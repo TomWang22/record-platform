@@ -1,0 +1,164 @@
+version: "3.9"
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment: { ZOOKEEPER_CLIENT_PORT: 2181 }
+    restart: unless-stopped
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on: [zookeeper]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    restart: unless-stopped
+    ports: ["9092:9092"]
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server","--save","","--appendonly","no"]
+    ports: ["6379:6379"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  postgres:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    volumes: ["./infra/prometheus.yml:/etc/prometheus/prometheus.yml"]
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    restart: unless-stopped
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    restart: unless-stopped
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+
+  auth-service:
+    build: ./services/auth-service
+    env_file: [.env]
+    depends_on: [postgres, kafka, redis]
+    expose: ["4001"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:4001/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  records-service:
+    build: ./services/records-service
+    env_file: [.env]
+    depends_on: [postgres, kafka, redis]
+    expose: ["4002"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:4002/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  listings-service:
+    build: ./services/listings-service
+    env_file: [.env]
+    depends_on: [postgres, redis]
+    expose: ["4003"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:4003/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  analytics-service:
+    build: ./services/analytics-service
+    env_file: [.env]
+    depends_on: [kafka, redis]
+    expose: ["4004"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:4004/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  python-ai-service:
+    build: ./services/python-ai-service
+    env_file: [.env]
+    depends_on: [redis]
+    expose: ["5005"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:5005/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  auction-monitor:
+    build: ./services/auction-monitor
+    env_file: [.env]
+    depends_on: [kafka, listings-service, postgres]
+    expose: ["4010"]
+    restart: unless-stopped
+
+  cron-jobs:
+    build: ./services/cron-jobs
+    env_file: [.env]
+    depends_on: [postgres]
+    restart: unless-stopped
+
+  api-gateway:
+    build: ./services/api-gateway
+    env_file: [.env]
+    depends_on: [auth-service, records-service, listings-service, analytics-service, python-ai-service]
+    expose: ["4000"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:4000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  haproxy:
+    image: haproxy:2.9
+    volumes: ["./infra/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro"]
+    ports: ["8081:8081"]
+    depends_on: [api-gateway]
+    restart: unless-stopped
+
+  webapp:
+    build: ./webapp
+    env_file: [.env]
+    expose: ["3001"]
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_cache:/var/cache/nginx
+    ports: ["8080:8080"]
+    depends_on: [api-gateway, webapp]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  nginx_cache:

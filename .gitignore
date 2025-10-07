@@ -8,3 +8,5 @@ coverage/
 __pycache__/
 *.pyc
 .venv/
+
+services/**/src/*.js

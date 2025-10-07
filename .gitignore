@@ -1,0 +1,10 @@
+node_modules/
+dist/
+pnpm-lock.yaml
+.env
+.DS_Store
+coverage/
+*.log
+__pycache__/
+*.pyc
+.venv/

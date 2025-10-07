@@ -4,8 +4,8 @@ import compression from "compression";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { createProxyMiddleware } from "http-proxy-middleware";
-import { register, httpCounter } from "@common/utils/src/metrics";
-import { verifyJwt } from "@common/utils/src/auth";
+import { register, httpCounter } from "@common/utils/metrics";
+import { verifyJwt } from "@common/utils/auth";
 
 const app = express();
 app.disable("x-powered-by");

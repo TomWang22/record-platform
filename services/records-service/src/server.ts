@@ -1,6 +1,6 @@
 import express from 'express'
 import { PrismaClient } from '@prisma/client'
-import { register, httpCounter } from '@common/utils/src/metrics'
+import { register, httpCounter } from '@common/utils/metrics'
 import { recordsRouter } from './routes/records'
 import exportRouter from './routes/export'
 

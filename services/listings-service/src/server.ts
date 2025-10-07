@@ -1,5 +1,5 @@
 import express from "express";
-import { register, httpCounter } from "@common/utils/src/metrics";
+import { register, httpCounter } from "@common/utils/metrics";
 import oauthRouter from "./oauth-discogs";
 import axios from "axios";
 import settingsRouter from "./settings";

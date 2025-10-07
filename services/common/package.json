@@ -1,6 +1,6 @@
 {
   "name": "@common/utils",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,6 +11,16 @@
     "./auth": "./dist/auth.js",
     "./kafka": "./dist/kafka.js",
     "./redis": "./dist/redis.js"
+  },
+  "typesVersions": {
+    "*": {
+      "logger": ["dist/logger.d.ts"],
+      "metrics": ["dist/metrics.d.ts"],
+      "auth": ["dist/auth.d.ts"],
+      "kafka": ["dist/kafka.d.ts"],
+      "redis": ["dist/redis.d.ts"],
+      "*": ["dist/index.d.ts"]
+    }
   },
   "files": ["dist"],
   "scripts": { "build": "tsc -p tsconfig.json" },

@@ -53,10 +53,15 @@ function authGuard(req: any, res: any, next: any) {
 }
 app.use(authGuard);
 
-app.use("/auth", createProxyMiddleware({ target: "http://auth-service:4001", changeOrigin: true, pathRewrite: { "^/auth": "" } }));
-app.use("/records", createProxyMiddleware({ target: "http://records-service:4002", changeOrigin: true }));
-app.use("/listings", createProxyMiddleware({ target: "http://listings-service:4003", changeOrigin: true, onProxyRes(res){ res.headers["Cache-Control"]=res.headers["cache-control"]||"public, max-age=60, s-maxage=300"; } }));
-app.use("/analytics", createProxyMiddleware({ target: "http://analytics-service:4004", changeOrigin: true }));
-app.use("/ai", createProxyMiddleware({ target: "http://python-ai-service:5005", changeOrigin: true, pathRewrite: {"^/ai": ""}, onProxyRes(res){ res.headers["Cache-Control"]=res.headers["cache-control"]||"public, max-age=120, s-maxage=600"; } }));
+// note: cast as any to allow onProxyRes without fighting d.ts variants
+app.use("/auth", createProxyMiddleware({ target: "http://auth-service:4001", changeOrigin: true, pathRewrite: { "^/auth": "" } } as any));
+app.use("/records", createProxyMiddleware({ target: "http://records-service:4002", changeOrigin: true } as any));
+app.use("/listings", createProxyMiddleware({ target: "http://listings-service:4003", changeOrigin: true,
+  onProxyRes(proxyRes){ (proxyRes.headers as any)["Cache-Control"] = (proxyRes.headers["cache-control"] as any) || "public, max-age=60, s-maxage=300"; }
+} as any));
+app.use("/analytics", createProxyMiddleware({ target: "http://analytics-service:4004", changeOrigin: true } as any));
+app.use("/ai", createProxyMiddleware({ target: "http://python-ai-service:5005", changeOrigin: true, pathRewrite: {"^/ai": ""},
+  onProxyRes(proxyRes){ (proxyRes.headers as any)["Cache-Control"] = (proxyRes.headers["cache-control"] as any) || "public, max-age=120, s-maxage=600"; }
+} as any));
 
 app.listen(process.env.GATEWAY_PORT || 4000, () => console.log("gateway up"));

@@ -1,8 +1,6 @@
 datasource db {
   provider = "postgresql"
-  url      = env("POSTGRES_URL")
-  // 👇 this service writes to the "records" schema
-  schemas  = ["records"]
+  url      = env("POSTGRES_URL_RECORDS")
 }
 
 generator client {
@@ -11,7 +9,7 @@ generator client {
 
 model Record {
   id               String   @id @default(cuid())
-  userId           String   @index
+  userId           String
   artist           String   @db.VarChar(256)
   name             String   @db.VarChar(256)
   format           String   @db.VarChar(64)
@@ -29,6 +27,7 @@ model Record {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  @@index([userId])
   @@index([artist])
   @@index([catalogNumber])
   @@index([artist, name, format])

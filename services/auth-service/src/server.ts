@@ -1,7 +1,7 @@
 import express from 'express'
 import { PrismaClient } from '@prisma/client'
-import { register, httpCounter } from '@common/utils/src/metrics'
-import { signJwt, verifyJwt } from '@common/utils/src/auth'
+import { register, httpCounter } from '@common/utils/metrics'
+import { signJwt, verifyJwt } from '@common/utils/auth'
 import bcrypt from 'bcryptjs'
 
 const app = express()

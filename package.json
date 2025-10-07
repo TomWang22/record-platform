@@ -2,12 +2,18 @@
   "name": "record-platform",
   "private": true,
   "version": "0.4.0",
-  "workspaces": ["services/*","webapp"],
+  "workspaces": [
+    "services/*",
+    "webapp"
+  ],
   "packageManager": "pnpm@9.11.0",
   "scripts": {
     "build": "pnpm -r --parallel build",
     "dev": "pnpm -r --parallel dev",
     "lint": "pnpm -r lint || true",
     "format": "pnpm -r format || true"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.0"
   }
 }

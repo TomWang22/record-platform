@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { PrismaClient } from '@prisma/client'
-import { verifyJwt } from '@common/utils/src/auth'
+import { verifyJwt } from '@common/utils/auth'
 
 export function recordsRouter(prisma: PrismaClient) {
   const r = Router()

@@ -1,0 +1,11 @@
+import multiprocessing, os
+bind = f"0.0.0.0:{os.getenv('AI_PORT','5005')}"
+workers = multiprocessing.cpu_count()
+worker_class = "uvicorn.workers.UvicornWorker"
+threads = 1
+preload_app = True
+timeout = 90
+graceful_timeout = 30
+keepalive = 5
+accesslog = "-"
+errorlog = "-"

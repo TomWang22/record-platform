@@ -1,0 +1,27 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api-gateway, auth-service, records-service, listings-service, analytics-service, cron-jobs]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: corepack enable && corepack prepare pnpm@9.11.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C services/${{ matrix.service }} build
+  python-ai:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: |
+          cd services/python-ai-service
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install -r requirements.txt
+          python -c "import fastapi,uvicorn; print('ai ok')"

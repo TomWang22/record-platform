@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import helmet from "helmet";
 import compression from "compression";
 import cors from "cors";
@@ -9,6 +9,7 @@ import { verifyJwt } from "@common/utils/auth";
 
 const app = express();
 app.disable("x-powered-by");
+
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
@@ -25,26 +26,30 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 app.use(cors({ origin: [/localhost:8080$/, /localhost:3001$/], credentials: false }));
-app.use(compression());
+
+// Cast to RequestHandler; avoids overload confusion on some @types combos
+app.use(compression() as unknown as import("express").RequestHandler);
+
 app.use(express.json({ limit: "1mb" }));
 
-app.use((req, _res, next) => {
+app.use((req: Request, _res: Response, next: NextFunction) => {
   for (const [k, v] of Object.entries(req.query)) {
     if (typeof v === "string") (req.query as any)[k] = v.replace(/[<>\"'`;(){}]/g, "");
   }
   next();
 });
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   res.on("finish", () => httpCounter.inc({ service: "gateway", route: req.path, method: req.method, code: res.statusCode }));
   next();
 });
-app.get("/healthz", (_req, res) => res.json({ ok: true }));
-app.get("/metrics", async (_req, res) => { res.setHeader("Content-Type", register.contentType); res.end(await register.metrics()); });
+
+app.get("/healthz", (_req: Request, res: Response) => res.json({ ok: true }));
+app.get("/metrics", async (_req: Request, res: Response) => { res.setHeader("Content-Type", register.contentType); res.end(await register.metrics()); });
 
 const limiter = rateLimit({ windowMs: 60_000, max: 300 });
 app.use(limiter);
 
-function authGuard(req: any, res: any, next: any) {
+function authGuard(req: Request & { user?: any }, res: Response, next: NextFunction) {
   if (req.path.startsWith("/auth/")) return next();
   if (req.method === "GET" && (req.path.startsWith("/listings/") || req.path.startsWith("/ai/"))) return next();
   const token = req.headers.authorization?.split(" ")[1];
@@ -53,15 +58,17 @@ function authGuard(req: any, res: any, next: any) {
 }
 app.use(authGuard);
 
-// note: cast as any to allow onProxyRes without fighting d.ts variants
+// Use `as any` to allow onProxyRes without fighting d.ts variance
 app.use("/auth", createProxyMiddleware({ target: "http://auth-service:4001", changeOrigin: true, pathRewrite: { "^/auth": "" } } as any));
 app.use("/records", createProxyMiddleware({ target: "http://records-service:4002", changeOrigin: true } as any));
-app.use("/listings", createProxyMiddleware({ target: "http://listings-service:4003", changeOrigin: true,
-  onProxyRes(proxyRes){ (proxyRes.headers as any)["Cache-Control"] = (proxyRes.headers["cache-control"] as any) || "public, max-age=60, s-maxage=300"; }
+app.use("/listings", createProxyMiddleware({
+  target: "http://listings-service:4003", changeOrigin: true,
+  onProxyRes(proxyRes: any){ proxyRes.headers["Cache-Control"] = proxyRes.headers["cache-control"] || "public, max-age=60, s-maxage=300"; }
 } as any));
 app.use("/analytics", createProxyMiddleware({ target: "http://analytics-service:4004", changeOrigin: true } as any));
-app.use("/ai", createProxyMiddleware({ target: "http://python-ai-service:5005", changeOrigin: true, pathRewrite: {"^/ai": ""},
-  onProxyRes(proxyRes){ (proxyRes.headers as any)["Cache-Control"] = (proxyRes.headers["cache-control"] as any) || "public, max-age=120, s-maxage=600"; }
+app.use("/ai", createProxyMiddleware({
+  target: "http://python-ai-service:5005", changeOrigin: true, pathRewrite: {"^/ai": ""},
+  onProxyRes(proxyRes: any){ proxyRes.headers["Cache-Control"] = proxyRes.headers["cache-control"] || "public, max-age=120, s-maxage=600"; }
 } as any));
 
 app.listen(process.env.GATEWAY_PORT || 4000, () => console.log("gateway up"));

@@ -1,9 +1,10 @@
 datasource db {
   provider = "postgresql"
   url      = env("POSTGRES_URL")
-  schemas  = ["records"]
+  schema   = "records"
 }
 generator client { provider = "prisma-client-js" }
+
 model Record {
   id               String   @id @default(cuid())
   userId           String   @index
@@ -20,9 +21,10 @@ model Record {
   isPromo          Boolean  @default(false)
   notes            String?  @db.Text
   purchasedAt      DateTime?
-  pricePaid        Decimal? @db.Decimal(10,2)
+  pricePaid        Decimal? @db.Decimal(10, 2)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
   @@index([artist])
   @@index([catalogNumber])
   @@index([artist, name, format])

@@ -1,50 +1,49 @@
 # syntax=docker/dockerfile:1
 
+# ---------- deps ----------
 FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# workspace manifests
+# workspace manifests (needed for resolution)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
-# package manifests needed for filtered install
+# package manifests for the pieces we care about
 COPY services/common/package.json ./services/common/package.json
+COPY services/common/tsconfig.json ./services/common/tsconfig.json
 COPY services/listings-service/package.json ./services/listings-service/package.json
+COPY services/listings-service/tsconfig.json ./services/listings-service/tsconfig.json
 
-# install dev deps for BOTH common and listings (no scripts yet)
+# install without running scripts yet (we'll build in next stage)
 RUN pnpm -w \
   --filter @common/utils... \
   --filter listings-service... \
   install --frozen-lockfile --ignore-scripts
 
-
+# ---------- build ----------
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# bring node_modules from deps
+# bring the prepared workspace
 COPY --from=deps /app /app
 
-# now copy sources
+# now add sources
 COPY services/common ./services/common
 COPY services/listings-service ./services/listings-service
 
-# build common first, then the service; then drop dev deps for runtime
+# build lib then the service
 RUN pnpm -C services/common build \
- && pnpm -C services/listings-service build \
- && pnpm -C services/listings-service prune --prod
+ && pnpm -C services/listings-service build
 
+# produce an isolated deploy bundle for just this service (includes node_modules)
+RUN pnpm deploy --filter listings-service --prod /app/deploy
 
+# ---------- runtime ----------
 FROM node:20-alpine
-WORKDIR /app
 ENV NODE_ENV=production
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+WORKDIR /app
 
-# runtime bits
-COPY --from=build /app/services/listings-service/dist ./dist
-COPY --from=build /app/services/listings-service/package.json ./package.json
-COPY --from=build /app/services/listings-service/node_modules ./node_modules
-
-# keep built common so workspace symlink resolves at runtime
-COPY --from=build /app/services/common ./services/common
+# package.json, dist/, node_modules/ for listings-service only
+COPY --from=build /app/deploy/ ./
 
 CMD ["node","dist/server.js"]

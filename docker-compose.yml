@@ -4,10 +4,12 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      # This may not be taking effect in your image; rely on SRVR which is enabled by default.
       ZOOKEEPER_4LW_COMMANDS_WHITELIST: "ruok,stat,srvr,mntr"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/2181; echo ruok >&3; timeout 2 cat <&3 | grep -q imok'"]
+      # Probe with SRVR and look for "Mode:" in the reply
+      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/2181; echo srvr >&3; timeout 2 cat <&3 | grep -qi \"Mode:\"'"]
       interval: 5s
       timeout: 3s
       retries: 25

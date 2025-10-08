@@ -3,7 +3,7 @@ import { register, httpCounter } from "@common/utils/metrics";
 import oauthRouter from "./oauth-discogs";
 import axios from "axios";
 import settingsRouter from "./settings";
-import { getRedis } from "@common/utils/src/redis";
+import { getRedis } from "@common/utils/redis";
 
 const app = express();
 const redis = getRedis();

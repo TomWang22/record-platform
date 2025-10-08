@@ -9,11 +9,15 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      # two listeners: internal (9092) + host (29092)
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     restart: unless-stopped
-    ports: ["9092:9092"]
+    ports:
+      - "29092:29092"
 
   redis:
     image: redis:7-alpine
@@ -43,7 +47,7 @@ services:
     volumes: ["./infra/prometheus.yml:/etc/prometheus/prometheus.yml"]
     command: ["--config.file=/etc/prometheus/prometheus.yml"]
     restart: unless-stopped
-    ports: ["9090:9090"]
+    ports: ["9091:9090"]
 
   grafana:
     image: grafana/grafana:11.1.0
@@ -148,8 +152,8 @@ services:
 
   python-ai-service:
     build:
-      context: .
-      dockerfile: services/python-ai-service/Dockerfile
+      context: ./services/python-ai-service
+      dockerfile: Dockerfile
     env_file: [.env]
     depends_on: [redis]
     expose: ["5005"]

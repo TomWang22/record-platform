@@ -4,8 +4,9 @@
   "main": "dist/jobs.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/jobs.js",
-    "dev": "tsx watch src/jobs.ts"
+    "start": "NODE_ENV=production node dist/jobs.js",
+    "dev": "tsx watch src/jobs.ts",
+    "prepare": "pnpm run build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.637.0",

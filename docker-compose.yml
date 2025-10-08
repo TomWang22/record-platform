@@ -1,23 +1,39 @@
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
-    environment: { ZOOKEEPER_CLIENT_PORT: 2181 }
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      # allow health probes
+      ZOOKEEPER_4LW_COMMANDS_WHITELIST: "ruok,srvr,stat,mntr"
+    healthcheck:
+      # cp-zookeeper has nc; this checks 'imok'
+      test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 | grep imok || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
     restart: unless-stopped
+
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    depends_on: [zookeeper]
+    depends_on:
+      zookeeper:
+        condition: service_healthy
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # two listeners: internal (9092) + host (29092)
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports: ["29092:29092"]
+    healthcheck:
+      test: ["CMD-SHELL","bash -lc 'echo > /dev/tcp/127.0.0.1/9092'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
     restart: unless-stopped
-    ports:
-      - "29092:29092"
 
   redis:
     image: redis:7-alpine
@@ -29,6 +45,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 5s
 
   postgres:
     image: postgres:16-alpine
@@ -41,6 +58,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 10s
 
   prometheus:
     image: prom/prometheus:v2.55.0
@@ -48,19 +66,36 @@ services:
     command: ["--config.file=/etc/prometheus/prometheus.yml"]
     restart: unless-stopped
     ports: ["9091:9090"]
+    healthcheck:
+      test: ["CMD-SHELL","wget -qO- http://localhost:9090/-/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 15s
 
   grafana:
     image: grafana/grafana:11.1.0
     restart: unless-stopped
     ports: ["3000:3000"]
-    depends_on: [prometheus]
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL","wget -qO- http://localhost:3000/api/health | grep -q 'database: ok'"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
 
   auth-service:
     build:
       context: .
       dockerfile: services/auth-service/Dockerfile
     env_file: [.env]
-    depends_on: [postgres, kafka, redis]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      redis: { condition: service_healthy }
     expose: ["4001"]
     restart: unless-stopped
     healthcheck:
@@ -68,13 +103,16 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+      start_period: 30s
 
   records-service:
     build:
       context: .
       dockerfile: services/records-service/Dockerfile
     env_file: [.env]
-    depends_on: [postgres, kafka, redis]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
     expose: ["4002"]
     restart: unless-stopped
     healthcheck:
@@ -82,13 +120,16 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+      start_period: 30s
 
   listings-service:
     build:
       context: .
       dockerfile: services/listings-service/Dockerfile
     env_file: [.env]
-    depends_on: [postgres, redis]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
     expose: ["4003"]
     restart: unless-stopped
     healthcheck:
@@ -96,13 +137,16 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+      start_period: 30s
 
   analytics-service:
     build:
       context: .
       dockerfile: services/analytics-service/Dockerfile
     env_file: [.env]
-    depends_on: [kafka, redis]
+    depends_on:
+      kafka: { condition: service_healthy }
+      redis: { condition: service_healthy }
     expose: ["4004"]
     restart: unless-stopped
     healthcheck:
@@ -110,30 +154,52 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+      start_period: 30s
 
   cron-jobs:
     build:
       context: .
       dockerfile: services/cron-jobs/Dockerfile
     env_file: [.env]
-    depends_on: [postgres]
+    depends_on:
+      postgres: { condition: service_healthy }
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL","ps aux | grep -v grep | grep -q 'node dist/jobs.js'"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   auction-monitor:
     build:
       context: .
       dockerfile: services/auction-monitor/Dockerfile
     env_file: [.env]
-    depends_on: [kafka, listings-service, postgres]
+    depends_on:
+      kafka: { condition: service_healthy }
+      listings-service: { condition: service_healthy }
+      postgres: { condition: service_healthy }
     expose: ["4010"]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:4010/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
 
   api-gateway:
     build:
       context: .
       dockerfile: services/api-gateway/Dockerfile
     env_file: [.env]
-    depends_on: [auth-service, records-service, listings-service, analytics-service, python-ai-service]
+    depends_on:
+      auth-service: { condition: service_healthy }
+      records-service: { condition: service_healthy }
+      listings-service: { condition: service_healthy }
+      analytics-service: { condition: service_healthy }
+      python-ai-service: { condition: service_healthy }
     expose: ["4000"]
     restart: unless-stopped
     healthcheck:
@@ -141,21 +207,29 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+      start_period: 30s
 
   webapp:
     build:
       context: .
       dockerfile: webapp/Dockerfile
     env_file: [.env]
-    expose: ["3000"]
+    expose: ["3001"]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL","wget -qO- http://localhost:3001/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   python-ai-service:
     build:
       context: ./services/python-ai-service
       dockerfile: Dockerfile
     env_file: [.env]
-    depends_on: [redis]
+    depends_on:
+      redis: { condition: service_healthy }
     expose: ["5005"]
     restart: unless-stopped
     healthcheck:
@@ -163,11 +237,14 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+      start_period: 15s
+
   haproxy:
     image: haproxy:2.9
     volumes: ["./infra/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro"]
     ports: ["8081:8081"]
-    depends_on: [api-gateway]
+    depends_on:
+      api-gateway: { condition: service_started }
     restart: unless-stopped
 
   nginx:
@@ -176,8 +253,13 @@ services:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - nginx_cache:/var/cache/nginx
     ports: ["8080:8080"]
-    depends_on: [api-gateway, webapp]
+    depends_on:
+      api-gateway: { condition: service_started }
+      webapp: { condition: service_started }
+    # wait for gateway DNS to exist to avoid "host not found in upstream"
+    command: ["/bin/sh","-lc","until getent hosts api-gateway; do echo 'waiting for api-gateway'; sleep 1; done; nginx -g 'daemon off;'"]
     restart: unless-stopped
+
 
 volumes:
   pgdata:

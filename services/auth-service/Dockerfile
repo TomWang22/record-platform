@@ -35,4 +35,4 @@ COPY --from=build /app/services/auth-service/package.json ./package.json
 COPY --from=build /app/services/auth-service/node_modules ./node_modules
 COPY --from=build /app/services/common ./services/common
 
-CMD ["pnpm","start"]
+CMD ["node","dist/server.js"]

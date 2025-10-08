@@ -51,4 +51,4 @@ COPY --from=build /app/services/common ./services/common
 # prisma schema if you need it at runtime (harmless otherwise)
 COPY --from=build /app/services/records-service/prisma ./prisma
 EXPOSE 4002
-CMD ["pnpm","start"]
+CMD ["node","dist/server.js"]

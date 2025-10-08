@@ -47,4 +47,4 @@ COPY --from=build /app/services/api-gateway/node_modules ./node_modules
 # include built common to satisfy pnpm workspace link at runtime
 COPY --from=build /app/services/common ./services/common
 
-CMD ["pnpm","start"]
+CMD ["node","dist/server.js"]

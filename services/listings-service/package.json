@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/server.ts",
-    "start": "pm2-runtime pm2.config.cjs"
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "@common/utils": "workspace:*",

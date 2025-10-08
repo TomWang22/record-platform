@@ -1,5 +1,6 @@
 name: ci
 on: [push, pull_request]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -8,13 +9,25 @@ jobs:
         service: [api-gateway, auth-service, records-service, listings-service, analytics-service, cron-jobs]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: 'pnpm' }
+        with:
+          node-version: 20
+          cache: 'pnpm'
       - run: corepack enable && corepack prepare pnpm@9.11.0 --activate
-      - run: pnpm install --frozen-lockfile
-      # ensure workspace dep is compiled
+
+      # Install ONLY what we need for the service + common
+      - run: |
+          pnpm -w \
+            --filter @common/utils... \
+            --filter ${{ matrix.service }}... \
+            install --frozen-lockfile
+
+      # Ensure common is compiled (prepare also does this, but be explicit)
       - run: pnpm -C services/common build
-      # each service builds its own prisma client (binary) + ts
+
+      # Build the service (prisma generate + tsc if defined in its package.json)
       - run: pnpm -C services/${{ matrix.service }} build
 
   python-ai:

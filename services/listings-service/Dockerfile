@@ -47,4 +47,4 @@ COPY --from=build /app/services/listings-service/node_modules ./node_modules
 # keep built common so workspace symlink resolves at runtime
 COPY --from=build /app/services/common ./services/common
 
-CMD ["pnpm","start"]
+CMD ["node","dist/server.js"]

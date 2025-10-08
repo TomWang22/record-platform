@@ -9,25 +9,28 @@ jobs:
         service: [api-gateway, auth-service, records-service, listings-service, analytics-service, cron-jobs]
     steps:
       - uses: actions/checkout@v4
+
+      # install pnpm first (adds the pnpm binary reliably)
+      - uses: pnpm/action-setup@v4
         with:
-          fetch-depth: 0
+          version: 9.11.0
+
+      # then setup node and enable pnpm cache
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'pnpm'
-      - run: corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-      # Install ONLY what we need for the service + common
-      - run: |
-          pnpm -w \
-            --filter @common/utils... \
-            --filter ${{ matrix.service }}... \
-            install --frozen-lockfile
+      # (optional) fix rare git safe-directory hiccups
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      # Ensure common is compiled (prepare also does this, but be explicit)
+      - run: pnpm -v
+      - run: pnpm install --frozen-lockfile
+
+      # ensure workspace lib is compiled first
       - run: pnpm -C services/common build
 
-      # Build the service (prisma generate + tsc if defined in its package.json)
+      # build each service from the matrix
       - run: pnpm -C services/${{ matrix.service }} build
 
   python-ai:
@@ -35,7 +38,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with:
+          python-version: "3.11"
       - run: |
           cd services/python-ai-service
           python -m venv .venv

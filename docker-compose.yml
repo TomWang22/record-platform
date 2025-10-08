@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -53,7 +52,9 @@ services:
     depends_on: [prometheus]
 
   auth-service:
-    build: ./services/auth-service
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
     env_file: [.env]
     depends_on: [postgres, kafka, redis]
     expose: ["4001"]
@@ -65,7 +66,9 @@ services:
       retries: 10
 
   records-service:
-    build: ./services/records-service
+    build:
+      context: .
+      dockerfile: services/records-service/Dockerfile
     env_file: [.env]
     depends_on: [postgres, kafka, redis]
     expose: ["4002"]
@@ -77,7 +80,9 @@ services:
       retries: 10
 
   listings-service:
-    build: ./services/listings-service
+    build:
+      context: .
+      dockerfile: services/listings-service/Dockerfile
     env_file: [.env]
     depends_on: [postgres, redis]
     expose: ["4003"]
@@ -89,7 +94,9 @@ services:
       retries: 10
 
   analytics-service:
-    build: ./services/analytics-service
+    build:
+      context: .
+      dockerfile: services/analytics-service/Dockerfile
     env_file: [.env]
     depends_on: [kafka, redis]
     expose: ["4004"]
@@ -100,33 +107,27 @@ services:
       timeout: 3s
       retries: 10
 
-  python-ai-service:
-    build: ./services/python-ai-service
+  cron-jobs:
+    build:
+      context: .
+      dockerfile: services/cron-jobs/Dockerfile
     env_file: [.env]
-    depends_on: [redis]
-    expose: ["5005"]
+    depends_on: [postgres]
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD","wget","-qO-","http://localhost:5005/healthz"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
 
   auction-monitor:
-    build: ./services/auction-monitor
+    build:
+      context: .
+      dockerfile: services/auction-monitor/Dockerfile
     env_file: [.env]
     depends_on: [kafka, listings-service, postgres]
     expose: ["4010"]
     restart: unless-stopped
 
-  cron-jobs:
-    build: ./services/cron-jobs
-    env_file: [.env]
-    depends_on: [postgres]
-    restart: unless-stopped
-
   api-gateway:
-    build: ./services/api-gateway
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
     env_file: [.env]
     depends_on: [auth-service, records-service, listings-service, analytics-service, python-ai-service]
     expose: ["4000"]
@@ -137,17 +138,32 @@ services:
       timeout: 3s
       retries: 10
 
+  webapp:
+    build:
+      context: .
+      dockerfile: webapp/Dockerfile
+    env_file: [.env]
+    expose: ["3001"]
+    restart: unless-stopped
+
+  python-ai-service:
+    build:
+      context: .
+      dockerfile: services/python-ai-service/Dockerfile
+    env_file: [.env]
+    depends_on: [redis]
+    expose: ["5005"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:5005/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
   haproxy:
     image: haproxy:2.9
     volumes: ["./infra/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro"]
     ports: ["8081:8081"]
     depends_on: [api-gateway]
-    restart: unless-stopped
-
-  webapp:
-    build: ./webapp
-    env_file: [.env]
-    expose: ["3001"]
     restart: unless-stopped
 
   nginx:

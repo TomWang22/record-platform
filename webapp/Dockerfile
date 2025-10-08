@@ -26,6 +26,9 @@ COPY --from=deps /app /app
 # Now bring the rest of the webapp sources
 COPY webapp ./webapp
 
+# Ensure /webapp/public exists even if empty (git doesn't track empty dirs)
+RUN mkdir -p webapp/public
+
 # Build and prune to production deps
 RUN pnpm -C webapp build && pnpm -C webapp prune --prod
 

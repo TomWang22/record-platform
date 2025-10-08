@@ -21,5 +21,8 @@
     "@types/node": "^20.19.19",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.10.2"
+  },
+  "dependencies": {
+    "@types/jsonwebtoken": "^9.0.5"
   }
 }

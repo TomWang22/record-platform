@@ -9,3 +9,6 @@ __pycache__/
 .venv/
 
 services/**/src/*.js
+
+services/**/generated/
+webapp/generated/

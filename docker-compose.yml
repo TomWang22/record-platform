@@ -147,7 +147,7 @@ services:
       context: .
       dockerfile: webapp/Dockerfile
     env_file: [.env]
-    expose: ["3001"]
+    expose: ["3000"]
     restart: unless-stopped
 
   python-ai-service:

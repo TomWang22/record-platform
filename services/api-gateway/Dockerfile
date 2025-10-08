@@ -4,14 +4,13 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# workspace manifests
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-
-# only the manifests of deps we care about (common + this svc)
+# workspace manifests (+ base tsconfig!)
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+# only the manifests we need for filtered install
 COPY services/common/package.json ./services/common/package.json
 COPY services/api-gateway/package.json ./services/api-gateway/package.json
 
-# install ONLY what we need for this build; no scripts yet
+# install dev deps for BOTH common and gateway; no scripts yet
 RUN pnpm -w \
   --filter @common/utils... \
   --filter api-gateway... \
@@ -22,14 +21,14 @@ FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# bring installed node_modules
+# bring installed node_modules and tsconfig.base.json
 COPY --from=deps /app /app
 
-# now copy the sources we actually need
+# now copy sources
 COPY services/common ./services/common
 COPY services/api-gateway ./services/api-gateway
 
-# build common first, then the service (runs prisma generate + tsc)
+# build common first, then gateway; then prune dev deps for runtime
 RUN pnpm -C services/common build \
  && pnpm -C services/api-gateway build \
  && pnpm -C services/api-gateway prune --prod
@@ -40,17 +39,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# copy built service + its node_modules
+# runtime bits
 COPY --from=build /app/services/api-gateway/dist ./dist
 COPY --from=build /app/services/api-gateway/package.json ./package.json
 COPY --from=build /app/services/api-gateway/node_modules ./node_modules
 
-# IMPORTANT: pnpm links @common/utils as a workspace symlink;
-# include the built common project so the link resolves at runtime.
+# include built common to satisfy pnpm workspace link at runtime
 COPY --from=build /app/services/common ./services/common
 
-# prisma schema if you need it at runtime (harmless otherwise)
-COPY --from=build /app/services/api-gateway/prisma ./prisma
-
-EXPOSE 4000
 CMD ["pnpm","start"]

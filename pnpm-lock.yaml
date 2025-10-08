@@ -108,7 +108,7 @@ importers:
         specifier: workspace:*
         version: link:../common
       '@prisma/client':
-        specifier: ^5.18.0
+        specifier: 5.22.0
         version: 5.22.0(prisma@5.22.0)
       bcryptjs:
         specifier: ^2.4.3
@@ -117,7 +117,7 @@ importers:
         specifier: ^4.19.2
         version: 4.21.2
       prisma:
-        specifier: ^5.18.0
+        specifier: 5.22.0
         version: 5.22.0
       prom-client:
         specifier: ^15.1.3
@@ -199,22 +199,22 @@ importers:
   services/records-service:
     dependencies:
       '@aws-sdk/client-s3':
-        specifier: ^3.637.0
+        specifier: ^3.901.0
         version: 3.901.0
       '@aws-sdk/s3-request-presigner':
-        specifier: ^3.637.0
+        specifier: ^3.901.0
         version: 3.901.0
       '@common/utils':
         specifier: workspace:*
         version: link:../common
       '@prisma/client':
-        specifier: ^5.18.0
+        specifier: 5.22.0
         version: 5.22.0(prisma@5.22.0)
       express:
         specifier: ^4.19.2
         version: 4.21.2
       prisma:
-        specifier: ^5.18.0
+        specifier: 5.22.0
         version: 5.22.0
       prom-client:
         specifier: ^15.1.3

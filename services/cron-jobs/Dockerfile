@@ -4,42 +4,52 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# root workspace files
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
+# workspace manifests
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 
-# any local workspace packages needed by cron-jobs (adjust if different)
+# only the manifests of deps we care about (common + this svc)
 COPY services/common/package.json ./services/common/package.json
-
-# the service package.json
 COPY services/cron-jobs/package.json ./services/cron-jobs/package.json
 
-# install only what's needed for this service (dev deps included)
-RUN pnpm -w --filter ./services/cron-jobs... install --frozen-lockfile
+# install ONLY what we need for this build; no scripts yet
+RUN pnpm -w \
+  --filter @common/utils... \
+  --filter cron-jobs... \
+  install --frozen-lockfile --ignore-scripts
+
 
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
+# bring installed node_modules
 COPY --from=deps /app /app
-# now copy sources for the service (and any local libs it imports)
+
+# now copy the sources we actually need
 COPY services/common ./services/common
 COPY services/cron-jobs ./services/cron-jobs
 
-# build just this service
-RUN pnpm -C services/common build && pnpm -C services/cron-jobs build
+# build common first, then the service (runs prisma generate + tsc)
+RUN pnpm -C services/common build \
+ && pnpm -C services/cron-jobs build \
+ && pnpm -C services/cron-jobs prune --prod
 
-# prune to production deps for runtime
-RUN pnpm -C services/cron-jobs prune --prod
 
 FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# copy built output + runtime deps
+# copy built service + its node_modules
 COPY --from=build /app/services/cron-jobs/dist ./dist
 COPY --from=build /app/services/cron-jobs/package.json ./package.json
 COPY --from=build /app/services/cron-jobs/node_modules ./node_modules
 
-# start command (uses your package.json "start")
+# IMPORTANT: pnpm links @common/utils as a workspace symlink;
+# include the built common project so the link resolves at runtime.
+COPY --from=build /app/services/common ./services/common
+
+# prisma schema if you need it at runtime (harmless otherwise)
+COPY --from=build /app/services/cron-jobs/prisma ./prisma
+
 CMD ["pnpm","start"]

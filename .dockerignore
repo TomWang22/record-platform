@@ -1,0 +1,18 @@
+# .dockerignore (root)
+
+# VCS / OS
+.git
+**/.DS_Store
+
+# Package managers / caches
+**/node_modules
+pnpm-store
+
+# Build artifacts
+**/dist
+**/.next
+**/coverage
+
+# Env & secrets
+**/.env
+**/.env.*

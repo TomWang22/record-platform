@@ -9,10 +9,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20 }
+        with: { node-version: 20, cache: 'pnpm' }
       - run: corepack enable && corepack prepare pnpm@9.11.0 --activate
       - run: pnpm install --frozen-lockfile
+      # ensure workspace dep is compiled
+      - run: pnpm -C services/common build
+      # each service builds its own prisma client (binary) + ts
       - run: pnpm -C services/${{ matrix.service }} build
+
   python-ai:
     runs-on: ubuntu-latest
     steps:

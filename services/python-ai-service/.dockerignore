@@ -1,0 +1,9 @@
+# Keep context small but include source
+__pycache__/
+*.pyc
+.venv
+.env
+.env.*
+build
+dist
+tests/__pycache__/

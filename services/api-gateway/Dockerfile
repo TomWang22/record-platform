@@ -35,16 +35,18 @@ RUN pnpm -C services/common build \
 
 
 FROM node:20-alpine
-WORKDIR /app
+# keep workspace layout so pnpm's symlinks continue to resolve
+WORKDIR /app/services/api-gateway
 ENV NODE_ENV=production
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
 # runtime bits
+COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/services/api-gateway/dist ./dist
 COPY --from=build /app/services/api-gateway/package.json ./package.json
 COPY --from=build /app/services/api-gateway/node_modules ./node_modules
 
 # include built common to satisfy pnpm workspace link at runtime
-COPY --from=build /app/services/common ./services/common
+COPY --from=build /app/services/common /app/services/common
 
 CMD ["node","dist/server.js"]

@@ -1,3 +1,4 @@
+SET ROLE record_owner;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS citext;
@@ -156,3 +157,4 @@ CREATE OR REPLACE FUNCTION listings.upsert_auction(
     title = EXCLUDED.title, price = EXCLUDED.price, currency = EXCLUDED.currency,
     shipping = EXCLUDED.shipping, ends_at = EXCLUDED.ends_at, url = EXCLUDED.url, fetched_at = now();
 END; $$ LANGUAGE plpgsql;
+RESET ROLE;

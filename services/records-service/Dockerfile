@@ -1,54 +1,54 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-alpine AS deps
+# --- deps ---
+FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Workspace manifests
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
-
-# Only the manifests we care about
 COPY services/common/package.json ./services/common/package.json
 COPY services/records-service/package.json ./services/records-service/package.json
+COPY services/common/tsconfig.json ./services/common/tsconfig.json
+COPY services/common/src ./services/common/src
 
-# Install JUST common + this service (with dev deps so tsc/prisma are present)
 RUN pnpm -w \
   --filter @common/utils... \
   --filter records-service... \
-  install --frozen-lockfile --ignore-scripts
+  install --frozen-lockfile
 
-
-FROM node:20-alpine AS build
+# --- build ---
+FROM node:20-bookworm-slim AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
-
-# Bring installed node_modules
 COPY --from=deps /app /app
 
-# Copy sources needed to build
 COPY services/common ./services/common
 COPY services/records-service ./services/records-service
 
-# Build common first, then this service; then prune to prod
 RUN pnpm -C services/common build \
- && pnpm -C services/records-service build \
- && pnpm -C services/records-service prune --prod
+ && pnpm -C services/records-service exec prisma generate \
+ && pnpm -C services/records-service build
 
-
-FROM node:20-alpine
-WORKDIR /app
+# --- runtime ---
+FROM node:20-bookworm-slim
+WORKDIR /app/services/records-service
 ENV NODE_ENV=production
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Copy built service
-COPY --from=build /app/services/records-service/dist ./dist
-COPY --from=build /app/services/records-service/package.json ./package.json
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# pnpm store (workspace root)
+COPY --from=build /app/node_modules /app/node_modules
+# the service's node_modules
 COPY --from=build /app/services/records-service/node_modules ./node_modules
 
-# Important: include the built common workspace so pnpm workspace link resolves
-COPY --from=build /app/services/common ./services/common
-
-# prisma schema if you need it at runtime (harmless otherwise)
+# app bits
+COPY --from=build /app/services/records-service/dist ./dist
+COPY --from=build /app/services/records-service/package.json ./package.json
 COPY --from=build /app/services/records-service/prisma ./prisma
+COPY --from=build /app/services/records-service/generated ./generated
+COPY --from=build /app/services/common /app/services/common
+
 EXPOSE 4002
-CMD ["node","dist/server.js"]
+CMD ["node", "dist/server.js"]

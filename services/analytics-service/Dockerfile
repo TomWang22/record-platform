@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1
+
+# ---------- deps ----------
 FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
@@ -12,6 +14,7 @@ RUN pnpm -w \
   --filter analytics-service... \
   install --frozen-lockfile --ignore-scripts
 
+# ---------- build ----------
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
@@ -24,14 +27,14 @@ RUN pnpm -C services/common build \
  && pnpm -C services/analytics-service build \
  && pnpm -C services/analytics-service prune --prod
 
+# ---------- runtime ----------
 FROM node:20-alpine
-WORKDIR /app
 ENV NODE_ENV=production
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+WORKDIR /app/services/analytics-service
 
-COPY --from=build /app/services/analytics-service/dist ./dist
-COPY --from=build /app/services/analytics-service/package.json ./package.json
-COPY --from=build /app/services/analytics-service/node_modules ./node_modules
-COPY --from=build /app/services/common ./services/common
+COPY --from=build /app/node_modules /app/node_modules
+COPY --from=build /app/services/analytics-service /app/services/analytics-service
+COPY --from=build /app/services/common /app/services/common
 
-CMD ["pnpm","start"]
+EXPOSE 4004
+CMD ["node","dist/server.js"]

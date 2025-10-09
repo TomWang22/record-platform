@@ -6,6 +6,7 @@ datasource db {
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/records-client"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
 }
 
 // Map Prisma model to the physical snake_case table+columns created by 03-database.sql

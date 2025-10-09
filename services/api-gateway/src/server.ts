@@ -41,9 +41,11 @@ app.use(
   })
 );
 
-// gzip + JSON body
+// gzip (response only; does not touch request bodies)
 app.use(compression() as unknown as import("express").RequestHandler);
-app.use(express.json({ limit: "1mb" }));
+
+// NOTE: DO NOT use express.json() here. The gateway must stream bodies to upstreams.
+// If you ever add gateway-owned JSON endpoints, mount express.json() ONLY on those paths.
 
 // Tiny query sanitizer
 app.use((req: Request, _res: Response, next: NextFunction) => {

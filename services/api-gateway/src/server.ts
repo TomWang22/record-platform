@@ -1,3 +1,4 @@
+/* cspell:ignore healthz maxage s-maxage */
 import express, { type Request, type Response, type NextFunction } from "express";
 import helmet from "helmet";
 import compression from "compression";
@@ -10,30 +11,37 @@ import { verifyJwt } from "@common/utils/auth";
 const app = express();
 app.disable("x-powered-by");
 
+/** We run behind nginx: required for express-rate-limit & real client IPs */
+app.set("trust proxy", 1);
+
 // Security headers
-app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: true,
-    directives: {
-      "default-src": ["'self'"],
-      "script-src": ["'self'", "'unsafe-inline'"],
-      "style-src": ["'self'", "'unsafe-inline'"],
-      "img-src": ["'self'", "data:", "https:"],
-      "connect-src": ["'self'"], // same-origin /api calls from webapp are allowed
-      "frame-ancestors": ["'none'"],
-      "upgrade-insecure-requests": []
-    }
-  },
-  crossOriginEmbedderPolicy: false
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "default-src": ["'self'"],
+        "script-src": ["'self'", "'unsafe-inline'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "img-src": ["'self'", "data:", "https:"],
+        "connect-src": ["'self'"],
+        "frame-ancestors": ["'none'"],
+        "upgrade-insecure-requests": [],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  })
+);
 
-// CORS — allow browser app on 8080 and dev webapp port if you hit it directly
-app.use(cors({
-  origin: [/localhost:8080$/, /localhost:3001$/],
-  credentials: false
-}));
+// CORS — allow browser app through nginx:8080 and direct dev webapp:3001
+app.use(
+  cors({
+    origin: [/localhost:8080$/, /localhost:3001$/],
+    credentials: false,
+  })
+);
 
-// gzip + body
+// gzip + JSON body
 app.use(compression() as unknown as import("express").RequestHandler);
 app.use(express.json({ limit: "1mb" }));
 
@@ -47,12 +55,14 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 
 // Metrics counter
 app.use((req: Request, res: Response, next: NextFunction) => {
-  res.on("finish", () => httpCounter.inc({
-    service: "gateway",
-    route: req.path,
-    method: req.method,
-    code: res.statusCode
-  }));
+  res.on("finish", () =>
+    httpCounter.inc({
+      service: "gateway",
+      route: req.path,
+      method: req.method,
+      code: res.statusCode,
+    })
+  );
   next();
 });
 
@@ -63,13 +73,13 @@ app.get("/metrics", async (_req: Request, res: Response) => {
   res.end(await register.metrics());
 });
 
-// Rate limit (skip health/metrics so probes and Prometheus are never throttled)
+// Rate limit (skip health/metrics so probes/Prom don't get throttled)
 const limiter = rateLimit({
   windowMs: 60_000,
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path === "/healthz" || req.path === "/metrics"
+  skip: (req) => req.path === "/healthz" || req.path === "/metrics",
 });
 app.use(limiter);
 
@@ -80,7 +90,7 @@ function authGuard(req: Request & { user?: any }, res: Response, next: NextFunct
   // Public: health, metrics, all /auth/*
   if (p === "/healthz" || p === "/metrics" || p.startsWith("/auth/")) return next();
 
-  // Optional public GETs:
+  // Optional public GETs (read-only):
   if (req.method === "GET" && (p.startsWith("/listings/") || p.startsWith("/ai/"))) {
     return next();
   }
@@ -99,49 +109,74 @@ function authGuard(req: Request & { user?: any }, res: Response, next: NextFunct
 app.use(authGuard);
 
 // ----- Proxies -----
+// Note: nginx maps /api/* -> gateway /* (strips /api), so clients hit /api/auth, /api/records, etc.
+
 // Auth service: strip /auth
-app.use("/auth", createProxyMiddleware({
-  target: "http://auth-service:4001",
-  changeOrigin: true,
-  pathRewrite: { "^/auth": "" }
-} as any));
+app.use(
+  "/auth",
+  createProxyMiddleware({
+    target: "http://auth-service:4001",
+    changeOrigin: true,
+    pathRewrite: { "^/auth": "" },
+    proxyTimeout: 15000,
+    onError: (_err: unknown, _req: Request, res: Response) => {
+      if (!res.headersSent) res.status(502).json({ error: "auth upstream error" });
+    },
+  } as any)
+);
 
 // Records (protected)
-app.use("/records", createProxyMiddleware({
-  target: "http://records-service:4002",
-  changeOrigin: true
-} as any));
+app.use(
+  "/records",
+  createProxyMiddleware({
+    target: "http://records-service:4002",
+    changeOrigin: true,
+    proxyTimeout: 15000,
+  } as any)
+);
 
 // Listings (GET public, others protected by guard above)
-app.use("/listings", createProxyMiddleware({
-  target: "http://listings-service:4003",
-  changeOrigin: true,
-  onProxyRes(proxyRes: any) {
-    proxyRes.headers["Cache-Control"] = proxyRes.headers["cache-control"] || "public, max-age=60, s-maxage=300";
-  }
-} as any));
+app.use(
+  "/listings",
+  createProxyMiddleware({
+    target: "http://listings-service:4003",
+    changeOrigin: true,
+    proxyTimeout: 15000,
+    onProxyRes: (proxyRes: any) => {
+      proxyRes.headers["Cache-Control"] = proxyRes.headers["cache-control"] || "public, max-age=60, s-maxage=300";
+    },
+  } as any)
+);
 
 // Analytics (protected)
-app.use("/analytics", createProxyMiddleware({
-  target: "http://analytics-service:4004",
-  changeOrigin: true
-} as any));
+app.use(
+  "/analytics",
+  createProxyMiddleware({
+    target: "http://analytics-service:4004",
+    changeOrigin: true,
+    proxyTimeout: 15000,
+  } as any)
+);
 
 // Python AI (GET public via guard; strip /ai)
-app.use("/ai", createProxyMiddleware({
-  target: "http://python-ai-service:5005",
-  changeOrigin: true,
-  pathRewrite: { "^/ai": "" },
-  onProxyRes(proxyRes: any) {
-    proxyRes.headers["Cache-Control"] = proxyRes.headers["cache-control"] || "public, max-age=120, s-maxage=600";
-  }
-} as any));
+app.use(
+  "/ai",
+  createProxyMiddleware({
+    target: "http://python-ai-service:5005",
+    changeOrigin: true,
+    pathRewrite: { "^/ai": "" },
+    proxyTimeout: 15000,
+    onProxyRes: (proxyRes: any) => {
+      proxyRes.headers["Cache-Control"] = proxyRes.headers["cache-control"] || "public, max-age=120, s-maxage=600";
+    },
+  } as any)
+);
 
-// (optional) generic error handler so proxy errors don’t crash the process
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error("gateway error:", err?.message || err);
-  if (res.headersSent) return;
-  res.status(500).json({ error: "internal" });
+// Generic error handler (so proxy errors don’t crash the process)
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error("gateway error:", msg);
+  if (!res.headersSent) res.status(500).json({ error: "internal" });
 });
 
 app.listen(process.env.GATEWAY_PORT || 4000, () => console.log("gateway up"));

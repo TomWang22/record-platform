@@ -25,29 +25,27 @@ COPY --from=deps /app /app
 COPY services/common ./services/common
 COPY services/auth-service ./services/auth-service
 
+# Build shared code, then force a fresh prisma client for correct binary target, then build service
 RUN pnpm -C services/common build \
- && pnpm -C services/auth-service exec prisma generate \
+ && rm -rf services/auth-service/prisma/generated \
+ && pnpm -C services/auth-service exec prisma generate --schema prisma/schema.prisma \
  && pnpm -C services/auth-service build
 
 # --- runtime ---
 FROM node:20-bookworm-slim
-# IMPORTANT: run from the service folder so Node resolves that service's node_modules
 WORKDIR /app/services/auth-service
 ENV NODE_ENV=production
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && apt-get install -y --no-install-recommends curl ca-certificates openssl \
  && rm -rf /var/lib/apt/lists/*
 
-# pnpm store (workspace root)
 COPY --from=build /app/node_modules /app/node_modules
-# the service's own node_modules (contains symlinks that point to ../../node_modules/.pnpm)
 COPY --from=build /app/services/auth-service/node_modules ./node_modules
 
-# app bits
 COPY --from=build /app/services/auth-service/dist ./dist
 COPY --from=build /app/services/auth-service/package.json ./package.json
-# workspace package that the service imports
+COPY --from=build /app/services/auth-service/prisma ./prisma
 COPY --from=build /app/services/common /app/services/common
 
 EXPOSE 4001

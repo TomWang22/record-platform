@@ -25,13 +25,15 @@ RUN pnpm -C services/common build \
  && pnpm -C services/auction-monitor prune --prod
 
 FROM node:20-alpine
-WORKDIR /app
+# keep workspace layout so pnpm's symlinks continue to resolve
+WORKDIR /app/services/auction-monitor
 ENV NODE_ENV=production
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
 COPY --from=build /app/services/auction-monitor/dist ./dist
 COPY --from=build /app/services/auction-monitor/package.json ./package.json
+COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/services/auction-monitor/node_modules ./node_modules
-COPY --from=build /app/services/common ./services/common
+COPY --from=build /app/services/common /app/services/common
 
 CMD ["pnpm","start"]

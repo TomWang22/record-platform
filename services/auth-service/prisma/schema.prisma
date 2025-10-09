@@ -1,17 +1,22 @@
 datasource db {
   provider = "postgresql"
-  url      = env("POSTGRES_URL_AUTH") // ?schema=auth
+  // POSTGRES_URL_AUTH=postgresql://record_app:CHANGE_ME_STRONG_PASSWORD@postgres:5432/records?schema=auth
+  url      = env("POSTGRES_URL_AUTH")
 }
 
 generator client {
   provider = "prisma-client-js"
+  output   = "./generated/client" // service-local client
+  // 👇 this is the key line for Bookworm on Apple Silicon (arm64 + OpenSSL 3)
   binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+  email        String   @unique @db.Citext
+  passwordHash String   @map("password_hash")
+  settings     Json?    @db.JsonB
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users") // table name within the selected schema
 }

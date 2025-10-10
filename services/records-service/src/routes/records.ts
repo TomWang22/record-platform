@@ -1,39 +1,65 @@
-import {
-  Router,
-  type Request,
-  type Response,
-  type NextFunction,
-  type RequestHandler,
-} from "express";
+import { Router, type Request, type Response, type NextFunction, type RequestHandler } from "express";
 import type { PrismaClient } from "../../generated/records-client";
 
-const asyncHandler =
-  (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>): RequestHandler =>
-  (req, res, next) =>
-    Promise.resolve(fn(req, res, next)).catch(next);
+type AuthedReq = Request & { userId?: string; userEmail?: string };
 
-function requireUid(req: Request, res: Response): string | undefined {
-  const raw = req.headers["x-user-id"];
-  const uid = typeof raw === "string" ? raw : undefined;
-  if (!uid) res.status(401).json({ error: "auth required" });
-  return uid;
+// wrap async handlers so TS is happy and errors go to Express
+function asyncHandler(
+  fn: (req: AuthedReq, res: Response, next: NextFunction) => Promise<any>
+): RequestHandler {
+  return (req, res, next) => {
+    Promise.resolve(fn(req as AuthedReq, res, next)).catch(next);
+  };
 }
 
-export function recordsRouter(prisma: PrismaClient) {
+function pickUpdate(body: any) {
+  // allow updating these fields
+  const allow = [
+    "artist",
+    "name",
+    "format",
+    "catalogNumber",
+    "recordGrade",
+    "sleeveGrade",
+    "hasInsert",
+    "hasBooklet",
+    "hasObiStrip",
+    "hasFactorySleeve",
+    "isPromo",
+    "notes",
+    "purchasedAt",
+    "pricePaid",
+  ] as const;
+
+  const out: any = {};
+  for (const k of allow) {
+    if (body[k] !== undefined) out[k] = body[k];
+  }
+
+  // normalize a couple of fields
+  if (out.purchasedAt && typeof out.purchasedAt === "string") {
+    const d = new Date(out.purchasedAt);
+    if (!isNaN(+d)) out.purchasedAt = d;
+  }
+  if (out.pricePaid != null) {
+    // Prisma Decimal accepts string/number; pass string for safety
+    out.pricePaid = String(out.pricePaid);
+  }
+  return out;
+}
+
+export function recordsRouter(prisma: PrismaClient): Router {
   const r = Router();
 
-  // GET /records → list records for user (latest 100)
+  // GET /records → list latest 100 for this user
   r.get(
     "/",
     asyncHandler(async (req, res) => {
-      const uid = requireUid(req, res);
-      if (!uid) return;
-
-      const limit = Math.min(Number(req.query.limit ?? 100) || 100, 500);
+      const userId = (req as AuthedReq).userId!;
       const items = await prisma.record.findMany({
-        where: { userId: uid },
+        where: { userId },
         orderBy: { updatedAt: "desc" },
-        take: limit,
+        take: 100,
       });
       res.json(items);
     })
@@ -43,86 +69,50 @@ export function recordsRouter(prisma: PrismaClient) {
   r.post(
     "/",
     asyncHandler(async (req, res) => {
-      const uid = requireUid(req, res);
-      if (!uid) return;
-
-      const body = (req.body ?? {}) as Record<string, unknown>;
-      const artist = body.artist;
-      const name = body.name;
-      const format = body.format;
-
-      if (typeof artist !== "string" || typeof name !== "string" || typeof format !== "string") {
-        res.status(400).json({ error: "artist, name, format are required" });
-        return;
+      const userId = (req as AuthedReq).userId!;
+      const { artist, name, format } = req.body ?? {};
+      if (!artist || !name || !format) {
+        return res.status(400).json({ error: "artist, name, format are required" });
       }
+      const data = pickUpdate({ ...req.body, userId });
+      data.userId = userId;
 
-      const created = await prisma.record.create({
-        data: {
-          userId: uid,
-          artist,
-          name,
-          format,
-          catalogNumber:
-            typeof body.catalogNumber === "string" ? (body.catalogNumber as string) : undefined,
-          recordGrade:
-            typeof body.recordGrade === "string" ? (body.recordGrade as string) : undefined,
-          sleeveGrade:
-            typeof body.sleeveGrade === "string" ? (body.sleeveGrade as string) : undefined,
-          hasInsert: Boolean(body.hasInsert ?? false),
-          hasBooklet: Boolean(body.hasBooklet ?? false),
-          hasObiStrip: Boolean(body.hasObiStrip ?? false),
-          hasFactorySleeve: Boolean(body.hasFactorySleeve ?? false),
-          isPromo: Boolean(body.isPromo ?? false),
-          notes: typeof body.notes === "string" ? (body.notes as string) : undefined,
-          purchasedAt:
-            typeof body.purchasedAt === "string" ? new Date(body.purchasedAt as string) : undefined,
-          pricePaid:
-            typeof body.pricePaid === "number" || typeof body.pricePaid === "string"
-              ? (body.pricePaid as any)
-              : undefined,
-        },
-      });
-
+      const created = await prisma.record.create({ data });
       res.status(201).json(created);
     })
   );
 
-  // PUT /records/:id → update (must own)
+  // PUT /records/:id → update if owned
   r.put(
     "/:id",
     asyncHandler(async (req, res) => {
-      const uid = requireUid(req, res);
-      if (!uid) return;
-      const { id } = req.params;
+      const userId = (req as AuthedReq).userId!;
+      const id = req.params.id;
 
-      const result = await prisma.record.updateMany({
-        where: { id, userId: uid },
-        data: req.body ?? {},
-      });
-
-      if (result.count === 0) {
-        res.status(404).json({ error: "not found" });
-        return;
+      const existing = await prisma.record.findUnique({ where: { id } });
+      if (!existing || existing.userId !== userId) {
+        return res.status(404).json({ error: "not found" });
       }
 
-      const updated = await prisma.record.findFirst({ where: { id, userId: uid } });
+      const data = pickUpdate(req.body);
+      const updated = await prisma.record.update({ where: { id }, data });
       res.json(updated);
     })
   );
 
-  // DELETE /records/:id → delete (must own)
+  // DELETE /records/:id → delete if owned
   r.delete(
     "/:id",
     asyncHandler(async (req, res) => {
-      const uid = requireUid(req, res);
-      if (!uid) return;
-      const { id } = req.params;
+      const userId = (req as AuthedReq).userId!;
+      const id = req.params.id;
 
-      const result = await prisma.record.deleteMany({ where: { id, userId: uid } });
-      if (result.count === 0) {
-        res.status(404).json({ error: "not found" });
-        return;
+      const existing = await prisma.record.findUnique({ where: { id } });
+      if (!existing || existing.userId !== userId) {
+        return res.status(404).json({ error: "not found" });
       }
+
+      await prisma.record.delete({ where: { id } });
       res.status(204).end();
     })
   );

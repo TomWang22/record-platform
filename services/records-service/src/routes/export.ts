@@ -1,45 +1,21 @@
-import {
-  Router,
-  type Request,
-  type Response,
-  type NextFunction,
-  type RequestHandler,
-} from "express";
+import { Router, type Request, type Response, type NextFunction, type RequestHandler } from "express";
 import type { PrismaClient } from "../../generated/records-client";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const asyncHandler =
-  (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>): RequestHandler =>
-  (req, res, next) =>
-    Promise.resolve(fn(req, res, next)).catch(next);
+type AuthedReq = Request & { userId?: string; userEmail?: string };
 
-function requireUid(req: Request, res: Response): string | undefined {
-  const raw = req.headers["x-user-id"];
-  const uid = typeof raw === "string" ? raw : undefined;
-  if (!uid) res.status(401).json({ error: "auth required" });
-  return uid;
-}
-
-function makeS3() {
-  const endpoint = process.env.S3_ENDPOINT || undefined;
-  const region = process.env.S3_REGION || "auto";
-  const forcePathStyle = String(process.env.S3_FORCE_PATH_STYLE || "").toLowerCase() === "true";
-  return new S3Client({
-    region,
-    endpoint,
-    forcePathStyle,
-    credentials: {
-      accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
-      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
-    },
-  });
+function asyncHandler(
+  fn: (req: AuthedReq, res: Response, next: NextFunction) => Promise<any>
+): RequestHandler {
+  return (req, res, next) => {
+    Promise.resolve(fn(req as AuthedReq, res, next)).catch(next);
+  };
 }
 
 function toCsv(rows: any[]) {
   const headers = [
     "id",
-    "userId",
     "artist",
     "name",
     "format",
@@ -57,91 +33,93 @@ function toCsv(rows: any[]) {
     "createdAt",
     "updatedAt",
   ];
-
-  const escape = (v: any) => {
+  const esc = (v: any) => {
     if (v === null || v === undefined) return "";
     const s = String(v).replace(/"/g, '""');
     return /[,"\n]/.test(s) ? `"${s}"` : s;
   };
-
-  const lines = [headers.join(",")];
-  for (const r of rows) {
-    lines.push(
-      headers
-        .map((h) =>
-          escape(
-            h === "purchasedAt" || h === "createdAt" || h === "updatedAt"
-              ? r[h]?.toISOString?.() ?? r[h] ?? ""
-              : r[h]
-          )
-        )
-        .join(",")
-    );
-  }
-  return lines.join("\n");
+  const body = [headers.join(",")]
+    .concat(
+      rows.map((row) =>
+        headers
+          .map((h) => {
+            const v = row[h] ?? row[h as keyof typeof row];
+            return esc(v);
+          })
+          .join(",")
+      )
+    )
+    .join("\n");
+  return body;
 }
 
-/**
- * Exports:
- *  - GET  /records/export.csv → stream CSV directly
- *  - POST /records/export     → write CSV to S3 (if configured) and return { bucket, key, presign_get }
- */
-export default function exportRouter(prisma: PrismaClient) {
+function s3() {
+  const endpoint = process.env.S3_ENDPOINT || undefined;
+  const region = process.env.S3_REGION || "auto";
+  const forcePathStyle = String(process.env.S3_FORCE_PATH_STYLE || "").toLowerCase() === "true";
+  return new S3Client({
+    region,
+    endpoint,
+    forcePathStyle,
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
+    },
+  });
+}
+
+export function exportRouter(prisma: PrismaClient): Router {
   const r = Router();
 
-  // Direct CSV download
+  // GET /records/export.csv → stream CSV directly
   r.get(
     "/export.csv",
     asyncHandler(async (req, res) => {
-      const uid = requireUid(req, res);
-      if (!uid) return;
-
-      const rows = await prisma.record.findMany({
-        where: { userId: uid },
+      const userId = (req as AuthedReq).userId!;
+      const data = await prisma.record.findMany({
+        where: { userId },
         orderBy: { updatedAt: "desc" },
-        take: 10_000,
       });
 
-      const csv = toCsv(rows);
+      const csv = toCsv(data);
+      const filename = `records-${new Date().toISOString().slice(0, 10)}.csv`;
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="records.csv"`);
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.send(csv);
     })
   );
 
-  // Upload to S3
+  // POST /records/export → upload CSV to S3 and return presigned GET url
   r.post(
     "/export",
     asyncHandler(async (req, res) => {
-      const uid = requireUid(req, res);
-      if (!uid) return;
-
       const bucket = process.env.S3_BUCKET;
-      if (!bucket) {
-        res
-          .status(500)
-          .json({ error: "S3_BUCKET not configured (use GET /records/export.csv for direct download)" });
-        return;
-      }
+      if (!bucket) return res.status(503).json({ error: "S3 not configured" });
 
-      const rows = await prisma.record.findMany({
-        where: { userId: uid },
+      const userId = (req as AuthedReq).userId!;
+      const data = await prisma.record.findMany({
+        where: { userId },
         orderBy: { updatedAt: "desc" },
-        take: 50_000,
       });
+      const csv = toCsv(data);
 
-      const csv = toCsv(rows);
-      const key = `exports/${uid}/${Date.now()}-records.csv`;
-      const client = makeS3();
+      const key = `${userId}/exports/${Date.now()}-records.csv`;
+      const client = s3();
 
       await client.send(
-        new PutObjectCommand({ Bucket: bucket, Key: key, Body: csv, ContentType: "text/csv" })
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: csv,
+          ContentType: "text/csv",
+        })
       );
 
+      // presign GET so user can download
       const presign_get = await getSignedUrl(
         client,
         new GetObjectCommand({ Bucket: bucket, Key: key }),
-        { expiresIn: 300 }
+        { expiresIn: 60 }
       );
 
       res.json({ bucket, key, presign_get });

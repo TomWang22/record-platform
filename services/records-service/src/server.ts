@@ -6,7 +6,7 @@ import cors from "cors";
 import { PrismaClient } from "../generated/records-client";
 import { register, httpCounter } from "@common/utils/metrics";
 import { recordsRouter } from "./routes/records";
-import exportRouter from "./routes/export";
+import { exportRouter } from "./routes/export";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -60,21 +60,14 @@ app.get("/healthz", async (_req: Request, res: Response) => {
 /**
  * Identity guard
  * The gateway strips client-sent x-user-* and sets them AFTER JWT verification.
- * Only trust requests routed through gateway.
+ * We still only trust the gateway (this service should be network-private).
  */
-function requireUser(
-  req: Request & { userId?: string; userEmail?: string },
-  res: Response,
-  next: NextFunction
-) {
-  const header = req.headers["x-user-id"];
-  const uid = typeof header === "string" ? header : "";
+function requireUser(req: Request & { userId?: string; userEmail?: string }, res: Response, next: NextFunction) {
+  const uid = String(req.headers["x-user-id"] || "");
   if (!uid) return res.status(401).json({ error: "auth required" });
   req.userId = uid;
-
   const email = req.headers["x-user-email"];
   if (typeof email === "string") req.userEmail = email;
-
   next();
 }
 

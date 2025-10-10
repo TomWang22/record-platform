@@ -6,13 +6,27 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { register, httpCounter } from "@common/utils/metrics";
-import { verifyJwt } from "@common/utils/auth";
+import { verifyJwt, type JwtPayload as TokenPayload } from "@common/utils/auth";
+import { createClient } from "redis";
 
 const app = express();
 app.disable("x-powered-by");
 
 /** We run behind nginx: required for express-rate-limit & real client IPs */
 app.set("trust proxy", 1);
+
+// --- Redis (revocation list check) ---
+const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
+const redis = createClient({ url: REDIS_URL });
+redis.on("error", (e: unknown) => console.error("gateway redis error:", e));
+(async () => {
+  try {
+    await redis.connect();
+    console.log("gateway redis connected");
+  } catch (e) {
+    console.error("gateway redis connect failed:", e);
+  }
+})();
 
 // Security headers
 app.use(
@@ -44,8 +58,7 @@ app.use(
 // gzip (response only; does not touch request bodies)
 app.use(compression() as unknown as import("express").RequestHandler);
 
-// NOTE: DO NOT use express.json() here. The gateway must stream bodies to upstreams.
-// If you ever add gateway-owned JSON endpoints, mount express.json() ONLY on those paths.
+// NOTE: DO NOT use express.json() globally; the gateway streams bodies to upstreams.
 
 // Tiny query sanitizer
 app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -85,8 +98,8 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// ----- Auth guard (allowlist first, then require JWT) -----
-function authGuard(req: Request & { user?: any }, res: Response, next: NextFunction) {
+// ----- Auth guard (allowlist first, then require JWT + revocation check) -----
+app.use(async (req: Request & { user?: TokenPayload }, res: Response, next: NextFunction) => {
   const p = req.path;
 
   // Public: health, metrics, all /auth/*
@@ -102,16 +115,27 @@ function authGuard(req: Request & { user?: any }, res: Response, next: NextFunct
   if (!token) return res.status(401).json({ error: "auth required" });
 
   try {
-    req.user = verifyJwt(token);
+    const payload = verifyJwt(token) as TokenPayload & { jti?: string };
+    if (payload?.jti) {
+      try {
+        const revoked = await redis.get(`revoked:${payload.jti}`);
+        if (revoked) {
+          console.warn("gateway: blocked revoked token jti:", payload.jti);
+          return res.status(401).json({ error: "token revoked" });
+        }
+      } catch (e) {
+        console.warn("revocation check failed, proceeding:", (e as Error)?.message);
+      }
+    }
+    req.user = payload;
     return next();
   } catch {
     return res.status(401).json({ error: "invalid token" });
   }
-}
-app.use(authGuard);
+});
 
 // ----- Proxies -----
-// Note: nginx maps /api/* -> gateway /* (strips /api), so clients hit /api/auth, /api/records, etc.
+// Note: nginx maps /api/* -> gateway /* (strips /api)
 
 // Auth service: strip /auth
 app.use(
@@ -144,9 +168,6 @@ app.use(
     target: "http://listings-service:4003",
     changeOrigin: true,
     proxyTimeout: 15000,
-    onProxyRes: (proxyRes: any) => {
-      proxyRes.headers["Cache-Control"] = proxyRes.headers["cache-control"] || "public, max-age=60, s-maxage=300";
-    },
   } as any)
 );
 
@@ -168,9 +189,6 @@ app.use(
     changeOrigin: true,
     pathRewrite: { "^/ai": "" },
     proxyTimeout: 15000,
-    onProxyRes: (proxyRes: any) => {
-      proxyRes.headers["Cache-Control"] = proxyRes.headers["cache-control"] || "public, max-age=120, s-maxage=600";
-    },
   } as any)
 );
 

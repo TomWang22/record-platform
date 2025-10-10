@@ -101,25 +101,30 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// ----- Auth guard (allowlist first, then require JWT + revocation check) -----
+// add near the top
+function extractBearer(req: Request): string | undefined {
+  const raw = (req.headers["authorization"] as string | undefined) ?? "";
+  const [scheme, token] = raw.split(/\s+/);
+  if (scheme && scheme.toLowerCase() === "bearer" && token) return token.trim();
+  return undefined;
+}
+
+app.get("/__echo_authz", (req, res) => {
+  res.json({ path: req.path, authz: req.headers.authorization ?? null });
+});
+
+// -------------------- AUTH GUARD --------------------
 app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
   const p = req.path;
 
-  // Public: health, metrics, all /auth/*
   if (p === "/healthz" || p === "/metrics" || p.startsWith("/auth/")) return next();
+  if (req.method === "GET" && (p.startsWith("/listings/") || p.startsWith("/ai/"))) return next();
 
-  // Optional public GETs (read-only):
-  if (req.method === "GET" && (p.startsWith("/listings/") || p.startsWith("/ai/"))) {
-    return next();
-  }
-
-  // Anti-spoof: never trust client-sent identity headers
   delete (req.headers as any)["x-user-id"];
   delete (req.headers as any)["x-user-email"];
   delete (req.headers as any)["x-user-jti"];
 
-  // Everything else requires JWT
-  const token = req.headers.authorization?.split(" ")[1];
+  const token = extractBearer(req);
   if (!token) return res.status(401).json({ error: "auth required" });
 
   try {
@@ -137,6 +142,11 @@ app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
   } catch {
     return res.status(401).json({ error: "invalid token" });
   }
+});
+
+// 2) put __whoami *after* the guard so req.user is populated
+app.get("/__whoami", (req: AuthedRequest, res: Response) => {
+  res.json({ user: req.user ?? null });
 });
 
 // Helper: attach identity headers for proxied calls (only if JWT verified)
@@ -168,18 +178,18 @@ app.use(
   } as any)
 );
 
-// Records (protected)
-// Records (protected)
+// 3) records proxy: target includes /records so upstream sees the right path
 app.use(
   "/records",
   createProxyMiddleware({
     target: "http://records-service:4002/records",
     changeOrigin: true,
     proxyTimeout: 15000,
-    onProxyReq: (proxyReq: ClientRequest, req: Request & { user?: TokenPayload }) => {
-      if (req.user?.sub) proxyReq.setHeader("x-user-id", req.user.sub);
-      if ((req.user as any)?.email) proxyReq.setHeader("x-user-email", (req.user as any).email);
-      if ((req.user as any)?.jti)   proxyReq.setHeader("x-user-jti",   (req.user as any).jti);
+    onProxyReq: (proxyReq: ClientRequest, req: AuthedRequest) => {
+      const u = req.user as any;
+      if (u?.sub)   proxyReq.setHeader("x-user-id", u.sub);
+      if (u?.email) proxyReq.setHeader("x-user-email", u.email);
+      if (u?.jti)   proxyReq.setHeader("x-user-jti", u.jti);
     },
   } as any)
 );

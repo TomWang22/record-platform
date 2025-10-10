@@ -1,5 +1,6 @@
 /* cspell:ignore healthz maxage s-maxage */
 import express, { type Request, type Response, type NextFunction } from "express";
+import type { ClientRequest } from "http";
 import helmet from "helmet";
 import compression from "compression";
 import cors from "cors";
@@ -8,6 +9,8 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 import { register, httpCounter } from "@common/utils/metrics";
 import { verifyJwt, type JwtPayload as TokenPayload } from "@common/utils/auth";
 import { createClient } from "redis";
+
+type AuthedRequest = Request & { user?: TokenPayload };
 
 const app = express();
 app.disable("x-powered-by");
@@ -99,7 +102,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // ----- Auth guard (allowlist first, then require JWT + revocation check) -----
-app.use(async (req: Request & { user?: TokenPayload }, res: Response, next: NextFunction) => {
+app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
   const p = req.path;
 
   // Public: health, metrics, all /auth/*
@@ -110,6 +113,11 @@ app.use(async (req: Request & { user?: TokenPayload }, res: Response, next: Next
     return next();
   }
 
+  // Anti-spoof: never trust client-sent identity headers
+  delete (req.headers as any)["x-user-id"];
+  delete (req.headers as any)["x-user-email"];
+  delete (req.headers as any)["x-user-jti"];
+
   // Everything else requires JWT
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ error: "auth required" });
@@ -119,10 +127,7 @@ app.use(async (req: Request & { user?: TokenPayload }, res: Response, next: Next
     if (payload?.jti) {
       try {
         const revoked = await redis.get(`revoked:${payload.jti}`);
-        if (revoked) {
-          console.warn("gateway: blocked revoked token jti:", payload.jti);
-          return res.status(401).json({ error: "token revoked" });
-        }
+        if (revoked) return res.status(401).json({ error: "token revoked" });
       } catch (e) {
         console.warn("revocation check failed, proceeding:", (e as Error)?.message);
       }
@@ -134,10 +139,22 @@ app.use(async (req: Request & { user?: TokenPayload }, res: Response, next: Next
   }
 });
 
+// Helper: attach identity headers for proxied calls (only if JWT verified)
+function attachIdentityHeaders() {
+  return (proxyReq: ClientRequest, req: AuthedRequest) => {
+    const uid = req.user?.sub;
+    if (uid) proxyReq.setHeader("x-user-id", uid);
+    const email = (req.user as any)?.email;
+    if (email) proxyReq.setHeader("x-user-email", email);
+    const jti = (req.user as any)?.jti;
+    if (jti) proxyReq.setHeader("x-user-jti", jti);
+  };
+}
+
 // ----- Proxies -----
 // Note: nginx maps /api/* -> gateway /* (strips /api)
 
-// Auth service: strip /auth
+// Auth service: strip /auth (no identity headers forwarded)
 app.use(
   "/auth",
   createProxyMiddleware({
@@ -158,16 +175,26 @@ app.use(
     target: "http://records-service:4002",
     changeOrigin: true,
     proxyTimeout: 15000,
+    onProxyReq: (proxyReq: ClientRequest, req: AuthedRequest) => {
+      const uid = req.user?.sub;
+      if (uid) proxyReq.setHeader("x-user-id", uid);
+      const email = (req.user as any)?.email;
+      if (email) proxyReq.setHeader("x-user-email", email);
+    },
   } as any)
 );
 
-// Listings (GET public, others protected by guard above)
+// Listings (GET public, others protected by guard above) — still forward identity if present
 app.use(
   "/listings",
   createProxyMiddleware({
     target: "http://listings-service:4003",
     changeOrigin: true,
     proxyTimeout: 15000,
+    onProxyReq: attachIdentityHeaders(),
+    onProxyRes: (proxyRes: any) => {
+      proxyRes.headers["Cache-Control"] = proxyRes.headers["cache-control"] || "public, max-age=60, s-maxage=300";
+    },
   } as any)
 );
 
@@ -178,6 +205,7 @@ app.use(
     target: "http://analytics-service:4004",
     changeOrigin: true,
     proxyTimeout: 15000,
+    onProxyReq: attachIdentityHeaders(),
   } as any)
 );
 
@@ -189,6 +217,11 @@ app.use(
     changeOrigin: true,
     pathRewrite: { "^/ai": "" },
     proxyTimeout: 15000,
+    onProxyReq: attachIdentityHeaders(),
+    onProxyRes: (proxyRes: any) => {
+      proxyRes.headers["Cache-Control"] =
+        proxyRes.headers["cache-control"] || "public, max-age=120, s-maxage=600";
+    },
   } as any)
 );
 

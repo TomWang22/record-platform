@@ -169,17 +169,17 @@ app.use(
 );
 
 // Records (protected)
+// Records (protected)
 app.use(
   "/records",
   createProxyMiddleware({
-    target: "http://records-service:4002",
+    target: "http://records-service:4002/records",
     changeOrigin: true,
     proxyTimeout: 15000,
-    onProxyReq: (proxyReq: ClientRequest, req: AuthedRequest) => {
-      const uid = req.user?.sub;
-      if (uid) proxyReq.setHeader("x-user-id", uid);
-      const email = (req.user as any)?.email;
-      if (email) proxyReq.setHeader("x-user-email", email);
+    onProxyReq: (proxyReq: ClientRequest, req: Request & { user?: TokenPayload }) => {
+      if (req.user?.sub) proxyReq.setHeader("x-user-id", req.user.sub);
+      if ((req.user as any)?.email) proxyReq.setHeader("x-user-email", (req.user as any).email);
+      if ((req.user as any)?.jti)   proxyReq.setHeader("x-user-jti",   (req.user as any).jti);
     },
   } as any)
 );

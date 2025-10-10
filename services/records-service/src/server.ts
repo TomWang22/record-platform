@@ -28,6 +28,10 @@ app.use(
   })
 );
 
+//quick probe
+app.get("/records/_ping", (_req, res) => res.json({ ok: true }));
+
+
 // Metrics
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.on("finish", () =>

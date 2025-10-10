@@ -1,5 +1,9 @@
 /* cspell:ignore healthz maxage s-maxage */
-import express, { type Request, type Response, type NextFunction } from "express";
+import express, {
+  type Request,
+  type Response,
+  type NextFunction,
+} from "express";
 import type { ClientRequest } from "http";
 import helmet from "helmet";
 import compression from "compression";
@@ -66,7 +70,8 @@ app.use(compression() as unknown as import("express").RequestHandler);
 // Tiny query sanitizer
 app.use((req: Request, _res: Response, next: NextFunction) => {
   for (const [k, v] of Object.entries(req.query)) {
-    if (typeof v === "string") (req.query as any)[k] = v.replace(/[<>\"'`;(){}]/g, "");
+    if (typeof v === "string")
+      (req.query as any)[k] = v.replace(/[<>\"'`;(){}]/g, "");
   }
   next();
 });
@@ -101,31 +106,77 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// add near the top
+// Add this helper (replace your current one)
+// replace your current extractBearer with this:
 function extractBearer(req: Request): string | undefined {
-  const raw = (req.headers["authorization"] as string | undefined) ?? "";
-  const [scheme, token] = raw.split(/\s+/);
-  if (scheme && scheme.toLowerCase() === "bearer" && token) return token.trim();
-  return undefined;
+  const h = req.get("authorization") ?? (Array.isArray(req.headers.authorization)
+    ? req.headers.authorization[0]
+    : req.headers.authorization);
+  if (!h) return;
+  const m = /^Bearer\s+(.+)$/i.exec(h.trim());
+  return m?.[1]?.trim();
 }
 
 app.get("/__echo_authz", (req, res) => {
   res.json({ path: req.path, authz: req.headers.authorization ?? null });
 });
 
+app.use((req, _res, next) => {
+  if (req.path === "/records" || req.path.startsWith("/records/")) {
+    console.log(
+      "[gw] before guard",
+      req.method,
+      req.path,
+      "authz:",
+      req.headers.authorization || "<none>"
+    );
+  }
+  next();
+});
+
+app.use((req, _res, next) => {
+  if (req.path === "/records" || req.path.startsWith("/records/")) {
+    console.log("[gw] /records authz:", req.headers.authorization || "<none>");
+  }
+  next();
+});
+
+// log just before the guard, only for /records paths
+app.use((req, _res, next) => {
+  if (req.path === "/records" || req.path.startsWith("/records/")) {
+    console.log("[gw] before guard", req.method, req.path, "authz:", req.headers.authorization ?? "<none>");
+  }
+  next();
+});
+
+
 // -------------------- AUTH GUARD --------------------
 app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
   const p = req.path;
 
-  if (p === "/healthz" || p === "/metrics" || p.startsWith("/auth/")) return next();
-  if (req.method === "GET" && (p.startsWith("/listings/") || p.startsWith("/ai/"))) return next();
+  if (p === "/healthz" || p === "/metrics" || p.startsWith("/auth/"))
+    return next();
+  if (
+    req.method === "GET" &&
+    (p.startsWith("/listings/") || p.startsWith("/ai/"))
+  )
+    return next();
 
   delete (req.headers as any)["x-user-id"];
   delete (req.headers as any)["x-user-email"];
   delete (req.headers as any)["x-user-jti"];
 
   const token = extractBearer(req);
-  if (!token) return res.status(401).json({ error: "auth required" });
+  if (!token) {
+    console.log(
+      "[gw] NO TOKEN seen by guard for",
+      req.method,
+      req.path,
+      "all headers:",
+      req.headers
+    );
+    return res.status(401).json({ error: "auth required" });
+  }
 
   try {
     const payload = verifyJwt(token) as TokenPayload & { jti?: string };
@@ -134,7 +185,10 @@ app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
         const revoked = await redis.get(`revoked:${payload.jti}`);
         if (revoked) return res.status(401).json({ error: "token revoked" });
       } catch (e) {
-        console.warn("revocation check failed, proceeding:", (e as Error)?.message);
+        console.warn(
+          "revocation check failed, proceeding:",
+          (e as Error)?.message
+        );
       }
     }
     req.user = payload;
@@ -147,6 +201,22 @@ app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
 // 2) put __whoami *after* the guard so req.user is populated
 app.get("/__whoami", (req: AuthedRequest, res: Response) => {
   res.json({ user: req.user ?? null });
+});
+
+app.use((req: AuthedRequest, _res, next) => {
+  if (req.path === "/__whoami") {
+    console.log("[debug] whoami user:", req.user);
+  }
+  next();
+});
+
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof Error) {
+    console.error("records service error:", err.stack || err.message);
+  } else {
+    console.error("records service error:", err);
+  }
+  if (!res.headersSent) res.status(500).json({ error: "internal" });
 });
 
 // Helper: attach identity headers for proxied calls (only if JWT verified)
@@ -173,20 +243,24 @@ app.use(
     pathRewrite: { "^/auth": "" },
     proxyTimeout: 15000,
     onError: (_err: unknown, _req: Request, res: Response) => {
-      if (!res.headersSent) res.status(502).json({ error: "auth upstream error" });
+      if (!res.headersSent)
+        res.status(502).json({ error: "auth upstream error" });
     },
   } as any)
 );
 
 // 3) records proxy: target includes /records so upstream sees the right path
+// PROXY: make sure upstream sees /records prefix
 app.use(
   "/records",
   createProxyMiddleware({
-    target: "http://records-service:4002/records",
+    target: "http://records-service:4002",
     changeOrigin: true,
     proxyTimeout: 15000,
+    // express removes the mount path; add it back so upstream sees /records/...
+    pathRewrite: (path: string) => (path === "/" ? "/records" : `/records${path}`),
     onProxyReq: (proxyReq: ClientRequest, req: AuthedRequest) => {
-      const u = req.user as any;
+      const u: any = req.user;
       if (u?.sub)   proxyReq.setHeader("x-user-id", u.sub);
       if (u?.email) proxyReq.setHeader("x-user-email", u.email);
       if (u?.jti)   proxyReq.setHeader("x-user-jti", u.jti);
@@ -203,7 +277,8 @@ app.use(
     proxyTimeout: 15000,
     onProxyReq: attachIdentityHeaders(),
     onProxyRes: (proxyRes: any) => {
-      proxyRes.headers["Cache-Control"] = proxyRes.headers["cache-control"] || "public, max-age=60, s-maxage=300";
+      proxyRes.headers["Cache-Control"] =
+        proxyRes.headers["cache-control"] || "public, max-age=60, s-maxage=300";
     },
   } as any)
 );
@@ -230,7 +305,8 @@ app.use(
     onProxyReq: attachIdentityHeaders(),
     onProxyRes: (proxyRes: any) => {
       proxyRes.headers["Cache-Control"] =
-        proxyRes.headers["cache-control"] || "public, max-age=120, s-maxage=600";
+        proxyRes.headers["cache-control"] ||
+        "public, max-age=120, s-maxage=600";
     },
   } as any)
 );

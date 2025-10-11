@@ -42,11 +42,12 @@ function pickUpdate(body: any) {
     if (!isNaN(+d)) out.purchasedAt = d;
   }
   if (out.pricePaid != null) {
-    // Prisma Decimal accepts string/number; pass string for safety
-    out.pricePaid = String(out.pricePaid);
+    out.pricePaid = String(out.pricePaid); // Prisma Decimal prefers string
   }
   return out;
 }
+
+const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function recordsRouter(prisma: PrismaClient): Router {
   const r = Router();
@@ -70,14 +71,39 @@ export function recordsRouter(prisma: PrismaClient): Router {
     "/",
     asyncHandler(async (req, res) => {
       const userId = (req as AuthedReq).userId!;
+      if (!userId || !UUID_RX.test(userId)) {
+        return res.status(401).json({ error: "auth required" });
+      }
+
       const { artist, name, format } = req.body ?? {};
       if (!artist || !name || !format) {
         return res.status(400).json({ error: "artist, name, format are required" });
       }
-      const data = pickUpdate({ ...req.body, userId });
-      data.userId = userId;
 
-      const created = await prisma.record.create({ data });
+      // Explicit mapping to avoid leaking unwanted keys into UUID columns
+      const patch = pickUpdate(req.body);
+
+      const created = await prisma.record.create({
+        data: {
+          userId,                         // UUID
+          artist: String(patch.artist ?? artist),
+          name:   String(patch.name   ?? name),
+          format: String(patch.format ?? format),
+
+          catalogNumber:    patch.catalogNumber ?? null,
+          recordGrade:      patch.recordGrade ?? null,
+          sleeveGrade:      patch.sleeveGrade ?? null,
+          hasInsert:        Boolean(patch.hasInsert ?? false),
+          hasBooklet:       Boolean(patch.hasBooklet ?? false),
+          hasObiStrip:      Boolean(patch.hasObiStrip ?? false),
+          hasFactorySleeve: Boolean(patch.hasFactorySleeve ?? false),
+          isPromo:          Boolean(patch.isPromo ?? false),
+          notes:            patch.notes ?? null,
+          purchasedAt:      patch.purchasedAt ?? null,
+          pricePaid:        patch.pricePaid ?? null,
+        },
+      });
+
       res.status(201).json(created);
     })
   );

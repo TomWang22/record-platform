@@ -4,7 +4,7 @@ import express, {
   type Response,
   type NextFunction,
 } from "express";
-import type { ClientRequest } from "http";
+import type { ClientRequest, IncomingMessage } from "http";
 import helmet from "helmet";
 import compression from "compression";
 import cors from "cors";
@@ -14,7 +14,7 @@ import { register, httpCounter } from "@common/utils/metrics";
 import { verifyJwt, type JwtPayload as TokenPayload } from "@common/utils/auth";
 import { createClient } from "redis";
 
-type AuthedRequest = Request & { user?: TokenPayload };
+type AuthedRequest = Request & { user?: { sub?: string; email?: string; jti?: string } };
 
 const app = express();
 app.disable("x-powered-by");
@@ -109,12 +109,17 @@ app.use(limiter);
 // Add this helper (replace your current one)
 // replace your current extractBearer with this:
 function extractBearer(req: Request): string | undefined {
-  const h = req.get("authorization") ?? (Array.isArray(req.headers.authorization)
-    ? req.headers.authorization[0]
-    : req.headers.authorization);
-  if (!h) return;
-  const m = /^Bearer\s+(.+)$/i.exec(h.trim());
-  return m?.[1]?.trim();
+  const raw =
+    req.get("authorization") ??
+    (Array.isArray(req.headers.authorization)
+      ? req.headers.authorization[0]
+      : req.headers.authorization) ??
+    "";
+  const s = String(raw).trim();
+  const i = s.toLowerCase().indexOf("bearer ");
+  if (i === -1) return undefined;
+  const token = s.slice(i + "bearer ".length).trim();
+  return token || undefined;
 }
 
 app.get("/__echo_authz", (req, res) => {
@@ -144,11 +149,16 @@ app.use((req, _res, next) => {
 // log just before the guard, only for /records paths
 app.use((req, _res, next) => {
   if (req.path === "/records" || req.path.startsWith("/records/")) {
-    console.log("[gw] before guard", req.method, req.path, "authz:", req.headers.authorization ?? "<none>");
+    console.log(
+      "[gw] before guard",
+      req.method,
+      req.path,
+      "authz:",
+      req.headers.authorization ?? "<none>"
+    );
   }
   next();
 });
-
 
 // -------------------- AUTH GUARD --------------------
 app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
@@ -167,16 +177,15 @@ app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
   delete (req.headers as any)["x-user-jti"];
 
   const token = extractBearer(req);
-  if (!token) {
-    console.log(
-      "[gw] NO TOKEN seen by guard for",
-      req.method,
-      req.path,
-      "all headers:",
-      req.headers
-    );
-    return res.status(401).json({ error: "auth required" });
-  }
+  console.log(
+    "[gw] guard token?",
+    !!token,
+    "len=",
+    token?.length,
+    "path=",
+    req.path
+  );
+  if (!token) return res.status(401).json({ error: "auth required" });
 
   try {
     const payload = verifyJwt(token) as TokenPayload & { jti?: string };
@@ -231,6 +240,18 @@ function attachIdentityHeaders() {
   };
 }
 
+app.use("/records", (req: AuthedRequest, _res, next) => {
+  // anti-spoof: ensure we write, not trust client
+  delete (req.headers as any)["x-user-id"];
+  delete (req.headers as any)["x-user-email"];
+  delete (req.headers as any)["x-user-jti"];
+
+  if (req.user?.sub)   (req.headers as any)["x-user-id"]    = req.user.sub;
+  if ((req.user as any)?.email) (req.headers as any)["x-user-email"] = (req.user as any).email;
+  if ((req.user as any)?.jti)   (req.headers as any)["x-user-jti"]   = (req.user as any).jti;
+
+  next();
+});
 // ----- Proxies -----
 // Note: nginx maps /api/* -> gateway /* (strips /api)
 
@@ -257,13 +278,28 @@ app.use(
     target: "http://records-service:4002",
     changeOrigin: true,
     proxyTimeout: 15000,
-    // express removes the mount path; add it back so upstream sees /records/...
-    pathRewrite: (path: string) => (path === "/" ? "/records" : `/records${path}`),
+
+    // 👇 Make sure upstream sees /records + the path after the mount
+    pathRewrite: (path: string, req: Request) => {
+      const rewritten = "/records" + (path.startsWith("/") ? path : `/${path}`);
+      console.log(`[gw] rewrite ${req.method} ${req.baseUrl}${path} -> ${rewritten}`);
+      return rewritten;
+    },
+
     onProxyReq: (proxyReq: ClientRequest, req: AuthedRequest) => {
-      const u: any = req.user;
+      const u = req.user as any;
       if (u?.sub)   proxyReq.setHeader("x-user-id", u.sub);
       if (u?.email) proxyReq.setHeader("x-user-email", u.email);
       if (u?.jti)   proxyReq.setHeader("x-user-jti", u.jti);
+    },
+
+    onProxyRes: (proxyRes: IncomingMessage) => {
+      console.log("[gw] /records upstream status:", proxyRes.statusCode);
+    },
+
+    onError: (err: unknown, _req: Request, res: Response) => {
+      console.error("[gw] records proxy error:", err);
+      if (!res.headersSent) res.status(502).json({ error: "records upstream error" });
     },
   } as any)
 );

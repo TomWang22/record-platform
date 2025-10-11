@@ -31,6 +31,10 @@ app.use(
 //quick probe
 app.get("/records/_ping", (_req, res) => res.json({ ok: true }));
 
+app.get("/_ping", (req, res) => {
+  res.json({ ok: true });
+});
+
 
 // Metrics
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -88,6 +92,10 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 // Start + graceful shutdown
 const port = Number(process.env.RECORDS_PORT || 4002);
+
+app.get("/healthz", (_req, res) => res.json({ ok: true }));
+
+
 const server = app.listen(port, () => console.log("records up on", port));
 
 function shutdown(signal: string) {

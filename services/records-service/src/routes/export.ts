@@ -1,4 +1,10 @@
-import { Router, type Request, type Response, type NextFunction, type RequestHandler } from "express";
+import {
+  Router,
+  type Request,
+  type Response,
+  type NextFunction,
+  type RequestHandler,
+} from "express";
 import type { PrismaClient } from "../../generated/records-client";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -23,13 +29,18 @@ function toCsv(rows: any[]) {
     "recordGrade",
     "sleeveGrade",
     "hasInsert",
+    "insertGrade",
     "hasBooklet",
+    "bookletGrade",
     "hasObiStrip",
+    "obiStripGrade",
     "hasFactorySleeve",
+    "factorySleeveGrade",
     "isPromo",
     "purchasedAt",
     "pricePaid",
     "notes",
+    "mediaPieces", // JSON snapshot
     "createdAt",
     "updatedAt",
   ];
@@ -38,18 +49,17 @@ function toCsv(rows: any[]) {
     const s = String(v).replace(/"/g, '""');
     return /[,"\n]/.test(s) ? `"${s}"` : s;
   };
+
   const body = [headers.join(",")]
     .concat(
-      rows.map((row) =>
-        headers
-          .map((h) => {
-            const v = row[h] ?? row[h as keyof typeof row];
-            return esc(v);
-          })
-          .join(",")
-      )
+      rows.map((row) => {
+        const flat: Record<string, any> = { ...row };
+        flat.mediaPieces = row.mediaPieces ? JSON.stringify(row.mediaPieces) : "";
+        return headers.map((h) => esc(flat[h])).join(",");
+      })
     )
     .join("\n");
+
   return body;
 }
 
@@ -71,15 +81,17 @@ function s3() {
 export function exportRouter(prisma: PrismaClient): Router {
   const r = Router();
 
-  // GET /records/export.csv → stream CSV directly
+  // GET /records/export.csv
   r.get(
     "/export.csv",
     asyncHandler(async (req, res) => {
       const userId = (req as AuthedReq).userId!;
-      const data = await prisma.record.findMany({
+      // Cast the full options object via (prisma as any) to bypass `include: never`
+      const data = (await (prisma as any).record.findMany({
         where: { userId },
         orderBy: { updatedAt: "desc" },
-      });
+        include: { mediaPieces: true },
+      })) as any[];
 
       const csv = toCsv(data);
       const filename = `records-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -89,7 +101,7 @@ export function exportRouter(prisma: PrismaClient): Router {
     })
   );
 
-  // POST /records/export → upload CSV to S3 and return presigned GET url
+  // POST /records/export → upload to S3 and return presigned URL
   r.post(
     "/export",
     asyncHandler(async (req, res) => {
@@ -97,10 +109,12 @@ export function exportRouter(prisma: PrismaClient): Router {
       if (!bucket) return res.status(503).json({ error: "S3 not configured" });
 
       const userId = (req as AuthedReq).userId!;
-      const data = await prisma.record.findMany({
+      const data = (await (prisma as any).record.findMany({
         where: { userId },
         orderBy: { updatedAt: "desc" },
-      });
+        include: { mediaPieces: true },
+      })) as any[];
+
       const csv = toCsv(data);
 
       const key = `${userId}/exports/${Date.now()}-records.csv`;
@@ -115,13 +129,11 @@ export function exportRouter(prisma: PrismaClient): Router {
         })
       );
 
-      // presign GET so user can download
       const presign_get = await getSignedUrl(
         client,
         new GetObjectCommand({ Bucket: bucket, Key: key }),
         { expiresIn: 60 }
       );
-
       res.json({ bucket, key, presign_get });
     })
   );

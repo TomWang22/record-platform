@@ -11,28 +11,29 @@ generator client {
 
 // Map Prisma model to the physical snake_case table+columns created by 03-database.sql
 model Record {
-  id               String   @id @default(cuid())
-  userId           String   @map("user_id")
+  id               String   @id @db.Uuid @default(uuid())
+  userId           String   @db.Uuid @map("user_id")
   artist           String   @db.VarChar(256)
   name             String   @db.VarChar(256)
   format           String   @db.VarChar(64)
   catalogNumber    String?  @map("catalog_number") @db.VarChar(64)
   recordGrade      String?  @map("record_grade")   @db.VarChar(16)
   sleeveGrade      String?  @map("sleeve_grade")   @db.VarChar(16)
-  hasInsert        Boolean  @map("has_insert")        @default(false)
-  hasBooklet       Boolean  @map("has_booklet")       @default(false)
-  hasObiStrip      Boolean  @map("has_obi_strip")     @default(false)
-  hasFactorySleeve Boolean  @map("has_factory_sleeve")@default(false)
-  isPromo          Boolean  @map("is_promo")          @default(false)
+  hasInsert        Boolean  @map("has_insert")         @default(false)
+  hasBooklet       Boolean  @map("has_booklet")        @default(false)
+  hasObiStrip      Boolean  @map("has_obi_strip")      @default(false)
+  hasFactorySleeve Boolean  @map("has_factory_sleeve") @default(false)
+  isPromo          Boolean  @map("is_promo")           @default(false)
   notes            String?  @db.Text
   purchasedAt      DateTime? @map("purchased_at")
   pricePaid        Decimal?  @map("price_paid") @db.Decimal(10, 2)
   createdAt        DateTime  @map("created_at") @default(now())
   updatedAt        DateTime  @map("updated_at") @updatedAt
 
-  @@map("records") // table name
+  @@map("records")
   @@index([userId])
   @@index([artist])
   @@index([catalogNumber])
   @@index([artist, name, format])
 }
+

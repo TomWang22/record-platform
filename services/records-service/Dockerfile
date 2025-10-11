@@ -37,6 +37,7 @@ ENV NODE_ENV=production
 RUN apt-get update \
   && apt-get install -y --no-install-recommends curl ca-certificates openssl \
   && rm -rf /var/lib/apt/lists/*
+  
 
 # pnpm store (workspace root)
 COPY --from=build /app/node_modules /app/node_modules

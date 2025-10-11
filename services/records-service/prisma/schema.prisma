@@ -1,32 +1,73 @@
 datasource db {
   provider = "postgresql"
-  url      = env("POSTGRES_URL_RECORDS") // ?schema=records
+  url      = env("POSTGRES_URL_RECORDS")
 }
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/records-client"
-  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+  provider       = "prisma-client-js"
+  output         = "../generated/records-client"
+  binaryTargets  = ["native", "linux-arm64-openssl-3.0.x"]
 }
 
-// Map Prisma model to the physical snake_case table+columns created by 03-database.sql
+enum Condition {
+  M
+  NM
+  NM_MINUS
+  EX_PLUS
+  EX
+  EX_MINUS
+  VG_PLUS
+  VG
+  VG_MINUS
+  G_PLUS
+  G
+  G_MINUS
+  F
+  P
+}
+
+enum MediumKind {
+  VINYL
+  CD
+  CASSETTE
+  OTHER
+}
+
 model Record {
-  id               String   @id @db.Uuid @default(uuid())
-  userId           String   @db.Uuid @map("user_id")
-  artist           String   @db.VarChar(256)
-  name             String   @db.VarChar(256)
-  format           String   @db.VarChar(64)
-  catalogNumber    String?  @map("catalog_number") @db.VarChar(64)
-  recordGrade      String?  @map("record_grade")   @db.VarChar(16)
-  sleeveGrade      String?  @map("sleeve_grade")   @db.VarChar(16)
-  hasInsert        Boolean  @map("has_insert")         @default(false)
-  hasBooklet       Boolean  @map("has_booklet")        @default(false)
-  hasObiStrip      Boolean  @map("has_obi_strip")      @default(false)
-  hasFactorySleeve Boolean  @map("has_factory_sleeve") @default(false)
-  isPromo          Boolean  @map("is_promo")           @default(false)
-  notes            String?  @db.Text
+  id               String    @id @db.Uuid @default(uuid())
+  userId           String    @db.Uuid @map("user_id")
+
+  artist           String    @db.VarChar(256)
+  name             String    @db.VarChar(256)
+  format           String    @db.VarChar(64) 
+
+  // Overall condition (top-level, for quick sorting/filtering)
+  recordGrade      Condition? @map("record_grade")
+  sleeveGrade      Condition? @map("sleeve_grade")
+
+  // Extras (presence + optional condition); factory sleeve = presence only
+  hasInsert        Boolean   @map("has_insert")          @default(false)
+  insertGrade      Condition? @map("insert_grade")
+
+  hasBooklet       Boolean   @map("has_booklet")         @default(false)
+  bookletGrade     Condition? @map("booklet_grade")
+
+  hasObiStrip      Boolean   @map("has_obi_strip")       @default(false)
+  obiStripGrade    Condition? @map("obi_strip_grade")
+
+  hasFactorySleeve Boolean   @map("has_factory_sleeve")  @default(false)
+  factorySleeveGrade Condition? @map("factory_sleeve_grade")
+
+  isPromo          Boolean   @map("is_promo")            @default(false)
+
+  catalogNumber    String?   @map("catalog_number") @db.VarChar(64)
+  notes            String?   @db.Text                 
+
   purchasedAt      DateTime? @map("purchased_at")
   pricePaid        Decimal?  @map("price_paid") @db.Decimal(10, 2)
+
+  mediaPieces      RecordMedium[]
+
   createdAt        DateTime  @map("created_at") @default(now())
   updatedAt        DateTime  @map("updated_at") @updatedAt
 
@@ -37,3 +78,24 @@ model Record {
   @@index([artist, name, format])
 }
 
+
+model RecordMedium {
+  id         String      @id @db.Uuid @default(uuid())
+  recordId   String      @db.Uuid @map("record_id")
+  record     Record      @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  index      Int         // 1..N within the record
+  kind       MediumKind
+  sizeInch   Int?        @map("size_inch") // 7/10/12 for vinyl; null for non-vinyl
+  speedRpm   Int?        @map("speed_rpm") // 33/45/78 for vinyl; null for non-vinyl
+
+  discGrade  Condition?  @map("disc_grade")  // overall grade for the piece
+  sides      Json?                        // free-form per-side map, e.g. {"A":"NM","B":"VG+"}
+  notes      String?       @db.Text
+
+  createdAt  DateTime     @map("created_at") @default(now())
+  updatedAt  DateTime     @map("updated_at") @updatedAt
+
+  @@map("record_media")
+  @@unique([recordId, index])
+}

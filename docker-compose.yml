@@ -63,6 +63,25 @@ services:
       retries: 20
       start_period: 10s
 
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:15
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: records
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      SCHEDULE: "0 3 * * *"          # every day 03:00
+      BACKUP_KEEP_DAYS: "7"           # keep 7 daily
+      BACKUP_KEEP_WEEKS: "4"          # (optional) keep 4 weekly
+      BACKUP_KEEP_MONTHS: "6"         # (optional) keep 6 monthly
+      COMPRESS: "gzip"
+    volumes:
+      - ./backups:/backups            # dumps land in ./backups on your host
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v2.55.0
     volumes: ["./infra/prometheus.yml:/etc/prometheus/prometheus.yml"]

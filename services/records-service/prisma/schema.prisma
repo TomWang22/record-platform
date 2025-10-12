@@ -4,97 +4,82 @@ datasource db {
 }
 
 generator client {
-  provider       = "prisma-client-js"
-  output         = "../generated/records-client"
-  binaryTargets  = ["native", "linux-arm64-openssl-3.0.x"]
-}
-
-enum Condition {
-  M
-  NM
-  NM_MINUS
-  EX_PLUS
-  EX
-  EX_MINUS
-  VG_PLUS
-  VG
-  VG_MINUS
-  G_PLUS
-  G
-  G_MINUS
-  F
-  P
-}
-
-enum MediumKind {
-  VINYL
-  CD
-  CASSETTE
-  OTHER
+  provider      = "prisma-client-js"
+  output        = "../generated/records-client"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
 }
 
 model Record {
-  id               String    @id @db.Uuid @default(uuid())
-  userId           String    @db.Uuid @map("user_id")
+  id                 String   @id @db.Uuid @default(uuid())
+  userId             String   @db.Uuid @map("user_id")
 
-  artist           String    @db.VarChar(256)
-  name             String    @db.VarChar(256)
-  format           String    @db.VarChar(64) 
+  artist             String   @db.VarChar(256)
+  name               String   @db.VarChar(256)
+  format             String   @db.VarChar(64)
 
-  // Overall condition (top-level, for quick sorting/filtering)
-  recordGrade      Condition? @map("record_grade")
-  sleeveGrade      Condition? @map("sleeve_grade")
+  // simple strings (no enums)
+  recordGrade        String?  @db.VarChar(16) @map("record_grade")
+  sleeveGrade        String?  @db.VarChar(16) @map("sleeve_grade")
 
-  // Extras (presence + optional condition); factory sleeve = presence only
-  hasInsert        Boolean   @map("has_insert")          @default(false)
-  insertGrade      Condition? @map("insert_grade")
+  hasInsert          Boolean  @map("has_insert")          @default(false)
+  insertGrade        String?  @db.VarChar(16)             @map("insert_grade")
 
-  hasBooklet       Boolean   @map("has_booklet")         @default(false)
-  bookletGrade     Condition? @map("booklet_grade")
+  hasBooklet         Boolean  @map("has_booklet")         @default(false)
+  bookletGrade       String?  @db.VarChar(16)             @map("booklet_grade")
 
-  hasObiStrip      Boolean   @map("has_obi_strip")       @default(false)
-  obiStripGrade    Condition? @map("obi_strip_grade")
+  hasObiStrip        Boolean  @map("has_obi_strip")       @default(false)
+  obiStripGrade      String?  @db.VarChar(16)             @map("obi_strip_grade")
 
-  hasFactorySleeve Boolean   @map("has_factory_sleeve")  @default(false)
-  factorySleeveGrade Condition? @map("factory_sleeve_grade")
+  hasFactorySleeve   Boolean  @map("has_factory_sleeve")  @default(false)
+  factorySleeveGrade String?  @db.VarChar(16)             @map("factory_sleeve_grade")
 
-  isPromo          Boolean   @map("is_promo")            @default(false)
+  isPromo            Boolean  @map("is_promo")            @default(false)
 
-  catalogNumber    String?   @map("catalog_number") @db.VarChar(64)
-  notes            String?   @db.Text                 
+  catalogNumber      String?  @db.VarChar(64)             @map("catalog_number")
+  notes              String?  @db.Text
 
-  purchasedAt      DateTime? @map("purchased_at")
-  pricePaid        Decimal?  @map("price_paid") @db.Decimal(10, 2)
+  purchasedAt        DateTime?                            @map("purchased_at")
+  pricePaid          Decimal?  @db.Decimal(10, 2)         @map("price_paid")
 
-  mediaPieces      RecordMedium[]
+  // NEW: pressing/release metadata
+  releaseYear        Int?      @map("release_year")
+  releaseDate        DateTime? @map("release_date")
+  pressingYear       Int?      @map("pressing_year")
+  label              String?   @db.VarChar(128)
+  labelCode          String?   @db.VarChar(64)             @map("label_code")
 
-  createdAt        DateTime  @map("created_at") @default(now())
-  updatedAt        DateTime  @map("updated_at") @updatedAt
+  mediaPieces        RecordMedium[]
+
+  createdAt          DateTime @default(now())             @map("created_at")
+  updatedAt          DateTime @updatedAt                  @map("updated_at")
 
   @@map("records")
   @@index([userId])
   @@index([artist])
   @@index([catalogNumber])
   @@index([artist, name, format])
+
+  // NEW indexes
+  @@index([releaseYear])
+  @@index([label])
 }
 
-
 model RecordMedium {
-  id         String      @id @db.Uuid @default(uuid())
-  recordId   String      @db.Uuid @map("record_id")
-  record     Record      @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  id         String   @id @db.Uuid @default(uuid())
+  recordId   String   @db.Uuid @map("record_id")
+  record     Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
 
-  index      Int         // 1..N within the record
-  kind       MediumKind
-  sizeInch   Int?        @map("size_inch") // 7/10/12 for vinyl; null for non-vinyl
-  speedRpm   Int?        @map("speed_rpm") // 33/45/78 for vinyl; null for non-vinyl
+  index      Int
+  kind       String   @db.Text
+  sizeInch   Int?     @map("size_inch")
+  speedRpm   Int?     @map("speed_rpm")
 
-  discGrade  Condition?  @map("disc_grade")  // overall grade for the piece
-  sides      Json?                        // free-form per-side map, e.g. {"A":"NM","B":"VG+"}
-  notes      String?       @db.Text
+  discGrade  String?  @db.VarChar(16) @map("disc_grade")
+  sides      Json?
+  notes      String?  @db.Text
 
-  createdAt  DateTime     @map("created_at") @default(now())
-  updatedAt  DateTime     @map("updated_at") @updatedAt
+  createdAt  DateTime @default(now())  @map("created_at")
+  updatedAt  DateTime @updatedAt       @map("updated_at")
 
   @@map("record_media")
   @@unique([recordId, index])

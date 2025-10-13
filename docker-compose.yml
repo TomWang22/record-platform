@@ -119,6 +119,8 @@ services:
       kafka: { condition: service_healthy }
       redis: { condition: service_healthy }
     expose: ["4001"]
+    ports:
+      - "4001:4001"
     restart: unless-stopped
     healthcheck:
       test:

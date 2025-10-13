@@ -126,6 +126,39 @@ app.get("/__echo_authz", (req, res) => {
   res.json({ path: req.path, authz: req.headers.authorization ?? null });
 });
 
+type RouteRule = { method: string; pattern: RegExp };
+const OPEN_ROUTES: RouteRule[] = [
+  { method: "GET", pattern: /^\/(?:api\/)?healthz\/?$/ },
+  { method: "GET", pattern: /^\/(?:api\/)?metrics\/?$/ },
+  { method: "POST", pattern: /^\/(?:api\/)?auth\/login\/?$/ },
+  { method: "GET", pattern: /^\/(?:api\/)?listings(?:\/|$)/ },
+  { method: "GET", pattern: /^\/(?:api\/)?ai(?:\/|$)/ },
+];
+
+const isOpenRoute = (req: Request) => {
+  const url =
+    (req.headers["x-original-uri"] as string) ||
+    (req.headers["x-forwarded-uri"] as string) ||
+    req.originalUrl ||
+    req.url ||
+    req.path ||
+    "";
+  return OPEN_ROUTES.some(
+    (rule) => rule.method === req.method && rule.pattern.test(url)
+  );
+};
+
+app.use((req, _res, next) => {
+  console.log(
+    `[gw] ${req.method} path=${req.path} orig=${req.originalUrl} raw=${
+      (req.headers["x-original-uri"] as string) ??
+      (req.headers["x-forwarded-uri"] as string) ??
+      req.originalUrl
+    } open=${isOpenRoute(req)} auth=${!!req.headers.authorization}`
+  );
+  next();
+});
+
 app.use((req, _res, next) => {
   if (req.path === "/records" || req.path.startsWith("/records/")) {
     console.log(
@@ -162,29 +195,13 @@ app.use((req, _res, next) => {
 
 // -------------------- AUTH GUARD --------------------
 app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
-  const p = req.path;
-
-  if (p === "/healthz" || p === "/metrics" || p.startsWith("/auth/"))
-    return next();
-  if (
-    req.method === "GET" &&
-    (p.startsWith("/listings/") || p.startsWith("/ai/"))
-  )
-    return next();
+  if (isOpenRoute(req)) return next();
 
   delete (req.headers as any)["x-user-id"];
   delete (req.headers as any)["x-user-email"];
   delete (req.headers as any)["x-user-jti"];
 
   const token = extractBearer(req);
-  console.log(
-    "[gw] guard token?",
-    !!token,
-    "len=",
-    token?.length,
-    "path=",
-    req.path
-  );
   if (!token) return res.status(401).json({ error: "auth required" });
 
   try {

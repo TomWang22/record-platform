@@ -16,6 +16,18 @@ Fully dockerized dev environment
 
 ✅ Recent fixes:
 
+# Login
+JWT=$(
+  curl -sS -H 'content-type: application/json' \
+    -d '{"email":"t@t.t","password":"p@ssw0rd"}' \
+    http://localhost:8080/api/auth/login | jq -r .token
+)
+
+# Create
+curl -sS -H "Authorization: Bearer $JWT" -H 'content-type: application/json' \
+  -d '{"artist":"Aphex Twin","name":"SAW 85-92","format":"LP"}' \
+  http://localhost:8080/api/records | jq .
+
 Gateway now verifies JWTs and injects x-user-* headers to downstream services.
 
 Records proxy uses the mount path (no extra rewrite), so /api/records hits /records upstream.

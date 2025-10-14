@@ -7,6 +7,9 @@ coverage/
 __pycache__/
 *.pyc
 .venv/
+*.json
+*.ndjson
+*.csv
 
 services/**/src/*.js
 

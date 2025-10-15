@@ -1,26 +1,34 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
-/* ========= env =========
-   - If you pass BASE_URL=http://api-gateway:4000       → API_BASE=http://api-gateway:4000 (records), AUTH_BASE same (login)
-   - If you pass BASE_URL=http://nginx:8080/api         → API_BASE=http://nginx:8080/api  (records), AUTH_BASE=http://nginx:8080 (login)
-*/
-const RAW_BASE  = (__ENV.BASE_URL || 'http://api-gateway:4000').replace(/\/$/, '');
-const API_BASE  = RAW_BASE;                    // used for /records...
-const AUTH_BASE = RAW_BASE.replace(/\/api$/, ''); // login lives one level up when using nginx /api
+// ===== base URLs (robust to /api or not) =====
+const RAW_BASE  = __ENV.BASE_URL || 'http://api-gateway:4000'; // default in compose
+const API_BASE  = RAW_BASE.replace(/\/$/, '');                  // canonical base for API calls
 
-const EMAIL     = __ENV.EMAIL     || 't@t.t';
-const PASS      = __ENV.PASS      || 'p@ssw0rd';
-const MODE      = ( __ENV.MODE    || 'mixed').toLowerCase();
+const u = new URL(API_BASE);
+const ORIGIN = `${u.protocol}//${u.host}`;                      // scheme://host:port
+const HAS_API_PREFIX = (u.pathname || '').startsWith('/api');
+
+// helper to build API URLs
+function apiUrl(path) {
+  const p = path.startsWith('/') ? path : `/${path}`;
+  // If API_BASE already includes a path (e.g. /api), just append.
+  return `${API_BASE}${p}`;
+}
+
+// ===== env =====
+const EMAIL     = __ENV.EMAIL      || 't@t.t';
+const PASS      = __ENV.PASS       || 'p@ssw0rd';
+const MODE      = ( __ENV.MODE     || 'mixed').toLowerCase();
 const RATE      = Number(__ENV.RATE || 50);
-const DURATION  = __ENV.DURATION || '5m';
+const DURATION  = __ENV.DURATION   || '5m';
 const VUS       = Number(__ENV.VUS || 20);
 const MAX_VUS   = Number(__ENV.MAX_VUS || 200);
 const DEBUG     = __ENV.DEBUG === '1';
-const WRITE_PCT = Number(__ENV.WRITE_PCT || 35);
+const WRITE_PCT = Number(__ENV.WRITE_PCT || 35);     // % iterations that do writes
 const BASE_BACKOFF_MS = Number(__ENV.BACKOFF_MS || 200);
 
-/* ========= tiny helpers ========= */
+// ===== tiny helpers =====
 function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 function dbg(label, res) {
   if (DEBUG && res) {
@@ -36,16 +44,16 @@ function retryAfterSeconds(res) {
   if (!ra) return 0;
   const n = Number(ra);
   if (!Number.isNaN(n)) return n; // seconds
-  return 1; // minimal sleep if HTTP-date
+  return 1;
 }
 function backoffOnce(res, attempt) {
-  const jitter = Math.random() * 0.2; // up to +200ms
+  const jitter = Math.random() * 0.2; // 0–200ms jitter when base is 1s
   const ra = retryAfterSeconds(res);
   const delayMs = ra ? ra * 1000 : Math.min(BASE_BACKOFF_MS * Math.pow(2, attempt), 4000);
   sleep((delayMs / 1000) + jitter);
 }
 
-/* ========= options builder ========= */
+// ===== options builder =====
 function buildOptions(mode) {
   const thresholds = {
     http_req_failed: ['rate<0.01'],
@@ -137,19 +145,28 @@ function buildOptions(mode) {
 }
 export const options = buildOptions(MODE);
 
-/* ========= test logic ========= */
+// ===== test logic =====
 let token;
 const myIds = new Map(); // per-VU created IDs
 
 function loginWithRetry() {
   const payload = JSON.stringify({ email: EMAIL, password: PASS });
-  const candidates = Array.from(new Set([AUTH_BASE, API_BASE])); // try base w/o /api, then with /api
+
+  // Prefer /api/auth/login if BASE_URL includes /api; fallback to origin (/auth/login)
+  const candidates = HAS_API_PREFIX
+    ? [ apiUrl('/auth/login'), `${ORIGIN}/auth/login` ]
+    : [ `${ORIGIN}/auth/login`, apiUrl('/auth/login') ];
 
   for (let attempt = 0; attempt < 8; attempt++) {
-    for (const b of candidates) {
-      const url = `${b}/auth/login`;
+    for (const url of candidates) {
       const res = http.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
       dbg(`LOGIN ${url}`, res);
+
+      if (res.status === 0) {
+        // network or DNS failure
+        backoffOnce(res, attempt);
+        continue;
+      }
 
       const ok = res.status >= 200 && res.status < 300;
       if (ok) {
@@ -159,12 +176,15 @@ function loginWithRetry() {
         throw new Error('Login succeeded but no token in response');
       }
 
-      if (res.status === 404) continue; // try the other base next
+      if (res.status === 404) {
+        // try the next candidate in this attempt
+        continue;
+      }
       if (shouldBackoff(res)) { backoffOnce(res, attempt); continue; }
-      throw new Error(`Login failed: status=${res.status} body=${String(res.body || '').slice(0, 200)}`);
+      throw new Error(`Login failed: url=${url} status=${res.status} body=${String(res.body || '').slice(0, 200)}`);
     }
   }
-  throw new Error('Login failed after retries (429/5xx or both bases 404).');
+  throw new Error('Login failed after retries (DNS/connection/429/5xx or both candidates 404).');
 }
 
 export function setup() {
@@ -183,8 +203,7 @@ function createRecord(t) {
     format: 'LP',
     recordGrade: 'VG+',
   };
-  // Do NOT retry POST to avoid dupes
-  const res = http.post(`${API_BASE}/records`, JSON.stringify(payload), auth(t));
+  const res = http.post(apiUrl('/records'), JSON.stringify(payload), auth(t));
   dbg('POST /records', res);
 
   const ok = check(res, { 'POST /records 2xx': r => r.status >= 200 && r.status < 300 });
@@ -193,7 +212,7 @@ function createRecord(t) {
   const j = safeJson(res);
   const id = j && j.id;
   if (id) {
-    const upd = http.put(`${API_BASE}/records/${id}`, JSON.stringify({ notes: `k6_${__VU}_${Date.now()}` }), auth(t));
+    const upd = http.put(apiUrl(`/records/${id}`), JSON.stringify({ notes: `k6_${__VU}_${Date.now()}` }), auth(t));
     dbg('PUT /records/:id (notes)', upd);
     check(upd, { 'PUT notes 2xx': r => r.status >= 200 && r.status < 300 });
     const arr = myIds.get(__VU) || [];
@@ -205,20 +224,19 @@ function createRecord(t) {
 function listRecords(t) {
   let res;
   for (let attempt = 0; attempt < 3; attempt++) {
-    res = http.get(`${API_BASE}/records`, auth(t));
+    res = http.get(apiUrl('/records'), auth(t));
     dbg('GET /records', res);
     if (shouldBackoff(res)) { backoffOnce(res, attempt); continue; }
     break;
   }
-  const ok = check(res, { 'GET /records 2xx': r => r.status >= 200 && r.status < 300 });
-  if (!ok) return;
+  check(res, { 'GET /records 2xx': r => r.status >= 200 && r.status < 300 });
   safeJson(res);
 }
 
 function getOneOfMine(t) {
   let mine = myIds.get(__VU) || [];
   if (!mine.length) {
-    if (WRITE_PCT === 0) return; // no seeding in read-only mode
+    if (WRITE_PCT === 0) return; // don’t seed on read-only runs
     createRecord(t);
     mine = myIds.get(__VU) || [];
     if (!mine.length) return;
@@ -227,7 +245,7 @@ function getOneOfMine(t) {
 
   let res;
   for (let attempt = 0; attempt < 3; attempt++) {
-    res = http.get(`${API_BASE}/records/${id}`, auth(t));
+    res = http.get(apiUrl(`/records/${id}`), auth(t));
     dbg('GET /records/:id', res);
     if (shouldBackoff(res)) { backoffOnce(res, attempt); continue; }
     break;
@@ -244,7 +262,7 @@ function updateOneOfMine(t) {
 
   let res;
   for (let attempt = 0; attempt < 3; attempt++) {
-    res = http.put(`${API_BASE}/records/${id}`, JSON.stringify(body), auth(t));
+    res = http.put(apiUrl(`/records/${id}`), JSON.stringify(body), auth(t));
     dbg('PUT /records/:id', res);
     if (shouldBackoff(res)) { backoffOnce(res, attempt); continue; }
     break;
@@ -260,7 +278,7 @@ function deleteOneOfMine(t) {
 
   let res;
   for (let attempt = 0; attempt < 3; attempt++) {
-    res = http.del(`${API_BASE}/records/${id}`, null, auth(t));
+    res = http.del(apiUrl(`/records/${id}`), null, auth(t));
     dbg('DEL /records/:id', res);
     if (shouldBackoff(res)) { backoffOnce(res, attempt); continue; }
     break;
@@ -269,7 +287,7 @@ function deleteOneOfMine(t) {
   if (ok) { mine.splice(idx, 1); myIds.set(__VU, mine); }
 }
 
-/* ========= iteration loops ========= */
+// ===== iteration loops =====
 function loopMixed(t) {
   const roll = Math.random() * 100;
   if (roll < (100 - WRITE_PCT)) {
@@ -291,5 +309,4 @@ function loopReadMostly(t) {
 export function runMixed(data)      { loopMixed(data.token); }
 export function runReadMostly(data) { loopReadMostly(data.token); }
 
-// No teardown — avoids __VU visibility issues
 export function teardown(_) { /* no-op */ }

@@ -1,25 +1,20 @@
-# -------- Makefile (repo root) --------
-# Use: make help
-
 COMPOSE := docker compose
 
-# All services as named in docker-compose.yml (order matters a bit for readability)
 SERVICES := \
   zookeeper kafka redis postgres prometheus grafana \
   auth-service records-service listings-service analytics-service \
   cron-jobs auction-monitor api-gateway webapp python-ai-service \
   haproxy nginx
 
-# Only include services that actually have Docker health checks.
 HEALTH_WAIT_SERVICES ?= postgres zookeeper kafka auth-service records-service listings-service analytics-service api-gateway
-
-# Default service for service-specific logs/rebuild/restart:
 SRV ?= records-service
-
 BACKUPS_DIR := backups
 
-# ---------- Quick waits ----------
-.PHONY: wait-api wait-all logs-recent
+.PHONY: wait-api wait-all logs-recent \
+        up up-all start-all stop-all restart-all ps logs logs-all rebuild build-all build-nc wait \
+        backup list-backups restore down prune deep-clean e2e \
+        token whoami k6-reads k6-mixed nginx-reload restart-edge \
+        haproxy-reload haproxy-conf haproxy-test haproxy-logs haproxy-lint-host haproxy-fix-eol edge-dns scale-gateway help
 
 ## Wait until HTTP 200 from the public API (via nginx)
 wait-api:
@@ -30,8 +25,7 @@ wait-api:
 	  sleep 2; \
 	done; echo "API not ready"; $(COMPOSE) ps; exit 1'
 
-## Wait until docker health checks are "healthy" for core services, ensure nginx is running,
-## verify gateway is reachable *from* nginx, then confirm external /api/healthz
+## Wait for health checks, ensure nginx up, verify gateway from nginx
 wait-all:
 	@set -e; \
 	for s in $(HEALTH_WAIT_SERVICES); do \
@@ -56,30 +50,16 @@ wait-all:
 	  && echo "✓ gateway DNS ok" || { echo "✗ nginx cannot reach api-gateway:4000"; exit 1; }; \
 	$(MAKE) wait-api
 
-## Show recent logs for key services (override N=300)
 logs-recent:
 	@N=$${N:-300}; echo "Last $$N lines from key services:"; \
 	$(COMPOSE) logs --since=10m api-gateway records-service nginx postgres | tail -n $$N
 
 # ---------- Lifecycle ----------
-.PHONY: up up-all start-all stop-all restart-all ps logs logs-all rebuild build-all build-nc wait
-
-## Create containers if needed & start ALL services (detached)
-up:
-	$(COMPOSE) up -d $(SERVICES)
-
-## up + block until key services report healthy and API is live
+up: ; $(COMPOSE) up -d $(SERVICES)
 up-all: up wait-all
+start-all: ; $(COMPOSE) start $(SERVICES)
+stop-all: ; $(COMPOSE) stop $(SERVICES)
 
-## Start previously created containers (won’t build or create)
-start-all:
-	$(COMPOSE) start $(SERVICES)
-
-## Stop containers (keeps them + volumes)
-stop-all:
-	$(COMPOSE) stop $(SERVICES)
-
-## Restart core containers, wait, then restart nginx (so it resolves fresh), then confirm API
 restart-all:
 	$(COMPOSE) restart zookeeper kafka redis postgres prometheus grafana \
 	  auth-service records-service listings-service analytics-service \
@@ -88,30 +68,17 @@ restart-all:
 	$(COMPOSE) restart nginx
 	$(MAKE) wait-api
 
-ps:
-	$(COMPOSE) ps
+## Restart only edge pieces (PHONY prevents “Nothing to be done”)
+restart-edge:
+	$(COMPOSE) restart api-gateway haproxy nginx
 
-## Tail logs for one service (override with SRV=api-gateway)
-logs:
-	$(COMPOSE) logs -f $(SRV)
+ps: ; $(COMPOSE) ps
+logs: ; $(COMPOSE) logs -f $(SRV)
+logs-all: ; $(COMPOSE) logs -f
+rebuild: ; $(COMPOSE) build $(SRV) && $(COMPOSE) up -d $(SRV)
+build-all: ; $(COMPOSE) build $(SERVICES)
+build-nc: ; $(COMPOSE) build --no-cache $(SERVICES)
 
-## Tail logs for ALL services
-logs-all:
-	$(COMPOSE) logs -f
-
-## Rebuild and redeploy one service
-rebuild:
-	$(COMPOSE) build $(SRV) && $(COMPOSE) up -d $(SRV)
-
-## Build all images (cache ok)
-build-all:
-	$(COMPOSE) build $(SERVICES)
-
-## Build all images (no cache)
-build-nc:
-	$(COMPOSE) build --no-cache $(SERVICES)
-
-## Wait until HEALTH=healthy for a set of services (no external /api check)
 wait:
 	@set -e; \
 	for s in $(HEALTH_WAIT_SERVICES); do \
@@ -125,10 +92,7 @@ wait:
 	  echo "✓ $$s healthy"; \
 	done
 
-# ---------- DB backups (records schema only) ----------
-.PHONY: backup list-backups restore
-
-## Dump schema 'records' to backups/records_YYYY-MM-DD_HHMM.sql.gz
+# ---------- DB ----------
 backup:
 	mkdir -p $(BACKUPS_DIR)
 	$(COMPOSE) exec -T postgres \
@@ -138,35 +102,77 @@ backup:
 list-backups:
 	@ls -lh $(BACKUPS_DIR) 2>/dev/null || echo "No backups yet."
 
-## Restore a backup file: make restore FILE=backups/records_YYYY-MM-DD_HHMM.sql.gz
 restore:
 	@test -n "$(FILE)" || (echo "ERROR: pass FILE=path/to/backup.sql.gz"; exit 1)
 	$(COMPOSE) exec -T postgres psql -U postgres -d records -c "CREATE SCHEMA IF NOT EXISTS records;"
 	zcat "$(FILE)" | $(COMPOSE) exec -T postgres psql -U postgres -d records
 
 # ---------- Cleanup ----------
-.PHONY: down prune deep-clean
-
-## Stop and remove containers (keeps volumes; DB SAFE)
-down:
-	$(COMPOSE) down
-
-## Remove stopped containers/images/networks (keeps volumes; DB SAFE)
-prune:
-	docker system prune -f
-
-## NUKE containers + VOLUMES (DB LOST) — confirm required
+down: ; $(COMPOSE) down
+prune: ; docker system prune -f
 deep-clean:
 	@test "$(CONFIRM)" = "YES" || (echo "Refusing. Run: make deep-clean CONFIRM=YES"; exit 2)
 	$(COMPOSE) down -v --remove-orphans
 	docker system prune -af
 
 # ---------- E2E ----------
-.PHONY: e2e
-e2e:
-	./scripts/e2e_records.sh
+e2e: ; ./scripts/e2e_records.sh
 
-# ---------- Help ----------
-.PHONY: help
+# ---------- LOAD / UTIL ----------
+token:
+	@EMAIL="$${EMAIL:-t@t.t}" PASS="$${PASS:-p@ssw0rd}" bash scripts/load/get-token.sh
+
+whoami:
+	@TOKEN="$$(EMAIL="$${EMAIL:-t@t.t}" PASS="$${PASS:-p@ssw0rd}" bash scripts/load/get-token.sh)"; \
+	test -n "$$TOKEN" || { echo "no token"; exit 1; }; \
+	TOKEN="$$TOKEN" bash scripts/load/whoami.sh
+
+k6-reads:
+	@TOKEN="$$(EMAIL="$${EMAIL:-t@t.t}" PASS="$${PASS:-p@ssw0rd}" bash scripts/load/get-token.sh)"; \
+	echo "TOKEN=$${TOKEN:0:16}…"; \
+	docker run --rm --network record-platform_default -v "$$PWD:/work" -w /work \
+	-e BASE_URL="http://nginx:8080" -e TOKEN="$$TOKEN" \
+	-e RATE="$${RATE:-300}" -e VUS="$${VUS:-50}" -e DURATION="$${DURATION:-30s}" \
+	-e ACCEPT_429="$${ACCEPT_429:-1}" -e SYNTH_IP="$${SYNTH_IP:-1}" \
+	grafana/k6:latest run scripts/load/k6-reads.js
+
+k6-mixed:
+	@TOKEN="$$(EMAIL="$${EMAIL:-t@t.t}" PASS="$${PASS:-p@ssw0rd}" bash scripts/load/get-token.sh)"; \
+	echo "TOKEN=$${TOKEN:0:16}…"; \
+	docker run --rm --network record-platform_default -v "$$PWD:/work" -w /work \
+	-e BASE_URL="http://nginx:8080" -e TOKEN="$$TOKEN" \
+	-e RATE="$${RATE:-120}" -e VUS="$${VUS:-20}" -e DURATION="$${DURATION:-30s}" \
+	-e ACCEPT_429="$${ACCEPT_429:-1}" -e SYNTH_IP="$${SYNTH_IP:-1}" \
+	grafana/k6:latest run scripts/load/k6-mixed.js
+
+nginx-reload: ; $(COMPOSE) exec -T nginx nginx -s reload
+
+haproxy-reload:
+	-$(COMPOSE) exec -T haproxy sh -lc 'haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg && kill -HUP 1' || $(COMPOSE) restart haproxy
+
+haproxy-conf:
+	$(COMPOSE) exec -T haproxy sh -lc 'echo "=== running config ==="; sed -n "1,200p" /usr/local/etc/haproxy/haproxy.cfg; echo; echo "=== haproxy -c ==="; haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg' || true
+
+haproxy-logs:
+	$(COMPOSE) logs -f haproxy
+
+haproxy-test:
+	docker run --rm --network record-platform_default curlimages/curl:8.7.1 -sSI http://haproxy:8081/healthz | head -n 5 || true
+	docker run --rm --network record-platform_default curlimages/curl:8.7.1 -sS  http://haproxy:8404/ | head || true
+
+haproxy-lint-host:
+	docker run --rm -v "$$PWD/infra/haproxy/haproxy.cfg:/cfg:ro" haproxy:2.8 haproxy -c -f /cfg
+
+## Fix CRLF and ensure trailing newline on HAProxy cfg (mac-safe)
+haproxy-fix-eol:
+	@perl -pi -e 's/\r$$//' infra/haproxy/haproxy.cfg
+	@awk '1; END{if (NR>0 && $$0 !~ /\n/) print ""}' infra/haproxy/haproxy.cfg > infra/haproxy/haproxy.cfg.new && mv infra/haproxy/haproxy.cfg.new infra/haproxy/haproxy.cfg
+	@echo "normalized EOL + ensured trailing newline"
+
+scale-gateway: ; $(COMPOSE) up -d --scale api-gateway=$${N:-3}
+
+edge-dns:
+	$(COMPOSE) exec -T nginx sh -lc 'getent hosts api-gateway || true; getent hosts haproxy || true'
+
 help:
 	@awk 'BEGIN{FS=":.*##"; printf "\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*##/{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST); echo ""

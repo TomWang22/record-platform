@@ -83,7 +83,7 @@ importers:
         specifier: ^7.1.0
         version: 7.2.0
       http-proxy-middleware:
-        specifier: ^3.0.0
+        specifier: ^3.0.5
         version: 3.0.5
       prom-client:
         specifier: ^15.1.3

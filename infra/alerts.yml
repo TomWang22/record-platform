@@ -1,0 +1,44 @@
+groups:
+  - name: edge-health
+    rules:
+      # NGINX exporter down
+      - alert: NginxExporterDown
+        expr: up{job="nginx"} == 0
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "NGINX exporter is down"
+          description: "Prometheus cannot scrape nginx-exporter for 2m."
+
+      # High rate of 429s at the edge (over last 5m)
+      - alert: NginxTooMany429
+        expr: |
+          sum(rate(nginx_http_requests_total{status="429"}[5m]))
+          /
+          clamp_min(sum(rate(nginx_http_requests_total[5m])), 1)
+          > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "High proportion of 429 responses"
+          description: "More than 5% of requests are 429 over 5m. Investigate limits/bursts."
+
+      # 5xx spike from NGINX (usually upstream errors)
+      - alert: Nginx5xxSpike
+        expr: sum(rate(nginx_http_requests_total{status=~"5.."}[5m])) > 1
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "NGINX 5xx rate is elevated"
+          description: "5xx > 1 req/s over 5m. Check upstream health and timeouts."
+
+  - name: infra-scrapes
+    rules:
+      # Any job target down (generic)
+      - alert: TargetDown
+        expr: up == 0
+        for: 3m
+        labels: { severity: warning }
+        annotations:
+          summary: "Prometheus target down"
+          description: "Job {{ $labels.job }} target {{ $labels.instance }} is down."

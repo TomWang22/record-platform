@@ -4,12 +4,14 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-      # This may not be taking effect in your image; rely on SRVR which is enabled by default.
       ZOOKEEPER_4LW_COMMANDS_WHITELIST: "ruok,stat,srvr,mntr"
     restart: unless-stopped
     healthcheck:
-      # Probe with SRVR and look for "Mode:" in the reply
-      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/2181; echo srvr >&3; timeout 2 cat <&3 | grep -qi \"Mode:\"'"]
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/2181; echo srvr >&3; timeout 2 cat <&3 | grep -qi 'Mode:'",
+        ]
       interval: 5s
       timeout: 3s
       retries: 25
@@ -18,8 +20,7 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     depends_on:
-      zookeeper:
-        condition: service_healthy
+      zookeeper: { condition: service_healthy }
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -28,11 +29,14 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    ports:
-      - "29092:29092"
+    ports: ["29092:29092"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      test:
+        [
+          "CMD-SHELL",
+          "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -40,11 +44,11 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server","--save","","--appendonly","no"]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
     ports: ["6379:6379"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD","redis-cli","ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -57,7 +61,7 @@ services:
     ports: ["5432:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
     healthcheck:
-      test: ["CMD-SHELL","pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -66,20 +70,19 @@ services:
   postgres-backup:
     image: prodrigestivill/postgres-backup-local:15
     depends_on:
-      postgres:
-        condition: service_healthy
+      postgres: { condition: service_healthy }
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_DB: records
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      SCHEDULE: "0 3 * * *"          # every day 03:00
-      BACKUP_KEEP_DAYS: "7"           # keep 7 daily
-      BACKUP_KEEP_WEEKS: "4"          # (optional) keep 4 weekly
-      BACKUP_KEEP_MONTHS: "6"         # (optional) keep 6 monthly
+      SCHEDULE: "0 3 * * *"
+      BACKUP_KEEP_DAYS: "7"
+      BACKUP_KEEP_WEEKS: "4"
+      BACKUP_KEEP_MONTHS: "6"
       COMPRESS: "gzip"
     volumes:
-      - ./backups:/backups            # dumps land in ./backups on your host
+      - ./backups:/backups
     restart: unless-stopped
 
   prometheus:
@@ -89,7 +92,7 @@ services:
     restart: unless-stopped
     ports: ["9091:9090"]
     healthcheck:
-      test: ["CMD-SHELL","wget -qO- http://localhost:9090/-/ready >/dev/null"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/ready >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -100,43 +103,37 @@ services:
     restart: unless-stopped
     ports: ["3000:3000"]
     depends_on:
-      prometheus:
-        condition: service_healthy
+      prometheus: { condition: service_healthy }
     healthcheck:
-     test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/api/health >/dev/null"]
-     interval: 10s
-     timeout: 5s
-     retries: 12
-     start_period: 30s
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/api/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   auth-service:
-    build:
-      context: .
-      dockerfile: services/auth-service/Dockerfile
+    build: { context: ., dockerfile: services/auth-service/Dockerfile }
     env_file: [.env]
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
       redis: { condition: service_healthy }
     expose: ["4001"]
-    ports:
-      - "4001:4001"
+    ports: ["4001:4001"]
     restart: unless-stopped
     healthcheck:
       test:
-        - CMD-SHELL
-        - >
-          node -e "require('http').get('http://127.0.0.1:4001/healthz',
-          r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://127.0.0.1:4001/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\"",
+        ]
       interval: 5s
       timeout: 2s
       retries: 10
       start_period: 10s
 
   records-service:
-    build:
-      context: .
-      dockerfile: services/records-service/Dockerfile
+    build: { context: ., dockerfile: services/records-service/Dockerfile }
     env_file: [.env]
     depends_on:
       postgres: { condition: service_healthy }
@@ -145,19 +142,17 @@ services:
     restart: unless-stopped
     healthcheck:
       test:
-        - CMD-SHELL
-        - >
-          node -e "require('http').get('http://127.0.0.1:4002/healthz',
-          r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://127.0.0.1:4002/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\"",
+        ]
       interval: 5s
       timeout: 2s
       retries: 10
       start_period: 10s
 
   listings-service:
-    build:
-      context: .
-      dockerfile: services/listings-service/Dockerfile
+    build: { context: ., dockerfile: services/listings-service/Dockerfile }
     env_file: [.env]
     depends_on:
       postgres: { condition: service_healthy }
@@ -165,16 +160,14 @@ services:
     expose: ["4003"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD","wget","-qO-","http://localhost:4003/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:4003/healthz"]
       interval: 10s
       timeout: 3s
       retries: 10
       start_period: 30s
 
   analytics-service:
-    build:
-      context: .
-      dockerfile: services/analytics-service/Dockerfile
+    build: { context: ., dockerfile: services/analytics-service/Dockerfile }
     env_file: [.env]
     depends_on:
       kafka: { condition: service_healthy }
@@ -182,31 +175,30 @@ services:
     expose: ["4004"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD","wget","-qO-","http://localhost:4004/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:4004/healthz"]
       interval: 10s
       timeout: 3s
       retries: 10
-      start_period: 30s
+    environment:
+      BASE_URL: http://haproxy:8081   # call gateway via HAProxy internally
 
   cron-jobs:
-    build:
-      context: .
-      dockerfile: services/cron-jobs/Dockerfile
+    build: { context: ., dockerfile: services/cron-jobs/Dockerfile }
     env_file: [.env]
     depends_on:
       postgres: { condition: service_healthy }
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL","ps aux | grep -v grep | grep -q 'node dist/jobs.js'"]
+      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'node dist/jobs.js'"]
       interval: 20s
       timeout: 5s
       retries: 5
       start_period: 20s
+    environment:
+      BASE_URL: http://haproxy:8081
 
   auction-monitor:
-    build:
-      context: .
-      dockerfile: services/auction-monitor/Dockerfile
+    build: { context: ., dockerfile: services/auction-monitor/Dockerfile }
     env_file: [.env]
     depends_on:
       kafka: { condition: service_healthy }
@@ -216,19 +208,18 @@ services:
     restart: unless-stopped
     healthcheck:
       test:
-        - CMD-SHELL
-        - >
-          node -e "require('http').get('http://127.0.0.1:4010/healthz',
-          r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://127.0.0.1:4010/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\"",
+        ]
       interval: 5s
       timeout: 2s
       start_period: 5s
-      retries: 5
+    environment:
+      BASE_URL: http://haproxy:8081
 
   api-gateway:
-    build:
-      context: .
-      dockerfile: services/api-gateway/Dockerfile
+    build: { context: ., dockerfile: services/api-gateway/Dockerfile }
     env_file: [.env]
     depends_on:
       auth-service: { condition: service_healthy }
@@ -239,30 +230,26 @@ services:
     expose: ["4000"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD","wget","-qO-","http://localhost:4000/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/healthz"]
       interval: 10s
       timeout: 3s
       retries: 10
       start_period: 30s
 
   webapp:
-    build:
-      context: .
-      dockerfile: webapp/Dockerfile
+    build: { context: ., dockerfile: webapp/Dockerfile }
     env_file: [.env]
     expose: ["3001"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL","wget -qO- http://localhost:3001/ >/dev/null"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/ >/dev/null"]
       interval: 15s
       timeout: 5s
       retries: 10
       start_period: 30s
 
   python-ai-service:
-    build:
-      context: ./services/python-ai-service
-      dockerfile: Dockerfile
+    build: { context: ./services/python-ai-service, dockerfile: Dockerfile }
     env_file: [.env]
     depends_on:
       redis: { condition: service_healthy }
@@ -272,7 +259,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "python -c \"import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:5005/healthz', timeout=3).status==200 else sys.exit(1)\""
+          "python -c \"import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:5005/healthz', timeout=3).status==200 else sys.exit(1)\"",
         ]
       interval: 10s
       timeout: 5s
@@ -281,10 +268,20 @@ services:
 
   haproxy:
     image: haproxy:2.9
-    volumes: ["./infra/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro"]
-    ports: ["8081:8081"]
+    volumes:
+      - ./infra/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "8081:8081"     # API front
+      - "8404:8404"     # HAProxy stats
     depends_on:
-      api-gateway: { condition: service_started }
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "haproxy", "-c", "-f", "/usr/local/etc/haproxy/haproxy.cfg"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
     restart: unless-stopped
 
   nginx:
@@ -292,14 +289,23 @@ services:
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - nginx_cache:/var/cache/nginx
-    ports: ["8080:8080"]
+    ports:
+      - "8080:8080"
+      - "8082:8082"   # perf port (no write limits)
     depends_on:
-      api-gateway: { condition: service_started }
-      webapp: { condition: service_started }
-    # wait for gateway DNS to exist to avoid "host not found in upstream"
-    command: ["/bin/sh","-lc","until getent hosts api-gateway; do echo 'waiting for api-gateway'; sleep 1; done; nginx -g 'daemon off;'"]
+      haproxy: { condition: service_healthy }
+      webapp:  { condition: service_healthy }
     restart: unless-stopped
-
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz >/dev/null"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
+      start_period: 10s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
 volumes:
   pgdata:

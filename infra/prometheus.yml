@@ -24,13 +24,12 @@ scrape_configs:
           - api-gateway:4000
           - python-ai-service:5005
 
-  # NGINX exporter (if you added it earlier)
+  # Optional NGINX exporter (only if you actually run one)
   - job_name: nginx
     static_configs:
       - targets: ["nginx-exporter:9113"]
 
-  # NEW: HAProxy Prometheus exporter on :8404
+  # CORRECT: scrape the exporter, not haproxy:8404 directly
   - job_name: haproxy
-    metrics_path: /metrics
     static_configs:
-      - targets: ["haproxy:8404"]
+      - targets: ["haproxy-exporter:9101"]

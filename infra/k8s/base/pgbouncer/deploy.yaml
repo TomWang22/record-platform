@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgbouncer
+  labels: { app: pgbouncer }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: pgbouncer } }
+  template:
+    metadata: { labels: { app: pgbouncer } }
+    spec:
+      containers:
+      - name: pgbouncer
+        image: edoburu/pgbouncer:1.22.1
+        args: ["-u","pgbouncer","/etc/pgbouncer/pgbouncer.ini"]
+        ports: [ { containerPort: 6432, name: pg } ]
+        securityContext:
+          runAsUser: 100
+          runAsGroup: 100
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+        readinessProbe:
+          tcpSocket: { port: pg }
+          initialDelaySeconds: 2
+          periodSeconds: 5
+          failureThreshold: 12
+        livenessProbe:
+          tcpSocket: { port: pg }
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        volumeMounts:
+        - { name: cfg,  mountPath: /etc/pgbouncer/pgbouncer.ini, subPath: pgbouncer.ini }
+        - { name: auth, mountPath: /etc/pgbouncer/userlist.txt,  subPath: userlist.txt  }
+      volumes:
+      - name: cfg
+        configMap: { name: pgbouncer-cm }
+      - name: auth
+        secret: { secretName: pgbouncer-auth }

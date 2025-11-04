@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  NODE_ENV: development
+  NEXT_PUBLIC_GATEWAY_URL: http://localhost:8080
+
+  GATEWAY_PORT: "4000"
+  AUTH_PORT: "4001"
+  RECORDS_PORT: "4002"
+  LISTINGS_PORT: "4003"
+  ANALYTICS_PORT: "4004"
+  AI_PORT: "5005"
+
+  REDIS_URL: redis://redis.record-platform.svc.cluster.local:6379/0
+
+  # single source of truth
+  DATABASE_URL: postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connection_limit=1&pool_timeout=10&connect_timeout=5
+
+  # optional compatibility (literal duplicates, not $(…))
+  POSTGRES_URL:         postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connection_limit=1&pool_timeout=10&connect_timeout=5
+  POSTGRES_URL_AUTH:    postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connection_limit=1&pool_timeout=10&connect_timeout=5
+  POSTGRES_URL_RECORDS: postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connection_limit=1&pool_timeout=10&connect_timeout=5

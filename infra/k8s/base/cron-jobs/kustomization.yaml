@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: record-platform
+
+resources:
+  - service.yaml
+  - deploy.yaml
+
+  # backups:
+  - pg-backup-pgpass.secret.yaml
+  - pg-dump-nightly.yaml
+  - redis-dump-nightly.yaml
+  - pg-repl.secret.yaml
+  - pg-basebackup-weekly.yaml

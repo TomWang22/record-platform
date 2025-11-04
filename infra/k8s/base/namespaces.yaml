@@ -1,0 +1,9 @@
+kubectl -n "$NS" delete pod curl-tools --grace-period=0 --force || trueapiVersion: v1
+kind: Namespace
+metadata:
+  name: record-platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring

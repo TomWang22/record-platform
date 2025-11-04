@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auction-monitor
+  namespace: record-platform
+  labels: { app: auction-monitor }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: auction-monitor }
+  template:
+    metadata:
+      labels: { app: auction-monitor }
+      annotations:
+        # If you expose metrics on /metrics, Prom can scrape this; otherwise harmless
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4010"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: app
+          image: auction-monitor:dev
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 4010
+          envFrom:
+            - configMapRef: { name: app-config }
+            - secretRef:    { name: app-secrets }
+          env:
+            # You used this in compose
+            - name: BASE_URL
+              value: "http://haproxy.record-platform.svc.cluster.local:8081"
+            # If your code expects PG via Prisma or similar, keep one of these that your app uses:
+            - name: DATABASE_URL
+              value: "postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connect_timeout=5&pool_timeout=10"
+            # Only if you actually have Kafka in K8s; otherwise remove/override in app-config
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka.record-platform.svc.cluster.local:9092"
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 20

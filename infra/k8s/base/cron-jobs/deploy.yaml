@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cron-jobs
+  namespace: record-platform
+  labels: { app: cron-jobs }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: cron-jobs } }
+  template:
+    metadata:
+      labels: { app: cron-jobs }
+    spec:
+      containers:
+        - name: app
+          image: cron-jobs:dev
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef: { name: app-config }
+            - secretRef:    { name: app-secrets }
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: POSTGRES_URL
+              value: >-
+                postgresql://postgres:$(POSTGRES_PASSWORD)@
+                pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=1&connect_timeout=5&pool_timeout=10
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: postgres-secret, key: POSTGRES_PASSWORD } }
+
+            # S3 is OPTIONAL – leave empty to disable backup upload
+            - { name: S3_BUCKET, value: "" }
+            - { name: S3_ENDPOINT, value: "" }
+            - { name: S3_REGION, value: "auto" }
+            - { name: S3_FORCE_PATH_STYLE, value: "true" }
+            - { name: S3_ACCESS_KEY_ID, value: "" }
+            - { name: S3_SECRET_ACCESS_KEY, value: "" }

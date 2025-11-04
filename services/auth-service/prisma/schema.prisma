@@ -1,14 +1,12 @@
 datasource db {
   provider = "postgresql"
-  // POSTGRES_URL_AUTH=postgresql://record_app:CHANGE_ME_STRONG_PASSWORD@postgres:5432/records?schema=auth
   url      = env("POSTGRES_URL_AUTH")
 }
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "./generated/client" // service-local client
-  // 👇 this is the key line for Bookworm on Apple Silicon (arm64 + OpenSSL 3)
-  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+  provider      = "prisma-client-js"
+  output        = "./generated/client"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
 }
 
 model User {

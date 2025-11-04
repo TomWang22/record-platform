@@ -19,15 +19,26 @@ RUN pnpm -w \
 # --- build ---
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
+
+# OpenSSL for prisma generate
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates openssl \
+ && rm -rf /var/lib/apt/lists/*
+
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 COPY --from=deps /app /app
 
+# Bring in full sources (this COPY INVALIDATES CACHE when src changes)
 COPY services/common ./services/common
 COPY services/records-service ./services/records-service
 
+# Build shared, generate prisma client, build service
 RUN pnpm -C services/common build \
- && pnpm -C services/records-service exec prisma generate \
- && pnpm -C services/records-service build
+ && rm -rf services/records-service/generated/records-client \
+ && pnpm -C services/records-service exec prisma generate --schema prisma/schema.prisma \
+ && pnpm -C services/records-service build \
+ && test -f services/records-service/dist/routes/records.js \
+ && grep -q "__" services/records-service/dist/routes/records.js || true
 
 # --- runtime ---
 FROM node:20-bookworm-slim
@@ -35,16 +46,11 @@ WORKDIR /app/services/records-service
 ENV NODE_ENV=production
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends curl ca-certificates openssl \
-  && rm -rf /var/lib/apt/lists/*
-  
+ && apt-get install -y --no-install-recommends curl ca-certificates openssl \
+ && rm -rf /var/lib/apt/lists/*
 
-# pnpm store (workspace root)
 COPY --from=build /app/node_modules /app/node_modules
-# the service's node_modules
 COPY --from=build /app/services/records-service/node_modules ./node_modules
-
-# app bits
 COPY --from=build /app/services/records-service/dist ./dist
 COPY --from=build /app/services/records-service/package.json ./package.json
 COPY --from=build /app/services/records-service/prisma ./prisma

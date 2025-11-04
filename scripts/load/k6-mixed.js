@@ -14,11 +14,14 @@ const VUS      = Number(__ENV.VUS  || 20);
 const DUR      = __ENV.DURATION || '30s';
 const ACCEPT_429 = (__ENV.ACCEPT_429 || '1') === '1';
 const SYNTH_IP   = (__ENV.SYNTH_IP   || '1') === '1';
-const HOT_PCT    = Math.max(0, Math.min(1, Number(__ENV.HOT_PCT || 0.8))); // fraction of by-id GETs using a hot ID
+const HOT_PCT    = Math.max(0, Math.min(1, Number(__ENV.HOT_PCT || 0.9)));   // hot id ratio for GET by id
+const WRITE_PCT  = Math.max(0, Math.min(1, Number(__ENV.WRITE_PCT || 0.2))); // fraction of iters that do writes
+const MAX_VUS        = Number(__ENV.MAX_VUS || 400);
+const SWEEP_MAX_VUS  = Number(__ENV.SWEEP_MAX_VUS || 600);
 
 // --- tunable SLOs (ms) ---
 const W_P95 = Number(__ENV.WRITE_P95_MS || 120);
-const W_P99 = Number(__ENV.WRITE_P99_MS || 300); // was 250; 300 is more forgiving for p99 spikes
+const W_P99 = Number(__ENV.WRITE_P99_MS || 300);
 const GID_P95 = Number(__ENV.IDGET_P95_MS || 80);
 const GID_P99 = Number(__ENV.IDGET_P99_MS || 180);
 
@@ -41,17 +44,19 @@ const thresholds = {
   errors: ['rate<0.01'],
   'http_req_failed{expected_response:true}': ['rate<0.02'],
 
-  // Write budgets (tunable)
+  // Write budgets
   [`http_req_duration{method:POST}`]:   [`p(95)<${W_P95}`, `p(99)<${W_P99}`],
   [`http_req_duration{method:PUT}`]:    [`p(95)<${W_P95}`, `p(99)<${W_P99}`],
   [`http_req_duration{method:DELETE}`]: [`p(95)<${W_P95}`, `p(99)<${W_P99}`],
 
   // Read budgets
-  'http_req_duration{name:GET /records}':     ['p(95)<80','p(99)<180'],
+  'http_req_duration{name:GET /records}':       ['p(95)<80','p(99)<180'],
   [`http_req_duration{name:GET /records/:id}`]: [`p(95)<${GID_P95}`, `p(99)<${GID_P99}`],
 };
 
 function buildOptions() {
+  const systemTags = ['status','method','name','scenario','expected_response']; // keep cardinality low
+
   if (MODE === 'sweep') {
     let stages = [];
     if (STAGES_CSV) {
@@ -67,11 +72,12 @@ function buildOptions() {
           startRate: stages[0]?.target || 1,
           timeUnit: '1s',
           preAllocatedVUs: VUS,
-          maxVUs: Math.max(VUS, 600),
+          maxVUs: Math.max(VUS, SWEEP_MAX_VUS),
           stages,
         },
       },
       thresholds,
+      systemTags,
     };
   }
 
@@ -84,14 +90,15 @@ function buildOptions() {
           timeUnit: '1s',
           duration: DUR,
           preAllocatedVUs: VUS,
-          maxVUs: Math.max(VUS, 200),
+          maxVUs: Math.max(VUS, MAX_VUS),
         },
       },
       thresholds,
+      systemTags,
     };
   }
 
-  return { vus: VUS, duration: DUR, thresholds };
+  return { vus: VUS, duration: DUR, thresholds, systemTags };
 }
 export const options = buildOptions();
 
@@ -131,12 +138,12 @@ function headers() {
 export default function (data) {
   const H = headers();
 
-  // list
+  // GET /records
   let r = http.get(api('/records'), { headers: H, tags: { name: 'GET /records' } });
   let ok = r.status === 200 || (ACCEPT_429 && r.status === 429);
   errors.add(!ok); check(r, { 'list ok(200|429)': () => ok });
 
-  // by id (hot most of the time)
+  // GET /records/:id (hot most of the time)
   const hasPool = data && Array.isArray(data.ids) && data.ids.length > 0;
   const useHot  = hasPool && Math.random() < HOT_PCT;
   const byId    = useHot ? data.ids[(Math.random() * data.ids.length) | 0] : uuidv4();
@@ -145,29 +152,40 @@ export default function (data) {
   ok = [200, 404].includes(r.status) || (ACCEPT_429 && r.status === 429);
   errors.add(!ok); check(r, { 'byId ok(200|404|429)': () => ok });
 
-  // create
-  let rid = null;
-  r = http.post(
-    api('/records'),
-    JSON.stringify({ artist: 'k6', name: `rec-${__VU}-${Date.now()}`, format: 'LP' }),
-    { headers: H }
-  );
-  ok = [200, 201].includes(r.status) || (ACCEPT_429 && r.status === 429);
-  errors.add(!ok); check(r, { 'post ok(201|200|429)': () => ok });
-  try { rid = r.json()?.id || null; } catch {}
+  // Writes only on a fraction of iterations
+  if (Math.random() < WRITE_PCT) {
+    // create
+    let rid = null;
+    r = http.post(
+      api('/records'),
+      JSON.stringify({ artist: 'k6', name: `rec-${__VU}-${Date.now()}`, format: 'LP' }),
+      { headers: H, tags: { name: 'POST /records' } }
+    );
+    ok = [200, 201].includes(r.status) || (ACCEPT_429 && r.status === 429);
+    errors.add(!ok); check(r, { 'post ok(201|200|429)': () => ok });
+    try { rid = r.json()?.id || null; } catch {}
 
-  // update
-  const putId = rid || uuidv4();
-  r = http.put(api(`/records/${putId}`), JSON.stringify({ notes: `updated ${Date.now()}` }), { headers: H });
-  ok = [200, 201, 204, 409].includes(r.status)
-       || (!rid && r.status === 404)
-       || (ACCEPT_429 && r.status === 429);
-  errors.add(!ok); check(r, { 'put ok(2xx|409|404|429)': () => ok });
+    // update
+    const putId = rid || uuidv4();
+    r = http.put(
+      api(`/records/${putId}`),
+      JSON.stringify({ notes: `updated ${Date.now()}` }),
+      { headers: H, tags: { name: 'PUT /records/:id' } }
+    );
+    ok = [200, 201, 204, 409].includes(r.status)
+         || (!rid && r.status === 404)
+         || (ACCEPT_429 && r.status === 429);
+    errors.add(!ok); check(r, { 'put ok(2xx|409|404|429)': () => ok });
 
-  // delete
-  r = http.del(api(`/records/${putId}`), null, { headers: H });
-  ok = [200, 204, 404].includes(r.status) || (ACCEPT_429 && r.status === 429);
-  errors.add(!ok); check(r, { 'del ok(2xx|404|429)': () => ok });
+    // delete
+    r = http.del(
+      api(`/records/${putId}`),
+      null,
+      { headers: H, tags: { name: 'DEL /records/:id' } }
+    );
+    ok = [200, 204, 404].includes(r.status) || (ACCEPT_429 && r.status === 429);
+    errors.add(!ok); check(r, { 'del ok(2xx|404|429)': () => ok });
+  }
 
   if (!RATE && MODE !== 'sweep') sleep(0.5);
 }

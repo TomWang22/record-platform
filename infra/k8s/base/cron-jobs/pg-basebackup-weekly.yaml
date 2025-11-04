@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pg-basebackup-weekly
+  labels: { app: postgres-backup }
+spec:
+  schedule: "20 6 * * 0"      # Sundays 06:20 ET
+  timeZone: America/New_York
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: basebackup
+            image: postgres:16
+            imagePullPolicy: IfNotPresent
+            envFrom:
+              - secretRef: { name: pg-repl }
+            env:
+              - { name: PGHOST, value: "postgres" }
+              - { name: PGPORT, value: "5432" }
+            volumeMounts:
+              - { name: backups, mountPath: /backups }
+            command: ["bash","-lc"]
+            args:
+            - |
+              set -euo pipefail
+              TS=$(date +%Y%m%d-%H%M)
+              OUT="/backups/basebackup-$TS"
+              echo "[$(date -Is)] start pg_basebackup"
+              mkdir -p "$OUT"
+              pg_basebackup -D "$OUT" -Ft -z -X stream -c fast -P
+              tar -C /backups -czf "/backups/basebackup-$TS.bundle.tar.gz" "basebackup-$TS"
+              rm -rf "$OUT"
+              ls -1t /backups/basebackup-*.bundle.tar.gz | tail -n +4 | xargs -r rm -f
+              echo "[$(date -Is)] done: /backups/basebackup-$TS.bundle.tar.gz"
+          volumes:
+            - name: backups
+              persistentVolumeClaim: { claimName: pg-backups-2 }

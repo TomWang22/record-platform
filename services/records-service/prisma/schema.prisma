@@ -1,15 +1,20 @@
 datasource db {
   provider = "postgresql"
-  url      = env("POSTGRES_URL_RECORDS")
+  url      = env("DATABASE_URL")
+  // help Prisma know we use multiple schemas
+  schemas  = ["records", "public", "auth"]
 }
 
 generator client {
   provider      = "prisma-client-js"
   output        = "../generated/records-client"
-  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
 }
 
 model Record {
+  @@schema("records")
+  @@map("records")
+
   id                 String   @id @db.Uuid @default(uuid())
   userId             String   @db.Uuid @map("user_id")
 
@@ -17,7 +22,6 @@ model Record {
   name               String   @db.VarChar(256)
   format             String   @db.VarChar(64)
 
-  // simple strings (no enums)
   recordGrade        String?  @db.VarChar(16) @map("record_grade")
   sleeveGrade        String?  @db.VarChar(16) @map("sleeve_grade")
 
@@ -41,30 +45,29 @@ model Record {
   purchasedAt        DateTime?                            @map("purchased_at")
   pricePaid          Decimal?  @db.Decimal(10, 2)         @map("price_paid")
 
-  // NEW: pressing/release metadata
   releaseYear        Int?      @map("release_year")
   releaseDate        DateTime? @map("release_date")
   pressingYear       Int?      @map("pressing_year")
   label              String?   @db.VarChar(128)
-  labelCode          String?   @db.VarChar(64)             @map("label_code")
+  labelCode          String?   @db.VarChar(64)            @map("label_code")
 
   mediaPieces        RecordMedium[]
 
   createdAt          DateTime @default(now())             @map("created_at")
   updatedAt          DateTime @updatedAt                  @map("updated_at")
 
-  @@map("records")
   @@index([userId])
   @@index([artist])
   @@index([catalogNumber])
   @@index([artist, name, format])
-
-  // NEW indexes
   @@index([releaseYear])
   @@index([label])
 }
 
 model RecordMedium {
+  @@schema("records")
+  @@map("record_media")
+
   id         String   @id @db.Uuid @default(uuid())
   recordId   String   @db.Uuid @map("record_id")
   record     Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
@@ -81,6 +84,26 @@ model RecordMedium {
   createdAt  DateTime @default(now())  @map("created_at")
   updatedAt  DateTime @updatedAt       @map("updated_at")
 
-  @@map("record_media")
   @@unique([recordId, index])
+}
+
+model Users {
+  @@schema("auth")
+  @@map("users")
+  @@ignore
+  id String @id @db.Uuid
+}
+
+model RecordsStaging {
+  @@schema("records")
+  @@map("records_staging")
+  @@ignore
+  id String @id @db.Uuid
+}
+
+model SearchTerms {
+  @@schema("public")
+  @@map("search_terms")
+  @@ignore
+  id String @id @db.Uuid
 }

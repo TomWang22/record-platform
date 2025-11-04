@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: listings-service
+  namespace: record-platform
+  labels: { app: listings-service }
+spec:
+  selector: { app: listings-service }
+  ports:
+    - name: http
+      port: 4003
+      targetPort: http

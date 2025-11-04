@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>bench_sweep charts</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.1.min.js"></script>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:24px;}
+    h1{margin-bottom:8px}
+    .meta{color:#555;margin-bottom:20px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(520px,1fr));grid-gap:18px}
+    .card{border:1px solid #e5e7eb;border-radius:10px;padding:10px}
+    .title{font-weight:600;margin:6px 6px 10px}
+    .plot{width:100%;height:360px}
+  </style>
+</head>
+<body>
+  <h1>bench_sweep charts</h1>
+  <div class="meta">CSV: /Users/tom/record-platform/bench_sweep.csv</div>
+  <div class="grid">
+    <div class="card"><div class="title">p50 vs clients</div><div id="chart_p50_ms" class="plot"></div></div><div class="card"><div class="title">p95 vs clients</div><div id="chart_p95_ms" class="plot"></div></div><div class="card"><div class="title">p99 vs clients</div><div id="chart_p99_ms" class="plot"></div></div><div class="card"><div class="title">p99.9 vs clients</div><div id="chart_p999_ms" class="plot"></div></div><div class="card"><div class="title">p99.99 vs clients</div><div id="chart_p9999_ms" class="plot"></div></div><div class="card"><div class="title">Max (worst) vs clients</div><div id="chart_max_ms" class="plot"></div></div><div class="card"><div class="title">Average latency vs clients</div><div id="chart_avg_ms" class="plot"></div></div><div class="card"><div class="title">Latency stddev vs clients</div><div id="chart_std_ms" class="plot"></div></div><div class="card"><div class="title">TPS vs clients</div><div id="chart_tps" class="plot"></div></div>
+  </div>
+  <script>
+    const charts = [{"id": "chart_p50_ms", "title": "p50 vs clients", "y": "p50_ms", "traces": [{"name": "knn", "x": [8, 16, 24, 32, 48, 64], "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "mode": "lines+markers", "type": "scatter"}, {"name": "percent", "x": [8, 16, 24, 32, 48, 64], "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "mode": "lines+markers", "type": "scatter"}]}, {"id": "chart_p95_ms", "title": "p95 vs clients", "y": "p95_ms", "traces": [{"name": "knn", "x": [8, 16, 24, 32, 48, 64], "y": [9.344902, 4.831776, 2.65447, 2.074922, 1.281024, 0.90499], "mode": "lines+markers", "type": "scatter"}, {"name": "percent", "x": [8, 16, 24, 32, 48, 64], "y": [10.020931, 5.521662, 3.335084, 2.439393, 1.540355, 1.072942], "mode": "lines+markers", "type": "scatter"}]}, {"id": "chart_p99_ms", "title": "p99 vs clients", "y": "p99_ms", "traces": [{"name": "knn", "x": [8, 16, 24, 32, 48, 64], "y": [5.395024, 2.837629, 1.539794, 1.202698, 0.741037, 0.52519], "mode": "lines+markers", "type": "scatter"}, {"name": "percent", "x": [8, 16, 24, 32, 48, 64], "y": [5.785363, 3.247665, 1.928577, 1.416476, 0.890514, 0.629688], "mode": "lines+markers", "type": "scatter"}]}, {"id": "chart_p999_ms", "title": "p99.9 vs clients", "y": "p999_ms", "traces": [{"name": "knn", "x": [8, 16, 24, 32, 48, 64], "y": [9.345, 4.789, 2.649, 2.071, 1.279, 0.902], "mode": "lines+markers", "type": "scatter"}, {"name": "percent", "x": [8, 16, 24, 32, 48, 64], "y": [10.021, 5.468, 3.332, 2.432, 1.539, 1.064], "mode": "lines+markers", "type": "scatter"}]}, {"id": "chart_p9999_ms", "title": "p99.99 vs clients", "y": "p9999_ms", "traces": [{"name": "knn", "x": [8, 16, 24, 32, 48, 64], "y": [17.755, 9.504, 5.033, 3.942, 2.435, 1.724], "mode": "lines+markers", "type": "scatter"}, {"name": "percent", "x": [8, 16, 24, 32, 48, 64], "y": [19.039, 10.919, 6.335, 4.638, 2.924, 2.069], "mode": "lines+markers", "type": "scatter"}]}, {"id": "chart_max_ms", "title": "Max (worst) vs clients", "y": "max_ms", "traces": [{"name": "knn", "x": [8, 16, 24, 32, 48, 64], "y": [18.502, 10.285, 5.392, 4.249, 2.577, 1.861], "mode": "lines+markers", "type": "scatter"}, {"name": "percent", "x": [8, 16, 24, 32, 48, 64], "y": [19.841, 11.794, 6.685, 5.069, 3.092, 2.341], "mode": "lines+markers", "type": "scatter"}]}, {"id": "chart_avg_ms", "title": "Average latency vs clients", "y": "avg_ms", "traces": [{"name": "knn", "x": [8, 16, 24, 32, 48, 64], "y": [149510.0, 153224.0, 127108.0, 132489.0, 122784.0, 115445.0], "mode": "lines+markers", "type": "scatter"}, {"name": "percent", "x": [8, 16, 24, 32, 48, 64], "y": [160326.0, 174962.0, 159920.0, 155635.0, 147705.0, 136149.0], "mode": "lines+markers", "type": "scatter"}]}, {"id": "chart_std_ms", "title": "Latency stddev vs clients", "y": "std_ms", "traces": [{"name": "knn", "x": [8, 16, 24, 32, 48, 64], "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "mode": "lines+markers", "type": "scatter"}, {"name": "percent", "x": [8, 16, 24, 32, 48, 64], "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "mode": "lines+markers", "type": "scatter"}]}, {"id": "chart_tps", "title": "TPS vs clients", "y": "tps", "traces": [{"name": "knn", "x": [8, 16, 24, 32, 48, 64], "y": [2492.488816, 2555.268453, 2121.471165, 2210.321936, 2048.291119, 1926.610533], "mode": "lines+markers", "type": "scatter"}, {"name": "percent", "x": [8, 16, 24, 32, 48, 64], "y": [2672.821706, 2917.956996, 2667.680448, 2595.79243, 2465.269871, 2272.870272], "mode": "lines+markers", "type": "scatter"}]}];
+    charts.forEach(c => {
+      Plotly.newPlot(
+        c.id,
+        c.traces,
+        {
+          title: null,
+          hovermode: 'x unified',
+          xaxis: {title: 'clients', automargin:true},
+          yaxis: {title: c.y, automargin:true},
+          margin: {l:60, r:20, t:20, b:50}
+        },
+        {displayModeBar:false}
+      );
+    });
+  </script>
+</body>
+</html>

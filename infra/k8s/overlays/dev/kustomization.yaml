@@ -1,0 +1,84 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: record-platform
+
+resources:
+  - ../../base/config
+  - ../../base/haproxy
+  - ../../base/nginx
+  - ../../base/postgres
+  - ../../base/pgbouncer
+  - ../../base/redis
+  - ../../base/exporters
+  - ../../base/api-gateway
+  - ../../base/auth-service
+  - ../../base/records-service
+  - ../../base/listings-service
+  - ../../base/analytics-service
+  - ../../base/python-ai-service
+  - ../../base/monitoring
+  - ../../base/auction-monitor        # ← NEW
+  - ../../base/cron-jobs              # ← NEW
+  # overlay extras
+  - pvc/pgbackups-pvc.yaml
+  - cronjobs/pg-backup-pvc.yaml
+  - jobs/postgres-restore-from-pvc.yaml
+  - jobs/postgres-postinit-sql-cm.yaml   # ONLY the SQL CM, not the Job
+  - ingress.yaml
+  - hpa-api-gateway.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+images:
+  - name: ghcr.io/yourorg/api-gateway
+    newName: api-gateway
+    newTag: dev
+  - name: ghcr.io/yourorg/auth-service
+    newName: auth-service
+    newTag: dev
+  - name: ghcr.io/yourorg/records-service
+    newName: records-service
+    newTag: dev
+  - name: ghcr.io/yourorg/listings-service
+    newName: listings-service
+    newTag: dev
+  - name: ghcr.io/yourorg/analytics-service
+    newName: analytics-service
+    newTag: dev
+  - name: ghcr.io/yourorg/python-ai-service
+    newName: python-ai-service
+    newTag: dev
+  - name: ghcr.io/yourorg/auction-monitor       # ← NEW
+    newName: auction-monitor
+    newTag: dev
+  - name: ghcr.io/yourorg/cron-jobs             # ← NEW
+    newName: cron-jobs
+    newTag: dev
+
+patches:
+  - path: patches/api-gateway-resources.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: api-gateway, namespace: record-platform }
+
+  - path: patches/envfrom-api-gateway.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: api-gateway, namespace: record-platform }
+  - path: patches/envfrom-auth-service.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: auth-service, namespace: record-platform }
+  - path: patches/auth-env.jsonpatch.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: auth-service, namespace: record-platform }
+  - path: patches/envfrom-records-service.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: records-service, namespace: record-platform }
+  - path: patches/envfrom-listings-service.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: listings-service, namespace: record-platform }
+  - path: patches/envfrom-analytics-service.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: analytics-service, namespace: record-platform }
+  - path: patches/envfrom-python-ai-service.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: python-ai-service, namespace: record-platform }
+
+  - path: patches/dev-termination-and-strategy.yaml
+
+  - path: patches/probes-auth.jsonpatch.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: auth-service, namespace: record-platform }
+  - path: patches/probes-records.jsonpatch.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: records-service, namespace: record-platform }

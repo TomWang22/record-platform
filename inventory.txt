@@ -1,0 +1,117 @@
+=== Server ===
+version
+PostgreSQL 16.10 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit
+(1 row)
+=== Relevant settings ===
+name | setting | unit
+effective_cache_size | 262144 | 8kB
+effective_io_concurrency | 200 | 
+pg_stat_statements.max | 10000 | 
+pg_stat_statements.track | all | 
+random_page_cost | 1.2 | 
+shared_buffers | 65536 | 8kB
+track_io_timing | on | 
+work_mem | 16384 | kB
+(8 rows)
+=== Extensions ===
+extname | extversion | schema
+btree_gin | 1.3 | public
+btree_gist | 1.7 | public
+citext | 1.6 | public
+pg_prewarm | 1.2 | public
+pg_stat_statements | 1.10 | public
+pg_trgm | 1.6 | public
+pgcrypto | 1.3 | public
+plpgsql | 1.0 | pg_catalog
+unaccent | 1.1 | public
+(9 rows)
+=== Schemas ===
+oid | schema
+2200 | public
+25501 | records
+(2 rows)
+=== Tables (size & row est) ===
+schema | table | relkind | total_size | main_heap | est_rows
+records | records | r | 52 MB | 8008 kB |       30,000
+records | aliases_mv | m | 24 MB | 4336 kB |       56,341
+records | aliases | r | 6400 kB | 3456 kB |       56,341
+records | artist_seed | r | 1800 kB | 1096 kB |       12,004
+records | autocomplete_terms_mv | m | 64 kB | 8192 bytes |           46
+records | records_staging_v2 | r | 64 kB | 0 bytes |            0
+(6 rows)
+=== Indexes (type/opclass/columns) ===
+schema | table | index | am | ddl
+records | aliases | aliases_pkey | btree | CREATE UNIQUE INDEX aliases_pkey ON records.aliases USING btree (record_id, alias)
+records | aliases_mv | aliases_mv_uniq_btree | btree | CREATE UNIQUE INDEX aliases_mv_uniq_btree ON records.aliases_mv USING btree (user_id, record_id, alias_norm)
+records | aliases_mv | aliases_mv_user_alias_gist | gist | CREATE INDEX aliases_mv_user_alias_gist ON records.aliases_mv USING gist (user_id, alias_norm gist_trgm_ops)
+records | aliases_mv | aliases_mv_user_alias_norm_gist | gist | CREATE INDEX aliases_mv_user_alias_norm_gist ON records.aliases_mv USING gist (user_id, alias_norm gist_trgm_ops)
+records | artist_seed | artist_seed_aid_idx | btree | CREATE UNIQUE INDEX artist_seed_aid_idx ON records.artist_seed USING btree (aid)
+records | artist_seed | artist_seed_pkey | btree | CREATE UNIQUE INDEX artist_seed_pkey ON records.artist_seed USING btree (canon)
+records | autocomplete_terms_mv | ac_terms_mv_uid_term_uq | btree | CREATE UNIQUE INDEX ac_terms_mv_uid_term_uq ON records.autocomplete_terms_mv USING btree (user_id, term_raw, term_norm)
+records | autocomplete_terms_mv | ac_terms_user_hits | btree | CREATE INDEX ac_terms_user_hits ON records.autocomplete_terms_mv USING btree (user_id, hits DESC)
+records | autocomplete_terms_mv | ac_terms_user_term_gist | gist | CREATE INDEX ac_terms_user_term_gist ON records.autocomplete_terms_mv USING gist (user_id, term_norm gist_trgm_ops)
+records | records | idx_records_artist_gist_trgm | gist | CREATE INDEX idx_records_artist_gist_trgm ON records.records USING gist (artist_norm gist_trgm_ops)
+records | records | idx_records_artist_trgm | gin | CREATE INDEX idx_records_artist_trgm ON records.records USING gin (artist gin_trgm_ops)
+records | records | idx_records_catalog | btree | CREATE INDEX idx_records_catalog ON records.records USING btree (catalog_number)
+records | records | idx_records_catalog_gist_trgm | gist | CREATE INDEX idx_records_catalog_gist_trgm ON records.records USING gist (catalog_norm gist_trgm_ops)
+records | records | idx_records_id_inc_user | btree | CREATE INDEX idx_records_id_inc_user ON records.records USING btree (id) INCLUDE (user_id)
+records | records | idx_records_label_gist_trgm | gist | CREATE INDEX idx_records_label_gist_trgm ON records.records USING gist (label_norm gist_trgm_ops)
+records | records | idx_records_name_gist_trgm | gist | CREATE INDEX idx_records_name_gist_trgm ON records.records USING gist (name_norm gist_trgm_ops)
+records | records | idx_records_name_trgm | gin | CREATE INDEX idx_records_name_trgm ON records.records USING gin (name gin_trgm_ops)
+records | records | idx_records_user | btree | CREATE INDEX idx_records_user ON records.records USING btree (user_id)
+records | records | idx_records_user_artist_norm_gist | gist | CREATE INDEX idx_records_user_artist_norm_gist ON records.records USING gist (user_id, artist_norm gist_trgm_ops)
+records | records | idx_records_user_catalog_norm_gist | gist | CREATE INDEX idx_records_user_catalog_norm_gist ON records.records USING gist (user_id, catalog_norm gist_trgm_ops)
+records | records | idx_records_user_label_norm_gist | gist | CREATE INDEX idx_records_user_label_norm_gist ON records.records USING gist (user_id, label_norm gist_trgm_ops)
+records | records | idx_records_user_search_gist_trgm | gist | CREATE INDEX idx_records_user_search_gist_trgm ON records.records USING gist (user_id, search_norm gist_trgm_ops)
+records | records | idx_records_user_search_gist_trgm_price | gist | CREATE INDEX idx_records_user_search_gist_trgm_price ON records.records USING gist (user_id, search_norm gist_trgm_ops) INCLUDE (price_paid)
+records | records | idx_records_user_search_trgm_price | gist | CREATE INDEX idx_records_user_search_trgm_price ON records.records USING gist (user_id, search_norm gist_trgm_ops) WHERE (price_paid IS NOT NULL)
+records | records | idx_records_user_updated | btree | CREATE INDEX idx_records_user_updated ON records.records USING btree (user_id, updated_at DESC)
+records | records | records_pkey | btree | CREATE UNIQUE INDEX records_pkey ON records.records USING btree (id)
+records | records_staging_v2 | records_staging_v2_artist_name_format_idx | btree | CREATE INDEX records_staging_v2_artist_name_format_idx ON records.records_staging_v2 USING btree (artist, name, format)
+records | records_staging_v2 | records_staging_v2_catalog_number_idx | btree | CREATE INDEX records_staging_v2_catalog_number_idx ON records.records_staging_v2 USING btree (catalog_number)
+records | records_staging_v2 | records_staging_v2_user_id_idx | btree | CREATE INDEX records_staging_v2_user_id_idx ON records.records_staging_v2 USING btree (user_id)
+(29 rows)
+=== Stat tables (seq vs idx scans) ===
+schemaname | relname | seq_scan | idx_scan | n_tup_ins | n_tup_upd | n_tup_del | vacuum_count | autovacuum_count | analyze_count | autoanalyze_count
+records | records | 57 | 36 | 0 | 0 | 0 | 0 | 0 | 5 | 0
+records | aliases_mv | 21 | 14 | 0 | 0 | 0 | 0 | 0 | 4 | 0
+records | aliases | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0
+auth | users | 9 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0
+records | records_staging_v2 | 10 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0
+records | autocomplete_terms_mv | 9 | 0 | 46 | 0 | 0 | 0 | 0 | 4 | 0
+records | artist_seed | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0
+(7 rows)
+=== Stat indexes (usage) ===
+schemaname | relname | indexrelname | idx_scan | idx_tup_read | idx_tup_fetch
+records | aliases_mv | aliases_mv_user_alias_norm_gist | 13 | 6995 | 3000
+records | records | idx_records_id_inc_user | 9 | 30006 | 54
+records | records | idx_records_user_search_gist_trgm | 8 | 6200 | 6200
+records | records | idx_records_user | 7 | 210000 | 210000
+records | aliases | aliases_pkey | 5 | 56343 | 0
+records | records | idx_records_label_gist_trgm | 3 | 0 | 0
+records | records | idx_records_catalog_gist_trgm | 3 | 0 | 0
+records | records | idx_records_name_gist_trgm | 3 | 0 | 0
+records | records | idx_records_artist_gist_trgm | 3 | 1322 | 0
+records | aliases_mv | aliases_mv_uniq_btree | 1 | 56341 | 0
+auth | users | users_email_key | 1 | 1 | 1
+records | aliases_mv | aliases_mv_user_alias_gist | 0 | 0 | 0
+records | records_staging_v2 | records_staging_v2_user_id_idx | 0 | 0 | 0
+records | records_staging_v2 | records_staging_v2_catalog_number_idx | 0 | 0 | 0
+records | records_staging_v2 | records_staging_v2_artist_name_format_idx | 0 | 0 | 0
+records | artist_seed | artist_seed_aid_idx | 0 | 0 | 0
+records | autocomplete_terms_mv | ac_terms_mv_uid_term_uq | 0 | 0 | 0
+records | autocomplete_terms_mv | ac_terms_user_term_gist | 0 | 0 | 0
+records | autocomplete_terms_mv | ac_terms_user_hits | 0 | 0 | 0
+records | records | idx_records_user_artist_norm_gist | 0 | 0 | 0
+records | records | idx_records_user_search_gist_trgm_price | 0 | 0 | 0
+records | records | idx_records_catalog | 0 | 0 | 0
+auth | users | users_pkey | 0 | 0 | 0
+records | records | records_pkey | 0 | 0 | 0
+records | records | idx_records_user_updated | 0 | 0 | 0
+records | records | idx_records_artist_trgm | 0 | 0 | 0
+records | records | idx_records_name_trgm | 0 | 0 | 0
+records | records | idx_records_user_label_norm_gist | 0 | 0 | 0
+records | records | idx_records_user_catalog_norm_gist | 0 | 0 | 0
+records | artist_seed | artist_seed_pkey | 0 | 0 | 0
+records | records | idx_records_user_search_trgm_price | 0 | 0 | 0
+(31 rows)

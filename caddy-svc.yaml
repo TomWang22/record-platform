@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: caddy-h3
+  namespace: ingress-nginx
+spec:
+  type: ClusterIP
+  selector: { app: caddy-h3 }
+  ports:
+    - { name: https, port: 443, targetPort: 443, protocol: TCP }
+    - { name: https-udp, port: 443, targetPort: 443, protocol: UDP }

@@ -1,0 +1,18 @@
+[databases]
+records = host=postgres port=5432 dbname=records user=postgres password=postgres
+
+[pgbouncer]
+admin_users = postgres
+stats_users = postgres
+listen_addr = 0.0.0.0
+listen_port = 6432
+auth_type   = plain
+auth_file   = /etc/pgbouncer/userlist.txt
+
+pool_mode   = transaction
+max_client_conn   = 1000
+default_pool_size = 20
+
+# Faster resets and avoid noisy params
+server_reset_query = DISCARD ALL
+ignore_startup_parameters = extra_float_digits

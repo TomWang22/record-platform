@@ -7,11 +7,22 @@ import { PrismaClient } from "../generated/records-client";
 import { register, httpCounter } from "@common/utils/metrics";
 import { recordsRouter } from "./routes/records";
 import { exportRouter } from "./routes/export";
+import { makeRedis } from "./lib/cache";
 
 const app = express();
-const prisma = new PrismaClient();
-
 app.disable("x-powered-by");
+
+// --- Prisma: force runtime DATABASE_URL ---
+const RUNTIME_DB_URL = process.env.DATABASE_URL || "";
+if (!RUNTIME_DB_URL) {
+  console.warn("[records] DATABASE_URL is empty at startup");
+}
+const prisma = new PrismaClient({
+  datasources: { db: { url: RUNTIME_DB_URL } },
+});
+
+// --- Redis (for cache + rate-limit) ---
+const redis = makeRedis();
 
 // Security headers, gzip, JSON body, CORS (same origins as gateway)
 app.use(
@@ -28,13 +39,11 @@ app.use(
   })
 );
 
-//quick probe
+// quick probe (K8s probes use this path)
+app.get("/_ping", (_req, res) => res.json({ ok: true }));
+
+// legacy/probe
 app.get("/records/_ping", (_req, res) => res.json({ ok: true }));
-
-app.get("/_ping", (req, res) => {
-  res.json({ ok: true });
-});
-
 
 // Metrics
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -55,11 +64,14 @@ app.get("/metrics", async (_req: Request, res: Response) => {
   res.end(await register.metrics());
 });
 
-// /healthz — check DB
+// /healthz — cheap DB + optional Redis ping
 app.get("/healthz", async (_req: Request, res: Response) => {
   try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({ ok: true });
+    const row = await prisma.$queryRaw<{ current_user: string }[]>`SELECT current_user`;
+    const user = row?.[0]?.current_user ?? "unknown";
+    let r = "skipped";
+    try { r = redis ? await redis.ping() : "disabled"; } catch { r = "error"; }
+    res.json({ ok: true, db_user: user, redis: r });
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e?.message || "db error" });
   }
@@ -68,9 +80,12 @@ app.get("/healthz", async (_req: Request, res: Response) => {
 /**
  * Identity guard
  * The gateway strips client-sent x-user-* and sets them AFTER JWT verification.
- * We still only trust the gateway (this service should be network-private).
  */
-function requireUser(req: Request & { userId?: string; userEmail?: string }, res: Response, next: NextFunction) {
+function requireUser(
+  req: Request & { userId?: string; userEmail?: string },
+  res: Response,
+  next: NextFunction
+) {
   const uid = String(req.headers["x-user-id"] || "");
   if (!uid) return res.status(401).json({ error: "auth required" });
   req.userId = uid;
@@ -79,8 +94,34 @@ function requireUser(req: Request & { userId?: string; userEmail?: string }, res
   next();
 }
 
-// Routes
-app.use("/records", requireUser, recordsRouter(prisma));
+/** Lightweight per-user rate limit using Redis buckets (windowed). */
+function userRateLimit(opts?: { windowSec?: number; max?: number }): import("express").RequestHandler {
+  const windowSec = opts?.windowSec ?? Number(process.env.RL_WINDOW_SEC ?? 60);
+  const max = opts?.max ?? Number(process.env.RL_MAX_PER_WINDOW ?? 240); // e.g., 240 req/min
+  return (req, res, next) => {
+    (async () => {
+      // No Redis? Just continue.
+      if (!redis) return next();
+
+      const uid = (req as any).userId || req.ip;
+      const now = Math.floor(Date.now() / 1000);
+      const bucket = Math.floor(now / windowSec);
+      const key = `rl:u:${uid}:${bucket}`;
+
+      const n = await redis.incr(key);
+      if (n === 1) await redis.expire(key, windowSec + 1); // ensure TTL on first hit
+
+      if (n > max) {
+        res.setHeader("Retry-After", String(windowSec));
+        return res.status(429).json({ error: "rate limited" });
+      }
+      return next();
+    })().catch(next);
+  };
+}
+
+// Routes (order matters)
+app.use("/records", requireUser, userRateLimit(), recordsRouter(prisma, redis));
 app.use("/records", requireUser, exportRouter(prisma));
 
 // Safety net
@@ -92,17 +133,17 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 // Start + graceful shutdown
 const port = Number(process.env.RECORDS_PORT || 4002);
-
-app.get("/healthz", (_req, res) => res.json({ ok: true }));
-
-
-const server = app.listen(port, () => console.log("records up on", port));
+const server = app.listen(port, () => {
+  const safeUrl = (RUNTIME_DB_URL || "").replace(/:(.+?)@/, ":****@");
+  console.log("records up on", port, "| DB:", safeUrl);
+});
 
 function shutdown(signal: string) {
   console.log(`[records] received ${signal}, shutting down...`);
   server.close(async () => {
     try {
       await prisma.$disconnect();
+      if (redis) await redis.quit();
     } finally {
       process.exit(0);
     }

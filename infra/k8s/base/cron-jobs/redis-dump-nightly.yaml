@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: redis-dump-nightly
+  labels: { app: redis-backup }
+spec:
+  schedule: "10 6 * * *"          # 06:10 ET (after PG)
+  timeZone: America/New_York
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: dump
+            image: redis:7-alpine
+            imagePullPolicy: IfNotPresent
+            env:
+              - { name: REDIS_HOST, value: "redis" }
+              - { name: REDIS_PORT, value: "6379" }
+            # pull the same password your Deployment uses
+            envFrom:
+              - secretRef: { name: redis-auth }   # provides REDIS_PASSWORD
+            volumeMounts:
+              - { name: backups, mountPath: /backups }
+            command: ["/bin/sh","-lc"]
+            args:
+              - |
+                set -euo pipefail
+                TS=$(date +%Y%m%d-%H%M)
+                OUT="/backups/redis-rdb-$TS.rdb"
+                echo "[$(date -Is)] start redis rdb"
+                # --rdb uses replication path; must AUTH first
+                redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" -a "$REDIS_PASSWORD" --rdb "$OUT"
+                gzip -9 "$OUT"
+                # keep last 7
+                ls -1t /backups/redis-rdb-*.rdb.gz | tail -n +8 | xargs -r rm -f
+                echo "[$(date -Is)] done: ${OUT}.gz"
+          volumes:
+            - name: backups
+              persistentVolumeClaim: { claimName: pg-backups-2 }

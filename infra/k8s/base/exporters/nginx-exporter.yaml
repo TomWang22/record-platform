@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-exporter
+  namespace: record-platform
+  labels: { app: nginx-exporter }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: nginx-exporter } }
+  template:
+    metadata:
+      labels: { app: nginx-exporter }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9113"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: exporter
+          image: nginx/nginx-prometheus-exporter:0.11.0
+          args: ["-nginx.scrape-uri=http://nginx:8080/nginx_status"]
+          ports: [{ name: http, containerPort: 9113 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-exporter
+  namespace: record-platform
+  labels: { app: nginx-exporter }
+spec:
+  selector: { app: nginx-exporter }
+  ports: [{ name: http, port: 9113, targetPort: http }]

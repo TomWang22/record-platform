@@ -42,3 +42,28 @@ groups:
         annotations:
           summary: "Prometheus target down"
           description: "Job {{ $labels.job }} target {{ $labels.instance }} is down."
+
+  - name: edge-slos
+    rules:
+      - alert: EdgeHigh5xx
+        expr: sum(rate(haproxy_backend_http_responses_total{backend="be_api",code="5xx"}[5m]))
+              /
+              clamp_min(sum(rate(haproxy_backend_http_responses_total{backend="be_api"}[5m])), 1) > 0.01
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "Edge 5xx > 1% (5m)"
+          desc: "HAProxy backend be_api 5xx ratio is >1% for 5 minutes."
+
+      - alert: EdgeWriteLatencyP95High
+        expr: histogram_quantile(
+                0.95,
+                sum by (le) (
+                  rate(http_server_request_duration_seconds_bucket{job=~"api-gateway|records-service",method=~"POST|PUT|DELETE"}[5m])
+                )
+              ) > 0.12
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Write p95 > 120ms (10m)"
+          desc: "API write latency p95 above 120ms."

@@ -21,7 +21,7 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://host.docker.internal:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -289,6 +289,7 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
+    command: ["sh","-c","nginx -t && exec nginx -g 'daemon off;'"]
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - nginx_cache:/var/cache/nginx
@@ -300,11 +301,12 @@ services:
       webapp:  { condition: service_healthy }
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL","wget -qO- http://localhost:8080/healthz >/dev/null"]
+      # IPv4 loopback + quick fail
+      test: ["CMD-SHELL","wget -q --spider --tries=1 --timeout=2 http://127.0.0.1:8080/healthz || exit 1"]
       interval: 5s
-      timeout: 2s
+      timeout: 3s
       retries: 20
-      start_period: 10s
+      start_period: 15s
     ulimits:
       nofile:
         soft: 65536
@@ -314,11 +316,12 @@ services:
     image: nginx/nginx-prometheus-exporter:0.11.0
     command: ["-nginx.scrape-uri=http://nginx:8080/nginx_status"]
     depends_on:
-      nginx: { condition: service_started }
-    expose: ["9113"]
+      nginx: { condition: service_healthy }
+    expose:
+      - "9113"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL","wget -qO- http://localhost:9113/metrics >/dev/null"]
+      test: ["CMD-SHELL","wget -q --spider --tries=1 --timeout=2 http://127.0.0.1:9113/metrics || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 10

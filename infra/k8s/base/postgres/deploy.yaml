@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels: { app: postgres }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: postgres } }
+  template:
+    metadata: { labels: { app: postgres } }
+    spec:
+      containers:
+      - name: db
+        image: postgres:16-alpine
+        env:
+        - { name: POSTGRES_DB,   value: "records" }
+        - { name: POSTGRES_USER, value: "postgres" }
+        - name: POSTGRES_PASSWORD
+          valueFrom: { secretKeyRef: { name: postgres-secret, key: POSTGRES_PASSWORD } }
+        ports:
+        - { name: pg, containerPort: 5432 }
+        readinessProbe:
+          exec: { command: ["sh","-lc","pg_isready -U postgres -h 127.0.0.1 -p 5432"] }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          exec: { command: ["sh","-lc","pg_isready -U postgres -h 127.0.0.1 -p 5432"] }
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        volumeMounts:
+        - { name: data,  mountPath: /var/lib/postgresql/data }
+        - { name: init,  mountPath: /docker-entrypoint-initdb.d }
+      volumes:
+      - name: data
+        persistentVolumeClaim: { claimName: pgdata }
+      - name: init
+        configMap: { name: postgres-init }
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: SUPER_STRONG_POSTGRES_PASSWORD

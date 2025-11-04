@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels: { app: redis }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: redis } }
+  template:
+    metadata:
+      labels: { app: redis }
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-auth
+                  key: REDIS_PASSWORD
+          args:
+            - sh
+            - -lc
+            - |
+              exec redis-server /usr/local/etc/redis/redis.conf \
+                --requirepass "$REDIS_PASSWORD"
+          ports:
+            - { name: redis, containerPort: 6379 }
+          readinessProbe:
+            tcpSocket: { port: redis }
+            initialDelaySeconds: 3
+          livenessProbe:
+            tcpSocket: { port: redis }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
+          volumeMounts:
+            - name: redis-config
+              mountPath: /usr/local/etc/redis
+      volumes:
+        - name: redis-config
+          configMap:
+            name: redis-config

@@ -20,6 +20,7 @@ import type {
 import { Agent as HttpAgent } from "http";
 import type { Socket } from "net";
 
+
 // one shared agent (tune if needed)
 const keepAliveAgent = new HttpAgent({
   keepAlive: true,
@@ -35,7 +36,6 @@ type AuthedRequest = Request & {
 
 /* ----------------------- Small helpers ----------------------- */
 function sendJson502(res: NodeServerResponse | Socket, msg: string) {
-  // In v3, `res` can be Node ServerResponse *or* a raw Socket.
   if ("setHeader" in res) {
     const sr = res as NodeServerResponse;
     if (!sr.headersSent) {
@@ -45,11 +45,7 @@ function sendJson502(res: NodeServerResponse | Socket, msg: string) {
       return;
     }
   }
-  try {
-    (res as Socket).destroy();
-  } catch {
-    /* noop */
-  }
+  try { (res as Socket).destroy(); } catch {}
 }
 
 function extractBearer(req: Request): string | undefined {
@@ -72,7 +68,6 @@ function injectIdentityHeadersIfAny(
   _res: Response,
   next: NextFunction
 ) {
-  // Anti-spoof: wipe any client-provided values
   delete (req.headers as any)["x-user-id"];
   delete (req.headers as any)["x-user-email"];
   delete (req.headers as any)["x-user-jti"];
@@ -89,9 +84,27 @@ function injectIdentityHeadersIfAny(
 /* ----------------------- App init ----------------------- */
 const app = express();
 app.disable("x-powered-by");
-
-/** We run behind nginx: required for express-rate-limit & real client IPs */
 app.set("trust proxy", 1);
+
+// DEV: trust x-user-id and short-circuit auth if DEBUG_FAKE_AUTH is on
+const UUID_RX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const FAKE_AUTH = process.env.DEBUG_FAKE_AUTH === '1' || process.env.DEBUG_FAKE_AUTH === 'true';
+
+if (FAKE_AUTH) {
+  console.log('[gateway] DEBUG_FAKE_AUTH is ON — trusting x-user-id header');
+  // Put this BEFORE any real auth middleware
+  app.use((req, _res, next) => {
+    const hdr = req.get('x-user-id') || '';
+    if (UUID_RX.test(hdr)) {
+      (req as any).userId = hdr;            // downstream expects this
+      (req as any).userEmail = 'dev@local'; // optional
+      (req as any).__devAuth = true;
+    }
+    next();
+  });
+}
 
 /* ----------------------- Redis (revocation check) ----------------------- */
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
@@ -134,19 +147,17 @@ app.use(
 
 app.use(compression() as unknown as import("express").RequestHandler);
 
-/* ----------------------- Basic endpoints ----------------------- */
+/* ----------------------- Gateway own endpoints ----------------------- */
 app.get("/whoami", (_req, res) =>
   res.json({ pod: process.env.HOSTNAME || require("os").hostname() })
 );
-
 app.get("/healthz", (_req: Request, res: Response) => res.json({ ok: true }));
-
 app.get("/metrics", async (_req: Request, res: Response) => {
   res.setHeader("Content-Type", register.contentType);
   res.end(await register.metrics());
 });
 
-/* ----------------------- Tiny query sanitizer ----------------------- */
+/* ----------------------- Sanitizer + counters + rate limit ----------------------- */
 app.use((req: Request, _res: Response, next: NextFunction) => {
   for (const [k, v] of Object.entries(req.query)) {
     if (typeof v === "string")
@@ -154,61 +165,86 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   }
   next();
 });
-
-/* ----------------------- Metrics counter ----------------------- */
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.on("finish", () =>
-    httpCounter.inc({
-      service: "gateway",
-      route: req.path,
-      method: req.method,
-      code: res.statusCode,
-    })
+    httpCounter.inc({ service: "gateway", route: req.path, method: req.method, code: res.statusCode })
   );
   next();
 });
-
-/* ----------------------- Rate limit ----------------------- */
 const limiter = rateLimit({
-  windowMs: 60_000,
-  max: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
+  windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false,
   skip: (req) => req.path === "/healthz" || req.path === "/metrics",
 });
 app.use(limiter);
 
-/* ----------------------- Open routes ----------------------- */
+/* =========================================================
+   PRE-GUARD DIRECT HEALTH/METRICS (never require auth)
+   ========================================================= */
+app.use(
+  "/auth/healthz",
+  createProxyMiddleware({
+    target: "http://auth-service:4001",
+    changeOrigin: true,
+    pathRewrite: () => "/healthz",
+    proxyTimeout: 10000,
+    agent: keepAliveAgent,
+  })
+);
+app.use(
+  "/auth/metrics",
+  createProxyMiddleware({
+    target: "http://auth-service:4001",
+    changeOrigin: true,
+    pathRewrite: () => "/metrics",
+    proxyTimeout: 10000,
+    agent: keepAliveAgent,
+  })
+);
+app.use(
+  "/records/healthz",
+  createProxyMiddleware({
+    target: "http://records-service:4002",
+    changeOrigin: true,
+    pathRewrite: () => "/healthz",
+    proxyTimeout: 10000,
+    agent: keepAliveAgent,
+  })
+);
+app.use(
+  "/records/metrics",
+  createProxyMiddleware({
+    target: "http://records-service:4002",
+    changeOrigin: true,
+    pathRewrite: () => "/metrics",
+    proxyTimeout: 10000,
+    agent: keepAliveAgent,
+  })
+);
+
+/* ----------------------- Open-route matcher (for other cases) ----------------------- */
 type RouteRule = { method: string; pattern: RegExp };
 const OPEN_ROUTES: RouteRule[] = [
-  { method: "GET", pattern: /^\/(?:api\/)?healthz\/?$/ },
-  { method: "GET", pattern: /^\/(?:api\/)?metrics\/?$/ },
-  { method: "POST", pattern: /^\/(?:api\/)?auth\/login\/?$/ },
-  { method: "GET", pattern: /^\/(?:api\/)?listings(?:\/|$)/ },
-  { method: "GET", pattern: /^\/(?:api\/)?ai(?:\/|$)/ },
-];
+  { method: "GET",  pattern: /^\/(?:api\/)?healthz\/?$/ },
+  { method: "HEAD", pattern: /^\/(?:api\/)?healthz\/?$/ },
+  { method: "GET",  pattern: /^\/(?:api\/)?metrics\/?$/ },
+  { method: "HEAD", pattern: /^\/(?:api\/)?metrics\/?$/ },
 
+  // auth entrypoints
+  { method: "POST", pattern: /^\/(?:api\/)?auth\/(login|register)\/?$/ },
+
+  // public GETs
+  { method: "GET",  pattern: /^\/(?:api\/)?listings(?:\/|$)/ },
+  { method: "GET",  pattern: /^\/(?:api\/)?ai(?:\/|$)/ },
+];
 const isOpenRoute = (req: Request) => {
-  const url =
-    (req.headers["x-original-uri"] as string) ||
-    (req.headers["x-forwarded-uri"] as string) ||
-    req.originalUrl ||
-    req.url ||
-    req.path ||
-    "";
-  return OPEN_ROUTES.some(
-    (rule) => rule.method === req.method && rule.pattern.test(url)
-  );
+  const path = req.path || req.url || "";
+  return OPEN_ROUTES.some((r) => r.method === req.method && r.pattern.test(path));
 };
 
 /* ----------------------- Logging (helpful while stabilizing) ----------------------- */
 app.use((req, _res, next) => {
   console.log(
-    `[gw] ${req.method} path=${req.path} orig=${req.originalUrl} raw=${
-      (req.headers["x-original-uri"] as string) ??
-      (req.headers["x-forwarded-uri"] as string) ??
-      req.originalUrl
-    } open=${isOpenRoute(req)} auth=${!!req.headers.authorization}`
+    `[gw] ${req.method} path=${req.path} orig=${req.originalUrl} open=${isOpenRoute(req)} auth=${!!req.headers.authorization}`
   );
   next();
 });
@@ -217,7 +253,6 @@ app.use((req, _res, next) => {
 app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
   if (isOpenRoute(req)) return next();
 
-  // Clear any spoofed identity headers from clients (we set them ourselves)
   delete (req.headers as any)["x-user-id"];
   delete (req.headers as any)["x-user-email"];
   delete (req.headers as any)["x-user-jti"];
@@ -232,10 +267,7 @@ app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
         const revoked = await redis.get(`revoked:${payload.jti}`);
         if (revoked) return res.status(401).json({ error: "token revoked" });
       } catch (e) {
-        console.warn(
-          "revocation check failed, proceeding:",
-          (e as Error)?.message
-        );
+        console.warn("revocation check failed, proceeding:", (e as Error)?.message);
       }
     }
     req.user = payload;
@@ -252,11 +284,8 @@ app.get("/__whoami", (req: AuthedRequest, res: Response) => {
 
 /* ----------------------- Local error logging (pre-proxy) ----------------------- */
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  if (err instanceof Error) {
-    console.error("records service error:", err.stack || err.message);
-  } else {
-    console.error("records service error:", err);
-  }
+  if (err instanceof Error) console.error("records service error:", err.stack || err.message);
+  else console.error("records service error:", err);
   if (!res.headersSent) res.status(500).json({ error: "internal" });
 });
 
@@ -264,7 +293,6 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
    PROXIES
    - nginx strips /api, so HPM sees paths starting with /auth, /records, ...
    - Identity headers are injected via middleware *before* the proxy.
-   - No on.proxyReq needed → avoids Express vs. Node type clashes.
    ========================================================= */
 
 /* Auth service (strip /auth) — no identity injection */
@@ -284,15 +312,15 @@ app.use(
   })
 );
 
-// --- TEMP DEBUG: show what the records service actually receives
+// debug on PUT /records*
 app.use((req, _res, next) => {
-  if (req.method === 'PUT' && (req.path === '/records' || req.path.startsWith('/records/'))) {
-    console.log('[records] saw', req.method, req.originalUrl, 'authz:', req.headers.authorization || '<none>');
+  if (req.method === "PUT" && (req.path === "/records" || req.path.startsWith("/records/"))) {
+    console.log("[records] saw", req.method, req.originalUrl, "authz:", req.headers.authorization || "<none>");
   }
   next();
 });
 
-/* Records service — inject identity, forward /records as-is (no rewrite) */
+/* Records service — inject identity, and rewrite /records health/metrics to root */
 app.use(
   "/records",
   injectIdentityHeadersIfAny,
@@ -301,8 +329,11 @@ app.use(
     changeOrigin: true,
     proxyTimeout: 15000,
     agent: keepAliveAgent,
-    pathRewrite: (path) =>
-      path.startsWith("/records") ? path : `/records${path}`,
+    pathRewrite: (path) => {
+      const m = path.match(/^\/records\/(healthz|metrics)\/?$/);
+      if (m) return `/${m[1]}`;
+      return path.startsWith("/records") ? path : `/records${path}`;
+    },
     on: {
       proxyRes(proxyRes: IncomingMessage) {
         console.log("[gw] /records upstream status:", proxyRes.statusCode);
@@ -315,7 +346,7 @@ app.use(
   })
 );
 
-/* Listings — public GETs, but we still forward identity if present */
+/* Listings — public GETs, but forward identity if present */
 app.use(
   "/listings",
   injectIdentityHeadersIfAny,
@@ -327,16 +358,11 @@ app.use(
     on: {
       proxyRes(proxyRes) {
         const h = proxyRes.headers as Record<string, string>;
-        if (!h["cache-control"]) {
-          h["cache-control"] = "public, max-age=60, s-maxage=300";
-        }
+        if (!h["cache-control"]) h["cache-control"] = "public, max-age=60, s-maxage=300";
       },
       error(err, _req, res) {
         console.error("[gw] listings proxy error:", err);
-        sendJson502(
-          res as NodeServerResponse | Socket,
-          "listings upstream error"
-        );
+        sendJson502(res as NodeServerResponse | Socket, "listings upstream error");
       },
     },
   })
@@ -354,10 +380,7 @@ app.use(
     on: {
       error(err, _req, res) {
         console.error("[gw] analytics proxy error:", err);
-        sendJson502(
-          res as NodeServerResponse | Socket,
-          "analytics upstream error"
-        );
+        sendJson502(res as NodeServerResponse | Socket, "analytics upstream error");
       },
     },
   })
@@ -376,9 +399,7 @@ app.use(
     on: {
       proxyRes(proxyRes) {
         const h = proxyRes.headers as Record<string, string>;
-        if (!h["cache-control"]) {
-          h["cache-control"] = "public, max-age=120, s-maxage=600";
-        }
+        if (!h["cache-control"]) h["cache-control"] = "public, max-age=120, s-maxage=600";
       },
       error(err, _req, res) {
         console.error("[gw] ai proxy error:", err);

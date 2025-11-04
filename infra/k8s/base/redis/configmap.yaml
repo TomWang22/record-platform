@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+data:
+  redis.conf: |
+    maxmemory 1gb
+    maxmemory-policy allkeys-lfu
+    save ""                      # disable RDB
+    appendonly no                # disable AOF
+    stop-writes-on-bgsave-error no
+    tcp-keepalive 30
+    timeout 0

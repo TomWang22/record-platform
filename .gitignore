@@ -18,3 +18,13 @@ webapp/generated/
 
 # local secrets
 .env
+vscode/
+
+# TLS certificates and private keys
+certs/
+*.crt
+*.key
+*.pem
+*.csr
+*.cnf
+*.srl

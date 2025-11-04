@@ -1,0 +1,45 @@
+# ==================================================
+# FILE: caddy-deploy.yaml  (root)
+# (unchanged except we keep tcpSocket probes)
+# ==================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: caddy-h3
+  namespace: ingress-nginx
+spec:
+  strategy: { type: Recreate }
+  replicas: 1
+  selector: { matchLabels: { app: caddy-h3 } }
+  template:
+    metadata: { labels: { app: caddy-h3 } }
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 5
+      containers:
+      - name: caddy
+        image: caddy:2.8
+        securityContext:
+          runAsNonRoot: false
+          capabilities: { add: ["NET_BIND_SERVICE"] }
+        ports:
+        - { name: https, containerPort: 443, protocol: TCP }
+        - { name: https-udp, containerPort: 443, protocol: UDP }
+        volumeMounts:
+        - { name: caddy-conf,  mountPath: /etc/caddy }
+        - { name: caddy-certs, mountPath: /etc/caddy/certs, readOnly: true }
+        - { name: caddy-ca,    mountPath: /etc/caddy/ca,    readOnly: true }
+        readinessProbe: { tcpSocket: { port: 443 }, periodSeconds: 5, failureThreshold: 6 }   # avoids SNI
+        livenessProbe:  { tcpSocket: { port: 443 }, initialDelaySeconds: 3, periodSeconds: 10, failureThreshold: 3 }
+      volumes:
+      - name: caddy-conf
+        configMap: { name: caddy-h3, items: [{ key: Caddyfile, path: Caddyfile }] }
+      - name: caddy-certs
+        secret:
+          secretName: record-local-tls
+          items: [{ key: tls.crt, path: tls.crt }, { key: tls.key, path: tls.key }]
+      - name: caddy-ca
+        secret:
+          secretName: dev-root-ca
+          items: [{ key: dev-root.pem, path: dev-root.pem }]

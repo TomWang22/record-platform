@@ -1,0 +1,92 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pg-dump-nightly
+  labels:
+    app: postgres-backup
+spec:
+  schedule: "0 6 * * *"              # 06:00 daily
+  timeZone: America/New_York         # honors DST
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: dump
+            image: postgres:16
+            imagePullPolicy: IfNotPresent
+            env:
+            - name: PGPASSFILE
+              value: /opt/pg/.pgpass
+            volumeMounts:
+            - name: backups
+              mountPath: /backups
+            - name: pgpass
+              mountPath: /opt/pg/.pgpass
+              subPath: .pgpass
+              readOnly: true
+            command: ["bash","-lc"]
+            args:
+            - |
+              set -euo pipefail
+              echo "[$(date -Is)] start backup"
+              until pg_isready -h postgres -p 5432 -U postgres -d records -t 1 >/dev/null; do sleep 1; done
+              TS=$(date +%Y%m%d-%H%M)
+              OUT="/backups/nightly-$TS"
+              mkdir -p "$OUT"
+
+              # --- logical dump with simple retries ---
+              n=0
+              until \
+                pg_dump    -h postgres -U postgres -d records -F d -j 4 -f "$OUT/records.dir" && \
+                pg_dumpall -h postgres -U postgres -g -f "$OUT/globals.sql"
+              do
+                n=$((n+1))
+                [ $n -ge 3 ] && { echo "backup failed after $n attempts"; exit 1; }
+                echo "retrying in 10s... ($n/3)"; sleep 10
+              done
+
+              # --- capture server config & extensions for rebuilds ---
+              psql -h postgres -U postgres -d records -X -P pager=off -Atc \
+                "SELECT name||E'\t'||setting||E'\t'||source FROM pg_settings ORDER BY name" \
+                > "$OUT/pg_settings.tsv"
+
+              psql -h postgres -U postgres -d records -X -P pager=off -c "SHOW ALL" \
+                > "$OUT/show_all.txt"
+
+              psql -h postgres -U postgres -d records -X -P pager=off -Atc \
+                "SELECT extname||E'\t'||extversion FROM pg_extension ORDER BY 1" \
+                > "$OUT/extensions.tsv"
+
+              # pull postgresql.conf & pg_hba.conf content from within data_directory
+              psql -h postgres -U postgres -d records -X -P pager=off -Atc \
+                "WITH d AS (SELECT current_setting('data_directory') AS dd),
+                      cf AS (SELECT replace(current_setting('config_file'), (SELECT dd||'/' FROM d), '') AS f),
+                      hf AS (SELECT replace(current_setting('hba_file'),    (SELECT dd||'/' FROM d), '') AS f)
+                 SELECT pg_read_file((SELECT f FROM cf))" > "$OUT/postgresql.conf" || true
+
+              psql -h postgres -U postgres -d records -X -P pager=off -Atc \
+                "WITH d AS (SELECT current_setting('data_directory') AS dd),
+                      hf AS (SELECT replace(current_setting('hba_file'), (SELECT dd||'/' FROM d), '') AS f)
+                 SELECT pg_read_file((SELECT f FROM hf))" > "$OUT/pg_hba.conf" || true
+
+              # --- package + prune ---
+              tar -C /backups -czf "/backups/nightly-$TS.tar.gz" "nightly-$TS"
+              rm -rf "$OUT"
+              ls -1t /backups/nightly-*.tar.gz | tail -n +8 | xargs -r rm -f
+              echo "[$(date -Is)] done: /backups/nightly-$TS.tar.gz"
+          volumes:
+          - name: backups
+            persistentVolumeClaim:
+              claimName: pg-backups-2
+          - name: pgpass
+            secret:
+              secretName: pg-backup-pgpass
+              defaultMode: 0600

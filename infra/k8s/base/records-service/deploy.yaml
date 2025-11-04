@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: records-service
+  namespace: record-platform
+  labels: { app: records-service }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: records-service } }
+  template:
+    metadata:
+      labels: { app: records-service }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4002"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: app
+          image: records-service:dev
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 4002
+          # Load base config first; explicit env below overrides these.
+          envFrom:
+            - configMapRef: { name: app-config }
+            - secretRef:    { name: app-secrets }
+          env:
+            - name: NODE_ENV
+              value: "development"
+            - name: REDIS_URL
+              value: "redis://redis.record-platform.svc.cluster.local:6379"
+            - name: CACHE_TTL_MS_SHORT
+              value: "15000"
+            - name: CACHE_TTL_MS_LONG
+              value: "60000"
+            - name: DATABASE_URL
+              value: "postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connect_timeout=5&pool_timeout=10"
+          readinessProbe:
+            httpGet: { path: /_ping, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            httpGet: { path: /_ping, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          startupProbe:
+            httpGet: { path: /_ping, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 20

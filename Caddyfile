@@ -1,0 +1,42 @@
+# =========================
+# FILE: Caddyfile
+# =========================
+{
+  admin off
+  # No 'servers { ... }' needed; h3 is enabled automatically in Caddy 2.8
+}
+
+# Primary vhost (SNI = record.local)
+https://record.local {
+  tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key
+
+  @health path /_caddy/healthz
+  respond @health "ok\n" 200
+
+  # TLS to ingress; keep SNI=record.local; prefer h2 upstream
+  reverse_proxy https://ingress-nginx-controller.ingress-nginx.svc.cluster.local:443 {
+    header_up Host {http.request.host}
+    transport http {
+      tls
+      tls_server_name record.local
+
+      # --- ONE of the following trust options ---
+
+      # A) TEMP: prove pathing first (disable once CA works):
+      # tls_insecure_skip_verify
+
+      # B) Proper CA trust (preferred): your mkcert CA is mounted at /etc/caddy/ca/dev-root.pem
+      # (If Caddy complains about unknown authority, this is the bit to keep enabled)
+      tls_trusted_ca_certs /etc/caddy/ca/dev-root.pem
+
+      versions h2 h1
+    }
+  }
+}
+
+# Catch-all for probe without SNI
+https://:443 {
+  tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key
+  @probe path /_caddy/healthz
+  respond @probe "ok\n" 200
+}

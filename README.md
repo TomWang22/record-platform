@@ -1,442 +1,190 @@
-Record Platform
-
-A containerized microservices stack for managing a personal record collection with auth, gateway, observability, and a web app.
-
-Gateway (Node/Express) with JWT verification, rate limiting, identity fan-out
-
-Records Service (Node/Express + Prisma + Postgres)
-
-Auth, Listings, Analytics, AI services
-
-Nginx entrypoint, Prometheus + Grafana metrics, Redis for token revocation
-
-Kafka + Zookeeper (future/eventing)
-
-Fully dockerized dev environment
-
-✅ Recent fixes:
-
-# Login
-JWT=$(
-  curl -sS -H 'content-type: application/json' \
-    -d '{"email":"t@t.t","password":"p@ssw0rd"}' \
-    http://localhost:8080/api/auth/login | jq -r .token
-)
-
-# Create
-curl -sS -H "Authorization: Bearer $JWT" -H 'content-type: application/json' \
-  -d '{"artist":"Aphex Twin","name":"SAW 85-92","format":"LP"}' \
-  http://localhost:8080/api/records | jq .
-
-Gateway now verifies JWTs and injects x-user-* headers to downstream services.
-
-Records proxy uses the mount path (no extra rewrite), so /api/records hits /records upstream.
-
-Prisma model aligned to UUID for id and userId; POST create mapping hardened.
-
-Slim runtime images (no pnpm in containers); migrations run via build step or on host.
-
-Contents
-
-Architecture
-
-Services & Ports
-
-Data Model
-
-API
-
-Auth & Identity Flow
-
-Local Quickstart
-
-Smoke Test
-
-Build & Rebuild Tips
-
-Migrations
-
-Nginx
-
-Observability
-
-Security Hardening
-
-Troubleshooting
-
-Roadmap
-
-Contributing
-
-Architecture
-Browser
-  │
-  ▼
-NGINX (8080)  ──►  API Gateway (Node 4000)
-                   • JWT verify (verifyJwt)
-                   • Rate-limit (300/min)
-                   • Inject x-user-id/email/jti
-                   • /metrics, /healthz
-                   • Redis (revocation)
-                   │
-                   ├─► Auth Service (4001)
-                   ├─► Records Service (4002) ──► Postgres (5432) via Prisma
-                   ├─► Listings (4003)
-                   ├─► Analytics (4004)
-                   └─► Python AI (5005)
-
-Prometheus (9091→9090) ⇦ scrapes /metrics
-Grafana (3000) dashboards
-Kafka (29092) + Zookeeper (2181) for events
-Redis (6379) for token revocation
-
-
-Key paths
-
-Nginx serves the UI at / and proxies /api/* to the gateway (stripping /api).
-
-Gateway proxies:
-
-/auth/* → auth-service:4001 (strips /auth)
-
-/records/* → records-service:4002 (no prefix rewrite; uses mount path)
-
-/listings/*, /analytics/*, /ai/* with identity headers when available
-
-Services & Ports
-Service	Port (inside)	Notes
-Nginx	8080 (host)	Entry point: / (web), /api/* → gateway
-API Gateway	4000	Auth guard, identity headers, metrics
-Auth Service	4001	Login/register, /auth/*
-Records Service	4002	/records CRUD, /records/_ping
-Listings Service	4003	Public GETs allowed
-Analytics Service	4004	Protected
-Python AI	5005	/ai/* via gateway (GETs public)
-Postgres	5432 (host)	Dev DB
-Redis	6379 (host)	Revoked JWT store
-Prometheus	9091 (host)	Scrapes gateway & services /metrics
-Grafana	3000 (host)	Dashboards
-Kafka/Zookeeper	29092/2181	Event infra
-Data Model
-
-services/records-service/prisma/schema.prisma
-
-datasource db {
-  provider = "postgresql"
-  url      = env("POSTGRES_URL_RECORDS")
-}
-
-generator client {
-  provider      = "prisma-client-js"
-  output        = "../generated/records-client"
-  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
-}
-
-model Record {
-  id               String    @id @db.Uuid @default(uuid())
-  userId           String    @db.Uuid @map("user_id")
-
-  artist           String    @db.VarChar(256)
-  name             String    @db.VarChar(256)
-  format           String    @db.VarChar(64)
-
-  catalogNumber    String?   @db.VarChar(64) @map("catalog_number")
-  recordGrade      String?   @db.VarChar(16) @map("record_grade")
-  sleeveGrade      String?   @db.VarChar(16) @map("sleeve_grade")
-  hasInsert        Boolean   @default(false) @map("has_insert")
-  hasBooklet       Boolean   @default(false) @map("has_booklet")
-  hasObiStrip      Boolean   @default(false) @map("has_obi_strip")
-  hasFactorySleeve Boolean   @default(false) @map("has_factory_sleeve")
-  isPromo          Boolean   @default(false) @map("is_promo")
-
-  notes            String?   @db.Text
-  purchasedAt      DateTime? @map("purchased_at")
-  pricePaid        Decimal?  @db.Decimal(10, 2) @map("price_paid")
-
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt      @map("updated_at")
-
-  @@map("records")
-  @@index([userId])
-  @@index([artist])
-  @@index([catalogNumber])
-  @@index([artist, name, format])
-}
-
-
-Gotcha we fixed: aligning Prisma types to UUIDs (and using uuid() default) prevents runtime errors like “Inconsistent column data: Error creating UUID…”
-
-API
-Auth (via gateway /api/auth/*)
-
-POST /api/auth/register {email, password}
-
-POST /api/auth/login → { token }
-
-GET /api/auth/me (Bearer) → token payload
-
-POST /api/auth/logout (Bearer) → 204 and revokes token JTI in Redis
-
-Records (via gateway /api/records/*) — requires Bearer
-
-GET /api/records → latest 100 for user
-
-POST /api/records body:
-
-{
-  "artist": "Aphex Twin",
-  "name": "Selected Ambient Works",
-  "format": "LP",
-  "pricePaid": "24.50",
-  "purchasedAt": "2022-10-01",
-  "notes": "used, VG+"
-}
-
-
-→ 201 Created with the new record
-
-PUT /api/records/:id → update if owned
-
-DELETE /api/records/:id → 204 if owned
-
-GET /api/records/_ping → { ok: true }
-
-The gateway verifies the JWT and injects x-user-id, x-user-email, x-user-jti for the records service. The service does not parse JWTs itself.
-
-Auth & Identity Flow
-
-Client hits /api/auth/login → gets JWT.
-
-All protected routes go through the gateway:
-
-Gateway deletes any client x-user-* headers (anti-spoof),
-
-Verifies JWT, checks Redis revocation (revoked:<jti>),
-
-Sets x-user-id/email/jti on the proxied request to the service.
-
-Service scopes all queries to the user-id header.
-
-Helpers in gateway:
-
-extractBearer(req) for reliable Authorization parsing
-
-Debug routes:
-
-/api/__echo_authz (shows raw Authorization header)
-
-/api/__whoami (after guard; shows decoded payload)
-
-Local Quickstart
-# 1) build & start everything
-docker compose up -d
-
-# 2) check health
-curl -sSf http://localhost:8080/api/healthz
-
-# 3) register (once; ignore “email exists”)
-curl -sS -X POST http://localhost:8080/api/auth/register \
-  -H 'content-type: application/json' \
-  -d '{"email":"t@t.t","password":"p@ssw0rd"}'
-
-# 4) login → JWT
-JWT=$(curl -sS -X POST http://localhost:8080/api/auth/login \
-  -H 'content-type: application/json' \
-  -d '{"email":"t@t.t","password":"p@ssw0rd"}' | jq -r .token)
-
-# 5) sanity check identity
-curl -sS http://localhost:8080/api/__whoami -H "Authorization: Bearer $JWT"
-
-Smoke Test
-# ping records
-curl -sS http://localhost:8080/api/records/_ping -H "Authorization: Bearer $JWT"
-
-# list (expect [])
-curl -sS http://localhost:8080/api/records -H "Authorization: Bearer $JWT" | jq .
-
-# create
-curl -sS -X POST http://localhost:8080/api/records \
-  -H "Authorization: Bearer $JWT" -H 'content-type: application/json' \
-  -d '{"artist":"Aphex Twin","name":"Selected Ambient Works","format":"LP"}' | jq .
-
-# list again (expect the new record)
-curl -sS http://localhost:8080/api/records -H "Authorization: Bearer $JWT" | jq .
-
-Build & Rebuild Tips
-
-Rebuild one service:
-
-docker compose up -d --no-deps --build records-service
-docker compose up -d --no-deps --build api-gateway
-
-
-Full rebuild (be careful with -v: it deletes DB):
-
-docker compose down -v
-docker compose build --no-cache
-docker compose up -d
-
-
-Why pnpm is “not found” inside containers?
-Runtime images are slim by design; we run pnpm only in the build stage. The Prisma client is generated during the build.
-
-Migrations
-
-You’ve got three good options:
-
-A) Run from host
-export POSTGRES_URL_RECORDS='postgresql://record_app:CHANGE_ME_STRONG_PASSWORD@localhost:5432/records?schema=records'
-pnpm -C services/records-service prisma migrate deploy
-
-B) One-off inside container (no pnpm needed)
-docker compose exec -T records-service sh -lc \
-  'export POSTGRES_URL_RECORDS="$POSTGRES_URL_RECORDS" && npx --yes prisma@latest migrate deploy'
-
-C) Dedicated migrator service (recommended for CI/CD)
-# docker-compose.yml
-records-migrator:
-  build:
-    context: .
-    dockerfile: ./services/records-service/Dockerfile
-    target: build
-  command: sh -lc "pnpm -C services/records-service exec prisma migrate deploy"
-  environment:
-    POSTGRES_URL_RECORDS: ${POSTGRES_URL_RECORDS}
-  depends_on:
-    postgres:
-      condition: service_healthy
-
-
-Run as needed:
-
-docker compose run --rm records-migrator
-
-Nginx
-
-Key bits (already configured):
-
-upstream gateway  { server api-gateway:4000; }
-server {
-  listen 8080;
-
-  location = /api/healthz { proxy_pass http://gateway/healthz; proxy_cache off; }
-
-  # /api/* -> gateway /* (strip /api)
-  location /api/ {
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_pass http://gateway/;
-
-    proxy_cache STATIC;
-    proxy_cache_methods GET HEAD;
-    proxy_no_cache     $http_authorization;
-    proxy_cache_bypass $http_authorization;
-    proxy_cache_valid  200 1m;
-
-    add_header X-Cache-Status $upstream_cache_status always;
-  }
-
-  # everything else → webapp
-  location / { proxy_pass http://webapp_up; }
-}
-
-
-The trailing / in proxy_pass http://gateway/; under location /api/ removes the /api prefix (this was a previous source of “Cannot GET /”).
-
-Observability
-
-Every service exposes /metrics (Prometheus text format).
-
-Gateway increments a labeled counter per route/method/status:
-
-httpCounter{service="gateway", route, method, code}
-
-Prometheus is exposed at http://localhost:9091 (proxied to container 9090).
-
-Grafana at http://localhost:3000 (admin/admin by default – change it).
-
-Security Hardening
-
-helmet with CSP (restrictive defaults)
-
-Rate limiting 300 req / 60s (skips /healthz, /metrics)
-
-compression, cors (explicit allowlist for localhost:8080 and 3001)
-
-app.set('trust proxy', 1) (we sit behind Nginx)
-
-Gateway never trusts client x-user-* headers; it sets them after JWT verify
-
-Troubleshooting
-
-401 “auth required” on /api/records
-
-Check gateway logs to confirm the guard sees your token:
-
-docker compose logs -f api-gateway
-
-
-You should see [gw] guard token? true len= ... path=/records
-
-“Cannot GET /” (HTML error page)
-
-Typically a proxy path issue. Make sure records proxy uses:
-
-app.use("/records", createProxyMiddleware({
-  target: "http://records-service:4002",
-  changeOrigin: true,
-  // NO extra pathRewrite here; mount path passes through
-}));
-
-
-Prisma “Inconsistent column data: Error creating UUID …”
-
-Mismatch between Prisma model and DB column type/default.
-
-We set @db.Uuid and @default(uuid()) and rebuilt the service.
-
-pnpm: not found inside container
-
-Expected. Use the host to run Prisma CLI, or the migrator service.
-
-Check service health
-
-curl -sSf http://localhost:8080/api/healthz
-curl -sSf http://localhost:8080/api/records/_ping -H "Authorization: Bearer $JWT"
-docker compose logs -f records-service
-
-Roadmap
-
-v0.2 – AI insights layer + prompt logging
-
-Lightweight analysis over a user’s collection, persisted prompt/response logs
-
-v0.3 – Dashboard refinement
-
-Web UI polish, bulk import/export, real-world collection flows
-
-v0.4 – Multi-agent orchestration
-
-Fetch/analyze/report pipelines, Kafka events, scheduled jobs
-
-Contributing
-
-Node 20+, pnpm@9
-
-PRs should:
-
-Include service-level smoke instructions
-
-Keep runtime images slim (no build tools)
-
-Surface metrics for new endpoints
-
-Commit convention example:
-
-fix(records-service): align Prisma UUID columns and harden create mapping
-
-- Mark id and userId as @db.Uuid; switch id default to uuid()
-- Map POST fields explicitly to avoid leaking unexpected keys
-- Normalize purchasedAt and pricePaid inputs
-
-
-License: MIT (or your choice)
+# Record Platform
+
+Record Platform is a Kubernetes-first microservices stack for managing a personal record collection while exercising modern edge patterns. The stack spans Node.js/Express services, Prisma/Postgres data, Redis-backed caching, and a suite of observability and operational tools. The latest revamp replaces the Docker Compose dev story with Kustomize-driven Kubernetes, adds a Caddy front door that speaks HTTP/2 and HTTP/3, and ships automation scripts for day-to-day ops.
+
+## Highlights
+- **Multi-protocol edge** - Caddy terminates TLS/QUIC and forwards into nginx-ingress; HTTP/2 and HTTP/3 flows are probed via `scripts/h3-matrix.sh`.
+- **Kubernetes-native workflows** - `infra/k8s` provides composable bases and overlays, with bootstrapping scripts that stand up Kind, build images, load them, and apply manifests.
+- **Hardened gateway path** - API Gateway keeps the JWT guard, adds optional `DEBUG_FAKE_AUTH`, injects identity headers, and exposes detailed metrics.
+- **Redis-assisted records caching** - `services/records-service/src/lib/cache.ts` adds normalized search keys, safe JSON encoding, and targeted invalidation hooks.
+- **Operational tooling** - `scripts/` covers smoke tests, TLS helpers, QUIC tuning, backup/restore, load tests, and rollout automation.
+
+## Why This Exists
+I have been cataloging vinyl for a little over a year, and this codebase sits at the intersection of that hobby and a desire to level up on distributed systems and observability. The earlier Docker Compose stack was enough to track spins, but I wanted to understand how real platforms layer ingress controllers, service meshes, CI/CD-friendly manifests, and QUIC edges. Every migration choice (Caddy front door, nginx micro-cache, HAProxy fan-in, the Kustomize base/overlay split) is framed so a curious collector can trace data flow from a record search UI all the way to Postgres buffers and Grafana dashboards. The repo keeps personal workflow sharp (fast search, authenticated inserts) while remaining a playground for new infra ideas.
+
+## System Architecture
+```
+Client (HTTP/3, HTTP/2, HTTP/1.1)
+  |
+  v
+Caddy (host) -- TLS termination + mkcert CA ---> ingress-nginx (cluster)
+                                             +---------------+
+                                             | host: record.local
+                                             +------+--------+
+        / (web app) ----------------> nginx edge (8080) --> HAProxy (8081) --> API Gateway (4000)
+        /api/* (direct path) -------> API Gateway (4000)
+                                          |
+                                          +- Auth Service (4001) -> Redis (revocations)
+                                          +- Records Service (4002) -> Postgres + Redis cache
+                                          +- Listings Service (4003)
+                                          +- Analytics Service (4004)
+                                          +- Python AI Service (5005)
+
+Postgres (statefulset) <-> Prisma clients        Redis (statefulset) <-> JWT & cache
+Prometheus Operator + Grafana <- ServiceMonitors scrape /metrics endpoints
+```
+
+`ingress-nginx` maps `/` traffic to the `nginx` edge deployment (micro-cache + rate limiting) and `/api/*` to the `api-gateway` Service. Port-forwarding `svc/nginx` gives an all-in-one entry point when you want to exercise the Nginx -> HAProxy -> Gateway chain directly. Caddy runs on the host, serves `record.local`, and forwards into the ingress controller; TLS material is generated locally (and ignored by Git) so leaf certificates can be rotated without touching history.
+
+## Core Services
+| Component | Deployment / Service | Notes |
+|-----------|---------------------|-------|
+| **API Gateway** | `deploy/api-gateway` -> `svc/api-gateway:4000` | Node/Express gateway; verifies JWTs, enforces rate limit, injects `x-user-*`, exports `/metrics`, and supports `DEBUG_FAKE_AUTH` for trusted developer flows. |
+| **Auth Service** | `deploy/auth-service` -> `svc/auth-service:4001` | Handles register/login/logout, persists to the Postgres `auth` schema via Prisma, includes seed jobs in the dev overlay. |
+| **Records Service** | `deploy/records-service` -> `svc/records-service:4002` | CRUD + search over records. Uses Redis for search caching, enforces user ownership, exports health + metrics. |
+| **Listings Service** | `deploy/listings-service` -> `svc/listings-service:4003` | Public catalogue endpoints; lightweight GET workloads targeted for QUIC tuning. |
+| **Analytics Service** | `deploy/analytics-service` -> `svc/analytics-service:4004` | Authenticated aggregations and stats. |
+| **Python AI Service** | `deploy/python-ai-service` -> `svc/python-ai-service:5005` | Python worker invoked via the gateway; placeholder for AI/ML prototypes. |
+| **Web App Edge (Nginx)** | `deploy/nginx` -> `svc/nginx:8080` | Serves static UI assets, proxies `/api` through HAProxy, and applies micro-caching / rate limits. |
+
+## Supporting Infrastructure
+- **Caddy** (`Caddyfile`, `caddy-*.yaml`) - host-side HTTP/2 + HTTP/3 front door. Mounts the local cert bundle under `/etc/caddy/certs` and trusts `certs/dev-root.pem`.
+- **Ingress** (`infra/k8s/overlays/dev/ingress.yaml`) - nginx ingress controller routing for Kind. Rewrites `/api/...` to `/...` before hitting the gateway.
+- **HAProxy** (`infra/k8s/base/haproxy`) - maintains keep-alive pools to the gateway, surfaces stats on `:8404`, and keeps the gateway replicas warm.
+- **Postgres** (`infra/k8s/base/postgres`) - StatefulSet with init ConfigMaps and PVC. Post-init jobs populate schema, roles, and extensions.
+- **Redis** (`infra/k8s/base/redis`) - StatefulSet used for JWT revocation and records cache keys.
+- **Monitoring** (`infra/k8s/base/monitoring`) - ServiceMonitors targeting gateway, services, nginx, and haproxy. `infra/k8s/overlays/dev/bootstrap.sh` installs `kube-prometheus-stack`.
+- **Cron Jobs** (`infra/k8s/base/cron-jobs`) - Nightly Postgres dumps, Redis snapshots, basebackups, and related secrets.
+
+## Repository Layout
+- `infra/k8s/base/*` - canonical manifests for services, data stores, ingress, monitoring, and cron jobs.
+- `infra/k8s/overlays/dev/*` - dev overlay, ingress, patches, bootstrap scripts, job templates, and PVC helpers.
+- `scripts/` - automation: cluster bootstrap, smoke tests, diagnostics, TLS toggles, QUIC tuning, load tests, backups, and rollouts.
+- `services/` - microservice code (Node + Python). Prisma schemas and migrations live beside each service.
+- `Caddyfile`, `caddy-*.yaml` - Caddy configuration and deployment manifests for the HTTP/3 edge.
+- `Makefile`, `Makefile1` - convenience targets for applying manifests, running post-init jobs, smoke tests, and data imports.
+- `tests-local.sh`, `verify.sh`, `inventory.txt` - sanity checks and current cluster inventory snapshots.
+
+## Prerequisites
+- Docker 24+, Kind, kubectl >=1.30, Helm >=3.13.
+- mkcert (or another local CA tool) to mint and trust `record.local` certificates.
+- Node 20+ and pnpm 9.x for service builds.
+- Optional: `curl` with HTTP/3 support (Homebrew `curl --with-quic`) and `k6` for load tests.
+
+## Local Development Quickstart
+1. Ensure `record.local` resolves locally:
+   ```bash
+   echo '127.0.0.1 record.local' | sudo tee -a /etc/hosts
+   ```
+2. Bootstrap (or refresh) the Kind cluster and dev overlay:
+   ```bash
+   ./infra/k8s/overlays/dev/bootstrap.sh
+   ```
+   The script verifies tooling, creates the `record-platform` Kind cluster if missing, builds `:dev` images, loads them into Kind, applies the Kustomize overlay, installs `kube-prometheus-stack`, waits for rollouts, and prints port-forward tips.
+3. Iterate after the initial bootstrap with the faster dev loop:
+   ```bash
+   KIND_CLUSTER=h3 ./scripts/dev-up.sh
+   ```
+   This rebuilds service images for the cluster architecture, reloads them into Kind, reapplies the overlay, ensures the `records` database exists with extensions, re-runs seed jobs, and restarts DB-dependent deployments.
+4. Validate the edge and API path:
+   ```bash
+   ./scripts/h3-matrix.sh          # HTTP/2 + HTTP/3 health probes
+   ./scripts/smoke.sh record-platform
+   ./scripts/smoke-edge.sh         # exercises nginx/haproxy/gateway chain
+   ```
+5. Port-forward when you need direct access:
+   ```bash
+   kubectl -n record-platform port-forward svc/nginx 8080:8080
+   kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80
+   ```
+   Grafana defaults to `admin/Admin123!` (see bootstrap script overrides); change it for long-lived clusters.
+
+Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. Rotate credentials before sharing a cluster.
+
+## TLS & HTTP/3
+- TLS material lives in `certs/` (`tls.crt`, `tls.key`, `dev-root.pem`, etc.) and is ignored by Git (`.gitignore:23-30`). Generate new keys with `scripts/strict-tls-bootstrap.sh` and trust `caddy-local-root.crt` locally (`security add-trusted-cert ...` on macOS).
+- Caddy expects the leaf cert/key at `/etc/caddy/certs/` and the trusted CA at `/etc/caddy/ca/dev-root.pem`. Use `scripts/caddy-toggle-insecure.sh` to temporarily disable upstream verification while debugging.
+- `scripts/h3-matrix.sh`, `scripts/diag-caddy-h3.sh`, and `scripts/diag-caddy-h3-extended.sh` probe HTTP/2/3 behavior, SNI routing, and upstream TLS handshakes.
+- Redistribute regenerated certs out-of-band; they intentionally stay out of Git history.
+
+## Data & Migrations
+- Postgres hosts separate `auth` and `records` schemas. The current records baseline lives in `services/records-service/prisma/migrations/20251028_baseline/`.
+- Apply migrations via the Postgres post-init job (`make postinit`) or directly with Prisma:
+  ```bash
+  pnpm -C services/records-service prisma migrate deploy
+  pnpm -C services/auth-service prisma migrate deploy
+  ```
+- `scripts/import-sample-data.sh`, `scripts/backup-now.sh`, and `scripts/restore-from-pvc.sh` cover sample data loads, on-demand backups, and restores.
+- `Makefile` targets:
+  - `make apply` - apply the rendered manifest bundle in `k8s/all.yaml`.
+  - `make postinit` - rerun the Postgres post-init job and stream logs.
+  - `make smoke` - call `scripts/smoke.sh` for the configured namespace.
+  - `make import-sample USER_ID=<uuid> N=<count>` - bulk load sample records for a user.
+
+## Performance Benchmarks
+- The `psql-inventory` job (see snippet below) creates a `bench.results` table, prewarms hot partitions, and sweeps pgbench runs over two stored search plans: `percent` (prefix filtering) and `knn` (vector KNN).
+- Results are recorded in Postgres with git metadata and exported to `bench_sweep.csv` for spreadsheet review. Latency files are parsed into p50/p95/p99/p999, plus CPU share and IO deltas.
+- Recent sweep (records schema warmed, 12 worker threads, 60 second windows, limit=50):
+  - `percent` variant peaked at ~3.0k TPS (16 clients) with p95 ~12 ms and p99 ~13 ms before caching and kernel tuning drove p95 below 2 ms at higher client counts.
+  - `knn` variant sustained ~2.6k TPS with p95 hovering 10 to 13 ms at lower concurrency and dropping to ~2 ms after buffer warmups.
+  - Postgres 16.10 on arm64, `track_io_timing=on`, collected buffer hit deltas and pg_stat_io rollups for later graphing.
+- The one-liner that orchestrates the sweep (truncated for brevity) is kept in `inventory.txt` for reproducibility:
+  ```
+  kubectl -n "$NS" exec -i psql-inventory -- bash -s <<'BASH'
+  # ... creates bench schema, prewarms partitions, runs pgbench variants, upserts into bench.results,
+  # and writes CSV summaries to /tmp/bench_sweep.csv plus shared volumes.
+  BASH
+  ```
+- Sample CSV rows (2025-11-03):
+  ```
+  ts_utc,variant,clients,tps,p95_ms,p99_ms
+  2025-11-03T20:48:43Z,percent,16,2997.227769,12.128,12.468
+  2025-11-03T20:49:43Z,knn,16,2614.342007,10.794,11.053
+  2025-11-03T21:12:30Z,percent,48,2728.663783,3.507,4.576
+  2025-11-03T22:10:29Z,knn,32,1875.440407,3.648,3.856
+  ```
+- Long-form output lives in `bench_sweep.csv`; use `scripts/perf_runner.sh` or adapt the snippet to compare future schema or index experiments.
+
+## Auth & Identity Flow
+1. Clients obtain JWTs via `/api/auth/login` (Caddy -> ingress -> gateway).
+2. API Gateway:
+   - strips inbound `x-user-*` headers,
+   - verifies the JWT and checks Redis for a revoked JTI,
+   - injects `x-user-id`, `x-user-email`, and `x-user-jti`,
+   - proxies to downstream services.
+3. Services scope queries by the injected headers. Records service enforces ownership on every CRUD path and re-computes derived grades when media pieces update.
+4. Development helper: set `DEBUG_FAKE_AUTH=1` on the gateway deployment to allow trusted curl/k6 traffic to supply `x-user-id` directly (UUID validated).
+
+`services/records-service/src/lib/cache.ts` provides `cached`, `makeSearchKey`, and `invalidateSearchKeysForUser`. Mutations call the invalidation helper to clear search, autocomplete, facet, and price-stat caches per user.
+
+## Observability & Diagnostics
+- Prometheus/Grafana arrive via `kube-prometheus-stack`. Custom ServiceMonitors scrape gateway, services, nginx, and HAProxy `/metrics`.
+- Gateway exports per-route/method/status counters; edge Nginx exposes cache hit/miss gauges; records service emits Prisma timings.
+- Key scripts:
+  - `scripts/verify-dev.sh` - end-to-end cluster sanity.
+  - `scripts/diag-caddy.sh`, `scripts/diag-gateway.sh`, `scripts/quic-tune-kind.sh` - ingress and QUIC inspection.
+  - `scripts/perf_runner.sh`, `scripts/perf_smoke.sh`, `scripts/load/k6-*.js` - load/perf harnesses.
+  - `scripts/pg-connectivity-check.sh`, `scripts/run-postinit-debug-pod.sh` - database connectivity + post-init debugging.
+  - `scripts/tests.sh`, `tests-local.sh` - ad-hoc regression checks.
+
+## Maintenance & Backups
+- CronJobs under `infra/k8s/base/cron-jobs` perform nightly `pg_dump`, weekly `pg_basebackup`, and Redis dumps. Secrets such as `pg-backup-pgpass.secret.yaml` and `pg-repl.secret.yaml` house credentials.
+- `backups/` and `records-*.tar.gz` artifacts are produced locally and intentionally remain untracked.
+- Rollout helpers (`scripts/rollout-caddy.sh`, `scripts/rollout-latest.sh`, `scripts/rollout-unstick.sh`) wrap common `kubectl` commands.
+- Use `scripts/fix_pg.sh`, `scripts/debug-postinit.sh`, and `scripts/diag-caddy-h3-extended.sh` while finishing the DB repair and TLS rotation work noted in the commit message.
+
+## Roadmap
+- Finalize the DB repair plan and automate CA rotation across environments.
+- Route `/api/*` through the Nginx edge by default once micro-caching + backpressure tuning is complete.
+- Expand the analytics + AI services with real data pipelines (Kafka hooks live under `infra/k8s/base/kafka`).
+- Harden production overlays (separate values, secrets management, external TLS provisioning).
+
+## Contributing
+- Use Node 20+ and pnpm 9.x. Install workspaces from repo root via `pnpm install`.
+- Keep runtime images slim; tools like pnpm and Prisma CLI stay in the build stage.
+- Update both base and overlay manifests when tweaking infrastructure; `repair-kustomize-structure.sh` can fix patch ordering if Kustomize complains.
+- Add or update smoke tests (`scripts/smoke*.sh`, `scripts/tests.sh`) when changing behavior. Prefer `k6` scripts for perf regressions.
+- Follow conventional commits (`type(scope): summary`) so the changelog stays readable.
+
+## License
+MIT (or customize to your needs).

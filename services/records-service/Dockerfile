@@ -37,6 +37,8 @@ RUN pnpm -C services/common build \
  && rm -rf services/records-service/generated/records-client \
  && pnpm -C services/records-service exec prisma generate --schema prisma/schema.prisma \
  && pnpm -C services/records-service build \
+ && mkdir -p services/records-service/dist/lib \
+ && cp services/records-service/src/lib/*.lua services/records-service/dist/lib/ \
  && test -f services/records-service/dist/routes/records.js \
  && grep -q "__" services/records-service/dist/routes/records.js || true
 
@@ -52,6 +54,9 @@ RUN apt-get update \
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/services/records-service/node_modules ./node_modules
 COPY --from=build /app/services/records-service/dist ./dist
+COPY --from=build /app/services/records-service/src/lib/*.lua ./dist/lib/
+## (safety) ensure lua exists in runtime image
+RUN test -f dist/lib/singleflight_cache.lua
 COPY --from=build /app/services/records-service/package.json ./package.json
 COPY --from=build /app/services/records-service/prisma ./prisma
 COPY --from=build /app/services/records-service/generated ./generated

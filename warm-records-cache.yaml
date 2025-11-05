@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: warm-records-cache
+  namespace: record-platform
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: warm
+          image: records-service:dev
+          imagePullPolicy: IfNotPresent
+          command: [sh, -lc]
+          args:
+            - |
+              set -e
+              base="http://records-service.record-platform.svc.cluster.local:4002"
+              uid="${WARM_USER_ID:?set WARM_USER_ID env}"
+              for q in warner 鄧麗君 "レスリー・チャン"; do
+                enc=$(printf %s "$q" | python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))')
+                echo "warming: $q -> $enc"
+                curl -fsS -H "x-user-id: $uid" \
+                  "$base/records/search?user=$uid&q=$enc&limit=20&offset=0" >/dev/null || true
+              done
+          env:
+            - name: WARM_USER_ID
+              value: "0dc268d0-a86f-4e12-8d10-9db0f1b735e0"

@@ -26,6 +26,7 @@
     "@types/jsonwebtoken": "^9.0.5",
     "compression": "^1",
     "cors": "^2",
-    "helmet": "^7"
+    "helmet": "^7",
+    "pg": "^8.12.0"
   }
 }

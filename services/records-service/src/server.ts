@@ -7,7 +7,8 @@ import { PrismaClient } from "../generated/records-client";
 import { register, httpCounter } from "@common/utils/metrics";
 import { recordsRouter } from "./routes/records";
 import { exportRouter } from "./routes/export";
-import { makeRedis } from "./lib/cache";
+import { makeRedis, attachPgInvalidationListener } from "./lib/cache";
+import { Client as PgClient } from "pg";
 
 const app = express();
 app.disable("x-powered-by");
@@ -23,6 +24,13 @@ const prisma = new PrismaClient({
 
 // --- Redis (for cache + rate-limit) ---
 const redis = makeRedis();
+
+// --- PG LISTEN/NOTIFY -> bump per-user cache versions ---
+const pgListener = new PgClient({ connectionString: RUNTIME_DB_URL });
+pgListener
+  .connect()
+  .then(() => attachPgInvalidationListener(pgListener, redis))
+  .catch((e) => console.warn("[records] pg LISTEN skipped:", e?.message || String(e)));
 
 // Security headers, gzip, JSON body, CORS (same origins as gateway)
 app.use(
@@ -70,17 +78,18 @@ app.get("/healthz", async (_req: Request, res: Response) => {
     const row = await prisma.$queryRaw<{ current_user: string }[]>`SELECT current_user`;
     const user = row?.[0]?.current_user ?? "unknown";
     let r = "skipped";
-    try { r = redis ? await redis.ping() : "disabled"; } catch { r = "error"; }
+    try {
+      r = redis ? await redis.ping() : "disabled";
+    } catch {
+      r = "error";
+    }
     res.json({ ok: true, db_user: user, redis: r });
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e?.message || "db error" });
   }
 });
 
-/**
- * Identity guard
- * The gateway strips client-sent x-user-* and sets them AFTER JWT verification.
- */
+/** Identity guard */
 function requireUser(
   req: Request & { userId?: string; userEmail?: string },
   res: Response,
@@ -97,19 +106,17 @@ function requireUser(
 /** Lightweight per-user rate limit using Redis buckets (windowed). */
 function userRateLimit(opts?: { windowSec?: number; max?: number }): import("express").RequestHandler {
   const windowSec = opts?.windowSec ?? Number(process.env.RL_WINDOW_SEC ?? 60);
-  const max = opts?.max ?? Number(process.env.RL_MAX_PER_WINDOW ?? 240); // e.g., 240 req/min
+  const max = opts?.max ?? Number(process.env.RL_MAX_PER_WINDOW ?? 240);
   return (req, res, next) => {
     (async () => {
-      // No Redis? Just continue.
       if (!redis) return next();
-
       const uid = (req as any).userId || req.ip;
       const now = Math.floor(Date.now() / 1000);
       const bucket = Math.floor(now / windowSec);
       const key = `rl:u:${uid}:${bucket}`;
 
       const n = await redis.incr(key);
-      if (n === 1) await redis.expire(key, windowSec + 1); // ensure TTL on first hit
+      if (n === 1) await redis.expire(key, windowSec + 1);
 
       if (n > max) {
         res.setHeader("Retry-After", String(windowSec));
@@ -144,6 +151,9 @@ function shutdown(signal: string) {
     try {
       await prisma.$disconnect();
       if (redis) await redis.quit();
+      try {
+        await pgListener.end();
+      } catch {}
     } finally {
       process.exit(0);
     }

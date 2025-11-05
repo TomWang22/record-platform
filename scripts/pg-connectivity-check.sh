@@ -8,5 +8,5 @@ kubectl -n "$NS" run psql-check --rm -i --restart=Never --image=postgres:16 -- \
             export PGPASSWORD;
             pg_isready -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" &&
             psql -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" -Atqc "select version();" ' <<'EOF'
-SUPER_STRONG_POSTGRES_PASSWORD
+REPLACE_WITH_POSTGRES_PASSWORD
 EOF

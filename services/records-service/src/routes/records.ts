@@ -1,3 +1,4 @@
+// src/routes/records.ts
 import {
   Router,
   type Request,
@@ -18,7 +19,12 @@ import {
   makeSearchKey,
   normalizeQ,
   invalidateSearchKeysForUser,
+  verKey,
+  idKey,
+  getDocsByIds,
+  docKey,
 } from "../lib/cache";
+import { Decimal } from "@prisma/client/runtime/library";
 
 type AuthedReq = Request & { userId?: string; userEmail?: string };
 
@@ -30,23 +36,19 @@ function asyncHandler(
 ): RequestHandler {
   return (req, res, next) => {
     Promise.resolve(fn(req as AuthedReq, res, next)).catch((err) => {
-      // surface real cause in logs while still returning {error:"internal"}
       console.error("[route error]", req.method, req.path, err);
       next(err);
     });
   };
 }
 
-// Strict UUID (v1–v5) and a reusable string for route regex
 const UUID_RX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UUID_ROUTE =
   "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}";
 
 function requireUserId(req: AuthedReq, res: Response): string | undefined {
-  // trust upstream if present
   let userId = req.userId;
-  // fallback: accept x-user-id header for tools/curl
   if (!userId) {
     const hdr = req.get("x-user-id");
     if (hdr && UUID_RX.test(hdr)) userId = hdr;
@@ -58,7 +60,6 @@ function requireUserId(req: AuthedReq, res: Response): string | undefined {
   return userId;
 }
 
-/** Deeply convert BigInt → number (if safe) or string */
 function debigint<T>(v: T): T {
   const seen = new WeakSet();
   const walk = (x: any): any => {
@@ -79,6 +80,35 @@ function debigint<T>(v: T): T {
   return walk(v);
 }
 
+// Decimal/date → plain JSON (records + mediaPieces)
+function toPlainRecord(r: any) {
+  const toIso = (d: any) => (d ? new Date(d).toISOString() : null);
+  const toNum = (v: any) =>
+    v == null
+      ? null
+      : v instanceof Decimal
+      ? v.toNumber()
+      : typeof v === "string"
+      ? Number(v)
+      : Number(v);
+  return {
+    ...r,
+    pricePaid: r.pricePaid == null ? null : toNum(r.pricePaid),
+    purchasedAt: toIso(r.purchasedAt),
+    releaseDate: toIso(r.releaseDate),
+    createdAt: toIso(r.createdAt),
+    updatedAt: toIso(r.updatedAt),
+    mediaPieces: (r.mediaPieces ?? []).map((m: any) => ({
+      ...m,
+      sizeInch: m.sizeInch ?? null,
+      speedRpm: m.speedRpm ?? null,
+      createdAt: toIso(m.createdAt),
+      updatedAt: toIso(m.updatedAt),
+    })),
+  };
+}
+
+// -------------------------- update/patch shaper -----------------------------
 function pickUpdate(body: any) {
   const allow = [
     "artist",
@@ -121,6 +151,7 @@ function pickUpdate(body: any) {
   if (out.releaseYear != null) out.releaseYear = Number(out.releaseYear);
   if (out.pressingYear != null) out.pressingYear = Number(out.pressingYear);
 
+  // store as DECIMAL string; toPlainRecord will emit a number
   if (out.pricePaid != null) out.pricePaid = String(out.pricePaid);
 
   ["hasInsert", "hasBooklet", "hasObiStrip", "hasFactorySleeve", "isPromo"].forEach(
@@ -193,6 +224,7 @@ function pickUpdate(body: any) {
   return out;
 }
 
+// -------------------------------- Router -----------------------------------
 export function recordsRouter(
   prisma: PrismaClient,
   redis?: Redis | null
@@ -200,77 +232,77 @@ export function recordsRouter(
   const r = Router();
   const db = prisma as any;
 
-  // -------------------- DEBUG ROUTES (registered FIRST) --------------------
+  // -------------------- DEBUG ROUTES (FIRST) --------------------
   if (DEBUG_ROUTES) {
     const logDbg = (...args: any[]) => console.log("[records dbg]", ...args);
-
-    // show every request that hits this router (after app-level requireUser)
     r.use((req: AuthedReq, _res: Response, next: NextFunction) => {
       logDbg(req.method, req.path);
       next();
     });
-
-    // simple sanity check (still requires x-user-id because of app-level requireUser)
     r.get("/__ok", (_req: AuthedReq, res: Response) =>
       res.json({ ok: true, in: "recordsRouter" })
     );
-
-    // minimal whoami (only SELECT current_user) with friendly errors
     r.get(
       "/__whoami",
       asyncHandler(async (req, res) => {
         const userId = requireUserId(req as AuthedReq, res);
         if (!userId) return;
-
         try {
-          const [row] = await (prisma as any).$queryRaw<{ current_user: string }[]>`
-            SELECT current_user
-          `;
-          const dbUser = row?.current_user ?? null;
-          res.json({ ok: true, userId, db_user: dbUser, debug: true });
+          const [row] = await (prisma as any).$queryRaw<{
+            current_user: string;
+          }[]>`SELECT current_user`;
+          res.json({
+            ok: true,
+            userId,
+            db_user: row?.current_user ?? null,
+            debug: true,
+          });
         } catch (e: any) {
-          res
-            .status(200)
-            .json({
-              ok: false,
-              step: "select_current_user",
-              error: e?.message || String(e),
-            });
+          res.status(200).json({
+            ok: false,
+            step: "select_current_user",
+            error: e?.message || String(e),
+          });
         }
       })
     );
-
-    // full diagnostics; each step isolated; never throws
     r.get(
       "/__diag",
       asyncHandler(async (req, res) => {
         const userId = requireUserId(req as AuthedReq, res);
         if (!userId) return;
-
         const out: any = { ok: true, userId, steps: {} };
-
         try {
           const [who] = await (prisma as any).$queryRaw<{ current_user: string }[]>`
             SELECT current_user
           `;
-          out.steps.select_current_user = { ok: true, current_user: who?.current_user ?? null };
+          out.steps.select_current_user = {
+            ok: true,
+            current_user: who?.current_user ?? null,
+          };
         } catch (e: any) {
-          out.steps.select_current_user = { ok: false, error: e?.message || String(e) };
+          out.steps.select_current_user = {
+            ok: false,
+            error: e?.message || String(e),
+          };
         }
-
         try {
           const [sp] = await (prisma as any).$queryRaw<{ setting: string }[]>`
             SHOW search_path
           `;
-          out.steps.show_search_path = { ok: true, search_path: sp?.setting ?? null };
+          out.steps.show_search_path = {
+            ok: true,
+            search_path: sp?.setting ?? null,
+          };
         } catch (e: any) {
-          out.steps.show_search_path = { ok: false, error: e?.message || String(e) };
+          out.steps.show_search_path = {
+            ok: false,
+            error: e?.message || String(e),
+          };
         }
-
         res.json(out);
       })
     );
-
     r.get("/__echo", (req: AuthedReq, res: Response) => {
       res.json({
         header_user: req.get("x-user-id") ?? null,
@@ -292,7 +324,7 @@ export function recordsRouter(
         take: 100,
         include: { mediaPieces: { orderBy: { index: "asc" } } },
       });
-      res.json(items);
+      res.json(items.map(toPlainRecord));
     })
   );
 
@@ -311,18 +343,25 @@ export function recordsRouter(
       if (!qNorm) return res.json([]);
 
       const short = qNorm.length <= 3;
-      const ttlMs = short
-        ? Number(process.env.CACHE_TTL_MS_SHORT ?? 15000)
-        : Number(process.env.CACHE_TTL_MS_LONG ?? 60000);
+      const ttlSec = Math.floor(
+        (short
+          ? Number(process.env.CACHE_TTL_MS_SHORT ?? 15000)
+          : Number(process.env.CACHE_TTL_MS_LONG ?? 60000)) / 1000
+      );
 
-      const key = makeSearchKey(userId, qNorm, fuzzy, limit, offset);
+      if (fuzzy && redis) {
+        // -------- Ranked ID Redis cache (versioned) --------
+        const ver = (await redis.get(verKey(userId))) ?? "0";
+        const key = idKey(ver, userId, qNorm, limit, offset, true);
 
-      const result = await cached(redis ?? null, key, ttlMs, async () => {
-        if (fuzzy) {
+        const hit = await redis.get(key);
+        let ids: string[];
+        if (hit) {
+          ids = JSON.parse(hit) as string[];
+        } else {
+          // no hit → get ranked IDs from SQL, cache IDs, then fetch docs
           type RankedRow = { id: string; rank: number };
-          type Item = { id: string };
-
-          const ranked = await (prisma as any).$queryRaw<RankedRow[]>`
+          const ranked = (await (prisma as any).$queryRaw<RankedRow[]>`
             SELECT id, rank
             FROM public.search_records_fuzzy_ids(
               CAST(${userId} AS uuid),
@@ -330,47 +369,61 @@ export function recordsRouter(
               CAST(${limit}  AS bigint),
               CAST(${offset} AS bigint)
             )
-          `;
+          `) as RankedRow[];
 
-          const ids: string[] = ranked.map((row: RankedRow) => row.id);
-          if (ids.length === 0) return [];
+          // make noImplicitAny happy
+          ids = ranked.map((row: RankedRow) => row.id);
 
-          const items: Item[] = await db.record.findMany({
-            where: { userId, id: { in: ids } },
+          await redis.setex(key, Math.max(5, ttlSec), JSON.stringify(ids));
+        }
+        if (ids.length === 0) return res.json([]);
+
+        // -------- Full-doc cache: single MGET + backfill --------
+        const docs = await getDocsByIds<any>(
+          redis,
+          ids,
+          short ? 60_000 : 180_000,
+          async (missingIds: string[]) => {
+            if (!missingIds.length) return {};
+            const items = await db.record.findMany({
+              where: { userId, id: { in: missingIds } },
+              include: { mediaPieces: { orderBy: { index: "asc" } } },
+            });
+            const map: Record<string, any> = {};
+            for (const it of items) map[it.id] = toPlainRecord(it);
+            return map;
+          }
+        );
+
+        // Keep result order and drop nulls (shouldn’t happen unless deleted concurrently)
+        const ordered = docs.filter(Boolean);
+        return res.json(ordered);
+      }
+
+      // non-fuzzy
+      const key = makeSearchKey(userId, qNorm, false, limit, offset);
+      const items = await cached(
+        redis ?? null,
+        key,
+        ttlSec * 1000,
+        async () => {
+          return db.record.findMany({
+            where: {
+              userId,
+              OR: [
+                { artist: { contains: qRaw, mode: "insensitive" } },
+                { name: { contains: qRaw, mode: "insensitive" } },
+                { catalogNumber: { contains: qRaw, mode: "insensitive" } },
+              ],
+            },
+            orderBy: { updatedAt: "desc" },
+            take: limit,
+            skip: offset,
             include: { mediaPieces: { orderBy: { index: "asc" } } },
           });
-
-          const pos = new Map<string, number>(
-            ids.map((id: string, i: number): [string, number] => [id, i])
-          );
-
-          items.sort(
-            (a: Item, b: Item) =>
-              (pos.get(a.id) ?? Number.POSITIVE_INFINITY) -
-              (pos.get(b.id) ?? Number.POSITIVE_INFINITY)
-          );
-
-          return items;
         }
-
-        // non-fuzzy path
-        return db.record.findMany({
-          where: {
-            userId,
-            OR: [
-              { artist: { contains: qRaw, mode: "insensitive" } },
-              { name: { contains: qRaw, mode: "insensitive" } },
-              { catalogNumber: { contains: qRaw, mode: "insensitive" } },
-            ],
-          },
-          orderBy: { updatedAt: "desc" },
-          take: limit,
-          skip: offset,
-          include: { mediaPieces: { orderBy: { index: "asc" } } },
-        });
-      });
-
-      res.json(debigint(result));
+      );
+      res.json((items as any[]).map(toPlainRecord));
     })
   );
 
@@ -403,7 +456,7 @@ export function recordsRouter(
             CAST(${field}  AS text)
           )
         `;
-        return debigint(out).map((r: any) => ({
+        return debigint(out).map((r: Row) => ({
           term: r.term,
           hits: r.hits as number,
           dist: r.dist as number,
@@ -472,7 +525,15 @@ export function recordsRouter(
         const [r1] = await (prisma as any).$queryRaw<Row[]>`
           SELECT * FROM public.search_price_stats(CAST(${userId} AS uuid), CAST(${qRaw} AS text))
         `;
-        if (!r1) return { n: 0, min: null, p50: null, avg: null, p90: null, max: null };
+        if (!r1)
+          return {
+            n: 0,
+            min: null,
+            p50: null,
+            avg: null,
+            p90: null,
+            max: null,
+          };
         const toNum = (v: string | null) => (v == null ? null : Number(v));
         const nNum = typeof r1.n === "bigint" ? Number(r1.n) : r1.n;
         return {
@@ -500,7 +561,7 @@ export function recordsRouter(
       const items = await (prisma as any).$queryRaw<any[]>`
         SELECT * FROM public.records_recent(CAST(${userId} AS uuid), CAST(${limit} AS int))
       `;
-      res.json(items);
+      res.json(items.map(toPlainRecord));
     })
   );
 
@@ -526,16 +587,21 @@ export function recordsRouter(
         SELECT records.upsert_aliases(CAST(${id} AS uuid), ${terms}::text[])
       `;
 
-      await (prisma as any).$executeRawUnsafe(
-        "SELECT records.refresh_aliases_mv_concurrent()"
-      );
+      try {
+        await (prisma as any).$executeRawUnsafe(
+          "SELECT records.refresh_aliases_mv_concurrent()"
+        );
+      } catch {
+        /* optional */
+      }
 
+      if (redis) await redis.incr(verKey(userId));
       await invalidateSearchKeysForUser(redis ?? null, userId);
 
       const added =
         row && typeof row.upsert_aliases === "bigint"
           ? Number(row.upsert_aliases)
-          : (row?.upsert_aliases ?? 0);
+          : row?.upsert_aliases ?? 0;
 
       res.json({ added });
     })
@@ -554,7 +620,7 @@ export function recordsRouter(
         include: { mediaPieces: { orderBy: { index: "asc" } } },
       });
       if (!rec) return res.status(404).json({ error: "not found" });
-      res.json(rec);
+      res.json(toPlainRecord(rec));
     })
   );
 
@@ -627,9 +693,21 @@ export function recordsRouter(
         include: { mediaPieces: { orderBy: { index: "asc" } } },
       });
 
+      // warm doc cache (best-effort)
+      try {
+        if (redis) {
+          await redis.psetex(
+            docKey(created.id),
+            120_000,
+            JSON.stringify(toPlainRecord(created))
+          );
+        }
+      } catch {}
+
+      if (redis) await redis.incr(verKey(userId));
       await invalidateSearchKeysForUser(redis ?? null, userId);
 
-      res.status(201).json(created);
+      res.status(201).json(toPlainRecord(created));
     })
   );
 
@@ -689,13 +767,19 @@ export function recordsRouter(
         },
       });
 
+      // purge doc cache for this record (fresh read will refill)
+      try {
+        if (redis) await redis.del(docKey(id));
+      } catch {}
+
+      if (redis) await redis.incr(verKey(userId));
       await invalidateSearchKeysForUser(redis ?? null, userId);
 
       const fresh = await db.record.findFirst({
         where: { id, userId },
         include: { mediaPieces: { orderBy: { index: "asc" } } },
       });
-      res.json(fresh);
+      res.json(toPlainRecord(fresh));
     })
   );
 
@@ -713,7 +797,14 @@ export function recordsRouter(
         return res.status(404).json({ error: "not found" });
 
       await db.record.delete({ where: { id } });
+
+      try {
+        if (redis) await redis.del(docKey(id));
+      } catch {}
+
+      if (redis) await redis.incr(verKey(userId));
       await invalidateSearchKeysForUser(redis ?? null, userId);
+
       res.status(204).end();
     })
   );

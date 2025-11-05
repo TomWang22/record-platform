@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 NS=${NS:-record-platform}
-PGURL=${PGURL:-'postgresql://record_app:SUPER_STRONG_APP_PASSWORD@localhost:5432/records'}
+PGURL=${PGURL:-'postgresql://record_app:REPLACE_WITH_APP_PASSWORD@localhost:5432/records'}
 USER_ID=${USER_ID:-'4ad36240-c1ad-4638-ab1b-4c8cfb04a553'}
 
 kubectl -n "$NS" exec -i deploy/postgres -- psql "$PGURL" -v ON_ERROR_STOP=1 <<SQL

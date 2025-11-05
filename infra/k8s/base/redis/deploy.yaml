@@ -10,6 +10,8 @@ spec:
     metadata:
       labels: { app: redis }
     spec:
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 10
       containers:
         - name: redis
           image: redis:7-alpine
@@ -23,19 +25,26 @@ spec:
             - sh
             - -lc
             - |
+              ulimit -n 65536
               exec redis-server /usr/local/etc/redis/redis.conf \
                 --requirepass "$REDIS_PASSWORD"
           ports:
             - { name: redis, containerPort: 6379 }
           readinessProbe:
-            tcpSocket: { port: redis }
+            exec:
+              command: ["sh","-lc","redis-cli -a \"$REDIS_PASSWORD\" ping | grep PONG"]
             initialDelaySeconds: 3
+            periodSeconds: 3
+            timeoutSeconds: 2
           livenessProbe:
-            tcpSocket: { port: redis }
+            exec:
+              command: ["sh","-lc","redis-cli -a \"$REDIS_PASSWORD\" ping | grep PONG"]
             initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
           resources:
-            requests: { cpu: "250m", memory: "512Mi" }
-            limits:   { cpu: "1",    memory: "1Gi" }
+            requests: { cpu: "500m", memory: "512Mi" }
+            limits:   { cpu: "2",    memory: "1Gi" }
           volumeMounts:
             - name: redis-config
               mountPath: /usr/local/etc/redis

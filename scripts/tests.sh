@@ -5,7 +5,7 @@ APP=records-service
 
 # PgBouncer connectivity
 kubectl -n "$NS" run psql --rm -it --image=postgres:16 -- \
- 'psql "host=pgbouncer.record-platform.svc.cluster.local port=6432 dbname=records user=record_app password=SUPER_STRONG_APP_PASSWORD sslmode=disable" -c SELECT\ 1;'
+ 'psql "host=pgbouncer.record-platform.svc.cluster.local port=6432 dbname=records user=record_app password=REPLACE_WITH_APP_PASSWORD sslmode=disable" -c SELECT\ 1;'
 
 # Insert/find a user and capture USER_ID
 USER_ID="$(

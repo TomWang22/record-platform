@@ -74,8 +74,8 @@ model RecordMedium {
 
   index      Int
   kind       String   @db.Text
-  sizeInch   Int?     @map("size_inch")
-  speedRpm   Int?     @map("speed_rpm")
+  sizeInch   Int?     @db.SmallInt @map("size_inch")
+  speedRpm   Int?     @db.SmallInt @map("speed_rpm")
 
   discGrade  String?  @db.VarChar(16) @map("disc_grade")
   sides      Json?

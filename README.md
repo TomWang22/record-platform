@@ -164,6 +164,7 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
   - `scripts/verify-dev.sh` - end-to-end cluster sanity.
   - `scripts/diag-caddy.sh`, `scripts/diag-gateway.sh`, `scripts/quic-tune-kind.sh` - ingress and QUIC inspection.
   - `scripts/perf_runner.sh`, `scripts/perf_smoke.sh`, `scripts/load/k6-*.js` - load/perf harnesses.
+  - `services/records-service/src/lib/singleflight_cache.lua` - Redis Lua helper for single-flight caching to prevent request stampedes.
   - `scripts/pg-connectivity-check.sh`, `scripts/run-postinit-debug-pod.sh` - database connectivity + post-init debugging.
   - `scripts/tests.sh`, `tests-local.sh` - ad-hoc regression checks.
 

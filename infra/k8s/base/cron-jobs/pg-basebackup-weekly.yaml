@@ -42,4 +42,4 @@ spec:
               echo "[$(date -Is)] done: /backups/basebackup-$TS.bundle.tar.gz"
           volumes:
             - name: backups
-              persistentVolumeClaim: { claimName: pg-backups-2 }
+              persistentVolumeClaim: { claimName: pgbackups }

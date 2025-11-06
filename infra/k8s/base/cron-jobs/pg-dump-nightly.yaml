@@ -47,6 +47,8 @@ spec:
               until \
                 pg_dump    -h postgres -U postgres -d records -F d -j 4 -f "$OUT/records.dir" && \
                 pg_dumpall -h postgres -U postgres -g -f "$OUT/globals.sql"
+                pg_dump -h postgres -U postgres -d records -F p --no-owner --no-privileges \
+                  | gzip -9 > "$OUT/records.sql.gz"
               do
                 n=$((n+1))
                 [ $n -ge 3 ] && { echo "backup failed after $n attempts"; exit 1; }
@@ -85,7 +87,7 @@ spec:
           volumes:
           - name: backups
             persistentVolumeClaim:
-              claimName: pg-backups-2
+              claimName: pgbackups
           - name: pgpass
             secret:
               secretName: pg-backup-pgpass

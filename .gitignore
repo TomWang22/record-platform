@@ -28,3 +28,21 @@ certs/
 *.csr
 *.cnf
 *.srl
+
+# Database dumps, backups, and bundles
+*.sql
+*.sql.gz
+*.dump
+*.tar.gz
+pg_bundle_*/
+bundle-*/
+records_dump_*/
+records-*/
+backups/
+!infra/db/*.sql
+!services/*/prisma/migrations/*.sql
+
+# Prisma generated files
+**/prisma/generated/
+**/prisma/migrations/migration_lock.toml
+**/prisma/.env

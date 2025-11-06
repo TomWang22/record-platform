@@ -1,0 +1,11 @@
+# infra/k8s/base/postgres/wal-archive-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pg-wal-archive
+  namespace: record-platform
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 20Gi

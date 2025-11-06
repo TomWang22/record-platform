@@ -35,14 +35,22 @@ certs/
 *.dump
 *.tar.gz
 *.zip
+*.txt
+*.tsv
 pg_bundle_*/
 pg_bundle_*.zip
 bundle-*/
 records_dump_*/
 records-*/
 backups/
+# Exceptions: keep infrastructure and Prisma migrations
 !infra/db/*.sql
 !services/*/prisma/migrations/*.sql
+# Exceptions: keep important text files
+!README.md
+!LICENSE
+!CHANGELOG.md
+!**/requirements.txt
 
 # Prisma generated files
 **/prisma/generated/

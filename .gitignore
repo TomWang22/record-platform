@@ -34,7 +34,9 @@ certs/
 *.sql.gz
 *.dump
 *.tar.gz
+*.zip
 pg_bundle_*/
+pg_bundle_*.zip
 bundle-*/
 records_dump_*/
 records-*/
@@ -46,3 +48,6 @@ backups/
 **/prisma/generated/
 **/prisma/migrations/migration_lock.toml
 **/prisma/.env
+
+# Documentation notes (user-specific)
+docs/restore-notes.md

@@ -9,6 +9,24 @@ spec:
   template:
     metadata: { labels: { app: postgres } }
     spec:
+      # ensure the archive directory exists + is writable by postgres user
+      initContainers:
+        - name: init-wal-archive-perms
+          image: busybox
+          command:
+            - sh
+            - -lc
+            - |
+              set -e
+              mkdir -p /wal-archive
+              # try common postgres UIDs across images; ignore failures
+              chown -R 999:999 /wal-archive || true
+              chown -R 70:70  /wal-archive || true
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - { name: wal-archive, mountPath: /wal-archive }
+
       containers:
       - name: db
         image: postgres:16-alpine
@@ -28,13 +46,17 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 10
         volumeMounts:
-        - { name: data,  mountPath: /var/lib/postgresql/data }
-        - { name: init,  mountPath: /docker-entrypoint-initdb.d }
+        - { name: data,        mountPath: /var/lib/postgresql/data }
+        - { name: init,        mountPath: /docker-entrypoint-initdb.d }
+        - { name: wal-archive, mountPath: /wal-archive }     # ← WAL archive mount
+
       volumes:
       - name: data
         persistentVolumeClaim: { claimName: pgdata }
       - name: init
         configMap: { name: postgres-init }
+      - name: wal-archive
+        persistentVolumeClaim: { claimName: pg-wal-archive }  # ← WAL archive PVC
 
 ---
 apiVersion: v1

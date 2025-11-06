@@ -43,4 +43,4 @@ spec:
                 echo "[$(date -Is)] done: ${OUT}.gz"
           volumes:
             - name: backups
-              persistentVolumeClaim: { claimName: pg-backups-2 }
+              persistentVolumeClaim: { claimName: pgbackups }

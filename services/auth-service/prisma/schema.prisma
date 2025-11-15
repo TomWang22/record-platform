@@ -1,6 +1,7 @@
 datasource db {
   provider = "postgresql"
   url      = env("POSTGRES_URL_AUTH")
+  schemas  = ["auth"]
 }
 
 generator client {
@@ -16,5 +17,6 @@ model User {
   settings     Json?    @db.JsonB
   createdAt    DateTime @default(now()) @map("created_at")
 
+  @@schema("auth")
   @@map("users") // table name within the selected schema
 }

@@ -15,10 +15,12 @@ data:
 
   REDIS_URL: redis://redis.record-platform.svc.cluster.local:6379/0
 
+  PROTO_ROOT: /app/proto
+
   # single source of truth
-  DATABASE_URL: postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connection_limit=1&pool_timeout=10&connect_timeout=5
+  DATABASE_URL:         postgresql://record_app:SUPER_STRONG_APP_PASSWORD@postgres.record-platform.svc.cluster.local:5432/records?connect_timeout=5
 
   # optional compatibility (literal duplicates, not $(…))
-  POSTGRES_URL:         postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connection_limit=1&pool_timeout=10&connect_timeout=5
-  POSTGRES_URL_AUTH:    postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connection_limit=1&pool_timeout=10&connect_timeout=5
-  POSTGRES_URL_RECORDS: postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connection_limit=1&pool_timeout=10&connect_timeout=5
+  POSTGRES_URL:         postgresql://record_app:SUPER_STRONG_APP_PASSWORD@postgres.record-platform.svc.cluster.local:5432/records?connect_timeout=5
+  POSTGRES_URL_AUTH:    postgresql://record_app:SUPER_STRONG_APP_PASSWORD@postgres.record-platform.svc.cluster.local:5432/records?search_path=auth&connect_timeout=5
+  POSTGRES_URL_RECORDS: postgresql://record_app:SUPER_STRONG_APP_PASSWORD@postgres.record-platform.svc.cluster.local:5432/records?

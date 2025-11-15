@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Wrapper that retries kubectl commands to mask transient TLS handshake timeouts.
+set -euo pipefail
+
+REAL_BIN="${KUBECTL_REAL_BIN:-}"
+if [[ -z "$REAL_BIN" ]]; then
+  echo "kubectl shim missing KUBECTL_REAL_BIN; falling back to real kubectl on PATH" >&2
+  REAL_BIN="$(command -v kubectl)"
+fi
+
+MAX_RETRIES="${KUBECTL_MAX_RETRIES:-5}"
+SLEEP_SECS="${KUBECTL_RETRY_SLEEP:-2}"
+REQUEST_TIMEOUT="${KUBECTL_REQUEST_TIMEOUT:-10s}"
+
+attempt=1
+while true; do
+  if "$REAL_BIN" --request-timeout="$REQUEST_TIMEOUT" "$@"; then
+    exit 0
+  fi
+  status=$?
+  if (( attempt >= MAX_RETRIES )); then
+    echo "kubectl failed after ${MAX_RETRIES} attempts (exit ${status})" >&2
+    exit "$status"
+  fi
+  echo "kubectl attempt ${attempt}/${MAX_RETRIES} failed (exit ${status}); retrying in ${SLEEP_SECS}s..." >&2
+  sleep "$SLEEP_SECS"
+  attempt=$((attempt + 1))
+done
+

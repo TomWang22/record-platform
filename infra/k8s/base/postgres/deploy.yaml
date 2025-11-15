@@ -9,32 +9,54 @@ spec:
   template:
     metadata: { labels: { app: postgres } }
     spec:
-      # ensure the archive directory exists + is writable by postgres user
+      securityContext:
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        fsGroupChangePolicy: OnRootMismatch
+      # Init containers: prepare directories with correct permissions
       initContainers:
-        - name: init-wal-archive-perms
-          image: busybox
-          command:
-            - sh
-            - -lc
+        # prep-dirs: runs as uid 70, just ensures dirs exist (host PVC already owned by 70:70)
+        - name: prep-dirs
+          image: busybox:1.36
+          command: ["/bin/sh","-lc"]
+          args:
             - |
-              set -e
-              mkdir -p /wal-archive
-              # try common postgres UIDs across images; ignore failures
-              chown -R 999:999 /wal-archive || true
-              chown -R 70:70  /wal-archive || true
+              set -eux
+              # just ensure dirs exist; do NOT chown here (host already fixed to 70:70)
+              mkdir -p /var/run/postgresql /var/lib/postgresql/data
+              chmod 0775 /var/run/postgresql || true
+              ls -ld /var/lib/postgresql /var/lib/postgresql/data /wal-archive /var/run/postgresql || true
           securityContext:
-            runAsUser: 0
+            runAsUser: 70
+            runAsGroup: 70
+            allowPrivilegeEscalation: false
           volumeMounts:
+            - { name: data,        mountPath: /var/lib/postgresql }
             - { name: wal-archive, mountPath: /wal-archive }
+            - { name: run,         mountPath: /var/run/postgresql }
+          terminationMessagePolicy: FallbackToLogsOnError
+        # ensure-db: ensures records database exists (runs after postgres is up)
+        # Note: This runs as a sidecar approach - we'll use a postStart hook instead
 
       containers:
       - name: db
         image: postgres:16-alpine
+        resources:
+          requests:
+            memory: "6Gi"
+            cpu: "500m"
+          limits:
+            memory: "12Gi"
+            cpu: "2000m"
         env:
-        - { name: POSTGRES_DB,   value: "records" }
+        # POSTGRES_DB: Only create database if it doesn't exist (Postgres checks this)
+        # This prevents reinitialization if database already exists on PVC
         - { name: POSTGRES_USER, value: "postgres" }
-        - name: POSTGRES_PASSWORD
-          valueFrom: { secretKeyRef: { name: postgres-secret, key: POSTGRES_PASSWORD } }
+        - { name: POSTGRES_DB,   value: "records" }
+        - { name: PGDATA,        value: "/var/lib/postgresql/data" }
+        envFrom:
+        - { secretRef: { name: postgres-superuser } }
         ports:
         - { name: pg, containerPort: 5432 }
         readinessProbe:
@@ -45,24 +67,96 @@ spec:
           exec: { command: ["sh","-lc","pg_isready -U postgres -h 127.0.0.1 -p 5432"] }
           initialDelaySeconds: 10
           periodSeconds: 10
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  # Wait for postgres to be ready, then ensure records database exists
+                  sleep 10
+                  for i in $(seq 1 30); do
+                    if pg_isready -U postgres -h 127.0.0.1 -p 5432 >/dev/null 2>&1; then
+                      break
+                    fi
+                    sleep 2
+                  done
+                  # Check if database exists, create if not
+                  psql -U postgres -d postgres -c "SELECT 1 FROM pg_database WHERE datname='records'" 2>/dev/null | grep -q 1 || createdb -U postgres records 2>/dev/null || true
+        securityContext:
+          runAsUser: 70
+          runAsGroup: 70
+          allowPrivilegeEscalation: false
         volumeMounts:
-        - { name: data,        mountPath: /var/lib/postgresql/data }
+        - { name: data,        mountPath: /var/lib/postgresql }
         - { name: init,        mountPath: /docker-entrypoint-initdb.d }
-        - { name: wal-archive, mountPath: /wal-archive }     # ← WAL archive mount
+        - { name: wal-archive, mountPath: /wal-archive }
+        - { name: run,         mountPath: /var/run/postgresql }
+        args:
+          - "-c"
+          - "wal_level=replica"
+          - "-c"
+          - "archive_mode=on"
+          - "-c"
+          - "archive_command=if [ -f /wal-archive/%f ]; then exit 0; else cp %p /wal-archive/%f; fi"
+          - "-c"
+          - "archive_timeout=60s"
+          - "-c"
+          - "max_wal_size=2GB"
+          - "-c"
+          - "min_wal_size=80MB"
+          - "-c"
+          - "max_connections=200"
+          - "-c"
+          - "shared_buffers=1GB"
+          - "-c"
+          - "effective_cache_size=8GB"
+          - "-c"
+          - "work_mem=64MB"
+          - "-c"
+          - "maintenance_work_mem=512MB"
+          - "-c"
+          - "random_page_cost=0.8"
+          - "-c"
+          - "cpu_index_tuple_cost=0.0005"
+          - "-c"
+          - "cpu_tuple_cost=0.01"
+          - "-c"
+          - "effective_io_concurrency=200"
+          - "-c"
+          - "max_worker_processes=16"
+          - "-c"
+          - "max_parallel_workers=16"
+          - "-c"
+          - "max_parallel_workers_per_gather=4"
+          - "-c"
+          - "autovacuum_naptime=30s"
+          - "-c"
+          - "autovacuum_vacuum_scale_factor=0.05"
+          - "-c"
+          - "autovacuum_analyze_scale_factor=0.02"
+          - "-c"
+          - "checkpoint_completion_target=0.9"
+          - "-c"
+          - "checkpoint_timeout=900s"
+          - "-c"
+          - "jit=off"
+          - "-c"
+          - "track_io_timing=on"
+          - "-c"
+          - "shared_preload_libraries=pg_stat_statements"
+          - "-c"
+          - "pg_stat_statements.max=10000"
+          - "-c"
+          - "pg_stat_statements.track=all"
 
       volumes:
       - name: data
-        persistentVolumeClaim: { claimName: pgdata }
+        persistentVolumeClaim: { claimName: pgdata-big }
       - name: init
         configMap: { name: postgres-init }
       - name: wal-archive
-        persistentVolumeClaim: { claimName: pg-wal-archive }  # ← WAL archive PVC
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres-secret
-type: Opaque
-stringData:
-  POSTGRES_PASSWORD: SUPER_STRONG_POSTGRES_PASSWORD
+        persistentVolumeClaim: { claimName: pg-wal-archive }
+      - name: run
+        emptyDir: {}

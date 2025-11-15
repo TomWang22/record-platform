@@ -3,3 +3,10 @@ kind: Kustomization
 resources:
   - app-config.yaml
   - app-secrets.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: proto-files
+    files:
+      - auth.proto=proto/auth.proto
+      - records.proto=proto/records.proto

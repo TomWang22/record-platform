@@ -28,9 +28,17 @@ spec:
           env:
             - name: NODE_ENV
               value: "development"
+          volumeMounts:
+            - name: proto-files
+              mountPath: /app/proto
+              readOnly: true
           readinessProbe:
             httpGet: { path: /healthz, port: http }
             initialDelaySeconds: 5
           livenessProbe:
             httpGet: { path: /healthz, port: http }
             initialDelaySeconds: 15
+      volumes:
+        - name: proto-files
+          configMap:
+            name: proto-files

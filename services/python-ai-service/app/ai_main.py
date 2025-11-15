@@ -15,6 +15,7 @@ USER_AGENT = "record-platform/0.4 (+https://example)"
 DISCOGS_TOKEN = os.getenv("DISCOGS_TOKEN")
 EBAY_OAUTH_TOKEN = os.getenv("EBAY_OAUTH_TOKEN")
 REDIS_URL = os.getenv("REDIS_URL","redis://redis:6379/0")
+ANALYTICS_URL = os.getenv("ANALYTICS_URL","http://analytics-service.record-platform.svc.cluster.local:4004")
 
 rconn: Optional[redis.Redis] = None
 async def get_redis():
@@ -94,16 +95,42 @@ async def infer_base_price(query: Optional[str]) -> Optional[float]:
         return round(statistics.median(mid if mid else prices), 2)
     return None
 
+async def analytics_estimate(items: List[PredictItem]) -> Optional[dict]:
+    if not ANALYTICS_URL or not items:
+        return None
+    url = ANALYTICS_URL.rstrip("/") + "/analytics/predict-price"
+    payload = {"items": [it.model_dump(exclude_none=True) for it in items]}
+    try:
+        async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": USER_AGENT}) as c:
+            resp = await c.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception:
+        return None
+
 @app.post("/predict-price")
 async def predict(body: PredictReq):
     t0 = time.time()
+    items = body.items or []
+    analytics_task = asyncio.create_task(analytics_estimate(items))
     out = []
-    for it in body.items:
+    for it in items:
         base = it.base_price or await infer_base_price(it.query) or 50.0
         out.append(adjust(base, it.record_grade, it.sleeve_grade, it.promo, it.anniversary_boost))
-    suggested = round(sum(out)/len(out), 2)
+    suggested = round(sum(out)/len(out), 2) if out else 0.0
+    analytics_result = await analytics_task
+    blended = suggested
+    if analytics_result and analytics_result.get("suggested") is not None:
+        blended = round((suggested + float(analytics_result["suggested"])) / 2, 2)
     REQS.labels("/predict-price","200").inc()
-    return JSONResponse({"suggested": suggested, "samples": len(out), "estimates": out, "t_ms": int((time.time()-t0)*1000)})
+    return JSONResponse({
+        "suggested": blended,
+        "local_suggested": suggested,
+        "analytics_suggested": analytics_result.get("suggested") if analytics_result else None,
+        "samples": len(out),
+        "estimates": out,
+        "t_ms": int((time.time()-t0)*1000)
+    })
 
 @app.get("/price-trends")
 async def price_trends(q: str = Query(..., min_length=2)):

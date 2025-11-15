@@ -1,0 +1,96 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: restore-from-upload
+  namespace: record-platform
+  labels:
+    app: postgres-restore
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: r
+        image: postgres:16
+        env:
+        - { name: PGHOST,     value: "postgres" }
+        - { name: PGUSER,     value: "postgres" }
+        - { name: PGDATABASE, value: "records" }
+        envFrom:
+        - { secretRef: { name: postgres-superuser } }
+        command: ["bash","-lc"]
+        args:
+        - |
+          set -euo pipefail
+          shopt -s nullglob
+          echo "== pick dump"
+          if [ -f /backups/records_dump_20251102.tar.gz ]; then
+            DUMP=/backups/records_dump_20251102.tar.gz
+          else
+            DUMP=$(ls -1t /backups/nightly-*.tar.gz 2>/dev/null | head -n1 || true)
+          fi
+          [ -n "${DUMP:-}" ] || { echo "No dump file found in /backups"; ls -lh /backups || true; exit 1; }
+          echo "-> using $DUMP"
+          echo "== unpack"
+          rm -rf /tmp/restore; mkdir -p /tmp/restore
+          tar -xzf "$DUMP" -C /tmp/restore
+          echo "== contents"; ls -lah /tmp/restore | sed -n '1,120p'
+          # Optional globals.sql
+          if [ -s /tmp/restore/globals.sql ]; then
+            echo "== apply globals.sql (ignore exists)"
+            psql -X -v ON_ERROR_STOP=0 -f /tmp/restore/globals.sql || true
+          fi
+          # common extensions (no-op if present)
+          psql -X -v ON_ERROR_STOP=1 -c "
+            CREATE EXTENSION IF NOT EXISTS pgcrypto;
+            CREATE EXTENSION IF NOT EXISTS citext;
+            CREATE EXTENSION IF NOT EXISTS pg_trgm;
+            CREATE EXTENSION IF NOT EXISTS unaccent;
+            CREATE EXTENSION IF NOT EXISTS btree_gin;
+            CREATE EXTENSION IF NOT EXISTS btree_gist;
+            CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+          "
+          if [ -d /tmp/restore/records.dir ]; then
+            echo "== directory-format restore"
+            time pg_restore \
+              --verbose \
+              --clean --if-exists \
+              --no-owner --no-privileges \
+              -j 4 \
+              -d "$PGDATABASE" \
+              /tmp/restore/records.dir
+          else
+            SQL=
+            for f in /tmp/restore/*.sql /tmp/restore/*.sql.gz; do
+              if [ -f "$f" ]; then SQL="$f"; break; fi
+            done
+            [ -n "${SQL:-}" ] || { echo "No records.dir or *.sql[.gz] found"; ls -lah /tmp/restore; exit 1; }
+            echo "== plain SQL restore: $SQL"
+            if [[ "$SQL" == *.gz ]]; then
+              gunzip -c "$SQL" | psql -X -v ON_ERROR_STOP=1 -d "$PGDATABASE"
+            else
+              psql -X -v ON_ERROR_STOP=1 -d "$PGDATABASE" -f "$SQL"
+            fi
+          fi
+          echo "== ANALYZE"
+          psql -X -v ON_ERROR_STOP=1 -c "ANALYZE;"
+          echo "== refresh MVs (best-effort)"
+          psql -X -v ON_ERROR_STOP=0 <<'SQL'
+          WITH mvs AS (
+            SELECT oid::regclass AS mv
+            FROM pg_class
+            WHERE oid IN (to_regclass('records.aliases_mv'), to_regclass('records.search_doc_mv'))
+              AND oid IS NOT NULL
+          )
+          SELECT 'REFRESH MATERIALIZED VIEW '||mv::text||';' FROM mvs;
+          \gexec
+          SQL
+          echo "done."
+        volumeMounts:
+        - { name: backups, mountPath: /backups }
+      volumes:
+      - name: backups
+        persistentVolumeClaim:
+          claimName: pgbackups

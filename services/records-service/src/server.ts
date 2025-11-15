@@ -138,12 +138,22 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (!res.headersSent) res.status(500).json({ error: "internal" });
 });
 
-// Start + graceful shutdown
+// Start HTTP server
 const port = Number(process.env.RECORDS_PORT || 4002);
 const server = app.listen(port, () => {
   const safeUrl = (RUNTIME_DB_URL || "").replace(/:(.+?)@/, ":****@");
-  console.log("records up on", port, "| DB:", safeUrl);
+  console.log("records HTTP server up on", port, "| DB:", safeUrl);
 });
+
+// Start gRPC server
+if (process.env.ENABLE_GRPC !== "false") {
+  import("./grpc-server").then(({ startGrpcServer }) => {
+    const grpcPort = parseInt(process.env.GRPC_PORT || "50051", 10);
+    startGrpcServer(grpcPort);
+  }).catch((e) => {
+    console.error("Failed to start gRPC server:", e);
+  });
+}
 
 function shutdown(signal: string) {
   console.log(`[records] received ${signal}, shutting down...`);

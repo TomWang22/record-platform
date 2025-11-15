@@ -37,6 +37,10 @@ spec:
               value: "60000"
             - name: DATABASE_URL
               value: "postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connect_timeout=5&pool_timeout=10"
+          volumeMounts:
+            - name: proto-files
+              mountPath: /app/proto
+              readOnly: true
           readinessProbe:
             httpGet: { path: /_ping, port: http }
             initialDelaySeconds: 5
@@ -55,3 +59,7 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 20
+      volumes:
+        - name: proto-files
+          configMap:
+            name: proto-files

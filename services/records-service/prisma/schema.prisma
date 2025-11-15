@@ -15,7 +15,7 @@ model Record {
   @@schema("records")
   @@map("records")
 
-  id                 String   @id @db.Uuid @default(uuid())
+  id                 String   @db.Uuid @default(uuid())
   userId             String   @db.Uuid @map("user_id")
 
   artist             String   @db.VarChar(256)
@@ -56,6 +56,7 @@ model Record {
   createdAt          DateTime @default(now())             @map("created_at")
   updatedAt          DateTime @updatedAt                  @map("updated_at")
 
+  @@id([id, userId])
   @@index([userId])
   @@index([artist])
   @@index([catalogNumber])
@@ -68,9 +69,10 @@ model RecordMedium {
   @@schema("records")
   @@map("record_media")
 
-  id         String   @id @db.Uuid @default(uuid())
+  id         String   @db.Uuid @default(uuid())
   recordId   String   @db.Uuid @map("record_id")
-  record     Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  userId     String   @db.Uuid @map("user_id")
+  record     Record   @relation(fields: [recordId, userId], references: [id, userId], onDelete: Cascade)
 
   index      Int
   kind       String   @db.Text
@@ -84,7 +86,8 @@ model RecordMedium {
   createdAt  DateTime @default(now())  @map("created_at")
   updatedAt  DateTime @updatedAt       @map("updated_at")
 
-  @@unique([recordId, index])
+  @@id([id, userId])
+  @@unique([recordId, userId, index])
 }
 
 model Users {

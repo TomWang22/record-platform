@@ -3,6 +3,7 @@ import express, {
   type Response,
   type NextFunction,
 } from "express";
+import * as grpc from "@grpc/grpc-js";
 import helmet from "helmet";
 import compression from "compression";
 import cors from "cors";
@@ -11,12 +12,14 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 
 import { register, httpCounter } from "@common/utils/metrics";
 import { verifyJwt, type JwtPayload as TokenPayload } from "@common/utils/auth";
+import {
+  createAuthClient,
+  createRecordsClient,
+  promisifyGrpcCall,
+} from "@common/utils/grpc-clients";
 
 import { createClient } from "redis";
-import type {
-  IncomingMessage,
-  ServerResponse as NodeServerResponse,
-} from "http";
+import type { ServerResponse as NodeServerResponse } from "http";
 import { Agent as HttpAgent } from "http";
 import type { Socket } from "net";
 
@@ -28,6 +31,13 @@ const keepAliveAgent = new HttpAgent({
   maxFreeSockets: 256,
   keepAliveMsecs: 30_000,
 });
+
+const AUTH_GRPC_TARGET = process.env.AUTH_GRPC_TARGET || "auth-service:50051";
+const RECORDS_GRPC_TARGET =
+  process.env.RECORDS_GRPC_TARGET || "records-service:50051";
+
+const authGrpcClient = createAuthClient(AUTH_GRPC_TARGET);
+const recordsGrpcClient = createRecordsClient(RECORDS_GRPC_TARGET);
 
 /* ----------------------- Types ----------------------- */
 type AuthedRequest = Request & {
@@ -79,6 +89,72 @@ function injectIdentityHeadersIfAny(
     (req.headers as any)["x-user-jti"] = (req.user as any).jti;
 
   next();
+}
+
+const grpcStatusToHttp: Record<number, number> = {
+  [grpc.status.INVALID_ARGUMENT ?? 3]: 400,
+  [grpc.status.UNAUTHENTICATED ?? 16]: 401,
+  [grpc.status.PERMISSION_DENIED ?? 7]: 403,
+  [grpc.status.NOT_FOUND ?? 5]: 404,
+  [grpc.status.ALREADY_EXISTS ?? 6]: 409,
+  [grpc.status.UNAVAILABLE ?? 14]: 503,
+};
+
+function handleGrpcError(res: Response, err: any) {
+  const status = grpcStatusToHttp[err?.code ?? -1] ?? 500;
+  const message = err?.details || err?.message || "grpc error";
+  res.status(status).json({ error: message });
+}
+
+const jsonParser = express.json({ limit: "1mb" });
+
+function mapHttpRecordToGrpcInput(body: Record<string, any> | undefined | null) {
+  if (!body) return {};
+  const out: Record<string, any> = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (value === undefined) continue;
+    const snake = key.includes("_")
+      ? key
+      : key.replace(/([A-Z])/g, "_$1").toLowerCase();
+    out[snake] = value;
+  }
+  return out;
+}
+
+function grpcRecordToHttp(record: any) {
+  if (!record) return null;
+  return {
+    id: record.id,
+    userId: record.user_id,
+    artist: record.artist,
+    name: record.name,
+    format: record.format,
+    catalogNumber: record.catalog_number ?? null,
+    notes: record.notes ?? null,
+    recordGrade: record.record_grade ?? null,
+    sleeveGrade: record.sleeve_grade ?? null,
+    hasInsert: !!record.has_insert,
+    hasBooklet: !!record.has_booklet,
+    hasObiStrip: !!record.has_obi_strip,
+    hasFactorySleeve: !!record.has_factory_sleeve,
+    isPromo: !!record.is_promo,
+    pricePaid: record.price_paid ?? null,
+    purchasedAt: record.purchased_at || null,
+    createdAt: record.created_at || null,
+    updatedAt: record.updated_at || null,
+  };
+}
+
+function requireUserIdFromRequest(
+  req: AuthedRequest,
+  res: Response
+): string | undefined {
+  const userId = req.user?.sub;
+  if (!userId) {
+    res.status(401).json({ error: "auth required" });
+    return undefined;
+  }
+  return userId;
 }
 
 /* ----------------------- App init ----------------------- */
@@ -237,8 +313,13 @@ const OPEN_ROUTES: RouteRule[] = [
   { method: "GET",  pattern: /^\/(?:api\/)?ai(?:\/|$)/ },
 ];
 const isOpenRoute = (req: Request) => {
+  // Check both path and originalUrl (path is what Express sees, originalUrl includes query)
   const path = req.path || req.url || "";
-  return OPEN_ROUTES.some((r) => r.method === req.method && r.pattern.test(path));
+  const originalPath = req.originalUrl?.split('?')[0] || path;
+  // Try both paths in case ingress rewrites differently
+  return OPEN_ROUTES.some((r) => 
+    r.method === req.method && (r.pattern.test(path) || r.pattern.test(originalPath))
+  );
 };
 
 /* ----------------------- Logging (helpful while stabilizing) ----------------------- */
@@ -277,6 +358,160 @@ app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
   }
 });
 
+/* ----------------------- gRPC-backed Auth Routes ----------------------- */
+app.post("/auth/register", jsonParser, async (req: Request, res: Response) => {
+  const { email, password } = (req.body ?? {}) as {
+    email?: string;
+    password?: string;
+  };
+  if (!email || !password) {
+    return res.status(400).json({ error: "email/password required" });
+  }
+
+  try {
+    const response = await promisifyGrpcCall<any>(authGrpcClient, "Register", {
+      email,
+      password,
+    });
+    res.status(201).json({
+      token: response?.token ?? "",
+      user: response?.user ?? null,
+    });
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/auth/login", jsonParser, async (req: Request, res: Response) => {
+  const { email, password } = (req.body ?? {}) as {
+    email?: string;
+    password?: string;
+  };
+  if (!email || !password) {
+    return res.status(400).json({ error: "email/password required" });
+  }
+
+  try {
+    const response = await promisifyGrpcCall<any>(
+      authGrpcClient,
+      "Authenticate",
+      { email, password }
+    );
+    res.json({
+      token: response?.token ?? "",
+      refreshToken: response?.refresh_token ?? "",
+      user: response?.user ?? null,
+    });
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+/* ----------------------- gRPC-backed Records Routes ----------------------- */
+app.get("/records", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(
+      recordsGrpcClient,
+      "SearchRecords",
+      {
+        user_id: userId,
+        query: typeof req.query.q === "string" ? req.query.q : "",
+        limit: req.query.limit ? Number(req.query.limit) : undefined,
+        offset: req.query.offset ? Number(req.query.offset) : undefined,
+      }
+    );
+    const items = (response?.records ?? [])
+      .map(grpcRecordToHttp)
+      .filter(Boolean);
+    res.json(items);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.get("/records/:id", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(
+      recordsGrpcClient,
+      "GetRecord",
+      {
+        record_id: req.params.id,
+        user_id: userId,
+      }
+    );
+    if (!response?.record) {
+      return res.status(404).json({ error: "not found" });
+    }
+    res.json(grpcRecordToHttp(response.record));
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/records", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(
+      recordsGrpcClient,
+      "CreateRecord",
+      {
+        user_id: userId,
+        record: mapHttpRecordToGrpcInput(req.body),
+      }
+    );
+    res.status(201).json(grpcRecordToHttp(response?.record));
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.put(
+  "/records/:id",
+  jsonParser,
+  async (req: AuthedRequest, res: Response) => {
+    const userId = requireUserIdFromRequest(req, res);
+    if (!userId) return;
+
+    try {
+      const response = await promisifyGrpcCall<any>(
+        recordsGrpcClient,
+        "UpdateRecord",
+        {
+          record_id: req.params.id,
+          user_id: userId,
+          record: mapHttpRecordToGrpcInput(req.body),
+        }
+      );
+      res.json(grpcRecordToHttp(response?.record));
+    } catch (err) {
+      handleGrpcError(res, err);
+    }
+  }
+);
+
+app.delete("/records/:id", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    await promisifyGrpcCall(recordsGrpcClient, "DeleteRecord", {
+      record_id: req.params.id,
+      user_id: userId,
+    });
+    res.status(204).end();
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
 /* ----------------------- Debug helper after guard ----------------------- */
 app.get("/__whoami", (req: AuthedRequest, res: Response) => {
   res.json({ user: req.user ?? null });
@@ -294,57 +529,6 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
    - nginx strips /api, so HPM sees paths starting with /auth, /records, ...
    - Identity headers are injected via middleware *before* the proxy.
    ========================================================= */
-
-/* Auth service (strip /auth) — no identity injection */
-app.use(
-  "/auth",
-  createProxyMiddleware({
-    target: "http://auth-service:4001",
-    changeOrigin: true,
-    pathRewrite: { "^/auth": "" },
-    proxyTimeout: 15000,
-    agent: keepAliveAgent,
-    on: {
-      error(_err, _req, res) {
-        sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
-      },
-    },
-  })
-);
-
-// debug on PUT /records*
-app.use((req, _res, next) => {
-  if (req.method === "PUT" && (req.path === "/records" || req.path.startsWith("/records/"))) {
-    console.log("[records] saw", req.method, req.originalUrl, "authz:", req.headers.authorization || "<none>");
-  }
-  next();
-});
-
-/* Records service — inject identity, and rewrite /records health/metrics to root */
-app.use(
-  "/records",
-  injectIdentityHeadersIfAny,
-  createProxyMiddleware({
-    target: "http://records-service:4002",
-    changeOrigin: true,
-    proxyTimeout: 15000,
-    agent: keepAliveAgent,
-    pathRewrite: (path) => {
-      const m = path.match(/^\/records\/(healthz|metrics)\/?$/);
-      if (m) return `/${m[1]}`;
-      return path.startsWith("/records") ? path : `/records${path}`;
-    },
-    on: {
-      proxyRes(proxyRes: IncomingMessage) {
-        console.log("[gw] /records upstream status:", proxyRes.statusCode);
-      },
-      error(err, _req, res) {
-        console.error("[gw] records proxy error:", err);
-        sendJson502(res as NodeServerResponse | Socket, "records upstream error");
-      },
-    },
-  })
-);
 
 /* Listings — public GETs, but forward identity if present */
 app.use(

@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tmp-restore-latest
+spec:
+  restartPolicy: Never
+  volumes:
+    - name: bk
+      persistentVolumeClaim:
+        claimName: pgbackups
+  containers:
+    - name: r
+      image: postgres:16
+      env:
+        - name: PGHOST
+          value: "postgres"
+        - name: PGUSER
+          value: "postgres"
+        - name: PGDATABASE
+          value: "records"
+        - name: PGPASSWORD
+          value: "SUPER_STRONG_POSTGRES_PASSWORD"
+      command: ["bash", "-lc"]
+      args:
+        - |
+          set -Eeuo pipefail
+          L=/b/LATEST.dump
+          echo "-> using $L"
+          pg_restore -l "$L" | head -n 12
+          time pg_restore \
+            --verbose \
+            --clean --if-exists \
+            --no-owner --no-privileges \
+            --disable-triggers \
+            -j ${JOBS:-4} \
+            -d "$PGDATABASE" \
+            "$L"
+          echo "-> ANALYZE"
+          psql -v ON_ERROR_STOP=1 -c "ANALYZE;"
+          echo "-> refresh MVs if present"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          WITH mvs AS (
+            SELECT oid::regclass AS mv
+            FROM pg_class
+            WHERE oid IN (to_regclass('records.aliases_mv'), to_regclass('records.search_doc_mv'))
+              AND oid IS NOT NULL
+          )
+          SELECT 'REFRESH MATERIALIZED VIEW '||mv::text||';' FROM mvs;
+          \gexec
+          SQL
+          echo "-> sanity"
+          psql -c "SELECT count(*) AS records_rows FROM records.records;" || true
+      volumeMounts:
+        - name: bk
+          mountPath: /b
+

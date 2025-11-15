@@ -5,7 +5,7 @@ namespace: record-platform
 
 resources:
   - pvc.yaml
-  - wal-archive-pvc.yaml      # ← add this
+  - secret.superuser.yaml
   - init-cm.yaml
   - deploy.yaml
   - svc.yaml

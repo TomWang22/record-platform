@@ -13,9 +13,9 @@
           name: app-config
           key: DATABASE_URL
 
-    # Optional alias if any code still reads this name:
+    # Use POSTGRES_URL_AUTH from configmap (which includes search_path=auth)
     - name: POSTGRES_URL_AUTH
       valueFrom:
         configMapKeyRef:
           name: app-config
-          key: DATABASE_URL
+          key: POSTGRES_URL_AUTH

@@ -59,4 +59,6 @@ backups/
 **/prisma/.env
 
 # Documentation notes (user-specific)
-docs/restore-notes.md
+docs/
+records_chunks/
+records_chunks_small/

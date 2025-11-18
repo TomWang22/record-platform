@@ -18,9 +18,11 @@ data:
   PROTO_ROOT: /app/proto
 
   # single source of truth
-  DATABASE_URL:         postgresql://record_app:SUPER_STRONG_APP_PASSWORD@postgres.record-platform.svc.cluster.local:5432/records?connect_timeout=5
+  # EXTERNAL Postgres (Docker) - Direct connection, no K8s service, persistent tuning
+  # Connection from K8s pods: Use host.docker.internal (Mac) or host IP
+  DATABASE_URL:         postgresql://postgres:postgres@host.docker.internal:5432/records?connect_timeout=5
 
   # optional compatibility (literal duplicates, not $(…))
-  POSTGRES_URL:         postgresql://record_app:SUPER_STRONG_APP_PASSWORD@postgres.record-platform.svc.cluster.local:5432/records?connect_timeout=5
-  POSTGRES_URL_AUTH:    postgresql://record_app:SUPER_STRONG_APP_PASSWORD@postgres.record-platform.svc.cluster.local:5432/records?search_path=auth&connect_timeout=5
-  POSTGRES_URL_RECORDS: postgresql://record_app:SUPER_STRONG_APP_PASSWORD@postgres.record-platform.svc.cluster.local:5432/records?
+  POSTGRES_URL:         postgresql://postgres:postgres@host.docker.internal:5432/records?connect_timeout=5
+  POSTGRES_URL_AUTH:    postgresql://postgres:postgres@host.docker.internal:5432/records?search_path=auth&connect_timeout=5
+  POSTGRES_URL_RECORDS: postgresql://postgres:postgres@host.docker.internal:5432/records?connect_timeout=5

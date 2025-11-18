@@ -13,7 +13,247 @@ APPUSER="${APPUSER:-record_app}"
 PGPORT_LOCAL="${PGPORT_LOCAL:-15432}"
 SVC="${SVC:-postgres}"
 HOT_TENANT_UUID="${HOT_TENANT_UUID:-0dc268d0-a86f-4e12-8d10-9db0f1b735e0}"
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
 HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-110000}"
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
+=======
+HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
+>>>>>>> Incoming (Background Agent changes)
 
 # actions
 DO_BACKUP=0
@@ -246,6 +486,9 @@ PGPASSWORD="$APP_PW" "$PSQL" -h 127.0.0.1 -p "$PGPORT_LOCAL" -U "$APPUSER" -d "$
 \pset pager off
 \pset border 2
 \pset linestyle unicode
+SELECT inet_server_addr()||':'||inet_server_port() AS server,
+       pg_postmaster_start_time() AS started,
+       (pg_control_system()).system_identifier AS sysid;
 SELECT current_user usr, current_setting('server_version') pg, current_database() db, now() ts;
 SELECT count(*) AS records_rows FROM records.records;
 SELECT count(*) AS hot_rows     FROM records_hot.records_hot;

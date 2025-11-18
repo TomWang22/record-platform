@@ -10,6 +10,11 @@ ok() { echo "✅ $*"; }
 warn() { echo "⚠️  $*"; }
 fail() { echo "❌ $*" >&2; exit 1; }
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/http3.sh
+. "$SCRIPT_DIR/lib/http3.sh"
+HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
+
 say "=== Testing gRPC via HTTP/2 and HTTP/3 ==="
 
 # Step 1: Create test user
@@ -38,7 +43,7 @@ if [[ -z "$AUTH_POD" ]]; then
     ok "User registration attempted (HTTP $REGISTER_CODE)"
   else
     warn "Registration failed - HTTP $REGISTER_CODE"
-    echo "Response: $(echo "$REGISTER_RESPONSE" | head -n -1)"
+    echo "Response: $(echo "$REGISTER_RESPONSE" | sed '$d')"
   fi
   
   # Try to login
@@ -51,8 +56,8 @@ if [[ -z "$AUTH_POD" ]]; then
   
   HTTP_CODE=$(echo "$LOGIN_RESPONSE" | tail -1)
   if [[ "$HTTP_CODE" == "200" ]]; then
-    TEST_TOKEN=$(echo "$LOGIN_RESPONSE" | head -n -1 | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
-    TEST_USER_ID=$(echo "$LOGIN_RESPONSE" | head -n -1 | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
+    TEST_TOKEN=$(echo "$LOGIN_RESPONSE" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+    TEST_USER_ID=$(echo "$LOGIN_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
     if [[ -n "$TEST_TOKEN" ]]; then
       ok "Test user authenticated via API gateway"
     fi
@@ -93,10 +98,13 @@ fi
 
 # Step 3: Test HTTP/3 health check
 say "Step 3: Testing HTTP/3 health check..."
-if "$CURL_BIN" -k -sS -I --http3-only -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1 | head -n1 | grep -q "200"; then
+if http3_curl -k -sS -I --http3-only --max-time 15 \
+  -H "Host: $HOST" \
+  --resolve "$HTTP3_RESOLVE" \
+  "https://$HOST/_caddy/healthz" 2>&1 | head -n1 | grep -q "HTTP/3 200"; then
   ok "HTTP/3 health check works"
 else
-  warn "HTTP/3 health check failed"
+  warn "HTTP/3 health check failed (QUIC path unavailable)"
 fi
 
 # Step 4: Test API endpoint via HTTP/2
@@ -111,7 +119,10 @@ fi
 
 # Step 5: Test API endpoint via HTTP/3
 say "Step 5: Testing API endpoint via HTTP/3..."
-API_RESPONSE_H3=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http3-only --max-time 10 -H "Host: $HOST" "https://$HOST:8443/api/healthz" 2>&1)
+API_RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  -H "Host: $HOST" \
+  --resolve "$HTTP3_RESOLVE" \
+  "https://$HOST/api/healthz" 2>&1)
 HTTP_CODE_H3=$(echo "$API_RESPONSE_H3" | tail -1)
 if [[ "$HTTP_CODE_H3" =~ ^(200|404|502)$ ]]; then
   ok "API endpoint reachable via HTTP/3 - HTTP $HTTP_CODE_H3"
@@ -130,7 +141,7 @@ if [[ -n "${TEST_EMAIL:-}" ]]; then
   AUTH_CODE=$(echo "$AUTH_RESPONSE" | tail -1)
   if [[ "$AUTH_CODE" == "200" ]]; then
     ok "Authentication works via HTTP/2"
-    AUTH_TOKEN=$(echo "$AUTH_RESPONSE" | head -n -1 | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+    AUTH_TOKEN=$(echo "$AUTH_RESPONSE" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
   else
     warn "Authentication failed via HTTP/2 - HTTP $AUTH_CODE"
   fi
@@ -151,7 +162,7 @@ if [[ -n "${AUTH_TOKEN:-}" ]]; then
   CREATE_CODE=$(echo "$CREATE_RESPONSE" | tail -1)
   if [[ "$CREATE_CODE" == "200" ]] || [[ "$CREATE_CODE" == "201" ]]; then
     ok "Create record works via HTTP/2"
-    RECORD_ID=$(echo "$CREATE_RESPONSE" | head -n -1 | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
+    RECORD_ID=$(echo "$CREATE_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
     
     # Delete record if we got an ID
     if [[ -n "$RECORD_ID" ]]; then
@@ -177,23 +188,25 @@ fi
 say "Step 8: Testing records CRUD via HTTP/3..."
 if [[ -n "${AUTH_TOKEN:-}" ]]; then
   # Create record
-  CREATE_RESPONSE_H3=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http3-only --max-time 10 \
+  CREATE_RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $AUTH_TOKEN" \
-    -X POST "https://$HOST:8443/api/records" \
+    --resolve "$HTTP3_RESOLVE" \
+    -X POST "https://$HOST/api/records" \
     -d '{"artist":"Test Artist H3","name":"Test Record H3","format":"LP","catalog_number":"TEST-H3-001"}' 2>&1)
   CREATE_CODE_H3=$(echo "$CREATE_RESPONSE_H3" | tail -1)
   if [[ "$CREATE_CODE_H3" == "200" ]] || [[ "$CREATE_CODE_H3" == "201" ]]; then
     ok "Create record works via HTTP/3"
-    RECORD_ID_H3=$(echo "$CREATE_RESPONSE_H3" | head -n -1 | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
+    RECORD_ID_H3=$(echo "$CREATE_RESPONSE_H3" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
     
     # Delete record if we got an ID
     if [[ -n "$RECORD_ID_H3" ]]; then
-      DELETE_RESPONSE_H3=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http3-only --max-time 10 \
+      DELETE_RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
         -H "Host: $HOST" \
         -H "Authorization: Bearer $AUTH_TOKEN" \
-        -X DELETE "https://$HOST:8443/api/records/$RECORD_ID_H3" 2>&1)
+        --resolve "$HTTP3_RESOLVE" \
+        -X DELETE "https://$HOST/api/records/$RECORD_ID_H3" 2>&1)
       DELETE_CODE_H3=$(echo "$DELETE_RESPONSE_H3" | tail -1)
       if [[ "$DELETE_CODE_H3" == "200" ]] || [[ "$DELETE_CODE_H3" == "204" ]]; then
         ok "Delete record works via HTTP/3"
@@ -211,7 +224,10 @@ fi
 # Step 9: Verify HTTP/2 and HTTP/3 protocol usage
 say "Step 9: Verifying protocol usage..."
 H2_PROTOCOL=$("$CURL_BIN" -k -sS -I --http2 -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1 | grep -i "HTTP/2" || echo "")
-H3_PROTOCOL=$("$CURL_BIN" -k -sS -I --http3-only -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1 | grep -i "HTTP/3\|HTTP/2" || echo "")
+H3_PROTOCOL=$(http3_curl -k -sS -I --http3-only --max-time 15 \
+  -H "Host: $HOST" \
+  --resolve "$HTTP3_RESOLVE" \
+  "https://$HOST/_caddy/healthz" 2>&1 | grep -i "HTTP/3\|HTTP/2" || echo "")
 
 if [[ -n "$H2_PROTOCOL" ]]; then
   ok "HTTP/2 protocol confirmed: $H2_PROTOCOL"

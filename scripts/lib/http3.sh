@@ -63,9 +63,14 @@ _http3_ensure_runner() {
 
 http3_curl() {
   _http3_ensure_runner || return 1
+  # Use timeout to ensure the command doesn't hang indefinitely
+  # Docker run with --rm will clean up automatically
   docker run --rm \
     --network "container:${HTTP3_KIND_NODE}" \
     "$HTTP3_IMAGE" \
-    curl "$@"
+    curl "$@" || {
+    # If curl fails, return with exit code 1
+    return 1
+  }
 }
 

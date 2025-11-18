@@ -109,7 +109,7 @@ spec:
           - "-c"
           - "max_connections=200"
           - "-c"
-          - "shared_buffers=1GB"
+          - "shared_buffers=2GB"
           - "-c"
           - "effective_cache_size=8GB"
           - "-c"

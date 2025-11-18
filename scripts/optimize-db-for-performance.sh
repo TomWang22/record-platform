@@ -27,7 +27,19 @@ done
 
 say "Applying aggressive performance optimizations..."
 
-kubectl -n "$NS" exec "$POD" -c db -- psql -U postgres -d records -X -P pager=off -v ON_ERROR_STOP=1 <<'SQL'
+# Always use localhost:5432 to match run_pgbench_sweep.sh
+# This ensures optimizations are applied to the same database
+: "${PGHOST:=localhost}"
+: "${PGPORT:=5432}"
+: "${PGUSER:=postgres}"
+: "${PGDATABASE:=records}"
+: "${PGPASSWORD:=postgres}"
+
+echo "Using Postgres at ${PGHOST}:${PGPORT} for optimizations..."
+PGPASSWORD="$PGPASSWORD" psql \
+  -h "$PGHOST" -p "$PGPORT" \
+  -U "$PGUSER" -d "$PGDATABASE" \
+  -X -P pager=off -v ON_ERROR_STOP=1 <<'SQL'
 -- ============================================
 -- AGGRESSIVE PERFORMANCE OPTIMIZATIONS
 -- Target: 28k TPS (from good run)
@@ -145,6 +157,12 @@ ORDER BY name;
 
 ok "Performance optimizations applied"
 SQL
+OPT_EXIT=$?
+
+if [[ ${OPT_EXIT:-0} -ne 0 ]]; then
+  echo "❌ Optimization failed!" >&2
+  exit 1
+fi
 
 say "=== Optimization Complete ==="
 echo ""

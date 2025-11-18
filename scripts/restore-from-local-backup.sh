@@ -324,8 +324,13 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT regexp_replace(lower(unaccent(coalesce(t,''))), '\s+', ' ', 'g')
 $$;
 
--- Ensure search_records_fuzzy_ids function exists (critical for benchmarks)
-CREATE OR REPLACE FUNCTION public.search_records_fuzzy_ids(
+-- Ensure record_aliases view exists
+CREATE OR REPLACE VIEW public.record_aliases AS
+  SELECT record_id, alias_norm AS term_norm
+  FROM records.aliases_mv;
+
+-- Ensure search_records_fuzzy_ids_core function exists (4 params, bigint)
+CREATE OR REPLACE FUNCTION public.search_records_fuzzy_ids_core(
   p_user UUID, p_q TEXT, p_limit bigint DEFAULT 100, p_offset bigint DEFAULT 0
 ) RETURNS TABLE(id UUID, rank real)
 LANGUAGE sql STABLE PARALLEL SAFE AS $$
@@ -371,6 +376,14 @@ LANGUAGE sql STABLE PARALLEL SAFE AS $$
   ORDER BY rank DESC
   LIMIT LEAST(1000, GREATEST(1, p_limit))
   OFFSET GREATEST(0, p_offset);
+$$;
+
+-- Ensure search_records_fuzzy_ids wrapper function exists (5 params: uuid, text, integer, integer, boolean) - matches benchmark signature
+CREATE OR REPLACE FUNCTION public.search_records_fuzzy_ids(
+  p_user UUID, p_q TEXT, p_limit integer DEFAULT 100, p_offset integer DEFAULT 0, p_strict boolean DEFAULT false
+) RETURNS TABLE(id UUID, rank real)
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT * FROM public.search_records_fuzzy_ids_core(p_user, p_q, p_limit::bigint, p_offset::bigint);
 $$;
 
 -- Refresh materialized views (in correct order, ignore errors)

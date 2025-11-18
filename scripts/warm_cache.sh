@@ -110,7 +110,7 @@ SELECT id, user_id, search_norm
 FROM records.records
 WHERE user_id = '$USER_UUID'::uuid
 ORDER BY updated_at DESC
-LIMIT 110000;
+LIMIT 100000;
 COMMIT;
 SELECT COUNT(*) as refreshed_count FROM records_hot.records_hot;
 SQL

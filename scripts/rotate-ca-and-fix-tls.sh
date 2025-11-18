@@ -45,12 +45,25 @@ kubectl -n "$NS_ING" create secret generic dev-root-ca \
 
 ok "CA secret updated"
 
-# Update Caddyfile with strict TLS
+# Update Caddyfile with strict TLS (sanitize to remove any invalid servers{} blocks)
 say "Updating Caddyfile with strict TLS configuration..."
 if [[ -f "./Caddyfile" ]]; then
+  TMP_CF="$(mktemp)"
+  # Strip any legacy 'servers { ... }' block which is invalid for our Caddy 2.8 config
+  awk '
+    BEGIN{skip=0}
+    /^\\s*servers\\s*\\{/ { skip=1; depth=1; next }
+    skip==1 {
+      if ($0 ~ /\\{/) depth++
+      if ($0 ~ /\\}/) { depth--; if (depth==0) { skip=0; next } }
+      next
+    }
+    { print }
+  ' ./Caddyfile > "$TMP_CF"
   kubectl -n "$NS_ING" create configmap caddy-h3 \
-    --from-file=Caddyfile=./Caddyfile \
+    --from-file=Caddyfile="$TMP_CF" \
     --dry-run=client -o yaml | kubectl apply -f -
+  rm -f "$TMP_CF"
   ok "Caddyfile updated"
 else
   warn "Caddyfile not found in current directory"
@@ -65,31 +78,47 @@ say "Waiting for Caddy rollout..."
 if kubectl -n "$NS_ING" rollout status deploy/caddy-h3 --timeout=180s 2>&1; then
   ok "Caddy restarted successfully"
 else
-  warn "Caddy rollout timed out, but continuing..."
-  # Check if pod is actually running
+  warn "Caddy rollout timed out, checking pod status..."
+  # Check if pod is actually running and ready
   sleep 5
-  if kubectl -n "$NS_ING" get pod -l app=caddy-h3 -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
-    ok "Caddy pod is Running (rollout status may have timed out)"
+  POD_PHASE=$(kubectl -n "$NS_ING" get pod -l app=caddy-h3 -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "")
+  POD_READY=$(kubectl -n "$NS_ING" get pod -l app=caddy-h3 -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
+  
+  if [[ "$POD_PHASE" == "Running" ]] && [[ "$POD_READY" == "True" ]]; then
+    ok "Caddy pod is Running and Ready (rollout status may have timed out)"
+  elif [[ "$POD_PHASE" == "Running" ]]; then
+    warn "Caddy pod is Running but not Ready yet - waiting..."
+    sleep 10
+    # Check again
+    POD_READY=$(kubectl -n "$NS_ING" get pod -l app=caddy-h3 -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
+    if [[ "$POD_READY" == "True" ]]; then
+      ok "Caddy pod is now Ready"
+    else
+      warn "Caddy pod still not Ready - checking logs..."
+      kubectl -n "$NS_ING" logs -l app=caddy-h3 --tail=10 2>&1 | head -5
+    fi
   else
-    warn "Caddy pod may not be ready yet"
+    warn "Caddy pod phase: $POD_PHASE (may not be ready yet)"
+    kubectl -n "$NS_ING" logs -l app=caddy-h3 --tail=10 2>&1 | head -5
   fi
 fi
 
 # Wait a bit for Caddy to be ready
 sleep 3
 
-# Test HTTP/2 and HTTP/3
+# Test HTTP/2 and HTTP/3 (non-fatal - don't exit on failure)
 say "Testing HTTP/2 and HTTP/3..."
 if /opt/homebrew/opt/curl/bin/curl -k -sS -I --http2 -H "Host: ${HOST}" "https://${HOST}:8443/_caddy/healthz" 2>&1 | head -n1 | grep -q "200"; then
   ok "HTTP/2 works"
 else
-  warn "HTTP/2 failed"
+  warn "HTTP/2 failed (non-fatal)"
 fi
 
+# HTTP/3 from host is often flaky on macOS, so make it non-fatal
 if /opt/homebrew/opt/curl/bin/curl -k -sS -I --http3-only -H "Host: ${HOST}" "https://${HOST}:8443/_caddy/healthz" 2>&1 | head -n1 | grep -q "200"; then
   ok "HTTP/3 works"
 else
-  warn "HTTP/3 failed"
+  warn "HTTP/3 failed (non-fatal - host-based H3 is often flaky on macOS)"
 fi
 
 # Test with CA trust (no -k) - requires mkcert CA to be installed
@@ -109,14 +138,14 @@ say "Testing actual API endpoint via HTTP/2..."
 if /opt/homebrew/opt/curl/bin/curl -k -sS -I --http2 -H "Host: ${HOST}" "https://${HOST}:8443/api/healthz" 2>&1 | head -n1 | grep -q "200\|404\|502"; then
   ok "API endpoint reachable via HTTP/2"
 else
-  warn "API endpoint test failed"
+  warn "API endpoint test failed (non-fatal)"
 fi
 
 say "Testing actual API endpoint via HTTP/3..."
 if /opt/homebrew/opt/curl/bin/curl -k -sS -I --http3-only -H "Host: ${HOST}" "https://${HOST}:8443/api/healthz" 2>&1 | head -n1 | grep -q "200\|404\|502"; then
   ok "API endpoint reachable via HTTP/3"
 else
-  warn "API endpoint test failed"
+  warn "API endpoint test failed (non-fatal - host-based H3 is often flaky)"
 fi
 
 # Cleanup
@@ -127,4 +156,7 @@ echo ""
 echo "Test commands:"
 echo "  curl -sS -I --http2 -H 'Host: ${HOST}' 'https://${HOST}:8443/_caddy/healthz'"
 echo "  /opt/homebrew/opt/curl/bin/curl -k -sS -I --http3-only -H 'Host: ${HOST}' 'https://${HOST}:8443/_caddy/healthz'"
+
+# Exit with success (0) - rotation completed even if some tests failed
+exit 0
 

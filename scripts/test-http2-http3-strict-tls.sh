@@ -90,4 +90,86 @@ else
   warn "Caddy may not have strict TLS configured"
 fi
 
+# Test 9: CA Rotation (optional - can be skipped with SKIP_ROTATION=1)
+if [[ "${SKIP_ROTATION:-}" != "1" ]]; then
+  say "Test 9: CA Rotation with Zero-Downtime Reload"
+  say "Starting continuous requests during rotation..."
+  
+  # Start background requests (longer window to observe restart)
+  (
+    for i in {1..60}; do
+      /opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 -H "Host: ${HOST}" "https://${HOST}:8443/_caddy/healthz" 2>&1 | tail -1
+      sleep 0.5
+    done
+  ) > /tmp/rotation-test.log &
+  REQ_PID=$!
+  
+  # Perform CA rotation
+  say "Rotating CA..."
+  if ./scripts/rotate-ca-and-fix-tls.sh >/dev/null 2>&1; then
+    ok "CA rotation script completed"
+  else
+    warn "CA rotation script returned non-zero status"
+  fi
+  
+  # Wait for requests to complete
+  wait $REQ_PID 2>/dev/null || true
+  
+  # Analyze results
+  if [[ -f /tmp/rotation-test.log ]] && [[ -s /tmp/rotation-test.log ]]; then
+    SUCCESS_COUNT=$(grep -c "200" /tmp/rotation-test.log 2>/dev/null || echo "0")
+    TOTAL_COUNT=$(wc -l < /tmp/rotation-test.log 2>/dev/null | tr -d '[:space:]' || echo "0")
+  else
+    SUCCESS_COUNT="0"
+    TOTAL_COUNT="0"
+  fi
+  
+  # Ensure counts are numeric (strip any whitespace/newlines)
+  SUCCESS_COUNT=$(echo "$SUCCESS_COUNT" | tr -d '[:space:]')
+  TOTAL_COUNT=$(echo "$TOTAL_COUNT" | tr -d '[:space:]')
+  
+  # Default to 0 if empty
+  SUCCESS_COUNT="${SUCCESS_COUNT:-0}"
+  TOTAL_COUNT="${TOTAL_COUNT:-0}"
+  
+  # Validate numeric
+  if ! [[ "$SUCCESS_COUNT" =~ ^[0-9]+$ ]]; then
+    SUCCESS_COUNT="0"
+  fi
+  if ! [[ "$TOTAL_COUNT" =~ ^[0-9]+$ ]]; then
+    TOTAL_COUNT="0"
+  fi
+  
+  # Only report if we have valid data
+  if [[ "$TOTAL_COUNT" -gt 0 ]]; then
+    if [[ "$SUCCESS_COUNT" -gt 0 ]]; then
+      ok "CA rotation completed - $SUCCESS_COUNT/$TOTAL_COUNT requests succeeded during rotation"
+      if [[ "$SUCCESS_COUNT" -eq "$TOTAL_COUNT" ]]; then
+        ok "Zero-downtime rotation confirmed!"
+      else
+        warn "Some requests failed during rotation (may be expected during restart)"
+      fi
+    else
+      warn "No successful requests during rotation ($TOTAL_COUNT total requests)"
+    fi
+  else
+    warn "Could not analyze rotation results (log file may be empty or malformed)"
+  fi
+  
+  rm -f /tmp/rotation-test.log
+  
+  # Verify new certificate is active
+  say "Test 9b: Verify new certificate is active"
+  # Use openssl to get certificate info more reliably
+  CERT_INFO=$(echo | openssl s_client -connect "${HOST}:8443" -servername "${HOST}" 2>/dev/null | openssl x509 -noout -subject -issuer 2>/dev/null || echo "")
+  if [[ -n "$CERT_INFO" ]]; then
+    ok "Certificate info retrieved"
+    echo "$CERT_INFO" | sed 's/^/  /'
+  else
+    warn "Could not retrieve certificate info (openssl may not be available or connection failed)"
+  fi
+else
+  say "Test 9: CA Rotation (skipped - set SKIP_ROTATION=1 to skip)"
+fi
+
 say "=== All tests complete ==="

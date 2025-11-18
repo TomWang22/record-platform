@@ -15,6 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/http3.sh"
 
 HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
+TOKEN=""
 
 say "=== Testing Microservices via HTTP/2 and HTTP/3 ==="
 
@@ -30,11 +31,12 @@ REGISTER_CODE=$(echo "$REGISTER_RESPONSE" | tail -1)
 if [[ "$REGISTER_CODE" == "201" ]]; then
   TOKEN=$(echo "$REGISTER_RESPONSE" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
   ok "Registration works via HTTP/2"
-  echo "Token: ${TOKEN:0:50}..."
+  [[ -n "$TOKEN" ]] && echo "Token: ${TOKEN:0:50}..."
 elif [[ "$REGISTER_CODE" == "409" ]]; then
-  ok "User exists (expected)"
+  ok "User exists (expected) - will try login instead"
 else
   warn "Registration failed - HTTP $REGISTER_CODE"
+  echo "Response body: $(echo "$REGISTER_RESPONSE" | sed '$d' | head -5)"
 fi
 
 # Test 2: Auth Service - Login (HTTP/3)
@@ -44,20 +46,27 @@ LOGIN_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 1
   -H "Content-Type: application/json" \
   --resolve "$HTTP3_RESOLVE" \
   -X POST "https://$HOST/api/auth/login" \
-  -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}" 2>&1)
-LOGIN_CODE=$(echo "$LOGIN_RESPONSE" | tail -1)
-if [[ "$LOGIN_CODE" == "200" ]]; then
-  TOKEN=$(echo "$LOGIN_RESPONSE" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
-  ok "Login works via HTTP/3"
-  echo "Token: ${TOKEN:0:50}..."
-else
-  warn "Login failed - HTTP $LOGIN_CODE"
-  TOKEN=""
+  -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}" 2>&1) || {
+  warn "HTTP/3 curl command failed (exit code: $?)"
+  echo "This may indicate HTTP/3 connectivity issues. Check http3_curl helper."
+  LOGIN_RESPONSE=""
+  LOGIN_CODE="000"
+}
+if [[ -n "$LOGIN_RESPONSE" ]]; then
+  LOGIN_CODE=$(echo "$LOGIN_RESPONSE" | tail -1)
+  if [[ "$LOGIN_CODE" == "200" ]]; then
+    TOKEN=$(echo "$LOGIN_RESPONSE" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+    ok "Login works via HTTP/3"
+    [[ -n "$TOKEN" ]] && echo "Token: ${TOKEN:0:50}..."
+  else
+    warn "Login failed - HTTP $LOGIN_CODE"
+    echo "Response body: $(echo "$LOGIN_RESPONSE" | sed '$d' | head -5)"
+  fi
 fi
 
 # Test 3: Records Service - Create Record (HTTP/2)
+say "Test 3: Records Service - Create Record via HTTP/2"
 if [[ -n "${TOKEN:-}" ]]; then
-  say "Test 3: Records Service - Create Record via HTTP/2"
   CREATE_RC=0
   CREATE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
     -H "Host: $HOST" \
@@ -73,7 +82,37 @@ if [[ -n "${TOKEN:-}" ]]; then
     RECORD_ID=$(echo "$CREATE_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
   else
     warn "Create record failed - HTTP $CREATE_CODE"
+    echo "Response body: $(echo "$CREATE_RESPONSE" | sed '$d' | head -5)"
   fi
+else
+  warn "Skipping record creation - no auth token available"
+fi
+
+# Test 3b: Records Service - Create Record (HTTP/3)
+say "Test 3b: Records Service - Create Record via HTTP/3"
+if [[ -n "${TOKEN:-}" ]]; then
+  CREATE_H3_RC=0
+  CREATE_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    --resolve "$HTTP3_RESOLVE" \
+    -X POST "https://$HOST/api/records" \
+    -d '{"artist":"Test Artist H3","name":"Test Record H3","format":"LP","catalog_number":"TEST-H3-001"}' 2>&1) || CREATE_H3_RC=$?
+  if [[ "$CREATE_H3_RC" -ne 0 ]]; then
+    warn "Create record via HTTP/3 failed (curl exit $CREATE_H3_RC)"
+  elif [[ -n "$CREATE_H3_RESPONSE" ]]; then
+    CREATE_H3_CODE=$(echo "$CREATE_H3_RESPONSE" | tail -1)
+    if [[ "$CREATE_H3_CODE" =~ ^(200|201)$ ]]; then
+      ok "Create record works via HTTP/3"
+      RECORD_H3_ID=$(echo "$CREATE_H3_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
+    else
+      warn "Create record via HTTP/3 failed - HTTP $CREATE_H3_CODE"
+      echo "Response body: $(echo "$CREATE_H3_RESPONSE" | sed '$d' | head -5)"
+    fi
+  fi
+else
+  warn "Skipping record creation via HTTP/3 - no auth token available"
 fi
 
 # Test 4: Health Checks (HTTP/2 and HTTP/3)

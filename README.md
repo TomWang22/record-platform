@@ -45,7 +45,7 @@ Postgres (statefulset) <-> Prisma clients        Redis (statefulset) <-> JWT & c
 Prometheus Operator + Grafana <- ServiceMonitors scrape /metrics endpoints
 ```
 
-`ingress-nginx` maps `/` traffic to the `nginx` edge deployment (micro-cache + rate limiting) and `/api/*` to the `api-gateway` Service. Port-forwarding `svc/nginx` gives an all-in-one entry point when you want to exercise the Nginx -> HAProxy -> Gateway chain directly. Caddy runs on the host, serves `record.local`, and forwards into the ingress controller; TLS material is generated locally (and ignored by Git) so leaf certificates can be rotated without touching history.
+`ingress-nginx` maps `/` traffic to the `nginx` edge deployment (micro-cache + rate limiting) and `/api/*` to the `api-gateway` Service. Port-forwarding `svc/nginx` gives an all-in-one entry point when you want to exercise the Nginx -> HAProxy -> Gateway chain directly. Caddy runs on the host, serves `record.local`, and forwards into the ingress controller; TLS material is generated locally (and ignored by Git) so leaf certificates can be rotated without touching history. Caddy only advertises TLS 1.2/1.3 with HTTP/2 and HTTP/3 preferred, while HTTP/1.1 remains available as an acceptable fallback for legacy clients.
 
 ## Core Services
 | Component | Deployment / Service | Notes |
@@ -115,7 +115,10 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
 ## TLS & HTTP/3
 - TLS material lives in `certs/` (`tls.crt`, `tls.key`, `dev-root.pem`, etc.) and is ignored by Git (`.gitignore:23-30`). Generate new keys with `scripts/strict-tls-bootstrap.sh` and trust `caddy-local-root.crt` locally (`security add-trusted-cert ...` on macOS).
 - Caddy expects the leaf cert/key at `/etc/caddy/certs/` and the trusted CA at `/etc/caddy/ca/dev-root.pem`. Use `scripts/caddy-toggle-insecure.sh` to temporarily disable upstream verification while debugging.
-- `scripts/h3-matrix.sh`, `scripts/diag-caddy-h3.sh`, and `scripts/diag-caddy-h3-extended.sh` probe HTTP/2/3 behavior, SNI routing, and upstream TLS handshakes.
+- `scripts/test-http2-http3-strict-tls.sh` verifies health/API reachability over HTTP/2 and HTTP/3 using a helper container that runs `curl --http3` inside the Kind control-plane network namespace. It enforces TLS 1.2/1.3 and logs (but does not fail) if TLS 1.1 is still reachable.
+- `scripts/test-microservices-http2-http3.sh` drives the auth + records flows (registration via HTTP/2, login via HTTP/3, HTTP/2 record creation) and reuses the same HTTP/3 helper for QUIC coverage. When the DB is under load (e.g., while `run_pgbench_sweep.sh` runs) the records write may return 503; the script logs a warning so you can re-run once the benchmark finishes.
+- `scripts/h3-matrix.sh`, `scripts/diag-caddy-h3.sh`, and `scripts/diag-caddy-h3-extended.sh` remain available for low-level inspection (ALPN, SNI, upstream TLS handshakes).
+- HTTP/1.1/TLS 1.2 stays enabled intentionally for compatibility; new clients are expected to negotiate HTTP/2 or HTTP/3 automatically.
 - Redistribute regenerated certs out-of-band; they intentionally stay out of Git history.
 
 ## Data & Migrations
@@ -235,7 +238,7 @@ Postgres (statefulset) <-> Prisma clients        Redis (statefulset) <-> JWT & c
 Prometheus Operator + Grafana <- ServiceMonitors scrape /metrics endpoints
 ```
 
-`ingress-nginx` maps `/` traffic to the `nginx` edge deployment (micro-cache + rate limiting) and `/api/*` to the `api-gateway` Service. Port-forwarding `svc/nginx` gives an all-in-one entry point when you want to exercise the Nginx -> HAProxy -> Gateway chain directly. Caddy runs on the host, serves `record.local`, and forwards into the ingress controller; TLS material is generated locally (and ignored by Git) so leaf certificates can be rotated without touching history.
+`ingress-nginx` maps `/` traffic to the `nginx` edge deployment (micro-cache + rate limiting) and `/api/*` to the `api-gateway` Service. Port-forwarding `svc/nginx` gives an all-in-one entry point when you want to exercise the Nginx -> HAProxy -> Gateway chain directly. Caddy runs on the host, serves `record.local`, and forwards into the ingress controller; TLS material is generated locally (and ignored by Git) so leaf certificates can be rotated without touching history. Caddy only advertises TLS 1.2/1.3 with HTTP/2 and HTTP/3 preferred, while HTTP/1.1 remains available as an acceptable fallback for legacy clients.
 
 ## Core Services
 | Component | Deployment / Service | Notes |
@@ -305,7 +308,10 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
 ## TLS & HTTP/3
 - TLS material lives in `certs/` (`tls.crt`, `tls.key`, `dev-root.pem`, etc.) and is ignored by Git (`.gitignore:23-30`). Generate new keys with `scripts/strict-tls-bootstrap.sh` and trust `caddy-local-root.crt` locally (`security add-trusted-cert ...` on macOS).
 - Caddy expects the leaf cert/key at `/etc/caddy/certs/` and the trusted CA at `/etc/caddy/ca/dev-root.pem`. Use `scripts/caddy-toggle-insecure.sh` to temporarily disable upstream verification while debugging.
-- `scripts/h3-matrix.sh`, `scripts/diag-caddy-h3.sh`, and `scripts/diag-caddy-h3-extended.sh` probe HTTP/2/3 behavior, SNI routing, and upstream TLS handshakes.
+- `scripts/test-http2-http3-strict-tls.sh` verifies health/API reachability over HTTP/2 and HTTP/3 using a helper container that runs `curl --http3` inside the Kind control-plane network namespace. It enforces TLS 1.2/1.3 and logs (but does not fail) if TLS 1.1 is still reachable.
+- `scripts/test-microservices-http2-http3.sh` drives the auth + records flows (registration via HTTP/2, login via HTTP/3, HTTP/2 record creation) and reuses the same HTTP/3 helper for QUIC coverage. When the DB is under load (e.g., while `run_pgbench_sweep.sh` runs) the records write may return 503; the script logs a warning so you can re-run once the benchmark finishes.
+- `scripts/h3-matrix.sh`, `scripts/diag-caddy-h3.sh`, and `scripts/diag-caddy-h3-extended.sh` remain available for low-level inspection (ALPN, SNI, upstream TLS handshakes).
+- HTTP/1.1/TLS 1.2 stays enabled intentionally for compatibility; new clients are expected to negotiate HTTP/2 or HTTP/3 automatically.
 - Redistribute regenerated certs out-of-band; they intentionally stay out of Git history.
 
 ## Data & Migrations

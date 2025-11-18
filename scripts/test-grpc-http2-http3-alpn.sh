@@ -9,6 +9,11 @@ ok() { echo "✅ $*"; }
 warn() { echo "⚠️  $*"; }
 fail() { echo "❌ $*" >&2; exit 1; }
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/http3.sh
+. "$SCRIPT_DIR/lib/http3.sh"
+HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
+
 say "=== Testing gRPC over HTTP/2/3 with ALPN ==="
 
 # Test 1: HTTP/2 with prior knowledge
@@ -22,8 +27,10 @@ fi
 
 # Test 2: HTTP/3
 say "Test 2: HTTP/3 (QUIC)"
-if "$CURL_BIN" -k -v --http3-only -H "Host: $HOST" \
-  "https://$HOST:8443/_caddy/healthz" 2>&1 | grep -q "HTTP/3\|QUIC"; then
+if http3_curl -k -v --http3-only --max-time 15 \
+  -H "Host: $HOST" \
+  --resolve "$HTTP3_RESOLVE" \
+  "https://$HOST/_caddy/healthz" 2>&1 | grep -q "HTTP/3\|QUIC"; then
   ok "HTTP/3 works"
 else
   warn "HTTP/3 may have failed"

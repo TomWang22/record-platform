@@ -44,6 +44,10 @@ bundle-*/
 records_dump_*/
 records-*/
 backups/
+bench_sweep_*.csv
+bench_export_*.csv
+# Allow docs references
+!docs/bench_sweep*.csv
 # Exceptions: keep infrastructure and Prisma migrations
 !infra/db/*.sql
 !services/*/prisma/migrations/*.sql

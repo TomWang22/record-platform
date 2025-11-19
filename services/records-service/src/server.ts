@@ -147,12 +147,14 @@ const server = app.listen(port, () => {
 
 // Start gRPC server
 if (process.env.ENABLE_GRPC !== "false") {
-  import("./grpc-server").then(({ startGrpcServer }) => {
-    const grpcPort = parseInt(process.env.GRPC_PORT || "50051", 10);
-    startGrpcServer(grpcPort);
-  }).catch((e) => {
-    console.error("Failed to start gRPC server:", e);
-  });
+  import("./grpc-server")
+    .then(({ startGrpcServer }) => {
+      const grpcPort = parseInt(process.env.GRPC_PORT || "50051", 10);
+      startGrpcServer(grpcPort, prisma);
+    })
+    .catch((e) => {
+      console.error("Failed to start gRPC server:", e);
+    });
 }
 
 function shutdown(signal: string) {

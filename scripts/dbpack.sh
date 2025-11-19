@@ -50,99 +50,7 @@ HOT_TENANT_UUID="${HOT_TENANT_UUID:-0dc268d0-a86f-4e12-8d10-9db0f1b735e0}"
 <<<<<<< Current (Your changes)
 <<<<<<< Current (Your changes)
 <<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
 HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-110000}"
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
-=======
-HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
->>>>>>> Incoming (Background Agent changes)
 =======
 HOT_TENANT_TARGET="${HOT_TENANT_TARGET:-100000}"
 >>>>>>> Incoming (Background Agent changes)
@@ -505,3 +413,4 @@ SQL
 
 log "GUI connection:"
 log "postgresql://${APPUSER}:<APP_PW>@localhost:${PGPORT_LOCAL}/${DBNAME}"
+ 

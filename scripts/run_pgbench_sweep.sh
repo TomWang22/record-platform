@@ -26,7 +26,16 @@ CLIENTS="8,16,24,32,48,64"
 # Note: Can reduce to "8,16,24,32" for faster runs
 THREADS=12 # Keep at 12 for consistency with gold run
 LIMIT=50   # Keep at 50 for consistency with gold run
-PGOPTIONS_EXTRA="-c jit=off -c enable_seqscan=off -c random_page_cost=1.0 -c cpu_index_tuple_cost=0.0005 -c cpu_tuple_cost=0.01 -c effective_cache_size=8GB -c work_mem=256MB -c track_io_timing=on -c max_parallel_workers=12 -c max_parallel_workers_per_gather=4 -c maintenance_work_mem=1GB"
+PGOPTIONS_EXTRA="-c jit=off -c enable_seqscan=off -c random_page_cost=1.0 \
+  -c cpu_index_tuple_cost=0.0005 -c cpu_tuple_cost=0.01 \
+  -c effective_cache_size=8GB -c work_mem=256MB \
+  -c track_io_timing=on -c max_parallel_workers=12 \
+  -c max_parallel_workers_per_gather=4 -c maintenance_work_mem=1GB \
+  -c pg_trgm.similarity_threshold=${TRGM_THRESHOLD}"
+
+
+# TRGM tuning: similarity threshold used by trgm / trgm_simple
+TRGM_THRESHOLD="${TRGM_THRESHOLD:-0.30}"  # tweak this to 0.2–0.4 as you experiment
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -422,6 +431,14 @@ BEGIN
   EXCEPTION WHEN undefined_object THEN
     RAISE NOTICE 'gin_trgm_ops not available; skipping ix_records_catalog_trgm';
   END;
+
+  -- NEW: GIN index that TRGM % on search_norm can use
+  BEGIN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS ix_records_search_norm_gin
+             ON records.records USING gin (search_norm gin_trgm_ops)';
+  EXCEPTION WHEN undefined_object THEN
+    RAISE NOTICE 'gin_trgm_ops not available; skipping ix_records_search_norm_gin';
+  END;
 END $$;
 
 -- KNN path (TRGM GiST) on the real column (no expression)
@@ -446,6 +463,9 @@ SELECT pg_prewarm('records.ix_records_catalog_trgm'::regclass)
 WHERE to_regclass('records.ix_records_catalog_trgm') IS NOT NULL;
 SELECT pg_prewarm('records.ix_records_search_norm_gist'::regclass)
 WHERE to_regclass('records.ix_records_search_norm_gist') IS NOT NULL;
+-- NEW:
+SELECT pg_prewarm('records.ix_records_search_norm_gin'::regclass)
+WHERE to_regclass('records.ix_records_search_norm_gin') IS NOT NULL;
 SQL
 
 # FORCE CLEAN: Prepare bench SQL files locally, then (optionally) copy into a pod
@@ -464,8 +484,10 @@ SELECT count(*) FROM (
 ) s;
 EOF
 
+# TRGM via search_records_fuzzy_ids (production-ish path)
 cat > "$bench_sql_dir/bench_trgm.sql" <<'EOF'
-SET search_path = public, records, pg_catalog;
+-- search_path and similarity_threshold are set via PGOPTIONS
+
 SELECT count(*) FROM public.search_records_fuzzy_ids(
   :uid::uuid,
   :q::text,
@@ -474,8 +496,9 @@ SELECT count(*) FROM public.search_records_fuzzy_ids(
 );
 EOF
 
+# TRGM "simple": raw GIN+%+similarity on search_norm
 cat > "$bench_sql_dir/bench_trgm_simple.sql" <<'EOF'
-SET search_path = records, public, pg_catalog;
+-- search_path and similarity_threshold are set via PGOPTIONS
 
 WITH q AS (
   SELECT public.norm_text(lower(:q::text)) AS qn
@@ -766,10 +789,11 @@ SQL
     echo "Running pgbench locally (connecting to Postgres at localhost:5432)..."
     rm -f "$wd"/pgbench_log.* 2>/dev/null || true
     PGBENCH_LOG_DIR="$wd" bash "$tmpdir/run_pgbench.sh" "$PGOPTIONS_EXTRA" \
-      -n -M prepared \
+     -n -M prepared \
       -P 5 --progress-timestamp \
       -T "$DURATION" -c "$clients" -j "$actual_threads" \
       -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
+      -D trgm_threshold="$TRGM_THRESHOLD" \
       -l -f "$bench_sql_dir/$sql_file" | tee out.txt
   else
     kubectl -n "$NS" exec "$POD" -c db -- bash -lc 'rm -f /tmp/pgbench_log.*' >/dev/null 2>&1 || \
@@ -785,17 +809,19 @@ SQL
     kubectl -n "$NS" cp "$tmpdir/bench_sql/." "$POD:/tmp/bench_sql" >/dev/null 2>&1 || true
 
     kubectl -n "$NS" exec "$POD" -c db -- /tmp/run_pgbench.sh "$PGOPTIONS_EXTRA" \
-      -n -M prepared \
-      -P 5 --progress-timestamp \
-      -T "$DURATION" -c "$clients" -j "$actual_threads" \
-      -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
-      -l -f "/tmp/bench_sql/$sql_file" | tee out.txt || \
-    kubectl -n "$NS" exec "$POD" -- /tmp/run_pgbench.sh "$PGOPTIONS_EXTRA" \
-      -n -M prepared \
-      -P 5 --progress-timestamp \
-      -T "$DURATION" -c "$clients" -j "$actual_threads" \
-      -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
-      -l -f "/tmp/bench_sql/$sql_file" | tee out.txt
+  -n -M prepared \
+  -P 5 --progress-timestamp \
+  -T "$DURATION" -c "$clients" -j "$actual_threads" \
+  -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
+  -D trgm_threshold="$TRGM_THRESHOLD" \
+  -l -f "/tmp/bench_sql/$sql_file" | tee out.txt || \
+kubectl -n "$NS" exec "$POD" -- /tmp/run_pgbench.sh "$PGOPTIONS_EXTRA" \
+  -n -M prepared \
+  -P 5 --progress-timestamp \
+  -T "$DURATION" -c "$clients" -j "$actual_threads" \
+  -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
+  -D trgm_threshold="$TRGM_THRESHOLD" \
+  -l -f "/tmp/bench_sql/$sql_file" | tee out.txt
 
     if kubectl -n "$NS" exec "$POD" -c db -- bash -lc 'cd /tmp && compgen -G "pgbench_log.*" >/dev/null' 2>/dev/null; then
       kubectl -n "$NS" exec "$POD" -c db -- bash -lc 'cd /tmp && tar cf - pgbench_log.*' | tar xf - -C "$wd" 2>/dev/null || \

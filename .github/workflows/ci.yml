@@ -4,6 +4,13 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      POSTGRES_URL_AUTH: postgresql://postgres:postgres@localhost:5432/postgres?schema=auth
+      POSTGRES_URL_RECORDS: postgresql://postgres:postgres@localhost:5432/postgres?schema=records
+      REDIS_URL: redis://localhost:6379
+      POSTGRES_URL_LISTINGS: postgresql://postgres:postgres@localhost:5432/postgres
     strategy:
       matrix:
         service: [api-gateway, auth-service, records-service, listings-service, analytics-service, cron-jobs]

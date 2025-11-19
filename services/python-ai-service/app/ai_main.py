@@ -131,6 +131,55 @@ async def predict(body: PredictReq):
         "estimates": out,
         "t_ms": int((time.time()-t0)*1000)
     })
+<<<<<<< Current (Your changes)
+=======
+
+async def analytics_recommendations(query: str, user_id: Optional[str] = None, limit: int = 10) -> Optional[dict]:
+    if not ANALYTICS_URL or not query:
+        return None
+    url = ANALYTICS_URL.rstrip("/") + "/analytics/recommendations/similar"
+    params = {"q": query, "limit": limit}
+    if user_id:
+        params["userId"] = user_id
+    try:
+        async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": USER_AGENT}) as c:
+            resp = await c.get(url, params=params)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception:
+        return None
+
+async def analytics_trending(days: int = 7, limit: int = 20) -> Optional[dict]:
+    if not ANALYTICS_URL:
+        return None
+    url = ANALYTICS_URL.rstrip("/") + "/analytics/trending"
+    params = {"days": days, "limit": limit}
+    try:
+        async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": USER_AGENT}) as c:
+            resp = await c.get(url, params=params)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception:
+        return None
+
+@app.get("/recommendations")
+async def recommendations(q: str = Query(..., min_length=2), user_id: Optional[str] = Query(None), limit: int = Query(10, ge=1, le=50)):
+    analytics_recs = await analytics_recommendations(q, user_id, limit)
+    return JSONResponse({
+        "query": q,
+        "recommendations": analytics_recs.get("recommendations", []) if analytics_recs else [],
+        "source": "analytics" if analytics_recs else "none"
+    })
+
+@app.get("/trending")
+async def trending(days: int = Query(7, ge=1, le=90), limit: int = Query(20, ge=1, le=100)):
+    analytics_trend = await analytics_trending(days, limit)
+    return JSONResponse({
+        "days": days,
+        "trending": analytics_trend.get("trending", []) if analytics_trend else [],
+        "source": "analytics" if analytics_trend else "none"
+    })
+>>>>>>> Incoming (Background Agent changes)
 
 @app.get("/price-trends")
 async def price_trends(q: str = Query(..., min_length=2)):

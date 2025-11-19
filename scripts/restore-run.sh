@@ -17,7 +17,6 @@ extract_bundle() {
   rm -rf "$WORK" && mkdir -p "$WORK"
 
   if [ -d "$BPKG_DIR" ]; then
-    # Directory already copied into the pod
     cp -a "$BPKG_DIR"/. "$WORK"/
   elif [ -f "$BPKG_ARC" ]; then
     if tar -tzf "$BPKG_ARC" >/dev/null 2>&1; then
@@ -34,9 +33,8 @@ extract_bundle() {
   fi
 
   # If exactly one top-level dir, cd into it, otherwise stay at $WORK
-  local dcount
+  local dcount fcount
   dcount=$(find "$WORK" -mindepth 1 -maxdepth 1 -type d | wc -l)
-  local fcount
   fcount=$(find "$WORK" -mindepth 1 -maxdepth 1 -type f | wc -l)
   if [ "$dcount" -eq 1 ] && [ "$fcount" -eq 0 ]; then
     cd "$(find "$WORK" -mindepth 1 -maxdepth 1 -type d)"
@@ -45,23 +43,37 @@ extract_bundle() {
   fi
 }
 
-# Remove UTF-8 BOM and delete ANY line that begins with a backslash (after optional whitespace)
-strip_backslash_meta() {
-  # sed: strip BOM on first line, then drop backslash-meta lines
-  sed -E $'1s/^\xEF\xBB\xBF//; /^[[:space:]]*\\/d'
+# One-time scrub on disk: normalize CRLF/BOM and drop ANY psql backslash meta-commands
+normalize_all_sql_inplace() {
+  shopt -s nullglob
+  for f in schema.sql functions.sql *.sql; do
+    [ -f "$f" ] || continue
+    awk '
+      BEGIN { BOM = sprintf("%c%c%c",239,187,191) }
+      { gsub(/\r/,"") }                     # CRLF -> LF
+      NR==1 { sub("^" BOM, "", $0) }        # strip UTF-8 BOM on first line
+      /^[[:space:]]*\\/ { next }            # drop ALL psql meta-commands (\restrict, \unrestrict, \set, ...)
+      { print }
+    ' "$f" > "$f.__clean__" && mv "$f.__clean__" "$f"
+  done
 }
 
-# Strip psql transcript chatter and ALL backslash meta-commands (lines starting with "\")
+# Stream scrubber (kept for defense-in-depth)
+strip_backslash_meta() {
+  awk '
+    BEGIN { BOM = sprintf("%c%c%c",239,187,191) }
+    { gsub(/\r/, "", $0) }
+    NR==1 { sub("^" BOM, "", $0) }
+    /^[[:space:]]*\\/ { next }
+    { print }
+  '
+}
+
+# Remove psql chatter
 sanitize_psql_transcript() {
   awk '
-    BEGIN {
-      # UTF-8 BOM (0xEF 0xBB 0xBF)
-      BOM = sprintf("%c%c%c", 239,187,191)
-    }
-    {
-      # strip BOM if present at start of this line
-      sub("^" BOM, "", $0)
-    }
+    BEGIN { BOM = sprintf("%c%c%c", 239,187,191) }
+    { sub("^" BOM, "", $0) }
     /^(Output format is|Tuples only is|Pager usage is|Expanded display is|Timing is|Null display is|Field separator is|Record separator is|Title is|Footers are)/ { next }
     /^psql:/                               { next }
     /^COPY [0-9]+$/                        { next }
@@ -69,8 +81,7 @@ sanitize_psql_transcript() {
     /^[^[:space:]]+[=#-] /                 { next }
     /^[-+]{3,}$/                           { next }
     /^[[:space:]]*\|/                      { next }
-    # 🔒 drop ANY psql backslash meta-command (literal "\" at line start after optional whitespace)
-    /^[[:space:]]*\\/                      { next }
+    /^[[:space:]]*\\/                      { next }   # drop literal backslash lines
     { print }
   '
 }
@@ -93,20 +104,37 @@ soften_create_schema_and_extension() {
 
 soften_create_table_index_sequence() {
   awk 'BEGIN{IGNORECASE=1}
-       { line=$0
+       # Rewrites "CREATE [UNIQUE ] INDEX [CONCURRENTLY ] <name> ..." to
+       #         "CREATE [UNIQUE ] INDEX [CONCURRENTLY ] IF NOT EXISTS <name> ..."
+       function ins_if_not_exists_for_index(line,    re,m,prefix,rest,u,c) {
+         re = "^[[:space:]]*CREATE[[:space:]]+(UNIQUE[[:space:]]+)?INDEX([[:space:]]+CONCURRENTLY)?[[:space:]]+"
+         if (match(line, re, m)) {
+           prefix = substr(line, 1, RSTART-1)
+           rest   = substr(line, RSTART+RLENGTH)  # starts at the index name
+           u = (m[1] ? m[1] : "")                 # "UNIQUE " (with trailing space) or ""
+           c = (m[2] ? m[2] : "")                 # " CONCURRENTLY" (with leading space) or ""
+           return prefix "CREATE " u "INDEX" c " IF NOT EXISTS " rest
+         }
+         return line
+       }
+       {
+         line = $0
+
+         # CREATE TABLE -> CREATE TABLE IF NOT EXISTS
          if (line ~ /^[[:space:]]*CREATE([[:space:]]+(GLOBAL|LOCAL))?[[:space:]]+((TEMPORARY|TEMP)[[:space:]]+|UNLOGGED[[:space:]]+)?TABLE[[:space:]]+/ &&
              line !~ /TABLE[[:space:]]+IF[[:space:]]+NOT[[:space:]]+EXISTS/) {
            sub(/TABLE[[:space:]]+/, "TABLE IF NOT EXISTS ", line)
          }
-         if (line ~ /^[[:space:]]*CREATE[[:space:]]+(UNIQUE[[:space:]]+)?INDEX([[:space:]]+CONCURRENTLY)?[[:space:]]+/ &&
-             line !~ /INDEX([[:space:]]+CONCURRENTLY)?[[:space:]]+IF[[:space:]]+NOT[[:space:]]+EXISTS/) {
-           sub(/^[[:space:]]*CREATE[[:space:]]+(UNIQUE[[:space:]]+)?INDEX([[:space:]]+CONCURRENTLY)?[[:space:]]+/,
-               "CREATE \\1INDEX\\2 IF NOT EXISTS ", line)
-         }
+
+         # CREATE [UNIQUE] INDEX [CONCURRENTLY] -> add IF NOT EXISTS
+         line = ins_if_not_exists_for_index(line)
+
+         # CREATE SEQUENCE -> CREATE SEQUENCE IF NOT EXISTS
          if (line ~ /^[[:space:]]*CREATE[[:space:]]+SEQUENCE[[:space:]]+/ &&
              line !~ /CREATE[[:space:]]+SEQUENCE[[:space:]]+IF[[:space:]]+NOT[[:space:]]+EXISTS/) {
            sub(/CREATE[[:space:]]+SEQUENCE[[:space:]]+/, "CREATE SEQUENCE IF NOT EXISTS ", line)
          }
+
          print line
        }'
 }
@@ -140,7 +168,7 @@ guard_add_constraint_do() {
     BEGIN { IGNORECASE=1 }
     function trim(s){ gsub(/^[ \t\r\n]+|[ \t\r\n]+$/,"",s); return s }
     function unq(s){ gsub(/^"+|"+$/,"",s); return s }
-    function dq(s){ return "$q$" s "$q$" }  # dollar-quoted literal to avoid quote hell
+    function dq(s){ return "$q$" s "$q$" }
     {
       buf = buf $0 "\n"
       if ($0 ~ /;[[:space:]]*$/) {
@@ -239,6 +267,9 @@ fi
 extract_bundle
 echo "== Bundle contents =="; ls -la
 
+# One-time scrub so no backslash meta-commands survive anywhere
+normalize_all_sql_inplace
+
 # 0) roles
 $psql_base <<'SQL'
 DO $$
@@ -328,6 +359,7 @@ if [ -f schema.sql ]; then
     | soften_create_table_index_sequence \
     | guard_add_constraint_do \
     | guard_create_matview_do \
+    | awk '!/^[[:space:]]*\\/' \
     | $psql_base -f -
 fi
 
@@ -344,6 +376,7 @@ for f in *.sql; do
     | soften_create_table_index_sequence \
     | guard_add_constraint_do \
     | guard_create_matview_do \
+    | awk '!/^[[:space:]]*\\/' \
     | $psql_base -f -
 done
 

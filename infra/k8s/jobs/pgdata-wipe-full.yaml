@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pgdata-wipe-full
+  namespace: record-platform
+  labels:
+    app: postgres-wipe
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: wipe
+        image: alpine:latest
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 999
+        command: ["/bin/sh","-lc"]
+        args:
+        - |
+          set -eux
+          echo "== BEFORE =="
+          ls -al /var/lib/postgresql || true
+          ls -al /var/lib/postgresql/data || true
+          echo ""
+          echo "== WIPING ==="
+          # Remove everything under /var/lib/postgresql (PVC is mounted here)
+          find /var/lib/postgresql -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+          # Recreate data subdirectory with correct permissions (owned by 999)
+          mkdir -p /var/lib/postgresql/data
+          chown -R 999:999 /var/lib/postgresql || true
+          chmod 0700 /var/lib/postgresql/data || true
+          echo ""
+          echo "== AFTER =="
+          ls -ld /var/lib/postgresql /var/lib/postgresql/data || true
+          echo ""
+          echo "=== WIPE COMPLETE ==="
+        volumeMounts:
+        - { name: data, mountPath: /var/lib/postgresql }
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: pgdata-big

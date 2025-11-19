@@ -8,7 +8,9 @@
 
 # Primary vhost (SNI = record.local)
 https://record.local {
-  tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key
+  tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key {
+    protocols tls1.2 tls1.3
+  }
 
   @health path /_caddy/healthz
   respond @health "ok\n" 200
@@ -27,6 +29,7 @@ https://record.local {
 
       # B) Proper CA trust (preferred): your mkcert CA is mounted at /etc/caddy/ca/dev-root.pem
       # (If Caddy complains about unknown authority, this is the bit to keep enabled)
+      # Note: tls_trusted_ca_certs is deprecated but still works in Caddy 2.8
       tls_trusted_ca_certs /etc/caddy/ca/dev-root.pem
 
       versions h2 h1
@@ -36,7 +39,9 @@ https://record.local {
 
 # Catch-all for probe without SNI
 https://:443 {
-  tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key
+  tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key {
+    protocols tls1.2 tls1.3
+  }
   @probe path /_caddy/healthz
   respond @probe "ok\n" 200
 }

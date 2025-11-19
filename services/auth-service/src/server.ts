@@ -8,6 +8,9 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "redis";
 
 const app = express();
+// Initialize Prisma
+// Note: With @@schema("auth") and schemas = ["auth"], Prisma should use auth schema
+// Connection string has search_path=auth which should be respected
 const prisma = new PrismaClient();
 
 /** Extend the shared JwtPayload with fields we also put/read */
@@ -46,9 +49,12 @@ app.get("/healthz", async (_req: Request, res: Response) => {
     await prisma.$queryRaw`SELECT 1`;
     try {
       await redis.ping();
-    } catch {}
+    } catch (redisErr) {
+      console.warn("auth-service healthz redis ping failed:", redisErr);
+    }
     res.json({ ok: true });
   } catch (e: any) {
+    console.error("auth-service healthz failed:", e);
     res.status(500).json({ ok: false, error: e?.message || "db error" });
   }
 });
@@ -58,13 +64,18 @@ app.post("/register", async (req: Request, res: Response) => {
     const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
     if (!email || !password) return res.status(400).json({ error: "email/password required" });
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    // Use raw SQL query to access auth.users table directly
+    const existing = await prisma.$queryRaw<Array<{ id: string; email: string }>>`
+      SELECT id, email FROM auth.users WHERE email = ${email}
+    `.then((r) => r[0] || null);
     if (existing) return res.status(409).json({ error: "email already exists" });
 
     const hash = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
-      data: { email, passwordHash: hash },
-    });
+    const user = await prisma.$queryRaw<Array<{ id: string; email: string; created_at: Date }>>`
+      INSERT INTO auth.users (email, password_hash, created_at)
+      VALUES (${email}, ${hash}, NOW())
+      RETURNING id, email, created_at
+    `.then((r) => r[0]);
 
     const jti = randomUUID();
     const payload: WithJti = { sub: user.id, email: user.email, jti };
@@ -81,7 +92,12 @@ app.post("/login", async (req: Request, res: Response) => {
     const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
     if (!email || !password) return res.status(400).json({ error: "email/password required" });
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    // Use raw SQL query to access auth.users table directly
+    const user = await prisma.$queryRaw<Array<{ id: string; email: string; passwordHash: string; createdAt: Date }>>`
+      SELECT id, email, password_hash as "passwordHash", created_at as "createdAt"
+      FROM auth.users
+      WHERE email = ${email}
+    `.then((r) => r[0] || null);
     if (!user || !user.passwordHash) return res.status(401).json({ error: "invalid credentials" });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
@@ -140,4 +156,16 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (!res.headersSent) res.status(500).json({ error: "internal" });
 });
 
-app.listen(process.env.AUTH_PORT || 4001, () => console.log("auth up"));
+// Start HTTP server
+const httpPort = process.env.AUTH_PORT || 4001;
+app.listen(httpPort, () => console.log(`auth HTTP server up on port ${httpPort}`));
+
+// Start gRPC server
+if (process.env.ENABLE_GRPC !== "false") {
+  import("./grpc-server").then(({ startGrpcServer }) => {
+    const grpcPort = parseInt(process.env.GRPC_PORT || "50051", 10);
+    startGrpcServer(grpcPort);
+  }).catch((e) => {
+    console.error("Failed to start gRPC server:", e);
+  });
+}

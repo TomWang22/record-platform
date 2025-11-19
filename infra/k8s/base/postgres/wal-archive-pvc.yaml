@@ -6,6 +6,7 @@ metadata:
   namespace: record-platform
 spec:
   accessModes: ["ReadWriteOnce"]
+  storageClassName: standard
   resources:
     requests:
       storage: 20Gi

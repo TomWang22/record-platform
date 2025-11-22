@@ -40,3 +40,17 @@ spec:
             name: auth-service
             port:
               number: 50051
+      - path: /social.SocialService
+        pathType: Prefix
+        backend:
+          service:
+            name: social-service
+            port:
+              number: 50056
+      - path: /listings.ListingsService
+        pathType: Prefix
+        backend:
+          service:
+            name: listings-service
+            port:
+              number: 50057

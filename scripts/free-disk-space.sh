@@ -1,52 +1,50 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Free up disk space before restore
-# Usage: ./scripts/free-disk-space.sh
+# Free up disk space for PostgreSQL optimizations
+# Cleans Docker resources and checks available space
 
-NS="${NS:-record-platform}"
-
-PGPOD=$(kubectl -n "$NS" get pod -l app=postgres -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | awk 'NR==1{print $1}')
-
-if [[ -z "$PGPOD" ]]; then
-  echo "Error: Postgres pod not found" >&2
-  exit 1
-fi
-
-echo "=== Freeing Disk Space ==="
-echo "Pod: $PGPOD"
+echo "=== Freeing Up Disk Space ==="
 echo ""
 
-# Check current space
-echo "=== Current disk usage ==="
-kubectl -n "$NS" exec "$PGPOD" -c db -- df -h /var/lib/postgresql/data | head -2
+# Check current disk usage
+echo "Current Docker disk usage:"
+docker system df
 echo ""
 
-# Force checkpoint to reduce WAL
-echo "=== Forcing checkpoint to reduce WAL ==="
-kubectl -n "$NS" exec "$PGPOD" -c db -- psql -U postgres -d postgres -X -P pager=off <<'SQL'
-CHECKPOINT;
-SELECT pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0')) as wal_size;
-SQL
-
-# Vacuum to reclaim space (regular VACUUM, not FULL to avoid locking)
-echo ""
-echo "=== Running VACUUM to reclaim space ==="
-kubectl -n "$NS" exec "$PGPOD" -c db -- psql -U postgres -d records -X -P pager=off <<'SQL' || true
-SET search_path = records, public;
--- Regular VACUUM (non-blocking) to reclaim space
-VACUUM ANALYZE records.records;
-VACUUM ANALYZE records.record_media;
-VACUUM ANALYZE records.aliases;
-SQL
-
-# Check space after cleanup
-echo ""
-echo "=== Disk usage after cleanup ==="
-kubectl -n "$NS" exec "$PGPOD" -c db -- df -h /var/lib/postgresql/data | head -2
+# Remove unused containers
+echo "Removing stopped containers..."
+docker container prune -f
 echo ""
 
-# Show WAL size
-echo "=== WAL directory size ==="
-kubectl -n "$NS" exec "$PGPOD" -c db -- du -sh /var/lib/postgresql/data/pg_wal 2>/dev/null || echo "WAL directory not found"
+# Remove unused images
+echo "Removing unused images..."
+docker image prune -f
+echo ""
 
+# Remove build cache
+echo "Removing build cache..."
+docker builder prune -f
+echo ""
+
+# Check PostgreSQL volume size
+echo "PostgreSQL volumes:"
+docker volume ls | grep -E "(postgres|pg)" || echo "No postgres volumes found"
+echo ""
+
+# Final disk usage
+echo "Disk usage after cleanup:"
+docker system df
+echo ""
+
+# Check system disk space
+echo "System disk space:"
+df -h / | tail -1
+echo ""
+
+echo "✅ Cleanup complete"
+echo ""
+echo "If still low on space:"
+echo "1. Check Docker volume sizes: docker volume inspect <volume-name>"
+echo "2. Consider removing old backups/logs"
+echo "3. Expand Docker disk allocation in Docker Desktop settings"

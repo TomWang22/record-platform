@@ -1,0 +1,193 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL_LISTINGS")
+  schemas  = ["listings", "auth"]
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../generated/client"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
+}
+
+// ============================================================
+// LISTINGS SCHEMA
+// ============================================================
+
+model Listing {
+  @@schema("listings")
+  @@map("listings")
+
+  id              String    @id @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+  user_id         String    @db.Uuid @map("user_id")
+  title           String    @db.VarChar(512)
+  description     String?   @db.Text
+  price           Decimal   @db.Decimal(12, 2)
+  currency        String    @db.VarChar(3) @default("USD")
+  listing_type    String    @db.VarChar(32) @default("fixed_price") @map("listing_type")
+  condition       String?   @db.VarChar(64)
+  category        String?   @db.VarChar(128)
+  location        String?   @db.VarChar(256)
+  shipping_cost   Decimal?  @db.Decimal(10, 2) @default(0) @map("shipping_cost")
+  shipping_method String?   @db.VarChar(128) @map("shipping_method")
+  is_active       Boolean   @default(true) @map("is_active")
+  is_featured     Boolean   @default(false) @map("is_featured")
+  view_count      Int       @default(0) @map("view_count")
+  watch_count     Int       @default(0) @map("watch_count")
+  created_at      DateTime  @default(now()) @map("created_at")
+  updated_at      DateTime  @updatedAt @map("updated_at")
+  expires_at      DateTime? @map("expires_at")
+  sold_at         DateTime? @map("sold_at")
+  sold_to         String?   @db.Uuid @map("sold_to")
+
+  images          ListingImage[]
+  auction_details AuctionDetail?
+  bids            Bid[]
+  offers          Offer[]
+  watchlist_items Watchlist[]
+  views           ListingView[]
+
+  @@index([user_id])
+  @@index([listing_type])
+  @@index([is_active])
+  @@index([created_at(sort: Desc)])
+  @@index([price])
+  @@index([category])
+  @@index([location])
+}
+
+model AuctionDetail {
+  @@schema("listings")
+  @@map("auction_details")
+
+  id              String    @id @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+  listing_id      String    @unique @db.Uuid @map("listing_id")
+  starting_bid    Decimal   @db.Decimal(12, 2) @map("starting_bid")
+  current_bid     Decimal?  @db.Decimal(12, 2) @map("current_bid")
+  current_bidder  String?   @db.Uuid @map("current_bidder")
+  reserve_price   Decimal?  @db.Decimal(12, 2) @map("reserve_price")
+  bid_increment   Decimal?  @db.Decimal(10, 2) @default(1.00) @map("bid_increment")
+  start_time      DateTime  @default(now()) @map("start_time")
+  end_time        DateTime  @map("end_time")
+  bid_count       Int       @default(0) @map("bid_count")
+  created_at      DateTime  @default(now()) @map("created_at")
+  updated_at      DateTime  @updatedAt @map("updated_at")
+
+  listing         Listing   @relation(fields: [listing_id], references: [id], onDelete: Cascade)
+
+  @@index([end_time])
+  @@index([current_bidder])
+}
+
+model Bid {
+  @@schema("listings")
+  @@map("bids")
+
+  id              String    @id @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+  listing_id      String    @db.Uuid @map("listing_id")
+  user_id         String    @db.Uuid @map("user_id")
+  bid_amount      Decimal   @db.Decimal(12, 2) @map("bid_amount")
+  is_winning      Boolean   @default(false) @map("is_winning")
+  created_at      DateTime  @default(now()) @map("created_at")
+
+  listing         Listing   @relation(fields: [listing_id], references: [id], onDelete: Cascade)
+
+  @@unique([listing_id, user_id, bid_amount])
+  @@index([listing_id])
+  @@index([user_id])
+  @@index([created_at(sort: Desc)])
+}
+
+model ListingImage {
+  @@schema("listings")
+  @@map("listing_images")
+
+  id              String    @id @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+  listing_id      String    @db.Uuid @map("listing_id")
+  image_url       String    @db.Text @map("image_url")
+  image_path      String?   @db.Text @map("image_path")
+  thumbnail_url   String?   @db.Text @map("thumbnail_url")
+  display_order   Int       @default(0) @map("display_order")
+  is_primary      Boolean   @default(false) @map("is_primary")
+  file_size       BigInt?   @map("file_size")
+  mime_type       String?   @db.VarChar(128) @map("mime_type")
+  width           Int?
+  height          Int?
+  created_at      DateTime  @default(now()) @map("created_at")
+
+  listing         Listing   @relation(fields: [listing_id], references: [id], onDelete: Cascade)
+
+  @@index([listing_id])
+  @@index([listing_id, display_order])
+  @@index([listing_id, is_primary])
+}
+
+model Offer {
+  @@schema("listings")
+  @@map("offers")
+
+  id              String    @id @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+  listing_id      String    @db.Uuid @map("listing_id")
+  user_id         String    @db.Uuid @map("user_id")
+  offer_amount    Decimal   @db.Decimal(12, 2) @map("offer_amount")
+  message         String?   @db.Text
+  status          String    @db.VarChar(32) @default("pending")
+  expires_at      DateTime? @map("expires_at")
+  responded_at    DateTime? @map("responded_at")
+  counter_offer   Decimal?  @db.Decimal(12, 2) @map("counter_offer")
+  created_at      DateTime  @default(now()) @map("created_at")
+  updated_at      DateTime  @updatedAt @map("updated_at")
+
+  listing         Listing   @relation(fields: [listing_id], references: [id], onDelete: Cascade)
+
+  @@index([listing_id])
+  @@index([user_id])
+  @@index([status])
+  @@index([expires_at])
+}
+
+model Watchlist {
+  @@schema("listings")
+  @@map("watchlist")
+
+  id              String    @id @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+  user_id         String    @db.Uuid @map("user_id")
+  listing_id      String    @db.Uuid @map("listing_id")
+  created_at      DateTime  @default(now()) @map("created_at")
+
+  listing         Listing   @relation(fields: [listing_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, listing_id])
+  @@index([user_id])
+  @@index([listing_id])
+}
+
+model ListingView {
+  @@schema("listings")
+  @@map("listing_views")
+
+  id              String    @id @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+  listing_id      String    @db.Uuid @map("listing_id")
+  user_id         String?   @db.Uuid @map("user_id")
+  ip_address      String?   @db.Inet @map("ip_address")
+  user_agent      String?   @db.Text @map("user_agent")
+  viewed_at       DateTime  @default(now()) @map("viewed_at")
+
+  listing         Listing   @relation(fields: [listing_id], references: [id], onDelete: Cascade)
+
+  @@index([listing_id])
+  @@index([user_id])
+  @@index([viewed_at(sort: Desc)])
+}
+
+// ============================================================
+// REFERENCE MODELS (from auth schema)
+// ============================================================
+
+model User {
+  @@schema("auth")
+  @@map("users")
+  @@ignore
+  id String @id @db.Uuid
+}
+

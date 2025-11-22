@@ -65,28 +65,34 @@ for d in api-gateway records-service auth-service listings-service analytics-ser
   kubectl -n "$NAMESPACE" rollout status "deploy/$d" --timeout=90s || true
 done
 
-# 5) monitoring stack (Prom + Grafana)
-step "Installing/Upgrading kube-prometheus-stack (Prometheus + Grafana)"
-kubectl create ns monitoring 2>/dev/null || true
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
-helm repo update >/dev/null
-helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
-  --namespace monitoring \
-  --set grafana.adminPassword='Admin123!' \
-  --set grafana.service.type=ClusterIP
-
-# Wait for ServiceMonitor CRD before applying SMs
-step "Waiting for ServiceMonitor CRD to be established…"
-for i in {1..60}; do
-  if kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
-    break
-  fi
-  sleep 2
-done
-
-# 6) ServiceMonitors
-step "Applying ServiceMonitors"
-kubectl -n monitoring apply -f infra/k8s/base/monitoring/servicemonitors.yaml
+# 5) observability stack (Prometheus, Grafana, Jaeger, OTel, Linkerd)
+step "Installing comprehensive observability stack..."
+if [ -f "infra/k8s/scripts/install-observability.sh" ]; then
+  bash infra/k8s/scripts/install-observability.sh
+else
+  # Fallback to basic Prometheus/Grafana if script not found
+  step "Installing/Upgrading kube-prometheus-stack (Prometheus + Grafana)"
+  kubectl create ns monitoring 2>/dev/null || true
+  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
+  helm repo update >/dev/null
+  helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+    --namespace monitoring \
+    --set grafana.adminPassword='Admin123!' \
+    --set grafana.service.type=ClusterIP
+  
+  # Wait for ServiceMonitor CRD before applying SMs
+  step "Waiting for ServiceMonitor CRD to be established…"
+  for i in {1..60}; do
+    if kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+  done
+  
+  # Apply ServiceMonitors
+  step "Applying ServiceMonitors"
+  kubectl -n monitoring apply -f infra/k8s/base/monitoring/servicemonitors.yaml || true
+fi
 
 # 7) show what’s up
 step "Workload status in $NAMESPACE"
@@ -96,5 +102,8 @@ kubectl -n monitoring get servicemonitors,prometheus,pod -o wide || true
 
 echo
 bold "Port-forward tips:"
-echo "  kubectl -n monitoring      port-forward svc/monitoring-grafana 3000:80"
-echo "  kubectl -n $NAMESPACE      port-forward svc/nginx 8080:8080 8082:8082"
+echo "  Grafana:       kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80"
+echo "  Prometheus:    kubectl -n monitoring port-forward svc/monitoring-kube-prom-prometheus 9090:9090"
+echo "  Jaeger:        kubectl -n observability port-forward svc/jaeger 16686:16686"
+echo "  Linkerd Viz:   linkerd viz dashboard"
+echo "  Services:      kubectl -n $NAMESPACE port-forward svc/nginx 8080:8080 8082:8082"

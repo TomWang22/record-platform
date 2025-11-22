@@ -15,6 +15,7 @@ import { verifyJwt, type JwtPayload as TokenPayload } from "@common/utils/auth";
 import {
   createAuthClient,
   createRecordsClient,
+  createSocialClient,
   promisifyGrpcCall,
 } from "@common/utils/grpc-clients";
 
@@ -35,9 +36,11 @@ const keepAliveAgent = new HttpAgent({
 const AUTH_GRPC_TARGET = process.env.AUTH_GRPC_TARGET || "auth-service:50051";
 const RECORDS_GRPC_TARGET =
   process.env.RECORDS_GRPC_TARGET || "records-service:50051";
+const SOCIAL_GRPC_TARGET = process.env.SOCIAL_GRPC_TARGET || "social-service:50056";
 
 const authGrpcClient = createAuthClient(AUTH_GRPC_TARGET);
 const recordsGrpcClient = createRecordsClient(RECORDS_GRPC_TARGET);
+const socialGrpcClient = createSocialClient(SOCIAL_GRPC_TARGET);
 
 /* ----------------------- Types ----------------------- */
 type AuthedRequest = Request & {
@@ -592,6 +595,160 @@ app.use(
     },
   })
 );
+
+/* ----------------------- gRPC-backed Social Routes (Forum + Messages) ----------------------- */
+// Forum routes
+app.get("/forum/posts", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(socialGrpcClient, "ListPosts", {
+      user_id: userId,
+      page: req.query.page ? Number(req.query.page) : 1,
+      limit: req.query.limit ? Number(req.query.limit) : 20,
+      flair: req.query.flair as string || "",
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/forum/posts", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(socialGrpcClient, "CreatePost", {
+      user_id: userId,
+      title: req.body.title,
+      content: req.body.content,
+      flair: req.body.flair,
+    });
+    res.status(201).json(response.post);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.get("/forum/posts/:postId", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(socialGrpcClient, "GetPost", {
+      post_id: req.params.postId,
+      user_id: userId,
+    });
+    res.json(response.post);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/forum/posts/:postId/vote", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(socialGrpcClient, "VotePost", {
+      post_id: req.params.postId,
+      user_id: userId,
+      vote: req.body.vote,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.get("/forum/posts/:postId/comments", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(socialGrpcClient, "ListComments", {
+      post_id: req.params.postId,
+      user_id: userId,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/forum/posts/:postId/comments", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(socialGrpcClient, "CreateComment", {
+      post_id: req.params.postId,
+      user_id: userId,
+      content: req.body.content,
+      parent_id: req.body.parent_id || "",
+    });
+    res.status(201).json(response.comment);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+// Messages routes
+app.get("/messages", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(socialGrpcClient, "ListMessages", {
+      user_id: userId,
+      page: req.query.page ? Number(req.query.page) : 1,
+      limit: req.query.limit ? Number(req.query.limit) : 20,
+      message_type: req.query.type as string || "",
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/messages", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(socialGrpcClient, "SendMessage", {
+      sender_id: userId,
+      recipient_id: req.body.recipient_id,
+      message_type: req.body.message_type || req.body.messageType,
+      subject: req.body.subject,
+      content: req.body.content,
+      parent_message_id: req.body.parent_message_id || req.body.parentMessageId || "",
+    });
+    res.status(201).json(response.message);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/messages/:messageId/reply", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(socialGrpcClient, "ReplyMessage", {
+      message_id: req.params.messageId,
+      sender_id: userId,
+      message_type: req.body.message_type || req.body.messageType || "General",
+      subject: req.body.subject || "",
+      content: req.body.content,
+    });
+    res.status(201).json(response.message);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
 
 /* ----------------------- Final safety net ----------------------- */
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

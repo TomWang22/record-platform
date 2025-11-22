@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: otel-collector-config
-  namespace: record-platform
+  namespace: observability
 data:
   otel-collector-config.yaml: |
     receivers:
@@ -29,31 +29,41 @@ data:
 
     exporters:
       jaeger:
-        endpoint: jaeger.record-platform.svc.cluster.local:14250
+        endpoint: jaeger.observability.svc.cluster.local:14250
         tls:
           insecure: true
       prometheus:
         endpoint: "0.0.0.0:8889"
+      newrelic:
+        apikey: ${NEW_RELIC_LICENSE_KEY}
+        endpoint: https://otlp.nr-data.net
+      logging:
+        loglevel: info
 
     service:
       pipelines:
         traces:
           receivers: [otlp]
           processors: [memory_limiter, batch]
-          exporters: [jaeger]
+          exporters: [jaeger, newrelic]
         metrics:
           receivers: [prometheus, otlp]
           processors: [memory_limiter, batch]
-          exporters: [prometheus]
+          exporters: [prometheus, newrelic]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [logging, newrelic]
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: otel-collector
-  namespace: record-platform
+  namespace: observability
   labels:
     app: otel-collector
+    component: collector
 spec:
   replicas: 1
   selector:
@@ -66,7 +76,7 @@ spec:
     spec:
       containers:
       - name: otel-collector
-        image: otel/opentelemetry-collector:0.108.0
+        image: otel/opentelemetry-collector-contrib:0.108.0
         ports:
         - name: otlp-grpc
           containerPort: 4317
@@ -76,16 +86,23 @@ spec:
           containerPort: 8889
         - name: metrics
           containerPort: 8888
+        env:
+        - name: NEW_RELIC_LICENSE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: newrelic-secret
+              key: license-key
+              optional: true
         volumeMounts:
         - name: config
           mountPath: /etc/otelcol-contrib
         resources:
           requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
             memory: "512Mi"
-            cpu: "500m"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
       volumes:
       - name: config
         configMap:
@@ -95,9 +112,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: otel-collector
-  namespace: record-platform
+  namespace: observability
   labels:
     app: otel-collector
+    component: collector
 spec:
   type: ClusterIP
   ports:

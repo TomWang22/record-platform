@@ -8,5 +8,8 @@ generatorOptions:
 configMapGenerator:
   - name: proto-files
     files:
+      # Proto files are symlinked from repo root: proto/*.proto
       - auth.proto=proto/auth.proto
       - records.proto=proto/records.proto
+      - social.proto=proto/social.proto
+      - listings.proto=proto/listings.proto

@@ -18,10 +18,12 @@ type AppShellProps = {
 }
 
 const navItems = [
-  { href: '/dashboard', label: 'Overview' },
+  { href: '/dashboard', label: 'My Collection' },
   { href: '/records', label: 'Records' },
-  { href: '/insights', label: 'Insights' },
-  { href: '/market', label: 'Marketplace' },
+  { href: '/market', label: 'Sell / List' },
+  { href: '/auctions', label: 'Auction Monitor' },
+  { href: '/forum', label: 'Forum' },
+  { href: '/insights', label: 'Insights & AI' },
   { href: '/messages', label: 'Messages' },
   { href: '/integrations', label: 'Integrations' },
   { href: '/settings', label: 'Settings' },

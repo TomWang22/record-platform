@@ -8,6 +8,7 @@ resources:
   - redis
   - exporters
   - monitoring
+  - observability
   - haproxy
   - nginx
   - api-gateway
@@ -16,6 +17,7 @@ resources:
   - listings-service
   - analytics-service
   - python-ai-service
+  - social-service
   - auction-monitor        # NEW (you added this)
   - cron-jobs              # NEW (you added this)
   - kafka                  # (recommended dev Kafka)

@@ -14,6 +14,16 @@ type NewRecord = {
   catalogNumber?: string
   recordGrade?: string
   sleeveGrade?: string
+  label?: string
+  labelCode?: string
+  releaseYear?: number
+  releaseDate?: string
+  pressingYear?: number
+  hasInsert?: boolean
+  hasBooklet?: boolean
+  hasObiStrip?: boolean
+  hasFactorySleeve?: boolean
+  isPromo?: boolean
   pricePaid?: number
   purchasedAt?: string
   notes?: string
@@ -26,6 +36,16 @@ const defaultRecord: NewRecord = {
   catalogNumber: '',
   recordGrade: '',
   sleeveGrade: '',
+  label: '',
+  labelCode: '',
+  releaseYear: undefined,
+  releaseDate: '',
+  pressingYear: undefined,
+  hasInsert: false,
+  hasBooklet: false,
+  hasObiStrip: false,
+  hasFactorySleeve: false,
+  isPromo: false,
   pricePaid: undefined,
   purchasedAt: '',
   notes: '',
@@ -54,6 +74,11 @@ export default function NewRecordPage() {
           catalogNumber: record.catalogNumber || undefined,
           recordGrade: record.recordGrade || undefined,
           sleeveGrade: record.sleeveGrade || undefined,
+          label: record.label || undefined,
+          labelCode: record.labelCode || undefined,
+          releaseYear: record.releaseYear || undefined,
+          releaseDate: record.releaseDate || undefined,
+          pressingYear: record.pressingYear || undefined,
           pricePaid: record.pricePaid || undefined,
           purchasedAt: record.purchasedAt ? `${record.purchasedAt}T00:00:00Z` : undefined,
           notes: record.notes || undefined,
@@ -120,6 +145,32 @@ export default function NewRecordPage() {
             value={record.sleeveGrade || ''}
             onChange={(value) => setRecord((prev) => ({ ...prev, sleeveGrade: value }))}
           />
+          <Field
+            label="Label"
+            value={record.label || ''}
+            onChange={(value) => setRecord((prev) => ({ ...prev, label: value }))}
+          />
+          <Field
+            label="Label Code"
+            value={record.labelCode || ''}
+            onChange={(value) => setRecord((prev) => ({ ...prev, labelCode: value }))}
+          />
+          <NumberField
+            label="Release Year"
+            value={record.releaseYear || 0}
+            onChange={(value) => setRecord((prev) => ({ ...prev, releaseYear: value || undefined }))}
+          />
+          <Field
+            label="Release Date"
+            type="date"
+            value={record.releaseDate || ''}
+            onChange={(value) => setRecord((prev) => ({ ...prev, releaseDate: value }))}
+          />
+          <NumberField
+            label="Pressing Year"
+            value={record.pressingYear || 0}
+            onChange={(value) => setRecord((prev) => ({ ...prev, pressingYear: value || undefined }))}
+          />
           <NumberField
             label="Price Paid"
             value={record.pricePaid || 0}
@@ -130,6 +181,33 @@ export default function NewRecordPage() {
             type="date"
             value={record.purchasedAt || ''}
             onChange={(value) => setRecord((prev) => ({ ...prev, purchasedAt: value }))}
+          />
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <CheckboxField
+            label="Has Insert"
+            checked={record.hasInsert || false}
+            onChange={(checked) => setRecord((prev) => ({ ...prev, hasInsert: checked }))}
+          />
+          <CheckboxField
+            label="Has Booklet"
+            checked={record.hasBooklet || false}
+            onChange={(checked) => setRecord((prev) => ({ ...prev, hasBooklet: checked }))}
+          />
+          <CheckboxField
+            label="Has Obi Strip"
+            checked={record.hasObiStrip || false}
+            onChange={(checked) => setRecord((prev) => ({ ...prev, hasObiStrip: checked }))}
+          />
+          <CheckboxField
+            label="Has Factory Sleeve"
+            checked={record.hasFactorySleeve || false}
+            onChange={(checked) => setRecord((prev) => ({ ...prev, hasFactorySleeve: checked }))}
+          />
+          <CheckboxField
+            label="Is Promo"
+            checked={record.isPromo || false}
+            onChange={(checked) => setRecord((prev) => ({ ...prev, isPromo: checked }))}
           />
         </div>
         <div className="mt-4">
@@ -205,11 +283,31 @@ function NumberField({ label, value, onChange }: NumberFieldProps) {
       {label}
       <input
         type="number"
-        step="0.01"
+        step={label.includes('Year') ? '1' : '0.01'}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
         className="mt-1 w-full rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand focus:outline-none dark:border-white/10 dark:bg-slate-950 dark:text-white"
       />
+    </label>
+  )
+}
+
+type CheckboxFieldProps = {
+  label: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}
+
+function CheckboxField({ label, checked, onChange }: CheckboxFieldProps) {
+  return (
+    <label className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand dark:border-slate-600"
+      />
+      {label}
     </label>
   )
 }

@@ -44,6 +44,28 @@ const recordsPackageDefinition = protoLoader.loadSync(RECORDS_PROTO_PATH, {
 });
 const recordsProto = grpc.loadPackageDefinition(recordsPackageDefinition) as any;
 
+// Load social proto
+const SOCIAL_PROTO_PATH = resolveProtoPath("social.proto");
+const socialPackageDefinition = protoLoader.loadSync(SOCIAL_PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+});
+const socialProto = grpc.loadPackageDefinition(socialPackageDefinition) as any;
+
+// Load listings proto
+const LISTINGS_PROTO_PATH = resolveProtoPath("listings.proto");
+const listingsPackageDefinition = protoLoader.loadSync(LISTINGS_PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+});
+const listingsProto = grpc.loadPackageDefinition(listingsPackageDefinition) as any;
+
 // Create gRPC clients
 export function createAuthClient(address: string = "auth-service:50051") {
   const AuthService = authProto.auth.AuthService;
@@ -56,6 +78,22 @@ export function createAuthClient(address: string = "auth-service:50051") {
 export function createRecordsClient(address: string = "records-service:50051") {
   const RecordsService = recordsProto.records.RecordsService;
   return new RecordsService(
+    address,
+    buildCredentials()
+  );
+}
+
+export function createSocialClient(address: string = "social-service:50056") {
+  const SocialService = socialProto.social.SocialService;
+  return new SocialService(
+    address,
+    buildCredentials()
+  );
+}
+
+export function createListingsClient(address: string = "listings-service:50057") {
+  const ListingsService = listingsProto.listings.ListingsService;
+  return new ListingsService(
     address,
     buildCredentials()
   );

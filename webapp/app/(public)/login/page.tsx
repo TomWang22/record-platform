@@ -24,7 +24,7 @@ export default function LoginPage() {
         data: { email, password },
       })
       persistSessionToken(data.token)
-      router.replace('/records')
+      router.replace('/dashboard')
     } catch (error) {
       if (error instanceof ApiError) {
         setMessage(error.message || 'Unable to authenticate')

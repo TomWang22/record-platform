@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: social-service
+  namespace: record-platform
+  labels: { app: social-service }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: social-service } }
+  template:
+    metadata:
+      labels: { app: social-service }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4006"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/yourorg/social-service:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 4006
+            - name: grpc
+              containerPort: 50056
+          envFrom:
+            - configMapRef: { name: app-config }
+            - secretRef:    { name: app-secrets }
+          env:
+            - name: NODE_ENV
+              value: "development"
+            - name: SOCIAL_PORT
+              value: "4006"
+            - name: GRPC_PORT
+              value: "50056"
+            - name: ENABLE_GRPC
+              value: "true"
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+

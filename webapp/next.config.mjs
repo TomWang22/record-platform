@@ -17,6 +17,29 @@ const corsHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone', // so the Dockerfile can copy .next/standalone
+  swcMinify: true,
+  // Optimize compilation
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  // Faster builds
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      // Reduce bundle size in dev
+      config.optimization = {
+        ...config.optimization,
+        moduleIds: 'deterministic',
+      }
+    }
+    return config
+  },
+  experimental: {
+    // Faster refresh and package imports
+    optimizePackageImports: ['lucide-react', 'recharts'],
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+  },
   async headers() {
     return [
       {

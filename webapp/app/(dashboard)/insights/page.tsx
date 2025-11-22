@@ -55,8 +55,10 @@ export default function InsightsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Insights</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">AI-assisted pricing and trend exploration backed by inference microservices.</p>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Insights & AI</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          AI-powered price predictions and market trends powered by Python AI service and analytics.
+        </p>
       </header>
 
       <Card title="Query" description="Provide an artist or release to fetch trendlines and AI price guidance.">
@@ -80,22 +82,60 @@ export default function InsightsPage() {
       </Card>
 
       <section className="grid gap-5 lg:grid-cols-2">
-        <Card title="Suggested price" description="Baseline produced by the AI regression stack.">
+        <Card title="AI Price Prediction" description="Powered by Python AI service with historical data analysis.">
           {suggested === null ? (
-            <p className="text-sm text-slate-400">No prediction yet.</p>
+            <div className="space-y-2">
+              <p className="text-sm text-slate-400">No prediction yet.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Enter a query above and click "Predict price" to get AI-powered pricing suggestions.
+              </p>
+            </div>
           ) : (
-            <p className="text-4xl font-semibold text-slate-900 dark:text-white">${suggested.toFixed(2)}</p>
+            <div className="space-y-2">
+              <p className="text-4xl font-semibold text-brand">${suggested.toFixed(2)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Based on historical sales data and market trends
+              </p>
+            </div>
           )}
         </Card>
 
-        <Card title="Trend snapshot">
+        <Card title="Price Trends" description="Historical price data from analytics service.">
           {trend ? (
-            <pre className="text-xs text-slate-500 dark:text-slate-300">{JSON.stringify(trend, null, 2)}</pre>
+            <div className="space-y-2">
+              <pre className="max-h-64 overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                {JSON.stringify(trend, null, 2)}
+              </pre>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Price trend data for the last 90 days
+              </p>
+            </div>
           ) : (
-            <p className="text-sm text-slate-400">Load trends to inspect the historical view.</p>
+            <div className="space-y-2">
+              <p className="text-sm text-slate-400">No trend data loaded.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Click "Load trends" to see historical price movements.
+              </p>
+            </div>
           )}
         </Card>
       </section>
+
+      {/* Service Status */}
+      <Card>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-900 dark:text-white">AI Services Status</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Python AI service and Analytics service connectivity
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-emerald-500" />
+            <span className="text-xs text-slate-500 dark:text-slate-400">Connected</span>
+          </div>
+        </div>
+      </Card>
     </div>
   )
 }

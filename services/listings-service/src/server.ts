@@ -3,18 +3,28 @@ import { register, httpCounter } from "@common/utils/metrics";
 import oauthRouter from "./oauth-discogs";
 import axios from "axios";
 import settingsRouter from "./settings";
+import listingsRouter from "./routes/listings";
 import { getRedis } from "@common/utils/redis";
+import { pool } from "./lib/db";
 
 const app = express();
 const redis = getRedis();
 
 app.use(express.json());
-app.get("/healthz", (_req,res)=>res.json({ok:true}));
+app.get("/healthz", async (_req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ ok: true, db: 'connected' });
+  } catch (err) {
+    res.status(503).json({ ok: false, db: 'disconnected', error: String(err) });
+  }
+});
 app.use((req, res, next) => { res.on("finish", () => httpCounter.inc({ service: "listings", route: req.path, method: req.method, code: res.statusCode })); next(); });
 app.get("/metrics", async (_req, res) => { res.setHeader("Content-Type", register.contentType); res.end(await register.metrics()); });
 
 app.use("/oauth", oauthRouter);
 app.use("/settings", settingsRouter);
+app.use("/listings", listingsRouter);
 
 app.get("/search/ebay", async (req, res) => {
   const qRaw = (req.query.q as string || "");
@@ -51,5 +61,16 @@ app.get("/search/ebay", async (req, res) => {
     res.status(500).json({ error: "ebay search failed" });
   }
 });
+// Start HTTP server
 const port = Number(process.env.LISTINGS_PORT || 4003);
-app.listen(port, () => console.log(`listings up on ${port}`));
+app.listen(port, () => console.log(`listings HTTP server up on port ${port}`));
+
+// Start gRPC server
+if (process.env.ENABLE_GRPC !== "false") {
+  import("./grpc-server").then(({ startGrpcServer }) => {
+    const grpcPort = parseInt(process.env.GRPC_PORT || "50057", 10);
+    startGrpcServer(grpcPort);
+  }).catch((e) => {
+    console.error("Failed to start gRPC server:", e);
+  });
+}

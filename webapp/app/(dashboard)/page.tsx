@@ -1,6 +1,6 @@
-// Temporary placeholder file for worktree patch application
-// This file was moved to dashboard/page.tsx
+import { redirect } from 'next/navigation'
+
 export default function Page() {
-  return null
+  redirect('/dashboard')
 }
 

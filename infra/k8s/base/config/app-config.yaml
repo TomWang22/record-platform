@@ -17,12 +17,16 @@ data:
 
   PROTO_ROOT: /app/proto
 
-  # single source of truth
   # EXTERNAL Postgres (Docker) - Direct connection, no K8s service, persistent tuning
-  # Connection from K8s pods: Use host.docker.internal (Mac) or host IP
-  DATABASE_URL:         postgresql://postgres:postgres@host.docker.internal:5432/records?connect_timeout=5
+  # Connection from K8s pods: Use host.docker.internal:5433 (Docker Compose main DB)
+  # CRITICAL: Docker Compose exposes main DB as 5433:5432, so pods must use :5433
+  # CRITICAL: auth-service uses POSTGRES_URL_AUTH, so it must point to Docker Postgres with auth schema
+  # single source of truth
+  DATABASE_URL:         postgresql://postgres:postgres@host.docker.internal:5433/records?connect_timeout=5
 
   # optional compatibility (literal duplicates, not $(…))
-  POSTGRES_URL:         postgresql://postgres:postgres@host.docker.internal:5432/records?connect_timeout=5
-  POSTGRES_URL_AUTH:    postgresql://postgres:postgres@host.docker.internal:5432/records?search_path=auth&connect_timeout=5
-  POSTGRES_URL_RECORDS: postgresql://postgres:postgres@host.docker.internal:5432/records?connect_timeout=5
+  POSTGRES_URL:         postgresql://postgres:postgres@host.docker.internal:5433/records?connect_timeout=5
+  POSTGRES_URL_AUTH:    postgresql://postgres:postgres@host.docker.internal:5433/records?search_path=auth&connect_timeout=5
+  POSTGRES_URL_RECORDS: postgresql://postgres:postgres@host.docker.internal:5433/records?connect_timeout=5
+  POSTGRES_URL_SOCIAL:  postgresql://postgres:postgres@host.docker.internal:5434/records?connect_timeout=5
+  POSTGRES_URL_LISTINGS: postgresql://postgres:postgres@host.docker.internal:5435/records?connect_timeout=5

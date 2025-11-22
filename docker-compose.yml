@@ -50,8 +50,35 @@ services:
     image: postgres:16-alpine
     environment: { POSTGRES_PASSWORD: postgres }
     restart: unless-stopped
-    ports: ["5432:5432"]
+    ports: ["5433:5432"]  # Changed to 5433 to avoid conflict with Postgres.app
     volumes: ["pgdata:/var/lib/postgresql/data"]
+    shm_size: 1g  # Increased from 256m to prevent shared memory errors at high concurrency
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  postgres-social:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5434:5432"]
+    volumes: ["pgdata-social:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  postgres-listings:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5435:5432"]
+    volumes: ["pgdata-listings:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U postgres"]
       interval: 5s
@@ -217,6 +244,7 @@ services:
       listings-service: { condition: service_healthy }
       analytics-service: { condition: service_healthy }
       python-ai-service: { condition: service_healthy }
+      social-service: { condition: service_healthy }
     expose: ["4000"]
     restart: unless-stopped
     healthcheck:
@@ -251,6 +279,23 @@ services:
       timeout: 5s
       retries: 20
       start_period: 60s
+
+  social-service:
+    build: { context: ., dockerfile: services/social-service/Dockerfile }
+    env_file: [.env]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    expose: ["4006", "50056"]
+    ports: ["4006:4006", "50056:50056"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL","node -e \"require('http').get('http://127.0.0.1:4006/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+      start_period: 10s
 
   haproxy:
     image: haproxy:2.9
@@ -329,4 +374,6 @@ services:
 
 volumes:
   pgdata:
+  pgdata-social:
+  pgdata-listings:
   nginx_cache:

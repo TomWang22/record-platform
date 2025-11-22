@@ -17,6 +17,7 @@ resources:
   - ../../base/listings-service
   - ../../base/analytics-service
   - ../../base/python-ai-service
+  - ../../base/social-service
   - ../../base/monitoring
   - ../../base/auction-monitor        # ← NEW
   - ../../base/cron-jobs              # ← NEW
@@ -50,6 +51,9 @@ images:
   - name: ghcr.io/yourorg/python-ai-service
     newName: python-ai-service
     newTag: dev
+  - name: ghcr.io/yourorg/social-service
+    newName: social-service
+    newTag: dev
   - name: ghcr.io/yourorg/auction-monitor       # ← NEW
     newName: auction-monitor
     newTag: dev
@@ -75,6 +79,10 @@ patches:
     target: { group: apps, version: v1, kind: Deployment, name: analytics-service, namespace: record-platform }
   - path: patches/envfrom-python-ai-service.yaml
     target: { group: apps, version: v1, kind: Deployment, name: python-ai-service, namespace: record-platform }
+  - path: patches/envfrom-social-service.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: social-service, namespace: record-platform }
+  - path: patches/social-service-image.yaml
+    target: { group: apps, version: v1, kind: Deployment, name: social-service, namespace: record-platform }
 
   - path: patches/dev-termination-and-strategy.yaml
 

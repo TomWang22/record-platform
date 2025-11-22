@@ -30,12 +30,20 @@ say "Applying aggressive performance optimizations..."
 # Always use localhost:5432 to match run_pgbench_sweep.sh
 # This ensures optimizations are applied to the same database
 : "${PGHOST:=localhost}"
-: "${PGPORT:=5432}"
+: "${PGPORT:=5433}"  # Changed to 5433 to match Docker port (avoids Postgres.app conflict)
 : "${PGUSER:=postgres}"
 : "${PGDATABASE:=records}"
 : "${PGPASSWORD:=postgres}"
 
 echo "Using Postgres at ${PGHOST}:${PGPORT} for optimizations..."
+
+# Handle effective_io_concurrency at bash level (can't use DO block for ALTER SYSTEM)
+echo "Setting effective_io_concurrency (with macOS fallback)..."
+if ! PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -X -P pager=off -c "ALTER SYSTEM SET effective_io_concurrency = 200;" 2>/dev/null; then
+  echo "⚠️  Platform doesn't support effective_io_concurrency=200 (macOS?), using 0..."
+  PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -X -P pager=off -c "ALTER SYSTEM SET effective_io_concurrency = 0;" 2>/dev/null || true
+fi
+
 PGPASSWORD="$PGPASSWORD" psql \
   -h "$PGHOST" -p "$PGPORT" \
   -U "$PGUSER" -d "$PGDATABASE" \
@@ -53,7 +61,7 @@ ALTER SYSTEM SET effective_cache_size = '4GB';
 ALTER SYSTEM SET work_mem = '32MB';
 ALTER SYSTEM SET maintenance_work_mem = '512MB';
 ALTER SYSTEM SET shared_buffers = '1GB';
-ALTER SYSTEM SET max_connections = 200;
+ALTER SYSTEM SET max_connections = 400;
 ALTER SYSTEM SET max_worker_processes = 12;
 ALTER SYSTEM SET max_parallel_workers = 12;
 ALTER SYSTEM SET max_parallel_workers_per_gather = 4;
@@ -61,13 +69,23 @@ ALTER SYSTEM SET track_io_timing = on;
 ALTER SYSTEM SET checkpoint_completion_target = 0.9;
 ALTER SYSTEM SET checkpoint_timeout = '15min';
 ALTER SYSTEM SET wal_buffers = '16MB';
-ALTER SYSTEM SET effective_io_concurrency = 200;
+-- Note: effective_io_concurrency is handled before this SQL block (bash level)
 ALTER SYSTEM SET autovacuum_naptime = '10s';
 ALTER SYSTEM SET autovacuum_vacuum_scale_factor = 0.05;
 ALTER SYSTEM SET autovacuum_analyze_scale_factor = 0.02;
 
--- Reload configuration
+-- Reload configuration (note: max_connections requires a restart to take effect)
 SELECT pg_reload_conf();
+
+-- CRITICAL: max_connections requires a PostgreSQL restart to take effect
+-- The setting is written to postgresql.auto.conf, but won't be active until restart
+-- This script cannot restart PostgreSQL automatically, so we output a warning
+DO $$
+BEGIN
+  RAISE NOTICE '⚠️  max_connections was set to 400, but PostgreSQL restart is required to apply it.';
+  RAISE NOTICE '    Current max_connections: %', current_setting('max_connections');
+  RAISE NOTICE '    Please restart PostgreSQL container: docker restart <container-name>';
+END $$;
 
 -- 2. Database-level settings (persistent)
 ALTER DATABASE records SET random_page_cost = 1.1;
@@ -92,6 +110,8 @@ SET max_parallel_workers_per_gather = 4;
 SET search_path = records, public;
 
 -- 4. Ensure all critical indexes exist and are optimized
+-- Note: CREATE INDEX IF NOT EXISTS is safe and will skip if index already exists
+-- These may take a while on large tables but won't block reads
 CREATE INDEX IF NOT EXISTS ix_records_user_id_updated_at ON records.records(user_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS ix_records_search_norm_gist ON records.records USING gist (search_norm gist_trgm_ops);
 CREATE INDEX IF NOT EXISTS ix_records_artist_trgm ON records.records USING gin (artist gin_trgm_ops) WITH (fastupdate = off);
@@ -115,8 +135,9 @@ UPDATE records.records
 SET search_norm = lower(concat_ws(' ', artist, name, catalog_number)) 
 WHERE search_norm IS NULL;
 
--- 6. VACUUM ANALYZE for fresh statistics
-VACUUM ANALYZE records.records;
+-- 6. ANALYZE only (skip VACUUM - too slow on 1.2M rows, ANALYZE is sufficient for stats)
+-- VACUUM ANALYZE records.records;  -- Commented out: too slow, ANALYZE is enough for query planning
+ANALYZE records.records;
 
 -- 7. Prewarm critical indexes
 SELECT pg_prewarm('records.ix_records_user_id_updated_at'::regclass) 
@@ -155,9 +176,11 @@ WHERE name IN (
 )
 ORDER BY name;
 
-ok "Performance optimizations applied"
+\echo 'Performance optimizations applied'
 SQL
 OPT_EXIT=$?
+
+ok "Performance optimizations applied"
 
 if [[ ${OPT_EXIT:-0} -ne 0 ]]; then
   echo "❌ Optimization failed!" >&2

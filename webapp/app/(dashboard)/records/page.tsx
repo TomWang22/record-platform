@@ -142,6 +142,9 @@ export default function RecordsPage() {
                   <Button variant="ghost" size="sm" asChild>
                     <Link href={`/records/${record.id}`}>View</Link>
                   </Button>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/market?record=${record.id}`}>Sell / List</Link>
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

@@ -27,6 +27,7 @@ COPY --from=deps /app /app
 # now copy sources
 COPY services/common ./services/common
 COPY services/api-gateway ./services/api-gateway
+COPY proto ./proto
 
 # build common first, then gateway; then prune dev deps for runtime
 RUN pnpm -C services/common build \
@@ -48,5 +49,7 @@ COPY --from=build /app/services/api-gateway/node_modules ./node_modules
 
 # include built common to satisfy pnpm workspace link at runtime
 COPY --from=build /app/services/common /app/services/common
+# include proto files for gRPC client loading
+COPY --from=build /app/proto /app/proto
 
 CMD ["node","dist/server.js"]

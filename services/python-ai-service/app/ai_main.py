@@ -131,8 +131,6 @@ async def predict(body: PredictReq):
         "estimates": out,
         "t_ms": int((time.time()-t0)*1000)
     })
-<<<<<<< Current (Your changes)
-=======
 
 async def analytics_recommendations(query: str, user_id: Optional[str] = None, limit: int = 10) -> Optional[dict]:
     if not ANALYTICS_URL or not query:
@@ -179,7 +177,6 @@ async def trending(days: int = Query(7, ge=1, le=90), limit: int = Query(20, ge=
         "trending": analytics_trend.get("trending", []) if analytics_trend else [],
         "source": "analytics" if analytics_trend else "none"
     })
->>>>>>> Incoming (Background Agent changes)
 
 @app.get("/price-trends")
 async def price_trends(q: str = Query(..., min_length=2)):

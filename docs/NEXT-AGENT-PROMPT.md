@@ -23,6 +23,12 @@
    - Enable `pg_stat_statements` by adding it to `shared_preload_libraries` in the Postgres config (and redeploy). Capture before/after snapshots once it’s live.
 2. **Protocol Verification**
    - Run `./scripts/test-microservices-http2-http3.sh` (and the manual `curl --http2-prior-knowledge` / `curl --http3-only` commands) to confirm ALPN negotiation has no regressions after the DB work.
+   - **NEW**: Test `social-service` endpoints (forum + messaging) over HTTP/2 and HTTP/3. See `docs/SOCIAL-SERVICE-TESTING.md` for full testing checklist.
+   - **NEW**: Verify gRPC ingress route `/social.SocialService` works (port 50056). Service uses gRPC like auth/records services.
+   - **NEW**: Test Kafka integration for real-time messaging (messages published to `messages` topic).
+   - **NEW**: Test `listings-service` endpoints over HTTP/2 and HTTP/3. See `docs/LISTINGS-SERVICE-TESTING.md` for full testing checklist.
+   - **NEW**: Verify gRPC ingress route `/listings.ListingsService` works (port 50057). Service uses gRPC like other services.
+   - **NEW**: Test listings CRUD, auction bidding, OBO offers, and watchlist operations.
 3. **Observability**
    - Re-validate Prometheus scrapes, Grafana dashboards, OpenTelemetry exporters, and Jaeger traces now that services speak gRPC.
    - Finish wiring the service mesh sidecars (Istio/Linkerd) once the HTTP/2 tests pass.
@@ -34,6 +40,10 @@
 - Benchmark: `./scripts/run_pgbench_sweep.sh`
 - HTTP/2/3 tests: `./scripts/test-microservices-http2-http3.sh`
 - Ingress manifests: `infra/k8s/overlays/dev/ingress*.yaml` (look for `backend-protocol: "GRPC"` and `server-snippets`)
+- **NEW**: Social-service testing: See `docs/SOCIAL-SERVICE-TESTING.md` for complete testing guide
+- **NEW**: Social-service endpoints: `/api/forum/*` and `/api/messages/*` (gRPC-backed via API Gateway)
+- **NEW**: Listings-service testing: See `docs/LISTINGS-SERVICE-TESTING.md` for complete testing guide
+- **NEW**: Listings-service endpoints: `/api/listings/*` (gRPC-backed via API Gateway, port 50057)
 
 ### Reminders
 - Ping the user before running long pgbench sweeps—they often want to watch TPS live.

@@ -5,7 +5,7 @@ import { pool } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
 
 export default function watchlistRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
-  const router = Router()
+  const router: Router = Router()
 
   // GET /watchlist - Get user's watchlist
   router.get('/', async (req: AuthedRequest, res: Response) => {

@@ -5,7 +5,7 @@ import { pool } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
 
 export default function wishlistRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
-  const router = Router()
+  const router: Router = Router()
 
   // GET /wishlist - Get user's wishlist
   router.get('/', async (req: AuthedRequest, res: Response) => {

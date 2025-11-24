@@ -33,7 +33,7 @@ async function getKafkaProducer() {
 }
 
 export default function forumRouter(redis: Redis | null, cpuCores: number) {
-  const router = Router()
+  const router: Router = Router()
 
   // GET /forum/posts - List posts (paginated, filterable by flair)
   router.get('/posts', async (req: Request, res: Response) => {

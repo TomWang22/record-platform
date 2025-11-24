@@ -33,7 +33,7 @@ async function getKafkaProducer() {
 }
 
 export default function messagesRouter(redis: Redis | null, cpuCores: number) {
-  const router = Router()
+  const router: Router = Router()
 
   // GET /messages - List user's messages (inbox)
   router.get('/', async (req: AuthedRequest, res: Response) => {

@@ -5,7 +5,7 @@ import { pool } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
 
 export default function recentlyViewedRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
-  const router = Router()
+  const router: Router = Router()
 
   // GET /recently-viewed - Get user's recently viewed items
   router.get('/', async (req: AuthedRequest, res: Response) => {

@@ -1,5 +1,6 @@
 import express from "express";
 import { register, httpCounter } from "@common/utils";
+import type { Router } from "express";
 import oauthRouter from "./oauth-discogs.js";
 import axios from "axios";
 import settingsRouter from "./settings.js";
@@ -59,7 +60,7 @@ app.get("/search/ebay", async (req, res) => {
   const token = process.env.EBAY_OAUTH_TOKEN;
   if (!token) return res.status(200).json({ query: q, items: [] });
   try {
-    const r = await axios.get("https://api.ebay.com/buy/browse/v1/item_summary/search", {
+    const r: { data?: { itemSummaries?: any[] } } = await axios.get("https://api.ebay.com/buy/browse/v1/item_summary/search", {
       params: { q, limit: 10 }, headers: { Authorization: `Bearer ${token}` }
     });
     const items = (r.data?.itemSummaries || []).map((i:any) => ({
@@ -87,7 +88,7 @@ app.listen(port, () => console.log(`listings HTTP server up on port ${port}`));
 
 // Start gRPC server
 if (process.env.ENABLE_GRPC !== "false") {
-  import("./grpc-server").then(({ startGrpcServer }) => {
+  import("./grpc-server.js").then(({ startGrpcServer }) => {
     const grpcPort = parseInt(process.env.GRPC_PORT || "50057", 10);
     startGrpcServer(grpcPort);
   }).catch((e) => {

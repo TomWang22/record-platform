@@ -3,7 +3,7 @@ import axios from "axios";
 import crypto from "crypto";
 import { Pool } from "pg";
 
-const router = express.Router();
+const router: express.Router = express.Router();
 const pool = new Pool({ connectionString: process.env.POSTGRES_URL });
 
 const DISCOGS_REQUEST_TOKEN_URL = "https://api.discogs.com/oauth/request_token";

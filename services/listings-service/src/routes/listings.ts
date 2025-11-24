@@ -15,7 +15,7 @@ import {
   searchListings,
 } from '../lib/db.js';
 
-const router = Router();
+const router: Router = Router();
 
 // Auth middleware
 router.use((req, res, next) => {

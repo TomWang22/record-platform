@@ -1,7 +1,7 @@
 /* cspell:ignore healthz */
 import express, { type Request, type Response, type NextFunction } from "express";
 import { PrismaClient } from "../prisma/generated/client";
-import { register, httpCounter } from "@common/utils/metrics";
+import { register, httpCounter } from "@common/utils";
 import { signJwt, verifyJwt, type JwtPayload as TokenPayload } from "@common/utils/auth";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";

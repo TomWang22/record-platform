@@ -4,7 +4,7 @@ import helmet from "helmet";
 import compression from "compression";
 import cors from "cors";
 import { PrismaClient } from "../generated/records-client";
-import { register, httpCounter } from "@common/utils/metrics";
+import { register, httpCounter } from "@common/utils";
 import { recordsRouter } from "./routes/records";
 import { exportRouter } from "./routes/export";
 import { makeRedis, attachPgInvalidationListener } from "./lib/cache";

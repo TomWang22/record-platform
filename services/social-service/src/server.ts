@@ -1,6 +1,6 @@
 import express, { type Request, type Response, type NextFunction } from 'express'
 import os from 'os'
-import { register, httpCounter } from '@common/utils/metrics'
+import { register, httpCounter } from '@common/utils'
 import { requireUser, type AuthedRequest } from './lib/auth'
 import { pool } from './lib/db'
 import { makeRedis } from './lib/cache'

@@ -10,7 +10,7 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { createProxyMiddleware } from "http-proxy-middleware";
 
-import { register, httpCounter } from "@common/utils/metrics";
+import { register, httpCounter } from "@common/utils";
 import { verifyJwt, type JwtPayload as TokenPayload } from "@common/utils/auth";
 import {
   createAuthClient,

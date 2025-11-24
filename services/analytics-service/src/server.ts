@@ -2,7 +2,7 @@ import express from 'express'
 import os from 'os'
 import { Worker } from 'worker_threads'
 import path from 'path'
-import { register, httpCounter } from '@common/utils/metrics'
+import { register, httpCounter } from '@common/utils'
 import {
   pool,
   listingsPool,

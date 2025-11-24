@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from 'express'
 import type Redis from 'ioredis'
-import type { AuthedRequest } from '../lib/auth.js''
-import { cached, makeMessagesKey, makeThreadKey } from '../lib/cache.js''
-import { pool } from '../lib/db.js''
+import type { AuthedRequest } from '../lib/auth.js'
+import { cached, makeMessagesKey, makeThreadKey } from '../lib/cache.js'
+import { pool } from '../lib/db.js'
 import { kafka } from '@common/utils/kafka'
 
 // Kafka producer for real-time messaging (optional - fails gracefully if Kafka is unavailable)

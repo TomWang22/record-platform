@@ -13,7 +13,7 @@ import {
   getPriceTrend,
   getHistoricalAveragePrice,
   logSearch,
-} from './db.js''
+} from "./db.js";
 
 const app = express()
 app.use(express.json())

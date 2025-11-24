@@ -1,14 +1,14 @@
 import express, { type Request, type Response, type NextFunction } from 'express'
 import os from 'os'
 import { register, httpCounter } from '@common/utils'
-import { requireUser, type AuthedRequest } from './lib/auth.js''
-import { pool } from './lib/db.js''
-import { makeRedis, CacheManager } from './lib/cache.js''
-import cartRouter from './routes/cart.js''
-import watchlistRouter from './routes/watchlist.js''
-import recentlyViewedRouter from './routes/recently-viewed.js''
-import wishlistRouter from './routes/wishlist.js''
-import historyRouter from './routes/history.js''
+import { requireUser, type AuthedRequest } from './lib/auth.js'
+import { pool } from './lib/db.js'
+import { makeRedis, CacheManager } from './lib/cache.js'
+import cartRouter from './routes/cart.js'
+import watchlistRouter from './routes/watchlist.js'
+import recentlyViewedRouter from './routes/recently-viewed.js'
+import wishlistRouter from './routes/wishlist.js'
+import historyRouter from './routes/history.js'
 
 const app = express()
 app.use(express.json())

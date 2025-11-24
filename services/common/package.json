@@ -2,8 +2,8 @@
   "name": "@common/utils",
   "version": "0.3.1",
   "type": "commonjs",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -45,31 +45,31 @@
   "typesVersions": {
     "*": {
       ".": [
-        "dist/index.d.ts"
+        "./dist/index.d.ts"
       ],
       "./logger": [
-        "dist/logger.d.ts"
+        "./dist/logger.d.ts"
       ],
       "./metrics": [
-        "dist/metrics.d.ts"
+        "./dist/metrics.d.ts"
       ],
       "./auth": [
-        "dist/auth.d.ts"
+        "./dist/auth.d.ts"
       ],
       "./kafka": [
-        "dist/kafka.d.ts"
+        "./dist/kafka.d.ts"
       ],
       "./redis": [
-        "dist/redis.d.ts"
+        "./dist/redis.d.ts"
       ],
       "./grpc-clients": [
-        "dist/grpc-clients.d.ts"
+        "./dist/grpc-clients.d.ts"
       ],
       "./grpc-reflection": [
-        "dist/grpc-reflection.d.ts"
+        "./dist/grpc-reflection.d.ts"
       ],
       "./proto": [
-        "dist/proto.d.ts"
+        "./dist/proto.d.ts"
       ]
     }
   },

@@ -1,6 +1,6 @@
 /* cspell:ignore healthz */
 import express, { type Request, type Response, type NextFunction } from "express";
-import { PrismaClient } from "../prisma/generated/client.js";
+import { PrismaClient } from "../prisma/generated/client";
 import { register, httpCounter } from "@common/utils";
 import { signJwt, verifyJwt, type JwtPayload as TokenPayload } from "@common/utils/auth";
 import bcrypt from "bcryptjs";
@@ -96,7 +96,7 @@ app.post("/register", async (req: Request, res: Response) => {
     // Use raw SQL query to access auth.users table directly
     const existing = await prisma.$queryRaw<Array<{ id: string; email: string }>>`
       SELECT id, email FROM auth.users WHERE email = ${email}
-    `.then((r) => r[0] || null);
+    `.then((r: Array<any>) => r[0] || null);
     if (existing) return res.status(409).json({ error: "email already exists" });
 
     const hash = await bcrypt.hash(password, 10);
@@ -104,7 +104,7 @@ app.post("/register", async (req: Request, res: Response) => {
       INSERT INTO auth.users (email, password_hash, created_at)
       VALUES (${email}, ${hash}, NOW())
       RETURNING id, email, created_at
-    `.then((r) => r[0]);
+    `.then((r: Array<{ id: string; email: string; created_at: Date }>) => r[0]);
 
     const jti = randomUUID();
     const payload: WithJti = { sub: user.id, email: user.email, jti };
@@ -126,7 +126,7 @@ app.post("/login", async (req: Request, res: Response) => {
       SELECT id, email, password_hash as "passwordHash", created_at as "createdAt"
       FROM auth.users
       WHERE email = ${email}
-    `.then((r) => r[0] || null);
+    `.then((r: Array<{ id: string; email: string; passwordHash: string; createdAt: Date }>) => r[0] || null);
     if (!user || !user.passwordHash) return res.status(401).json({ error: "invalid credentials" });
 
     const ok = await bcrypt.compare(password, user.passwordHash);

@@ -1,7 +1,7 @@
 /* cspell:ignore grpc */
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
-import { PrismaClient } from "../prisma/generated/client.js";
+import { PrismaClient } from "../prisma/generated/client";
 import { signJwt, verifyJwt } from "@common/utils/auth";
 import * as bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
@@ -56,7 +56,7 @@ const authService = {
 
       const existing = await prisma.$queryRaw<Array<{ id: string }>>`
         SELECT id FROM auth.users WHERE email = ${email}
-      `.then((r) => r[0] || null);
+      `.then((r: Array<any>) => r[0] || null);
       if (existing) {
         return callback({
           code: grpc.status.ALREADY_EXISTS,
@@ -71,7 +71,7 @@ const authService = {
         INSERT INTO auth.users (email, password_hash, created_at)
         VALUES (${email}, ${passwordHash}, NOW())
         RETURNING id, email, created_at as "createdAt"
-      `.then((r) => r[0]);
+      `.then((r: Array<{ id: string; email: string; createdAt: Date }>) => r[0]);
 
       const jti = randomUUID();
       const token = signJwt({ sub: user.id, email: user.email, jti } as any);
@@ -107,7 +107,7 @@ const authService = {
         SELECT id, email, password_hash as "passwordHash", created_at as "createdAt"
         FROM auth.users
         WHERE email = ${email}
-      `.then((r) => r[0] || null);
+      `.then((r: Array<{ id: string; email: string; passwordHash: string; createdAt: Date }>) => r[0] || null);
 
       if (!user || !user.passwordHash) {
         return callback({
@@ -160,7 +160,7 @@ const authService = {
         SELECT id, email, created_at as "createdAt"
         FROM auth.users
         WHERE id = ${payload.sub}::uuid
-      `.then((r) => r[0] || null);
+      `.then((r: Array<{ id: string; email: string; createdAt: Date }>) => r[0] || null);
       
       if (!user) {
         return callback({

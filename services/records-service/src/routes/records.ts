@@ -6,13 +6,13 @@ import {
   type NextFunction,
   type RequestHandler,
 } from "express";
-import type { PrismaClient } from '../../generated/records-client.js'";
+import type { PrismaClient } from '../../generated/records-client.js';
 import {
   normalizeGradeLoose,
   normalizeMediaPiece,
   deriveOverallGrade,
-} from '../lib/grades.js'";
-import { normalizeKindInfo, type Kind } from '../lib/kind.js'";
+} from '../lib/grades.js';
+import { normalizeKindInfo, type Kind } from '../lib/kind.js';
 import type Redis from "ioredis";
 import {
   cached,
@@ -23,7 +23,7 @@ import {
   idKey,
   getDocsByIds,
   docKey,
-} from '../lib/cache.js'";
+} from '../lib/cache.js';
 import { Decimal } from "@prisma/client/runtime/library";
 
 type AuthedReq = Request & { userId?: string; userEmail?: string };

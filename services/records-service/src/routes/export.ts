@@ -5,7 +5,7 @@ import {
   type NextFunction,
   type RequestHandler,
 } from "express";
-import type { PrismaClient } from '../../generated/records-client.js'";
+import type { PrismaClient } from '../../generated/records-client.js';
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 

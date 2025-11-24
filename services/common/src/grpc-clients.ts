@@ -2,7 +2,7 @@
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as fs from "fs";
-import { resolveProtoPath } from './proto.js'";
+import { resolveProtoPath } from "./proto.js";
 
 function buildCredentials() {
   const caPath =

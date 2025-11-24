@@ -1,7 +1,7 @@
 /* cspell:ignore grpc */
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
-import { PrismaClient } from '../prisma/generated/client.js'";
+import { PrismaClient } from "../prisma/generated/client.js";
 import { signJwt, verifyJwt } from "@common/utils/auth";
 import * as bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";

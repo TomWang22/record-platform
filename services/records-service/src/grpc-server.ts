@@ -1,8 +1,8 @@
 /* cspell:ignore grpc */
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
-import type { PrismaClient } from '../generated/records-client.js'";
-import { PrismaClient as PrismaClientCtor, Prisma } from '../generated/records-client.js'";
+import type { PrismaClient } from '../generated/records-client.js';
+import { PrismaClient as PrismaClientCtor, Prisma } from '../generated/records-client.js';
 import path from "path";
 import fs from "fs";
 

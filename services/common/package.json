@@ -5,15 +5,42 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./logger": "./dist/logger.js",
-    "./metrics": "./dist/metrics.js",
-    "./auth": "./dist/auth.js",
-    "./kafka": "./dist/kafka.js",
-    "./redis": "./dist/redis.js",
-    "./grpc-clients": "./dist/grpc-clients.js",
-    "./grpc-reflection": "./dist/grpc-reflection.js",
-    "./proto": "./dist/proto.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./logger": {
+      "types": "./dist/logger.d.ts",
+      "default": "./dist/logger.js"
+    },
+    "./metrics": {
+      "types": "./dist/metrics.d.ts",
+      "default": "./dist/metrics.js"
+    },
+    "./auth": {
+      "types": "./dist/auth.d.ts",
+      "default": "./dist/auth.js"
+    },
+    "./kafka": {
+      "types": "./dist/kafka.d.ts",
+      "default": "./dist/kafka.js"
+    },
+    "./redis": {
+      "types": "./dist/redis.d.ts",
+      "default": "./dist/redis.js"
+    },
+    "./grpc-clients": {
+      "types": "./dist/grpc-clients.d.ts",
+      "default": "./dist/grpc-clients.js"
+    },
+    "./grpc-reflection": {
+      "types": "./dist/grpc-reflection.d.ts",
+      "default": "./dist/grpc-reflection.js"
+    },
+    "./proto": {
+      "types": "./dist/proto.d.ts",
+      "default": "./dist/proto.js"
+    }
   },
   "typesVersions": {
     "*": {

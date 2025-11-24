@@ -3,7 +3,7 @@ import express, { type Request, type Response, type NextFunction } from "express
 import helmet from "helmet";
 import compression from "compression";
 import cors from "cors";
-import { PrismaClient } from "../generated/records-client.js";
+import { PrismaClient } from '../generated/records-client';
 import { register, httpCounter } from "@common/utils";
 import { recordsRouter } from "./routes/records.js";
 import { exportRouter } from "./routes/export.js";

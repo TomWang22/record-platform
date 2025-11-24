@@ -6,7 +6,7 @@ import {
   type NextFunction,
   type RequestHandler,
 } from "express";
-import type { PrismaClient } from '../../generated/records-client.js';
+import type { PrismaClient } from '../../generated/records-client';
 import {
   normalizeGradeLoose,
   normalizeMediaPiece,

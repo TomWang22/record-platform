@@ -24,6 +24,7 @@ spec:
         ports:
         - { name: https, containerPort: 443, protocol: TCP }
         - { name: https-udp, containerPort: 443, protocol: UDP }
+        - { name: grpc-h2c, containerPort: 5000, protocol: TCP }
         volumeMounts:
         - { name: caddy-conf,  mountPath: /etc/caddy }                       # Caddyfile
         - { name: caddy-certs, mountPath: /etc/caddy/certs, readOnly: true } # tls.crt,tls.key

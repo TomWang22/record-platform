@@ -17,6 +17,17 @@ HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
 
 say "=== Testing gRPC via HTTP/2 and HTTP/3 ==="
 
+# Check if grpcurl is available
+if ! command -v grpcurl >/dev/null 2>&1; then
+  warn "grpcurl not found - some gRPC tests will be skipped"
+  warn "  Install with: brew install grpcurl"
+  warn "  Or: go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest"
+  SKIP_GRPC=1
+else
+  SKIP_GRPC=0
+  ok "grpcurl found - gRPC tests will run"
+fi
+
 # Step 1: Create test user
 say "Step 1: Creating test user for authentication..."
 
@@ -241,6 +252,141 @@ else
   warn "HTTP/3 protocol not confirmed"
 fi
 
+# Helper function to run grpcurl with timeout
+grpcurl_with_timeout() {
+  local timeout_sec="${1:-10}"
+  shift
+  local cmd=("$@")
+  
+  # Try to use timeout command (Linux, or gtimeout on macOS with coreutils)
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$timeout_sec" "${cmd[@]}" 2>&1
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$timeout_sec" "${cmd[@]}" 2>&1
+  else
+    # Fallback: run in background and kill after timeout
+    local pid
+    "${cmd[@]}" 2>&1 &
+    pid=$!
+    (
+      sleep "$timeout_sec"
+      kill "$pid" 2>/dev/null || true
+    ) &
+    wait "$pid" 2>/dev/null || echo "grpcurl timeout after ${timeout_sec}s"
+  fi
+}
+
+# Step 10: Test gRPC services (if grpcurl is available)
+if [[ "${SKIP_GRPC:-1}" == "0" ]]; then
+  say "Step 10: Testing gRPC Services via HTTP/2..."
+  
+  # Test Auth Service gRPC
+  say "Step 10a: gRPC Auth Service - HealthCheck"
+  GRPC_AUTH_HEALTH=$(grpcurl_with_timeout 10 grpcurl -insecure -H "Host: $HOST" \
+    -d '{}' \
+    "$HOST:8443" /auth.AuthService/HealthCheck) || GRPC_AUTH_HEALTH=""
+  if echo "$GRPC_AUTH_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Auth HealthCheck works"
+  else
+    warn "gRPC Auth HealthCheck failed"
+    echo "Response: $GRPC_AUTH_HEALTH" | head -3
+  fi
+
+  # Test Auth Service - Authenticate
+  if [[ -n "${TEST_EMAIL:-}" ]] && [[ -n "${TEST_PASSWORD:-}" ]]; then
+    say "Step 10b: gRPC Auth Service - Authenticate"
+    GRPC_AUTH_RESPONSE=$(grpcurl_with_timeout 10 grpcurl -insecure -H "Host: $HOST" \
+      -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}" \
+      "$HOST:8443" /auth.AuthService/Authenticate) || GRPC_AUTH_RESPONSE=""
+    if echo "$GRPC_AUTH_RESPONSE" | grep -q "token"; then
+      ok "gRPC Auth Authenticate works"
+      GRPC_TOKEN=$(echo "$GRPC_AUTH_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+    else
+      warn "gRPC Auth Authenticate failed"
+      echo "Response: $GRPC_AUTH_RESPONSE" | head -3
+    fi
+  fi
+
+  # Test Records Service gRPC
+  say "Step 10c: gRPC Records Service - HealthCheck"
+  GRPC_RECORDS_HEALTH=$(grpcurl_with_timeout 10 grpcurl -insecure -H "Host: $HOST" \
+    -d '{}' \
+    "$HOST:8443" /records.RecordsService/HealthCheck) || GRPC_RECORDS_HEALTH=""
+  if echo "$GRPC_RECORDS_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Records HealthCheck works"
+  else
+    warn "gRPC Records HealthCheck failed"
+    echo "Response: $GRPC_RECORDS_HEALTH" | head -3
+  fi
+
+  # Test Social Service gRPC
+  say "Step 10d: gRPC Social Service - HealthCheck"
+  GRPC_SOCIAL_HEALTH=$(grpcurl_with_timeout 10 grpcurl -insecure -H "Host: $HOST" \
+    -d '{}' \
+    "$HOST:8443" /social.SocialService/HealthCheck) || GRPC_SOCIAL_HEALTH=""
+  if echo "$GRPC_SOCIAL_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Social HealthCheck works"
+  else
+    warn "gRPC Social HealthCheck failed"
+    echo "Response: $GRPC_SOCIAL_HEALTH" | head -3
+  fi
+
+  # Test Listings Service gRPC
+  say "Step 10e: gRPC Listings Service - HealthCheck"
+  GRPC_LISTINGS_HEALTH=$(grpcurl_with_timeout 10 grpcurl -insecure -H "Host: $HOST" \
+    -d '{}' \
+    "$HOST:8443" /listings.ListingsService/HealthCheck) || GRPC_LISTINGS_HEALTH=""
+  if echo "$GRPC_LISTINGS_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Listings HealthCheck works"
+  else
+    warn "gRPC Listings HealthCheck failed"
+    echo "Response: $GRPC_LISTINGS_HEALTH" | head -3
+  fi
+
+  # Test Analytics Service gRPC
+  say "Step 10f: gRPC Analytics Service - HealthCheck"
+  GRPC_ANALYTICS_HEALTH=$(grpcurl_with_timeout 10 grpcurl -insecure -H "Host: $HOST" \
+    -d '{}' \
+    "$HOST:8443" /analytics.AnalyticsService/HealthCheck) || GRPC_ANALYTICS_HEALTH=""
+  if echo "$GRPC_ANALYTICS_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Analytics HealthCheck works"
+  else
+    warn "gRPC Analytics HealthCheck failed"
+    echo "Response: $GRPC_ANALYTICS_HEALTH" | head -3
+  fi
+else
+  warn "Skipping gRPC tests - grpcurl not available"
+fi
+
+# Step 11: Test Logout
+say "Step 11: Testing Logout..."
+if [[ -n "${AUTH_TOKEN:-}" ]]; then
+  LOGOUT_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
+    -H "Host: $HOST" \
+    -H "Authorization: Bearer $AUTH_TOKEN" \
+    -X POST "https://$HOST:8443/api/auth/logout" 2>&1)
+  LOGOUT_CODE=$(echo "$LOGOUT_RESPONSE" | tail -1)
+  if [[ "$LOGOUT_CODE" =~ ^(200|204)$ ]]; then
+    ok "Logout works via HTTP/2"
+    # Verify token is revoked
+    sleep 1
+    VERIFY_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
+      -H "Host: $HOST" \
+      -H "Authorization: Bearer $AUTH_TOKEN" \
+      -X GET "https://$HOST:8443/api/records" 2>&1)
+    VERIFY_CODE=$(echo "$VERIFY_RESPONSE" | tail -1)
+    if [[ "$VERIFY_CODE" == "401" ]]; then
+      ok "Token revocation verified (401 on protected endpoint)"
+    else
+      warn "Token may not be revoked (got HTTP $VERIFY_CODE instead of 401)"
+    fi
+  else
+    warn "Logout failed - HTTP $LOGOUT_CODE"
+  fi
+else
+  warn "Skipping logout test (no auth token)"
+fi
+
 say "=== Testing Complete ==="
 echo ""
 echo "Summary:"
@@ -248,4 +394,6 @@ echo "- HTTP/2: $(if [[ "$HTTP_CODE_H2" =~ ^(200|404|502)$ ]]; then echo "✅ Wo
 echo "- HTTP/3: $(if [[ "$HTTP_CODE_H3" =~ ^(200|404|502)$ ]]; then echo "✅ Working"; else echo "❌ Failed"; fi)"
 echo "- Authentication: $(if [[ -n "${AUTH_TOKEN:-}" ]]; then echo "✅ Working"; else echo "⚠️  Skipped"; fi)"
 echo "- CRUD Operations: $(if [[ -n "${RECORD_ID:-}" ]] || [[ -n "${RECORD_ID_H3:-}" ]]; then echo "✅ Working"; else echo "⚠️  Skipped"; fi)"
+echo "- gRPC Services: $(if [[ "${SKIP_GRPC:-1}" == "0" ]]; then echo "✅ Tested"; else echo "⚠️  Skipped (grpcurl not found)"; fi)"
+echo "- Logout: $(if [[ -n "${AUTH_TOKEN:-}" ]] && [[ "$LOGOUT_CODE" =~ ^(200|204)$ ]]; then echo "✅ Working"; else echo "⚠️  Skipped"; fi)"
 

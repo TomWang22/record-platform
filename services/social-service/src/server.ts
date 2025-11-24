@@ -91,8 +91,13 @@ function shutdown(signal: string) {
       console.log('[social] DB pool closed')
     })
     if (redis) {
-      await redis.quit()
-      console.log('[social] Redis closed')
+      try {
+        // Use disconnect instead of quit to avoid writeable stream errors
+        await redis.disconnect()
+        console.log('[social] Redis closed')
+      } catch (err) {
+        console.warn('[social] Redis disconnect error (non-fatal):', err)
+      }
     }
     process.exit(0)
   })

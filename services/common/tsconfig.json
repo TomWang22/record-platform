@@ -4,7 +4,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "declaration": true,
-    "emitDeclarationOnly": false
+    "emitDeclarationOnly": false,
+    "composite": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/tracing.ts"]

@@ -6,6 +6,8 @@ resources:
   - postgres
   - pgbouncer
   - redis
+  - zookeeper
+  - kafka
   - exporters
   - monitoring
   - observability
@@ -18,6 +20,7 @@ resources:
   - analytics-service
   - python-ai-service
   - social-service
+  - shopping-service
   - auction-monitor        # NEW (you added this)
   - cron-jobs              # NEW (you added this)
   - kafka                  # (recommended dev Kafka)

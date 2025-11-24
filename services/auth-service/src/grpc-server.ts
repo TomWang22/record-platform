@@ -228,6 +228,16 @@ export function startGrpcServer(port: number = 50051) {
     HealthCheck: withLogging(authService.HealthCheck, "HealthCheck"),
   });
 
+  // Enable gRPC reflection for tooling (grpcurl, etc.)
+  if (process.env.ENABLE_GRPC_REFLECTION !== "false") {
+    try {
+      const { enableReflection } = require("@common/utils/grpc-reflection");
+      enableReflection(server, [PROTO_PATH], ["auth.AuthService"]);
+    } catch (err) {
+      console.warn("[gRPC] Failed to enable reflection:", err);
+    }
+  }
+
   // Try to load TLS certs (for production with ALPN = h2)
   let credentials: grpc.ServerCredentials;
   const keyPath = process.env.TLS_KEY_PATH || "/etc/certs/tls.key";

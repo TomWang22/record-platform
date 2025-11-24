@@ -12,8 +12,12 @@ data:
   LISTINGS_PORT: "4003"
   ANALYTICS_PORT: "4004"
   AI_PORT: "5005"
+  SHOPPING_PORT: "4007"
 
-  REDIS_URL: redis://redis.record-platform.svc.cluster.local:6379/0
+  # Redis URL with password (password is in redis-auth secret)
+  # Format: redis://:password@host:port/db
+  # Note: Services should use REDIS_PASSWORD env var from secret, but REDIS_URL is also supported
+  REDIS_URL: redis://:SUPER_STRONG_REDIS_PASSWORD@redis.record-platform.svc.cluster.local:6379/0
 
   PROTO_ROOT: /app/proto
 
@@ -26,7 +30,11 @@ data:
 
   # optional compatibility (literal duplicates, not $(…))
   POSTGRES_URL:         postgresql://postgres:postgres@host.docker.internal:5433/records?connect_timeout=5
-  POSTGRES_URL_AUTH:    postgresql://postgres:postgres@host.docker.internal:5433/records?search_path=auth&connect_timeout=5
+  POSTGRES_URL_AUTH:    postgresql://postgres:postgres@host.docker.internal:5437/records?search_path=auth&connect_timeout=5
   POSTGRES_URL_RECORDS: postgresql://postgres:postgres@host.docker.internal:5433/records?connect_timeout=5
   POSTGRES_URL_SOCIAL:  postgresql://postgres:postgres@host.docker.internal:5434/records?connect_timeout=5
   POSTGRES_URL_LISTINGS: postgresql://postgres:postgres@host.docker.internal:5435/records?connect_timeout=5
+  POSTGRES_URL_SHOPPING: postgresql://postgres:postgres@host.docker.internal:5436/records?connect_timeout=5
+  POSTGRES_URL_AUCTION_MONITOR: postgresql://postgres:postgres@host.docker.internal:5438/auction_monitor?connect_timeout=5
+  POSTGRES_URL_ANALYTICS: postgresql://postgres:postgres@host.docker.internal:5439/analytics?connect_timeout=5
+  POSTGRES_URL_PYTHON_AI: postgresql://postgres:postgres@host.docker.internal:5440/python_ai?connect_timeout=5

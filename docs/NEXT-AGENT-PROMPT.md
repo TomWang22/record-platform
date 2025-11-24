@@ -29,6 +29,9 @@
    - **NEW**: Test `listings-service` endpoints over HTTP/2 and HTTP/3. See `docs/LISTINGS-SERVICE-TESTING.md` for full testing checklist.
    - **NEW**: Verify gRPC ingress route `/listings.ListingsService` works (port 50057). Service uses gRPC like other services.
    - **NEW**: Test listings CRUD, auction bidding, OBO offers, and watchlist operations.
+   - **NEW**: Test `shopping-service` endpoints over HTTP/2 and HTTP/3. Service includes shopping cart, watchlist, recently viewed, wishlist, purchase/search history, and LFU/LRU caching.
+   - **NEW**: Verify gRPC ingress route `/shopping.ShoppingService` works (port 50058). Service uses gRPC like other services.
+   - **NEW**: Test shopping cart operations, watchlist, recently viewed (LRU), wishlist, purchase history, and search history with trending searches.
 3. **Observability**
    - Re-validate Prometheus scrapes, Grafana dashboards, OpenTelemetry exporters, and Jaeger traces now that services speak gRPC.
    - Finish wiring the service mesh sidecars (Istio/Linkerd) once the HTTP/2 tests pass.
@@ -44,6 +47,9 @@
 - **NEW**: Social-service endpoints: `/api/forum/*` and `/api/messages/*` (gRPC-backed via API Gateway)
 - **NEW**: Listings-service testing: See `docs/LISTINGS-SERVICE-TESTING.md` for complete testing guide
 - **NEW**: Listings-service endpoints: `/api/listings/*` (gRPC-backed via API Gateway, port 50057)
+- **NEW**: Shopping-service testing: See `docs/SHOPPING-SERVICE-TESTING.md` for complete testing guide
+- **NEW**: Shopping-service endpoints: `/api/shopping/*` (gRPC-backed via API Gateway, port 50058)
+- **NEW**: Shopping database: Port 5436 (Docker Compose only, NOT in K8s)
 
 ### Reminders
 - Ping the user before running long pgbench sweeps—they often want to watch TPS live.

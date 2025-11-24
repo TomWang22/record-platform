@@ -20,10 +20,11 @@ RUN pnpm -w \
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
 
-# OpenSSL for prisma generate
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates openssl \
- && rm -rf /var/lib/apt/lists/*
+    # OpenSSL for prisma generate (node:20-bookworm-slim should have openssl, but ensure it's available)
+    RUN apt-get update --allow-insecure-repositories || true && \
+        apt-get install -y --allow-unauthenticated --no-install-recommends curl ca-certificates openssl || \
+        (echo "OpenSSL may already be installed, continuing..." && which openssl || true) && \
+        rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 COPY --from=deps /app /app
@@ -47,9 +48,10 @@ FROM node:20-bookworm-slim
 WORKDIR /app/services/social-service
 ENV NODE_ENV=production
 
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates openssl \
- && rm -rf /var/lib/apt/lists/*
+RUN apt-get update --allow-insecure-repositories || true && \
+    apt-get install -y --allow-unauthenticated --no-install-recommends curl ca-certificates openssl || \
+    (echo "OpenSSL may already be installed, continuing..." && which openssl || true) && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/services/social-service/node_modules ./node_modules

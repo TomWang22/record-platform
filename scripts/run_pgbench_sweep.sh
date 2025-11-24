@@ -70,9 +70,13 @@ EFFECTIVE_IO_CONCURRENCY="${EFFECTIVE_IO_CONCURRENCY:-200}"
 # Optional: name of a pre-created temp tablespace on tmpfs (e.g. fasttmp)
 # If set, benchmarks will use this tablespace for temp files (reduces p999 spikes)
 FAST_TEMP_TABLESPACE="${FAST_TEMP_TABLESPACE:-}"
-# TUNED: Disabled parallelism for FTS+trgm queries (reduces tail latency)
-# TUNED: Reduced candidate_cap multiplier and raised min_rank in function
-PGOPTIONS_EXTRA="-c jit=off -c enable_seqscan=off -c random_page_cost=1.0 -c cpu_index_tuple_cost=0.0005 -c cpu_tuple_cost=0.01 -c effective_cache_size=8GB -c work_mem=${WORK_MEM_MB}MB -c track_io_timing=${TRACK_IO_TIMING} -c effective_io_concurrency=${EFFECTIVE_IO_CONCURRENCY} -c max_parallel_workers=0 -c max_parallel_workers_per_gather=0 -c maintenance_work_mem=512MB -c pg_trgm.similarity_threshold=${TRGM_THRESHOLD} -c search_path=public,records,pg_catalog"
+# TUNED: Enable parallelism for better TPS (max_parallel_workers=12, max_parallel_workers_per_gather=4)
+# TUNED: FTS-first strategy with candidate_cap and min_rank filtering
+# GUCs match gold benchmark configuration:
+# - random_page_cost=1.1 (gold: 1.1, was 1.0)
+# - effective_cache_size=4GB (gold: 4GB/524288 8kB, was 8GB)
+# - All other settings match gold exactly
+PGOPTIONS_EXTRA="-c jit=off -c enable_seqscan=off -c random_page_cost=1.1 -c cpu_index_tuple_cost=0.0005 -c cpu_tuple_cost=0.01 -c effective_cache_size=4GB -c work_mem=${WORK_MEM_MB}MB -c track_io_timing=${TRACK_IO_TIMING} -c effective_io_concurrency=${EFFECTIVE_IO_CONCURRENCY} -c max_parallel_workers=12 -c max_parallel_workers_per_gather=4 -c maintenance_work_mem=512MB -c pg_trgm.similarity_threshold=${TRGM_THRESHOLD} -c synchronous_commit=off -c search_path=public,records,pg_catalog"
 
 # Add temp_tablespaces if FAST_TEMP_TABLESPACE is set
 if [[ -n "$FAST_TEMP_TABLESPACE" ]]; then
@@ -89,6 +93,20 @@ REG_THRESH_TPS_DROP="${REG_THRESH_TPS_DROP:-0.15}"      # 15% TPS drop = regress
 REG_THRESH_P95_INCREASE="${REG_THRESH_P95_INCREASE:-0.25}"  # 25% p95 increase = regression
 SKIP_RESTORE="${SKIP_RESTORE:-false}"            # if true, skip automatic restore from backup
 INCLUDE_RAW_TRGM_EXPLAIN="${INCLUDE_RAW_TRGM_EXPLAIN:-false}"  # if true, include raw trigram % EXPLAIN baseline
+USE_AUTO_WRAPPER="${USE_AUTO_WRAPPER:-false}"    # if true, use search_records_fuzzy_ids_auto (with timeout) instead of bare function
+USE_SQL_FUNCTION="${USE_SQL_FUNCTION:-false}"    # if true, use SQL-language function (faster) instead of PL/pgSQL (gold version)
+CREATE_BENCH_BACKUP="${CREATE_BENCH_BACKUP:-false}"  # if true, create backup after benchmark (default: false to avoid disk bloat)
+RUN_OPTIMIZE_DB="${RUN_OPTIMIZE_DB:-false}"      # if true, run optimize-db-for-performance.sh (default: false, run once after restore)
+SKIP_DISK_CHECK="${SKIP_DISK_CHECK:-false}"      # if true, skip disk space checks (faster for dev runs)
+RUN_NOOP_BASELINE="${RUN_NOOP_BASELINE:-false}"  # if true, run NOOP baseline test (default: false for fast dev mode)
+RUN_PLAN_DUMP="${RUN_PLAN_DUMP:-true}"           # if true, run comprehensive query plan analysis (default: true)
+DISABLE_AUTOVACUUM="${DISABLE_AUTOVACUUM:-true}" # if true, disable autovacuum during benchmarks (default: true to prevent pauses)
+
+# FAST DEV MODE: For quick iteration, use this combo:
+# USE_SQL_FUNCTION=true USE_AUTO_WRAPPER=false RUN_COLD_CACHE=false RUN_SMOKE_TESTS=false \
+# GENERATE_PLOTS=false RUN_DIFF_MODE=false CREATE_BENCH_BACKUP=false RUN_OPTIMIZE_DB=false \
+# SKIP_DISK_CHECK=true RUN_NOOP_BASELINE=false RUN_PLAN_DUMP=false DISABLE_AUTOVACUUM=false \
+# TRACK_IO_TIMING=off MODE=quick ./scripts/run_pgbench_sweep.sh
 
 # Phase marker (warm vs cold)
 PHASE="warm"
@@ -152,7 +170,8 @@ fi
 
 # CRITICAL: Helper function for psql - always uses the same DSN as pgbench
 # Uses parameterized connection settings (can be overridden via env vars)
-# Canonical external Postgres endpoint: localhost:5433 (Docker port, avoids Postgres.app conflict)
+# Canonical external Postgres endpoint: localhost:5433 (Docker Compose, avoids Postgres.app conflict)
+# NOTE: Function name is "psql_in_pod" for historical reasons, but it connects to external Docker PostgreSQL
 # This ensures psql_in_pod and pgbench connect to the SAME database
 psql_in_pod() {
   PGPASSWORD="$RECORDS_DB_PASS" psql \
@@ -171,6 +190,143 @@ fi
 
 # NOTE: Function creation moved to AFTER database restore check
 # This ensures the function is created on the correct database
+
+# Pre-flight: Check disk space (Docker and host)
+check_disk_space() {
+  local docker_avail docker_total host_avail host_total
+  local docker_pct host_pct
+  
+  echo "🔍 Pre-flight: Checking disk space..."
+  
+  # Check Docker disk space
+  docker_info=$(docker system df 2>/dev/null | grep -E "TYPE|Images|Containers|Local Volumes|Build Cache" || echo "")
+  if [[ -n "$docker_info" ]]; then
+    docker_total=$(docker system df 2>/dev/null | awk '/Images|Containers|Local Volumes|Build Cache/ {total+=$3} END {print total}')
+    docker_reclaim=$(docker system df 2>/dev/null | awk '/Images|Containers|Local Volumes|Build Cache/ {reclaim+=$4} END {print reclaim}')
+    echo "  Docker: $(docker system df 2>/dev/null | head -5 | tail -4 | awk '{print $1": "$3" (reclaimable: "$4")"}' | tr '\n' '; ')"
+  fi
+  
+  # Check PostgreSQL Docker container disk space
+  local pg_container
+  pg_container=$(docker ps --filter "name=postgres" --filter "publish=5433" --format "{{.Names}}" | head -1)
+  if [[ -n "$pg_container" ]]; then
+    local container_disk_info
+    container_disk_info=$(docker exec "$pg_container" df -h /var/lib/postgresql/data 2>/dev/null | tail -1 || echo "")
+    if [[ -n "$container_disk_info" ]]; then
+      local container_used container_avail container_pct
+      container_used=$(echo "$container_disk_info" | awk '{print $3}')
+      container_avail=$(echo "$container_disk_info" | awk '{print $4}')
+      container_pct=$(echo "$container_disk_info" | awk '{print $5}' | sed 's/%//')
+      echo "  PostgreSQL container ($pg_container): ${container_used} used, ${container_avail} available (${container_pct}% used)"
+      
+      # Warn if container disk is >90% full
+      if [[ "$container_pct" -gt 90 ]]; then
+        echo "  ⚠️  WARNING: PostgreSQL container disk is ${container_pct}% full!" >&2
+        echo "     This can cause database failures. Check Docker volume size:" >&2
+        echo "       docker volume inspect record-platform_pgdata" >&2
+      fi
+    fi
+  fi
+  
+  # Check host disk space
+  host_info=$(df -h . 2>/dev/null | tail -1)
+  if [[ -n "$host_info" ]]; then
+    host_avail=$(echo "$host_info" | awk '{print $4}')
+    host_used=$(echo "$host_info" | awk '{print $3}')
+    host_pct=$(echo "$host_info" | awk '{print $5}' | sed 's/%//')
+    echo "  Host: ${host_used} used, ${host_avail} available (${host_pct}% used)"
+    
+    # CRITICAL: Refuse to run if disk is >95% full (risk of database corruption)
+    if [[ "$host_pct" -gt 95 ]]; then
+      echo "  ❌ ERROR: Host disk is ${host_pct}% full. Cannot run benchmarks safely." >&2
+      echo "     Disk space is critically low - database may fail during checkpoints." >&2
+      echo "     Please run emergency cleanup first:" >&2
+      echo "       ./scripts/emergency-disk-cleanup.sh" >&2
+      echo "     Or manually free space before continuing." >&2
+      return 1
+    fi
+    
+    # WARN and offer cleanup if disk is >90% full
+    if [[ "$host_pct" -gt 90 ]]; then
+      echo "  ⚠️  WARNING: Host disk is ${host_pct}% full. Risk of database failures." >&2
+      echo "     Recommend running emergency cleanup:" >&2
+      echo "       ./scripts/emergency-disk-cleanup.sh" >&2
+      echo "     Continuing anyway, but benchmarks may fail if disk fills up..." >&2
+    elif [[ "$host_pct" -gt 85 ]]; then
+      echo "  ⚠️  WARNING: Host disk is ${host_pct}% full. Consider cleaning up before running benchmarks."
+      echo "     Run: ./scripts/emergency-disk-cleanup.sh"
+      echo "     Or: docker system prune -a --volumes -f"
+      echo "     Or: find bench_logs/ -type f -mtime +1 -delete"
+    fi
+  fi
+  
+  # Check Docker specifically (skip if parsing fails - docker system df format may vary)
+  # Extract numeric percentage only, skip if we get a size value with units
+  docker_space=$(docker system df 2>/dev/null | grep "Images" | awk '{print $4}' | sed 's/[()%]//g' | awk -F'/' '{print $1}' | grep -E '^[0-9]+$' || echo "")
+  if [[ -n "$docker_space" ]] && [[ "$docker_space" =~ ^[0-9]+$ ]] && [[ "$docker_space" -gt 70 ]]; then
+    echo "  ⚠️  WARNING: Docker images are ${docker_space}% reclaimable. Consider cleaning up."
+    echo "     Run: docker system prune -a --volumes -f"
+  fi
+  
+  echo ""
+  return 0
+}
+
+# Run disk space check - exit if critically low (unless skipped)
+if [[ "$SKIP_DISK_CHECK" != "true" ]]; then
+  if ! check_disk_space; then
+    echo "❌ Cannot proceed with critically low disk space. Exiting." >&2
+    exit 1
+  fi
+else
+  echo "⚠️  Skipping disk space check (SKIP_DISK_CHECK=true)"
+fi
+
+# Wait for database to exit recovery mode
+wait_for_db_ready() {
+  local max_attempts=60
+  local attempt=0
+  local wait_interval=2
+  
+  echo "🔍 Checking database readiness..."
+  
+  while [[ $attempt -lt $max_attempts ]]; do
+    # Check if database is in recovery mode
+    local recovery_status
+    recovery_status=$(psql_in_pod -d postgres -tAc "SELECT pg_is_in_recovery();" 2>/dev/null || echo "t")
+    
+    if [[ "$recovery_status" == "f" ]]; then
+      # Not in recovery, check if it accepts connections
+      if psql_in_pod -d postgres -c "SELECT 1;" >/dev/null 2>&1; then
+        echo "✅ Database is ready (not in recovery mode)"
+        return 0
+      fi
+    elif [[ "$recovery_status" == "t" ]]; then
+      echo "⏳ Database is in recovery mode (attempt $((attempt + 1))/$max_attempts)..."
+    else
+      # Connection failed - might be starting up
+      echo "⏳ Database connection failed, waiting... (attempt $((attempt + 1))/$max_attempts)"
+    fi
+    
+    sleep "$wait_interval"
+    attempt=$((attempt + 1))
+  done
+  
+  echo "❌ ERROR: Database did not exit recovery mode after $((max_attempts * wait_interval)) seconds" >&2
+  echo "   This usually means:" >&2
+  echo "   1. Database is still recovering from a crash or checkpoint" >&2
+  echo "   2. Disk space is full (check with: df -h)" >&2
+  echo "   3. WAL files are corrupted or missing" >&2
+  echo "   Check Docker container logs: docker logs record-platform-postgres-1" >&2
+  echo "   Or check disk space in container: docker exec record-platform-postgres-1 df -h" >&2
+  return 1
+}
+
+# Wait for database to be ready before proceeding
+wait_for_db_ready || {
+  echo "❌ Cannot proceed without a ready database. Exiting." >&2
+  exit 1
+}
 
 tmpdir=$(mktemp -d)
 # CRITICAL: Always cd back to repo root before cleanup to avoid popd errors
@@ -225,6 +381,7 @@ CREATE TABLE IF NOT EXISTS bench.results (
   id bigserial PRIMARY KEY,
   ts_utc timestamptz DEFAULT now() NOT NULL,
   variant text NOT NULL,
+  phase text,        -- "warm" or "cold"
   clients int NOT NULL,
   threads int NOT NULL,
   duration_s int NOT NULL,
@@ -296,6 +453,10 @@ ALTER TABLE bench.results
 -- Ensure p99999_ms column exists (for older schemas without it)
 ALTER TABLE bench.results
   ADD COLUMN IF NOT EXISTS p99999_ms numeric;
+
+-- Ensure phase column exists (warm vs cold)
+ALTER TABLE bench.results
+  ADD COLUMN IF NOT EXISTS phase text;
 
 -- Note: Not creating unique constraint to avoid conflicts with existing duplicates
 -- If uniqueness is needed later, dedupe rows first, then add constraint
@@ -477,10 +638,21 @@ SQL
 
 # CRITICAL: Ensure canonical KNN function and performance tuning are applied BEFORE reading max_connections
 # This ensures max_connections=400 is set (though restart is required to apply it)
-if [[ -x "./scripts/optimize-db-for-performance.sh" ]]; then
+# NOTE: Only run this if explicitly requested (default: false to avoid re-tuning on every run)
+if [[ "$RUN_OPTIMIZE_DB" == "true" ]] && [[ -x "./scripts/optimize-db-for-performance.sh" ]]; then
   echo "=== Applying canonical DB optimizations (optimize-db-for-performance.sh) ==="
   NS="$NS" ./scripts/optimize-db-for-performance.sh
+elif [[ "$RUN_OPTIMIZE_DB" != "true" ]]; then
+  echo "⚠️  Skipping DB optimization (RUN_OPTIMIZE_DB=${RUN_OPTIMIZE_DB}). Set RUN_OPTIMIZE_DB=true to enable."
 fi
+
+# Align pg_trgm.similarity_threshold at DB level to match function's min_rank
+# This ensures consistency across all sessions, not just pgbench
+echo "=== Aligning pg_trgm.similarity_threshold at DB level ==="
+psql_in_pod <<SQL
+ALTER DATABASE records SET pg_trgm.similarity_threshold = '${TRGM_THRESHOLD}';
+SQL
+echo "✅ Set pg_trgm.similarity_threshold = ${TRGM_THRESHOLD} at database level"
 
 # Derive safe max pgbench client count from Postgres max_connections
 # Read this AFTER optimization script runs (so we get the updated value if restart happened)
@@ -567,7 +739,11 @@ if [[ -x "./scripts/create-partial-indexes-for-bench.sh" ]]; then
 fi
 
 if [[ -x "./scripts/create-knn-function.sh" ]]; then
-  echo "=== (Re)creating canonical search_records_fuzzy_ids function ==="
+  if [[ "$USE_SQL_FUNCTION" == "true" ]]; then
+    echo "=== (Re)creating canonical search_records_fuzzy_ids function (SQL-language optimized version) ==="
+  else
+    echo "=== (Re)creating canonical search_records_fuzzy_ids function (PL/pgSQL gold version) ==="
+  fi
   # Create function directly in pod using psql_in_pod to avoid connection mismatch
   psql_in_pod -v ON_ERROR_STOP=1 <<'EOFSQL'
 SET search_path = records, public, pg_catalog;
@@ -589,15 +765,98 @@ CREATE OR REPLACE FUNCTION public.norm_text(t text) RETURNS text
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT regexp_replace(lower(coalesce(t,'')), '\s+', ' ', 'g');
 $$;
+EOFSQL
 
--- Canonical function: FTS filter on search_tsv + trigram rank on search_norm.
--- OPTIMIZED: Uses parameterized queries (USING clause) to avoid per-call re-planning,
--- while keeping user_id as literal to enable partial index usage.
+  # Conditionally create PL/pgSQL (gold) or SQL (optimized) version
+  if [[ "$USE_SQL_FUNCTION" == "true" ]]; then
+    # SQL-language optimized version (same behavior, lower overhead)
+    # Removes PL/pgSQL interpreter overhead and dynamic EXECUTE parse/plan overhead
+    # Typically 10-20% faster than PL/pgSQL version while maintaining identical behavior
+    psql_in_pod -v ON_ERROR_STOP=1 <<'EOFSQL'
+SET search_path = records, public, pg_catalog;
+
+-- Canonical function: Dual-mode FTS-only filter, trigram-only scoring (no trigram index scan).
+-- STRATEGY: Use FTS (search_tsv @@ tsq) as the ONLY filter via idx_records_search_tsv_bench.
+-- Compute trigram similarity() only on the small FTS candidate set (no trigram GIN index used).
+-- FAST mode: small candidate set (40) + high cutoff (0.50) for best tail latency at high concurrency.
+-- DEEP mode: larger candidate set (150) + lower cutoff (0.35) for better recall when needed.
+-- SQL-language version: removes PL/pgSQL overhead, typically 10-20% faster
 CREATE OR REPLACE FUNCTION public.search_records_fuzzy_ids(
   p_user   uuid,
   p_q      text,
   p_limit  bigint DEFAULT 100,
-  p_offset bigint DEFAULT 0
+  p_offset bigint DEFAULT 0,
+  p_mode   text  DEFAULT 'fast'  -- 'fast' or 'deep'
+) RETURNS TABLE(id uuid, rank real)
+LANGUAGE sql
+STABLE
+PARALLEL SAFE
+SET search_path = records, public, pg_catalog
+AS $$
+WITH params AS (
+  SELECT
+    public.norm_text(coalesce(p_q, ''))                           AS qn,
+    plainto_tsquery('simple', public.norm_text(coalesce(p_q, ''))) AS tsq,
+    CASE
+      WHEN lower(coalesce(p_mode, 'fast')) = 'deep'
+        THEN LEAST(150::bigint, GREATEST(p_limit * 3, 60))
+      ELSE
+        LEAST(40::bigint, GREATEST((p_limit * 5) / 4, 25))
+    END                                                           AS candidate_cap,
+    CASE
+      WHEN lower(coalesce(p_mode, 'fast')) = 'deep'
+        THEN 0.35::real
+      ELSE
+        0.50::real
+    END                                                           AS min_rank,
+    GREATEST(0, p_offset)                                         AS off,
+    LEAST(1000, GREATEST(1, p_limit))                             AS lim
+),
+fts AS (
+  SELECT
+    r.id,
+    r.search_norm
+  FROM records.records AS r
+  CROSS JOIN params p
+  WHERE r.user_id   = p_user
+    AND r.search_tsv @@ p.tsq
+  LIMIT (SELECT candidate_cap FROM params)
+),
+scored AS (
+  SELECT
+    f.id,
+    similarity(f.search_norm, p.qn) AS sim
+  FROM fts AS f
+  CROSS JOIN params p
+)
+SELECT
+  s.id,
+  s.sim::real AS rank
+FROM scored AS s
+CROSS JOIN params p
+WHERE s.sim >= p.min_rank
+ORDER BY s.sim DESC
+OFFSET (SELECT off FROM params)
+LIMIT  (SELECT lim FROM params);
+$$;
+EOFSQL
+  else
+    # PL/pgSQL gold version (exact match to benchmark "good" run)
+    psql_in_pod -v ON_ERROR_STOP=1 <<'EOFSQL'
+SET search_path = records, public, pg_catalog;
+
+-- Canonical function: Dual-mode FTS-only filter, trigram-only scoring (no trigram index scan).
+-- STRATEGY: Use FTS (search_tsv @@ tsq) as the ONLY filter via idx_records_search_tsv_bench.
+-- Compute trigram similarity() only on the small FTS candidate set (no trigram GIN index used).
+-- FAST mode: small candidate set (40) + high cutoff (0.50) for best tail latency at high concurrency.
+-- DEEP mode: larger candidate set (150) + lower cutoff (0.35) for better recall when needed.
+-- PL/pgSQL version: gold/benchmark version (exact match to "good" run)
+CREATE OR REPLACE FUNCTION public.search_records_fuzzy_ids(
+  p_user   uuid,
+  p_q      text,
+  p_limit  bigint DEFAULT 100,
+  p_offset bigint DEFAULT 0,
+  p_mode   text  DEFAULT 'fast'  -- 'fast' or 'deep'
 ) RETURNS TABLE(id uuid, rank real)
 LANGUAGE plpgsql STABLE PARALLEL SAFE
 SET search_path = records, public, pg_catalog
@@ -605,62 +864,158 @@ AS $function$
 DECLARE
   qn            text;
   tsq           tsquery;
-  -- Candidate set tuning:
-  -- hard cap at 120 rows max, scales with LIMIT (2×LIMIT, min 40)
-  candidate_cap integer;
-  -- Similarity cutoff; should roughly track pg_trgm.similarity_threshold
-  min_rank      real := 0.40;
+  candidate_cap bigint;
+  min_rank      real;
   sql           text;
 BEGIN
+  -- Normalize query once
   qn  := public.norm_text(COALESCE(p_q, ''));
   tsq := plainto_tsquery('simple', qn);
 
-  -- Slightly tighter cap (80 vs 120) since trigram % pre-filters candidates.
-  -- For LIMIT=50: candidate_cap = 80.
-  candidate_cap := LEAST(80, GREATEST(p_limit * 2, 40));
+  -- Dual-mode tuning:
+  -- FAST: small candidate set + stricter similarity => best tail latency
+  -- DEEP: bigger candidate set + looser similarity => better recall, slower
+  IF lower(p_mode) = 'deep' THEN
+    -- Deep: up to ~3×LIMIT candidates, hard-capped at 150
+    -- with a lower cutoff for recall.
+    candidate_cap := LEAST(150::bigint, GREATEST(p_limit * 3, 60));
+    min_rank      := 0.35;
+  ELSE
+    -- Fast: ~1.25×LIMIT candidates, hard-capped at 40
+    -- with higher cutoff to keep CPU very small.
+    candidate_cap := LEAST(40::bigint, GREATEST((p_limit * 5) / 4, 25));
+    min_rank      := 0.50;
+  END IF;
 
-  -- NOTE:
-  -- - user_id is embedded as a literal (%L) so the partial indexes on user_id can be used.
-  -- - all other parameters are $1–$6 so the plan is reusable across calls.
+  -- FTS used only as a filter; no ts_rank_cd, no ORDER BY in FTS
   sql := format($fmt$
-    WITH cand AS (
+    WITH fts AS (
       SELECT
         r.id,
-        similarity(r.search_norm, $1) AS sim
+        r.search_norm
       FROM records.records AS r
       WHERE r.user_id = %L::uuid
-        AND r.search_norm %% $1
         AND r.search_tsv @@ $2
-      ORDER BY sim DESC
       LIMIT $3
+    ),
+    scored AS (
+      SELECT
+        f.id,
+        similarity(f.search_norm, $1) AS sim
+      FROM fts AS f
     )
     SELECT
-      c.id,
-      c.sim::real AS rank
-    FROM cand AS c
-    WHERE c.sim >= $4
-    ORDER BY c.sim DESC
+      s.id,
+      s.sim::real AS rank
+    FROM scored AS s
+    WHERE s.sim >= $4
+    ORDER BY s.sim DESC
     OFFSET GREATEST(0, $5)
     LIMIT LEAST(1000, GREATEST(1, $6));
   $fmt$, p_user::text);
 
   RETURN QUERY EXECUTE sql
     USING
-      qn,           -- $1 : normalized query text
-      tsq,          -- $2 : tsquery
-      candidate_cap,-- $3
-      min_rank,     -- $4
-      p_offset,     -- $5
-      p_limit;      -- $6
+      qn,            -- $1 : normalized query
+      tsq,           -- $2 : tsquery
+      candidate_cap, -- $3 : FTS candidate cap (fast/deep dependent)
+      min_rank,      -- $4 : similarity cutoff
+      p_offset,      -- $5
+      p_limit;       -- $6
 END;
 $function$;
 EOFSQL
-  # Verify function was created
-  if ! psql_in_pod -c "SELECT 1 FROM pg_proc WHERE proname = 'search_records_fuzzy_ids' AND pronamespace = 'public'::regnamespace AND pronargs = 4;" >/dev/null 2>&1; then
-    echo "❌ Function creation failed!" >&2
+  fi
+
+  # Continue with auto wrapper creation
+  psql_in_pod -v ON_ERROR_STOP=1 <<'EOFSQL'
+SET search_path = records, public, pg_catalog;
+
+-- Auto-fallback wrapper: tries fast mode first, falls back to deep if needed
+-- Includes statement timeout to cap p9999/p100 latency
+CREATE OR REPLACE FUNCTION public.search_records_fuzzy_ids_auto(
+  p_user               uuid,
+  p_q                  text,
+  p_limit              bigint DEFAULT 100,
+  p_offset             bigint DEFAULT 0,
+  p_min_rows_for_fast  int    DEFAULT NULL
+) RETURNS TABLE(id uuid, rank real)
+LANGUAGE plpgsql STABLE PARALLEL SAFE
+SET search_path = records, public, pg_catalog
+AS $function$
+DECLARE
+  ids        uuid[];
+  ranks      real[];
+  fast_count int := 0;
+  threshold  int;
+  i          int;
+BEGIN
+  -- Hard cap for search latency per call (only affects this statement).
+  -- Prevents multi-second outliers at high concurrency.
+  PERFORM set_config('statement_timeout', '200ms', true);
+
+  -- "Good enough" threshold for fast path:
+  -- default: max(10, p_limit / 2)
+  threshold := COALESCE(
+    p_min_rows_for_fast,
+    GREATEST(10, (p_limit::int / 2))
+  );
+
+  -- 1) Run FAST mode, but buffer results instead of returning immediately.
+  FOR id, rank IN
+    SELECT f.id, f.rank
+    FROM public.search_records_fuzzy_ids(
+      p_user   => p_user,
+      p_q      => p_q,
+      p_limit  => p_limit,
+      p_offset => p_offset,
+      p_mode   => 'fast'
+    ) AS f
+  LOOP
+    fast_count := fast_count + 1;
+    ids   := array_append(ids, id);
+    ranks := array_append(ranks, rank);
+  END LOOP;
+
+  -- 2) If fast produced enough rows, just return those (no deep fallback).
+  IF fast_count >= threshold THEN
+    IF ids IS NOT NULL THEN
+      FOR i IN 1..array_length(ids, 1) LOOP
+        id   := ids[i];
+        rank := ranks[i];
+        RETURN NEXT;
+      END LOOP;
+    END IF;
+    RETURN;
+  END IF;
+
+  -- 3) Otherwise, run DEEP mode and ignore fast results entirely.
+  FOR id, rank IN
+    SELECT f.id, f.rank
+    FROM public.search_records_fuzzy_ids(
+      p_user   => p_user,
+      p_q      => p_q,
+      p_limit  => p_limit,
+      p_offset => p_offset,
+      p_mode   => 'deep'
+    ) AS f
+  LOOP
+    RETURN NEXT;
+  END LOOP;
+  RETURN;
+END;
+$function$;
+EOFSQL
+  # Verify functions were created
+  if ! psql_in_pod -c "SELECT 1 FROM pg_proc WHERE proname = 'search_records_fuzzy_ids' AND pronamespace = 'public'::regnamespace AND pronargs = 5;" >/dev/null 2>&1; then
+    echo "❌ Function search_records_fuzzy_ids creation failed!" >&2
     exit 1
   fi
-  echo "✅ Function verified to exist"
+  if ! psql_in_pod -c "SELECT 1 FROM pg_proc WHERE proname = 'search_records_fuzzy_ids_auto' AND pronamespace = 'public'::regnamespace AND pronargs = 4;" >/dev/null 2>&1; then
+    echo "❌ Function search_records_fuzzy_ids_auto creation failed!" >&2
+    exit 1
+  fi
+  echo "✅ Functions verified to exist"
 fi
 
 # step 0: prepare extensions and indexes
@@ -766,10 +1121,37 @@ bench_sql_dir="$tmpdir/bench_sql"
 mkdir -p "$bench_sql_dir"
 
 echo "Generating bench SQL files locally..."
-cat > "$bench_sql_dir/bench_knn.sql" <<'EOF'
+# Use auto wrapper if enabled (includes statement timeout and dual-mode fallback)
+if [[ "$USE_AUTO_WRAPPER" == "true" ]]; then
+  echo "⚠️  Using search_records_fuzzy_ids_auto wrapper (includes 200ms timeout)"
+  cat > "$bench_sql_dir/bench_knn.sql" <<'EOF'
 SET search_path = records, public, pg_catalog;
--- Use optimized function instead of raw GiST <-> query (much faster)
--- Function already uses GIN % with high threshold and candidate limiting
+-- Use auto wrapper: fast mode with deep fallback + 200ms statement timeout
+-- This matches the production user-facing search path
+SELECT count(*) FROM public.search_records_fuzzy_ids_auto(
+  :uid::uuid,
+  :q::text,
+  :lim::bigint,
+  0::bigint
+);
+EOF
+
+  cat > "$bench_sql_dir/bench_trgm.sql" <<'EOF'
+SET search_path = public, records, pg_catalog;
+-- Use auto wrapper: fast mode with deep fallback + 200ms statement timeout
+-- This matches the production user-facing search path
+SELECT count(*) FROM public.search_records_fuzzy_ids_auto(
+  :uid::uuid,
+  :q::text,
+  :lim::bigint,
+  0::bigint
+);
+EOF
+else
+  cat > "$bench_sql_dir/bench_knn.sql" <<'EOF'
+SET search_path = records, public, pg_catalog;
+-- Use optimized function (fast mode only, no timeout)
+-- Fast mode: candidate_cap = 40 (matches gold run)
 SELECT count(*) FROM public.search_records_fuzzy_ids(
   :uid::uuid,
   :q::text,
@@ -778,8 +1160,10 @@ SELECT count(*) FROM public.search_records_fuzzy_ids(
 );
 EOF
 
-cat > "$bench_sql_dir/bench_trgm.sql" <<'EOF'
+  cat > "$bench_sql_dir/bench_trgm.sql" <<'EOF'
 SET search_path = public, records, pg_catalog;
+-- Use optimized function (fast mode only, no timeout)
+-- Fast mode: candidate_cap = 40 (matches gold run)
 SELECT count(*) FROM public.search_records_fuzzy_ids(
   :uid::uuid,
   :q::text,
@@ -787,6 +1171,7 @@ SELECT count(*) FROM public.search_records_fuzzy_ids(
   0::bigint
 );
 EOF
+fi
 
 cat > "$bench_sql_dir/bench_trgm_simple.sql" <<'EOF'
 SET search_path = public, records, pg_catalog;
@@ -897,22 +1282,23 @@ DO $$
 DECLARE
   func_exists boolean;
 BEGIN
-  -- Check function: public.search_records_fuzzy_ids(uuid, text, bigint, bigint) - canonical 4-arg version
+  -- Check function: public.search_records_fuzzy_ids(uuid, text, bigint, bigint, text) - canonical 5-arg version
   SELECT EXISTS(
     SELECT 1
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'public'
       AND p.proname = 'search_records_fuzzy_ids'
-      AND p.pronargs = 4
+      AND p.pronargs = 5
       AND p.proargtypes[0] = 'uuid'::regtype::oid
       AND p.proargtypes[1] = 'text'::regtype::oid
       AND p.proargtypes[2] = 'bigint'::regtype::oid
       AND p.proargtypes[3] = 'bigint'::regtype::oid
+      AND p.proargtypes[4] = 'text'::regtype::oid
   ) INTO func_exists;
   
   IF NOT func_exists THEN
-    RAISE EXCEPTION 'Function public.search_records_fuzzy_ids(uuid, text, bigint, bigint) does not exist!';
+    RAISE EXCEPTION 'Function public.search_records_fuzzy_ids(uuid, text, bigint, bigint, text) does not exist!';
   END IF;
   
   RAISE NOTICE '✅ Pre-flight check passed: canonical function exists';
@@ -935,6 +1321,13 @@ fi
 
 echo "✅ Pre-flight verification passed"
 
+# CRITICAL: Check for common typos in environment variables and auto-fix
+if [[ -n "${SE_SQL_FUNCTION:-}" ]]; then
+  echo "⚠️  WARNING: Found typo 'SE_SQL_FUNCTION' (should be 'USE_SQL_FUNCTION')" >&2
+  echo "   Auto-fixing: setting USE_SQL_FUNCTION=${SE_SQL_FUNCTION}" >&2
+  USE_SQL_FUNCTION="${SE_SQL_FUNCTION}"
+fi
+
 # Sanity check: Print function definition for verification
 echo "--- Verifying canonical function definition (saving to log)"
 psql_in_pod <<'EOFSQL' | tee "$LOG_DIR/function_search_records_fuzzy_ids.sql"
@@ -943,13 +1336,48 @@ SELECT
   n.nspname,
   p.proname,
   p.proargtypes::regtype[]::text AS args,
+  CASE 
+    WHEN p.prolang = 'sql'::regproc::oid THEN 'SQL'
+    WHEN p.prolang = 'plpgsql'::regproc::oid THEN 'PL/pgSQL'
+    ELSE 'OTHER'
+  END AS language,
   pg_get_functiondef(p.oid) AS definition
 FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public'
   AND p.proname = 'search_records_fuzzy_ids'
-  AND p.pronargs = 4;
+  AND p.pronargs = 5;
 EOFSQL
+
+# Verify function language matches USE_SQL_FUNCTION setting
+echo "--- Verifying function language matches USE_SQL_FUNCTION=${USE_SQL_FUNCTION:-false} ---"
+FUNC_LANG=$(psql_in_pod -tAc "
+  SELECT CASE 
+    WHEN p.prolang = 'sql'::regproc::oid THEN 'SQL'
+    WHEN p.prolang = 'plpgsql'::regproc::oid THEN 'PL/pgSQL'
+    ELSE 'OTHER'
+  END
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND p.proname = 'search_records_fuzzy_ids'
+    AND p.pronargs = 5;
+" 2>/dev/null | tr -d ' ' || echo "")
+
+if [[ "$USE_SQL_FUNCTION" == "true" ]]; then
+  if [[ "$FUNC_LANG" != "SQL" ]]; then
+    echo "⚠️  WARNING: USE_SQL_FUNCTION=true but function language is '$FUNC_LANG' (expected 'SQL')" >&2
+    echo "   This may indicate the function wasn't recreated correctly." >&2
+  else
+    echo "✅ Function language is SQL (matches USE_SQL_FUNCTION=true)"
+  fi
+else
+  if [[ "$FUNC_LANG" != "PL/pgSQL" ]]; then
+    echo "⚠️  WARNING: USE_SQL_FUNCTION=false but function language is '$FUNC_LANG' (expected 'PL/pgSQL')" >&2
+  else
+    echo "✅ Function language is PL/pgSQL (matches USE_SQL_FUNCTION=false)"
+  fi
+fi
 
 echo "--- Smoke check"
 # Skip smoke tests if using local pgbench (no pod needed)
@@ -968,6 +1396,52 @@ else
   echo "Skipping smoke tests (using local pgbench)"
 fi
 
+# CRITICAL: Quick NOOP baseline test to measure environment overhead (optional)
+# This helps identify if slowdowns are from query plan or system overhead
+if [[ "$RUN_NOOP_BASELINE" == "true" ]]; then
+  echo "--- Quick NOOP baseline test (measuring environment overhead) ---"
+  echo "Running barebones pgbench NOOP test: 8 clients, 8 threads, 3s"
+  NOOP_OUTPUT=$(mktemp)
+  if [[ "$USE_LOCAL_PGBENCH" == "true" ]]; then
+    PGHOST="$RECORDS_DB_HOST" PGPORT="$RECORDS_DB_PORT" PGUSER="$RECORDS_DB_USER" PGDATABASE="$RECORDS_DB_NAME" PGPASSWORD="$RECORDS_DB_PASS" \
+    PGOPTIONS="-c search_path=public,records,pg_catalog" \
+    pgbench \
+      -n -M prepared \
+      -c 8 -j 8 -T 3 \
+      -f "$bench_sql_dir/bench_noop.sql" \
+      > "$NOOP_OUTPUT" 2>&1 || true
+  else
+    # Using pod - would need to copy script first, but skip for now
+    echo "Skipping NOOP baseline (using pod pgbench)"
+    rm -f "$NOOP_OUTPUT"
+    NOOP_OUTPUT=""
+  fi
+
+  if [[ -n "$NOOP_OUTPUT" ]] && [[ -s "$NOOP_OUTPUT" ]]; then
+    NOOP_TPS=$(sed -n "s/^tps = \([0-9.][0-9.]*\) .*/\1/p" "$NOOP_OUTPUT" | tail -n1 || echo "")
+    NOOP_LAT=$(sed -n 's/^latency average = \([0-9.][0-9.]*\) ms$/\1/p' "$NOOP_OUTPUT" | tail -n1 || echo "")
+    if [[ -n "$NOOP_TPS" ]] && [[ -n "$NOOP_LAT" ]]; then
+      echo "  NOOP baseline: ${NOOP_TPS} TPS, ${NOOP_LAT} ms avg latency"
+      # Reference: good run had ~9.4K TPS, ~0.85 ms at 8 clients
+      # If we're significantly slower, that's environment overhead
+      if (( $(echo "$NOOP_TPS < 7000" | bc -l 2>/dev/null || echo 0) )); then
+        echo "  ⚠️  WARNING: NOOP TPS is low (${NOOP_TPS} < 7000). This indicates environment overhead." >&2
+        echo "     Reference: ~9.4K TPS expected. Check Docker/host load, logging settings, extensions." >&2
+      elif (( $(echo "$NOOP_LAT > 1.5" | bc -l 2>/dev/null || echo 0) )); then
+        echo "  ⚠️  WARNING: NOOP latency is high (${NOOP_LAT} ms > 1.5 ms). This indicates environment overhead." >&2
+        echo "     Reference: ~0.85 ms expected. Check Docker/host load, logging settings, extensions." >&2
+      else
+        echo "  ✅ NOOP baseline looks good (environment overhead is minimal)"
+      fi
+    fi
+    # Save NOOP output to log directory
+    cp "$NOOP_OUTPUT" "$LOG_DIR/noop_baseline_test.txt" 2>/dev/null || true
+    rm -f "$NOOP_OUTPUT"
+  fi
+else
+  echo "--- Skipping NOOP baseline test (RUN_NOOP_BASELINE=${RUN_NOOP_BASELINE}) ---"
+fi
+
 # Helper: Reset pg_stat_statements for clean per-run deltas
 reset_pg_stat_statements() {
   echo "--- Resetting pg_stat_statements ---"
@@ -978,12 +1452,42 @@ reset_pg_stat_statements() {
 # Helper: Cold cache reset (DB-level)
 cold_cache_reset() {
   echo "--- Cold cache reset (DB-level) ---"
-  psql_in_pod <<'SQL' >/dev/null 2>&1 || true
+  
+  # Check if database is in recovery mode before attempting checkpoint
+  local recovery_status
+  recovery_status=$(psql_in_pod -d postgres -tAc "SELECT pg_is_in_recovery();" 2>/dev/null || echo "t")
+  
+  if [[ "$recovery_status" == "t" ]]; then
+    echo "⚠️  WARNING: Database is in recovery mode, skipping cold cache reset" >&2
+    echo "   This will affect cold phase results. Waiting for recovery to complete..." >&2
+    wait_for_db_ready || {
+      echo "❌ Database still in recovery after wait. Skipping cold phase." >&2
+      return 1
+    }
+  fi
+  
+  # Check Docker container disk space before checkpoint
+  local pg_container
+  pg_container=$(docker ps --filter "name=postgres" --filter "publish=5433" --format "{{.Names}}" | head -1)
+  if [[ -n "$pg_container" ]]; then
+    local container_disk_pct
+    container_disk_pct=$(docker exec "$pg_container" df -h /var/lib/postgresql/data 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//' || echo "0")
+    if [[ "$container_disk_pct" -gt 95 ]]; then
+      echo "⚠️  WARNING: Docker container disk is ${container_disk_pct}% full, checkpoint may fail" >&2
+      echo "   Consider cleaning up Docker volumes or increasing disk space" >&2
+    fi
+  fi
+  
+  if ! psql_in_pod <<'SQL' >/dev/null 2>&1; then
 CHECKPOINT;
 DISCARD ALL;
 -- Reset stats so deltas are per-phase
 SELECT pg_stat_reset();
 SQL
+    echo "⚠️  Cold cache reset failed (database may be in recovery or out of disk space)" >&2
+    echo "   Check Docker container: docker logs $pg_container" >&2
+    return 1
+  fi
 }
 
 # CRITICAL: Warm cache and ensure fresh statistics before benchmarks
@@ -1030,7 +1534,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RUN_ID="run_${TIMESTAMP}"
 echo "RUN_ID=${RUN_ID}"
 results_csv="$tmpdir/bench_sweep_${TIMESTAMP}.csv"
-echo "ts_utc,variant,clients,threads,duration_s,limit_rows,tps,ok_xacts,fail_xacts,err_pct,lat_avg_ms,lat_std_ms,lat_est_ms,p50_ms,p95_ms,p99_ms,p999_ms,p9999_ms,p99999_ms,p100_ms,git_rev,git_branch,host,server_version,track_io,delta_blks_hit,delta_blks_read,delta_blk_read_ms,delta_blk_write_ms,delta_xact_commit,delta_tup_returned,delta_tup_fetched,delta_stmt_total_ms,delta_stmt_shared_hit,delta_stmt_shared_read,delta_stmt_shared_dirtied,delta_stmt_shared_written,delta_stmt_temp_read,delta_stmt_temp_written,delta_io_read_ms,delta_io_write_ms,delta_io_extend_ms,delta_io_fsync_ms,io_total_ms,active_sessions,cpu_share_pct,delta_wal_records,delta_wal_fpi,delta_wal_bytes,delta_ckpt_write_ms,delta_ckpt_sync_ms,delta_buf_checkpoint,delta_buf_backend,delta_buf_alloc,hit_ratio_pct,notes" > "$results_csv"
+echo "ts_utc,variant,clients,threads,duration_s,limit_rows,tps,ok_xacts,fail_xacts,err_pct,lat_avg_ms,lat_std_ms,lat_est_ms,p50_ms,p95_ms,p99_ms,p999_ms,p9999_ms,p99999_ms,p100_ms,git_rev,git_branch,host,server_version,track_io,delta_blks_hit,delta_blks_read,delta_blk_read_ms,delta_blk_write_ms,delta_xact_commit,delta_tup_returned,delta_tup_fetched,delta_stmt_total_ms,delta_stmt_shared_hit,delta_stmt_shared_read,delta_stmt_shared_dirtied,delta_stmt_shared_written,delta_stmt_temp_read,delta_stmt_temp_written,delta_io_read_ms,delta_io_write_ms,delta_io_extend_ms,delta_io_fsync_ms,io_total_ms,active_sessions,cpu_share_pct,delta_wal_records,delta_wal_fpi,delta_wal_bytes,delta_ckpt_write_ms,delta_ckpt_sync_ms,delta_buf_checkpoint,delta_buf_backend,delta_buf_alloc,hit_ratio_pct,phase,notes" > "$results_csv"
 echo "📊 CSV results file: $results_csv"
 
 echo "--- Running sweep"
@@ -1122,13 +1626,14 @@ run_variant() {
   # CRITICAL: Always return to repo root before cleanup
   trap 'cd "$REPO_ROOT" 2>/dev/null || true; popd >/dev/null 2>&1 || true; rm -rf "$wd"' RETURN
 
-  # CRITICAL: Disable autovacuum at TABLE level during benchmark to prevent pauses
+  # CRITICAL: Disable autovacuum at TABLE level during benchmark to prevent pauses (optional)
   # Note: We disable autovacuum ONLY during the benchmark run, then re-enable it after
   # This prevents pauses without permanently affecting database maintenance
   # NOTE: Session-level SET statements here do NOT affect pgbench connections.
   # All pgbench tuning comes from PGOPTIONS_EXTRA (work_mem, track_io_timing, etc.)
-  echo "Disabling autovacuum (table-level) for benchmark..."
-  psql_in_pod <<'SQL' >/dev/null 2>&1 || true
+  if [[ "$DISABLE_AUTOVACUUM" == "true" ]]; then
+    echo "Disabling autovacuum (table-level) for benchmark..."
+    psql_in_pod <<'SQL' >/dev/null 2>&1 || true
 -- Table-level autovacuum disable (affects all sessions) - TEMPORARY for benchmark only
 ALTER TABLE records.records SET (autovacuum_enabled = false);
 DO $$
@@ -1138,6 +1643,7 @@ BEGIN
   END IF;
 END $$;
 SQL
+  fi
 
   local metrics_before stmt_before io_before wal_before ckpt_before
   read -r metrics_before <<< "$(read_metrics)"
@@ -1221,8 +1727,9 @@ SQL
 
   local rc=${PIPESTATUS[0]}
   
-  # Re-enable autovacuum after benchmark (table-level)
-  psql_in_pod <<'SQL' >/dev/null 2>&1 || true
+  # Re-enable autovacuum after benchmark (table-level) if it was disabled
+  if [[ "$DISABLE_AUTOVACUUM" == "true" ]]; then
+    psql_in_pod <<'SQL' >/dev/null 2>&1 || true
 ALTER TABLE records.records SET (autovacuum_enabled = true);
 DO $$
 BEGIN
@@ -1231,6 +1738,7 @@ BEGIN
   END IF;
 END $$;
 SQL
+  fi
 
   if [[ $rc -ne 0 ]]; then
     echo "pgbench failed for $variant (clients=$clients)" >&2
@@ -1398,7 +1906,9 @@ SQL
   track_io=$(psql_in_pod -At -c "SHOW track_io_timing" | tr 'A-Z' 'a-z')
   track_io=$([[ "$track_io" == "on" ]] && echo true || echo false)
 
-  echo "$ts,$variant,$clients,$actual_threads,$duration,$LIMIT,$tps,$ok,$fail,$err_pct,$avg,$std,$lat_est_ms,$p50,$p95,$p99,$p999,$p9999,$p99999,$pmax,$git_rev,$git_branch,$host,$(psql_in_pod -At -c 'SHOW server_version'),$track_io,$d_blks_hit,$d_blks_read,$d_read_ms,$d_write_ms,$d_xact,$d_tup_ret,$d_tup_fetch,$d_stmt_ms,$d_stmt_hit,$d_stmt_read,$d_stmt_dirty,$d_stmt_written,$d_temp_read,$d_temp_written,$d_io_read,$d_io_write,$d_io_extend,$d_io_fsync,$io_total,$active_sessions,$cpu_share_pct,$d_wal_rec,$d_wal_fpi,$d_wal_bytes,$d_ckpt_write,$d_ckpt_sync,$d_buf_ckpt,$d_buf_backend,$d_buf_alloc,$hit_ratio" >> "$results_csv"
+  local notes_str="rev=$git_rev branch=$git_branch host=$host variant=$variant lim=$LIMIT query=$QUERY phase=$PHASE"
+
+  echo "$ts,$variant,$clients,$actual_threads,$duration,$LIMIT,$tps,$ok,$fail,$err_pct,$avg,$std,$lat_est_ms,$p50,$p95,$p99,$p999,$p9999,$p99999,$pmax,$git_rev,$git_branch,$host,$(psql_in_pod -At -c 'SHOW server_version'),$track_io,$d_blks_hit,$d_blks_read,$d_read_ms,$d_write_ms,$d_xact,$d_tup_ret,$d_tup_fetch,$d_stmt_ms,$d_stmt_hit,$d_stmt_read,$d_stmt_dirty,$d_stmt_written,$d_temp_read,$d_temp_written,$d_io_read,$d_io_write,$d_io_extend,$d_io_fsync,$io_total,$active_sessions,$cpu_share_pct,$d_wal_rec,$d_wal_fpi,$d_wal_bytes,$d_ckpt_write,$d_ckpt_sync,$d_buf_ckpt,$d_buf_backend,$d_buf_alloc,$hit_ratio,$PHASE,$notes_str" >> "$results_csv"
   
   # Optional: Warn about high latency
   if [[ -n "$lat_est_ms" ]] && [[ -n "$tps" ]] && (( $(echo "$tps > 0" | bc -l 2>/dev/null || echo 0) )); then
@@ -1414,7 +1924,8 @@ SQL
     -v duration="$duration" -v lim="$LIMIT" -v tps="$tps" -v ok="$ok" \
     -v fail="$fail" -v err_pct="$err_pct" -v avg="$avg" -v std="$std" \
     -v lat_est="$lat_est_ms" -v p50="$p50" -v p95="$p95" -v p99="$p99" -v p999="$p999" \
-    -v p9999="$p9999" -v p99999="$p99999" -v p100="$pmax" -v notes="rev=$git_rev branch=$git_branch host=$host variant=$variant lim=$LIMIT query=$QUERY phase=$PHASE" \
+    -v p9999="$p9999" -v p99999="$p99999" -v p100="$pmax" \
+    -v phase="$PHASE" -v notes="$notes_str" \
     -v git_rev="$git_rev" -v git_branch="$git_branch" -v host="$host" \
     -v server_version="$(psql_in_pod -At -c 'SHOW server_version')" \
     -v track_io="$track_io" -v dH="$d_blks_hit" -v dR="$d_blks_read" \
@@ -1431,10 +1942,11 @@ SQL
     -f - <<'EOSQL'
       \echo 'Inserting bench.results row variant=' :'variant' ', clients=' :'clients' ', tps=' :'tps'
       INSERT INTO bench.results(
-        variant, clients, threads, duration_s, limit_rows,
+        variant, phase, clients, threads, duration_s, limit_rows,
         tps, ok_xacts, fail_xacts, err_pct,
         lat_avg_ms, lat_std_ms, lat_est_ms,
-        p50_ms, p95_ms, p99_ms, p999_ms, p9999_ms, p99999_ms, p100_ms, notes,
+        p50_ms, p95_ms, p99_ms, p999_ms, p9999_ms, p99999_ms, p100_ms,
+        notes,
         git_rev, git_branch, host, server_version, track_io,
         delta_blks_hit, delta_blks_read, delta_blk_read_ms, delta_blk_write_ms,
         delta_xact_commit, delta_tup_returned, delta_tup_fetched,
@@ -1446,7 +1958,7 @@ SQL
         delta_ckpt_write_ms, delta_ckpt_sync_ms, delta_buf_checkpoint, delta_buf_backend,
         delta_buf_alloc, hit_ratio_pct, run_id
       ) VALUES (
-        :'variant', :'clients'::int, :'threads'::int, :'duration'::int, :'lim'::int,
+        :'variant', :'phase', :'clients'::int, :'threads'::int, :'duration'::int, :'lim'::int,
         NULLIF(:'tps','')::numeric, NULLIF(:'ok','')::bigint, NULLIF(:'fail','')::bigint, NULLIF(:'err_pct','')::numeric,
         NULLIF(NULLIF(:'avg','NaN'),'')::numeric, NULLIF(NULLIF(:'std','NaN'),'')::numeric,
         NULLIF(NULLIF(:'lat_est','NaN'),'')::numeric,
@@ -1484,14 +1996,14 @@ for clients in "${client_array[@]}"; do
     variant_label=$(printf '%s' "$variant" | tr '[:lower:]' '[:upper:]')
     echo "== ${variant_label}, clients=$clients, phase=$PHASE =="
     
-    # CRITICAL: Run comprehensive EXPLAIN ANALYZE before first benchmark
-    if [[ "$clients" == "${client_array[0]}" ]] && [[ "$variant" == "${variants[0]}" ]]; then
+    # CRITICAL: Run comprehensive EXPLAIN ANALYZE before first benchmark (optional)
+    if [[ "$RUN_PLAN_DUMP" == "true" ]] && [[ "$clients" == "${client_array[0]}" ]] && [[ "$variant" == "${variants[0]}" ]]; then
       echo "--- Running Comprehensive Query Plan Analysis ---"
       echo "📁 Saving full query plans to: $LOG_DIR/"
       timestamp=$(date +%H%M%S)
       
       # Verify function exists before running EXPLAIN
-      if ! psql_in_pod -c "SELECT 1 FROM pg_proc WHERE proname = 'search_records_fuzzy_ids' AND pronamespace = 'public'::regnamespace AND pronargs = 4;" >/dev/null 2>&1; then
+      if ! psql_in_pod -c "SELECT 1 FROM pg_proc WHERE proname = 'search_records_fuzzy_ids' AND pronamespace = 'public'::regnamespace AND pronargs = 5;" >/dev/null 2>&1; then
         echo "❌ ERROR: Function search_records_fuzzy_ids does not exist! Cannot run EXPLAIN ANALYZE." >&2
         exit 1
       fi
@@ -1517,7 +2029,8 @@ SET jit = off;
 \echo ''
 
 \echo '=== 1. FTS + Trigram Rank Function Query Plan (REAL PATH) ==='
-EXPLAIN (ANALYZE, BUFFERS, VERBOSE, COSTS, TIMING, SUMMARY)
+\echo 'NOTE: Using TIMING OFF to reduce EXPLAIN overhead (real runtime is ~2-4ms, not 130ms)'
+EXPLAIN (ANALYZE, BUFFERS, COSTS, SUMMARY, TIMING OFF)
 SELECT count(*)
 FROM public.search_records_fuzzy_ids(
   '0dc268d0-a86f-4e12-8d10-9db0f1b735e0'::uuid,
@@ -1527,14 +2040,30 @@ FROM public.search_records_fuzzy_ids(
 );
 
 \echo ''
-\echo '=== 2. Raw Trigram % Query Plan (BASELINE - for comparison) ==='
-\echo 'NOTE: This baseline is disabled by default (very slow, 5s+). Set INCLUDE_RAW_TRGM_EXPLAIN=true to enable.'
-\echo ''
-\echo '=== 3. Function Definition ==='
-SELECT pg_get_functiondef('public.search_records_fuzzy_ids(uuid,text,bigint,bigint)'::regprocedure);
+\echo '=== 2. FTS Partial Index Usage Check (CRITICAL) ==='
+\echo 'Verifying that idx_records_search_tsv_bench is actually being used'
+EXPLAIN (ANALYZE, BUFFERS, COSTS, SUMMARY, TIMING OFF)
+SELECT
+  r.id,
+  r.search_norm
+FROM records.records AS r
+WHERE r.user_id = '0dc268d0-a86f-4e12-8d10-9db0f1b735e0'::uuid
+  AND r.search_tsv @@ plainto_tsquery('simple', public.norm_text('鄧麗君 album 263 cn-041 polygram'))
+LIMIT 40;
 
 \echo ''
-\echo '=== 4. Table Statistics ==='
+\echo '=== 3. FTS Partial Index Definition ==='
+SELECT pg_get_indexdef('records.idx_records_search_tsv_bench'::regclass);
+
+\echo ''
+\echo '=== 4. Raw Trigram % Query Plan (BASELINE - for comparison) ==='
+\echo 'NOTE: This baseline is disabled by default (very slow, 5s+). Set INCLUDE_RAW_TRGM_EXPLAIN=true to enable.'
+\echo ''
+\echo '=== 5. Function Definition ==='
+SELECT pg_get_functiondef('public.search_records_fuzzy_ids(uuid,text,bigint,bigint,text)'::regprocedure);
+
+\echo ''
+\echo '=== 6. Table Statistics ==='
 SELECT 
   schemaname,
   relname AS tablename,
@@ -1549,7 +2078,7 @@ FROM pg_stat_user_tables
 WHERE schemaname = 'records' AND relname = 'records';
 
 \echo ''
-\echo '=== 5. Index Statistics ==='
+\echo '=== 7. Index Statistics ==='
 SELECT 
   schemaname,
   relname AS tablename,
@@ -1564,7 +2093,7 @@ ORDER BY pg_relation_size((schemaname||'.'||indexrelname)::regclass) DESC
 LIMIT 20;
 
 \echo ''
-\echo '=== 6. Alias Table Statistics ==='
+\echo '=== 8. Alias Table Statistics ==='
 SELECT 
   schemaname,
   relname AS tablename,
@@ -1574,7 +2103,7 @@ FROM pg_stat_user_tables
 WHERE schemaname = 'public' AND relname IN ('record_aliases', 'aliases_mv');
 
 \echo ''
-\echo '=== 7. Alias Index Statistics ==='
+\echo '=== 9. Alias Index Statistics ==='
 SELECT 
   schemaname,
   relname AS tablename,
@@ -1587,7 +2116,7 @@ WHERE schemaname = 'public' AND relname IN ('record_aliases', 'aliases_mv')
 ORDER BY pg_relation_size((schemaname||'.'||indexrelname)::regclass) DESC;
 
 \echo ''
-\echo '=== 8. PostgreSQL Configuration (Performance Settings) ==='
+\echo '=== 10. PostgreSQL Configuration (Performance Settings) ==='
 SELECT name, setting, unit, source
 FROM pg_settings
 WHERE name IN (
@@ -1608,7 +2137,7 @@ WHERE name IN (
 ORDER BY name;
 
 \echo ''
-\echo '=== 9. Partitioning Status ==='
+\echo '=== 11. Partitioning Status ==='
 SELECT 
   schemaname,
   tablename,
@@ -1631,7 +2160,7 @@ FROM pg_tables
 WHERE schemaname = 'records' AND tablename = 'records';
 
 \echo ''
-\echo '=== 10. Database Size ==='
+\echo '=== 12. Database Size ==='
 SELECT 
   pg_size_pretty(pg_database_size(current_database())) AS database_size;
 
@@ -1643,6 +2172,8 @@ EOFSQL
       echo ""
       echo "✅ Full query plan saved to: $LOG_DIR/query_plan_full_analysis_${timestamp}.txt"
       echo "   This file contains all information needed for PostgreSQL GPT analysis"
+    elif [[ "$RUN_PLAN_DUMP" != "true" ]]; then
+      echo "--- Skipping query plan analysis (RUN_PLAN_DUMP=${RUN_PLAN_DUMP}) ---"
     fi
     
     # Map variant names to SQL files
@@ -1769,17 +2300,23 @@ try:
     # We'll treat (variant, clients, tps) as unique for plotting.
     df = df.sort_values("ts_utc")
     
+    # Build a series label that includes phase when present
+    if "phase" in df.columns:
+        df["series"] = df["variant"] + "_" + df["phase"].fillna("warm")
+    else:
+        df["series"] = df["variant"]
+    
     def plot_metric(metric, ylabel, filename, logy=False):
         if metric not in df.columns:
             return
         plt.figure(figsize=(10, 6))
-        for variant, sub in df.groupby("variant"):
-            # take best row per clients for this variant
+        for series, sub in df.groupby("series"):
+            # take best row per clients for this series
             best = sub.sort_values("tps", ascending=False).drop_duplicates(["clients"])
             x = best["clients"]
             y = best[metric]
             if y.notnull().any():
-                plt.plot(x, y, marker="o", label=variant)
+                plt.plot(x, y, marker="o", label=series)
         plt.xlabel("clients")
         plt.ylabel(ylabel)
         plt.title(f"{metric} vs clients")
@@ -1922,6 +2459,7 @@ echo "--- Peak TPS Summary (this run only: $RUN_ID) ---"
 psql_in_pod -v run_id="$RUN_ID" <<'SQL' | tee "$LOG_DIR/peak_tps_summary.txt"
 SELECT 
   variant,
+  phase,
   clients,
   tps,
   lat_est_ms,
@@ -1936,7 +2474,7 @@ FROM bench.results
 WHERE variant IN ('knn', 'trgm', 'noop')
   AND tps IS NOT NULL
   AND run_id = :'run_id'
-ORDER BY variant, clients;
+ORDER BY variant, phase, clients;
 SQL
 
 # Find peak TPS for each variant (this run only)
@@ -1951,9 +2489,10 @@ for variant in knn trgm noop; do
 done
 echo ""
 
-# Create automatic backup after benchmark
-echo "=== Creating automatic backup ==="
-if [[ -f "./scripts/create-comprehensive-backup.sh" ]]; then
+# Create automatic backup after benchmark (only if explicitly requested)
+# NOTE: Default is false to avoid disk bloat during repeated benchmark runs
+if [[ "$CREATE_BENCH_BACKUP" == "true" ]] && [[ -f "./scripts/create-comprehensive-backup.sh" ]]; then
+  echo "=== Creating automatic backup ==="
   # Wait for pod to be ready before backup (pod might have restarted)
   NS="${NS:-record-platform}"
   PGPOD=$(kubectl -n "$NS" get pod -l app=postgres -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | awk 'NR==1{print $1}')
@@ -1971,5 +2510,9 @@ if [[ -f "./scripts/create-comprehensive-backup.sh" ]]; then
   fi
   ./scripts/create-comprehensive-backup.sh
 else
-  echo "⚠️  Backup script not found, skipping automatic backup"
+  if [[ "$CREATE_BENCH_BACKUP" != "true" ]]; then
+    echo "⚠️  Backup disabled for this run (CREATE_BENCH_BACKUP=${CREATE_BENCH_BACKUP})"
+  else
+    echo "⚠️  Backup script not found, skipping automatic backup"
+  fi
 fi

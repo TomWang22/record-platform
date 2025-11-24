@@ -1,52 +1,206 @@
-# =========================
-# FILE: Caddyfile
-# =========================
 {
   admin off
-  servers {
-    protocol {
-      allow_h2
-      allow_h3
-    }
-  }
 }
 
-# Primary vhost (SNI = record.local)
+# Primary vhost
 https://record.local {
   tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key {
     protocols tls1.2 tls1.3
   }
 
-  @health path /_caddy/healthz
-  respond @health "ok\n" 200
+  # Health check endpoint
+  handle_path /_caddy/healthz {
+    respond "ok" 200
+  }
 
-  # TLS to ingress; keep SNI=record.local; prefer h2 upstream
-  reverse_proxy https://ingress-nginx-controller.ingress-nginx.svc.cluster.local:443 {
-    header_up Host {http.request.host}
-    transport http {
-      tls
-      tls_server_name record.local
+  # gRPC matchers - route by service name in path
+  @grpc_auth {
+    protocol grpc
+    path_regexp ^/auth\.
+  }
+  @grpc_records {
+    protocol grpc
+    path_regexp ^/records\.
+  }
+  @grpc_social {
+    protocol grpc
+    path_regexp ^/social\.
+  }
+  @grpc_listings {
+    protocol grpc
+    path_regexp ^/listings\.
+  }
+  @grpc_analytics {
+    protocol grpc
+    path_regexp ^/analytics\.
+  }
 
-      # --- ONE of the following trust options ---
+  # Route auth-service gRPC requests
+  handle @grpc_auth {
+    reverse_proxy auth-service.record-platform.svc.cluster.local:50051 {
+      header_up Host {http.request.host}
+      header_up TE trailers
+      header_up grpc-timeout {http.request.header.grpc-timeout}
+      transport http {
+        versions h2c
+      }
+    }
+  }
 
-      # A) TEMP: prove pathing first (disable once CA works):
-      # tls_insecure_skip_verify
+  # Route records-service gRPC requests
+  handle @grpc_records {
+    reverse_proxy records-service.record-platform.svc.cluster.local:50051 {
+      header_up Host {http.request.host}
+      header_up TE trailers
+      header_up grpc-timeout {http.request.header.grpc-timeout}
+      transport http {
+        versions h2c
+      }
+    }
+  }
 
-      # B) Proper CA trust (preferred): your mkcert CA is mounted at /etc/caddy/ca/dev-root.pem
-      # (If Caddy complains about unknown authority, this is the bit to keep enabled)
-      # Note: tls_trusted_ca_certs is deprecated but still works in Caddy 2.8
-      tls_trusted_ca_certs /etc/caddy/ca/dev-root.pem
+  # Route social-service gRPC requests
+  handle @grpc_social {
+    reverse_proxy social-service.record-platform.svc.cluster.local:50056 {
+      header_up Host {http.request.host}
+      header_up TE trailers
+      header_up grpc-timeout {http.request.header.grpc-timeout}
+      transport http {
+        versions h2c
+      }
+    }
+  }
 
-      versions h2 h1
+  # Route listings-service gRPC requests
+  handle @grpc_listings {
+    reverse_proxy listings-service.record-platform.svc.cluster.local:50057 {
+      header_up Host {http.request.host}
+      header_up TE trailers
+      header_up grpc-timeout {http.request.header.grpc-timeout}
+      transport http {
+        versions h2c
+      }
+    }
+  }
+
+  # Route analytics-service gRPC requests
+  handle @grpc_analytics {
+    reverse_proxy analytics-service.record-platform.svc.cluster.local:50054 {
+      header_up Host {http.request.host}
+      header_up TE trailers
+      header_up grpc-timeout {http.request.header.grpc-timeout}
+      transport http {
+        versions h2c
+      }
+    }
+  }
+
+  # REST API requests: route through nginx ingress (as before)
+  handle {
+    reverse_proxy https://ingress-nginx-controller.ingress-nginx.svc.cluster.local:443 {
+      header_up Host {http.request.host}
+      transport http {
+        tls
+        tls_server_name record.local
+        tls_trusted_ca_certs /etc/caddy/ca/dev-root.pem
+        versions h2 h1
+      }
     }
   }
 }
 
-# Catch-all for probe without SNI
+# FIX #1: Internal h2c port for gRPC tests (bypasses TLS)
+:5000 {
+  # gRPC matchers - route by service name in path
+  @grpc_auth {
+    protocol grpc
+    path_regexp ^/auth\.
+  }
+  @grpc_records {
+    protocol grpc
+    path_regexp ^/records\.
+  }
+  @grpc_social {
+    protocol grpc
+    path_regexp ^/social\.
+  }
+  @grpc_listings {
+    protocol grpc
+    path_regexp ^/listings\.
+  }
+  @grpc_analytics {
+    protocol grpc
+    path_regexp ^/analytics\.
+  }
+
+  # Route auth-service gRPC requests
+  handle @grpc_auth {
+    reverse_proxy auth-service.record-platform.svc.cluster.local:50051 {
+      header_up Host {http.request.host}
+      header_up TE trailers
+      header_up grpc-timeout {http.request.header.grpc-timeout}
+      transport http {
+        versions h2c
+      }
+    }
+  }
+
+  # Route records-service gRPC requests
+  handle @grpc_records {
+    reverse_proxy records-service.record-platform.svc.cluster.local:50051 {
+      header_up Host {http.request.host}
+      header_up TE trailers
+      header_up grpc-timeout {http.request.header.grpc-timeout}
+      transport http {
+        versions h2c
+      }
+    }
+  }
+
+  # Route social-service gRPC requests
+  handle @grpc_social {
+    reverse_proxy social-service.record-platform.svc.cluster.local:50056 {
+      header_up Host {http.request.host}
+      header_up TE trailers
+      header_up grpc-timeout {http.request.header.grpc-timeout}
+      transport http {
+        versions h2c
+      }
+    }
+  }
+
+  # Route listings-service gRPC requests
+  handle @grpc_listings {
+    reverse_proxy listings-service.record-platform.svc.cluster.local:50057 {
+      header_up Host {http.request.host}
+      header_up TE trailers
+      header_up grpc-timeout {http.request.header.grpc-timeout}
+      transport http {
+        versions h2c
+      }
+    }
+  }
+
+  # Route analytics-service gRPC requests
+  handle @grpc_analytics {
+    reverse_proxy analytics-service.record-platform.svc.cluster.local:50054 {
+      header_up Host {http.request.host}
+      header_up TE trailers
+      header_up grpc-timeout {http.request.header.grpc-timeout}
+      transport http {
+        versions h2c
+      }
+    }
+  }
+}
+
+# Catch-all for probes without SNI
 https://:443 {
   tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key {
     protocols tls1.2 tls1.3
   }
-  @probe path /_caddy/healthz
-  respond @probe "ok\n" 200
+  # Health check endpoint for probes without SNI
+  handle_path /_caddy/healthz {
+    respond "ok" 200
+  }
 }

@@ -54,3 +54,17 @@ spec:
             name: listings-service
             port:
               number: 50057
+      - path: /shopping.ShoppingService
+        pathType: Prefix
+        backend:
+          service:
+            name: shopping-service
+            port:
+              number: 50058
+      - path: /analytics.AnalyticsService
+        pathType: Prefix
+        backend:
+          service:
+            name: analytics-service
+            port:
+              number: 50054

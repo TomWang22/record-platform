@@ -1,0 +1,138 @@
+// Shopping/Collector Service Database Schema
+// Port: 5436 (separate from main, social, listings)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL_SHOPPING")
+}
+
+// Shopping Cart - temporary items user is considering
+model ShoppingCart {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id") @db.Uuid
+  listingId String?  @map("listing_id") @db.Uuid // Optional: can add items not yet listed
+  itemType  String   @map("item_type") // 'listing', 'record', 'custom'
+  itemId    String   @map("item_id") @db.Uuid // ID of the item (listing, record, etc.)
+  quantity  Int      @default(1)
+  price     Decimal? @db.Decimal(10, 2) // Snapshot price at add time
+  metadata  Json?    // Additional item data (title, image, etc.)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([userId, itemType, itemId])
+  @@map("shopping_cart")
+}
+
+// Watchlist - items user wants to monitor (price changes, availability)
+model Watchlist {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id") @db.Uuid
+  listingId String?  @map("listing_id") @db.Uuid
+  itemType  String   @map("item_type") // 'listing', 'record', 'auction'
+  itemId    String   @map("item_id") @db.Uuid
+  notifyOn  String[] @map("notify_on") // ['price_drop', 'availability', 'bid_end']
+  metadata  Json?   // Snapshot of item at watch time
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, itemType, itemId])
+  @@index([userId])
+  @@index([itemId, itemType])
+  @@map("watchlist")
+}
+
+// Recently Viewed - track what user has viewed (LRU cache in Redis, persisted here)
+model RecentlyViewed {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id") @db.Uuid
+  itemType  String   @map("item_type") // 'listing', 'record', 'user', 'forum_post'
+  itemId    String   @map("item_id") @db.Uuid
+  viewedAt  DateTime @default(now()) @map("viewed_at")
+  metadata  Json?   // Snapshot of item at view time
+
+  @@unique([userId, itemType, itemId])
+  @@index([userId, viewedAt(sort: Desc)])
+  @@index([itemId, itemType])
+  @@map("recently_viewed")
+}
+
+// Wishlist - items user wants to buy later
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id") @db.Uuid
+  listingId String?  @map("listing_id") @db.Uuid
+  itemType  String   @map("item_type") // 'listing', 'record', 'custom'
+  itemId    String   @map("item_id") @db.Uuid
+  priority  Int      @default(0) // User-defined priority
+  notes     String?  @db.Text
+  metadata  Json?   // Snapshot of item at wish time
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, itemType, itemId])
+  @@index([userId, priority(sort: Desc)])
+  @@index([itemId, itemType])
+  @@map("wishlist")
+}
+
+// Purchase History - completed purchases
+model PurchaseHistory {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id") @db.Uuid
+  orderId       String   @map("order_id") @db.Uuid // Link to order system
+  listingId     String?  @map("listing_id") @db.Uuid
+  itemType      String   @map("item_type") // 'listing', 'record', 'auction'
+  itemId        String   @map("item_id") @db.Uuid
+  quantity      Int      @default(1)
+  pricePaid     Decimal  @map("price_paid") @db.Decimal(10, 2)
+  currency      String   @default("USD")
+  purchaseType  String   @map("purchase_type") // 'buy_now', 'auction_win', 'best_offer'
+  status        String   @default("completed") // 'completed', 'pending', 'cancelled', 'refunded'
+  purchasedAt   DateTime @default(now()) @map("purchased_at")
+  metadata      Json?   // Full purchase details
+
+  @@index([userId, purchasedAt(sort: Desc)])
+  @@index([orderId])
+  @@index([itemId, itemType])
+  @@map("purchase_history")
+}
+
+// Search History - track user searches (for recommendations)
+model SearchHistory {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id") @db.Uuid
+  query       String   @db.Text
+  queryType   String   @map("query_type") // 'listing', 'record', 'user', 'forum'
+  filters     Json?   // Applied filters (price range, condition, etc.)
+  resultCount Int?     @map("result_count")
+  clickedItem String?  @map("clicked_item") @db.Uuid // If user clicked a result
+  searchedAt  DateTime @default(now()) @map("searched_at")
+
+  @@index([userId, searchedAt(sort: Desc)])
+  @@index([query]) // For trending searches
+  @@index([queryType, searchedAt(sort: Desc)])
+  @@map("search_history")
+}
+
+// Cache Metadata - track LFU/LRU stats (synced from Redis)
+model CacheMetadata {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id") @db.Uuid
+  cacheKey  String   @map("cache_key") @db.Text
+  cacheType String   @map("cache_type") // 'lfu', 'lru', 'recently_viewed'
+  accessCount Int    @default(0) @map("access_count") // For LFU
+  lastAccess  DateTime @default(now()) @map("last_access") // For LRU
+  metadata  Json?
+
+  @@unique([userId, cacheKey])
+  @@index([userId, cacheType])
+  @@index([cacheType, accessCount(sort: Desc)]) // For LFU eviction
+  @@index([cacheType, lastAccess(sort: Asc)]) // For LRU eviction
+  @@map("cache_metadata")
+}
+

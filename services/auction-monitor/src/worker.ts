@@ -3,14 +3,19 @@ import axios from "axios";
 import { Pool } from "pg";
 import http from "http";
 
-const POSTGRES_URL = process.env.POSTGRES_URL!;
+// Dual-DB setup: listings DB for reading watchlist, auction-monitor DB for writing results
+const POSTGRES_URL_LISTINGS = process.env.POSTGRES_URL_LISTINGS || process.env.POSTGRES_URL!;
+const POSTGRES_URL_AUCTION_MONITOR = process.env.POSTGRES_URL_AUCTION_MONITOR || process.env.POSTGRES_URL!;
 const KAFKA_BROKER = process.env.KAFKA_BROKER || "kafka:9092";
 const KAFKA_CLIENT_ID = process.env.KAFKA_CLIENT_ID || "record-platform";
 const EBAY_TOKEN = process.env.EBAY_OAUTH_TOKEN;
 
 const healthPort = Number(process.env.AUCTION_MONITOR_PORT) || 4010;
 
-const pool = new Pool({ connectionString: POSTGRES_URL });
+// Pool for reading watchlist from listings DB
+const listingsPool = new Pool({ connectionString: POSTGRES_URL_LISTINGS });
+// Pool for writing auction results to auction-monitor DB
+const auctionPool = new Pool({ connectionString: POSTGRES_URL_AUCTION_MONITOR });
 
 const kafka = new Kafka({
   clientId: KAFKA_CLIENT_ID,
@@ -48,9 +53,11 @@ function computeTotals(
 async function waitForDb() {
   for (;;) {
     try {
-      await pool.query("select 1");
+      // Check both databases
+      await listingsPool.query("select 1");
+      await auctionPool.query("select 1");
       dbReady = true;
-      console.log("db ok");
+      console.log("db ok (both listings and auction-monitor)");
       return;
     } catch (e: any) {
       dbReady = false;
@@ -87,7 +94,8 @@ async function pollOnce() {
     return;
   }
 
-  const { rows: wl } = await pool.query(`
+  // Read watchlist from listings DB
+  const { rows: wl } = await listingsPool.query(`
     SELECT w.id, w.user_id, w.source, w.query,
            COALESCE(us.country_code,'US') as country_code,
            COALESCE(us.fee_rate,0.0) as fee_rate,
@@ -132,9 +140,28 @@ async function pollOnce() {
     });
 
     for (const a of items) {
-      await pool.query(
-        "SELECT listings.upsert_auction($1,$2,$3,$4,$5,$6,$7,$8)",
-        [a.source, a.item_id, a.title, a.price, a.currency, a.shipping, a.ends_at, a.url]
+      // Write auction results to auction-monitor DB using the new function
+      await auctionPool.query(
+        "SELECT auction_monitor.upsert_auction_result($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)",
+        [
+          a.source,        // p_source
+          a.item_id,       // p_external_id
+          a.title,         // p_title
+          a.price,         // p_price
+          a.total,         // p_total_cost
+          a.ends_at,       // p_sold_at
+          null,            // p_artist (optional)
+          null,            // p_label (optional)
+          null,            // p_catalog_number (optional)
+          null,            // p_format (optional)
+          null,            // p_condition_record (optional)
+          null,            // p_condition_sleeve (optional)
+          a.currency,      // p_currency
+          a.shipping,      // p_shipping_cost
+          a.url,           // p_auction_url
+          null,            // p_image_url (optional)
+          null             // p_notes (optional)
+        ]
       );
 
       if (kafkaReady) {
@@ -168,6 +195,7 @@ async function pollOnce() {
 process.on("SIGTERM", async () => {
   try { await producer.disconnect(); } catch {}
   try { await admin.disconnect(); } catch {}
-  try { await pool.end(); } catch {}
+  try { await listingsPool.end(); } catch {}
+  try { await auctionPool.end(); } catch {}
   process.exit(0);
 });

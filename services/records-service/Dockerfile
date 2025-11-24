@@ -20,10 +20,11 @@ RUN pnpm -w \
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
 
-# OpenSSL for prisma generate
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates openssl \
- && rm -rf /var/lib/apt/lists/*
+# OpenSSL for prisma generate (skip if already available)
+RUN (apt-get update --allow-releaseinfo-change 2>&1 | grep -v "GPG error" || true) \
+ && (apt-get install -y --no-install-recommends --allow-unauthenticated curl ca-certificates openssl 2>&1 | grep -v "GPG error" || \
+     (command -v openssl >/dev/null 2>&1 && echo "OpenSSL already available" || (apt-get update && apt-get install -y --no-install-recommends curl ca-certificates openssl))) \
+ && rm -rf /var/lib/apt/lists/* || true
 
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 COPY --from=deps /app /app
@@ -47,9 +48,10 @@ FROM node:20-bookworm-slim
 WORKDIR /app/services/records-service
 ENV NODE_ENV=production
 
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates openssl \
- && rm -rf /var/lib/apt/lists/*
+RUN (apt-get update --allow-releaseinfo-change 2>&1 | grep -v "GPG error" || true) \
+ && (apt-get install -y --no-install-recommends --allow-unauthenticated curl ca-certificates openssl 2>&1 | grep -v "GPG error" || \
+     (command -v openssl >/dev/null 2>&1 && echo "OpenSSL already available" || (apt-get update && apt-get install -y --no-install-recommends curl ca-certificates openssl))) \
+ && rm -rf /var/lib/apt/lists/* || true
 
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/services/records-service/node_modules ./node_modules

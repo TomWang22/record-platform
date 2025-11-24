@@ -16,6 +16,8 @@ import {
   createAuthClient,
   createRecordsClient,
   createSocialClient,
+  createListingsClient,
+  createShoppingClient,
   promisifyGrpcCall,
 } from "@common/utils/grpc-clients";
 
@@ -37,10 +39,14 @@ const AUTH_GRPC_TARGET = process.env.AUTH_GRPC_TARGET || "auth-service:50051";
 const RECORDS_GRPC_TARGET =
   process.env.RECORDS_GRPC_TARGET || "records-service:50051";
 const SOCIAL_GRPC_TARGET = process.env.SOCIAL_GRPC_TARGET || "social-service:50056";
+const LISTINGS_GRPC_TARGET = process.env.LISTINGS_GRPC_TARGET || "listings-service:50057";
+const SHOPPING_GRPC_TARGET = process.env.SHOPPING_GRPC_TARGET || "shopping-service:50058";
 
 const authGrpcClient = createAuthClient(AUTH_GRPC_TARGET);
 const recordsGrpcClient = createRecordsClient(RECORDS_GRPC_TARGET);
 const socialGrpcClient = createSocialClient(SOCIAL_GRPC_TARGET);
+const listingsGrpcClient = createListingsClient(LISTINGS_GRPC_TARGET);
+const shoppingGrpcClient = createShoppingClient(SHOPPING_GRPC_TARGET);
 
 /* ----------------------- Types ----------------------- */
 type AuthedRequest = Request & {
@@ -289,6 +295,21 @@ app.use(
     agent: keepAliveAgent,
   })
 );
+// Listings health check - must be before auth guard
+app.get("/listings/healthz", createProxyMiddleware({
+  target: "http://listings-service:4003",
+  changeOrigin: true,
+  pathRewrite: () => "/healthz",
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+}));
+app.head("/listings/healthz", createProxyMiddleware({
+  target: "http://listings-service:4003",
+  changeOrigin: true,
+  pathRewrite: () => "/healthz",
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+}));
 app.use(
   "/records/metrics",
   createProxyMiddleware({
@@ -300,6 +321,24 @@ app.use(
   })
 );
 
+/* ----------------------- Auth Routes (before auth guard) ----------------------- */
+// Logout must be before auth guard to allow token revocation
+app.post("/auth/logout", createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000, // Increased timeout for logout (Redis operations)
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/logout proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+
+
 /* ----------------------- Open-route matcher (for other cases) ----------------------- */
 type RouteRule = { method: string; pattern: RegExp };
 const OPEN_ROUTES: RouteRule[] = [
@@ -308,11 +347,15 @@ const OPEN_ROUTES: RouteRule[] = [
   { method: "GET",  pattern: /^\/(?:api\/)?metrics\/?$/ },
   { method: "HEAD", pattern: /^\/(?:api\/)?metrics\/?$/ },
 
-  // auth entrypoints
+  // service health checks (public)
+  { method: "GET",  pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics)\/healthz\/?$/ },
+  { method: "HEAD", pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics)\/healthz\/?$/ },
+
+  // auth entrypoints (logout is handled by proxy route before this check)
   { method: "POST", pattern: /^\/(?:api\/)?auth\/(login|register)\/?$/ },
 
-  // public GETs
-  { method: "GET",  pattern: /^\/(?:api\/)?listings(?:\/|$)/ },
+  // public GETs (exclude protected routes like /my-listings)
+  { method: "GET",  pattern: /^\/(?:api\/)?listings\/(search|$)/ },
   { method: "GET",  pattern: /^\/(?:api\/)?ai(?:\/|$)/ },
 ];
 const isOpenRoute = (req: Request) => {
@@ -409,6 +452,7 @@ app.post("/auth/login", jsonParser, async (req: Request, res: Response) => {
     handleGrpcError(res, err);
   }
 });
+
 
 /* ----------------------- gRPC-backed Records Routes ----------------------- */
 app.get("/records", async (req: AuthedRequest, res: Response) => {
@@ -534,21 +578,39 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
    ========================================================= */
 
 /* Listings — public GETs, but forward identity if present */
+// Note: /listings/healthz is handled by specific route above (line 298)
 app.use(
   "/listings",
   injectIdentityHeadersIfAny,
   createProxyMiddleware({
     target: "http://listings-service:4003",
     changeOrigin: true,
-    proxyTimeout: 15000,
+    // http-proxy-middleware strips the matched path prefix (/listings), so we need to add it back
+    // If path is empty or just "/", it means POST /listings, so we keep it as /listings
+    pathRewrite: (path, req) => {
+      // path is already stripped (e.g., /search becomes /search, / becomes empty)
+      // listings-service expects /listings/search, /listings/, etc.
+      if (!path || path === "/") {
+        return "/listings";
+      }
+      return `/listings${path}`;
+    },
+    proxyTimeout: 30000, // Increased timeout for HTTP/3 requests
     agent: keepAliveAgent,
     on: {
+      proxyReq(proxyReq, req, res) {
+        console.log(`[gw] Proxying ${req.method} ${req.path} to listings-service${proxyReq.path}`);
+      },
       proxyRes(proxyRes) {
         const h = proxyRes.headers as Record<string, string>;
         if (!h["cache-control"]) h["cache-control"] = "public, max-age=60, s-maxage=300";
       },
       error(err, _req, res) {
-        console.error("[gw] listings proxy error:", err);
+        console.error("[gw] listings proxy error:", {
+          message: err.message,
+          code: (err as any).code,
+          path: (_req as any).path
+        });
         sendJson502(res as NodeServerResponse | Socket, "listings upstream error");
       },
     },
@@ -695,6 +757,125 @@ app.post("/forum/posts/:postId/comments", jsonParser, async (req: AuthedRequest,
   }
 });
 
+
+/* ----------------------- Group Chat Routes (after auth guard, before general /messages) ----------------------- */
+// Group chat endpoints (MUST be before general /messages route to match first)
+// Note: Don't use jsonParser for proxy routes - http-proxy-middleware needs the raw body stream
+app.post("/messages/groups", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: { "^/messages": "/messages" },
+  proxyTimeout: 30000, // Increased to 30s to match test script timeout
+  agent: keepAliveAgent,
+  on: {
+    proxyReq(proxyReq, req, res) {
+      const authedReq = req as AuthedRequest;
+      console.log(`[gw] Proxying POST ${req.path} to social-service${proxyReq.path}`, {
+        method: req.method,
+        body: req.body,
+        userId: authedReq.user?.sub,
+        headers: { 
+          'content-type': req.headers['content-type'], 
+          'authorization': req.headers['authorization'] ? 'present' : 'missing',
+          'x-user-id': req.headers['x-user-id'] || 'missing'
+        }
+      });
+      // Ensure Content-Type is set for JSON body
+      if (req.body && !proxyReq.getHeader('content-type')) {
+        proxyReq.setHeader('content-type', 'application/json');
+      }
+      // Ensure x-user-id header is forwarded (from middleware or user object)
+      if (authedReq.user?.sub) {
+        proxyReq.setHeader('x-user-id', authedReq.user.sub);
+      } else if (req.headers['x-user-id']) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      }
+    },
+    proxyRes(proxyRes, req, res) {
+      console.log(`[gw] Received response from social-service for ${req.path}:`, proxyRes.statusCode);
+    },
+    error(err, req, res) {
+      console.error("[gw] messages/groups proxy error:", {
+        message: err.message,
+        code: (err as any).code,
+        path: req.path,
+        method: req.method,
+        body: req.body
+      });
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// Note: Don't use jsonParser for proxy routes - http-proxy-middleware needs the raw body stream
+app.post("/messages/groups/:groupId/members", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: { "^/messages": "/messages" },
+  proxyTimeout: 30000, // Increased timeout to 30s
+  agent: keepAliveAgent,
+  on: {
+    proxyReq(proxyReq, req, res) {
+      const authedReq = req as AuthedRequest;
+      console.log(`[gw] Proxying POST ${req.path} to social-service${proxyReq.path}`, {
+        method: req.method,
+        userId: authedReq.user?.sub,
+        headers: {
+          'content-type': req.headers['content-type'],
+          'authorization': req.headers['authorization'] ? 'present' : 'missing',
+          'x-user-id': req.headers['x-user-id'] || 'missing'
+        }
+      });
+      // Ensure x-user-id header is forwarded (from middleware or user object)
+      if (authedReq.user?.sub) {
+        proxyReq.setHeader('x-user-id', authedReq.user.sub);
+      } else if (req.headers['x-user-id']) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      }
+    },
+    proxyRes(proxyRes, req, res) {
+      console.log(`[gw] Received response from social-service for ${req.path}:`, proxyRes.statusCode);
+    },
+    error(err, req, res) {
+      console.error("[gw] messages/groups/*/members proxy error:", {
+        message: err.message,
+        code: (err as any).code,
+        path: req.path,
+        method: req.method
+      });
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+app.get("/messages/groups/:groupId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: { "^/messages": "/messages" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] messages/groups/* proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+app.get("/messages/groups", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: { "^/messages": "/messages" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] messages/groups proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
 // Messages routes
 app.get("/messages", async (req: AuthedRequest, res: Response) => {
   const userId = requireUserIdFromRequest(req, res);
@@ -713,24 +894,34 @@ app.get("/messages", async (req: AuthedRequest, res: Response) => {
   }
 });
 
-app.post("/messages", jsonParser, async (req: AuthedRequest, res: Response) => {
-  const userId = requireUserIdFromRequest(req, res);
-  if (!userId) return;
-
-  try {
-    const response = await promisifyGrpcCall<any>(socialGrpcClient, "SendMessage", {
-      sender_id: userId,
-      recipient_id: req.body.recipient_id,
-      message_type: req.body.message_type || req.body.messageType,
-      subject: req.body.subject,
-      content: req.body.content,
-      parent_message_id: req.body.parent_message_id || req.body.parentMessageId || "",
-    });
-    res.status(201).json(response.message);
-  } catch (err) {
-    handleGrpcError(res, err);
-  }
-});
+// POST /messages - Send message (direct or group)
+// For group messages (with group_id), proxy to HTTP endpoint since gRPC doesn't support group_id
+// For direct messages (with recipient_id), use gRPC
+// Note: We need jsonParser to check the body, but for group messages we'll proxy (which needs raw body)
+// So we'll handle group messages by proxying directly, and direct messages via gRPC
+app.post("/messages", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: { "^/messages": "/messages" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq(proxyReq, req, res) {
+      // Check if this is a direct message (has recipient_id but no group_id)
+      // If so, we should use gRPC instead, but we can't switch mid-request
+      // So we'll proxy all /messages to HTTP endpoint for now
+      // TODO: Split into /messages/direct (gRPC) and /messages (HTTP proxy for group)
+      const authedReq = req as AuthedRequest;
+      if (authedReq.user?.sub) {
+        proxyReq.setHeader('x-user-id', authedReq.user.sub);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] messages proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
 
 app.post("/messages/:messageId/reply", jsonParser, async (req: AuthedRequest, res: Response) => {
   const userId = requireUserIdFromRequest(req, res);
@@ -745,6 +936,301 @@ app.post("/messages/:messageId/reply", jsonParser, async (req: AuthedRequest, re
       content: req.body.content,
     });
     res.status(201).json(response.message);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+
+/* ----------------------- gRPC-backed Shopping Routes ----------------------- */
+// Shopping Cart routes
+app.get("/shopping/cart", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "GetCart", {
+      user_id: userId,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/shopping/cart", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "AddToCart", {
+      user_id: userId,
+      item_type: req.body.item_type,
+      item_id: req.body.item_id,
+      quantity: req.body.quantity || 1,
+      listing_id: req.body.listing_id,
+      price: req.body.price,
+      metadata: req.body.metadata ? JSON.stringify(req.body.metadata) : undefined,
+    });
+    res.status(201).json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.delete("/shopping/cart/:itemId", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "RemoveFromCart", {
+      user_id: userId,
+      cart_item_id: req.params.itemId,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.delete("/shopping/cart", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "ClearCart", {
+      user_id: userId,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+// Watchlist routes
+app.get("/shopping/watchlist", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "GetWatchlist", {
+      user_id: userId,
+      limit: req.query.limit ? Number(req.query.limit) : 50,
+      offset: req.query.offset ? Number(req.query.offset) : 0,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/shopping/watchlist", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "AddToWatchlist", {
+      user_id: userId,
+      item_type: req.body.item_type,
+      item_id: req.body.item_id,
+      listing_id: req.body.listing_id,
+      notify_on: req.body.notify_on || [],
+      metadata: req.body.metadata ? JSON.stringify(req.body.metadata) : undefined,
+    });
+    res.status(201).json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.delete("/shopping/watchlist/:itemType/:itemId", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "RemoveFromWatchlist", {
+      user_id: userId,
+      item_type: req.params.itemType,
+      item_id: req.params.itemId,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+// Recently Viewed routes
+app.get("/shopping/recently-viewed", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "GetRecentlyViewed", {
+      user_id: userId,
+      item_type: req.query.item_type as string,
+      limit: req.query.limit ? Number(req.query.limit) : 50,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/shopping/recently-viewed", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "AddRecentlyViewed", {
+      user_id: userId,
+      item_type: req.body.item_type,
+      item_id: req.body.item_id,
+      metadata: req.body.metadata ? JSON.stringify(req.body.metadata) : undefined,
+    });
+    res.status(201).json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+// Wishlist routes
+app.get("/shopping/wishlist", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "GetWishlist", {
+      user_id: userId,
+      limit: req.query.limit ? Number(req.query.limit) : 50,
+      offset: req.query.offset ? Number(req.query.offset) : 0,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/shopping/wishlist", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "AddToWishlist", {
+      user_id: userId,
+      item_type: req.body.item_type,
+      item_id: req.body.item_id,
+      listing_id: req.body.listing_id,
+      priority: req.body.priority || 0,
+      notes: req.body.notes,
+      metadata: req.body.metadata ? JSON.stringify(req.body.metadata) : undefined,
+    });
+    res.status(201).json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.delete("/shopping/wishlist/:itemType/:itemId", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "RemoveFromWishlist", {
+      user_id: userId,
+      item_type: req.params.itemType,
+      item_id: req.params.itemId,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+// Purchase History routes
+app.get("/shopping/purchases", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "GetPurchaseHistory", {
+      user_id: userId,
+      limit: req.query.limit ? Number(req.query.limit) : 50,
+      offset: req.query.offset ? Number(req.query.offset) : 0,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/shopping/purchases", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "AddPurchase", {
+      user_id: userId,
+      order_id: req.body.order_id,
+      item_type: req.body.item_type,
+      item_id: req.body.item_id,
+      listing_id: req.body.listing_id,
+      quantity: req.body.quantity || 1,
+      price_paid: req.body.price_paid,
+      currency: req.body.currency || "USD",
+      purchase_type: req.body.purchase_type,
+      status: req.body.status || "completed",
+      metadata: req.body.metadata ? JSON.stringify(req.body.metadata) : undefined,
+    });
+    res.status(201).json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+// Search History routes
+app.get("/shopping/searches", async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "GetSearchHistory", {
+      user_id: userId,
+      query_type: req.query.query_type as string,
+      limit: req.query.limit ? Number(req.query.limit) : 50,
+    });
+    res.json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.post("/shopping/searches", jsonParser, async (req: AuthedRequest, res: Response) => {
+  const userId = requireUserIdFromRequest(req, res);
+  if (!userId) return;
+
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "AddSearch", {
+      user_id: userId,
+      query: req.body.query,
+      query_type: req.body.query_type,
+      filters: req.body.filters ? JSON.stringify(req.body.filters) : undefined,
+      result_count: req.body.result_count,
+      clicked_item: req.body.clicked_item,
+    });
+    res.status(201).json(response);
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+});
+
+app.get("/shopping/searches/trending", async (req: AuthedRequest, res: Response) => {
+  try {
+    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "GetTrendingSearches", {
+      query_type: req.query.query_type as string,
+      limit: req.query.limit ? Number(req.query.limit) : 20,
+      time_range: req.query.time_range as string || "24h",
+    });
+    res.json(response);
   } catch (err) {
     handleGrpcError(res, err);
   }

@@ -163,7 +163,7 @@ export async function deleteListing(listingId: string, userId: string) {
      RETURNING id`,
     [listingId, userId]
   );
-  return result.rowCount > 0;
+  return (result.rowCount !== null && result.rowCount > 0);
 }
 
 export async function addListingImage(listingId: string, imageData: {
@@ -264,7 +264,7 @@ export async function removeFromWatchlist(userId: string, listingId: string) {
      WHERE user_id = $1 AND listing_id = $2`,
     [userId, listingId]
   );
-  return result.rowCount > 0;
+  return (result.rowCount !== null && result.rowCount > 0);
 }
 
 export async function getUserWatchlist(userId: string) {

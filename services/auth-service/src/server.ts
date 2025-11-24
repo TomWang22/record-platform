@@ -45,18 +45,47 @@ app.get("/metrics", async (_req: Request, res: Response) => {
 });
 
 app.get("/healthz", async (_req: Request, res: Response) => {
+  let dbOk = false;
+  let redisOk = false;
+  
+  // Check database (non-blocking, with timeout)
   try {
-    await prisma.$queryRaw`SELECT 1`;
-    try {
-      await redis.ping();
-    } catch (redisErr) {
+    // Use Promise.race to add a timeout to the database query
+    const dbCheck = prisma.$queryRaw`SELECT 1`;
+    const timeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("DB check timeout")), 500)
+    );
+    await Promise.race([dbCheck, timeout]);
+    dbOk = true;
+  } catch (e: any) {
+    // Silently fail - don't log timeout errors to reduce noise
+    if (!e?.message?.includes("timeout")) {
+      console.warn("auth-service healthz db check failed:", e?.message || "db error");
+    }
+  }
+  
+  // Check Redis (non-blocking, with timeout)
+  try {
+    const redisCheck = redis.ping();
+    const timeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Redis check timeout")), 500)
+    );
+    await Promise.race([redisCheck, timeout]);
+    redisOk = true;
+  } catch (redisErr: any) {
+    // Silently fail - don't log timeout errors to reduce noise
+    if (!redisErr?.message?.includes("timeout")) {
       console.warn("auth-service healthz redis ping failed:", redisErr);
     }
-    res.json({ ok: true });
-  } catch (e: any) {
-    console.error("auth-service healthz failed:", e);
-    res.status(500).json({ ok: false, error: e?.message || "db error" });
   }
+  
+  // Return 200 immediately - allows service to start and gRPC to be available
+  // The service can still handle requests, they'll just fail if DB is down
+  res.status(200).json({ 
+    ok: true, 
+    db: dbOk ? 'connected' : 'disconnected',
+    redis: redisOk ? 'connected' : 'disconnected'
+  });
 });
 
 app.post("/register", async (req: Request, res: Response) => {

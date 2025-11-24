@@ -5,6 +5,8 @@ import path from 'path'
 import { register, httpCounter } from '@common/utils/metrics'
 import {
   pool,
+  listingsPool,
+  analyticsPool,
   getUserSearchHistory,
   getSimilarSearches,
   getTrendingSearches,
@@ -29,8 +31,10 @@ app.get('/metrics', async (_req, res) => {
 
 app.get('/healthz', async (_req, res) => {
   try {
-    await pool.query('SELECT 1')
-    res.json({ ok: true, db: 'connected' })
+    // Check both databases
+    await listingsPool.query('SELECT 1')
+    await analyticsPool.query('SELECT 1')
+    res.json({ ok: true, db: 'connected', listings: 'ok', analytics: 'ok' })
   } catch (err) {
     res.status(503).json({ ok: false, db: 'disconnected', error: String(err) })
   }
@@ -179,13 +183,30 @@ const server = app.listen(PORT, () => {
   console.log(`[analytics] service listening on port ${PORT}`)
 })
 
+// Start gRPC server if enabled
+let grpcServer: any = null
+if (process.env.ENABLE_GRPC === 'true') {
+  const { startGrpcServer } = require('./grpc-server')
+  const grpcPort = parseInt(process.env.GRPC_PORT || '50054', 10)
+  grpcServer = startGrpcServer(grpcPort)
+}
+
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('[analytics] SIGTERM received, shutting down gracefully')
   server.close(() => {
-    pool.end(() => {
-      console.log('[analytics] DB pool closed')
-      process.exit(0)
-    })
+      if (grpcServer) {
+        grpcServer.tryShutdown(() => {
+          Promise.all([listingsPool.end(), analyticsPool.end()]).then(() => {
+            console.log('[analytics] DB pools closed')
+            process.exit(0)
+          })
+        })
+      } else {
+        Promise.all([listingsPool.end(), analyticsPool.end()]).then(() => {
+          console.log('[analytics] DB pools closed')
+          process.exit(0)
+        })
+      }
   })
 })

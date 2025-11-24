@@ -22,6 +22,8 @@ spec:
           ports:
             - name: http
               containerPort: 4002
+            - name: grpc
+              containerPort: 50051
           # Load base config first; explicit env below overrides these.
           envFrom:
             - configMapRef: { name: app-config }
@@ -35,8 +37,12 @@ spec:
               value: "15000"
             - name: CACHE_TTL_MS_LONG
               value: "60000"
-            - name: DATABASE_URL
-              value: "postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connect_timeout=5&pool_timeout=10"
+            - name: GRPC_PORT
+              value: "50051"
+            - name: ENABLE_GRPC
+              value: "true"
+            # Use external Docker Postgres (port 5433) as per run_pgbench_sweep.sh reference
+            # DATABASE_URL from app-config.yaml is already set correctly to host.docker.internal:5433
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto

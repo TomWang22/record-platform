@@ -8,7 +8,10 @@ import fs from "fs";
 
 type LoadedRecord = Awaited<ReturnType<PrismaClient["record"]["findFirst"]>>;
 
-const PROTO_PATH = path.join(__dirname, "../../proto/records.proto");
+// Proto files are mounted at /app/proto in K8s, fallback to relative path for local dev
+const PROTO_PATH = fs.existsSync("/app/proto/records.proto") 
+  ? "/app/proto/records.proto"
+  : path.join(__dirname, "../../proto/records.proto");
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,
   longs: String,
@@ -208,6 +211,21 @@ export function startGrpcServer(port: number = 50051, prismaClient?: PrismaClien
   };
 
   server.addService(service, handlers);
+
+  // Enable gRPC reflection for tooling (grpcurl, etc.)
+  if (process.env.ENABLE_GRPC_REFLECTION !== "false") {
+    try {
+      console.log("[records gRPC] Attempting to enable reflection...");
+      const { enableReflection } = require("@common/utils/grpc-reflection");
+      console.log("[records gRPC] Reflection module loaded, calling enableReflection...");
+      enableReflection(server, [PROTO_PATH], ["records.RecordsService"]);
+      console.log("[records gRPC] Reflection enabled successfully");
+    } catch (err: any) {
+      console.error("[records gRPC] Failed to enable reflection:", err?.message || err, err?.stack);
+    }
+  } else {
+    console.log("[records gRPC] Reflection disabled via ENABLE_GRPC_REFLECTION=false");
+  }
 
   let credentials: grpc.ServerCredentials;
   const keyPath = process.env.TLS_KEY_PATH || "/etc/certs/tls.key";

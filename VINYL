@@ -10,6 +10,10 @@ RUN_SMOKE_TESTS=false ./scripts/run_pgbench_sweep.sh
 Skip plots:
 GENERATE_PLOTS=false ./scripts/run_pgbench_sweep.sh
 
+USE_AUTO_WRAPPER=true MODE=deep RUN_COLD_CACHE=true ./scripts/run_pgbench_sweep.sh
+
+USE_AUTO_WRAPPER=false MODE=deep RUN_COLD_CACHE=true ./scripts/run_pgbench_sweep.sh
+
 # Standard run
 ./scripts/run_pgbench_sweep.sh
 
@@ -20,7 +24,7 @@ FAST_TEMP_TABLESPACE=fasttmp MODE=deep ./scripts/run_pgbench_sweep.sh
 MODE=deep RUN_COLD_CACHE=true ./scripts/run_pgbench_sweep.sh
 
 # Custom I/O concurrency
-EFFECTIVE_IO_CONCURRENCY=300 FAST_TEMP_TABLESPACE=fasttmp MODE=deep ./scripts/run_pgbench_sweep.sh
+SE_SQL_FUNCTION=true USE_AUTO_WRAPPER=false RUN_COLD_CACHE=true EFFECTIVE_IO_CONCURRENCY=300 FAST_TEMP_TABLESPACE=fasttmp MODE=deep ./scripts/run_pgbench_sweep.sh
 
 uick access
 # Grafanakubectl -n monitoring port-forward svc/monitoring-grafana 3000:80# http://localhost:3000 (admin/Admin123!)# Prometheuskubectl -n monitoring port-forward svc/monitoring-kube-prom-prometheus 9090:9090# http://localhost:9090# Jaegerkubectl -n observability port-forward svc/jaeger 16686:16686# http://localhost:16686# Linkerd Vizlinkerd viz dashboard

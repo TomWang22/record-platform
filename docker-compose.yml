@@ -86,6 +86,74 @@ services:
       retries: 20
       start_period: 10s
 
+  postgres-shopping:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5436:5432"]
+    volumes: ["pgdata-shopping:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  postgres-auth:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5437:5432"]
+    volumes: ["pgdata-auth:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  postgres-auction-monitor:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5438:5432"]
+    volumes: ["pgdata-auction-monitor:/var/lib/postgresql/data"]
+    shm_size: 1g
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  postgres-analytics:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5439:5432"]
+    volumes: ["pgdata-analytics:/var/lib/postgresql/data"]
+    shm_size: 1g
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  postgres-python-ai:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5440:5432"]
+    volumes: ["pgdata-python-ai:/var/lib/postgresql/data"]
+    shm_size: 1g
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
   postgres-backup:
     image: prodrigestivill/postgres-backup-local:15
     depends_on:
@@ -193,6 +261,8 @@ services:
     depends_on:
       kafka: { condition: service_healthy }
       redis: { condition: service_healthy }
+      postgres-analytics: { condition: service_healthy }
+      postgres-listings: { condition: service_healthy }
     expose: ["4004"]
     restart: unless-stopped
     healthcheck:
@@ -202,6 +272,9 @@ services:
       retries: 10
     environment:
       BASE_URL: http://haproxy:8081
+      DATABASE_URL: postgresql://postgres:postgres@postgres-analytics:5432/analytics
+      POSTGRES_URL_LISTINGS: postgresql://postgres:postgres@postgres-listings:5432/records
+      POSTGRES_URL_ANALYTICS: postgresql://postgres:postgres@postgres-analytics:5432/analytics
 
   cron-jobs:
     build: { context: ., dockerfile: services/cron-jobs/Dockerfile }
@@ -224,7 +297,12 @@ services:
     depends_on:
       kafka: { condition: service_healthy }
       listings-service: { condition: service_healthy }
-      postgres: { condition: service_healthy }
+      postgres-auction-monitor: { condition: service_healthy }
+      postgres-listings: { condition: service_healthy }
+    environment:
+      POSTGRES_URL: postgresql://postgres:postgres@postgres-auction-monitor:5432/auction_monitor
+      POSTGRES_URL_LISTINGS: postgresql://postgres:postgres@postgres-listings:5432/records
+      POSTGRES_URL_AUCTION_MONITOR: postgresql://postgres:postgres@postgres-auction-monitor:5432/auction_monitor
     expose: ["4010"]
     restart: unless-stopped
     healthcheck:
@@ -271,6 +349,7 @@ services:
     env_file: [.env]
     depends_on:
       redis: { condition: service_healthy }
+      postgres-python-ai: { condition: service_healthy }
     expose: ["5005"]
     restart: unless-stopped
     healthcheck:
@@ -279,6 +358,8 @@ services:
       timeout: 5s
       retries: 20
       start_period: 60s
+    environment:
+      POSTGRES_URL_PYTHON_AI: postgresql://postgres:postgres@postgres-python-ai:5432/python_ai
 
   social-service:
     build: { context: ., dockerfile: services/social-service/Dockerfile }
@@ -292,6 +373,23 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL","node -e \"require('http').get('http://127.0.0.1:4006/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+      start_period: 10s
+
+  shopping-service:
+    build: { context: ., dockerfile: services/shopping-service/Dockerfile }
+    env_file: [.env]
+    depends_on:
+      postgres-shopping: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    expose: ["4007", "50058"]
+    ports: ["4007:4007", "50058:50058"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL","node -e \"require('http').get('http://127.0.0.1:4007/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
       interval: 5s
       timeout: 2s
       retries: 10
@@ -376,4 +474,9 @@ volumes:
   pgdata:
   pgdata-social:
   pgdata-listings:
+  pgdata-shopping:
+  pgdata-auth:
+  pgdata-auction-monitor:
+  pgdata-analytics:
+  pgdata-python-ai:
   nginx_cache:

@@ -10,3 +10,9 @@ spec:
     - name: http
       port: 4004
       targetPort: http
+    - name: grpc
+      port: 50054
+      targetPort: grpc
+    - name: grpc
+      port: 50054
+      targetPort: grpc

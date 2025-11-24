@@ -30,12 +30,29 @@ const redis = makeRedis()
 const CPU_CORES = os.cpus().length
 console.log(`[social-grpc] Using ${CPU_CORES} CPU cores for parallel processing`)
 
-// Kafka producer for real-time messaging
+// Kafka producer for real-time messaging (optional - fails gracefully if Kafka is unavailable)
 let kafkaProducer: any = null
+let kafkaConnectionFailed = false
 async function getKafkaProducer() {
+  if (kafkaConnectionFailed) {
+    return null // Don't retry if we've already failed
+  }
   if (!kafkaProducer) {
-    kafkaProducer = kafka.producer()
-    await kafkaProducer.connect()
+    try {
+      kafkaProducer = kafka.producer()
+      // Add connection timeout
+      await Promise.race([
+        kafkaProducer.connect(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Kafka connection timeout')), 2000)
+        )
+      ])
+    } catch (err) {
+      console.warn('[social] Kafka producer connection failed (non-fatal):', (err as Error)?.message || err)
+      kafkaConnectionFailed = true
+      kafkaProducer = null
+      return null
+    }
   }
   return kafkaProducer
 }
@@ -225,16 +242,31 @@ const socialService = {
   async ListMessages(call: any, callback: any) {
     const { user_id, page = 1, limit = 20, message_type } = call.request
     const cacheKey = makeMessagesKey(user_id, page, limit, message_type)
-    const result = await cached(
-      redis,
-      cacheKey,
-      30_000, // 30 second cache
-      async () => ({
+    try {
+      // Add timeout wrapper to prevent hanging on slow Redis
+      const result = await Promise.race([
+        cached(
+          redis,
+          cacheKey,
+          30_000, // 30 second cache
+          async () => ({
+            messages: [],
+            pagination: { page, limit, total: 0, total_pages: 0 },
+          })
+        ),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('ListMessages cache timeout')), 5000)
+        )
+      ]) as any
+      callback(null, result)
+    } catch (err: any) {
+      // Fallback to empty result if cache fails
+      console.warn('[social-grpc] ListMessages cache error, returning empty result:', err?.message)
+      callback(null, {
         messages: [],
         pagination: { page, limit, total: 0, total_pages: 0 },
       })
-    )
-    callback(null, result)
+    }
   },
 
   async GetMessage(call: any, callback: any) {
@@ -265,26 +297,33 @@ const socialService = {
       })
     }
 
-    // Publish to Kafka for real-time delivery
+    // Publish to Kafka for real-time delivery (with timeout to prevent hanging)
     try {
       const producer = await getKafkaProducer()
-      await producer.send({
-        topic: 'messages',
-        messages: [
-          {
-            key: recipient_id,
-            value: JSON.stringify({
-              sender_id,
-              recipient_id,
-              message_type,
-              subject,
-              content,
-              parent_message_id: parent_message_id || null,
-              timestamp: new Date().toISOString(),
-            }),
-          },
-        ],
-      })
+      if (producer) {
+        await Promise.race([
+          producer.send({
+            topic: 'messages',
+            messages: [
+              {
+                key: recipient_id,
+                value: JSON.stringify({
+                  sender_id,
+                  recipient_id,
+                  message_type,
+                  subject,
+                  content,
+                  parent_message_id: parent_message_id || null,
+                  timestamp: new Date().toISOString(),
+                }),
+              },
+            ],
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Kafka send timeout')), 2000)
+          )
+        ])
+      }
     } catch (err) {
       console.warn('[social] Kafka publish failed (non-fatal):', err)
     }
@@ -318,22 +357,24 @@ const socialService = {
     // Publish reply to Kafka
     try {
       const producer = await getKafkaProducer()
-      await producer.send({
-        topic: 'messages',
-        messages: [
-          {
-            key: message_id, // Use parent message ID as key for thread grouping
-            value: JSON.stringify({
-              parent_message_id: message_id,
-              sender_id,
-              message_type: message_type || 'General',
-              subject: subject || 'Re: ...',
-              content,
-              timestamp: new Date().toISOString(),
-            }),
-          },
-        ],
-      })
+      if (producer) {
+        await producer.send({
+          topic: 'messages',
+          messages: [
+            {
+              key: message_id, // Use parent message ID as key for thread grouping
+              value: JSON.stringify({
+                parent_message_id: message_id,
+                sender_id,
+                message_type: message_type || 'General',
+                subject: subject || 'Re: ...',
+                content,
+                timestamp: new Date().toISOString(),
+              }),
+            },
+          ],
+        })
+      }
     } catch (err) {
       console.warn('[social] Kafka publish failed (non-fatal):', err)
     }
@@ -408,6 +449,16 @@ export function startGrpcServer(port: number) {
   const server = new grpc.Server()
   server.addService(socialProto.social.SocialService.service, wrappedService)
 
+  // Enable gRPC reflection for tooling (grpcurl, etc.)
+  if (process.env.ENABLE_GRPC_REFLECTION !== "false") {
+    try {
+      const { enableReflection } = require("@common/utils/grpc-reflection");
+      enableReflection(server, [PROTO_PATH], ["social.SocialService"]);
+    } catch (err) {
+      console.warn("[social gRPC] Failed to enable reflection:", err);
+    }
+  }
+
   server.bindAsync(`0.0.0.0:${port}`, grpc.ServerCredentials.createInsecure(), (err, actualPort) => {
     if (err) {
       console.error('[social] gRPC server bind failed:', err)
@@ -425,7 +476,12 @@ export function startGrpcServer(port: number) {
       await kafkaProducer.disconnect()
     }
     if (redis) {
-      await redis.quit()
+      try {
+        // Use disconnect instead of quit to avoid writeable stream errors
+        await redis.disconnect()
+      } catch (err) {
+        console.warn('[social] Redis disconnect error (non-fatal):', err)
+      }
     }
   })
 }

@@ -21,6 +21,8 @@ SERVICES=(
   listings-service
   analytics-service
   python-ai-service
+  social-service
+  shopping-service
   auction-monitor
   cron-jobs
   pgbouncer

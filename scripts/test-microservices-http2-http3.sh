@@ -16,16 +16,50 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
 TOKEN=""
+TOKEN_USER2=""
+USER1_ID=""
+USER2_ID=""
+GROUP_ID=""
+TEST_EMAIL=""
+TEST_PASSWORD="test123"
 
 say "=== Testing Microservices via HTTP/2 and HTTP/3 ==="
 
 # Pre-flight: Check database schema
 say "Pre-flight: Checking database schema..."
-if kubectl -n "$NS" exec deploy/postgres -- psql -U postgres -d records -c "\dt auth.*" 2>/dev/null | grep -q "auth.users"; then
-  ok "Auth schema exists"
-else
+# Check auth database (port 5437, external Docker) - auth-service now uses separate DB
+AUTH_SCHEMA_FOUND=false
+AUTH_DB_STATUS="unknown"
+
+# Try auth DB first (port 5437) - this is where auth-service expects it
+# Use PGCONNECT_TIMEOUT env var to prevent hanging if DB is down
+AUTH_DB_CHECK=$(PGCONNECT_TIMEOUT=3 PGPASSWORD=postgres psql -h localhost -p 5437 -U postgres -d records -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema='auth' AND table_name='users'" 2>&1 || echo "CONNECTION_FAILED")
+if echo "$AUTH_DB_CHECK" | grep -q "1"; then
+  ok "Auth schema exists in auth database (port 5437)"
+  AUTH_SCHEMA_FOUND=true
+  AUTH_DB_STATUS="port_5437"
+elif echo "$AUTH_DB_CHECK" | grep -qE "(recovery|No space|FATAL)"; then
+  warn "Auth database (port 5437) is in recovery mode or has disk space issues"
+  warn "  → Auth-service may fail. Users need to login first for other services to work."
+  AUTH_DB_STATUS="recovery"
+# Fallback: check main DB (port 5433) - might still have old schema (users migrated there first)
+elif PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d records -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema='auth' AND table_name='users'" 2>/dev/null | grep -q "1"; then
+  warn "Auth schema exists in main database (port 5433)"
+  warn "  → Auth-service expects port 5437, but users exist in port 5433"
+  warn "  → This is OK for now - users can login from main DB, then other services work"
+  AUTH_SCHEMA_FOUND=true
+  AUTH_DB_STATUS="port_5433"
+# Last resort: check K8s postgres pod
+elif kubectl -n "$NS" exec deploy/postgres -- psql -U postgres -d records -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema='auth' AND table_name='users'" 2>/dev/null | grep -q "1"; then
+  warn "Auth schema exists in K8s postgres pod"
+  warn "  → Auth-service expects external port 5437"
+  AUTH_SCHEMA_FOUND=true
+  AUTH_DB_STATUS="k8s_pod"
+fi
+
+if [[ "$AUTH_SCHEMA_FOUND" == "false" ]]; then
   warn "Auth schema missing - auth-service will fail"
-  warn "  → To fix: ./scripts/init-auth-schema.sh"
+  warn "  → To fix: ./scripts/setup-auth-db.sh"
   warn "  → Or run: kubectl apply -k infra/k8s/overlays/dev (to run seed jobs)"
 fi
 
@@ -39,9 +73,16 @@ check_service_ready() {
   say "Waiting for $service to be ready..."
   while [[ $waited -lt $max_wait ]]; do
     if kubectl -n "$NS" get deployment "$service" >/dev/null 2>&1; then
-      if kubectl -n "$NS" rollout status deployment/"$service" --timeout=10s >/dev/null 2>&1; then
+      # Check if rollout is complete (non-blocking, quick check)
+      if kubectl -n "$NS" rollout status deployment/"$service" --timeout=5s >/dev/null 2>&1; then
         ok "$service is ready"
         return 0
+      fi
+      # Check if pod is in CrashLoopBackOff - if so, warn and continue
+      if kubectl -n "$NS" get pods -l app="$service" -o jsonpath='{.items[0].status.containerStatuses[0].state.waiting.reason}' 2>/dev/null | grep -q "CrashLoopBackOff"; then
+        warn "$service is in CrashLoopBackOff - will continue but tests may fail"
+        kubectl -n "$NS" get pods -l app="$service" 2>/dev/null | head -2
+        return 1
       fi
     fi
     sleep 2
@@ -79,49 +120,150 @@ else
   SKIP_LISTINGS=1
 fi
 
-# Test 1: Auth Service - Registration (HTTP/2)
-say "Test 1: Auth Service - Registration via HTTP/2"
+# Helper function to extract user ID from JWT token
+extract_user_id() {
+  local token=$1
+  if [[ -z "$token" ]]; then
+    echo ""
+    return
+  fi
+  # Decode JWT payload (second part, base64url)
+  local payload=$(echo "$token" | cut -d'.' -f2)
+  # Convert base64url to base64 (replace - with +, _ with /)
+  payload=$(echo "$payload" | tr '_-' '/+')
+  # Add padding if needed
+  local mod=$((${#payload} % 4))
+  if [[ $mod -eq 2 ]]; then
+    payload="${payload}=="
+  elif [[ $mod -eq 3 ]]; then
+    payload="${payload}="
+  fi
+  # Decode and extract 'sub' field
+  echo "$payload" | base64 -d 2>/dev/null | grep -o '"sub":"[^"]*"' | cut -d'"' -f4 || echo ""
+}
+
+# Test 1: Auth Service - Registration (HTTP/2) - User 1
+say "Test 1: Auth Service - Registration via HTTP/2 (User 1)"
 TEST_EMAIL="microservice-test-$(date +%s)@example.com"
+TEST_PASSWORD="test123"
 REGISTER_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+  --resolve "$HOST:8443:127.0.0.1" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -X POST "https://$HOST:8443/api/auth/register" \
-  -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}" 2>&1)
-REGISTER_CODE=$(echo "$REGISTER_RESPONSE" | tail -1)
+  -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}" 2>&1) || {
+  warn "Registration curl command failed (exit code: $?)"
+  REGISTER_RESPONSE=""
+  REGISTER_CODE="000"
+}
+if [[ -n "$REGISTER_RESPONSE" ]]; then
+  REGISTER_CODE=$(echo "$REGISTER_RESPONSE" | tail -1)
+else
+  REGISTER_CODE="000"
+fi
 if [[ "$REGISTER_CODE" == "201" ]]; then
   TOKEN=$(echo "$REGISTER_RESPONSE" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
-  ok "Registration works via HTTP/2"
+  USER1_ID=$(extract_user_id "$TOKEN")
+  ok "User 1 registration works via HTTP/2"
   [[ -n "$TOKEN" ]] && echo "Token: ${TOKEN:0:50}..."
+  [[ -n "$USER1_ID" ]] && echo "User 1 ID: $USER1_ID"
 elif [[ "$REGISTER_CODE" == "409" ]]; then
-  ok "User exists (expected) - will try login instead"
+  ok "User 1 exists (expected) - will try login instead"
 else
-  warn "Registration failed - HTTP $REGISTER_CODE"
+  warn "User 1 registration failed - HTTP $REGISTER_CODE"
   echo "Response body: $(echo "$REGISTER_RESPONSE" | sed '$d' | head -5)"
 fi
 
-# Test 2: Auth Service - Login (HTTP/3)
-say "Test 2: Auth Service - Login via HTTP/3"
-LOGIN_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+# Test 1b: Auth Service - Registration (HTTP/2) - User 2
+say "Test 1b: Auth Service - Registration via HTTP/2 (User 2)"
+TEST_EMAIL_USER2="microservice-test-2-$(date +%s)@example.com"
+REGISTER_RESPONSE_USER2=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+  --resolve "$HOST:8443:127.0.0.1" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
-  --resolve "$HTTP3_RESOLVE" \
-  -X POST "https://$HOST/api/auth/login" \
-  -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}" 2>&1) || {
-  warn "HTTP/3 curl command failed (exit code: $?)"
-  echo "This may indicate HTTP/3 connectivity issues. Check http3_curl helper."
-  LOGIN_RESPONSE=""
-  LOGIN_CODE="000"
+  -X POST "https://$HOST:8443/api/auth/register" \
+  -d "{\"email\":\"$TEST_EMAIL_USER2\",\"password\":\"test123\"}" 2>&1) || {
+  warn "User 2 registration curl command failed (exit code: $?)"
+  REGISTER_RESPONSE_USER2=""
+  REGISTER_CODE_USER2="000"
 }
-if [[ -n "$LOGIN_RESPONSE" ]]; then
-  LOGIN_CODE=$(echo "$LOGIN_RESPONSE" | tail -1)
-  if [[ "$LOGIN_CODE" == "200" ]]; then
-    TOKEN=$(echo "$LOGIN_RESPONSE" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
-    ok "Login works via HTTP/3"
-    [[ -n "$TOKEN" ]] && echo "Token: ${TOKEN:0:50}..."
-  else
-    warn "Login failed - HTTP $LOGIN_CODE"
-    echo "Response body: $(echo "$LOGIN_RESPONSE" | sed '$d' | head -5)"
+if [[ -n "$REGISTER_RESPONSE_USER2" ]]; then
+  REGISTER_CODE_USER2=$(echo "$REGISTER_RESPONSE_USER2" | tail -1)
+else
+  REGISTER_CODE_USER2="000"
+fi
+if [[ "$REGISTER_CODE_USER2" == "201" ]]; then
+  TOKEN_USER2=$(echo "$REGISTER_RESPONSE_USER2" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+  USER2_ID=$(extract_user_id "$TOKEN_USER2")
+  ok "User 2 registration works via HTTP/2"
+  [[ -n "$TOKEN_USER2" ]] && echo "Token: ${TOKEN_USER2:0:50}..."
+  [[ -n "$USER2_ID" ]] && echo "User 2 ID: $USER2_ID"
+elif [[ "$REGISTER_CODE_USER2" == "409" ]]; then
+  ok "User 2 exists (expected) - will try login instead"
+else
+  warn "User 2 registration failed - HTTP $REGISTER_CODE_USER2"
+  echo "Response body: $(echo "$REGISTER_RESPONSE_USER2" | sed '$d' | head -5)"
+fi
+
+# Test 2: Auth Service - Login (HTTP/3) - User 1
+say "Test 2: Auth Service - Login via HTTP/3 (User 1)"
+if [[ -z "$TOKEN" ]]; then
+  LOGIN_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    --resolve "$HTTP3_RESOLVE" \
+    -X POST "https://$HOST/api/auth/login" \
+    -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}" 2>&1) || {
+    warn "HTTP/3 curl command failed (exit code: $?)"
+    echo "This may indicate HTTP/3 connectivity issues. Check http3_curl helper."
+    LOGIN_RESPONSE=""
+    LOGIN_CODE="000"
+  }
+  if [[ -n "$LOGIN_RESPONSE" ]]; then
+    LOGIN_CODE=$(echo "$LOGIN_RESPONSE" | tail -1)
+    if [[ "$LOGIN_CODE" == "200" ]]; then
+      TOKEN=$(echo "$LOGIN_RESPONSE" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+      USER1_ID=$(extract_user_id "$TOKEN")
+      ok "User 1 login works via HTTP/3"
+      [[ -n "$TOKEN" ]] && echo "Token: ${TOKEN:0:50}..."
+      [[ -n "$USER1_ID" ]] && echo "User 1 ID: $USER1_ID"
+    else
+      warn "User 1 login failed - HTTP $LOGIN_CODE"
+      echo "Response body: $(echo "$LOGIN_RESPONSE" | sed '$d' | head -5)"
+    fi
   fi
+else
+  ok "User 1 already has token from registration"
+fi
+
+# Test 2b: Auth Service - Login (HTTP/3) - User 2
+say "Test 2b: Auth Service - Login via HTTP/3 (User 2)"
+if [[ -z "$TOKEN_USER2" ]]; then
+  LOGIN_RESPONSE_USER2=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    --resolve "$HTTP3_RESOLVE" \
+    -X POST "https://$HOST/api/auth/login" \
+    -d "{\"email\":\"$TEST_EMAIL_USER2\",\"password\":\"test123\"}" 2>&1) || {
+    warn "HTTP/3 curl command failed (exit code: $?)"
+    LOGIN_RESPONSE_USER2=""
+    LOGIN_CODE_USER2="000"
+  }
+  if [[ -n "$LOGIN_RESPONSE_USER2" ]]; then
+    LOGIN_CODE_USER2=$(echo "$LOGIN_RESPONSE_USER2" | tail -1)
+    if [[ "$LOGIN_CODE_USER2" == "200" ]]; then
+      TOKEN_USER2=$(echo "$LOGIN_RESPONSE_USER2" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+      USER2_ID=$(extract_user_id "$TOKEN_USER2")
+      ok "User 2 login works via HTTP/3"
+      [[ -n "$TOKEN_USER2" ]] && echo "Token: ${TOKEN_USER2:0:50}..."
+      [[ -n "$USER2_ID" ]] && echo "User 2 ID: $USER2_ID"
+    else
+      warn "User 2 login failed - HTTP $LOGIN_CODE_USER2"
+      echo "Response body: $(echo "$LOGIN_RESPONSE_USER2" | sed '$d' | head -5)"
+    fi
+  fi
+else
+  ok "User 2 already has token from registration"
 fi
 
 # Test 3: Records Service - Create Record (HTTP/2)
@@ -129,6 +271,7 @@ say "Test 3: Records Service - Create Record via HTTP/2"
 if [[ -n "${TOKEN:-}" ]]; then
   CREATE_RC=0
   CREATE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
@@ -177,7 +320,10 @@ fi
 
 # Test 4: Health Checks (HTTP/2 and HTTP/3)
 say "Test 4: Health Checks"
-if "$CURL_BIN" -k -sS -I --http2 --max-time 10 -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1 | head -n1 | grep -q "200"; then
+CADDY_H2_HEALTH=$("$CURL_BIN" -k -sS -I --http2 --max-time 10 \
+  --resolve "$HOST:8443:127.0.0.1" \
+  -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1) || CADDY_H2_HEALTH=""
+if echo "$CADDY_H2_HEALTH" | head -n1 | grep -q "200"; then
   ok "Caddy health check works via HTTP/2"
 else
   warn "Caddy health check failed via HTTP/2"
@@ -194,8 +340,18 @@ fi
 
 # Test 5: API Gateway Health
 say "Test 5: API Gateway Health"
-GATEWAY_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 -H "Host: $HOST" "https://$HOST:8443/api/healthz" 2>&1)
-GATEWAY_CODE=$(echo "$GATEWAY_RESPONSE" | tail -1)
+GATEWAY_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
+  --resolve "$HOST:8443:127.0.0.1" \
+  -H "Host: $HOST" "https://$HOST:8443/api/healthz" 2>&1) || {
+  warn "API Gateway health check curl command failed (exit code: $?)"
+  GATEWAY_RESPONSE=""
+  GATEWAY_CODE="000"
+}
+if [[ -n "$GATEWAY_RESPONSE" ]]; then
+  GATEWAY_CODE=$(echo "$GATEWAY_RESPONSE" | tail -1)
+else
+  GATEWAY_CODE="000"
+fi
 if [[ "$GATEWAY_CODE" =~ ^(200|404|502)$ ]]; then
   ok "API Gateway reachable via HTTP/2 - HTTP $GATEWAY_CODE"
 else
@@ -207,17 +363,19 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 6: Social Service - Create Forum Post via HTTP/2"
   FORUM_POST_RC=0
   FORUM_POST_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
     -X POST "https://$HOST:8443/api/forum/posts" \
-    -d '{"title":"Test Forum Post","content":"This is a test post via HTTP/2","category":"general"}' 2>&1) || FORUM_POST_RC=$?
+    -d '{"title":"Test Forum Post","content":"This is a test post via HTTP/2","flair":"general"}' 2>&1) || FORUM_POST_RC=$?
   FORUM_POST_CODE=$(echo "$FORUM_POST_RESPONSE" | tail -1)
   if [[ "$FORUM_POST_RC" -ne 0 ]]; then
     warn "Create forum post request failed (curl exit $FORUM_POST_RC)"
   elif [[ "$FORUM_POST_CODE" =~ ^(200|201)$ ]]; then
     ok "Create forum post works via HTTP/2"
     FORUM_POST_ID=$(echo "$FORUM_POST_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
+    [[ -n "$FORUM_POST_ID" ]] && echo "Forum post ID: $FORUM_POST_ID"
   else
     warn "Create forum post failed - HTTP $FORUM_POST_CODE"
     echo "Response body: $(echo "$FORUM_POST_RESPONSE" | sed '$d' | head -5)"
@@ -236,7 +394,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
     -H "Authorization: Bearer $TOKEN" \
     --resolve "$HTTP3_RESOLVE" \
     -X POST "https://$HOST/api/forum/posts" \
-    -d '{"title":"Test Forum Post H3","content":"This is a test post via HTTP/3","category":"general"}' 2>&1) || FORUM_POST_H3_RC=$?
+    -d '{"title":"Test Forum Post H3","content":"This is a test post via HTTP/3","flair":"general"}' 2>&1) || FORUM_POST_H3_RC=$?
   if [[ "$FORUM_POST_H3_RC" -ne 0 ]]; then
     warn "Create forum post via HTTP/3 failed (curl exit $FORUM_POST_H3_RC)"
   elif [[ -n "$FORUM_POST_H3_RESPONSE" ]]; then
@@ -266,6 +424,15 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
     warn "Get forum posts request failed (curl exit $GET_FORUM_RC)"
   elif [[ "$GET_FORUM_CODE" =~ ^(200)$ ]]; then
     ok "Get forum posts works via HTTP/2"
+    # Extract post ID for comment test (if not already set)
+    if [[ -z "${FORUM_POST_ID:-}" ]]; then
+      FORUM_POST_ID=$(echo "$GET_FORUM_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+      if [[ -z "$FORUM_POST_ID" ]]; then
+        # Try parsing as JSON array
+        FORUM_POST_ID=$(echo "$GET_FORUM_RESPONSE" | sed '$d' | python3 -c "import sys, json; data=json.load(sys.stdin); print(data[0].get('id', '') if isinstance(data, list) and len(data) > 0 else '')" 2>/dev/null || echo "")
+      fi
+      [[ -n "$FORUM_POST_ID" ]] && echo "Found forum post ID: $FORUM_POST_ID"
+    fi
   else
     warn "Get forum posts failed - HTTP $GET_FORUM_CODE"
     echo "Response body: $(echo "$GET_FORUM_RESPONSE" | sed '$d' | head -5)"
@@ -274,74 +441,104 @@ else
   warn "Skipping get forum posts - social-service not available or no auth token"
 fi
 
-# Test 8: Social Service - Messages Endpoints (HTTP/2)
-if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
-  say "Test 8: Social Service - Send Message via HTTP/2"
-  # Note: This assumes we have a recipient user ID - using a placeholder
+# Test 7b: Social Service - Add Comment to Forum Post (HTTP/3) - User 2 comments on User 1's post
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${FORUM_POST_ID:-}" ]]; then
+  say "Test 7b: Social Service - Add Comment to Forum Post via HTTP/3 (User 2)"
+  ADD_COMMENT_RC=0
+  ADD_COMMENT_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN_USER2" \
+    --resolve "$HTTP3_RESOLVE" \
+    -X POST "https://$HOST/api/forum/posts/$FORUM_POST_ID/comments" \
+    -d '{"content":"Great post! This is a test comment via HTTP/3 from User 2"}' 2>&1) || ADD_COMMENT_RC=$?
+  if [[ "$ADD_COMMENT_RC" -ne 0 ]]; then
+    warn "Add comment via HTTP/3 failed (curl exit $ADD_COMMENT_RC)"
+  elif [[ -n "$ADD_COMMENT_RESPONSE" ]]; then
+    ADD_COMMENT_CODE=$(echo "$ADD_COMMENT_RESPONSE" | tail -1)
+    if [[ "$ADD_COMMENT_CODE" =~ ^(200|201)$ ]]; then
+      ok "Add comment to forum post works via HTTP/3"
+    else
+      warn "Add comment via HTTP/3 failed - HTTP $ADD_COMMENT_CODE"
+      echo "Response body: $(echo "$ADD_COMMENT_RESPONSE" | sed '$d' | head -5)"
+    fi
+  fi
+else
+  if [[ -z "${FORUM_POST_ID:-}" ]]; then
+    warn "Skipping add comment - Forum post ID not available"
+  else
+    warn "Skipping add comment - social-service not available or no auth token"
+  fi
+fi
+
+# Test 8: Social Service - P2P Direct Message (HTTP/2) - User 1 to User 2
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${USER2_ID:-}" ]]; then
+  say "Test 8: Social Service - Send P2P Direct Message via HTTP/2 (User 1 -> User 2)"
   SEND_MSG_RC=0
   SEND_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
     -X POST "https://$HOST:8443/api/messages" \
-    -d '{"recipient_id":"test-recipient","content":"Test message via HTTP/2"}' 2>&1) || SEND_MSG_RC=$?
+    -d "{\"recipient_id\":\"$USER2_ID\",\"message_type\":\"direct\",\"subject\":\"Test P2P Message\",\"content\":\"Hello User 2, this is a test message via HTTP/2\"}" 2>&1) || SEND_MSG_RC=$?
   SEND_MSG_CODE=$(echo "$SEND_MSG_RESPONSE" | tail -1)
   if [[ "$SEND_MSG_RC" -ne 0 ]]; then
-    warn "Send message request failed (curl exit $SEND_MSG_RC)"
-  elif [[ "$SEND_MSG_CODE" =~ ^(200|201|400|404)$ ]]; then
-    # 400/404 might be expected if recipient doesn't exist
-    if [[ "$SEND_MSG_CODE" =~ ^(200|201)$ ]]; then
-      ok "Send message works via HTTP/2"
-      MESSAGE_ID=$(echo "$SEND_MSG_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
-    else
-      warn "Send message returned HTTP $SEND_MSG_CODE (may be expected if recipient doesn't exist)"
-    fi
+    warn "Send P2P message request failed (curl exit $SEND_MSG_RC)"
+  elif [[ "$SEND_MSG_CODE" =~ ^(200|201)$ ]]; then
+    ok "Send P2P message works via HTTP/2"
+    MESSAGE_ID=$(echo "$SEND_MSG_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
   else
-    warn "Send message failed - HTTP $SEND_MSG_CODE"
+    warn "Send P2P message failed - HTTP $SEND_MSG_CODE"
     echo "Response body: $(echo "$SEND_MSG_RESPONSE" | sed '$d' | head -5)"
   fi
 else
-  warn "Skipping send message - social-service not available or no auth token"
+  if [[ -z "${USER2_ID:-}" ]]; then
+    warn "Skipping P2P message test - User 2 ID not available"
+  else
+    warn "Skipping P2P message test - social-service not available or no auth token"
+  fi
 fi
 
-# Test 8b: Social Service - Messages Endpoints (HTTP/3)
-if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
-  say "Test 8b: Social Service - Send Message via HTTP/3"
+# Test 8b: Social Service - P2P Direct Message (HTTP/3) - User 2 to User 1
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${USER1_ID:-}" ]]; then
+  say "Test 8b: Social Service - Send P2P Direct Message via HTTP/3 (User 2 -> User 1)"
   SEND_MSG_H3_RC=0
   SEND_MSG_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $TOKEN" \
+    -H "Authorization: Bearer $TOKEN_USER2" \
     --resolve "$HTTP3_RESOLVE" \
     -X POST "https://$HOST/api/messages" \
-    -d '{"recipient_id":"test-recipient","content":"Test message via HTTP/3"}' 2>&1) || SEND_MSG_H3_RC=$?
+    -d "{\"recipient_id\":\"$USER1_ID\",\"message_type\":\"direct\",\"subject\":\"Test P2P Reply\",\"content\":\"Hello User 1, this is a reply via HTTP/3\"}" 2>&1) || SEND_MSG_H3_RC=$?
   if [[ "$SEND_MSG_H3_RC" -ne 0 ]]; then
-    warn "Send message via HTTP/3 failed (curl exit $SEND_MSG_H3_RC)"
+    warn "Send P2P message via HTTP/3 failed (curl exit $SEND_MSG_H3_RC)"
   elif [[ -n "$SEND_MSG_H3_RESPONSE" ]]; then
     SEND_MSG_H3_CODE=$(echo "$SEND_MSG_H3_RESPONSE" | tail -1)
-    if [[ "$SEND_MSG_H3_CODE" =~ ^(200|201|400|404)$ ]]; then
-      if [[ "$SEND_MSG_H3_CODE" =~ ^(200|201)$ ]]; then
-        ok "Send message works via HTTP/3"
-        MESSAGE_H3_ID=$(echo "$SEND_MSG_H3_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
-      else
-        warn "Send message via HTTP/3 returned HTTP $SEND_MSG_H3_CODE (may be expected if recipient doesn't exist)"
-      fi
+    if [[ "$SEND_MSG_H3_CODE" =~ ^(200|201)$ ]]; then
+      ok "Send P2P message works via HTTP/3"
+      MESSAGE_H3_ID=$(echo "$SEND_MSG_H3_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
     else
-      warn "Send message via HTTP/3 failed - HTTP $SEND_MSG_H3_CODE"
+      warn "Send P2P message via HTTP/3 failed - HTTP $SEND_MSG_H3_CODE"
       echo "Response body: $(echo "$SEND_MSG_H3_RESPONSE" | sed '$d' | head -5)"
     fi
   fi
 else
-  warn "Skipping send message via HTTP/3 - social-service not available or no auth token"
+  if [[ -z "${USER1_ID:-}" ]]; then
+    warn "Skipping P2P message reply test - User 1 ID not available"
+  else
+    warn "Skipping P2P message reply test - social-service not available or no auth token"
+  fi
 fi
 
-# Test 9: Social Service - Get Messages (HTTP/2)
-if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
-  say "Test 9: Social Service - Get Messages via HTTP/2"
+# Test 9: Social Service - Get Messages (HTTP/2) - User 2's inbox
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]]; then
+  say "Test 9: Social Service - Get Messages via HTTP/2 (User 2's inbox)"
   GET_MSG_RC=0
-  GET_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+  GET_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 20 \
+    --resolve "$HOST:8443:127.0.0.1" \
     -H "Host: $HOST" \
-    -H "Authorization: Bearer $TOKEN" \
+    -H "Authorization: Bearer $TOKEN_USER2" \
     -X GET "https://$HOST:8443/api/messages" 2>&1) || GET_MSG_RC=$?
   GET_MSG_CODE=$(echo "$GET_MSG_RESPONSE" | tail -1)
   if [[ "$GET_MSG_RC" -ne 0 ]]; then
@@ -356,18 +553,137 @@ else
   warn "Skipping get messages - social-service not available or no auth token"
 fi
 
+# Test 9b: Social Service - Create Group Chat (HTTP/2)
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
+  say "Test 9b: Social Service - Create Group Chat via HTTP/2"
+  CREATE_GROUP_RC=0
+  CREATE_GROUP_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -X POST "https://$HOST:8443/api/messages/groups" \
+    -d '{"name":"My Custom Group Name","description":"A test group for HTTP/2/3 testing"}' 2>&1) || CREATE_GROUP_RC=$?
+  CREATE_GROUP_CODE=$(echo "$CREATE_GROUP_RESPONSE" | tail -1)
+  if [[ "$CREATE_GROUP_RC" -ne 0 ]]; then
+    warn "Create group request failed (curl exit $CREATE_GROUP_RC)"
+  elif [[ "$CREATE_GROUP_CODE" =~ ^(200|201)$ ]]; then
+    ok "Create group works via HTTP/2"
+    GROUP_ID=$(echo "$CREATE_GROUP_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
+    [[ -n "$GROUP_ID" ]] && echo "Group ID: $GROUP_ID"
+  else
+    warn "Create group failed - HTTP $CREATE_GROUP_CODE"
+    echo "Response body: $(echo "$CREATE_GROUP_RESPONSE" | sed '$d' | head -5)"
+  fi
+else
+  warn "Skipping create group - social-service not available or no auth token"
+fi
+
+# Test 9c: Social Service - Add User 2 to Group (HTTP/2)
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${GROUP_ID:-}" ]] && [[ -n "${USER2_ID:-}" ]]; then
+  say "Test 9c: Social Service - Add User 2 to Group via HTTP/2"
+  ADD_MEMBER_RC=0
+  ADD_MEMBER_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -X POST "https://$HOST:8443/api/messages/groups/$GROUP_ID/members" \
+    -d "{\"user_id\":\"$USER2_ID\"}" 2>&1) || ADD_MEMBER_RC=$?
+  ADD_MEMBER_CODE=$(echo "$ADD_MEMBER_RESPONSE" | tail -1)
+  if [[ "$ADD_MEMBER_RC" -ne 0 ]]; then
+    warn "Add member request failed (curl exit $ADD_MEMBER_RC)"
+  elif [[ "$ADD_MEMBER_CODE" =~ ^(200|201)$ ]]; then
+    ok "Add member to group works via HTTP/2"
+  else
+    warn "Add member to group failed - HTTP $ADD_MEMBER_CODE"
+    echo "Response body: $(echo "$ADD_MEMBER_RESPONSE" | sed '$d' | head -5)"
+  fi
+else
+  if [[ -z "${GROUP_ID:-}" ]]; then
+    warn "Skipping add member - Group ID not available"
+  elif [[ -z "${USER2_ID:-}" ]]; then
+    warn "Skipping add member - User 2 ID not available"
+  else
+    warn "Skipping add member - social-service not available or no auth token"
+  fi
+fi
+
+# Test 9d: Social Service - Send Group Message (HTTP/3)
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${GROUP_ID:-}" ]]; then
+  say "Test 9d: Social Service - Send Group Message via HTTP/3"
+  SEND_GROUP_MSG_RC=0
+  SEND_GROUP_MSG_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    --resolve "$HTTP3_RESOLVE" \
+    -X POST "https://$HOST/api/messages" \
+    -d "{\"group_id\":\"$GROUP_ID\",\"message_type\":\"group\",\"subject\":\"Group Chat Test\",\"content\":\"Hello group! This is a test message via HTTP/3\"}" 2>&1) || SEND_GROUP_MSG_RC=$?
+  if [[ "$SEND_GROUP_MSG_RC" -ne 0 ]]; then
+    warn "Send group message via HTTP/3 failed (curl exit $SEND_GROUP_MSG_RC)"
+  elif [[ -n "$SEND_GROUP_MSG_RESPONSE" ]]; then
+    SEND_GROUP_MSG_CODE=$(echo "$SEND_GROUP_MSG_RESPONSE" | tail -1)
+    if [[ "$SEND_GROUP_MSG_CODE" =~ ^(200|201)$ ]]; then
+      ok "Send group message works via HTTP/3"
+    else
+      warn "Send group message via HTTP/3 failed - HTTP $SEND_GROUP_MSG_CODE"
+      echo "Response body: $(echo "$SEND_GROUP_MSG_RESPONSE" | sed '$d' | head -5)"
+    fi
+  fi
+else
+  if [[ -z "${GROUP_ID:-}" ]]; then
+    warn "Skipping group message - Group ID not available"
+  else
+    warn "Skipping group message - social-service not available or no auth token"
+  fi
+fi
+
+# Test 9e: Social Service - Get Group Details (HTTP/2)
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${GROUP_ID:-}" ]]; then
+  say "Test 9e: Social Service - Get Group Details via HTTP/2"
+  GET_GROUP_RC=0
+  GET_GROUP_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    -H "Host: $HOST" \
+    -H "Authorization: Bearer $TOKEN_USER2" \
+    -X GET "https://$HOST:8443/api/messages/groups/$GROUP_ID" 2>&1) || GET_GROUP_RC=$?
+  GET_GROUP_CODE=$(echo "$GET_GROUP_RESPONSE" | tail -1)
+  if [[ "$GET_GROUP_RC" -ne 0 ]]; then
+    warn "Get group details request failed (curl exit $GET_GROUP_RC)"
+  elif [[ "$GET_GROUP_CODE" =~ ^(200)$ ]]; then
+    ok "Get group details works via HTTP/2"
+  else
+    warn "Get group details failed - HTTP $GET_GROUP_CODE"
+    echo "Response body: $(echo "$GET_GROUP_RESPONSE" | sed '$d' | head -5)"
+  fi
+else
+  if [[ -z "${GROUP_ID:-}" ]]; then
+    warn "Skipping get group details - Group ID not available"
+  else
+    warn "Skipping get group details - social-service not available or no auth token"
+  fi
+fi
+
 # Test 10: Listings Service - Health Check (HTTP/2)
+# Note: Health check should be public (no auth required), but listings service requires auth
+# So we'll test it directly or skip if it requires auth
 if [[ "${SKIP_LISTINGS:-}" != "1" ]]; then
   say "Test 10: Listings Service - Health Check via HTTP/2"
   LISTINGS_HEALTH_RC=0
   LISTINGS_HEALTH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
+    --resolve "$HOST:8443:127.0.0.1" \
     -H "Host: $HOST" \
     "https://$HOST:8443/api/listings/healthz" 2>&1) || LISTINGS_HEALTH_RC=$?
   LISTINGS_HEALTH_CODE=$(echo "$LISTINGS_HEALTH_RESPONSE" | tail -1)
   if [[ "$LISTINGS_HEALTH_RC" -ne 0 ]]; then
     warn "Listings health check failed (curl exit $LISTINGS_HEALTH_RC)"
-  elif [[ "$LISTINGS_HEALTH_CODE" =~ ^(200)$ ]]; then
-    ok "Listings health check works via HTTP/2"
+  elif [[ "$LISTINGS_HEALTH_CODE" =~ ^(200|401)$ ]]; then
+    # 401 is expected if healthz requires auth (which it shouldn't, but listings router has global auth middleware)
+    if [[ "$LISTINGS_HEALTH_CODE" == "200" ]]; then
+      ok "Listings health check works via HTTP/2"
+    else
+      warn "Listings health check requires auth (HTTP 401) - this is a configuration issue"
+    fi
   else
     warn "Listings health check failed - HTTP $LISTINGS_HEALTH_CODE"
   fi
@@ -402,6 +718,7 @@ if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 11: Listings Service - Search Listings via HTTP/2"
   LISTINGS_SEARCH_RC=0
   LISTINGS_SEARCH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN" \
     "https://$HOST:8443/api/listings/search?q=vinyl" 2>&1) || LISTINGS_SEARCH_RC=$?
@@ -447,6 +764,7 @@ if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 12: Listings Service - Create Listing via HTTP/2"
   LISTINGS_CREATE_RC=0
   LISTINGS_CREATE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
@@ -498,6 +816,7 @@ if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 13: Listings Service - Get My Listings via HTTP/2"
   LISTINGS_MY_RC=0
   LISTINGS_MY_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN" \
     "https://$HOST:8443/api/listings/my-listings" 2>&1) || LISTINGS_MY_RC=$?
@@ -512,6 +831,199 @@ if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   fi
 else
   warn "Skipping get my listings - listings-service not available or no auth token"
+fi
+
+# Test 14: Logout (HTTP/2)
+if [[ -n "${TOKEN:-}" ]]; then
+  say "Test 14: Auth Service - Logout via HTTP/2"
+  LOGOUT_RC=0
+  LOGOUT_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Authorization: Bearer $TOKEN" \
+    -X POST "https://$HOST:8443/api/auth/logout" 2>&1) || LOGOUT_RC=$?
+  LOGOUT_CODE=$(echo "$LOGOUT_RESPONSE" | tail -1)
+  if [[ "$LOGOUT_RC" -ne 0 ]]; then
+    warn "Logout request failed (curl exit $LOGOUT_RC)"
+  elif [[ "$LOGOUT_CODE" =~ ^(200|204)$ ]]; then
+    ok "Logout works via HTTP/2"
+    # Verify token is revoked by trying to use it
+    sleep 1
+    VERIFY_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
+      -H "Host: $HOST" \
+      -H "Authorization: Bearer $TOKEN" \
+      -X GET "https://$HOST:8443/api/records" 2>&1)
+    VERIFY_CODE=$(echo "$VERIFY_RESPONSE" | tail -1)
+    if [[ "$VERIFY_CODE" == "401" ]]; then
+      ok "Token revocation verified (401 on protected endpoint)"
+    else
+      warn "Token may not be revoked (got HTTP $VERIFY_CODE instead of 401)"
+    fi
+  else
+    warn "Logout failed - HTTP $LOGOUT_CODE"
+  fi
+else
+  warn "Skipping logout test - no auth token available"
+fi
+
+# Helper function to run grpcurl with timeout
+grpcurl_with_timeout() {
+  local timeout_sec="${1:-10}"
+  shift
+  local cmd=("$@")
+  
+  # Try to use timeout command (Linux, or gtimeout on macOS with coreutils)
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$timeout_sec" "${cmd[@]}" 2>&1
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$timeout_sec" "${cmd[@]}" 2>&1
+  else
+    # Fallback: run in background and kill after timeout
+    local pid
+    "${cmd[@]}" 2>&1 &
+    pid=$!
+    (
+      sleep "$timeout_sec"
+      kill "$pid" 2>/dev/null || true
+    ) &
+    wait "$pid" 2>/dev/null || echo "grpcurl timeout after ${timeout_sec}s"
+  fi
+}
+
+# Helper function to test gRPC with both FIX #1 (h2c port 5000) and FIX #2 (improved flags on 8443)
+grpc_test() {
+  local service_name="$1"
+  local method="$2"
+  local proto_file="$3"
+  local data="${4:-'{}'}"
+  local timeout="${5:-10}"
+  
+  PROTO_DIR="${SCRIPT_DIR}/../proto"
+  [[ -d "$PROTO_DIR" ]] || PROTO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../proto" && pwd)"
+  
+  local result=""
+  
+  # FIX #1: Try h2c port 5000 first (plaintext, most reliable)
+  # Note: Port 5000 may not be working, so we'll try with a shorter timeout
+  CADDY_POD=$(kubectl -n ingress-nginx get pods -l app=caddy-h3 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [[ -n "$CADDY_POD" ]]; then
+    # Start port forward in background
+    kubectl -n ingress-nginx port-forward pod/$CADDY_POD 5000:5000 > /dev/null 2>&1 &
+    local PF_PID=$!
+    sleep 2
+    # Try port 5000 with shorter timeout (2 seconds) to fail fast
+    # Use grpcurl's built-in timeout instead of wrapper to avoid conflicts
+    result=$(grpcurl -plaintext \
+      -import-path "$PROTO_DIR" \
+      -proto "$PROTO_DIR/$proto_file" \
+      -d "$data" \
+      -max-time 2 \
+      "127.0.0.1:5000" "$method" 2>&1) || result=""
+    kill $PF_PID 2>/dev/null || true
+    wait $PF_PID 2>/dev/null || true
+    sleep 1  # Give port forward time to clean up
+  fi
+  
+  # FIX #2: Fallback to improved flags on port 8443 if h2c port fails
+  # Check if result is empty, contains error, or timeout
+  if [[ -z "$result" ]] || echo "$result" | grep -q -iE "error|failed|timeout|deadline|connection refused|dial.*failed|context deadline"; then
+    # Use grpcurl's built-in timeout for port 8443 as well
+    result=$(grpcurl -insecure \
+      -H "Host: $HOST" \
+      -authority "$HOST" \
+      -H "TE: trailers" \
+      -H "Content-Type: application/grpc" \
+      -import-path "$PROTO_DIR" \
+      -proto "$PROTO_DIR/$proto_file" \
+      -max-time "$timeout" \
+      -d "$data" \
+      "127.0.0.1:8443" "$method" 2>&1) || result=""
+  fi
+  
+  echo "$result"
+}
+
+# Test 15: gRPC Testing (if grpcurl is available)
+say "Test 15: gRPC Service Testing"
+if ! command -v grpcurl >/dev/null 2>&1; then
+  warn "grpcurl not installed - skipping gRPC tests"
+  warn "  Install with: brew install grpcurl"
+  warn "  Or: go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest"
+else
+  # Test gRPC Auth Service - HealthCheck
+  say "Test 15a: gRPC Auth Service - HealthCheck via HTTP/2"
+  GRPC_AUTH_HEALTH=$(grpc_test "Auth" "auth.AuthService/HealthCheck" "auth.proto" '{}' 10)
+  if echo "$GRPC_AUTH_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Auth HealthCheck works via HTTP/2"
+  else
+    warn "gRPC Auth HealthCheck failed"
+    echo "Response: $GRPC_AUTH_HEALTH" | head -3
+  fi
+
+  # Test gRPC Auth Service - Authenticate (if we have credentials)
+  if [[ -n "${TEST_EMAIL:-}" ]] && [[ -n "${TEST_PASSWORD:-}" ]]; then
+    say "Test 15b: gRPC Auth Service - Authenticate via HTTP/2"
+    GRPC_AUTH_RESPONSE=$(grpc_test "Auth" "auth.AuthService/Authenticate" "auth.proto" "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}" 10)
+    if echo "$GRPC_AUTH_RESPONSE" | grep -q "token"; then
+      ok "gRPC Auth Authenticate works via HTTP/2"
+      GRPC_TOKEN=$(echo "$GRPC_AUTH_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+    else
+      warn "gRPC Auth Authenticate failed"
+      echo "Response: $GRPC_AUTH_RESPONSE" | head -3
+    fi
+  fi
+
+  # Test gRPC Records Service - HealthCheck
+  say "Test 15c: gRPC Records Service - HealthCheck via HTTP/2"
+  GRPC_RECORDS_HEALTH=$(grpc_test "Records" "records.RecordsService/HealthCheck" "records.proto" '{}' 10)
+  if echo "$GRPC_RECORDS_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Records HealthCheck works via HTTP/2"
+  else
+    warn "gRPC Records HealthCheck failed"
+    echo "Response: $GRPC_RECORDS_HEALTH" | head -3
+  fi
+
+  # Test gRPC Records Service - SearchRecords (if we have a user ID)
+  if [[ -n "${USER1_ID:-}" ]]; then
+    say "Test 15d: gRPC Records Service - SearchRecords via HTTP/2"
+    GRPC_SEARCH_RESPONSE=$(grpc_test "Records" "records.RecordsService/SearchRecords" "records.proto" "{\"user_id\":\"$USER1_ID\",\"query\":\"test\",\"limit\":10}" 10)
+    if echo "$GRPC_SEARCH_RESPONSE" | grep -q "records"; then
+      ok "gRPC Records SearchRecords works via HTTP/2"
+    else
+      warn "gRPC Records SearchRecords failed"
+      echo "Response: $GRPC_SEARCH_RESPONSE" | head -3
+    fi
+  fi
+
+  # Test gRPC Social Service - HealthCheck
+  say "Test 15e: gRPC Social Service - HealthCheck via HTTP/2"
+  GRPC_SOCIAL_HEALTH=$(grpc_test "Social" "social.SocialService/HealthCheck" "social.proto" '{}' 10)
+  if echo "$GRPC_SOCIAL_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Social HealthCheck works via HTTP/2"
+  else
+    warn "gRPC Social HealthCheck failed"
+    echo "Response: $GRPC_SOCIAL_HEALTH" | head -3
+  fi
+
+  # Test gRPC Listings Service - HealthCheck
+  say "Test 15f: gRPC Listings Service - HealthCheck via HTTP/2"
+  GRPC_LISTINGS_HEALTH=$(grpc_test "Listings" "listings.ListingsService/HealthCheck" "listings.proto" '{}' 10)
+  if echo "$GRPC_LISTINGS_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Listings HealthCheck works via HTTP/2"
+  else
+    warn "gRPC Listings HealthCheck failed"
+    echo "Response: $GRPC_LISTINGS_HEALTH" | head -3
+  fi
+
+  # Test gRPC Analytics Service - HealthCheck
+  say "Test 15g: gRPC Analytics Service - HealthCheck via HTTP/2"
+  GRPC_ANALYTICS_HEALTH=$(grpc_test "Analytics" "analytics.AnalyticsService/HealthCheck" "analytics.proto" '{}' 10)
+  if echo "$GRPC_ANALYTICS_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Analytics HealthCheck works via HTTP/2"
+  else
+    warn "gRPC Analytics HealthCheck failed"
+    echo "Response: $GRPC_ANALYTICS_HEALTH" | head -3
+  fi
 fi
 
 say "=== Microservices Testing Complete ==="

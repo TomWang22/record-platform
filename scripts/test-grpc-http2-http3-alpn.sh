@@ -42,7 +42,7 @@ if command -v grpcurl >/dev/null 2>&1; then
   if grpcurl -insecure -H "Host: $HOST" \
     -d '{}' \
     "$HOST:8443" \
-    auth.AuthService/HealthCheck 2>&1 | grep -q "healthy"; then
+    /auth.AuthService/HealthCheck 2>&1 | grep -q "healthy"; then
     ok "gRPC health check works via HTTP/2"
   else
     warn "gRPC health check failed"

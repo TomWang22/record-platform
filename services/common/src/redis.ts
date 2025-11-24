@@ -5,8 +5,29 @@ let client: Redis | null = null
 /** Singleton Redis client. Why: avoid multiple TCP connections per worker. */
 export function getRedis(): Redis {
   if (!client) {
-    const url = process.env.REDIS_URL || 'redis://redis:6379/0'
-    client = new Redis(url, { lazyConnect: false, maxRetriesPerRequest: 2 })
+    // Support both REDIS_URL (with password) and REDIS_PASSWORD env var
+    let url = process.env.REDIS_URL || 'redis://redis:6379/0'
+    const password = process.env.REDIS_PASSWORD
+    // If REDIS_PASSWORD is set and URL doesn't have password, add it
+    if (password && !url.includes('@') && !url.includes('://:')) {
+      // Insert password after redis://
+      url = url.replace('redis://', `redis://:${password}@`)
+    }
+    client = new Redis(url, { 
+      lazyConnect: true,  // Don't connect immediately - allows graceful degradation
+      maxRetriesPerRequest: 2,
+      password: password, // Also set password directly (ioredis supports both)
+      retryStrategy: (times) => {
+        // Exponential backoff, max 2s
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+      },
+      enableOfflineQueue: false,  // Don't queue commands when disconnected
+    })
+    // Handle errors gracefully - don't crash the app
+    client.on('error', (err) => {
+      console.warn('[redis] Connection error (non-fatal):', err.message);
+    });
   }
   return client
 }

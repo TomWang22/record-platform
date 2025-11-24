@@ -5,7 +5,7 @@ set -euo pipefail
 KIND_CLUSTER="${KIND_CLUSTER:-h3}"
 OVERLAY_DIR="infra/k8s/overlays/dev"
 NS="record-platform"
-SERVICES=(api-gateway auth-service records-service listings-service analytics-service python-ai-service)
+SERVICES=(api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service)
 # ----------------------------
 
 log()  { printf "\n\033[1;36m▶ %s\033[0m\n" "$*"; }
@@ -114,7 +114,7 @@ fi
 
 # 9) restart DB-using services to pick up migrations/env
 log "Restarting DB-using services…"
-kubectl -n "$NS" rollout restart deploy/auth-service deploy/records-service || true
+kubectl -n "$NS" rollout restart deploy/auth-service deploy/records-service deploy/listings-service deploy/social-service deploy/shopping-service || true
 
 # 10) wait for all core services
 log "Waiting for deployments to roll out…"
@@ -147,7 +147,7 @@ CURL="${CURL_BIN:-/opt/homebrew/opt/curl/bin/curl}"
 if ! "$CURL" --version 2>/dev/null | grep -q 'HTTP3'; then CURL="$(command -v curl)"; fi
 echo "H2 /_caddy/healthz : $("$CURL" -sS -I --http2 -H 'Host: record.local' https://record.local/_caddy/healthz | head -n1)"
 echo "H2 /api/healthz     : $("$CURL" -sS -I --http2 -H 'Host: record.local' https://record.local/api/healthz | head -n1)"
-for p in auth records listings analytics ai; do
+for p in auth records listings analytics ai social shopping; do
   printf "/api/%s/healthz  : " "$p"
   $CURL -sS -I --http2 -H 'Host: record.local' "https://record.local/api/$p/healthz" | head -n1
 done

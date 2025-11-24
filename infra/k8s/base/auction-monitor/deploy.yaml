@@ -31,9 +31,23 @@ spec:
             # You used this in compose
             - name: BASE_URL
               value: "http://haproxy.record-platform.svc.cluster.local:8081"
-            # If your code expects PG via Prisma or similar, keep one of these that your app uses:
-            - name: DATABASE_URL
-              value: "postgresql://record_app:SUPER_STRONG_APP_PASSWORD@pgbouncer.record-platform.svc.cluster.local:6432/records?pgbouncer=true&connect_timeout=5&pool_timeout=10"
+            # Dual-DB setup: listings DB for reading watchlist, auction-monitor DB for writing results
+            - name: POSTGRES_URL_LISTINGS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: POSTGRES_URL_LISTINGS
+            - name: POSTGRES_URL_AUCTION_MONITOR
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: POSTGRES_URL_AUCTION_MONITOR
+            # Legacy POSTGRES_URL defaults to auction-monitor DB
+            - name: POSTGRES_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: POSTGRES_URL_AUCTION_MONITOR
             # Only if you actually have Kafka in K8s; otherwise remove/override in app-config
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: "kafka.record-platform.svc.cluster.local:9092"

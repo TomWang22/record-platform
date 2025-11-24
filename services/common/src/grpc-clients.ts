@@ -66,6 +66,17 @@ const listingsPackageDefinition = protoLoader.loadSync(LISTINGS_PROTO_PATH, {
 });
 const listingsProto = grpc.loadPackageDefinition(listingsPackageDefinition) as any;
 
+// Load shopping proto
+const SHOPPING_PROTO_PATH = resolveProtoPath("shopping.proto");
+const shoppingPackageDefinition = protoLoader.loadSync(SHOPPING_PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+});
+const shoppingProto = grpc.loadPackageDefinition(shoppingPackageDefinition) as any;
+
 // Create gRPC clients
 export function createAuthClient(address: string = "auth-service:50051") {
   const AuthService = authProto.auth.AuthService;
@@ -99,19 +110,46 @@ export function createListingsClient(address: string = "listings-service:50057")
   );
 }
 
-// Helper to promisify gRPC calls
+export function createShoppingClient(address: string = "shopping-service:50058") {
+  const ShoppingService = shoppingProto.shopping.ShoppingService;
+  return new ShoppingService(
+    address,
+    buildCredentials()
+  );
+}
+
+// Helper to promisify gRPC calls with timeout
 export function promisifyGrpcCall<T>(
   client: any,
   method: string,
-  request: any
+  request: any,
+  timeoutMs: number = 10000 // Default 10 second timeout
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    client[method](request, (error: any, response: T) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(response);
+    let completed = false;
+    const timeout = setTimeout(() => {
+      if (!completed) {
+        completed = true;
+        reject(new Error(`gRPC call ${method} timed out after ${timeoutMs}ms`));
       }
-    });
+    }, timeoutMs);
+
+    try {
+      client[method](request, (error: any, response: T) => {
+        if (completed) return;
+        completed = true;
+        clearTimeout(timeout);
+        if (error) {
+          reject(error);
+        } else {
+          resolve(response);
+        }
+      });
+    } catch (err) {
+      if (completed) return;
+      completed = true;
+      clearTimeout(timeout);
+      reject(err);
+    }
   });
 }

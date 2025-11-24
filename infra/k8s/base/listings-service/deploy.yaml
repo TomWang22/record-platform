@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
         - name: app
-          image: ghcr.io/yourorg/listings-service:dev
-          imagePullPolicy: IfNotPresent
+          image: listings-service:dev
+          imagePullPolicy: Never
           ports:
             - name: http
               containerPort: 4003
@@ -30,16 +30,26 @@ spec:
           env:
             - name: NODE_ENV
               value: "development"
+            - name: GRPC_PORT
+              value: "50057"
+            - name: ENABLE_GRPC
+              value: "true"
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto
               readOnly: true
           readinessProbe:
             httpGet: { path: /healthz, port: http }
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           livenessProbe:
             httpGet: { path: /healthz, port: http }
-            initialDelaySeconds: 15
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes:
         - name: proto-files
           configMap:

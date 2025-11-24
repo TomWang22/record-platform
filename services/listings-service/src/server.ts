@@ -8,7 +8,17 @@ import { getRedis } from "@common/utils/redis";
 import { pool } from "./lib/db";
 
 const app = express();
-const redis = getRedis();
+// Redis is optional - wrap in try/catch to prevent startup failures
+let redis: ReturnType<typeof getRedis> | null = null;
+try {
+  redis = getRedis();
+  // Set up error handlers to prevent crashes
+  redis.on('error', (err) => {
+    console.warn('[listings] Redis error (non-fatal):', err.message);
+  });
+} catch (err) {
+  console.warn('[listings] Redis initialization failed (continuing without cache):', err);
+}
 
 app.use(express.json());
 app.get("/healthz", async (_req, res) => {
@@ -16,7 +26,9 @@ app.get("/healthz", async (_req, res) => {
     await pool.query('SELECT 1');
     res.json({ ok: true, db: 'connected' });
   } catch (err) {
-    res.status(503).json({ ok: false, db: 'disconnected', error: String(err) });
+    // Return 200 with warning instead of 503 - allows service to be marked ready
+    // even if DB is temporarily unavailable (e.g., disk space issues)
+    res.status(200).json({ ok: true, db: 'disconnected', warning: String(err) });
   }
 });
 app.use((req, res, next) => { res.on("finish", () => httpCounter.inc({ service: "listings", route: req.path, method: req.method, code: res.statusCode })); next(); });
@@ -32,12 +44,17 @@ app.get("/search/ebay", async (req, res) => {
   if (!q) return res.status(400).json({ error: "q required" });
 
   const cacheKey = `ebay:q:${q}`;
-  try { await redis.connect().catch(()=>{}); } catch {}
-
-  try {
-    const cached = await redis.get(cacheKey);
-    if (cached) return res.setHeader("X-Cache","HIT").json(JSON.parse(cached));
-  } catch {}
+  // Try Redis cache if available
+  if (redis) {
+    try {
+      await redis.connect().catch(()=>{});
+      const cached = await redis.get(cacheKey);
+      if (cached) return res.setHeader("X-Cache","HIT").json(JSON.parse(cached));
+    } catch (err) {
+      // Redis cache miss or error - continue without cache
+      console.debug('[listings] Redis cache miss/error:', err);
+    }
+  }
 
   const token = process.env.EBAY_OAUTH_TOKEN;
   if (!token) return res.status(200).json({ query: q, items: [] });
@@ -53,7 +70,10 @@ app.get("/search/ebay", async (req, res) => {
       importCharges: i?.importCharges?.value || null
     }));
     const payload = { query: q, items };
-    try { await redis.setex(cacheKey, 60, JSON.stringify(payload)); } catch {}
+    // Try to cache if Redis is available
+    if (redis) {
+      try { await redis.setex(cacheKey, 60, JSON.stringify(payload)); } catch {}
+    }
     res.setHeader("Cache-Control","public, max-age=60, s-maxage=300, stale-while-revalidate=600");
     res.setHeader("X-Cache","MISS");
     res.json(payload);

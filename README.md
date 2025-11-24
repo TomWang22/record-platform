@@ -3,16 +3,20 @@
 Record Platform is a Kubernetes-first microservices stack for managing a personal record collection while exercising modern edge patterns. The stack spans Node.js/Express services, Prisma/Postgres data, Redis-backed caching, and a suite of observability and operational tools. The latest revamp replaces the Docker Compose dev story with Kustomize-driven Kubernetes, adds a Caddy front door that speaks HTTP/2 and HTTP/3, and ships automation scripts for day-to-day ops.
 
 ## Highlights
-- **✅ Multi-protocol edge (HTTP/2, HTTP/3, gRPC)** - Caddy terminates TLS/QUIC and forwards into nginx-ingress; **all 27 tests passing** including HTTP/2, HTTP/3, and gRPC flows via `scripts/test-microservices-http2-http3.sh`.
+- **✅ Multi-protocol edge (HTTP/2, HTTP/3, gRPC)** - Caddy terminates TLS/QUIC and forwards into nginx-ingress; **all tests passing** including HTTP/2, HTTP/3, and gRPC flows via `scripts/test-microservices-http2-http3.sh`.
 - **✅ Full gRPC inter-service communication** - All services communicate via gRPC with protocol buffers; Caddy routes gRPC requests using `protocol grpc` matcher with h2c transport to backend services.
+- **✅ Multi-database architecture** - **8 dedicated PostgreSQL instances** for service isolation, scalability, and independent scaling (auth, records, social, listings, shopping, auction-monitor, analytics, python-ai).
+- **✅ Dual-database connections** - Services like auction-monitor and analytics-service connect to multiple databases for cross-service data access while maintaining data isolation.
 - **Kubernetes-native workflows** - `infra/k8s` provides composable bases and overlays, with bootstrapping scripts that stand up Kind, build images, load them, and apply manifests.
 - **Hardened gateway path** - API Gateway keeps the JWT guard, adds optional `DEBUG_FAKE_AUTH`, injects identity headers, and exposes detailed metrics.
 - **Redis-assisted records caching** - `services/records-service/src/lib/cache.ts` adds normalized search keys, safe JSON encoding, and targeted invalidation hooks.
+- **Kafka messaging** - Real-time messaging for forum posts, direct messages, and group chats via Kafka integration in social-service.
 - **Operational tooling** - `scripts/` covers smoke tests, TLS helpers, QUIC tuning, backup/restore, load tests, and rollout automation.
 
-## 🎉 Recent Breakthrough: Full Multi-Protocol Support
+## 🎉 Recent Breakthroughs
 
-**All 27 tests passing** - Complete end-to-end validation of HTTP/2, HTTP/3 (QUIC), and gRPC communication:
+### Full Multi-Protocol Support ✅
+**All tests passing** - Complete end-to-end validation of HTTP/2, HTTP/3 (QUIC), and gRPC communication:
 
 - ✅ **Tests 1-14**: REST API via HTTP/2 and HTTP/3 (auth, records, social, listings)
 - ✅ **Tests 15a-15g**: gRPC HealthCheck and business logic for all services (auth, records, social, listings, analytics)
@@ -26,6 +30,26 @@ Key technical achievements:
 - **Proto file management**: All proto files loaded from ConfigMap, with lazy loading in analytics-service to prevent startup crashes
 - **Timeout handling**: Fixed grpcurl timeout conflicts by using native `-max-time` flag instead of wrapper functions
 - **Health checks**: Caddy health endpoint (`/_caddy/healthz`) working for both HTTP/2 and HTTP/3
+
+### Multi-Database Architecture ✅
+**8 dedicated PostgreSQL instances** for complete service isolation and independent scaling:
+
+- ✅ **Main DB (5433)**: `records` schema for core record collection data
+- ✅ **Auth DB (5437)**: Dedicated `auth` schema for user authentication and JWT management
+- ✅ **Social DB (5434)**: `social` schema for forum posts, comments, and messaging
+- ✅ **Listings DB (5435)**: `listings` schema for marketplace data, auctions, and watchlists
+- ✅ **Shopping DB (5436)**: `shopping` schema for carts, orders, and purchase history
+- ✅ **Auction Monitor DB (5438)**: `auction_monitor` schema for auction results and price tracking
+- ✅ **Analytics DB (5439)**: `analytics` schema for price snapshots and analytics data
+- ✅ **Python AI DB (5440)**: `python_ai` schema for AI model persistence and predictions
+
+Key architectural benefits:
+- **Service isolation**: Each service has its own database, preventing cross-service data conflicts
+- **Independent scaling**: Databases can be scaled independently based on service load
+- **Dual-DB connections**: Services like auction-monitor and analytics-service connect to multiple databases for cross-service queries while maintaining isolation
+- **Schema separation**: Clear boundaries between service domains with dedicated schemas
+- **Redis authentication**: All services use password-protected Redis connections
+- **Kafka integration**: Real-time messaging for forum posts, direct messages, and group chats
 
 ## Why This Exists
 I have been cataloging vinyl for a little over a year, and this codebase sits at the intersection of that hobby and a desire to level up on distributed systems and observability. The earlier Docker Compose stack was enough to track spins, but I wanted to understand how real platforms layer ingress controllers, service meshes, CI/CD-friendly manifests, and QUIC edges. Every migration choice (Caddy front door, nginx micro-cache, HAProxy fan-in, the Kustomize base/overlay split) is framed so a curious collector can trace data flow from a record search UI all the way to Postgres buffers and Grafana dashboards. The repo keeps personal workflow sharp (fast search, authenticated inserts) while remaining a playground for new infra ideas.
@@ -106,20 +130,37 @@ I have been cataloging vinyl for a little over a year, and this codebase sits at
         ├───────────────────────────────────────────────────────────────┤
         │                                                               │
         │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-        │  │  Postgres    │  │Postgres Social│ │Postgres      │       │
-        │  │  (Main DB)   │  │   (5434)     │ │Listings(5435)│       │
-        │  │   (5433)     │  │              │ │              │       │
-        │  │ - auth schema│  │ - social     │ │ - listings   │       │
-        │  │ - records    │  │   schema     │ │   schema     │       │
-        │  └──────────────┘  └──────────────┘ └──────────────┘       │
+        │  │  Postgres   │  │Postgres Auth │  │Postgres Social│       │
+        │  │  (Main DB)  │  │   (5437)     │  │   (5434)     │       │
+        │  │   (5433)    │  │              │  │              │       │
+        │  │ - records   │  │ - auth       │  │ - social      │       │
+        │  │   schema    │  │   schema     │  │   schema      │       │
+        │  └──────────────┘  └──────────────┘  └──────────────┘       │
         │                                                               │
         │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-        │  │Postgres      │  │    Redis     │  │    Kafka     │       │
-        │  │Shopping(5436)│  │   (6379)     │  │   (9092)     │       │
-        │  │              │  │ - JWT Cache  │  │ - Messaging  │       │
-        │  │ - shopping   │  │ - Search     │  │ - Events     │       │
-        │  │   schema     │  │   Cache      │  │              │       │
+        │  │Postgres      │  │Postgres      │  │Postgres      │       │
+        │  │Listings(5435)│  │Shopping(5436)│  │Auction Mon(5438)│     │
+        │  │              │  │              │  │              │       │
+        │  │ - listings   │  │ - shopping   │  │ - auction_   │       │
+        │  │   schema     │  │   schema     │  │   monitor    │       │
         │  └──────────────┘  └──────────────┘  └──────────────┘       │
+        │                                                               │
+        │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+        │  │Postgres      │  │Postgres      │  │    Redis     │       │
+        │  │Analytics(5439)│ │Python AI(5440)│ │   (6379)     │       │
+        │  │              │  │              │  │ - JWT Cache  │       │
+        │  │ - analytics  │  │ - python_ai  │  │ - Search     │       │
+        │  │   schema     │  │   schema     │  │   Cache      │       │
+        │  └──────────────┘  └──────────────┘  └──────────────┘       │
+        │                                                               │
+        │  ┌──────────────┐                                           │
+        │  │    Kafka     │                                           │
+        │  │   (9092)     │                                           │
+        │  │ - Messaging  │                                           │
+        │  │ - Events     │                                           │
+        │  │ - Forum Posts│                                           │
+        │  │ - Group Chat │                                           │
+        │  └──────────────┘                                           │
         └───────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -167,14 +208,21 @@ I have been cataloging vinyl for a little over a year, and this codebase sits at
 
 **Data Layer:**
 - **All databases run outside Kubernetes** in Docker Compose for stability and easier management
-- **4 PostgreSQL instances:**
-  - Main DB (5433): `auth` and `records` schemas
-  - Social DB (5434): `social` schema (forum, messages)
-  - Listings DB (5435): `listings` schema
-  - Shopping DB (5436): `shopping` schema
-- **Redis** (6379): JWT revocation cache, search result caching
-- **Kafka** (9092): Event streaming, messaging, real-time updates
-- Services connect via `host.docker.internal` from Kubernetes pods
+- **8 dedicated PostgreSQL instances** for service isolation and independent scaling:
+  - **Main DB (5433)**: `records` schema for core record collection data
+  - **Auth DB (5437)**: Dedicated `auth` schema for user authentication and JWT management
+  - **Social DB (5434)**: `social` schema for forum posts, comments, and messaging
+  - **Listings DB (5435)**: `listings` schema for marketplace data, auctions, and watchlists
+  - **Shopping DB (5436)**: `shopping` schema for carts, orders, and purchase history
+  - **Auction Monitor DB (5438)**: `auction_monitor` schema for auction results and price tracking
+  - **Analytics DB (5439)**: `analytics` schema for price snapshots and analytics data
+  - **Python AI DB (5440)**: `python_ai` schema for AI model persistence and predictions
+- **Dual-DB connections**: Services like auction-monitor and analytics-service connect to multiple databases:
+  - **Auction Monitor**: Reads from `listings.watchlist` (port 5435), writes to `auction_monitor.auction_results` (port 5438)
+  - **Analytics Service**: Reads from `listings.search_history` (port 5435), writes to `analytics.price_snapshots` (port 5439)
+- **Redis** (6379): Password-protected JWT revocation cache, search result caching, rate limiting
+- **Kafka** (9092): Event streaming, real-time messaging for forum posts, direct messages, and group chats
+- Services connect via `host.docker.internal:PORT` from Kubernetes pods
 
 **Observability:**
 - **Prometheus** scrapes metrics from all services via ServiceMonitors/PodMonitors
@@ -188,14 +236,14 @@ I have been cataloging vinyl for a little over a year, and this codebase sits at
 | Component | Port | Protocol | Notes |
 |-----------|------|----------|-------|
 | **API Gateway** | 4000 | HTTP/gRPC | Node/Express gateway; verifies JWTs, enforces rate limit, injects `x-user-*`, proxies HTTP to gRPC, exports `/metrics`, supports `DEBUG_FAKE_AUTH` |
-| **Auth Service** | 4001/50051 | HTTP/gRPC | Handles register/login/logout, persists to Postgres `auth` schema via Prisma, gRPC server on port 50051 |
+| **Auth Service** | 4001/50051 | HTTP/gRPC | Handles register/login/logout, persists to dedicated Auth DB (port 5437) `auth` schema via Prisma, gRPC server on port 50051 |
 | **Records Service** | 4002/50051 | HTTP/gRPC | CRUD + search over records, uses Redis for search caching, enforces user ownership, gRPC on port 50051 |
 | **Listings Service** | 4003/50057 | HTTP/gRPC | Public catalogue endpoints, eBay integration, gRPC interface on port 50057 for marketplace data |
-| **Analytics Service** | 4004/50054 | HTTP/gRPC | Authenticated aggregations, price snapshots, multi-core worker pool, gRPC on port 50054 |
+| **Analytics Service** | 4004/50054 | HTTP/gRPC | Authenticated aggregations, price snapshots, dual-DB (listings + analytics), multi-core worker pool, gRPC on port 50054 |
 | **Social Service** | 4006/50056 | HTTP/gRPC | Forum posts, comments, votes, user messaging, threaded conversations, gRPC on port 50056 |
 | **Shopping Service** | 4007/50052 | HTTP/gRPC | Shopping cart, checkout, order management, gRPC on port 50052 |
 | **Python AI Service** | 5005 | HTTP | FastAPI service for AI/ML predictions, grade recommendations, Discogs/eBay integration |
-| **Auction Monitor** | 4008 | HTTP | Monitors auction trends, price tracking, Kafka integration for real-time updates |
+| **Auction Monitor** | 4008 | HTTP | Monitors auction trends, price tracking, dual-DB (listings read + auction-monitor write), Kafka integration for real-time updates |
 | **Web App (Next.js)** | 3001 | HTTP | React/Next.js frontend, serves via Nginx edge, forum, messaging, collection management |
 | **Nginx Edge** | 8080 | HTTP | Serves static UI assets, proxies `/api` through HAProxy, micro-caching, rate limiting |
 | **HAProxy** | 8081 | HTTP | Keep-alive pools to gateway, load balancing, stats on port 8404 |
@@ -210,14 +258,30 @@ I have been cataloging vinyl for a little over a year, and this codebase sits at
 ### Data Layer (External - Docker Compose)
 **All databases run outside Kubernetes** in Docker Compose for stability and easier management:
 
-- **Postgres Main** (`docker-compose.yml:postgres`) - Port 5433, hosts `auth` and `records` schemas
-- **Postgres Social** (`docker-compose.yml:postgres-social`) - Port 5434, hosts `social` schema (forum, messages)
-- **Postgres Listings** (`docker-compose.yml:postgres-listings`) - Port 5435, hosts `listings` schema
-- **Postgres Shopping** (`docker-compose.yml:postgres-shopping`) - Port 5436, hosts `shopping` schema
-- **Redis** (`docker-compose.yml:redis`) - Port 6379, JWT revocation cache, search result caching
-- **Kafka** (`docker-compose.yml:kafka`) - Port 9092, event streaming, messaging, real-time updates
+#### PostgreSQL Instances (8 dedicated databases)
+- **Postgres Main** (`docker-compose.yml:postgres`) - Port 5433, hosts `records` schema for core collection data
+- **Postgres Auth** (`docker-compose.yml:postgres-auth`) - Port 5437, dedicated `auth` schema for user authentication and JWT management
+- **Postgres Social** (`docker-compose.yml:postgres-social`) - Port 5434, hosts `social` schema (forum posts, comments, messages)
+- **Postgres Listings** (`docker-compose.yml:postgres-listings`) - Port 5435, hosts `listings` schema (marketplace data, auctions, watchlists, search_history)
+- **Postgres Shopping** (`docker-compose.yml:postgres-shopping`) - Port 5436, hosts `shopping` schema (carts, orders, wishlists, purchase history)
+- **Postgres Auction Monitor** (`docker-compose.yml:postgres-auction-monitor`) - Port 5438, hosts `auction_monitor` schema (auction results, price tracking)
+- **Postgres Analytics** (`docker-compose.yml:postgres-analytics`) - Port 5439, hosts `analytics` schema (price snapshots, analytics data)
+- **Postgres Python AI** (`docker-compose.yml:postgres-python-ai`) - Port 5440, hosts `python_ai` schema (AI model persistence, predictions)
 
-Services connect via `host.docker.internal:PORT` from Kubernetes pods.
+#### Dual-Database Connections
+Some services connect to multiple databases for cross-service data access:
+- **Auction Monitor Service**: 
+  - Reads from `listings.watchlist` (port 5435) to monitor watched items
+  - Writes to `auction_monitor.auction_results` (port 5438) using `auction_monitor.upsert_auction_result()` function
+- **Analytics Service**:
+  - Reads from `listings.search_history` (port 5435) for search analytics
+  - Writes to `analytics.price_snapshots` (port 5439) for price trend analysis
+
+#### Supporting Infrastructure
+- **Redis** (`docker-compose.yml:redis`) - Port 6379, password-protected, JWT revocation cache, search result caching, rate limiting
+- **Kafka** (`docker-compose.yml:kafka`) - Port 9092, event streaming, real-time messaging for forum posts, direct messages, and group chats
+
+Services connect via `host.docker.internal:PORT` from Kubernetes pods. Connection strings are configured in `infra/k8s/base/config/app-config.yaml` with `POSTGRES_URL_*` environment variables.
 
 ### Observability
 - **Prometheus** (`infra/k8s/base/observability`) - Metrics collection via kube-prometheus-stack, 30-day retention, 50Gi storage
@@ -289,13 +353,18 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
 ## Data & Migrations
 
 ### Database Architecture
-- **4 PostgreSQL instances** running in Docker Compose (outside Kubernetes):
-  - **Main DB (5433)**: `auth` and `records` schemas
-  - **Social DB (5434)**: `social` schema (forum posts, comments, messages)
-  - **Listings DB (5435)**: `listings` schema (marketplace data)
-  - **Shopping DB (5436)**: `shopping` schema (carts, orders)
-- **Redis (6379)**: JWT revocation cache, search result caching
-- **Kafka (9092)**: Event streaming, messaging, real-time updates
+- **8 dedicated PostgreSQL instances** running in Docker Compose (outside Kubernetes) for service isolation and independent scaling:
+  - **Main DB (5433)**: `records` schema for core record collection data
+  - **Auth DB (5437)**: Dedicated `auth` schema for user authentication and JWT management
+  - **Social DB (5434)**: `social` schema (forum posts, comments, messages, groups)
+  - **Listings DB (5435)**: `listings` schema (marketplace data, auctions, watchlists, search_history)
+  - **Shopping DB (5436)**: `shopping` schema (carts, orders, wishlists, purchase history)
+  - **Auction Monitor DB (5438)**: `auction_monitor` schema (auction results, price tracking)
+  - **Analytics DB (5439)**: `analytics` schema (price snapshots, analytics data)
+  - **Python AI DB (5440)**: `python_ai` schema (AI model persistence, predictions)
+- **Dual-DB connections**: Services like auction-monitor and analytics-service connect to multiple databases for cross-service queries while maintaining data isolation
+- **Redis (6379)**: Password-protected, JWT revocation cache, search result caching, rate limiting
+- **Kafka (9092)**: Event streaming, real-time messaging for forum posts, direct messages, and group chats
 
 ### Schema Management
 - Prisma schemas and migrations live in each service directory
@@ -414,9 +483,10 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
 
 ### Backend Services
 - **gRPC Inter-Service Communication**: Type-safe, efficient protocol buffer-based communication
-- **Multi-Database Architecture**: Separate databases for auth, records, social, listings, shopping
-- **Event Streaming**: Kafka integration for real-time messaging and event processing
-- **Caching Layer**: Redis for JWT revocation, search results, and performance optimization
+- **Multi-Database Architecture**: 8 dedicated PostgreSQL instances for complete service isolation (auth, records, social, listings, shopping, auction-monitor, analytics, python-ai)
+- **Dual-DB Connections**: Services like auction-monitor and analytics-service connect to multiple databases for cross-service data access
+- **Event Streaming**: Kafka integration for real-time messaging (forum posts, direct messages, group chats) and event processing
+- **Caching Layer**: Password-protected Redis for JWT revocation, search results, and performance optimization
 - **Observability**: Full observability stack with Prometheus, Grafana, Jaeger, OpenTelemetry
 
 ## Roadmap

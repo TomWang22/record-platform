@@ -17,32 +17,32 @@
   },
   "typesVersions": {
     "*": {
-      "logger": [
+      ".": [
+        "dist/index.d.ts"
+      ],
+      "./logger": [
         "dist/logger.d.ts"
       ],
-      "metrics": [
+      "./metrics": [
         "dist/metrics.d.ts"
       ],
-      "auth": [
+      "./auth": [
         "dist/auth.d.ts"
       ],
-      "kafka": [
+      "./kafka": [
         "dist/kafka.d.ts"
       ],
-      "redis": [
+      "./redis": [
         "dist/redis.d.ts"
       ],
-      "grpc-clients": [
+      "./grpc-clients": [
         "dist/grpc-clients.d.ts"
       ],
-      "grpc-reflection": [
+      "./grpc-reflection": [
         "dist/grpc-reflection.d.ts"
       ],
-      "proto": [
+      "./proto": [
         "dist/proto.d.ts"
-      ],
-      "*": [
-        "dist/index.d.ts"
       ]
     }
   },

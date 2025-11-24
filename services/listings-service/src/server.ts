@@ -13,7 +13,7 @@ let redis: ReturnType<typeof getRedis> | null = null;
 try {
   redis = getRedis();
   // Set up error handlers to prevent crashes
-  redis.on('error', (err) => {
+  redis.on('error', (err: Error) => {
     console.warn('[listings] Redis error (non-fatal):', err.message);
   });
 } catch (err) {

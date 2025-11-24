@@ -191,7 +191,7 @@ app.listen(httpPort, () => console.log(`auth HTTP server up on port ${httpPort}`
 
 // Start gRPC server
 if (process.env.ENABLE_GRPC !== "false") {
-  import('./grpc-server.js.js.js').then(({ startGrpcServer }) => {
+  import('./grpc-server.js').then(({ startGrpcServer }) => {
     const grpcPort = parseInt(process.env.GRPC_PORT || "50051", 10);
     startGrpcServer(grpcPort);
   }).catch((e) => {

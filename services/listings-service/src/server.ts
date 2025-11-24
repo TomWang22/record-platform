@@ -1,11 +1,11 @@
 import express from "express";
 import { register, httpCounter } from "@common/utils";
-import oauthRouter from "./oauth-discogs";
+import oauthRouter from './oauth-discogs.js'";
 import axios from "axios";
-import settingsRouter from "./settings";
-import listingsRouter from "./routes/listings";
+import settingsRouter from './settings.js'";
+import listingsRouter from './routes/listings.js'";
 import { getRedis } from "@common/utils/redis";
-import { pool } from "./lib/db";
+import { pool } from './lib/db.js'";
 
 const app = express();
 // Redis is optional - wrap in try/catch to prevent startup failures

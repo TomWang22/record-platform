@@ -16,7 +16,7 @@ import {
   removeFromWatchlist,
   getUserWatchlist,
   pool,
-} from "./lib/db";
+} from './lib/db.js'";
 
 // Load proto file
 const PROTO_PATH = resolveProtoPath("listings.proto");

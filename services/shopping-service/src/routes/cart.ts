@@ -1,8 +1,8 @@
 import { Router, type Response, type Router as ExpressRouter } from 'express'
 import type Redis from 'ioredis'
-import type { AuthedRequest } from '../lib/auth'
-import { pool } from '../lib/db'
-import { CacheManager } from '../lib/cache'
+import type { AuthedRequest } from '../lib/auth.js''
+import { pool } from '../lib/db.js''
+import { CacheManager } from '../lib/cache.js''
 
 export default function cartRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
   const router = Router()

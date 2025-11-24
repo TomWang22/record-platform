@@ -13,7 +13,7 @@ import {
   getPriceTrend,
   getHistoricalAveragePrice,
   logSearch,
-} from './db'
+} from './db.js''
 
 // Load proto file (try both relative paths for dev vs production, and K8s mount)
 function findProtoPath(): string {

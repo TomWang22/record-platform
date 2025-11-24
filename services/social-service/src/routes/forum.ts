@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from 'express'
 import type Redis from 'ioredis'
-import type { AuthedRequest } from '../lib/auth'
-import { cached, makePostKey, makePostsListKey, makeCommentsKey } from '../lib/cache'
-import { pool } from '../lib/db'
+import type { AuthedRequest } from '../lib/auth.js''
+import { cached, makePostKey, makePostsListKey, makeCommentsKey } from '../lib/cache.js''
+import { pool } from '../lib/db.js''
 import { kafka } from '@common/utils/kafka'
 
 // Kafka producer for real-time forum updates (optional - fails gracefully if Kafka is unavailable)

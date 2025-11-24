@@ -1,11 +1,11 @@
 import express, { type Request, type Response, type NextFunction } from 'express'
 import os from 'os'
 import { register, httpCounter } from '@common/utils'
-import { requireUser, type AuthedRequest } from './lib/auth'
-import { pool } from './lib/db'
-import { makeRedis } from './lib/cache'
-import forumRouter from './routes/forum'
-import messagesRouter from './routes/messages'
+import { requireUser, type AuthedRequest } from './lib/auth.js''
+import { pool } from './lib/db.js''
+import { makeRedis } from './lib/cache.js''
+import forumRouter from './routes/forum.js''
+import messagesRouter from './routes/messages.js''
 
 const app = express()
 app.use(express.json())

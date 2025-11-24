@@ -1,6 +1,6 @@
 /* cspell:ignore healthz */
 import express, { type Request, type Response, type NextFunction } from "express";
-import { PrismaClient } from "../prisma/generated/client";
+import { PrismaClient } from '../prisma/generated/client.js'";
 import { register, httpCounter } from "@common/utils";
 import { signJwt, verifyJwt, type JwtPayload as TokenPayload } from "@common/utils/auth";
 import bcrypt from "bcryptjs";
@@ -191,7 +191,7 @@ app.listen(httpPort, () => console.log(`auth HTTP server up on port ${httpPort}`
 
 // Start gRPC server
 if (process.env.ENABLE_GRPC !== "false") {
-  import("./grpc-server").then(({ startGrpcServer }) => {
+  import("./grpc-server.js").then(({ startGrpcServer }) => {
     const grpcPort = parseInt(process.env.GRPC_PORT || "50051", 10);
     startGrpcServer(grpcPort);
   }).catch((e) => {

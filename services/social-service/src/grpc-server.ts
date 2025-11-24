@@ -4,9 +4,9 @@ import * as protoLoader from '@grpc/proto-loader'
 import * as path from 'path'
 import * as fs from 'fs'
 import os from 'os'
-import { pool } from './lib/db'
-import { makeRedis } from './lib/cache'
-import { cached, makePostKey, makePostsListKey, makeCommentsKey, makeMessagesKey, makeThreadKey } from './lib/cache'
+import { pool } from './lib/db.js''
+import { makeRedis } from './lib/cache.js''
+import { cached, makePostKey, makePostsListKey, makeCommentsKey, makeMessagesKey, makeThreadKey } from './lib/cache.js''
 import { kafka } from '@common/utils/kafka'
 
 // Load proto file (try both relative paths for dev vs production)

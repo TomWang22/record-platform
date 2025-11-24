@@ -13,7 +13,7 @@ import {
   removeFromWatchlist,
   getUserWatchlist,
   searchListings,
-} from '../lib/db';
+} from '../lib/db.js'';
 
 const router = Router();
 

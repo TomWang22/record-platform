@@ -1024,6 +1024,36 @@ else
     warn "gRPC Analytics HealthCheck failed"
     echo "Response: $GRPC_ANALYTICS_HEALTH" | head -3
   fi
+
+  # Test gRPC Shopping Service - HealthCheck
+  say "Test 15h: gRPC Shopping Service - HealthCheck via HTTP/2"
+  GRPC_SHOPPING_HEALTH=$(grpc_test "Shopping" "shopping.ShoppingService/HealthCheck" "shopping.proto" '{}' 10)
+  if echo "$GRPC_SHOPPING_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Shopping HealthCheck works via HTTP/2"
+  else
+    warn "gRPC Shopping HealthCheck failed"
+    echo "Response: $GRPC_SHOPPING_HEALTH" | head -3
+  fi
+
+  # Test gRPC Auction Monitor Service - HealthCheck
+  say "Test 15i: gRPC Auction Monitor Service - HealthCheck via HTTP/2"
+  GRPC_AUCTION_MONITOR_HEALTH=$(grpc_test "AuctionMonitor" "auction_monitor.AuctionMonitorService/HealthCheck" "auction-monitor.proto" '{}' 10)
+  if echo "$GRPC_AUCTION_MONITOR_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Auction Monitor HealthCheck works via HTTP/2"
+  else
+    warn "gRPC Auction Monitor HealthCheck failed"
+    echo "Response: $GRPC_AUCTION_MONITOR_HEALTH" | head -3
+  fi
+
+  # Test gRPC Python AI Service - HealthCheck
+  say "Test 15j: gRPC Python AI Service - HealthCheck via HTTP/2"
+  GRPC_PYTHON_AI_HEALTH=$(grpc_test "PythonAI" "python_ai.PythonAIService/HealthCheck" "python-ai.proto" '{}' 10)
+  if echo "$GRPC_PYTHON_AI_HEALTH" | grep -q "healthy"; then
+    ok "gRPC Python AI HealthCheck works via HTTP/2"
+  else
+    warn "gRPC Python AI HealthCheck failed"
+    echo "Response: $GRPC_PYTHON_AI_HEALTH" | head -3
+  fi
 fi
 
 say "=== Microservices Testing Complete ==="

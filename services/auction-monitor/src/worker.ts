@@ -10,7 +10,9 @@ const KAFKA_BROKER = process.env.KAFKA_BROKER || "kafka:9092";
 const KAFKA_CLIENT_ID = process.env.KAFKA_CLIENT_ID || "record-platform";
 const EBAY_TOKEN = process.env.EBAY_OAUTH_TOKEN;
 
-const healthPort = Number(process.env.AUCTION_MONITOR_PORT) || 4010;
+// Health port is only used in standalone mode (RUN_WORKER_ONLY=true)
+// When running with server.ts, the Express server handles health checks on port 4008
+const healthPort = Number(process.env.AUCTION_MONITOR_HEALTH_PORT) || 4010;
 
 // Pool for reading watchlist from listings DB
 const listingsPool = new Pool({ connectionString: POSTGRES_URL_LISTINGS });
@@ -28,13 +30,21 @@ const producer = kafka.producer();
 let dbReady = false;
 let kafkaReady = false;
 
-http
-  .createServer((_req, res) => {
-    const ok = dbReady && kafkaReady;
-    res.writeHead(ok ? 200 : 503, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok, dbReady, kafkaReady }));
-  })
-  .listen(healthPort, () => console.log("health server on", healthPort));
+// Note: Health check is now handled by the Express server in server.ts
+// Only start the HTTP health server if RUN_WORKER_ONLY is set (standalone mode)
+// When running with server.ts (via start.ts), skip the HTTP server entirely
+const RUN_WORKER_ONLY = process.env.RUN_WORKER_ONLY === 'true';
+if (RUN_WORKER_ONLY) {
+  http
+    .createServer((_req, res) => {
+      const ok = dbReady && kafkaReady;
+      res.writeHead(ok ? 200 : 503, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok, dbReady, kafkaReady }));
+    })
+    .listen(healthPort, () => console.log("health server on", healthPort));
+} else {
+  console.log("[auction-monitor] Worker running in server mode - health check handled by Express server on port 4008");
+}
 
 function computeTotals(
   price: number,

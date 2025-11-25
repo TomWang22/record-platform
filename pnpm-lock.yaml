@@ -119,9 +119,21 @@ importers:
 
   services/auction-monitor:
     dependencies:
+      '@common/utils':
+        specifier: workspace:*
+        version: link:../common
+      '@grpc/grpc-js':
+        specifier: ^1.10.9
+        version: 1.14.1
+      '@grpc/proto-loader':
+        specifier: ^0.7.13
+        version: 0.7.15
       axios:
         specifier: ^1.7.7
         version: 1.12.2
+      express:
+        specifier: ^4.18.2
+        version: 4.21.2
       kafkajs:
         specifier: ^2.2.4
         version: 2.2.4
@@ -129,6 +141,9 @@ importers:
         specifier: ^8.12.0
         version: 8.16.3
     devDependencies:
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.21
       tsx:
         specifier: ^4.16.2
         version: 4.20.6

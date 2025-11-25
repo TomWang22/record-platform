@@ -15,4 +15,5 @@ configMapGenerator:
       - listings.proto=proto/listings.proto
       - shopping.proto=proto/shopping.proto
       - analytics.proto=proto/analytics.proto
-      - shopping.proto=proto/shopping.proto
+      - auction-monitor.proto=proto/auction-monitor.proto
+      - python-ai.proto=proto/python-ai.proto

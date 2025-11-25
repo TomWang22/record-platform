@@ -205,3 +205,117 @@ async def price_trends(q: str = Query(..., min_length=2)):
             pass
     REQS.labels("/price-trends","200").inc()
     return payload
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    user_id: Optional[str] = None
+    context: Optional[str] = None
+
+@app.post("/chat")
+async def chat(body: ChatRequest):
+    """
+    Chatbot endpoint - records-focused ChatGPT-like interface.
+    Uses analytics service to gather data and provide intelligent responses.
+    """
+    key = f"ai:chat:{user_id}:{hash(message)}"
+    rc = await get_redis()
+    if rc:
+        try:
+            cached = await rc.get(key)
+            if cached:
+                return JSONResponse(content=json.loads(cached))
+        except Exception:
+            pass
+
+    message = body.message
+    user_id = body.user_id
+    
+    # Gather context from analytics service
+    analytics_data = None
+    if ANALYTICS_URL:
+        try:
+            # Try to extract a query from the message
+            # Simple heuristic: look for artist/album mentions
+            words = message.lower().split()
+            potential_query = " ".join(words[:5])  # First 5 words as potential query
+            
+            async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": USER_AGENT}) as c:
+                # Get similar searches and recommendations
+                similar_resp = await c.get(
+                    ANALYTICS_URL.rstrip("/") + "/analytics/recommendations/similar",
+                    params={"q": potential_query, "userId": user_id, "limit": 5}
+                )
+                if similar_resp.status_code == 200:
+                    analytics_data = similar_resp.json()
+        except Exception:
+            pass
+
+    # Generate response based on message and analytics data
+    # This is a simple implementation - in production, you'd use an LLM
+    response_text = f"I understand you're asking about: {message}"
+    
+    if analytics_data and analytics_data.get("recommendations"):
+        recs = analytics_data["recommendations"][:3]
+        response_text += f"\n\nBased on similar searches, I found: {', '.join([r.get('query', '') for r in recs])}"
+    
+    # Add price trend info if available
+    if "price" in message.lower() or "cost" in message.lower() or "value" in message.lower():
+        response_text += "\n\nI can help you find price trends. Try asking about a specific record or use the price-trends endpoint."
+    
+    payload = {
+        "message": message,
+        "response": response_text,
+        "analytics_context": analytics_data,
+        "timestamp": time.time(),
+    }
+    
+    if rc:
+        try:
+            await rc.setex(key, 300, json.dumps(payload))  # Cache for 5 minutes
+        except Exception:
+            pass
+    
+    REQS.labels("/chat","200").inc()
+    return JSONResponse(content=payload)
+
+# Start gRPC server if enabled
+grpc_server = None
+@app.on_event("startup")
+async def startup_event():
+    """Start gRPC server on startup if enabled"""
+    global grpc_server
+    if os.getenv("ENABLE_GRPC") == "true":
+        try:
+            # Import grpc_server from the same directory
+            import sys
+            import os as os_module
+            import asyncio
+            sys.path.insert(0, os_module.path.dirname(os_module.path.abspath(__file__)))
+            from grpc_server import serve
+            grpc_port = int(os.getenv("GRPC_PORT", "50060"))
+            # Start gRPC server in background task
+            async def start_grpc():
+                server = await serve(grpc_port)
+                if server:
+                    print(f"[python-ai] gRPC server started on port {grpc_port}")
+                    # Keep server running
+                    await server.wait_for_termination()
+            # Create background task
+            asyncio.create_task(start_grpc())
+        except Exception as e:
+            import traceback
+            print(f"[python-ai] Failed to start gRPC server: {e}")
+            traceback.print_exc()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Shutdown gRPC server gracefully"""
+    global grpc_server
+    if grpc_server:
+        try:
+            # grpc.aio.server.stop() is async
+            await grpc_server.stop(5)  # 5 second grace period
+            await grpc_server.wait_for_termination(timeout=5)
+            print("[python-ai] gRPC server stopped")
+        except Exception as e:
+            print(f"[python-ai] Error stopping gRPC server: {e}")

@@ -13,7 +13,7 @@ jobs:
       POSTGRES_URL_LISTINGS: postgresql://postgres:postgres@localhost:5432/postgres
     strategy:
       matrix:
-        service: [api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, auction-monitor, cron-jobs]
+        service: [api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, auction-monitor]
     steps:
       - uses: actions/checkout@v4
 

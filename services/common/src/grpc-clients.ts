@@ -77,6 +77,28 @@ const shoppingPackageDefinition = protoLoader.loadSync(SHOPPING_PROTO_PATH, {
 });
 const shoppingProto = grpc.loadPackageDefinition(shoppingPackageDefinition) as any;
 
+// Load auction-monitor proto
+const AUCTION_MONITOR_PROTO_PATH = resolveProtoPath("auction-monitor.proto");
+const auctionMonitorPackageDefinition = protoLoader.loadSync(AUCTION_MONITOR_PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+});
+const auctionMonitorProto = grpc.loadPackageDefinition(auctionMonitorPackageDefinition) as any;
+
+// Load python-ai proto
+const PYTHON_AI_PROTO_PATH = resolveProtoPath("python-ai.proto");
+const pythonAiPackageDefinition = protoLoader.loadSync(PYTHON_AI_PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+});
+const pythonAiProto = grpc.loadPackageDefinition(pythonAiPackageDefinition) as any;
+
 // Create gRPC clients
 export function createAuthClient(address: string = "auth-service:50051") {
   const AuthService = authProto.auth.AuthService;
@@ -113,6 +135,22 @@ export function createListingsClient(address: string = "listings-service:50057")
 export function createShoppingClient(address: string = "shopping-service:50058") {
   const ShoppingService = shoppingProto.shopping.ShoppingService;
   return new ShoppingService(
+    address,
+    buildCredentials()
+  );
+}
+
+export function createAuctionMonitorClient(address: string = "auction-monitor:50059") {
+  const AuctionMonitorService = auctionMonitorProto.auction_monitor.AuctionMonitorService;
+  return new AuctionMonitorService(
+    address,
+    buildCredentials()
+  );
+}
+
+export function createPythonAIClient(address: string = "python-ai-service:50060") {
+  const PythonAIService = pythonAiProto.python_ai.PythonAIService;
+  return new PythonAIService(
     address,
     buildCredentials()
   );

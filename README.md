@@ -19,10 +19,14 @@ Record Platform is a Kubernetes-first microservices stack for managing a persona
 **All tests passing** - Complete end-to-end validation of HTTP/2, HTTP/3 (QUIC), and gRPC communication:
 
 - ✅ **Tests 1-14**: REST API via HTTP/2 and HTTP/3 (auth, records, social, listings)
-- ✅ **Tests 15a-15g**: gRPC HealthCheck and business logic for all services (auth, records, social, listings, analytics)
-- ✅ **Caddy gRPC routing**: Uses `protocol grpc` matcher with service-specific path routing
+- ✅ **Tests 15a-15j**: gRPC HealthCheck and business logic for **all 10 services**:
+  - **15a-15g**: Core services (auth, records, social, listings, analytics, shopping)
+  - **15h**: Shopping Service gRPC (port 50058)
+  - **15i**: Auction Monitor gRPC (port 50059)
+  - **15j**: Python AI Service gRPC (port 50060)
+- ✅ **Caddy gRPC routing**: Uses `protocol grpc` matcher with service-specific path routing for all services
 - ✅ **Dual transport support**: h2c (port 5000) for internal testing, TLS (port 8443) for production
-- ✅ **Complete test coverage**: Registration, login, CRUD operations, messaging, group chats, listings search
+- ✅ **Complete test coverage**: Registration, login, CRUD operations, messaging, group chats, listings search, auction monitoring, AI predictions
 
 Key technical achievements:
 - **Caddy gRPC routing**: Implemented service-specific gRPC routing using `protocol grpc` matcher and `path_regexp` for service identification
@@ -111,15 +115,16 @@ I have been cataloging vinyl for a little over a year, and this codebase sits at
         │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
         │  │Analytics     │  │Social Service│  │Shopping      │     │
         │  │Service (4004)│  │    (4006)    │  │Service (4007)│     │
-        │  │ gRPC:50054   │  │ gRPC:50056   │  │ gRPC:50052   │     │
+        │  │ gRPC:50054   │  │ gRPC:50056   │  │ gRPC:50058   │     │
         │  │ HTTP:4004    │  │ HTTP:4006    │  │ HTTP:4007    │     │
         │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
         │         │                 │                 │              │
         │  ┌──────────────┐  ┌──────────────┐                        │
-        │  │Python AI     │  │Auction Monitor│                       │
-        │  │Service (5005)│  │    (4008)    │                       │
-        │  │   HTTP       │  │    HTTP      │                       │
-        │  └──────────────┘  └──────────────┘                       │
+        │  │Auction Monitor│  │Python AI     │                        │
+        │  │    (4008)    │  │Service (5005)│                        │
+        │  │ gRPC:50059   │  │ gRPC:50060   │                        │
+        │  │ HTTP:4008    │  │ HTTP:5005    │                        │
+        │  └──────────────┘  └──────────────┘                        │
         └─────────────────────────────────────────────────────────────┘
                                   │
                                   │ gRPC/HTTP
@@ -241,10 +246,10 @@ I have been cataloging vinyl for a little over a year, and this codebase sits at
 | **Listings Service** | 4003/50057 | HTTP/gRPC | Public catalogue endpoints, eBay integration, gRPC interface on port 50057 for marketplace data |
 | **Analytics Service** | 4004/50054 | HTTP/gRPC | Authenticated aggregations, price snapshots, dual-DB (listings + analytics), multi-core worker pool, gRPC on port 50054 |
 | **Social Service** | 4006/50056 | HTTP/gRPC | Forum posts, comments, votes, user messaging, threaded conversations, gRPC on port 50056 |
-| **Shopping Service** | 4007/50052 | HTTP/gRPC | Shopping cart, checkout, order management, gRPC on port 50052 |
-| **Python AI Service** | 5005 | HTTP | FastAPI service for AI/ML predictions, grade recommendations, Discogs/eBay integration |
-| **Auction Monitor** | 4008 | HTTP | Monitors auction trends, price tracking, dual-DB (listings read + auction-monitor write), Kafka integration for real-time updates |
-| **Web App (Next.js)** | 3001 | HTTP | React/Next.js frontend, serves via Nginx edge, forum, messaging, collection management |
+| **Shopping Service** | 4007/50058 | HTTP/gRPC | Shopping cart, checkout, order management, wishlist, purchase history, gRPC on port 50058 |
+| **Auction Monitor** | 4008/50059 | HTTP/gRPC | Monitors auction trends, price tracking, dual-DB (listings read + auction-monitor write), gRPC on port 50059 |
+| **Python AI Service** | 5005/50060 | HTTP/gRPC | FastAPI service for AI/ML predictions, grade recommendations, Discogs/eBay integration, chatbot interface, gRPC on port 50060 |
+| **Web App (Next.js)** | 3001 | HTTP | React/Next.js frontend with TypeScript, serves via Nginx edge, includes dashboard, forum, messaging, collection management, auction monitoring, insights, and integrations pages |
 | **Nginx Edge** | 8080 | HTTP | Serves static UI assets, proxies `/api` through HAProxy, micro-caching, rate limiting |
 | **HAProxy** | 8081 | HTTP | Keep-alive pools to gateway, load balancing, stats on port 8404 |
 
@@ -472,14 +477,17 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
 
 ## Features
 
-### Web Application
+### Web Application (React/Next.js)
+- **Modern Frontend Stack**: Next.js 14+ with React, TypeScript, and Tailwind CSS
 - **Collection Management**: Full CRUD for records with search, filtering, and categorization
+- **Dashboard**: Overview of collection statistics, recent activity, and quick actions
 - **Forum**: Reddit-style discussion forum with posts, comments, upvotes, and flairs
-- **Messaging**: User-to-user messaging with types/flair, threaded conversations, and real-time updates
-- **Marketplace**: eBay integration, listings management, price tracking
-- **Auction Monitor**: Real-time auction tracking with trend visualization
-- **Insights & AI**: Price recommendations, grade predictions, collection analytics
+- **Messaging**: User-to-user messaging with types/flair, threaded conversations, and real-time updates via Kafka
+- **Marketplace**: eBay integration, listings management, price tracking, and watchlists
+- **Auction Monitor**: Real-time auction tracking with trend visualization and price alerts
+- **Insights & AI**: Price recommendations, grade predictions, collection analytics, and AI-powered chatbot
 - **Integrations**: Discogs OAuth (starter), external marketplace connections
+- **Responsive Design**: Mobile-friendly UI with modern component library
 
 ### Backend Services
 - **gRPC Inter-Service Communication**: Type-safe, efficient protocol buffer-based communication

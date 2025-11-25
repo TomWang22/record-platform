@@ -178,6 +178,59 @@ app.post('/analytics/log-search', async (req, res) => {
   }
 })
 
+// Fuzzy search across multiple data sources (data science core)
+// This endpoint combs through search history, price snapshots, and listings
+app.get('/analytics/fuzzy-search', async (req, res) => {
+  const query = req.query.q as string
+  const userId = req.query.userId as string | undefined
+  const limit = parseInt(req.query.limit as string) || 20
+
+  if (!query || query.length < 2) {
+    return res.status(400).json({ error: 'query parameter required (min 2 chars)' })
+  }
+
+  try {
+    // Search across multiple sources using fuzzy matching
+    const [similarSearches, priceMatches, searchHistory] = await Promise.all([
+      // Similar searches from search history
+      getSimilarSearches(query, userId, limit),
+      // Price snapshots matching query (fuzzy artist/name match)
+      analyticsPool.query(
+        `SELECT artist, name, format, median_price, sample_count, snap_date
+         FROM analytics.price_snapshots
+         WHERE artist % $1 OR name % $1
+         ORDER BY similarity(artist, $1) + similarity(name, $1) DESC
+         LIMIT $2`,
+        [query, limit]
+      ),
+      // Recent search history matching query
+      listingsPool.query(
+        `SELECT q, source, COUNT(*)::int as count, MAX(created_at) as last_searched
+         FROM listings.search_history
+         WHERE ($3::uuid IS NULL OR user_id = $3)
+           AND q % $1
+         GROUP BY q, source
+         ORDER BY similarity(q, $1) DESC, count DESC
+         LIMIT $2`,
+        [query, limit, userId || null]
+      ),
+    ])
+
+    res.json({
+      query,
+      results: {
+        similarSearches: similarSearches,
+        priceMatches: priceMatches.rows,
+        searchHistory: searchHistory.rows,
+      },
+      count: similarSearches.length + priceMatches.rows.length + searchHistory.rows.length,
+    })
+  } catch (err) {
+    console.error('[analytics] fuzzy search error:', err)
+    res.status(500).json({ error: 'Internal server error', details: String(err) })
+  }
+})
+
 const PORT = process.env.ANALYTICS_PORT || 4004
 const server = app.listen(PORT, () => {
   console.log(`[analytics] service listening on port ${PORT}`)

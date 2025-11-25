@@ -8,5 +8,8 @@ spec:
   selector: { app: auction-monitor }
   ports:
     - name: http
-      port: 4010
+      port: 4008
       targetPort: http
+    - name: grpc
+      port: 50059
+      targetPort: grpc

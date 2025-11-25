@@ -56,21 +56,24 @@ export default function AuctionsPage() {
 
   async function fetchTrendData(auctionId: string) {
     try {
-      // TODO: Replace with actual endpoint when available
-      // For now, generate mock trend data
-      const mockTrend: AuctionTrend[] = Array.from({ length: 20 }, (_, i) => {
-        const date = new Date()
-        date.setMinutes(date.getMinutes() - (20 - i) * 5)
-        return {
-          timestamp: date.toLocaleTimeString(),
-          bid: 50 + Math.random() * 200 + i * 5,
-          watchers: Math.floor(5 + Math.random() * 15),
-          bids: Math.floor(2 + Math.random() * 10) + i,
-        }
+      // Fetch trend data from auction-monitor service
+      const response = await apiFetch<{ results: any[] }>(`/api/auctions/results/${auctionId}`, {
+        auth: true,
       })
-      setTrendData(mockTrend)
+      
+      // Transform auction results into trend data
+      const trend: AuctionTrend[] = response.results.map((result, i) => ({
+        timestamp: new Date(result.sold_at || result.created_at).toLocaleTimeString(),
+        bid: result.price || result.total_cost || 0,
+        watchers: 0, // Not available in current schema
+        bids: i + 1,
+      }))
+      
+      setTrendData(trend)
     } catch (error) {
       console.error('Failed to fetch trend data:', error)
+      // Fallback to empty array
+      setTrendData([])
     }
   }
 
@@ -78,13 +81,8 @@ export default function AuctionsPage() {
     setLoading(true)
     setStatus('')
     try {
-      // TODO: Replace with actual auction-monitor endpoint when available
-      // For now, this is a placeholder that will work once the service is integrated
-      const data = await apiFetch<AuctionItem[]>('/auctions', {
+      const data = await apiFetch<AuctionItem[]>('/api/auctions', {
         auth: true,
-      }).catch(() => {
-        // Service not available yet, return empty array
-        return []
       })
       setAuctions(Array.isArray(data) ? data : [])
       if (Array.isArray(data) && data.length > 0) {
@@ -95,8 +93,11 @@ export default function AuctionsPage() {
         router.replace('/login')
         return
       }
-      // Service not available - this is expected until auction-monitor is fully integrated
+      // Service not available - return empty array
       setAuctions([])
+      if (error instanceof ApiError && error.status !== 404) {
+        setStatus('Unable to fetch auctions. Service may be starting up.')
+      }
     } finally {
       setLoading(false)
     }
@@ -106,11 +107,14 @@ export default function AuctionsPage() {
     setMonitoring(true)
     setStatus('Starting auction monitoring...')
     try {
-      // TODO: POST to /auctions/monitor to start monitoring specific records
-      await apiFetch('/auctions/monitor', {
+      // For now, monitor a default query - in the future, this could be based on user's collection
+      await apiFetch('/api/auctions/monitor', {
         method: 'POST',
         auth: true,
-        data: {},
+        data: {
+          query: 'vinyl record',
+          source: 'ebay',
+        },
       })
       setStatus('Monitoring started')
       void fetchAuctions()

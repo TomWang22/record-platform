@@ -8,10 +8,26 @@ import { pool } from './lib/db.js'
 import { makeRedis, CacheManager } from './lib/cache.js'
 import { kafka } from '@common/utils/kafka'
 
-// Load proto file
-const PROTO_PATH = fs.existsSync(path.join(__dirname, '../../proto/shopping.proto'))
-  ? path.join(__dirname, '../../proto/shopping.proto')
-  : path.join(__dirname, '../../../proto/shopping.proto')
+// Load proto file (try both relative paths for dev vs production, and K8s mount)
+function findProtoPath(): string {
+  const paths = [
+    '/app/proto/shopping.proto',  // K8s ConfigMap mount
+    path.join(__dirname, '../../proto/shopping.proto'),
+    path.join(__dirname, '../../../proto/shopping.proto'),
+    path.join(process.cwd(), 'proto/shopping.proto'),
+  ]
+  
+  for (const protoPath of paths) {
+    if (fs.existsSync(protoPath)) {
+      console.log(`[shopping-grpc] Found proto file at: ${protoPath}`)
+      return protoPath
+    }
+  }
+  
+  throw new Error(`shopping.proto not found in any of: ${paths.join(', ')}`)
+}
+
+const PROTO_PATH = findProtoPath()
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,
   longs: String,

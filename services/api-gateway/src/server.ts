@@ -18,6 +18,8 @@ import {
   createSocialClient,
   createListingsClient,
   createShoppingClient,
+  createAuctionMonitorClient,
+  createPythonAIClient,
   promisifyGrpcCall,
 } from "@common/utils/grpc-clients";
 
@@ -41,12 +43,16 @@ const RECORDS_GRPC_TARGET =
 const SOCIAL_GRPC_TARGET = process.env.SOCIAL_GRPC_TARGET || "social-service:50056";
 const LISTINGS_GRPC_TARGET = process.env.LISTINGS_GRPC_TARGET || "listings-service:50057";
 const SHOPPING_GRPC_TARGET = process.env.SHOPPING_GRPC_TARGET || "shopping-service:50058";
+const AUCTION_MONITOR_GRPC_TARGET = process.env.AUCTION_MONITOR_GRPC_TARGET || "auction-monitor:50059";
+const PYTHON_AI_GRPC_TARGET = process.env.PYTHON_AI_GRPC_TARGET || "python-ai-service:50060";
 
 const authGrpcClient = createAuthClient(AUTH_GRPC_TARGET);
 const recordsGrpcClient = createRecordsClient(RECORDS_GRPC_TARGET);
 const socialGrpcClient = createSocialClient(SOCIAL_GRPC_TARGET);
 const listingsGrpcClient = createListingsClient(LISTINGS_GRPC_TARGET);
 const shoppingGrpcClient = createShoppingClient(SHOPPING_GRPC_TARGET);
+const auctionMonitorGrpcClient = createAuctionMonitorClient(AUCTION_MONITOR_GRPC_TARGET);
+const pythonAiGrpcClient = createPythonAIClient(PYTHON_AI_GRPC_TARGET);
 
 /* ----------------------- Types ----------------------- */
 type AuthedRequest = Request & {
@@ -348,8 +354,8 @@ const OPEN_ROUTES: RouteRule[] = [
   { method: "HEAD", pattern: /^\/(?:api\/)?metrics\/?$/ },
 
   // service health checks (public)
-  { method: "GET",  pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics)\/healthz\/?$/ },
-  { method: "HEAD", pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics)\/healthz\/?$/ },
+  { method: "GET",  pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics|ai|auctions)\/healthz\/?$/ },
+  { method: "HEAD", pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics|ai|auctions)\/healthz\/?$/ },
 
   // auth entrypoints (logout is handled by proxy route before this check)
   { method: "POST", pattern: /^\/(?:api\/)?auth\/(login|register)\/?$/ },
@@ -1235,6 +1241,103 @@ app.get("/shopping/searches/trending", async (req: AuthedRequest, res: Response)
     handleGrpcError(res, err);
   }
 });
+
+/* ----------------------- Analytics Service Routes ----------------------- */
+// Analytics health check (public)
+app.use(
+  "/analytics/healthz",
+  createProxyMiddleware({
+    target: "http://analytics-service:4004",
+    changeOrigin: true,
+    pathRewrite: () => "/healthz",
+    proxyTimeout: 10000,
+    agent: keepAliveAgent,
+  })
+);
+
+// Analytics routes - proxy to analytics-service
+// Analytics service expects paths like /analytics/predict-price, so we keep the prefix
+app.use(
+  "/analytics",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: "http://analytics-service:4004",
+    changeOrigin: true,
+    pathRewrite: (path) => path, // Keep /analytics prefix as-is
+    proxyTimeout: 30000,
+    agent: keepAliveAgent,
+    on: {
+      error(err, _req, res) {
+        console.error("[gw] analytics proxy error:", err);
+        sendJson502(res as NodeServerResponse | Socket, "analytics upstream error");
+      },
+    },
+  })
+);
+
+/* ----------------------- Python AI Service Routes ----------------------- */
+// Python AI health check (public)
+app.use(
+  "/ai/healthz",
+  createProxyMiddleware({
+    target: "http://python-ai-service:5005",
+    changeOrigin: true,
+    pathRewrite: () => "/healthz",
+    proxyTimeout: 10000,
+    agent: keepAliveAgent,
+  })
+);
+
+// Python AI routes - proxy to python-ai-service
+app.use(
+  "/ai",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: "http://python-ai-service:5005",
+    changeOrigin: true,
+    pathRewrite: { "^/ai": "" }, // Remove /ai prefix
+    proxyTimeout: 30000,
+    agent: keepAliveAgent,
+    on: {
+      error(err, _req, res) {
+        console.error("[gw] python-ai proxy error:", err);
+        sendJson502(res as NodeServerResponse | Socket, "python-ai upstream error");
+      },
+    },
+  })
+);
+
+/* ----------------------- Auction Monitor Service Routes ----------------------- */
+// Auction Monitor health check (public)
+app.use(
+  "/auctions/healthz",
+  createProxyMiddleware({
+    target: "http://auction-monitor:4008",
+    changeOrigin: true,
+    pathRewrite: () => "/healthz",
+    proxyTimeout: 10000,
+    agent: keepAliveAgent,
+  })
+);
+
+// Auction Monitor routes - proxy to auction-monitor
+app.use(
+  "/auctions",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: "http://auction-monitor:4008",
+    changeOrigin: true,
+    pathRewrite: { "^/auctions": "" }, // Remove /auctions prefix
+    proxyTimeout: 30000,
+    agent: keepAliveAgent,
+    on: {
+      error(err, _req, res) {
+        console.error("[gw] auction-monitor proxy error:", err);
+        sendJson502(res as NodeServerResponse | Socket, "auction-monitor upstream error");
+      },
+    },
+  })
+);
 
 /* ----------------------- Final safety net ----------------------- */
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

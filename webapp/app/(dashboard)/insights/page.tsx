@@ -20,8 +20,9 @@ export default function InsightsPage() {
     setError('')
     try {
       const payload = { items: [{ query: sanitize(query), record_grade: 'VG+', sleeve_grade: 'VG', promo: false, anniversary_boost: 0 }] }
-      const response = await apiFetch<{ suggested?: number }>(`/analytics/predict-price`, {
+      const response = await apiFetch<{ suggested?: number }>(`/api/analytics/predict-price`, {
         method: 'POST',
+        auth: true,
         data: payload,
       })
       setSuggested(response?.suggested ?? null)
@@ -35,7 +36,9 @@ export default function InsightsPage() {
   async function handleTrends() {
     setError('')
     try {
-      const response = await apiFetch<TrendResponse>(`/ai/price-trends?${new URLSearchParams({ q: sanitize(query) })}`)
+      const response = await apiFetch<TrendResponse>(`/api/ai/price-trends?${new URLSearchParams({ q: sanitize(query) })}`, {
+        auth: true,
+      })
       setTrend(response)
     } catch (err) {
       handleError(err)

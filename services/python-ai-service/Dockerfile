@@ -17,6 +17,14 @@ RUN apt-get update \
  && python -m pip install --upgrade pip \
  && pip install --no-cache-dir -r /tmp/requirements.txt
 
+# copy proto files and generate Python stubs
+COPY proto /tmp/proto
+RUN python -m grpc_tools.protoc \
+    --python_out=/app \
+    --grpc_python_out=/app \
+    --proto_path=/tmp/proto \
+    /tmp/proto/python-ai.proto
+
 # copy the app from monorepo path
 COPY services/python-ai-service/app /app/app
 

@@ -14,7 +14,7 @@ spec:
       annotations:
         # If you expose metrics on /metrics, Prom can scrape this; otherwise harmless
         prometheus.io/scrape: "true"
-        prometheus.io/port: "4010"
+        prometheus.io/port: "4008"
         prometheus.io/path: "/metrics"
     spec:
       containers:
@@ -23,7 +23,9 @@ spec:
           imagePullPolicy: Never
           ports:
             - name: http
-              containerPort: 4010
+              containerPort: 4008
+            - name: grpc
+              containerPort: 50059
           envFrom:
             - configMapRef: { name: app-config }
             - secretRef:    { name: app-secrets }
@@ -51,6 +53,14 @@ spec:
             # Only if you actually have Kafka in K8s; otherwise remove/override in app-config
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: "kafka.record-platform.svc.cluster.local:9092"
+            - name: ENABLE_GRPC
+              value: "true"
+            - name: GRPC_PORT
+              value: "50059"
+          volumeMounts:
+            - name: proto-files
+              mountPath: /app/proto
+              readOnly: true
           readinessProbe:
             httpGet: { path: /healthz, port: http }
             initialDelaySeconds: 5
@@ -69,3 +79,7 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 20
+      volumes:
+        - name: proto-files
+          configMap:
+            name: proto-files

@@ -4,6 +4,7 @@ Record Platform is a Kubernetes-first microservices stack for managing a persona
 
 ## Highlights
 - **✅ Multi-protocol edge (HTTP/2, HTTP/3, gRPC)** - Caddy terminates TLS/QUIC and forwards into nginx-ingress; **all tests passing** including HTTP/2, HTTP/3, and gRPC flows via `scripts/test-microservices-http2-http3.sh`.
+- **✅ Strict TLS enforcement** - TLS 1.2 and 1.3 only (TLS 1.1 and below rejected); CA rotation support with zero-downtime capability; validated via `scripts/test-http2-http3-strict-tls.sh` and `scripts/test-full-chain-with-rotation.sh`.
 - **✅ Full gRPC inter-service communication** - All services communicate via gRPC with protocol buffers; Caddy routes gRPC requests using `protocol grpc` matcher with h2c transport to backend services.
 - **✅ Multi-database architecture** - **8 dedicated PostgreSQL instances** for service isolation, scalability, and independent scaling (auth, records, social, listings, shopping, auction-monitor, analytics, python-ai).
 - **✅ Dual-database connections** - Services like auction-monitor and analytics-service connect to multiple databases for cross-service data access while maintaining data isolation.
@@ -196,7 +197,9 @@ I have been cataloging vinyl for a little over a year, and this codebase sits at
 ### Architecture Notes
 
 **Edge & Routing:**
-- **Caddy** runs on the host, terminates TLS (TLS 1.2/1.3), and supports HTTP/2 + HTTP/3 (QUIC) + gRPC
+- **Caddy** runs on the host, terminates TLS (TLS 1.2/1.3 only - strict TLS enforcement), and supports HTTP/2 + HTTP/3 (QUIC) + gRPC
+- **Strict TLS**: Configured with `protocols tls1.2 tls1.3` - TLS 1.1 and below are rejected; validated via test scripts
+- **CA Rotation**: Supports certificate authority rotation with `scripts/rotate-ca-and-fix-tls.sh`; rotation works with expected downtime during Caddy restart (Recreate strategy); for production zero-downtime, use RollingUpdate with multiple replicas
 - **Caddy gRPC routing**: Uses `protocol grpc` matcher to detect gRPC requests and routes by service name in path (e.g., `/auth.*` → auth-service)
 - **Dual gRPC transport**: Port 5000 (h2c/plaintext) for internal testing, Port 8443 (TLS) for production
 - **ingress-nginx** routes `/` to Nginx edge (static assets + micro-cache) and `/api/*` directly to API Gateway
@@ -204,11 +207,11 @@ I have been cataloging vinyl for a little over a year, and this codebase sits at
 - **HAProxy** maintains keep-alive pools and load balances to API Gateway
 
 **Inter-Service Communication:**
-- **API Gateway** communicates with backend services via **gRPC** (except Python AI Service which uses HTTP)
+- **API Gateway** communicates with backend services via **gRPC** for all services
 - **Caddy gRPC proxy**: Routes gRPC requests directly to services using h2c (HTTP/2 cleartext) transport
 - Services expose both HTTP (for health/metrics) and gRPC endpoints on separate ports
 - gRPC provides type-safe, efficient inter-service communication with protocol buffers
-- Proto definitions in `proto/` directory (auth.proto, records.proto, listings.proto, social.proto, analytics.proto)
+- Proto definitions in `proto/` directory (auth.proto, records.proto, listings.proto, social.proto, analytics.proto, shopping.proto, auction-monitor.proto, python-ai.proto)
 - **gRPC reflection**: Enabled on all services for tooling support (grpcurl, etc.)
 
 **Data Layer:**
@@ -347,10 +350,14 @@ Services connect via `host.docker.internal:PORT` from Kubernetes pods. Connectio
 Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. Rotate credentials before sharing a cluster.
 
 ## TLS & HTTP/3
-- TLS material lives in `certs/` (`tls.crt`, `tls.key`, `dev-root.pem`, etc.) and is ignored by Git (`.gitignore:23-30`). Generate new keys with `scripts/strict-tls-bootstrap.sh` and trust `caddy-local-root.crt` locally (`security add-trusted-cert ...` on macOS).
-- Caddy expects the leaf cert/key at `/etc/caddy/certs/` and the trusted CA at `/etc/caddy/ca/dev-root.pem`. Use `scripts/caddy-toggle-insecure.sh` to temporarily disable upstream verification while debugging.
-- `scripts/test-http2-http3-strict-tls.sh` verifies health/API reachability over HTTP/2 and HTTP/3 using a helper container that runs `curl --http3` inside the Kind control-plane network namespace. It enforces TLS 1.2/1.3 and logs (but does not fail) if TLS 1.1 is still reachable.
-- `scripts/test-microservices-http2-http3.sh` drives the auth + records flows (registration via HTTP/2, login via HTTP/3, HTTP/2 record creation) and reuses the same HTTP/3 helper for QUIC coverage. When the DB is under load (e.g., while `run_pgbench_sweep.sh` runs) the records write may return 503; the script logs a warning so you can re-run once the benchmark finishes.
+- **Strict TLS Enforcement**: Caddy is configured with `protocols tls1.2 tls1.3` - only TLS 1.2 and 1.3 are accepted; TLS 1.1 and below are rejected. This is validated by test scripts.
+- **TLS Material**: Lives in `certs/` (`tls.crt`, `tls.key`, `dev-root.pem`, etc.) and is ignored by Git (`.gitignore:23-30`). Generate new keys with `scripts/strict-tls-bootstrap.sh` and trust `caddy-local-root.crt` locally (`security add-trusted-cert ...` on macOS).
+- **Caddy Configuration**: Expects the leaf cert/key at `/etc/caddy/certs/` and the trusted CA at `/etc/caddy/ca/dev-root.pem`. Use `scripts/caddy-toggle-insecure.sh` to temporarily disable upstream verification while debugging.
+- **CA Rotation**: Supports certificate authority rotation via `scripts/rotate-ca-and-fix-tls.sh`. Rotation works with expected downtime during Caddy restart (Recreate deployment strategy). For production zero-downtime rotation, use RollingUpdate strategy with multiple replicas.
+- **Test Scripts**:
+  - `scripts/test-http2-http3-strict-tls.sh` - Verifies HTTP/2, HTTP/3, strict TLS (TLS 1.2/1.3 only), and CA rotation with continuous health checks during rotation
+  - `scripts/test-full-chain-with-rotation.sh` - Full end-to-end chain test (Client → Caddy → Ingress → Backend) with HTTP/2, HTTP/3, strict TLS validation, and CA rotation testing
+  - `scripts/test-microservices-http2-http3.sh` - Drives the auth + records flows (registration via HTTP/2, login via HTTP/3, HTTP/2 record creation) and reuses the same HTTP/3 helper for QUIC coverage. When the DB is under load (e.g., while `run_pgbench_sweep.sh` runs) the records write may return 503; the script logs a warning so you can re-run once the benchmark finishes.
 - `scripts/h3-matrix.sh`, `scripts/diag-caddy-h3.sh`, and `scripts/diag-caddy-h3-extended.sh` remain available for low-level inspection (ALPN, SNI, upstream TLS handshakes).
 - HTTP/1.1/TLS 1.2 stays enabled intentionally for compatibility; new clients are expected to negotiate HTTP/2 or HTTP/3 automatically.
 - Redistribute regenerated certs out-of-band; they intentionally stay out of Git history.

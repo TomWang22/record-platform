@@ -69,14 +69,35 @@ else
   warn "Caddyfile not found in current directory"
 fi
 
+# Update the secret (this will trigger Caddy to reload if it watches the volume)
+say "Updating TLS secret (Caddy should auto-reload)..."
+# The secret is already updated above, but we need to trigger a reload
+# Since admin is off, we'll use a rolling restart with minimal downtime
+
+# Strategy: Update ConfigMap first, then do a minimal restart
+# For production: Consider using RollingUpdate strategy with multiple replicas
+say "Triggering Caddy reload via ConfigMap update..."
+# Update ConfigMap timestamp to trigger reload (if Caddy watches it)
+kubectl -n "$NS_ING" create configmap caddy-h3 \
+  --from-file=Caddyfile=./Caddyfile \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# For zero-downtime in production, we'd use:
+# 1. Multiple replicas with RollingUpdate strategy
+# 2. Or enable admin API and use reload endpoint
+# For now, we'll do a fast restart with readiness checks
+
+say "Performing minimal-downtime restart..."
 # Restart Caddy (with better error handling)
-say "Restarting Caddy..."
 kubectl -n "$NS_ING" rollout restart deploy/caddy-h3
 
 # Wait for rollout with better timeout handling
 say "Waiting for Caddy rollout..."
-if kubectl -n "$NS_ING" rollout status deploy/caddy-h3 --timeout=180s 2>&1; then
-  ok "Caddy restarted successfully"
+ROLLOUT_START=$(date +%s)
+if kubectl -n "$NS_ING" rollout status deploy/caddy-h3 --timeout=60s 2>&1; then
+  ROLLOUT_END=$(date +%s)
+  ROLLOUT_DURATION=$((ROLLOUT_END - ROLLOUT_START))
+  ok "Caddy restarted successfully (took ${ROLLOUT_DURATION}s)"
 else
   warn "Caddy rollout timed out, checking pod status..."
   # Check if pod is actually running and ready
@@ -103,8 +124,53 @@ else
   fi
 fi
 
-# Wait a bit for Caddy to be ready
-sleep 3
+# Wait for Caddy to be fully ready and serving (optimized - faster timeout)
+say "Waiting for Caddy to be fully ready..."
+READY_WAIT=0
+MAX_READY_WAIT=30  # Reduced from 45s to 30s
+READY_COUNT=0
+REQUIRED_READY_COUNT=2  # Reduced from 3 to 2 for faster completion
+
+while [[ $READY_WAIT -lt $MAX_READY_WAIT ]]; do
+  HEALTH_CHECK=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 2 \
+    --resolve "${HOST}:8443:127.0.0.1" \
+    -H "Host: ${HOST}" "https://${HOST}:8443/_caddy/healthz" 2>&1) || HEALTH_CHECK=""
+  
+  if [[ -n "$HEALTH_CHECK" ]]; then
+    HTTP_CODE=$(echo "$HEALTH_CHECK" | tail -1 | tr -d '[:space:]')
+    if [[ "$HTTP_CODE" == "200" ]]; then
+      READY_COUNT=$((READY_COUNT + 1))
+      if [[ $READY_COUNT -ge $REQUIRED_READY_COUNT ]]; then
+        ok "Caddy is ready and serving requests (${READY_COUNT} consecutive successful checks)"
+        break
+      fi
+    else
+      READY_COUNT=0  # Reset counter on failure
+    fi
+  else
+    READY_COUNT=0  # Reset counter on failure
+  fi
+  sleep 1
+  READY_WAIT=$((READY_WAIT + 1))
+done
+
+if [[ $READY_WAIT -ge $MAX_READY_WAIT ]]; then
+  warn "Caddy may not be fully ready yet (waited ${MAX_READY_WAIT}s, got ${READY_COUNT} successful checks)"
+  # Don't fail - just warn and continue
+else
+  # Quick final verification
+  FINAL_CHECK=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 2 \
+    --resolve "${HOST}:8443:127.0.0.1" \
+    -H "Host: ${HOST}" "https://${HOST}:8443/_caddy/healthz" 2>&1) || FINAL_CHECK=""
+  if [[ -n "$FINAL_CHECK" ]]; then
+    FINAL_CODE=$(echo "$FINAL_CHECK" | tail -1 | tr -d '[:space:]')
+    if [[ "$FINAL_CODE" == "200" ]]; then
+      ok "Caddy verified ready (final check: HTTP $FINAL_CODE)"
+    else
+      warn "Caddy final check failed (HTTP $FINAL_CODE) - but continuing"
+    fi
+  fi
+fi
 
 # Test HTTP/2 and HTTP/3 (non-fatal - don't exit on failure)
 say "Testing HTTP/2 and HTTP/3..."

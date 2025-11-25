@@ -41,19 +41,34 @@ jobs:
       - name: Build common package
         run: |
           echo "Building @common/utils package..."
-          cd services/common
-          pnpm build
+          pnpm -C services/common build
           echo "Verifying build output exists..."
-          if [ ! -d "dist" ] || [ -z "$(ls -A dist 2>/dev/null)" ]; then
+          if [ ! -d "services/common/dist" ] || [ -z "$(ls -A services/common/dist 2>/dev/null)" ]; then
             echo "ERROR: dist directory is empty or missing!"
             exit 1
           fi
           echo "Build output verified:"
-          ls -la dist/ | head -10
+          ls -la services/common/dist/ | head -10
+          echo ""
+          echo "Verifying key files exist:"
+          test -f services/common/dist/index.d.ts && echo "✅ dist/index.d.ts exists" || echo "❌ dist/index.d.ts missing"
+          test -f services/common/dist/grpc-clients.d.ts && echo "✅ dist/grpc-clients.d.ts exists" || echo "❌ dist/grpc-clients.d.ts missing"
+          test -f services/common/dist/proto.d.ts && echo "✅ dist/proto.d.ts exists" || echo "❌ dist/proto.d.ts missing"
+          echo ""
+          echo "Verifying package.json exports point to dist:"
+          cat services/common/package.json | grep -A 2 '"main"'
 
       # build each service from the matrix
       - name: Build ${{ matrix.service }}
-        run: pnpm -C services/${{ matrix.service }} build
+        run: |
+          echo "Building ${{ matrix.service }}..."
+          # Verify common package is available before building
+          if [ ! -f "services/common/dist/index.d.ts" ]; then
+            echo "ERROR: @common/utils dist/index.d.ts not found!"
+            echo "This should have been built in the previous step."
+            exit 1
+          fi
+          pnpm -C services/${{ matrix.service }} build
 
   python-ai:
     runs-on: ubuntu-latest

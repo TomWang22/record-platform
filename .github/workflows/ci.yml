@@ -36,24 +36,67 @@ jobs:
       - run: pnpm -v
       - run: pnpm install --frozen-lockfile
 
+      # Set working directory explicitly to repo root
+      - name: Verify working directory
+        run: |
+          echo "Working directory: $(pwd)"
+          echo "Repository root contents:"
+          ls -la | head -10
+          echo "Services directory exists:"
+          test -d services && echo "✅ services/ exists" || echo "❌ services/ missing"
+
       # ensure workspace lib is compiled first
       # This must happen before any service builds since they depend on @common/utils
       - name: Build common package
         run: |
           echo "Building @common/utils package..."
-          pnpm -C services/common build
+          echo "Current directory: $(pwd)"
+          echo "Cleaning dist and buildinfo to ensure fresh build:"
+          rm -rf services/common/dist services/common/tsconfig.tsbuildinfo
+          echo "Running build command:"
+          cd services/common && pnpm build
+          echo ""
+          echo "Build command exit code: $?"
+          echo ""
           echo "Verifying build output exists..."
-          if [ ! -d "services/common/dist" ] || [ -z "$(ls -A services/common/dist 2>/dev/null)" ]; then
-            echo "ERROR: dist directory is empty or missing!"
+          echo "Checking: services/common/dist/"
+          if [ -d "services/common/dist" ]; then
+            ls -la services/common/dist/ 2>&1 | head -15
+          else
+            echo "ERROR: dist directory not found!"
+            echo "Current working directory: $(pwd)"
+            echo "Listing services/common contents:"
+            ls -la services/common/ | head -15
+            echo "Checking for TypeScript errors:"
+            cd services/common && pnpm exec tsc --noEmit 2>&1 | head -20
+            exit 1
+          fi
+          echo ""
+          if [ -z "$(ls -A services/common/dist 2>/dev/null)" ]; then
+            echo "ERROR: dist directory is empty!"
+            echo "Current working directory: $(pwd)"
+            echo "Listing services/common:"
+            ls -la services/common/ | head -15
+            echo "Running TypeScript with verbose output:"
+            cd services/common && pnpm exec tsc -p tsconfig.json --listEmittedFiles 2>&1 | head -20
             exit 1
           fi
           echo "Build output verified:"
-          ls -la services/common/dist/ | head -10
+          ls -la services/common/dist/ | head -15
           echo ""
           echo "Verifying key files exist:"
-          test -f services/common/dist/index.d.ts && echo "✅ dist/index.d.ts exists" || echo "❌ dist/index.d.ts missing"
-          test -f services/common/dist/grpc-clients.d.ts && echo "✅ dist/grpc-clients.d.ts exists" || echo "❌ dist/grpc-clients.d.ts missing"
-          test -f services/common/dist/proto.d.ts && echo "✅ dist/proto.d.ts exists" || echo "❌ dist/proto.d.ts missing"
+          if [ -f "services/common/dist/index.d.ts" ]; then
+            echo "✅ dist/index.d.ts exists ($(wc -l < services/common/dist/index.d.ts) lines)"
+          else
+            echo "❌ dist/index.d.ts missing!"
+            echo "Files in dist/:"
+            ls -la services/common/dist/ || echo "dist/ doesn't exist"
+            echo "Checking TypeScript compilation:"
+            cd services/common && pnpm exec tsc --listFiles 2>&1 | head -10
+            exit 1
+          fi
+          test -f services/common/dist/grpc-clients.d.ts && echo "✅ dist/grpc-clients.d.ts exists" || echo "⚠️  dist/grpc-clients.d.ts missing (may be ok)"
+          test -f services/common/dist/proto.d.ts && echo "✅ dist/proto.d.ts exists" || echo "⚠️  dist/proto.d.ts missing (may be ok)"
           echo ""
           echo "Verifying package.json exports point to dist:"
           cat services/common/package.json | grep -A 2 '"main"'

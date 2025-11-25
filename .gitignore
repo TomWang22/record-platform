@@ -89,11 +89,14 @@ records_chunks_small/
 *.tmpl
 *.tmpl.bak
 *.cnf
+# Temporary/legacy files
 canonical
 psql
 sh
 index.html
 nginx.conf/
+nginx.tmpl
+nginx.tmpl.bak
 COMMIT_MESSAGE.*
 CURRENT_STATUS.*
 DEEP_OPTIMIZATION_PLAN.*

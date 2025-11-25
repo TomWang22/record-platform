@@ -13,7 +13,7 @@ jobs:
       POSTGRES_URL_LISTINGS: postgresql://postgres:postgres@localhost:5432/postgres
     strategy:
       matrix:
-        service: [api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, auction-monitor]
+        service: [api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, auction-monitor, cron-jobs]
     steps:
       - uses: actions/checkout@v4
 
@@ -54,52 +54,57 @@ jobs:
           echo "Cleaning dist and buildinfo to ensure fresh build:"
           rm -rf services/common/dist services/common/tsconfig.tsbuildinfo
           echo "Running build command:"
-          cd services/common && pnpm build
+          cd services/common
+          pnpm build
           echo ""
           echo "Build command exit code: $?"
           echo ""
           echo "Verifying build output exists..."
-          echo "Checking: services/common/dist/"
-          if [ -d "services/common/dist" ]; then
-            ls -la services/common/dist/ 2>&1 | head -15
+          echo "Current directory after cd: $(pwd)"
+          echo "Checking: dist/ (relative to services/common)"
+          if [ -d "dist" ]; then
+            ls -la dist/ 2>&1 | head -15
           else
             echo "ERROR: dist directory not found!"
             echo "Current working directory: $(pwd)"
-            echo "Listing services/common contents:"
-            ls -la services/common/ | head -15
+            echo "Listing current directory contents:"
+            ls -la | head -15
             echo "Checking for TypeScript errors:"
-            cd services/common && pnpm exec tsc --noEmit 2>&1 | head -20
+            pnpm exec tsc --noEmit 2>&1 | head -20
             exit 1
           fi
           echo ""
-          if [ -z "$(ls -A services/common/dist 2>/dev/null)" ]; then
+          if [ -z "$(ls -A dist 2>/dev/null)" ]; then
             echo "ERROR: dist directory is empty!"
             echo "Current working directory: $(pwd)"
-            echo "Listing services/common:"
-            ls -la services/common/ | head -15
+            echo "Listing current directory:"
+            ls -la | head -15
             echo "Running TypeScript with verbose output:"
-            cd services/common && pnpm exec tsc -p tsconfig.json --listEmittedFiles 2>&1 | head -20
+            pnpm exec tsc -p tsconfig.json --listEmittedFiles 2>&1 | head -20
             exit 1
           fi
           echo "Build output verified:"
-          ls -la services/common/dist/ | head -15
+          ls -la dist/ | head -15
           echo ""
           echo "Verifying key files exist:"
-          if [ -f "services/common/dist/index.d.ts" ]; then
-            echo "✅ dist/index.d.ts exists ($(wc -l < services/common/dist/index.d.ts) lines)"
+          if [ -f "dist/index.d.ts" ]; then
+            echo "✅ dist/index.d.ts exists ($(wc -l < dist/index.d.ts) lines)"
           else
             echo "❌ dist/index.d.ts missing!"
             echo "Files in dist/:"
-            ls -la services/common/dist/ || echo "dist/ doesn't exist"
+            ls -la dist/ || echo "dist/ doesn't exist"
             echo "Checking TypeScript compilation:"
-            cd services/common && pnpm exec tsc --listFiles 2>&1 | head -10
+            pnpm exec tsc --listFiles 2>&1 | head -10
             exit 1
           fi
-          test -f services/common/dist/grpc-clients.d.ts && echo "✅ dist/grpc-clients.d.ts exists" || echo "⚠️  dist/grpc-clients.d.ts missing (may be ok)"
-          test -f services/common/dist/proto.d.ts && echo "✅ dist/proto.d.ts exists" || echo "⚠️  dist/proto.d.ts missing (may be ok)"
+          test -f dist/grpc-clients.d.ts && echo "✅ dist/grpc-clients.d.ts exists" || echo "⚠️  dist/grpc-clients.d.ts missing (may be ok)"
+          test -f dist/proto.d.ts && echo "✅ dist/proto.d.ts exists" || echo "⚠️  dist/proto.d.ts missing (may be ok)"
           echo ""
           echo "Verifying package.json exports point to dist:"
-          cat services/common/package.json | grep -A 2 '"main"'
+          cat package.json | grep -A 2 '"main"'
+          echo ""
+          echo "Returning to repo root for service builds..."
+          cd ../..
 
       # build each service from the matrix
       - name: Build ${{ matrix.service }}

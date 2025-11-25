@@ -127,3 +127,14 @@ tests-local.sh
 verify.sh
 out/
 tmp/
+
+# Old Makefiles (no longer needed)
+Makefile*
+!Makefile
+
+# Files with double dashes (old/legacy files)
+*--*
+
+# Dockerfiles in root (pgbouncer, etc. - not used)
+Dockerfile*
+!Dockerfile

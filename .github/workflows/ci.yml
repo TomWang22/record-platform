@@ -37,10 +37,23 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # ensure workspace lib is compiled first
-      - run: pnpm -C services/common build
+      # This must happen before any service builds since they depend on @common/utils
+      - name: Build common package
+        run: |
+          echo "Building @common/utils package..."
+          cd services/common
+          pnpm build
+          echo "Verifying build output exists..."
+          if [ ! -d "dist" ] || [ -z "$(ls -A dist 2>/dev/null)" ]; then
+            echo "ERROR: dist directory is empty or missing!"
+            exit 1
+          fi
+          echo "Build output verified:"
+          ls -la dist/ | head -10
 
       # build each service from the matrix
-      - run: pnpm -C services/${{ matrix.service }} build
+      - name: Build ${{ matrix.service }}
+        run: pnpm -C services/${{ matrix.service }} build
 
   python-ai:
     runs-on: ubuntu-latest

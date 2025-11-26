@@ -71,10 +71,12 @@ docs/
 records_chunks/
 records_chunks_small/
 
-# Random files in root directory (keep only README.md)
+# Random files in root directory (keep only README.md and ENGINEERING.md)
 *.md
 !README.md
+!ENGINEERING.md
 *.txt
+!COMMIT_MESSAGE.txt
 *.csv
 *.tsv
 *.html
@@ -97,7 +99,8 @@ index.html
 nginx.conf/
 nginx.tmpl
 nginx.tmpl.bak
-COMMIT_MESSAGE.*
+# Allow COMMIT_MESSAGE.txt (explicitly allowed above)
+# COMMIT_MESSAGE.*  # Commented out to allow COMMIT_MESSAGE.txt
 CURRENT_STATUS.*
 DEEP_OPTIMIZATION_PLAN.*
 PERFORMANCE_ANALYSIS.*

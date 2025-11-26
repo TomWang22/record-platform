@@ -728,5 +728,17 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
 - Add or update smoke tests (`scripts/smoke*.sh`, `scripts/tests.sh`) when changing behavior. Prefer `k6` scripts for perf regressions.
 - Follow conventional commits (`type(scope): summary`) so the changelog stays readable.
 
+### Commit Messages
+For detailed commit messages, use `COMMIT_MESSAGE.txt`:
+```bash
+# Option 1: Use git commit with -F flag
+git commit -F COMMIT_MESSAGE.txt
+
+# Option 2: Use the helper script
+./scripts/commit.sh
+
+# Note: git commit -m "COMMIT_MESSAGE.txt" won't work - use -F flag!
+```
+
 ## License
 MIT (or customize to your needs).

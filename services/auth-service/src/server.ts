@@ -6,6 +6,10 @@ import { signJwt, verifyJwt, type JwtPayload as TokenPayload } from "@common/uti
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { createClient } from "redis";
+import { setupOAuthRoutes } from "./routes/oauth.js";
+import { setupMFARoutes } from "./routes/mfa.js";
+import { setupVerificationRoutes } from "./routes/verification.js";
+import { verifyMFA } from "./lib/mfa.js";
 
 const app = express();
 // Initialize Prisma
@@ -90,7 +94,11 @@ app.get("/healthz", async (_req: Request, res: Response) => {
 
 app.post("/register", async (req: Request, res: Response) => {
   try {
-    const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
+    const { email, password, sendVerification } = (req.body ?? {}) as {
+      email?: string;
+      password?: string;
+      sendVerification?: boolean;
+    };
     if (!email || !password) return res.status(400).json({ error: "email/password required" });
 
     // Use raw SQL query to access auth.users table directly
@@ -101,15 +109,30 @@ app.post("/register", async (req: Request, res: Response) => {
 
     const hash = await bcrypt.hash(password, 10);
     const user = await prisma.$queryRaw<Array<{ id: string; email: string; created_at: Date }>>`
-      INSERT INTO auth.users (email, password_hash, created_at)
-      VALUES (${email}, ${hash}, NOW())
+      INSERT INTO auth.users (email, password_hash, email_verified, created_at)
+      VALUES (${email}, ${hash}, ${sendVerification ? false : true}, NOW())
       RETURNING id, email, created_at
     `.then((r: Array<{ id: string; email: string; created_at: Date }>) => r[0]);
+
+    // Send verification email if requested
+    if (sendVerification) {
+      try {
+        const { sendEmailVerificationCode } = await import("./lib/verification.js");
+        await sendEmailVerificationCode(prisma, user.id, email);
+      } catch (e) {
+        console.warn("Failed to send verification email:", e);
+        // Continue anyway - user is registered
+      }
+    }
 
     const jti = randomUUID();
     const payload: WithJti = { sub: user.id, email: user.email, jti };
     const token = signJwt(payload);
-    res.status(201).json({ token });
+    res.status(201).json({
+      token,
+      emailVerified: !sendVerification,
+      message: sendVerification ? "Verification email sent" : undefined,
+    });
   } catch (e: any) {
     console.error("register error:", e);
     res.status(500).json({ error: "internal" });
@@ -118,19 +141,46 @@ app.post("/register", async (req: Request, res: Response) => {
 
 app.post("/login", async (req: Request, res: Response) => {
   try {
-    const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
+    const { email, password, mfaCode } = (req.body ?? {}) as {
+      email?: string;
+      password?: string;
+      mfaCode?: string;
+    };
     if (!email || !password) return res.status(400).json({ error: "email/password required" });
 
     // Use raw SQL query to access auth.users table directly
-    const user = await prisma.$queryRaw<Array<{ id: string; email: string; passwordHash: string; createdAt: Date }>>`
-      SELECT id, email, password_hash as "passwordHash", created_at as "createdAt"
+    const user = await prisma.$queryRaw<Array<{
+      id: string;
+      email: string;
+      passwordHash: string;
+      mfaEnabled: boolean;
+      createdAt: Date;
+    }>>`
+      SELECT id, email, password_hash as "passwordHash", mfa_enabled as "mfaEnabled", created_at as "createdAt"
       FROM auth.users
       WHERE email = ${email}
-    `.then((r: Array<{ id: string; email: string; passwordHash: string; createdAt: Date }>) => r[0] || null);
+    `.then((r: Array<any>) => r[0] || null);
     if (!user || !user.passwordHash) return res.status(401).json({ error: "invalid credentials" });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: "invalid credentials" });
+
+    // Check if MFA is enabled
+    if (user.mfaEnabled) {
+      if (!mfaCode) {
+        return res.status(200).json({
+          requiresMFA: true,
+          userId: user.id,
+          message: "MFA code required",
+        });
+      }
+
+      // Verify MFA code
+      const mfaValid = await verifyMFA(prisma, user.id, mfaCode);
+      if (!mfaValid) {
+        return res.status(401).json({ error: "invalid MFA code" });
+      }
+    }
 
     const jti = randomUUID();
     const payload: WithJti = { sub: user.id, email: user.email, jti };
@@ -172,11 +222,39 @@ app.get("/me", (req: Request, res: Response) => {
   const auth = req.headers.authorization?.split(" ")[1];
   if (!auth) return res.status(401).json({ error: "missing token" });
   try {
-    res.json(verifyJwt(auth));
+    const payload = verifyJwt(auth);
+    // Fetch additional user info
+    prisma.$queryRaw<Array<{
+      email_verified: boolean;
+      phone_verified: boolean;
+      mfa_enabled: boolean;
+    }>>`
+      SELECT email_verified, phone_verified, mfa_enabled
+      FROM auth.users
+      WHERE id = ${payload.sub}::uuid
+    `.then((r: any[]) => {
+      res.json({
+        ...payload,
+        emailVerified: r[0]?.email_verified || false,
+        phoneVerified: r[0]?.phone_verified || false,
+        mfaEnabled: r[0]?.mfa_enabled || false,
+      });
+    }).catch(() => {
+      res.json(payload);
+    });
   } catch {
     res.status(401).json({ error: "invalid token" });
   }
 });
+
+// OAuth routes
+app.use("/auth", setupOAuthRoutes(prisma));
+
+// MFA routes
+app.use("/mfa", setupMFARoutes(prisma));
+
+// Verification routes
+app.use("/verify", setupVerificationRoutes(prisma));
 
 // safety net
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

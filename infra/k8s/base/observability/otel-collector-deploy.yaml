@@ -26,34 +26,39 @@ data:
         send_batch_size: 1024
       memory_limiter:
         limit_mib: 512
+        check_interval: 1s
 
     exporters:
-      jaeger:
-        endpoint: jaeger.observability.svc.cluster.local:14250
+      otlp/jaeger:
+        endpoint: jaeger.observability.svc.cluster.local:4317
         tls:
           insecure: true
+      otlp/newrelic:
+        endpoint: https://otlp.nr-data.net:4317
+        headers:
+          api-key: ${NEW_RELIC_LICENSE_KEY}
+        tls:
+          insecure: false
       prometheus:
         endpoint: "0.0.0.0:8889"
-      newrelic:
-        apikey: ${NEW_RELIC_LICENSE_KEY}
-        endpoint: https://otlp.nr-data.net
       logging:
         loglevel: info
+      debug:
 
     service:
       pipelines:
         traces:
           receivers: [otlp]
           processors: [memory_limiter, batch]
-          exporters: [jaeger, newrelic]
+          exporters: [otlp/jaeger, otlp/newrelic]
         metrics:
           receivers: [prometheus, otlp]
           processors: [memory_limiter, batch]
-          exporters: [prometheus, newrelic]
+          exporters: [prometheus, otlp/newrelic]
         logs:
           receivers: [otlp]
           processors: [memory_limiter, batch]
-          exporters: [logging, newrelic]
+          exporters: [logging, otlp/newrelic]
 
 ---
 apiVersion: apps/v1
@@ -96,6 +101,11 @@ spec:
         volumeMounts:
         - name: config
           mountPath: /etc/otelcol-contrib
+          readOnly: true
+        args:
+        - --config=/etc/otelcol-contrib/otel-collector-config.yaml
+        command:
+        - /otelcol-contrib
         resources:
           requests:
             memory: "512Mi"

@@ -30,6 +30,11 @@ if ! linkerd version --client &> /dev/null; then
   error "Linkerd CLI not working. Please check installation."
 fi
 
+step "Installing Gateway API CRDs (required for Linkerd)..."
+kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml || \
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml || \
+error "Failed to install Gateway API CRDs"
+
 step "Checking Linkerd pre-requisites..."
 linkerd check --pre || error "Pre-flight checks failed. Please fix issues before continuing."
 
@@ -55,7 +60,13 @@ kubectl wait --for=condition=available --timeout=300s deployment/metrics-api -n 
 kubectl wait --for=condition=available --timeout=300s deployment/web -n linkerd-viz
 
 step "Installing Linkerd Jaeger extension (for distributed tracing)..."
-linkerd jaeger install | kubectl apply -f -
+# Note: Jaeger extension may not be available in all Linkerd versions
+# If it fails, Jaeger is already installed separately in observability namespace
+if linkerd jaeger install 2>/dev/null | kubectl apply -f -; then
+  echo "✅ Linkerd Jaeger extension installed"
+else
+  echo "⚠️  Linkerd Jaeger extension not available (using standalone Jaeger instead)"
+fi
 sleep 10
 
 step "Linkerd installation complete!"

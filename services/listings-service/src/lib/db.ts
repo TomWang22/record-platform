@@ -78,12 +78,17 @@ export async function createListing(data: {
   shipping_cost?: number;
   shipping_method?: string;
   expires_at?: Date;
+  media_type?: string;
+  has_obi?: boolean;
+  label_type?: string;
+  stock_quantity?: number;
 }) {
   const result = await pool.query(
     `INSERT INTO listings.listings (
       user_id, title, description, price, currency, listing_type,
-      condition, category, location, shipping_cost, shipping_method, expires_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      condition, category, location, shipping_cost, shipping_method, expires_at,
+      media_type, has_obi, label_type, stock_quantity
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     RETURNING *`,
     [
       data.user_id,
@@ -98,6 +103,10 @@ export async function createListing(data: {
       data.shipping_cost || 0,
       data.shipping_method || null,
       data.expires_at || null,
+      data.media_type || null,
+      data.has_obi || false,
+      data.label_type || null,
+      data.stock_quantity || 1,
     ]
   );
 
@@ -285,10 +294,15 @@ export async function searchListings(query: string, filters?: {
   min_price?: number;
   max_price?: number;
   condition?: string;
+  media_type?: string;
+  has_obi?: boolean;
+  label_type?: string;
+  sort_by?: 'created_at' | 'price' | 'popularity' | 'label_type';
+  sort_order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
 }) {
-  const conditions: string[] = ['l.is_active = true'];
+  const conditions: string[] = ['l.is_active = true', 'l.stock_quantity > 0', 'l.sold_at IS NULL'];
   const params: any[] = [];
   let paramIndex = 1;
 
@@ -328,8 +342,46 @@ export async function searchListings(query: string, filters?: {
     paramIndex++;
   }
 
+  if (filters?.media_type) {
+    conditions.push(`l.media_type = $${paramIndex}`);
+    params.push(filters.media_type);
+    paramIndex++;
+  }
+
+  if (filters?.has_obi !== undefined) {
+    conditions.push(`l.has_obi = $${paramIndex}`);
+    params.push(filters.has_obi);
+    paramIndex++;
+  }
+
+  if (filters?.label_type) {
+    conditions.push(`l.label_type = $${paramIndex}`);
+    params.push(filters.label_type);
+    paramIndex++;
+  }
+
   const limit = filters?.limit || 50;
   const offset = filters?.offset || 0;
+
+  // Determine sort order
+  let orderBy = 'l.created_at DESC';
+  if (filters?.sort_by) {
+    const sortOrder = filters.sort_order || 'desc';
+    switch (filters.sort_by) {
+      case 'created_at':
+        orderBy = `l.created_at ${sortOrder.toUpperCase()}`;
+        break;
+      case 'price':
+        orderBy = `l.price ${sortOrder.toUpperCase()}`;
+        break;
+      case 'popularity':
+        orderBy = `l.popularity_score ${sortOrder.toUpperCase()}`;
+        break;
+      case 'label_type':
+        orderBy = `l.label_type ${sortOrder.toUpperCase()}, l.created_at DESC`;
+        break;
+    }
+  }
 
   const result = await pool.query(
     `SELECT l.*, 
@@ -340,10 +392,29 @@ export async function searchListings(query: string, filters?: {
                 'thumbnail_url', li.thumbnail_url,
                 'is_primary', li.is_primary
               ) ORDER BY li.display_order
-            ) FROM listings.listing_images li WHERE li.listing_id = l.id LIMIT 1) as primary_image
+            ) FROM listings.listing_images li WHERE li.listing_id = l.id LIMIT 1) as primary_image,
+            CASE 
+              WHEN l.listing_type = 'auction' THEN json_build_object(
+                'end_time', ad.end_time,
+                'current_bid', ad.current_bid,
+                'starting_bid', ad.starting_bid,
+                'bid_count', ad.bid_count,
+                'hours_remaining', EXTRACT(EPOCH FROM (ad.end_time - NOW())) / 3600,
+                'status', CASE 
+                  WHEN ad.end_time < NOW() THEN 'ended'
+                  WHEN EXTRACT(EPOCH FROM (ad.end_time - NOW())) / 3600 < 1 THEN 'ending_soon'
+                  WHEN EXTRACT(EPOCH FROM (ad.end_time - NOW())) / 3600 < 24 THEN 'ending_today'
+                  ELSE 'active'
+                END
+              )
+              ELSE NULL
+            END as auction_info,
+            l.seller_rating,
+            l.seller_rating_count
      FROM listings.listings l
+     LEFT JOIN listings.auction_details ad ON l.id = ad.listing_id AND l.listing_type = 'auction'
      WHERE ${conditions.join(' AND ')}
-     ORDER BY l.created_at DESC
+     ORDER BY ${orderBy}
      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
     [...params, limit, offset]
   );

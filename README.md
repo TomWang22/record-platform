@@ -12,6 +12,7 @@ Record Platform is a Kubernetes-first microservices stack for managing a persona
 - **✅ Full gRPC inter-service communication** - All services communicate via gRPC with protocol buffers; Caddy routes gRPC requests using `protocol grpc` matcher with h2c transport to backend services.
 - **✅ Multi-database architecture** - **8 dedicated PostgreSQL instances** for service isolation, scalability, and independent scaling (auth, records, social, listings, shopping, auction-monitor, analytics, python-ai).
 - **✅ Dual-database connections** - Services like auction-monitor and analytics-service connect to multiple databases for cross-service data access while maintaining data isolation.
+- **✅ One-command bootstrap & disaster recovery** - `scripts/bootstrap-platform.sh` deploys entire platform instantly; Terraform + Ansible enable instant cluster recreation for disaster recovery scenarios.
 - **Kubernetes-native workflows** - `infra/k8s` provides composable bases and overlays, with bootstrapping scripts that stand up Kind, build images, load them, and apply manifests.
 - **Hardened gateway path** - API Gateway keeps the JWT guard, adds optional `DEBUG_FAKE_AUTH`, injects identity headers, and exposes detailed metrics.
 - **Redis-assisted records caching** - `services/records-service/src/lib/cache.ts` adds normalized search keys, safe JSON encoding, and targeted invalidation hooks.
@@ -397,26 +398,135 @@ Some services connect to multiple databases for cross-service data access:
 
 Services connect via `host.docker.internal:PORT` from Kubernetes pods. Connection strings are configured in `infra/k8s/base/config/app-config.yaml` with `POSTGRES_URL_*` environment variables.
 
-### Observability
-- **Prometheus** (`infra/k8s/base/observability`) - Metrics collection via kube-prometheus-stack, 30-day retention, 50Gi storage
-- **Grafana** - Visualization dashboards, pre-configured datasources, custom dashboards for microservices
-- **Jaeger** - Distributed tracing, receives traces via OpenTelemetry Collector
-- **OpenTelemetry Collector** - Receives OTLP (traces/metrics/logs), exports to Jaeger/Prometheus/New Relic
-- **Linkerd** (optional) - Service mesh with mTLS, traffic management, auto-injection
-- **ServiceMonitors/PodMonitors** - Auto-discovery and scraping of service metrics
+### Observability & Monitoring Stack 📊
+**Comprehensive observability** - Full-stack monitoring, tracing, and visualization:
+
+- **Prometheus** (`infra/k8s/base/observability`) - Metrics collection and alerting
+  - Installed via **Helm Chart**: `prometheus-community/kube-prometheus-stack`
+  - **30-day retention**, **50Gi storage** with PVC persistence
+  - Auto-discovery via ServiceMonitors and PodMonitors
+  - Scrape interval: 15-30 seconds
+  - **ServiceMonitors** (`infra/k8s/base/monitoring/servicemonitors.yaml`): Targets all services, nginx, haproxy, exporters
+  - **PodMonitors** (`infra/k8s/base/observability/podmonitors.yaml`): Pod-level metrics collection
+  - **AlertManager**: Integrated alerting with notification channels
+
+- **Grafana** - Visualization and dashboards
+  - Installed via **Helm Chart**: `prometheus-community/kube-prometheus-stack` (included in kube-prometheus-stack)
+  - **10Gi persistent storage** for dashboards and data sources
+  - Pre-configured datasources: Prometheus, Jaeger, Loki (optional)
+  - Custom dashboards for microservices (`infra/k8s/base/observability/grafana-dashboards.yaml`)
+  - Default credentials: `admin/Admin123!` (change for production)
+  - Dashboard provisioning: Auto-loads dashboards from ConfigMaps
+
+- **Jaeger** - Distributed tracing
+  - Deployment: `infra/k8s/base/observability/jaeger-deploy.yaml`
+  - Receives traces via OpenTelemetry Collector
+  - **Query UI**: Port-forward to `svc/jaeger:16686` for trace visualization
+  - Storage: In-memory (dev) or persistent storage (production)
+  - Trace collection: Automatic via OpenTelemetry instrumentation
+
+- **OpenTelemetry Collector** - Unified observability data pipeline
+  - Deployment: `infra/k8s/base/observability/otel-collector-deploy.yaml`
+  - **Receivers**: OTLP (gRPC:4317, HTTP:4318), Prometheus
+  - **Processors**: Batch, memory limiter, resource detection
+  - **Exporters**: 
+    - **Jaeger**: Exports traces to Jaeger backend
+    - **Prometheus**: Exports metrics to Prometheus
+    - **New Relic**: Exports traces and metrics to New Relic (optional, requires license key)
+    - **Logging**: Debug logging for troubleshooting
+  - **Pipelines**: Traces, metrics, and logs pipelines configured
+  - **Configuration**: `infra/k8s/base/observability/otel-collector-deploy.yaml` (ConfigMap)
+
+- **New Relic Integration** (Optional) - Cloud observability platform
+  - Secret: `infra/k8s/base/observability/newrelic-secret.yaml`
+  - Configured in OpenTelemetry Collector exporters
+  - Requires New Relic license key: `export NEW_RELIC_LICENSE_KEY='your-key'`
+  - Exports traces and metrics to New Relic OTLP endpoint
+  - **Setup**: Create secret with license key, OTel Collector automatically exports
+
+- **Linkerd** (Optional) - Service mesh with advanced observability
+  - Installation: `infra/k8s/scripts/install-linkerd.sh`
+  - **Features**:
+    - **mTLS**: Automatic mutual TLS between services
+    - **Traffic Management**: Request routing, retries, timeouts
+    - **Metrics**: Service-level metrics (request rate, latency, success rate)
+    - **Topology**: Visual service dependency graph
+    - **Auto-injection**: Automatic sidecar injection via namespace annotation
+  - **Linkerd Viz**: Dashboard for service mesh visualization
+  - **Access**: `linkerd viz dashboard` (CLI tool required)
+
+- **ServiceMonitors/PodMonitors** - Auto-discovery and scraping
+  - **ServiceMonitors** (`infra/k8s/base/monitoring/servicemonitors.yaml`): 
+    - Targets: api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, python-ai-service, auction-monitor, nginx, haproxy
+  - **PodMonitors** (`infra/k8s/base/observability/podmonitors.yaml`):
+    - Pod-level metrics for detailed observability
+  - **Auto-discovery**: Prometheus automatically discovers and scrapes targets
+
+**Installation**:
+```bash
+# Automated installation (recommended)
+bash infra/k8s/scripts/install-observability.sh
+
+# Or via bootstrap script (includes observability)
+./scripts/bootstrap-platform.sh
+```
+
+**Access**:
+```bash
+# Grafana
+kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80
+# http://localhost:3000 (admin/Admin123!)
+
+# Prometheus
+kubectl -n monitoring port-forward svc/monitoring-kube-prom-prometheus 9090:9090
+# http://localhost:9090
+
+# Jaeger
+kubectl -n observability port-forward svc/jaeger 16686:16686
+# http://localhost:16686
+
+# Linkerd Viz
+linkerd viz dashboard
+```
+
+**Helm Charts Used**:
+- `prometheus-community/kube-prometheus-stack`: Prometheus + Grafana + AlertManager + ServiceMonitors
+- Custom deployments: Jaeger, OpenTelemetry Collector (via Kustomize)
+
+**Documentation**:
+- `infra/k8s/OBSERVABILITY.md` - Comprehensive observability guide
+- `infra/k8s/GRAFANA-GUIDE.md` - Grafana usage and dashboard creation
+- `infra/k8s/base/observability/otel-instrumentation.md` - OpenTelemetry instrumentation guide
 
 ### Monitoring & Operations
 - **ServiceMonitors** (`infra/k8s/base/monitoring`) - Target gateway, services, nginx, haproxy, exporters
 - **Cron Jobs** (`infra/k8s/base/cron-jobs`) - Nightly Postgres dumps, Redis snapshots, basebackups, WAL archiving
 - **Exporters** (`infra/k8s/base/exporters`) - nginx-exporter, haproxy-exporter for metrics collection
 
-### Infrastructure as Code (IAC)
+### Infrastructure as Code (IAC) & Disaster Recovery 🚀
+**One-Command Bootstrap** - Deploy entire platform instantly for disaster recovery:
+
+- **Bootstrap Script** (`scripts/bootstrap-platform.sh`) - **Complete platform deployment in one command**
+  - ✅ Checks all prerequisites (Terraform, Ansible, kubectl, kind, docker)
+  - ✅ Creates/verifies Kind cluster
+  - ✅ Initializes and applies Terraform (creates namespace, base configs)
+  - ✅ Installs Ansible collections
+  - ✅ Deploys all services with Ansible
+  - ✅ Builds and loads Docker images
+  - ✅ Applies Kubernetes resources via Kustomize
+  - ✅ Waits for all deployments to be ready
+  - ✅ Shows status and next steps
+  - **Usage**: `./scripts/bootstrap-platform.sh` (see `docs/BOOTSTRAP.md` for complete guide)
+  - **Disaster Recovery**: Instant cluster spin-up with `--destroy` flag for teardown
+
 - **Terraform** (`infra/terraform/`) - Kubernetes infrastructure provisioning with declarative configuration
   - `main.tf` - Main configuration with Kubernetes provider
   - `variables.tf` - Namespace, environment, and kubeconfig settings
   - `outputs.tf` - Namespace, kubeconfig path, and service ports
   - `kubernetes.tf` - Kubernetes resources (namespaces, ConfigMaps)
   - `.terraform-version` - Version pinning (1.6.0)
+  - **Disaster Recovery**: Infrastructure state stored in Terraform, enables instant recreation
+
 - **Ansible** (`infra/ansible/`) - Configuration management and service deployment
   - `ansible.cfg` - Ansible configuration with inventory and connection settings
   - `requirements.yml` - Kubernetes collections (kubernetes.core, community.kubernetes)
@@ -424,6 +534,8 @@ Services connect via `host.docker.internal:PORT` from Kubernetes pods. Connectio
   - `playbooks/deploy-services.yml` - Safe deployment playbook with standalone mode
     - Includes `skip_cert_management: true` and `skip_caddy_config: true` for safety
     - Does not interfere with existing certificates, Caddy config, or CA rotation
+  - **Disaster Recovery**: Idempotent playbooks enable consistent service deployment
+
 - **Verification & Automation**:
   - `test-iac-setup.sh` - Comprehensive setup verification script
     - Checks prerequisites (Terraform, Ansible, kubectl)
@@ -435,9 +547,24 @@ Services connect via `host.docker.internal:PORT` from Kubernetes pods. Connectio
     - `make terraform-init`, `make terraform-validate`, `make terraform-plan`, `make terraform-apply`
     - `make ansible-install`, `make ansible-check`, `make ansible-deploy`
     - `make test-setup`, `make clean`
-- **Documentation**: `infra/IAC-GUIDE.md` - Complete guide with quick start, prerequisites, usage examples, and troubleshooting
 
-**Quick Start**:
+- **Documentation**: 
+  - `infra/IAC-GUIDE.md` - Complete guide with quick start, prerequisites, usage examples, and troubleshooting
+  - `docs/BOOTSTRAP.md` - Complete bootstrap and disaster recovery guide
+
+**Quick Start - One Command Bootstrap**:
+```bash
+# Deploy entire platform
+./scripts/bootstrap-platform.sh
+
+# Preview changes (dry-run)
+./scripts/bootstrap-platform.sh --dry-run
+
+# Teardown (disaster recovery reset)
+./scripts/bootstrap-platform.sh --destroy
+```
+
+**Manual Setup**:
 ```bash
 cd infra
 ./test-iac-setup.sh    # Verify setup and create missing files
@@ -451,12 +578,23 @@ cd terraform && terraform plan
 cd ansible && ansible-playbook playbooks/deploy-services.yml --check
 ```
 
+**Disaster Recovery Capabilities**:
+- ✅ **Instant Cluster Recreation**: Bootstrap script recreates entire Kubernetes cluster
+- ✅ **Service Deployment**: Ansible playbooks deploy all services consistently
+- ✅ **Database Redundancy**: **Note**: Databases currently run in Docker Compose (external to Kubernetes) - **production requires redundancy**:
+  - PostgreSQL: Use managed database services (AWS RDS, Google Cloud SQL, Azure Database) with automatic backups, read replicas, and multi-AZ deployment
+  - Redis: Use managed Redis (AWS ElastiCache, Google Cloud Memorystore) with replication and failover
+  - Kafka: Use managed Kafka (AWS MSK, Confluent Cloud) with replication and high availability
+- ✅ **State Management**: Terraform state enables infrastructure recreation
+- ✅ **Idempotent Operations**: All operations are safe to run multiple times
+
 **Features**:
 - Safe defaults: All playbooks skip cert management and Caddy config
 - Dry-run support: `terraform plan` and `ansible-playbook --check` are safe
 - No interference: Does not touch certificates, Caddy config, or CA rotation
 - Auto-setup: Test script creates missing files automatically
 - Comprehensive validation: Checks prerequisites and validates configurations
+- **Disaster Recovery**: One-command platform restoration
 
 ## Repository Layout
 - `infra/k8s/base/*` - canonical manifests for services, data stores, ingress, monitoring, and cron jobs.

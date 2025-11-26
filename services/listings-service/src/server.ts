@@ -35,9 +35,12 @@ app.get("/healthz", async (_req, res) => {
 app.use((req, res, next) => { res.on("finish", () => httpCounter.inc({ service: "listings", route: req.path, method: req.method, code: res.statusCode })); next(); });
 app.get("/metrics", async (_req, res) => { res.setHeader("Content-Type", register.contentType); res.end(await register.metrics()); });
 
+import ratingsRouter from './routes/ratings.js';
+
 app.use("/oauth", oauthRouter);
 app.use("/settings", settingsRouter);
 app.use("/listings", listingsRouter);
+app.use("/ratings", ratingsRouter);
 
 app.get("/search/ebay", async (req, res) => {
   const qRaw = (req.query.q as string || "");

@@ -476,7 +476,52 @@ Services expose HTTP endpoints for:
 - User-specific cache keys prevent cross-user data leakage
 - Lua scripts prevent cache stampedes (singleflight pattern)
 
-## Infrastructure as Code
+## Infrastructure as Code & Disaster Recovery
+
+### One-Command Bootstrap
+
+**Purpose**: Instant platform deployment and disaster recovery.
+
+**Bootstrap Script** (`scripts/bootstrap-platform.sh`):
+- **Complete platform deployment** in a single command
+- Orchestrates Terraform + Ansible + Docker + Kubernetes
+- **Disaster recovery**: Instant cluster recreation
+- **Idempotent**: Safe to run multiple times
+
+**Features**:
+- Prerequisites checking (Terraform, Ansible, kubectl, kind, docker)
+- Kind cluster creation/verification
+- Terraform initialization and application
+- Ansible collection installation and service deployment
+- Docker image building and loading
+- Kubernetes resource deployment via Kustomize
+- Health checks and status reporting
+
+**Usage**:
+```bash
+# Full bootstrap
+./scripts/bootstrap-platform.sh
+
+# Preview changes (dry-run)
+./scripts/bootstrap-platform.sh --dry-run
+
+# Skip Docker builds
+./scripts/bootstrap-platform.sh --skip-build
+
+# Teardown (disaster recovery reset)
+./scripts/bootstrap-platform.sh --destroy
+
+# Custom configuration
+./scripts/bootstrap-platform.sh --cluster my-cluster --env prod
+```
+
+**Disaster Recovery Workflow**:
+1. **Teardown**: `./scripts/bootstrap-platform.sh --destroy` (removes infrastructure)
+2. **Recreate**: `./scripts/bootstrap-platform.sh` (instantly recreates everything)
+3. **Database Restoration**: Restore from backups (see Backup Strategy section)
+4. **Verification**: Run integration tests to verify platform health
+
+**Documentation**: See `docs/BOOTSTRAP.md` for complete guide.
 
 ### Terraform
 
@@ -488,12 +533,19 @@ Services expose HTTP endpoints for:
 - `outputs.tf`: Output values (namespace, kubeconfig path, service ports)
 - `kubernetes.tf`: Kubernetes resources (namespaces, ConfigMaps)
 
+**Disaster Recovery**:
+- Infrastructure state stored in Terraform
+- Enables instant infrastructure recreation
+- Idempotent operations (safe to run multiple times)
+- State management: Local by default, remote backend for production (S3, GCS, etc.)
+
 **Usage**:
 ```bash
 cd infra/terraform
 terraform init
 terraform plan    # Dry-run
 terraform apply   # Apply changes
+terraform destroy # Teardown (use bootstrap script instead)
 ```
 
 ### Ansible
@@ -510,6 +562,12 @@ terraform apply   # Apply changes
 - `skip_cert_management: true`: Doesn't touch certificates
 - `skip_caddy_config: true`: Doesn't modify Caddy config
 - Dry-run support: `ansible-playbook --check`
+- **Idempotent**: Safe to run multiple times
+
+**Disaster Recovery**:
+- Idempotent playbooks enable consistent service deployment
+- Kubernetes API-based (no state files required)
+- Safe to re-run after infrastructure recreation
 
 **Usage**:
 ```bash
@@ -518,15 +576,74 @@ ansible-playbook playbooks/deploy-services.yml --check  # Dry-run
 ansible-playbook playbooks/deploy-services.yml          # Deploy
 ```
 
+### Database Redundancy & Disaster Recovery
+
+**Current State**: Databases run in Docker Compose (external to Kubernetes) for stability and easier management.
+
+**Production Requirements**:
+- **PostgreSQL**: 
+  - Use managed database services (AWS RDS, Google Cloud SQL, Azure Database)
+  - **Automatic backups**: Point-in-time recovery, daily snapshots
+  - **Read replicas**: For read-heavy workloads and failover
+  - **Multi-AZ deployment**: High availability across availability zones
+  - **Connection pooling**: PgBouncer for efficient connection management
+- **Redis**:
+  - Use managed Redis (AWS ElastiCache, Google Cloud Memorystore)
+  - **Replication**: Master-replica setup for failover
+  - **Persistence**: RDB snapshots and AOF for data durability
+  - **High availability**: Automatic failover to replica
+- **Kafka**:
+  - Use managed Kafka (AWS MSK, Confluent Cloud)
+  - **Replication**: Multi-broker replication for fault tolerance
+  - **High availability**: Automatic leader election and partition reassignment
+  - **Durability**: Replicated topics with configurable replication factor
+
+**Backup Strategy** (Current):
+- Nightly `pg_dump` for all databases
+- Weekly `pg_basebackup` for point-in-time recovery
+- Redis snapshots nightly
+- WAL archiving for continuous backup
+- **Restore**: `scripts/restore-from-pvc.sh` or `scripts/restore-from-upload.sh`
+
+**Disaster Recovery Plan**:
+1. **Infrastructure**: Bootstrap script recreates Kubernetes cluster
+2. **Services**: Ansible playbooks deploy all services
+3. **Databases**: Restore from backups (managed services handle this automatically)
+4. **Data**: Restore from latest backup or point-in-time recovery
+5. **Verification**: Run integration tests to verify platform health
+
 ## Observability & Monitoring
+
+### Complete Observability Stack
+
+**Components**:
+1. **Prometheus** - Metrics collection and alerting
+2. **Grafana** - Visualization and dashboards
+3. **Jaeger** - Distributed tracing
+4. **OpenTelemetry Collector** - Unified observability data pipeline
+5. **New Relic** (Optional) - Cloud observability platform
+6. **Linkerd** (Optional) - Service mesh with advanced observability
+
+**Installation**:
+- **Automated**: `bash infra/k8s/scripts/install-observability.sh`
+- **Via Bootstrap**: Included in `./scripts/bootstrap-platform.sh`
+- **Helm Charts**: `prometheus-community/kube-prometheus-stack` for Prometheus + Grafana
 
 ### Metrics (Prometheus)
 
+**Deployment**:
+- **Helm Chart**: `prometheus-community/kube-prometheus-stack`
+- **Storage**: 50Gi PVC with 30-day retention
+- **Namespace**: `monitoring`
+- **Configuration**: `infra/k8s/base/observability/prometheus-deploy.yaml`
+
 **Collection**:
-- ServiceMonitors: Auto-discovery of service metrics
-- PodMonitors: Pod-level metrics collection
-- Scrape interval: 15-30 seconds
-- Retention: 30 days
+- **ServiceMonitors** (`infra/k8s/base/monitoring/servicemonitors.yaml`): Auto-discovery of service metrics
+  - Targets: api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, python-ai-service, auction-monitor, nginx, haproxy
+- **PodMonitors** (`infra/k8s/base/observability/podmonitors.yaml`): Pod-level metrics collection
+- **Scrape interval**: 15-30 seconds
+- **Retention**: 30 days
+- **AlertManager**: Integrated alerting with notification channels
 
 **Key Metrics**:
 - Request rate, latency, error rate per service
@@ -534,13 +651,47 @@ ansible-playbook playbooks/deploy-services.yml          # Deploy
 - Database connection pool metrics
 - Cache hit/miss rates
 - HTTP/2 and HTTP/3 connection metrics
+- Kubernetes cluster metrics (CPU, memory, network)
 
-### Tracing (Jaeger)
+**Access**:
+```bash
+kubectl -n monitoring port-forward svc/monitoring-kube-prom-prometheus 9090:9090
+# http://localhost:9090
+```
+
+### Visualization (Grafana)
+
+**Deployment**:
+- **Helm Chart**: Included in `kube-prometheus-stack`
+- **Storage**: 10Gi PVC for dashboards and data sources
+- **Namespace**: `monitoring`
+- **Default Credentials**: `admin/Admin123!` (change for production)
+
+**Features**:
+- Pre-configured datasources: Prometheus, Jaeger, Loki (optional)
+- Custom dashboards: `infra/k8s/base/observability/grafana-dashboards.yaml`
+- Dashboard provisioning: Auto-loads dashboards from ConfigMaps
+- Alerting: Integrated with Prometheus AlertManager
+
+**Access**:
+```bash
+kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80
+# http://localhost:3000 (admin/Admin123!)
+```
+
+### Distributed Tracing (Jaeger)
+
+**Deployment**:
+- **Manifest**: `infra/k8s/base/observability/jaeger-deploy.yaml`
+- **Namespace**: `observability`
+- **Storage**: In-memory (dev) or persistent storage (production)
+- **Receives traces**: Via OpenTelemetry Collector
 
 **Instrumentation**:
 - OpenTelemetry SDK for Node.js and Python
 - Automatic trace propagation via gRPC metadata
 - Custom spans for business logic
+- See `infra/k8s/base/observability/otel-instrumentation.md` for guide
 
 **Trace Flow**:
 ```
@@ -552,6 +703,114 @@ Client Request
     └─► Database Query (span: db)
 ```
 
+**Access**:
+```bash
+kubectl -n observability port-forward svc/jaeger 16686:16686
+# http://localhost:16686
+```
+
+### OpenTelemetry Collector
+
+**Deployment**:
+- **Manifest**: `infra/k8s/base/observability/otel-collector-deploy.yaml`
+- **Namespace**: `observability`
+- **Configuration**: ConfigMap with OTLP receivers and exporters
+
+**Receivers**:
+- **OTLP**: gRPC (port 4317), HTTP (port 4318)
+- **Prometheus**: Scrapes Prometheus metrics
+
+**Processors**:
+- **Batch**: Batches traces and metrics for efficient export
+- **Memory Limiter**: Prevents OOM by limiting memory usage
+- **Resource Detection**: Adds resource attributes (pod, node, etc.)
+
+**Exporters**:
+- **Jaeger**: Exports traces to Jaeger backend
+- **Prometheus**: Exports metrics to Prometheus
+- **New Relic**: Exports traces and metrics to New Relic (optional)
+- **Logging**: Debug logging for troubleshooting
+
+**Pipelines**:
+- **Traces**: OTLP → Batch → Jaeger + New Relic
+- **Metrics**: Prometheus + OTLP → Batch → Prometheus + New Relic
+- **Logs**: (Future) OTLP → Batch → Loki/ELK
+
+**Configuration**:
+```yaml
+# infra/k8s/base/observability/otel-collector-deploy.yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  jaeger:
+    endpoint: jaeger.observability.svc.cluster.local:14250
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+  newrelic:
+    apikey: ${NEW_RELIC_LICENSE_KEY}
+    endpoint: https://otlp.nr-data.net
+```
+
+### New Relic Integration (Optional)
+
+**Purpose**: Cloud observability platform for production monitoring.
+
+**Setup**:
+1. Get New Relic license key from https://one.newrelic.com/admin-portal/api-keys/home
+2. Create secret: `kubectl create secret generic newrelic-secret --from-literal=license-key='YOUR_KEY' -n observability`
+3. OpenTelemetry Collector automatically exports to New Relic
+
+**Configuration**:
+- **Secret**: `infra/k8s/base/observability/newrelic-secret.yaml`
+- **Exporter**: Configured in OpenTelemetry Collector
+- **Endpoint**: `https://otlp.nr-data.net` (New Relic OTLP endpoint)
+
+**Features**:
+- Traces and metrics exported to New Relic
+- APM (Application Performance Monitoring)
+- Infrastructure monitoring
+- Custom dashboards and alerts
+
+### Service Mesh (Linkerd - Optional)
+
+**Purpose**: Service mesh with mTLS, traffic management, and advanced observability.
+
+**Installation**:
+- **Script**: `infra/k8s/scripts/install-linkerd.sh`
+- **CLI Required**: `curl -sL https://run.linkerd.io/install-edge | sh`
+
+**Features**:
+- **mTLS**: Automatic mutual TLS between services
+- **Traffic Management**: Request routing, retries, timeouts, circuit breakers
+- **Metrics**: Service-level metrics (request rate, latency, success rate)
+- **Topology**: Visual service dependency graph
+- **Auto-injection**: Automatic sidecar injection via namespace annotation
+- **Linkerd Viz**: Dashboard for service mesh visualization
+
+**Usage**:
+```bash
+# Install Linkerd
+bash infra/k8s/scripts/install-linkerd.sh
+
+# Enable auto-injection
+kubectl annotate namespace record-platform linkerd.io/inject=enabled
+
+# Access dashboard
+linkerd viz dashboard
+```
+
+**Benefits**:
+- Automatic mTLS between services
+- Service-level observability without code changes
+- Traffic splitting for canary deployments
+- Request-level retries and timeouts
+
 ### Logging
 
 **Structured Logging**:
@@ -559,9 +818,24 @@ Client Request
 - Correlation IDs for request tracing
 - Log levels: DEBUG, INFO, WARN, ERROR
 
-**Log Aggregation**:
+**Log Aggregation** (Current):
 - Kubernetes pod logs via `kubectl logs`
-- Future: Centralized logging with ELK stack or Loki
+- **Future**: Centralized logging with ELK stack or Loki
+
+**Access**:
+```bash
+# View service logs
+kubectl -n record-platform logs -f deployment/api-gateway
+
+# View all pods in namespace
+kubectl -n record-platform logs -f --all-containers=true
+```
+
+### Documentation
+
+- `infra/k8s/OBSERVABILITY.md` - Comprehensive observability guide
+- `infra/k8s/GRAFANA-GUIDE.md` - Grafana usage and dashboard creation
+- `infra/k8s/base/observability/otel-instrumentation.md` - OpenTelemetry instrumentation guide
 
 ## Performance Optimizations
 

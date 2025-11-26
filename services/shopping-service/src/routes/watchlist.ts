@@ -7,7 +7,7 @@ import { CacheManager } from '../lib/cache.js'
 export default function watchlistRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
   const router: Router = Router()
 
-  // GET /watchlist - Get user's watchlist
+  // GET /watchlist - Get user's watchlist (includes sold-out status)
   router.get('/', async (req: AuthedRequest, res: Response) => {
     const userId = req.user?.sub
     if (!userId) {
@@ -19,13 +19,35 @@ export default function watchlistRouter(redis: Redis | null, cacheManager: Cache
 
     try {
       const result = await pool.query(
-        `SELECT id, listing_id, item_type, item_id, notify_on, metadata, created_at
-         FROM shopping.watchlist
-         WHERE user_id = $1
-         ORDER BY created_at DESC
+        `SELECT w.id, w.listing_id, w.item_type, w.item_id, w.notify_on, w.metadata, w.created_at,
+                CASE 
+                  WHEN w.item_type = 'listing' AND w.listing_id IS NOT NULL THEN
+                    (SELECT json_build_object(
+                      'is_active', l.is_active,
+                      'sold_at', l.sold_at,
+                      'stock_quantity', l.stock_quantity,
+                      'title', l.title,
+                      'price', l.price
+                    ) FROM listings.listings l WHERE l.id = w.listing_id)
+                  ELSE NULL
+                END as listing_info
+         FROM shopping.watchlist w
+         WHERE w.user_id = $1
+         ORDER BY w.created_at DESC
          LIMIT $2 OFFSET $3`,
         [userId, limit, offset]
       )
+
+      // Enrich with sold-out status from metadata
+      const enrichedItems = result.rows.map((item: any) => {
+        const soldOut = item.metadata?.sold_out === true || 
+                       (item.listing_info && (!item.listing_info.is_active || item.listing_info.sold_at || item.listing_info.stock_quantity <= 0))
+        return {
+          ...item,
+          sold_out: soldOut,
+          sold_out_at: item.metadata?.sold_out_at || (item.listing_info?.sold_at || null),
+        }
+      })
 
       const countResult = await pool.query(
         `SELECT COUNT(*) as total FROM shopping.watchlist WHERE user_id = $1`,
@@ -33,7 +55,7 @@ export default function watchlistRouter(redis: Redis | null, cacheManager: Cache
       )
 
       res.json({
-        items: result.rows,
+        items: enrichedItems,
         total: parseInt(countResult.rows[0].total),
       })
     } catch (err) {

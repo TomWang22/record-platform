@@ -3,10 +3,11 @@
   hosts: kubernetes
   gather_facts: yes
   vars:
-    namespace: "record-platform"
+    namespace: "{{ namespace | default('record-platform') }}"
+    environment: "{{ environment | default('dev') }}"
+    kind_cluster: "{{ kind_cluster | default('h3') }}"
     skip_cert_management: true
     skip_caddy_config: true
-    # Add other variables as needed
 
   tasks:
     - name: Verify Kubernetes connection
@@ -18,25 +19,79 @@
       failed_when: false
       changed_when: false
 
-    - name: Display namespace status
-      debug:
-        msg: "Namespace '{{ namespace }}' {{ 'exists' if ns_info.resources else 'does not exist' }}"
-
-    - name: Example - Create ConfigMap (placeholder)
+    - name: Create namespace if it doesn't exist
       kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
-          kind: ConfigMap
+          kind: Namespace
           metadata:
-            name: app-config-example
-            namespace: "{{ namespace }}"
-          data:
-            example: "value"
+            name: "{{ namespace }}"
+            labels:
+              app: record-platform
+              env: "{{ environment }}"
+      when: not ns_info.resources
+
+    - name: Display namespace status
+      debug:
+        msg: "Namespace '{{ namespace }}' {{ 'exists' if ns_info.resources else 'created' }}"
+
+    - name: Verify kubectl is available
+      command: kubectl version --client --short
+      register: kubectl_version
+      changed_when: false
+      failed_when: false
+
+    - name: Display kubectl version
+      debug:
+        msg: "{{ kubectl_version.stdout }}"
+
+    - name: Apply base Kubernetes resources with kustomize
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ kubeconfig_path | default('~/.kube/config') | expanduser }}"
+        context: "{{ kubeconfig_context | default(omit) }}"
+        definition: "{{ lookup('pipe', 'kubectl kustomize ' + lookup('env', 'PWD') + '/infra/k8s/base') }}"
+      vars:
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
       when: not skip_caddy_config | default(false)
-      # This task is skipped when skip_caddy_config is true
+      ignore_errors: yes
+
+    - name: Apply environment overlay with kustomize
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ kubeconfig_path | default('~/.kube/config') | expanduser }}"
+        context: "{{ kubeconfig_context | default(omit) }}"
+        definition: "{{ lookup('pipe', 'kubectl kustomize ' + lookup('env', 'PWD') + '/infra/k8s/overlays/' + environment) }}"
+      vars:
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+      when: not skip_caddy_config | default(false)
+      ignore_errors: yes
+
+    - name: Wait for deployments to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: "{{ namespace }}"
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 300
+      register: deployments
+      ignore_errors: yes
+
+    - name: Display deployment status
+      debug:
+        msg: "Found {{ deployments.resources | length }} deployments in namespace '{{ namespace }}'"
 
     - name: Display completion message
       debug:
-        msg: "Deployment playbook completed (dry-run mode)"
-
+        msg: |
+          Deployment playbook completed!
+          
+          Next steps:
+          1. Check pod status: kubectl -n {{ namespace }} get pods
+          2. Check services: kubectl -n {{ namespace }} get svc
+          3. View logs: kubectl -n {{ namespace }} logs -f deployment/api-gateway
+          4. Run tests: ./scripts/test-microservices-http2-http3.sh

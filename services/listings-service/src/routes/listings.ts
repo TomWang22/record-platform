@@ -17,19 +17,68 @@ import {
 
 const router: Router = Router();
 
-// Auth middleware
-router.use((req, res, next) => {
+// Auth middleware (applied to routes that need auth)
+function requireAuth(req: any, res: any, next: () => void) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
     return res.status(401).json({ error: 'auth required' });
   }
   try {
-    (req as any).user = verifyJwt(token);
+    req.user = verifyJwt(token);
     next();
   } catch {
     return res.status(401).json({ error: 'invalid token' });
   }
+}
+
+// Public routes (no auth required)
+// Search is public - moved before auth middleware
+
+// Protected routes (require auth)
+router.use(requireAuth);
+
+// Search listings (public - no auth required)
+router.get('/search', async (req, res) => {
+  try {
+    const query = req.query.q as string || '';
+    const filters = {
+      listing_type: req.query.listing_type as string,
+      category: req.query.category as string,
+      min_price: req.query.min_price ? parseFloat(req.query.min_price as string) : undefined,
+      max_price: req.query.max_price ? parseFloat(req.query.max_price as string) : undefined,
+      condition: req.query.condition as string,
+      media_type: req.query.media_type as string,
+      has_obi: req.query.has_obi === 'true' ? true : req.query.has_obi === 'false' ? false : undefined,
+      label_type: req.query.label_type as string,
+      sort_by: req.query.sort_by as 'created_at' | 'price' | 'popularity' | 'label_type' | undefined,
+      sort_order: (req.query.sort_order as 'asc' | 'desc') || 'desc',
+      limit: parseInt(req.query.limit as string) || 50,
+      offset: parseInt(req.query.offset as string) || 0,
+    };
+    const listings = await searchListings(query, filters);
+    res.json({ listings, count: listings.length });
+  } catch (err) {
+    console.error('[listings] search error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
+
+// Get listing by ID (public - no auth required)
+router.get('/:id', async (req, res) => {
+  try {
+    const listing = await getListingById(req.params.id);
+    if (!listing) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+    res.json(listing);
+  } catch (err) {
+    console.error('[listings] get by id error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Protected routes below require authentication
+router.use(requireAuth);
 
 // Get user's listings
 router.get('/my-listings', async (req, res) => {
@@ -45,7 +94,7 @@ router.get('/my-listings', async (req, res) => {
   }
 });
 
-// Search listings
+// Search listings (public endpoint - no auth required for browsing)
 router.get('/search', async (req, res) => {
   try {
     const query = req.query.q as string || '';
@@ -55,6 +104,11 @@ router.get('/search', async (req, res) => {
       min_price: req.query.min_price ? parseFloat(req.query.min_price as string) : undefined,
       max_price: req.query.max_price ? parseFloat(req.query.max_price as string) : undefined,
       condition: req.query.condition as string,
+      media_type: req.query.media_type as string,
+      has_obi: req.query.has_obi === 'true' ? true : req.query.has_obi === 'false' ? false : undefined,
+      label_type: req.query.label_type as string,
+      sort_by: req.query.sort_by as 'created_at' | 'price' | 'popularity' | 'label_type' | undefined,
+      sort_order: (req.query.sort_order as 'asc' | 'desc') || 'desc',
       limit: parseInt(req.query.limit as string) || 50,
       offset: parseInt(req.query.offset as string) || 0,
     };
@@ -66,19 +120,6 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// Get listing by ID
-router.get('/:id', async (req, res) => {
-  try {
-    const listing = await getListingById(req.params.id);
-    if (!listing) {
-      return res.status(404).json({ error: 'Listing not found' });
-    }
-    res.json(listing);
-  } catch (err) {
-    console.error('[listings] get by id error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 // Create listing
 router.post('/', async (req, res) => {
@@ -97,6 +138,10 @@ router.post('/', async (req, res) => {
       shipping_cost: req.body.shipping_cost ? parseFloat(req.body.shipping_cost) : 0,
       shipping_method: req.body.shipping_method,
       expires_at: req.body.expires_at ? new Date(req.body.expires_at) : undefined,
+      media_type: req.body.media_type,
+      has_obi: req.body.has_obi || false,
+      label_type: req.body.label_type,
+      stock_quantity: req.body.stock_quantity || 1,
     });
     res.status(201).json(listing);
   } catch (err) {

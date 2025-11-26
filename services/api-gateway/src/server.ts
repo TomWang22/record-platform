@@ -231,8 +231,17 @@ app.use(
 
 app.use(
   cors({
-    origin: [/localhost:8080$/, /localhost:3001$/],
-    credentials: false,
+    origin: [
+      /^http:\/\/localhost:3000$/,
+      /^http:\/\/localhost:3001$/,
+      /^http:\/\/localhost:4000$/,
+      /^http:\/\/localhost:8080$/,
+      /^https:\/\/record\.local$/,
+      /^https:\/\/record-platform\.local$/,
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
 

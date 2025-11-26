@@ -57,7 +57,48 @@ Key architectural benefits:
 - **Kafka integration**: Real-time messaging for forum posts, direct messages, and group chats
 
 ## Why This Exists
-I have been cataloging vinyl for a little over a year, and this codebase sits at the intersection of that hobby and a desire to level up on distributed systems and observability. The earlier Docker Compose stack was enough to track spins, but I wanted to understand how real platforms layer ingress controllers, service meshes, CI/CD-friendly manifests, and QUIC edges. Every migration choice (Caddy front door, nginx micro-cache, HAProxy fan-in, the Kustomize base/overlay split) is framed so a curious collector can trace data flow from a record search UI all the way to Postgres buffers and Grafana dashboards. The repo keeps personal workflow sharp (fast search, authenticated inserts) while remaining a playground for new infra ideas.
+
+### The Problem with Record Collecting
+
+Record collecting is harder than it should be. The existing tools and marketplaces have significant limitations:
+
+**Marketplace Data Issues:**
+- **Discogs**: Often cited as the go-to source, but it's crowdsourced with incomplete data. No one can verify the "final" mark, and price history is stale because users don't upload it frequently (they have their own marketplace).
+- **eBay**: Completed/sold listings help, but many listings don't show final prices, making price research difficult.
+- **Popsike & Gripsweat**: Web scraping and user input, but lack complete information. Buyer's regret exists, and the bigger issue is that record shopping is harder than most hobbies.
+
+**The Real Challenge:**
+Unless you're a staff member at a record store (and even they face pricing and margin challenges), pricing history is often incomplete. The usual formula of "price = cost + margins" works, but pricing history helps significantly. However, that history is often incomplete unless someone is dedicated to monitoring and manually entering data into databases.
+
+**Personal Experience:**
+Starting this hobby at age 20 (from 10/1/2024 to 11/18/2025), I've collected:
+- **57 Teresa Teng LPs** (10/1/24 to 10/17/2025), including 2 NM unplayed super rare finds (one only seen in 18 years, first debut on eBay; the other not seen in 10 years)
+- **93 Momoe LPs** (7/30 to 11/18/2025) and 3 Star Legend box sets (5x LP collections covering Momoe's complete catalog in studio albums, live albums, compilations, soundtracks/stage & screen)
+- **6 Anita Mui LPs** (including one signed gatefold promo from first month of collecting)
+- **1 signed Teresa Teng EP** (Airport EP, her debut, signed in 3 languages: English, Japanese, Chinese)
+- **100+ Momoe EPs** (best hit packs, clover series, golden hits, white label promos)
+
+**Auction Success:**
+- **34/34 wins on eBay** (never lost an auction)
+- **61/62 on Buyee** (one loss due to buyout)
+- Strategy: 2-second latency for bid registration, 5 seconds = 3 seconds prime time window, CS math optimization
+
+**The Realization:**
+If I (at 21, with CS background) feel this is a lot of work but "busy work," what chance do real record shops have? Or older collectors who are actually the majority of the audience? This was the entire reasoning why I built and continue working on Record Platform—never getting tired because it's a flagship project going into my MSCS (with all my background).
+
+### The Solution
+
+Record Platform solves these problems by providing:
+- **Comprehensive price tracking**: Automated auction monitoring and price history
+- **Intelligent recommendations**: AI-powered grade predictions and price recommendations
+- **Complete collection management**: Full CRUD with search, filtering, and categorization
+- **Marketplace integration**: eBay integration, listings management, watchlists
+- **Community features**: Forum, messaging, and social features for collectors
+- **Real-time insights**: Analytics, price trends, and collection statistics
+
+### Technical Journey
+
+This codebase sits at the intersection of record collecting and a desire to level up on distributed systems and observability. The earlier Docker Compose stack was enough to track spins, but I wanted to understand how real platforms layer ingress controllers, service meshes, CI/CD-friendly manifests, and QUIC edges. Every migration choice (Caddy front door, nginx micro-cache, HAProxy fan-in, the Kustomize base/overlay split, Terraform/Ansible IAC) is framed so a curious collector can trace data flow from a record search UI all the way to Postgres buffers and Grafana dashboards. The repo keeps personal workflow sharp (fast search, authenticated inserts) while remaining a playground for new infra ideas.
 
 ## System Architecture
 
@@ -192,14 +233,57 @@ I have been cataloging vinyl for a little over a year, and this codebase sits at
 │  │   Management │  │   Flow       │                                       │
 │  └──────────────┘  └──────────────┘                                       │
 └─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│              Infrastructure as Code (IAC) Layer                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │                         Terraform                                    │  │
+│  │  - Kubernetes Infrastructure Provisioning                            │  │
+│  │  - Declarative Configuration (main.tf, variables.tf, outputs.tf)   │  │
+│  │  - Namespace Management                                              │  │
+│  │  - ConfigMap Creation                                                │  │
+│  │  - Version Pinning (.terraform-version: 1.6.0)                     │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │                         Ansible                                       │  │
+│  │  - Configuration Management                                           │  │
+│  │  - Service Deployment (deploy-services.yml)                         │  │
+│  │  - Safe Defaults (skip_cert_management, skip_caddy_config)          │  │
+│  │  - Kubernetes Collections (kubernetes.core, community.kubernetes)   │  │
+│  │  - Inventory Management (inventory/hosts.yml)                        │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │                    Automation & Verification                          │  │
+│  │  - test-iac-setup.sh: Comprehensive setup verification               │  │
+│  │  - Makefile: Convenient IAC commands (terraform-*, ansible-*)        │  │
+│  │  - Dry-run Support: terraform plan, ansible-playbook --check         │  │
+│  │  - Auto-setup: Creates missing files automatically                   │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Architecture Notes
 
+**Infrastructure as Code (IAC):**
+- **Terraform** (`infra/terraform/`): Declarative Kubernetes infrastructure provisioning
+  - Manages namespaces, ConfigMaps, and Kubernetes resources
+  - Version-pinned configuration (Terraform 1.6.0)
+  - Safe dry-run support via `terraform plan`
+- **Ansible** (`infra/ansible/`): Configuration management and service deployment
+  - Safe defaults: Skips cert management and Caddy config to avoid interference
+  - Kubernetes collections for resource management
+  - Dry-run support via `ansible-playbook --check`
+- **Automation**: `test-iac-setup.sh` verifies setup and auto-creates missing files
+- **Documentation**: Complete guide in `infra/IAC-GUIDE.md`
+
 **Edge & Routing:**
 - **Caddy** runs on the host, terminates TLS (TLS 1.2/1.3 only - strict TLS enforcement), and supports HTTP/2 + HTTP/3 (QUIC) + gRPC
 - **Strict TLS**: Configured with `protocols tls1.2 tls1.3` - TLS 1.1 and below are rejected; validated via test scripts
-- **CA Rotation**: Supports certificate authority rotation with `scripts/rotate-ca-and-fix-tls.sh`; rotation works with expected downtime during Caddy restart (Recreate strategy); for production zero-downtime, use RollingUpdate with multiple replicas
+- **CA Rotation**: Supports certificate authority rotation with `scripts/rotate-ca-and-fix-tls.sh`; **zero-downtime rotation achieved** via admin API reload (~16s, 100% success rate); for production, use RollingUpdate with multiple replicas
 - **Caddy gRPC routing**: Uses `protocol grpc` matcher to detect gRPC requests and routes by service name in path (e.g., `/auth.*` → auth-service)
 - **Dual gRPC transport**: Port 5000 (h2c/plaintext) for internal testing, Port 8443 (TLS) for production
 - **ingress-nginx** routes `/` to Nginx edge (static assets + micro-cache) and `/api/*` directly to API Gateway
@@ -304,9 +388,59 @@ Services connect via `host.docker.internal:PORT` from Kubernetes pods. Connectio
 - **Cron Jobs** (`infra/k8s/base/cron-jobs`) - Nightly Postgres dumps, Redis snapshots, basebackups, WAL archiving
 - **Exporters** (`infra/k8s/base/exporters`) - nginx-exporter, haproxy-exporter for metrics collection
 
+### Infrastructure as Code (IAC)
+- **Terraform** (`infra/terraform/`) - Kubernetes infrastructure provisioning with declarative configuration
+  - `main.tf` - Main configuration with Kubernetes provider
+  - `variables.tf` - Namespace, environment, and kubeconfig settings
+  - `outputs.tf` - Namespace, kubeconfig path, and service ports
+  - `kubernetes.tf` - Kubernetes resources (namespaces, ConfigMaps)
+  - `.terraform-version` - Version pinning (1.6.0)
+- **Ansible** (`infra/ansible/`) - Configuration management and service deployment
+  - `ansible.cfg` - Ansible configuration with inventory and connection settings
+  - `requirements.yml` - Kubernetes collections (kubernetes.core, community.kubernetes)
+  - `inventory/hosts.yml` - Localhost Kubernetes host configuration
+  - `playbooks/deploy-services.yml` - Safe deployment playbook with standalone mode
+    - Includes `skip_cert_management: true` and `skip_caddy_config: true` for safety
+    - Does not interfere with existing certificates, Caddy config, or CA rotation
+- **Verification & Automation**:
+  - `test-iac-setup.sh` - Comprehensive setup verification script
+    - Checks prerequisites (Terraform, Ansible, kubectl)
+    - Auto-creates missing Terraform/Ansible files
+    - Validates Terraform configuration
+    - Installs Ansible collections
+    - Verifies inventory configuration
+  - `Makefile` - Convenient commands for IAC operations
+    - `make terraform-init`, `make terraform-validate`, `make terraform-plan`, `make terraform-apply`
+    - `make ansible-install`, `make ansible-check`, `make ansible-deploy`
+    - `make test-setup`, `make clean`
+- **Documentation**: `infra/IAC-GUIDE.md` - Complete guide with quick start, prerequisites, usage examples, and troubleshooting
+
+**Quick Start**:
+```bash
+cd infra
+./test-iac-setup.sh    # Verify setup and create missing files
+make help              # See all available commands
+make test-setup        # Run verification
+
+# Test Terraform (dry-run, safe)
+cd terraform && terraform plan
+
+# Test Ansible (dry-run, safe)
+cd ansible && ansible-playbook playbooks/deploy-services.yml --check
+```
+
+**Features**:
+- Safe defaults: All playbooks skip cert management and Caddy config
+- Dry-run support: `terraform plan` and `ansible-playbook --check` are safe
+- No interference: Does not touch certificates, Caddy config, or CA rotation
+- Auto-setup: Test script creates missing files automatically
+- Comprehensive validation: Checks prerequisites and validates configurations
+
 ## Repository Layout
 - `infra/k8s/base/*` - canonical manifests for services, data stores, ingress, monitoring, and cron jobs.
 - `infra/k8s/overlays/dev/*` - dev overlay, ingress, patches, bootstrap scripts, job templates, and PVC helpers.
+- `infra/terraform/*` - Terraform configuration for Kubernetes infrastructure provisioning.
+- `infra/ansible/*` - Ansible playbooks and configuration for service deployment and management.
 - `scripts/` - automation: cluster bootstrap, smoke tests, diagnostics, TLS toggles, QUIC tuning, load tests, backups, and rollouts.
 - `services/` - microservice code (Node + Python). Prisma schemas and migrations live beside each service.
 - `Caddyfile`, `caddy-*.yaml` - Caddy configuration and deployment manifests for the HTTP/3 edge.
@@ -318,6 +452,7 @@ Services connect via `host.docker.internal:PORT` from Kubernetes pods. Connectio
 - mkcert (or another local CA tool) to mint and trust `record.local` certificates.
 - Node 20+ and pnpm 9.x for service builds.
 - Optional: `curl` with HTTP/3 support (Homebrew `curl --with-quic`) and `k6` for load tests.
+- Optional: Terraform >=1.0 and Ansible >=2.9 for Infrastructure as Code (IAC) workflows (see `infra/IAC-GUIDE.md`).
 
 ## Local Development Quickstart
 1. Ensure `record.local` resolves locally:

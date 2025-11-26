@@ -9,6 +9,7 @@ import watchlistRouter from './routes/watchlist.js'
 import recentlyViewedRouter from './routes/recently-viewed.js'
 import wishlistRouter from './routes/wishlist.js'
 import historyRouter from './routes/history.js'
+import recommendationsRouter from './routes/recommendations.js'
 
 const app = express()
 app.use(express.json())
@@ -62,6 +63,7 @@ app.use('/watchlist', requireUser, watchlistRouter(redis, cacheManager))
 app.use('/recently-viewed', requireUser, recentlyViewedRouter(redis, cacheManager))
 app.use('/wishlist', requireUser, wishlistRouter(redis, cacheManager))
 app.use('/history', requireUser, historyRouter(redis, cacheManager))
+app.use('/recommendations', requireUser, recommendationsRouter(redis, cacheManager))
 
 // Error handler
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

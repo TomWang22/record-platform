@@ -2,6 +2,23 @@
 set -euo pipefail
 
 HOST="${HOST:-record.local}"
+# Auto-detect port based on cluster, or use provided PORT
+if [[ -z "${PORT:-}" ]]; then
+  CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
+  if [[ "$CURRENT_CONTEXT" == "kind-h3-multi" ]]; then
+    # Multi-node cluster: try ports 8444, 8445, 8446
+    # Test with direct IP (127.0.0.1) since hostNetwork pods bind to node IP
+    for p in 8445 8446 8444; do
+      if curl -k -s --http2 --max-time 1 -H "Host: ${HOST}" "https://127.0.0.1:${p}/_caddy/healthz" >/dev/null 2>&1; then
+        PORT=$p
+        break
+      fi
+    done
+    PORT="${PORT:-8445}"  # Default to 8445 (worker1) if none work
+  else
+    PORT=8443  # Default for single-node cluster (h3)
+  fi
+fi
 NS_ING="ingress-nginx"
 NS_APP="record-platform"
 
@@ -21,8 +38,7 @@ say "=== Full End-to-End Chain Test with CA Rotation ==="
 # Test 1: Caddy health (H2)
 say "Test 1: Caddy health via HTTP/2"
 CADDY_H2_RESPONSE=$("$CURL_BIN" -k -sS -I --http2 \
-  --resolve "$HOST:8443:127.0.0.1" \
-  -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1) || CADDY_H2_RESPONSE=""
+  -H "Host: $HOST" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || CADDY_H2_RESPONSE=""
 if echo "$CADDY_H2_RESPONSE" | head -n1 | grep -qE "200|HTTP/2 200"; then
   ok "Caddy health (H2) works"
 else
@@ -48,8 +64,7 @@ fi
 # Test 3: Backend via ingress (H2) - Full chain
 say "Test 3: Backend API via Ingress Nginx via Caddy (HTTP/2) - Full Chain"
 RESPONSE_H2=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 \
-  --resolve "$HOST:8443:127.0.0.1" \
-  -H "Host: $HOST" "https://$HOST:8443/api/healthz" 2>&1) || RESPONSE_H2=""
+  -H "Host: $HOST" "https://127.0.0.1:${PORT}/api/healthz" 2>&1) || RESPONSE_H2=""
 HTTP_CODE_H2=$(echo "$RESPONSE_H2" | tail -1 | tr -d '[:space:]' || echo "000")
 if [[ "$HTTP_CODE_H2" =~ ^(200|404|502)$ ]]; then
   ok "Backend via ingress (H2) works - HTTP $HTTP_CODE_H2 (Full chain: Client -> Caddy -> Ingress -> Backend)"
@@ -79,8 +94,7 @@ fi
 say "Test 5: Verify strict TLS (TLS 1.2/1.3 only)"
 # Test TLS 1.2 first (should work)
 TLS12_RESPONSE=$("$CURL_BIN" -k -sS -I --tlsv1.2 --http2 \
-  --resolve "$HOST:8443:127.0.0.1" \
-  -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1) || TLS12_RESPONSE=""
+  -H "Host: $HOST" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || TLS12_RESPONSE=""
 TLS12_WORKS=false
 if echo "$TLS12_RESPONSE" | head -n1 | grep -qE "200|HTTP/2 200"; then
   ok "TLS 1.2 works"
@@ -92,8 +106,7 @@ fi
 
 # Test TLS 1.3 (should work)
 TLS13_RESPONSE=$("$CURL_BIN" -k -sS -I --tlsv1.3 --http2 \
-  --resolve "$HOST:8443:127.0.0.1" \
-  -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1) || TLS13_RESPONSE=""
+  -H "Host: $HOST" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || TLS13_RESPONSE=""
 TLS13_WORKS=false
 if echo "$TLS13_RESPONSE" | head -n1 | grep -qE "200|HTTP/2 200"; then
   ok "TLS 1.3 works"
@@ -107,8 +120,7 @@ fi
 # Use --tls-max 1.1 to force maximum TLS 1.1 (prevent upgrade to higher versions)
 set +e  # Temporarily disable exit on error to capture TLS 1.1 rejection
 TLS11_RESPONSE=$("$CURL_BIN" -k -sS -I --tlsv1.1 --tls-max 1.1 --http2 \
-  --resolve "$HOST:8443:127.0.0.1" \
-  -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1)
+  -H "Host: $HOST" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1)
 TLS11_EXIT=$?
 set -e  # Re-enable exit on error
 # Check if we got an error (rejection) or a successful response
@@ -140,8 +152,7 @@ rm -f /tmp/rotation-test.log
 # First, verify Caddy is working before rotation
 say "Pre-rotation health check..."
 PRE_ROTATION_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 \
-  --resolve "$HOST:8443:127.0.0.1" \
-  -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1) || PRE_ROTATION_RESPONSE=""
+  -H "Host: $HOST" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || PRE_ROTATION_RESPONSE=""
 if [[ -n "$PRE_ROTATION_RESPONSE" ]]; then
   PRE_ROTATION_HEALTH=$(echo "$PRE_ROTATION_RESPONSE" | tail -1 | tr -d '[:space:]')
 else
@@ -215,7 +226,13 @@ if [[ "${SKIP_ROTATION:-0}" != "1" ]]; then
     ROTATION_DURATION=$((ROTATION_END - ROTATION_START))
     ok "CA rotation script completed (took ${ROTATION_DURATION}s)"
   else
-    warn "CA rotation script returned non-zero status"
+    ROTATION_END=$(date +%s)
+    ROTATION_DURATION=$((ROTATION_END - ROTATION_START))
+    warn "CA rotation script returned non-zero status (took ${ROTATION_DURATION}s)"
+    # Set a default duration if rotation failed very quickly
+    if [[ "$ROTATION_DURATION" -lt 5 ]]; then
+      ROTATION_DURATION=60  # Default to 60s if rotation failed immediately
+    fi
   fi
   
   # Continue monitoring after rotation completes
@@ -230,6 +247,8 @@ if [[ "${SKIP_ROTATION:-0}" != "1" ]]; then
   # After rotation ends, remaining time = ROTATION_COVERAGE_TIME - (5 + ROTATION_DURATION)
   # But since process started at T=0, we need: ROTATION_COVERAGE_TIME - (5 + ROTATION_DURATION) + 5
   # = ROTATION_COVERAGE_TIME - ROTATION_DURATION
+  # Default ROTATION_DURATION if not set (e.g., if rotation script failed)
+  ROTATION_DURATION="${ROTATION_DURATION:-60}"  # Default to 60s if not set
   REMAINING_TIME=$((ROTATION_COVERAGE_TIME - ROTATION_DURATION + 30))  # Add 30s buffer for safety
   if [[ $REMAINING_TIME -lt 60 ]]; then
     REMAINING_TIME=60  # Minimum 60 seconds to allow process to complete
@@ -425,26 +444,48 @@ if [[ "${SKIP_ROTATION:-0}" == "1" ]]; then
 elif [[ "$TOTAL_COUNT" -gt 0 ]]; then
   # Calculate success rate
   SUCCESS_RATE=$((SUCCESS_COUNT * 100 / TOTAL_COUNT))
-    if [[ "$SUCCESS_COUNT" -gt 0 ]]; then
+  
+  # Detect actual deployment strategy
+  ACTUAL_STRATEGY=$(kubectl -n ingress-nginx get deployment caddy-h3 -o jsonpath='{.spec.strategy.type}' 2>/dev/null || echo "Unknown")
+  ACTUAL_REPLICAS=$(kubectl -n ingress-nginx get deployment caddy-h3 -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+  
+  if [[ "$SUCCESS_COUNT" -gt 0 ]]; then
       if [[ "$SUCCESS_COUNT" -eq "$TOTAL_COUNT" ]]; then
         ok "✅ Zero-downtime rotation confirmed! (100% success rate - $SUCCESS_COUNT/$TOTAL_COUNT requests)"
+        if [[ "$ACTUAL_STRATEGY" == "RollingUpdate" ]] && [[ "$ACTUAL_REPLICAS" -ge 2 ]]; then
+          ok "  ✅ Using RollingUpdate with $ACTUAL_REPLICAS replicas - perfect zero-downtime setup!"
+        elif [[ "$ACTUAL_STRATEGY" == "RollingUpdate" ]]; then
+          ok "  ✅ Using RollingUpdate with admin API reload - zero-downtime achieved!"
+        fi
       elif [[ "$SUCCESS_RATE" -ge 95 ]]; then
         ok "✅ Near-zero-downtime rotation (${SUCCESS_RATE}% success rate - $SUCCESS_COUNT/$TOTAL_COUNT requests)"
-        warn "  → For production: Consider using RollingUpdate strategy with multiple replicas for true 100% uptime"
+        if [[ "$ACTUAL_STRATEGY" == "RollingUpdate" ]] && [[ "$ACTUAL_REPLICAS" -ge 2 ]]; then
+          warn "  → Strategy is RollingUpdate with $ACTUAL_REPLICAS replicas, but success rate < 100%"
+          warn "  → Check if pods are on different nodes (required for hostNetwork)"
+        else
+          warn "  → For production: Use RollingUpdate strategy with 2+ replicas on multiple nodes for true 100% uptime"
+        fi
       elif [[ "$SUCCESS_RATE" -ge 60 ]]; then
-        # With Recreate strategy, 50-70% success rate is normal due to downtime during restart
         ok "Rotation completed (${SUCCESS_RATE}% success rate - $SUCCESS_COUNT/$TOTAL_COUNT requests)"
-        say "  ℹ️  Note: This success rate is EXPECTED with Recreate strategy"
-        say "  ℹ️  Caddy uses Recreate strategy, which causes downtime during pod restart"
-        say "  ℹ️  Requests during the restart window (~30-60s) will fail/timeout"
-        say "  ℹ️  This is normal behavior for Recreate deployments"
-        warn "  → For production: Use RollingUpdate strategy with 2+ replicas for zero-downtime"
-        warn "  → With RollingUpdate: Old pod stays up while new pod starts, eliminating downtime"
+        if [[ "$ACTUAL_STRATEGY" == "Recreate" ]]; then
+          say "  ℹ️  Note: This success rate is EXPECTED with Recreate strategy"
+          say "  ℹ️  Caddy uses Recreate strategy, which causes downtime during pod restart"
+          say "  ℹ️  Requests during the restart window (~30-60s) will fail/timeout"
+          say "  ℹ️  This is normal behavior for Recreate deployments"
+        elif [[ "$ACTUAL_STRATEGY" == "RollingUpdate" ]] && [[ "$ACTUAL_REPLICAS" -eq 1 ]]; then
+          say "  ℹ️  Using RollingUpdate with 1 replica + hostNetwork"
+          say "  ℹ️  New pod can't start (port conflict), so admin API reload should be used"
+          say "  ℹ️  If admin API reload failed, pod restart causes downtime"
+        fi
+        warn "  → For production: Use RollingUpdate strategy with 2+ replicas on multiple nodes for zero-downtime"
+        warn "  → With RollingUpdate + 2 replicas: Old pod stays up while new pod starts, eliminating downtime"
       elif [[ "$SUCCESS_RATE" -ge 40 ]]; then
         warn "Rotation completed with downtime (${SUCCESS_RATE}% success rate - $SUCCESS_COUNT/$TOTAL_COUNT requests)"
         say "  ℹ️  Lower success rate may indicate longer restart time or more requests during restart"
-        say "  ℹ️  This is still expected with Recreate strategy"
-        warn "  → For production: Use RollingUpdate strategy with 2+ replicas for zero-downtime"
+        if [[ "$ACTUAL_STRATEGY" == "Recreate" ]]; then
+          say "  ℹ️  This is still expected with Recreate strategy"
+        fi
+        warn "  → For production: Use RollingUpdate strategy with 2+ replicas on multiple nodes for zero-downtime"
       else
         warn "Very low success rate during rotation (${SUCCESS_RATE}% - $SUCCESS_COUNT/$TOTAL_COUNT requests)"
         warn "  → $TIMEOUT_COUNT requests failed/timed out during Caddy restart"
@@ -505,7 +546,7 @@ rm -f /tmp/rotation-test.log
 # Test 7: Verify new certificate is being used
 say "Test 7: Verify new certificate is active"
 # Use openssl to get certificate info more reliably
-CERT_INFO=$(echo | openssl s_client -connect "${HOST}:8443" -servername "${HOST}" 2>/dev/null | openssl x509 -noout -subject -issuer 2>/dev/null || echo "")
+CERT_INFO=$(echo | openssl s_client -connect "${HOST}:${PORT}" -servername "${HOST}" 2>/dev/null | openssl x509 -noout -subject -issuer 2>/dev/null || echo "")
 if [[ -n "$CERT_INFO" ]]; then
   ok "Certificate info retrieved"
   echo "$CERT_INFO" | sed 's/^/  /'
@@ -516,8 +557,7 @@ fi
 # Test 8: Full chain with actual API call
 say "Test 8: Full chain test with actual API endpoint"
 API_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 \
-  --resolve "$HOST:8443:127.0.0.1" \
-  -H "Host: $HOST" "https://$HOST:8443/api/healthz" 2>&1) || API_RESPONSE=""
+  -H "Host: $HOST" "https://127.0.0.1:${PORT}/api/healthz" 2>&1) || API_RESPONSE=""
 API_CODE=$(echo "$API_RESPONSE" | tail -1 | tr -d '[:space:]' || echo "000")
 if [[ "$API_CODE" =~ ^(200|404|502)$ ]]; then
   ok "Full chain works: Client -> Caddy (H2) -> Ingress Nginx -> Backend - HTTP $API_CODE"

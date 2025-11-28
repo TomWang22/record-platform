@@ -65,9 +65,23 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
               m.is_read,
               m.created_at,
               m.updated_at,
-              g.name as group_name
+              g.name as group_name,
+              -- Include parent message preview for replies (WhatsApp-style)
+              CASE 
+                WHEN m.parent_message_id IS NOT NULL THEN
+                  json_build_object(
+                    'id', pm.id,
+                    'sender_id', pm.sender_id,
+                    'subject', pm.subject,
+                    'content', LEFT(pm.content, 100) || CASE WHEN LENGTH(pm.content) > 100 THEN '...' ELSE '' END,
+                    'message_type', pm.message_type,
+                    'created_at', pm.created_at
+                  )
+                ELSE NULL
+              END as parent_message
             FROM messages.messages m
             LEFT JOIN messages.groups g ON m.group_id = g.id
+            LEFT JOIN messages.messages pm ON m.parent_message_id = pm.id
             WHERE (m.recipient_id = $1 OR m.group_id IN (
               SELECT group_id FROM messages.group_members WHERE user_id = $1
             ))
@@ -212,6 +226,92 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     }
   })
 
+  // POST /messages/:messageId/attachments - Add attachment to message (MUST be before /:messageId)
+  router.post('/:messageId/attachments', async (req: AuthedRequest, res: Response) => {
+    const { messageId } = req.params
+    const userId = req.userId
+    const { file_url, file_path, thumbnail_url, file_name, file_size, mime_type, file_type, width, height, duration, display_order } = req.body
+
+    if (!file_url || !file_type) {
+      return res.status(400).json({ error: 'file_url and file_type required' })
+    }
+
+    // Validate file_type
+    if (!['image', 'video', 'audio', 'document', 'other'].includes(file_type)) {
+      return res.status(400).json({ error: 'file_type must be one of: image, video, audio, document, other' })
+    }
+
+    try {
+      // Verify user has access to this message
+      const messageCheck = await pool.query(
+        `SELECT sender_id, recipient_id, group_id FROM messages.messages WHERE id = $1
+         AND (sender_id = $2 OR recipient_id = $2 OR group_id IN (
+           SELECT group_id FROM messages.group_members WHERE user_id = $2
+         ))`,
+        [messageId, userId]
+      )
+      if (messageCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Message not found or access denied' })
+      }
+
+      // Insert attachment
+      const insertQuery = `
+        INSERT INTO messages.message_attachments (
+          message_id, file_url, file_path, thumbnail_url, file_name, file_size,
+          mime_type, file_type, width, height, duration, display_order
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        RETURNING id, message_id, file_url, file_path, thumbnail_url, file_name,
+                  file_size, mime_type, file_type, width, height, duration,
+                  display_order, created_at
+      `
+      const { rows } = await pool.query(insertQuery, [
+        messageId, file_url, file_path || null, thumbnail_url || null,
+        file_name || null, file_size || null, mime_type || null, file_type,
+        width || null, height || null, duration || null, display_order || 0
+      ])
+
+      res.status(201).json(rows[0])
+    } catch (err: any) {
+      console.error('[social] Error adding message attachment:', err)
+      res.status(500).json({ error: 'Failed to add attachment' })
+    }
+  })
+
+  // GET /messages/:messageId/attachments - Get attachments for message (MUST be before /:messageId)
+  router.get('/:messageId/attachments', async (req: AuthedRequest, res: Response) => {
+    const { messageId } = req.params
+    const userId = req.userId
+
+    try {
+      // Verify user has access to this message
+      const messageCheck = await pool.query(
+        `SELECT 1 FROM messages.messages WHERE id = $1
+         AND (sender_id = $2 OR recipient_id = $2 OR group_id IN (
+           SELECT group_id FROM messages.group_members WHERE user_id = $2
+         ))`,
+        [messageId, userId]
+      )
+      if (messageCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Message not found or access denied' })
+      }
+
+      const query = `
+        SELECT id, message_id, file_url, file_path, thumbnail_url, file_name,
+               file_size, mime_type, file_type, width, height, duration,
+               display_order, created_at
+        FROM messages.message_attachments
+        WHERE message_id = $1
+        ORDER BY display_order ASC, created_at ASC
+      `
+      const { rows } = await pool.query(query, [messageId])
+
+      res.json({ attachments: rows })
+    } catch (err) {
+      console.error('[social] Error fetching message attachments:', err)
+      res.status(500).json({ error: 'Failed to fetch attachments' })
+    }
+  })
+
   // GET /messages/:messageId - Get message details
   router.get('/:messageId', async (req: AuthedRequest, res: Response) => {
     const { messageId } = req.params
@@ -253,7 +353,7 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     }
   })
 
-  // POST /messages/:messageId/reply - Reply to message (creates thread)
+  // POST /messages/:messageId/reply - Reply to message (creates thread, WhatsApp-style)
   router.post('/:messageId/reply', async (req: AuthedRequest, res: Response) => {
     const { messageId } = req.params
     const { message_type, subject, content } = req.body
@@ -264,9 +364,10 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     }
 
     try {
-      // Get parent message to determine recipient/group
+      // Get parent message to determine recipient/group and include full parent details for reply context
       const parentQuery = await pool.query(
-        'SELECT recipient_id, group_id, sender_id FROM messages.messages WHERE id = $1',
+        `SELECT id, sender_id, recipient_id, group_id, subject, content, message_type, created_at
+         FROM messages.messages WHERE id = $1`,
         [messageId]
       )
       if (parentQuery.rows.length === 0) {
@@ -274,10 +375,12 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       }
 
       const parent = parentQuery.rows[0]
-      const recipient_id = parent.recipient_id || (parent.sender_id === sender_id ? null : parent.sender_id)
+      // For group messages, recipient_id must be null (check constraint)
+      // For P2P messages, set recipient_id to the other party
       const group_id = parent.group_id
+      const recipient_id = group_id ? null : (parent.recipient_id || (parent.sender_id === sender_id ? null : parent.sender_id))
 
-      // Insert reply
+      // Insert reply with parent_message_id set (WhatsApp-style reply)
       const insertQuery = `
         INSERT INTO messages.messages (
           sender_id, recipient_id, group_id, parent_message_id,
@@ -290,12 +393,22 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
         sender_id,
         recipient_id,
         group_id,
-        messageId,
+        messageId, // parent_message_id - links to the message being replied to
         message_type || 'General',
         subject || `Re: ${parent.subject || 'Message'}`,
         content,
       ])
       const message = rows[0]
+
+      // Fetch parent message details to include in response (for UI to show "replying to...")
+      const parentDetails = {
+        id: parent.id,
+        sender_id: parent.sender_id,
+        subject: parent.subject,
+        content: parent.content.substring(0, 100) + (parent.content.length > 100 ? '...' : ''), // Preview
+        message_type: parent.message_type,
+        created_at: parent.created_at,
+      }
 
       // Publish reply to Kafka
       try {
@@ -334,6 +447,7 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
                   content,
                   thread_id: message.thread_id,
                   timestamp: message.created_at,
+                  parent_message: parentDetails, // Include parent message details for UI
                 }),
               },
             ],
@@ -343,7 +457,11 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
         console.warn('[social] Kafka publish failed (non-fatal):', err)
       }
 
-      res.status(201).json(message)
+      // Return reply with parent message context (WhatsApp-style)
+      res.status(201).json({
+        ...message,
+        parent_message: parentDetails, // Include parent message preview in response
+      })
     } catch (err: any) {
       console.error('[social] Error replying to message:', err)
       res.status(500).json({ error: 'Failed to reply to message' })
@@ -660,6 +778,50 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       res.status(500).json({ error: 'Failed to fetch groups' })
     }
   })
+
+  // DELETE /messages/groups/:groupId/leave - User leaves a group (MUST be before /groups/:groupId)
+  router.delete('/groups/:groupId/leave', async (req: AuthedRequest, res: Response) => {
+    const { groupId } = req.params
+    const userId = req.userId
+
+    try {
+      // Verify user is a member
+      const memberCheck = await pool.query(
+        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, userId]
+      )
+      if (memberCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'You are not a member of this group' })
+      }
+
+      // Check if user is the only admin
+      const adminCheck = await pool.query(
+        'SELECT COUNT(*) as admin_count FROM messages.group_members WHERE group_id = $1 AND role = $2',
+        [groupId, 'admin']
+      )
+      const adminCount = parseInt(adminCheck.rows[0]?.admin_count || '0', 10)
+      const userRole = memberCheck.rows[0].role
+
+      // Prevent leaving if user is the only admin
+      if (userRole === 'admin' && adminCount === 1) {
+        return res.status(400).json({ 
+          error: 'Cannot leave group: you are the only admin. Transfer admin role or delete the group instead.' 
+        })
+      }
+
+      // Remove user from group
+      await pool.query(
+        'DELETE FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, userId]
+      )
+
+      res.status(204).end()
+    } catch (err: any) {
+      console.error('[social] Error leaving group:', err)
+      res.status(500).json({ error: 'Failed to leave group' })
+    }
+  })
+
 
   return router
 }

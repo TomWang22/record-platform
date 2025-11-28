@@ -28,11 +28,22 @@ http.setResponseCallback(
   http.expectedStatuses({ min: 200, max: 399 }, 404, 409, 429)
 );
 
-// -------- thresholds (reads are strict) --------
+// -------- thresholds (reads are strict) - comprehensive percentiles --------
 const thresholds = {
   errors: ['rate<0.01'],
-  'http_req_duration{method:GET}': ['p(95)<50','p(99)<120'],
+  'http_req_duration{method:GET}': [
+    'p(50)<25', 'p(95)<50', 'p(99)<120',
+    'p(99.9)<300', 'p(99.99)<600', 'p(99.999)<1200',
+    'p(99.9999)<3000', 'p(99.99999)<6000', 'p(100)<12000'
+  ],
   http_req_failed: ['rate<0.005'],
+  
+  // Global comprehensive percentiles
+  'http_req_duration': [
+    'p(50)<30', 'p(95)<60', 'p(99)<150',
+    'p(99.9)<400', 'p(99.99)<800', 'p(99.999)<1600',
+    'p(99.9999)<4000', 'p(99.99999)<8000', 'p(100)<16000'
+  ],
 };
 
 // -------- options builder --------
@@ -108,4 +119,61 @@ export default function () {
   check(res, { 'ok(200|429)': () => ok });
 
   if (!RATE && MODE !== 'sweep') sleep(0.5);
+}
+
+// Comprehensive latency summary handler
+export function handleSummary(data) {
+  const extractPercentiles = (metric) => {
+    if (!metric || !metric.values) return {};
+    return {
+      p50: metric.values['p(50)'] || null,
+      p95: metric.values['p(95)'] || null,
+      p99: metric.values['p(99)'] || null,
+      p999: metric.values['p(99.9)'] || null,
+      p9999: metric.values['p(99.99)'] || null,
+      p99999: metric.values['p(99.999)'] || null,
+      p999999: metric.values['p(99.9999)'] || null,
+      p9999999: metric.values['p(99.99999)'] || null,
+      p100: metric.values['p(100)'] || metric.values.max || null,
+      avg: metric.values.avg || null,
+      min: metric.values.min || null,
+      max: metric.values.max || null,
+    };
+  };
+
+  const latencyReport = {
+    timestamp: new Date().toISOString(),
+    summary: {
+      total_requests: data.metrics.http_reqs?.values.count || 0,
+      total_duration: data.metrics.http_req_duration?.values.avg || 0,
+      error_rate: data.metrics.errors?.values.rate || 0,
+    },
+    latency_metrics: {},
+  };
+
+  for (const [key, metric] of Object.entries(data.metrics)) {
+    if (key.startsWith('http_req_duration')) {
+      latencyReport.latency_metrics[key] = extractPercentiles(metric);
+    }
+  }
+
+  console.log('\n=== Comprehensive Latency Metrics (Reads) ===');
+  for (const [key, metrics] of Object.entries(latencyReport.latency_metrics)) {
+    console.log(`\n${key}:`);
+    console.log(`  p50:      ${metrics.p50?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p95:      ${metrics.p95?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p99:      ${metrics.p99?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p999:     ${metrics.p999?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p9999:    ${metrics.p9999?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p99999:   ${metrics.p99999?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p999999:  ${metrics.p999999?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p9999999: ${metrics.p9999999?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p100:     ${metrics.p100?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  avg:      ${metrics.avg?.toFixed(2) || 'N/A'} ms`);
+  }
+
+  return {
+    'stdout': JSON.stringify(latencyReport, null, 2),
+    'k6-latency-report.json': JSON.stringify(latencyReport, null, 2),
+  };
 }

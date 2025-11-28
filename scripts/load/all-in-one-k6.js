@@ -57,10 +57,33 @@ function backoffOnce(res, attempt) {
 function buildOptions(mode) {
   const thresholds = {
     http_req_failed: ['rate<0.01'],
-    'http_req_duration{method:GET}':    ['p(95)<300'],
-    'http_req_duration{method:POST}':   ['p(95)<500'],
-    'http_req_duration{method:PUT}':    ['p(95)<600'],
-    'http_req_duration{method:DELETE}': ['p(95)<500'],
+    // Comprehensive latency percentiles for all methods
+    'http_req_duration{method:GET}':    [
+      'p(50)<150', 'p(95)<300', 'p(99)<600',
+      'p(99.9)<1200', 'p(99.99)<3000', 'p(99.999)<6000',
+      'p(99.9999)<15000', 'p(99.99999)<30000', 'p(100)<60000'
+    ],
+    'http_req_duration{method:POST}':   [
+      'p(50)<250', 'p(95)<500', 'p(99)<1000',
+      'p(99.9)<2000', 'p(99.99)<5000', 'p(99.999)<10000',
+      'p(99.9999)<25000', 'p(99.99999)<50000', 'p(100)<100000'
+    ],
+    'http_req_duration{method:PUT}':    [
+      'p(50)<300', 'p(95)<600', 'p(99)<1200',
+      'p(99.9)<2400', 'p(99.99)<6000', 'p(99.999)<12000',
+      'p(99.9999)<30000', 'p(99.99999)<60000', 'p(100)<120000'
+    ],
+    'http_req_duration{method:DELETE}': [
+      'p(50)<250', 'p(95)<500', 'p(99)<1000',
+      'p(99.9)<2000', 'p(99.99)<5000', 'p(99.999)<10000',
+      'p(99.9999)<25000', 'p(99.99999)<50000', 'p(100)<100000'
+    ],
+    // Global comprehensive percentiles
+    'http_req_duration': [
+      'p(50)<200', 'p(95)<400', 'p(99)<800',
+      'p(99.9)<2000', 'p(99.99)<5000', 'p(99.999)<10000',
+      'p(99.9999)<25000', 'p(99.99999)<50000', 'p(100)<100000'
+    ],
     checks: ['rate>0.98'],
   };
 
@@ -310,3 +333,62 @@ export function runMixed(data)      { loopMixed(data.token); }
 export function runReadMostly(data) { loopReadMostly(data.token); }
 
 export function teardown(_) { /* no-op */ }
+
+// Comprehensive latency summary handler
+export function handleSummary(data) {
+  const extractPercentiles = (metric) => {
+    if (!metric || !metric.values) return {};
+    return {
+      p50: metric.values['p(50)'] || null,
+      p95: metric.values['p(95)'] || null,
+      p99: metric.values['p(99)'] || null,
+      p999: metric.values['p(99.9)'] || null,
+      p9999: metric.values['p(99.99)'] || null,
+      p99999: metric.values['p(99.999)'] || null,
+      p999999: metric.values['p(99.9999)'] || null,
+      p9999999: metric.values['p(99.99999)'] || null,
+      p100: metric.values['p(100)'] || metric.values.max || null,
+      avg: metric.values.avg || null,
+      min: metric.values.min || null,
+      max: metric.values.max || null,
+    };
+  };
+
+  const latencyReport = {
+    timestamp: new Date().toISOString(),
+    summary: {
+      total_requests: data.metrics.http_reqs?.values.count || 0,
+      total_duration: data.metrics.http_req_duration?.values.avg || 0,
+      error_rate: data.metrics.http_req_failed?.values.rate || 0,
+      checks_passed: data.metrics.checks?.values.passes || 0,
+      checks_failed: data.metrics.checks?.values.fails || 0,
+    },
+    latency_metrics: {},
+  };
+
+  for (const [key, metric] of Object.entries(data.metrics)) {
+    if (key.startsWith('http_req_duration')) {
+      latencyReport.latency_metrics[key] = extractPercentiles(metric);
+    }
+  }
+
+  console.log('\n=== Comprehensive Latency Metrics (All-in-One) ===');
+  for (const [key, metrics] of Object.entries(latencyReport.latency_metrics)) {
+    console.log(`\n${key}:`);
+    console.log(`  p50:      ${metrics.p50?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p95:      ${metrics.p95?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p99:      ${metrics.p99?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p999:     ${metrics.p999?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p9999:    ${metrics.p9999?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p99999:   ${metrics.p99999?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p999999:  ${metrics.p999999?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p9999999: ${metrics.p9999999?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  p100:     ${metrics.p100?.toFixed(2) || 'N/A'} ms`);
+    console.log(`  avg:      ${metrics.avg?.toFixed(2) || 'N/A'} ms`);
+  }
+
+  return {
+    'stdout': JSON.stringify(latencyReport, null, 2),
+    'k6-latency-report.json': JSON.stringify(latencyReport, null, 2),
+  };
+}

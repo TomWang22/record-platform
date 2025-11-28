@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS forum.posts (
   title         VARCHAR(512) NOT NULL,
   content       TEXT NOT NULL,
   flair         VARCHAR(64) NOT NULL DEFAULT 'Discussion',
+  upload_type   VARCHAR(32) NOT NULL DEFAULT 'text' CHECK (upload_type IN ('text', 'image', 'video', 'link', 'poll')),
   upvotes       INT NOT NULL DEFAULT 0,
   downvotes     INT NOT NULL DEFAULT 0,
   comment_count INT NOT NULL DEFAULT 0,
@@ -182,6 +183,7 @@ CREATE TABLE IF NOT EXISTS messages.message_reads (
 -- Forum indexes
 CREATE INDEX IF NOT EXISTS idx_posts_user_id ON forum.posts(user_id);
 CREATE INDEX IF NOT EXISTS idx_posts_flair ON forum.posts(flair);
+CREATE INDEX IF NOT EXISTS idx_posts_upload_type ON forum.posts(upload_type);
 CREATE INDEX IF NOT EXISTS idx_posts_created_at ON forum.posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_pinned_created ON forum.posts(is_pinned DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_upvotes_created ON forum.posts(upvotes DESC, created_at DESC);

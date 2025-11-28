@@ -24,7 +24,11 @@ try {
 app.use(express.json());
 app.get("/healthz", async (_req, res) => {
   try {
-    await pool.query('SELECT 1');
+    // Add a timeout to the database query to prevent hanging
+    const dbCheck = await Promise.race([
+      pool.query('SELECT 1'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DB check timeout')), 2000)) // 2 second timeout
+    ]);
     res.json({ ok: true, db: 'connected' });
   } catch (err) {
     // Return 200 with warning instead of 503 - allows service to be marked ready

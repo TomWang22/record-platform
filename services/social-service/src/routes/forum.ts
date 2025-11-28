@@ -51,7 +51,7 @@ export default function forumRouter(redis: Redis | null, cpuCores: number) {
         try {
           const query = `
             SELECT 
-              id, user_id, title, content, flair, upvotes, downvotes,
+              id, user_id, title, content, flair, upload_type, upvotes, downvotes,
               comment_count, is_pinned, is_locked, created_at, updated_at
             FROM forum.posts
             WHERE ($1::VARCHAR IS NULL OR flair = $1)
@@ -90,22 +90,26 @@ export default function forumRouter(redis: Redis | null, cpuCores: number) {
 
   // POST /forum/posts - Create post
   router.post('/posts', async (req: AuthedRequest, res: Response) => {
-    const { title, content, flair } = req.body
+    const { title, content, flair, upload_type } = req.body
     const userId = req.userId
 
     if (!title || !content || !flair) {
       return res.status(400).json({ error: 'title, content, and flair required' })
     }
 
+    // Validate upload_type
+    const validUploadTypes = ['text', 'image', 'video', 'link', 'poll']
+    const postUploadType = upload_type && validUploadTypes.includes(upload_type) ? upload_type : 'text'
+
     try {
       // Insert post into database
       const insertQuery = `
-        INSERT INTO forum.posts (user_id, title, content, flair)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, user_id, title, content, flair, upvotes, downvotes,
+        INSERT INTO forum.posts (user_id, title, content, flair, upload_type)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, user_id, title, content, flair, upload_type, upvotes, downvotes,
                   comment_count, is_pinned, is_locked, created_at, updated_at
       `
-      const { rows } = await pool.query(insertQuery, [userId, title, content, flair])
+      const { rows } = await pool.query(insertQuery, [userId, title, content, flair, postUploadType])
       const post = rows[0]
 
       // Publish to Kafka for real-time notifications
@@ -124,6 +128,7 @@ export default function forumRouter(redis: Redis | null, cpuCores: number) {
                   content,
                   flair,
                   created_at: post.created_at,
+                  upload_type: postUploadType,
                   event_type: 'post_created',
                 }),
               },
@@ -141,6 +146,79 @@ export default function forumRouter(redis: Redis | null, cpuCores: number) {
     }
   })
 
+  // POST /forum/posts/:postId/attachments - Add attachment to post (MUST be before /posts/:postId)
+  router.post('/posts/:postId/attachments', async (req: AuthedRequest, res: Response) => {
+    const { postId } = req.params
+    const userId = req.userId
+    const { file_url, file_path, thumbnail_url, file_name, file_size, mime_type, file_type, width, height, duration, display_order } = req.body
+
+    if (!file_url || !file_type) {
+      return res.status(400).json({ error: 'file_url and file_type required' })
+    }
+
+    // Validate file_type
+    if (!['image', 'video', 'audio', 'document', 'other'].includes(file_type)) {
+      return res.status(400).json({ error: 'file_type must be one of: image, video, audio, document, other' })
+    }
+
+    try {
+      // Verify user owns the post
+      const postCheck = await pool.query(
+        'SELECT user_id FROM forum.posts WHERE id = $1',
+        [postId]
+      )
+      if (postCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Post not found' })
+      }
+      if (postCheck.rows[0].user_id !== userId) {
+        return res.status(403).json({ error: 'You can only add attachments to your own posts' })
+      }
+
+      // Insert attachment
+      const insertQuery = `
+        INSERT INTO forum.post_attachments (
+          post_id, file_url, file_path, thumbnail_url, file_name, file_size,
+          mime_type, file_type, width, height, duration, display_order
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        RETURNING id, post_id, file_url, file_path, thumbnail_url, file_name,
+                  file_size, mime_type, file_type, width, height, duration,
+                  display_order, created_at
+      `
+      const { rows } = await pool.query(insertQuery, [
+        postId, file_url, file_path || null, thumbnail_url || null,
+        file_name || null, file_size || null, mime_type || null, file_type,
+        width || null, height || null, duration || null, display_order || 0
+      ])
+
+      res.status(201).json(rows[0])
+    } catch (err: any) {
+      console.error('[social] Error adding post attachment:', err)
+      res.status(500).json({ error: 'Failed to add attachment' })
+    }
+  })
+
+  // GET /forum/posts/:postId/attachments - Get attachments for post (MUST be before /posts/:postId)
+  router.get('/posts/:postId/attachments', async (req: Request, res: Response) => {
+    const { postId } = req.params
+
+    try {
+      const query = `
+        SELECT id, post_id, file_url, file_path, thumbnail_url, file_name,
+               file_size, mime_type, file_type, width, height, duration,
+               display_order, created_at
+        FROM forum.post_attachments
+        WHERE post_id = $1
+        ORDER BY display_order ASC, created_at ASC
+      `
+      const { rows } = await pool.query(query, [postId])
+
+      res.json({ attachments: rows })
+    } catch (err) {
+      console.error('[social] Error fetching post attachments:', err)
+      res.status(500).json({ error: 'Failed to fetch attachments' })
+    }
+  })
+
   // GET /forum/posts/:postId - Get post details
   router.get('/posts/:postId', async (req: Request, res: Response) => {
     const { postId } = req.params
@@ -154,7 +232,7 @@ export default function forumRouter(redis: Redis | null, cpuCores: number) {
         try {
           const query = `
             SELECT 
-              id, user_id, title, content, flair, upvotes, downvotes,
+              id, user_id, title, content, flair, upload_type, upvotes, downvotes,
               comment_count, is_pinned, is_locked, created_at, updated_at
             FROM forum.posts
             WHERE id = $1
@@ -179,7 +257,7 @@ export default function forumRouter(redis: Redis | null, cpuCores: number) {
   // PUT /forum/posts/:postId - Update post (author only)
   router.put('/posts/:postId', async (req: AuthedRequest, res: Response) => {
     const { postId } = req.params
-    const { title, content, flair } = req.body
+    const { title, content, flair, upload_type } = req.body
     const userId = req.userId
 
     try {
@@ -195,17 +273,27 @@ export default function forumRouter(redis: Redis | null, cpuCores: number) {
         return res.status(403).json({ error: 'You can only edit your own posts' })
       }
 
+      // Validate upload_type if provided
+      let validUploadType = null
+      if (upload_type) {
+        const validUploadTypes = ['text', 'image', 'video', 'link', 'poll']
+        if (validUploadTypes.includes(upload_type)) {
+          validUploadType = upload_type
+        }
+      }
+
       const updateQuery = `
         UPDATE forum.posts
         SET title = COALESCE($1, title),
             content = COALESCE($2, content),
             flair = COALESCE($3, flair),
+            upload_type = COALESCE($4, upload_type),
             updated_at = now()
-        WHERE id = $4
-        RETURNING id, user_id, title, content, flair, upvotes, downvotes,
+        WHERE id = $5
+        RETURNING id, user_id, title, content, flair, upload_type, upvotes, downvotes,
                   comment_count, is_pinned, is_locked, created_at, updated_at
       `
-      const { rows } = await pool.query(updateQuery, [title, content, flair, postId])
+      const { rows } = await pool.query(updateQuery, [title, content, flair, validUploadType, postId])
 
       res.json(rows[0])
     } catch (err) {
@@ -494,7 +582,81 @@ export default function forumRouter(redis: Redis | null, cpuCores: number) {
       })
     } catch (err) {
       console.error('[social] Error voting on comment:', err)
-      res.status(500).json({ error: 'Failed to vote on comment' })
+      res.status(500).json({ error: 'Failed to vote on comment'       })
+    }
+  })
+
+
+  // POST /forum/comments/:commentId/attachments - Add attachment to comment (MUST be before /comments/:commentId)
+  router.post('/comments/:commentId/attachments', async (req: AuthedRequest, res: Response) => {
+    const { commentId } = req.params
+    const userId = req.userId
+    const { file_url, file_path, thumbnail_url, file_name, file_size, mime_type, file_type, width, height, duration, display_order } = req.body
+
+    if (!file_url || !file_type) {
+      return res.status(400).json({ error: 'file_url and file_type required' })
+    }
+
+    // Validate file_type
+    if (!['image', 'video', 'audio', 'document', 'other'].includes(file_type)) {
+      return res.status(400).json({ error: 'file_type must be one of: image, video, audio, document, other' })
+    }
+
+    try {
+      // Verify user owns the comment
+      const commentCheck = await pool.query(
+        'SELECT user_id FROM forum.comments WHERE id = $1',
+        [commentId]
+      )
+      if (commentCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Comment not found' })
+      }
+      if (commentCheck.rows[0].user_id !== userId) {
+        return res.status(403).json({ error: 'You can only add attachments to your own comments' })
+      }
+
+      // Insert attachment
+      const insertQuery = `
+        INSERT INTO forum.comment_attachments (
+          comment_id, file_url, file_path, thumbnail_url, file_name, file_size,
+          mime_type, file_type, width, height, duration, display_order
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        RETURNING id, comment_id, file_url, file_path, thumbnail_url, file_name,
+                  file_size, mime_type, file_type, width, height, duration,
+                  display_order, created_at
+      `
+      const { rows } = await pool.query(insertQuery, [
+        commentId, file_url, file_path || null, thumbnail_url || null,
+        file_name || null, file_size || null, mime_type || null, file_type,
+        width || null, height || null, duration || null, display_order || 0
+      ])
+
+      res.status(201).json(rows[0])
+    } catch (err: any) {
+      console.error('[social] Error adding comment attachment:', err)
+      res.status(500).json({ error: 'Failed to add attachment' })
+    }
+  })
+
+  // GET /forum/comments/:commentId/attachments - Get attachments for comment
+  router.get('/comments/:commentId/attachments', async (req: Request, res: Response) => {
+    const { commentId } = req.params
+
+    try {
+      const query = `
+        SELECT id, comment_id, file_url, file_path, thumbnail_url, file_name,
+               file_size, mime_type, file_type, width, height, duration,
+               display_order, created_at
+        FROM forum.comment_attachments
+        WHERE comment_id = $1
+        ORDER BY display_order ASC, created_at ASC
+      `
+      const { rows } = await pool.query(query, [commentId])
+
+      res.json({ attachments: rows })
+    } catch (err) {
+      console.error('[social] Error fetching comment attachments:', err)
+      res.status(500).json({ error: 'Failed to fetch attachments' })
     }
   })
 

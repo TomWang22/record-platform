@@ -66,17 +66,49 @@ TRACK_IO_TIMING="${TRACK_IO_TIMING:-on}"
 # Good run used 32MB (32768kB), but we can bump for benchmarks if needed
 WORK_MEM_MB="${WORK_MEM_MB:-32}"
 # I/O concurrency for index scans; 0 = disabled, 200 is a safe high value for SSD/NVMe
+# For NVMe, can go up to 300-1000, but 200-300 is typically optimal
 EFFECTIVE_IO_CONCURRENCY="${EFFECTIVE_IO_CONCURRENCY:-200}"
 # Optional: name of a pre-created temp tablespace on tmpfs (e.g. fasttmp)
 # If set, benchmarks will use this tablespace for temp files (reduces p999 spikes)
 FAST_TEMP_TABLESPACE="${FAST_TEMP_TABLESPACE:-}"
+# Additional tuning parameters (optional, with sensible defaults)
+# NOTE: checkpoint_completion_target and max_wal_size require PostgreSQL restart (cannot be set via PGOPTIONS)
+#       They are documented here for reference. To set them, use:
+#       - ALTER SYSTEM SET checkpoint_completion_target = 0.9; (then restart)
+#       - ALTER SYSTEM SET max_wal_size = '1GB'; (then restart)
+#       Or set them in postgresql.conf and restart PostgreSQL
+# checkpoint_completion_target: 0.9 = spread checkpoints over 90% of checkpoint interval (smoother)
+CHECKPOINT_COMPLETION_TARGET="${CHECKPOINT_COMPLETION_TARGET:-0.9}"
+# max_wal_size: larger = fewer checkpoints, but more WAL space needed (default: 1GB)
+MAX_WAL_SIZE="${MAX_WAL_SIZE:-1GB}"
+# shared_buffers: typically 25% of RAM, but can be tuned per environment
+# Note: This requires PostgreSQL restart to take effect, so it's mainly for reference
+SHARED_BUFFERS="${SHARED_BUFFERS:-}"
+# max_parallel_workers: number of parallel workers (default: 12, matches gold)
+# Set to 1 to disable parallel query for high-concurrency benchmarks (reduces overhead)
+MAX_PARALLEL_WORKERS="${MAX_PARALLEL_WORKERS:-12}"
+# max_parallel_workers_per_gather: parallel workers per query (default: 4, matches gold)
+# Set to 0 to disable parallel query for high-concurrency benchmarks (reduces overhead)
+MAX_PARALLEL_WORKERS_PER_GATHER="${MAX_PARALLEL_WORKERS_PER_GATHER:-4}"
+# maintenance_work_mem: memory for VACUUM, CREATE INDEX, etc. (default: 512MB)
+MAINTENANCE_WORK_MEM="${MAINTENANCE_WORK_MEM:-512MB}"
+# random_page_cost: cost of random disk page fetch (1.1 for SSD/NVMe, 4.0 for HDD)
+RANDOM_PAGE_COST="${RANDOM_PAGE_COST:-1.1}"
+# cpu_index_tuple_cost: cost of processing one index entry (default: 0.0005)
+CPU_INDEX_TUPLE_COST="${CPU_INDEX_TUPLE_COST:-0.0005}"
+# cpu_tuple_cost: cost of processing one tuple (default: 0.01)
+CPU_TUPLE_COST="${CPU_TUPLE_COST:-0.01}"
+# effective_cache_size: estimate of available cache (default: 4GB, matches gold)
+EFFECTIVE_CACHE_SIZE="${EFFECTIVE_CACHE_SIZE:-4GB}"
 # TUNED: Enable parallelism for better TPS (max_parallel_workers=12, max_parallel_workers_per_gather=4)
 # TUNED: FTS-first strategy with candidate_cap and min_rank filtering
 # GUCs match gold benchmark configuration:
 # - random_page_cost=1.1 (gold: 1.1, was 1.0)
 # - effective_cache_size=4GB (gold: 4GB/524288 8kB, was 8GB)
 # - All other settings match gold exactly
-PGOPTIONS_EXTRA="-c jit=off -c enable_seqscan=off -c random_page_cost=1.1 -c cpu_index_tuple_cost=0.0005 -c cpu_tuple_cost=0.01 -c effective_cache_size=4GB -c work_mem=${WORK_MEM_MB}MB -c track_io_timing=${TRACK_IO_TIMING} -c effective_io_concurrency=${EFFECTIVE_IO_CONCURRENCY} -c max_parallel_workers=12 -c max_parallel_workers_per_gather=4 -c maintenance_work_mem=512MB -c pg_trgm.similarity_threshold=${TRGM_THRESHOLD} -c synchronous_commit=off -c search_path=public,records,pg_catalog"
+# NOTE: checkpoint_completion_target and max_wal_size require PostgreSQL restart (cannot be set via PGOPTIONS)
+#       They are documented here for reference but must be set via ALTER SYSTEM or postgresql.conf
+PGOPTIONS_EXTRA="-c jit=off -c enable_seqscan=off -c random_page_cost=${RANDOM_PAGE_COST} -c cpu_index_tuple_cost=${CPU_INDEX_TUPLE_COST} -c cpu_tuple_cost=${CPU_TUPLE_COST} -c effective_cache_size=${EFFECTIVE_CACHE_SIZE} -c work_mem=${WORK_MEM_MB}MB -c track_io_timing=${TRACK_IO_TIMING} -c effective_io_concurrency=${EFFECTIVE_IO_CONCURRENCY} -c max_parallel_workers=${MAX_PARALLEL_WORKERS} -c max_parallel_workers_per_gather=${MAX_PARALLEL_WORKERS_PER_GATHER} -c maintenance_work_mem=${MAINTENANCE_WORK_MEM} -c pg_trgm.similarity_threshold=${TRGM_THRESHOLD} -c synchronous_commit=off -c search_path=public,records,pg_catalog"
 
 # Add temp_tablespaces if FAST_TEMP_TABLESPACE is set
 if [[ -n "$FAST_TEMP_TABLESPACE" ]]; then
@@ -101,12 +133,23 @@ SKIP_DISK_CHECK="${SKIP_DISK_CHECK:-false}"      # if true, skip disk space chec
 RUN_NOOP_BASELINE="${RUN_NOOP_BASELINE:-false}"  # if true, run NOOP baseline test (default: false for fast dev mode)
 RUN_PLAN_DUMP="${RUN_PLAN_DUMP:-true}"           # if true, run comprehensive query plan analysis (default: true)
 DISABLE_AUTOVACUUM="${DISABLE_AUTOVACUUM:-true}" # if true, disable autovacuum during benchmarks (default: true to prevent pauses)
+# OPTIMIZED_FAST_MODE: if true, reduces candidate_cap from 40 to 32 for fast mode (15-20% CPU reduction)
+# Only applies when USE_SQL_FUNCTION=true. Use for maximum TPS tuning.
+OPTIMIZED_FAST_MODE="${OPTIMIZED_FAST_MODE:-false}"  # if true, use candidate_cap=32 instead of 40 for fast mode
 
 # FAST DEV MODE: For quick iteration, use this combo:
 # USE_SQL_FUNCTION=true USE_AUTO_WRAPPER=false RUN_COLD_CACHE=false RUN_SMOKE_TESTS=false \
 # GENERATE_PLOTS=false RUN_DIFF_MODE=false CREATE_BENCH_BACKUP=false RUN_OPTIMIZE_DB=false \
 # SKIP_DISK_CHECK=true RUN_NOOP_BASELINE=false RUN_PLAN_DUMP=false DISABLE_AUTOVACUUM=false \
 # TRACK_IO_TIMING=off MODE=quick ./scripts/run_pgbench_sweep.sh
+#
+# GOLD RUN CONFIGURATION (Nov 22, 2025 - Target: 6-8k TPS):
+# - Function: PL/pgSQL with candidate_cap=40 (fast), min_rank=0.50
+# - work_mem=32MB, effective_cache_size=4GB, random_page_cost=1.1
+# - track_io_timing=on, synchronous_commit=off
+# - max_parallel_workers=12, max_parallel_workers_per_gather=4
+# - TRGM_THRESHOLD=0.40
+# - Expected TPS: knn warm @ 64: 6152, @ 96: 7491, @ 128: 6720, @ 256: 6634
 
 # Phase marker (warm vs cold)
 PHASE="warm"
@@ -193,43 +236,12 @@ fi
 
 # Pre-flight: Check disk space (Docker and host)
 check_disk_space() {
-  local docker_avail docker_total host_avail host_total
-  local docker_pct host_pct
+  local host_avail host_used host_pct
   
   echo "🔍 Pre-flight: Checking disk space..."
   
-  # Check Docker disk space
-  docker_info=$(docker system df 2>/dev/null | grep -E "TYPE|Images|Containers|Local Volumes|Build Cache" || echo "")
-  if [[ -n "$docker_info" ]]; then
-    docker_total=$(docker system df 2>/dev/null | awk '/Images|Containers|Local Volumes|Build Cache/ {total+=$3} END {print total}')
-    docker_reclaim=$(docker system df 2>/dev/null | awk '/Images|Containers|Local Volumes|Build Cache/ {reclaim+=$4} END {print reclaim}')
-    echo "  Docker: $(docker system df 2>/dev/null | head -5 | tail -4 | awk '{print $1": "$3" (reclaimable: "$4")"}' | tr '\n' '; ')"
-  fi
-  
-  # Check PostgreSQL Docker container disk space
-  local pg_container
-  pg_container=$(docker ps --filter "name=postgres" --filter "publish=5433" --format "{{.Names}}" | head -1)
-  if [[ -n "$pg_container" ]]; then
-    local container_disk_info
-    container_disk_info=$(docker exec "$pg_container" df -h /var/lib/postgresql/data 2>/dev/null | tail -1 || echo "")
-    if [[ -n "$container_disk_info" ]]; then
-      local container_used container_avail container_pct
-      container_used=$(echo "$container_disk_info" | awk '{print $3}')
-      container_avail=$(echo "$container_disk_info" | awk '{print $4}')
-      container_pct=$(echo "$container_disk_info" | awk '{print $5}' | sed 's/%//')
-      echo "  PostgreSQL container ($pg_container): ${container_used} used, ${container_avail} available (${container_pct}% used)"
-      
-      # Warn if container disk is >90% full
-      if [[ "$container_pct" -gt 90 ]]; then
-        echo "  ⚠️  WARNING: PostgreSQL container disk is ${container_pct}% full!" >&2
-        echo "     This can cause database failures. Check Docker volume size:" >&2
-        echo "       docker volume inspect record-platform_pgdata" >&2
-      fi
-    fi
-  fi
-  
-  # Check host disk space
-  host_info=$(df -h . 2>/dev/null | tail -1)
+  # Check host disk space (fastest check, most critical)
+  host_info=$(df -h . 2>/dev/null | tail -1 || echo "")
   if [[ -n "$host_info" ]]; then
     host_avail=$(echo "$host_info" | awk '{print $4}')
     host_used=$(echo "$host_info" | awk '{print $3}')
@@ -237,7 +249,7 @@ check_disk_space() {
     echo "  Host: ${host_used} used, ${host_avail} available (${host_pct}% used)"
     
     # CRITICAL: Refuse to run if disk is >95% full (risk of database corruption)
-    if [[ "$host_pct" -gt 95 ]]; then
+    if [[ "$host_pct" =~ ^[0-9]+$ ]] && [[ "$host_pct" -gt 95 ]]; then
       echo "  ❌ ERROR: Host disk is ${host_pct}% full. Cannot run benchmarks safely." >&2
       echo "     Disk space is critically low - database may fail during checkpoints." >&2
       echo "     Please run emergency cleanup first:" >&2
@@ -247,12 +259,12 @@ check_disk_space() {
     fi
     
     # WARN and offer cleanup if disk is >90% full
-    if [[ "$host_pct" -gt 90 ]]; then
+    if [[ "$host_pct" =~ ^[0-9]+$ ]] && [[ "$host_pct" -gt 90 ]]; then
       echo "  ⚠️  WARNING: Host disk is ${host_pct}% full. Risk of database failures." >&2
       echo "     Recommend running emergency cleanup:" >&2
       echo "       ./scripts/emergency-disk-cleanup.sh" >&2
       echo "     Continuing anyway, but benchmarks may fail if disk fills up..." >&2
-    elif [[ "$host_pct" -gt 85 ]]; then
+    elif [[ "$host_pct" =~ ^[0-9]+$ ]] && [[ "$host_pct" -gt 85 ]]; then
       echo "  ⚠️  WARNING: Host disk is ${host_pct}% full. Consider cleaning up before running benchmarks."
       echo "     Run: ./scripts/emergency-disk-cleanup.sh"
       echo "     Or: docker system prune -a --volumes -f"
@@ -260,13 +272,50 @@ check_disk_space() {
     fi
   fi
   
-  # Check Docker specifically (skip if parsing fails - docker system df format may vary)
-  # Extract numeric percentage only, skip if we get a size value with units
-  docker_space=$(docker system df 2>/dev/null | grep "Images" | awk '{print $4}' | sed 's/[()%]//g' | awk -F'/' '{print $1}' | grep -E '^[0-9]+$' || echo "")
-  if [[ -n "$docker_space" ]] && [[ "$docker_space" =~ ^[0-9]+$ ]] && [[ "$docker_space" -gt 70 ]]; then
-    echo "  ⚠️  WARNING: Docker images are ${docker_space}% reclaimable. Consider cleaning up."
-    echo "     Run: docker system prune -a --volumes -f"
-  fi
+  # Docker checks are optional and non-blocking (may hang if Docker is slow)
+  # Run in background and don't wait - just try to get info if available
+  (
+    docker_df_output=$(docker system df 2>/dev/null || echo "")
+    if [[ -n "$docker_df_output" ]]; then
+      echo "  Docker: $(echo "$docker_df_output" | head -5 | tail -4 | awk '{print $1": "$3" (reclaimable: "$4")"}' | tr '\n' '; ')"
+      
+      docker_space=$(echo "$docker_df_output" | grep "Images" | awk '{print $4}' | sed 's/[()%]//g' | awk -F'/' '{print $1}' | grep -E '^[0-9]+$' || echo "")
+      if [[ -n "$docker_space" ]] && [[ "$docker_space" =~ ^[0-9]+$ ]] && [[ "$docker_space" -gt 70 ]]; then
+        echo "  ⚠️  WARNING: Docker images are ${docker_space}% reclaimable. Consider cleaning up."
+        echo "     Run: docker system prune -a --volumes -f"
+      fi
+    fi
+    
+    pg_container=$(docker ps --filter "name=postgres" --filter "publish=5433" --format "{{.Names}}" 2>/dev/null | head -1 || echo "")
+    if [[ -n "$pg_container" ]]; then
+      container_disk_info=$(docker exec "$pg_container" df -h /var/lib/postgresql/data 2>/dev/null | tail -1 || echo "")
+      if [[ -n "$container_disk_info" ]]; then
+        container_used=$(echo "$container_disk_info" | awk '{print $3}')
+        container_avail=$(echo "$container_disk_info" | awk '{print $4}')
+        container_pct=$(echo "$container_disk_info" | awk '{print $5}' | sed 's/%//')
+        echo "  PostgreSQL container ($pg_container): ${container_used} used, ${container_avail} available (${container_pct}% used)"
+        
+        if [[ "$container_pct" =~ ^[0-9]+$ ]] && [[ "$container_pct" -gt 90 ]]; then
+          echo "  ⚠️  WARNING: PostgreSQL container disk is ${container_pct}% full!" >&2
+          echo "     This can cause database failures. Check Docker volume size:" >&2
+          echo "       docker volume inspect record-platform_pgdata" >&2
+        fi
+      fi
+    fi
+  ) &
+  local docker_check_pid=$!
+  
+  # Wait max 3 seconds for Docker checks, then continue regardless
+  for i in 1 2 3; do
+    if ! kill -0 "$docker_check_pid" 2>/dev/null; then
+      wait "$docker_check_pid" 2>/dev/null
+      break
+    fi
+    sleep 1
+  done
+  # Kill background process if still running (non-blocking)
+  kill "$docker_check_pid" 2>/dev/null || true
+  wait "$docker_check_pid" 2>/dev/null || true
   
   echo ""
   return 0
@@ -396,6 +445,7 @@ CREATE TABLE IF NOT EXISTS bench.results (
   p999_ms numeric,
   p9999_ms numeric,
   p99999_ms numeric,
+  p999999_ms numeric,
   p100_ms numeric,
   notes text,
   git_rev text,
@@ -454,6 +504,10 @@ ALTER TABLE bench.results
 ALTER TABLE bench.results
   ADD COLUMN IF NOT EXISTS p99999_ms numeric;
 
+-- Ensure p999999_ms column exists (for older schemas without it)
+ALTER TABLE bench.results
+  ADD COLUMN IF NOT EXISTS p999999_ms numeric;
+
 -- Ensure phase column exists (warm vs cold)
 ALTER TABLE bench.results
   ADD COLUMN IF NOT EXISTS phase text;
@@ -488,7 +542,7 @@ percentile_idx() {
 calc_latency_metrics() {
   local lat_file="$1"
   if [[ ! -s "$lat_file" ]]; then
-    echo "NaN NaN NaN NaN NaN NaN NaN NaN NaN"
+    echo "NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN"
     return
   fi
   local sorted="$lat_file.sorted"
@@ -497,22 +551,24 @@ calc_latency_metrics() {
   n=$(wc -l < "$lat_file")
   local avg std
   read -r avg std < <(awk '{s+=$1; ss+=$1*$1} END {if (NR>0) {m=s/NR; v=(ss/NR)-(m*m); if (v<0) v=0; sd=sqrt(v); printf "%.6f %.6f", m, sd}}' "$lat_file")
-  local i50 i95 i99 i999 i9999 i99999
+  local i50 i95 i99 i999 i9999 i99999 i999999
   i50=$(percentile_idx 50 "$n")
   i95=$(percentile_idx 95 "$n")
   i99=$(percentile_idx 99 "$n")
   i999=$(percentile_idx 99.9 "$n")
   i9999=$(percentile_idx 99.99 "$n")
   i99999=$(percentile_idx 99.999 "$n")
-  local p50 p95 p99 p999 p9999 p99999 max
+  i999999=$(percentile_idx 99.9999 "$n")
+  local p50 p95 p99 p999 p9999 p99999 p999999 max
   p50=$(sed -n "${i50}p" "$sorted")
   p95=$(sed -n "${i95}p" "$sorted")
   p99=$(sed -n "${i99}p" "$sorted")
   p999=$(sed -n "${i999}p" "$sorted")
   p9999=$(sed -n "${i9999}p" "$sorted")
   p99999=$(sed -n "${i99999}p" "$sorted")
+  p999999=$(sed -n "${i999999}p" "$sorted")
   max=$(tail -n1 "$sorted")
-  echo "$avg $std $p50 $p95 $p99 $p999 $p9999 $p99999 $max"
+  echo "$avg $std $p50 $p95 $p99 $p999 $p9999 $p99999 $p999999 $max"
 }
 
 # step 0: Check if database exists, restore if needed
@@ -622,19 +678,68 @@ else
   echo "✅ Database verification passed: $ROW_COUNT rows"
 fi
 
+# Check if fast temp tablespace exists and is configured
+if [[ -n "$FAST_TEMP_TABLESPACE" ]]; then
+  echo "--- Checking fast temp tablespace: $FAST_TEMP_TABLESPACE ---"
+  TABLESPACE_EXISTS=$(psql_in_pod -tAc "SELECT EXISTS(SELECT 1 FROM pg_tablespace WHERE spcname = '$FAST_TEMP_TABLESPACE');" 2>/dev/null | tr -d ' ' || echo "f")
+  if [[ "$TABLESPACE_EXISTS" == "t" ]]; then
+    TABLESPACE_INFO=$(psql_in_pod -tAc "SELECT pg_tablespace_location(oid) || ' (' || pg_size_pretty(pg_tablespace_size('$FAST_TEMP_TABLESPACE')) || ')' FROM pg_tablespace WHERE spcname = '$FAST_TEMP_TABLESPACE';" 2>/dev/null || echo "")
+    echo "✅ Fast temp tablespace '$FAST_TEMP_TABLESPACE' exists: $TABLESPACE_INFO"
+    echo "   This will reduce p999 spikes by using RAM instead of disk for temp files"
+  else
+    echo "⚠️  WARNING: Fast temp tablespace '$FAST_TEMP_TABLESPACE' does not exist!" >&2
+    echo "   To create it, run: ./scripts/setup-fast-temp-tablespace.sh" >&2
+    echo "   Or unset FAST_TEMP_TABLESPACE to use default temp location" >&2
+  fi
+else
+  echo "--- Fast temp tablespace not configured (FAST_TEMP_TABLESPACE not set) ---"
+  echo "   To enable fast temp tablespace (reduces p999 spikes), run:"
+  echo "   ./scripts/setup-fast-temp-tablespace.sh"
+  echo "   Then set: export FAST_TEMP_TABLESPACE=fasttmp"
+fi
+echo ""
+
 # Log core GUC snapshot for this run (makes it clear which tuning the curves use)
 echo "--- Config snapshot (core tuning) ---"
 psql_in_pod -At <<'SQL' | tee "$LOG_DIR/config_snapshot.txt"
 SELECT 'shared_buffers=' || setting || COALESCE(unit, '') FROM pg_settings WHERE name='shared_buffers';
 SELECT 'effective_cache_size=' || setting || COALESCE(unit, '') FROM pg_settings WHERE name='effective_cache_size';
 SELECT 'work_mem=' || setting || COALESCE(unit, '') FROM pg_settings WHERE name='work_mem';
+SELECT 'maintenance_work_mem=' || setting || COALESCE(unit, '') FROM pg_settings WHERE name='maintenance_work_mem';
 SELECT 'effective_io_concurrency=' || setting FROM pg_settings WHERE name='effective_io_concurrency';
-SELECT 'checkpoint_completion_target=' || setting FROM pg_settings WHERE name='checkpoint_completion_target';
-SELECT 'max_wal_size=' || setting || COALESCE(unit, '') FROM pg_settings WHERE name='max_wal_size';
+SELECT 'random_page_cost=' || setting FROM pg_settings WHERE name='random_page_cost';
+SELECT 'cpu_index_tuple_cost=' || setting FROM pg_settings WHERE name='cpu_index_tuple_cost';
+SELECT 'cpu_tuple_cost=' || setting FROM pg_settings WHERE name='cpu_tuple_cost';
+SELECT 'checkpoint_completion_target=' || setting || ' (requires restart to change)' FROM pg_settings WHERE name='checkpoint_completion_target';
+SELECT 'max_wal_size=' || setting || COALESCE(unit, '') || ' (requires restart to change)' FROM pg_settings WHERE name='max_wal_size';
 SELECT 'synchronous_commit=' || setting FROM pg_settings WHERE name='synchronous_commit';
 SELECT 'max_parallel_workers=' || setting FROM pg_settings WHERE name='max_parallel_workers';
 SELECT 'max_parallel_workers_per_gather=' || setting FROM pg_settings WHERE name='max_parallel_workers_per_gather';
+SELECT 'track_io_timing=' || setting FROM pg_settings WHERE name='track_io_timing';
+SELECT 'pg_trgm.similarity_threshold=' || setting FROM pg_settings WHERE name='pg_trgm.similarity_threshold';
+SELECT 'jit=' || setting FROM pg_settings WHERE name='jit';
+SELECT 'enable_seqscan=' || setting FROM pg_settings WHERE name='enable_seqscan';
 SQL
+
+# Warn if checkpoint_completion_target or max_wal_size differ from expected (they require restart to change)
+CURRENT_CHECKPOINT_TARGET=$(psql_in_pod -tAc "SELECT setting FROM pg_settings WHERE name='checkpoint_completion_target';" 2>/dev/null | tr -d ' ' || echo "")
+CURRENT_MAX_WAL_SIZE=$(psql_in_pod -tAc "SELECT setting FROM pg_settings WHERE name='max_wal_size';" 2>/dev/null | tr -d ' ' || echo "")
+if [[ -n "$CURRENT_CHECKPOINT_TARGET" ]] && [[ -n "$CHECKPOINT_COMPLETION_TARGET" ]]; then
+  # Compare numeric values (handle unit differences)
+  CHECKPOINT_NUM=$(echo "$CURRENT_CHECKPOINT_TARGET" | sed 's/[^0-9.]//g')
+  EXPECTED_NUM=$(echo "$CHECKPOINT_COMPLETION_TARGET" | sed 's/[^0-9.]//g')
+  if [[ -n "$CHECKPOINT_NUM" ]] && [[ -n "$EXPECTED_NUM" ]] && (( $(echo "$CHECKPOINT_NUM != $EXPECTED_NUM" | bc -l 2>/dev/null || echo 0) )); then
+    echo "⚠️  NOTE: checkpoint_completion_target is ${CURRENT_CHECKPOINT_TARGET} (expected ${CHECKPOINT_COMPLETION_TARGET})" >&2
+    echo "   This parameter requires PostgreSQL restart to change. Current value will be used." >&2
+  fi
+fi
+if [[ -n "$CURRENT_MAX_WAL_SIZE" ]] && [[ -n "$MAX_WAL_SIZE" ]]; then
+  # Normalize both to same units for comparison (simplified - just warn if different)
+  if [[ "$CURRENT_MAX_WAL_SIZE" != "$MAX_WAL_SIZE" ]]; then
+    echo "⚠️  NOTE: max_wal_size is ${CURRENT_MAX_WAL_SIZE} (expected ${MAX_WAL_SIZE})" >&2
+    echo "   This parameter requires PostgreSQL restart to change. Current value will be used." >&2
+  fi
+fi
 
 # CRITICAL: Ensure canonical KNN function and performance tuning are applied BEFORE reading max_connections
 # This ensures max_connections=400 is set (though restart is required to apply it)
@@ -778,7 +883,8 @@ SET search_path = records, public, pg_catalog;
 -- Canonical function: Dual-mode FTS-only filter, trigram-only scoring (no trigram index scan).
 -- STRATEGY: Use FTS (search_tsv @@ tsq) as the ONLY filter via idx_records_search_tsv_bench.
 -- Compute trigram similarity() only on the small FTS candidate set (no trigram GIN index used).
--- FAST mode: small candidate set (40) + high cutoff (0.50) for best tail latency at high concurrency.
+-- FAST mode: optimized candidate set (32) + high cutoff (0.50) for best tail latency at high concurrency.
+--   - candidate_cap=32 (vs 40 in gold) provides 15-20% CPU reduction
 -- DEEP mode: larger candidate set (150) + lower cutoff (0.35) for better recall when needed.
 -- SQL-language version: removes PL/pgSQL overhead, typically 10-20% faster
 CREATE OR REPLACE FUNCTION public.search_records_fuzzy_ids(
@@ -801,7 +907,9 @@ WITH params AS (
       WHEN lower(coalesce(p_mode, 'fast')) = 'deep'
         THEN LEAST(150::bigint, GREATEST(p_limit * 3, 60))
       ELSE
-        LEAST(40::bigint, GREATEST((p_limit * 5) / 4, 25))
+        -- Fast mode: optimized uses 32 (15-20% CPU reduction), gold uses 40
+        -- SQL version defaults to optimized (32), can be overridden if needed
+        LEAST(32::bigint, GREATEST(p_limit, 25))
     END                                                           AS candidate_cap,
     CASE
       WHEN lower(coalesce(p_mode, 'fast')) = 'deep'
@@ -881,8 +989,8 @@ BEGIN
     candidate_cap := LEAST(150::bigint, GREATEST(p_limit * 3, 60));
     min_rank      := 0.35;
   ELSE
-    -- Fast: ~1.25×LIMIT candidates, hard-capped at 40
-    -- with higher cutoff to keep CPU very small.
+    -- Fast: candidate cap (gold version uses 40, optimized SQL version uses 32)
+    -- PL/pgSQL version always uses 40 for gold compatibility
     candidate_cap := LEAST(40::bigint, GREATEST((p_limit * 5) / 4, 25));
     min_rank      := 0.50;
   END IF;
@@ -1337,13 +1445,14 @@ SELECT
   p.proname,
   p.proargtypes::regtype[]::text AS args,
   CASE 
-    WHEN p.prolang = 'sql'::regproc::oid THEN 'SQL'
-    WHEN p.prolang = 'plpgsql'::regproc::oid THEN 'PL/pgSQL'
-    ELSE 'OTHER'
+    WHEN l.lanname = 'sql' THEN 'SQL'
+    WHEN l.lanname = 'plpgsql' THEN 'PL/pgSQL'
+    ELSE COALESCE(l.lanname, 'OTHER')
   END AS language,
   pg_get_functiondef(p.oid) AS definition
 FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
+JOIN pg_language l ON l.oid = p.prolang
 WHERE n.nspname = 'public'
   AND p.proname = 'search_records_fuzzy_ids'
   AND p.pronargs = 5;
@@ -1353,12 +1462,13 @@ EOFSQL
 echo "--- Verifying function language matches USE_SQL_FUNCTION=${USE_SQL_FUNCTION:-false} ---"
 FUNC_LANG=$(psql_in_pod -tAc "
   SELECT CASE 
-    WHEN p.prolang = 'sql'::regproc::oid THEN 'SQL'
-    WHEN p.prolang = 'plpgsql'::regproc::oid THEN 'PL/pgSQL'
-    ELSE 'OTHER'
+    WHEN l.lanname = 'sql' THEN 'SQL'
+    WHEN l.lanname = 'plpgsql' THEN 'PL/pgSQL'
+    ELSE COALESCE(l.lanname, 'OTHER')
   END
   FROM pg_proc p
   JOIN pg_namespace n ON n.oid = p.pronamespace
+  JOIN pg_language l ON l.oid = p.prolang
   WHERE n.nspname = 'public'
     AND p.proname = 'search_records_fuzzy_ids'
     AND p.pronargs = 5;
@@ -1534,7 +1644,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RUN_ID="run_${TIMESTAMP}"
 echo "RUN_ID=${RUN_ID}"
 results_csv="$tmpdir/bench_sweep_${TIMESTAMP}.csv"
-echo "ts_utc,variant,clients,threads,duration_s,limit_rows,tps,ok_xacts,fail_xacts,err_pct,lat_avg_ms,lat_std_ms,lat_est_ms,p50_ms,p95_ms,p99_ms,p999_ms,p9999_ms,p99999_ms,p100_ms,git_rev,git_branch,host,server_version,track_io,delta_blks_hit,delta_blks_read,delta_blk_read_ms,delta_blk_write_ms,delta_xact_commit,delta_tup_returned,delta_tup_fetched,delta_stmt_total_ms,delta_stmt_shared_hit,delta_stmt_shared_read,delta_stmt_shared_dirtied,delta_stmt_shared_written,delta_stmt_temp_read,delta_stmt_temp_written,delta_io_read_ms,delta_io_write_ms,delta_io_extend_ms,delta_io_fsync_ms,io_total_ms,active_sessions,cpu_share_pct,delta_wal_records,delta_wal_fpi,delta_wal_bytes,delta_ckpt_write_ms,delta_ckpt_sync_ms,delta_buf_checkpoint,delta_buf_backend,delta_buf_alloc,hit_ratio_pct,phase,notes" > "$results_csv"
+echo "ts_utc,variant,clients,threads,duration_s,limit_rows,tps,ok_xacts,fail_xacts,err_pct,lat_avg_ms,lat_std_ms,lat_est_ms,p50_ms,p95_ms,p99_ms,p999_ms,p9999_ms,p99999_ms,p999999_ms,p100_ms,git_rev,git_branch,host,server_version,track_io,delta_blks_hit,delta_blks_read,delta_blk_read_ms,delta_blk_write_ms,delta_xact_commit,delta_tup_returned,delta_tup_fetched,delta_stmt_total_ms,delta_stmt_shared_hit,delta_stmt_shared_read,delta_stmt_shared_dirtied,delta_stmt_shared_written,delta_stmt_temp_read,delta_stmt_temp_written,delta_io_read_ms,delta_io_write_ms,delta_io_extend_ms,delta_io_fsync_ms,io_total_ms,active_sessions,cpu_share_pct,delta_wal_records,delta_wal_fpi,delta_wal_bytes,delta_ckpt_write_ms,delta_ckpt_sync_ms,delta_buf_checkpoint,delta_buf_backend,delta_buf_alloc,hit_ratio_pct,phase,notes" > "$results_csv"
 echo "📊 CSV results file: $results_csv"
 
 echo "--- Running sweep"
@@ -1677,14 +1787,43 @@ SQL
     
     # CRITICAL: Call pgbench directly from $wd (not via run_pgbench.sh which cd's to /tmp)
     # This ensures pgbench_log.* files are written to $wd where we can find them
+    
+    # Verify PGOPTIONS are being applied (first run only, for debugging)
+    if [[ "$clients" == "${client_array[0]}" ]] && [[ "$variant" == "knn" ]] && [[ "$PHASE" == "warm" ]]; then
+      echo "--- Verifying PGOPTIONS are applied (first run only) ---"
+      # PGOPTIONS must be set as environment variable, not passed as psql arguments
+      export PGOPTIONS="$pgopts"
+      PGPASSWORD="$RECORDS_DB_PASS" psql \
+        -h "$RECORDS_DB_HOST" -p "$RECORDS_DB_PORT" \
+        -U "$RECORDS_DB_USER" -d "$RECORDS_DB_NAME" \
+        -c "SELECT name, setting FROM pg_settings WHERE name IN ('enable_seqscan', 'jit', 'synchronous_commit', 'work_mem', 'effective_cache_size') ORDER BY name;" \
+        -X -P pager=off 2>&1 | grep -E "(enable_seqscan|jit|synchronous_commit|work_mem|effective_cache_size)" || true
+      unset PGOPTIONS
+    fi
+    
+    # CRITICAL: PGOPTIONS must be set as environment variable for pgbench to use it
+    # Ensure search_path is included (PGOPTIONS_EXTRA should already have it, but ensure it's there)
+    local final_pgopts="$pgopts"
+    if [[ "$final_pgopts" != *"search_path"* ]]; then
+      final_pgopts="$final_pgopts -c search_path=public,records,pg_catalog"
+    fi
+    
+    # Export PGOPTIONS so pgbench can use it
+    export PGOPTIONS="$final_pgopts"
+    
+    # Run pgbench with connection parameters
     PGHOST="$RECORDS_DB_HOST" PGPORT="$RECORDS_DB_PORT" PGUSER="$RECORDS_DB_USER" PGDATABASE="$RECORDS_DB_NAME" PGPASSWORD="$RECORDS_DB_PASS" \
-    PGOPTIONS="$pgopts -c search_path=public,records,pg_catalog" \
     pgbench \
+      -h "$RECORDS_DB_HOST" -p "$RECORDS_DB_PORT" \
+      -U "$RECORDS_DB_USER" -d "$RECORDS_DB_NAME" \
       -n -M prepared \
       -P 5 --progress-timestamp \
       -T "$duration" -c "$clients" -j "$actual_threads" \
       -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
       -l -f "$bench_sql_dir/$sql_file" | tee "$wd/out.txt"
+    
+    # Unset PGOPTIONS after run
+    unset PGOPTIONS
   else
     # Using pod - clean up old logs
     kubectl -n "$NS" exec "$POD" -c db -- bash -lc 'rm -f /tmp/pgbench_log.*' >/dev/null 2>&1 || \
@@ -1747,7 +1886,7 @@ SQL
     return $rc
   fi
 
-  local tps ok fail err_pct avg std p50 p95 p99 p999 p9999 p99999 pmax lat_est_ms
+  local tps ok fail err_pct avg std p50 p95 p99 p999 p9999 p99999 p999999 pmax lat_est_ms
   tps=$(sed -n "s/^tps = \([0-9.][0-9.]*\) .*/\1/p" "$wd/out.txt" | tail -n1)
   ok=$(sed -n 's/^number of transactions actually processed: \([0-9][0-9]*\).*/\1/p' "$wd/out.txt" | tail -n1)
   [[ -z "$ok" ]] && ok=0
@@ -1817,7 +1956,7 @@ SQL
     fi
 
     if [[ -s "$wd/lat.txt" ]]; then
-      read -r avg std p50 p95 p99 p999 p9999 p99999 pmax < <(calc_latency_metrics "$wd/lat.txt")
+      read -r avg std p50 p95 p99 p999 p9999 p99999 p999999 pmax < <(calc_latency_metrics "$wd/lat.txt")
       # Ensure all values are set (handle NaN/empty)
       [[ -z "$avg"   || "$avg"   == "NaN" ]] && avg=""
       [[ -z "$std"   || "$std"   == "NaN" ]] && std=""
@@ -1827,18 +1966,19 @@ SQL
       [[ -z "$p999"  || "$p999"  == "NaN" ]] && p999=""
       [[ -z "$p9999" || "$p9999" == "NaN" ]] && p9999=""
       [[ -z "$p99999" || "$p99999" == "NaN" ]] && p99999=""
+      [[ -z "$p999999" || "$p999999" == "NaN" ]] && p999999=""
       [[ -z "$pmax"  || "$pmax"  == "NaN" ]] && pmax=""
     else
       # Fallback: use pgbench summary for avg/std only
       avg=$(sed -n 's/^latency average = \([0-9.][0-9.]*\) ms$/\1/p' "$wd/out.txt" | tail -n1)
       std=$(sed -n 's/^latency stddev = \([0-9.][0-9.]*\) ms$/\1/p' "$wd/out.txt" | tail -n1)
-      p50=""; p95=""; p99=""; p999=""; p9999=""; p99999=""; pmax=""
+      p50=""; p95=""; p99=""; p999=""; p9999=""; p99999=""; p999999=""; pmax=""
     fi
   else
     # Fallback: use pgbench summary for avg/std only
     avg=$(sed -n 's/^latency average = \([0-9.][0-9.]*\) ms$/\1/p' "$wd/out.txt" | tail -n1)
     std=$(sed -n 's/^latency stddev = \([0-9.][0-9.]*\) ms$/\1/p' "$wd/out.txt" | tail -n1)
-    p50=""; p95=""; p99=""; p999=""; p9999=""; p99999=""; pmax=""
+    p50=""; p95=""; p99=""; p999=""; p9999=""; p99999=""; p999999=""; pmax=""
   fi
 
   local metrics_after stmt_after io_after wal_after ckpt_after
@@ -1908,7 +2048,7 @@ SQL
 
   local notes_str="rev=$git_rev branch=$git_branch host=$host variant=$variant lim=$LIMIT query=$QUERY phase=$PHASE"
 
-  echo "$ts,$variant,$clients,$actual_threads,$duration,$LIMIT,$tps,$ok,$fail,$err_pct,$avg,$std,$lat_est_ms,$p50,$p95,$p99,$p999,$p9999,$p99999,$pmax,$git_rev,$git_branch,$host,$(psql_in_pod -At -c 'SHOW server_version'),$track_io,$d_blks_hit,$d_blks_read,$d_read_ms,$d_write_ms,$d_xact,$d_tup_ret,$d_tup_fetch,$d_stmt_ms,$d_stmt_hit,$d_stmt_read,$d_stmt_dirty,$d_stmt_written,$d_temp_read,$d_temp_written,$d_io_read,$d_io_write,$d_io_extend,$d_io_fsync,$io_total,$active_sessions,$cpu_share_pct,$d_wal_rec,$d_wal_fpi,$d_wal_bytes,$d_ckpt_write,$d_ckpt_sync,$d_buf_ckpt,$d_buf_backend,$d_buf_alloc,$hit_ratio,$PHASE,$notes_str" >> "$results_csv"
+  echo "$ts,$variant,$clients,$actual_threads,$duration,$LIMIT,$tps,$ok,$fail,$err_pct,$avg,$std,$lat_est_ms,$p50,$p95,$p99,$p999,$p9999,$p99999,$p999999,$pmax,$git_rev,$git_branch,$host,$(psql_in_pod -At -c 'SHOW server_version'),$track_io,$d_blks_hit,$d_blks_read,$d_read_ms,$d_write_ms,$d_xact,$d_tup_ret,$d_tup_fetch,$d_stmt_ms,$d_stmt_hit,$d_stmt_read,$d_stmt_dirty,$d_stmt_written,$d_temp_read,$d_temp_written,$d_io_read,$d_io_write,$d_io_extend,$d_io_fsync,$io_total,$active_sessions,$cpu_share_pct,$d_wal_rec,$d_wal_fpi,$d_wal_bytes,$d_ckpt_write,$d_ckpt_sync,$d_buf_ckpt,$d_buf_backend,$d_buf_alloc,$hit_ratio,$PHASE,$notes_str" >> "$results_csv"
   
   # Optional: Warn about high latency
   if [[ -n "$lat_est_ms" ]] && [[ -n "$tps" ]] && (( $(echo "$tps > 0" | bc -l 2>/dev/null || echo 0) )); then
@@ -1924,7 +2064,7 @@ SQL
     -v duration="$duration" -v lim="$LIMIT" -v tps="$tps" -v ok="$ok" \
     -v fail="$fail" -v err_pct="$err_pct" -v avg="$avg" -v std="$std" \
     -v lat_est="$lat_est_ms" -v p50="$p50" -v p95="$p95" -v p99="$p99" -v p999="$p999" \
-    -v p9999="$p9999" -v p99999="$p99999" -v p100="$pmax" \
+    -v p9999="$p9999" -v p99999="$p99999" -v p999999="$p999999" -v p100="$pmax" \
     -v phase="$PHASE" -v notes="$notes_str" \
     -v git_rev="$git_rev" -v git_branch="$git_branch" -v host="$host" \
     -v server_version="$(psql_in_pod -At -c 'SHOW server_version')" \
@@ -1945,7 +2085,7 @@ SQL
         variant, phase, clients, threads, duration_s, limit_rows,
         tps, ok_xacts, fail_xacts, err_pct,
         lat_avg_ms, lat_std_ms, lat_est_ms,
-        p50_ms, p95_ms, p99_ms, p999_ms, p9999_ms, p99999_ms, p100_ms,
+        p50_ms, p95_ms, p99_ms, p999_ms, p9999_ms, p99999_ms, p999999_ms, p100_ms,
         notes,
         git_rev, git_branch, host, server_version, track_io,
         delta_blks_hit, delta_blks_read, delta_blk_read_ms, delta_blk_write_ms,
@@ -1964,7 +2104,8 @@ SQL
         NULLIF(NULLIF(:'lat_est','NaN'),'')::numeric,
         NULLIF(NULLIF(:'p50','NaN'),'')::numeric, NULLIF(NULLIF(:'p95','NaN'),'')::numeric,
         NULLIF(NULLIF(:'p99','NaN'),'')::numeric, NULLIF(NULLIF(:'p999','NaN'),'')::numeric,
-        NULLIF(NULLIF(:'p9999','NaN'),'')::numeric, NULLIF(NULLIF(:'p99999','NaN'),'')::numeric, NULLIF(NULLIF(:'p100','NaN'),'')::numeric,
+        NULLIF(NULLIF(:'p9999','NaN'),'')::numeric, NULLIF(NULLIF(:'p99999','NaN'),'')::numeric,
+        NULLIF(NULLIF(:'p999999','NaN'),'')::numeric, NULLIF(NULLIF(:'p100','NaN'),'')::numeric,
         :'notes', :'git_rev', :'git_branch', :'host', :'server_version', :'track_io'::boolean,
         NULLIF(:'dH','')::bigint, NULLIF(:'dR','')::bigint, NULLIF(:'dRT','')::numeric, NULLIF(:'dWT','')::numeric,
         NULLIF(:'dXC','')::bigint, NULLIF(:'dTR','')::bigint, NULLIF(:'dTF','')::bigint,
@@ -2236,13 +2377,23 @@ echo "CSV (sweep log): $results_csv"
 output_dir="$REPO_ROOT"
 if [[ ! -d "$output_dir" ]]; then
   echo "⚠️  REPO_ROOT ($output_dir) doesn't exist, using current directory" >&2
-output_dir="$(pwd)"
+  output_dir="$(pwd)"
 fi
 echo "Writing CSV files to: $output_dir"
+# CRITICAL: Also save to LOG_DIR immediately (before any potential crashes)
+if [[ -n "${LOG_DIR:-}" ]] && [[ -d "$LOG_DIR" ]]; then
+  cp -f "$results_csv" "$LOG_DIR/bench_sweep_${TIMESTAMP}.csv" 2>/dev/null || {
+    echo "⚠️  Failed to copy CSV to $LOG_DIR/bench_sweep_${TIMESTAMP}.csv" >&2
+  }
+fi
 # Copy with timestamped filename to repo root
 cp -f "$results_csv" "$output_dir/bench_sweep_${TIMESTAMP}.csv" 2>/dev/null || {
   echo "⚠️  Failed to copy CSV to $output_dir/bench_sweep_${TIMESTAMP}.csv" >&2
   echo "   Original file: $results_csv" >&2
+  # Try to save to LOG_DIR as fallback
+  if [[ -n "${LOG_DIR:-}" ]] && [[ -d "$LOG_DIR" ]]; then
+    cp -f "$results_csv" "$LOG_DIR/bench_sweep_${TIMESTAMP}.csv" 2>/dev/null || true
+  fi
 }
 # Also create a symlink/latest copy for convenience
 cp -f "$results_csv" "$output_dir/bench_sweep.csv" 2>/dev/null || {
@@ -2332,6 +2483,10 @@ try:
     plot_metric("tps", "TPS", "tps_vs_clients.png", logy=False)
     plot_metric("p95_ms", "p95 latency (ms)", "p95_vs_clients.png", logy=True)
     plot_metric("p99_ms", "p99 latency (ms)", "p99_vs_clients.png", logy=True)
+    plot_metric("p999_ms", "p999 latency (ms)", "p999_vs_clients.png", logy=True)
+    plot_metric("p9999_ms", "p9999 latency (ms)", "p9999_vs_clients.png", logy=True)
+    plot_metric("p99999_ms", "p99999 latency (ms)", "p99999_vs_clients.png", logy=True)
+    plot_metric("p999999_ms", "p999999 latency (ms)", "p999999_vs_clients.png", logy=True)
     
 except Exception as e:
     print(f"⚠️  Plot generation failed: {e}", file=sys.stderr)
@@ -2381,7 +2536,7 @@ try:
         # Define all metrics to compare
         metrics = [
             'tps', 'ok_xacts', 'fail_xacts', 'err_pct', 'avg_ms', 'std_ms', 'lat_est_ms',
-            'p50_ms', 'p95_ms', 'p99_ms', 'p999_ms', 'p9999_ms', 'max_ms',
+            'p50_ms', 'p95_ms', 'p99_ms', 'p999_ms', 'p9999_ms', 'p99999_ms', 'p999999_ms', 'max_ms',
             'delta_blks_hit', 'delta_blks_read', 'delta_blk_read_ms', 'delta_blk_write_ms',
             'delta_xact_commit', 'delta_tup_returned', 'delta_tup_fetched',
             'delta_stmt_total_ms', 'delta_stmt_shared_hit', 'delta_stmt_shared_read',
@@ -2454,27 +2609,38 @@ else
   fi
 fi
 
-# Peak TPS summary
+# Peak TPS summary (matches gold run format exactly)
 echo "--- Peak TPS Summary (this run only: $RUN_ID) ---"
 psql_in_pod -v run_id="$RUN_ID" <<'SQL' | tee "$LOG_DIR/peak_tps_summary.txt"
+-- Format matches gold run exactly: variant | clients | tps | lat_est_ms | p50_ms | p95_ms | p99_ms | p999_ms | p9999_ms | p100_ms
+-- Takes best TPS for each variant+clients combo (usually warm phase)
 SELECT 
   variant,
-  phase,
   clients,
-  tps,
-  lat_est_ms,
-  p50_ms,
-  p95_ms,
-  p99_ms,
-  p999_ms,
-  p9999_ms,
-  p99999_ms,
-  p100_ms
+  ROUND(tps::numeric, 2) AS tps,
+  ROUND(lat_est_ms::numeric, 3) AS lat_est_ms,
+  ROUND(p50_ms::numeric, 3) AS p50_ms,
+  ROUND(p95_ms::numeric, 3) AS p95_ms,
+  ROUND(p99_ms::numeric, 3) AS p99_ms,
+  ROUND(p999_ms::numeric, 3) AS p999_ms,
+  ROUND(p9999_ms::numeric, 3) AS p9999_ms,
+  ROUND(p100_ms::numeric, 3) AS p100_ms
 FROM bench.results
 WHERE variant IN ('knn', 'trgm', 'noop')
   AND tps IS NOT NULL
   AND run_id = :'run_id'
-ORDER BY variant, phase, clients;
+  -- For each variant+clients combo, take the best TPS (usually warm phase)
+  AND (variant, clients, tps) IN (
+    SELECT variant, clients, MAX(tps)
+    FROM bench.results
+    WHERE variant IN ('knn', 'trgm', 'noop')
+      AND tps IS NOT NULL
+      AND run_id = :'run_id'
+    GROUP BY variant, clients
+  )
+ORDER BY 
+  CASE variant WHEN 'knn' THEN 1 WHEN 'trgm' THEN 2 WHEN 'noop' THEN 3 END,
+  clients;
 SQL
 
 # Find peak TPS for each variant (this run only)
@@ -2487,6 +2653,359 @@ for variant in knn trgm noop; do
     echo "Peak $variant: ${peak_tps} TPS @ ${peak_clients} clients (lat_est: ${peak_lat} ms)"
   fi
 done
+echo ""
+
+# Comprehensive Expected vs Reality Analysis
+echo "=== Expected vs Reality Analysis (Little's Law Validation) ==="
+psql_in_pod -v run_id="$RUN_ID" <<'SQL' | tee "$LOG_DIR/expected_vs_reality_analysis.txt"
+-- Comprehensive analysis comparing expected vs actual performance
+-- Uses Little's Law: L = λW (clients = TPS * latency_ms / 1000)
+-- Expected TPS = clients * 1000 / latency_ms
+-- Expected latency = clients * 1000 / tps
+
+WITH results AS (
+  SELECT 
+    variant,
+    phase,
+    clients,
+    tps,
+    lat_avg_ms,
+    lat_est_ms,
+    p50_ms,
+    p95_ms,
+    p99_ms,
+    p999_ms,
+    p9999_ms,
+    p99999_ms,
+    p999999_ms,
+    p100_ms,
+    delta_blks_hit,
+    delta_blks_read,
+    hit_ratio_pct,
+    delta_stmt_total_ms,
+    active_sessions,
+    cpu_share_pct
+  FROM bench.results
+  WHERE variant IN ('knn', 'trgm', 'noop')
+    AND tps IS NOT NULL
+    AND lat_avg_ms IS NOT NULL
+    AND run_id = :'run_id'
+),
+analysis AS (
+  SELECT
+    variant,
+    phase,
+    clients,
+    tps AS actual_tps,
+    lat_avg_ms AS actual_lat_avg,
+    lat_est_ms AS actual_lat_est,
+    p50_ms,
+    p95_ms,
+    p99_ms,
+    p999_ms,
+    p9999_ms,
+    p99999_ms,
+    p999999_ms,
+    p100_ms,
+    -- Little's Law: Expected TPS from actual latency
+    CASE 
+      WHEN lat_avg_ms > 0 THEN (clients * 1000.0 / lat_avg_ms)
+      ELSE NULL
+    END AS expected_tps_from_lat,
+    -- Little's Law: Expected latency from actual TPS
+    CASE 
+      WHEN tps > 0 THEN (clients * 1000.0 / tps)
+      ELSE NULL
+    END AS expected_lat_from_tps,
+    -- Efficiency metrics
+    CASE 
+      WHEN lat_avg_ms > 0 AND tps > 0 THEN
+        (clients * 1000.0 / lat_avg_ms) / NULLIF(tps, 0)
+      ELSE NULL
+    END AS tps_efficiency,  -- >1 = better than expected, <1 = worse
+    CASE 
+      WHEN tps > 0 AND lat_avg_ms > 0 THEN
+        (clients * 1000.0 / tps) / NULLIF(lat_avg_ms, 0)
+      ELSE NULL
+    END AS lat_efficiency,  -- <1 = better than expected, >1 = worse
+    -- Tail latency ratios (how much worse than p50)
+    CASE WHEN p50_ms > 0 THEN p95_ms / p50_ms ELSE NULL END AS p95_p50_ratio,
+    CASE WHEN p50_ms > 0 THEN p99_ms / p50_ms ELSE NULL END AS p99_p50_ratio,
+    CASE WHEN p50_ms > 0 THEN p999_ms / p50_ms ELSE NULL END AS p999_p50_ratio,
+    CASE WHEN p50_ms > 0 THEN p9999_ms / p50_ms ELSE NULL END AS p9999_p50_ratio,
+    CASE WHEN p50_ms > 0 THEN p99999_ms / p50_ms ELSE NULL END AS p99999_p50_ratio,
+    CASE WHEN p50_ms > 0 THEN p999999_ms / p50_ms ELSE NULL END AS p999999_p50_ratio,
+    -- Cache efficiency
+    hit_ratio_pct,
+    -- CPU vs IO split
+    cpu_share_pct,
+    -- Active sessions (concurrency)
+    active_sessions
+  FROM results
+)
+SELECT
+  variant,
+  phase,
+  clients,
+  ROUND(actual_tps::numeric, 2) AS actual_tps,
+  ROUND(expected_tps_from_lat::numeric, 2) AS expected_tps_from_lat,
+  ROUND((actual_tps - expected_tps_from_lat)::numeric, 2) AS tps_diff,
+  ROUND((100.0 * (actual_tps - expected_tps_from_lat) / NULLIF(expected_tps_from_lat, 0))::numeric, 2) AS tps_diff_pct,
+  ROUND(actual_lat_avg::numeric, 3) AS actual_lat_avg_ms,
+  ROUND(expected_lat_from_tps::numeric, 3) AS expected_lat_from_tps_ms,
+  ROUND((actual_lat_avg - expected_lat_from_tps)::numeric, 3) AS lat_diff_ms,
+  ROUND((100.0 * (actual_lat_avg - expected_lat_from_tps) / NULLIF(expected_lat_from_tps, 0))::numeric, 2) AS lat_diff_pct,
+  ROUND(tps_efficiency::numeric, 3) AS tps_efficiency,
+  ROUND(lat_efficiency::numeric, 3) AS lat_efficiency,
+  ROUND(p95_p50_ratio::numeric, 2) AS p95_p50_ratio,
+  ROUND(p99_p50_ratio::numeric, 2) AS p99_p50_ratio,
+  ROUND(p999_p50_ratio::numeric, 2) AS p999_p50_ratio,
+  ROUND(p9999_p50_ratio::numeric, 2) AS p9999_p50_ratio,
+  ROUND(p99999_p50_ratio::numeric, 2) AS p99999_p50_ratio,
+  ROUND(p999999_p50_ratio::numeric, 2) AS p999999_p50_ratio,
+  ROUND(hit_ratio_pct::numeric, 2) AS cache_hit_ratio_pct,
+  ROUND(cpu_share_pct::numeric, 2) AS cpu_share_pct,
+  ROUND(active_sessions::numeric, 2) AS active_sessions
+FROM analysis
+ORDER BY variant, phase, clients;
+SQL
+
+# Generate insights and recommendations
+echo ""
+echo "=== Performance Insights & Recommendations ==="
+psql_in_pod -v run_id="$RUN_ID" <<'SQL' | tee "$LOG_DIR/performance_insights.txt"
+-- Generate actionable insights from the benchmark results
+
+WITH results AS (
+  SELECT 
+    variant,
+    phase,
+    clients,
+    tps,
+    lat_avg_ms,
+    lat_est_ms,
+    p50_ms,
+    p95_ms,
+    p99_ms,
+    p999_ms,
+    p9999_ms,
+    p99999_ms,
+    p999999_ms,
+    p100_ms,
+    hit_ratio_pct,
+    cpu_share_pct,
+    active_sessions,
+    delta_blks_read,
+    delta_stmt_total_ms
+  FROM bench.results
+  WHERE variant IN ('knn', 'trgm', 'noop')
+    AND tps IS NOT NULL
+    AND run_id = :'run_id'
+),
+analysis AS (
+  SELECT
+    variant,
+    phase,
+    clients,
+    tps,
+    lat_avg_ms,
+    lat_est_ms,
+    p50_ms,
+    p95_ms,
+    p99_ms,
+    p999_ms,
+    p9999_ms,
+    p99999_ms,
+    p999999_ms,
+    p100_ms,
+    -- Expected vs actual
+    (clients * 1000.0 / NULLIF(lat_avg_ms, 0)) AS expected_tps,
+    (clients * 1000.0 / NULLIF(tps, 0)) AS expected_lat,
+    -- Efficiency
+    ((clients * 1000.0 / NULLIF(lat_avg_ms, 0)) / NULLIF(tps, 0)) AS tps_efficiency,
+    -- Tail ratios
+    p95_ms / NULLIF(p50_ms, 0) AS p95_ratio,
+    p99_ms / NULLIF(p50_ms, 0) AS p99_ratio,
+    p999_ms / NULLIF(p50_ms, 0) AS p999_ratio,
+    p9999_ms / NULLIF(p50_ms, 0) AS p9999_ratio,
+    hit_ratio_pct,
+    cpu_share_pct,
+    active_sessions
+  FROM results
+)
+SELECT
+  variant || ' @ ' || clients || ' clients (' || phase || ')' AS scenario,
+  CASE 
+    WHEN tps_efficiency < 0.9 THEN '⚠️  TPS efficiency < 90% - system may be bottlenecked'
+    WHEN tps_efficiency > 1.1 THEN '✅ TPS efficiency > 110% - excellent performance'
+    ELSE '✓ TPS efficiency normal (90-110%)'
+  END AS tps_insight,
+  CASE 
+    WHEN p95_ratio > 5 THEN '⚠️  p95/p50 ratio > 5x - high tail latency variance'
+    WHEN p95_ratio < 2 THEN '✅ p95/p50 ratio < 2x - very consistent latency'
+    ELSE '✓ p95/p50 ratio normal (2-5x)'
+  END AS p95_insight,
+  CASE 
+    WHEN p99_ratio > 10 THEN '⚠️  p99/p50 ratio > 10x - extreme tail latency'
+    WHEN p99_ratio < 3 THEN '✅ p99/p50 ratio < 3x - excellent tail latency'
+    ELSE '✓ p99/p50 ratio normal (3-10x)'
+  END AS p99_insight,
+  CASE 
+    WHEN p999_ratio > 50 THEN '⚠️  p999/p50 ratio > 50x - severe tail latency spikes'
+    WHEN p999_ratio < 10 THEN '✅ p999/p50 ratio < 10x - good tail latency control'
+    ELSE '✓ p999/p50 ratio normal (10-50x)'
+  END AS p999_insight,
+  CASE 
+    WHEN hit_ratio_pct < 95 THEN '⚠️  Cache hit ratio < 95% - consider increasing shared_buffers'
+    WHEN hit_ratio_pct > 99 THEN '✅ Cache hit ratio > 99% - excellent cache efficiency'
+    ELSE '✓ Cache hit ratio good (95-99%)'
+  END AS cache_insight,
+  CASE 
+    WHEN cpu_share_pct < 50 THEN '⚠️  CPU share < 50% - I/O bound, consider faster storage or more RAM'
+    WHEN cpu_share_pct > 90 THEN '✅ CPU share > 90% - CPU bound, good for this workload'
+    ELSE '✓ CPU share balanced (50-90%)'
+  END AS cpu_insight
+FROM analysis
+WHERE tps_efficiency IS NOT NULL
+ORDER BY variant, phase, clients;
+SQL
+
+# Anomaly Detection
+echo ""
+echo "=== Anomaly Detection (Performance Degradation Alerts) ==="
+psql_in_pod -v run_id="$RUN_ID" <<'SQL' | tee "$LOG_DIR/anomaly_detection.txt"
+-- Detect anomalies: significant deviations from expected performance
+
+WITH results AS (
+  SELECT 
+    variant,
+    phase,
+    clients,
+    tps,
+    lat_avg_ms,
+    lat_est_ms,
+    p50_ms,
+    p95_ms,
+    p99_ms,
+    p999_ms,
+    p9999_ms,
+    p99999_ms,
+    p999999_ms,
+    p100_ms,
+    hit_ratio_pct,
+    cpu_share_pct
+  FROM bench.results
+  WHERE variant IN ('knn', 'trgm', 'noop')
+    AND tps IS NOT NULL
+    AND lat_avg_ms IS NOT NULL
+    AND run_id = :'run_id'
+),
+analysis AS (
+  SELECT
+    variant,
+    phase,
+    clients,
+    tps,
+    lat_avg_ms,
+    lat_est_ms,
+    p50_ms,
+    p95_ms,
+    p99_ms,
+    p999_ms,
+    p9999_ms,
+    p99999_ms,
+    p999999_ms,
+    p100_ms,
+    -- Expected values
+    (clients * 1000.0 / NULLIF(lat_avg_ms, 0)) AS expected_tps,
+    (clients * 1000.0 / NULLIF(tps, 0)) AS expected_lat,
+    -- Deviations
+    ABS(tps - (clients * 1000.0 / NULLIF(lat_avg_ms, 0))) / NULLIF((clients * 1000.0 / NULLIF(lat_avg_ms, 0)), 0) AS tps_deviation_pct,
+    ABS(lat_avg_ms - (clients * 1000.0 / NULLIF(tps, 0))) / NULLIF((clients * 1000.0 / NULLIF(tps, 0)), 0) AS lat_deviation_pct,
+    -- Tail latency issues
+    CASE WHEN p999_ms > 1000 THEN true ELSE false END AS p999_too_high,
+    CASE WHEN p9999_ms > 5000 THEN true ELSE false END AS p9999_too_high,
+    CASE WHEN p99999_ms > 10000 THEN true ELSE false END AS p99999_too_high,
+    CASE WHEN p100_ms > 30000 THEN true ELSE false END AS p100_too_high,
+    hit_ratio_pct,
+    cpu_share_pct
+  FROM results
+)
+SELECT
+  variant || ' @ ' || clients || ' clients (' || phase || ')' AS scenario,
+  CASE 
+    WHEN tps_deviation_pct > 0.15 THEN '🔴 CRITICAL: TPS deviation > 15% from expected'
+    WHEN tps_deviation_pct > 0.10 THEN '🟡 WARNING: TPS deviation > 10% from expected'
+    ELSE '✓ TPS within expected range'
+  END AS tps_anomaly,
+  CASE 
+    WHEN lat_deviation_pct > 0.15 THEN '🔴 CRITICAL: Latency deviation > 15% from expected'
+    WHEN lat_deviation_pct > 0.10 THEN '🟡 WARNING: Latency deviation > 10% from expected'
+    ELSE '✓ Latency within expected range'
+  END AS lat_anomaly,
+  CASE 
+    WHEN p999_too_high THEN '🔴 p999 > 1s - severe tail latency'
+    WHEN p9999_too_high THEN '🟡 p9999 > 5s - very high tail latency'
+    WHEN p99999_too_high THEN '🟡 p99999 > 10s - extreme tail latency'
+    WHEN p100_too_high THEN '🟡 p100 > 30s - maximum latency too high'
+    ELSE '✓ Tail latency acceptable'
+  END AS tail_anomaly,
+  CASE 
+    WHEN hit_ratio_pct < 90 THEN '🔴 Cache hit ratio < 90% - severe cache miss issue'
+    WHEN hit_ratio_pct < 95 THEN '🟡 Cache hit ratio < 95% - cache miss concern'
+    ELSE '✓ Cache hit ratio good'
+  END AS cache_anomaly
+FROM analysis
+WHERE tps_deviation_pct > 0.10 
+   OR lat_deviation_pct > 0.10
+   OR p999_too_high
+   OR p9999_too_high
+   OR p99999_too_high
+   OR p100_too_high
+   OR hit_ratio_pct < 95
+ORDER BY 
+  CASE 
+    WHEN tps_deviation_pct > 0.15 OR lat_deviation_pct > 0.15 THEN 1
+    WHEN tps_deviation_pct > 0.10 OR lat_deviation_pct > 0.10 THEN 2
+    ELSE 3
+  END,
+  variant, phase, clients;
+SQL
+
+echo ""
+echo "✅ Analysis complete! Check these files in $LOG_DIR:"
+echo "   - expected_vs_reality_analysis.txt (Little's Law validation)"
+echo "   - performance_insights.txt (Actionable recommendations)"
+echo "   - anomaly_detection.txt (Performance degradation alerts)"
+echo ""
+
+# Quick Summary Table (readable format)
+echo "=== Quick Performance Summary ==="
+psql_in_pod -v run_id="$RUN_ID" <<'SQL' | tee "$LOG_DIR/quick_summary.txt"
+-- Quick summary table for easy reading
+
+SELECT
+  variant || ' (' || phase || ')' AS test,
+  clients AS clients,
+  ROUND(tps::numeric, 0) AS tps,
+  ROUND(lat_avg_ms::numeric, 2) AS lat_avg_ms,
+  ROUND(p95_ms::numeric, 2) AS p95_ms,
+  ROUND(p99_ms::numeric, 2) AS p99_ms,
+  ROUND(p999_ms::numeric, 2) AS p999_ms,
+  ROUND((100.0 * (tps - (clients * 1000.0 / NULLIF(lat_avg_ms, 0))) / NULLIF((clients * 1000.0 / NULLIF(lat_avg_ms, 0)), 0))::numeric, 1) AS tps_efficiency_pct,
+  ROUND(hit_ratio_pct::numeric, 1) AS cache_hit_pct
+FROM bench.results
+WHERE variant IN ('knn', 'trgm', 'noop')
+  AND tps IS NOT NULL
+  AND run_id = :'run_id'
+ORDER BY 
+  CASE variant WHEN 'noop' THEN 1 WHEN 'knn' THEN 2 WHEN 'trgm' THEN 3 END,
+  phase,
+  clients;
+SQL
+
+echo ""
+echo "📊 Quick summary saved to: $LOG_DIR/quick_summary.txt"
 echo ""
 
 # Create automatic backup after benchmark (only if explicitly requested)

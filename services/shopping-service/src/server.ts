@@ -10,6 +10,8 @@ import recentlyViewedRouter from './routes/recently-viewed.js'
 import wishlistRouter from './routes/wishlist.js'
 import historyRouter from './routes/history.js'
 import recommendationsRouter from './routes/recommendations.js'
+import resellRouter from './routes/resell.js'
+import ordersRouter from './routes/orders.js'
 
 const app = express()
 app.use(express.json())
@@ -35,15 +37,28 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next()
 })
 
-// Health check
+// Health check - optimized for faster response
 app.get('/healthz', async (_req: Request, res: Response) => {
   try {
-    await pool.query('SELECT 1')
-    let r = 'skipped'
-    try {
-      r = redis ? await redis.ping() : 'disabled'
-    } catch {
-      r = 'error'
+    // Use Promise.race to timeout DB query if it takes too long
+    const dbCheck = Promise.race([
+      pool.query('SELECT 1'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DB timeout')), 2000))
+    ])
+    await dbCheck
+    
+    // Redis ping with timeout
+    let r: string = 'skipped'
+    if (redis) {
+      try {
+        const redisCheck = Promise.race([
+          redis.ping(),
+          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 1000))
+        ])
+        r = await redisCheck as string
+      } catch {
+        r = 'error'
+      }
     }
     res.json({ ok: true, db: 'connected', redis: r, cpu_cores: CPU_CORES })
   } catch (err) {
@@ -64,6 +79,8 @@ app.use('/recently-viewed', requireUser, recentlyViewedRouter(redis, cacheManage
 app.use('/wishlist', requireUser, wishlistRouter(redis, cacheManager))
 app.use('/history', requireUser, historyRouter(redis, cacheManager))
 app.use('/recommendations', requireUser, recommendationsRouter(redis, cacheManager))
+app.use('/resell', requireUser, resellRouter(redis, cacheManager))
+app.use('/orders', requireUser, ordersRouter(redis, cacheManager))
 
 // Error handler
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

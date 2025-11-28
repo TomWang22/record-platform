@@ -9,6 +9,7 @@ import { createClient } from "redis";
 import { setupOAuthRoutes } from "./routes/oauth.js";
 import { setupMFARoutes } from "./routes/mfa.js";
 import { setupVerificationRoutes } from "./routes/verification.js";
+import passkeyRouter from "./routes/passkey.js";
 import { verifyMFA } from "./lib/mfa.js";
 
 const app = express();
@@ -249,6 +250,7 @@ app.get("/me", (req: Request, res: Response) => {
 
 // OAuth routes
 app.use("/auth", setupOAuthRoutes(prisma));
+app.use("/passkeys", passkeyRouter);
 
 // MFA routes
 app.use("/mfa", setupMFARoutes(prisma));

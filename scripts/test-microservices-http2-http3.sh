@@ -664,6 +664,293 @@ else
   fi
 fi
 
+# Test 9f: Social Service - Reply to Group Message (WhatsApp-style) (HTTP/2)
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${GROUP_ID:-}" ]]; then
+  say "Test 9f: Social Service - Reply to Group Message via HTTP/2 (WhatsApp-style)"
+  # First, get a message ID from the group (from Test 9d)
+  # Try to get group messages by querying the group details or messages with group_id filter
+  GET_GROUP_MSG_RC=0
+  GET_GROUP_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    -H "Host: $HOST" \
+    -H "Authorization: Bearer $TOKEN_USER2" \
+    -X GET "https://$HOST:8443/api/messages?page=1&limit=50" 2>&1) || GET_GROUP_MSG_RC=$?
+  if [[ "$GET_GROUP_MSG_RC" -eq 0 ]]; then
+    GET_GROUP_MSG_CODE=$(echo "$GET_GROUP_MSG_RESPONSE" | tail -1)
+    if [[ "$GET_GROUP_MSG_CODE" == "200" ]]; then
+      # Try to extract a message ID from the group messages (look for messages with group_id matching GROUP_ID)
+      # First try to find a message with group_id in the response
+      GROUP_MSG_ID=$(echo "$GET_GROUP_MSG_RESPONSE" | sed '$d' | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    if isinstance(data, dict) and 'messages' in data:
+        messages = data['messages']
+    elif isinstance(data, list):
+        messages = data
+    else:
+        messages = []
+    for msg in messages:
+        if isinstance(msg, dict) and msg.get('group_id') == '${GROUP_ID}':
+            print(msg.get('id', ''))
+            break
+except:
+    pass
+" 2>/dev/null || echo "")
+      # If not found, try simple grep (fallback) - get any message ID
+      if [[ -z "$GROUP_MSG_ID" ]]; then
+        GROUP_MSG_ID=$(echo "$GET_GROUP_MSG_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+      fi
+      # Debug output
+      if [[ -z "$GROUP_MSG_ID" ]]; then
+        echo "Debug: Could not extract group message ID from response"
+        echo "Response preview: $(echo "$GET_GROUP_MSG_RESPONSE" | sed '$d' | head -20)"
+      fi
+      if [[ -n "$GROUP_MSG_ID" ]]; then
+        REPLY_GROUP_MSG_RC=0
+        REPLY_GROUP_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+          --resolve "$HOST:8443:127.0.0.1" \
+          -H "Host: $HOST" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $TOKEN_USER2" \
+          -X POST "https://$HOST:8443/api/messages/$GROUP_MSG_ID/reply" \
+          -d '{"message_type":"group","subject":"Re: Group Chat Test","content":"This is a WhatsApp-style reply to the previous message!"}' 2>&1) || REPLY_GROUP_MSG_RC=$?
+        REPLY_GROUP_MSG_CODE=$(echo "$REPLY_GROUP_MSG_RESPONSE" | tail -1)
+        if [[ "$REPLY_GROUP_MSG_RC" -ne 0 ]]; then
+          warn "Reply to group message request failed (curl exit $REPLY_GROUP_MSG_RC)"
+        elif [[ "$REPLY_GROUP_MSG_CODE" =~ ^(200|201)$ ]]; then
+          ok "Reply to group message works via HTTP/2 (WhatsApp-style)"
+          # Check if parent_message is included in response
+          if echo "$REPLY_GROUP_MSG_RESPONSE" | sed '$d' | grep -q "parent_message"; then
+            ok "Parent message context included in reply response"
+          fi
+        else
+          warn "Reply to group message failed - HTTP $REPLY_GROUP_MSG_CODE"
+          echo "Response body: $(echo "$REPLY_GROUP_MSG_RESPONSE" | sed '$d' | head -5)"
+        fi
+      else
+        warn "No group message ID found to reply to"
+      fi
+    fi
+  fi
+else
+  if [[ -z "${GROUP_ID:-}" ]]; then
+    warn "Skipping reply to group message - Group ID not available"
+  else
+    warn "Skipping reply to group message - social-service not available or no auth token"
+  fi
+fi
+
+# Test 9g: Social Service - Forum Post with upload_type (HTTP/2)
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
+  say "Test 9g: Social Service - Create Forum Post with upload_type via HTTP/2"
+  FORUM_POST_UPLOAD_RC=0
+  FORUM_POST_UPLOAD_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -X POST "https://$HOST:8443/api/forum/posts" \
+    -d '{"title":"Test Image Post","content":"This is a test post with upload_type=image","flair":"general","upload_type":"image"}' 2>&1) || FORUM_POST_UPLOAD_RC=$?
+  FORUM_POST_UPLOAD_CODE=$(echo "$FORUM_POST_UPLOAD_RESPONSE" | tail -1)
+  if [[ "$FORUM_POST_UPLOAD_RC" -ne 0 ]]; then
+    warn "Create forum post with upload_type request failed (curl exit $FORUM_POST_UPLOAD_RC)"
+  elif [[ "$FORUM_POST_UPLOAD_CODE" =~ ^(200|201)$ ]]; then
+    ok "Create forum post with upload_type works via HTTP/2"
+    FORUM_POST_UPLOAD_ID=$(echo "$FORUM_POST_UPLOAD_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
+    # Verify upload_type is in response
+    if echo "$FORUM_POST_UPLOAD_RESPONSE" | sed '$d' | grep -q '"upload_type":"image"'; then
+      ok "upload_type field correctly returned in response"
+    fi
+  else
+    warn "Create forum post with upload_type failed - HTTP $FORUM_POST_UPLOAD_CODE"
+    echo "Response body: $(echo "$FORUM_POST_UPLOAD_RESPONSE" | sed '$d' | head -5)"
+  fi
+else
+  warn "Skipping forum post with upload_type - social-service not available or no auth token"
+fi
+
+# Test 9h: Social Service - Add Attachment to Forum Post (HTTP/2)
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${FORUM_POST_UPLOAD_ID:-${FORUM_POST_ID:-}}" ]]; then
+  say "Test 9h: Social Service - Add Attachment to Forum Post via HTTP/2"
+  POST_ATTACH_RC=0
+  POST_ID="${FORUM_POST_UPLOAD_ID:-$FORUM_POST_ID}"
+  POST_ATTACH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -X POST "https://$HOST:8443/api/forum/posts/$POST_ID/attachments" \
+    -d '{"file_url":"https://example.com/test-image.jpg","file_type":"image","file_name":"test-image.jpg","mime_type":"image/jpeg","file_size":12345,"width":1920,"height":1080,"display_order":0}' 2>&1) || POST_ATTACH_RC=$?
+  POST_ATTACH_CODE=$(echo "$POST_ATTACH_RESPONSE" | tail -1)
+  if [[ "$POST_ATTACH_RC" -ne 0 ]]; then
+    warn "Add post attachment request failed (curl exit $POST_ATTACH_RC)"
+  elif [[ "$POST_ATTACH_CODE" =~ ^(200|201)$ ]]; then
+    ok "Add attachment to forum post works via HTTP/2"
+    POST_ATTACH_ID=$(echo "$POST_ATTACH_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
+  else
+    warn "Add post attachment failed - HTTP $POST_ATTACH_CODE"
+    echo "Response body: $(echo "$POST_ATTACH_RESPONSE" | sed '$d' | head -5)"
+  fi
+else
+  if [[ -z "${FORUM_POST_UPLOAD_ID:-${FORUM_POST_ID:-}}" ]]; then
+    warn "Skipping add post attachment - Forum post ID not available"
+  else
+    warn "Skipping add post attachment - social-service not available or no auth token"
+  fi
+fi
+
+# Test 9i: Social Service - Add Attachment to Comment (HTTP/3)
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${FORUM_POST_ID:-}" ]]; then
+  say "Test 9i: Social Service - Add Comment with Attachment via HTTP/3"
+  # First create a comment
+  COMMENT_WITH_ATTACH_RC=0
+  COMMENT_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN_USER2" \
+    --resolve "$HTTP3_RESOLVE" \
+    -X POST "https://$HOST/api/forum/posts/$FORUM_POST_ID/comments" \
+    -d '{"content":"This comment will have an attachment"}' 2>&1) || COMMENT_WITH_ATTACH_RC=$?
+  if [[ "$COMMENT_WITH_ATTACH_RC" -eq 0 ]] && [[ -n "$COMMENT_RESPONSE" ]]; then
+    COMMENT_CODE=$(echo "$COMMENT_RESPONSE" | tail -1)
+    if [[ "$COMMENT_CODE" =~ ^(200|201)$ ]]; then
+      COMMENT_ID=$(echo "$COMMENT_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
+      # Also try JSON parsing as fallback
+      if [[ -z "$COMMENT_ID" ]]; then
+        COMMENT_ID=$(echo "$COMMENT_RESPONSE" | sed '$d' | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('id', '') if isinstance(data, dict) else '')" 2>/dev/null || echo "")
+      fi
+      if [[ -n "$COMMENT_ID" ]] && [[ "$COMMENT_ID" != "placeholder-comment-id" ]]; then
+        # Add attachment to comment
+        COMMENT_ATTACH_RC=0
+        COMMENT_ATTACH_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+          -H "Host: $HOST" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $TOKEN_USER2" \
+          --resolve "$HTTP3_RESOLVE" \
+          -X POST "https://$HOST/api/forum/comments/$COMMENT_ID/attachments" \
+          -d '{"file_url":"https://example.com/comment-pdf.pdf","file_type":"document","file_name":"document.pdf","mime_type":"application/pdf","file_size":54321,"display_order":0}' 2>&1) || COMMENT_ATTACH_RC=$?
+        if [[ "$COMMENT_ATTACH_RC" -eq 0 ]] && [[ -n "$COMMENT_ATTACH_RESPONSE" ]]; then
+          COMMENT_ATTACH_CODE=$(echo "$COMMENT_ATTACH_RESPONSE" | tail -1)
+          if [[ "$COMMENT_ATTACH_CODE" =~ ^(200|201)$ ]]; then
+            ok "Add attachment to comment works via HTTP/3"
+          else
+            warn "Add comment attachment failed - HTTP $COMMENT_ATTACH_CODE"
+            echo "Response body: $(echo "$COMMENT_ATTACH_RESPONSE" | sed '$d' | head -5)"
+          fi
+        else
+          warn "Add comment attachment request failed (curl exit $COMMENT_ATTACH_RC)"
+        fi
+      else
+        warn "Comment ID extraction failed or invalid - COMMENT_ID='${COMMENT_ID}'"
+        echo "Comment response: $(echo "$COMMENT_RESPONSE" | sed '$d' | head -10)"
+      fi
+    else
+      warn "Create comment for attachment test failed - HTTP $COMMENT_CODE"
+      echo "Response body: $(echo "$COMMENT_RESPONSE" | sed '$d' | head -5)"
+    fi
+  else
+    warn "Create comment for attachment test failed"
+  fi
+else
+  if [[ -z "${FORUM_POST_ID:-}" ]]; then
+    warn "Skipping add comment attachment - Forum post ID not available"
+  else
+    warn "Skipping add comment attachment - social-service not available or no auth token"
+  fi
+fi
+
+# Test 9j: Social Service - Add Attachment to Message (HTTP/2)
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${MESSAGE_ID:-${MESSAGE_H3_ID:-}}" ]]; then
+  say "Test 9j: Social Service - Add Attachment to Message via HTTP/2"
+  MSG_ATTACH_RC=0
+  MSG_ID="${MESSAGE_ID:-$MESSAGE_H3_ID}"
+  MSG_ATTACH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -X POST "https://$HOST:8443/api/messages/$MSG_ID/attachments" \
+    -d '{"file_url":"https://example.com/video.mp4","file_type":"video","file_name":"test-video.mp4","mime_type":"video/mp4","file_size":9876543,"width":1280,"height":720,"duration":120,"display_order":0}' 2>&1) || MSG_ATTACH_RC=$?
+  MSG_ATTACH_CODE=$(echo "$MSG_ATTACH_RESPONSE" | tail -1)
+  if [[ "$MSG_ATTACH_RC" -ne 0 ]]; then
+    warn "Add message attachment request failed (curl exit $MSG_ATTACH_RC)"
+  elif [[ "$MSG_ATTACH_CODE" =~ ^(200|201)$ ]]; then
+    ok "Add attachment to message works via HTTP/2"
+    MSG_ATTACH_ID=$(echo "$MSG_ATTACH_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
+  else
+    warn "Add message attachment failed - HTTP $MSG_ATTACH_CODE"
+    echo "Response body: $(echo "$MSG_ATTACH_RESPONSE" | sed '$d' | head -5)"
+  fi
+else
+  if [[ -z "${MESSAGE_ID:-${MESSAGE_H3_ID:-}}" ]]; then
+    warn "Skipping add message attachment - Message ID not available"
+  else
+    warn "Skipping add message attachment - social-service not available or no auth token"
+  fi
+fi
+
+# Test 9k: Social Service - Leave Group Chat (HTTP/2)
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${GROUP_ID:-}" ]]; then
+  say "Test 9k: Social Service - Leave Group Chat via HTTP/2"
+  LEAVE_GROUP_RC=0
+  LEAVE_GROUP_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Authorization: Bearer $TOKEN_USER2" \
+    -X DELETE "https://$HOST:8443/api/messages/groups/$GROUP_ID/leave" 2>&1) || LEAVE_GROUP_RC=$?
+  LEAVE_GROUP_CODE=$(echo "$LEAVE_GROUP_RESPONSE" | tail -1)
+  if [[ "$LEAVE_GROUP_RC" -ne 0 ]]; then
+    warn "Leave group request failed (curl exit $LEAVE_GROUP_RC)"
+  elif [[ "$LEAVE_GROUP_CODE" =~ ^(204)$ ]]; then
+    ok "Leave group chat works via HTTP/2"
+    # Verify user is no longer in group by trying to get group details (should fail with 403)
+    VERIFY_LEAVE_RC=0
+    VERIFY_LEAVE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
+      -H "Host: $HOST" \
+      -H "Authorization: Bearer $TOKEN_USER2" \
+      -X GET "https://$HOST:8443/api/messages/groups/$GROUP_ID" 2>&1) || VERIFY_LEAVE_RC=$?
+    VERIFY_LEAVE_CODE=$(echo "$VERIFY_LEAVE_RESPONSE" | tail -1)
+    if [[ "$VERIFY_LEAVE_CODE" == "403" ]]; then
+      ok "User successfully left group (403 on group access confirms removal)"
+    else
+      warn "Leave verification unexpected - HTTP $VERIFY_LEAVE_CODE (expected 403)"
+    fi
+  else
+    warn "Leave group failed - HTTP $LEAVE_GROUP_CODE"
+    echo "Response body: $(echo "$LEAVE_GROUP_RESPONSE" | sed '$d' | head -5)"
+  fi
+else
+  if [[ -z "${GROUP_ID:-}" ]]; then
+    warn "Skipping leave group - Group ID not available"
+  else
+    warn "Skipping leave group - social-service not available or no auth token"
+  fi
+fi
+
+# Test 9l: Social Service - Get Post Attachments (HTTP/3)
+if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${FORUM_POST_UPLOAD_ID:-${FORUM_POST_ID:-}}" ]]; then
+  say "Test 9l: Social Service - Get Post Attachments via HTTP/3"
+  GET_POST_ATTACH_RC=0
+  POST_ID="${FORUM_POST_UPLOAD_ID:-$FORUM_POST_ID}"
+  GET_POST_ATTACH_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+    -H "Host: $HOST" \
+    -H "Authorization: Bearer ${TOKEN:-$TOKEN_USER2}" \
+    --resolve "$HTTP3_RESOLVE" \
+    -X GET "https://$HOST/api/forum/posts/$POST_ID/attachments" 2>&1) || GET_POST_ATTACH_RC=$?
+  if [[ "$GET_POST_ATTACH_RC" -eq 0 ]] && [[ -n "$GET_POST_ATTACH_RESPONSE" ]]; then
+    GET_POST_ATTACH_CODE=$(echo "$GET_POST_ATTACH_RESPONSE" | tail -1)
+    if [[ "$GET_POST_ATTACH_CODE" == "200" ]]; then
+      ok "Get post attachments works via HTTP/3"
+    else
+      warn "Get post attachments failed - HTTP $GET_POST_ATTACH_CODE"
+    fi
+  else
+    warn "Get post attachments request failed (curl exit $GET_POST_ATTACH_RC)"
+  fi
+else
+  warn "Skipping get post attachments - Forum post ID not available"
+fi
+
 # Test 10: Listings Service - Health Check (HTTP/2)
 # Note: Health check should be public (no auth required), but listings service requires auth
 # So we'll test it directly or skip if it requires auth
@@ -763,16 +1050,39 @@ fi
 if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 12: Listings Service - Create Listing via HTTP/2"
   LISTINGS_CREATE_RC=0
-  LISTINGS_CREATE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+  # Try port 8443 first (HTTP/2), with increased timeout to match API gateway proxyTimeout
+  LISTINGS_CREATE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 --connect-timeout 10 \
     --resolve "$HOST:8443:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
     -X POST "https://$HOST:8443/api/listings" \
     -d '{"title":"Test Vinyl Record","description":"Mint condition test listing","price":29.99,"listing_type":"fixed_price","condition":"Mint","category":"Vinyl"}' 2>&1) || LISTINGS_CREATE_RC=$?
+  
+  # If port 8443 times out, try port 443 as fallback (same as HTTP/3 test)
+  if [[ "$LISTINGS_CREATE_RC" -eq 28 ]]; then
+    warn "Port 8443 timed out, trying port 443 as fallback..."
+    LISTINGS_CREATE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 --connect-timeout 10 \
+      --resolve "$HOST:443:127.0.0.1" \
+      -H "Host: $HOST" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $TOKEN" \
+      -X POST "https://$HOST:443/api/listings" \
+      -d '{"title":"Test Vinyl Record","description":"Mint condition test listing","price":29.99,"listing_type":"fixed_price","condition":"Mint","category":"Vinyl"}' 2>&1) || LISTINGS_CREATE_RC=$?
+  fi
+  
   LISTINGS_CREATE_CODE=$(echo "$LISTINGS_CREATE_RESPONSE" | tail -1)
   if [[ "$LISTINGS_CREATE_RC" -ne 0 ]]; then
     warn "Create listing request failed (curl exit $LISTINGS_CREATE_RC)"
+    if [[ "$LISTINGS_CREATE_RC" -eq 28 ]]; then
+      warn "  → Timeout (28): Request took longer than 30s on both ports 8443 and 443"
+      warn "  → This may indicate:"
+      warn "     - Database connection issue (check listings-service logs)"
+      warn "     - API gateway proxy timeout"
+      warn "     - HTTP/2 connection pooling issue in Caddy/Linkerd"
+      warn "  → Note: HTTP/3 version (Test 12b) works, suggesting HTTP/2-specific issue"
+      warn "  → Debug: Check kubectl logs -l app=listings-service"
+    fi
   elif [[ "$LISTINGS_CREATE_CODE" =~ ^(200|201)$ ]]; then
     ok "Create listing works via HTTP/2"
     LISTING_ID=$(echo "$LISTINGS_CREATE_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
@@ -831,6 +1141,231 @@ if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   fi
 else
   warn "Skipping get my listings - listings-service not available or no auth token"
+fi
+
+# Test 13: Shopping Service - Cart, Checkout, Orders, Purchase History, Resell (HTTP/2)
+if [[ "${SKIP_SHOPPING:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
+  say "Test 13: Shopping Service - Cart Operations via HTTP/2"
+  
+  # Test 13a: Add item to cart
+  say "Test 13a: Shopping Service - Add Item to Cart via HTTP/2"
+  if [[ -n "${LISTING_ID:-}" ]]; then
+    ADD_CART_RC=0
+    ADD_CART_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+      --resolve "$HOST:8443:127.0.0.1" \
+      -H "Host: $HOST" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $TOKEN" \
+      -X POST "https://$HOST:8443/api/cart" \
+      -d "{\"item_type\":\"listing\",\"item_id\":\"$LISTING_ID\",\"listing_id\":\"$LISTING_ID\",\"quantity\":1,\"price\":29.99,\"metadata\":{\"title\":\"Test Listing\"}}" 2>&1) || ADD_CART_RC=$?
+    ADD_CART_CODE=$(echo "$ADD_CART_RESPONSE" | tail -1)
+    if [[ "$ADD_CART_RC" -ne 0 ]]; then
+      warn "Add to cart request failed (curl exit $ADD_CART_RC)"
+    elif [[ "$ADD_CART_CODE" =~ ^(200|201)$ ]]; then
+      ok "Add item to cart works via HTTP/2"
+      CART_ITEM_ID=$(echo "$ADD_CART_RESPONSE" | sed '$d' | grep -o '"cart_item_id":"[^"]*"' | cut -d'"' -f4 || echo "")
+    else
+      warn "Add to cart failed - HTTP $ADD_CART_CODE"
+      echo "Response body: $(echo "$ADD_CART_RESPONSE" | sed '$d' | head -5)"
+    fi
+  else
+    warn "Skipping add to cart - Listing ID not available"
+  fi
+  
+  # Test 13b: Get cart
+  say "Test 13b: Shopping Service - Get Cart via HTTP/2"
+  GET_CART_RC=0
+  GET_CART_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Authorization: Bearer $TOKEN" \
+    -X GET "https://$HOST:8443/api/cart" 2>&1) || GET_CART_RC=$?
+  GET_CART_CODE=$(echo "$GET_CART_RESPONSE" | tail -1)
+  if [[ "$GET_CART_RC" -ne 0 ]]; then
+    warn "Get cart request failed (curl exit $GET_CART_RC)"
+  elif [[ "$GET_CART_CODE" == "200" ]]; then
+    ok "Get cart works via HTTP/2"
+    CART_ITEMS=$(echo "$GET_CART_RESPONSE" | sed '$d' | grep -o '"items":\[.*\]' || echo "")
+    if [[ -n "$CART_ITEMS" ]]; then
+      CART_ITEM_ID=$(echo "$GET_CART_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+    fi
+  else
+    warn "Get cart failed - HTTP $GET_CART_CODE"
+  fi
+  
+  # Test 13c: Checkout (with simulated payment)
+  say "Test 13c: Shopping Service - Checkout with Simulated Payment via HTTP/2"
+  if [[ -n "${CART_ITEM_ID:-}" ]] && [[ -n "${LISTING_ID:-}" ]]; then
+    CHECKOUT_RC=0
+    CHECKOUT_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+      --resolve "$HOST:8443:127.0.0.1" \
+      -H "Host: $HOST" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $TOKEN" \
+      -X POST "https://$HOST:8443/api/cart/checkout" \
+      -d "{\"items\":[{\"item_type\":\"listing\",\"item_id\":\"$LISTING_ID\",\"listing_id\":\"$LISTING_ID\",\"quantity\":1,\"price\":29.99}],\"payment_method\":\"simulated\",\"shipping_address\":{\"street\":\"123 Test St\",\"city\":\"Test City\",\"state\":\"CA\",\"zip\":\"12345\",\"country\":\"US\"},\"billing_address\":{\"street\":\"123 Test St\",\"city\":\"Test City\",\"state\":\"CA\",\"zip\":\"12345\",\"country\":\"US\"}}" 2>&1) || CHECKOUT_RC=$?
+    CHECKOUT_CODE=$(echo "$CHECKOUT_RESPONSE" | tail -1)
+    if [[ "$CHECKOUT_RC" -ne 0 ]]; then
+      warn "Checkout request failed (curl exit $CHECKOUT_RC)"
+    elif [[ "$CHECKOUT_CODE" =~ ^(200|201)$ ]]; then
+      ok "Checkout with simulated payment works via HTTP/2"
+      ORDER_ID=$(echo "$CHECKOUT_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+      ORDER_NUMBER=$(echo "$CHECKOUT_RESPONSE" | sed '$d' | grep -o '"order_number":"[^"]*"' | cut -d'"' -f4 || echo "")
+      PURCHASE_ID=$(echo "$CHECKOUT_RESPONSE" | sed '$d' | grep -o '"purchase_id":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+      # Also try to extract from purchases array
+      if [[ -z "$PURCHASE_ID" ]]; then
+        PURCHASE_ID=$(echo "$CHECKOUT_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | tail -1 | cut -d'"' -f4 || echo "")
+      fi
+      if echo "$CHECKOUT_RESPONSE" | sed '$d' | grep -q '"payment_status":"paid"'; then
+        ok "Payment status confirmed as paid"
+      fi
+    else
+      warn "Checkout failed - HTTP $CHECKOUT_CODE"
+      echo "Response body: $(echo "$CHECKOUT_RESPONSE" | sed '$d' | head -10)"
+    fi
+  else
+    warn "Skipping checkout - Cart item ID or Listing ID not available"
+  fi
+  
+  # Test 13d: Get orders
+  say "Test 13d: Shopping Service - Get Orders via HTTP/2"
+  GET_ORDERS_RC=0
+  GET_ORDERS_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Authorization: Bearer $TOKEN" \
+    -X GET "https://$HOST:8443/api/orders" 2>&1) || GET_ORDERS_RC=$?
+  GET_ORDERS_CODE=$(echo "$GET_ORDERS_RESPONSE" | tail -1)
+  if [[ "$GET_ORDERS_RC" -ne 0 ]]; then
+    warn "Get orders request failed (curl exit $GET_ORDERS_RC)"
+  elif [[ "$GET_ORDERS_CODE" == "200" ]]; then
+    ok "Get orders works via HTTP/2"
+    if [[ -z "${ORDER_NUMBER:-}" ]]; then
+      ORDER_NUMBER=$(echo "$GET_ORDERS_RESPONSE" | sed '$d' | grep -o '"order_number":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+    fi
+  else
+    warn "Get orders failed - HTTP $GET_ORDERS_CODE"
+  fi
+  
+  # Test 13e: Get order details
+  say "Test 13e: Shopping Service - Get Order Details via HTTP/2"
+  if [[ -n "${ORDER_ID:-}" ]]; then
+    GET_ORDER_RC=0
+    GET_ORDER_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+      --resolve "$HOST:8443:127.0.0.1" \
+      -H "Host: $HOST" \
+      -H "Authorization: Bearer $TOKEN" \
+      -X GET "https://$HOST:8443/api/orders/$ORDER_ID" 2>&1) || GET_ORDER_RC=$?
+    GET_ORDER_CODE=$(echo "$GET_ORDER_RESPONSE" | tail -1)
+    if [[ "$GET_ORDER_RC" -ne 0 ]]; then
+      warn "Get order details request failed (curl exit $GET_ORDER_RC)"
+    elif [[ "$GET_ORDER_CODE" == "200" ]]; then
+      ok "Get order details works via HTTP/2"
+      if echo "$GET_ORDER_RESPONSE" | sed '$d' | grep -q '"items"'; then
+        ok "Order items included in response"
+      fi
+    else
+      warn "Get order details failed - HTTP $GET_ORDER_CODE"
+    fi
+  else
+    warn "Skipping get order details - Order ID not available"
+  fi
+  
+  # Test 13f: Get purchase history
+  say "Test 13f: Shopping Service - Get Purchase History via HTTP/2"
+  GET_PURCHASES_RC=0
+  GET_PURCHASES_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Authorization: Bearer $TOKEN" \
+    -X GET "https://$HOST:8443/api/history/purchases" 2>&1) || GET_PURCHASES_RC=$?
+  GET_PURCHASES_CODE=$(echo "$GET_PURCHASES_RESPONSE" | tail -1)
+  if [[ "$GET_PURCHASES_RC" -ne 0 ]]; then
+    warn "Get purchase history request failed (curl exit $GET_PURCHASES_RC)"
+  elif [[ "$GET_PURCHASES_CODE" == "200" ]]; then
+    ok "Get purchase history works via HTTP/2"
+    if [[ -z "${PURCHASE_ID:-}" ]]; then
+      PURCHASE_ID=$(echo "$GET_PURCHASES_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+    fi
+    if echo "$GET_PURCHASES_RESPONSE" | sed '$d' | grep -q '"resellable":true'; then
+      ok "Purchase history includes resellable flag"
+    fi
+  else
+    warn "Get purchase history failed - HTTP $GET_PURCHASES_CODE"
+  fi
+  
+  # Test 13g: Get resellable purchases (eBay-style)
+  say "Test 13g: Shopping Service - Get Resellable Purchases via HTTP/2"
+  GET_RESELLABLE_RC=0
+  GET_RESELLABLE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Authorization: Bearer $TOKEN" \
+    -X GET "https://$HOST:8443/api/resell/purchases" 2>&1) || GET_RESELLABLE_RC=$?
+  GET_RESELLABLE_CODE=$(echo "$GET_RESELLABLE_RESPONSE" | tail -1)
+  if [[ "$GET_RESELLABLE_RC" -ne 0 ]]; then
+    warn "Get resellable purchases request failed (curl exit $GET_RESELLABLE_RC)"
+  elif [[ "$GET_RESELLABLE_CODE" == "200" ]]; then
+    ok "Get resellable purchases works via HTTP/2"
+    if [[ -z "${PURCHASE_ID:-}" ]]; then
+      PURCHASE_ID=$(echo "$GET_RESELLABLE_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+    fi
+  else
+    warn "Get resellable purchases failed - HTTP $GET_RESELLABLE_CODE"
+  fi
+  
+  # Test 13h: Resell purchase (eBay-style - create listing from purchase)
+  say "Test 13h: Shopping Service - Resell Purchase (eBay-style) via HTTP/2"
+  if [[ -n "${PURCHASE_ID:-}" ]]; then
+    RESELL_RC=0
+    RESELL_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+      --resolve "$HOST:8443:127.0.0.1" \
+      -H "Host: $HOST" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $TOKEN" \
+      -X POST "https://$HOST:8443/api/resell/$PURCHASE_ID" \
+      -d "{\"title\":\"Reselling Test Item\",\"description\":\"This is a test resell listing\",\"price\":35.99,\"currency\":\"USD\",\"listing_type\":\"fixed_price\",\"condition\":\"used\",\"category\":\"vinyl\",\"location\":\"US\",\"shipping_cost\":5.00,\"mark_as_resold\":true}" 2>&1) || RESELL_RC=$?
+    RESELL_CODE=$(echo "$RESELL_RESPONSE" | tail -1)
+    if [[ "$RESELL_RC" -ne 0 ]]; then
+      warn "Resell purchase request failed (curl exit $RESELL_RC)"
+    elif [[ "$RESELL_CODE" =~ ^(200|201)$ ]]; then
+      ok "Resell purchase works via HTTP/2 (eBay-style)"
+      RESELL_LISTING_ID=$(echo "$RESELL_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+      if echo "$RESELL_RESPONSE" | sed '$d' | grep -q '"resold_from_purchase"'; then
+        ok "Resell listing includes purchase metadata"
+      fi
+    else
+      warn "Resell purchase failed - HTTP $RESELL_CODE"
+      echo "Response body: $(echo "$RESELL_RESPONSE" | sed '$d' | head -10)"
+    fi
+  else
+    warn "Skipping resell purchase - Purchase ID not available"
+  fi
+  
+  # Test 13i: Search history
+  say "Test 13i: Shopping Service - Add Search History via HTTP/2"
+  ADD_SEARCH_RC=0
+  ADD_SEARCH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+    --resolve "$HOST:8443:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -X POST "https://$HOST:8443/api/history/searches" \
+    -d "{\"query\":\"test search\",\"query_type\":\"listing\",\"filters\":{\"min_price\":10,\"max_price\":100},\"result_count\":25}" 2>&1) || ADD_SEARCH_RC=$?
+  ADD_SEARCH_CODE=$(echo "$ADD_SEARCH_RESPONSE" | tail -1)
+  if [[ "$ADD_SEARCH_RC" -ne 0 ]]; then
+    warn "Add search history request failed (curl exit $ADD_SEARCH_RC)"
+  elif [[ "$ADD_SEARCH_CODE" =~ ^(200|201)$ ]]; then
+    ok "Add search history works via HTTP/2"
+  else
+    warn "Add search history failed - HTTP $ADD_SEARCH_CODE"
+  fi
+else
+  if [[ "${SKIP_SHOPPING:-}" == "1" ]]; then
+    warn "Skipping shopping service tests - SKIP_SHOPPING=1"
+  else
+    warn "Skipping shopping service tests - shopping-service not available or no auth token"
+  fi
 fi
 
 # Test 14: Logout (HTTP/2)

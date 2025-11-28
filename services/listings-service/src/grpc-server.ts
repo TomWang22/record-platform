@@ -112,8 +112,8 @@ const listingsService = {
       const listings = await getListingsByUser(userId, limit, offset);
 
       callback(null, {
-        listings: listings.map(formatListing),
-        count: listings.length,
+        listings: (Array.isArray(listings) ? listings : (listings as any).listings || []).map(formatListing),
+        count: Array.isArray(listings) ? listings.length : ((listings as any).total || ((listings as any).listings?.length || 0)),
       });
     } catch (error: any) {
       console.error("[gRPC] ListMyListings error:", error);
@@ -136,11 +136,11 @@ const listingsService = {
         offset: call.request.offset || 0,
       };
 
-      const listings = await searchListings(call.request.query || "", filters);
+      const result = await searchListings(call.request.query || "", filters);
 
       callback(null, {
-        listings: listings.map(formatListing),
-        count: listings.length,
+        listings: (result.listings || []).map(formatListing),
+        count: result.total || 0,
       });
     } catch (error: any) {
       console.error("[gRPC] SearchListings error:", error);

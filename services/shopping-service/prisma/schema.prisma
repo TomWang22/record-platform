@@ -80,6 +80,39 @@ model Wishlist {
   @@map("wishlist")
 }
 
+// Orders - checkout and purchase management
+model Order {
+  id                    String    @id @default(uuid())
+  userId                String    @map("user_id") @db.Uuid
+  orderNumber           String    @unique @map("order_number") @db.VarChar(64)
+  status                String    @default("pending") // 'pending', 'processing', 'completed', 'cancelled', 'refunded'
+  paymentStatus         String    @default("pending") @map("payment_status") // 'pending', 'processing', 'paid', 'failed', 'refunded'
+  paymentMethod         String?   @map("payment_method")
+  paymentTransactionId  String?   @map("payment_transaction_id") @db.Text
+  subtotal              Decimal   @default(0) @db.Decimal(10, 2)
+  shippingCost          Decimal   @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  tax                   Decimal   @default(0) @db.Decimal(10, 2)
+  total                 Decimal   @default(0) @db.Decimal(10, 2)
+  currency              String    @default("USD")
+  shippingAddress       Json?     @map("shipping_address")
+  billingAddress        Json?     @map("billing_address")
+  notes                 String?   @db.Text
+  metadata              Json?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  completedAt           DateTime? @map("completed_at")
+  cancelledAt           DateTime? @map("cancelled_at")
+
+  purchases             PurchaseHistory[]
+
+  @@index([userId])
+  @@index([orderNumber])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt(sort: Desc)])
+  @@map("orders")
+}
+
 // Purchase History - completed purchases
 model PurchaseHistory {
   id            String   @id @default(uuid())
@@ -95,10 +128,14 @@ model PurchaseHistory {
   status        String   @default("completed") // 'completed', 'pending', 'cancelled', 'refunded'
   purchasedAt   DateTime @default(now()) @map("purchased_at")
   metadata      Json?   // Full purchase details
+  resellable    Boolean  @default(true) // eBay-style reselling
+
+  order         Order    @relation(fields: [orderId], references: [id])
 
   @@index([userId, purchasedAt(sort: Desc)])
   @@index([orderId])
   @@index([itemId, itemType])
+  @@index([userId, resellable])
   @@map("purchase_history")
 }
 

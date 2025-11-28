@@ -1,4 +1,4 @@
-import { PrismaClient } from "../prisma/generated/client";
+import { PrismaClient } from "@prisma/client";
 import { randomInt } from "node:crypto";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
@@ -67,17 +67,31 @@ export async function sendEmailVerificationCode(
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
   // Store code in database
-  await prisma.$queryRaw`
-    INSERT INTO auth.verification_codes (user_id, type, target, code, expires_at, created_at)
-    VALUES (
-      ${userId ? `${userId}::uuid` : null},
-      'email',
-      ${email},
-      ${hashedCode},
-      ${expiresAt}::timestamptz,
-      NOW()
-    )
-  `;
+  if (userId) {
+    await prisma.$queryRaw`
+      INSERT INTO auth.verification_codes (user_id, type, target, code, expires_at, created_at)
+      VALUES (
+        ${userId}::uuid,
+        'email',
+        ${email},
+        ${hashedCode},
+        ${expiresAt}::timestamptz,
+        NOW()
+      )
+    `;
+  } else {
+    await prisma.$queryRaw`
+      INSERT INTO auth.verification_codes (user_id, type, target, code, expires_at, created_at)
+      VALUES (
+        NULL,
+        'email',
+        ${email},
+        ${hashedCode},
+        ${expiresAt}::timestamptz,
+        NOW()
+      )
+    `;
+  }
 
   // Send email
   const transporter = getEmailTransporter();
@@ -115,17 +129,31 @@ export async function sendSmsVerificationCode(
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
   // Store code in database
-  await prisma.$queryRaw`
-    INSERT INTO auth.verification_codes (user_id, type, target, code, expires_at, created_at)
-    VALUES (
-      ${userId ? `${userId}::uuid` : null},
-      'phone',
-      ${phone},
-      ${hashedCode},
-      ${expiresAt}::timestamptz,
-      NOW()
-    )
-  `;
+  if (userId) {
+    await prisma.$queryRaw`
+      INSERT INTO auth.verification_codes (user_id, type, target, code, expires_at, created_at)
+      VALUES (
+        ${userId}::uuid,
+        'phone',
+        ${phone},
+        ${hashedCode},
+        ${expiresAt}::timestamptz,
+        NOW()
+      )
+    `;
+  } else {
+    await prisma.$queryRaw`
+      INSERT INTO auth.verification_codes (user_id, type, target, code, expires_at, created_at)
+      VALUES (
+        NULL,
+        'phone',
+        ${phone},
+        ${hashedCode},
+        ${expiresAt}::timestamptz,
+        NOW()
+      )
+    `;
+  }
 
   // Send SMS
   const client = getSmsClient();

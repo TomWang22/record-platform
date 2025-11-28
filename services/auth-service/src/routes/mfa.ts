@@ -49,8 +49,8 @@ export function setupMFARoutes(prisma: PrismaClient): Router {
         return res.status(400).json({ error: "Code required" });
       }
 
-      // First verify the code
-      const isValid = await verifyMFA(prisma, userId, code);
+      // First verify the code (allow verification even if MFA not enabled yet - this is the setup verification)
+      const isValid = await verifyMFA(prisma, userId, code, true);
       if (!isValid) {
         return res.status(401).json({ error: "Invalid code" });
       }

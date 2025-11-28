@@ -19,13 +19,16 @@ RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 COPY --from=deps /app /app
 COPY services/common ./services/common
 COPY services/auth-service ./services/auth-service
-# Install any missing dependencies and build
+# Install any missing dependencies and build  
 RUN pnpm -w install --frozen-lockfile || true \
  && pnpm -C services/common build \
- && rm -rf services/auth-service/prisma/generated \
- && rm -rf services/auth-service/dist \
- && pnpm -C services/auth-service exec prisma generate --schema prisma/schema.prisma \
- && pnpm -C services/auth-service build
+ && cd services/auth-service \
+ && rm -rf prisma/generated dist \
+ && pnpm exec prisma generate \
+ && ls -la prisma/generated/client/ | head -3 \
+ && test -f prisma/generated/client/index.d.ts && echo "✓ index.d.ts exists" \
+ && test -f prisma/generated/client/index.js && echo "✓ index.js exists" \
+ && pnpm run build
 
 # --- runtime ---
 FROM node:20-bookworm-slim

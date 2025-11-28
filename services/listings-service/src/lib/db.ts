@@ -82,13 +82,15 @@ export async function createListing(data: {
   has_obi?: boolean;
   label_type?: string;
   stock_quantity?: number;
+  duration_days?: number;
+  visible_from?: Date;
 }) {
   const result = await pool.query(
     `INSERT INTO listings.listings (
       user_id, title, description, price, currency, listing_type,
       condition, category, location, shipping_cost, shipping_method, expires_at,
-      media_type, has_obi, label_type, stock_quantity
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      media_type, has_obi, label_type, stock_quantity, duration_days, visible_from
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     RETURNING *`,
     [
       data.user_id,
@@ -107,6 +109,8 @@ export async function createListing(data: {
       data.has_obi || false,
       data.label_type || null,
       data.stock_quantity || 1,
+      data.duration_days || 30,
+      data.visible_from || new Date(),
     ]
   );
 
@@ -302,7 +306,13 @@ export async function searchListings(query: string, filters?: {
   limit?: number;
   offset?: number;
 }) {
-  const conditions: string[] = ['l.is_active = true', 'l.stock_quantity > 0', 'l.sold_at IS NULL'];
+  const conditions: string[] = [
+    'l.is_active = true', 
+    'l.stock_quantity > 0', 
+    'l.sold_at IS NULL',
+    '(l.visible_from IS NULL OR l.visible_from <= NOW())',
+    '(l.visible_until IS NULL OR l.visible_until >= NOW())'
+  ];
   const params: any[] = [];
   let paramIndex = 1;
 
@@ -383,6 +393,16 @@ export async function searchListings(query: string, filters?: {
     }
   }
 
+  // Get total count for pagination
+  const countResult = await pool.query(
+    `SELECT COUNT(*) as total
+     FROM listings.listings l
+     LEFT JOIN listings.auction_details ad ON l.id = ad.listing_id AND l.listing_type = 'auction'
+     WHERE ${conditions.join(' AND ')}`,
+    params
+  );
+  const total = parseInt(countResult.rows[0]?.total || '0', 10);
+
   const result = await pool.query(
     `SELECT l.*, 
             (SELECT json_agg(
@@ -410,7 +430,16 @@ export async function searchListings(query: string, filters?: {
               ELSE NULL
             END as auction_info,
             l.seller_rating,
-            l.seller_rating_count
+            l.seller_rating_count,
+            CASE 
+              WHEN l.visible_from IS NOT NULL AND l.visible_until IS NOT NULL THEN json_build_object(
+                'visible_from', l.visible_from,
+                'visible_until', l.visible_until,
+                'duration_days', l.duration_days,
+                'days_remaining', EXTRACT(EPOCH FROM (l.visible_until - NOW())) / 86400
+              )
+              ELSE NULL
+            END as visibility_timeline
      FROM listings.listings l
      LEFT JOIN listings.auction_details ad ON l.id = ad.listing_id AND l.listing_type = 'auction'
      WHERE ${conditions.join(' AND ')}
@@ -419,6 +448,12 @@ export async function searchListings(query: string, filters?: {
     [...params, limit, offset]
   );
 
-  return result.rows;
+  return {
+    listings: result.rows,
+    total,
+    limit,
+    offset,
+    hasMore: offset + result.rows.length < total
+  };
 }
 

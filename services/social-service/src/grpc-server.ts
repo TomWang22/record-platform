@@ -195,19 +195,37 @@ const socialService = {
 
   async CreateComment(call: any, callback: any) {
     const { post_id, user_id, content, parent_id } = call.request
-    callback(null, {
-      comment: {
-        id: 'placeholder-comment-id',
-        post_id,
-        user_id,
-        parent_id: parent_id || '',
-        content,
-        upvotes: 0,
-        downvotes: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    })
+    try {
+      // Insert comment into database
+      const insertQuery = `
+        INSERT INTO forum.comments (post_id, user_id, parent_id, content)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, post_id, user_id, parent_id, content, upvotes, downvotes,
+                  created_at, updated_at
+      `
+      const { rows } = await pool.query(insertQuery, [post_id, user_id, parent_id || null, content])
+      const comment = rows[0]
+      
+      callback(null, {
+        comment: {
+          id: comment.id,
+          post_id: comment.post_id,
+          user_id: comment.user_id,
+          parent_id: comment.parent_id || '',
+          content: comment.content,
+          upvotes: comment.upvotes,
+          downvotes: comment.downvotes,
+          created_at: comment.created_at.toISOString(),
+          updated_at: comment.updated_at.toISOString(),
+        },
+      })
+    } catch (error: any) {
+      console.error('[gRPC] CreateComment error:', error)
+      callback({
+        code: 13, // INTERNAL
+        message: error.message || 'Failed to create comment',
+      })
+    }
   },
 
   async UpdateComment(call: any, callback: any) {

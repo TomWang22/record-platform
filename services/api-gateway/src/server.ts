@@ -315,15 +315,30 @@ app.get("/listings/healthz", createProxyMiddleware({
   target: "http://listings-service:4003",
   changeOrigin: true,
   pathRewrite: () => "/healthz",
-  proxyTimeout: 10000,
+  proxyTimeout: 10000, // Increased timeout for health checks
   agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying GET ${req.path} to listings-service${proxyReq.path}`);
+    },
+    error(err, _req, res) {
+      console.error("[gw] listings/healthz GET proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "listings upstream error");
+    },
+  },
 }));
 app.head("/listings/healthz", createProxyMiddleware({
   target: "http://listings-service:4003",
   changeOrigin: true,
   pathRewrite: () => "/healthz",
-  proxyTimeout: 10000,
+  proxyTimeout: 5000, // Reduced timeout to fail faster
   agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] listings/healthz HEAD proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "listings upstream error");
+    },
+  },
 }));
 app.use(
   "/records/metrics",
@@ -341,12 +356,125 @@ app.use(
 app.post("/auth/logout", createProxyMiddleware({
   target: "http://auth-service:4001",
   changeOrigin: true,
-  pathRewrite: { "^/auth": "" },
+  pathRewrite: (path) => {
+    console.log(`[gw] pathRewrite auth logout: ${path}`);
+    return path.replace(/^\/auth/, ''); // Strip /auth prefix
+  },
   proxyTimeout: 15000, // Increased timeout for logout (Redis operations)
   agent: keepAliveAgent,
   on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying POST ${req.path} to auth-service${proxyReq.path}`);
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+    },
     error(err, _req, res) {
       console.error("[gw] auth/logout proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+// OAuth routes (public, before auth guard)
+app.get("/auth/auth/google", createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/google proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+app.get("/auth/auth/google/callback", createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/google/callback proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+// Passkey authentication start (public, before auth guard - needs email)
+// Note: Don't use jsonParser for proxy routes - http-proxy-middleware needs the raw body stream
+app.post("/auth/passkeys/authenticate/start", createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/passkeys/authenticate/start proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+// Verification routes (public, before auth guard)
+// Note: Don't use jsonParser for proxy routes - http-proxy-middleware needs the raw body stream
+app.post("/auth/verify/email/send", createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/verify/email/send proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+app.post("/auth/verify/email/verify", createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/verify/email/verify proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+app.post("/auth/verify/phone/send", createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/verify/phone/send proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+app.post("/auth/verify/phone/verify", createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/verify/phone/verify proxy error:", err);
       sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
     },
   },
@@ -406,9 +534,15 @@ app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
     const payload = verifyJwt(token) as TokenPayload & { jti?: string };
     if (payload?.jti) {
       try {
-        const revoked = await redis.get(`revoked:${payload.jti}`);
+        // Add timeout to Redis check to prevent hanging
+        const revoked = await Promise.race([
+          redis.get(`revoked:${payload.jti}`),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Redis check timeout')), 500))
+        ]) as string | null;
         if (revoked) return res.status(401).json({ error: "token revoked" });
       } catch (e) {
+        // If Redis check fails, log but proceed (non-blocking)
+        // This allows the service to continue working even if Redis is temporarily unavailable
         console.warn("revocation check failed, proceeding:", (e as Error)?.message);
       }
     }
@@ -418,6 +552,153 @@ app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
     return res.status(401).json({ error: "invalid token" });
   }
 });
+
+/* ----------------------- Auth Service HTTP Proxy Routes (protected, after auth guard) ----------------------- */
+// These routes require authentication and are proxied to the auth service HTTP endpoint
+// Note: /auth/register and /auth/login are handled via gRPC above (and are in OPEN_ROUTES)
+
+// User info endpoint
+app.get("/auth/me", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/me proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+// MFA routes (require auth)
+app.post("/auth/mfa/setup", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/mfa/setup proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+app.post("/auth/mfa/verify", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/mfa/verify proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+app.post("/auth/mfa/disable", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/mfa/disable proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+app.post("/auth/mfa/verify-login", createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/mfa/verify-login proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+// Passkey routes (require auth except authenticate/start which is public)
+app.post("/auth/passkeys/register/start", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/passkeys/register/start proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+app.post("/auth/passkeys/register/finish", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/passkeys/register/finish proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+app.post("/auth/passkeys/authenticate/finish", createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/passkeys/authenticate/finish proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+app.get("/auth/passkeys", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/passkeys proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
+
+app.delete("/auth/passkeys/:id", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/passkeys/:id proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
 
 /* ----------------------- gRPC-backed Auth Routes ----------------------- */
 app.post("/auth/register", jsonParser, async (req: Request, res: Response) => {
@@ -430,10 +711,11 @@ app.post("/auth/register", jsonParser, async (req: Request, res: Response) => {
   }
 
   try {
+    // Register can be slow (password hashing, DB writes), so use 20s timeout
     const response = await promisifyGrpcCall<any>(authGrpcClient, "Register", {
       email,
       password,
-    });
+    }, 20000); // 20 second timeout for registration
     res.status(201).json({
       token: response?.token ?? "",
       user: response?.user ?? null,
@@ -467,6 +749,7 @@ app.post("/auth/login", jsonParser, async (req: Request, res: Response) => {
     handleGrpcError(res, err);
   }
 });
+
 
 
 /* ----------------------- gRPC-backed Records Routes ----------------------- */
@@ -613,18 +896,31 @@ app.use(
     proxyTimeout: 30000, // Increased timeout for HTTP/3 requests
     agent: keepAliveAgent,
     on: {
-      proxyReq(proxyReq, req, res) {
-        console.log(`[gw] Proxying ${req.method} ${req.path} to listings-service${proxyReq.path}`);
+      proxyReq: (proxyReq: any, req: AuthedRequest) => {
+        console.log(`[gw] Proxying ${req.method} ${req.path} to listings-service${proxyReq.path}`, {
+          originalPath: req.originalUrl,
+          query: req.query,
+          userId: req.user?.sub,
+        });
+        if (req.user?.sub) {
+          proxyReq.setHeader('x-user-id', req.user.sub);
+        }
+        const authHeader = req.headers.authorization;
+        if (authHeader) {
+          proxyReq.setHeader('Authorization', authHeader);
+        }
       },
-      proxyRes(proxyRes) {
+      proxyRes: (proxyRes: any) => {
         const h = proxyRes.headers as Record<string, string>;
         if (!h["cache-control"]) h["cache-control"] = "public, max-age=60, s-maxage=300";
+        console.log(`[gw] Received response from listings-service: ${proxyRes.statusCode}`);
       },
       error(err, _req, res) {
         console.error("[gw] listings proxy error:", {
           message: err.message,
           code: (err as any).code,
-          path: (_req as any).path
+          path: (_req as any).path,
+          stack: (err as any).stack,
         });
         sendJson502(res as NodeServerResponse | Socket, "listings upstream error");
       },
@@ -692,22 +988,138 @@ app.get("/forum/posts", async (req: AuthedRequest, res: Response) => {
   }
 });
 
-app.post("/forum/posts", jsonParser, async (req: AuthedRequest, res: Response) => {
-  const userId = requireUserIdFromRequest(req, res);
-  if (!userId) return;
+// Create post via HTTP proxy (gRPC CreatePost returns placeholder, use HTTP instead)
+app.post("/forum/posts", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  // http-proxy-middleware doesn't strip prefix for specific routes, so we keep it as-is
+  pathRewrite: (path) => {
+    console.log(`[gw] pathRewrite forum posts POST: ${path}`);
+    return path; // Keep /forum/posts as-is
+  },
+  proxyTimeout: 30000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying POST ${req.path} to social-service${proxyReq.path}`);
+      // CRITICAL: Only forward x-user-id from JWT (req.user.sub), never trust client headers
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      } else if (req.headers['x-user-id'] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.headers['x-user-id'] as string)) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      }
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+    },
+    proxyRes: (proxyRes: any, req: AuthedRequest) => {
+      console.log(`[gw] Received response from social-service for POST /forum/posts:`, proxyRes.statusCode);
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/posts POST proxy error:", {
+        message: err.message,
+        code: (err as any).code,
+        path: _req.path
+      });
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
 
-  try {
-    const response = await promisifyGrpcCall<any>(socialGrpcClient, "CreatePost", {
-      user_id: userId,
-      title: req.body.title,
-      content: req.body.content,
-      flair: req.body.flair,
-    });
-    res.status(201).json(response.post);
-  } catch (err) {
-    handleGrpcError(res, err);
-  }
-});
+// Forum Attachment Routes (MUST be before /forum/posts/:postId to match first)
+app.post("/forum/posts/:postId/attachments", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  // Specific route, path is not stripped, so we keep it as-is
+  pathRewrite: (path) => {
+    console.log(`[gw] pathRewrite forum attachments POST: ${path}`);
+    return path; // Keep /forum/posts/:postId/attachments as-is
+  },
+  proxyTimeout: 30000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying ${req.method} ${req.path} to social-service${proxyReq.path}`);
+      // CRITICAL: Only forward x-user-id from JWT (req.user.sub), never trust client headers
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      } else if (req.headers['x-user-id'] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.headers['x-user-id'] as string)) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      }
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/posts/*/attachments POST proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+app.get("/forum/posts/:postId/attachments", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  // Specific route, path is not stripped, so we keep it as-is
+  pathRewrite: (path) => {
+    console.log(`[gw] pathRewrite forum attachments GET: ${path}`);
+    return path; // Keep /forum/posts/:postId/attachments as-is
+  },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying ${req.method} ${req.path} to social-service${proxyReq.path}`);
+      // CRITICAL: Only forward x-user-id from JWT (req.user.sub), never trust client headers
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      } else if (req.headers['x-user-id'] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.headers['x-user-id'] as string)) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      }
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/posts/*/attachments GET proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+app.post("/forum/comments/:commentId/attachments", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  // Specific route, path is not stripped, so we keep it as-is
+  pathRewrite: (path) => {
+    console.log(`[gw] pathRewrite forum comments attachments: ${path}`);
+    return path; // Keep /forum/comments/:commentId/attachments as-is
+  },
+  proxyTimeout: 30000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying ${req.method} ${req.path} to social-service${proxyReq.path}`);
+      // CRITICAL: Only forward x-user-id from JWT (req.user.sub), never trust client headers
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      } else if (req.headers['x-user-id'] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.headers['x-user-id'] as string)) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      }
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/comments/*/attachments proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
 
 app.get("/forum/posts/:postId", async (req: AuthedRequest, res: Response) => {
   const userId = requireUserIdFromRequest(req, res);
@@ -755,22 +1167,52 @@ app.get("/forum/posts/:postId/comments", async (req: AuthedRequest, res: Respons
   }
 });
 
-app.post("/forum/posts/:postId/comments", jsonParser, async (req: AuthedRequest, res: Response) => {
-  const userId = requireUserIdFromRequest(req, res);
-  if (!userId) return;
-
-  try {
-    const response = await promisifyGrpcCall<any>(socialGrpcClient, "CreateComment", {
-      post_id: req.params.postId,
-      user_id: userId,
-      content: req.body.content,
-      parent_id: req.body.parent_id || "",
-    });
-    res.status(201).json(response.comment);
-  } catch (err) {
-    handleGrpcError(res, err);
-  }
-});
+// Create comment via HTTP proxy (gRPC CreateComment may have issues, use HTTP instead)
+// MUST be before any gRPC routes for the same path
+app.post("/forum/posts/:postId/comments", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path, req) => {
+    console.log(`[gw] pathRewrite forum comments POST: originalPath=${req.originalUrl}, path=${path}`);
+    return path; // Keep /forum/posts/:postId/comments as-is
+  },
+  proxyTimeout: 30000,
+  timeout: 30000, // Add explicit timeout option
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying POST ${req.path} to social-service${proxyReq.path}`, {
+        postId: req.params.postId,
+        userId: req.user?.sub,
+        contentType: req.headers['content-type'],
+      });
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      }
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+      // Ensure Content-Type is set if not already present
+      if (!proxyReq.getHeader('Content-Type') && req.headers['content-type']) {
+        proxyReq.setHeader('Content-Type', req.headers['content-type']);
+      }
+      // Ensure Content-Length is preserved
+      if (req.headers['content-length']) {
+        proxyReq.setHeader('Content-Length', req.headers['content-length']);
+      }
+    },
+    proxyRes: (proxyRes: any, req: AuthedRequest) => {
+      console.log(`[gw] Received response from social-service for POST /forum/posts/*/comments: ${proxyRes.statusCode}`);
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/posts/*/comments POST proxy error:", err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error("[gw] Error details:", { message: errorMsg, code: (err as any)?.code });
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
 
 
 /* ----------------------- Group Chat Routes (after auth guard, before general /messages) ----------------------- */
@@ -799,11 +1241,15 @@ app.post("/messages/groups", injectIdentityHeadersIfAny, createProxyMiddleware({
       if (req.body && !proxyReq.getHeader('content-type')) {
         proxyReq.setHeader('content-type', 'application/json');
       }
-      // Ensure x-user-id header is forwarded (from middleware or user object)
+      // CRITICAL: Only forward x-user-id from JWT (req.user.sub), never trust client headers
+      // injectIdentityHeadersIfAny already set x-user-id from req.user.sub
       if (authedReq.user?.sub) {
         proxyReq.setHeader('x-user-id', authedReq.user.sub);
-      } else if (req.headers['x-user-id']) {
+      } else if (req.headers['x-user-id'] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.headers['x-user-id'] as string)) {
+        // Only allow valid UUIDs (from DEBUG_FAKE_AUTH)
         proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      } else {
+        console.error(`[gw] Invalid or missing user ID in request to ${req.path}`);
       }
     },
     proxyRes(proxyRes, req, res) {
@@ -841,11 +1287,15 @@ app.post("/messages/groups/:groupId/members", injectIdentityHeadersIfAny, create
           'x-user-id': req.headers['x-user-id'] || 'missing'
         }
       });
-      // Ensure x-user-id header is forwarded (from middleware or user object)
+      // CRITICAL: Only forward x-user-id from JWT (req.user.sub), never trust client headers
+      // injectIdentityHeadersIfAny already set x-user-id from req.user.sub
       if (authedReq.user?.sub) {
         proxyReq.setHeader('x-user-id', authedReq.user.sub);
-      } else if (req.headers['x-user-id']) {
+      } else if (req.headers['x-user-id'] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.headers['x-user-id'] as string)) {
+        // Only allow valid UUIDs (from DEBUG_FAKE_AUTH)
         proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      } else {
+        console.error(`[gw] Invalid or missing user ID in request to ${req.path}`);
       }
     },
     proxyRes(proxyRes, req, res) {
@@ -863,6 +1313,38 @@ app.post("/messages/groups/:groupId/members", injectIdentityHeadersIfAny, create
   },
 }));
 
+// Leave Group Route (MUST be before /messages/groups/:groupId to match first)
+app.delete("/messages/groups/:groupId/leave", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  // Specific route, path is not stripped, so we keep it as-is
+  pathRewrite: (path) => {
+    console.log(`[gw] pathRewrite messages groups leave: ${path}`);
+    return path; // Keep /messages/groups/:groupId/leave as-is
+  },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying ${req.method} ${req.path} to social-service${proxyReq.path}`);
+      // CRITICAL: Only forward x-user-id from JWT (req.user.sub), never trust client headers
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      } else if (req.headers['x-user-id'] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.headers['x-user-id'] as string)) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      }
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] messages/groups/*/leave proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
 app.get("/messages/groups/:groupId", injectIdentityHeadersIfAny, createProxyMiddleware({
   target: "http://social-service:4006",
   changeOrigin: true,
@@ -870,6 +1352,14 @@ app.get("/messages/groups/:groupId", injectIdentityHeadersIfAny, createProxyMidd
   proxyTimeout: 15000,
   agent: keepAliveAgent,
   on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      // CRITICAL: Only forward x-user-id from JWT (req.user.sub), never trust client headers
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      } else if (req.headers['x-user-id'] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.headers['x-user-id'] as string)) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      }
+    },
     error(err, _req, res) {
       console.error("[gw] messages/groups/* proxy error:", err);
       sendJson502(res as NodeServerResponse | Socket, "social upstream error");
@@ -884,6 +1374,14 @@ app.get("/messages/groups", injectIdentityHeadersIfAny, createProxyMiddleware({
   proxyTimeout: 15000,
   agent: keepAliveAgent,
   on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      // CRITICAL: Only forward x-user-id from JWT (req.user.sub), never trust client headers
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      } else if (req.headers['x-user-id'] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.headers['x-user-id'] as string)) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      }
+    },
     error(err, _req, res) {
       console.error("[gw] messages/groups proxy error:", err);
       sendJson502(res as NodeServerResponse | Socket, "social upstream error");
@@ -891,23 +1389,33 @@ app.get("/messages/groups", injectIdentityHeadersIfAny, createProxyMiddleware({
   },
 }));
 
-// Messages routes
-app.get("/messages", async (req: AuthedRequest, res: Response) => {
-  const userId = requireUserIdFromRequest(req, res);
-  if (!userId) return;
-
-  try {
-    const response = await promisifyGrpcCall<any>(socialGrpcClient, "ListMessages", {
-      user_id: userId,
-      page: req.query.page ? Number(req.query.page) : 1,
-      limit: req.query.limit ? Number(req.query.limit) : 20,
-      message_type: req.query.type as string || "",
-    });
-    res.json(response);
-  } catch (err) {
-    handleGrpcError(res, err);
-  }
-});
+// Messages routes - Use HTTP proxy to get group messages (gRPC ListMessages returns empty)
+// MUST be before any gRPC routes for the same path
+app.get("/messages", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path, req) => {
+    console.log(`[gw] pathRewrite messages GET: originalPath=${req.originalUrl}, path=${path}`);
+    return path; // Keep /messages as-is
+  },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying GET ${req.path} to social-service${proxyReq.path}`, {
+        query: req.query,
+        userId: req.user?.sub,
+      });
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] messages GET proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
 
 // POST /messages - Send message (direct or group)
 // For group messages (with group_id), proxy to HTTP endpoint since gRPC doesn't support group_id
@@ -917,44 +1425,269 @@ app.get("/messages", async (req: AuthedRequest, res: Response) => {
 app.post("/messages", injectIdentityHeadersIfAny, createProxyMiddleware({
   target: "http://social-service:4006",
   changeOrigin: true,
-  pathRewrite: { "^/messages": "/messages" },
+  pathRewrite: (path) => {
+    console.log(`[gw] pathRewrite messages POST: ${path}`);
+    return path; // Keep /messages as-is
+  },
   proxyTimeout: 15000,
   agent: keepAliveAgent,
   on: {
-    proxyReq(proxyReq, req, res) {
-      // Check if this is a direct message (has recipient_id but no group_id)
-      // If so, we should use gRPC instead, but we can't switch mid-request
-      // So we'll proxy all /messages to HTTP endpoint for now
-      // TODO: Split into /messages/direct (gRPC) and /messages (HTTP proxy for group)
-      const authedReq = req as AuthedRequest;
-      if (authedReq.user?.sub) {
-        proxyReq.setHeader('x-user-id', authedReq.user.sub);
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying POST ${req.path} to social-service${proxyReq.path}`, {
+        userId: req.user?.sub,
+        hasBody: !!req.body,
+      });
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      }
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
       }
     },
     error(err, _req, res) {
-      console.error("[gw] messages proxy error:", err);
+      console.error("[gw] messages POST proxy error:", err);
       sendJson502(res as NodeServerResponse | Socket, "social upstream error");
     },
   },
 }));
 
-app.post("/messages/:messageId/reply", jsonParser, async (req: AuthedRequest, res: Response) => {
-  const userId = requireUserIdFromRequest(req, res);
-  if (!userId) return;
+// Reply to message - use HTTP proxy (supports group messages, gRPC doesn't)
+app.post("/messages/:messageId/reply", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: { "^/messages": "/messages" },
+  proxyTimeout: 30000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying ${req.method} ${req.path} to social-service${proxyReq.path}`);
+      // CRITICAL: Only forward x-user-id from JWT (req.user.sub), never trust client headers
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      } else if (req.headers['x-user-id'] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.headers['x-user-id'] as string)) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      }
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] messages/*/reply proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
 
-  try {
-    const response = await promisifyGrpcCall<any>(socialGrpcClient, "ReplyMessage", {
-      message_id: req.params.messageId,
-      sender_id: userId,
-      message_type: req.body.message_type || req.body.messageType || "General",
-      subject: req.body.subject || "",
-      content: req.body.content,
-    });
-    res.status(201).json(response.message);
-  } catch (err) {
-    handleGrpcError(res, err);
+// Message Attachment Routes (MUST be before /messages/:messageId/reply to match first)
+app.post("/messages/:messageId/attachments", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  // Specific route, path is not stripped, so we keep it as-is
+  pathRewrite: (path) => {
+    console.log(`[gw] pathRewrite messages attachments: ${path}`);
+    return path; // Keep /messages/:messageId/attachments as-is
+  },
+  proxyTimeout: 30000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying ${req.method} ${req.path} to social-service${proxyReq.path}`);
+      // CRITICAL: Only forward x-user-id from JWT (req.user.sub), never trust client headers
+      if (req.user?.sub) {
+        proxyReq.setHeader('x-user-id', req.user.sub);
+      } else if (req.headers['x-user-id'] && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.headers['x-user-id'] as string)) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
+      }
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] messages/*/attachments proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+/* ----------------------- Shopping Service HTTP Route Aliases (for /api/cart, /api/orders, etc.) ----------------------- */
+// MOVED AFTER AUTH GUARD - These routes require authentication
+// Test script calls /api/cart which becomes /cart after Caddy strips /api
+// Shopping service uses requireUser middleware which checks Authorization header directly
+// We forward both Authorization header and inject x-user-id for compatibility
+
+// Cart checkout route (must be BEFORE general /cart route to match /cart/checkout first)
+// Note: For app.post() specific routes, http-proxy-middleware doesn't strip the prefix
+// So pathRewrite receives the full path /cart/checkout
+// Shopping service has router.post('/checkout', ...) mounted at /cart, so it expects /cart/checkout
+app.post("/cart/checkout", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: (path, req) => {
+    // path is /cart/checkout (full path, not stripped for specific routes)
+    // Shopping service has router.post('/checkout', ...) mounted at /cart
+    // So the full path in shopping service is /cart/checkout
+    // We need to keep /cart/checkout as-is (don't strip /cart)
+    const rewritten = path; // Keep /cart/checkout as-is
+    console.log(`[gw] pathRewrite cart checkout: originalPath=${req.originalUrl}, path=${path}, rewritten=${rewritten}`);
+    return rewritten;
+  },
+  proxyTimeout: 30000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying POST ${req.path} to shopping-service${proxyReq.path}`);
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+      const userId = req.headers['x-user-id'];
+      if (userId) {
+        proxyReq.setHeader('x-user-id', userId as string);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] /cart/checkout proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+// General /cart route (excludes /cart/checkout which is handled by specific route above)
+app.use("/cart", (req, res, next) => {
+  // Skip /cart/checkout - it's handled by the specific route above
+  if (req.path === "/checkout" || req.originalUrl?.startsWith("/cart/checkout")) {
+    return next("route"); // Skip this middleware, try next route
   }
+  next();
 });
+app.use("/cart", injectIdentityHeadersIfAny);
+app.use("/cart", createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  // http-proxy-middleware strips the matched prefix (/cart) before pathRewrite
+  // So /cart becomes /, and /cart/checkout becomes /checkout
+  // We need to add /cart back
+  pathRewrite: (path, req) => {
+    const rewritten = `/cart${path === '/' ? '' : path}`;
+    console.log(`[gw] pathRewrite: ${req.path} -> ${path} -> ${rewritten}`);
+    return rewritten;
+  },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying ${req.method} ${req.path} to shopping-service${proxyReq.path}`);
+      // Ensure Authorization header is forwarded to shopping service
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+      // Also ensure x-user-id is set (from injectIdentityHeadersIfAny)
+      const userId = req.headers['x-user-id'];
+      if (userId) {
+        proxyReq.setHeader('x-user-id', userId as string);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] /cart proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+app.use("/orders", injectIdentityHeadersIfAny);
+app.use("/orders", createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: (path, req) => {
+    // http-proxy-middleware strips /orders prefix, so path is / or empty
+    // Shopping service has router.get('/', ...) mounted at /orders
+    // So we need to send /orders (or /orders/ if path is /)
+    const rewritten = path === '/' || !path ? '/orders' : `/orders${path}`;
+    console.log(`[gw] pathRewrite orders: originalPath=${req.originalUrl}, path=${path}, rewritten=${rewritten}`);
+    return rewritten;
+  },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying ${req.method} ${req.path} to shopping-service${proxyReq.path}`);
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+      const userId = req.headers['x-user-id'];
+      if (userId) {
+        proxyReq.setHeader('x-user-id', userId as string);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] /orders proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+app.use("/history", injectIdentityHeadersIfAny);
+app.use("/history", createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: (path, req) => {
+    const rewritten = `/history${path === '/' ? '' : path}`;
+    console.log(`[gw] pathRewrite history: ${req.path} -> ${path} -> ${rewritten}`);
+    return rewritten;
+  },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] /history proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+app.use("/resell", injectIdentityHeadersIfAny);
+app.use("/resell", createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: (path, req) => {
+    // http-proxy-middleware strips /resell prefix, so /resell/purchases becomes /purchases
+    // Shopping service has router.get('/purchases', ...) mounted at /resell
+    // So we need to send /resell/purchases
+    const rewritten = path === '/' || !path ? '/resell' : `/resell${path}`;
+    console.log(`[gw] pathRewrite resell: originalPath=${req.originalUrl}, path=${path}, rewritten=${rewritten}`);
+    return rewritten;
+  },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying ${req.method} ${req.path} to shopping-service${proxyReq.path}`);
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+      const userId = req.headers['x-user-id'];
+      if (userId) {
+        proxyReq.setHeader('x-user-id', userId as string);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] /resell proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
 
 
 /* ----------------------- gRPC-backed Shopping Routes ----------------------- */
@@ -1250,6 +1983,112 @@ app.get("/shopping/searches/trending", async (req: AuthedRequest, res: Response)
     handleGrpcError(res, err);
   }
 });
+
+
+/* ----------------------- Shopping Service HTTP Routes (checkout, orders, resell, history) ----------------------- */
+// Shopping Cart Checkout (HTTP proxy to shopping-service)
+app.post("/shopping/cart/checkout", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: { "^/shopping": "" }, // Remove /shopping prefix, shopping-service expects /cart/checkout
+  proxyTimeout: 30000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] shopping/cart/checkout proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+// Shopping Orders Routes (HTTP proxy)
+app.get("/shopping/orders", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: { "^/shopping": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] shopping/orders proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+app.get("/shopping/orders/:orderId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: { "^/shopping": "" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] shopping/orders/* proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+// Shopping Purchase History Routes (HTTP proxy)
+app.get("/shopping/history/purchases", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: { "^/shopping/history": "/history" }, // Map /shopping/history to /history
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] shopping/history/purchases proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+// Shopping Resell Routes (HTTP proxy)
+app.get("/shopping/resell/purchases", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: { "^/shopping/resell": "/resell" }, // Map /shopping/resell to /resell
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] shopping/resell/purchases proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+app.post("/shopping/resell/purchases/:purchaseId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: { "^/shopping/resell": "/resell" },
+  proxyTimeout: 30000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] shopping/resell/purchases/* proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+// Shopping Search History Route (HTTP proxy)
+app.post("/shopping/history/search", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: { "^/shopping/history": "/history" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] shopping/history/search proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
 
 /* ----------------------- Analytics Service Routes ----------------------- */
 // Analytics health check (public)

@@ -36,12 +36,26 @@ export function setupVerificationRoutes(prisma: PrismaClient): Router {
 
       const result = await sendEmailVerificationCode(prisma, userId, email);
       if (!result.success) {
+        // If service is not configured, return 503 instead of 500
+        if (result.message?.includes("not configured") || result.message?.includes("SMTP")) {
+          return res.status(503).json({ 
+            error: "Email service not configured", 
+            message: "SMTP credentials are required. Please configure SMTP_USER and SMTP_PASSWORD environment variables." 
+          });
+        }
         return res.status(500).json({ error: result.message || "Failed to send verification code" });
       }
 
       res.json({ success: true, message: "Verification code sent" });
     } catch (error: any) {
       console.error("Send email verification error:", error);
+      // Check if it's a service configuration error
+      if (error.message?.includes("not configured") || error.message?.includes("SMTP")) {
+        return res.status(503).json({ 
+          error: "Email service not configured", 
+          message: "SMTP credentials are required. Please configure SMTP_USER and SMTP_PASSWORD environment variables." 
+        });
+      }
       res.status(500).json({ error: "Failed to send verification code" });
     }
   });
@@ -79,12 +93,26 @@ export function setupVerificationRoutes(prisma: PrismaClient): Router {
 
       const result = await sendSmsVerificationCode(prisma, userId, phone);
       if (!result.success) {
+        // If service is not configured, return 503 instead of 500
+        if (result.message?.includes("not configured") || result.message?.includes("Twilio")) {
+          return res.status(503).json({ 
+            error: "SMS service not configured", 
+            message: "Twilio credentials are required. Please configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables." 
+          });
+        }
         return res.status(500).json({ error: result.message || "Failed to send verification code" });
       }
 
       res.json({ success: true, message: "Verification code sent" });
     } catch (error: any) {
       console.error("Send SMS verification error:", error);
+      // Check if it's a service configuration error
+      if (error.message?.includes("not configured") || error.message?.includes("Twilio")) {
+        return res.status(503).json({ 
+          error: "SMS service not configured", 
+          message: "Twilio credentials are required. Please configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables." 
+        });
+      }
       res.status(500).json({ error: "Failed to send verification code" });
     }
   });

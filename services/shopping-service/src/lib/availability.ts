@@ -1,10 +1,11 @@
 import { Pool } from 'pg';
 
 // Create a separate pool for listings DB queries
-// Note: This assumes listings DB is accessible from shopping service
-// In production, you might want to use a service-to-service call instead
-const listingsPool = new Pool({
-  connectionString: process.env.POSTGRES_URL_LISTINGS || process.env.POSTGRES_URL || 'postgresql://postgres:postgres@localhost:5435/records',
+// Listings database is on port 5435 (record-platform-postgres-listings-1)
+// Connection string format: postgresql://user:password@host:port/database
+export const listingsPool = new Pool({
+  connectionString: process.env.POSTGRES_URL_LISTINGS || 
+    'postgresql://postgres:postgres@host.docker.internal:5435/records',
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
@@ -46,6 +47,7 @@ export async function checkCartAvailability(
   pool: Pool,
   userId: string
 ): Promise<Array<{ cartItemId: string; itemId: string; itemType: string; reason: string }>> {
+  // Use the same pool for listings queries (listings schema is in records DB)
   try {
     // Get all cart items
     const cartItems = await pool.query(
@@ -59,31 +61,46 @@ export async function checkCartAvailability(
 
     for (const item of cartItems.rows) {
       if (item.item_type === 'listing' && item.listing_id) {
-        // Check listing availability (using listings DB pool)
-        const listing = await listingsPool.query(
-          `SELECT is_active, sold_at, stock_quantity
-           FROM listings.listings
-           WHERE id = $1::uuid`,
-          [item.listing_id]
-        );
+        // Check listing availability (using listings DB pool - listings DB is on port 5435)
+        // Add timeout to prevent hanging
+        try {
+          const listing = await Promise.race([
+            listingsPool.query(
+              `SELECT is_active, sold_at, stock_quantity
+               FROM listings.listings
+               WHERE id = $1::uuid`,
+              [item.listing_id]
+            ),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Listings DB query timeout')), 2000))
+          ]) as any;
 
-        if (listing.rows.length === 0) {
-          unavailable.push({
-            cartItemId: item.id,
-            itemId: item.item_id,
-            itemType: item.item_type,
-            reason: 'Listing not found',
-          });
-        } else {
-          const listingData = listing.rows[0];
-          if (!listingData.is_active || listingData.sold_at || listingData.stock_quantity <= 0) {
+          if (listing.rows.length === 0) {
             unavailable.push({
               cartItemId: item.id,
               itemId: item.item_id,
               itemType: item.item_type,
-              reason: 'Item is sold out',
+              reason: 'Listing not found',
             });
+          } else {
+            const listingData = listing.rows[0];
+            if (!listingData.is_active || listingData.sold_at || listingData.stock_quantity <= 0) {
+              unavailable.push({
+                cartItemId: item.id,
+                itemId: item.item_id,
+                itemType: item.item_type,
+                reason: 'Item is sold out',
+              });
+            }
           }
+        } catch (listingErr: any) {
+          // If listings DB is unavailable, mark item as unavailable
+          console.warn('[shopping] Could not check listing availability:', listingErr.message);
+          unavailable.push({
+            cartItemId: item.id,
+            itemId: item.item_id,
+            itemType: item.item_type,
+            reason: 'Listing availability check failed',
+          });
         }
       }
     }
@@ -134,18 +151,24 @@ export async function markWatchlistSoldOut(
   itemId: string
 ): Promise<number> {
   try {
-    // Update watchlist metadata
+    // Update watchlist metadata - ensure metadata is valid JSON
     const watchlistResult = await pool.query(
       `UPDATE shopping.watchlist
-       SET metadata = COALESCE(metadata, '{}'::jsonb) || '{"sold_out": true, "sold_out_at": $1}'::jsonb
+       SET metadata = CASE 
+         WHEN metadata IS NULL OR metadata::text = 'null' THEN '{"sold_out": true, "sold_out_at": $1}'::jsonb
+         ELSE metadata || '{"sold_out": true, "sold_out_at": $1}'::jsonb
+       END
        WHERE item_type = $2 AND item_id = $3::uuid`,
       [new Date().toISOString(), itemType, itemId]
     );
 
-    // Update wishlist metadata
+    // Update wishlist metadata - ensure metadata is valid JSON
     const wishlistResult = await pool.query(
       `UPDATE shopping.wishlist
-       SET metadata = COALESCE(metadata, '{}'::jsonb) || '{"sold_out": true, "sold_out_at": $1}'::jsonb
+       SET metadata = CASE 
+         WHEN metadata IS NULL OR metadata::text = 'null' THEN '{"sold_out": true, "sold_out_at": $1}'::jsonb
+         ELSE metadata || '{"sold_out": true, "sold_out_at": $1}'::jsonb
+       END
        WHERE item_type = $2 AND item_id = $3::uuid`,
       [new Date().toISOString(), itemType, itemId]
     );

@@ -1,4 +1,4 @@
-import { PrismaClient } from "../prisma/generated/client";
+import { PrismaClient } from "@prisma/client";
 import { signJwt, type JwtPayload } from "@common/utils/auth";
 import { randomUUID } from "node:crypto";
 

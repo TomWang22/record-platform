@@ -33,6 +33,11 @@ data:
         endpoint: jaeger.observability.svc.cluster.local:4317
         tls:
           insecure: true
+      # Alternative: Use Jaeger's gRPC collector if OTLP doesn't work
+      # jaeger:
+      #   endpoint: jaeger.observability.svc.cluster.local:14250
+      #   tls:
+      #     insecure: true
       otlp/newrelic:
         endpoint: https://otlp.nr-data.net:4317
         headers:

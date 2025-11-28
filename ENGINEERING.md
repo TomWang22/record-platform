@@ -839,6 +839,30 @@ kubectl -n record-platform logs -f --all-containers=true
 
 ## Performance Optimizations
 
+### Performance Testing & Benchmarking
+
+**Comprehensive Percentile Coverage**:
+- All performance testing scripts (k6 and pgbench) include extended percentile coverage: **p50, p95, p99, p999, p9999, p99999, p999999, p9999999, and p100**
+- **p9999999 (99.99999th percentile)**: Enables detection of extreme tail latencies (1 in 10 million requests) for comprehensive performance analysis
+- **k6 scripts**: `scripts/load/k6-mixed.js`, `scripts/load/k6-reads.js`, `scripts/load/all-in-one-k6.js`, `scripts/load/k6-summary-handler.js`
+- **pgbench scripts**: Service-specific benchmark scripts for auth, social, listings, shopping, analytics, auction-monitor, and python-ai services
+- **Database schema**: All benchmark results stored in `bench.results` table with full percentile columns
+- **CSV export**: Results exported to CSV with all percentile metrics for analysis
+
+**Benchmark Execution**:
+- **Service-specific benchmarks**: Each service has its own pgbench sweep script
+- **Multiple client counts**: Tests run with varying client counts (8, 16, 24, 32, 48, 64, etc.)
+- **Extended duration**: Higher client counts use extended test durations (3x) for stability
+- **Cold cache support**: Optional cold cache phase for realistic performance testing
+- **Fast temp tablespace**: Optional RAM-based temp files to reduce p999 spikes
+
+**Performance Metrics**:
+- **Throughput (TPS)**: Transactions per second
+- **Latency percentiles**: p50, p95, p99, p999, p9999, p99999, p999999, p9999999, p100
+- **Cache hit ratio**: Database buffer cache effectiveness
+- **I/O metrics**: Disk I/O timing and statistics
+- **CPU usage**: CPU share and utilization
+
 ### Database Optimizations
 
 **Partitioning**:
@@ -958,6 +982,145 @@ kubectl -n record-platform logs -f --all-containers=true
 **Backup Storage**:
 - Local backups in `backups/` directory
 - Future: Cloud storage integration (S3, GCS)
+
+## Recovery Procedures & Troubleshooting
+
+### Service Recovery
+
+**Diagnosis**:
+1. Check pod status: `kubectl -n record-platform get pods`
+2. Check pod events: `kubectl -n record-platform describe pod <pod-name>`
+3. Check service logs: `kubectl -n record-platform logs -l app=<service> -c app --tail=200`
+4. Check service endpoints: `kubectl -n record-platform get endpoints <service-name>`
+
+**Common Issues**:
+- **Pod CrashLoopBackOff**: Check logs for errors, verify environment variables, check resource limits
+- **502 Bad Gateway**: Downstream service unavailable, verify service endpoints and health
+- **503 Service Unavailable**: Health check failures, database/Redis connectivity issues
+- **504 Gateway Timeout**: Proxy timeout too short, service response time too long
+
+**Recovery Steps**:
+1. Restart service: `kubectl -n record-platform rollout restart deployment/<service>`
+2. Verify rollout: `kubectl -n record-platform rollout status deployment/<service>`
+3. Check logs: Monitor logs for errors after restart
+4. Test endpoint: `curl -k https://record.local:8443/api/<service>/healthz`
+
+### Database Recovery
+
+**Diagnosis**:
+1. Check disk space: `df -h` and `docker system df`
+2. Check database connectivity: `psql -h localhost -p <port> -U postgres -d <db> -c "SELECT 1"`
+3. Check database logs: `docker-compose logs postgres-* | tail -100`
+4. Check database pods: `kubectl -n record-platform get pods -l app=postgres`
+
+**Common Issues**:
+- **"No space left on device"**: Disk full, need cleanup
+- **Connection refused**: Database not running, port mismatch
+- **Connection timeout**: Network issues, firewall blocking
+- **Authentication failed**: Wrong credentials, user doesn't exist
+
+**Recovery Steps**:
+1. Cleanup disk space: `docker system prune -a --volumes`
+2. Restart databases: `docker-compose restart postgres-*`
+3. Check connectivity: Test connection from service pod
+4. Restore from backup: `make pg.restore.dump` (see `docs/postgres-infra-setup.md`)
+
+### API Gateway Recovery
+
+**Diagnosis**:
+1. Check gateway logs: `kubectl -n record-platform logs -l app=api-gateway -c app --tail=500`
+2. Check proxy errors: Filter logs for "proxy error", "502", "upstream error"
+3. Check Redis connection: Filter logs for "redis", "Redis"
+4. Test gateway health: `curl -k https://record.local:8443/api/healthz`
+
+**Common Issues**:
+- **502 Bad Gateway**: Downstream service unavailable
+- **Socket hang up**: Service connection timeout
+- **Token revocation failing**: Redis connection issue
+- **Path rewrite issues**: Incorrect pathRewrite logic
+
+**Recovery Steps**:
+1. Check downstream services: Verify all services are healthy
+2. Check Redis: Verify Redis connectivity and password
+3. Restart gateway: `kubectl -n record-platform rollout restart deployment/api-gateway`
+4. Verify routes: Test all proxy routes with curl
+
+### Linkerd Recovery
+
+**Diagnosis**:
+1. Check Linkerd status: `linkerd check`
+2. Check Linkerd pods: `kubectl -n linkerd get pods`
+3. Check CoreDNS: `kubectl -n kube-system get pods -l k8s-app=kube-dns`
+4. Check injection: `kubectl -n record-platform get pods -o jsonpath='{.items[*].metadata.annotations.linkerd\.io/inject}'`
+
+**Common Issues**:
+- **502 errors with Linkerd**: DNS resolution issues, control plane unavailable
+- **Proxy not starting**: Linkerd control plane issues
+- **mTLS failures**: Certificate issues, control plane connectivity
+
+**Recovery Steps**:
+1. Fix CoreDNS: `kubectl -n kube-system rollout restart deployment/coredns`
+2. Restart Linkerd: `kubectl -n linkerd rollout restart deployment --all`
+3. Re-enable injection: `kubectl annotate namespace record-platform linkerd.io/inject=enabled --overwrite`
+4. Restart services: `kubectl -n record-platform rollout restart deployment --all`
+
+**Disable Linkerd** (if causing issues):
+1. Disable injection: `kubectl annotate namespace record-platform linkerd.io/inject- --overwrite`
+2. Delete pods: `kubectl -n record-platform delete pods --all`
+3. Verify removal: `kubectl -n record-platform get pods`
+
+### Health Check Recovery
+
+**Diagnosis**:
+1. Check probe status: `kubectl -n record-platform describe pod <pod> | grep -A 10 "Liveness\|Readiness"`
+2. Check probe failures: `kubectl -n record-platform get events | grep -E "Unhealthy|Failed"`
+3. Test health endpoint: `curl -k https://record.local:8443/api/<service>/healthz`
+4. Check service logs: Look for health check related errors
+
+**Common Issues**:
+- **Health check timeout**: Timeout too short, database/Redis slow
+- **Health check failing**: Service not responding, dependency unavailable
+- **Probe errors**: Incorrect probe configuration, service not ready
+
+**Recovery Steps**:
+1. Increase timeouts: Update `livenessProbe.timeoutSeconds` and `readinessProbe.timeoutSeconds` to 5s
+2. Add internal timeouts: Add timeouts to database/Redis checks in health endpoint
+3. Restart service: `kubectl -n record-platform rollout restart deployment/<service>`
+4. Monitor logs: Watch for health check improvements
+
+### Emergency Recovery
+
+**Complete Platform Reset** (use with extreme caution):
+1. **Backup**: `./scripts/backup-now.sh`
+2. **Scale down**: `kubectl -n record-platform scale deployment --replicas=0 --all`
+3. **Cleanup** (if safe): `kubectl -n record-platform delete pods --all`
+4. **Restart**: `./scripts/bootstrap-platform.sh`
+5. **Restore**: `make pg.restore.dump`
+
+**Quick Recovery**:
+1. Restart all: `kubectl -n record-platform rollout restart deployment --all`
+2. Wait for ready: `kubectl -n record-platform wait --for=condition=ready pod --all --timeout=300s`
+3. Verify health: Run test script `./scripts/test-microservices-http2-http3.sh`
+
+### Performance Troubleshooting
+
+**Slow Queries**:
+1. Check database logs: Look for slow query logs
+2. Check connection pools: Verify pool sizes and usage
+3. Check indexes: Verify indexes exist for query patterns
+4. Check query plans: Use `EXPLAIN ANALYZE` for slow queries
+
+**High Memory Usage**:
+1. Check resource limits: `kubectl -n record-platform describe pod <pod> | grep -A 5 "Limits\|Requests"`
+2. Check memory leaks: Monitor memory usage over time
+3. Check connection pools: Too many connections can cause high memory
+4. Check caching: Verify Redis cache is working correctly
+
+**High CPU Usage**:
+1. Check CPU limits: Verify CPU requests/limits are appropriate
+2. Check query performance: Slow queries can cause high CPU
+3. Check worker threads: Verify thread pool sizes
+4. Check load: Verify if load is expected or abnormal
 
 ## Future Enhancements
 

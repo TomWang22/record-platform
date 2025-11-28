@@ -33,11 +33,6 @@ function requireAuth(req: any, res: any, next: () => void) {
 
 // Public routes (no auth required)
 // Search is public - moved before auth middleware
-
-// Protected routes (require auth)
-router.use(requireAuth);
-
-// Search listings (public - no auth required)
 router.get('/search', async (req, res) => {
   try {
     const query = req.query.q as string || '';
@@ -55,24 +50,16 @@ router.get('/search', async (req, res) => {
       limit: parseInt(req.query.limit as string) || 50,
       offset: parseInt(req.query.offset as string) || 0,
     };
-    const listings = await searchListings(query, filters);
-    res.json({ listings, count: listings.length });
+    const result = await searchListings(query, filters);
+    res.json({ 
+      listings: result.listings, 
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      hasMore: result.hasMore
+    });
   } catch (err) {
     console.error('[listings] search error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Get listing by ID (public - no auth required)
-router.get('/:id', async (req, res) => {
-  try {
-    const listing = await getListingById(req.params.id);
-    if (!listing) {
-      return res.status(404).json({ error: 'Listing not found' });
-    }
-    res.json(listing);
-  } catch (err) {
-    console.error('[listings] get by id error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -80,7 +67,7 @@ router.get('/:id', async (req, res) => {
 // Protected routes below require authentication
 router.use(requireAuth);
 
-// Get user's listings
+// Get user's listings (MUST be before /:id route to avoid matching "my-listings" as an ID)
 router.get('/my-listings', async (req, res) => {
   try {
     const userId = (req as any).user.sub;
@@ -94,32 +81,19 @@ router.get('/my-listings', async (req, res) => {
   }
 });
 
-// Search listings (public endpoint - no auth required for browsing)
-router.get('/search', async (req, res) => {
+// Get listing by ID (public - no auth required, but must be after /my-listings)
+router.get('/:id', async (req, res) => {
   try {
-    const query = req.query.q as string || '';
-    const filters = {
-      listing_type: req.query.listing_type as string,
-      category: req.query.category as string,
-      min_price: req.query.min_price ? parseFloat(req.query.min_price as string) : undefined,
-      max_price: req.query.max_price ? parseFloat(req.query.max_price as string) : undefined,
-      condition: req.query.condition as string,
-      media_type: req.query.media_type as string,
-      has_obi: req.query.has_obi === 'true' ? true : req.query.has_obi === 'false' ? false : undefined,
-      label_type: req.query.label_type as string,
-      sort_by: req.query.sort_by as 'created_at' | 'price' | 'popularity' | 'label_type' | undefined,
-      sort_order: (req.query.sort_order as 'asc' | 'desc') || 'desc',
-      limit: parseInt(req.query.limit as string) || 50,
-      offset: parseInt(req.query.offset as string) || 0,
-    };
-    const listings = await searchListings(query, filters);
-    res.json({ listings, count: listings.length });
+    const listing = await getListingById(req.params.id);
+    if (!listing) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+    res.json(listing);
   } catch (err) {
-    console.error('[listings] search error:', err);
+    console.error('[listings] get by id error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
 
 // Create listing
 router.post('/', async (req, res) => {
@@ -142,6 +116,8 @@ router.post('/', async (req, res) => {
       has_obi: req.body.has_obi || false,
       label_type: req.body.label_type,
       stock_quantity: req.body.stock_quantity || 1,
+      duration_days: req.body.duration_days || 30,
+      visible_from: req.body.visible_from ? new Date(req.body.visible_from) : undefined,
     });
     res.status(201).json(listing);
   } catch (err) {

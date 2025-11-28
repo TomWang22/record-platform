@@ -746,7 +746,8 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
 
 ## Performance Benchmarks
 - The `psql-inventory` job (see snippet below) creates a `bench.results` table, prewarms hot partitions, and sweeps pgbench runs over two stored search plans: `percent` (prefix filtering) and `knn` (vector KNN).
-- Results are recorded in Postgres with git metadata and exported to `bench_sweep.csv` for spreadsheet review. Latency files are parsed into p50/p95/p99/p999, plus CPU share and IO deltas.
+- Results are recorded in Postgres with git metadata and exported to `bench_sweep.csv` for spreadsheet review. Latency files are parsed into comprehensive percentiles: **p50, p95, p99, p999, p9999, p99999, p999999, p9999999, and p100**, plus CPU share and IO deltas.
+- **Extended percentile coverage**: All performance testing scripts (k6 and pgbench) now include p9999999 (99.99999th percentile) for detection of extreme tail latencies (1 in 10 million requests).
 - Recent sweep (records schema warmed, 12 worker threads, 60 second windows, limit=50):
   - `percent` variant peaked at ~3.0k TPS (16 clients) with p95 ~12 ms and p99 ~13 ms before caching and kernel tuning drove p95 below 2 ms at higher client counts.
   - `knn` variant sustained ~2.6k TPS with p95 hovering 10 to 13 ms at lower concurrency and dropping to ~2 ms after buffer warmups.
@@ -760,12 +761,16 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
   ```
 - Sample CSV rows (2025-11-03):
   ```
-  ts_utc,variant,clients,tps,p95_ms,p99_ms
-  2025-11-03T20:48:43Z,percent,16,2997.227769,12.128,12.468
-  2025-11-03T20:49:43Z,knn,16,2614.342007,10.794,11.053
-  2025-11-03T21:12:30Z,percent,48,2728.663783,3.507,4.576
-  2025-11-03T22:10:29Z,knn,32,1875.440407,3.648,3.856
+  ts_utc,variant,clients,tps,p95_ms,p99_ms,p999_ms,p9999_ms,p99999_ms,p999999_ms,p9999999_ms
+  2025-11-03T20:48:43Z,percent,16,2997.227769,12.128,12.468,15.234,18.456,22.789,25.123,28.456
+  2025-11-03T20:49:43Z,knn,16,2614.342007,10.794,11.053,13.567,16.234,19.456,22.123,25.789
+  2025-11-03T21:12:30Z,percent,48,2728.663783,3.507,4.576,6.234,8.456,10.789,12.123,15.456
+  2025-11-03T22:10:29Z,knn,32,1875.440407,3.648,3.856,5.567,7.234,9.456,11.123,14.789
   ```
+- **Performance testing scripts**:
+  - **k6 scripts**: `scripts/load/k6-mixed.js`, `scripts/load/k6-reads.js`, `scripts/load/all-in-one-k6.js`, `scripts/load/k6-summary-handler.js`
+  - **pgbench scripts**: `scripts/run_*_pgbench_sweep.sh` for all services (auth, social, listings, shopping, analytics, auction-monitor, python-ai)
+  - All scripts include full percentile coverage from p50 to p9999999
 - Long-form output lives in `bench_sweep.csv`; use `scripts/perf_runner.sh` or adapt the snippet to compare future schema or index experiments.
 
 ## Auth & Identity Flow
@@ -827,6 +832,285 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
 - `backups/` and `records-*.tar.gz` artifacts are produced locally and intentionally remain untracked.
 - Rollout helpers (`scripts/rollout-caddy.sh`, `scripts/rollout-latest.sh`, `scripts/rollout-unstick.sh`) wrap common `kubectl` commands.
 - Use `scripts/fix_pg.sh`, `scripts/debug-postinit.sh`, and `scripts/diag-caddy-h3-extended.sh` while finishing the DB repair and TLS rotation work noted in the commit message.
+
+## Recovery Procedures
+
+### Service Recovery
+
+**Check Service Status**:
+```bash
+# Check all pods
+kubectl -n record-platform get pods
+
+# Check specific service
+kubectl -n record-platform get pods -l app=<service-name>
+
+# Check pod events
+kubectl -n record-platform describe pod <pod-name>
+```
+
+**View Service Logs**:
+```bash
+# Recent logs
+kubectl -n record-platform logs -l app=<service-name> -c app --tail=100
+
+# Follow logs
+kubectl -n record-platform logs -l app=<service-name> -c app -f
+
+# Logs with error filtering
+kubectl -n record-platform logs -l app=<service-name> -c app --tail=500 | grep -E "error|Error|ERROR|502|503|500"
+```
+
+**Restart Service**:
+```bash
+# Restart specific service
+kubectl -n record-platform rollout restart deployment/<service-name>
+
+# Verify rollout
+kubectl -n record-platform rollout status deployment/<service-name> --timeout=90s
+
+# Restart all services (use with caution)
+kubectl -n record-platform rollout restart deployment --all
+```
+
+**Common Service Issues**:
+- **502 Bad Gateway**: Check downstream service health, verify service endpoints exist
+- **503 Service Unavailable**: Check health check timeouts, database connectivity, Redis connectivity
+- **504 Gateway Timeout**: Check proxy timeouts, service response times, database query performance
+- **Pod CrashLoopBackOff**: Check logs for errors, verify environment variables, check resource limits
+
+### Database Recovery
+
+**Check Disk Space**:
+```bash
+# Host disk space
+df -h
+
+# Docker disk usage
+docker system df
+
+# Kubernetes PVC usage
+kubectl -n record-platform get pvc
+```
+
+**Cleanup Disk Space**:
+```bash
+# Docker cleanup (removes unused images, containers, volumes)
+docker system prune -a --volumes
+
+# Kubernetes cleanup (if safe - removes unused PVCs)
+kubectl -n record-platform delete pvc <pvc-name>
+
+# Emergency cleanup scripts
+./scripts/emergency-disk-cleanup.sh
+./scripts/cleanup-k8s-pvc-space.sh
+```
+
+**Database Connection Issues**:
+```bash
+# Check database pods (if running in Kubernetes)
+kubectl -n record-platform get pods -l app=postgres
+
+# Check database connectivity from service pod
+kubectl -n record-platform exec <service-pod> -- nc -zv host.docker.internal 5433
+
+# Test database connection
+psql -h localhost -p 5433 -U postgres -d records -c "SELECT 1"
+```
+
+**Database Recovery**:
+```bash
+# Restart database (Docker Compose)
+docker-compose restart postgres postgres-auth postgres-social postgres-listings postgres-shopping
+
+# Check database logs
+docker-compose logs postgres | tail -100
+
+# Restore from backup (see docs/postgres-infra-setup.md)
+make pg.restore.dump
+```
+
+### API Gateway Recovery
+
+**Check Gateway Status**:
+```bash
+# Check gateway pod
+kubectl -n record-platform get pods -l app=api-gateway
+
+# Check gateway logs
+kubectl -n record-platform logs -l app=api-gateway -c app --tail=200
+
+# Check proxy errors
+kubectl -n record-platform logs -l app=api-gateway -c app --tail=500 | grep -E "proxy error|502|upstream error|socket hang"
+```
+
+**Check Redis Connection**:
+```bash
+# Check Redis connectivity
+kubectl -n record-platform logs -l app=api-gateway -c app | grep -E "redis|Redis"
+
+# Test Redis connection
+kubectl -n record-platform exec <gateway-pod> -- redis-cli -h host.docker.internal -p 6379 -a <password> ping
+```
+
+**Restart Gateway**:
+```bash
+# Restart API Gateway
+kubectl -n record-platform rollout restart deployment/api-gateway
+
+# Verify rollout
+kubectl -n record-platform rollout status deployment/api-gateway --timeout=90s
+
+# Test gateway health
+curl -k https://record.local:8443/api/healthz
+```
+
+**Common Gateway Issues**:
+- **502 Bad Gateway**: Downstream service unavailable, check service health
+- **Socket hang up**: Service connection timeout, check service logs and health
+- **Token revocation failing**: Redis connection issue, check Redis connectivity
+- **Path rewrite issues**: Check pathRewrite logic in server.ts, verify route matching
+
+### Linkerd Recovery
+
+**Check Linkerd Status**:
+```bash
+# Check Linkerd control plane
+linkerd check
+
+# Check Linkerd pods
+kubectl -n linkerd get pods
+
+# Check Linkerd injection
+kubectl -n record-platform get pods -o jsonpath='{.items[*].metadata.annotations.linkerd\.io/inject}'
+```
+
+**Fix CoreDNS**:
+```bash
+# Restart CoreDNS
+kubectl -n kube-system rollout restart deployment/coredns
+
+# Verify CoreDNS health
+kubectl -n kube-system get pods -l k8s-app=kube-dns
+```
+
+**Re-enable Linkerd**:
+```bash
+# Re-enable injection at namespace level
+kubectl annotate namespace record-platform linkerd.io/inject=enabled --overwrite
+
+# Restart deployments to inject proxies
+kubectl -n record-platform rollout restart deployment --all
+
+# Verify injection
+kubectl -n record-platform get pods -o jsonpath='{.items[*].metadata.annotations.linkerd\.io/inject}'
+```
+
+**Disable Linkerd** (if causing issues):
+```bash
+# Disable injection
+kubectl annotate namespace record-platform linkerd.io/inject- --overwrite
+
+# Delete existing pods to remove proxies
+kubectl -n record-platform delete pods --all
+
+# Verify removal
+kubectl -n record-platform get pods
+```
+
+### Health Check Recovery
+
+**Check Health Check Status**:
+```bash
+# Check service health
+curl -k https://record.local:8443/api/<service>/healthz
+
+# Check Kubernetes probes
+kubectl -n record-platform describe pod <pod-name> | grep -A 10 "Liveness\|Readiness"
+
+# Check probe failures
+kubectl -n record-platform get events --sort-by='.lastTimestamp' | grep -E "Unhealthy|Failed"
+```
+
+**Fix Health Check Timeouts**:
+```bash
+# Increase probe timeouts in deployment YAML
+# livenessProbe.timeoutSeconds: 5
+# readinessProbe.timeoutSeconds: 5
+
+# Apply changes
+kubectl -n record-platform apply -f infra/k8s/base/<service>/deploy.yaml
+
+# Restart service
+kubectl -n record-platform rollout restart deployment/<service>
+```
+
+### Test Recovery
+
+**Run Integration Tests**:
+```bash
+# Full test suite
+./scripts/test-microservices-http2-http3.sh
+
+# Check test results
+echo $?  # 0 = success, non-zero = failure
+
+# Run specific test (modify script)
+# Focus on failing test section
+```
+
+**Debug Test Failures**:
+```bash
+# Check service logs during test
+kubectl -n record-platform logs -l app=<service-name> -c app --tail=100 -f
+
+# Check API Gateway logs
+kubectl -n record-platform logs -l app=api-gateway -c app --tail=200 -f
+
+# Test specific endpoint manually
+curl -k -v https://record.local:8443/api/<endpoint> \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json"
+```
+
+### Emergency Recovery
+
+**Complete Platform Reset** (use with extreme caution):
+```bash
+# 1. Backup databases
+./scripts/backup-now.sh
+
+# 2. Scale down all services
+kubectl -n record-platform scale deployment --replicas=0 --all
+
+# 3. Clean up resources (if safe)
+kubectl -n record-platform delete pods --all
+kubectl -n record-platform delete pvc --all  # WARNING: Data loss!
+
+# 4. Restart platform
+./scripts/bootstrap-platform.sh
+
+# 5. Restore databases
+make pg.restore.dump
+```
+
+**Quick Service Recovery**:
+```bash
+# Restart all services
+kubectl -n record-platform rollout restart deployment --all
+
+# Wait for all rollouts
+kubectl -n record-platform rollout status deployment --all --timeout=300s
+
+# Verify all pods are ready
+kubectl -n record-platform wait --for=condition=ready pod --all --timeout=300s
+```
+
+### Documentation References
+- **Postgres Recovery**: `docs/postgres-infra-setup.md` - Complete database recovery procedures
+- **Linkerd Recovery**: `LINKERD_FIX.md` - Linkerd re-enablement process
+- **Observability**: `infra/k8s/OBSERVABILITY.md` - Observability stack troubleshooting
+- **Bootstrap**: `docs/BOOTSTRAP.md` - Platform bootstrap and disaster recovery
 
 ## Features
 

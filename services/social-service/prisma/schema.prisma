@@ -23,6 +23,7 @@ model Post {
   title        String    @db.VarChar(512)
   content      String    @db.Text
   flair        String    @db.VarChar(64) @default("Discussion")
+  upload_type  String    @db.VarChar(32) @default("text") @map("upload_type")
   upvotes      Int       @default(0)
   downvotes    Int       @default(0)
   comment_count Int      @default(0) @map("comment_count")
@@ -37,6 +38,7 @@ model Post {
 
   @@index([user_id])
   @@index([flair])
+  @@index([upload_type])
   @@index([created_at(sort: Desc)])
   @@index([is_pinned(sort: Desc), created_at(sort: Desc)])
   @@index([upvotes(sort: Desc), created_at(sort: Desc)])

@@ -1,6 +1,6 @@
 import { authenticator, totp } from "otplib";
 import { randomBytes } from "node:crypto";
-import { PrismaClient } from "../prisma/generated/client";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import QRCode from "qrcode";
 
@@ -68,7 +68,8 @@ export async function setupMFA(
 export async function verifyMFA(
   prisma: PrismaClient,
   userId: string,
-  code: string
+  code: string,
+  allowUnenabled: boolean = false
 ): Promise<boolean> {
   // Get MFA settings
   const mfaSettings = await prisma.$queryRaw<Array<{
@@ -82,7 +83,12 @@ export async function verifyMFA(
     LIMIT 1
   `.then((r: any[]) => r[0] || null);
 
-  if (!mfaSettings || !mfaSettings.enabled) {
+  if (!mfaSettings) {
+    return false;
+  }
+
+  // If MFA is not enabled, only allow verification during setup (allowUnenabled=true)
+  if (!mfaSettings.enabled && !allowUnenabled) {
     return false;
   }
 
@@ -101,9 +107,13 @@ export async function verifyMFA(
   const isBackupCode = await verifyBackupCode(mfaSettings.backup_codes, code);
   if (isBackupCode) {
     // Remove used backup code
-    const remainingCodes = mfaSettings.backup_codes.filter(
-      async (hashed) => !(await bcrypt.compare(code, hashed))
-    );
+    const remainingCodes: string[] = [];
+    for (const hashed of mfaSettings.backup_codes) {
+      const isMatch = await bcrypt.compare(code, hashed);
+      if (!isMatch) {
+        remainingCodes.push(hashed);
+      }
+    }
     await prisma.$queryRaw`
       UPDATE auth.mfa_settings
       SET backup_codes = ${remainingCodes}::text[],

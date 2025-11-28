@@ -16,7 +16,8 @@ r.get("/", async (req,res)=>{
   const uid = (req as any).user.sub;
   const { rows } = await pool.query(
     `SELECT country_code, currency, fee_rate, duty_rate, timezone, 
-            auction_deadline_reminder, auction_deadline_hours_before, preferred_auction_end_time
+            auction_deadline_reminder, auction_deadline_hours_before, preferred_auction_end_time,
+            items_per_page, display_style
      FROM listings.user_settings WHERE user_id=$1`,
     [uid]
   );
@@ -28,7 +29,9 @@ r.get("/", async (req,res)=>{
     timezone: "UTC",
     auction_deadline_reminder: true,
     auction_deadline_hours_before: 24,
-    preferred_auction_end_time: "20:00:00"
+    preferred_auction_end_time: "20:00:00",
+    items_per_page: 50,
+    display_style: "grid"
   });
 });
 
@@ -42,14 +45,17 @@ r.put("/", async (req,res)=>{
     timezone="UTC",
     auction_deadline_reminder=true,
     auction_deadline_hours_before=24,
-    preferred_auction_end_time="20:00:00"
+    preferred_auction_end_time="20:00:00",
+    items_per_page=50,
+    display_style="grid"
   } = req.body || {};
   await pool.query(`
     INSERT INTO listings.user_settings(
       user_id, country_code, currency, fee_rate, duty_rate,
-      timezone, auction_deadline_reminder, auction_deadline_hours_before, preferred_auction_end_time
+      timezone, auction_deadline_reminder, auction_deadline_hours_before, preferred_auction_end_time,
+      items_per_page, display_style
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     ON CONFLICT (user_id) DO UPDATE SET 
       country_code=EXCLUDED.country_code, 
       currency=EXCLUDED.currency,
@@ -58,8 +64,10 @@ r.put("/", async (req,res)=>{
       timezone=EXCLUDED.timezone,
       auction_deadline_reminder=EXCLUDED.auction_deadline_reminder,
       auction_deadline_hours_before=EXCLUDED.auction_deadline_hours_before,
-      preferred_auction_end_time=EXCLUDED.preferred_auction_end_time
-  `,[uid, country_code, currency, fee_rate, duty_rate, timezone, auction_deadline_reminder, auction_deadline_hours_before, preferred_auction_end_time]);
+      preferred_auction_end_time=EXCLUDED.preferred_auction_end_time,
+      items_per_page=EXCLUDED.items_per_page,
+      display_style=EXCLUDED.display_style
+  `,[uid, country_code, currency, fee_rate, duty_rate, timezone, auction_deadline_reminder, auction_deadline_hours_before, preferred_auction_end_time, items_per_page, display_style]);
   res.status(204).end();
 });
 

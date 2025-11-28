@@ -26,6 +26,10 @@ spec:
           containerPort: 14268
         - name: grpc-collector
           containerPort: 14250
+        - name: otlp-grpc
+          containerPort: 4317
+        - name: otlp-http
+          containerPort: 4318
         env:
         - name: COLLECTOR_OTLP_ENABLED
           value: "true"
@@ -57,6 +61,12 @@ spec:
   - name: grpc-collector
     port: 14250
     targetPort: 14250
+  - name: otlp-grpc
+    port: 4317
+    targetPort: 4317
+  - name: otlp-http
+    port: 4318
+    targetPort: 4318
   selector:
     app: jaeger
 

@@ -1121,6 +1121,11 @@ kubectl -n record-platform wait --for=condition=ready pod --all --timeout=300s
 - **Forum**: Reddit-style discussion forum with posts, comments, upvotes, and flairs
 - **Messaging**: User-to-user messaging with types/flair, threaded conversations, and real-time updates via Kafka
 - **Marketplace**: eBay integration, listings management, price tracking, and watchlists
+- **Shopping Cart**: Amazon-style cart with catalog differentiation, item notes, and rich item display
+  - **Catalog ID Support**: Unique identifiers to differentiate items with same title/condition
+  - **User Notes**: Per-item notes for buyer context (e.g., "Has minor scratch", "Gift for John")
+  - **Rich Display**: Image, title, condition, catalog ID, price, quantity, and total per item
+  - **Responsive Design**: Works seamlessly on mobile, tablet, and desktop
 - **Auction Monitor**: Real-time auction tracking with trend visualization and price alerts
 - **Insights & AI**: Price recommendations, grade predictions, collection analytics, and AI-powered chatbot
 - **Integrations**: Discogs OAuth (starter), external marketplace connections
@@ -1132,7 +1137,10 @@ kubectl -n record-platform wait --for=condition=ready pod --all --timeout=300s
 - **Dual-DB Connections**: Services like auction-monitor and analytics-service connect to multiple databases for cross-service data access
 - **Event Streaming**: Kafka integration for real-time messaging (forum posts, direct messages, group chats) and event processing
 - **Caching Layer**: Password-protected Redis for JWT revocation, search results, and performance optimization
-- **Observability**: Full observability stack with Prometheus, Grafana, Jaeger, OpenTelemetry
+- **Observability**: Full observability stack with Prometheus, Grafana, Jaeger, OpenTelemetry, Linkerd/Istio service mesh
+  - **Setup Guide**: See `infra/k8s/OBSERVABILITY-PRODUCTION-SETUP.md` for production-ready configuration
+  - **Quick Fix**: Run `bash infra/k8s/scripts/fix-observability-production.sh` to fix common issues
+  - **Components**: Prometheus (metrics), Grafana (dashboards), Jaeger (tracing), OTel Collector (OTLP), Linkerd/Istio (service mesh)
 
 ## Roadmap
 - Complete forum and messaging backend integration with database persistence

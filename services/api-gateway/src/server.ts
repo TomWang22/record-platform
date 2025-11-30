@@ -1208,7 +1208,19 @@ app.post("/forum/posts/:postId/comments", injectIdentityHeadersIfAny, createProx
     error(err, _req, res) {
       console.error("[gw] forum/posts/*/comments POST proxy error:", err);
       const errorMsg = err instanceof Error ? err.message : String(err);
-      console.error("[gw] Error details:", { message: errorMsg, code: (err as any)?.code });
+      const errorCode = (err as any)?.code;
+      console.error("[gw] Error details:", { 
+        message: errorMsg, 
+        code: errorCode,
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      
+      // ECONNRESET often happens with HTTP/3 → HTTP/2 conversion
+      // This is a known limitation - HTTP/3 is experimental
+      if (errorCode === 'ECONNRESET' || errorCode === 'ECONNREFUSED') {
+        console.warn("[gw] Connection reset/refused - may be HTTP/3 conversion issue. Client should retry with HTTP/2.");
+      }
+      
       sendJson502(res as NodeServerResponse | Socket, "social upstream error");
     },
   },

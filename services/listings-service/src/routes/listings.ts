@@ -107,6 +107,7 @@ router.post('/', async (req, res) => {
       currency: req.body.currency || 'USD',
       listing_type: req.body.listing_type || 'fixed_price',
       condition: req.body.condition,
+      catalog_id: req.body.catalog_id,
       category: req.body.category,
       location: req.body.location,
       shipping_cost: req.body.shipping_cost ? parseFloat(req.body.shipping_cost) : 0,
@@ -135,6 +136,7 @@ router.put('/:id', async (req, res) => {
     if (req.body.description !== undefined) updates.description = req.body.description;
     if (req.body.price !== undefined) updates.price = parseFloat(req.body.price);
     if (req.body.condition !== undefined) updates.condition = req.body.condition;
+    if (req.body.catalog_id !== undefined) updates.catalog_id = req.body.catalog_id;
     if (req.body.category !== undefined) updates.category = req.body.category;
     if (req.body.location !== undefined) updates.location = req.body.location;
     if (req.body.shipping_cost !== undefined) updates.shipping_cost = parseFloat(req.body.shipping_cost);

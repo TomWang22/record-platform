@@ -26,6 +26,7 @@ model Listing {
   currency        String    @db.VarChar(3) @default("USD")
   listing_type    String    @db.VarChar(32) @default("fixed_price") @map("listing_type")
   condition       String?   @db.VarChar(64)
+  catalog_id      String?   @db.VarChar(128) @map("catalog_id")
   category        String?   @db.VarChar(128)
   location        String?   @db.VarChar(256)
   shipping_cost   Decimal?  @db.Decimal(10, 2) @default(0) @map("shipping_cost")

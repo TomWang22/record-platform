@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   - config
   - postgres
-  - pgbouncer
+  # - pgbouncer  # Disabled for direct DB tuning
   - redis
   - zookeeper
   - kafka

@@ -1,0 +1,490 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Comprehensive observability stack fix script for production
+# Fixes: Grafana, Prometheus, Jaeger, OpenTelemetry, Linkerd, Istio, CoreDNS, DNS resolution, sidecar injection
+
+bold() {
+  echo -e "\033[1m$1\033[0m"
+}
+
+ok() {
+  echo -e "\033[32m✅ $1\033[0m"
+}
+
+warn() {
+  echo -e "\033[33m⚠️  $1\033[0m"
+}
+
+error() {
+  echo -e "\033[31m❌ $1\033[0m" >&2
+}
+
+step() {
+  echo
+  bold ">>> $1"
+}
+
+MONITORING_NS="monitoring"
+OBSERVABILITY_NS="observability"
+LINKERD_NS="linkerd"
+ISTIO_NS="istio-system"
+RECORD_PLATFORM_NS="record-platform"
+
+step "=== Production Observability Stack Fix ==="
+
+# ============================================================================
+# 1. Fix CoreDNS and DNS Resolution
+# ============================================================================
+step "1. Fixing CoreDNS and DNS Resolution"
+
+# Check CoreDNS pods
+COREDNS_PODS=$(kubectl -n kube-system get pods -l k8s-app=kube-dns --no-headers 2>/dev/null | wc -l | tr -d ' \n' || echo "0")
+if [ "$COREDNS_PODS" -gt 0 ]; then
+  ok "CoreDNS: $COREDNS_PODS pod(s) found"
+  
+  # Check for unhealthy pods
+  UNHEALTHY=$(kubectl -n kube-system get pods -l k8s-app=kube-dns --no-headers 2>/dev/null | grep -v Running | wc -l | tr -d ' \n' || echo "0")
+  if [ "${UNHEALTHY:-0}" -gt 0 ]; then
+    warn "CoreDNS: $UNHEALTHY unhealthy pod(s) - restarting..."
+    kubectl -n kube-system rollout restart deployment/coredns
+    echo "Waiting up to 60 seconds for CoreDNS to be ready..."
+    kubectl -n kube-system wait --for=condition=ready pod -l k8s-app=kube-dns --timeout=60s || warn "CoreDNS not ready after restart (this is OK, may take longer)"
+    ok "CoreDNS restarted"
+  else
+    ok "CoreDNS: All pods healthy"
+  fi
+  
+  # Verify DNS resolution
+  step "1.1. Testing DNS resolution..."
+  if timeout 10 kubectl run -n kube-system --rm --restart=Never test-dns-$$ --image=busybox:1.35 -- \
+    nslookup kubernetes.default.svc.cluster.local >/dev/null 2>&1; then
+    ok "DNS resolution: Working"
+  else
+    warn "DNS resolution: May have issues (test timed out or failed)"
+  fi
+else
+  error "CoreDNS: No pods found"
+fi
+
+# ============================================================================
+# 2. Fix Grafana CrashLoopBackOff
+# ============================================================================
+step "2. Fixing Grafana CrashLoopBackOff"
+
+# Check if Grafana is using Helm chart (monitoring namespace)
+GRAFANA_HELM=$(kubectl -n "$MONITORING_NS" get pods -l app.kubernetes.io/name=grafana --no-headers 2>/dev/null | head -1 || echo "")
+if [ -n "$GRAFANA_HELM" ]; then
+  GRAFANA_POD=$(echo "$GRAFANA_HELM" | awk '{print $1}')
+  GRAFANA_STATUS=$(echo "$GRAFANA_HELM" | awk '{print $3}')
+  
+  if echo "$GRAFANA_STATUS" | grep -q "CrashLoopBackOff\|Error\|Init:CrashLoopBackOff"; then
+    warn "Grafana (Helm): Pod $GRAFANA_POD is in $GRAFANA_STATUS"
+    
+    # Check if it's the init-chown-data issue
+    INIT_ERROR=$(kubectl -n "$MONITORING_NS" logs "$GRAFANA_POD" -c init-chown-data 2>&1 | tail -5 || echo "")
+    if echo "$INIT_ERROR" | grep -q "chown\|permission"; then
+      warn "Grafana: Init container chown-data failing - fixing PVC permissions..."
+      
+      # Get PVC name
+      GRAFANA_PVC=$(kubectl -n "$MONITORING_NS" get pvc -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+      if [ -n "$GRAFANA_PVC" ]; then
+        warn "Grafana: Found PVC $GRAFANA_PVC - attempting to fix permissions..."
+        
+        # Delete the pod to allow recreation
+        kubectl -n "$MONITORING_NS" delete pod "$GRAFANA_POD" --grace-period=0 --force 2>/dev/null || true
+        
+        # Wait a bit for pod recreation
+        sleep 5
+        
+        # If still failing, we may need to delete and recreate the PVC (data loss!)
+        # For now, just restart the deployment
+        kubectl -n "$MONITORING_NS" rollout restart deployment -l app.kubernetes.io/name=grafana || true
+        ok "Grafana: Deployment restarted"
+      else
+        warn "Grafana: No PVC found - may be using emptyDir"
+      fi
+    fi
+  else
+    ok "Grafana (Helm): Pod is $GRAFANA_STATUS"
+  fi
+fi
+
+# Check standalone Grafana in observability namespace
+GRAFANA_STANDALONE=$(kubectl -n "$OBSERVABILITY_NS" get pods -l app=grafana --no-headers 2>/dev/null | head -1 || echo "")
+if [ -n "$GRAFANA_STANDALONE" ]; then
+  GRAFANA_POD=$(echo "$GRAFANA_STANDALONE" | awk '{print $1}')
+  GRAFANA_STATUS=$(echo "$GRAFANA_STANDALONE" | awk '{print $3}')
+  
+  if echo "$GRAFANA_STATUS" | grep -q "CrashLoopBackOff\|Error"; then
+    warn "Grafana (Standalone): Pod $GRAFANA_POD is in $GRAFANA_STATUS - restarting..."
+    kubectl -n "$OBSERVABILITY_NS" rollout restart deployment/grafana || true
+    kubectl -n "$OBSERVABILITY_NS" wait --for=condition=available --timeout=120s deployment/grafana || warn "Grafana not ready after restart"
+  else
+    ok "Grafana (Standalone): Pod is $GRAFANA_STATUS"
+  fi
+fi
+
+# ============================================================================
+# 3. Fix Prometheus Helm Chart
+# ============================================================================
+step "3. Fixing Prometheus Helm Chart"
+
+# Check Helm release status
+HELM_STATUS=$(helm list -n "$MONITORING_NS" -o json 2>/dev/null | jq -r '.[] | select(.name=="monitoring") | .status' || echo "")
+if [ "$HELM_STATUS" = "failed" ]; then
+  warn "Prometheus Helm chart: Status is 'failed' - attempting to fix..."
+  
+  # Check what's wrong
+  PROM_PODS=$(kubectl -n "$MONITORING_NS" get pods -l app.kubernetes.io/name=prometheus --no-headers 2>/dev/null | grep -c Running | tr -d ' \n' || echo "0")
+  if [ "$PROM_PODS" -eq 0 ]; then
+    warn "Prometheus: No running pods - attempting to upgrade Helm chart..."
+    
+    # Try to upgrade the chart
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
+    helm repo update >/dev/null
+    
+    helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+      --namespace "$MONITORING_NS" \
+      --set grafana.adminPassword='Admin123!' \
+      --set grafana.service.type=ClusterIP \
+      --set grafana.persistence.enabled=true \
+      --set grafana.persistence.size=10Gi \
+      --set prometheus.prometheusSpec.retention=30d \
+      --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=standard \
+      --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=50Gi \
+      --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+      --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false \
+      --wait --timeout=5m || warn "Helm upgrade failed - may need manual intervention"
+    
+    ok "Prometheus: Helm chart upgrade attempted"
+  else
+    ok "Prometheus: $PROM_PODS pod(s) running despite failed status"
+  fi
+else
+  ok "Prometheus Helm chart: Status is '$HELM_STATUS'"
+fi
+
+# ============================================================================
+# 4. Fix OpenTelemetry Collector Duplicate Pods
+# ============================================================================
+step "4. Fixing OpenTelemetry Collector"
+
+# Check for duplicate/pending pods
+OTEL_PODS=$(kubectl -n "$OBSERVABILITY_NS" get pods -l app=otel-collector -o wide --no-headers 2>/dev/null || echo "")
+PENDING_PODS=$(echo "$OTEL_PODS" | grep -c "Pending" || echo "0")
+RUNNING_PODS=$(echo "$OTEL_PODS" | grep -c "Running" || echo "0")
+
+if [ "$PENDING_PODS" -gt 0 ]; then
+  warn "OTel Collector: $PENDING_PODS pending pod(s) found"
+  
+  # Delete pending pods
+  echo "$OTEL_PODS" | grep "Pending" | awk '{print $1}' | while read -r pod; do
+    warn "OTel Collector: Deleting pending pod $pod..."
+    kubectl -n "$OBSERVABILITY_NS" delete pod "$pod" --grace-period=0 --force 2>/dev/null || true
+  done
+  
+  ok "OTel Collector: Pending pods deleted"
+fi
+
+# Check for multiple replicas (should be 1)
+if [ "$RUNNING_PODS" -gt 1 ]; then
+  warn "OTel Collector: Multiple running pods ($RUNNING_PODS) - checking deployment replicas..."
+  CURRENT_REPLICAS=$(kubectl -n "$OBSERVABILITY_NS" get deployment otel-collector -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+  if [ "$CURRENT_REPLICAS" -gt 1 ]; then
+    warn "OTel Collector: Scaling down to 1 replica..."
+    kubectl -n "$OBSERVABILITY_NS" scale deployment otel-collector --replicas=1
+    ok "OTel Collector: Scaled to 1 replica"
+  fi
+fi
+
+# Restart OTel Collector to ensure clean state
+kubectl -n "$OBSERVABILITY_NS" rollout restart deployment/otel-collector || true
+echo "Waiting up to 60 seconds for OTel Collector to be ready..."
+kubectl -n "$OBSERVABILITY_NS" wait --for=condition=available --timeout=60s deployment/otel-collector || warn "OTel Collector not ready after restart (this is OK, may take longer)"
+
+ok "OTel Collector: Fixed"
+
+# ============================================================================
+# 5. Fix Linkerd Control Plane
+# ============================================================================
+step "5. Fixing Linkerd Control Plane"
+
+# Check if Linkerd is installed
+if kubectl get namespace "$LINKERD_NS" >/dev/null 2>&1; then
+  ok "Linkerd: Namespace exists"
+  
+  # Check control plane pods
+  LINKERD_PODS=$(kubectl -n "$LINKERD_NS" get pods --no-headers 2>/dev/null | wc -l | tr -d ' \n' || echo "0")
+  if [ "$LINKERD_PODS" -gt 0 ]; then
+    # Check for pods with many restarts
+    RESTARTING=$(kubectl -n "$LINKERD_NS" get pods --no-headers 2>/dev/null | awk '$4 > 10 {print $1, $4}' || echo "")
+    if [ -n "$RESTARTING" ]; then
+      warn "Linkerd: Pods with high restart counts:"
+      echo "$RESTARTING" | while read -r pod restarts; do
+        warn "  - $pod: $restarts restarts"
+      done
+      
+      # Check DNS resolution from Linkerd pods
+      step "5.1. Testing DNS resolution from Linkerd pods..."
+      LINKERD_POD=$(kubectl -n "$LINKERD_NS" get pods -l app=linkerd-destination --no-headers 2>/dev/null | head -1 | awk '{print $1}' || echo "")
+      if [ -n "$LINKERD_POD" ]; then
+        # Check if pod is ready first
+        POD_READY=$(kubectl -n "$LINKERD_NS" get pod "$LINKERD_POD" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        if [ "$POD_READY" != "Running" ]; then
+          warn "Linkerd: Pod $LINKERD_POD is not Running (status: $POD_READY) - skipping DNS test"
+        else
+          # Try DNS test with timeout
+          if timeout 10 kubectl -n "$LINKERD_NS" exec "$LINKERD_POD" -c linkerd-destination -- \
+            sh -c "nslookup linkerd-policy.linkerd.svc.cluster.local || echo 'DNS_FAILED'" >/dev/null 2>&1; then
+            ok "Linkerd: DNS resolution working from control plane"
+          else
+            warn "Linkerd: DNS resolution failing - this may cause restarts"
+            
+            # Fix CoreDNS if needed
+            warn "Linkerd: Restarting CoreDNS to fix DNS resolution..."
+            kubectl -n kube-system rollout restart deployment/coredns
+            echo "Waiting 10 seconds for CoreDNS to restart..."
+            sleep 10
+            
+            # Restart Linkerd control plane
+            warn "Linkerd: Restarting control plane pods..."
+            kubectl -n "$LINKERD_NS" rollout restart deployment --all
+            echo "Waiting up to 60 seconds for Linkerd control plane to be ready..."
+            kubectl -n "$LINKERD_NS" wait --for=condition=ready pod --all --timeout=60s || warn "Linkerd control plane not ready after restart (this is OK, may take longer)"
+          fi
+        fi
+      else
+        warn "Linkerd: No destination pod found for DNS test"
+      fi
+    else
+      ok "Linkerd: Control plane pods healthy"
+    fi
+  else
+    warn "Linkerd: No control plane pods found"
+  fi
+else
+  warn "Linkerd: Not installed"
+fi
+
+# ============================================================================
+# 6. Fix Istio (if installed)
+# ============================================================================
+step "6. Checking Istio"
+
+if kubectl get namespace "$ISTIO_NS" >/dev/null 2>&1; then
+  ok "Istio: Namespace exists"
+  
+  ISTIO_PODS=$(kubectl -n "$ISTIO_NS" get pods --no-headers 2>/dev/null | wc -l | tr -d ' \n' || echo "0")
+  if [ "${ISTIO_PODS:-0}" -gt 0 ]; then
+    UNHEALTHY_ISTIO=$(kubectl -n "$ISTIO_NS" get pods --no-headers 2>/dev/null | grep -v Running | wc -l | tr -d ' \n' || echo "0")
+    if [ "${UNHEALTHY_ISTIO:-0}" -gt 0 ]; then
+      warn "Istio: $UNHEALTHY_ISTIO unhealthy pod(s) - restarting..."
+      kubectl -n "$ISTIO_NS" rollout restart deployment --all
+      echo "Waiting up to 60 seconds for Istio pods to be ready..."
+    kubectl -n "$ISTIO_NS" wait --for=condition=ready pod --all --timeout=60s || warn "Istio pods not ready after restart (this is OK, may take longer)"
+    else
+      ok "Istio: All pods healthy"
+    fi
+  else
+    warn "Istio: No pods found"
+  fi
+else
+  warn "Istio: Not installed"
+fi
+
+# ============================================================================
+# 7. Fix Sidecar Injection Issues
+# ============================================================================
+step "7. Fixing Sidecar Injection Issues"
+
+# Linkerd injection
+if kubectl get namespace "$LINKERD_NS" >/dev/null 2>&1; then
+  step "7.1. Fixing Linkerd sidecar injection..."
+  
+  # Check namespace injection
+  INJECTED_NS=$(kubectl get namespace "$RECORD_PLATFORM_NS" -o jsonpath='{.metadata.annotations.linkerd\.io/inject}' 2>/dev/null || echo "")
+  if [ "$INJECTED_NS" != "enabled" ]; then
+    warn "Linkerd: Injection not enabled for $RECORD_PLATFORM_NS namespace"
+    if [ -t 0 ]; then
+      # Only prompt if running interactively
+      read -p "Enable Linkerd injection for $RECORD_PLATFORM_NS? [y/N] " -n 1 -r
+      echo
+      if [[ $REPLY =~ ^[Yy]$ ]]; then
+        kubectl annotate namespace "$RECORD_PLATFORM_NS" linkerd.io/inject=enabled --overwrite
+        ok "Linkerd: Injection enabled for $RECORD_PLATFORM_NS"
+        
+        # Restart deployments to inject sidecars
+        warn "Linkerd: Restarting deployments to inject sidecars..."
+        kubectl -n "$RECORD_PLATFORM_NS" rollout restart deployment --all
+      fi
+    else
+      warn "Linkerd: Skipping injection prompt (non-interactive mode). To enable manually:"
+      echo "  kubectl annotate namespace $RECORD_PLATFORM_NS linkerd.io/inject=enabled --overwrite"
+    fi
+  else
+    ok "Linkerd: Injection enabled for $RECORD_PLATFORM_NS"
+  fi
+  
+  # Check observability namespace
+  OBS_INJECTED=$(kubectl get namespace "$OBSERVABILITY_NS" -o jsonpath='{.metadata.annotations.linkerd\.io/inject}' 2>/dev/null || echo "")
+  if [ "$OBS_INJECTED" != "enabled" ]; then
+    kubectl annotate namespace "$OBSERVABILITY_NS" linkerd.io/inject=enabled --overwrite
+    ok "Linkerd: Injection enabled for $OBSERVABILITY_NS"
+  fi
+fi
+
+# Istio injection
+if kubectl get namespace "$ISTIO_NS" >/dev/null 2>&1; then
+  step "7.2. Fixing Istio sidecar injection..."
+  
+  ISTIO_INJECTED=$(kubectl get namespace "$RECORD_PLATFORM_NS" -o jsonpath='{.metadata.labels.istio-injection}' 2>/dev/null || echo "")
+  if [ "$ISTIO_INJECTED" != "enabled" ]; then
+    warn "Istio: Injection not enabled for $RECORD_PLATFORM_NS namespace"
+    if [ -t 0 ]; then
+      # Only prompt if running interactively
+      read -p "Enable Istio injection for $RECORD_PLATFORM_NS? [y/N] " -n 1 -r
+      echo
+      if [[ $REPLY =~ ^[Yy]$ ]]; then
+        kubectl label namespace "$RECORD_PLATFORM_NS" istio-injection=enabled --overwrite
+        ok "Istio: Injection enabled for $RECORD_PLATFORM_NS"
+        
+        # Restart deployments to inject sidecars
+        warn "Istio: Restarting deployments to inject sidecars..."
+        kubectl -n "$RECORD_PLATFORM_NS" rollout restart deployment --all
+      fi
+    else
+      warn "Istio: Skipping injection prompt (non-interactive mode). To enable manually:"
+      echo "  kubectl label namespace $RECORD_PLATFORM_NS istio-injection=enabled --overwrite"
+    fi
+  else
+    ok "Istio: Injection enabled for $RECORD_PLATFORM_NS"
+  fi
+fi
+
+# ============================================================================
+# 8. Verify Jaeger Configuration
+# ============================================================================
+step "8. Verifying Jaeger Configuration"
+
+JAEGER_PODS=$(kubectl -n "$OBSERVABILITY_NS" get pods -l app=jaeger --no-headers 2>/dev/null | grep -c Running | tr -d ' \n' || echo "0")
+if [ "$JAEGER_PODS" -gt 0 ]; then
+  ok "Jaeger: $JAEGER_PODS pod(s) running"
+  
+  # Check OTLP ports
+  JAEGER_SVC=$(kubectl -n "$OBSERVABILITY_NS" get svc jaeger -o jsonpath='{.spec.ports[?(@.name=="otlp-grpc")].port}' 2>/dev/null || echo "")
+  if [ -z "$JAEGER_SVC" ] || [ "$JAEGER_SVC" != "4317" ]; then
+    warn "Jaeger: OTLP gRPC port not configured correctly (expected 4317, got $JAEGER_SVC)"
+    warn "Jaeger: May need to update service configuration"
+  else
+    ok "Jaeger: OTLP gRPC port configured (4317)"
+  fi
+else
+  warn "Jaeger: No running pods"
+fi
+
+# ============================================================================
+# 9. Verify New Relic Configuration
+# ============================================================================
+step "9. Verifying New Relic Configuration"
+
+NEW_RELIC_SECRET=$(kubectl get secret -n "$OBSERVABILITY_NS" newrelic-secret -o jsonpath='{.data.license-key}' 2>/dev/null | base64 -d || echo "")
+if [ -n "$NEW_RELIC_SECRET" ]; then
+  if [ "$NEW_RELIC_SECRET" = "YOUR_NEW_RELIC_LICENSE_KEY_HERE" ] || [ -z "$NEW_RELIC_SECRET" ]; then
+    warn "New Relic: Secret exists but contains placeholder or empty key"
+    warn "New Relic: To configure, run:"
+    echo "  kubectl create secret generic newrelic-secret \\"
+    echo "    --from-literal=license-key='YOUR_ACTUAL_KEY' \\"
+    echo "    -n $OBSERVABILITY_NS --dry-run=client -o yaml | kubectl apply -f -"
+    echo "  kubectl rollout restart deployment/otel-collector -n $OBSERVABILITY_NS"
+  else
+    ok "New Relic: Secret configured"
+  fi
+else
+  warn "New Relic: Secret not found (optional - only needed if using New Relic)"
+fi
+
+# ============================================================================
+# 10. Verify ServiceMonitors and PodMonitors
+# ============================================================================
+step "10. Verifying ServiceMonitors and PodMonitors"
+
+# Wait for CRDs (with progress indicator)
+step "10.1. Waiting for Prometheus CRDs..."
+for i in {1..30}; do
+  if kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1 && \
+     kubectl get crd podmonitors.monitoring.coreos.com >/dev/null 2>&1; then
+    ok "Prometheus CRDs: Available"
+    break
+  fi
+  if [ $((i % 5)) -eq 0 ]; then
+    echo "  Waiting for CRDs... ($i/30)"
+  fi
+  sleep 2
+done
+
+# Apply ServiceMonitors
+if [ -f "infra/k8s/base/monitoring/servicemonitors.yaml" ]; then
+  kubectl apply -f infra/k8s/base/monitoring/servicemonitors.yaml || warn "ServiceMonitors apply failed"
+  ok "ServiceMonitors: Applied"
+fi
+
+if [ -f "infra/k8s/base/observability/servicemonitors.yaml" ]; then
+  kubectl apply -f infra/k8s/base/observability/servicemonitors.yaml || warn "Observability ServiceMonitors apply failed"
+  ok "Observability ServiceMonitors: Applied"
+fi
+
+# Apply PodMonitors
+if [ -f "infra/k8s/base/observability/podmonitors.yaml" ]; then
+  kubectl apply -f infra/k8s/base/observability/podmonitors.yaml || warn "PodMonitors apply failed"
+  ok "PodMonitors: Applied"
+fi
+
+# ============================================================================
+# 11. Final Verification
+# ============================================================================
+step "11. Final Verification"
+
+echo
+bold "📊 Component Status:"
+echo "  Prometheus:    $(kubectl -n $MONITORING_NS get pods -l app.kubernetes.io/name=prometheus --no-headers 2>/dev/null | grep -c Running | tr -d ' \n' || echo '0') running"
+echo "  Grafana:       $(kubectl -n $MONITORING_NS get pods -l app.kubernetes.io/name=grafana --no-headers 2>/dev/null | grep -c Running | tr -d ' \n' || echo '0') running (Helm)"
+echo "  Grafana:       $(kubectl -n $OBSERVABILITY_NS get pods -l app=grafana --no-headers 2>/dev/null | grep -c Running | tr -d ' \n' || echo '0') running (Standalone)"
+echo "  Jaeger:        $(kubectl -n $OBSERVABILITY_NS get pods -l app=jaeger --no-headers 2>/dev/null | grep -c Running | tr -d ' \n' || echo '0') running"
+echo "  OTEL Collector: $(kubectl -n $OBSERVABILITY_NS get pods -l app=otel-collector --no-headers 2>/dev/null | grep -c Running | tr -d ' \n' || echo '0') running"
+echo "  Linkerd:       $(kubectl -n $LINKERD_NS get pods --no-headers 2>/dev/null | grep -c Running | tr -d ' \n' || echo '0') running"
+echo "  Istio:         $(kubectl -n $ISTIO_NS get pods --no-headers 2>/dev/null | grep -c Running | tr -d ' \n' || echo '0') running"
+echo "  CoreDNS:       $(kubectl -n kube-system get pods -l k8s-app=kube-dns --no-headers 2>/dev/null | grep -c Running | tr -d ' \n' || echo '0') running"
+
+echo
+bold "🔗 Access URLs (port-forward required):"
+echo "  Grafana (Helm):    kubectl -n $MONITORING_NS port-forward svc/monitoring-grafana 3000:80"
+echo "  Grafana (Standalone): kubectl -n $OBSERVABILITY_NS port-forward svc/grafana 3001:3000"
+echo "  Prometheus:        kubectl -n $MONITORING_NS port-forward svc/monitoring-kube-prom-prometheus 9090:9090"
+echo "  Jaeger:            kubectl -n $OBSERVABILITY_NS port-forward svc/jaeger 16686:16686"
+echo "  OTEL Collector:    kubectl -n $OBSERVABILITY_NS port-forward svc/otel-collector 4317:4317"
+
+if kubectl get namespace "$LINKERD_NS" >/dev/null 2>&1; then
+  echo "  Linkerd Viz:       linkerd viz dashboard (requires linkerd CLI)"
+fi
+
+if kubectl get namespace "$ISTIO_NS" >/dev/null 2>&1; then
+  echo "  Istio Kiali:       istioctl dashboard kiali (requires istioctl)"
+  echo "  Istio Grafana:     istioctl dashboard grafana"
+fi
+
+echo
+bold "🔐 Grafana Credentials:"
+echo "  Username: admin"
+echo "  Password: Admin123! (Helm) or admin (Standalone)"
+
+echo
+bold "📝 Next Steps:"
+echo "  1. Verify all components are running: kubectl get pods -A | grep -E 'monitoring|observability|linkerd|istio'"
+echo "  2. Check DNS resolution: kubectl run -n kube-system --rm -i --restart=Never test-dns --image=busybox:1.35 -- nslookup kubernetes.default"
+echo "  3. Test service connectivity: kubectl run -n $RECORD_PLATFORM_NS --rm -i --restart=Never test-curl --image=curlimages/curl:latest -- curl -s http://api-gateway:4000/healthz"
+echo "  4. Monitor Linkerd/Istio sidecar injection: kubectl get pods -n $RECORD_PLATFORM_NS -o jsonpath='{.items[*].spec.containers[*].name}'"
+echo "  5. Configure New Relic (if needed): See warnings above"
+
+step "=== Observability Stack Fix Complete ==="
+

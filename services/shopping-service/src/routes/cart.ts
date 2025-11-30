@@ -307,20 +307,84 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
         console.log(`[shopping] Removed ${removedCount} unavailable items from cart for user ${userId}`)
       }
 
-      // Get remaining cart items
-      // Note: We removed the listings.listings subquery because the listings schema
-      // may not be accessible from the shopping service's database connection.
-      // The cleanupUnavailableItems function already handles availability checks.
+      // Get remaining cart items with notes
       const result = await pool.query(
-        `SELECT c.id, c.listing_id, c.item_type, c.item_id, c.quantity, c.price, c.metadata, c.created_at, c.updated_at
+        `SELECT c.id, c.listing_id, c.item_type, c.item_id, c.quantity, c.price, c.metadata, c.notes, c.created_at, c.updated_at
          FROM shopping.shopping_cart c
          WHERE c.user_id = $1
          ORDER BY c.created_at DESC`,
         [userId]
       )
 
+      // Fetch listing details from listings DB for items that have listing_id
+      const { listingsPool } = await import('../lib/availability.js')
+      const enrichedItems = await Promise.all(
+        result.rows.map(async (item: any) => {
+          // If item has listing_id, fetch full listing details
+          if (item.item_type === 'listing' && item.listing_id) {
+            try {
+              const listingResult = await Promise.race([
+                listingsPool.query(
+                  `SELECT l.id, l.title, l.condition, l.catalog_id, l.price,
+                          json_agg(
+                            json_build_object(
+                              'id', li.id,
+                              'image_url', li.image_url,
+                              'thumbnail_url', li.thumbnail_url,
+                              'display_order', li.display_order,
+                              'is_primary', li.is_primary
+                            ) ORDER BY li.display_order, li.is_primary DESC
+                          ) FILTER (WHERE li.id IS NOT NULL) as images
+                   FROM listings.listings l
+                   LEFT JOIN listings.listing_images li ON l.id = li.listing_id
+                   WHERE l.id = $1::uuid
+                   GROUP BY l.id, l.title, l.condition, l.catalog_id, l.price`,
+                  [item.listing_id]
+                ),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Listings DB query timeout')), 2000))
+              ]) as any
+
+              if (listingResult.rows.length > 0) {
+                const listing = listingResult.rows[0]
+                const primaryImage = listing.images?.find((img: any) => img.is_primary) || listing.images?.[0]
+                
+                return {
+                  ...item,
+                  // Enrich with listing details
+                  title: listing.title || item.metadata?.title,
+                  condition: listing.condition || item.metadata?.condition,
+                  catalog_id: listing.catalog_id || item.metadata?.catalog_id,
+                  image_url: primaryImage?.image_url || primaryImage?.thumbnail_url || item.metadata?.image_url,
+                  // Preserve existing metadata but enhance it
+                  metadata: {
+                    ...item.metadata,
+                    title: listing.title || item.metadata?.title,
+                    condition: listing.condition || item.metadata?.condition,
+                    catalog_id: listing.catalog_id || item.metadata?.catalog_id,
+                    image_url: primaryImage?.image_url || primaryImage?.thumbnail_url || item.metadata?.image_url,
+                    images: listing.images || item.metadata?.images,
+                  },
+                }
+              }
+            } catch (listingErr: any) {
+              console.warn('[shopping] Could not fetch listing details:', listingErr.message)
+              // Fall back to metadata if listing fetch fails
+            }
+          }
+          
+          // Return item with existing metadata (for non-listing items or if listing fetch failed)
+          return {
+            ...item,
+            title: item.metadata?.title,
+            condition: item.metadata?.condition,
+            catalog_id: item.metadata?.catalog_id,
+            image_url: item.metadata?.image_url,
+          }
+        })
+      )
+
       // All items are considered available (cleanupUnavailableItems already removed unavailable ones)
-      const availableItems = result.rows
+      const availableItems = enrichedItems
 
       const totalPrice = availableItems.reduce((sum: number, item: any) => {
         return sum + (Number(item.price || 0) * item.quantity)
@@ -345,7 +409,7 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
       return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const { item_type, item_id, quantity = 1, listing_id, price, metadata } = req.body
+    const { item_type, item_id, quantity = 1, listing_id, price, metadata, notes } = req.body
 
     if (!item_type || !item_id) {
       return res.status(400).json({ error: 'item_type and item_id required' })
@@ -361,22 +425,27 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
 
       let cartItemId: string
       if (existing.rows.length > 0) {
-        // Update quantity
+        // Update quantity and notes (if provided)
         const newQuantity = existing.rows[0].quantity + quantity
-        await pool.query(
-          `UPDATE shopping.shopping_cart
-           SET quantity = $1, updated_at = now()
-           WHERE id = $2`,
-          [newQuantity, existing.rows[0].id]
-        )
+        const updateQuery = notes !== undefined
+          ? `UPDATE shopping.shopping_cart
+             SET quantity = $1, notes = $2, updated_at = now()
+             WHERE id = $3`
+          : `UPDATE shopping.shopping_cart
+             SET quantity = $1, updated_at = now()
+             WHERE id = $2`
+        const updateParams = notes !== undefined
+          ? [newQuantity, notes || null, existing.rows[0].id]
+          : [newQuantity, existing.rows[0].id]
+        await pool.query(updateQuery, updateParams)
         cartItemId = existing.rows[0].id
       } else {
         // Insert new item
         const result = await pool.query(
-          `INSERT INTO shopping.shopping_cart (user_id, item_type, item_id, listing_id, quantity, price, metadata)
-           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+          `INSERT INTO shopping.shopping_cart (user_id, item_type, item_id, listing_id, quantity, price, metadata, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
            RETURNING id`,
-          [userId, item_type, item_id, listing_id || null, quantity, price || null, metadata ? JSON.stringify(metadata) : null]
+          [userId, item_type, item_id, listing_id || null, quantity, price || null, metadata ? JSON.stringify(metadata) : null, notes || null]
         )
         cartItemId = result.rows[0].id
       }
@@ -431,7 +500,7 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
     }
 
     const { itemId } = req.params
-    const { quantity, price } = req.body
+    const { quantity, price, notes } = req.body
 
     try {
       const updates: string[] = []
@@ -445,6 +514,10 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
       if (price !== undefined) {
         updates.push(`price = $${paramIndex++}`)
         values.push(price)
+      }
+      if (notes !== undefined) {
+        updates.push(`notes = $${paramIndex++}`)
+        values.push(notes || null)
       }
 
       if (updates.length === 0) {

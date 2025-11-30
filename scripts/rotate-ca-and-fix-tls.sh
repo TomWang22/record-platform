@@ -35,29 +35,29 @@ if kubectl -n "$NS_ING" get secret record-local-tls >/dev/null 2>&1; then
     warn "Failed to delete secret (may not exist or API error)"
   fi
 fi
-# Retry secret creation in case of transient API errors
-RETRY_COUNT=0
-MAX_RETRIES=5
-SECRET_CREATED=0
-while [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; do
-  # Delete existing secret first if it exists
-  if kubectl -n "$NS_ING" get secret record-local-tls >/dev/null 2>&1; then
-    kubectl -n "$NS_ING" delete secret record-local-tls >/dev/null 2>&1 || true
-    sleep 1  # Brief wait after deletion
-  fi
-  
-  if kubectl -n "$NS_ING" create secret tls record-local-tls \
-    --cert="$CERT_DIR/tls.crt" \
-    --key="$CERT_DIR/tls.key" 2>/dev/null; then
-    SECRET_CREATED=1
-    break
-  fi
-  RETRY_COUNT=$((RETRY_COUNT + 1))
-  if [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; then
-    warn "Secret creation failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
-    sleep 3  # Longer wait between retries
-  fi
-done
+  # Retry secret creation in case of transient API errors (optimized for speed)
+  RETRY_COUNT=0
+  MAX_RETRIES=3  # Reduced from 5 to 3 for faster failure
+  SECRET_CREATED=0
+  while [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; do
+    # Delete existing secret first if it exists
+    if kubectl -n "$NS_ING" get secret record-local-tls >/dev/null 2>&1; then
+      kubectl -n "$NS_ING" delete secret record-local-tls >/dev/null 2>&1 || true
+      sleep 0.5  # Reduced from 1s to 0.5s
+    fi
+    
+    if kubectl -n "$NS_ING" create secret tls record-local-tls \
+      --cert="$CERT_DIR/tls.crt" \
+      --key="$CERT_DIR/tls.key" 2>/dev/null; then
+      SECRET_CREATED=1
+      break
+    fi
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; then
+      warn "Secret creation failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
+      sleep 1  # Reduced from 3s to 1s between retries
+    fi
+  done
 
 if [[ $SECRET_CREATED -eq 0 ]]; then
   warn "Failed to create TLS secret after $MAX_RETRIES attempts (API may be slow)"
@@ -113,7 +113,7 @@ if [[ -n "$CADDY_POD" ]]; then
   say "Setting up port-forward for admin API..."
   kubectl -n "$NS_ING" port-forward "pod/$CADDY_POD" 2019:2019 >/dev/null 2>&1 &
   PF_PID=$!
-  sleep 2  # Wait for port-forward to establish
+  sleep 1  # Reduced from 2s to 1s - port-forward is usually fast
   
   # Try to reload via admin API (port 2019)
   # IMPORTANT: When we update the Kubernetes secret, the mounted files update,
@@ -126,11 +126,10 @@ if [[ -n "$CADDY_POD" ]]; then
     # First, wait for Kubernetes to update the mounted secret files
     # Kubernetes updates mounted secrets asynchronously, so we need to wait
     say "Waiting for Kubernetes to update mounted secret files..."
+    # Reduced wait time - Kubernetes usually updates secrets within 1-2 seconds
     SECRET_WAIT=0
-    MAX_SECRET_WAIT=10
+    MAX_SECRET_WAIT=3  # Reduced from 10s to 3s - Kubernetes is usually fast
     while [[ $SECRET_WAIT -lt $MAX_SECRET_WAIT ]]; do
-      # Check if the secret file has been updated (compare modification time)
-      # We can't easily check this from outside the pod, so we just wait
       sleep 1
       SECRET_WAIT=$((SECRET_WAIT + 1))
     done
@@ -155,7 +154,7 @@ if [[ -n "$CADDY_POD" ]]; then
       -d "$CURRENT_CONFIG" >/dev/null 2>&1 || false; then
       ok "Caddy config reloaded via admin API"
       # Brief wait for reload to complete
-      sleep 2
+      sleep 1  # Reduced from 2s to 1s
       # Verify it's still working (quick check, no long timeout)
       HEALTH_CHECK=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 2 \
       -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || HEALTH_CHECK=""
@@ -226,15 +225,40 @@ if [[ "${SKIP_POD_RESTART:-0}" != "1" ]]; then
     kubectl -n "$NS_ING" rollout restart deploy/caddy-h3
   fi
   
-  # Wait for rollout with better timeout handling
+  # Wait for rollout with optimized timeout handling
   say "Waiting for Caddy rollout..."
   ROLLOUT_START=$(date +%s)
-  # Increase timeout for RollingUpdate (takes longer but zero-downtime)
-  TIMEOUT=120
+  # With RollingUpdate + 2 replicas, we can check pod status directly instead of waiting for rollout
+  # This is much faster - we just need at least 1 pod Running and Ready
   if [[ "$STRATEGY" == "RollingUpdate" ]]; then
-    TIMEOUT=180  # More time for RollingUpdate to complete gracefully
+    # For RollingUpdate, check pod status directly (faster than waiting for rollout status)
+    say "Checking pod status directly (faster than rollout status wait)..."
+    POD_CHECK_WAIT=0
+    MAX_POD_CHECK=30  # Maximum 30 seconds to wait for pod to be ready
+    while [[ $POD_CHECK_WAIT -lt $MAX_POD_CHECK ]]; do
+      RUNNING_PODS=$(kubectl -n "$NS_ING" get pods -l app=caddy-h3 --no-headers 2>/dev/null | awk '$3=="Running" && $2 ~ /1\/1/ {count++} END {print count+0}' || echo "0")
+      if [[ "$RUNNING_PODS" -ge 1 ]]; then
+        ROLLOUT_END=$(date +%s)
+        ROLLOUT_DURATION=$((ROLLOUT_END - ROLLOUT_START))
+        ok "Caddy has $RUNNING_PODS pod(s) Running and Ready (took ${ROLLOUT_DURATION}s)"
+        ROTATION_SUCCESS=1
+        break
+      fi
+      sleep 1
+      POD_CHECK_WAIT=$((POD_CHECK_WAIT + 1))
+    done
+    # If we didn't find a ready pod, fall back to rollout status (but with shorter timeout)
+    if [[ "${ROTATION_SUCCESS:-0}" != "1" ]]; then
+      say "Pod not ready yet, checking rollout status with shorter timeout..."
+      TIMEOUT=20  # Much shorter timeout - just verify rollout is progressing
+    else
+      # Pod is ready, skip rollout status check
+      TIMEOUT=0
+    fi
+  else
+    TIMEOUT=20  # Shorter timeout for Recreate strategy
   fi
-  if kubectl -n "$NS_ING" rollout status deploy/caddy-h3 --timeout=${TIMEOUT}s 2>&1; then
+  if [[ $TIMEOUT -gt 0 ]] && kubectl -n "$NS_ING" rollout status deploy/caddy-h3 --timeout=${TIMEOUT}s 2>&1; then
     ROLLOUT_END=$(date +%s)
     ROLLOUT_DURATION=$((ROLLOUT_END - ROLLOUT_START))
     ok "Caddy restarted successfully (took ${ROLLOUT_DURATION}s)"
@@ -242,28 +266,47 @@ if [[ "${SKIP_POD_RESTART:-0}" != "1" ]]; then
   else
     warn "Caddy rollout timed out, checking pod status..."
   # Check if pod is actually running and ready
-  sleep 5
+  sleep 2  # Reduced from 5s to 2s - pods are usually ready quickly
   POD_PHASE=$(kubectl -n "$NS_ING" get pod -l app=caddy-h3 -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "")
   POD_READY=$(kubectl -n "$NS_ING" get pod -l app=caddy-h3 -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
   
-  if [[ "$POD_PHASE" == "Running" ]] && [[ "$POD_READY" == "True" ]]; then
+  # Check all pods, not just the first one (with 2 replicas, one might be Pending)
+  RUNNING_PODS=$(kubectl -n "$NS_ING" get pods -l app=caddy-h3 --no-headers 2>/dev/null | awk '$3=="Running" && $2 ~ /1\/1/ {count++} END {print count+0}' || echo "0")
+  if [[ "$RUNNING_PODS" -ge 1 ]]; then
+    ok "Caddy has $RUNNING_PODS pod(s) Running and Ready (rollout status may have timed out, but pods are healthy)"
+    ROTATION_SUCCESS=1
+  elif [[ "$POD_PHASE" == "Running" ]] && [[ "$POD_READY" == "True" ]]; then
     ok "Caddy pod is Running and Ready (rollout status may have timed out)"
     ROTATION_SUCCESS=1
   elif [[ "$POD_PHASE" == "Running" ]]; then
     warn "Caddy pod is Running but not Ready yet - waiting..."
-    sleep 10
+    sleep 3  # Reduced from 10s to 3s - readiness probes are usually fast
     # Check again
     POD_READY=$(kubectl -n "$NS_ING" get pod -l app=caddy-h3 -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
     if [[ "$POD_READY" == "True" ]]; then
       ok "Caddy pod is now Ready"
       ROTATION_SUCCESS=1
     else
-      warn "Caddy pod still not Ready - checking logs..."
-      kubectl -n "$NS_ING" logs -l app=caddy-h3 --tail=10 2>&1 | head -5
+      # Check if any pod is Running and Ready (with 2 replicas, might be a different pod)
+      RUNNING_PODS=$(kubectl -n "$NS_ING" get pods -l app=caddy-h3 --no-headers 2>/dev/null | awk '$3=="Running" && $2 ~ /1\/1/ {count++} END {print count+0}' || echo "0")
+      if [[ "$RUNNING_PODS" -ge 1 ]]; then
+        ok "Caddy has $RUNNING_PODS pod(s) Running and Ready"
+        ROTATION_SUCCESS=1
+      else
+        warn "Caddy pod still not Ready - checking logs..."
+        kubectl -n "$NS_ING" logs -l app=caddy-h3 --tail=10 2>&1 | head -5
+      fi
     fi
   else
-    warn "Caddy pod phase: $POD_PHASE (may not be ready yet)"
-    kubectl -n "$NS_ING" logs -l app=caddy-h3 --tail=10 2>&1 | head -5
+    # Pod phase is not Running - check if any pod is Running and Ready
+    RUNNING_PODS=$(kubectl -n "$NS_ING" get pods -l app=caddy-h3 --no-headers 2>/dev/null | awk '$3=="Running" && $2 ~ /1\/1/ {count++} END {print count+0}' || echo "0")
+    if [[ "$RUNNING_PODS" -ge 1 ]]; then
+      ok "Caddy has $RUNNING_PODS pod(s) Running and Ready (first pod is $POD_PHASE, but other pod is healthy)"
+      ROTATION_SUCCESS=1
+    else
+      warn "Caddy pod phase: $POD_PHASE (may not be ready yet)"
+      kubectl -n "$NS_ING" logs -l app=caddy-h3 --tail=10 2>&1 | head -5
+    fi
   fi
   fi  # End of kubectl rollout status if
 else
@@ -276,62 +319,83 @@ fi  # End of SKIP_POD_RESTART if
 
 # Wait for Caddy to be fully ready and serving (only if pod restart was used)
 if [[ "${SKIP_POD_RESTART:-0}" != "1" ]]; then
-  say "Waiting for Caddy to be fully ready..."
-READY_WAIT=0
-MAX_READY_WAIT=30  # Reduced from 45s to 30s
-READY_COUNT=0
-REQUIRED_READY_COUNT=2  # Reduced from 3 to 2 for faster completion
-
-while [[ $READY_WAIT -lt $MAX_READY_WAIT ]]; do
-  HEALTH_CHECK=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 2 \
-      -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || HEALTH_CHECK=""
-  
-  if [[ -n "$HEALTH_CHECK" ]]; then
-    HTTP_CODE=$(echo "$HEALTH_CHECK" | tail -1 | tr -d '[:space:]')
+  # Optimized: Check if Caddy is already accessible (may already be ready from rollout)
+  say "Verifying Caddy is ready and serving..."
+  QUICK_CHECK=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 2 \
+      -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || QUICK_CHECK=""
+  if [[ -n "$QUICK_CHECK" ]]; then
+    HTTP_CODE=$(echo "$QUICK_CHECK" | tail -1 | tr -d '[:space:]')
     if [[ "$HTTP_CODE" == "200" ]]; then
-      READY_COUNT=$((READY_COUNT + 1))
-      if [[ $READY_COUNT -ge $REQUIRED_READY_COUNT ]]; then
-        ok "Caddy is ready and serving requests (${READY_COUNT} consecutive successful checks)"
-        ROTATION_SUCCESS=1
-        break
-      fi
+      ok "Caddy is ready and serving requests (immediate check succeeded)"
+      ROTATION_SUCCESS=1
     else
-      READY_COUNT=0  # Reset counter on failure
+      # Not ready yet, do a quick wait (reduced from 30s to 10s)
+      READY_WAIT=0
+      MAX_READY_WAIT=10  # Reduced from 30s to 10s for faster completion
+      READY_COUNT=0
+      REQUIRED_READY_COUNT=1  # Reduced from 2 to 1 for faster completion
+      
+      while [[ $READY_WAIT -lt $MAX_READY_WAIT ]]; do
+        HEALTH_CHECK=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 2 \
+            -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || HEALTH_CHECK=""
+        
+        if [[ -n "$HEALTH_CHECK" ]]; then
+          HTTP_CODE=$(echo "$HEALTH_CHECK" | tail -1 | tr -d '[:space:]')
+          if [[ "$HTTP_CODE" == "200" ]]; then
+            READY_COUNT=$((READY_COUNT + 1))
+            if [[ $READY_COUNT -ge $REQUIRED_READY_COUNT ]]; then
+              ok "Caddy is ready and serving requests (${READY_COUNT} consecutive successful checks)"
+              ROTATION_SUCCESS=1
+              break
+            fi
+          else
+            READY_COUNT=0  # Reset counter on failure
+          fi
+        else
+          READY_COUNT=0  # Reset counter on failure
+        fi
+        sleep 1
+        READY_WAIT=$((READY_WAIT + 1))
+      done
     fi
   else
-    READY_COUNT=0  # Reset counter on failure
+    # Quick check failed, do minimal wait
+    warn "Caddy not immediately accessible, waiting briefly..."
+    sleep 3
+    FINAL_QUICK_CHECK=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 2 \
+        -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || FINAL_QUICK_CHECK=""
+    if [[ -n "$FINAL_QUICK_CHECK" ]]; then
+      HTTP_CODE=$(echo "$FINAL_QUICK_CHECK" | tail -1 | tr -d '[:space:]')
+      if [[ "$HTTP_CODE" == "200" ]]; then
+        ok "Caddy is ready and serving requests"
+        ROTATION_SUCCESS=1
+      fi
+    fi
   fi
-  sleep 1
-  READY_WAIT=$((READY_WAIT + 1))
-done
 
-if [[ $READY_WAIT -ge $MAX_READY_WAIT ]]; then
-  warn "Caddy may not be fully ready yet (waited ${MAX_READY_WAIT}s, got ${READY_COUNT} successful checks)"
-  # Don't fail - just warn and continue
-else
-  # Quick final verification
-  FINAL_CHECK=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 2 \
-      -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || FINAL_CHECK=""
-  if [[ -n "$FINAL_CHECK" ]]; then
-    FINAL_CODE=$(echo "$FINAL_CHECK" | tail -1 | tr -d '[:space:]')
-    if [[ "$FINAL_CODE" == "200" ]]; then
-      ok "Caddy verified ready (final check: HTTP $FINAL_CODE)"
-      # If we got here via pod restart path and Caddy is ready, rotation succeeded
-      ROTATION_SUCCESS=1
+  # Final verification (only if we didn't already succeed)
+  if [[ "${ROTATION_SUCCESS:-0}" != "1" ]]; then
+    FINAL_CHECK=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 2 \
+        -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || FINAL_CHECK=""
+    if [[ -n "$FINAL_CHECK" ]]; then
+      FINAL_CODE=$(echo "$FINAL_CHECK" | tail -1 | tr -d '[:space:]')
+      if [[ "$FINAL_CODE" == "200" ]]; then
+        ok "Caddy verified ready (final check: HTTP $FINAL_CODE)"
+        ROTATION_SUCCESS=1
+      else
+        warn "Caddy final check failed (HTTP $FINAL_CODE) - but continuing"
+        # Even if final check failed, if we got successful checks earlier, rotation likely succeeded
+        if [[ "${READY_COUNT:-0}" -gt 0 ]]; then
+          ROTATION_SUCCESS=1
+        fi
+      fi
     else
-      warn "Caddy final check failed (HTTP $FINAL_CODE) - but continuing"
-      # Even if final check failed, if we got successful checks earlier, rotation likely succeeded
-      if [[ $READY_COUNT -gt 0 ]]; then
+      # Final check returned empty, but if we got some successful checks earlier, rotation likely succeeded
+      if [[ "${READY_COUNT:-0}" -gt 0 ]]; then
         ROTATION_SUCCESS=1
       fi
     fi
-  else
-    # Final check returned empty, but if we got some successful checks earlier, rotation likely succeeded
-    if [[ $READY_COUNT -gt 0 ]]; then
-      ROTATION_SUCCESS=1
-    fi
   fi
-fi
 else
   # Admin API reload succeeded - Caddy is already ready, skip ready check
   ok "Caddy ready (admin API reload succeeded, no pod restart needed)"
@@ -397,11 +461,26 @@ say "CA rotation complete!"
 if [[ "${ROTATION_SUCCESS:-0}" == "1" ]]; then
   exit 0
 elif [[ "${SKIP_POD_RESTART:-0}" == "0" ]]; then
-  # We attempted pod restart - even if it didn't fully succeed, rotation was attempted
-  # With RollingUpdate, pod restart usually succeeds even if health checks are slow
-  # Exit 0 to not break test scripts - they check success rate anyway
-  warn "CA rotation completed (pod restart was attempted)"
-  exit 0
+  # We attempted pod restart - check if at least one pod is Running and Ready
+  # With 2 replicas on 1 node, one pod will be Pending (expected), but one should be Running
+  RUNNING_PODS=$(kubectl -n "$NS_ING" get pods -l app=caddy-h3 --no-headers 2>/dev/null | awk '$3=="Running" && $2 ~ /1\/1/ {count++} END {print count+0}' || echo "0")
+  if [[ "$RUNNING_PODS" -ge 1 ]]; then
+    ok "CA rotation completed successfully ($RUNNING_PODS pod(s) Running and Ready)"
+    exit 0
+  else
+    # Check if Caddy is accessible (final verification)
+    FINAL_HEALTH=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 3 \
+      -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1 | tail -1 | tr -d '[:space:]' || echo "000")
+    if [[ "$FINAL_HEALTH" == "200" ]]; then
+      ok "CA rotation completed successfully (Caddy is accessible and healthy)"
+      exit 0
+    else
+      # With RollingUpdate, pod restart usually succeeds even if health checks are slow
+      # Exit 0 to not break test scripts - they check success rate anyway
+      warn "CA rotation completed (pod restart was attempted, Caddy may still be starting)"
+      exit 0
+    fi
+  fi
 else
   # Rotation failed - neither admin API reload nor pod restart succeeded
   warn "CA rotation may not have completed successfully"

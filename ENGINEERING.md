@@ -777,6 +777,16 @@ exporters:
 - Infrastructure monitoring
 - Custom dashboards and alerts
 
+**Production Setup**: See `infra/k8s/OBSERVABILITY-PRODUCTION-SETUP.md` for comprehensive setup and troubleshooting guide.
+
+**Quick Fix Script**: Run `bash infra/k8s/scripts/fix-observability-production.sh` to automatically fix common issues:
+- Grafana CrashLoopBackOff
+- Prometheus Helm chart failures
+- OpenTelemetry Collector duplicate pods
+- Linkerd/Istio control plane restarts
+- DNS resolution issues
+- Sidecar injection problems
+
 ### Service Mesh (Linkerd - Optional)
 
 **Purpose**: Service mesh with mTLS, traffic management, and advanced observability.
@@ -837,6 +847,71 @@ kubectl -n record-platform logs -f --all-containers=true
 - `infra/k8s/GRAFANA-GUIDE.md` - Grafana usage and dashboard creation
 - `infra/k8s/base/observability/otel-instrumentation.md` - OpenTelemetry instrumentation guide
 
+## Shopping Cart Architecture
+
+### Amazon-Style Cart Design
+
+**Problem Statement:**
+Marketplace platforms require sophisticated cart experiences where users frequently
+encounter multiple identical items (same title, condition) that need differentiation.
+Industry leaders (Amazon, eBay) solve this through catalog identification and user
+notes.
+
+**Why This Matters:**
+- **User Experience**: Users need to distinguish between multiple identical items
+  in their cart (e.g., two "Beatles - Abbey Road" records, both "Very Good" condition,
+  but one has original packaging and one doesn't)
+- **Seller Flexibility**: Sellers can list the same item multiple times with different
+  catalog IDs (e.g., different pressings, different sellers, different batches)
+- **Purchase Clarity**: Buyers can add notes to remember why they added an item or
+  distinguish between similar items
+- **Marketplace Standards**: Aligns with industry-standard UX patterns from Amazon,
+  eBay, and other major marketplaces
+
+**Investigation of Alternatives:**
+- **Option 1: Use listing ID only** - Rejected: Listing ID changes when item is
+  reposted, doesn't help differentiate identical items
+- **Option 2: Composite key (title + condition)** - Rejected: Too restrictive,
+  prevents sellers from listing same item multiple times
+- **Option 3: Catalog ID + Notes (Chosen)** - Best: Provides seller flexibility
+  (catalog ID) and buyer clarity (notes), aligns with industry standards
+
+### Technical Implementation
+
+**Database Schema:**
+- **Listings DB**: `catalog_id VARCHAR(128)` in `listings.listings` table
+  - Unique constraint on `(user_id, title, condition, catalog_id)` when catalog_id
+    is provided
+  - Index on `catalog_id` for fast lookups
+  - Allows NULL catalog_id for items without catalog distinction
+- **Shopping DB**: `notes TEXT` in `shopping.shopping_cart` table
+  - User-specific notes per cart item
+  - Allows differentiation of items with same condition
+
+**Cross-Service Data Enrichment:**
+- Shopping service connects to listings database to fetch item details
+- Uses `listingsPool` connection pool for efficient cross-database queries
+- Enriches cart items with listing metadata (image, title, condition, catalog_id)
+  before returning to frontend
+
+**API Design:**
+- **GET /cart**: Returns enriched cart items with full listing details
+- **POST /cart**: Accepts optional `notes` field for new cart items
+- **PUT /cart/:itemId**: Allows updating `notes` field for existing cart items
+- **POST /listings**: Accepts optional `catalog_id` in request body
+- **PUT /listings/:id**: Allows updating `catalog_id` for existing listings
+
+**Frontend Implementation:**
+- Amazon-style grid layout with responsive design
+- Visual badges for condition and catalog ID
+- Inline editing for notes with optimistic updates
+- Lazy loading for images to reduce initial page load
+
+**Performance Considerations:**
+- Cart GET endpoint performs one additional query per item to fetch listing details
+- Consider caching listing details if cart contains many items
+- Index on `catalog_id` ensures fast lookups
+
 ## Performance Optimizations
 
 ### Performance Testing & Benchmarking
@@ -878,6 +953,71 @@ kubectl -n record-platform logs -f --all-containers=true
 **Connection Pooling**:
 - Prisma connection pool per service
 - Configurable pool size based on service load
+
+### Shopping Cart Architecture
+
+### Amazon-Style Cart Design
+
+**Problem Statement:**
+Marketplace platforms require sophisticated cart experiences where users frequently
+encounter multiple identical items (same title, condition) that need differentiation.
+Industry leaders (Amazon, eBay) solve this through catalog identification and user
+notes.
+
+**Why This Matters:**
+- **User Experience**: Users need to distinguish between multiple identical items
+  in their cart (e.g., two "Beatles - Abbey Road" records, both "Very Good" condition,
+  but one has original packaging and one doesn't)
+- **Seller Flexibility**: Sellers can list the same item multiple times with different
+  catalog IDs (e.g., different pressings, different sellers, different batches)
+- **Purchase Clarity**: Buyers can add notes to remember why they added an item or
+  distinguish between similar items
+- **Marketplace Standards**: Aligns with industry-standard UX patterns from Amazon,
+  eBay, and other major marketplaces
+
+**Investigation of Alternatives:**
+- **Option 1: Use listing ID only** - Rejected: Listing ID changes when item is
+  reposted, doesn't help differentiate identical items
+- **Option 2: Composite key (title + condition)** - Rejected: Too restrictive,
+  prevents sellers from listing same item multiple times
+- **Option 3: Catalog ID + Notes (Chosen)** - Best: Provides seller flexibility
+  (catalog ID) and buyer clarity (notes), aligns with industry standards
+
+### Technical Implementation
+
+**Database Schema:**
+- **Listings DB**: `catalog_id VARCHAR(128)` in `listings.listings` table
+  - Unique constraint on `(user_id, title, condition, catalog_id)` when catalog_id
+    is provided
+  - Index on `catalog_id` for fast lookups
+  - Allows NULL catalog_id for items without catalog distinction
+- **Shopping DB**: `notes TEXT` in `shopping.shopping_cart` table
+  - User-specific notes per cart item
+  - Allows differentiation of items with same condition
+
+**Cross-Service Data Enrichment:**
+- Shopping service connects to listings database to fetch item details
+- Uses `listingsPool` connection pool for efficient cross-database queries
+- Enriches cart items with listing metadata (image, title, condition, catalog_id)
+  before returning to frontend
+
+**API Design:**
+- **GET /cart**: Returns enriched cart items with full listing details
+- **POST /cart**: Accepts optional `notes` field for new cart items
+- **PUT /cart/:itemId**: Allows updating `notes` field for existing cart items
+- **POST /listings**: Accepts optional `catalog_id` in request body
+- **PUT /listings/:id**: Allows updating `catalog_id` for existing listings
+
+**Frontend Implementation:**
+- Amazon-style grid layout with responsive design
+- Visual badges for condition and catalog ID
+- Inline editing for notes with optimistic updates
+- Lazy loading for images to reduce initial page load
+
+**Performance Considerations:**
+- Cart GET endpoint performs one additional query per item to fetch listing details
+- Consider caching listing details if cart contains many items
+- Index on `catalog_id` ensures fast lookups
 
 ### Caching Strategy
 

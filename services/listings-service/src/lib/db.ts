@@ -84,13 +84,14 @@ export async function createListing(data: {
   stock_quantity?: number;
   duration_days?: number;
   visible_from?: Date;
+  catalog_id?: string;
 }) {
   const result = await pool.query(
     `INSERT INTO listings.listings (
       user_id, title, description, price, currency, listing_type,
       condition, category, location, shipping_cost, shipping_method, expires_at,
-      media_type, has_obi, label_type, stock_quantity, duration_days, visible_from
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      media_type, has_obi, label_type, stock_quantity, duration_days, visible_from, catalog_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
     RETURNING *`,
     [
       data.user_id,
@@ -111,6 +112,7 @@ export async function createListing(data: {
       data.stock_quantity || 1,
       data.duration_days || 30,
       data.visible_from || new Date(),
+      data.catalog_id || null,
     ]
   );
 
@@ -134,6 +136,7 @@ export async function updateListing(listingId: string, userId: string, updates: 
   description: string;
   price: number;
   condition: string;
+  catalog_id: string;
   category: string;
   location: string;
   shipping_cost: number;

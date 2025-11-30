@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS listings.listings (
   currency        VARCHAR(3) NOT NULL DEFAULT 'USD',
   listing_type    VARCHAR(32) NOT NULL DEFAULT 'fixed_price' CHECK (listing_type IN ('fixed_price', 'auction', 'obo', 'best_offer')),
   condition       VARCHAR(64), -- e.g., "New", "Like New", "Very Good", "Good", "Fair"
+  catalog_id      VARCHAR(128), -- Catalog ID to differentiate items with same title and condition (e.g., SKU, product code)
   category        VARCHAR(128),
   location        VARCHAR(256), -- Seller location
   shipping_cost   NUMERIC(10,2) DEFAULT 0.0,

@@ -5,6 +5,8 @@ metadata:
   name: caddy-h3
   namespace: ingress-nginx
 spec:
+  # NOTE: Using Recreate strategy for now to get it working
+  # For CA rotation with 2 replicas, we'll need to handle port conflicts differently
   strategy: { type: Recreate }
   replicas: 1
   selector: { matchLabels: { app: caddy-h3 } }
@@ -13,7 +15,22 @@ spec:
     spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
-      terminationGracePeriodSeconds: 5
+      terminationGracePeriodSeconds: 30  # Longer grace period for graceful shutdown
+      # Pod anti-affinity: prefer pods on different nodes (but allow same node if needed)
+      # With hostNetwork, only 1 pod per node can bind to port 443
+      # Using "preferred" instead of "required" allows scheduling even if only 1 node available
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - caddy-h3
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: caddy
         image: caddy:2.8
@@ -35,12 +52,18 @@ spec:
             path: /_caddy/healthz
             port: 443
           periodSeconds: 5
-          failureThreshold: 6
+          failureThreshold: 3
+          initialDelaySeconds: 5
         livenessProbe:
           tcpSocket: { port: 443 }
-          initialDelaySeconds: 3
+          initialDelaySeconds: 10
           periodSeconds: 10
           failureThreshold: 3
+        # Graceful shutdown: drain connections before termination
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 5"]  # Give time for connections to drain
       volumes:
       - name: caddy-conf
         configMap:

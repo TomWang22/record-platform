@@ -17,6 +17,9 @@ spec:
           - listings-service
           - analytics-service
           - python-ai-service
+          - social-service
+          - shopping-service
+          - auction-monitor
   endpoints:
     - port: http
       path: /metrics
@@ -38,5 +41,8 @@ spec:
           - nginx-exporter
           - haproxy-exporter
   endpoints:
+    - port: http
+      interval: 15s
+
     - port: http
       interval: 15s

@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import type { ReactElement, MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -26,7 +26,7 @@ type AuctionTrend = {
   bids: number
 }
 
-export default function AuctionsPage() {
+export default function AuctionsPage(): ReactElement {
   const router = useRouter()
   const [auctions, setAuctions] = useState<AuctionItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -57,7 +57,7 @@ export default function AuctionsPage() {
   async function fetchTrendData(auctionId: string) {
     try {
       // Fetch trend data from auction-monitor service
-      const response = await apiFetch<{ results: any[] }>(`/api/auctions/results/${auctionId}`, {
+      const response = await apiFetch<{ results: Array<{ sold_at?: string; created_at: string; price?: number; total_cost?: number }> }>(`/api/auctions/results/${auctionId}`, {
         auth: true,
       })
       
@@ -189,13 +189,14 @@ export default function AuctionsPage() {
       {auctions.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {auctions.map((auction) => (
-            <Card 
-              key={auction.id} 
+            <div
+              key={auction.id}
               className={`hover:shadow-lg transition-shadow cursor-pointer ${
                 selectedAuction === auction.id ? 'ring-2 ring-brand' : ''
               }`}
               onClick={() => setSelectedAuction(selectedAuction === auction.id ? null : auction.id)}
             >
+              <Card>
               <div className="space-y-3">
                 <h3 className="font-semibold text-slate-900 dark:text-white line-clamp-2">{auction.title}</h3>
                 
@@ -222,7 +223,8 @@ export default function AuctionsPage() {
                   </a>
                 </Button>
               </div>
-            </Card>
+              </Card>
+            </div>
           ))}
         </div>
       )}
@@ -230,44 +232,37 @@ export default function AuctionsPage() {
       {/* Auction Trend Chart */}
       {selectedAuction && trendData.length > 0 && (
         <Card title="Bid Trend" description="Track how the auction price climbs over time">
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={trendData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
-              <XAxis 
-                dataKey="timestamp" 
-                className="text-xs text-slate-500"
-                tick={{ fill: 'currentColor' }}
-              />
-              <YAxis 
-                className="text-xs text-slate-500"
-                tick={{ fill: 'currentColor' }}
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'var(--tw-color-slate-900)',
-                  border: '1px solid var(--tw-color-slate-700)',
-                  borderRadius: '0.5rem',
-                }}
-              />
-              <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="bid" 
-                stroke="#5C6FF8" 
-                strokeWidth={2}
-                name="Current Bid ($)"
-                dot={{ r: 3 }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="bids" 
-                stroke="#10b981" 
-                strokeWidth={2}
-                name="Total Bids"
-                dot={{ r: 3 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="rounded-lg bg-slate-100 dark:bg-slate-800 p-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Latest Bid</p>
+                <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                  ${trendData[trendData.length - 1]?.bid.toFixed(2) || '0.00'}
+                </p>
+              </div>
+              <div className="rounded-lg bg-slate-100 dark:bg-slate-800 p-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Total Bids</p>
+                <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                  {trendData[trendData.length - 1]?.bids || 0}
+                </p>
+              </div>
+              <div className="rounded-lg bg-slate-100 dark:bg-slate-800 p-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Data Points</p>
+                <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                  {trendData.length}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {trendData.slice(-10).reverse().map((point, idx) => (
+                <div key={idx} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-900 p-2 text-xs">
+                  <span className="text-slate-600 dark:text-slate-400">{point.timestamp}</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">${point.bid.toFixed(2)}</span>
+                  <span className="text-slate-500 dark:text-slate-400">{point.bids} bids</span>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <span>Click an auction card above to view its trend</span>
             <Button variant="ghost" size="sm" onClick={() => setSelectedAuction(null)}>

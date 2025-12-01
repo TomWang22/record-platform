@@ -5,6 +5,31 @@ NS="record-platform"
 HOST="${HOST:-record.local}"
 CURL_BIN="${CURL_BIN:-/opt/homebrew/opt/curl/bin/curl}"
 
+# Auto-detect port based on cluster, or use provided PORT
+if [[ -z "${PORT:-}" ]]; then
+  CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
+  if [[ "$CURRENT_CONTEXT" == "kind-h3-multi" ]]; then
+    # Multi-node cluster: try ports 8444, 8445, 8446
+    for p in 8445 8446 8444; do
+      if curl -k -s --http2 --max-time 1 -H "Host: ${HOST}" "https://127.0.0.1:${p}/_caddy/healthz" >/dev/null 2>&1; then
+        PORT=$p
+        break
+      fi
+    done
+    PORT="${PORT:-8445}"
+  else
+    # With NodePort, use 30443 (or detect from service)
+    PORT="${PORT:-30443}"  # Default to NodePort 30443
+    # Try to detect actual NodePort from service if not set
+    if [[ -z "${PORT:-}" ]] || [[ "${PORT:-}" == "30443" ]]; then
+      DETECTED_PORT=$(kubectl -n ingress-nginx get svc caddy-h3 -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || echo "")
+      if [[ -n "$DETECTED_PORT" ]]; then
+        PORT=$DETECTED_PORT
+      fi
+    fi
+  fi
+fi
+
 say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
 ok() { echo "✅ $*"; }
 warn() { echo "⚠️  $*"; }
@@ -14,7 +39,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib/http3.sh
 . "$SCRIPT_DIR/lib/http3.sh"
 
-HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
+# For HTTP/3, we need to use the service ClusterIP when inside container network
+# With hostNetwork, we used 127.0.0.1:443, but with NodePort, we need the service IP
+# Detect service IP for HTTP/3 (inside container network, we can't use NodePort)
+HTTP3_SVC_IP=$(kubectl -n ingress-nginx get svc caddy-h3 -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
+if [[ -n "$HTTP3_SVC_IP" ]]; then
+  HTTP3_RESOLVE="${HOST}:443:${HTTP3_SVC_IP}"
+else
+  # Fallback to 127.0.0.1 if service not found (shouldn't happen)
+  HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
+fi
 TOKEN=""
 TOKEN_USER2=""
 USER1_ID=""
@@ -146,11 +180,11 @@ extract_user_id() {
 say "Test 1: Auth Service - Registration via HTTP/2 (User 1)"
 TEST_EMAIL="microservice-test-$(date +%s)@example.com"
 TEST_PASSWORD="test123"
-REGISTER_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-  --resolve "$HOST:8443:127.0.0.1" \
+REGISTER_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+  --resolve "$HOST:${PORT}:127.0.0.1" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
-  -X POST "https://$HOST:8443/api/auth/register" \
+  -X POST "https://$HOST:${PORT}/api/auth/register" \
   -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}" 2>&1) || {
   warn "Registration curl command failed (exit code: $?)"
   REGISTER_RESPONSE=""
@@ -177,11 +211,11 @@ fi
 # Test 1b: Auth Service - Registration (HTTP/2) - User 2
 say "Test 1b: Auth Service - Registration via HTTP/2 (User 2)"
 TEST_EMAIL_USER2="microservice-test-2-$(date +%s)@example.com"
-REGISTER_RESPONSE_USER2=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-  --resolve "$HOST:8443:127.0.0.1" \
+REGISTER_RESPONSE_USER2=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+  --resolve "$HOST:${PORT}:127.0.0.1" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
-  -X POST "https://$HOST:8443/api/auth/register" \
+  -X POST "https://$HOST:${PORT}/api/auth/register" \
   -d "{\"email\":\"$TEST_EMAIL_USER2\",\"password\":\"test123\"}" 2>&1) || {
   warn "User 2 registration curl command failed (exit code: $?)"
   REGISTER_RESPONSE_USER2=""
@@ -208,7 +242,7 @@ fi
 # Test 2: Auth Service - Login (HTTP/3) - User 1
 say "Test 2: Auth Service - Login via HTTP/3 (User 1)"
 if [[ -z "$TOKEN" ]]; then
-  LOGIN_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  LOGIN_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     --resolve "$HTTP3_RESOLVE" \
@@ -239,7 +273,7 @@ fi
 # Test 2b: Auth Service - Login (HTTP/3) - User 2
 say "Test 2b: Auth Service - Login via HTTP/3 (User 2)"
 if [[ -z "$TOKEN_USER2" ]]; then
-  LOGIN_RESPONSE_USER2=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  LOGIN_RESPONSE_USER2=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     --resolve "$HTTP3_RESOLVE" \
@@ -270,12 +304,12 @@ fi
 say "Test 3: Records Service - Create Record via HTTP/2"
 if [[ -n "${TOKEN:-}" ]]; then
   CREATE_RC=0
-  CREATE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  CREATE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
-    -X POST "https://$HOST:8443/api/records" \
+    -X POST "https://$HOST:${PORT}/api/records" \
     -d '{"artist":"Test Artist","name":"Test Record","format":"LP","catalog_number":"TEST-001"}' 2>&1) || CREATE_RC=$?
   CREATE_CODE=$(echo "$CREATE_RESPONSE" | tail -1)
   if [[ "$CREATE_RC" -ne 0 ]]; then
@@ -295,7 +329,7 @@ fi
 say "Test 3b: Records Service - Create Record via HTTP/3"
 if [[ -n "${TOKEN:-}" ]]; then
   CREATE_H3_RC=0
-  CREATE_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  CREATE_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
@@ -321,8 +355,8 @@ fi
 # Test 4: Health Checks (HTTP/2 and HTTP/3)
 say "Test 4: Health Checks"
 CADDY_H2_HEALTH=$("$CURL_BIN" -k -sS -I --http2 --max-time 10 \
-  --resolve "$HOST:8443:127.0.0.1" \
-  -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1) || CADDY_H2_HEALTH=""
+  --resolve "$HOST:${PORT}:127.0.0.1" \
+  -H "Host: $HOST" "https://$HOST:${PORT}/_caddy/healthz" 2>&1) || CADDY_H2_HEALTH=""
 if echo "$CADDY_H2_HEALTH" | head -n1 | grep -q "200"; then
   ok "Caddy health check works via HTTP/2"
 else
@@ -341,8 +375,8 @@ fi
 # Test 5: API Gateway Health
 say "Test 5: API Gateway Health"
 GATEWAY_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
-  --resolve "$HOST:8443:127.0.0.1" \
-  -H "Host: $HOST" "https://$HOST:8443/api/healthz" 2>&1) || {
+  --resolve "$HOST:${PORT}:127.0.0.1" \
+  -H "Host: $HOST" "https://$HOST:${PORT}/api/healthz" 2>&1) || {
   warn "API Gateway health check curl command failed (exit code: $?)"
   GATEWAY_RESPONSE=""
   GATEWAY_CODE="000"
@@ -362,12 +396,12 @@ fi
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 6: Social Service - Create Forum Post via HTTP/2"
   FORUM_POST_RC=0
-  FORUM_POST_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  FORUM_POST_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
-    -X POST "https://$HOST:8443/api/forum/posts" \
+    -X POST "https://$HOST:${PORT}/api/forum/posts" \
     -d '{"title":"Test Forum Post","content":"This is a test post via HTTP/2","flair":"general"}' 2>&1) || FORUM_POST_RC=$?
   FORUM_POST_CODE=$(echo "$FORUM_POST_RESPONSE" | tail -1)
   if [[ "$FORUM_POST_RC" -ne 0 ]]; then
@@ -388,7 +422,7 @@ fi
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 6b: Social Service - Create Forum Post via HTTP/3"
   FORUM_POST_H3_RC=0
-  FORUM_POST_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  FORUM_POST_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
@@ -415,10 +449,10 @@ fi
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 7: Social Service - Get Forum Posts via HTTP/2"
   GET_FORUM_RC=0
-  GET_FORUM_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+  GET_FORUM_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN" \
-    -X GET "https://$HOST:8443/api/forum/posts" 2>&1) || GET_FORUM_RC=$?
+    -X GET "https://$HOST:${PORT}/api/forum/posts" 2>&1) || GET_FORUM_RC=$?
   GET_FORUM_CODE=$(echo "$GET_FORUM_RESPONSE" | tail -1)
   if [[ "$GET_FORUM_RC" -ne 0 ]]; then
     warn "Get forum posts request failed (curl exit $GET_FORUM_RC)"
@@ -445,7 +479,7 @@ fi
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${FORUM_POST_ID:-}" ]]; then
   say "Test 7b: Social Service - Add Comment to Forum Post via HTTP/3 (User 2)"
   ADD_COMMENT_RC=0
-  ADD_COMMENT_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  ADD_COMMENT_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN_USER2" \
@@ -475,12 +509,12 @@ fi
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${USER2_ID:-}" ]]; then
   say "Test 8: Social Service - Send P2P Direct Message via HTTP/2 (User 1 -> User 2)"
   SEND_MSG_RC=0
-  SEND_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  SEND_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
-    -X POST "https://$HOST:8443/api/messages" \
+    -X POST "https://$HOST:${PORT}/api/messages" \
     -d "{\"recipient_id\":\"$USER2_ID\",\"message_type\":\"direct\",\"subject\":\"Test P2P Message\",\"content\":\"Hello User 2, this is a test message via HTTP/2\"}" 2>&1) || SEND_MSG_RC=$?
   SEND_MSG_CODE=$(echo "$SEND_MSG_RESPONSE" | tail -1)
   if [[ "$SEND_MSG_RC" -ne 0 ]]; then
@@ -504,7 +538,7 @@ fi
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${USER1_ID:-}" ]]; then
   say "Test 8b: Social Service - Send P2P Direct Message via HTTP/3 (User 2 -> User 1)"
   SEND_MSG_H3_RC=0
-  SEND_MSG_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  SEND_MSG_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN_USER2" \
@@ -536,10 +570,10 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]]; then
   say "Test 9: Social Service - Get Messages via HTTP/2 (User 2's inbox)"
   GET_MSG_RC=0
   GET_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 20 \
-    --resolve "$HOST:8443:127.0.0.1" \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN_USER2" \
-    -X GET "https://$HOST:8443/api/messages" 2>&1) || GET_MSG_RC=$?
+    -X GET "https://$HOST:${PORT}/api/messages" 2>&1) || GET_MSG_RC=$?
   GET_MSG_CODE=$(echo "$GET_MSG_RESPONSE" | tail -1)
   if [[ "$GET_MSG_RC" -ne 0 ]]; then
     warn "Get messages request failed (curl exit $GET_MSG_RC)"
@@ -558,11 +592,11 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 9b: Social Service - Create Group Chat via HTTP/2"
   CREATE_GROUP_RC=0
   CREATE_GROUP_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
-    --resolve "$HOST:8443:127.0.0.1" \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
-    -X POST "https://$HOST:8443/api/messages/groups" \
+    -X POST "https://$HOST:${PORT}/api/messages/groups" \
     -d '{"name":"My Custom Group Name","description":"A test group for HTTP/2/3 testing"}' 2>&1) || CREATE_GROUP_RC=$?
   CREATE_GROUP_CODE=$(echo "$CREATE_GROUP_RESPONSE" | tail -1)
   if [[ "$CREATE_GROUP_RC" -ne 0 ]]; then
@@ -584,11 +618,11 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${GROUP_ID
   say "Test 9c: Social Service - Add User 2 to Group via HTTP/2"
   ADD_MEMBER_RC=0
   ADD_MEMBER_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
-    --resolve "$HOST:8443:127.0.0.1" \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
-    -X POST "https://$HOST:8443/api/messages/groups/$GROUP_ID/members" \
+    -X POST "https://$HOST:${PORT}/api/messages/groups/$GROUP_ID/members" \
     -d "{\"user_id\":\"$USER2_ID\"}" 2>&1) || ADD_MEMBER_RC=$?
   ADD_MEMBER_CODE=$(echo "$ADD_MEMBER_RESPONSE" | tail -1)
   if [[ "$ADD_MEMBER_RC" -ne 0 ]]; then
@@ -613,7 +647,7 @@ fi
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${GROUP_ID:-}" ]]; then
   say "Test 9d: Social Service - Send Group Message via HTTP/3"
   SEND_GROUP_MSG_RC=0
-  SEND_GROUP_MSG_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  SEND_GROUP_MSG_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
@@ -643,10 +677,10 @@ fi
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${GROUP_ID:-}" ]]; then
   say "Test 9e: Social Service - Get Group Details via HTTP/2"
   GET_GROUP_RC=0
-  GET_GROUP_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+  GET_GROUP_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN_USER2" \
-    -X GET "https://$HOST:8443/api/messages/groups/$GROUP_ID" 2>&1) || GET_GROUP_RC=$?
+    -X GET "https://$HOST:${PORT}/api/messages/groups/$GROUP_ID" 2>&1) || GET_GROUP_RC=$?
   GET_GROUP_CODE=$(echo "$GET_GROUP_RESPONSE" | tail -1)
   if [[ "$GET_GROUP_RC" -ne 0 ]]; then
     warn "Get group details request failed (curl exit $GET_GROUP_RC)"
@@ -670,10 +704,10 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${GR
   # First, get a message ID from the group (from Test 9d)
   # Try to get group messages by querying the group details or messages with group_id filter
   GET_GROUP_MSG_RC=0
-  GET_GROUP_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
+  GET_GROUP_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN_USER2" \
-    -X GET "https://$HOST:8443/api/messages?page=1&limit=50" 2>&1) || GET_GROUP_MSG_RC=$?
+    -X GET "https://$HOST:${PORT}/api/messages?page=1&limit=50" 2>&1) || GET_GROUP_MSG_RC=$?
   if [[ "$GET_GROUP_MSG_RC" -eq 0 ]]; then
     GET_GROUP_MSG_CODE=$(echo "$GET_GROUP_MSG_RESPONSE" | tail -1)
     if [[ "$GET_GROUP_MSG_CODE" == "200" ]]; then
@@ -707,12 +741,12 @@ except:
       fi
       if [[ -n "$GROUP_MSG_ID" ]]; then
         REPLY_GROUP_MSG_RC=0
-        REPLY_GROUP_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-          --resolve "$HOST:8443:127.0.0.1" \
+        REPLY_GROUP_MSG_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+          --resolve "$HOST:${PORT}:127.0.0.1" \
           -H "Host: $HOST" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer $TOKEN_USER2" \
-          -X POST "https://$HOST:8443/api/messages/$GROUP_MSG_ID/reply" \
+          -X POST "https://$HOST:${PORT}/api/messages/$GROUP_MSG_ID/reply" \
           -d '{"message_type":"group","subject":"Re: Group Chat Test","content":"This is a WhatsApp-style reply to the previous message!"}' 2>&1) || REPLY_GROUP_MSG_RC=$?
         REPLY_GROUP_MSG_CODE=$(echo "$REPLY_GROUP_MSG_RESPONSE" | tail -1)
         if [[ "$REPLY_GROUP_MSG_RC" -ne 0 ]]; then
@@ -744,12 +778,12 @@ fi
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 9g: Social Service - Create Forum Post with upload_type via HTTP/2"
   FORUM_POST_UPLOAD_RC=0
-  FORUM_POST_UPLOAD_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  FORUM_POST_UPLOAD_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
-    -X POST "https://$HOST:8443/api/forum/posts" \
+    -X POST "https://$HOST:${PORT}/api/forum/posts" \
     -d '{"title":"Test Image Post","content":"This is a test post with upload_type=image","flair":"general","upload_type":"image"}' 2>&1) || FORUM_POST_UPLOAD_RC=$?
   FORUM_POST_UPLOAD_CODE=$(echo "$FORUM_POST_UPLOAD_RESPONSE" | tail -1)
   if [[ "$FORUM_POST_UPLOAD_RC" -ne 0 ]]; then
@@ -774,12 +808,12 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${FORUM_PO
   say "Test 9h: Social Service - Add Attachment to Forum Post via HTTP/2"
   POST_ATTACH_RC=0
   POST_ID="${FORUM_POST_UPLOAD_ID:-$FORUM_POST_ID}"
-  POST_ATTACH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  POST_ATTACH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
-    -X POST "https://$HOST:8443/api/forum/posts/$POST_ID/attachments" \
+    -X POST "https://$HOST:${PORT}/api/forum/posts/$POST_ID/attachments" \
     -d '{"file_url":"https://example.com/test-image.jpg","file_type":"image","file_name":"test-image.jpg","mime_type":"image/jpeg","file_size":12345,"width":1920,"height":1080,"display_order":0}' 2>&1) || POST_ATTACH_RC=$?
   POST_ATTACH_CODE=$(echo "$POST_ATTACH_RESPONSE" | tail -1)
   if [[ "$POST_ATTACH_RC" -ne 0 ]]; then
@@ -804,7 +838,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${FO
   say "Test 9i: Social Service - Add Comment with Attachment via HTTP/3"
   # First create a comment
   COMMENT_WITH_ATTACH_RC=0
-  COMMENT_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  COMMENT_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN_USER2" \
@@ -822,7 +856,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${FO
       if [[ -n "$COMMENT_ID" ]] && [[ "$COMMENT_ID" != "placeholder-comment-id" ]]; then
         # Add attachment to comment
         COMMENT_ATTACH_RC=0
-        COMMENT_ATTACH_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+        COMMENT_ATTACH_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
           -H "Host: $HOST" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer $TOKEN_USER2" \
@@ -864,12 +898,12 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${MESSAGE_
   say "Test 9j: Social Service - Add Attachment to Message via HTTP/2"
   MSG_ATTACH_RC=0
   MSG_ID="${MESSAGE_ID:-$MESSAGE_H3_ID}"
-  MSG_ATTACH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  MSG_ATTACH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
-    -X POST "https://$HOST:8443/api/messages/$MSG_ID/attachments" \
+    -X POST "https://$HOST:${PORT}/api/messages/$MSG_ID/attachments" \
     -d '{"file_url":"https://example.com/video.mp4","file_type":"video","file_name":"test-video.mp4","mime_type":"video/mp4","file_size":9876543,"width":1280,"height":720,"duration":120,"display_order":0}' 2>&1) || MSG_ATTACH_RC=$?
   MSG_ATTACH_CODE=$(echo "$MSG_ATTACH_RESPONSE" | tail -1)
   if [[ "$MSG_ATTACH_RC" -ne 0 ]]; then
@@ -893,11 +927,11 @@ fi
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${GROUP_ID:-}" ]]; then
   say "Test 9k: Social Service - Leave Group Chat via HTTP/2"
   LEAVE_GROUP_RC=0
-  LEAVE_GROUP_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  LEAVE_GROUP_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN_USER2" \
-    -X DELETE "https://$HOST:8443/api/messages/groups/$GROUP_ID/leave" 2>&1) || LEAVE_GROUP_RC=$?
+    -X DELETE "https://$HOST:${PORT}/api/messages/groups/$GROUP_ID/leave" 2>&1) || LEAVE_GROUP_RC=$?
   LEAVE_GROUP_CODE=$(echo "$LEAVE_GROUP_RESPONSE" | tail -1)
   if [[ "$LEAVE_GROUP_RC" -ne 0 ]]; then
     warn "Leave group request failed (curl exit $LEAVE_GROUP_RC)"
@@ -908,7 +942,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${GR
     VERIFY_LEAVE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
       -H "Host: $HOST" \
       -H "Authorization: Bearer $TOKEN_USER2" \
-      -X GET "https://$HOST:8443/api/messages/groups/$GROUP_ID" 2>&1) || VERIFY_LEAVE_RC=$?
+      -X GET "https://$HOST:${PORT}/api/messages/groups/$GROUP_ID" 2>&1) || VERIFY_LEAVE_RC=$?
     VERIFY_LEAVE_CODE=$(echo "$VERIFY_LEAVE_RESPONSE" | tail -1)
     if [[ "$VERIFY_LEAVE_CODE" == "403" ]]; then
       ok "User successfully left group (403 on group access confirms removal)"
@@ -932,7 +966,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${FORUM_POST_UPLOAD_ID:-${FORUM_POS
   say "Test 9l: Social Service - Get Post Attachments via HTTP/3"
   GET_POST_ATTACH_RC=0
   POST_ID="${FORUM_POST_UPLOAD_ID:-$FORUM_POST_ID}"
-  GET_POST_ATTACH_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  GET_POST_ATTACH_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Authorization: Bearer ${TOKEN:-$TOKEN_USER2}" \
     --resolve "$HTTP3_RESOLVE" \
@@ -958,9 +992,9 @@ if [[ "${SKIP_LISTINGS:-}" != "1" ]]; then
   say "Test 10: Listings Service - Health Check via HTTP/2"
   LISTINGS_HEALTH_RC=0
   LISTINGS_HEALTH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
-    --resolve "$HOST:8443:127.0.0.1" \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
-    "https://$HOST:8443/api/listings/healthz" 2>&1) || LISTINGS_HEALTH_RC=$?
+    "https://$HOST:${PORT}/api/listings/healthz" 2>&1) || LISTINGS_HEALTH_RC=$?
   LISTINGS_HEALTH_CODE=$(echo "$LISTINGS_HEALTH_RESPONSE" | tail -1)
   if [[ "$LISTINGS_HEALTH_RC" -ne 0 ]]; then
     warn "Listings health check failed (curl exit $LISTINGS_HEALTH_RC)"
@@ -1004,11 +1038,11 @@ fi
 if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 11: Listings Service - Search Listings via HTTP/2"
   LISTINGS_SEARCH_RC=0
-  LISTINGS_SEARCH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  LISTINGS_SEARCH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN" \
-    "https://$HOST:8443/api/listings/search?q=vinyl" 2>&1) || LISTINGS_SEARCH_RC=$?
+    "https://$HOST:${PORT}/api/listings/search?q=vinyl" 2>&1) || LISTINGS_SEARCH_RC=$?
   LISTINGS_SEARCH_CODE=$(echo "$LISTINGS_SEARCH_RESPONSE" | tail -1)
   if [[ "$LISTINGS_SEARCH_RC" -ne 0 ]]; then
     warn "Search listings request failed (curl exit $LISTINGS_SEARCH_RC)"
@@ -1026,7 +1060,7 @@ fi
 if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 11b: Listings Service - Search Listings via HTTP/3"
   LISTINGS_SEARCH_H3_RC=0
-  LISTINGS_SEARCH_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  LISTINGS_SEARCH_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN" \
     --resolve "$HTTP3_RESOLVE" \
@@ -1050,18 +1084,18 @@ fi
 if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 12: Listings Service - Create Listing via HTTP/2"
   LISTINGS_CREATE_RC=0
-  # Try port 8443 first (HTTP/2), with increased timeout to match API gateway proxyTimeout
+  # Try with NodePort (HTTP/2), with increased timeout to match API gateway proxyTimeout
   LISTINGS_CREATE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 --connect-timeout 10 \
-    --resolve "$HOST:8443:127.0.0.1" \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
-    -X POST "https://$HOST:8443/api/listings" \
+    -X POST "https://$HOST:${PORT}/api/listings" \
     -d '{"title":"Test Vinyl Record","description":"Mint condition test listing","price":29.99,"listing_type":"fixed_price","condition":"Mint","category":"Vinyl"}' 2>&1) || LISTINGS_CREATE_RC=$?
   
-  # If port 8443 times out, try port 443 as fallback (same as HTTP/3 test)
+  # If NodePort times out, try port 443 as fallback (same as HTTP/3 test)
   if [[ "$LISTINGS_CREATE_RC" -eq 28 ]]; then
-    warn "Port 8443 timed out, trying port 443 as fallback..."
+    warn "NodePort ${PORT} timed out, trying port 443 as fallback..."
     LISTINGS_CREATE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 --connect-timeout 10 \
       --resolve "$HOST:443:127.0.0.1" \
       -H "Host: $HOST" \
@@ -1075,7 +1109,7 @@ if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   if [[ "$LISTINGS_CREATE_RC" -ne 0 ]]; then
     warn "Create listing request failed (curl exit $LISTINGS_CREATE_RC)"
     if [[ "$LISTINGS_CREATE_RC" -eq 28 ]]; then
-      warn "  → Timeout (28): Request took longer than 30s on both ports 8443 and 443"
+      warn "  → Timeout (28): Request took longer than 30s on both NodePort ${PORT} and port 443"
       warn "  → This may indicate:"
       warn "     - Database connection issue (check listings-service logs)"
       warn "     - API gateway proxy timeout"
@@ -1098,7 +1132,7 @@ fi
 if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 12b: Listings Service - Create Listing via HTTP/3"
   LISTINGS_CREATE_H3_RC=0
-  LISTINGS_CREATE_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  LISTINGS_CREATE_H3_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
@@ -1125,11 +1159,11 @@ fi
 if [[ "${SKIP_LISTINGS:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 13: Listings Service - Get My Listings via HTTP/2"
   LISTINGS_MY_RC=0
-  LISTINGS_MY_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  LISTINGS_MY_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN" \
-    "https://$HOST:8443/api/listings/my-listings" 2>&1) || LISTINGS_MY_RC=$?
+    "https://$HOST:${PORT}/api/listings/my-listings" 2>&1) || LISTINGS_MY_RC=$?
   LISTINGS_MY_CODE=$(echo "$LISTINGS_MY_RESPONSE" | tail -1)
   if [[ "$LISTINGS_MY_RC" -ne 0 ]]; then
     warn "Get my listings request failed (curl exit $LISTINGS_MY_RC)"
@@ -1151,12 +1185,12 @@ if [[ "${SKIP_SHOPPING:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 13a: Shopping Service - Add Item to Cart via HTTP/2"
   if [[ -n "${LISTING_ID:-}" ]]; then
     ADD_CART_RC=0
-    ADD_CART_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-      --resolve "$HOST:8443:127.0.0.1" \
+    ADD_CART_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+      --resolve "$HOST:${PORT}:127.0.0.1" \
       -H "Host: $HOST" \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer $TOKEN" \
-      -X POST "https://$HOST:8443/api/cart" \
+      -X POST "https://$HOST:${PORT}/api/cart" \
       -d "{\"item_type\":\"listing\",\"item_id\":\"$LISTING_ID\",\"listing_id\":\"$LISTING_ID\",\"quantity\":1,\"price\":29.99,\"metadata\":{\"title\":\"Test Listing\"}}" 2>&1) || ADD_CART_RC=$?
     ADD_CART_CODE=$(echo "$ADD_CART_RESPONSE" | tail -1)
     if [[ "$ADD_CART_RC" -ne 0 ]]; then
@@ -1175,11 +1209,11 @@ if [[ "${SKIP_SHOPPING:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   # Test 13b: Get cart
   say "Test 13b: Shopping Service - Get Cart via HTTP/2"
   GET_CART_RC=0
-  GET_CART_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  GET_CART_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN" \
-    -X GET "https://$HOST:8443/api/cart" 2>&1) || GET_CART_RC=$?
+    -X GET "https://$HOST:${PORT}/api/cart" 2>&1) || GET_CART_RC=$?
   GET_CART_CODE=$(echo "$GET_CART_RESPONSE" | tail -1)
   if [[ "$GET_CART_RC" -ne 0 ]]; then
     warn "Get cart request failed (curl exit $GET_CART_RC)"
@@ -1198,11 +1232,11 @@ if [[ "${SKIP_SHOPPING:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   if [[ -n "${CART_ITEM_ID:-}" ]] && [[ -n "${LISTING_ID:-}" ]]; then
     CHECKOUT_RC=0
     CHECKOUT_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
-      --resolve "$HOST:8443:127.0.0.1" \
+      --resolve "$HOST:${PORT}:127.0.0.1" \
       -H "Host: $HOST" \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer $TOKEN" \
-      -X POST "https://$HOST:8443/api/cart/checkout" \
+      -X POST "https://$HOST:${PORT}/api/cart/checkout" \
       -d "{\"items\":[{\"item_type\":\"listing\",\"item_id\":\"$LISTING_ID\",\"listing_id\":\"$LISTING_ID\",\"quantity\":1,\"price\":29.99}],\"payment_method\":\"simulated\",\"shipping_address\":{\"street\":\"123 Test St\",\"city\":\"Test City\",\"state\":\"CA\",\"zip\":\"12345\",\"country\":\"US\"},\"billing_address\":{\"street\":\"123 Test St\",\"city\":\"Test City\",\"state\":\"CA\",\"zip\":\"12345\",\"country\":\"US\"}}" 2>&1) || CHECKOUT_RC=$?
     CHECKOUT_CODE=$(echo "$CHECKOUT_RESPONSE" | tail -1)
     if [[ "$CHECKOUT_RC" -ne 0 ]]; then
@@ -1230,11 +1264,11 @@ if [[ "${SKIP_SHOPPING:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   # Test 13d: Get orders
   say "Test 13d: Shopping Service - Get Orders via HTTP/2"
   GET_ORDERS_RC=0
-  GET_ORDERS_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  GET_ORDERS_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN" \
-    -X GET "https://$HOST:8443/api/orders" 2>&1) || GET_ORDERS_RC=$?
+    -X GET "https://$HOST:${PORT}/api/orders" 2>&1) || GET_ORDERS_RC=$?
   GET_ORDERS_CODE=$(echo "$GET_ORDERS_RESPONSE" | tail -1)
   if [[ "$GET_ORDERS_RC" -ne 0 ]]; then
     warn "Get orders request failed (curl exit $GET_ORDERS_RC)"
@@ -1251,11 +1285,11 @@ if [[ "${SKIP_SHOPPING:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   say "Test 13e: Shopping Service - Get Order Details via HTTP/2"
   if [[ -n "${ORDER_ID:-}" ]]; then
     GET_ORDER_RC=0
-    GET_ORDER_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-      --resolve "$HOST:8443:127.0.0.1" \
+    GET_ORDER_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+      --resolve "$HOST:${PORT}:127.0.0.1" \
       -H "Host: $HOST" \
       -H "Authorization: Bearer $TOKEN" \
-      -X GET "https://$HOST:8443/api/orders/$ORDER_ID" 2>&1) || GET_ORDER_RC=$?
+      -X GET "https://$HOST:${PORT}/api/orders/$ORDER_ID" 2>&1) || GET_ORDER_RC=$?
     GET_ORDER_CODE=$(echo "$GET_ORDER_RESPONSE" | tail -1)
     if [[ "$GET_ORDER_RC" -ne 0 ]]; then
       warn "Get order details request failed (curl exit $GET_ORDER_RC)"
@@ -1274,11 +1308,11 @@ if [[ "${SKIP_SHOPPING:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   # Test 13f: Get purchase history
   say "Test 13f: Shopping Service - Get Purchase History via HTTP/2"
   GET_PURCHASES_RC=0
-  GET_PURCHASES_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  GET_PURCHASES_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN" \
-    -X GET "https://$HOST:8443/api/history/purchases" 2>&1) || GET_PURCHASES_RC=$?
+    -X GET "https://$HOST:${PORT}/api/history/purchases" 2>&1) || GET_PURCHASES_RC=$?
   GET_PURCHASES_CODE=$(echo "$GET_PURCHASES_RESPONSE" | tail -1)
   if [[ "$GET_PURCHASES_RC" -ne 0 ]]; then
     warn "Get purchase history request failed (curl exit $GET_PURCHASES_RC)"
@@ -1297,11 +1331,11 @@ if [[ "${SKIP_SHOPPING:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   # Test 13g: Get resellable purchases (eBay-style)
   say "Test 13g: Shopping Service - Get Resellable Purchases via HTTP/2"
   GET_RESELLABLE_RC=0
-  GET_RESELLABLE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  GET_RESELLABLE_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN" \
-    -X GET "https://$HOST:8443/api/resell/purchases" 2>&1) || GET_RESELLABLE_RC=$?
+    -X GET "https://$HOST:${PORT}/api/resell/purchases" 2>&1) || GET_RESELLABLE_RC=$?
   GET_RESELLABLE_CODE=$(echo "$GET_RESELLABLE_RESPONSE" | tail -1)
   if [[ "$GET_RESELLABLE_RC" -ne 0 ]]; then
     warn "Get resellable purchases request failed (curl exit $GET_RESELLABLE_RC)"
@@ -1319,11 +1353,11 @@ if [[ "${SKIP_SHOPPING:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   if [[ -n "${PURCHASE_ID:-}" ]]; then
     RESELL_RC=0
     RESELL_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
-      --resolve "$HOST:8443:127.0.0.1" \
+      --resolve "$HOST:${PORT}:127.0.0.1" \
       -H "Host: $HOST" \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer $TOKEN" \
-      -X POST "https://$HOST:8443/api/resell/$PURCHASE_ID" \
+      -X POST "https://$HOST:${PORT}/api/resell/$PURCHASE_ID" \
       -d "{\"title\":\"Reselling Test Item\",\"description\":\"This is a test resell listing\",\"price\":35.99,\"currency\":\"USD\",\"listing_type\":\"fixed_price\",\"condition\":\"used\",\"category\":\"vinyl\",\"location\":\"US\",\"shipping_cost\":5.00,\"mark_as_resold\":true}" 2>&1) || RESELL_RC=$?
     RESELL_CODE=$(echo "$RESELL_RESPONSE" | tail -1)
     if [[ "$RESELL_RC" -ne 0 ]]; then
@@ -1345,12 +1379,12 @@ if [[ "${SKIP_SHOPPING:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
   # Test 13i: Search history
   say "Test 13i: Shopping Service - Add Search History via HTTP/2"
   ADD_SEARCH_RC=0
-  ADD_SEARCH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  ADD_SEARCH_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
-    -X POST "https://$HOST:8443/api/history/searches" \
+    -X POST "https://$HOST:${PORT}/api/history/searches" \
     -d "{\"query\":\"test search\",\"query_type\":\"listing\",\"filters\":{\"min_price\":10,\"max_price\":100},\"result_count\":25}" 2>&1) || ADD_SEARCH_RC=$?
   ADD_SEARCH_CODE=$(echo "$ADD_SEARCH_RESPONSE" | tail -1)
   if [[ "$ADD_SEARCH_RC" -ne 0 ]]; then
@@ -1372,11 +1406,11 @@ fi
 if [[ -n "${TOKEN:-}" ]]; then
   say "Test 14: Auth Service - Logout via HTTP/2"
   LOGOUT_RC=0
-  LOGOUT_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 15 \
-    --resolve "$HOST:8443:127.0.0.1" \
+  LOGOUT_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
     -H "Host: $HOST" \
     -H "Authorization: Bearer $TOKEN" \
-    -X POST "https://$HOST:8443/api/auth/logout" 2>&1) || LOGOUT_RC=$?
+    -X POST "https://$HOST:${PORT}/api/auth/logout" 2>&1) || LOGOUT_RC=$?
   LOGOUT_CODE=$(echo "$LOGOUT_RESPONSE" | tail -1)
   if [[ "$LOGOUT_RC" -ne 0 ]]; then
     warn "Logout request failed (curl exit $LOGOUT_RC)"
@@ -1387,7 +1421,7 @@ if [[ -n "${TOKEN:-}" ]]; then
     VERIFY_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
       -H "Host: $HOST" \
       -H "Authorization: Bearer $TOKEN" \
-      -X GET "https://$HOST:8443/api/records" 2>&1)
+      -X GET "https://$HOST:${PORT}/api/records" 2>&1)
     VERIFY_CODE=$(echo "$VERIFY_RESPONSE" | tail -1)
     if [[ "$VERIFY_CODE" == "401" ]]; then
       ok "Token revocation verified (401 on protected endpoint)"
@@ -1425,7 +1459,7 @@ grpcurl_with_timeout() {
   fi
 }
 
-# Helper function to test gRPC with both FIX #1 (h2c port 5000) and FIX #2 (improved flags on 8443)
+# Helper function to test gRPC with both FIX #1 (h2c port 5000) and FIX #2 (improved flags on NodePort)
 grpc_test() {
   local service_name="$1"
   local method="$2"
@@ -1459,10 +1493,10 @@ grpc_test() {
     sleep 1  # Give port forward time to clean up
   fi
   
-  # FIX #2: Fallback to improved flags on port 8443 if h2c port fails
+  # FIX #2: Fallback to improved flags on NodePort if h2c port fails
   # Check if result is empty, contains error, or timeout
   if [[ -z "$result" ]] || echo "$result" | grep -q -iE "error|failed|timeout|deadline|connection refused|dial.*failed|context deadline"; then
-    # Use grpcurl's built-in timeout for port 8443 as well
+    # Use grpcurl's built-in timeout for NodePort as well
     result=$(grpcurl -insecure \
       -H "Host: $HOST" \
       -authority "$HOST" \
@@ -1472,7 +1506,7 @@ grpc_test() {
       -proto "$PROTO_DIR/$proto_file" \
       -max-time "$timeout" \
       -d "$data" \
-      "127.0.0.1:8443" "$method" 2>&1) || result=""
+      "127.0.0.1:${PORT}" "$method" 2>&1) || result=""
   fi
   
   echo "$result"

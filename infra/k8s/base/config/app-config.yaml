@@ -17,7 +17,8 @@ data:
   # Redis URL with password (password is in redis-auth secret)
   # Format: redis://:password@host:port/db
   # Note: Services should use REDIS_PASSWORD env var from secret, but REDIS_URL is also supported
-  REDIS_URL: redis://:SUPER_STRONG_REDIS_PASSWORD@redis.record-platform.svc.cluster.local:6379/0
+  # Updated to use correct password: postgres (matches redis-auth secret)
+  REDIS_URL: redis://:postgres@redis.record-platform.svc.cluster.local:6379/0
 
   PROTO_ROOT: /app/proto
 

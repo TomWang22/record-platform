@@ -16,7 +16,15 @@ if [[ -z "${PORT:-}" ]]; then
     done
     PORT="${PORT:-8445}"  # Default to 8445 (worker1) if none work
   else
-    PORT=8443  # Default for single-node cluster (h3)
+    # With NodePort, use 30443 (or detect from service)
+    PORT="${PORT:-30443}"  # Default to NodePort 30443
+    # Try to detect actual NodePort from service if not set
+    if [[ -z "${PORT:-}" ]] || [[ "${PORT:-}" == "30443" ]]; then
+      DETECTED_PORT=$(kubectl -n ingress-nginx get svc caddy-h3 -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || echo "")
+      if [[ -n "$DETECTED_PORT" ]]; then
+        PORT=$DETECTED_PORT
+      fi
+    fi
   fi
 fi
 NS_ING="ingress-nginx"
@@ -31,7 +39,17 @@ CURL_BIN="/opt/homebrew/opt/curl/bin/curl"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib/http3.sh
 . "$SCRIPT_DIR/lib/http3.sh"
-HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
+
+# For HTTP/3, we need to use the service ClusterIP when inside container network
+# With hostNetwork, we used 127.0.0.1:443, but with NodePort, we need the service IP
+# Detect service IP for HTTP/3 (inside container network, we can't use NodePort)
+HTTP3_SVC_IP=$(kubectl -n ingress-nginx get svc caddy-h3 -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
+if [[ -n "$HTTP3_SVC_IP" ]]; then
+  HTTP3_RESOLVE="${HOST}:443:${HTTP3_SVC_IP}"
+else
+  # Fallback to 127.0.0.1 if service not found (shouldn't happen)
+  HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
+fi
 
 say "=== Full End-to-End Chain Test with CA Rotation ==="
 
@@ -66,10 +84,17 @@ say "Test 3: Backend API via Ingress Nginx via Caddy (HTTP/2) - Full Chain"
 RESPONSE_H2=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 \
   -H "Host: $HOST" "https://127.0.0.1:${PORT}/api/healthz" 2>&1) || RESPONSE_H2=""
 HTTP_CODE_H2=$(echo "$RESPONSE_H2" | tail -1 | tr -d '[:space:]' || echo "000")
-if [[ "$HTTP_CODE_H2" =~ ^(200|404|502)$ ]]; then
+if [[ "$HTTP_CODE_H2" == "200" ]]; then
   ok "Backend via ingress (H2) works - HTTP $HTTP_CODE_H2 (Full chain: Client -> Caddy -> Ingress -> Backend)"
+elif [[ "$HTTP_CODE_H2" == "404" ]]; then
+  warn "Backend via ingress (H2) returned HTTP 404 (endpoint may not exist, but routing works)"
 else
-  warn "Backend via ingress (H2) returned HTTP $HTTP_CODE_H2"
+  warn "Backend via ingress (H2) returned HTTP $HTTP_CODE_H2 (expected 200)"
+  # 502 indicates Caddy can't reach ingress-nginx or ingress-nginx can't reach backend
+  if [[ "$HTTP_CODE_H2" == "502" ]]; then
+    echo "  → 502 Bad Gateway: Caddy → Ingress-nginx → Backend chain is broken"
+    echo "  → Check ingress-nginx pod status and backend service endpoints"
+  fi
 fi
 
 # Test 4: Backend via ingress (H3) - Full chain
@@ -82,7 +107,7 @@ RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only \
   RESPONSE_H3="000"
 }
 HTTP_CODE_H3=$(echo "$RESPONSE_H3" | tail -1 | tr -d '[:space:]' || echo "000")
-if [[ "$HTTP_CODE_H3" =~ ^(200|404|502)$ ]]; then
+if [[ "$HTTP_CODE_H3" == "200" ]]; then
   ok "Backend via ingress (H3) works - HTTP $HTTP_CODE_H3 (Full chain: Client -> Caddy -> Ingress -> Backend)"
 elif [[ -n "$HTTP_CODE_H3" ]]; then
   warn "Backend via ingress (H3) returned HTTP $HTTP_CODE_H3"
@@ -172,28 +197,31 @@ if [[ "${SKIP_ROTATION:-0}" != "1" ]]; then
   # 2. Use faster request intervals to catch any brief downtime
   # 3. Run for longer to cover the entire rotation window
   
-  # Calculate how many requests we need to cover the rotation period
-  # Rotation typically takes 200-250 seconds
-  # Each request takes ~5 seconds (with --max-time 5), so we can do ~1 request per 5 seconds
-  # For 300 seconds coverage, we can realistically do: 300 / 5 = 60 requests
-  # But we want more samples, so let's do 120 requests over 300 seconds
-  # This gives us ~1 request every 2.5 seconds (accounting for slow requests)
-  REQUEST_INTERVAL=2.5
-  ROTATION_COVERAGE_TIME=300
-  # Calculate requests: 120 requests (more realistic given ~5s per request)
-  NUM_REQUESTS=120
+  # Calculate how many requests we need for a prolonged stress test
+  # This is a stress test to verify zero-downtime under load
+  # Target: 600 requests over 120 seconds to thoroughly test rotation under stress
+  # Each request takes ~0.5-1 second (with --max-time 1), so we can do ~1-2 requests per second
+  # For 120 seconds coverage with realistic request completion, we need:
+  #   - Request interval: 0.15s (allows requests to complete without heavy overlap)
+  #   - Request timeout: 1s (faster timeout for stress test)
+  #   - Total requests: 600 (120s / 0.15s = 800 max, but we cap at 600 for realistic load)
+  # This gives us ~6.7 requests/second (stress test: high but realistic request rate)
+  REQUEST_INTERVAL=0.15  # Stress test: high request rate (600 requests in 120s, ~6.7 req/s)
+  ROTATION_COVERAGE_TIME=120  # Stress test: 120 seconds of continuous requests
+  # Calculate requests: 600 requests (stress test: high load to verify zero-downtime)
+  NUM_REQUESTS=600
   
-  say "Starting continuous health checks ($NUM_REQUESTS requests over ${ROTATION_COVERAGE_TIME}s to cover rotation period)..."
+  say "Starting continuous health checks ($NUM_REQUESTS requests over ${ROTATION_COVERAGE_TIME}s - stress test to verify zero-downtime under load)..."
   # Clean up any old log file
   rm -f /tmp/rotation-test.log
   touch /tmp/rotation-test.log
   # Write directly to log file in the loop to avoid buffering issues
   (
     for i in $(seq 1 $NUM_REQUESTS); do
-      # Add timeout to curl to prevent hanging (5 seconds per request)
-      RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 5 \
-        --resolve "$HOST:8443:127.0.0.1" \
-        -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1 | tail -1 || echo "timeout")
+      # Add timeout to curl to prevent hanging (1 second per request for stress test speed)
+      RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 1 \
+        --resolve "$HOST:${PORT}:127.0.0.1" \
+        -H "Host: $HOST" "https://$HOST:${PORT}/_caddy/healthz" 2>&1 | tail -1 || echo "timeout")
       # Write directly to log file (append mode, unbuffered)
       echo "$RESPONSE" >> /tmp/rotation-test.log 2>&1
       sleep $REQUEST_INTERVAL
@@ -248,10 +276,14 @@ if [[ "${SKIP_ROTATION:-0}" != "1" ]]; then
   # But since process started at T=0, we need: ROTATION_COVERAGE_TIME - (5 + ROTATION_DURATION) + 5
   # = ROTATION_COVERAGE_TIME - ROTATION_DURATION
   # Default ROTATION_DURATION if not set (e.g., if rotation script failed)
-  ROTATION_DURATION="${ROTATION_DURATION:-60}"  # Default to 60s if not set
-  REMAINING_TIME=$((ROTATION_COVERAGE_TIME - ROTATION_DURATION + 30))  # Add 30s buffer for safety
-  if [[ $REMAINING_TIME -lt 60 ]]; then
-    REMAINING_TIME=60  # Minimum 60 seconds to allow process to complete
+  ROTATION_DURATION="${ROTATION_DURATION:-10}"  # Default to 10s if not set
+  # Calculate remaining time: requests need time to complete after rotation
+  # With 600 requests at 0.15s interval, total time = 600 * 0.15 = 90s
+  # But requests can take up to 1s each, so we need buffer for completion
+  # Remaining time = coverage time - rotation duration + buffer for request completion
+  REMAINING_TIME=$((ROTATION_COVERAGE_TIME - ROTATION_DURATION + 60))  # Add 60s buffer for request completion
+  if [[ $REMAINING_TIME -lt 90 ]]; then
+    REMAINING_TIME=90  # Minimum 90 seconds to allow all requests to complete (stress test)
   fi
   say "Waiting for remaining requests to complete (estimated ${REMAINING_TIME}s, target: $NUM_REQUESTS requests)..."
   ELAPSED=0
@@ -287,10 +319,10 @@ if [[ "${SKIP_ROTATION:-0}" != "1" ]]; then
     # Calculate expected requests based on elapsed time
     # Process started at T=0, so total elapsed = baseline (5s) + rotation (ROTATION_DURATION) + wait (ELAPSED)
     TOTAL_ELAPSED=$((5 + ROTATION_DURATION + ELAPSED))
-    # Expected requests: ideally 2 per second, but requests are slow (taking ~5s each with timeout)
-    # So we expect roughly 1 request per 5 seconds = 0.2 requests/second
-    # But we cap at NUM_REQUESTS since that's our target
-    EXPECTED_REQUESTS=$((TOTAL_ELAPSED / 5))  # Rough estimate: 1 request per 5 seconds
+    # Expected requests: with 0.15s interval, we expect ~6.7 requests/second theoretical
+    # But requests can take up to 1s each, so actual rate is lower
+    # Realistic estimate: ~3-4 requests/second (accounting for request duration)
+    EXPECTED_REQUESTS=$((TOTAL_ELAPSED * 3))  # Rough estimate: 3 requests per second
     if [[ $EXPECTED_REQUESTS -gt $NUM_REQUESTS ]]; then
       EXPECTED_REQUESTS=$NUM_REQUESTS
     fi
@@ -506,9 +538,9 @@ elif [[ "$TOTAL_COUNT" -gt 0 ]]; then
   # Try multiple times with increasing delays
   POST_ROTATION_HEALTH="000"
   for attempt in 1 2 3; do
-    POST_ROTATION_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 \
-      --resolve "$HOST:8443:127.0.0.1" \
-      -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1) || POST_ROTATION_RESPONSE=""
+      POST_ROTATION_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 \
+      --resolve "$HOST:${PORT}:127.0.0.1" \
+      -H "Host: $HOST" "https://$HOST:${PORT}/_caddy/healthz" 2>&1) || POST_ROTATION_RESPONSE=""
     if [[ -n "$POST_ROTATION_RESPONSE" ]]; then
       POST_ROTATION_HEALTH=$(echo "$POST_ROTATION_RESPONSE" | tail -1 | tr -d '[:space:]')
       if [[ "$POST_ROTATION_HEALTH" == "200" ]]; then
@@ -526,8 +558,8 @@ elif [[ "$TOTAL_COUNT" -gt 0 ]]; then
     # Final attempt
     sleep 5
     POST_ROTATION_FINAL=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 \
-      --resolve "$HOST:8443:127.0.0.1" \
-      -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1) || POST_ROTATION_FINAL=""
+      --resolve "$HOST:${PORT}:127.0.0.1" \
+      -H "Host: $HOST" "https://$HOST:${PORT}/_caddy/healthz" 2>&1) || POST_ROTATION_FINAL=""
     if [[ -n "$POST_ROTATION_FINAL" ]]; then
       POST_ROTATION_FINAL_HEALTH=$(echo "$POST_ROTATION_FINAL" | tail -1 | tr -d '[:space:]')
       if [[ "$POST_ROTATION_FINAL_HEALTH" == "200" ]]; then
@@ -559,8 +591,12 @@ say "Test 8: Full chain test with actual API endpoint"
 API_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 \
   -H "Host: $HOST" "https://127.0.0.1:${PORT}/api/healthz" 2>&1) || API_RESPONSE=""
 API_CODE=$(echo "$API_RESPONSE" | tail -1 | tr -d '[:space:]' || echo "000")
-if [[ "$API_CODE" =~ ^(200|404|502)$ ]]; then
+if [[ "$API_CODE" == "200" ]]; then
+  if [[ "$API_CODE" == "200" ]]; then
   ok "Full chain works: Client -> Caddy (H2) -> Ingress Nginx -> Backend - HTTP $API_CODE"
+else
+  warn "Full chain test returned HTTP $API_CODE (expected 200)"
+fi
   echo "Response body: $(echo "$API_RESPONSE" | sed '$d')"
 else
   warn "Full chain test returned HTTP $API_CODE"

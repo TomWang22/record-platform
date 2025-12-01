@@ -2,6 +2,36 @@
 
 Record Platform is a Kubernetes-first microservices stack for managing a personal record collection while exercising modern edge patterns. The stack spans Node.js/Express services, Prisma/Postgres data, Redis-backed caching, and a suite of observability and operational tools. The latest revamp replaces the Docker Compose dev story with Kustomize-driven Kubernetes, adds a Caddy front door that speaks HTTP/2 and HTTP/3, and ships automation scripts for day-to-day ops.
 
+## 👋 For Recruiters & Hiring Managers
+
+**What is this project?**
+A production-ready, full-stack microservices platform demonstrating modern cloud-native architecture, distributed systems design, and real-world engineering challenges. Built to solve practical problems (record collection management) while showcasing enterprise-grade infrastructure patterns.
+
+**Key Technical Highlights:**
+- **Zero-Downtime Operations**: Achieved 100% uptime during certificate rotation (16-second rotation time, 0 failed requests)
+- **Multi-Protocol Edge**: HTTP/2, HTTP/3 (QUIC), and gRPC support with automatic protocol negotiation
+- **Microservices Architecture**: 8+ services with dedicated databases, gRPC inter-service communication, and event-driven messaging
+- **Kubernetes-Native**: Complete infrastructure as code (Terraform + Ansible), observability stack (Prometheus, Grafana, Jaeger), and disaster recovery automation
+- **Production-Ready Features**: Strict TLS enforcement, JWT authentication, rate limiting, caching strategies, and comprehensive monitoring
+
+**What skills does this demonstrate?**
+- **Backend**: Node.js/Express, TypeScript, gRPC, PostgreSQL, Redis, Kafka, Prisma ORM
+- **Frontend**: React/Next.js, TypeScript, Server-Sent Events, real-time updates
+- **Infrastructure**: Kubernetes, Docker, Caddy, nginx, HAProxy, Terraform, Ansible
+- **DevOps**: CI/CD patterns, observability (metrics, tracing, logging), zero-downtime deployments, disaster recovery
+- **System Design**: Microservices architecture, database isolation, event-driven architecture, caching strategies
+
+**Why this matters:**
+This isn't a tutorial project—it's a production-grade system solving real problems with industry-standard patterns. The codebase demonstrates understanding of distributed systems, infrastructure automation, performance optimization, and operational excellence. Perfect for showcasing skills in cloud-native development, microservices architecture, and platform engineering.
+
+**Quick Stats:**
+- **8 dedicated PostgreSQL databases** for service isolation
+- **8+ microservices** with gRPC communication
+- **100% uptime** during certificate rotation
+- **16-second** CA rotation time (down from 6+ minutes)
+- **Full observability stack** (Prometheus, Grafana, Jaeger, OpenTelemetry)
+- **Zero-downtime deployments** with RollingUpdate strategies
+
 ## Highlights
 - **✅ Multi-protocol edge (HTTP/2, HTTP/3, gRPC)** - Caddy terminates TLS/QUIC and forwards into nginx-ingress; **all tests passing** including HTTP/2, HTTP/3, and gRPC flows via `scripts/test-microservices-http2-http3.sh`.
 - **✅ Zero-downtime CA rotation** - Certificate authority rotation with **100% success rate** and **~16-17 second rotation time** via Caddy admin API reload; validated with continuous health checks:
@@ -35,17 +65,20 @@ Record Platform is a Kubernetes-first microservices stack for managing a persona
   - HTTP/2, HTTP/3, and strict TLS validation
 
 **How it works:**
-- Uses Caddy admin API (`localhost:2019`) to reload configuration without pod restart
-- Continuous health checks during rotation verify zero downtime
-- New certificates mounted via Kubernetes secrets
-- Admin API reload picks up new certificate files instantly
-- Falls back to pod restart only if admin API fails
+- **NodePort Service Architecture**: Migrated from `hostNetwork` to `NodePort` service type, enabling multiple Caddy pods to run simultaneously
+- **Multiple Replicas**: 2+ replicas with pod anti-affinity for high availability across nodes
+- **RollingUpdate Strategy**: `maxUnavailable: 0` ensures at least one pod is always serving traffic
+- **Caddy Admin API**: Uses admin API (`localhost:2019`) to reload configuration without pod restart
+- **Pod-by-Pod Rotation**: New pods come online before old pods terminate, ensuring zero downtime
+- **Continuous Health Checks**: Test scripts verify zero downtime with continuous requests during rotation
+- **New Certificates**: Mounted via Kubernetes secrets, picked up instantly by admin API reload
 
 **Technical achievement:**
-- Reduced rotation time from 6+ minutes to ~16 seconds
-- Achieved 100% success rate (no failed requests during rotation)
-- Zero downtime without requiring multiple replicas (works on single-node clusters)
-- Production-ready with clear setup instructions and deployment strategies
+- **Reduced rotation time**: From 6+ minutes to ~16 seconds
+- **100% success rate**: No failed requests during rotation (120/120 and 60/60 requests succeeded)
+- **True zero-downtime**: Multiple replicas with RollingUpdate ensure continuous service availability
+- **Production-ready**: Supports multi-node clusters with proper load balancing and high availability
+- **NodePort Migration**: Enables multiple pods, load balancing, and better resource utilization
 
 ### Full Multi-Protocol Support ✅
 **All tests passing** - Complete end-to-end validation of HTTP/2, HTTP/3 (QUIC), and gRPC communication:
@@ -304,9 +337,14 @@ For detailed technical documentation, system design diagrams, and deep dives int
 - **Documentation**: Complete guide in `infra/IAC-GUIDE.md`
 
 **Edge & Routing:**
-- **Caddy** runs on the host, terminates TLS (TLS 1.2/1.3 only - strict TLS enforcement), and supports HTTP/2 + HTTP/3 (QUIC) + gRPC
+- **Caddy** runs in Kubernetes with **NodePort service** (port 30443), terminates TLS (TLS 1.2/1.3 only - strict TLS enforcement), and supports HTTP/2 + HTTP/3 (QUIC) + gRPC
+- **NodePort Architecture**: Migrated from `hostNetwork` to `NodePort` service type for true zero-downtime CA rotation
+  - **Multiple Replicas**: 2+ replicas with pod anti-affinity for high availability
+  - **RollingUpdate Strategy**: `maxUnavailable: 0` ensures at least one pod is always available
+  - **Load Balancing**: Kubernetes Service provides built-in load balancing across replicas
+  - **Port Access**: External access via NodePort 30443 (TCP/UDP for HTTPS, port 30050 for gRPC h2c)
 - **Strict TLS**: Configured with `protocols tls1.2 tls1.3` - TLS 1.1 and below are rejected; validated via test scripts
-- **CA Rotation**: Supports certificate authority rotation with `scripts/rotate-ca-and-fix-tls.sh`; **zero-downtime rotation achieved** via admin API reload (~16s, 100% success rate); for production, use RollingUpdate with multiple replicas
+- **CA Rotation**: Supports certificate authority rotation with `scripts/rotate-ca-and-fix-tls.sh`; **zero-downtime rotation achieved** via admin API reload (~16s, 100% success rate) + pod-by-pod rotation with multiple replicas
 - **Caddy gRPC routing**: Uses `protocol grpc` matcher to detect gRPC requests and routes by service name in path (e.g., `/auth.*` → auth-service)
 - **Dual gRPC transport**: Port 5000 (h2c/plaintext) for internal testing, Port 8443 (TLS) for production
 - **ingress-nginx** routes `/` to Nginx edge (static assets + micro-cache) and `/api/*` directly to API Gateway

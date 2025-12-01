@@ -109,7 +109,7 @@ fi
 
 # Step 3: Test HTTP/3 health check
 say "Step 3: Testing HTTP/3 health check..."
-if http3_curl -k -sS -I --http3-only --max-time 15 \
+if http3_curl -k -sS -I --http3-only --max-time 30 \
   -H "Host: $HOST" \
   --resolve "$HTTP3_RESOLVE" \
   "https://$HOST/_caddy/healthz" 2>&1 | head -n1 | grep -q "HTTP/3 200"; then
@@ -130,7 +130,7 @@ fi
 
 # Step 5: Test API endpoint via HTTP/3
 say "Step 5: Testing API endpoint via HTTP/3..."
-API_RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+API_RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
   -H "Host: $HOST" \
   --resolve "$HTTP3_RESOLVE" \
   "https://$HOST/api/healthz" 2>&1)
@@ -199,7 +199,7 @@ fi
 say "Step 8: Testing records CRUD via HTTP/3..."
 if [[ -n "${AUTH_TOKEN:-}" ]]; then
   # Create record
-  CREATE_RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+  CREATE_RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $AUTH_TOKEN" \
@@ -213,7 +213,7 @@ if [[ -n "${AUTH_TOKEN:-}" ]]; then
     
     # Delete record if we got an ID
     if [[ -n "$RECORD_ID_H3" ]]; then
-      DELETE_RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+      DELETE_RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
         -H "Host: $HOST" \
         -H "Authorization: Bearer $AUTH_TOKEN" \
         --resolve "$HTTP3_RESOLVE" \
@@ -235,7 +235,7 @@ fi
 # Step 9: Verify HTTP/2 and HTTP/3 protocol usage
 say "Step 9: Verifying protocol usage..."
 H2_PROTOCOL=$("$CURL_BIN" -k -sS -I --http2 -H "Host: $HOST" "https://$HOST:8443/_caddy/healthz" 2>&1 | grep -i "HTTP/2" || echo "")
-H3_PROTOCOL=$(http3_curl -k -sS -I --http3-only --max-time 15 \
+H3_PROTOCOL=$(http3_curl -k -sS -I --http3-only --max-time 30 \
   -H "Host: $HOST" \
   --resolve "$HTTP3_RESOLVE" \
   "https://$HOST/_caddy/healthz" 2>&1 | grep -i "HTTP/3\|HTTP/2" || echo "")

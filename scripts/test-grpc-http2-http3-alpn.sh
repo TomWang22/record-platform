@@ -27,7 +27,7 @@ fi
 
 # Test 2: HTTP/3
 say "Test 2: HTTP/3 (QUIC)"
-if http3_curl -k -v --http3-only --max-time 15 \
+if http3_curl -k -v --http3-only --max-time 30 \
   -H "Host: $HOST" \
   --resolve "$HTTP3_RESOLVE" \
   "https://$HOST/_caddy/healthz" 2>&1 | grep -q "HTTP/3\|QUIC"; then

@@ -13,6 +13,3 @@ spec:
     - name: grpc
       port: 50054
       targetPort: grpc
-    - name: grpc
-      port: 50054
-      targetPort: grpc

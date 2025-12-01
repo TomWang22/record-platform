@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// TODO: Connect to backend service
-// This is a placeholder API route for forum post comments
-// Will be connected to a forum service/backend later
+const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8081'
 
 export async function GET(
   request: NextRequest,
@@ -11,13 +9,18 @@ export async function GET(
   try {
     const { postId } = params
 
-    // TODO: Fetch comments from backend
-    // const response = await fetch(`${process.env.API_GATEWAY_URL}/forum/posts/${postId}/comments`)
-    // const data = await response.json()
-    // return NextResponse.json(data)
+    const response = await fetch(`${API_GATEWAY_URL}/forum/posts/${postId}/comments`, {
+      headers: {
+        'Authorization': request.headers.get('Authorization') || '',
+      },
+    })
 
-    // Placeholder response
-    return NextResponse.json([])
+    if (!response.ok) {
+      return NextResponse.json({ error: 'Failed to fetch comments' }, { status: response.status })
+    }
+
+    const data = await response.json()
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Failed to fetch comments:', error)
     return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 })
@@ -29,37 +32,32 @@ export async function POST(
   { params }: { params: { postId: string } }
 ) {
   try {
-    const { postId } = params
     const body = await request.json()
-    const { content, parentId } = body
+    const { postId } = params
+    const { content, parent_id } = body
 
     if (!content) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 })
     }
 
-    // TODO: Create comment via backend
-    // const response = await fetch(`${process.env.API_GATEWAY_URL}/forum/posts/${postId}/comments`, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ content, parentId }),
-    // })
-    // const data = await response.json()
-    // return NextResponse.json(data)
-
-    // Placeholder response
-    return NextResponse.json({
-      id: `comment-${Date.now()}`,
-      postId,
-      parentId,
-      content,
-      author: { id: 'current-user', email: 'user@example.com' },
-      upvotes: 0,
-      downvotes: 0,
-      createdAt: new Date().toISOString(),
+    const response = await fetch(`${API_GATEWAY_URL}/forum/posts/${postId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': request.headers.get('Authorization') || '',
+      },
+      body: JSON.stringify({ content, parent_id }),
     })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to create comment' }))
+      return NextResponse.json(error, { status: response.status })
+    }
+
+    const data = await response.json()
+    return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error('Failed to create comment:', error)
     return NextResponse.json({ error: 'Failed to create comment' }, { status: 500 })
   }
 }
-

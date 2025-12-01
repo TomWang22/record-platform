@@ -31,10 +31,16 @@ This document provides in-depth technical documentation for the Record Platform 
 │                         Edge Layer (Caddy)                                   │
 │              TLS Termination (TLS 1.2/1.3) + mkcert CA                      │
 │         HTTP/2 + HTTP/3 (QUIC) + gRPC Routing (protocol grpc)              │
-│              Port 443 (HTTPS) | Port 8443 (HTTPS) | Port 5000 (h2c)        │
+│         NodePort Service (30443 TCP/UDP) | Port 8443 (HTTPS) | Port 5000 (h2c) │
+│                                                                              │
+│  Architecture:                                                               │
+│  - NodePort Service: Multiple replicas with load balancing                   │
+│  - RollingUpdate: maxUnavailable=0 for zero-downtime deployments            │
+│  - Pod Anti-Affinity: Distributes pods across nodes for HA                  │
 │                                                                              │
 │  Features:                                                                   │
 │  - Zero-downtime CA rotation via admin API (localhost:2019)                │
+│  - True zero-downtime: Pod-by-pod rotation with multiple replicas          │
 │  - Strict TLS enforcement (TLS 1.2/1.3 only)                                │
 │  - Protocol detection and routing                                            │
 │  - QUIC (HTTP/3) support with automatic fallback                            │
@@ -1089,15 +1095,25 @@ notes.
 
 ### Zero-Downtime Deployments
 
+**NodePort Service Architecture**:
+- **Migration from hostNetwork**: Changed from `hostNetwork: true` to `NodePort` service type
+- **Multiple Replicas**: 2+ replicas with pod anti-affinity for high availability
+- **Service Type**: NodePort (ports 30443 TCP/UDP for HTTPS, 30050 for gRPC h2c)
+- **Load Balancing**: Kubernetes Service provides built-in load balancing across replicas
+- **Benefits**: Enables multiple pods to run simultaneously, true zero-downtime CA rotation
+
 **RollingUpdate Strategy**:
 - `maxUnavailable: 0`: Never have zero pods running
 - `maxSurge: 1`: One extra pod during rollout
 - `replicas: 2+`: Multiple replicas for true zero-downtime
+- **Pod Anti-Affinity**: Prefers pods on different nodes for better high availability
 
 **CA Rotation**:
-- Admin API reload: ~16 seconds, 100% success
-- Pod restart fallback: If admin API fails
-- Multi-node cluster: Required for pod-by-pod rotation
+- **Admin API reload**: ~16 seconds, 100% success rate
+- **Pod-by-pod rotation**: New pods come online before old pods terminate
+- **Zero downtime**: Multiple replicas ensure continuous service availability
+- **Pod restart fallback**: If admin API fails, RollingUpdate handles rotation
+- **Multi-node cluster**: Recommended for optimal pod distribution and HA
 
 ### Database Migrations
 

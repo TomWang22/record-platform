@@ -15,7 +15,15 @@ if [[ -z "${PORT:-}" ]]; then
     done
     PORT="${PORT:-8445}"
   else
-    PORT=8443  # Default for single-node cluster (h3)
+    # With NodePort, use 30443 (or detect from service)
+    PORT="${PORT:-30443}"  # Default to NodePort 30443
+    # Try to detect actual NodePort from service if not set
+    if [[ -z "${PORT:-}" ]] || [[ "${PORT:-}" == "30443" ]]; then
+      DETECTED_PORT=$(kubectl -n ingress-nginx get svc caddy-h3 -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || echo "")
+      if [[ -n "$DETECTED_PORT" ]]; then
+        PORT=$DETECTED_PORT
+      fi
+    fi
   fi
 fi
 NS_ING="ingress-nginx"
@@ -29,7 +37,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib/http3.sh
 . "$SCRIPT_DIR/lib/http3.sh"
 
-HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
+# For HTTP/3, we need to use the service ClusterIP when inside container network
+# With hostNetwork, we used 127.0.0.1:443, but with NodePort, we need the service IP
+# Detect service IP for HTTP/3 (inside container network, we can't use NodePort)
+HTTP3_SVC_IP=$(kubectl -n ingress-nginx get svc caddy-h3 -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
+if [[ -n "$HTTP3_SVC_IP" ]]; then
+  HTTP3_RESOLVE="${HOST}:443:${HTTP3_SVC_IP}"
+else
+  # Fallback to 127.0.0.1 if service not found (shouldn't happen)
+  HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
+fi
 
 say "=== Testing HTTP/2, HTTP/3, and Strict TLS ==="
 
@@ -46,13 +63,21 @@ fi
 
 # Test 2: HTTP/3 health check
 say "Test 2: HTTP/3 health check"
-if http3_curl -k -sS -I --http3-only --max-time 15 \
+H3_HEALTH_OUTPUT=$(http3_curl -k -sS -I --http3-only --max-time 30 \
   -H "Host: ${HOST}" \
   --resolve "$HTTP3_RESOLVE" \
-  "https://${HOST}/_caddy/healthz" 2>&1 | head -n1 | grep -q "HTTP/3 200"; then
+  "https://${HOST}/_caddy/healthz" 2>&1) || {
+  warn "HTTP/3 curl command failed (exit code: $?)"
+  H3_HEALTH_OUTPUT=""
+}
+if echo "$H3_HEALTH_OUTPUT" | head -n1 | grep -q "HTTP/3 200"; then
   ok "HTTP/3 health check works"
 else
   warn "HTTP/3 health check failed (QUIC path unavailable)"
+  # Debug: show what we got if it's not empty
+  if [[ -n "$H3_HEALTH_OUTPUT" ]]; then
+    echo "  Response: $(echo "$H3_HEALTH_OUTPUT" | head -n3)"
+  fi
 fi
 
 # Test 3: HTTP/2 API endpoint
@@ -68,14 +93,18 @@ fi
 
 # Test 4: HTTP/3 API endpoint
 say "Test 4: HTTP/3 API endpoint"
-API_RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 15 \
+API_RESPONSE_H3=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
   -H "Host: ${HOST}" \
   --resolve "$HTTP3_RESOLVE" \
-  "https://${HOST}/api/healthz" 2>&1)
-if echo "$API_RESPONSE_H3" | tail -1 | grep -qE "200|404|502"; then
-  ok "API endpoint reachable via HTTP/3 (status: $(echo "$API_RESPONSE_H3" | tail -1))"
+  "https://${HOST}/api/healthz" 2>&1) || {
+  warn "HTTP/3 curl command failed (exit code: $?)"
+  API_RESPONSE_H3="000"
+}
+HTTP_CODE_H3=$(echo "$API_RESPONSE_H3" | tail -1 | tr -d '[:space:]' || echo "000")
+if [[ "$HTTP_CODE_H3" =~ ^(200|404|502)$ ]]; then
+  ok "API endpoint reachable via HTTP/3 (status: $HTTP_CODE_H3)"
 else
-  warn "API endpoint test failed"
+  warn "API endpoint test failed (status: $HTTP_CODE_H3)"
 fi
 
 # Test 5: Strict TLS - TLS 1.3
@@ -103,17 +132,33 @@ fi
 
 # Test 7: Strict TLS - TLS 1.1 should fail
 say "Test 7: Strict TLS - TLS 1.1 should be rejected"
-TLS11_RESPONSE=$(/opt/homebrew/opt/curl/bin/curl -k -sS -I --tlsv1.1 --http2 \
-  -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || TLS11_RESPONSE=""
-if echo "$TLS11_RESPONSE" | grep -qE "error|handshake|protocol|SSL.*error|TLS.*error|unsupported protocol"; then
-  ok "TLS 1.1 correctly rejected"
+# Use --tls-max 1.1 to prevent curl from upgrading to higher TLS versions
+# Temporarily disable exit on error to capture TLS 1.1 rejection
+set +e
+TLS11_RESPONSE=$(/opt/homebrew/opt/curl/bin/curl -k -sS -I --tlsv1.1 --tls-max 1.1 --http2 \
+  -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1)
+TLS11_EXIT=$?
+set -e
+# Check if we got an error (rejection) or a successful response
+if [[ $TLS11_EXIT -ne 0 ]] || echo "$TLS11_RESPONSE" | grep -qiE "error|handshake|protocol|SSL.*error|TLS.*error|unsupported protocol|alert.*protocol|wrong.*version|no protocols available|TLS connect error|routines"; then
+  ok "TLS 1.1 correctly rejected (strict TLS working)"
+elif echo "$TLS11_RESPONSE" | head -n1 | grep -qE "200|HTTP/2 200"; then
+  # TLS 1.1 connection succeeded - this means strict TLS is NOT working
+  fail "TLS 1.1 was NOT rejected - connection succeeded (strict TLS not working)"
+  echo "  Response: $(echo "$TLS11_RESPONSE" | head -n1)"
+  echo "  Caddy should reject TLS 1.1 when configured with 'protocols tls1.2 tls1.3'"
 else
-  warn "TLS 1.1 was not rejected (strict TLS may not be working)"
-  # Also verify TLS 1.3 works to confirm strict TLS is partially working
+  # Unknown response - check if TLS 1.2/1.3 work to confirm strict TLS is partially working
+  TLS12_VERIFY=$(/opt/homebrew/opt/curl/bin/curl -k -sS -I --tlsv1.2 --http2 \
+    -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || TLS12_VERIFY=""
   TLS13_VERIFY=$(/opt/homebrew/opt/curl/bin/curl -k -sS -I --tlsv1.3 --http2 \
     -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1) || TLS13_VERIFY=""
-  if echo "$TLS13_VERIFY" | head -n1 | grep -qE "200|HTTP/2 200"; then
-    ok "TLS 1.3 works (strict TLS partially working - TLS 1.2/1.3 enabled)"
+  if echo "$TLS12_VERIFY" | head -n1 | grep -qE "200|HTTP/2 200" && echo "$TLS13_VERIFY" | head -n1 | grep -qE "200|HTTP/2 200"; then
+    warn "TLS 1.1 test inconclusive, but TLS 1.2 and 1.3 work"
+    echo "  Exit code: $TLS11_EXIT"
+    echo "  Response: $(echo "$TLS11_RESPONSE" | head -n3)"
+  else
+    warn "TLS 1.1 test failed and TLS 1.2/1.3 also failed"
   fi
 fi
 

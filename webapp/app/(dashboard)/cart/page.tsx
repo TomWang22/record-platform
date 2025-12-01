@@ -16,7 +16,7 @@ type CartItem = {
   quantity: number
   price?: number
   notes?: string
-  metadata?: any
+  metadata?: Record<string, unknown>
   // Enriched fields from listings DB
   title?: string
   condition?: string

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// TODO: Connect to backend service
-// This is a placeholder API route for forum post voting
-// Will be connected to a forum service/backend later
+const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8081'
 
 export async function POST(
   request: NextRequest,
@@ -17,17 +15,22 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid vote' }, { status: 400 })
     }
 
-    // TODO: Submit vote via backend
-    // const response = await fetch(`${process.env.API_GATEWAY_URL}/forum/posts/${postId}/vote`, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ vote }),
-    // })
-    // const data = await response.json()
-    // return NextResponse.json(data)
+    const response = await fetch(`${API_GATEWAY_URL}/forum/posts/${postId}/vote`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': request.headers.get('Authorization') || '',
+      },
+      body: JSON.stringify({ vote }),
+    })
 
-    // Placeholder response
-    return NextResponse.json({ success: true, vote })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to vote' }))
+      return NextResponse.json(error, { status: response.status })
+    }
+
+    const data = await response.json()
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Failed to vote:', error)
     return NextResponse.json({ error: 'Failed to vote' }, { status: 500 })

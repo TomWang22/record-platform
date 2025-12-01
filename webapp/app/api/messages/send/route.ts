@@ -1,59 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { apiFetch } from '@/lib/api-client'
 
-// This is a proxy to the backend messaging service
-// In production, this would connect to Kafka for real-time messaging
-export async function POST(req: NextRequest) {
+const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8081'
+
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json()
-    const { toUserId, message, recordId, messageType, parentMessageId } = body
+    const body = await request.json()
+    const { recipient_id, group_id, message_type, subject, content, parent_message_id } = body
 
-    if (!toUserId || !message) {
-      return NextResponse.json({ error: 'toUserId and message are required' }, { status: 400 })
+    if ((!recipient_id && !group_id) || (recipient_id && group_id)) {
+      return NextResponse.json(
+        { error: 'Either recipient_id (direct message) or group_id (group message) required, but not both' },
+        { status: 400 }
+      )
     }
 
-    // TODO: Replace with actual messaging service endpoint
-    // For now, this is a placeholder that will work once the messaging service is integrated
-    // The backend should handle:
-    // 1. Validating users exist
-    // 2. Storing message in database with messageType and parentMessageId
-    // 3. Publishing to Kafka topic for real-time delivery
-    // 4. Returning message ID
+    if (!message_type || !subject || !content) {
+      return NextResponse.json(
+        { error: 'message_type, subject, and content are required' },
+        { status: 400 }
+      )
+    }
 
-    const result = await apiFetch('/messages/send', {
+    const response = await fetch(`${API_GATEWAY_URL}/messages`, {
       method: 'POST',
-      auth: true,
-      data: {
-        toUserId,
-        message,
-        recordId,
-        messageType: messageType || 'general',
-        parentMessageId,
-        timestamp: new Date().toISOString(),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': request.headers.get('Authorization') || '',
       },
-    }).catch(() => {
-      // Service not available yet - return mock response
-      return {
-        id: `msg-${Date.now()}`,
-        fromUserId: 'current-user',
-        toUserId,
-        message,
-        recordId,
-        messageType: messageType || 'general',
-        parentMessageId,
-        timestamp: new Date().toISOString(),
-        read: false,
-        status: 'sent',
-      }
+      body: JSON.stringify({
+        recipient_id: recipient_id || null,
+        group_id: group_id || null,
+        message_type,
+        subject,
+        content,
+        parent_message_id: parent_message_id || null,
+      }),
     })
 
-    return NextResponse.json(result)
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to send message' }))
+      return NextResponse.json(error, { status: response.status })
+    }
+
+    const data = await response.json()
+    return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error('Failed to send message:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to send message' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to send message' }, { status: 500 })
   }
 }
-

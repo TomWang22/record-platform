@@ -22,7 +22,14 @@ const prisma = new PrismaClient();
 type WithJti = TokenPayload & { jti?: string; exp?: number };
 
 // --- Redis (revocation list) ---
-const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
+// Support both REDIS_URL (with password) and REDIS_PASSWORD env var
+let REDIS_URL = process.env.REDIS_URL || "redis://redis:6379/0";
+const REDIS_PASSWORD = process.env.REDIS_PASSWORD;
+// If REDIS_PASSWORD is set and URL doesn't have password, add it
+if (REDIS_PASSWORD && !REDIS_URL.includes('@') && !REDIS_URL.includes('://:')) {
+  // Insert password after redis://
+  REDIS_URL = REDIS_URL.replace('redis://', `redis://:${REDIS_PASSWORD}@`);
+}
 const redis = createClient({ url: REDIS_URL });
 redis.on("error", (e: unknown) => console.error("auth-service redis error:", e));
 (async () => {
@@ -202,7 +209,7 @@ app.post("/login", async (req: Request, res: Response) => {
  */
 app.post("/logout", async (req: Request, res: Response) => {
   const raw = req.headers.authorization?.split(" ")[1];
-  if (!raw) return res.status(204).end();
+  if (!raw) return res.status(200).json({ ok: true, revoked: false });
 
   try {
     const payload = verifyJwt(raw) as WithJti;
@@ -210,12 +217,20 @@ app.post("/logout", async (req: Request, res: Response) => {
       const now = Math.floor(Date.now() / 1000);
       const exp = typeof payload.exp === "number" ? payload.exp : now + 24 * 60 * 60; // fallback 24h
       const ttl = Math.max(1, exp - now);
-      await redis.set(`revoked:${payload.jti}`, "1", { EX: ttl });
-      console.log("auth-service: revoked jti", payload.jti, "ttl", ttl, "s");
+      try {
+        await redis.set(`revoked:${payload.jti}`, "1", { EX: ttl });
+        console.log("auth-service: revoked jti", payload.jti, "ttl", ttl, "s");
+        return res.status(200).json({ ok: true, revoked: true });
+      } catch (redisErr) {
+        console.error("auth-service: failed to revoke token in Redis:", redisErr);
+        // Still return 200 but indicate revocation failed
+        return res.status(200).json({ ok: true, revoked: false, error: "Redis unavailable" });
+      }
     }
-    return res.status(204).end();
-  } catch {
-    return res.status(204).end();
+    return res.status(200).json({ ok: true, revoked: false });
+  } catch (err) {
+    console.error("auth-service: logout error:", err);
+    return res.status(200).json({ ok: true, revoked: false });
   }
 });
 

@@ -306,9 +306,9 @@ This document provides in-depth technical documentation for the Record Platform 
 4. **Fallback Strategy**: Pod restart if admin API fails
 
 **Results**:
-- ✅ 100% success rate (120/120 and 60/60 requests)
-- ✅ ~16-17 second rotation time
-- ✅ Zero downtime achieved
+- ✅ 100% success rate (4200/4200 and 60/60 requests)
+- ✅ 1-2 second rotation time (consistently fast, 8-10x faster than previous 16-17s)
+- ✅ Zero downtime achieved with production-grade chaos testing (4200 requests at 35 req/s)
 
 **Trade-offs**:
 - Admin API must be accessible (port-forward during rotation)
@@ -436,11 +436,21 @@ Auction Monitor Service (4008)
     ├─► Read: Listings DB (5435) - listings.watchlist
     │   └─► Get Watched Items
     │
-    ├─► Monitor eBay API
-    │   └─► Track Auction Prices
+    ├─► Platform Adapters (eBay API, Discogs API, Scraping)
+    │   ├─► Rate Limiting (Redis Lua scripts)
+    │   ├─► Caching (Redis with singleflight pattern)
+    │   └─► Browser Pool (Puppeteer for scraping)
     │
-    └─► Write: Auction Monitor DB (5438) - auction_monitor.auction_results
-        └─► Store Price History
+    ├─► Data Pipeline
+    │   ├─► Normalization (platform-specific → unified schema)
+    │   ├─► Validation (required fields, data types, business rules)
+    │   ├─► Deduplication (exact match, URL match, fuzzy matching)
+    │   └─► Confidence Scoring (completeness, source reliability, freshness)
+    │
+    └─► Write: Auction Monitor DB (5438)
+        ├─► raw_listings (staging)
+        ├─► normalized_listings (validated, high-confidence)
+        └─► price_history (time-series)
 ```
 
 ## Service Communication Patterns
@@ -1031,6 +1041,7 @@ notes.
 - Search results cached with normalized keys
 - User-specific cache invalidation
 - Singleflight pattern prevents cache stampedes
+- **Auction Monitor**: Platform search results with Lua singleflight (prevents thundering herd and cache stampede)
 
 **Nginx Micro-Cache**:
 - Short TTL (5-10 seconds) for static assets
@@ -1051,6 +1062,44 @@ notes.
 ## Security Architecture
 
 ### Authentication & Authorization
+
+**Production-Tier Authentication (Auth Service)**:
+
+**Google OAuth 2.0**:
+- Full OAuth flow with Google Cloud Console integration
+- Published OAuth app allows any Google user to sign in (not just test users)
+- Consent screen with privacy policy and terms of service URLs
+- Callback URL routing via ngrok for local development/testing
+- Client ID and Secret stored in Kubernetes secrets
+- Routes: `/api/auth/google` (initiate), `/api/auth/google/callback` (callback)
+
+**SMS/Phone Verification**:
+- Multi-provider abstraction layer with lazy-loaded SDKs
+- Supported providers: Mock (default), Twilio, AWS SNS, Vonage, MessageBird
+- Provider selection via `SMS_PROVIDER` environment variable
+- Mock provider for development/testing with `/api/auth/sms/mock/messages` endpoint
+- Lazy loading prevents build failures if optional dependencies are missing
+- Rate limiting and verification code generation
+
+**Passkey/WebAuthn**:
+- Modern passwordless authentication using WebAuthn API
+- Mock data support for testing (controlled via `ALLOW_MOCK_PASSKEY_DATA`)
+- Production-ready WebAuthn configuration (`WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN`)
+- Client-side validation with server-side verification
+- Routes: `/api/auth/passkeys/register/start`, `/api/auth/passkeys/register/finish`, `/api/auth/passkeys/login/start`, `/api/auth/passkeys/login/finish`
+
+**MFA/TOTP**:
+- Time-based one-time password (TOTP) support
+- QR code generation for authenticator apps
+- Verification code validation
+- Routes: `/api/auth/mfa/setup`, `/api/auth/mfa/verify`, `/api/auth/mfa/disable`
+
+**Privacy & Terms Pages**:
+- Required for OAuth consent screen compliance
+- Served directly from auth-service (`/privacy`, `/terms`)
+- Separate ingress routing to bypass rewrite-target conflicts
+- HTML pages with proper styling and content
+- Accessible via public URLs for Google Cloud Console configuration
 
 **JWT-Based Authentication**:
 - Access tokens: Short-lived (15 minutes)
@@ -1109,10 +1158,12 @@ notes.
 - **Pod Anti-Affinity**: Prefers pods on different nodes for better high availability
 
 **CA Rotation**:
-- **Admin API reload**: ~16 seconds, 100% success rate
+- **Optimized rotation script**: 1-2 seconds, 100% success rate
+- **Direct Kubernetes patch**: Fastest rollout restart method (~0.4s)
 - **Pod-by-pod rotation**: New pods come online before old pods terminate
 - **Zero downtime**: Multiple replicas ensure continuous service availability
-- **Pod restart fallback**: If admin API fails, RollingUpdate handles rotation
+- **Production chaos testing**: Validated with 4200 requests at 35 req/s during rotation
+- **Optimizations**: Removed PORT detection, eliminated output overhead, direct merge patch
 - **Multi-node cluster**: Recommended for optimal pod distribution and HA
 
 ### Database Migrations
@@ -1277,6 +1328,348 @@ notes.
 2. Check query performance: Slow queries can cause high CPU
 3. Check worker threads: Verify thread pool sizes
 4. Check load: Verify if load is expected or abnormal
+
+## Auction Monitor Data Pipeline Architecture
+
+### Overview
+
+The Auction Monitor service implements a comprehensive data pipeline for ingesting, normalizing, validating, and storing auction listings from multiple platforms (eBay, Discogs, Buyee, YahooJP, CarousellHK, RecordCity). The pipeline ensures data quality before feeding into Analytics Service and Python AI Service.
+
+**Key Features**:
+- **Granular Percentiles (p1-p99)**: Calculates every percentile from p1 to p99 (not just p25, p50, p75, p95) for precise price positioning and better AI predictions
+- **Discogs Price History**: Browser automation for full sales arc scraping (not just low/median/high)
+- **Service Integrations**: Provides price analytics to Social Service (negotiation assistance), Shopping Service (buyer evaluation), and Listings Service (seller optimization)
+- **Data Quality Engine**: Multi-factor confidence scoring (0.0-1.0) with enrichment bonuses
+- **Comprehensive Documentation**: See `services/auction-monitor/SERVICE_INTEGRATIONS.md` for complete integration details
+
+### Pipeline Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              Platform Adapters (Extract Layer)                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │   eBay API   │  │ Discogs API  │  │  Buyee       │        │
+│  │  (Official)  │  │  (Official)  │  │  (Scraping)  │        │
+│  │              │  │              │  │  Puppeteer   │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │  YahooJP     │  │ CarousellHK  │  │ RecordCity   │        │
+│  │  (Scraping)  │  │  (Scraping)  │  │  (Multi-Region)│       │
+│  │  Puppeteer   │  │  Puppeteer   │  │  Puppeteer   │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
+│                                                                 │
+│  Rate Limiting: Redis Lua scripts (token-bucket, sliding-window)│
+│  Caching: Redis with Lua singleflight (prevents thundering herd)│
+│  Browser Pool: Puppeteer browser instance management            │
+└──────────────────────────────────────┬──────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Data Normalizer (Transform Layer)                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  - Schema Mapping: Platform-specific → Unified schema         │
+│  - Field Normalization: Currencies, conditions, formats, URLs │
+│  - Price Conversion: Multi-currency support                   │
+│  - Proxy Fee Calculation: Buyee/YahooJP total cost            │
+└──────────────────────────────────────┬──────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Validation Engine (Quality Layer)                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  - Required Fields: Title, price, URL, external ID            │
+│  - Data Types: Numeric validation, URL validation            │
+│  - Business Rules: Price ranges, date validation              │
+│  - Completeness Scoring: 0.0-1.0 based on field population   │
+└──────────────────────────────────────┬──────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Staging Pipeline (Load Layer)                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Store Raw: auction_monitor.raw_listings                   │
+│  2. Normalize: Platform-specific → Unified schema             │
+│  3. Validate: Required fields, data types, business rules     │
+│  4. Deduplicate: Exact match, URL match, fuzzy matching       │
+│  5. Enrich: Discogs catalog matching (future)                 │
+│  6. Score Confidence: Multi-factor (0.0-1.0)                  │
+│  7. Store Normalized: Only if valid & confidence ≥ 0.5        │
+└──────────────────────────────────────┬──────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              PostgreSQL (Staging & Normalized)                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  raw_listings: Raw platform data, validation status          │
+│  normalized_listings: Unified schema, confidence scores       │
+│  price_history: Time-series price snapshots                   │
+│  user_watches: User-defined search criteria                   │
+│  watch_matches: Listings matching user watches                │
+│  platform_health: Platform availability monitoring            │
+│  data_quality_metrics: Quality tracking per platform          │
+└──────────────────────────────────────┬──────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Analytics Service Integration                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  - Ingests from normalized_listings (confidence ≥ 0.7)        │
+│  - **Granular percentile calculation (p1-p99)** - every percentile│
+│  - Historical comparison and trend analysis                   │
+│  - **Discogs price history integration** (full sales arc)     │
+│  - Time-series storage for price snapshots                    │
+│  - **Service integrations**: Social, Shopping, Listings        │
+└──────────────────────────────────────┬──────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Python AI Service Integration                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  - Consumes clean, validated data from Analytics Service       │
+│  - ML models trained on high-quality data (confidence ≥ 0.7)  │
+│  - **Uses granular percentiles (p1-p99)** for precise analysis│
+│  - Price predictions, deal detection, recommendations         │
+│  - **Service integrations**: Social (negotiation), Shopping (evaluation), Listings (optimization)│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Decisions
+
+#### 1. Two-Stage Storage (Raw → Normalized)
+
+**Decision**: Store raw platform data separately from normalized data.
+
+**Rationale**:
+- **Reprocessing**: Raw data can be reprocessed if normalization logic changes
+- **Debugging**: Original platform data preserved for troubleshooting
+- **Quality Analysis**: Compare raw vs normalized to identify data quality issues
+- **Audit Trail**: Complete history of data transformations
+
+**Implementation**:
+- `raw_listings`: Stores original JSONB data from platforms
+- `normalized_listings`: Stores unified schema with validation results
+- Foreign key relationship: `normalized_listings.raw_listing_id → raw_listings.id`
+
+#### 2. Redis Rate Limiting with Lua Scripts
+
+**Decision**: Use Redis Lua scripts for atomic rate limiting operations.
+
+**Rationale**:
+- **Atomic Operations**: Lua scripts execute atomically, preventing race conditions
+- **Distributed Rate Limiting**: Works across multiple service instances
+- **Multiple Strategies**: Token bucket, sliding window, fixed window
+- **Performance**: Single round-trip to Redis per rate limit check
+
+**Implementation**:
+- **Token Bucket**: Refills tokens at a constant rate, allows bursts
+- **Sliding Window**: Tracks requests in a rolling time window
+- **Fixed Window**: Simple counter per time window
+- **Platform-Specific**: Each platform has its own rate limit configuration
+
+**Example**:
+```typescript
+// eBay: 5000 requests/day (token bucket)
+await rateLimiter.acquire('ebay', {
+  requests: 5000,
+  window: '24h',
+  strategy: 'token-bucket'
+})
+
+// Buyee: 1 request/2s (fixed window)
+await rateLimiter.acquire('buyee', {
+  requests: 1,
+  window: '2s',
+  strategy: 'fixed-window'
+})
+```
+
+#### 3. Redis Caching with Lua Singleflight
+
+**Decision**: Implement singleflight pattern using Lua scripts to prevent thundering herd.
+
+**Rationale**:
+- **Thundering Herd Prevention**: Only one request fetches data, others wait for result
+- **Cache Stampede Prevention**: Prevents multiple simultaneous cache misses
+- **Atomic Lock Management**: Lua scripts ensure atomic lock acquisition/release
+- **Fail-Open**: Falls back to direct fetch if Redis is unavailable
+
+**Implementation**:
+- **Lock Acquisition**: First request acquires lock, fetches data
+- **Wait Pattern**: Other requests wait for data to be set (polling)
+- **Lock Release**: Data setter releases lock atomically
+- **Timeout Handling**: Waits up to 10 seconds, then fetches directly
+
+**Example**:
+```typescript
+// Multiple requests for same data
+const data = await cache.getOrSet(
+  'ebay:search:beatles',
+  async () => {
+    // Only one request executes this
+    return await ebayAdapter.search({ query: 'beatles' })
+  },
+  { ttl: 300 }  // Cache for 5 minutes
+)
+```
+
+**Lua Script Flow**:
+1. Check if data exists → Return if cache hit
+2. Try to acquire lock → If acquired, return "LOCK_ACQUIRED"
+3. If lock exists → Return "LOCK_EXISTS" (client-side polling)
+4. Lock holder fetches data → Sets data and releases lock
+5. Waiting requests → Poll for data, return when available
+
+#### 4. Browser Pool Management
+
+**Decision**: Reuse Puppeteer browser instances instead of creating new ones per request.
+
+**Rationale**:
+- **Performance**: Browser startup is expensive (~2-3 seconds)
+- **Resource Efficiency**: Reuses browser instances across requests
+- **Connection Limits**: Manages page count per browser
+- **Error Recovery**: Automatically removes closed/disconnected browsers
+
+**Implementation**:
+- **Pool Size**: Configurable max browsers (default: 3)
+- **Pages Per Browser**: Configurable max pages (default: 5)
+- **Automatic Cleanup**: Removes disconnected browsers
+- **Graceful Shutdown**: Closes all browsers on service shutdown
+
+#### 5. Confidence Scoring
+
+**Decision**: Multi-factor confidence score (0.0-1.0) to filter low-quality data.
+
+**Rationale**:
+- **Data Quality Gate**: Only high-confidence data (≥0.7) feeds to Analytics/AI
+- **Source Reliability**: Official APIs (0.95) vs scraping (0.70-0.75)
+- **Completeness**: Penalizes missing required/important fields
+- **Freshness**: Penalizes stale data
+- **Enrichment Bonus**: Rewards catalog number matches
+
+**Factors**:
+- **Completeness**: Percentage of required/important fields populated
+- **Source Reliability**: Platform-specific reliability score
+- **Validation Errors**: Penalty for each validation error
+- **Warnings**: Smaller penalty for validation warnings
+- **Enrichment**: Bonus for Discogs catalog matches (future)
+
+**Thresholds**:
+- **≥0.7**: High confidence, fed to Analytics Service (with granular percentiles p1-p99)
+- **≥0.8**: Very high confidence, optimal for Python AI Service
+- **0.5-0.7**: Medium confidence, stored but not analyzed
+- **<0.5**: Low confidence, stored in raw_listings only
+
+**Granular Percentiles**:
+- **Implementation**: Calculates every percentile from p1 to p99 (not just p25, p50, p75, p95)
+- **Benefits**: Precise price positioning, better negotiation guidance, accurate AI predictions
+- **Storage**: All percentiles stored in `price_history.metadata` for detailed analysis
+- **Price Position**: Calculates which percentile current price falls into (0.0-1.0)
+
+### Platform-Specific Implementation
+
+#### Official APIs (eBay, Discogs)
+
+**Advantages**:
+- High reliability (0.95 confidence)
+- Structured data, easy to parse
+- Rate limits documented
+- No anti-bot measures
+
+**Challenges**:
+- API key management
+- Rate limit compliance
+- OAuth for user-specific data (eBay)
+
+#### Web Scraping (Buyee, YahooJP, CarousellHK, RecordCity)
+
+**Advantages**:
+- Access to platforms without APIs
+- Can extract additional data not in APIs
+
+**Challenges**:
+- HTML structure changes break scrapers
+- Anti-bot measures (CAPTCHAs, rate limiting)
+- Lower reliability (0.70-0.75 confidence)
+- Requires browser automation (Puppeteer)
+
+**Mitigation**:
+- **Rate Limiting**: Respectful scraping (1-2 requests/second)
+- **Error Handling**: Graceful degradation, retry logic
+- **Monitoring**: Track scraping success rates
+- **Browser Pool**: Efficient resource usage
+
+### Data Quality Metrics
+
+**Tracking**:
+- Total ingested vs validated listings per platform
+- Average confidence and completeness scores
+- Duplicate detection rates
+- Enrichment rates (catalog number matches)
+- Platform health (uptime, response times)
+
+**Alerting**:
+- Low confidence scores (<0.7 average)
+- High failure rates (>10%)
+- Platform downtime
+- Data quality degradation
+
+### Performance Optimizations
+
+1. **Redis Caching**: Reduces redundant API calls and scraping
+2. **Browser Pool**: Reuses expensive browser instances
+3. **Rate Limiting**: Prevents platform blocking
+4. **Batch Processing**: Processes multiple listings in parallel
+5. **Database Indexes**: Fast lookups for deduplication and matching
+
+### Service Integrations
+
+**Social Service Integration**:
+- **Negotiation Assistance**: Price context (granular percentiles p1-p99) for buyer/seller negotiations
+- **Mood Analysis**: Python AI analyzes negotiation mood based on price position
+- **Bigger Context**: Market trends, new drops detection
+- **API Endpoints**: `GET /analytics/price-percentiles`, `POST /python-ai/negotiation-assist`
+- **Example**: Buyer offers $45, system shows it's at p25 (good deal), suggests seller might accept $47-48 (p50-p60 range)
+
+**Shopping Service Integration**:
+- **Buyer Evaluation**: Price assessment using granular percentiles (p1-p99)
+- **Negotiation Suggestions**: OBO (or best offer) recommendations based on percentile position
+- **Auction Temperature**: Bid activity analysis, watcher count, time remaining
+- **API Endpoints**: `GET /analytics/evaluate-price`, `GET /analytics/auction-temperature`
+- **Example**: Item at $50 (p60), system suggests negotiating to $45-48 range with 65% success probability
+
+**Listings Service Integration**:
+- **Seller Optimization**: Pricing guidance using granular percentiles (p1-p99)
+- **Listing Recommendations**: Title, description, photo suggestions based on successful listings
+- **Price Positioning**: Optimal listing price based on percentile analysis
+- **API Endpoints**: `GET /analytics/pricing-guidance`, `GET /analytics/successful-listings`, `POST /python-ai/optimize-listing`
+- **Example**: Seller lists at $60 (above p75), system recommends $48 (p50) for better visibility
+
+**Complete Integration Documentation**: See `services/auction-monitor/SERVICE_INTEGRATIONS.md` for detailed API specifications, example flows, and implementation status.
+
+### Recent Enhancements
+
+1. ✅ **Granular Percentiles**: p1-p99 calculation (replaces coarse p25/p50/p75/p95)
+2. ✅ **Discogs Price History**: Browser automation for full sales arc (not just low/median/high)
+3. ✅ **Service Integrations**: Social, Shopping, Listings service integration documentation
+4. ✅ **Data Quality Engine**: Multi-factor confidence scoring with enrichment bonuses
+
+### Future Enhancements
+
+1. **Service Integration Endpoints**: Implement APIs for Social, Shopping, Listings services
+2. **CAPTCHA Automation**: Integration with automated CAPTCHA solving services
+3. **Additional Platforms**: Buyee, YahooJP, CarousellHK, RecordCity adapters
+4. **Proxy Rotation**: Rotate IP addresses for scraping
+5. **Machine Learning**: ML-based confidence scoring
+6. **Real-Time Updates**: WebSocket/SSE for live price updates
 
 ## Future Enhancements
 

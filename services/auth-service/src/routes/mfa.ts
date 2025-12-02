@@ -30,7 +30,7 @@ export function setupMFARoutes(prisma: PrismaClient): Router {
       const result = await setupMFA(prisma, userId, email);
       res.json({
         secret: result.secret,
-        qrCode: result.qrCode,
+        qrCode: result.qrCode || "",
         backupCodes: result.backupCodes,
       });
     } catch (error: any) {

@@ -7,6 +7,7 @@ import * as bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import * as fs from "fs";
 import { resolveProtoPath } from "@common/utils/proto";
+import { verifyMFA } from "./lib/mfa.js";
 
 const prisma = new PrismaClient();
 
@@ -95,7 +96,8 @@ const authService = {
 
   async Authenticate(call: any, callback: any) {
     try {
-      const { email, password } = call.request;
+      const { email, password, mfa_code, mfaCode } = call.request; // Support both mfa_code (proto) and mfaCode (legacy)
+      const mfaCodeValue = mfa_code || mfaCode; // Use proto field first, fallback to legacy
       if (!email || !password) {
         return callback({
           code: grpc.status.INVALID_ARGUMENT,
@@ -103,11 +105,23 @@ const authService = {
         });
       }
 
-      const user = await prisma.$queryRaw<Array<{ id: string; email: string; passwordHash: string; createdAt: Date }>>`
-        SELECT id, email, password_hash as "passwordHash", created_at as "createdAt"
+      console.log(`[gRPC] Authenticate attempt for email: ${email}, hasMfaCode: ${!!mfaCodeValue}`);
+
+      // Force connection refresh to ensure we see latest committed data
+      await prisma.$queryRaw`SELECT pg_backend_pid()`;
+      await new Promise(resolve => setTimeout(resolve, 200)); // Delay for commit visibility
+
+      const user = await prisma.$queryRaw<Array<{ 
+        id: string; 
+        email: string; 
+        passwordHash: string; 
+        mfaEnabled: boolean;
+        createdAt: Date 
+      }>>`
+        SELECT id, email, password_hash as "passwordHash", mfa_enabled as "mfaEnabled", created_at as "createdAt"
         FROM auth.users
         WHERE email = ${email}
-      `.then((r: Array<{ id: string; email: string; passwordHash: string; createdAt: Date }>) => r[0] || null);
+      `.then((r: Array<{ id: string; email: string; passwordHash: string; mfaEnabled: boolean; createdAt: Date }>) => r[0] || null);
 
       if (!user || !user.passwordHash) {
         return callback({
@@ -115,6 +129,8 @@ const authService = {
           message: "invalid credentials",
         });
       }
+
+      console.log(`[gRPC] User ${user.email} (${user.id}) - mfaEnabled: ${user.mfaEnabled} (type: ${typeof user.mfaEnabled})`);
 
       const ok = await bcrypt.compare(password, user.passwordHash);
       if (!ok) {
@@ -124,18 +140,63 @@ const authService = {
         });
       }
 
+      // Check if MFA is enabled - use explicit boolean check
+      console.log(`[gRPC] Checking MFA - user.mfaEnabled=${user.mfaEnabled}, typeof=${typeof user.mfaEnabled}, truthy=${!!user.mfaEnabled}`);
+      if (user.mfaEnabled === true) {
+        console.log(`[gRPC] MFA is enabled, checking for mfaCode...`);
+        if (!mfaCodeValue) {
+          console.log(`[gRPC] MFA required but no code provided - returning requiresMFA response`);
+          // Return success response with requiresMFA flag (gateway will convert to HTTP 200)
+          // Use a special token field to indicate MFA required
+          callback(null, {
+            token: "", // Empty token indicates MFA required
+            refresh_token: "",
+            requires_mfa: true, // Use proto field name (snake_case)
+            user_id: user.id, // Use proto field name (snake_case)
+            message: "MFA code required",
+            user: {
+              id: user.id,
+              email: user.email,
+              created_at: user.createdAt.toISOString(),
+            },
+          });
+          return;
+        }
+
+        // Verify MFA code
+        console.log(`[gRPC] Verifying MFA code for user ${user.id}, code: ${mfaCodeValue}`);
+        const mfaValid = await verifyMFA(prisma, user.id, mfaCodeValue);
+        if (!mfaValid) {
+          console.log(`[gRPC] MFA code verification failed for user ${user.id}`);
+          return callback({
+            code: grpc.status.UNAUTHENTICATED,
+            message: "invalid MFA code",
+          });
+        }
+        console.log(`[gRPC] ✅ MFA code verified successfully for user ${user.id}, proceeding to generate token`);
+      } else {
+        console.log(`[gRPC] MFA not enabled, proceeding with login`);
+      }
+
       const jti = randomUUID();
       const token = signJwt({ sub: user.id, email: user.email, jti } as any);
+      
+      console.log(`[gRPC] Token generated for user ${user.id}, token length: ${token.length}`);
 
-      callback(null, {
+      // Return success response with token - explicitly set requiresMFA to false
+      const response = {
         token,
         refresh_token: "",
+        requires_mfa: false, // Use proto field name (snake_case)
         user: {
           id: user.id,
           email: user.email,
           created_at: user.createdAt.toISOString(),
         },
-      });
+      };
+      
+      console.log(`[gRPC] Returning response with token (length: ${response.token.length}), requires_mfa: ${response.requires_mfa}`);
+      callback(null, response);
     } catch (error: any) {
       console.error("[gRPC] Authenticate error:", error);
       callback({

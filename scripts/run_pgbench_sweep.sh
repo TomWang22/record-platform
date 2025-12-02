@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Benchmark target database (dev/local):
-#   - Postgres host (from this script): localhost:5433
+#   - Postgres host: localhost:5433 (external Docker container)
 #   - Database: records
-#   - Docker Compose service: postgres (ports: 5433:5432)
+#   - Docker Compose service: record-platform-postgres-1 (ports: 5433:5432)
 #   - Schemas used: records (data), bench (results), public, auth
 #
 # Important:
-#   - This script benchmarks the Docker Postgres instance, NOT the K8s postgres pod.
+#   - This script benchmarks the external Docker Postgres instance (NOT K8s pods).
+#   - Requires local pgbench installation: brew install postgresql@16
 #   - K8s microservices connect to the same Docker DB via:
 #       host.docker.internal:5433 (db=records, search_path=auth|records|...)
 #   - Other Docker Postgres instances:
@@ -21,8 +22,7 @@ export PGGSSENCMODE=disable
 usage() {
   cat <<USAGE
 Usage: ${0##*/} [options]
-  -p, --pod NAME           Postgres pod name (default: autodetect)
-  -n, --namespace NS       Kubernetes namespace (default: record-platform)
+  -n, --namespace NS       Kubernetes namespace (default: record-platform, used for config only)
   -u, --user UUID          Tenant UUID to benchmark (default: 0dc268d0-a86f-4e12-8d10-9db0f1b735e0)
   -q, --query TEXT         Search query string (default: "鄧麗君 album 263 cn-041 polygram")
   -d, --duration SEC       Duration per benchmark run (default: 60)
@@ -31,6 +31,9 @@ Usage: ${0##*/} [options]
   -l, --limit N            LIMIT value for queries (default: 50)
   --pgoptions OPTS         Extra PGOPTIONS (default: '-c jit=off -c random_page_cost=1.0 -c cpu_index_tuple_cost=0.0005 -c cpu_tuple_cost=0.01')
   -h, --help               Show this help
+
+Note: This script requires local pgbench installation (brew install postgresql@16).
+      It connects to external Docker Postgres on localhost:5433.
 USAGE
 }
 
@@ -42,7 +45,6 @@ RECORDS_DB_NAME="${RECORDS_DB_NAME:-records}"
 RECORDS_DB_PASS="${RECORDS_DB_PASS:-postgres}"
 
 NS="record-platform"
-POD=""
 USER_UUID="0dc268d0-a86f-4e12-8d10-9db0f1b735e0"
 QUERY='鄧麗君 album 263 cn-041 polygram'
 DURATION=60
@@ -190,7 +192,6 @@ PHASE="warm"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -n|--namespace) NS="$2"; shift 2 ;;
-    -p|--pod) POD="$2"; shift 2 ;;
     -u|--user) USER_UUID="$2"; shift 2 ;;
     -q|--query) QUERY="$2"; shift 2 ;;
     -d|--duration) DURATION="$2"; shift 2 ;;
@@ -234,33 +235,16 @@ LOG_DIR="$REPO_ROOT/bench_logs/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$LOG_DIR"
 echo "📁 Logging EXPLAINs and diagnostics to: $LOG_DIR"
 
-# Find a pod to run pgbench from (can be any pod with pgbench, or use local pgbench)
-# Since Postgres is now external, we don't need the postgres pod specifically
-USE_LOCAL_PGBENCH=false
-if [[ -z "$POD" ]]; then
-  # Try to find any pod that might have pgbench (postgres pod, or any pod)
-  POD=$(kubectl -n "$NS" get pod -l app=postgres -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | awk 'NR==1{print $1}')
-fi
-if [[ -z "$POD" ]]; then
-  # Try any running pod in the namespace
-  POD=$(kubectl -n "$NS" get pod --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-fi
-if [[ -z "$POD" ]]; then
-  # Check if pgbench is available locally
-  if command -v pgbench >/dev/null 2>&1; then
-    echo "⚠️  No pod found in namespace $NS - will run pgbench locally" >&2
-    echo "   Postgres is external (Docker), connecting to ${RECORDS_DB_HOST}:${RECORDS_DB_PORT}" >&2
-    USE_LOCAL_PGBENCH=true
-  else
-    echo "❌ No pod found and pgbench not installed locally" >&2
-    echo "   Please either:" >&2
-    echo "   1. Install pgbench locally: brew install postgresql@16" >&2
-    echo "   2. Or ensure a pod is running in namespace $NS" >&2
+# CRITICAL: Require local pgbench installation
+# Postgres is external (Docker container on localhost:5433), so we always use local pgbench
+if ! command -v pgbench >/dev/null 2>&1; then
+  echo "❌ pgbench not found locally" >&2
+  echo "   This script requires local pgbench to connect to external Docker Postgres" >&2
+  echo "   Install with: brew install postgresql@16" >&2
   exit 1
-  fi
-else
-  echo "Using pod: $POD (namespace: $NS) for running pgbench"
 fi
+
+echo "✅ Using local pgbench (connecting to external Docker Postgres at ${RECORDS_DB_HOST}:${RECORDS_DB_PORT})"
 
 # CRITICAL: Helper function for psql - always uses the same DSN as pgbench
 # Uses parameterized connection settings (can be overridden via env vars)
@@ -273,14 +257,6 @@ psql_in_pod() {
     -U "$RECORDS_DB_USER" -d "$RECORDS_DB_NAME" \
     -X -P pager=off "$@"
 }
-
-# Force local pgbench when pgbench is available locally
-# This ensures we use the same connection method (localhost:5433) for everything
-if command -v pgbench >/dev/null 2>&1; then
-  echo "✅ Using local pgbench (connecting to ${RECORDS_DB_HOST}:${RECORDS_DB_PORT})"
-  USE_LOCAL_PGBENCH=true
-  POD=""
-fi
 
 # NOTE: Function creation moved to AFTER database restore check
 # This ensures the function is created on the correct database
@@ -1520,8 +1496,7 @@ SQL
 # Database-level tuning is handled by canonical optimize-db-for-performance.sh script
 # No ALTER DATABASE or ALTER SYSTEM here - only session-level PGOPTIONS_EXTRA is used
 
-# FORCE CLEAN: Remove any existing files in pod first (AGGRESSIVE)
-# Prepare bench SQL files locally, then (optionally) copy into a pod
+# Prepare bench SQL files locally (for local pgbench)
 bench_sql_dir="$tmpdir/bench_sql"
 mkdir -p "$bench_sql_dir"
 
@@ -1623,70 +1598,8 @@ fi
 
 echo "✅ SQL files verified clean"
 
-# If we're going to run pgbench from a Kubernetes pod, sync the SQL there now
-if [[ "$USE_LOCAL_PGBENCH" != "true" ]] && [[ -n "$POD" ]]; then
-  echo "Syncing bench SQL files into pod..."
-  kubectl -n "$NS" exec "$POD" -c db -- bash -lc 'rm -rf /tmp/bench_sql && mkdir -p /tmp/bench_sql' >/dev/null 2>&1 || \
-  kubectl -n "$NS" exec "$POD" -- bash -lc 'rm -rf /tmp/bench_sql && mkdir -p /tmp/bench_sql' >/dev/null 2>&1 || true
-  kubectl -n "$NS" cp "$bench_sql_dir/." "$POD:/tmp/bench_sql" -c db >/dev/null 2>&1 || \
-  kubectl -n "$NS" cp "$bench_sql_dir/." "$POD:/tmp/bench_sql" >/dev/null 2>&1 || true
-fi
-
-# Create pgbench runner script
-# CRITICAL: Use parameterized connection settings (same as psql_in_pod)
-cat <<'SH' > "$tmpdir/run_pgbench.sh"
-#!/usr/bin/env bash
-set -Eeuo pipefail
-# Connection setup - use parameterized settings (can be overridden via env)
-: "${PGHOST:=localhost}"
-: "${PGPORT:=5433}"
-: "${PGUSER:=postgres}"
-: "${PGDATABASE:=records}"
-: "${PGPASSWORD:=postgres}"
-export PGPASSWORD
-
-# Get PGOPTIONS from first arg (if provided), rest are pgbench args
-# Default to empty string if no args provided (script can be called without args)
-pgopts="${1:-}"
-if [[ $# -ge 1 ]]; then
-  shift
-fi
-
-# Set PGOPTIONS to include search_path and tuning
-# CRITICAL: public must be first in search_path so functions are found
-# Also include pg_catalog for pg_trgm operators
-# Ensure search_path is set even if not in pgopts
-if [[ -n "$pgopts" ]]; then
-  if [[ "$pgopts" != *"search_path"* ]]; then
-    export PGOPTIONS="$pgopts -c search_path=public,records,pg_catalog"
-  else
-    export PGOPTIONS="$pgopts"
-  fi
-else
-  export PGOPTIONS="-c search_path=public,records,pg_catalog"
-fi
-
-cd /tmp
-# Call pgbench with explicit connection to localhost Postgres
-exec pgbench -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" "$@"
-SH
-
-# Copy script to pod if we have one, otherwise use local pgbench
-if [[ "$USE_LOCAL_PGBENCH" != "true" ]] && [[ -n "$POD" ]]; then
-  # Try to copy to pod (may fail if pod doesn't have /tmp or doesn't exist)
-  kubectl -n "$NS" cp "$tmpdir/run_pgbench.sh" "$POD:/tmp/run_pgbench.sh" -c db >/dev/null 2>&1 || \
-  kubectl -n "$NS" cp "$tmpdir/run_pgbench.sh" "$POD:/tmp/run_pgbench.sh" >/dev/null 2>&1 || {
-    echo "⚠️  Could not copy script to pod, will use local pgbench" >&2
-    USE_LOCAL_PGBENCH=true
-  }
-  if [[ "$USE_LOCAL_PGBENCH" != "true" ]]; then
-    kubectl -n "$NS" exec "$POD" -c db -- chmod +x /tmp/run_pgbench.sh >/dev/null 2>&1 || \
-    kubectl -n "$NS" exec "$POD" -- chmod +x /tmp/run_pgbench.sh >/dev/null 2>&1 || true
-  fi
-fi
-
-# Script already uses localhost by default, just ensure it's executable
-chmod +x "$tmpdir/run_pgbench.sh"
+# Note: SQL files are prepared locally and used directly by local pgbench
+# No need to sync to pods since we always use local pgbench
 
 # CRITICAL: Verify objects exist BEFORE pgbench runs
 echo "--- Pre-flight verification"
@@ -1791,20 +1704,27 @@ else
 fi
 
 echo "--- Smoke check"
-# Skip smoke tests if using local pgbench (no pod needed)
-if [[ "$USE_LOCAL_PGBENCH" != "true" ]] && [[ -n "$POD" ]]; then
+# Skip smoke tests for faster iteration (can be enabled if needed)
+if [[ "$RUN_SMOKE_TESTS" == "true" ]]; then
+  echo "--- Running smoke tests (local pgbench) ---"
   for script in bench_knn.sql bench_trgm.sql bench_trgm_simple.sql bench_noop.sql; do
-  echo "Testing $script..."
-    # Smoke test using the wrapper script (connecting to external Postgres)
-  if ! kubectl -n "$NS" exec "$POD" -c db -- /tmp/run_pgbench.sh "$PGOPTIONS_EXTRA" -n -M prepared -c 1 -T 2 -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" -f "/tmp/bench_sql/$script" >/dev/null 2>&1; then
-    echo "WARNING: pgbench smoke test failed for $script, but continuing..." >&2
-    # Don't exit - let it try to run anyway (matches user's working script approach)
-  else
-    echo "✓ $script smoke test passed"
-  fi
-done
+    echo "Testing $script..."
+    # Smoke test using local pgbench (connecting to external Postgres)
+    export PGHOST="$RECORDS_DB_HOST"
+    export PGPORT="$RECORDS_DB_PORT"
+    export PGUSER="$RECORDS_DB_USER"
+    export PGDATABASE="$RECORDS_DB_NAME"
+    export PGPASSWORD="$RECORDS_DB_PASS"
+    export PGOPTIONS="$PGOPTIONS_EXTRA"
+    if ! pgbench -n -M prepared -c 1 -T 2 -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" -f "$bench_sql_dir/$script" >/dev/null 2>&1; then
+      echo "WARNING: pgbench smoke test failed for $script, but continuing..." >&2
+    else
+      echo "✓ $script smoke test passed"
+    fi
+    unset PGOPTIONS
+  done
 else
-  echo "Skipping smoke tests (using local pgbench)"
+  echo "Skipping smoke tests (RUN_SMOKE_TESTS=${RUN_SMOKE_TESTS})"
 fi
 
 # CRITICAL: Quick NOOP baseline test to measure environment overhead (optional)
@@ -1813,20 +1733,18 @@ if [[ "$RUN_NOOP_BASELINE" == "true" ]]; then
   echo "--- Quick NOOP baseline test (measuring environment overhead) ---"
   echo "Running barebones pgbench NOOP test: 8 clients, 8 threads, 3s"
   NOOP_OUTPUT=$(mktemp)
-  if [[ "$USE_LOCAL_PGBENCH" == "true" ]]; then
-    PGHOST="$RECORDS_DB_HOST" PGPORT="$RECORDS_DB_PORT" PGUSER="$RECORDS_DB_USER" PGDATABASE="$RECORDS_DB_NAME" PGPASSWORD="$RECORDS_DB_PASS" \
-    PGOPTIONS="-c search_path=public,records,pg_catalog" \
-    pgbench \
-      -n -M prepared \
-      -c 8 -j 8 -T 3 \
-      -f "$bench_sql_dir/bench_noop.sql" \
-      > "$NOOP_OUTPUT" 2>&1 || true
-  else
-    # Using pod - would need to copy script first, but skip for now
-    echo "Skipping NOOP baseline (using pod pgbench)"
-    rm -f "$NOOP_OUTPUT"
-    NOOP_OUTPUT=""
-  fi
+  export PGHOST="$RECORDS_DB_HOST"
+  export PGPORT="$RECORDS_DB_PORT"
+  export PGUSER="$RECORDS_DB_USER"
+  export PGDATABASE="$RECORDS_DB_NAME"
+  export PGPASSWORD="$RECORDS_DB_PASS"
+  export PGOPTIONS="-c search_path=public,records,pg_catalog"
+  pgbench \
+    -n -M prepared \
+    -c 8 -j 8 -T 3 \
+    -f "$bench_sql_dir/bench_noop.sql" \
+    > "$NOOP_OUTPUT" 2>&1 || true
+  unset PGOPTIONS
 
   if [[ -n "$NOOP_OUTPUT" ]] && [[ -s "$NOOP_OUTPUT" ]]; then
     NOOP_TPS=$(sed -n "s/^tps = \([0-9.][0-9.]*\) .*/\1/p" "$NOOP_OUTPUT" | tail -n1 || echo "")
@@ -2141,104 +2059,59 @@ SQL
     echo "⚠️  High concurrency ($clients clients): using extended duration ${duration}s for soak test"
   fi
 
-  # Prepare pgbench script and SQL files
-  if [[ "$USE_LOCAL_PGBENCH" == "true" ]]; then
-    # Using local pgbench - call directly from $wd so logs end up in the right place
-    echo "Running pgbench locally (connecting to Postgres at ${RECORDS_DB_HOST}:${RECORDS_DB_PORT})..."
-    rm -f "$wd"/pgbench_log.* 2>/dev/null || true
-    
-    # Trgm_simple is the nastiest path; run it without parallel query to save shm
-    local pgopts="$PGOPTIONS_EXTRA"
-    if [[ "$variant" == "trgm_simple" ]]; then
-      pgopts="$pgopts -c max_parallel_workers_per_gather=0 -c max_parallel_workers=1"
-    fi
-    
-    # CRITICAL: Call pgbench directly from $wd (not via run_pgbench.sh which cd's to /tmp)
-    # This ensures pgbench_log.* files are written to $wd where we can find them
-    
-    # Verify PGOPTIONS are being applied (first run only, for debugging)
-    if [[ "$clients" == "${client_array[0]}" ]] && [[ "$variant" == "knn" ]] && [[ "$PHASE" == "warm" ]]; then
-      echo "--- Verifying PGOPTIONS are applied (first run only) ---"
-      # PGOPTIONS must be set as environment variable, not passed as psql arguments
-      export PGOPTIONS="$pgopts"
-      PGPASSWORD="$RECORDS_DB_PASS" psql \
-        -h "$RECORDS_DB_HOST" -p "$RECORDS_DB_PORT" \
-        -U "$RECORDS_DB_USER" -d "$RECORDS_DB_NAME" \
-        -c "SELECT name, setting FROM pg_settings WHERE name IN ('enable_seqscan', 'jit', 'synchronous_commit', 'work_mem', 'effective_cache_size') ORDER BY name;" \
-        -X -P pager=off 2>&1 | grep -E "(enable_seqscan|jit|synchronous_commit|work_mem|effective_cache_size)" || true
-      unset PGOPTIONS
-    fi
-    
-    # CRITICAL: PGOPTIONS must be set as environment variable for pgbench to use it
-    # Ensure search_path is included (PGOPTIONS_EXTRA should already have it, but ensure it's there)
-    local final_pgopts="$pgopts"
-    if [[ "$final_pgopts" != *"search_path"* ]]; then
-      final_pgopts="$final_pgopts -c search_path=public,records,pg_catalog"
-    fi
-    
-    # Export PGOPTIONS so pgbench can use it
-    export PGOPTIONS="$final_pgopts"
-    
-    # Run pgbench with connection parameters
-    # Use -q (quiet) to suppress verbose client messages - only show progress every 5 seconds
-    # Use -P 5 for progress every 5 seconds (clean output)
-    # Use -r for detailed latency reporting at the end
-    # Use environment variables for connection (PGHOST, PGPORT, etc.) instead of command-line flags
-    # to avoid conflicts with pgbench option parsing
-    export PGHOST="$RECORDS_DB_HOST"
-    export PGPORT="$RECORDS_DB_PORT"
-    export PGUSER="$RECORDS_DB_USER"
-    export PGDATABASE="$RECORDS_DB_NAME"
-    export PGPASSWORD="$RECORDS_DB_PASS"
-    
-    pgbench \
-      -n -M prepared \
-      -P 5 -r \
-      -T "$duration" -c "$clients" -j "$actual_threads" \
-      -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
-      -l -f "$bench_sql_dir/$sql_file" 2>&1 | tee "$wd/out.txt"
-    
-    # Unset PGOPTIONS after run
+  # Using local pgbench - call directly from $wd so logs end up in the right place
+  echo "Running pgbench locally (connecting to external Docker Postgres at ${RECORDS_DB_HOST}:${RECORDS_DB_PORT})..."
+  rm -f "$wd"/pgbench_log.* 2>/dev/null || true
+  
+  # Trgm_simple is the nastiest path; run it without parallel query to save shm
+  local pgopts="$PGOPTIONS_EXTRA"
+  if [[ "$variant" == "trgm_simple" ]]; then
+    pgopts="$pgopts -c max_parallel_workers_per_gather=0 -c max_parallel_workers=1"
+  fi
+  
+  # Verify PGOPTIONS are being applied (first run only, for debugging)
+  if [[ "$clients" == "${client_array[0]}" ]] && [[ "$variant" == "knn" ]] && [[ "$PHASE" == "warm" ]]; then
+    echo "--- Verifying PGOPTIONS are applied (first run only) ---"
+    # PGOPTIONS must be set as environment variable, not passed as psql arguments
+    export PGOPTIONS="$pgopts"
+    PGPASSWORD="$RECORDS_DB_PASS" psql \
+      -h "$RECORDS_DB_HOST" -p "$RECORDS_DB_PORT" \
+      -U "$RECORDS_DB_USER" -d "$RECORDS_DB_NAME" \
+      -c "SELECT name, setting FROM pg_settings WHERE name IN ('enable_seqscan', 'jit', 'synchronous_commit', 'work_mem', 'effective_cache_size') ORDER BY name;" \
+      -X -P pager=off 2>&1 | grep -E "(enable_seqscan|jit|synchronous_commit|work_mem|effective_cache_size)" || true
     unset PGOPTIONS
-  else
-    # Using pod - clean up old logs
-    kubectl -n "$NS" exec "$POD" -c db -- bash -lc 'rm -f /tmp/pgbench_log.*' >/dev/null 2>&1 || \
-    kubectl -n "$NS" exec "$POD" -- bash -lc 'rm -f /tmp/pgbench_log.*' >/dev/null 2>&1 || true
-
-  # Ensure wrapper script and SQL files exist (pod might have restarted)
-    kubectl -n "$NS" cp "$tmpdir/run_pgbench.sh" "$POD:/tmp/run_pgbench.sh" -c db >/dev/null 2>&1 || \
-    kubectl -n "$NS" cp "$tmpdir/run_pgbench.sh" "$POD:/tmp/run_pgbench.sh" >/dev/null 2>&1 || true
-    kubectl -n "$NS" exec "$POD" -c db -- chmod +x /tmp/run_pgbench.sh >/dev/null 2>&1 || \
-    kubectl -n "$NS" exec "$POD" -- chmod +x /tmp/run_pgbench.sh >/dev/null 2>&1 || true
-    kubectl -n "$NS" exec "$POD" -c db -- mkdir -p /tmp/bench_sql >/dev/null 2>&1 || \
-    kubectl -n "$NS" exec "$POD" -- mkdir -p /tmp/bench_sql >/dev/null 2>&1 || true
-    kubectl -n "$NS" cp "$tmpdir/bench_sql/." "$POD:/tmp/bench_sql" -c db >/dev/null 2>&1 || \
-    kubectl -n "$NS" cp "$tmpdir/bench_sql/." "$POD:/tmp/bench_sql" >/dev/null 2>&1 || true
-
-    # Run pgbench inside pod (connecting to Postgres at localhost:5433)
-    # Note: From pod, localhost refers to the pod's localhost, not the host machine
-    # If you need pod-to-host connection, use host.docker.internal, but ensure function exists there too
-  kubectl -n "$NS" exec "$POD" -c db -- /tmp/run_pgbench.sh "$PGOPTIONS_EXTRA" \
+  fi
+  
+  # CRITICAL: PGOPTIONS must be set as environment variable for pgbench to use it
+  # Ensure search_path is included (PGOPTIONS_EXTRA should already have it, but ensure it's there)
+  local final_pgopts="$pgopts"
+  if [[ "$final_pgopts" != *"search_path"* ]]; then
+    final_pgopts="$final_pgopts -c search_path=public,records,pg_catalog"
+  fi
+  
+  # Export PGOPTIONS so pgbench can use it
+  export PGOPTIONS="$final_pgopts"
+  
+  # Run pgbench with connection parameters
+  # Use -P 5 for progress every 5 seconds (clean output)
+  # Use -r for detailed latency reporting at the end
+  # Use environment variables for connection (PGHOST, PGPORT, etc.) instead of command-line flags
+  # to avoid conflicts with pgbench option parsing
+  export PGHOST="$RECORDS_DB_HOST"
+  export PGPORT="$RECORDS_DB_PORT"
+  export PGUSER="$RECORDS_DB_USER"
+  export PGDATABASE="$RECORDS_DB_NAME"
+  export PGPASSWORD="$RECORDS_DB_PASS"
+  
+  pgbench \
     -n -M prepared \
     -P 5 -r \
-      -T "$duration" -c "$clients" -j "$actual_threads" \
-      -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
-      -l -f "/tmp/bench_sql/$sql_file" 2>&1 | tee "$wd/out.txt" || \
-    kubectl -n "$NS" exec "$POD" -- /tmp/run_pgbench.sh "$PGOPTIONS_EXTRA" \
-      -n -M prepared \
-      -P 5 -r \
-      -T "$duration" -c "$clients" -j "$actual_threads" \
-      -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
-      -l -f "/tmp/bench_sql/$sql_file" 2>&1 | tee "$wd/out.txt"
-
-    # Copy log files from pod
-    if kubectl -n "$NS" exec "$POD" -c db -- bash -lc 'cd /tmp && compgen -G "pgbench_log.*" >/dev/null' 2>/dev/null; then
-      kubectl -n "$NS" exec "$POD" -c db -- bash -lc 'cd /tmp && tar cf - pgbench_log.*' | tar xf - -C "$wd" 2>/dev/null || \
-      kubectl -n "$NS" exec "$POD" -- bash -lc 'cd /tmp && tar cf - pgbench_log.*' | tar xf - -C "$wd" 2>/dev/null || true
-      kubectl -n "$NS" exec "$POD" -c db -- bash -lc 'rm -f /tmp/pgbench_log.*' >/dev/null 2>&1 || \
-      kubectl -n "$NS" exec "$POD" -- bash -lc 'rm -f /tmp/pgbench_log.*' >/dev/null 2>&1 || true
-    fi
-  fi
+    -T "$duration" -c "$clients" -j "$actual_threads" \
+    -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
+    -l -f "$bench_sql_dir/$sql_file" 2>&1 | tee "$wd/out.txt"
+  
+  # Unset PGOPTIONS after run
+  unset PGOPTIONS
 
   local rc=${PIPESTATUS[0]}
   
@@ -2420,7 +2293,7 @@ SQL
   local ts
   ts=$(date -u +%FT%TZ)
   local host
-  host="$POD"
+  host="$(hostname 2>/dev/null || echo 'localhost')"
   local track_io
   track_io=$(psql_in_pod -At -c "SHOW track_io_timing" | tr 'A-Z' 'a-z')
   track_io=$([[ "$track_io" == "on" ]] && echo true || echo false)
@@ -2764,17 +2637,6 @@ WHERE (p95_ms > 100000 OR p99_ms > 100000 OR lat_avg_ms > 10000 OR lat_avg_ms IS
   AND (run_id IS NULL OR run_id < 'run_20251121');
 SQL
 
-# Use SQL COPY instead of \copy (psql meta-command doesn't work well in heredocs)
-# COPY works fine since we're connecting as postgres superuser
-psql_in_pod <<SQL
-COPY (
-  SELECT *
-  FROM bench.results
-  WHERE run_id = '$RUN_ID'
-  ORDER BY ts_utc DESC
-) TO '/tmp/bench_export.csv' CSV HEADER;
-SQL
-
 echo "CSV (sweep log): $results_csv"
 # CRITICAL: Use REPO_ROOT set at top of script (like old version)
 # This ensures CSVs are written to repo root, not temp directories
@@ -2804,13 +2666,18 @@ cp -f "$results_csv" "$output_dir/bench_sweep.csv" 2>/dev/null || {
   echo "⚠️  Failed to copy CSV to $output_dir/bench_sweep.csv" >&2
 }
 
-# Try to get export from pod, but fall back to local CSV if unavailable
+# Export from database (using COPY to STDOUT via psql)
 remote_export="$output_dir/bench_export_${TIMESTAMP}.csv"
-if [[ -n "$POD" ]] && [[ "$USE_LOCAL_PGBENCH" != "true" ]]; then
-kubectl -n "$NS" cp "$POD:/tmp/bench_export.csv" "$remote_export" -c db >/dev/null 2>&1 || true
-fi
-if [[ ! -s "$remote_export" || $(wc -l < "$remote_export" 2>/dev/null || echo 0) -le 1 ]]; then
-  echo "bench.results empty or unavailable, using local sweep data for bench_export."
+if ! psql_in_pod <<SQL > "$remote_export" 2>/dev/null
+COPY (
+  SELECT *
+  FROM bench.results
+  WHERE run_id = '$RUN_ID'
+  ORDER BY ts_utc DESC
+) TO STDOUT CSV HEADER;
+SQL
+then
+  echo "bench.results export failed, using local sweep data for bench_export."
   cp -f "$results_csv" "$remote_export" 2>/dev/null || true
 fi
 cp -f "$remote_export" "$output_dir/bench_export.csv" 2>/dev/null || true
@@ -3448,28 +3315,20 @@ echo ""
 
 # Create automatic backup after benchmark (only if explicitly requested)
 # NOTE: Default is false to avoid disk bloat during repeated benchmark runs
-if [[ "$CREATE_BENCH_BACKUP" == "true" ]] && [[ -f "./scripts/create-comprehensive-backup.sh" ]]; then
-echo "=== Creating automatic backup ==="
-  # Wait for pod to be ready before backup (pod might have restarted)
-  NS="${NS:-record-platform}"
-  PGPOD=$(kubectl -n "$NS" get pod -l app=postgres -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | awk 'NR==1{print $1}')
-  if [[ -n "$PGPOD" ]]; then
-    echo "Waiting for pod to be ready..."
-    kubectl -n "$NS" wait pod "$PGPOD" --for=condition=Ready --timeout=60s >/dev/null 2>&1 || true
-    sleep 2
-    # Wait for database to accept connections
-    for i in $(seq 1 10); do
-      if psql_in_pod -c "SELECT 1;" >/dev/null 2>&1; then
-        break
-      fi
-      sleep 1
-    done
+# Since Postgres is external (Docker), we can use Docker-based backup scripts
+if [[ "$CREATE_BENCH_BACKUP" == "true" ]]; then
+  echo "=== Creating automatic backup ==="
+  # Check if database is ready
+  if ! psql_in_pod -c "SELECT 1;" >/dev/null 2>&1; then
+    echo "⚠️  Database not ready, skipping backup" >&2
+  elif [[ -f "./scripts/create-comprehensive-backup.sh" ]]; then
+    ./scripts/create-comprehensive-backup.sh
+  elif [[ -f "./scripts/restore-to-external-docker.sh" ]]; then
+    echo "⚠️  Using restore script for backup (may not be ideal)" >&2
+    echo "   Consider using create-comprehensive-backup.sh for proper backups" >&2
+  else
+    echo "⚠️  Backup script not found, skipping automatic backup" >&2
   fi
-  ./scripts/create-comprehensive-backup.sh
 else
-  if [[ "$CREATE_BENCH_BACKUP" != "true" ]]; then
-    echo "⚠️  Backup disabled for this run (CREATE_BENCH_BACKUP=${CREATE_BENCH_BACKUP})"
-else
-  echo "⚠️  Backup script not found, skipping automatic backup"
-  fi
+  echo "⚠️  Backup disabled for this run (CREATE_BENCH_BACKUP=${CREATE_BENCH_BACKUP})"
 fi

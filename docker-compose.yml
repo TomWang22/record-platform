@@ -303,6 +303,7 @@ services:
       POSTGRES_URL: postgresql://postgres:postgres@postgres-auction-monitor:5432/auction_monitor
       POSTGRES_URL_LISTINGS: postgresql://postgres:postgres@postgres-listings:5432/records
       POSTGRES_URL_AUCTION_MONITOR: postgresql://postgres:postgres@postgres-auction-monitor:5432/auction_monitor
+      BASE_URL: http://haproxy:8081
     expose: ["4010"]
     restart: unless-stopped
     healthcheck:
@@ -310,8 +311,6 @@ services:
       interval: 5s
       timeout: 2s
       start_period: 5s
-    environment:
-      BASE_URL: http://haproxy:8081
 
   api-gateway:
     build: { context: ., dockerfile: services/api-gateway/Dockerfile }
@@ -469,6 +468,19 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL","wget -qO- http://127.0.0.1:8025/api/v2/messages >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
 volumes:
   pgdata:

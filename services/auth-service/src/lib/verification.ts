@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { randomInt } from "node:crypto";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
-import twilio from "twilio";
+import { createSmsProvider, type SmsProvider } from "./sms-providers";
 
 // Generate 6-digit verification code
 function generateCode(): string {
@@ -21,39 +21,45 @@ async function verifyCode(hashed: string, code: string): Promise<boolean> {
 
 // Email transporter (configure via environment variables)
 function getEmailTransporter() {
-  const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+  const smtpHost = process.env.SMTP_HOST;
   const smtpPort = parseInt(process.env.SMTP_PORT || "587");
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASSWORD;
 
-  if (!smtpUser || !smtpPass) {
-    console.warn("SMTP credentials not configured, email verification disabled");
+  // If SMTP_HOST is not set, email verification is disabled
+  if (!smtpHost) {
+    console.warn("SMTP_HOST not configured, email verification disabled");
     return null;
   }
 
-  return nodemailer.createTransport({
+  // MailHog and some other mock SMTP servers don't require authentication
+  // Only require auth if both USER and PASSWORD are provided
+  const transportConfig: any = {
     host: smtpHost,
     port: smtpPort,
     secure: smtpPort === 465,
-    auth: {
+  };
+
+  // Only add auth if both user and password are provided
+  if (smtpUser && smtpPass) {
+    transportConfig.auth = {
       user: smtpUser,
       pass: smtpPass,
-    },
-  });
-}
-
-// SMS client (Twilio)
-function getSmsClient() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const fromNumber = process.env.TWILIO_FROM_NUMBER;
-
-  if (!accountSid || !authToken || !fromNumber) {
-    console.warn("Twilio credentials not configured, SMS verification disabled");
-    return null;
+    };
+  } else {
+    console.log(`SMTP configured without authentication (e.g., MailHog at ${smtpHost}:${smtpPort})`);
   }
 
-  return twilio(accountSid, authToken);
+  return nodemailer.createTransport(transportConfig);
+}
+
+// SMS provider (supports multiple providers with fallback)
+let smsProvider: SmsProvider | null = null;
+function getSmsProvider(): SmsProvider | null {
+  if (!smsProvider) {
+    smsProvider = createSmsProvider();
+  }
+  return smsProvider;
 }
 
 // Send email verification code
@@ -155,23 +161,22 @@ export async function sendSmsVerificationCode(
     `;
   }
 
-  // Send SMS
-  const client = getSmsClient();
-  if (!client) {
+  // Send SMS using provider abstraction
+  const provider = getSmsProvider();
+  if (!provider) {
     return { success: false, message: "SMS service not configured" };
   }
 
-  try {
-    await client.messages.create({
-      body: `Your Record Platform verification code is: ${code}. This code expires in 15 minutes.`,
-      from: process.env.TWILIO_FROM_NUMBER!,
-      to: phone,
-    });
-    return { success: true };
-  } catch (error: any) {
-    console.error("Failed to send SMS:", error);
-    return { success: false, message: error.message };
+  const message = `Your Record Platform verification code is: ${code}. This code expires in 15 minutes.`;
+  const result = await provider.sendSms(phone, message);
+  
+  if (!result.success) {
+    console.error(`[SMS] Failed to send SMS via ${provider.getName()}:`, result.error);
+    return { success: false, message: result.error || "Failed to send SMS" };
   }
+  
+  console.log(`[SMS] Verification code sent to ${phone} via ${provider.getName()} (ID: ${result.messageId})`);
+  return { success: true };
 }
 
 // Verify code

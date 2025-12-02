@@ -37,12 +37,12 @@ export function setupVerificationRoutes(prisma: PrismaClient): Router {
       const result = await sendEmailVerificationCode(prisma, userId, email);
       if (!result.success) {
         // If service is not configured, return 503 instead of 500
-        if (result.message?.includes("not configured") || result.message?.includes("SMTP")) {
-          return res.status(503).json({ 
-            error: "Email service not configured", 
-            message: "SMTP credentials are required. Please configure SMTP_USER and SMTP_PASSWORD environment variables." 
-          });
-        }
+      if (result.message?.includes("not configured") || result.message?.includes("SMTP")) {
+        return res.status(503).json({
+          error: "Email service not configured", 
+          message: "SMTP_HOST is required. Configure SMTP_HOST (and optionally SMTP_USER/SMTP_PASSWORD for authenticated SMTP servers)." 
+        });
+      }
         return res.status(500).json({ error: result.message || "Failed to send verification code" });
       }
 
@@ -51,9 +51,9 @@ export function setupVerificationRoutes(prisma: PrismaClient): Router {
       console.error("Send email verification error:", error);
       // Check if it's a service configuration error
       if (error.message?.includes("not configured") || error.message?.includes("SMTP")) {
-        return res.status(503).json({ 
+        return res.status(503).json({
           error: "Email service not configured", 
-          message: "SMTP credentials are required. Please configure SMTP_USER and SMTP_PASSWORD environment variables." 
+          message: "SMTP_HOST is required. Configure SMTP_HOST (and optionally SMTP_USER/SMTP_PASSWORD for authenticated SMTP servers)." 
         });
       }
       res.status(500).json({ error: "Failed to send verification code" });
@@ -94,10 +94,10 @@ export function setupVerificationRoutes(prisma: PrismaClient): Router {
       const result = await sendSmsVerificationCode(prisma, userId, phone);
       if (!result.success) {
         // If service is not configured, return 503 instead of 500
-        if (result.message?.includes("not configured") || result.message?.includes("Twilio")) {
+        if (result.message?.includes("not configured") || result.message?.includes("SMS service")) {
           return res.status(503).json({ 
             error: "SMS service not configured", 
-            message: "Twilio credentials are required. Please configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables." 
+            message: "SMS provider credentials are required. Configure one of: TWILIO_*, AWS_*, VONAGE_*, MESSAGEBIRD_*, or set SMS_USE_MOCK=true for development." 
           });
         }
         return res.status(500).json({ error: result.message || "Failed to send verification code" });
@@ -107,10 +107,10 @@ export function setupVerificationRoutes(prisma: PrismaClient): Router {
     } catch (error: any) {
       console.error("Send SMS verification error:", error);
       // Check if it's a service configuration error
-      if (error.message?.includes("not configured") || error.message?.includes("Twilio")) {
+      if (error.message?.includes("not configured") || error.message?.includes("SMS service")) {
         return res.status(503).json({ 
           error: "SMS service not configured", 
-          message: "Twilio credentials are required. Please configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables." 
+          message: "SMS provider credentials are required. Configure one of: TWILIO_*, AWS_*, VONAGE_*, MESSAGEBIRD_*, or set SMS_USE_MOCK=true for development." 
         });
       }
       res.status(500).json({ error: "Failed to send verification code" });

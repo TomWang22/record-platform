@@ -56,12 +56,13 @@ spec:
         - { name: caddy-ca,    mountPath: /etc/caddy/ca,    readOnly: true } # dev-root.pem
         readinessProbe:
           # Use TCP probe first to check if port is open, then HTTP probe for actual health
+          # Optimized for fast rotation: reduced initialDelaySeconds for 2-3s rotation target
           tcpSocket:
             port: 443
-          periodSeconds: 5
+          periodSeconds: 2  # Check every 2s (faster detection)
           failureThreshold: 3
-          initialDelaySeconds: 10
-          timeoutSeconds: 3
+          initialDelaySeconds: 2  # Reduced from 10s to 2s for fast rotation (production: 2-3s target)
+          timeoutSeconds: 1  # Reduced from 3s to 1s for faster checks
           # Also add HTTP probe as secondary check (but TCP must pass first)
           # httpGet:
           #   scheme: HTTPS
@@ -72,9 +73,10 @@ spec:
           #     value: record.local
         livenessProbe:
           tcpSocket: { port: 443 }
-          initialDelaySeconds: 10
+          initialDelaySeconds: 5  # Reduced from 10s to 5s (still safe, but faster)
           periodSeconds: 10
           failureThreshold: 3
+          timeoutSeconds: 1  # Faster timeout
         # Graceful shutdown: drain connections before termination
         lifecycle:
           preStop:

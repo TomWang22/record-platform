@@ -11,6 +11,7 @@ import {
   updatePasskeyUsage,
   deletePasskey,
 } from '../lib/passkey.js';
+// WebAuthn validation now uses @simplewebauthn/server directly
 
 const router: Router = Router();
 const prisma = new PrismaClient();
@@ -73,8 +74,82 @@ router.post('/register/finish', requireAuth, async (req: Request, res: Response)
       return res.status(400).json({ error: 'Invalid or expired challenge' });
     }
 
-    // Register the passkey
-    await registerPasskey(prisma, userId, credentialId, publicKey, deviceName, deviceType);
+    // Register the passkey with WebAuthn signature validation
+    // If attestationObject is provided, validate it using @simplewebauthn/server; otherwise accept mock data for testing
+    const { attestationObject, clientDataJSON } = req.body;
+    
+    if (attestationObject && clientDataJSON) {
+      // Production: Validate WebAuthn signature using @simplewebauthn/server
+      try {
+        const { verifyRegistrationResponse } = await import('@simplewebauthn/server');
+        const rpId = process.env.WEBAUTHN_RP_ID || process.env.WEB_APP_RP_ID || 'localhost';
+        const origin = process.env.WEBAUTHN_ORIGIN || process.env.WEB_APP_ORIGIN || `https://${rpId}`;
+        
+        // Decode base64url strings if needed
+        const credentialIdStr = typeof credentialId === 'string' ? credentialId : credentialId.toString('base64url');
+        const clientDataJSONStr = typeof clientDataJSON === 'string' ? clientDataJSON : clientDataJSON.toString('base64url');
+        const attestationObjectStr = typeof attestationObject === 'string' ? attestationObject : attestationObject.toString('base64url');
+        
+        // Verify the registration response
+        const verification = await verifyRegistrationResponse({
+          response: {
+            id: credentialIdStr,
+            rawId: credentialIdStr, // @simplewebauthn/server expects base64url string
+            response: {
+              clientDataJSON: clientDataJSONStr,
+              attestationObject: attestationObjectStr,
+            },
+            type: 'public-key',
+            clientExtensionResults: {}, // Required by @simplewebauthn/server
+          },
+          expectedChallenge: challenge,
+          expectedOrigin: origin,
+          expectedRPID: rpId,
+          requireUserVerification: false,
+        });
+        
+        if (!verification.verified) {
+          throw new Error('WebAuthn verification failed');
+        }
+        
+        // Extract public key from verification result
+        const verifiedPublicKey = verification.registrationInfo?.credentialPublicKey;
+        if (!verifiedPublicKey) {
+          throw new Error('Public key not found in verification result');
+        }
+        
+        // Register with verified public key
+        await registerPasskey(
+          prisma,
+          userId,
+          credentialId,
+          Buffer.from(verifiedPublicKey).toString('base64'),
+          deviceName,
+          deviceType
+        );
+        
+        console.log('[auth] WebAuthn registration verified using @simplewebauthn/server and passkey registered');
+      } catch (err: any) {
+        console.error('[auth] WebAuthn verification error:', err);
+        return res.status(400).json({ error: 'WebAuthn verification failed', details: err.message });
+      }
+    } else {
+      // Check if test/dev mode allows mock data
+      const allowMockData = process.env.ALLOW_MOCK_PASSKEY_DATA === 'true' || process.env.NODE_ENV === 'test';
+      
+      if (!allowMockData) {
+        // Production: Require real WebAuthn data - reject mock data
+        return res.status(400).json({ 
+          error: 'WebAuthn validation required',
+          message: 'attestationObject and clientDataJSON are required for passkey registration. Mock data is not accepted in production.',
+          details: 'Use @simplewebauthn/browser or browser WebAuthn API to generate valid attestation data. Set ALLOW_MOCK_PASSKEY_DATA=true for testing.'
+        });
+      }
+      
+      // Test/dev mode: Accept mock data (for testing without browser WebAuthn API)
+      console.warn('[auth] Test mode: Accepting mock passkey data (ALLOW_MOCK_PASSKEY_DATA=true)');
+      await registerPasskey(prisma, userId, credentialId, publicKey, deviceName, deviceType);
+    }
 
     res.json({ success: true, message: 'Passkey registered successfully' });
   } catch (err) {

@@ -378,10 +378,14 @@ app.post("/auth/logout", createProxyMiddleware({
 }));
 
 // OAuth routes (public, before auth guard)
-app.get("/auth/auth/google", createProxyMiddleware({
+// Support both /auth/google and /api/auth/google paths
+app.get(["/auth/google", "/api/auth/google"], createProxyMiddleware({
   target: "http://auth-service:4001",
   changeOrigin: true,
-  pathRewrite: { "^/auth": "" },
+  pathRewrite: (path) => {
+    // Remove /api/auth or /auth prefix, keep /auth/google
+    return path.replace(/^\/api\/auth/, "/auth").replace(/^\/auth\/auth/, "/auth");
+  },
   proxyTimeout: 15000,
   agent: keepAliveAgent,
   on: {
@@ -392,10 +396,13 @@ app.get("/auth/auth/google", createProxyMiddleware({
   },
 }));
 
-app.get("/auth/auth/google/callback", createProxyMiddleware({
+app.get(["/auth/google/callback", "/api/auth/google/callback"], createProxyMiddleware({
   target: "http://auth-service:4001",
   changeOrigin: true,
-  pathRewrite: { "^/auth": "" },
+  pathRewrite: (path) => {
+    // Remove /api/auth or /auth prefix, keep /auth/google/callback
+    return path.replace(/^\/api\/auth/, "/auth").replace(/^\/auth\/auth/, "/auth");
+  },
   proxyTimeout: 15000,
   agent: keepAliveAgent,
   on: {
@@ -726,9 +733,10 @@ app.post("/auth/register", jsonParser, async (req: Request, res: Response) => {
 });
 
 app.post("/auth/login", jsonParser, async (req: Request, res: Response) => {
-  const { email, password } = (req.body ?? {}) as {
+  const { email, password, mfaCode } = (req.body ?? {}) as {
     email?: string;
     password?: string;
+    mfaCode?: string;
   };
   if (!email || !password) {
     return res.status(400).json({ error: "email/password required" });
@@ -738,8 +746,44 @@ app.post("/auth/login", jsonParser, async (req: Request, res: Response) => {
     const response = await promisifyGrpcCall<any>(
       authGrpcClient,
       "Authenticate",
-      { email, password }
+      { email, password, mfa_code: mfaCode } // Use proto field name (snake_case)
     );
+    
+    // Log full response structure for debugging
+    console.log(`[gw] Login response structure:`, JSON.stringify({
+      hasToken: !!response?.token,
+      tokenLength: response?.token?.length ?? 0,
+      requiresMFA: response?.requiresMFA,
+      userRequiresMFA: response?.user?.requiresMFA,
+      userId: response?.userId ?? response?.user?.id,
+      hasUser: !!response?.user,
+      message: response?.message,
+      fullResponseKeys: Object.keys(response || {}),
+    }));
+    
+    // Check if MFA is required (explicit requires_mfa flag from proto)
+    // Support both snake_case (proto) and camelCase (legacy) for compatibility
+    const requiresMFA = response?.requires_mfa === true || response?.requiresMFA === true;
+    const hasEmptyToken = !response?.token || response?.token === "";
+    const hasUserId = !!(response?.user_id || response?.userId || response?.user?.id);
+    
+    // If requires_mfa is true OR (token is empty AND we have a userId) - this indicates MFA required
+    // Empty token + userId means MFA is required (gRPC returns empty token when MFA needed)
+    if (requiresMFA || (hasEmptyToken && hasUserId)) {
+      console.log(`[gw] ✅ MFA required detected - requires_mfa=${response?.requires_mfa}, requiresMFA=${response?.requiresMFA}, hasEmptyToken=${hasEmptyToken}, hasUserId=${hasUserId}`);
+      return res.status(200).json({
+        requiresMFA: true,
+        userId: response?.user_id ?? response?.userId ?? response?.user?.id ?? null,
+        message: response?.message ?? "MFA code required",
+      });
+    }
+    
+    // If we have an empty token but no userId, log warning
+    if (hasEmptyToken && !hasUserId) {
+      console.warn(`[gw] ⚠️ Empty token but no userId - unexpected response structure:`, JSON.stringify(response));
+    }
+    
+    // Normal login response with token
     res.json({
       token: response?.token ?? "",
       refreshToken: response?.refresh_token ?? "",

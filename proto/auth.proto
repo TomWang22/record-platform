@@ -24,12 +24,16 @@ service AuthService {
 message AuthenticateRequest {
   string email = 1;
   string password = 2;
+  string mfa_code = 3;  // Optional MFA code
 }
 
 message AuthenticateResponse {
   string token = 1;
   string refresh_token = 2;
   User user = 3;
+  bool requires_mfa = 4;  // Set to true if MFA code is required
+  string user_id = 5;  // User ID when MFA is required (token will be empty)
+  string message = 6;  // Optional message (e.g., "MFA code required")
 }
 
 message RegisterRequest {

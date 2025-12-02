@@ -8,6 +8,25 @@ https://record.local {
     protocols tls1.2 tls1.3
   }
 
+  # Privacy and Terms pages - route directly to auth-service (BEFORE catch-all)
+  @privacy {
+    path /privacy
+  }
+  handle @privacy {
+    reverse_proxy http://auth-service.record-platform.svc.cluster.local:4001 {
+      header_up Host {http.request.host}
+    }
+  }
+  
+  @terms {
+    path /terms
+  }
+  handle @terms {
+    reverse_proxy http://auth-service.record-platform.svc.cluster.local:4001 {
+      header_up Host {http.request.host}
+    }
+  }
+
   # Health check endpoint
   handle_path /_caddy/healthz {
     respond "ok" 200
@@ -157,6 +176,7 @@ https://record.local {
   }
 }
 
+
 # FIX #1: Internal h2c port for gRPC tests (bypasses TLS)
 :5000 {
   # gRPC matchers - route by service name in path
@@ -290,13 +310,46 @@ https://record.local {
   }
 }
 
-# Catch-all for probes without SNI
-https://:443 {
+# Catch-all for any hostname on port 443 (including ngrok, probes without SNI, etc.)
+:443 {
   tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key {
     protocols tls1.2 tls1.3
   }
-  # Health check endpoint for probes without SNI
+  
+  # Health check endpoint for probes without SNI (must be first)
   handle_path /_caddy/healthz {
     respond "ok" 200
+  }
+  
+  # Privacy and Terms pages - route directly to auth-service (BEFORE catch-all)
+  @privacy {
+    path /privacy
+  }
+  handle @privacy {
+    reverse_proxy http://auth-service.record-platform.svc.cluster.local:4001 {
+      header_up Host {http.request.host}
+    }
+  }
+  
+  @terms {
+    path /terms
+  }
+  handle @terms {
+    reverse_proxy http://auth-service.record-platform.svc.cluster.local:4001 {
+      header_up Host {http.request.host}
+    }
+  }
+  
+  # All other requests go through nginx ingress
+  handle {
+    reverse_proxy https://ingress-nginx-controller.ingress-nginx.svc.cluster.local:443 {
+      header_up Host {http.request.host}
+      transport http {
+        tls
+        tls_server_name record.local
+        tls_trusted_ca_certs /etc/caddy/ca/dev-root.pem
+        versions h2 h1
+      }
+    }
   }
 }

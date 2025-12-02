@@ -11,6 +11,7 @@ import { setupMFARoutes } from "./routes/mfa.js";
 import { setupVerificationRoutes } from "./routes/verification.js";
 import passkeyRouter from "./routes/passkey.js";
 import { verifyMFA } from "./lib/mfa.js";
+import { getMockSmsProvider } from "./lib/sms-providers.js";
 
 const app = express();
 // Initialize Prisma
@@ -156,7 +157,14 @@ app.post("/login", async (req: Request, res: Response) => {
     };
     if (!email || !password) return res.status(400).json({ error: "email/password required" });
 
+    console.log(`[LOGIN] Login attempt for email: ${email}, hasMfaCode: ${!!mfaCode}`);
+
     // Use raw SQL query to access auth.users table directly
+    // Force a connection refresh and add a small delay to ensure we see latest committed data
+    // This helps with connection pool visibility issues (even without pgbouncer, Prisma has its own pool)
+    await prisma.$queryRaw`SELECT pg_backend_pid()`;
+    await new Promise(resolve => setTimeout(resolve, 200)); // Increased delay for commit visibility
+    
     const user = await prisma.$queryRaw<Array<{
       id: string;
       email: string;
@@ -168,14 +176,24 @@ app.post("/login", async (req: Request, res: Response) => {
       FROM auth.users
       WHERE email = ${email}
     `.then((r: Array<any>) => r[0] || null);
+    
+    // Log MFA status for debugging
+    if (user) {
+      console.log(`[LOGIN] User ${user.email} (${user.id}) - mfaEnabled: ${user.mfaEnabled} (type: ${typeof user.mfaEnabled})`);
+    } else {
+      console.log(`[LOGIN] User not found for email: ${email}`);
+    }
     if (!user || !user.passwordHash) return res.status(401).json({ error: "invalid credentials" });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: "invalid credentials" });
 
-    // Check if MFA is enabled
-    if (user.mfaEnabled) {
+    // Check if MFA is enabled - use explicit boolean check
+    console.log(`[LOGIN] Checking MFA - user.mfaEnabled=${user.mfaEnabled}, typeof=${typeof user.mfaEnabled}, truthy=${!!user.mfaEnabled}`);
+    if (user.mfaEnabled === true) {
+      console.log(`[LOGIN] MFA is enabled, checking for mfaCode...`);
       if (!mfaCode) {
+        console.log(`[LOGIN] MFA required but no code provided - returning requiresMFA response`);
         return res.status(200).json({
           requiresMFA: true,
           userId: user.id,
@@ -184,10 +202,15 @@ app.post("/login", async (req: Request, res: Response) => {
       }
 
       // Verify MFA code
+      console.log(`[LOGIN] Verifying MFA code for user ${user.id}`);
       const mfaValid = await verifyMFA(prisma, user.id, mfaCode);
       if (!mfaValid) {
+        console.log(`[LOGIN] MFA code verification failed`);
         return res.status(401).json({ error: "invalid MFA code" });
       }
+      console.log(`[LOGIN] MFA code verified successfully`);
+    } else {
+      console.log(`[LOGIN] MFA not enabled, proceeding with login`);
     }
 
     const jti = randomUUID();
@@ -261,6 +284,154 @@ app.get("/me", (req: Request, res: Response) => {
   } catch {
     res.status(401).json({ error: "invalid token" });
   }
+});
+
+// Privacy Policy (required for OAuth consent screen)
+app.get("/privacy", (_req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Record Platform</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }
+    h1 { color: #1a1a1a; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }
+    h2 { color: #2a2a2a; margin-top: 30px; }
+    ul { margin: 10px 0; padding-left: 20px; }
+    .last-updated { color: #666; font-size: 0.9em; margin-bottom: 30px; }
+    a { color: #0066cc; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p class="last-updated"><strong>Last updated:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+
+  <h2>1. Information We Collect</h2>
+  <p>When you sign in with Google OAuth, we collect the following information:</p>
+  <ul>
+    <li><strong>Email address</strong> - Used to create and manage your account</li>
+    <li><strong>Name</strong> - Your display name from your Google account</li>
+    <li><strong>Profile picture</strong> - Your profile picture from your Google account (if available)</li>
+    <li><strong>Google User ID</strong> - A unique identifier from Google to link your account</li>
+  </ul>
+
+  <h2>2. How We Use Your Information</h2>
+  <p>We use the information we collect to:</p>
+  <ul>
+    <li>Create and manage your Record Platform account</li>
+    <li>Provide you with access to our services</li>
+    <li>Personalize your experience on the platform</li>
+    <li>Communicate with you about your account and our services</li>
+    <li>Ensure the security and integrity of our platform</li>
+  </ul>
+
+  <h2>3. Data Storage and Security</h2>
+  <p>We take the security of your personal information seriously:</p>
+  <ul>
+    <li>Your data is stored securely in our databases</li>
+    <li>We use industry-standard encryption to protect your information</li>
+    <li>Access to your personal information is restricted to authorized personnel only</li>
+    <li>We regularly review and update our security practices</li>
+  </ul>
+
+  <h2>4. Third-Party Services</h2>
+  <p>We use Google OAuth for authentication. When you sign in with Google:</p>
+  <ul>
+    <li>Google handles the authentication process</li>
+    <li>We only receive the information you authorize (email, name, profile picture)</li>
+    <li>We do not have access to your Google password or other Google account information</li>
+    <li>Your use of Google services is also governed by Google's Privacy Policy</li>
+  </ul>
+
+  <h2>5. Your Rights</h2>
+  <p>You have the right to:</p>
+  <ul>
+    <li>Access the personal information we hold about you</li>
+    <li>Request correction of inaccurate information</li>
+    <li>Request deletion of your account and personal information</li>
+    <li>Withdraw your consent for data processing at any time</li>
+  </ul>
+
+  <h2>6. Data Retention</h2>
+  <p>We retain your personal information for as long as your account is active or as needed to provide you with our services. If you delete your account, we will delete your personal information in accordance with our data retention policies, except where we are required to retain it by law.</p>
+
+  <h2>7. Changes to This Privacy Policy</h2>
+  <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date. You are advised to review this Privacy Policy periodically for any changes.</p>
+
+  <h2>8. Contact Us</h2>
+  <p>If you have any questions about this Privacy Policy or our data practices, please contact us:</p>
+  <ul>
+    <li><strong>Email:</strong> support@record-platform.local</li>
+    <li><strong>Platform:</strong> Record Platform</li>
+  </ul>
+</body>
+</html>
+  `);
+});
+
+// Terms of Service (optional but recommended for OAuth consent screen)
+app.get("/terms", (_req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service - Record Platform</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }
+    h1 { color: #1a1a1a; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }
+    h2 { color: #2a2a2a; margin-top: 30px; }
+    ul { margin: 10px 0; padding-left: 20px; }
+    .last-updated { color: #666; font-size: 0.9em; margin-bottom: 30px; }
+    a { color: #0066cc; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>Terms of Service</h1>
+  <p class="last-updated"><strong>Last updated:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+
+  <h2>1. Acceptance of Terms</h2>
+  <p>By accessing and using Record Platform ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.</p>
+
+  <h2>2. Use License</h2>
+  <p>Permission is granted to temporarily use Record Platform for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title, and under this license you may not modify or copy the materials, use them for commercial purposes, or attempt to reverse engineer any software.</p>
+
+  <h2>3. User Accounts</h2>
+  <p>To access certain features, you must register for an account. You agree to provide accurate information, maintain account security, and accept responsibility for activities under your account.</p>
+
+  <h2>4. User Content</h2>
+  <p>You retain ownership of content you submit. By submitting content, you grant us a license to use it solely for operating the Service. You are responsible for your content and agree not to submit content that violates laws or infringes on others' rights.</p>
+
+  <h2>5. Prohibited Uses</h2>
+  <p>You may not use the Service to violate laws, transmit malicious code, impersonate others, engage in automated scraping, or interfere with the Service.</p>
+
+  <h2>6. Intellectual Property</h2>
+  <p>The Service and its content are owned by Record Platform and protected by intellectual property laws.</p>
+
+  <h2>7. Disclaimer</h2>
+  <p>The materials are provided on an 'as is' basis. Record Platform makes no warranties, expressed or implied.</p>
+
+  <h2>8. Limitations</h2>
+  <p>In no event shall Record Platform be liable for damages arising from use or inability to use the Service.</p>
+
+  <h2>9. Termination</h2>
+  <p>We may terminate your account immediately for breach of Terms. Upon termination, your right to use the Service ceases.</p>
+
+  <h2>10. Changes to Terms</h2>
+  <p>We reserve the right to modify these Terms at any time. Material changes will be notified at least 30 days in advance.</p>
+
+  <h2>11. Contact Information</h2>
+  <p>If you have questions about these Terms, please contact us at support@record-platform.local</p>
+</body>
+</html>
+  `);
 });
 
 // OAuth routes

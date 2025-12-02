@@ -3,7 +3,17 @@ kind: ConfigMap
 metadata:
   name: app-config
 data:
-  NODE_ENV: development
+  NODE_ENV: production
+  ALLOW_MOCK_PASSKEY_DATA: "false"  # Production mode - requires real WebAuthn data (set to "true" for testing)
+  WEBAUTHN_RP_ID: "record.local"  # Relying Party ID (your domain)
+  WEBAUTHN_ORIGIN: "https://record.local:8443"  # WebAuthn origin (must match actual origin)
+  
+  # SMS Provider Configuration
+  # Using Mock SMS Provider (FREE - like MailHog for email)
+  # Perfect for development/testing - no external services needed
+  # Access sent messages via: GET /api/auth/sms/mock/messages
+  SMS_PROVIDER: "mock"  # Mock provider - FREE, works immediately, no setup needed
+  SMS_USE_MOCK: "true"  # Force mock mode (FREE - logs to console, accessible via API)
   NEXT_PUBLIC_GATEWAY_URL: http://localhost:8080
 
   GATEWAY_PORT: "4000"

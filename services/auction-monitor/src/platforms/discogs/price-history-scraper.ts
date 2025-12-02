@@ -387,20 +387,26 @@ async function extractPriceHistory(page: Page): Promise<DiscogsPriceHistoryEntry
  */
 export function convertToCompletedSales(
   entries: DiscogsPriceHistoryEntry[],
-  releaseId: number
+  releaseId: number,
+  title?: string
 ): CompletedSale[] {
   return entries.map(entry => ({
     platform: 'discogs',
     externalId: String(releaseId),
+    title: title || `Discogs Release ${releaseId}`,
     soldPrice: entry.price,
     currency: entry.currency,
-    soldAt: entry.date,
+    soldDate: entry.date,
     condition: entry.condition,
-    metadata: {
+    url: `https://www.discogs.com/release/${releaseId}/history`,
+    rawData: {
       mediaCondition: entry.mediaCondition,
       sleeveCondition: entry.sleeveCondition,
       seller: entry.seller,
       notes: entry.notes,
+      date: entry.date,
+      price: entry.price,
+      currency: entry.currency,
     },
   }))
 }

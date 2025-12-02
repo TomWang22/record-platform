@@ -584,7 +584,7 @@ app.post("/auth/mfa/setup", injectIdentityHeadersIfAny, createProxyMiddleware({
   target: "http://auth-service:4001",
   changeOrigin: true,
   pathRewrite: { "^/auth": "" },
-  proxyTimeout: 15000,
+  proxyTimeout: 30000, // Increased to 30s for bcrypt hashing of backup codes (CPU-intensive)
   agent: keepAliveAgent,
   on: {
     error(err, _req, res) {

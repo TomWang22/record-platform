@@ -200,31 +200,70 @@ if [[ "${SKIP_ROTATION:-}" != "1" ]]; then
     # Create empty log file first
     rm -f /tmp/rotation-test.log
     touch /tmp/rotation-test.log
-    # Start background process - match test-full-chain-with-rotation.sh exactly
+    # CONCURRENT POOL STRATEGY: Maintain constant pool of active requests for maximum throughput
+    # Use HTTP/2 only for maximum speed (HTTP/3 via Docker is slower and causes bottlenecks)
+    CONCURRENT_REQUESTS=10  # Parallel requests for HTTP/2 multiplexing
     (
-      for i in {1..60}; do
-        # Use same curl command format as test-full-chain-with-rotation.sh
-        RESPONSE=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 \
-          -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1 | tail -1 || echo "timeout")
-        # Write directly to log file (append mode, unbuffered) - same as working script
-        echo "$RESPONSE" >> /tmp/rotation-test.log 2>&1
-        sleep 0.5
+      REQUEST_COUNT=0
+      # Launch initial pool of concurrent requests
+      while [[ $REQUEST_COUNT -lt $CONCURRENT_REQUESTS ]] && [[ $REQUEST_COUNT -lt 60 ]]; do
+        (
+            # Use HTTP/2 for maximum throughput
+            # Increased timeout to 1.2s to catch edge cases during rotation
+            RESPONSE=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 1.2 \
+              -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1 | tail -1 || echo "timeout")
+          echo "$RESPONSE" >> /tmp/rotation-test.log 2>&1
+        ) &
+        REQUEST_COUNT=$((REQUEST_COUNT + 1))
       done
+      
+      # Maintain pool: when one request completes, launch the next immediately
+      # This keeps CONCURRENT_REQUESTS active at all times for maximum throughput
+      while [[ $REQUEST_COUNT -lt 60 ]]; do
+        # Wait for ANY job to complete (non-blocking pool maintenance)
+        wait -n
+        # Launch next request immediately to maintain pool size
+        (
+            # Use HTTP/2 for maximum throughput
+            # Increased timeout to 1.2s to catch edge cases during rotation
+            RESPONSE=$(/opt/homebrew/opt/curl/bin/curl -k -sS -w "\n%{http_code}" --http2 --max-time 1.2 \
+              -H "Host: ${HOST}" "https://127.0.0.1:${PORT}/_caddy/healthz" 2>&1 | tail -1 || echo "timeout")
+          echo "$RESPONSE" >> /tmp/rotation-test.log 2>&1
+        ) &
+        REQUEST_COUNT=$((REQUEST_COUNT + 1))
+      done
+      
+      # Wait for all remaining requests to complete
+      wait
+      # Final sync to ensure all writes are flushed
+      sync /tmp/rotation-test.log 2>/dev/null || true
     ) &
-    REQ_PID=$!
-    # Give the process a moment to start writing
-    sleep 2
-    # Verify the process is running and writing
-    if ! kill -0 $REQ_PID 2>/dev/null; then
-      warn "Background process failed to start"
+  REQ_PID=$!
+  # Give the process a moment to start writing (concurrent pool starts quickly)
+  sleep 1
+  # Verify the process is running and writing
+  INITIAL_LINES=$(wc -l < /tmp/rotation-test.log 2>/dev/null | tr -d '[:space:]' || echo "0")
+  if ! kill -0 $REQ_PID 2>/dev/null; then
+    # Process might have completed already (very fast with concurrent pool)
+    if [[ "$INITIAL_LINES" -gt 0 ]]; then
+      ok "Background process completed quickly - $INITIAL_LINES requests logged"
     else
+      warn "Background process failed to start or completed with no requests"
+    fi
+  else
+    if [[ "$INITIAL_LINES" -eq "0" ]]; then
+      # Give it one more second - concurrent pool might need a moment
+      sleep 1
       INITIAL_LINES=$(wc -l < /tmp/rotation-test.log 2>/dev/null | tr -d '[:space:]' || echo "0")
       if [[ "$INITIAL_LINES" -eq "0" ]]; then
         warn "Background process started but no requests logged yet"
       else
         ok "Background process started - $INITIAL_LINES requests logged initially"
       fi
+    else
+      ok "Background process started - $INITIAL_LINES requests logged initially"
     fi
+  fi
 
     # Let requests establish before starting rotation (better baseline) - same as working script
     say "Establishing baseline requests (5 seconds)..."
@@ -304,15 +343,39 @@ if [[ "${SKIP_ROTATION:-}" != "1" ]]; then
           FINAL_LINES=$(wc -l < /tmp/rotation-test.log 2>/dev/null | tr -d '[:space:]' || echo "0")
         fi
         
-        if [[ $FINAL_LINES -ge 42 ]]; then
-          # We got 70%+ of requests, that's good enough for the test
-          ok "Process completed with $FINAL_LINES/60 requests (70%+)"
-          kill $REQ_PID 2>/dev/null || true
+        # Wait for ALL requests to complete - require 100% completion for production-grade testing
+        if [[ $FINAL_LINES -ge 60 ]]; then
+          # All requests completed
+          ok "All requests completed! ($FINAL_LINES/60)"
           wait $REQ_PID 2>/dev/null || true
         else
-          warn "Background requests still running ($FINAL_LINES/60), killing process"
-          kill $REQ_PID 2>/dev/null || true
-          wait $REQ_PID 2>/dev/null || true
+          # Still waiting for more requests - give it more time
+          say "Waiting for remaining requests ($FINAL_LINES/60), extending wait time..."
+          FINAL_EXTRA_WAIT=0
+          while kill -0 $REQ_PID 2>/dev/null && [[ $FINAL_EXTRA_WAIT -lt 60 ]] && [[ $FINAL_LINES -lt 60 ]]; do
+            sleep 5
+            FINAL_EXTRA_WAIT=$((FINAL_EXTRA_WAIT + 5))
+            FINAL_LINES=$(wc -l < /tmp/rotation-test.log 2>/dev/null | tr -d '[:space:]' || echo "0")
+            if [[ $FINAL_LINES -ge 60 ]]; then
+              ok "All requests completed! ($FINAL_LINES/60)"
+              break
+            fi
+            if [[ $((FINAL_EXTRA_WAIT % 15)) -eq 0 ]]; then
+              echo "  Still waiting: $FINAL_LINES/60 requests logged (${FINAL_EXTRA_WAIT}s extra wait)..."
+            fi
+          done
+          if kill -0 $REQ_PID 2>/dev/null; then
+            FINAL_LINES=$(wc -l < /tmp/rotation-test.log 2>/dev/null | tr -d '[:space:]' || echo "0")
+            if [[ $FINAL_LINES -lt 60 ]]; then
+              warn "Background requests still running ($FINAL_LINES/60), but waiting for completion..."
+              # Give one final wait
+              sleep 30
+              FINAL_LINES=$(wc -l < /tmp/rotation-test.log 2>/dev/null | tr -d '[:space:]' || echo "0")
+            fi
+            wait $REQ_PID 2>/dev/null || true
+          else
+            wait $REQ_PID 2>/dev/null || true
+          fi
         fi
       else
         wait $REQ_PID 2>/dev/null || true

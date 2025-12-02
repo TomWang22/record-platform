@@ -180,7 +180,7 @@ export class DiscogsAdapter extends BaseAdapter {
    */
   async getPriceHistoryWithBrowser(releaseId: number): Promise<CompletedSale[]> {
     try {
-      const { scrapeDiscogsPriceHistory, convertToCompletedSales } = await import('./price-history-scraper')
+      const { scrapeDiscogsPriceHistory, convertToCompletedSales } = await import('./price-history-scraper.js')
       
       // Scrape price history with browser automation
       const priceHistory = await scrapeDiscogsPriceHistory({
@@ -191,7 +191,8 @@ export class DiscogsAdapter extends BaseAdapter {
       })
       
       // Convert to CompletedSale format
-      return convertToCompletedSales(priceHistory, releaseId)
+      // Note: title is not available from price history alone, use releaseId as fallback
+      return convertToCompletedSales(priceHistory, releaseId, `Discogs Release ${releaseId}`)
     } catch (error) {
       console.error(`[Discogs] Error getting price history with browser for release ${releaseId}:`, error)
       

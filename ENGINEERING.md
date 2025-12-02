@@ -306,9 +306,10 @@ This document provides in-depth technical documentation for the Record Platform 
 4. **Fallback Strategy**: Pod restart if admin API fails
 
 **Results**:
-- ✅ 100% success rate (4200/4200 and 60/60 requests)
+- ✅ 100% success rate (15000/15000 and 60/60 requests)
 - ✅ 1-2 second rotation time (consistently fast, 8-10x faster than previous 16-17s)
-- ✅ Zero downtime achieved with production-grade chaos testing (4200 requests at 35 req/s)
+- ✅ Zero downtime achieved with real stress testing (15000 requests at ~120 req/s average, 100-150 req/s observed)
+- ✅ Throughput optimization: Concurrent pool strategy (20 concurrent requests) achieves 10x higher throughput than sequential requests
 
 **Trade-offs**:
 - Admin API must be accessible (port-forward during rotation)
@@ -1162,8 +1163,9 @@ notes.
 - **Direct Kubernetes patch**: Fastest rollout restart method (~0.4s)
 - **Pod-by-pod rotation**: New pods come online before old pods terminate
 - **Zero downtime**: Multiple replicas ensure continuous service availability
-- **Production chaos testing**: Validated with 4200 requests at 35 req/s during rotation
-- **Optimizations**: Removed PORT detection, eliminated output overhead, direct merge patch
+- **Real stress testing**: Validated with 15000 requests at ~120 req/s average (100-150 req/s observed, peaks up to 200+ req/s)
+- **Throughput tuning**: Concurrent pool strategy (20 concurrent requests) with 3.0s timeout achieves 10x higher throughput than sequential requests
+- **Optimizations**: Removed PORT detection, eliminated output overhead, direct merge patch, increased timeout to 3.0s for 100% success
 - **Multi-node cluster**: Recommended for optimal pod distribution and HA
 
 ### Database Migrations

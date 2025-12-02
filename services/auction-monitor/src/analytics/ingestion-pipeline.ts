@@ -238,14 +238,7 @@ export class AnalyticsIngestionPipeline {
         params.push(`%${listing.artist}%`, `%${listing.album}%`)
       } else {
         // Not enough data for comparison
-        return {
-          p25: listing.current_price,
-          p50: listing.current_price,
-          p75: listing.current_price,
-          p95: listing.current_price,
-          count: 0,
-          confidence: 'low',
-        }
+        return this.createDefaultPercentiles(listing.current_price, 0)
       }
     }
     
@@ -312,7 +305,7 @@ export class AnalyticsIngestionPipeline {
     let discogsHistory: number[] = []
     if (listing.discogs_release_id) {
       try {
-        const { scrapeDiscogsPriceHistory } = await import('../platforms/discogs/price-history-scraper')
+        const { scrapeDiscogsPriceHistory } = await import('../platforms/discogs/price-history-scraper.js')
         const priceHistory = await scrapeDiscogsPriceHistory({
           releaseId: listing.discogs_release_id,
           waitForCaptcha: process.env.DISCOGS_WAIT_FOR_CAPTCHA !== 'false',
@@ -324,8 +317,8 @@ export class AnalyticsIngestionPipeline {
         ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
         
         discogsHistory = priceHistory
-          .filter(entry => entry.date >= ninetyDaysAgo)
-          .map(entry => entry.price)
+          .filter((entry: { date: Date }) => entry.date >= ninetyDaysAgo)
+          .map((entry: { price: number }) => entry.price)
       } catch (error) {
         console.warn(`[AnalyticsIngestion] Could not fetch Discogs price history for release ${listing.discogs_release_id}:`, error)
         // Continue without Discogs history
@@ -456,22 +449,6 @@ export class AnalyticsIngestionPipeline {
   }
   
   /**
-   * Calculate which percentile the current price falls into
-   * Returns value 0.0-1.0 (e.g., 0.60 = 60th percentile)
-   */
-  private calculatePricePosition(currentPrice: number, percentiles: PricePercentiles): number {
-    // Find the percentile that current price is closest to
-    for (let p = 1; p <= 99; p++) {
-      const percentileValue = (percentiles as any)[`p${p}`]
-      if (currentPrice <= percentileValue) {
-        return p / 100
-      }
-    }
-    // If price is above p99, return 0.99
-    return 0.99
-  }
-  
-  /**
    * Update analytics.price_snapshots table
    */
   private async updateAnalyticsSnapshots(
@@ -540,6 +517,7 @@ export class AnalyticsIngestionPipeline {
       max: price,
       mean: price,
       median: price,
+      stdDev: 0,
     }
   }
 }

@@ -145,10 +145,16 @@ feat(auth,auction-monitor): Production-tier authentication and auction monitor e
 - ✅ Ingress routing verified for privacy/terms pages
 - ✅ OAuth app published in Google Cloud Console
 - ✅ Updated `scripts/test-auth-service.sh` with comprehensive OAuth tests:
-  - Test 10: OAuth Google Initiation (corrected path, checks redirect to Google)
+  - Test 9: Phone Verification - explicitly shows "Mock SMS Provider" in title and success message
+  - Test 9: Checks for mock SMS endpoint availability (`/api/auth/sms/mock/messages`)
+  - Test 10: OAuth Google Initiation - HTTP 200 now treated as SUCCESS (not warning)
+  - Test 10: Better detection of Google sign-in page in response body
+  - Test 10: Removed `-L` flag, using `--max-redirs 1` for better redirect control
+  - Test 10: Clearer success messages explaining OAuth redirect behavior
   - Test 10b: OAuth Google Callback (verifies endpoint exists and handles errors)
   - Test 10c: Privacy Policy Page (OAuth compliance requirement)
   - Test 10d: Terms of Service Page (OAuth compliance recommendation)
+- ✅ **No secrets in test scripts**: All test credentials are dummy values (e.g., `TEST_PASSWORD="TestPassword123!"`)
 
 ## Breaking Changes
 
@@ -198,6 +204,37 @@ None - all changes are additive and backward compatible.
   - Background cleanup (non-blocking)
 - **RollingUpdate Strategy**: `maxUnavailable: 0` ensures zero downtime
 - **Multiple Replicas**: 2+ replicas with pod anti-affinity for HA
+
+### Test Script Improvements
+- ✅ **`scripts/test-auth-service.sh`**:
+  - Test 9: Explicitly shows "Mock SMS Provider" in title and success messages
+  - Test 9: Verifies mock SMS endpoint availability for development/testing
+  - Test 10: HTTP 200 now correctly treated as SUCCESS (OAuth redirect working)
+  - Test 10: Improved Google sign-in page detection in response body
+  - Test 10: Better redirect handling with `--max-redirs 1` instead of `-L`
+  - More consistent and accurate test results
+- ✅ **`scripts/test-full-chain-with-rotation.sh`**:
+  - Enhanced production-grade chaos testing (15,000 requests)
+  - Improved progress reporting and timeout handling
+  - Better error detection and reporting
+  - Validates full chain: Client → Caddy → Ingress → Backend
+- ✅ **`scripts/test-http2-http3-strict-tls.sh`**:
+  - Consistent rotation testing with 60 requests
+  - Improved HTTP/3 detection and error handling
+  - Better TLS version validation
+- ✅ **Security**: All test scripts use dummy credentials only (no real secrets)
+
+## CI/CD Improvements
+
+### Auction Monitor CI/CD Fixes
+- ✅ **Added auction-monitor to CI build matrix**: `.github/workflows/ci.yml`
+  - Auction monitor now builds in CI pipeline alongside other services
+  - Ensures build failures are caught early in development
+  - Validates TypeScript compilation and dependencies
+- ✅ **Build verification**: CI workflow includes comprehensive build checks
+  - Common package build verification before service builds
+  - Working directory validation
+  - Build output verification
 
 ## Related Documentation
 

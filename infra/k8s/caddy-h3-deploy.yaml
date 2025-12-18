@@ -55,22 +55,11 @@ spec:
         - { name: caddy-certs, mountPath: /etc/caddy/certs, readOnly: true } # tls.crt,tls.key
         - { name: caddy-ca,    mountPath: /etc/caddy/ca,    readOnly: true } # dev-root.pem
         readinessProbe:
-          # Use TCP probe first to check if port is open, then HTTP probe for actual health
-          # Optimized for fast rotation: reduced initialDelaySeconds for 2-3s rotation target
-          tcpSocket:
-            port: 443
-          periodSeconds: 2  # Check every 2s (faster detection)
+          tcpSocket: { port: 443 }  # avoid TLS validation issues on pod IP
+          periodSeconds: 2
           failureThreshold: 3
-          initialDelaySeconds: 2  # Reduced from 10s to 2s for fast rotation (production: 2-3s target)
-          timeoutSeconds: 1  # Reduced from 3s to 1s for faster checks
-          # Also add HTTP probe as secondary check (but TCP must pass first)
-          # httpGet:
-          #   scheme: HTTPS
-          #   path: /_caddy/healthz
-          #   port: 443
-          #   httpHeaders:
-          #   - name: Host
-          #     value: record.local
+          initialDelaySeconds: 2
+          timeoutSeconds: 1
         livenessProbe:
           tcpSocket: { port: 443 }
           initialDelaySeconds: 5  # Reduced from 10s to 5s (still safe, but faster)

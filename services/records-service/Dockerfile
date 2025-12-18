@@ -5,23 +5,29 @@ FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
+# Copy package manifests (changes rarely, good for caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY services/common/package.json ./services/common/package.json
-COPY services/records-service/package.json ./services/records-service/package.json
 COPY services/common/tsconfig.json ./services/common/tsconfig.json
+COPY services/records-service/package.json ./services/records-service/package.json
 COPY services/common/src ./services/common/src
 
-RUN pnpm -w \
-  --filter @common/utils... \
-  --filter records-service... \
-  install --frozen-lockfile
+# Use BuildKit cache mounts for pnpm store (persists between builds)
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
+    pnpm -w \
+      --filter @common/utils... \
+      --filter records-service... \
+      install --frozen-lockfile
 
 # --- build ---
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
 
-# OpenSSL for prisma generate (skip if already available)
-RUN (apt-get update --allow-releaseinfo-change 2>&1 | grep -v "GPG error" || true) \
+# Install OpenSSL for Prisma (with apt cache mount for faster installs)
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt \
+    (apt-get update --allow-releaseinfo-change 2>&1 | grep -v "GPG error" || true) \
  && (apt-get install -y --no-install-recommends --allow-unauthenticated curl ca-certificates openssl 2>&1 | grep -v "GPG error" || \
      (command -v openssl >/dev/null 2>&1 && echo "OpenSSL already available" || (apt-get update && apt-get install -y --no-install-recommends curl ca-certificates openssl))) \
  && rm -rf /var/lib/apt/lists/* || true
@@ -29,12 +35,13 @@ RUN (apt-get update --allow-releaseinfo-change 2>&1 | grep -v "GPG error" || tru
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 COPY --from=deps /app /app
 
-# Bring in full sources (this COPY INVALIDATES CACHE when src changes)
+# Copy source code (changes frequently, invalidates cache)
 COPY services/common ./services/common
 COPY services/records-service ./services/records-service
 
-# Build shared, generate prisma client, build service
-RUN pnpm -C services/common build \
+# Build with cache mount for faster subsequent builds
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm -C services/common build \
  && rm -rf services/records-service/generated/records-client \
  && pnpm -C services/records-service exec prisma generate --schema prisma/schema.prisma \
  && pnpm -C services/records-service build \
@@ -48,7 +55,10 @@ FROM node:20-bookworm-slim
 WORKDIR /app/services/records-service
 ENV NODE_ENV=production
 
-RUN (apt-get update --allow-releaseinfo-change 2>&1 | grep -v "GPG error" || true) \
+# Install OpenSSL for Prisma runtime (with apt cache mount)
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt \
+    (apt-get update --allow-releaseinfo-change 2>&1 | grep -v "GPG error" || true) \
  && (apt-get install -y --no-install-recommends --allow-unauthenticated curl ca-certificates openssl 2>&1 | grep -v "GPG error" || \
      (command -v openssl >/dev/null 2>&1 && echo "OpenSSL already available" || (apt-get update && apt-get install -y --no-install-recommends curl ca-certificates openssl))) \
  && rm -rf /var/lib/apt/lists/* || true

@@ -90,7 +90,14 @@ export function startGrpcServer(port: number) {
     return null
   }
   
-  const server = new grpc.Server()
+  const server = new grpc.Server({
+    'grpc.keepalive_time_ms': 30000,
+    'grpc.keepalive_timeout_ms': 5000,
+    'grpc.keepalive_permit_without_calls': 1,
+    'grpc.http2.max_pings_without_data': 0,
+    'grpc.http2.min_time_between_pings_ms': 10000,
+    'grpc.http2.min_ping_interval_without_data_ms': 300000,
+  })
 
   // HealthCheck
   server.addService(auctionMonitorProto.auction_monitor.AuctionMonitorService.service, {
@@ -312,13 +319,55 @@ export function startGrpcServer(port: number) {
     }, 'StopMonitoring'),
   })
 
-  server.bindAsync(`0.0.0.0:${port}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
+  // Enable gRPC reflection for tooling (grpcurl, etc.)
+  if (process.env.ENABLE_GRPC_REFLECTION !== "false") {
+    try {
+      const { enableReflection } = require("@common/utils/grpc-reflection");
+      const protoPath = findProtoPath();
+      enableReflection(server, [protoPath], ["auction_monitor.AuctionMonitorService"]);
+    } catch (err) {
+      console.warn("[auction-monitor gRPC] Failed to enable reflection:", err);
+    }
+  }
+
+  // Try to load TLS certs (for production with ALPN = h2)
+  let credentials: grpc.ServerCredentials;
+  const keyPath = process.env.TLS_KEY_PATH || "/etc/certs/tls.key";
+  const certPath = process.env.TLS_CERT_PATH || "/etc/certs/tls.crt";
+  const caPath = process.env.TLS_CA_PATH || process.env.GRPC_CA_CERT || "/etc/certs/ca.crt";
+  
+  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+    const key = fs.readFileSync(keyPath);
+    const cert = fs.readFileSync(certPath);
+    
+    // For strict TLS: verify client certificates if CA cert exists
+    let rootCerts: Buffer | null = null;
+    let checkClientCert = false;
+    if (fs.existsSync(caPath)) {
+      rootCerts = fs.readFileSync(caPath);
+      checkClientCert = true;
+      console.log("[gRPC] Starting secure HTTP/2-only server with strict TLS (client cert verification)");
+    } else {
+      console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)");
+    }
+    
+    credentials = grpc.ServerCredentials.createSsl(
+      rootCerts,
+      [{ private_key: key, cert_chain: cert }],
+      checkClientCert as any
+    );
+  } else {
+    console.warn("[gRPC] TLS certs not found, starting insecure server (dev only)");
+    credentials = grpc.ServerCredentials.createInsecure();
+  }
+
+  server.bindAsync(`0.0.0.0:${port}`, credentials, (err, actualPort) => {
     if (err) {
       console.error(`[auction-monitor-grpc] Failed to bind gRPC server:`, err)
       return
     }
     server.start()
-    console.log(`[auction-monitor-grpc] server listening on ${port}`)
+    console.log(`[auction-monitor-grpc] server listening on ${actualPort} (HTTP/2 only)`)
   })
 
   return server

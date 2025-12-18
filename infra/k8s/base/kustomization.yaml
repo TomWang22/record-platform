@@ -2,9 +2,11 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - config
+  - namespaces.yaml           # ensure namespaces exist first
+  - config                    # configmaps (app-config, proto-files)
+  - secrets                   # TLS/CA secrets (service-tls, dev-root-ca)
   - postgres
-  # - pgbouncer  # Disabled for direct DB tuning
+  # - pgbouncer               # Disabled for direct DB tuning
   - redis
   - zookeeper
   - kafka
@@ -21,6 +23,6 @@ resources:
   - python-ai-service
   - social-service
   - shopping-service
-  - auction-monitor        # NEW (you added this)
-  - cron-jobs              # NEW (you added this)
-  - kafka                  # (recommended dev Kafka)
+  - auction-monitor
+  # - cron-jobs              # Temporarily disabled - k6 files missing
+  # - webapp                 # Webapp frontend (port 3001) - excluded as requested (externalized)

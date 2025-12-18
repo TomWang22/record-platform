@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { randomInt } from "node:crypto";
-import bcrypt from "bcryptjs";
+import { hashPassword, comparePassword } from "./bcrypt-queue.js";
 import nodemailer from "nodemailer";
 import { createSmsProvider, type SmsProvider } from "./sms-providers";
 
@@ -11,12 +11,12 @@ function generateCode(): string {
 
 // Hash verification code
 async function hashCode(code: string): Promise<string> {
-  return bcrypt.hash(code, 10);
+  return hashPassword(code);
 }
 
 // Verify code
 async function verifyCode(hashed: string, code: string): Promise<boolean> {
-  return bcrypt.compare(code, hashed);
+  return comparePassword(code, hashed);
 }
 
 // Email transporter (configure via environment variables)

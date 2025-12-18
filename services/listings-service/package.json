@@ -11,6 +11,7 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "redis": "^4.7.1",
     "@common/utils": "workspace:*",
     "@grpc/grpc-js": "^1.10.9",
     "@grpc/proto-loader": "^0.7.13",

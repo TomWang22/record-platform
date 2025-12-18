@@ -96,6 +96,27 @@ export default function CartPage() {
     }
   }
 
+  async function updateNotes(itemId: string, notes: string) {
+    try {
+      await apiFetch(`/shopping/cart/${itemId}`, {
+        method: 'PUT',
+        auth: true,
+        data: { notes },
+      })
+      // Optionally reload cart, or just update local state for better UX
+      if (cart) {
+        setCart({
+          ...cart,
+          items: cart.items.map(item =>
+            item.id === itemId ? { ...item, notes } : item
+          ),
+        })
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update notes')
+    }
+  }
+
   async function checkout() {
     if (!cart || cart.items.length === 0) {
       setError('Your cart is empty')
@@ -178,10 +199,10 @@ export default function CartPage() {
             </Card>
             
             {cart.items.map((item) => {
-              const itemTitle = item.title || item.metadata?.title || `Item ${item.item_id.substring(0, 8)}`
-              const itemImage = item.image_url || item.metadata?.image_url
-              const itemCondition = item.condition || item.metadata?.condition
-              const itemCatalogId = item.catalog_id || item.metadata?.catalog_id
+              const itemTitle: string = typeof item.title === 'string' ? item.title : (typeof item.metadata?.title === 'string' ? item.metadata.title : `Item ${item.item_id.substring(0, 8)}`)
+              const itemImage: string | undefined = typeof item.image_url === 'string' ? item.image_url : (typeof item.metadata?.image_url === 'string' ? item.metadata.image_url : undefined)
+              const itemCondition: string | undefined = typeof item.condition === 'string' ? item.condition : (typeof item.metadata?.condition === 'string' ? item.metadata.condition : undefined)
+              const itemCatalogId: string | undefined = typeof item.catalog_id === 'string' ? item.catalog_id : (typeof item.metadata?.catalog_id === 'string' ? item.metadata.catalog_id : undefined)
               const itemPrice = item.price || 0
               const itemTotal = itemPrice * item.quantity
               

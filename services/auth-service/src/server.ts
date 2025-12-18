@@ -1,9 +1,7 @@
 /* cspell:ignore healthz */
 import express, { type Request, type Response, type NextFunction } from "express";
-import { PrismaClient } from "../prisma/generated/client";
 import { register, httpCounter } from "@common/utils";
 import { signJwt, verifyJwt, type JwtPayload as TokenPayload } from "@common/utils/auth";
-import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { createClient } from "redis";
 import { setupOAuthRoutes } from "./routes/oauth.js";
@@ -12,12 +10,12 @@ import { setupVerificationRoutes } from "./routes/verification.js";
 import passkeyRouter from "./routes/passkey.js";
 import { verifyMFA } from "./lib/mfa.js";
 import { getMockSmsProvider } from "./lib/sms-providers.js";
+import { prisma } from "./lib/prisma.js"; // Use shared PrismaClient instance
+import { hashPassword, comparePassword, getQueueStatus } from "./lib/bcrypt-queue.js"; // Use queued bcrypt operations
+import { getUserFromCache, cacheUser, invalidateUserCache, checkEmailExistsInCache } from "./lib/redis-cache.js"; // Redis caching with Lua scripts
 
 const app = express();
-// Initialize Prisma
-// Note: With @@schema("auth") and schemas = ["auth"], Prisma should use auth schema
-// Connection string has search_path=auth which should be respected
-const prisma = new PrismaClient();
+// Prisma is now imported from shared module to avoid connection pool exhaustion
 
 /** Extend the shared JwtPayload with fields we also put/read */
 type WithJti = TokenPayload & { jti?: string; exp?: number };
@@ -92,12 +90,32 @@ app.get("/healthz", async (_req: Request, res: Response) => {
     }
   }
   
+  // Include bcrypt queue status and cache stats in health check
+  const { getCacheStats } = await import("./lib/redis-cache.js");
+  // @ts-ignore - TypeScript incorrectly infers nested type from bcryptjs
+  const queueStatusData: any = getQueueStatus();
+  // @ts-ignore - TypeScript type inference issue (bcryptjs nested type)
+  const queueStatus = {
+    activeOperations: queueStatusData.activeOperations,
+    queueLength: queueStatusData.queueLength,
+    maxConcurrent: queueStatusData.maxConcurrent,
+    rounds: queueStatusData.rounds,
+  } as any;
+  const cacheStats = await getCacheStats();
+  
   // Return 200 immediately - allows service to start and gRPC to be available
   // The service can still handle requests, they'll just fail if DB is down
   res.status(200).json({ 
     ok: true, 
     db: dbOk ? 'connected' : 'disconnected',
-    redis: redisOk ? 'connected' : 'disconnected'
+    redis: redisOk ? 'connected' : 'disconnected',
+      bcrypt: {
+        activeOperations: queueStatus.activeOperations,
+        queueLength: queueStatus.queueLength,
+        maxConcurrent: queueStatus.maxConcurrent,
+        rounds: queueStatus.rounds,
+      },
+    cache: cacheStats,
   });
 });
 
@@ -110,18 +128,53 @@ app.post("/register", async (req: Request, res: Response) => {
     };
     if (!email || !password) return res.status(400).json({ error: "email/password required" });
 
+    // Check cache first for email existence (fast path)
+    const emailExists = await checkEmailExistsInCache(email);
+    if (emailExists) {
+      return res.status(409).json({ error: "email already exists" });
+    }
+
     // Use raw SQL query to access auth.users table directly
     const existing = await prisma.$queryRaw<Array<{ id: string; email: string }>>`
       SELECT id, email FROM auth.users WHERE email = ${email}
     `.then((r: Array<any>) => r[0] || null);
-    if (existing) return res.status(409).json({ error: "email already exists" });
+    if (existing) {
+      // Cache the existing user for future lookups
+      await cacheUser({
+        id: existing.id,
+        email: existing.email,
+        passwordHash: '', // Don't cache password hash for existing check
+        mfaEnabled: false,
+        emailVerified: false,
+        phoneVerified: false,
+        createdAt: new Date(),
+      });
+      return res.status(409).json({ error: "email already exists" });
+    }
 
-    const hash = await bcrypt.hash(password, 10);
+    // Use queued bcrypt to prevent CPU contention
+    const hashStart = Date.now();
+    const hash = await hashPassword(password);
+    const hashDuration = Date.now() - hashStart;
+    if (hashDuration > 5000) {
+      console.warn(`[auth] Slow bcrypt.hash: ${hashDuration}ms (queue may be backed up)`);
+    }
     const user = await prisma.$queryRaw<Array<{ id: string; email: string; created_at: Date }>>`
       INSERT INTO auth.users (email, password_hash, email_verified, created_at)
       VALUES (${email}, ${hash}, ${sendVerification ? false : true}, NOW())
       RETURNING id, email, created_at
     `.then((r: Array<{ id: string; email: string; created_at: Date }>) => r[0]);
+
+    // Cache the newly created user
+    await cacheUser({
+      id: user.id,
+      email: user.email,
+      passwordHash: hash,
+      mfaEnabled: false,
+      emailVerified: !sendVerification,
+      phoneVerified: false,
+      createdAt: user.created_at,
+    });
 
     // Send verification email if requested
     if (sendVerification) {
@@ -159,23 +212,45 @@ app.post("/login", async (req: Request, res: Response) => {
 
     console.log(`[LOGIN] Login attempt for email: ${email}, hasMfaCode: ${!!mfaCode}`);
 
-    // Use raw SQL query to access auth.users table directly
-    // Force a connection refresh and add a small delay to ensure we see latest committed data
-    // This helps with connection pool visibility issues (even without pgbouncer, Prisma has its own pool)
-    await prisma.$queryRaw`SELECT pg_backend_pid()`;
-    await new Promise(resolve => setTimeout(resolve, 200)); // Increased delay for commit visibility
+    // Try cache first (fast path)
+    const cacheStart = Date.now();
+    let user = await getUserFromCache(email);
+    const cacheDuration = Date.now() - cacheStart;
     
-    const user = await prisma.$queryRaw<Array<{
-      id: string;
-      email: string;
-      passwordHash: string;
-      mfaEnabled: boolean;
-      createdAt: Date;
-    }>>`
-      SELECT id, email, password_hash as "passwordHash", mfa_enabled as "mfaEnabled", created_at as "createdAt"
-      FROM auth.users
-      WHERE email = ${email}
-    `.then((r: Array<any>) => r[0] || null);
+    if (user) {
+      console.log(`[LOGIN] User found in cache (hit) took ${cacheDuration}ms`);
+    } else {
+      console.log(`[LOGIN] Cache miss, fetching from database (took ${cacheDuration}ms)`);
+      // Cache miss - fetch from database
+      const dbUser = await prisma.$queryRaw<Array<{
+        id: string;
+        email: string;
+        passwordHash: string;
+        mfaEnabled: boolean;
+        emailVerified: boolean;
+        phoneVerified: boolean;
+        createdAt: Date;
+      }>>`
+        SELECT id, email, password_hash as "passwordHash", mfa_enabled as "mfaEnabled", 
+               email_verified as "emailVerified", phone_verified as "phoneVerified", created_at as "createdAt"
+        FROM auth.users
+        WHERE email = ${email}
+      `.then((r: Array<any>) => r[0] || null);
+      
+      if (dbUser) {
+        // Cache the user for future lookups
+        await cacheUser({
+          id: dbUser.id,
+          email: dbUser.email,
+          passwordHash: dbUser.passwordHash,
+          mfaEnabled: dbUser.mfaEnabled,
+          emailVerified: dbUser.emailVerified,
+          phoneVerified: dbUser.phoneVerified,
+          createdAt: dbUser.createdAt,
+        });
+        user = dbUser;
+      }
+    }
     
     // Log MFA status for debugging
     if (user) {
@@ -185,7 +260,8 @@ app.post("/login", async (req: Request, res: Response) => {
     }
     if (!user || !user.passwordHash) return res.status(401).json({ error: "invalid credentials" });
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
+    // Use queued bcrypt compare (faster than hash, but still use the optimized function)
+    const ok = await comparePassword(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: "invalid credentials" });
 
     // Check if MFA is enabled - use explicit boolean check

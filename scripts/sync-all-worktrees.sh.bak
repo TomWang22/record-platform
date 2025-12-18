@@ -1,0 +1,85 @@
+#!/bin/bash
+# Comprehensive worktree sync script - prevents Cursor worktree errors
+# Run this script whenever you delete files or add new files that worktrees need
+
+set -euo pipefail
+
+MAIN_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORKTREES_DIR="$HOME/.cursor/worktrees/record-platform"
+
+if [ ! -d "$WORKTREES_DIR" ]; then
+  echo "Worktrees directory not found: $WORKTREES_DIR"
+  exit 0
+fi
+
+echo "🔄 Syncing all worktrees from $MAIN_REPO..."
+
+# Required scripts
+REQUIRED_SCRIPTS=(
+  "run-k6-shopping.sh"
+  "wait-and-retrieve-k6-results.sh"
+  "find-bottlenecks.sh"
+  "monitor-bottleneck-tests.sh"
+  "analyze-bottlenecks.sh"
+)
+
+# Required markdown files
+REQUIRED_MARKDOWN=(
+  "K6_SHOPPING_TEST_STATUS.md"
+  "BOTTLENECK_FINDER_README.md"
+  "TEST_STATUS.md"
+  "STRICT_TLS_PRODUCTION_README.md"
+  "SITREP.md"
+  "AUTH_SERVICE_INVESTIGATION.md"
+  "AUTH_SERVICE_FIXES.md"
+  "AUTH_SERVICE_DEPLOYMENT_STATUS.md"
+  "GRPC_HEALTH_CHECKS.md"
+  "GRPC_HEALTH_PROBES_UPDATE.md"
+  "K6_TEST_STATUS_STRICT_TLS.md"
+  "K6_SHOPPING_DAILY_CRONJOB.md"
+)
+
+SYNCED=0
+FIXED=0
+
+for WT in "$WORKTREES_DIR"/*; do
+  if [ -d "$WT" ]; then
+    WT_NAME=$(basename "$WT")
+    cd "$WT" || continue
+    
+    # Sync scripts
+    mkdir -p scripts
+    for SCRIPT in "${REQUIRED_SCRIPTS[@]}"; do
+      if [ -f "$MAIN_REPO/scripts/$SCRIPT" ]; then
+        if [ ! -f "scripts/$SCRIPT" ] || [ "$MAIN_REPO/scripts/$SCRIPT" -nt "scripts/$SCRIPT" ]; then
+          cp "$MAIN_REPO/scripts/$SCRIPT" "scripts/$SCRIPT"
+          chmod +x "scripts/$SCRIPT"
+          SYNCED=$((SYNCED + 1))
+        fi
+      fi
+    done
+    
+    # Sync markdown files
+    for MD_FILE in "${REQUIRED_MARKDOWN[@]}"; do
+      if [ -f "$MAIN_REPO/$MD_FILE" ]; then
+        if [ ! -f "$MD_FILE" ] || [ "$MAIN_REPO/$MD_FILE" -nt "$MD_FILE" ]; then
+          cp "$MAIN_REPO/$MD_FILE" "$MD_FILE"
+          SYNCED=$((SYNCED + 1))
+        fi
+      fi
+    done
+    
+    # Clean up deleted files from git index
+    DELETED=$(git ls-files --deleted 2>&1 | wc -l | tr -d ' ')
+    if [ "$DELETED" -gt 0 ]; then
+      git ls-files --deleted 2>&1 | xargs -r git rm 2>&1 || true
+      FIXED=$((FIXED + DELETED))
+    fi
+    
+    cd - >/dev/null
+  fi
+done
+
+echo "✅ Sync complete:"
+echo "   • Files synced: $SYNCED"
+echo "   • Deleted files cleaned: $FIXED"

@@ -1,41 +1,30 @@
 #!/usr/bin/env bash
-# Setup script for auction-monitor database
-# Port: 5438
-
 set -euo pipefail
 
-PGHOST="${PGHOST:-localhost}"
-PGPORT="${PGPORT:-5438}"
-PGUSER="${PGUSER:-postgres}"
-PGPASSWORD="${PGPASSWORD:-postgres}"
-PGDATABASE="${PGDATABASE:-postgres}"
+# Setup auction-monitor database schema
+# This script sets up the auction_monitor schema and tables in the Docker Postgres instance
 
-export PGPASSWORD
+# Get the container name (may vary)
+CONTAINER=$(docker ps --format "{{.Names}}" | grep -E "postgres.*auction|auction.*postgres" | head -1)
 
-echo "🔧 Setting up auction-monitor database on port $PGPORT..."
+if [[ -z "$CONTAINER" ]]; then
+  echo "❌ Could not find auction-monitor postgres container"
+  echo "Available containers:"
+  docker ps --format "{{.Names}}" | grep postgres
+  exit 1
+fi
 
-# Wait for database to be ready
-echo "⏳ Waiting for database to be ready..."
-until psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -c "SELECT 1;" >/dev/null 2>&1; do
-    echo "  Database not ready, waiting..."
-    sleep 2
-done
+echo "✅ Found container: $CONTAINER"
 
-echo "✅ Database is ready"
+# Apply schema
+echo "📝 Applying auction-monitor schema..."
+docker exec -i "$CONTAINER" psql -U postgres -d auction_monitor < infra/db/07-auction-monitor-schema.sql
 
-# Create database if it doesn't exist
-echo "📦 Creating database 'auction_monitor' if it doesn't exist..."
-psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" <<EOF
-SELECT 'CREATE DATABASE auction_monitor'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'auction_monitor')\gexec
-EOF
+echo "✅ Auction-monitor schema applied!"
 
-# Run schema
-echo "📋 Applying schema..."
-psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d auction_monitor -f infra/db/07-auction-monitor-schema.sql
+# Verify
+echo "🔍 Verifying schema..."
+docker exec "$CONTAINER" psql -U postgres -d auction_monitor -c "\dt auction_monitor.*"
 
-echo "✅ Auction-monitor database setup complete!"
 echo ""
-echo "Connection string:"
-echo "  postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/auction_monitor"
-
+echo "✅ Done! Auction-monitor database is ready."

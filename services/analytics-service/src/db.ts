@@ -9,17 +9,22 @@ if (!LISTINGS_DB_URL || !ANALYTICS_DB_URL) {
 }
 
 // Pool for listings DB (search_history)
+// Increased pool size to handle 50+ VUs with headroom for concurrent requests
+// Formula: max = (VUs * avg_concurrent_per_vu) + headroom
+// For 50 VUs with 2 concurrent requests each: 100 + 50 headroom = 150
+// But we cap at reasonable limit to avoid overwhelming DB
 export const listingsPool = new Pool({
   connectionString: LISTINGS_DB_URL,
-  max: 10,
+  max: 100,  // Increased from 50 to handle 50+ VUs with headroom (2 replicas * 50 = 100, but we need more for concurrent requests)
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
 })
 
 // Pool for analytics DB (price_snapshots, search_analytics, etc.)
+// Increased pool size to handle 50+ VUs with headroom
 export const analyticsPool = new Pool({
   connectionString: ANALYTICS_DB_URL,
-  max: 10,
+  max: 100,  // Increased from 50 to handle 50+ VUs with headroom
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
 })
@@ -115,49 +120,40 @@ export async function getTrendingSearches(
 }
 
 // Price trend analysis from snapshots (from analytics DB)
+// Note: This queries the actual schema which uses record_id and price
+// For now, return empty array since we need record_id to query (would need to join with records table)
 export async function getPriceTrend(
   artist: string,
   name: string,
   format?: string,
   days: number = 90
 ): Promise<PriceSnapshotRow[]> {
-  let query = `SELECT id, snap_date, artist, name, format, median_price, sample_count
-               FROM analytics.price_snapshots
-               WHERE artist ILIKE $1 AND name ILIKE $2`
-  const params: any[] = [artist, name]
+  // The actual schema uses record_id, not artist/name directly
+  // We'd need to join with records.records table to match artist/name
+  // For now, return empty array - this endpoint needs proper implementation
+  // TODO: Join with records.records table to match artist/name
+  return []
   
-  if (format) {
-    query += ` AND format = $3`
-    params.push(format)
-    query += ` AND snap_date >= NOW() - INTERVAL '${days} days'
-               ORDER BY snap_date DESC`
-  } else {
-    query += ` AND snap_date >= NOW() - INTERVAL '${days} days'
-               ORDER BY snap_date DESC`
-  }
-  
-  const result = await analyticsPool.query<PriceSnapshotRow>(query, params)
-  return result.rows
+  // Original query (doesn't match actual schema):
+  // let query = `SELECT id, snapshot_date, record_id, source, price, currency, condition_record, condition_sleeve, created_at
+  //              FROM analytics.price_snapshots
+  //              WHERE ... (need to join with records.records)`
+  // const result = await analyticsPool.query<PriceSnapshotRow>(query, params)
+  // return result.rows
 }
 
 // Get average price from historical snapshots (from analytics DB)
+// Note: Schema uses record_id, would need to join with records table
 export async function getHistoricalAveragePrice(
   artist: string,
   name: string,
   format?: string
 ): Promise<number | null> {
-  let query = `SELECT AVG(median_price) as avg_price
-               FROM analytics.price_snapshots
-               WHERE artist ILIKE $1 AND name ILIKE $2`
-  const params: any[] = [artist, name]
-  
-  if (format) {
-    query += ` AND format = $3`
-    params.push(format)
-  }
-  
-  const result = await analyticsPool.query<{ avg_price: number | null }>(query, params)
-  return result.rows[0]?.avg_price ?? null
+  // The actual schema uses record_id, not artist/name directly
+  // We'd need to join with records.records table to match artist/name
+  // For now, return null - this endpoint needs proper implementation
+  // TODO: Join with records.records table to match artist/name
+  return null
 }
 
 // Log a search (for building history) - writes to listings DB

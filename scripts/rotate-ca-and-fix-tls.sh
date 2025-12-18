@@ -16,53 +16,93 @@ fi
 
 # OPTIMIZED FOR CONSISTENT 1-2 SECOND ROTATION: Pre-generate cert, parallelize ALL operations
 # Generate new certificate with mkcert (rotate) - this is the slowest operation
+# Include all necessary SANs to avoid x509 errors:
+# - record.local (primary host)
+# - *.record.local (wildcard subdomains)
+# - localhost, 127.0.0.1, ::1 (local access)
+# - Kubernetes service DNS names (ClusterIP access)
 CERT_DIR="/tmp/caddy-certs-$(date +%s)"
 mkdir -p "$CERT_DIR"
-mkcert -cert-file "$CERT_DIR/tls.crt" -key-file "$CERT_DIR/tls.key" "${HOST}" "*.${HOST}" localhost 127.0.0.1 ::1 >/dev/null 2>&1
+mkcert -cert-file "$CERT_DIR/tls.crt" -key-file "$CERT_DIR/tls.key" \
+  "${HOST}" \
+  "*.${HOST}" \
+  "localhost" \
+  "127.0.0.1" \
+  "::1" \
+  "caddy-h3.ingress-nginx.svc.cluster.local" \
+  "*.ingress-nginx.svc.cluster.local" \
+  "*.record-platform.svc.cluster.local" \
+  "auth-service.record-platform.svc.cluster.local" \
+  "social-service.record-platform.svc.cluster.local" \
+  "shopping-service.record-platform.svc.cluster.local" \
+  "listings-service.record-platform.svc.cluster.local" \
+  "analytics-service.record-platform.svc.cluster.local" \
+  "auction-monitor.record-platform.svc.cluster.local" \
+  "python-ai-service.record-platform.svc.cluster.local" \
+  >/dev/null 2>&1
 
 # START TIMING HERE (certificate generation is done)
 ROTATION_START=$(date +%s)
 
-# PARALLELIZE: Run ALL kubectl operations in background with request timeouts to prevent hanging
-# Update TLS secret in Kubernetes (delete and recreate since type is immutable)
-# Using --request-timeout=2s to prevent hanging on slow API server
-(kubectl -n "$NS_ING" delete secret record-local-tls --request-timeout=2s >/dev/null 2>&1 || true; \
- kubectl -n "$NS_ING" create secret tls record-local-tls --request-timeout=2s \
-   --cert="$CERT_DIR/tls.crt" \
-   --key="$CERT_DIR/tls.key" >/dev/null 2>&1 || true) &
+# FIX #1: Restore ultra-fast parallel secret operations (1-3 second rotation)
+# All secret updates run in parallel - secrets will be ready before new pods start
+# RollingUpdate with maxUnavailable=0 ensures old pod stays up until new pod is ready
+(
+  kubectl -n "$NS_ING" delete secret record-local-tls >/dev/null 2>&1 || true
+  kubectl -n "$NS_ING" create secret tls record-local-tls \
+    --cert="$CERT_DIR/tls.crt" \
+    --key="$CERT_DIR/tls.key" >/dev/null 2>&1 || true
+) &
 
-# Update CA secret in background (with request timeout)
-(kubectl -n "$NS_ING" create secret generic dev-root-ca --request-timeout=2s \
-  --from-file=dev-root.pem="$CA_PATH" \
-  --dry-run=client -o yaml | kubectl apply -f - --request-timeout=2s >/dev/null 2>&1 || true) &
+(
+  kubectl -n record-platform delete secret record-local-tls >/dev/null 2>&1 || true
+  kubectl -n record-platform create secret tls record-local-tls \
+    --cert="$CERT_DIR/tls.crt" \
+    --key="$CERT_DIR/tls.key" >/dev/null 2>&1 || true
+) &
 
-# Update Caddyfile in background (only if it exists, with request timeout)
+(
+  kubectl -n "$NS_ING" create secret generic dev-root-ca \
+    --from-file=dev-root.pem="$CA_PATH" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1 || true
+) &
+
+(
+  # CRITICAL: Update CA certificate in record-platform namespace for services with strict TLS
+  # Services like social-service, auth-service, etc. need this CA to verify TLS certificates
+  # when making outbound requests (e.g., to Caddy, other services via HTTPS)
+  kubectl -n record-platform create secret generic dev-root-ca \
+    --from-file=dev-root.pem="$CA_PATH" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1 || true
+) &
+
+# Update Caddyfile in background (non-critical)
 if [[ -f "./Caddyfile" ]]; then
-  TMP_CF="$(mktemp)"
-  awk '
-    BEGIN{skip=0}
-    /^\\s*servers\\s*\\{/ { skip=1; depth=1; next }
-    skip==1 {
-      if ($0 ~ /\\{/) depth++
-      if ($0 ~ /\\}/) { depth--; if (depth==0) { skip=0; next } }
-      next
-    }
-    { print }
-  ' ./Caddyfile > "$TMP_CF"
-  (kubectl -n "$NS_ING" create configmap caddy-h3 --request-timeout=2s \
-    --from-file=Caddyfile="$TMP_CF" \
-    --dry-run=client -o yaml | kubectl apply -f - --request-timeout=2s >/dev/null 2>&1 || true; \
-   rm -f "$TMP_CF") &
+  (
+    TMP_CF="$(mktemp)"
+    awk '
+      BEGIN{skip=0}
+      /^\\s*servers\\s*\\{/ { skip=1; depth=1; next }
+      skip==1 {
+        if ($0 ~ /\\{/) depth++
+        if ($0 ~ /\\}/) { depth--; if (depth==0) { skip=0; next } }
+        next
+      }
+      { print }
+    ' ./Caddyfile > "$TMP_CF"
+    kubectl -n "$NS_ING" create configmap caddy-h3 \
+      --from-file=Caddyfile="$TMP_CF" \
+      --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1 || true
+    rm -f "$TMP_CF"
+  ) &
 fi
 
-# CRITICAL: Trigger rollout restart using merge patch (FASTEST method - simpler than JSON patch)
-# Merge patch is faster than JSON patch and simpler (no complex path escaping)
-# This directly updates the deployment annotation, triggering a RollingUpdate
-# The secrets will be ready by the time the new pod starts (RollingUpdate ensures old pod stays up)
+# CRITICAL: Trigger rollout restart immediately (secrets will be ready by the time pod starts)
+# With RollingUpdate + maxUnavailable=0, old pod MUST stay up until new pod is ready
 RESTART_TIME=$(date +%Y-%m-%dT%H:%M:%S%z)
 kubectl -n "$NS_ING" patch deployment caddy-h3 \
   -p="{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$RESTART_TIME\"}}}}}" \
-  --request-timeout=1s >/dev/null 2>&1 || true
+  >/dev/null 2>&1 || true
 
 # With RollingUpdate + maxUnavailable=0, old pod MUST stay up until new pod is ready
 # OPTIMIZED: No sleep, no health check, no output - just trigger restart and exit
@@ -82,5 +122,3 @@ ROTATION_SUCCESS=1
 
 # Exit immediately - rotation is complete (restart triggered)
 exit 0
-
-

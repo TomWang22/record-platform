@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -49,7 +49,22 @@ type DisplayStyle = 'grid' | 'list' | 'compact'
 const MEDIA_TYPES: MediaType[] = ['LP', '12"', '10"', '7"', 'CD', 'EP', 'CASSETTE', 'OTHER']
 const ITEMS_PER_PAGE_OPTIONS = [25, 50, 100, 200]
 
-export default function ListingsPage() {
+// Type guard to validate MediaType
+function isValidMediaType(value: string | null): value is MediaType {
+  return value !== null && MEDIA_TYPES.includes(value as MediaType)
+}
+
+// Type guard to validate SortOption
+function isValidSortOption(value: string | null): value is SortOption {
+  return value !== null && (value === 'created_at' || value === 'price' || value === 'popularity' || value === 'label_type')
+}
+
+// Type guard to validate SortOrder
+function isValidSortOrder(value: string | null): value is SortOrder {
+  return value !== null && (value === 'asc' || value === 'desc')
+}
+
+function ListingsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -66,15 +81,24 @@ export default function ListingsPage() {
   
   // Filters
   const [query, setQuery] = useState(searchParams.get('q') || '')
-  const [mediaType, setMediaType] = useState<MediaType | ''>(searchParams.get('media_type') || '')
+  const [mediaType, setMediaType] = useState<MediaType | ''>(() => {
+    const value = searchParams.get('media_type')
+    return isValidMediaType(value) ? value : ''
+  })
   const [hasObi, setHasObi] = useState<boolean | null>(
     searchParams.get('has_obi') === 'true' ? true : searchParams.get('has_obi') === 'false' ? false : null
   )
   const [minPrice, setMinPrice] = useState(searchParams.get('min_price') || '')
   const [maxPrice, setMaxPrice] = useState(searchParams.get('max_price') || '')
   const [labelType, setLabelType] = useState(searchParams.get('label_type') || '')
-  const [sortBy, setSortBy] = useState<SortOption>((searchParams.get('sort_by') as SortOption) || 'created_at')
-  const [sortOrder, setSortOrder] = useState<SortOrder>((searchParams.get('sort_order') as SortOrder) || 'desc')
+  const [sortBy, setSortBy] = useState<SortOption>(() => {
+    const value = searchParams.get('sort_by')
+    return isValidSortOption(value) ? value : 'created_at'
+  })
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+    const value = searchParams.get('sort_order')
+    return isValidSortOrder(value) ? value : 'desc'
+  })
 
   // Load user preferences
   useEffect(() => {
@@ -588,6 +612,14 @@ export default function ListingsPage() {
         </>
       )}
     </div>
+  )
+}
+
+export default function ListingsPage() {
+  return (
+    <Suspense fallback={<div className="p-8">Loading listings...</div>}>
+      <ListingsPageContent />
+    </Suspense>
   )
 }
 

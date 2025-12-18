@@ -1,15 +1,15 @@
 /* cspell:ignore grpc */
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
-import { PrismaClient } from "../prisma/generated/client";
 import { signJwt, verifyJwt } from "@common/utils/auth";
-import * as bcrypt from "bcryptjs";
+import { hashPassword, comparePassword, getQueueStatus } from "./lib/bcrypt-queue.js";
+import { getUserFromCache, cacheUser, invalidateUserCache, checkEmailExistsInCache } from "./lib/redis-cache.js"; // Redis caching with Lua scripts
 import { randomUUID } from "node:crypto";
 import * as fs from "fs";
 import { resolveProtoPath } from "@common/utils/proto";
 import { verifyMFA } from "./lib/mfa.js";
-
-const prisma = new PrismaClient();
+import { prisma } from "./lib/prisma.js"; // Use shared PrismaClient instance
+import { registerHealthService } from "@common/utils"; // Standard gRPC health service
 
 // Load proto file
 const PROTO_PATH = resolveProtoPath("auth.proto");
@@ -43,9 +43,118 @@ function withLogging(handler: any, methodName: string) {
   };
 }
 
+// Health check service implementation
+const healthService = {
+  async Check(call: any, callback: any) {
+    try {
+      let dbOk = false;
+      let redisOk = false;
+      let cacheStats = { connected: false, userCacheKeys: 0 };
+      let queueStatus: { activeOperations: number; queueLength: number; maxConcurrent: number; rounds: number } = { activeOperations: 0, queueLength: 0, maxConcurrent: 4, rounds: 8 };
+
+      // Check database
+      try {
+        const dbCheck = prisma.$queryRaw`SELECT 1`;
+        const timeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("DB check timeout")), 500)
+        );
+        await Promise.race([dbCheck, timeout]);
+        dbOk = true;
+      } catch (e: any) {
+        // DB check failed
+      }
+
+      // Check Redis
+      try {
+        const { getRedisClient, getCacheStats } = await import("./lib/redis-cache.js");
+        const client = getRedisClient();
+        if (client && client.isOpen) {
+          await client.ping();
+          redisOk = true;
+          cacheStats = await getCacheStats();
+        }
+      } catch (e: any) {
+        // Redis check failed
+      }
+
+      // Get queue status - TypeScript type inference issue workaround
+      const queueStatusData: any = getQueueStatus();
+      queueStatus.activeOperations = queueStatusData.activeOperations;
+      queueStatus.queueLength = queueStatusData.queueLength;
+      queueStatus.maxConcurrent = queueStatusData.maxConcurrent;
+      queueStatus.rounds = queueStatusData.rounds;
+
+      // Determine overall status - use registerHealthService's ServingStatus enum
+      const ServingStatus = {
+        UNKNOWN: 0,
+        SERVING: 1,
+        NOT_SERVING: 2,
+        SERVICE_UNKNOWN: 3,
+      };
+      const healthStatusValue = dbOk ? ServingStatus.SERVING : ServingStatus.NOT_SERVING;
+
+      callback(null, {
+        status: healthStatusValue,
+        message: dbOk ? "Service is healthy" : "Database connection failed",
+        details: {
+          db: dbOk ? "connected" : "disconnected",
+          redis: redisOk ? "connected" : "disconnected",
+          cache_keys: cacheStats.userCacheKeys.toString(),
+          bcrypt_queue: queueStatus.queueLength.toString(),
+          bcrypt_active: queueStatus.activeOperations.toString(),
+        },
+      });
+    } catch (error: any) {
+      callback({
+        code: grpc.status.INTERNAL,
+        message: error.message || "health check failed",
+      });
+    }
+  },
+
+  Watch(call: any) {
+    // Simple implementation - send periodic health checks
+    const interval = setInterval(async () => {
+      try {
+        let dbOk = false;
+        try {
+          const dbCheck = prisma.$queryRaw`SELECT 1`;
+          const timeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("DB check timeout")), 500)
+          );
+          await Promise.race([dbCheck, timeout]);
+          dbOk = true;
+        } catch (e: any) {
+          // DB check failed
+        }
+
+        const ServingStatus = {
+          UNKNOWN: 0,
+          SERVING: 1,
+          NOT_SERVING: 2,
+          SERVICE_UNKNOWN: 3,
+        };
+        const healthStatusValue = dbOk ? ServingStatus.SERVING : ServingStatus.NOT_SERVING;
+        call.write({
+          status: healthStatusValue,
+          message: dbOk ? "Service is healthy" : "Database connection failed",
+        });
+      } catch (error: any) {
+        call.end();
+      }
+    }, 5000); // Send health check every 5 seconds
+
+    call.on("end", () => {
+      clearInterval(interval);
+      call.end();
+    });
+  },
+};
+
 // Implement AuthService
 const authService = {
   async Register(call: any, callback: any) {
+    const startTime = Date.now();
     try {
       const { email, password } = call.request;
       if (!email || !password) {
@@ -55,17 +164,53 @@ const authService = {
         });
       }
 
+      const checkStart = Date.now();
+      
+      // Check cache first for email existence (fast path)
+      const emailExists = await checkEmailExistsInCache(email);
+      if (emailExists) {
+        const checkDuration = Date.now() - checkStart;
+        console.log(`[gRPC] Register: Email exists (cache hit) took ${checkDuration}ms`);
+        return callback({
+          code: grpc.status.ALREADY_EXISTS,
+          message: "email already exists",
+        });
+      }
+      
+      // Cache miss - check database
       const existing = await prisma.$queryRaw<Array<{ id: string }>>`
         SELECT id FROM auth.users WHERE email = ${email}
       `.then((r: Array<any>) => r[0] || null);
+      const checkDuration = Date.now() - checkStart;
+      console.log(`[gRPC] Register: SELECT existing user took ${checkDuration}ms (cache miss)`);
+      
       if (existing) {
+        // Cache the existing user for future lookups
+        await cacheUser({
+          id: existing.id,
+          email: email,
+          passwordHash: '', // Don't cache password hash for existing check
+          mfaEnabled: false,
+          emailVerified: false,
+          phoneVerified: false,
+          createdAt: new Date(),
+        });
         return callback({
           code: grpc.status.ALREADY_EXISTS,
           message: "email already exists",
         });
       }
 
-      const passwordHash = await bcrypt.hash(password, 10);
+      const hashStart = Date.now();
+      // Use queued bcrypt to prevent CPU contention
+      const passwordHash = await hashPassword(password);
+      const hashDuration = Date.now() - hashStart;
+      console.log(`[gRPC] Register: bcrypt.hash took ${hashDuration}ms (queued)`);
+      if (hashDuration > 5000) {
+        console.warn(`[gRPC] Register: Slow bcrypt.hash: ${hashDuration}ms (queue may be backed up)`);
+      }
+      
+      const insertStart = Date.now();
       const user = await prisma.$queryRaw<
         Array<{ id: string; email: string; createdAt: Date }>
       >`
@@ -73,9 +218,28 @@ const authService = {
         VALUES (${email}, ${passwordHash}, NOW())
         RETURNING id, email, created_at as "createdAt"
       `.then((r: Array<{ id: string; email: string; createdAt: Date }>) => r[0]);
+      const insertDuration = Date.now() - insertStart;
+      console.log(`[gRPC] Register: INSERT user took ${insertDuration}ms`);
 
+      // Cache the newly created user
+      await cacheUser({
+        id: user.id,
+        email: user.email,
+        passwordHash: passwordHash,
+        mfaEnabled: false,
+        emailVerified: false,
+        phoneVerified: false,
+        createdAt: user.createdAt,
+      });
+
+      const tokenStart = Date.now();
       const jti = randomUUID();
       const token = signJwt({ sub: user.id, email: user.email, jti } as any);
+      const tokenDuration = Date.now() - tokenStart;
+      console.log(`[gRPC] Register: signJwt took ${tokenDuration}ms`);
+
+      const totalDuration = Date.now() - startTime;
+      console.log(`[gRPC] Register: Total duration ${totalDuration}ms (check: ${checkDuration}ms, hash: ${hashDuration}ms, insert: ${insertDuration}ms, token: ${tokenDuration}ms)`);
 
       callback(null, {
         token,
@@ -86,7 +250,8 @@ const authService = {
         },
       });
     } catch (error: any) {
-      console.error("[gRPC] Register error:", error);
+      const totalDuration = Date.now() - startTime;
+      console.error(`[gRPC] Register error after ${totalDuration}ms:`, error);
       callback({
         code: grpc.status.INTERNAL,
         message: error.message || "internal error",
@@ -107,21 +272,45 @@ const authService = {
 
       console.log(`[gRPC] Authenticate attempt for email: ${email}, hasMfaCode: ${!!mfaCodeValue}`);
 
-      // Force connection refresh to ensure we see latest committed data
-      await prisma.$queryRaw`SELECT pg_backend_pid()`;
-      await new Promise(resolve => setTimeout(resolve, 200)); // Delay for commit visibility
-
-      const user = await prisma.$queryRaw<Array<{ 
-        id: string; 
-        email: string; 
-        passwordHash: string; 
-        mfaEnabled: boolean;
-        createdAt: Date 
-      }>>`
-        SELECT id, email, password_hash as "passwordHash", mfa_enabled as "mfaEnabled", created_at as "createdAt"
-        FROM auth.users
-        WHERE email = ${email}
-      `.then((r: Array<{ id: string; email: string; passwordHash: string; mfaEnabled: boolean; createdAt: Date }>) => r[0] || null);
+      // Try cache first (fast path)
+      const cacheStart = Date.now();
+      let user = await getUserFromCache(email);
+      const cacheDuration = Date.now() - cacheStart;
+      
+      if (user) {
+        console.log(`[gRPC] Authenticate: User found in cache (hit) took ${cacheDuration}ms`);
+      } else {
+        console.log(`[gRPC] Authenticate: Cache miss, fetching from database (took ${cacheDuration}ms)`);
+        // Cache miss - fetch from database
+        const dbUser = await prisma.$queryRaw<Array<{ 
+          id: string; 
+          email: string; 
+          passwordHash: string; 
+          mfaEnabled: boolean;
+          emailVerified: boolean;
+          phoneVerified: boolean;
+          createdAt: Date 
+        }>>`
+          SELECT id, email, password_hash as "passwordHash", mfa_enabled as "mfaEnabled",
+                 email_verified as "emailVerified", phone_verified as "phoneVerified", created_at as "createdAt"
+          FROM auth.users
+          WHERE email = ${email}
+        `.then((r: Array<any>) => r[0] || null);
+        
+        if (dbUser) {
+          // Cache the user for future lookups
+          await cacheUser({
+            id: dbUser.id,
+            email: dbUser.email,
+            passwordHash: dbUser.passwordHash,
+            mfaEnabled: dbUser.mfaEnabled,
+            emailVerified: dbUser.emailVerified,
+            phoneVerified: dbUser.phoneVerified,
+            createdAt: dbUser.createdAt,
+          });
+          user = dbUser;
+        }
+      }
 
       if (!user || !user.passwordHash) {
         return callback({
@@ -132,7 +321,8 @@ const authService = {
 
       console.log(`[gRPC] User ${user.email} (${user.id}) - mfaEnabled: ${user.mfaEnabled} (type: ${typeof user.mfaEnabled})`);
 
-      const ok = await bcrypt.compare(password, user.passwordHash);
+      // Use queued bcrypt compare (faster than hash, but still use the optimized function)
+      const ok = await comparePassword(password, user.passwordHash);
       if (!ok) {
         return callback({
           code: grpc.status.UNAUTHENTICATED,
@@ -289,6 +479,18 @@ export function startGrpcServer(port: number = 50051) {
     HealthCheck: withLogging(authService.HealthCheck, "HealthCheck"),
   });
 
+  // Register standard gRPC Health Service (grpc.health.v1.Health)
+  // This enables health checks via: grpc.health.v1.Health/Check
+  registerHealthService(server, "auth.AuthService", async () => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return true;
+    } catch (err) {
+      console.error("[gRPC] Health check failed:", err);
+      return false;
+    }
+  });
+
   // Enable gRPC reflection for tooling (grpcurl, etc.)
   if (process.env.ENABLE_GRPC_REFLECTION !== "false") {
     try {
@@ -303,17 +505,28 @@ export function startGrpcServer(port: number = 50051) {
   let credentials: grpc.ServerCredentials;
   const keyPath = process.env.TLS_KEY_PATH || "/etc/certs/tls.key";
   const certPath = process.env.TLS_CERT_PATH || "/etc/certs/tls.crt";
+  const caPath = process.env.TLS_CA_PATH || process.env.GRPC_CA_CERT || "/etc/certs/ca.crt";
   
   if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
     const key = fs.readFileSync(keyPath);
     const cert = fs.readFileSync(certPath);
-    // Create SSL credentials with ALPN = h2
+    
+    // For strict TLS: verify client certificates if CA cert exists
+    let rootCerts: Buffer | null = null;
+    let checkClientCert = false;
+    if (fs.existsSync(caPath)) {
+      rootCerts = fs.readFileSync(caPath);
+      checkClientCert = true;
+      console.log("[gRPC] Starting secure HTTP/2-only server with strict TLS (client cert verification)");
+    } else {
+      console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)");
+    }
+    
     credentials = grpc.ServerCredentials.createSsl(
-      null, // root certs (null = no client cert required)
+      rootCerts,
       [{ private_key: key, cert_chain: cert }],
-      false as any // check client cert (TypeScript type issue)
+      checkClientCert as any
     );
-    console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2");
   } else {
     console.warn("[gRPC] TLS certs not found, starting insecure server (dev only)");
     credentials = grpc.ServerCredentials.createInsecure();

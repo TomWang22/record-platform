@@ -5,6 +5,7 @@ namespace: record-platform
 resources:
   - deploy.yaml
   - service.yaml
+  - external-service.yaml  # External Service/Endpoint for Docker Compose Redis
 
 configMapGenerator:
   - name: redis-config

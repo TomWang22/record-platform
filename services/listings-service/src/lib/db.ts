@@ -1,6 +1,16 @@
 // Direct PostgreSQL client for listings-service
 // This bypasses Prisma if generation fails
 import { Pool } from 'pg';
+import { 
+  getListingFromCache, 
+  cacheListing, 
+  invalidateListingCache,
+  getSearchResultsFromCache,
+  cacheSearchResults,
+  getWatchlistFromCache,
+  cacheWatchlist,
+  invalidateWatchlistCache,
+} from './redis-cache.js';
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL_LISTINGS || 'postgresql://postgres:postgres@localhost:5435/records',
@@ -33,6 +43,13 @@ export async function getListingsByUser(userId: string, limit = 50, offset = 0) 
 }
 
 export async function getListingById(listingId: string) {
+  // Try cache first (fast path)
+  const cached = await getListingFromCache(listingId);
+  if (cached) {
+    return cached;
+  }
+
+  // Cache miss - fetch from database
   const result = await pool.query(
     `SELECT l.*, 
             json_agg(
@@ -62,7 +79,15 @@ export async function getListingById(listingId: string) {
      GROUP BY l.id, ad.id`,
     [listingId]
   );
-  return result.rows[0] || null;
+  
+  const listing = result.rows[0] || null;
+  
+  // Cache the result for future lookups
+  if (listing) {
+    await cacheListing(listingId, listing);
+  }
+  
+  return listing;
 }
 
 export async function createListing(data: {
@@ -128,6 +153,9 @@ export async function createListing(data: {
     );
   }
 
+  // Cache the newly created listing
+  await cacheListing(listing.id, listing);
+
   return listing;
 }
 
@@ -168,7 +196,16 @@ export async function updateListing(listingId: string, userId: string, updates: 
     values
   );
 
-  return result.rows[0] || null;
+  const updated = result.rows[0] || null;
+  
+  // Invalidate cache on update
+  if (updated) {
+    await invalidateListingCache(listingId);
+    // Optionally re-cache the updated listing
+    await cacheListing(listingId, updated);
+  }
+
+  return updated;
 }
 
 export async function deleteListing(listingId: string, userId: string) {
@@ -179,7 +216,15 @@ export async function deleteListing(listingId: string, userId: string) {
      RETURNING id`,
     [listingId, userId]
   );
-  return (result.rowCount !== null && result.rowCount > 0);
+  
+  const deleted = (result.rowCount !== null && result.rowCount > 0);
+  
+  // Invalidate cache on delete
+  if (deleted) {
+    await invalidateListingCache(listingId);
+  }
+  
+  return deleted;
 }
 
 export async function addListingImage(listingId: string, imageData: {
@@ -271,7 +316,15 @@ export async function addToWatchlist(userId: string, listingId: string) {
      RETURNING *`,
     [userId, listingId]
   );
-  return result.rows[0] || null;
+  
+  const added = result.rows[0] || null;
+  
+  // Invalidate watchlist cache on add
+  if (added) {
+    await invalidateWatchlistCache(userId);
+  }
+  
+  return added;
 }
 
 export async function removeFromWatchlist(userId: string, listingId: string) {
@@ -280,10 +333,25 @@ export async function removeFromWatchlist(userId: string, listingId: string) {
      WHERE user_id = $1 AND listing_id = $2`,
     [userId, listingId]
   );
-  return (result.rowCount !== null && result.rowCount > 0);
+  
+  const removed = (result.rowCount !== null && result.rowCount > 0);
+  
+  // Invalidate watchlist cache on remove
+  if (removed) {
+    await invalidateWatchlistCache(userId);
+  }
+  
+  return removed;
 }
 
 export async function getUserWatchlist(userId: string) {
+  // Try cache first (fast path)
+  const cached = await getWatchlistFromCache(userId);
+  if (cached) {
+    return cached;
+  }
+
+  // Cache miss - fetch from database
   const result = await pool.query(
     `SELECT l.*, w.created_at as watched_at
      FROM listings.watchlist w
@@ -292,7 +360,13 @@ export async function getUserWatchlist(userId: string) {
      ORDER BY w.created_at DESC`,
     [userId]
   );
-  return result.rows;
+  
+  const watchlist = result.rows;
+  
+  // Cache the result for future lookups
+  await cacheWatchlist(userId, watchlist);
+  
+  return watchlist;
 }
 
 export async function searchListings(query: string, filters?: {
@@ -451,12 +525,20 @@ export async function searchListings(query: string, filters?: {
     [...params, limit, offset]
   );
 
-  return {
+  const searchResult = {
     listings: result.rows,
     total,
     limit,
     offset,
     hasMore: offset + result.rows.length < total
   };
+  
+  // Cache search results (only first page for efficiency)
+  const source = 'listings'; // Default source for internal searches
+  if (!filters?.offset || filters.offset === 0) {
+    await cacheSearchResults(query, source, searchResult.listings);
+  }
+  
+  return searchResult;
 }
 

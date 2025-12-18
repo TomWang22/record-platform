@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -31,7 +31,7 @@ type RecordItem = {
 
 const DEFAULT_QUERY = 'Blue Note 1500 first press'
 
-export default function MarketPage() {
+function MarketPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const recordId = searchParams.get('record')
@@ -227,6 +227,14 @@ export default function MarketPage() {
         )}
       </Card>
     </div>
+  )
+}
+
+export default function MarketPage() {
+  return (
+    <Suspense fallback={<div className="p-8">Loading market...</div>}>
+      <MarketPageContent />
+    </Suspense>
   )
 }
 

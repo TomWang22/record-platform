@@ -429,32 +429,32 @@ export default function MessagesPage() {
         </div>
         <div className="flex gap-2">
           <Button
-            variant={viewMode === 'p2p' ? 'default' : 'outline'}
+            variant={viewMode === 'p2p' ? 'primary' : 'secondary'}
             onClick={() => setViewMode('p2p')}
           >
             P2P Messages
           </Button>
           <Button
-            variant={viewMode === 'group' ? 'default' : 'outline'}
+            variant={viewMode === 'group' ? 'primary' : 'secondary'}
             onClick={() => setViewMode('group')}
           >
             <Users className="h-4 w-4 mr-2" />
             Groups
           </Button>
           <Button
-            variant={viewMode === 'activity' ? 'default' : 'outline'}
+            variant={viewMode === 'activity' ? 'primary' : 'secondary'}
             onClick={() => setViewMode('activity')}
           >
             Activity
           </Button>
           {viewMode === 'group' && (
-            <Button variant="outline" onClick={() => setShowCreateGroup(!showCreateGroup)}>
+            <Button variant="secondary" onClick={() => setShowCreateGroup(!showCreateGroup)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Group
             </Button>
           )}
           {viewMode === 'p2p' && (
-            <Button variant="outline" onClick={() => setShowCompose(!showCompose)}>
+            <Button variant="secondary" onClick={() => setShowCompose(!showCompose)}>
               {showCompose ? 'Hide' : 'New Message'}
             </Button>
           )}
@@ -567,7 +567,7 @@ export default function MessagesPage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button onClick={sendMessage} disabled={sending || !newMessage.toUserId || !newMessage.message}>
+              <Button onClick={() => void sendMessage()} disabled={sending || !newMessage.toUserId || !newMessage.message}>
                 {sending ? 'Sending...' : 'Send Message'}
               </Button>
               <Button variant="ghost" onClick={() => setShowCompose(false)} disabled={sending}>
@@ -699,7 +699,7 @@ export default function MessagesPage() {
             <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10">
               <p className="text-xs uppercase text-slate-400 mb-2">Conversations</p>
               <ul className="space-y-1 text-sm">
-                {Array.from(new Set(conversations.map((c: UserMessage) => c.fromUserId === 'current-user' ? c.toUserId : c.fromUserId))).map((userId: string) => (
+                {Array.from(new Set(conversations.map((c: UserMessage) => c.fromUserId === 'current-user' ? c.toUserId : c.fromUserId))).filter((userId): userId is string => userId !== undefined).map((userId: string) => (
                   <li key={userId}>
                     <button
                       onClick={() => setSelectedConversation(selectedConversation === userId ? null : userId)}
@@ -850,7 +850,7 @@ export default function MessagesPage() {
                   const senderId = c.sender_id || c.fromUserId
                   const recipientId = c.recipient_id || c.toUserId
                   return senderId === 'current-user' ? recipientId : senderId
-                }))).map((userId: string) => (
+                }))).filter((userId): userId is string => userId !== undefined).map((userId: string) => (
                   <li key={userId}>
                     <button
                       onClick={() => setSelectedConversation(userId)}

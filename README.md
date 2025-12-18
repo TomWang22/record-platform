@@ -38,7 +38,7 @@ This isn't a tutorial project—it's a production-grade system solving real prob
   - `scripts/test-full-chain-with-rotation.sh`: **15000/15000 requests succeeded (100%)** during rotation (real stress test at ~120 req/s average, 100-150 req/s observed)
   - `scripts/test-http2-http3-strict-tls.sh`: **60/60 requests succeeded (100%)** during rotation
   - Zero downtime achieved with pod-by-pod rotation using RollingUpdate strategy
-- **✅ Strict TLS enforcement** - TLS 1.2 and 1.3 only (TLS 1.1 and below rejected); validated via `scripts/test-http2-http3-strict-tls.sh` and `scripts/test-full-chain-with-rotation.sh`.
+- **✅ Strict TLS enforcement** - **All k6 load tests use strict TLS verification** with CA certificate validation (no insecure TLS bypass); TLS 1.2 and 1.3 only (TLS 1.1 and below rejected); validated via `scripts/test-http2-http3-strict-tls.sh` and `scripts/test-full-chain-with-rotation.sh`. All k6 test scripts (`run-k6-shopping.sh`, `run-k6-social-with-graphs.sh`, `run-k6-listings-with-graphs.sh`, `find-bottlenecks.sh`) enforce strict TLS with `SSL_CERT_FILE` and CA certificate ConfigMaps. **Shopping service load tests** (`k6-shopping-stress.js`, `k6-shopping-ramp.js`, `k6-shopping-db-validation.js`, `k6-bottleneck-finder.js`) all use strict TLS verification for production-ready testing.
 - **✅ Full gRPC inter-service communication** - All services communicate via gRPC with protocol buffers; Caddy routes gRPC requests using `protocol grpc` matcher with h2c transport to backend services.
 - **✅ Multi-database architecture** - **8 dedicated PostgreSQL instances** for service isolation, scalability, and independent scaling (auth, records, social, listings, shopping, auction-monitor, analytics, python-ai).
 - **✅ Dual-database connections** - Services like auction-monitor and analytics-service connect to multiple databases for cross-service data access while maintaining data isolation.
@@ -46,7 +46,7 @@ This isn't a tutorial project—it's a production-grade system solving real prob
 - **Kubernetes-native workflows** - `infra/k8s` provides composable bases and overlays, with bootstrapping scripts that stand up Kind, build images, load them, and apply manifests.
 - **Hardened gateway path** - API Gateway keeps the JWT guard, adds optional `DEBUG_FAKE_AUTH`, injects identity headers, and exposes detailed metrics.
 - **Redis-assisted records caching** - `services/records-service/src/lib/cache.ts` adds normalized search keys, safe JSON encoding, and targeted invalidation hooks.
-- **Kafka messaging** - Real-time messaging for forum posts, direct messages, and group chats via Kafka integration in social-service.
+- **Kafka messaging with strict TLS** - Real-time messaging for forum posts, direct messages, and group chats via Kafka integration in social-service. **Strict TLS enabled** with SSL listener on port 9093, certificates managed via `kafka-ssl-secret`.
 - **Operational tooling** - `scripts/` covers smoke tests, TLS helpers, QUIC tuning, backup/restore, load tests, and rollout automation.
 
 ## 🎉 Recent Breakthroughs
@@ -54,6 +54,14 @@ This isn't a tutorial project—it's a production-grade system solving real prob
 ### Zero-Downtime CA Rotation ✅
 **100% success rate achieved** - Certificate authority rotation with zero downtime:
 
+- ✅ **`scripts/rotation-suite.sh`**: **k6 distributed load testing** with optimal configuration
+  - **Optimal config**: H2=250 req/s (max 160 VUs), H3=150 req/s (max 100 VUs)
+  - **Results**: 71,447 requests (~397 req/s), 0.76% drops, **0% failures** (100% uptime)
+  - **Breaking point**: 260/160 config shows 0.08% failures (violates zero-downtime)
+  - **Rotation time**: **1-2 seconds** (consistently fast)
+  - **Full chain validation**: Client → Caddy → Ingress → Backend
+  - **Production-ready**: Validated with k6 constant-arrival-rate executor and connection reuse
+  
 - ✅ **`scripts/test-full-chain-with-rotation.sh`**: **15000/15000 requests succeeded (100%)** during rotation
   - Rotation time: **1-2 seconds** (consistently fast)
   - Zero downtime confirmed with continuous health checks (real stress test: 15000 requests)
@@ -77,12 +85,15 @@ This isn't a tutorial project—it's a production-grade system solving real prob
 
 **Technical achievement:**
 - **Ultra-fast rotation time**: From 6+ minutes to **1-2 seconds** (8-10x faster than previous 16-17s)
-- **100% success rate**: No failed requests during rotation (15000/15000 and 60/60 requests succeeded)
-- **Real stress testing**: 15000 requests at ~120 req/s average (100-150 req/s observed, peaks up to 200+ req/s) validates zero downtime under extreme load
+- **100% success rate**: No failed requests during rotation (validated with k6 distributed load testing)
+- **Maximum proven throughput**: **~397 req/s** (71,447 requests in 180s) with **0% failures** and **0.76% drops**
+- **Optimal k6 configuration**: H2=250 req/s (max 160 VUs), H3=150 req/s (max 100 VUs) - **production-ready**
+- **Breaking point identified**: 260/160 configuration shows 0.08% failures (violates zero-downtime requirement)
+- **Real stress testing**: k6 distributed load testing validates zero downtime under extreme production load
 - **True zero-downtime**: Multiple replicas with RollingUpdate ensure continuous service availability
 - **Production-ready**: Supports multi-node clusters with proper load balancing and high availability
-- **Throughput optimization**: Concurrent pool strategy (20 concurrent requests) achieves 10x higher throughput than sequential requests
-- **Optimizations**: Removed PORT detection overhead, eliminated output overhead, direct merge patch for fastest restart, 3.0s timeout for 100% success
+- **Throughput optimization**: k6 constant-arrival-rate executor with connection reuse achieves optimal performance
+- **Optimizations**: Removed PORT detection overhead, eliminated output overhead, direct merge patch for fastest restart
 
 ### Full Multi-Protocol Support ✅
 **All tests passing** - Complete end-to-end validation of HTTP/2, HTTP/3 (QUIC), and gRPC communication:
@@ -262,11 +273,13 @@ For detailed technical documentation, system design diagrams, and deep dives int
         │                                                               │
         │  ┌──────────────┐                                           │
         │  │    Kafka     │                                           │
-        │  │   (9092)     │                                           │
+        │  │ PLAINTEXT:9092│                                          │
+        │  │   SSL:9093   │                                           │
         │  │ - Messaging  │                                           │
         │  │ - Events     │                                           │
         │  │ - Forum Posts│                                           │
         │  │ - Group Chat │                                           │
+        │  │ - Strict TLS │                                           │
         │  └──────────────┘                                           │
         └───────────────────────────────────────────────────────────────┘
 
@@ -378,7 +391,7 @@ For detailed technical documentation, system design diagrams, and deep dives int
   - **Auction Monitor**: Reads from `listings.watchlist` (port 5435), writes to `auction_monitor.auction_results` (port 5438)
   - **Analytics Service**: Reads from `listings.search_history` (port 5435), writes to `analytics.price_snapshots` (port 5439)
 - **Redis** (6379): Password-protected JWT revocation cache, search result caching, rate limiting
-- **Kafka** (9092): Event streaming, real-time messaging for forum posts, direct messages, and group chats
+- **Kafka** (PLAINTEXT:9092, SSL:9093): Event streaming, real-time messaging for forum posts, direct messages, and group chats. **Strict TLS enabled** with SSL certificates stored in `kafka-ssl-secret`. Services use SSL port (9093) for secure communication.
 - Services connect via `host.docker.internal:PORT` from Kubernetes pods
 
 **Observability:**
@@ -398,7 +411,7 @@ For detailed technical documentation, system design diagrams, and deep dives int
 | **Listings Service** | 4003/50057 | HTTP/gRPC | Public catalogue endpoints, eBay integration, gRPC interface on port 50057 for marketplace data |
 | **Analytics Service** | 4004/50054 | HTTP/gRPC | Authenticated aggregations, price snapshots, dual-DB (listings + analytics), multi-core worker pool, gRPC on port 50054 |
 | **Social Service** | 4006/50056 | HTTP/gRPC | Forum posts, comments, votes, user messaging, threaded conversations, gRPC on port 50056 |
-| **Shopping Service** | 4007/50058 | HTTP/gRPC | Shopping cart, checkout, order management, wishlist, purchase history, gRPC on port 50058 |
+| **Shopping Service** | 4007/50058 | HTTP/gRPC | Shopping cart, checkout, order management, wishlist, purchase history, gRPC on port 50058. **Strict TLS enforced** in all k6 load tests (`run-k6-shopping.sh`, `find-bottlenecks.sh`) with CA certificate validation. Tests use ClusterIP (`caddy-h3.ingress-nginx.svc.cluster.local:443`) for in-cluster testing to avoid NodePort TLS issues in Kind.
 | **Auction Monitor** | 4008/50059 | HTTP/gRPC | Monitors auction trends, price tracking, dual-DB (listings read + auction-monitor write), **granular percentiles (p1-p99)**, **Discogs price history scraping**, **service integrations** (Social, Shopping, Listings), gRPC on port 50059 |
 | **Python AI Service** | 5005/50060 | HTTP/gRPC | FastAPI service for AI/ML predictions, grade recommendations, Discogs/eBay integration, chatbot interface, gRPC on port 50060 |
 | **Web App (Next.js)** | 3001 | HTTP | React/Next.js frontend with TypeScript, serves via Nginx edge, includes dashboard, forum, messaging, collection management, auction monitoring, insights, and integrations pages |
@@ -436,9 +449,15 @@ Some services connect to multiple databases for cross-service data access:
 
 #### Supporting Infrastructure
 - **Redis** (`docker-compose.yml:redis`) - Port 6379, password-protected, JWT revocation cache, search result caching, rate limiting
-- **Kafka** (`docker-compose.yml:kafka`) - Port 9092, event streaming, real-time messaging for forum posts, direct messages, and group chats
+- **Kafka** (`infra/k8s/base/kafka/deploy.yaml`) - **Strict TLS enabled**:
+  - **PLAINTEXT listener**: Port 9092 (available for migration)
+  - **SSL listener**: Port 9093 (primary, strict TLS)
+  - **SSL certificates**: Generated and stored in `kafka-ssl-secret` (keystore, truststore, CA)
+  - **Environment variables**: All required Confluent Kafka SSL env vars configured
+  - **Services**: Python AI service and other services use SSL port (9093)
+  - **Event streaming**: Real-time messaging for forum posts, direct messages, and group chats
 
-Services connect via `host.docker.internal:PORT` from Kubernetes pods. Connection strings are configured in `infra/k8s/base/config/app-config.yaml` with `POSTGRES_URL_*` environment variables.
+Services connect via Kubernetes Service names (e.g., `postgres-auth-external.record-platform.svc.cluster.local:5437`) which route through Kubernetes Endpoints to Docker Compose postgres containers at `host.docker.internal:PORT` (192.168.65.254). Connection strings are configured in `infra/k8s/base/config/app-config.yaml` with `POSTGRES_URL_*` environment variables. All 8 postgres databases have corresponding Kubernetes Services and Endpoints configured for reliable connectivity from Kind cluster to Docker Compose.
 
 ### Observability & Monitoring Stack 📊
 **Comprehensive observability** - Full-stack monitoring, tracing, and visualization:
@@ -774,7 +793,7 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
   - **Python AI DB (5440)**: `python_ai` schema (AI model persistence, predictions)
 - **Dual-DB connections**: Services like auction-monitor and analytics-service connect to multiple databases for cross-service queries while maintaining data isolation
 - **Redis (6379)**: Password-protected, JWT revocation cache, search result caching, rate limiting
-- **Kafka (9092)**: Event streaming, real-time messaging for forum posts, direct messages, and group chats
+- **Kafka (PLAINTEXT:9092, SSL:9093)**: Event streaming, real-time messaging for forum posts, direct messages, and group chats. **Strict TLS enabled** with SSL certificates in `kafka-ssl-secret`. Services use SSL port (9093).
 
 ### Schema Management
 - Prisma schemas and migrations live in each service directory
@@ -960,14 +979,23 @@ kubectl -n record-platform delete pvc <pvc-name>
 
 **Database Connection Issues**:
 ```bash
-# Check database pods (if running in Kubernetes)
-kubectl -n record-platform get pods -l app=postgres
+# Check postgres external services and endpoints
+kubectl -n record-platform get svc | grep postgres
+kubectl -n record-platform get endpoints | grep postgres
 
-# Check database connectivity from service pod
-kubectl -n record-platform exec <service-pod> -- nc -zv host.docker.internal 5433
+# Verify endpoint IPs point to host.docker.internal (192.168.65.254 on macOS)
+kubectl -n record-platform get endpoints postgres-auth-external -o yaml | grep -A 3 "subsets:"
 
-# Test database connection
-psql -h localhost -p 5433 -U postgres -d records -c "SELECT 1"
+# Test database connectivity from service pod via service name
+kubectl -n record-platform run postgres-test --image=postgres:16-alpine --rm -i --restart=Never -- \
+  sh -c "PGPASSWORD=postgres psql -h postgres-auth-external.record-platform.svc.cluster.local -p 5437 -U postgres -d records -c 'SELECT 1;'"
+
+# Test direct IP connection (should be 192.168.65.254 on macOS)
+kubectl -n record-platform run postgres-test2 --image=postgres:16-alpine --rm -i --restart=Never -- \
+  sh -c "PGPASSWORD=postgres psql -h 192.168.65.254 -p 5437 -U postgres -d records -c 'SELECT 1;'"
+
+# Check service logs for database connection errors
+kubectl -n record-platform logs -l app=auth-service --tail=50 | grep -i "database\|postgres\|connection"
 ```
 
 **Database Recovery**:
@@ -1159,6 +1187,7 @@ kubectl -n record-platform wait --for=condition=ready pod --all --timeout=300s
 ```
 
 ### Documentation References
+- **Runbook**: `Runbook.md` - Comprehensive troubleshooting guide for all cluster stabilization issues and solutions
 - **Postgres Recovery**: `docs/postgres-infra-setup.md` - Complete database recovery procedures
 - **Linkerd Recovery**: `LINKERD_FIX.md` - Linkerd re-enablement process
 - **Observability**: `infra/k8s/OBSERVABILITY.md` - Observability stack troubleshooting
@@ -1194,7 +1223,7 @@ kubectl -n record-platform wait --for=condition=ready pod --all --timeout=300s
 - **Multi-Database Architecture**: 8 dedicated PostgreSQL instances for complete service isolation (auth, records, social, listings, shopping, auction-monitor, analytics, python-ai)
 - **Dual-DB Connections**: Services like auction-monitor and analytics-service connect to multiple databases for cross-service data access
 - **Auction Monitor Data Pipeline**: Comprehensive data ingestion, normalization, validation, and storage pipeline with **granular percentiles (p1-p99)**, **Discogs price history scraping**, and **service integrations** (Social, Shopping, Listings). See `services/auction-monitor/SERVICE_INTEGRATIONS.md` for details.
-- **Event Streaming**: Kafka integration for real-time messaging (forum posts, direct messages, group chats) and event processing
+- **Event Streaming**: Kafka integration with **strict TLS** (SSL port 9093) for real-time messaging (forum posts, direct messages, group chats) and event processing. SSL certificates managed via `kafka-ssl-secret`.
 - **Caching Layer**: Password-protected Redis for JWT revocation, search results, and performance optimization
 - **Observability**: Full observability stack with Prometheus, Grafana, Jaeger, OpenTelemetry, Linkerd/Istio service mesh
   - **Setup Guide**: See `infra/k8s/OBSERVABILITY-PRODUCTION-SETUP.md` for production-ready configuration

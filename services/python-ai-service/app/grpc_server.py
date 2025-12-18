@@ -179,9 +179,44 @@ async def serve(port: int = 50060):
         add_func(PythonAIServicer(), server)
     else:
         raise AttributeError("Could not find add_*Servicer_to_server function in python_ai_pb2_grpc")
-    server.add_insecure_port(f'[::]:{port}')
+    
+    # Try to load TLS certs (for production with ALPN = h2)
+    key_path = os.getenv('TLS_KEY_PATH', '/etc/certs/tls.key')
+    cert_path = os.getenv('TLS_CERT_PATH', '/etc/certs/tls.crt')
+    ca_path = os.getenv('TLS_CA_PATH', os.getenv('GRPC_CA_CERT', '/etc/certs/ca.crt'))
+    
+    if os.path.exists(key_path) and os.path.exists(cert_path):
+        # Read certificate files
+        with open(key_path, 'rb') as f:
+            private_key = f.read()
+        with open(cert_path, 'rb') as f:
+            certificate_chain = f.read()
+        
+        # For strict TLS: verify client certificates if CA cert exists
+        root_certificates = None
+        require_client_auth = False
+        if os.path.exists(ca_path):
+            with open(ca_path, 'rb') as f:
+                root_certificates = f.read()
+            require_client_auth = True
+            print("[python-ai-grpc] Starting secure HTTP/2-only server with strict TLS (client cert verification)")
+        else:
+            print("[python-ai-grpc] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)")
+        
+        # Create server credentials
+        server_credentials = grpc.ssl_server_credentials(
+            [(private_key, certificate_chain)],
+            root_certificates=root_certificates,
+            require_client_auth=require_client_auth
+        )
+        server.add_secure_port(f'[::]:{port}', server_credentials)
+        print(f"[python-ai-grpc] server listening on {port} (TLS enabled, HTTP/2 only)")
+    else:
+        print("[python-ai-grpc] TLS certs not found, starting insecure server (dev only)")
+        server.add_insecure_port(f'[::]:{port}')
+        print(f"[python-ai-grpc] server listening on {port}")
+    
     await server.start()
-    print(f"[python-ai-grpc] server listening on {port}")
     return server
 
 if __name__ == '__main__':

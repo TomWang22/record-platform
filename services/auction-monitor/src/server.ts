@@ -27,14 +27,37 @@ app.get('/metrics', async (_req, res) => {
 });
 
 app.get('/healthz', async (_req, res) => {
+  const status = {
+    ok: true,
+    listings: 'unknown',
+    auction_monitor: 'unknown',
+    timestamp: new Date().toISOString()
+  };
+  
+  // Check listings DB (REQUIRED - service needs this to read watchlist)
   try {
-    // Check both databases
     await listingsPool.query('SELECT 1');
-    await auctionPool.query('SELECT 1');
-    res.json({ ok: true, db: 'connected', listings: 'ok', auction_monitor: 'ok' });
+    status.listings = 'ok';
   } catch (err) {
-    res.status(503).json({ ok: false, db: 'disconnected', error: String(err) });
+    status.listings = 'error';
+    status.ok = false;
+    console.error('[auction-monitor] listings DB check failed:', err);
   }
+  
+  // Check auction-monitor DB (REQUIRED - service needs this to write results)
+  try {
+    await auctionPool.query('SELECT 1');
+    status.auction_monitor = 'ok';
+  } catch (err) {
+    status.auction_monitor = 'error';
+    status.ok = false;
+    console.error('[auction-monitor] auction-monitor DB check failed:', err);
+  }
+  
+  // BOTH databases are REQUIRED - return 503 if either fails
+  // Service cannot function properly without both databases
+  const httpStatus = status.ok ? 200 : 503;
+  res.status(httpStatus).json(status);
 });
 
 // Get active auctions being monitored (from watchlist)
@@ -42,29 +65,38 @@ app.get('/', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'] as string | undefined;
     
-    let query = `
-      SELECT 
-        w.id,
-        w.user_id,
-        w.source,
-        w.query,
-        w.created_at,
-        COUNT(ar.id) as result_count,
-        MAX(ar.sold_at) as last_updated
-      FROM listings.watchlist w
-      LEFT JOIN auction_monitor.auction_results ar ON ar.external_id = w.query
-    `;
-    
+    // Query watchlist from listings DB
+    let watchlistQuery = 'SELECT id, user_id, source, query, created_at FROM listings.watchlist';
     const params: any[] = [];
     if (userId) {
-      query += ' WHERE w.user_id = $1';
+      watchlistQuery += ' WHERE user_id = $1';
       params.push(userId);
     }
+    watchlistQuery += ' ORDER BY created_at DESC';
     
-    query += ' GROUP BY w.id, w.user_id, w.source, w.query, w.created_at ORDER BY w.created_at DESC';
+    const { rows: watchlistRows } = await listingsPool.query(watchlistQuery, params);
     
-    const { rows } = await listingsPool.query(query, params);
-    res.json(rows);
+    // For each watchlist item, get result count from auction-monitor DB
+    // Use Promise.all to query in parallel
+    const enrichedRows = await Promise.all(
+      watchlistRows.map(async (w: any) => {
+        // Query auction results for this watchlist query
+        const resultQuery = await auctionPool.query(
+          `SELECT COUNT(*) as count, MAX(sold_at) as last_updated
+           FROM auction_monitor.auction_results
+           WHERE external_id = $1 OR title ILIKE $2`,
+          [w.query, `%${w.query}%`]
+        );
+        
+        return {
+          ...w,
+          result_count: parseInt(resultQuery.rows[0]?.count || '0', 10),
+          last_updated: resultQuery.rows[0]?.last_updated || null
+        };
+      })
+    );
+    
+    res.json(enrichedRows);
   } catch (err) {
     console.error('[auction-monitor] GET / error:', err);
     res.status(500).json({ error: 'Internal server error', details: String(err) });
@@ -138,22 +170,22 @@ app.post('/monitor', async (req, res) => {
     }
     
     // Add to watchlist in listings DB
-    const { rows } = await listingsPool.query(
-      `INSERT INTO listings.watchlist (user_id, source, query)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (user_id, source, query) DO NOTHING
-       RETURNING id, user_id, source, query, created_at`,
+    // Check if already exists first (partial unique index doesn't work with ON CONFLICT)
+    const existing = await listingsPool.query(
+      'SELECT id, user_id, source, query, created_at FROM listings.watchlist WHERE user_id = $1 AND source = $2 AND query = $3',
       [userId, source, query]
     );
     
-    if (rows.length === 0) {
-      // Already exists
-      const existing = await listingsPool.query(
-        'SELECT id, user_id, source, query, created_at FROM listings.watchlist WHERE user_id = $1 AND source = $2 AND query = $3',
-        [userId, source, query]
-      );
+    if (existing.rows.length > 0) {
       return res.json({ message: 'Already monitoring', watchlist: existing.rows[0] });
     }
+    
+    const { rows } = await listingsPool.query(
+      `INSERT INTO listings.watchlist (user_id, source, query)
+       VALUES ($1, $2, $3)
+       RETURNING id, user_id, source, query, created_at`,
+      [userId, source, query]
+    );
     
     res.status(201).json({ message: 'Monitoring started', watchlist: rows[0] });
   } catch (err) {
@@ -169,6 +201,7 @@ app.get('/results', async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
     
+    // Get auction results from auction_monitor database
     let query = `
       SELECT 
         ar.id,
@@ -182,19 +215,36 @@ app.get('/results', async (req, res) => {
         ar.sold_at,
         ar.auction_url,
         ar.image_url,
-        ar.created_at,
-        w.user_id
+        ar.created_at
       FROM auction_monitor.auction_results ar
-      LEFT JOIN listings.watchlist w ON w.query = ar.external_id OR ar.title ILIKE '%' || w.query || '%'
     `;
     
     const params: any[] = [];
+    let paramCount = 0;
+    
+    // If userId provided, filter by matching watchlist entries
     if (userId) {
-      query += ' WHERE w.user_id = $1';
-      params.push(userId);
+      // First get watchlist queries for this user
+      const watchlistResult = await listingsPool.query(
+        'SELECT query FROM listings.watchlist WHERE user_id = $1 AND query IS NOT NULL',
+        [userId]
+      );
+      
+      if (watchlistResult.rows.length === 0) {
+        return res.json({ results: [], count: 0, limit, offset });
+      }
+      
+      const queries = watchlistResult.rows.map((r: any) => r.query);
+      const conditions = queries.map((q: string, i: number) => {
+        paramCount++;
+        params.push(`%${q}%`);
+        return `ar.title ILIKE $${paramCount}`;
+      }).join(' OR ');
+      
+      query += ` WHERE ${conditions}`;
     }
     
-    query += ' ORDER BY ar.sold_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+    query += ` ORDER BY ar.sold_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     params.push(limit, offset);
     
     const { rows } = await auctionPool.query(query, params);

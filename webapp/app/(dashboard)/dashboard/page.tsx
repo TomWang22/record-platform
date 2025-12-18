@@ -173,7 +173,7 @@ export default function DashboardHome() {
 
       {/* Quick Actions */}
       <section className="grid gap-4 md:grid-cols-3">
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer" asChild>
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
           <Link href="/records">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 dark:bg-brand/20">
@@ -189,7 +189,7 @@ export default function DashboardHome() {
           </Link>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer" asChild>
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
           <Link href="/market">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
@@ -205,7 +205,7 @@ export default function DashboardHome() {
           </Link>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer" asChild>
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
           <Link href="/auctions">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30">

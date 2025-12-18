@@ -1,7 +1,7 @@
 import { authenticator, totp } from "otplib";
 import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import { hashPassword, comparePassword } from "./bcrypt-queue.js";
 import QRCode from "qrcode";
 
 // Generate backup codes (10 codes, each 8 characters)
@@ -16,7 +16,7 @@ export function generateBackupCodes(): string[] {
 
 // Hash backup codes for storage
 export async function hashBackupCodes(codes: string[]): Promise<string[]> {
-  return Promise.all(codes.map((code) => bcrypt.hash(code, 10)));
+  return Promise.all(codes.map((code) => hashPassword(code)));
 }
 
 // Verify backup code
@@ -25,7 +25,7 @@ export async function verifyBackupCode(
   code: string
 ): Promise<boolean> {
   for (const hashed of hashedCodes) {
-    if (await bcrypt.compare(code, hashed)) {
+    if (await comparePassword(code, hashed)) {
       return true;
     }
   }
@@ -122,7 +122,7 @@ export async function verifyMFA(
     // Remove used backup code
     const remainingCodes: string[] = [];
     for (const hashed of mfaSettings.backup_codes) {
-      const isMatch = await bcrypt.compare(code, hashed);
+      const isMatch = await comparePassword(code, hashed);
       if (!isMatch) {
         remainingCodes.push(hashed);
       }

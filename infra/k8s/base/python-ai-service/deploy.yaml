@@ -5,7 +5,7 @@ metadata:
   namespace: record-platform
   labels: { app: python-ai-service }
 spec:
-  replicas: 1
+  replicas: 2  # Keep two pods (social + pipeline)
   selector: { matchLabels: { app: python-ai-service } }
   template:
     metadata:
@@ -26,6 +26,7 @@ spec:
               containerPort: 50060
           envFrom:
             - configMapRef: { name: app-config }
+            - secretRef: { name: app-secrets }
             - secretRef:    { name: app-secrets }
           env:
             - name: NODE_ENV
@@ -34,17 +35,79 @@ spec:
               value: "true"
             - name: GRPC_PORT
               value: "50060"
+            - name: NODE_TLS_REJECT_UNAUTHORIZED
+              value: "1"
+            - name: NODE_EXTRA_CA_CERTS
+              value: "/certs/dev-root.pem"
+            - name: KAFKA_SSL_CA_CERT
+              value: "/etc/kafka/secrets/ca-cert.pem"
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto
               readOnly: true
+            - name: dev-root-ca
+              mountPath: /certs
+              readOnly: true
+            - name: kafka-ssl-certs
+              mountPath: /etc/kafka/secrets
+              readOnly: true
           readinessProbe:
-            httpGet: { path: /healthz, port: http }
-            initialDelaySeconds: 5
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50060
+                - -service=grpc.health.v1.Health
+                - -connect-timeout=10s
+                - -rpc-timeout=15s
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 20
+            successThreshold: 1
+            failureThreshold: 6
           livenessProbe:
-            httpGet: { path: /healthz, port: http }
-            initialDelaySeconds: 15
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50060
+                - -service=grpc.health.v1.Health
+                - -connect-timeout=10s
+                - -rpc-timeout=15s
+            initialDelaySeconds: 150
+            periodSeconds: 30
+            timeoutSeconds: 20
+            successThreshold: 1
+            failureThreshold: 6
+          startupProbe:
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50060
+                - -service=grpc.health.v1.Health
+                - -connect-timeout=10s
+                - -rpc-timeout=20s
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 20
+            successThreshold: 1
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: "1000m"  # Increased from 500m (1 CPU core) for better baseline performance
+              memory: "1Gi"  # Increased from 512Mi for better caching and connection pools
+            limits:
+              cpu: "4"  # Increased from 2 (2 CPU cores) to 4 for better concurrency under load
+              memory: "4Gi"  # Increased from 2Gi to 4Gi for better caching and connection pools
       volumes:
         - name: proto-files
           configMap:
             name: proto-files
+        - name: dev-root-ca
+          secret:
+            secretName: dev-root-ca
+            items:
+              - key: dev-root.pem
+                path: dev-root.pem
+        - name: kafka-ssl-certs
+          secret:
+            secretName: kafka-ssl-secret
+            optional: true  # Optional for dev (can use PLAINTEXT if not available)

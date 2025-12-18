@@ -3,10 +3,11 @@
  * 
  * Ingests normalized listings from Auction Monitor into Analytics Service.
  * Performs:
- * - Price percentile calculation (p25, p50, p75, p95)
+ * - Price percentile calculation (p1-p100 - granular percentiles)
  * - Historical comparison
  * - Time-series storage
  * - Statistical analysis
+ * - Data quality validation (Python AI readiness)
  * 
  * Only processes high-confidence listings (confidence ≥ 0.7) to ensure
  * Analytics Service and Python AI Service receive quality data.
@@ -14,19 +15,21 @@
 
 import { Pool } from 'pg'
 import type { NormalizedListing } from '../normalizers/listing-normalizer'
+import { validatePythonAIReadiness } from './data-validator'
 
 /**
- * Granular Price Percentiles (p1 through p99)
+ * Granular Price Percentiles (p1 through p100)
  * 
- * Calculates every percentile from p1 to p99 for detailed price analysis.
+ * Calculates every percentile from p1 to p100 for detailed price analysis.
  * This granular approach enables:
  * - Precise price positioning (e.g., "this is at the 47th percentile")
  * - Better negotiation guidance (exact percentile-based recommendations)
  * - More accurate AI predictions (granular data for ML models)
  * - Detailed market analysis (price distribution curves)
+ * - Complete price range coverage (p1 = minimum, p100 = maximum)
  */
 export interface PricePercentiles {
-  // Granular percentiles (p1 through p99)
+  // Granular percentiles (p1 through p100)
   p1: number
   p2: number
   p3: number
@@ -126,6 +129,7 @@ export interface PricePercentiles {
   p97: number
   p98: number
   p99: number
+  p100: number
   
   // Metadata
   count: number
@@ -264,9 +268,9 @@ export class AnalyticsIngestionPipeline {
     const variance = sorted.reduce((sum, price) => sum + Math.pow(price - mean, 2), 0) / sorted.length
     const stdDev = Math.sqrt(variance)
     
-    // Calculate all percentiles from p1 to p99
+    // Calculate all percentiles from p1 to p100
     const percentiles: any = {}
-    for (let p = 1; p <= 99; p++) {
+    for (let p = 1; p <= 100; p++) {
       percentiles[`p${p}`] = this.percentile(sorted, p / 100)
     }
     
@@ -387,7 +391,8 @@ export class AnalyticsIngestionPipeline {
   
   /**
    * Store price snapshot in time-series table
-   * Includes granular percentiles (p1-p99) in metadata
+   * Includes granular percentiles (p1-p100) in metadata
+   * Validates data quality before storing (Python AI readiness)
    */
   private async storePriceSnapshot(
     listing: any,
@@ -411,7 +416,7 @@ export class AnalyticsIngestionPipeline {
         listing.watcher_count || 0,
         'active',
         JSON.stringify({
-          // Store all granular percentiles (p1-p99)
+          // Store all granular percentiles (p1-p100)
           percentiles: {
             // Include all percentiles for detailed analysis
             ...percentiles,
@@ -421,12 +426,32 @@ export class AnalyticsIngestionPipeline {
               p50: percentiles.p50,
               p75: percentiles.p75,
               p95: percentiles.p95,
+              p100: percentiles.p100,
             },
           },
           historical,
           confidence: listing.confidence_score,
+          completeness: listing.completeness_score,
           // Current price position (which percentile)
           pricePosition,
+          // Data quality validation results (Python AI readiness)
+          validation: (() => {
+            const validation = validatePythonAIReadiness(
+              percentiles,
+              listing.confidence_score || 0,
+              listing.completeness_score || 0
+            )
+            if (!validation.valid) {
+              console.warn(`[AnalyticsIngestion] Data quality validation failed for listing ${listing.id}:`, validation.errors)
+            }
+            return {
+              valid: validation.valid,
+              score: validation.score,
+              errors: validation.errors,
+              warnings: validation.warnings,
+              pythonAIReady: validation.valid && validation.score >= 0.8,
+            }
+          })(),
         }),
       ]
     )
@@ -438,14 +463,14 @@ export class AnalyticsIngestionPipeline {
    */
   private calculatePricePosition(currentPrice: number, percentiles: PricePercentiles): number {
     // Find the percentile that current price is closest to
-    for (let p = 1; p <= 99; p++) {
+    for (let p = 1; p <= 100; p++) {
       const percentileValue = (percentiles as any)[`p${p}`]
       if (currentPrice <= percentileValue) {
         return p / 100
       }
     }
-    // If price is above p99, return 0.99
-    return 0.99
+    // If price is above p100, return 1.0 (100th percentile)
+    return 1.0
   }
   
   /**
@@ -505,7 +530,7 @@ export class AnalyticsIngestionPipeline {
    */
   private createDefaultPercentiles(price: number, count: number): PricePercentiles {
     const percentiles: any = {}
-    for (let p = 1; p <= 99; p++) {
+    for (let p = 1; p <= 100; p++) {
       percentiles[`p${p}`] = price
     }
     

@@ -29,11 +29,11 @@ import { Agent as HttpAgent } from "http";
 import type { Socket } from "net";
 
 
-// one shared agent (tune if needed)
+// one shared agent (tune if needed) - increased for high concurrency
 const keepAliveAgent = new HttpAgent({
   keepAlive: true,
-  maxSockets: 512,
-  maxFreeSockets: 256,
+  maxSockets: 1000,  // Increased from 512 to 1000 for high concurrency (50+ VUs)
+  maxFreeSockets: 500,  // Increased from 256 to 500 for better connection reuse
   keepAliveMsecs: 30_000,
 });
 
@@ -272,8 +272,17 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 const limiter = rateLimit({
-  windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false,
-  skip: (req) => req.path === "/healthz" || req.path === "/metrics",
+  windowMs: 60_000, 
+  max: process.env.DISABLE_RATE_LIMIT === "true" ? 999999 : 300,  // Temporarily allow high rate for load testing
+  standardHeaders: true, 
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for health/metrics endpoints
+    if (req.path === "/healthz" || req.path === "/metrics") return true;
+    // Skip rate limiting when X-Loadtest header is present (for load testing)
+    if (req.get("x-loadtest") === "1" || req.get("X-Loadtest") === "1") return true;
+    return false;
+  },
 });
 app.use(limiter);
 
@@ -718,11 +727,12 @@ app.post("/auth/register", jsonParser, async (req: Request, res: Response) => {
   }
 
   try {
-    // Register can be slow (password hashing, DB writes), so use 20s timeout
+    // Register can be slow (password hashing, DB writes), so use 30s timeout
+    // Under load, bcrypt queue can back up and DB queries can be slow
     const response = await promisifyGrpcCall<any>(authGrpcClient, "Register", {
       email,
       password,
-    }, 20000); // 20 second timeout for registration
+    }, 30000); // 30 second timeout for registration (increased from 20s)
     res.status(201).json({
       token: response?.token ?? "",
       user: response?.user ?? null,
@@ -743,10 +753,12 @@ app.post("/auth/login", jsonParser, async (req: Request, res: Response) => {
   }
 
   try {
+    // Login can be slow under load (bcrypt verification, DB queries), so use 30s timeout
     const response = await promisifyGrpcCall<any>(
       authGrpcClient,
       "Authenticate",
-      { email, password, mfa_code: mfaCode } // Use proto field name (snake_case)
+      { email, password, mfa_code: mfaCode }, // Use proto field name (snake_case)
+      30000 // 30 second timeout for authentication (increased from default 10s)
     );
     
     // Log full response structure for debugging
@@ -2179,6 +2191,25 @@ app.use(
   })
 );
 
+// API Analytics routes - proxy to analytics-service (for /api/analytics/* paths)
+app.use(
+  "/api/analytics",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: "http://analytics-service:4004",
+    changeOrigin: true,
+    pathRewrite: { "^/api/analytics": "/analytics" }, // Rewrite /api/analytics to /analytics
+    proxyTimeout: 30000,
+    agent: keepAliveAgent,
+    on: {
+      error(err, _req, res) {
+        console.error("[gw] api/analytics proxy error:", err);
+        sendJson502(res as NodeServerResponse | Socket, "analytics upstream error");
+      },
+    },
+  })
+);
+
 /* ----------------------- Python AI Service Routes ----------------------- */
 // Python AI health check (public)
 app.use(
@@ -2205,6 +2236,25 @@ app.use(
     on: {
       error(err, _req, res) {
         console.error("[gw] python-ai proxy error:", err);
+        sendJson502(res as NodeServerResponse | Socket, "python-ai upstream error");
+      },
+    },
+  })
+);
+
+// API Python AI routes - proxy to python-ai-service (for /api/ai/* paths)
+app.use(
+  "/api/ai",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: "http://python-ai-service:5005",
+    changeOrigin: true,
+    pathRewrite: { "^/api/ai": "" }, // Remove /api/ai prefix
+    proxyTimeout: 30000,
+    agent: keepAliveAgent,
+    on: {
+      error(err, _req, res) {
+        console.error("[gw] api/python-ai proxy error:", err);
         sendJson502(res as NodeServerResponse | Socket, "python-ai upstream error");
       },
     },

@@ -1,6 +1,5 @@
 import { Router, type Request, type Response } from 'express';
 import { verifyJwt } from '@common/utils/auth';
-import { PrismaClient } from '../../prisma/generated/client';
 import {
   generateChallenge,
   storeChallenge,
@@ -11,10 +10,10 @@ import {
   updatePasskeyUsage,
   deletePasskey,
 } from '../lib/passkey.js';
+import { prisma } from '../lib/prisma.js'; // Use shared PrismaClient instance
 // WebAuthn validation now uses @simplewebauthn/server directly
 
 const router: Router = Router();
-const prisma = new PrismaClient();
 
 // Auth middleware helper
 function requireAuth(req: Request, res: Response, next: () => void) {

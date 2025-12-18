@@ -83,16 +83,18 @@ metadata:
   namespace: record-platform
 spec:
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0  # Zero-downtime deployments
   template:
     spec:
-      terminationGracePeriodSeconds: 5
+      terminationGracePeriodSeconds: 30  # Increased from 5s for graceful shutdown
       containers:
       - name: app
         lifecycle:
           preStop:
             exec:
-              command: ["sh","-lc","sleep 1"]
+              command: ["sh","-lc","sleep 10"]  # Give time for graceful shutdown
 
 ---
 apiVersion: apps/v1
@@ -102,13 +104,16 @@ metadata:
   namespace: record-platform
 spec:
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   template:
     spec:
-      terminationGracePeriodSeconds: 5
+      terminationGracePeriodSeconds: 30
       containers:
       - name: app
         lifecycle:
           preStop:
             exec:
-              command: ["sh","-lc","sleep 1"]
+              command: ["sh","-lc","sleep 5"]

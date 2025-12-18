@@ -3,7 +3,8 @@ set -euo pipefail
 
 HOST="${HOST:-record.local}"
 # Auto-detect port based on cluster, or use provided PORT
-if [[ -z "${PORT:-}" ]]; then
+# Validate PORT if set - if it's 443 (default HTTPS), re-detect
+if [[ -z "${PORT:-}" ]] || [[ "${PORT:-}" == "443" ]]; then
   CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
   if [[ "$CURRENT_CONTEXT" == "kind-h3-multi" ]]; then
     # Multi-node cluster: try ports 8444, 8445, 8446
@@ -32,6 +33,20 @@ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
 ok() { echo "✅ $*"; }
 warn() { echo "⚠️  $*"; }
 fail() { echo "❌ $*" >&2; exit 1; }
+
+# Cross-platform timeout command (macOS doesn't have timeout by default)
+_timeout_cmd() {
+  local timeout_seconds="$1"
+  shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$timeout_seconds" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$timeout_seconds" "$@"
+  else
+    # Fallback: use perl alarm (available on macOS)
+    perl -e 'alarm shift; exec @ARGV' "$timeout_seconds" "$@"
+  fi
+}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib/http3.sh

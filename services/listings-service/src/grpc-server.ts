@@ -3,6 +3,7 @@ import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as fs from "fs";
 import { resolveProtoPath } from "@common/utils/proto";
+import { registerHealthService } from "@common/utils";
 import {
   getListingById,
   getListingsByUser,
@@ -465,6 +466,17 @@ export function startGrpcServer(port: number = 50057) {
     HealthCheck: withLogging(listingsService.HealthCheck, "HealthCheck"),
   });
 
+  // Register standard gRPC Health Service (grpc.health.v1.Health)
+  registerHealthService(server, 'listings.ListingsService', async () => {
+    try {
+      await pool.query('SELECT 1');
+      return true;
+    } catch (err) {
+      console.error('[gRPC] Health check failed:', err);
+      return false;
+    }
+  });
+
   // Enable gRPC reflection for tooling (grpcurl, etc.)
   if (process.env.ENABLE_GRPC_REFLECTION !== "false") {
     try {
@@ -479,16 +491,28 @@ export function startGrpcServer(port: number = 50057) {
   let credentials: grpc.ServerCredentials;
   const keyPath = process.env.TLS_KEY_PATH || "/etc/certs/tls.key";
   const certPath = process.env.TLS_CERT_PATH || "/etc/certs/tls.crt";
+  const caPath = process.env.TLS_CA_PATH || process.env.GRPC_CA_CERT || "/etc/certs/ca.crt";
   
   if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
     const key = fs.readFileSync(keyPath);
     const cert = fs.readFileSync(certPath);
+    
+    // For strict TLS: verify client certificates if CA cert exists
+    let rootCerts: Buffer | null = null;
+    let checkClientCert = false;
+    if (fs.existsSync(caPath)) {
+      rootCerts = fs.readFileSync(caPath);
+      checkClientCert = true;
+      console.log("[gRPC] Starting secure HTTP/2-only server with strict TLS (client cert verification)");
+    } else {
+      console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)");
+    }
+    
     credentials = grpc.ServerCredentials.createSsl(
-      null,
+      rootCerts,
       [{ private_key: key, cert_chain: cert }],
-      false as any
+      checkClientCert as any
     );
-    console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2");
   } else {
     console.warn("[gRPC] TLS certs not found, starting insecure server (dev only)");
     credentials = grpc.ServerCredentials.createInsecure();

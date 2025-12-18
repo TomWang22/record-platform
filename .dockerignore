@@ -1,7 +1,56 @@
+# Git
 .git
-node_modules
-**/node_modules
-dist
-.build
-.tmp
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+README.md
+ENGINEERING.md
+
+# Build artifacts
+node_modules/
+dist/
+build/
+.next/
+out/
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Test files
+**/__tests__/
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Temporary files
+tmp/
+temp/
+*.tmp

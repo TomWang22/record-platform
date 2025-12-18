@@ -5,37 +5,39 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# workspace manifests (needed for resolution)
+# Copy package manifests (changes rarely, good for caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
-# package manifests for the pieces we care about
 COPY services/common/package.json ./services/common/package.json
 COPY services/common/tsconfig.json ./services/common/tsconfig.json
 COPY services/listings-service/package.json ./services/listings-service/package.json
 COPY services/listings-service/tsconfig.json ./services/listings-service/tsconfig.json
 
-# install without running scripts yet (we'll build in next stage)
-RUN pnpm -w \
-  --filter @common/utils... \
-  --filter listings-service... \
-  install --frozen-lockfile --ignore-scripts
+# Use BuildKit cache mounts for pnpm store (persists between builds)
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
+    pnpm -w \
+      --filter @common/utils... \
+      --filter listings-service... \
+      install --frozen-lockfile --ignore-scripts
 
 # ---------- build ----------
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# bring the prepared workspace
+# Copy installed dependencies from deps stage
 COPY --from=deps /app /app
 
-# now add sources
+# Copy source code (changes frequently, invalidates cache)
 COPY services/common ./services/common
 COPY services/listings-service ./services/listings-service
 
-# build lib then the service
-RUN pnpm -C services/common build \
+# Build with cache mount for faster subsequent builds
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm -C services/common build \
  && pnpm -C services/listings-service build
 
-# produce an isolated deploy bundle for just this service (includes node_modules)
+# Produce isolated deploy bundle (production deps only)
 RUN pnpm deploy --filter listings-service --prod /app/deploy
 
 # ---------- runtime ----------
@@ -43,7 +45,32 @@ FROM node:20-alpine
 ENV NODE_ENV=production
 WORKDIR /app
 
-# package.json, dist/, node_modules/ for listings-service only
+# Install grpc-health-probe for Kubernetes gRPC health checks (HTTP/2/3, NOT HTTP/1.1)
+RUN apk add --no-cache curl ca-certificates file && \
+    GRPC_HEALTH_PROBE_VERSION=v0.4.24 && \
+    ARCH=$(apk --print-arch) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+      BINARY_ARCH="amd64"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+      BINARY_ARCH="arm64"; \
+    else \
+      echo "Unsupported architecture: $ARCH"; exit 1; \
+    fi && \
+    echo "Downloading grpc-health-probe ${GRPC_HEALTH_PROBE_VERSION} for ${BINARY_ARCH}..." && \
+    curl -Lf -o /tmp/grpc-health-probe \
+    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-${BINARY_ARCH} && \
+    echo "Verifying binary..." && \
+    file /tmp/grpc-health-probe | grep -q "ELF.*executable" || (echo "ERROR: Downloaded file is not a valid ELF executable" && exit 1) && \
+    chmod +x /tmp/grpc-health-probe && \
+    /tmp/grpc-health-probe -version >/dev/null 2>&1 || (echo "ERROR: grpc-health-probe binary is corrupted or invalid" && exit 1) && \
+    mv /tmp/grpc-health-probe /usr/local/bin/grpc-health-probe && \
+    echo "Verifying installed binary..." && \
+    /usr/local/bin/grpc-health-probe -version >/dev/null 2>&1 && \
+    ls -lh /usr/local/bin/grpc-health-probe && \
+    echo "✅ grpc-health-probe installed and verified successfully" && \
+    apk del curl file && rm -rf /var/cache/apk/*
+
+# Copy only production bundle (smaller image)
 COPY --from=build /app/deploy/ ./
 
 CMD ["node","dist/server.js"]

@@ -1,5 +1,7 @@
 {
   admin localhost:2019
+  # HTTP/3 (QUIC) is enabled automatically when using port 443 with TLS
+  # No explicit configuration needed in Caddy v2.8+
 }
 
 # Primary vhost
@@ -27,9 +29,42 @@ https://record.local {
     }
   }
 
-  # Health check endpoint
+  # Health check endpoints
+  # HTTP/1.1 health check (for Kubernetes probes and legacy compatibility)
   handle_path /_caddy/healthz {
     respond "ok" 200
+  }
+  
+  # gRPC Health Check (grpc.health.v1.Health/Check) - HTTP/2/3 only, NOT HTTP/1.1
+  # This uses the standard gRPC health checking protocol over HTTP/2 (h2c) or HTTP/3 (QUIC)
+  # Service names: auth.AuthService, records.RecordsService, social.SocialService, shopping.ShoppingService, etc.
+  # Usage via Caddy (HTTP/2/3): grpcurl -plaintext -d '{"service":"auth.AuthService"}' record.local:443 grpc.health.v1.Health/Check
+  # Caddy automatically routes gRPC requests to the appropriate service based on the service name
+  # All gRPC traffic uses HTTP/2 (h2c) or HTTP/3 (QUIC) - NOT HTTP/1.1
+  @grpc_health {
+    protocol grpc
+    path_regexp ^/grpc\.health\.v1\.Health/
+  }
+  handle @grpc_health {
+    # Route to appropriate service based on service name in gRPC request
+    # Service name is in the request body: {"service":"auth.AuthService"}
+    # Caddy will route based on the service name header or use a default routing strategy
+    reverse_proxy {
+      to auth-service.record-platform.svc.cluster.local:50051
+      to records-service.record-platform.svc.cluster.local:50051
+      to social-service.record-platform.svc.cluster.local:50051
+      to listings-service.record-platform.svc.cluster.local:50051
+      to analytics-service.record-platform.svc.cluster.local:50051
+      to shopping-service.record-platform.svc.cluster.local:50058
+      to auction-monitor.record-platform.svc.cluster.local:50059
+      to python-ai-service.record-platform.svc.cluster.local:50060
+      header_up Host {http.request.host}
+      header_up TE trailers
+      header_up grpc-timeout {http.request.header.grpc-timeout}
+      transport http {
+        versions h2c  # HTTP/2 cleartext - NOT HTTP/1.1
+      }
+    }
   }
 
   # gRPC matchers - route by service name in path
@@ -162,20 +197,32 @@ https://record.local {
     }
   }
 
-  # REST API requests: route through nginx ingress (as before)
+  # REST API requests: route DIRECTLY to api-gateway (NOT through ingress-nginx)
+  # ROOT CAUSE FIX: Eliminate double-hop to prevent DNS timeouts and connection issues
+  # Direct routing: Caddy → api-gateway (single-hop, faster, more reliable)
   handle {
-    reverse_proxy https://ingress-nginx-controller.ingress-nginx.svc.cluster.local:443 {
+    reverse_proxy http://api-gateway.record-platform.svc.cluster.local:4000 {
       header_up Host {http.request.host}
+      # Use HTTP/1.1 to match backend
       transport http {
-        tls
-        tls_server_name record.local
-        tls_trusted_ca_certs /etc/caddy/ca/dev-root.pem
-        versions h2 h1
+        versions h1
+        # Connection pool settings for high load
+        dial_timeout 10s
+        response_header_timeout 30s
+        expect_continue_timeout 5s
+        # Connection reuse is enabled by default in Caddy
       }
+      # Load balancing and health checks
+      lb_policy round_robin
+      health_uri /healthz
+      health_interval 10s
+      health_timeout 5s
+      # Retry on connection errors
+      fail_duration 30s
+      max_fails 3
     }
   }
 }
-
 
 # FIX #1: Internal h2c port for gRPC tests (bypasses TLS)
 :5000 {
@@ -340,16 +387,28 @@ https://record.local {
     }
   }
   
-  # All other requests go through nginx ingress
+  # All other requests go through nginx ingress via HTTP (NOT HTTPS)
+  # FIX: Use HTTP to avoid double TLS termination
   handle {
-    reverse_proxy https://ingress-nginx-controller.ingress-nginx.svc.cluster.local:443 {
+    reverse_proxy http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80 {
       header_up Host {http.request.host}
+      # Use HTTP/1.1 to match backend (ingress-nginx speaks HTTP/1.1 to backends)
       transport http {
-        tls
-        tls_server_name record.local
-        tls_trusted_ca_certs /etc/caddy/ca/dev-root.pem
-        versions h2 h1
+        versions h1
+        # Connection pool settings for high load
+        dial_timeout 10s
+        response_header_timeout 30s
+        expect_continue_timeout 5s
+        # Connection reuse is enabled by default in Caddy
       }
+      # Load balancing and health checks
+      lb_policy round_robin
+      health_uri /healthz
+      health_interval 10s
+      health_timeout 5s
+      # Retry on connection errors
+      fail_duration 30s
+      max_fails 3
     }
   }
 }

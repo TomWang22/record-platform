@@ -128,8 +128,8 @@ async function testGranularPercentiles() {
     throw new Error('Percentiles not found in metadata')
   }
 
-  // Verify all percentiles p1-p99 exist
-  for (let p = 1; p <= 99; p++) {
+  // Verify all percentiles p1-p100 exist
+  for (let p = 1; p <= 100; p++) {
     const percentileKey = `p${p}`
     if (!percentiles[percentileKey]) {
       throw new Error(`Missing percentile ${percentileKey}`)
@@ -160,7 +160,7 @@ async function testGranularPercentiles() {
     throw new Error(`Invalid price position: ${pricePosition}`)
   }
 
-  console.log(`  ✅ All percentiles (p1-p99) calculated correctly`)
+  console.log(`  ✅ All percentiles (p1-p100) calculated correctly`)
   console.log(`  ✅ Summary stats: min=${min}, max=${max}, mean=${mean.toFixed(2)}, median=${median.toFixed(2)}, stdDev=${stdDev.toFixed(2)}`)
   console.log(`  ✅ Price position: ${pricePosition.toFixed(3)}`)
 
@@ -395,7 +395,7 @@ async function testPythonAIDataFormat() {
     'percentiles',
     'percentiles.p1',
     'percentiles.p50',
-    'percentiles.p99',
+    'percentiles.p100',
     'percentiles.min',
     'percentiles.max',
     'percentiles.mean',
@@ -403,6 +403,8 @@ async function testPythonAIDataFormat() {
     'percentiles.stdDev',
     'percentiles.count',
     'pricePosition',
+    'validation',
+    'validation.pythonAIReady',
   ]
 
   for (const field of requiredFields) {

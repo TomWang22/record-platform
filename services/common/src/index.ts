@@ -6,3 +6,4 @@ export * from "./redis.js";
 export * from "./grpc-reflection.js";
 export * from "./grpc-clients.js";
 export * from "./proto.js";
+export * from "./grpc-health.js";

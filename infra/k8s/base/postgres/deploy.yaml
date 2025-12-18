@@ -107,7 +107,7 @@ spec:
           - "-c"
           - "min_wal_size=80MB"
           - "-c"
-          - "max_connections=200"
+          - "max_connections=500"
           - "-c"
           - "shared_buffers=2GB"
           - "-c"
@@ -153,10 +153,10 @@ spec:
 
       volumes:
       - name: data
-        persistentVolumeClaim: { claimName: pgdata-big }
+        persistentVolumeClaim: { claimName: pgdata }
       - name: init
         configMap: { name: postgres-init }
       - name: wal-archive
-        persistentVolumeClaim: { claimName: pg-wal-archive }
+        emptyDir: {}  # Changed from PVC to emptyDir for simplicity (WAL archive not critical for dev)
       - name: run
         emptyDir: {}

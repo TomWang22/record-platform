@@ -5,18 +5,34 @@ import * as path from 'path'
 // Redis client factory (similar to social-service)
 export function makeRedis(): Redis | null {
   const url = process.env.REDIS_URL
+  const password = process.env.REDIS_PASSWORD
+  
   if (!url) {
     console.warn('[shopping] REDIS_URL not set, Redis caching disabled')
     return null
   }
 
+  // Support both REDIS_URL (with password) and REDIS_PASSWORD env var
+  let redisUrl = url
+  if (password && !redisUrl.includes('@') && !redisUrl.includes('://:')) {
+    // Insert password after redis://
+    redisUrl = redisUrl.replace('redis://', `redis://:${password}@`)
+  }
+
   try {
-    const redis = new Redis(url, {
+    const redis = new Redis(redisUrl, {
+      password: password, // Also set password directly (ioredis supports both)
       maxRetriesPerRequest: 3,
+      lazyConnect: true,
       retryStrategy: (times) => {
         if (times > 3) return null
         return Math.min(times * 50, 2000)
       },
+    })
+    
+    // Connect asynchronously
+    redis.connect().catch((err) => {
+      console.warn('[shopping] Redis connection failed (non-fatal):', err.message)
     })
 
     redis.on('error', (err) => {

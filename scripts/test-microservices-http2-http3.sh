@@ -6,7 +6,8 @@ HOST="${HOST:-record.local}"
 CURL_BIN="${CURL_BIN:-/opt/homebrew/opt/curl/bin/curl}"
 
 # Auto-detect port based on cluster, or use provided PORT
-if [[ -z "${PORT:-}" ]]; then
+# Validate PORT if set - if it's 443 (default HTTPS), re-detect
+if [[ -z "${PORT:-}" ]] || [[ "${PORT:-}" == "443" ]]; then
   CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
   if [[ "$CURRENT_CONTEXT" == "kind-h3-multi" ]]; then
     # Multi-node cluster: try ports 8444, 8445, 8446

@@ -5,6 +5,7 @@ import type { PrismaClient } from '../generated/records-client';
 import { PrismaClient as PrismaClientCtor, Prisma } from '../generated/records-client';
 import path from "path";
 import fs from "fs";
+import { registerHealthService } from "@common/utils";
 
 type LoadedRecord = Awaited<ReturnType<PrismaClient["record"]["findFirst"]>>;
 
@@ -211,6 +212,17 @@ export function startGrpcServer(port: number = 50051, prismaClient?: PrismaClien
   };
 
   server.addService(service, handlers);
+
+  // Register standard gRPC Health Service (grpc.health.v1.Health)
+  registerHealthService(server, 'records.RecordsService', async () => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return true;
+    } catch (err) {
+      console.error('[gRPC] Health check failed:', err);
+      return false;
+    }
+  });
 
   // Enable gRPC reflection for tooling (grpcurl, etc.)
   if (process.env.ENABLE_GRPC_REFLECTION !== "false") {

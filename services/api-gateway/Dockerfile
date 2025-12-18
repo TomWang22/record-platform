@@ -1,55 +1,65 @@
 # syntax=docker/dockerfile:1
 
+# ---------- deps ----------
 FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# workspace manifests (+ base tsconfig!)
+# Copy package manifests (changes rarely, good for caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
-# only the manifests we need for filtered install
 COPY services/common/package.json ./services/common/package.json
 COPY services/api-gateway/package.json ./services/api-gateway/package.json
 
-# install dev deps for BOTH common and gateway; no scripts yet
-RUN pnpm -w \
-  --filter @common/utils... \
-  --filter api-gateway... \
-  install --frozen-lockfile --ignore-scripts
+# Use BuildKit cache mounts for pnpm store (persists between builds)
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
+    pnpm -w \
+      --filter @common/utils... \
+      --filter api-gateway... \
+      install --frozen-lockfile --ignore-scripts
 
-
+# ---------- build ----------
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# bring installed node_modules and tsconfig.base.json
+# Copy installed dependencies from deps stage
 COPY --from=deps /app /app
 
-# now copy sources
+# Copy source code (changes frequently, invalidates cache)
 COPY services/common ./services/common
 COPY services/api-gateway ./services/api-gateway
 COPY proto ./proto
 
-# build common first, then gateway; then prune dev deps for runtime
-RUN pnpm -C services/common build \
+# Build with cache mount for faster subsequent builds
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm -C services/common build \
  && pnpm -C services/api-gateway build \
  && pnpm -C services/api-gateway prune --prod
 
+# Produce isolated deploy bundle (production deps only)
+RUN pnpm deploy --filter api-gateway --prod /app/deploy
 
+# ---------- runtime ----------
 FROM node:20-alpine
-# keep workspace layout so pnpm's symlinks continue to resolve
-WORKDIR /app/services/api-gateway
 ENV NODE_ENV=production
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+WORKDIR /app
 
-# runtime bits
-COPY --from=build /app/node_modules /app/node_modules
-COPY --from=build /app/services/api-gateway/dist ./dist
-COPY --from=build /app/services/api-gateway/package.json ./package.json
-COPY --from=build /app/services/api-gateway/node_modules ./node_modules
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nodejs
 
-# include built common to satisfy pnpm workspace link at runtime
-COPY --from=build /app/services/common /app/services/common
-# include proto files for gRPC client loading
-COPY --from=build /app/proto /app/proto
+# Copy only production bundle (smaller image)
+COPY --from=build --chown=nodejs:nodejs /app/deploy/ ./
+# Include proto files for gRPC client loading
+COPY --from=build --chown=nodejs:nodejs /app/proto /app/proto
 
+# Remove unnecessary files
+RUN rm -rf node_modules/.cache \
+    && find . -name "*.map" -delete 2>/dev/null || true \
+    && find . -name "*.ts" -type f -not -path "./node_modules/*" -delete 2>/dev/null || true
+
+USER nodejs
+
+EXPOSE 4000
 CMD ["node","dist/server.js"]

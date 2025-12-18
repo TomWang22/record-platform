@@ -7,6 +7,7 @@ import os from 'os'
 import { pool } from './lib/db.js'
 import { makeRedis, CacheManager } from './lib/cache.js'
 import { kafka } from '@common/utils/kafka'
+import { registerHealthService } from '@common/utils'
 
 // Load proto file (try both relative paths for dev vs production, and K8s mount)
 function findProtoPath(): string {
@@ -523,13 +524,17 @@ const shoppingService = {
     }
   },
 
-  // Health check
+  // Legacy health check (kept for backward compatibility)
+  // Note: Standard health check is now handled by grpc.health.v1.Health service
   async HealthCheck(_call: any, callback: any) {
     try {
       await pool.query('SELECT 1')
+      if (redis && redis.status !== 'ready') {
+        await redis.ping()
+      }
       callback(null, { healthy: true, message: 'OK' })
     } catch (err: any) {
-      callback({ code: grpc.status.UNAVAILABLE, message: 'Database unavailable' })
+      callback({ code: grpc.status.UNAVAILABLE, message: 'Database or Redis unavailable' })
     }
   },
 }
@@ -541,17 +546,84 @@ for (const [method, handler] of Object.entries(shoppingService)) {
 }
 
 export function startGrpcServer(port: number) {
-  const server = new grpc.Server()
+  const server = new grpc.Server({
+    'grpc.keepalive_time_ms': 30000,
+    'grpc.keepalive_timeout_ms': 5000,
+    'grpc.keepalive_permit_without_calls': 1,
+    'grpc.http2.max_pings_without_data': 0,
+    'grpc.http2.min_time_between_pings_ms': 10000,
+    'grpc.http2.min_ping_interval_without_data_ms': 300000,
+  })
 
   server.addService(shoppingProto.shopping.ShoppingService.service, wrappedService)
 
-  server.bindAsync(`0.0.0.0:${port}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
+  // Register standard gRPC Health Service (grpc.health.v1.Health/Check)
+  // This enables Kubernetes health probes and Caddy health checks
+  registerHealthService(server, 'shopping.ShoppingService', async () => {
+    try {
+      // Check database connectivity
+      await pool.query('SELECT 1')
+      
+      // Check Redis connectivity (if Redis is available)
+      if (redis && redis.status !== 'ready') {
+        await redis.ping()
+      }
+      
+      return true
+    } catch (err: any) {
+      console.error('[shopping] Health check failed:', err.message)
+      return false
+    }
+  })
+
+  // Enable gRPC reflection for tooling (grpcurl, etc.)
+  if (process.env.ENABLE_GRPC_REFLECTION !== "false") {
+    try {
+      const { enableReflection } = require("@common/utils/grpc-reflection");
+      enableReflection(server, [PROTO_PATH], ["shopping.ShoppingService"]);
+    } catch (err) {
+      console.warn("[shopping gRPC] Failed to enable reflection:", err);
+    }
+  }
+
+  // Try to load TLS certs (for production with ALPN = h2)
+  let credentials: grpc.ServerCredentials;
+  const keyPath = process.env.TLS_KEY_PATH || "/etc/certs/tls.key";
+  const certPath = process.env.TLS_CERT_PATH || "/etc/certs/tls.crt";
+  const caPath = process.env.TLS_CA_PATH || process.env.GRPC_CA_CERT || "/etc/certs/ca.crt";
+  
+  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+    const key = fs.readFileSync(keyPath);
+    const cert = fs.readFileSync(certPath);
+    
+    // For strict TLS: verify client certificates if CA cert exists
+    let rootCerts: Buffer | null = null;
+    let checkClientCert = false;
+    if (fs.existsSync(caPath)) {
+      rootCerts = fs.readFileSync(caPath);
+      checkClientCert = true;
+      console.log("[gRPC] Starting secure HTTP/2-only server with strict TLS (client cert verification)");
+    } else {
+      console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)");
+    }
+    
+    credentials = grpc.ServerCredentials.createSsl(
+      rootCerts,
+      [{ private_key: key, cert_chain: cert }],
+      checkClientCert as any
+    );
+  } else {
+    console.warn("[gRPC] TLS certs not found, starting insecure server (dev only)");
+    credentials = grpc.ServerCredentials.createInsecure();
+  }
+
+  server.bindAsync(`0.0.0.0:${port}`, credentials, (err, actualPort) => {
     if (err) {
       console.error(`[shopping-grpc] Failed to start gRPC server:`, err)
       return
     }
     server.start()
-    console.log(`[shopping-grpc] gRPC server listening on port ${port}`)
+    console.log(`[shopping-grpc] gRPC server listening on port ${actualPort} (HTTP/2 only)`)
   })
 
   // Graceful shutdown

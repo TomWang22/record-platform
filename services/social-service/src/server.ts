@@ -30,19 +30,61 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next()
 })
 
-// Health check
+// Health check with timeout protection
 app.get('/healthz', async (_req: Request, res: Response) => {
-  try {
-    await pool.query('SELECT 1')
-    let r = 'skipped'
-    try {
-      r = redis ? await redis.ping() : 'disabled'
-    } catch {
-      r = 'error'
+  const status = {
+    ok: true,
+    db: 'unknown',
+    redis: 'unknown',
+    cpu_cores: CPU_CORES,
+    timestamp: new Date().toISOString()
+  };
+  
+  // Set timeout for entire health check (max 3 seconds)
+  const healthCheckTimeout = setTimeout(() => {
+    if (!res.headersSent) {
+      status.db = 'timeout';
+      status.ok = false;
+      res.status(503).json(status);
     }
-    res.json({ ok: true, db: 'connected', redis: r, cpu_cores: CPU_CORES })
+  }, 3000);
+  
+  try {
+    // Check database (critical) with timeout wrapper
+    const dbCheckPromise = pool.query('SELECT 1');
+    const dbTimeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('DB query timeout')), 2000)
+    );
+    
+    await Promise.race([dbCheckPromise, dbTimeoutPromise]);
+    status.db = 'connected';
   } catch (err) {
-    res.status(503).json({ ok: false, db: 'disconnected', error: String(err) })
+    status.db = 'disconnected';
+    status.ok = false;
+    console.error('[social] DB check failed:', err);
+  }
+  
+  // Check Redis (non-critical) with timeout
+  try {
+    if (redis) {
+      const redisCheckPromise = redis.ping();
+      const redisTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Redis ping timeout')), 1000)
+      );
+      status.redis = await Promise.race([redisCheckPromise, redisTimeoutPromise]) as string;
+    } else {
+      status.redis = 'disabled';
+    }
+  } catch (err) {
+    status.redis = 'error';
+    // Don't fail health check if Redis is down (non-critical)
+    console.warn('[social] Redis check failed:', err);
+  }
+  
+  clearTimeout(healthCheckTimeout);
+  if (!res.headersSent) {
+    const httpStatus = status.ok ? 200 : 503;
+    res.status(httpStatus).json(status);
   }
 })
 

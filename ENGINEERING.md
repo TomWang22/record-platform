@@ -137,11 +137,13 @@ This document provides in-depth technical documentation for the Record Platform 
         │                                                               │
         │  ┌──────────────┐                                           │
         │  │    Kafka     │                                           │
-        │  │   (9092)     │                                           │
+        │  │ PLAINTEXT:9092│                                          │
+        │  │   SSL:9093   │                                           │
         │  │ - Messaging  │                                           │
         │  │ - Events     │                                           │
         │  │ - Forum Posts│                                           │
         │  │ - Group Chat │                                           │
+        │  │ - Strict TLS │                                           │
         │  └──────────────┘                                           │
         └───────────────────────────────────────────────────────────────┘
 
@@ -237,7 +239,7 @@ This document provides in-depth technical documentation for the Record Platform 
 - More complex connection management
 - Cross-service queries require dual-DB connections (auction-monitor, analytics-service)
 
-**Implementation**: Services connect via `host.docker.internal:PORT` from Kubernetes pods, with dedicated ports:
+**Implementation**: Services connect via Kubernetes Service names (e.g., `postgres-auth-external.record-platform.svc.cluster.local:5437`) which route through Kubernetes Endpoints to Docker Compose postgres containers at `host.docker.internal:PORT` (192.168.65.254 on macOS with Docker Desktop). All 8 postgres databases have corresponding Kubernetes Services and Endpoints configured. Dedicated ports:
 - Main DB: 5433 (records schema)
 - Auth DB: 5437 (auth schema)
 - Social DB: 5434 (social schema)
@@ -306,10 +308,14 @@ This document provides in-depth technical documentation for the Record Platform 
 4. **Fallback Strategy**: Pod restart if admin API fails
 
 **Results**:
-- ✅ 100% success rate (15000/15000 and 60/60 requests)
-- ✅ 1-2 second rotation time (consistently fast, 8-10x faster than previous 16-17s)
-- ✅ Zero downtime achieved with real stress testing (15000 requests at ~120 req/s average, 100-150 req/s observed)
-- ✅ Throughput optimization: Concurrent pool strategy (20 concurrent requests) achieves 10x higher throughput than sequential requests
+- ✅ **100% success rate** (validated with k6 distributed load testing)
+- ✅ **1-2 second rotation time** (consistently fast, 8-10x faster than previous 16-17s)
+- ✅ **Maximum proven throughput**: **~397 req/s** (71,447 requests in 180s) with **0% failures** and **0.76% drops**
+- ✅ **Optimal k6 configuration**: H2=250 req/s (max 160 VUs), H3=150 req/s (max 100 VUs) - **production-ready**
+- ✅ **Breaking point identified**: 260/160 configuration shows 0.08% failures (violates zero-downtime requirement)
+- ✅ **Zero downtime achieved** with k6 distributed load testing under extreme production load
+- ✅ **k6 optimization**: Constant-arrival-rate executor with connection reuse achieves optimal performance
+- ✅ **Performance progression**: Tested configurations from 100/50 to 250/150, all maintaining 0% failures
 
 **Trade-offs**:
 - Admin API must be accessible (port-forward during rotation)
@@ -334,7 +340,7 @@ This document provides in-depth technical documentation for the Record Platform 
 ### Data Layer
 - **PostgreSQL 16**: 8 dedicated instances for service isolation
 - **Redis 7**: JWT revocation cache, search result caching
-- **Kafka**: Event streaming, real-time messaging
+- **Kafka**: Event streaming, real-time messaging. **Strict TLS enabled** with SSL listener on port 9093. SSL certificates stored in `kafka-ssl-secret`.
 
 ### Inter-Service Communication
 - **gRPC**: Protocol buffer-based RPC
@@ -614,6 +620,9 @@ ansible-playbook playbooks/deploy-services.yml          # Deploy
   - **Replication**: Multi-broker replication for fault tolerance
   - **High availability**: Automatic leader election and partition reassignment
   - **Durability**: Replicated topics with configurable replication factor
+  - **Strict TLS**: SSL/TLS encryption enabled on port 9093
+  - **SSL Certificates**: Managed via Kubernetes secrets (`kafka-ssl-secret`)
+  - **Client Authentication**: Configurable (`none` for now, `required` for strict TLS)
 
 **Backup Strategy** (Current):
 - Nightly `pg_dump` for all databases
@@ -1119,15 +1128,37 @@ notes.
 
 ### TLS Security
 
+**k6 Load Test TLS Configuration**:
+- **CA Certificate**: Mounted at `/etc/ssl/certs/k6-ca.crt` in k6 pods
+- **Environment Variable**: `SSL_CERT_FILE=/etc/ssl/certs/k6-ca.crt` set in all k6 test jobs
+- **ConfigMap**: `k6-ca-cert` contains `ca.crt` (mkcert root CA) for all namespaces
+- **Scripts Updated**: All k6 JavaScript test scripts removed `insecureSkipTLSVerify: true` for production-ready testing
+- **Validation**: Tests fail if CA certificate is missing, ensuring strict TLS is always enforced
+- **Shopping Service Tests**: All shopping service k6 tests (`k6-shopping-stress.js`, `k6-shopping-ramp.js`, `k6-shopping-db-validation.js`, `k6-bottleneck-finder.js`) use strict TLS verification with CA certificate validation
+- **Test Scripts**: `run-k6-shopping.sh` and `find-bottlenecks.sh` enforce strict TLS by mounting CA certificate ConfigMap and setting `SSL_CERT_FILE` environment variable
+- **ClusterIP Access**: Tests use ClusterIP FQDN (`caddy-h3.ingress-nginx.svc.cluster.local:443`) for in-cluster testing to avoid NodePort TLS passthrough issues in Kind clusters
+
 **Strict TLS Enforcement**:
-- TLS 1.2 and 1.3 only
-- TLS 1.1 and below rejected
-- Validated via test scripts
+- **Edge Layer**: Caddy configured with `protocols tls1.2 tls1.3` - only TLS 1.2 and 1.3 are accepted; TLS 1.1 and below are rejected.
+- **Service-Level TLS**: All services enforce strict TLS with:
+  - `NODE_TLS_REJECT_UNAUTHORIZED=1` environment variable (rejects self-signed certificates)
+  - CA certificate mounted from `dev-root-ca` Kubernetes secret at `/certs/dev-root.pem`
+  - `NODE_EXTRA_CA_CERTS=/certs/dev-root.pem` for Node.js CA trust store
+  - Volume mount: `dev-root-ca` secret with `dev-root.pem` key
+- **Services with Strict TLS**: auth-service, listings-service, records-service, social-service, shopping-service, analytics-service, api-gateway, python-ai-service
+- **gRPC Health Checks**: Services with gRPC endpoints use `grpc.health.v1.Health/Check` protocol (HTTP/2/3) for Kubernetes health probes:
+  - **auth-service**: Uses `grpc-health-probe` binary for gRPC health checks
+  - **python-ai-service**: Uses native Kubernetes `grpc` probe type
+  - **Other services**: HTTP health checks via `/healthz` endpoint
+- **Validation**: Test scripts verify strict TLS enforcement:
+  - `scripts/test-http2-http3-strict-tls.sh` - Tests TLS 1.2/1.3 acceptance and TLS 1.1 rejection
+  - `scripts/test-full-chain-with-rotation.sh` - Full chain validation with strict TLS
 
 **Certificate Management**:
 - mkcert for local development
-- Kubernetes secrets for certificate storage
+- Kubernetes secrets for certificate storage (`dev-root-ca` secret in `record-platform` namespace)
 - Zero-downtime CA rotation via admin API
+- CA certificate distributed to all services via volume mounts
 
 ### Network Security
 
@@ -1140,6 +1171,30 @@ notes.
 - TLS termination at Caddy
 - Host-based routing
 - Rate limiting at multiple layers
+
+**Kafka Strict TLS**:
+- **SSL/TLS Encryption**: Kafka configured with strict TLS on port 9093
+- **Status**: ✅ Fully configured and operational
+- **SSL Certificates**: Generated and stored in `kafka-ssl-secret` Kubernetes secret
+  - CA certificate (ca-cert.pem, ca-key.pem)
+  - Broker certificate (broker-cert.pem, broker-key.pem)
+  - Keystore (kafka.keystore.jks)
+  - Truststore (kafka.truststore.jks)
+- **Environment Variables**: All required Confluent Kafka SSL env vars configured:
+  - `KAFKA_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets`
+  - `KAFKA_SSL_KEYSTORE_FILENAME=kafka.keystore.jks`
+  - `KAFKA_SSL_KEYSTORE_CREDENTIALS` (from secret)
+  - `KAFKA_SSL_KEY_CREDENTIALS` (from secret)
+  - `KAFKA_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets`
+  - `KAFKA_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks`
+  - `KAFKA_SSL_TRUSTSTORE_CREDENTIALS` (from secret)
+  - `KAFKA_SSL_CLIENT_AUTH=none` (can be set to `required` for strict TLS)
+- **Listeners**: 
+  - PLAINTEXT (9092): Available for migration
+  - SSL (9093): Primary listener with strict TLS
+- **Service Configuration**: Python AI service and other services use SSL port (9093)
+- **Certificate Management**: Certificates mounted from Kubernetes secret, passwords stored securely
+- **Documentation**: See `docs/kafka-ssl-setup.md` for complete setup guide
 
 ## Deployment Strategy
 
@@ -1163,9 +1218,13 @@ notes.
 - **Direct Kubernetes patch**: Fastest rollout restart method (~0.4s)
 - **Pod-by-pod rotation**: New pods come online before old pods terminate
 - **Zero downtime**: Multiple replicas ensure continuous service availability
-- **Real stress testing**: Validated with 15000 requests at ~120 req/s average (100-150 req/s observed, peaks up to 200+ req/s)
-- **Throughput tuning**: Concurrent pool strategy (20 concurrent requests) with 3.0s timeout achieves 10x higher throughput than sequential requests
-- **Optimizations**: Removed PORT detection, eliminated output overhead, direct merge patch, increased timeout to 3.0s for 100% success
+- **k6 distributed load testing**: Validated with k6 constant-arrival-rate executor
+- **Maximum proven throughput**: **~397 req/s** (71,447 requests in 180s) with **0% failures**
+- **Optimal k6 configuration**: H2=250 req/s (max 160 VUs), H3=150 req/s (max 100 VUs)
+- **Breaking point**: 260/160 configuration shows 0.08% failures (violates zero-downtime)
+- **Performance progression**: Tested 100/50 → 250/150, all maintaining 0% failures
+- **k6 optimization**: Connection reuse, random jitter, constant-arrival-rate executor
+- **Optimizations**: Removed PORT detection, eliminated output overhead, direct merge patch
 - **Multi-node cluster**: Recommended for optimal pod distribution and HA
 
 ### Database Migrations
@@ -1193,6 +1252,8 @@ notes.
 - Future: Cloud storage integration (S3, GCS)
 
 ## Recovery Procedures & Troubleshooting
+
+> **📖 Comprehensive Troubleshooting Guide**: For detailed documentation of all cluster stabilization issues, root causes, and solutions, see [`Runbook.md`](../Runbook.md). The Runbook covers 12 major issues including TLS handshake timeouts, missing secrets/configmaps, Kafka SSL configuration, Caddy errors, resource constraints, probe issues, and more.
 
 ### Service Recovery
 

@@ -1,4 +1,10 @@
 /** @type {import('next').NextConfig} */
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const securityHeaders = [
   { key: 'Strict-Transport-Security', value: 'max-age=15552000; includeSubDomains' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -24,6 +30,11 @@ const nextConfig = {
   },
   // Faster builds
   webpack: (config, { dev, isServer }) => {
+    // Explicitly resolve path aliases for Docker builds
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(__dirname),
+    }
     if (dev && !isServer) {
       // Reduce bundle size in dev
       config.optimization = {

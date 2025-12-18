@@ -6,11 +6,20 @@ if (!DB_URL) {
   console.warn('[social] POSTGRES_URL_SOCIAL and DATABASE_URL are empty at startup')
 }
 
+// Optimized connection pool for high-volume social service
+// Increased pool size for concurrent message/forum operations
+// Longer timeouts for connection stability under load
 export const pool = new Pool({
   connectionString: DB_URL,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  max: parseInt(process.env.DB_POOL_MAX || '50', 10), // Increased from 10 to 50 for high concurrency
+  min: parseInt(process.env.DB_POOL_MIN || '5', 10), // Keep minimum connections warm
+  idleTimeoutMillis: 60000, // Increased idle timeout (1 minute)
+  connectionTimeoutMillis: 10000, // Increased connection timeout (10 seconds)
+  statement_timeout: 30000, // 30 second statement timeout to prevent runaway queries
+  query_timeout: 30000, // 30 second query timeout
+  // Enable keep-alive for connection reuse
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 })
 
 pool.on('error', (err) => {

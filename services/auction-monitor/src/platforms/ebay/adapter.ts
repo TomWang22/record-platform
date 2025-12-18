@@ -106,54 +106,79 @@ export class eBayAdapter extends BaseAdapter {
   }
   
   async search(criteria: SearchCriteria): Promise<RawListing[]> {
+    // Use Finding API as primary (faster, no token needed, more reliable)
+    // Fall back to Buy API only if Finding API fails
     try {
+      return await this.searchWithFindingAPI(criteria)
+    } catch (error: any) {
+      // Check if it's a rate limit error
+      const isRateLimit = error.response?.status === 500 && 
+        error.response?.data?.errorMessage?.[0]?.error?.[0]?.errorId?.[0] === '10001'
+      
+      if (isRateLimit) {
+        console.warn('[eBay] Finding API rate limit hit, waiting before retry...')
+        // Wait 2 seconds before trying Buy API
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      } else {
+        console.warn('[eBay] Finding API failed, trying Buy API as fallback:', error.message)
+      }
+      
+      // Fallback to Buy API if Finding API fails
       if (!this.config.authToken) {
-        throw new Error('eBay auth token is required for Buy API')
+        // If rate limited and no token, return empty array (graceful degradation)
+        if (isRateLimit) {
+          console.warn('[eBay] Rate limited and no token available, returning empty results')
+          return []
+        }
+        throw new Error('eBay auth token is required for Buy API fallback')
       }
 
-      // Use Buy API item_summary/search endpoint
-      const params = new URLSearchParams({
-        'q': criteria.query,
-        'limit': String(criteria.limit || 50),
-        'offset': String(criteria.offset || 0),
-      })
-      
-      if (criteria.priceRange?.min) {
-        params.append('filter', `price:[${criteria.priceRange.min}..]`)
+      try {
+        // Use Buy API item_summary/search endpoint
+        const params = new URLSearchParams({
+          'q': criteria.query,
+          'limit': String(criteria.limit || 50),
+          'offset': String(criteria.offset || 0),
+        })
+        
+        if (criteria.priceRange?.min) {
+          params.append('filter', `price:[${criteria.priceRange.min}..]`)
+        }
+        
+        if (criteria.priceRange?.max) {
+          params.append('filter', `price:[..${criteria.priceRange.max}]`)
+        }
+        
+        const response = await this.client.get('/buy/browse/v1/item_summary/search', {
+          params,
+        })
+        
+        const items = response.data.itemSummaries || []
+        
+        // Map Buy API response to RawListing format
+        return items.map((item: any) => this.mapBuyApiToRawListing(item))
+      } catch (buyError: any) {
+        // If both fail and it's rate limit, return empty (graceful degradation)
+        if (isRateLimit || (buyError.response?.status === 403)) {
+          console.warn('[eBay] Both APIs unavailable (rate limit/auth), returning empty results')
+          return []
+        }
+        // If both fail for other reasons, throw the original Finding API error
+        console.error(`[eBay] Buy API also failed:`, buyError.message)
+        throw error
       }
-      
-      if (criteria.priceRange?.max) {
-        params.append('filter', `price:[..${criteria.priceRange.max}]`)
-      }
-      
-      const response = await this.client.get('/buy/browse/v1/item_summary/search', {
-        params,
-      })
-      
-      const items = response.data.itemSummaries || []
-      
-      // Map Buy API response to RawListing format
-      return items.map((item: any) => this.mapBuyApiToRawListing(item))
-    } catch (error: any) {
-      // If Buy API fails with 401 (invalid token), fall back to Finding API
-      if (error.response?.status === 401) {
-        console.warn('[eBay] Buy API authentication failed, falling back to Finding API')
-        return this.searchWithFindingAPI(criteria)
-      }
-      // Log full error details for debugging
-      if (error.response) {
-        console.error(`[eBay] Search error response:`, error.response.status, error.response.data)
-      }
-      console.error(`[eBay] Search error:`, error.message)
-      throw new Error(`eBay search failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
   private async searchWithFindingAPI(criteria: SearchCriteria): Promise<RawListing[]> {
-    // Fallback to Finding API (uses App ID in URL params, no Bearer token needed)
+    // Primary API: Finding API (uses App ID in URL params, no Bearer token needed, faster)
     const findingBaseUrl = this.config.sandbox
       ? 'https://svcs.sandbox.ebay.com'
       : 'https://svcs.ebay.com'
+    
+    if (!this.config.appId) {
+      throw new Error('eBay App ID is required for Finding API')
+    }
     
     const params = new URLSearchParams({
       'OPERATION-NAME': 'findItemsAdvanced',
@@ -176,20 +201,55 @@ export class eBayAdapter extends BaseAdapter {
       params.append('itemFilter(1).value', String(criteria.priceRange.max))
     }
     
-    const response = await axios.get<eBayFindingResponse>(
-      `${findingBaseUrl}/services/search/FindingService/v1?${params.toString()}`,
-      { timeout: 30000 }
-    )
-    
-    const items = response.data.findItemsAdvancedResponse?.[0]?.searchResult?.[0]?.item || []
-    
-    return Promise.all(
-      items.map(async (item) => {
-        const itemId = item.itemId?.[0] || ''
-        const details = await this.getDetails(itemId)
-        return details || this.mapToRawListing(item)
-      })
-    )
+    try {
+      const response = await axios.get<eBayFindingResponse>(
+        `${findingBaseUrl}/services/search/FindingService/v1?${params.toString()}`,
+        { 
+          timeout: 30000,
+          headers: {
+            'Accept': 'application/json',
+          }
+        }
+      )
+      
+      // Check for API errors in response
+      const responseData = response.data as any
+      if (responseData.findItemsAdvancedResponse?.[0]?.errorMessage) {
+        const errorMsg = responseData.findItemsAdvancedResponse[0].errorMessage[0]?.error?.[0]?.message || 'Unknown error'
+        throw new Error(`eBay Finding API error: ${errorMsg}`)
+      }
+      
+      const items = response.data.findItemsAdvancedResponse?.[0]?.searchResult?.[0]?.item || []
+      
+      // Return items directly from Finding API (faster, no need for details call)
+      // Only fetch details if we have auth token and want richer data
+      if (this.config.authToken && items.length > 0 && items.length <= 10) {
+        // For small result sets, optionally fetch details via Buy API
+        return Promise.all(
+          items.map(async (item) => {
+            const itemId = item.itemId?.[0] || ''
+            try {
+              const details = await this.getDetails(itemId)
+              return details || this.mapToRawListing(item)
+            } catch {
+              return this.mapToRawListing(item)
+            }
+          })
+        )
+      }
+      
+      // For larger result sets or no token, use Finding API data directly
+      return items.map((item) => this.mapToRawListing(item))
+    } catch (error: any) {
+      if (error.response) {
+        const errorData = error.response.data
+        const errorDetails = typeof errorData === 'string' ? errorData : JSON.stringify(errorData)
+        console.error(`[eBay] Finding API error (${error.response.status}):`, errorDetails)
+      } else {
+        console.error(`[eBay] Finding API error:`, error.message)
+      }
+      throw error
+    }
   }
   
   async getDetails(externalId: string): Promise<RawListing | null> {

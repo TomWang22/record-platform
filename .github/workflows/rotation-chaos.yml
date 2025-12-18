@@ -1,0 +1,35 @@
+name: rotation-chaos
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # nightly
+  workflow_dispatch:
+
+jobs:
+  chaos-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install KIND
+      run: |
+        sudo curl -Lo /usr/local/bin/kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
+        sudo chmod +x /usr/local/bin/kind
+
+    - name: Create cluster
+      run: kind create cluster --config kind-h3.yaml
+
+    - name: Deploy platform
+      run: ./deploy.sh
+
+    - name: Install mkcert
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libnss3-tools
+        curl -L https://github.com/FiloSottile/mkcert/releases/latest/download/mkcert-linux-amd64 -o mkcert
+        chmod +x mkcert
+        sudo mv mkcert /usr/local/bin/
+        mkcert -install
+
+    - name: Run rotation + chaos suite
+      run: ./scripts/rotation-suite.sh

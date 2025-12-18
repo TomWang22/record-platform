@@ -29,6 +29,8 @@ spec:
           envFrom:
             - configMapRef: { name: app-config }
             - secretRef:    { name: app-secrets }
+            - secretRef:    { name: ebay-credentials }
+              optional: true  # Optional - service can run without eBay credentials
           env:
             # You used this in compose
             - name: BASE_URL

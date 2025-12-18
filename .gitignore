@@ -144,3 +144,5 @@ Makefile*
 # Dockerfiles in root (pgbouncer, etc. - not used)
 Dockerfile*
 !Dockerfile
+# Backup environment files
+**/.env.bak

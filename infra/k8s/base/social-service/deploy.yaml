@@ -36,6 +36,8 @@ spec:
               value: "50056"
             - name: ENABLE_GRPC
               value: "true"
+            - name: GRPC_REQUIRE_CLIENT_CERT
+              value: "false"  # Disable client cert verification for dev (like auth-service)
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
@@ -50,17 +52,59 @@ spec:
             - name: service-tls
               mountPath: /etc/certs
               readOnly: true
+          startupProbe:
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50056
+                - -service=social.SocialService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
+                - -connect-timeout=10s
+                - -rpc-timeout=15s
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 10
+            failureThreshold: 40
           readinessProbe:
-            httpGet: { path: /healthz, port: http }
-            initialDelaySeconds: 20  # Give more time for DB connections
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 5  # More attempts
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50056
+                - -service=social.SocialService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
+                - -connect-timeout=5s
+                - -rpc-timeout=5s
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 10
+            failureThreshold: 3
           livenessProbe:
-            httpGet: { path: /healthz, port: http }
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50056
+                - -service=social.SocialService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
+                - -connect-timeout=5s
+                - -rpc-timeout=5s
             initialDelaySeconds: 30
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 10
             failureThreshold: 3
       volumes:
         - name: proto-files

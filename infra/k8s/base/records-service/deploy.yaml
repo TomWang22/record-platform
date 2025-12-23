@@ -54,6 +54,9 @@ spec:
             - name: dev-root-ca
               mountPath: /certs
               readOnly: true
+            - name: tls-certs
+              mountPath: /etc/certs
+              readOnly: true
           readinessProbe:
             httpGet: { path: /_ping, port: http }
             initialDelaySeconds: 5
@@ -82,3 +85,13 @@ spec:
             items:
               - key: dev-root.pem
                 path: dev-root.pem
+        - name: tls-certs
+          secret:
+            secretName: service-tls
+            items:
+              - key: tls.key
+                path: tls.key
+              - key: tls.crt
+                path: tls.crt
+              - key: ca.crt
+                path: ca.crt

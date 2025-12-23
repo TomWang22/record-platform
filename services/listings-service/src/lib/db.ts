@@ -12,11 +12,22 @@ import {
   invalidateWatchlistCache,
 } from './redis-cache.js';
 
+// Optimized connection pool for high-volume listings service
+// Increased pool size for concurrent listing operations and search queries
+// Formula: max = (VUs * avg_concurrent_per_vu) + headroom
+// For 50 VUs with 2-3 concurrent requests each: 100-150 + 50 headroom = 150-200
+// Increased to 100 to handle peak load and prevent connection exhaustion
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL_LISTINGS || 'postgresql://postgres:postgres@localhost:5435/records',
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  max: parseInt(process.env.DB_POOL_MAX || '100', 10), // Increased from 20 to 100 for high concurrency
+  min: parseInt(process.env.DB_POOL_MIN || '10', 10), // Keep minimum connections warm
+  idleTimeoutMillis: 60000, // Increased idle timeout (1 minute)
+  connectionTimeoutMillis: 10000, // Increased connection timeout (10 seconds)
+  statement_timeout: 30000, // 30 second statement timeout to prevent runaway queries
+  query_timeout: 30000, // 30 second query timeout
+  // Enable keep-alive for connection reuse
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 });
 
 // Test connection

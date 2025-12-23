@@ -63,15 +63,21 @@ spec:
               readOnly: true
           # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2/3 only, NOT HTTP/1.1
           # Uses grpc-health-probe binary for standard gRPC health checking protocol
-          # Protocol: HTTP/2 cleartext (h2c) for in-cluster communication via Caddy
+          # Protocol: HTTP/2 with TLS (strict TLS with client cert verification)
           # Service name: shopping.ShoppingService (registered service name)
-          # Note: Service runs in h2c mode (no TLS) for in-cluster, Caddy handles TLS at edge
+          # Note: Service uses strict TLS with client certificate verification
           readinessProbe:
             exec:
               command:
                 - /usr/local/bin/grpc-health-probe
                 - -addr=localhost:50058
                 - -service=shopping.ShoppingService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
                 - -connect-timeout=10s
                 - -rpc-timeout=10s
             initialDelaySeconds: 60
@@ -84,6 +90,12 @@ spec:
                 - /usr/local/bin/grpc-health-probe
                 - -addr=localhost:50058
                 - -service=shopping.ShoppingService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
                 - -connect-timeout=10s
                 - -rpc-timeout=10s
             initialDelaySeconds: 150
@@ -96,6 +108,12 @@ spec:
                 - /usr/local/bin/grpc-health-probe
                 - -addr=localhost:50058
                 - -service=shopping.ShoppingService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
                 - -connect-timeout=10s
                 - -rpc-timeout=15s
             initialDelaySeconds: 30

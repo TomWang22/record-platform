@@ -61,6 +61,10 @@ function loadLuaScript(scriptName: string): string {
   }
 }
 
+// Cache statistics (in-memory counters)
+let cacheHits = 0
+let cacheMisses = 0
+
 // Cache manager with LFU/LRU support
 export class CacheManager {
   private redis: Redis | null
@@ -202,11 +206,21 @@ export class CacheManager {
 
   // Generic cache operations
   async get<T>(key: string): Promise<T | null> {
-    if (!this.redis) return null
+    if (!this.redis) {
+      cacheMisses++
+      return null
+    }
     try {
       const value = await this.redis.get(key)
-      return value ? JSON.parse(value) : null
+      if (value) {
+        cacheHits++
+        return JSON.parse(value)
+      } else {
+        cacheMisses++
+        return null
+      }
     } catch (err) {
+      cacheMisses++
       console.error('[shopping] Cache get error:', err)
       return null
     }
@@ -252,5 +266,33 @@ export class CacheManager {
       return []
     }
   }
+}
+
+/**
+ * Get cache statistics
+ */
+export function getCacheStats(): {
+  hits: number
+  misses: number
+  hitRate: number
+  total: number
+} {
+  const total = cacheHits + cacheMisses
+  const hitRate = total > 0 ? (cacheHits / total) * 100 : 0
+  
+  return {
+    hits: cacheHits,
+    misses: cacheMisses,
+    hitRate: Math.round(hitRate * 100) / 100, // Round to 2 decimal places
+    total,
+  }
+}
+
+/**
+ * Reset cache statistics (for testing)
+ */
+export function resetCacheStats(): void {
+  cacheHits = 0
+  cacheMisses = 0
 }
 

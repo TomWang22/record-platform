@@ -1436,6 +1436,115 @@ else
   warn "Skipping logout test - no auth token available"
 fi
 
+# Test 15: Delete Account (HTTP/2)
+# Create a new user for deletion test to avoid affecting other tests
+say "Test 15: Auth Service - Delete Account via HTTP/2"
+DELETE_TEST_EMAIL="delete-test-$(date +%s)@example.com"
+DELETE_TEST_PASSWORD="test123"
+DELETE_REGISTER_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+  --resolve "$HOST:${PORT}:127.0.0.1" \
+  -H "Host: $HOST" \
+  -H "Content-Type: application/json" \
+  -X POST "https://$HOST:${PORT}/api/auth/register" \
+  -d "{\"email\":\"$DELETE_TEST_EMAIL\",\"password\":\"$DELETE_TEST_PASSWORD\"}" 2>&1) || {
+  warn "Delete test user registration curl command failed (exit code: $?)"
+  DELETE_REGISTER_RESPONSE=""
+  DELETE_REGISTER_CODE="000"
+}
+if [[ -n "$DELETE_REGISTER_RESPONSE" ]]; then
+  DELETE_REGISTER_CODE=$(echo "$DELETE_REGISTER_RESPONSE" | tail -1)
+else
+  DELETE_REGISTER_CODE="000"
+fi
+if [[ "$DELETE_REGISTER_CODE" == "201" ]]; then
+  DELETE_TOKEN=$(echo "$DELETE_REGISTER_RESPONSE" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+  if [[ -n "$DELETE_TOKEN" ]]; then
+    ok "Delete test user registered successfully"
+    # Now delete the account
+    DELETE_ACCOUNT_RC=0
+    DELETE_ACCOUNT_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+      --resolve "$HOST:${PORT}:127.0.0.1" \
+      -H "Host: $HOST" \
+      -H "Authorization: Bearer $DELETE_TOKEN" \
+      -X DELETE "https://$HOST:${PORT}/api/auth/account" 2>&1) || DELETE_ACCOUNT_RC=$?
+    DELETE_ACCOUNT_CODE=$(echo "$DELETE_ACCOUNT_RESPONSE" | tail -1)
+    if [[ "$DELETE_ACCOUNT_RC" -ne 0 ]]; then
+      warn "Delete account request failed (curl exit $DELETE_ACCOUNT_RC)"
+    elif [[ "$DELETE_ACCOUNT_CODE" == "204" ]]; then
+      ok "Delete account works via HTTP/2 (HTTP 204)"
+      # Verify account is deleted by trying to login
+      sleep 1
+      DELETE_LOGIN_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
+        --resolve "$HOST:${PORT}:127.0.0.1" \
+        -H "Host: $HOST" \
+        -H "Content-Type: application/json" \
+        -X POST "https://$HOST:${PORT}/api/auth/login" \
+        -d "{\"email\":\"$DELETE_TEST_EMAIL\",\"password\":\"$DELETE_TEST_PASSWORD\"}" 2>&1)
+      DELETE_LOGIN_CODE=$(echo "$DELETE_LOGIN_RESPONSE" | tail -1)
+      if [[ "$DELETE_LOGIN_CODE" == "401" ]]; then
+        ok "Account deletion verified (401 on login attempt)"
+      else
+        warn "Account may not be deleted (got HTTP $DELETE_LOGIN_CODE instead of 401)"
+      fi
+      # Verify token is revoked
+      DELETE_VERIFY_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 10 \
+        -H "Host: $HOST" \
+        -H "Authorization: Bearer $DELETE_TOKEN" \
+        -X GET "https://$HOST:${PORT}/api/records" 2>&1)
+      DELETE_VERIFY_CODE=$(echo "$DELETE_VERIFY_RESPONSE" | tail -1)
+      if [[ "$DELETE_VERIFY_CODE" == "401" ]]; then
+        ok "Token revocation verified after account deletion (401 on protected endpoint)"
+      else
+        warn "Token may not be revoked after account deletion (got HTTP $DELETE_VERIFY_CODE instead of 401)"
+      fi
+    elif [[ "$DELETE_ACCOUNT_CODE" == "401" ]]; then
+      warn "Delete account failed - HTTP 401 (authentication required)"
+    elif [[ "$DELETE_ACCOUNT_CODE" == "404" ]]; then
+      warn "Delete account failed - HTTP 404 (user not found)"
+    else
+      warn "Delete account failed - HTTP $DELETE_ACCOUNT_CODE"
+      echo "Response body: $(echo "$DELETE_ACCOUNT_RESPONSE" | sed '$d' | head -5)"
+    fi
+  else
+    warn "Delete test user registration succeeded but no token received"
+  fi
+elif [[ "$DELETE_REGISTER_CODE" == "409" ]]; then
+  warn "Delete test user already exists - will try to delete existing account"
+  # Try to login first, then delete
+  DELETE_LOGIN_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
+    -H "Host: $HOST" \
+    -H "Content-Type: application/json" \
+    -X POST "https://$HOST:${PORT}/api/auth/login" \
+    -d "{\"email\":\"$DELETE_TEST_EMAIL\",\"password\":\"$DELETE_TEST_PASSWORD\"}" 2>&1) || {
+    warn "Delete test user login failed"
+    DELETE_LOGIN_RESPONSE=""
+  }
+  if [[ -n "$DELETE_LOGIN_RESPONSE" ]]; then
+    DELETE_LOGIN_CODE=$(echo "$DELETE_LOGIN_RESPONSE" | tail -1)
+    if [[ "$DELETE_LOGIN_CODE" == "200" ]]; then
+      DELETE_TOKEN=$(echo "$DELETE_LOGIN_RESPONSE" | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+      if [[ -n "$DELETE_TOKEN" ]]; then
+        # Try to delete the account
+        DELETE_ACCOUNT_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+          --resolve "$HOST:${PORT}:127.0.0.1" \
+          -H "Host: $HOST" \
+          -H "Authorization: Bearer $DELETE_TOKEN" \
+          -X DELETE "https://$HOST:${PORT}/api/auth/account" 2>&1) || DELETE_ACCOUNT_RESPONSE=""
+        DELETE_ACCOUNT_CODE=$(echo "$DELETE_ACCOUNT_RESPONSE" | tail -1)
+        if [[ "$DELETE_ACCOUNT_CODE" == "204" ]]; then
+          ok "Delete account works via HTTP/2 (HTTP 204) - existing user deleted"
+        else
+          warn "Delete account failed for existing user - HTTP $DELETE_ACCOUNT_CODE"
+        fi
+      fi
+    fi
+  fi
+else
+  warn "Delete test user registration failed - HTTP $DELETE_REGISTER_CODE"
+  echo "Response body: $(echo "$DELETE_REGISTER_RESPONSE" | sed '$d' | head -5)"
+fi
+
 # Helper function to run grpcurl with timeout
 grpcurl_with_timeout() {
   local timeout_sec="${1:-10}"

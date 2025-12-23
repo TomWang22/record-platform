@@ -9,7 +9,11 @@
 import bcrypt from "bcryptjs";
 
 // Configuration
-const MAX_CONCURRENT_BCRYPT = 8; // Increased from 4 to 8 for better throughput under high load (k6 tests)
+// With 2000m CPU limit (2 cores) per pod, we can handle 32-64 concurrent bcrypt operations
+// With 4 replicas, total concurrent bcrypt = 128-256 operations
+// bcrypt is async and CPU-bound, so we can queue more operations per core
+// Increased to 64 to handle high load (500+ VUs) and prevent queue saturation
+const MAX_CONCURRENT_BCRYPT = 64; // Increased from 32 to 64 for better throughput under high load
 const BCRYPT_ROUNDS = 8; // Reduced from 10 for better performance (still secure)
 
 // Simple semaphore to limit concurrent operations

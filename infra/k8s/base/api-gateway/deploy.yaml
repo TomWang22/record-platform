@@ -32,9 +32,18 @@ spec:
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
               value: "/certs/dev-root.pem"
+            - name: GRPC_CA_CERT
+              value: "/etc/certs/ca.crt"
+            - name: GRPC_CLIENT_CERT
+              value: "/etc/certs/tls.crt"
+            - name: GRPC_CLIENT_KEY
+              value: "/etc/certs/tls.key"
           volumeMounts:
             - name: dev-root-ca
               mountPath: /certs
+              readOnly: true
+            - name: service-tls
+              mountPath: /etc/certs
               readOnly: true
             - name: proto-files
               mountPath: /app/proto
@@ -74,3 +83,13 @@ spec:
             items:
               - key: dev-root.pem
                 path: dev-root.pem
+        - name: service-tls
+          secret:
+            secretName: service-tls
+            items:
+              - key: tls.key
+                path: tls.key
+              - key: tls.crt
+                path: tls.crt
+              - key: ca.crt
+                path: ca.crt

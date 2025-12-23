@@ -397,6 +397,7 @@ const authService = {
   },
 
   async ValidateToken(call: any, callback: any) {
+    const startTime = Date.now();
     try {
       const { token } = call.request;
       if (!token) {
@@ -406,19 +407,54 @@ const authService = {
         });
       }
 
-      const payload = verifyJwt(token);
-      const user = await prisma.$queryRaw<Array<{ id: string; email: string; createdAt: Date }>>`
-        SELECT id, email, created_at as "createdAt"
-        FROM auth.users
-        WHERE id = ${payload.sub}::uuid
-      `.then((r: Array<{ id: string; email: string; createdAt: Date }>) => r[0] || null);
+      // Verify JWT token
+      const payload = verifyJwt(token) as any;
+      const userId = payload.sub;
       
-      if (!user) {
+      if (!userId) {
         return callback({
           code: grpc.status.UNAUTHENTICATED,
           message: "invalid token",
         });
       }
+
+      // Check if token is revoked (Redis)
+      const jti = payload.jti;
+      if (jti) {
+        const { getRedisClient } = await import("./lib/redis-cache.js");
+        const redis = getRedisClient();
+        if (redis) {
+          try {
+            const revoked = await redis.get(`revoked:${jti}`);
+            if (revoked) {
+              console.log(`[gRPC] ValidateToken: token revoked (jti: ${jti})`);
+              return callback({
+                code: grpc.status.UNAUTHENTICATED,
+                message: "token revoked",
+              });
+            }
+          } catch (redisErr) {
+            console.warn("[gRPC] ValidateToken: Redis check failed, continuing:", redisErr);
+          }
+        }
+      }
+
+      // Verify user exists
+      const user = await prisma.$queryRaw<Array<{ id: string; email: string; createdAt: Date }>>`
+        SELECT id, email, created_at as "createdAt"
+        FROM auth.users
+        WHERE id = ${userId}::uuid
+      `.then((r: Array<{ id: string; email: string; createdAt: Date }>) => r[0] || null);
+      
+      if (!user) {
+        return callback({
+          code: grpc.status.UNAUTHENTICATED,
+          message: "user not found",
+        });
+      }
+
+      const duration = Date.now() - startTime;
+      console.log(`[gRPC] ValidateToken: validated in ${duration}ms for user ${user.email}`);
 
       callback(null, {
         valid: true,
@@ -429,16 +465,96 @@ const authService = {
         },
       });
     } catch (error: any) {
-      console.error("[gRPC] ValidateToken error:", error);
-      callback(null, { valid: false });
+      const duration = Date.now() - startTime;
+      console.error(`[gRPC] ValidateToken error after ${duration}ms:`, error);
+      callback({
+        code: grpc.status.UNAUTHENTICATED,
+        message: error.message || "invalid token",
+      });
     }
   },
 
   async RefreshToken(call: any, callback: any) {
-    callback({
-      code: grpc.status.UNIMPLEMENTED,
-      message: "refresh token not implemented",
-    });
+    const startTime = Date.now();
+    try {
+      // Proto uses 'refresh_token' field, but we accept both for compatibility
+      const token = call.request.refresh_token || call.request.token;
+      if (!token) {
+        console.error(`[gRPC] RefreshToken: missing token in request`, {
+          requestKeys: Object.keys(call.request),
+          requestPreview: JSON.stringify(call.request).substring(0, 100),
+        });
+        return callback({
+          code: grpc.status.INVALID_ARGUMENT,
+          message: "token required",
+        });
+      }
+
+      // Verify JWT token
+      const payload = verifyJwt(token) as any;
+      const userId = payload.sub;
+      
+      if (!userId) {
+        return callback({
+          code: grpc.status.UNAUTHENTICATED,
+          message: "invalid token",
+        });
+      }
+
+      // Check if token is revoked (Redis)
+      const jti = payload.jti;
+      if (jti) {
+        const { getRedisClient } = await import("./lib/redis-cache.js");
+        const redis = getRedisClient();
+        if (redis) {
+          try {
+            const revoked = await redis.get(`revoked:${jti}`);
+            if (revoked) {
+              console.log(`[gRPC] RefreshToken: token revoked (jti: ${jti})`);
+              return callback({
+                code: grpc.status.UNAUTHENTICATED,
+                message: "token revoked",
+              });
+            }
+          } catch (redisErr) {
+            console.warn("[gRPC] RefreshToken: Redis check failed, continuing:", redisErr);
+          }
+        }
+      }
+
+      // Verify user exists
+      const user = await prisma.$queryRaw<Array<{ id: string; email: string }>>`
+        SELECT id, email
+        FROM auth.users
+        WHERE id = ${userId}::uuid
+      `.then((r: Array<{ id: string; email: string }>) => r[0] || null);
+      
+      if (!user) {
+        return callback({
+          code: grpc.status.UNAUTHENTICATED,
+          message: "user not found",
+        });
+      }
+
+      // Generate new token
+      const newJti = randomUUID();
+      const newPayload: any = { sub: user.id, email: user.email, jti: newJti };
+      const newToken = signJwt(newPayload);
+
+      const duration = Date.now() - startTime;
+      console.log(`[gRPC] RefreshToken: refreshed in ${duration}ms for user ${user.email}`);
+
+      callback(null, {
+        token: newToken,
+      });
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      console.error(`[gRPC] RefreshToken error after ${duration}ms:`, error);
+      callback({
+        code: grpc.status.UNAUTHENTICATED,
+        message: error.message || "invalid token",
+      });
+    }
   },
 
   async HealthCheck(call: any, callback: any) {
@@ -522,11 +638,21 @@ export function startGrpcServer(port: number = 50051) {
       console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)");
     }
     
+    // For dev: Don't require client cert verification (use false)
+    // For production: Enable client cert verification (use checkClientCert)
+    const requireClientCert = process.env.GRPC_REQUIRE_CLIENT_CERT === 'true' ? checkClientCert : false;
+    
     credentials = grpc.ServerCredentials.createSsl(
       rootCerts,
       [{ private_key: key, cert_chain: cert }],
-      checkClientCert as any
+      requireClientCert as any
     );
+    
+    if (requireClientCert) {
+      console.log("[gRPC] Client certificate verification: ENABLED (strict TLS)");
+    } else {
+      console.log("[gRPC] Client certificate verification: DISABLED (dev mode)");
+    }
   } else {
     console.warn("[gRPC] TLS certs not found, starting insecure server (dev only)");
     credentials = grpc.ServerCredentials.createInsecure();

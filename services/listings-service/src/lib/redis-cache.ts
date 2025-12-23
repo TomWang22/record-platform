@@ -10,6 +10,10 @@ import { createClient, type RedisClientType } from 'redis';
 // Redis client (shared instance)
 let redisClient: RedisClientType | null = null;
 
+// Cache statistics (in-memory counters)
+let cacheHits = 0;
+let cacheMisses = 0;
+
 // Initialize Redis client
 export function getRedisClient(): RedisClientType | null {
   if (redisClient) {
@@ -129,10 +133,12 @@ export async function cacheListing(listingId: string, listingData: any): Promise
 
 /**
  * Get listing from cache
+ * Returns cached data or null if cache miss
  */
 export async function getListingFromCache(listingId: string): Promise<any | null> {
   const client = getRedisClient();
   if (!client || !client.isOpen) {
+    cacheMisses++;
     return null;
   }
 
@@ -141,13 +147,44 @@ export async function getListingFromCache(listingId: string): Promise<any | null
     const result = await client.get(cacheKey);
     
     if (!result) {
+      cacheMisses++;
       return null;
     }
 
+    cacheHits++;
     return JSON.parse(result);
   } catch (err) {
+    cacheMisses++;
     return null;
   }
+}
+
+/**
+ * Get cache hit/miss statistics
+ */
+export function getCacheHitMissStats(): {
+  hits: number;
+  misses: number;
+  hitRate: number;
+  total: number;
+} {
+  const total = cacheHits + cacheMisses;
+  const hitRate = total > 0 ? (cacheHits / total) * 100 : 0;
+  
+  return {
+    hits: cacheHits,
+    misses: cacheMisses,
+    hitRate: Math.round(hitRate * 100) / 100, // Round to 2 decimal places
+    total,
+  };
+}
+
+/**
+ * Reset cache statistics (for testing)
+ */
+export function resetCacheStats(): void {
+  cacheHits = 0;
+  cacheMisses = 0;
 }
 
 /**

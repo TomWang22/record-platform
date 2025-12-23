@@ -15,11 +15,11 @@ async function getKafkaProducer() {
   if (!kafkaProducer) {
     try {
       kafkaProducer = kafka.producer()
-      // Add connection timeout
+      // Add connection timeout (match Kafka's 3s connectionTimeout)
       await Promise.race([
         kafkaProducer.connect(),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Kafka connection timeout')), 2000)
+          setTimeout(() => reject(new Error('Kafka connection timeout')), 5000)
         )
       ])
     } catch (err) {

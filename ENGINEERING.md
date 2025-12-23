@@ -1069,6 +1069,103 @@ notes.
 - Fallback to HTTP/2 if QUIC unavailable
 - Client support required (modern browsers, curl with HTTP/3)
 
+### k6 HTTP/3 Toolchain
+
+**Custom k6 Binary with HTTP/3 Extension**:
+- **Status**: ✅ **Extension built and loads successfully**
+- **Binary**: `.k6-build/bin/k6-http3`
+- **Build Script**: `scripts/build-k6-http3.sh`
+- **Extension**: `github.com/record-platform/xk6-http3` (local development using quic-go)
+- **Documentation**: See `test-results/K6_HTTP3_TOOLCHAIN_STATUS_12-22_tom.md` for complete status
+
+**How It Works**:
+- **xk6 Extension**: Custom Go extension using `quic-go` library for HTTP/3 (QUIC) support
+- **Build Process**: Uses xk6 to build custom k6 binary with local extension via replace directive
+- **Extension Registration**: Automatically registers as `k6/x/http3` module
+- **QUIC Client**: Implements HTTP/3 client with proper QUIC configuration (HandshakeIdleTimeout 10s, MaxIdleTimeout 60s)
+
+**Current Limitation**:
+- ⚠️ **NodePort UDP Routing**: HTTP/3 (QUIC) over NodePort (30443) has UDP routing issues causing connection timeouts
+- **Root Cause**: External k6 runs outside Kind cluster, NodePort UDP may not route QUIC correctly
+- **Workaround**: Use curl-based HTTP/3 testing (`scripts/test-microservices-http2-http3.sh`) which runs inside Kind node network namespace
+
+**Extension Features**:
+- ✅ HTTP/3 client using `quic-go` library
+- ✅ GET and POST methods implemented
+- ✅ Configurable timeouts (60s default for QUIC handshake)
+- ✅ TLS configuration (insecureSkipTLSVerify for dev)
+- ✅ Headers and error handling
+
+**Usage**:
+```bash
+# Build custom k6 with HTTP/3 extension
+./scripts/build-k6-http3.sh
+
+# Run HTTP/3 test (experimental, may timeout due to NodePort UDP routing)
+./scripts/run-k6-http3-test.sh
+
+# Or directly
+.k6-build/bin/k6-http3 run scripts/load/k6-http3-toolchain.js
+```
+
+**For Reliable HTTP/3 Testing**:
+- ✅ **Use curl-based testing**: `scripts/test-microservices-http2-http3.sh`
+- ✅ **Verified working**: tcpdump confirms QUIC (UDP) usage
+- ✅ **Production-ready**: Reliable and tested
+
+**Future Improvements**:
+- Run k6 inside Kubernetes cluster (use ClusterIP directly)
+- Port-forward UDP port 443 from Caddy pod
+- Use Kind node network namespace (similar to http3.sh)
+- Wait for native k6 HTTP/3 support in future versions
+
+### HTTP/3 Protocol Verification
+
+**Verification Script**: `scripts/verify-http3-with-tcpdump.sh`
+
+**Purpose**: Verify that HTTP/3 is actually using QUIC (UDP) protocol, not just HTTP/2 (TCP)
+
+**Methodology**:
+1. **Packet Capture**: Uses tcpdump in Caddy pod to capture UDP traffic on port 443 (QUIC)
+2. **Test Execution**: Runs HTTP/3 requests using curl (via `http3.sh` helper) since k6 doesn't support HTTP/3 natively
+3. **Analysis**: Analyzes pcap file to count UDP packets (QUIC) vs TCP packets (HTTP/2)
+4. **Verification**: Confirms QUIC usage by detecting UDP packets on port 443
+
+**Results**:
+- ✅ **QUIC Verified**: UDP packets detected on port 443 during HTTP/3 requests
+- ✅ **Protocol Confirmed**: HTTP/3 uses QUIC (UDP) as expected
+- ✅ **Wireshark Compatible**: pcap files available for detailed analysis
+
+**Usage**:
+```bash
+# Run HTTP/3 verification
+./scripts/verify-http3-with-tcpdump.sh
+
+# Results saved to: test-results/YYYYMMDD-HHMMSS-http3-verification/
+# - verification.log: Complete test log
+# - quic-capture.pcap: Packet capture file (Wireshark compatible)
+# - k6-metrics.txt: Extracted metrics
+```
+
+**Wireshark Analysis**:
+```bash
+# Open pcap file in Wireshark
+wireshark test-results/YYYYMMDD-HHMMSS-http3-verification/quic-capture.pcap
+
+# Look for:
+# - UDP packets on port 443 (QUIC)
+# - QUIC protocol in packet details
+# - HTTP/3 in application layer
+```
+
+**Comparison Testing**: `scripts/compare-http2-http3.sh`
+- Runs both HTTP/2 and HTTP/3 tests
+- Generates comparison report with metrics
+- Outputs JSON results for both protocols
+- Creates timestamped comparison folder
+
+**Important Note**: k6 v1.4.2 does NOT natively support HTTP/3 yet. The toolchain script uses `httpVersion: 'HTTP/3'` but may fall back to HTTP/2. For actual HTTP/3 testing, use `scripts/test-microservices-http2-http3.sh` which uses curl with HTTP/3 support via the `http3.sh` helper.
+
 ## Security Architecture
 
 ### Authentication & Authorization
@@ -1502,6 +1599,13 @@ The Auction Monitor service implements a comprehensive data pipeline for ingesti
 │  - **Uses granular percentiles (p1-p99)** for precise analysis│
 │  - Price predictions, deal detection, recommendations         │
 │  - **Service integrations**: Social (negotiation), Shopping (evaluation), Listings (optimization)│
+│                                                                 │
+│  **Platform-Wide Business Intelligence Use Cases**:            │
+│  - **Seller Intelligence**: Auction starting bid, OBO flexibility, fixed price optimization│
+│  - **Buyer Intelligence**: Price evaluation, negotiation assistance, deal detection│
+│  - **Social Integration**: Negotiation assistance for both buyers and sellers│
+│  - **Shopping Integration**: Buyer evaluation and seller optimization│
+│  - **Kafka Pipeline**: Real-time data flow from Analytics → Python AI│
 └─────────────────────────────────────────────────────────────────┘
 ```
 

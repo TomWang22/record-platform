@@ -37,6 +37,13 @@ const keepAliveAgent = new HttpAgent({
   keepAliveMsecs: 30_000,
 });
 
+// Separate agent for validate/refresh endpoints (no keep-alive to avoid connection reuse issues)
+// These endpoints have connection reset issues, so we use a fresh connection for each request
+const noKeepAliveAgent = new HttpAgent({
+  keepAlive: false,  // No keep-alive - fresh connection for each request
+  maxSockets: Infinity,  // No limit since we're not reusing connections
+});
+
 const AUTH_GRPC_TARGET = process.env.AUTH_GRPC_TARGET || "auth-service:50051";
 const RECORDS_GRPC_TARGET =
   process.env.RECORDS_GRPC_TARGET || "records-service:50051";
@@ -81,10 +88,34 @@ function extractBearer(req: Request): string | undefined {
       : req.headers.authorization) ??
     "";
   const s = String(raw).trim();
+  
+  // Debug logging for token extraction issues
+  if (!s || s.length === 0) {
+    console.warn(`[gw] extractBearer: empty authorization header`, {
+      hasGet: !!req.get("authorization"),
+      hasHeadersAuth: !!req.headers.authorization,
+      headersAuthType: typeof req.headers.authorization,
+      headersAuthIsArray: Array.isArray(req.headers.authorization),
+    });
+    return undefined;
+  }
+  
   const i = s.toLowerCase().indexOf("bearer ");
-  if (i === -1) return undefined;
+  if (i === -1) {
+    console.warn(`[gw] extractBearer: "bearer " not found in header`, {
+      headerPreview: s.substring(0, 50),
+      headerLength: s.length,
+    });
+    return undefined;
+  }
+  
   const token = s.slice(i + "bearer ".length).trim();
-  return token || undefined;
+  if (!token || token.length === 0) {
+    console.warn(`[gw] extractBearer: token is empty after extraction`);
+    return undefined;
+  }
+  
+  return token;
 }
 
 /** Inject x-user-* headers into the outgoing request before proxying. */
@@ -247,6 +278,99 @@ app.use(
 
 app.use(compression() as unknown as import("express").RequestHandler);
 
+/* ----------------------- API Analytics Routes (BEFORE URL Rewrite) ----------------------- */
+// Handle /api/analytics/* routes BEFORE URL rewrite middleware
+// This ensures the route matches before the URL is rewritten
+app.use(
+  "/api/analytics",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: "http://analytics-service:4004",
+    changeOrigin: true,
+    pathRewrite: (path, req) => {
+      // Health check endpoint is at root level, not under /analytics
+      if (path === '/healthz') {
+        console.log(`[gw] pathRewrite analytics health: ${req.originalUrl || req.url} -> ${path} -> /healthz`);
+        return '/healthz';
+      }
+      // Other paths need /analytics prefix (e.g., /log-search -> /analytics/log-search)
+      const newPath = `/analytics${path}`;
+      console.log(`[gw] pathRewrite analytics: ${req.originalUrl || req.url} -> ${path} -> ${newPath}`);
+      return newPath;
+    },
+    proxyTimeout: 30000,
+    agent: keepAliveAgent,
+    on: {
+      proxyReq(proxyReq, req, res) {
+        console.log(`[gw] Proxying ${req.method} ${req.originalUrl || req.url} to analytics-service${proxyReq.path}`);
+      },
+      error(err, _req, res) {
+        console.error("[gw] api/analytics proxy error:", err);
+        sendJson502(res as NodeServerResponse | Socket, "analytics upstream error");
+      },
+    },
+  })
+);
+
+/* ----------------------- API Python AI Routes (BEFORE URL Rewrite) ----------------------- */
+// Handle /api/ai/* routes BEFORE URL rewrite middleware
+// This ensures the route matches before the URL is rewritten
+app.use(
+  "/api/ai",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: "http://python-ai-service:5005",
+    changeOrigin: true,
+    pathRewrite: (path, req) => {
+      // Health check endpoint is at root level, not under /ai
+      if (path === '/healthz') {
+        console.log(`[gw] pathRewrite python-ai health: ${req.originalUrl || req.url} -> ${path} -> /healthz`);
+        return '/healthz';
+      }
+      // Other paths need /ai prefix removed (e.g., /selling-advice -> /ai/selling-advice)
+      // Python AI service expects /ai/* paths
+      const newPath = `/ai${path}`;
+      console.log(`[gw] pathRewrite python-ai: ${req.originalUrl || req.url} -> ${path} -> ${newPath}`);
+      return newPath;
+    },
+    proxyTimeout: 30000,
+    agent: keepAliveAgent,
+    on: {
+      proxyReq(proxyReq, req, res) {
+        console.log(`[gw] Proxying ${req.method} ${req.originalUrl || req.url} to python-ai-service${proxyReq.path}`);
+      },
+      error(err, _req, res) {
+        console.error("[gw] api/python-ai proxy error:", err);
+        sendJson502(res as NodeServerResponse | Socket, "python-ai upstream error");
+      },
+    },
+  })
+);
+
+/* ----------------------- API Prefix Middleware ----------------------- */
+// Rewrite /api/* paths to /* so existing routes work with both /api/ and non-/api/ prefixes
+// This must be early in the middleware chain, before route matching
+// We modify req.url (mutable) instead of req.path (read-only)
+// NOTE: /api/analytics is handled above, so it won't be rewritten
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  const originalUrl = req.originalUrl || req.url || '';
+  if (originalUrl.startsWith('/api/')) {
+    // Skip rewriting if already handled by specific route above
+    if (originalUrl.startsWith('/api/analytics')) {
+      return next(); // Already handled by /api/analytics route above
+    }
+    if (originalUrl.startsWith('/api/ai')) {
+      return next(); // Already handled by /api/ai route above
+    }
+    // Rewrite URL by removing /api prefix
+    const newUrl = originalUrl.replace(/^\/api/, '') || '/';
+    // Modify req.url which is mutable (req.path is read-only)
+    (req as any).url = newUrl;
+    (req as any).originalUrl = newUrl;
+  }
+  next();
+});
+
 /* ----------------------- Gateway own endpoints ----------------------- */
 app.get("/whoami", (_req, res) =>
   res.json({ pod: process.env.HOSTNAME || require("os").hostname() })
@@ -319,6 +443,63 @@ app.use(
     agent: keepAliveAgent,
   })
 );
+// Cache stats endpoints (public, before auth guard)
+app.get("/listings/cache/stats", createProxyMiddleware({
+  target: "http://listings-service:4003",
+  changeOrigin: true,
+  pathRewrite: () => "/cache/stats",
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] listings/cache/stats proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "listings upstream error");
+    },
+  },
+}));
+
+app.get("/api/listings/cache/stats", createProxyMiddleware({
+  target: "http://listings-service:4003",
+  changeOrigin: true,
+  pathRewrite: () => "/cache/stats",
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] api/listings/cache/stats proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "listings upstream error");
+    },
+  },
+}));
+
+app.get("/shopping/cache/stats", createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: () => "/cache/stats",
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] shopping/cache/stats proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+app.get("/api/shopping/cache/stats", createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: () => "/cache/stats",
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] api/shopping/cache/stats proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
 // Listings health check - must be before auth guard
 app.get("/listings/healthz", createProxyMiddleware({
   target: "http://listings-service:4003",
@@ -336,6 +517,7 @@ app.get("/listings/healthz", createProxyMiddleware({
     },
   },
 }));
+
 app.head("/listings/healthz", createProxyMiddleware({
   target: "http://listings-service:4003",
   changeOrigin: true,
@@ -510,8 +692,11 @@ const OPEN_ROUTES: RouteRule[] = [
   { method: "GET",  pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics|ai|auctions)\/healthz\/?$/ },
   { method: "HEAD", pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics|ai|auctions)\/healthz\/?$/ },
 
+  // cache stats endpoints (public)
+  { method: "GET",  pattern: /^\/(?:api\/)?(listings|shopping)\/cache\/stats\/?$/ },
+
   // auth entrypoints (logout is handled by proxy route before this check)
-  { method: "POST", pattern: /^\/(?:api\/)?auth\/(login|register)\/?$/ },
+  { method: "POST", pattern: /^\/(?:api\/)?auth\/(login|register|validate|refresh)\/?$/ },
 
   // public GETs (exclude protected routes like /my-listings)
   { method: "GET",  pattern: /^\/(?:api\/)?listings\/(search|$)/ },
@@ -534,6 +719,223 @@ app.use((req, _res, next) => {
   );
   next();
 });
+
+/* ----------------------- gRPC-backed Auth Routes (BEFORE auth guard) ----------------------- */
+// Support both /auth/register and /api/auth/register
+// These must be defined BEFORE the auth guard middleware
+const registerHandler = async (req: Request, res: Response) => {
+  const { email, password } = (req.body ?? {}) as {
+    email?: string;
+    password?: string;
+  };
+  if (!email || !password) {
+    return res.status(400).json({ error: "email/password required" });
+  }
+
+  try {
+    // Register can be slow (password hashing, DB writes), so use 30s timeout
+    // Under load, bcrypt queue can back up and DB queries can be slow
+    const response = await promisifyGrpcCall<any>(authGrpcClient, "Register", {
+      email,
+      password,
+    }, 30000); // 30 second timeout for registration (increased from 20s)
+    res.status(201).json({
+      token: response?.token ?? "",
+      user: response?.user ?? null,
+    });
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+};
+// Register routes BEFORE auth guard
+app.post("/auth/register", jsonParser, registerHandler);
+app.post("/api/auth/register", jsonParser, registerHandler);
+
+// Support both /auth/login and /api/auth/login
+const loginHandler = async (req: Request, res: Response) => {
+  const { email, password, mfaCode } = (req.body ?? {}) as {
+    email?: string;
+    password?: string;
+    mfaCode?: string;
+  };
+  if (!email || !password) {
+    return res.status(400).json({ error: "email/password required" });
+  }
+
+  try {
+    // Login can be slow under load (bcrypt verification, DB queries), so use 30s timeout
+    const response = await promisifyGrpcCall<any>(
+      authGrpcClient,
+      "Authenticate",
+      { email, password, mfa_code: mfaCode }, // Use proto field name (snake_case)
+      30000 // 30 second timeout for authentication (increased from default 10s)
+    );
+    
+    // Log full response structure for debugging
+    console.log(`[gw] Login response structure:`, JSON.stringify({
+      hasToken: !!response?.token,
+      tokenLength: response?.token?.length ?? 0,
+      requiresMFA: response?.requiresMFA,
+      userRequiresMFA: response?.user?.requiresMFA,
+      userId: response?.userId ?? response?.user?.id,
+      hasUser: !!response?.user,
+      message: response?.message,
+      fullResponseKeys: Object.keys(response || {}),
+    }));
+    
+    // Check if MFA is required (explicit requires_mfa flag from proto)
+    // Support both snake_case (proto) and camelCase (legacy) for compatibility
+    const requiresMFA = response?.requires_mfa === true || response?.requiresMFA === true;
+    const hasEmptyToken = !response?.token || response?.token === "";
+    const hasUserId = !!(response?.user_id || response?.userId || response?.user?.id);
+    
+    // If requires_mfa is true OR (token is empty AND we have a userId) - this indicates MFA required
+    // Empty token + userId means MFA is required (gRPC returns empty token when MFA needed)
+    if (requiresMFA || (hasEmptyToken && hasUserId)) {
+      console.log(`[gw] ✅ MFA required detected - requires_mfa=${response?.requires_mfa}, requiresMFA=${response?.requiresMFA}, hasEmptyToken=${hasEmptyToken}, hasUserId=${hasUserId}`);
+      return res.status(200).json({
+        requiresMFA: true,
+        userId: response?.user_id ?? response?.userId ?? response?.user?.id ?? null,
+        message: response?.message ?? "MFA code required",
+      });
+    }
+    
+    // If we have an empty token but no userId, log warning
+    if (hasEmptyToken && !hasUserId) {
+      console.warn(`[gw] ⚠️ Empty token but no userId - unexpected response structure:`, JSON.stringify(response));
+    }
+    
+    // Normal login response with token
+    res.json({
+      token: response?.token ?? "",
+      refreshToken: response?.refresh_token ?? "",
+      user: response?.user ?? null,
+    });
+  } catch (err) {
+    handleGrpcError(res, err);
+  }
+};
+// Register routes BEFORE auth guard
+app.post("/auth/login", jsonParser, loginHandler);
+app.post("/api/auth/login", jsonParser, loginHandler);
+
+/* ----------------------- Auth Service gRPC Routes (public, before auth guard) ----------------------- */
+// Token validation and refresh endpoints - MOVED TO gRPC for better connection handling
+// gRPC uses HTTP/2 with proper connection management, avoiding HTTP proxy connection issues
+// These endpoints validate the token themselves, so they're public (no auth guard)
+
+// Validate token handler (gRPC) - with connection logging
+const validateTokenHandler = async (req: Request, res: Response) => {
+  const connectionStart = Date.now();
+  const token = extractBearer(req);
+  
+  console.log(`[gw] ValidateToken: request received (${Date.now() - connectionStart}ms)`);
+  
+  if (!token) {
+    console.log(`[gw] ValidateToken: missing token (${Date.now() - connectionStart}ms)`);
+    return res.status(401).json({ error: "missing token", valid: false });
+  }
+
+  try {
+    console.log(`[gw] ValidateToken: calling gRPC ValidateToken (${Date.now() - connectionStart}ms)`);
+    const response = await promisifyGrpcCall<any>(
+      authGrpcClient,
+      "ValidateToken",
+      { token },
+      30000 // 30 second timeout
+    );
+    
+    const duration = Date.now() - connectionStart;
+    console.log(`[gw] ValidateToken: success in ${duration}ms`);
+    
+    if (response?.valid) {
+      return res.status(200).json({
+        valid: true,
+        user: response.user,
+      });
+    } else {
+      return res.status(401).json({ error: "invalid token", valid: false });
+    }
+  } catch (err: any) {
+    const duration = Date.now() - connectionStart;
+    console.error(`[gw] ValidateToken: error after ${duration}ms:`, {
+      code: err?.code,
+      message: err?.message,
+      details: err?.details,
+    });
+    handleGrpcError(res, err);
+  }
+};
+
+// Refresh token handler (gRPC) - with connection logging
+const refreshTokenHandler = async (req: Request, res: Response) => {
+  const connectionStart = Date.now();
+  
+  // Debug logging for token extraction
+  const authHeader = req.get("authorization") || req.headers.authorization;
+  console.log(`[gw] RefreshToken: request received (${Date.now() - connectionStart}ms)`, {
+    hasAuthHeader: !!authHeader,
+    authHeaderType: typeof authHeader,
+    authHeaderLength: authHeader ? String(authHeader).length : 0,
+    authHeaderPreview: authHeader ? String(authHeader).substring(0, 50) : 'none',
+  });
+  
+  const token = extractBearer(req);
+  
+  if (!token) {
+    console.error(`[gw] RefreshToken: missing token (${Date.now() - connectionStart}ms)`, {
+      authHeader: authHeader ? String(authHeader).substring(0, 100) : 'none',
+      headers: Object.keys(req.headers),
+    });
+    return res.status(401).json({ error: "missing token" });
+  }
+  
+  console.log(`[gw] RefreshToken: token extracted (${Date.now() - connectionStart}ms)`, {
+    tokenLength: token.length,
+    tokenPreview: token.substring(0, 20) + '...',
+  });
+
+  try {
+    console.log(`[gw] RefreshToken: calling gRPC RefreshToken (${Date.now() - connectionStart}ms)`, {
+      tokenLength: token.length,
+      tokenPreview: token.substring(0, 30) + '...',
+    });
+    // Proto expects 'refresh_token' field, not 'token'
+    const response = await promisifyGrpcCall<any>(
+      authGrpcClient,
+      "RefreshToken",
+      { refresh_token: token }, // Fixed: proto expects refresh_token, not token
+      30000 // 30 second timeout
+    );
+    
+    const duration = Date.now() - connectionStart;
+    console.log(`[gw] RefreshToken: success in ${duration}ms`);
+    
+    if (response?.token) {
+      return res.status(200).json({ token: response.token });
+    } else {
+      return res.status(401).json({ error: "invalid token" });
+    }
+  } catch (err: any) {
+    const duration = Date.now() - connectionStart;
+    console.error(`[gw] RefreshToken: error after ${duration}ms:`, {
+      code: err?.code,
+      message: err?.message,
+      details: err?.details,
+    });
+    handleGrpcError(res, err);
+  }
+};
+
+// Register routes BEFORE auth guard
+app.post("/auth/validate", jsonParser, validateTokenHandler);
+app.post("/api/auth/validate", jsonParser, validateTokenHandler);
+app.post("/auth/refresh", jsonParser, refreshTokenHandler);
+app.post("/api/auth/refresh", jsonParser, refreshTokenHandler);
+
+/* ----------------------- OLD HTTP Proxy Routes (REMOVED - replaced with gRPC above) ----------------------- */
+// HTTP proxy routes have been replaced with gRPC handlers above for better connection handling
+// gRPC uses HTTP/2 with proper connection management, avoiding HTTP proxy connection reset issues
 
 /* ----------------------- AUTH GUARD ----------------------- */
 app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
@@ -716,99 +1118,36 @@ app.delete("/auth/passkeys/:id", injectIdentityHeadersIfAny, createProxyMiddlewa
   },
 }));
 
-/* ----------------------- gRPC-backed Auth Routes ----------------------- */
-app.post("/auth/register", jsonParser, async (req: Request, res: Response) => {
-  const { email, password } = (req.body ?? {}) as {
-    email?: string;
-    password?: string;
-  };
-  if (!email || !password) {
-    return res.status(400).json({ error: "email/password required" });
-  }
+// Delete account endpoint
+app.delete("/auth/account", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/auth": "" },
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auth/account DELETE proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
 
-  try {
-    // Register can be slow (password hashing, DB writes), so use 30s timeout
-    // Under load, bcrypt queue can back up and DB queries can be slow
-    const response = await promisifyGrpcCall<any>(authGrpcClient, "Register", {
-      email,
-      password,
-    }, 30000); // 30 second timeout for registration (increased from 20s)
-    res.status(201).json({
-      token: response?.token ?? "",
-      user: response?.user ?? null,
-    });
-  } catch (err) {
-    handleGrpcError(res, err);
-  }
-});
+app.delete("/api/auth/account", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://auth-service:4001",
+  changeOrigin: true,
+  pathRewrite: { "^/api/auth": "" },
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] api/auth/account DELETE proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auth upstream error");
+    },
+  },
+}));
 
-app.post("/auth/login", jsonParser, async (req: Request, res: Response) => {
-  const { email, password, mfaCode } = (req.body ?? {}) as {
-    email?: string;
-    password?: string;
-    mfaCode?: string;
-  };
-  if (!email || !password) {
-    return res.status(400).json({ error: "email/password required" });
-  }
-
-  try {
-    // Login can be slow under load (bcrypt verification, DB queries), so use 30s timeout
-    const response = await promisifyGrpcCall<any>(
-      authGrpcClient,
-      "Authenticate",
-      { email, password, mfa_code: mfaCode }, // Use proto field name (snake_case)
-      30000 // 30 second timeout for authentication (increased from default 10s)
-    );
-    
-    // Log full response structure for debugging
-    console.log(`[gw] Login response structure:`, JSON.stringify({
-      hasToken: !!response?.token,
-      tokenLength: response?.token?.length ?? 0,
-      requiresMFA: response?.requiresMFA,
-      userRequiresMFA: response?.user?.requiresMFA,
-      userId: response?.userId ?? response?.user?.id,
-      hasUser: !!response?.user,
-      message: response?.message,
-      fullResponseKeys: Object.keys(response || {}),
-    }));
-    
-    // Check if MFA is required (explicit requires_mfa flag from proto)
-    // Support both snake_case (proto) and camelCase (legacy) for compatibility
-    const requiresMFA = response?.requires_mfa === true || response?.requiresMFA === true;
-    const hasEmptyToken = !response?.token || response?.token === "";
-    const hasUserId = !!(response?.user_id || response?.userId || response?.user?.id);
-    
-    // If requires_mfa is true OR (token is empty AND we have a userId) - this indicates MFA required
-    // Empty token + userId means MFA is required (gRPC returns empty token when MFA needed)
-    if (requiresMFA || (hasEmptyToken && hasUserId)) {
-      console.log(`[gw] ✅ MFA required detected - requires_mfa=${response?.requires_mfa}, requiresMFA=${response?.requiresMFA}, hasEmptyToken=${hasEmptyToken}, hasUserId=${hasUserId}`);
-      return res.status(200).json({
-        requiresMFA: true,
-        userId: response?.user_id ?? response?.userId ?? response?.user?.id ?? null,
-        message: response?.message ?? "MFA code required",
-      });
-    }
-    
-    // If we have an empty token but no userId, log warning
-    if (hasEmptyToken && !hasUserId) {
-      console.warn(`[gw] ⚠️ Empty token but no userId - unexpected response structure:`, JSON.stringify(response));
-    }
-    
-    // Normal login response with token
-    res.json({
-      token: response?.token ?? "",
-      refreshToken: response?.refresh_token ?? "",
-      user: response?.user ?? null,
-    });
-  } catch (err) {
-    handleGrpcError(res, err);
-  }
-});
-
-
-
-/* ----------------------- gRPC-backed Records Routes ----------------------- */
+/* ----------------------- Auth Service HTTP Proxy Routes (protected, after auth guard) ----------------------- */
 app.get("/records", async (req: AuthedRequest, res: Response) => {
   const userId = requireUserIdFromRequest(req, res);
   if (!userId) return;
@@ -1024,6 +1363,37 @@ app.use(
     },
   })
 );
+
+/* ----------------------- Service Health Endpoints (Public, Before Auth Guard) ----------------------- */
+// Social service health check
+app.get(["/social/healthz", "/api/social/healthz"], createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: { "^/api/social": "/social", "^/social": "" }, // Remove /api/social or /social prefix
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] social/healthz proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// Shopping service health check
+app.get(["/shopping/healthz", "/api/shopping/healthz"], createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: { "^/api/shopping": "/shopping", "^/shopping": "" }, // Remove /api/shopping or /shopping prefix
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] shopping/healthz proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
 
 /* ----------------------- gRPC-backed Social Routes (Forum + Messages) ----------------------- */
 // Forum routes
@@ -2191,24 +2561,7 @@ app.use(
   })
 );
 
-// API Analytics routes - proxy to analytics-service (for /api/analytics/* paths)
-app.use(
-  "/api/analytics",
-  injectIdentityHeadersIfAny,
-  createProxyMiddleware({
-    target: "http://analytics-service:4004",
-    changeOrigin: true,
-    pathRewrite: { "^/api/analytics": "/analytics" }, // Rewrite /api/analytics to /analytics
-    proxyTimeout: 30000,
-    agent: keepAliveAgent,
-    on: {
-      error(err, _req, res) {
-        console.error("[gw] api/analytics proxy error:", err);
-        sendJson502(res as NodeServerResponse | Socket, "analytics upstream error");
-      },
-    },
-  })
-);
+// NOTE: /api/analytics route moved above URL rewrite middleware to ensure it matches correctly
 
 /* ----------------------- Python AI Service Routes ----------------------- */
 // Python AI health check (public)
@@ -2242,24 +2595,7 @@ app.use(
   })
 );
 
-// API Python AI routes - proxy to python-ai-service (for /api/ai/* paths)
-app.use(
-  "/api/ai",
-  injectIdentityHeadersIfAny,
-  createProxyMiddleware({
-    target: "http://python-ai-service:5005",
-    changeOrigin: true,
-    pathRewrite: { "^/api/ai": "" }, // Remove /api/ai prefix
-    proxyTimeout: 30000,
-    agent: keepAliveAgent,
-    on: {
-      error(err, _req, res) {
-        console.error("[gw] api/python-ai proxy error:", err);
-        sendJson502(res as NodeServerResponse | Socket, "python-ai upstream error");
-      },
-    },
-  })
-);
+// NOTE: /api/ai route moved above URL rewrite middleware to ensure it matches correctly
 
 /* ----------------------- Auction Monitor Service Routes ----------------------- */
 // Auction Monitor health check (public)

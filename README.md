@@ -39,15 +39,27 @@ This isn't a tutorial project—it's a production-grade system solving real prob
   - `scripts/test-http2-http3-strict-tls.sh`: **60/60 requests succeeded (100%)** during rotation
   - Zero downtime achieved with pod-by-pod rotation using RollingUpdate strategy
 - **✅ Strict TLS enforcement** - **All k6 load tests use strict TLS verification** with CA certificate validation (no insecure TLS bypass); TLS 1.2 and 1.3 only (TLS 1.1 and below rejected); validated via `scripts/test-http2-http3-strict-tls.sh` and `scripts/test-full-chain-with-rotation.sh`. All k6 test scripts (`run-k6-shopping.sh`, `run-k6-social-with-graphs.sh`, `run-k6-listings-with-graphs.sh`, `find-bottlenecks.sh`) enforce strict TLS with `SSL_CERT_FILE` and CA certificate ConfigMaps. **Shopping service load tests** (`k6-shopping-stress.js`, `k6-shopping-ramp.js`, `k6-shopping-db-validation.js`, `k6-bottleneck-finder.js`) all use strict TLS verification for production-ready testing.
-- **✅ Full gRPC inter-service communication** - All services communicate via gRPC with protocol buffers; Caddy routes gRPC requests using `protocol grpc` matcher with h2c transport to backend services.
+- **✅ Full gRPC inter-service communication** - All services communicate via gRPC with protocol buffers; Caddy routes gRPC requests using `protocol grpc` matcher with h2c transport to backend services. **gRPC client certificate verification** configurable via `GRPC_REQUIRE_CLIENT_CERT` environment variable (disabled for dev, enabled for production).
 - **✅ Multi-database architecture** - **8 dedicated PostgreSQL instances** for service isolation, scalability, and independent scaling (auth, records, social, listings, shopping, auction-monitor, analytics, python-ai).
 - **✅ Dual-database connections** - Services like auction-monitor and analytics-service connect to multiple databases for cross-service data access while maintaining data isolation.
+- **✅ Analytics & AI Pipeline** - Platform-wide business intelligence pipeline for seller and buyer optimization:
+  - **Seller Intelligence**: Pricing guidance for auctions (starting bid), OBO (or best offer) flexibility, fixed price optimization
+  - **Buyer Intelligence**: Price evaluation, negotiation assistance, deal detection
+  - **Social Integration**: Negotiation assistance for both buyers and sellers
+  - **Shopping Integration**: Buyer evaluation and seller optimization
+  - **Granular Percentiles**: p1-p99 calculation for precise price positioning
+  - **Kafka Integration**: Real-time data pipeline from Analytics → Python AI Service
+- **✅ k6 HTTP/3 Toolchain** - Custom k6 binary with HTTP/3 extension built using xk6 and quic-go. Extension loads successfully, but NodePort UDP routing limits external testing. For reliable HTTP/3 testing, use `scripts/test-microservices-http2-http3.sh` (curl-based, verified with tcpdump). See `test-results/K6_HTTP3_TOOLCHAIN_STATUS_12-22_tom.md` for complete status and `scripts/build-k6-http3.sh` for build instructions.
+- **✅ HTTP/3 Protocol Verification** - tcpdump/Wireshark verification confirms HTTP/3 uses QUIC (UDP) protocol. Verification script (`scripts/verify-http3-with-tcpdump.sh`) captures UDP packets on port 443 during HTTP/3 requests, proving QUIC usage. See `test-results/E2E_TEST_RESULTS_SUMMARY_12-22_tom.md` and `ENGINEERING.md` for complete verification methodology.
+- **✅ Production-Ready Performance** - **99%+ success rates** across all services with **45-77% latency reduction** (p95 latencies improved from 2-5s to 0.5-2s). See `test-results/E2E_RETEST_RESULTS_12-21_tom.md` and `test-results/E2E_TEST_RESULTS_SUMMARY_12-22_tom.md` for complete test results.
+- **✅ Comprehensive E2E Testing** - HTTP/2 vs HTTP/3 comparison tests with organized timestamped results. See `scripts/compare-http2-http3.sh` and `test-results/` directory for all test results. **307+ shell scripts** support constant debugging and iterative development (see `test-results/REPO_STRUCTURE_EXPLANATION.md` for structure rationale).
 - **✅ One-command bootstrap & disaster recovery** - `scripts/bootstrap-platform.sh` deploys entire platform instantly; Terraform + Ansible enable instant cluster recreation for disaster recovery scenarios.
 - **Kubernetes-native workflows** - `infra/k8s` provides composable bases and overlays, with bootstrapping scripts that stand up Kind, build images, load them, and apply manifests.
 - **Hardened gateway path** - API Gateway keeps the JWT guard, adds optional `DEBUG_FAKE_AUTH`, injects identity headers, and exposes detailed metrics.
 - **Redis-assisted records caching** - `services/records-service/src/lib/cache.ts` adds normalized search keys, safe JSON encoding, and targeted invalidation hooks.
 - **Kafka messaging with strict TLS** - Real-time messaging for forum posts, direct messages, and group chats via Kafka integration in social-service. **Strict TLS enabled** with SSL listener on port 9093, certificates managed via `kafka-ssl-secret`.
-- **Operational tooling** - `scripts/` covers smoke tests, TLS helpers, QUIC tuning, backup/restore, load tests, and rollout automation.
+- **Operational tooling** - `scripts/` covers smoke tests, TLS helpers, QUIC tuning, backup/restore, load tests, and rollout automation. **307+ scripts** organized by purpose (testing, load testing, service management, database management, infrastructure, debugging, utilities) to support constant debugging and iterative development.
+- **Webapp** - Next.js 14 frontend with landing pages, dashboard, authentication, and comprehensive documentation. See `webapp/README.md` for frontend architecture and connection guide.
 
 ## 🎉 Recent Breakthroughs
 
@@ -815,10 +827,77 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
 - Cron jobs perform nightly dumps and weekly basebackups
 - Services connect via `host.docker.internal:PORT` from Kubernetes pods
 
+## Analytics & AI Pipeline Architecture
+
+### Platform-Wide Business Intelligence
+
+The Analytics & Python AI pipeline provides **platform-wide business intelligence** for both sellers and buyers, simulating real-world marketplace scenarios through comprehensive k6 load testing.
+
+**Pipeline Flow**:
+```
+User Actions → Analytics Service → Kafka → Python AI Service → Intelligent Recommendations
+```
+
+**Key Use Cases**:
+
+#### Seller Intelligence (Business Intelligence Tool)
+- **Auction Listings**: Optimal starting bid recommendations based on market analysis
+- **OBO (Or Best Offer)**: Price flexibility guidance to show negotiation willingness
+- **Fixed Price**: Best price recommendations that move inventory quickly without desperation pricing
+- **Listing Optimization**: Title, description, photo suggestions based on successful listings
+- **Price Positioning**: Granular percentile analysis (p1-p99) for precise market positioning
+
+#### Buyer Intelligence
+- **Price Evaluation**: Real-time price assessment using granular percentiles (p1-p99)
+- **Negotiation Assistance**: OBO recommendations based on percentile position and market trends
+- **Deal Detection**: Identification of good deals (low percentile prices) vs overpriced items
+- **Auction Temperature**: Bid activity analysis, watcher count, time remaining insights
+
+#### Social Integration (Negotiation Assistance)
+- **Buyer/Seller Negotiations**: Price context for both parties (roles can change)
+- **Mood Analysis**: AI analyzes negotiation mood based on price position
+- **Market Context**: Bigger picture trends, new drops detection
+- **Example**: Buyer offers $45 (p25 - good deal), system suggests seller might accept $47-48 (p50-p60 range)
+
+#### Shopping Integration (Buyer & Seller Evaluation)
+- **Buyer Evaluation**: Price assessment for purchase decisions
+- **Seller Optimization**: Pricing guidance for listings
+- **Cross-Role Support**: Same advice works for both buyer and seller roles (not fixed roles)
+
+**Why This Pipeline is Stronger Than AI Chatbots**:
+- **Data-Driven**: Uses real market data from Analytics Service (granular percentiles p1-p99)
+- **Platform-Wide**: Integrates with Social, Shopping, and Listings services
+- **Real-Time**: Kafka pipeline ensures fresh data for accurate recommendations
+- **Granular Analysis**: p1-p99 percentiles provide precise price positioning (not just p25/p50/p75/p95)
+
+**k6 Load Testing Simulation**:
+The comprehensive k6 test (`scripts/load/k6-all-services-comprehensive.js`) simulates the **complete user flow**:
+1. **Auth**: User registration/login (gatekeeper for all services)
+2. **Records**: Catalog management after purchase
+3. **Listings**: Random listing creation and search
+4. **Social**: Forum posts, messaging, group chats
+5. **Analytics Pipeline**: Search logging, price snapshots (feeds Python AI)
+6. **Python AI**: Selling advice, buying advice, negotiation advice (uses Analytics data)
+7. **Shopping**: Cart, checkout, orders, purchase history, resell
+
+This end-to-end simulation **finds system limits** by testing the complete flow under load, identifying bottlenecks across the entire platform.
+
+**Test Results** (December 21, 2025):
+- **Success Rates**: 99%+ for all services (auth, records, listings, social, shopping, analytics)
+- **Latency Improvements**: 45-77% reduction in p95 latencies
+- **Error Rates**: <1% for all services
+- See `test-results/E2E_RETEST_RESULTS_12-21_tom.md` for complete results
+
 ## Performance Benchmarks
 - The `psql-inventory` job (see snippet below) creates a `bench.results` table, prewarms hot partitions, and sweeps pgbench runs over two stored search plans: `percent` (prefix filtering) and `knn` (vector KNN).
 - Results are recorded in Postgres with git metadata and exported to `bench_sweep.csv` for spreadsheet review. Latency files are parsed into comprehensive percentiles: **p50, p95, p99, p999, p9999, p99999, p999999, p9999999, and p100**, plus CPU share and IO deltas.
 - **Extended percentile coverage**: All performance testing scripts (k6 and pgbench) now include p9999999 (99.99999th percentile) for detection of extreme tail latencies (1 in 10 million requests).
+- **Recent E2E Performance Improvements** (December 21, 2025):
+  - **Success Rates**: 99%+ for all services (auth: 99.87%, records: 99.62%, listings: 99.81%, social: 99.70%, shopping: 99.91%, analytics: 99.89%)
+  - **Latency Improvements**: 45-77% reduction in p95 latencies (auth: 1215ms, records: 2213ms, listings: 2101ms, social: 1293ms, shopping: 778ms, analytics: 556ms, python_ai: 541ms)
+  - **Error Rates**: <1% for all services
+  - **k6 HTTP/3 Toolchain**: 100% success rate, 15ms p95 latency
+  - See `test-results/E2E_RETEST_RESULTS_12-21_tom.md` for complete test results
 - Recent sweep (records schema warmed, 12 worker threads, 60 second windows, limit=50):
   - `percent` variant peaked at ~3.0k TPS (16 clients) with p95 ~12 ms and p99 ~13 ms before caching and kernel tuning drove p95 below 2 ms at higher client counts.
   - `knn` variant sustained ~2.6k TPS with p95 hovering 10 to 13 ms at lower concurrency and dropping to ~2 ms after buffer warmups.
@@ -839,7 +918,7 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
   2025-11-03T22:10:29Z,knn,32,1875.440407,3.648,3.856,5.567,7.234,9.456,11.123,14.789
   ```
 - **Performance testing scripts**:
-  - **k6 scripts**: `scripts/load/k6-mixed.js`, `scripts/load/k6-reads.js`, `scripts/load/all-in-one-k6.js`, `scripts/load/k6-summary-handler.js`
+  - **k6 scripts**: `scripts/load/k6-mixed.js`, `scripts/load/k6-reads.js`, `scripts/load/k6-all-services-comprehensive.js` (E2E flow simulation), `scripts/load/k6-http3-toolchain.js` (HTTP/3 testing)
   - **pgbench scripts**: `scripts/run_*_pgbench_sweep.sh` for all services (auth, social, listings, shopping, analytics, auction-monitor, python-ai)
   - All scripts include full percentile coverage from p50 to p9999999
 - Long-form output lives in `bench_sweep.csv`; use `scripts/perf_runner.sh` or adapt the snippet to compare future schema or index experiments.

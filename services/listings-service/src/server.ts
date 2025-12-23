@@ -39,6 +39,24 @@ app.get("/healthz", async (_req, res) => {
 app.use((req, res, next) => { res.on("finish", () => httpCounter.inc({ service: "listings", route: req.path, method: req.method, code: res.statusCode })); next(); });
 app.get("/metrics", async (_req, res) => { res.setHeader("Content-Type", register.contentType); res.end(await register.metrics()); });
 
+// Cache statistics endpoint
+app.get("/cache/stats", async (_req, res) => {
+  try {
+    const { getCacheHitMissStats, getCacheStats } = await import("./lib/redis-cache.js");
+    const hitMissStats = getCacheHitMissStats();
+    const redisStats = await getCacheStats();
+    res.json({
+      cache: {
+        ...hitMissStats,
+        redis: redisStats,
+      },
+      redis: redis ? { connected: true } : { connected: false },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "failed to get cache stats", message: err.message });
+  }
+});
+
 import ratingsRouter from './routes/ratings.js';
 
 app.use("/oauth", oauthRouter);

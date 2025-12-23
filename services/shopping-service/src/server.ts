@@ -3,7 +3,7 @@ import os from 'os'
 import { register, httpCounter } from '@common/utils'
 import { requireUser, type AuthedRequest } from './lib/auth.js'
 import { pool } from './lib/db.js'
-import { makeRedis, CacheManager } from './lib/cache.js'
+import { makeRedis, CacheManager, getCacheStats } from './lib/cache.js'
 import cartRouter from './routes/cart.js'
 import watchlistRouter from './routes/watchlist.js'
 import recentlyViewedRouter from './routes/recently-viewed.js'
@@ -70,6 +70,19 @@ app.get('/healthz', async (_req: Request, res: Response) => {
 app.get('/metrics', async (_req: Request, res: Response) => {
   res.setHeader('Content-Type', register.contentType)
   res.end(await register.metrics())
+})
+
+// Cache statistics endpoint
+app.get('/cache/stats', async (_req: Request, res: Response) => {
+  try {
+    const stats = getCacheStats()
+    res.json({
+      cache: stats,
+      redis: redis ? { connected: redis.status === 'ready' || redis.status === 'connect' } : { connected: false },
+    })
+  } catch (err: any) {
+    res.status(500).json({ error: 'failed to get cache stats', message: err.message })
+  }
 })
 
 // Routes (require auth) - pass redis and cacheManager

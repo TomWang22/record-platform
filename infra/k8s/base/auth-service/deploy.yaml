@@ -52,11 +52,11 @@ spec:
               value: "/etc/kafka/secrets/ca-cert.pem"
           resources:
             requests:
-              cpu: 50m
-              memory: 256Mi
+              cpu: "500m"
+              memory: "512Mi"
             limits:
-              cpu: 500m
-              memory: 768Mi
+              cpu: "2000m"  # 2 cores per pod (4 replicas × 2 cores = 8 cores total, leaves 4 cores for other services)
+              memory: "2Gi"
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto
@@ -88,11 +88,11 @@ spec:
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
                 - -tls-server-name=record.local
-                - -connect-timeout=5s
-                - -rpc-timeout=5s
+                - -connect-timeout=30s
+                - -rpc-timeout=30s
             initialDelaySeconds: 90
             periodSeconds: 15
-            timeoutSeconds: 20
+            timeoutSeconds: 35
             failureThreshold: 6
           livenessProbe:
             exec:
@@ -106,11 +106,11 @@ spec:
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
                 - -tls-server-name=record.local
-                - -connect-timeout=5s
-                - -rpc-timeout=5s
+                - -connect-timeout=30s
+                - -rpc-timeout=30s
             initialDelaySeconds: 150
             periodSeconds: 30
-            timeoutSeconds: 20
+            timeoutSeconds: 35
             failureThreshold: 6
           startupProbe:
             exec:
@@ -124,11 +124,11 @@ spec:
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
                 - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=15s
+                - -connect-timeout=30s
+                - -rpc-timeout=30s
             initialDelaySeconds: 45
             periodSeconds: 15
-            timeoutSeconds: 20
+            timeoutSeconds: 35
             failureThreshold: 30
       volumes:
         - name: proto-files

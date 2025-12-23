@@ -162,6 +162,41 @@ class PythonAIServicer:
             'timestamp': result.get('timestamp', 0),
         })()
 
+# Standard gRPC Health Service implementation
+class HealthServicer:
+    """Standard grpc.health.v1.Health service implementation"""
+    
+    async def Check(self, request, context):
+        """Check health status"""
+        # ServingStatus enum: UNKNOWN=0, SERVING=1, NOT_SERVING=2, SERVICE_UNKNOWN=3
+        try:
+            # Simple health check - service is healthy if we can respond
+            return type('HealthCheckResponse', (), {
+                'status': 1,  # SERVING
+                'message': 'Service is healthy'
+            })()
+        except Exception as e:
+            print(f"[python-ai-grpc] Health check failed: {e}")
+            return type('HealthCheckResponse', (), {
+                'status': 2,  # NOT_SERVING
+                'message': f'Service unhealthy: {str(e)}'
+            })()
+    
+    async def Watch(self, request, context):
+        """Watch health status (streaming)"""
+        # Simple implementation - send periodic health checks
+        import asyncio
+        try:
+            while True:
+                await asyncio.sleep(5)
+                response = type('HealthCheckResponse', (), {
+                    'status': 1,  # SERVING
+                    'message': 'Service is healthy'
+                })()
+                await context.write(response)
+        except Exception as e:
+            context.abort(grpc.StatusCode.INTERNAL, f'Health watch failed: {str(e)}')
+
 async def serve(port: int = 50060):
     """Start gRPC server"""
     if not PROTO_LOADED:
@@ -179,6 +214,49 @@ async def serve(port: int = 50060):
         add_func(PythonAIServicer(), server)
     else:
         raise AttributeError("Could not find add_*Servicer_to_server function in python_ai_pb2_grpc")
+    
+    # Register standard gRPC Health Service (grpc.health.v1.Health)
+    # Load health.proto dynamically
+    try:
+        health_proto_path = '/app/proto/health.proto'
+        if not os.path.exists(health_proto_path):
+            # Try alternative paths
+            for alt_path in ['/app/services/python-ai-service/proto/health.proto',
+                           os.path.join(os.path.dirname(__file__), '../../../proto/health.proto')]:
+                if os.path.exists(alt_path):
+                    health_proto_path = alt_path
+                    break
+        
+        if os.path.exists(health_proto_path):
+            # Generate health proto stubs on the fly
+            import subprocess
+            import tempfile
+            temp_dir = tempfile.mkdtemp()
+            try:
+                subprocess.run([
+                    'python', '-m', 'grpc_tools.protoc',
+                    f'--proto_path={os.path.dirname(health_proto_path)}',
+                    f'--python_out={temp_dir}',
+                    f'--grpc_python_out={temp_dir}',
+                    health_proto_path
+                ], check=True, capture_output=True)
+                
+                # Import generated health stubs
+                sys.path.insert(0, temp_dir)
+                import health_pb2
+                import health_pb2_grpc
+                
+                # Register health service
+                health_pb2_grpc.add_HealthServicer_to_server(HealthServicer(), server)
+                print("[python-ai-grpc] Standard gRPC Health Service (grpc.health.v1.Health) registered")
+            except Exception as e:
+                print(f"[python-ai-grpc] Failed to register health service: {e}")
+                # Continue without health service
+        else:
+            print(f"[python-ai-grpc] health.proto not found at {health_proto_path}, skipping standard health service")
+    except Exception as e:
+        print(f"[python-ai-grpc] Error setting up health service: {e}")
+        # Continue without health service
     
     # Try to load TLS certs (for production with ALPN = h2)
     key_path = os.getenv('TLS_KEY_PATH', '/etc/certs/tls.key')

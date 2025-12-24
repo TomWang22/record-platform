@@ -30,7 +30,7 @@ COPY webapp/next.config.mjs webapp/tsconfig.json webapp/tailwind.config.ts webap
 COPY webapp/app ./webapp/app
 COPY webapp/components ./webapp/components
 COPY webapp/lib ./webapp/lib
-COPY webapp/middleware.ts webapp/globals.css webapp/providers.tsx ./webapp/
+COPY webapp/middleware.ts ./webapp/
 RUN mkdir -p webapp/public
 
 # Build from webapp directory so path aliases resolve correctly
@@ -41,10 +41,16 @@ WORKDIR /app/webapp
 # Cache TypeScript build info for incremental builds
 # Parallel build optimization
 ENV NEXT_TELEMETRY_DISABLED=1
+# Show build progress and use parallel compilation
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+# Build with progress output (so it doesn't look stuck)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=next-cache,target=/app/webapp/.next/cache \
     --mount=type=cache,id=ts-buildinfo,target=/app/webapp/.next/tsconfig.tsbuildinfo \
-    pnpm build
+    echo "=== Starting Next.js build (this takes 2-5 minutes) ===" && \
+    echo "Progress will be shown below..." && \
+    pnpm build || (echo "Build failed!" && exit 1) && \
+    echo "=== Next.js build complete ==="
 
 # Prune production dependencies after build
 WORKDIR /app

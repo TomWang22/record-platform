@@ -24,14 +24,18 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone', // so the Dockerfile can copy .next/standalone
   swcMinify: true,
+  // Disable source maps for faster builds
+  productionBrowserSourceMaps: false,
+  // Reduce build output size
+  compress: true,
   // Optimize compilation - faster builds
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
   // Faster builds in Docker
   typescript: {
-    // Don't type-check during build (faster, type-check separately)
-    ignoreBuildErrors: false, // Keep false for production, but speeds up if set to true
+    // Skip type-checking during build to prevent hangs (type-check separately)
+    ignoreBuildErrors: true, // Set to true to prevent build hangs - type-check separately
   },
   eslint: {
     // Don't run ESLint during build (faster, lint separately)

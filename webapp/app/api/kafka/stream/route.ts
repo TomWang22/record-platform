@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 
 // For Next.js running on the host, we always use localhost:29092
 // (not kafka:9092 which is for Docker-internal connections)
-const { Kafka } = require('kafkajs')
+import { Kafka } from 'kafkajs'
 
 // Kafka consumer for real-time analytics events
 // This endpoint streams events from Kafka topics to the frontend via Server-Sent Events (SSE)

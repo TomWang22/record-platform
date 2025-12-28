@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { Kafka } from 'kafkajs'
 
 // Test Kafka connectivity
 export const dynamic = 'force-dynamic'
@@ -6,8 +7,6 @@ export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {
-    const { Kafka } = require('kafkajs')
-    
     // Use the PLAINTEXT_HOST listener for external connections
     const broker = process.env.KAFKA_BROKER || 'localhost:29092'
     

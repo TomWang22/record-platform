@@ -71,10 +71,11 @@ docs/
 records_chunks/
 records_chunks_small/
 
-# Random files in root directory (keep only README.md and ENGINEERING.md)
+# Random files in root directory (keep only README.md, ENGINEERING.md, and Runbook.md)
 *.md
 !README.md
 !ENGINEERING.md
+!Runbook.md
 *.txt
 !COMMIT_MESSAGE.txt
 *.csv
@@ -146,3 +147,6 @@ Dockerfile*
 !Dockerfile
 # Backup environment files
 **/.env.bak
+
+# Ops folder (excluded from GitHub)
+ops/

@@ -9,6 +9,7 @@ const variants = {
   primary: 'bg-brand text-white hover:bg-indigo-500',
   secondary: 'bg-slate-900/5 text-slate-900 hover:bg-slate-900/10 dark:text-slate-100 dark:bg-white/5',
   ghost: 'bg-transparent hover:bg-slate-900/5 dark:hover:bg-white/5',
+  outline: 'border border-slate-300 bg-transparent hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800',
 }
 
 const sizes = {

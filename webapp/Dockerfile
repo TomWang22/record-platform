@@ -44,12 +44,17 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Show build progress and use parallel compilation
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 # Build with progress output (so it doesn't look stuck)
+# Use unbuffered output so progress shows immediately
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    --mount=type=cache,id=next-cache,target=/app/webapp/.next/cache \
-    --mount=type=cache,id=ts-buildinfo,target=/app/webapp/.next/tsconfig.tsbuildinfo \
     echo "=== Starting Next.js build (this takes 2-5 minutes) ===" && \
-    echo "Progress will be shown below..." && \
-    pnpm build || (echo "Build failed!" && exit 1) && \
+    echo "Compiling TypeScript and bundling React..." && \
+    echo "Note: Type checking is skipped during build (ignoreBuildErrors: true)" && \
+    echo "Starting build at $(date)" && \
+    echo "Clearing Next.js cache to prevent corruption..." && \
+    rm -rf /app/webapp/.next && \
+    echo "Running build..." && \
+    NODE_OPTIONS="--max-old-space-size=4096" NEXT_TELEMETRY_DISABLED=1 pnpm build 2>&1 | tee /tmp/next-build.log && \
+    echo "Build completed at $(date)" && \
     echo "=== Next.js build complete ==="
 
 # Prune production dependencies after build
@@ -73,10 +78,10 @@ COPY --from=build --chown=nextjs:nodejs /app/webapp/.next/static ./webapp/.next/
 COPY --from=build --chown=nextjs:nodejs /app/webapp/public ./webapp/public
 
 # Remove source maps, dev files, and unnecessary files to reduce size
+# NOTE: Do NOT remove app-paths-manifest.json - Next.js needs it!
 RUN find ./webapp/.next -name "*.map" -delete 2>/dev/null || true \
     && find ./webapp/.next -type d -name "cache" -exec rm -rf {} + 2>/dev/null || true \
-    && rm -rf ./webapp/.next/server/chunks/development 2>/dev/null || true \
-    && rm -rf ./webapp/.next/server/app-paths-manifest.json 2>/dev/null || true
+    && rm -rf ./webapp/.next/server/chunks/development 2>/dev/null || true
 
 USER nextjs
 

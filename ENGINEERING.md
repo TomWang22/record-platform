@@ -1057,17 +1057,176 @@ notes.
 - Short TTL (5-10 seconds) for static assets
 - Cache headers for browser caching
 
+### System Performance Limits & Bottleneck Analysis
+
+**Comprehensive Load Testing Results** (December 27, 2025):
+
+**Test Methodology**:
+- **Smoke Test**: `scripts/test-microservices-http2-http3.sh` - Validates all services via HTTP/2 and HTTP/3
+- **k6 Comprehensive Test**: `scripts/load/k6-all-services-comprehensive.js` - Full service load testing
+- **Limit-Finding Test**: `scripts/load/k6-e2e-find-limit.js` - Identifies maximum capacity and bottlenecks
+- **HTTP/3 Testing**: Uses `HTTP_VERSION=HTTP/3` environment variable or curl-based testing via `http3.sh` helper
+
+**System Limits Identified**:
+- **Optimal Load**: ~50-100 VUs (Virtual Users) before performance degradation
+- **Maximum Tested**: 500 VUs (system completely overwhelmed)
+- **Degradation Point**: Services start showing errors above 100 VUs
+- **Critical Failure Point**: 500 VUs causes 80-96% error rates
+
+**Test Results Summary**:
+
+**k6 Comprehensive Test (HTTP/2)** - 50 VUs, 11 minutes:
+- ✅ **Auth Service**: 99.91% success (8 errors out of 9,043 requests)
+- ✅ **Records Service**: 100% success (13,530 requests)
+- ✅ **Listings Service**: 99.75% success (11,629 requests)
+- ✅ **Social Service**: 99.96% success (9,033 requests)
+- ✅ **Shopping Service**: 99.91% success (11,807 requests)
+- ✅ **Analytics Service**: 99.95% success (4,520 requests)
+- ⚠️ **Python AI Service**: 67.69% success (1,184 requests, 565 errors)
+
+**Limit-Finding Test (HTTP/2)** - 500 VUs, 3m46s:
+- ❌ **Auth Service**: 0% success (1,026 errors) - **PRIMARY BOTTLENECK**
+- ❌ **Records Service**: 17.88% success (8,638 errors)
+- ❌ **Listings Service**: 21.74% success (8,207 errors)
+- ❌ **Social Service**: 19.71% success (4,019 errors)
+- ❌ **Shopping Service**: 19.68% success (8,121 errors)
+- ❌ **Analytics Service**: 19.66% success (3,259 errors)
+- ❌ **Python AI Service**: 15.33% success (403 errors)
+- **Overall Error Rate**: 80.77%
+
+**Limit-Finding Test (HTTP/3)** - 500 VUs, 3m55s:
+- ❌ **Auth Service**: 0% success (308 errors) - **PRIMARY BOTTLENECK**
+- ⚠️ **Records Service**: 71.31% success (1,116 errors) - **Better than HTTP/2**
+- ✅ **Listings Service**: 93.70% success (239 errors) - **Much better than HTTP/2**
+- ✅ **Social Service**: 88.18% success (182 errors) - **Much better than HTTP/2**
+- ✅ **Shopping Service**: 87.53% success (398 errors) - **Much better than HTTP/2**
+- ✅ **Analytics Service**: 87.94% success (161 errors) - **Much better than HTTP/2**
+- ⚠️ **Python AI Service**: 42.62% success (175 errors)
+- **Overall Error Rate**: 17.94% - **Significantly better than HTTP/2**
+
+**Key Finding**: HTTP/3 (QUIC) shows **significantly better performance** than HTTP/2 under extreme load, with most services maintaining 85-95% success rates vs 15-20% for HTTP/2.
+
+**Auth Service Bottleneck - Security vs Performance Trade-off**:
+
+**Root Cause**: **bcrypt password hashing is intentionally CPU-intensive for security**
+
+**Current Configuration**:
+- **bcrypt Rounds**: 8 (reduced from 10 for performance, still secure)
+- **Concurrent Operations**: 64 per pod (queue-managed)
+- **Service Replicas**: 4 pods
+- **Total Capacity**: ~256 concurrent bcrypt operations across all pods
+- **CPU Allocation**: 2000m (2 cores) per pod
+- **Node CPU**: 12 cores total (allows for multiple services and monitoring overhead)
+
+**Why This Is Intentional**:
+1. **Security Requirement**: bcrypt is designed to be slow and CPU-intensive to prevent brute-force attacks
+2. **Password Protection**: Higher bcrypt rounds = better security, but slower performance
+3. **Industry Standard**: 8-10 rounds is standard for production systems
+4. **Security Budget**: We must budget CPU resources for security operations
+
+**Performance Characteristics**:
+- **Registration**: Requires bcrypt.hash() - CPU-intensive (~50-200ms per operation)
+- **Login**: Requires bcrypt.compare() - CPU-intensive (~50-200ms per operation)
+- **Queue Management**: Prevents CPU contention by limiting concurrent operations
+- **Queue Saturation**: At 500 VUs, queue backs up, causing timeouts and failures
+
+**Why Auth Fails First**:
+- **Gatekeeper Service**: All other services depend on auth tokens from auth service
+- **CPU-Bound Operations**: bcrypt operations are synchronous and CPU-bound
+- **Queue Limits**: 64 concurrent operations per pod = bottleneck under extreme load
+- **Cascading Failures**: When auth fails, all downstream services fail (no tokens)
+
+**Proving the Bottleneck Under the Wire**:
+
+We use comprehensive monitoring to prove why auth is the bottleneck:
+
+1. **tcpdump Protocol Verification**:
+   - **HTTP/2**: Captures TCP packets on port 443 (proves HTTP/2 uses TCP)
+   - **HTTP/3**: Captures UDP packets on port 443 (proves HTTP/3 uses QUIC/UDP)
+   - **Analysis**: Counts TCP vs UDP packets to verify protocol usage
+   - **Proof**: Shows HTTP/3 actually uses QUIC (UDP), not HTTP/2 (TCP)
+
+2. **strace System Call Monitoring**:
+   - **Monitors**: System calls during bcrypt operations (clone, fork, execve, gettimeofday, nanosleep)
+   - **Frequency**: Samples every 10 seconds during load tests
+   - **Shows**: High frequency of system calls during bcrypt operations
+   - **Proof**: Demonstrates CPU-intensive nature of bcrypt (frequent system calls)
+
+3. **htop-Style CPU Monitoring**:
+   - **Node-Level**: Shows overall node CPU usage (12 cores total)
+   - **Pod-Level**: Shows auth-service pod CPU approaching 2000m limit
+   - **Process-Level**: Shows Node.js process CPU spikes during bcrypt.hash()
+   - **Frequency**: Every 2 seconds (real-time CPU spike monitoring)
+   - **Includes**: /proc/stat for actual CPU time, process CPU percentage
+   - **Proof**: Visual evidence of CPU spikes during bcrypt operations
+
+4. **Why CPU Spikes Occur**:
+   - **bcrypt.hash()**: Takes 50-200ms per operation, uses significant CPU
+   - **bcrypt.compare()**: Similar CPU usage for password verification
+   - **Queue Saturation**: At 500 VUs, 64 concurrent operations per pod cannot keep up
+   - **CPU Limit**: 2000m (2 cores) per pod is fully utilized during bcrypt operations
+   - **Node Capacity**: 12 cores total allows for multiple services, but auth-service consumes significant CPU
+
+**Monitoring Script**: `scripts/run-k6-with-comprehensive-monitoring.sh`
+- Runs HTTP/2 and HTTP/3 limit tests with full monitoring
+- Generates comprehensive report with protocol verification
+- Documents CPU spikes and system call patterns
+- Proves under the wire that HTTP/3 uses QUIC (UDP) not HTTP/2 (TCP)
+
+**Security Budget Planning**:
+
+**Current Capacity** (4 replicas, 64 concurrent per pod):
+- **Theoretical Maximum**: 256 concurrent auth operations
+- **Practical Maximum**: ~100-150 VUs before degradation
+- **At 500 VUs**: Queue saturation, 0% success rate
+
+**Scaling Strategies**:
+1. **Horizontal Scaling**: Add more auth-service replicas (each adds 64 concurrent operations)
+   - 8 replicas = 512 concurrent operations
+   - 16 replicas = 1,024 concurrent operations
+2. **Vertical Scaling**: Increase CPU limits per pod (allows more concurrent operations)
+   - Current: 2000m (2 cores) per pod
+   - Increase to: 4000m (4 cores) per pod = potentially 128 concurrent operations per pod
+   - **Node Capacity**: 12 cores total (allows for multiple services and monitoring overhead)
+3. **bcrypt Rounds Tuning**: Balance security vs performance
+   - Current: 8 rounds (good balance)
+   - Production: 10 rounds (more secure, slower)
+   - Dev/Test: 6 rounds (faster, less secure - not recommended for production)
+4. **Queue Size Tuning**: Increase `MAX_CONCURRENT_BCRYPT` per pod
+   - Current: 64 concurrent operations
+   - Increase to: 128 concurrent operations (requires more CPU)
+
+**Recommendations**:
+- **Production Load**: Plan for 50-100 concurrent users per auth-service replica
+- **High Load**: Scale to 8-16 replicas for 500+ concurrent users
+- **Security First**: Never reduce bcrypt rounds below 8 for production
+- **Monitor Queue**: Track `bcrypt_queue` and `bcrypt_active` metrics in health checks
+- **HTTP/3 Preferred**: Use HTTP/3 (QUIC) for better performance under load
+
+**Monitoring**:
+- **Health Check Endpoint**: `/healthz` includes bcrypt queue status
+- **Metrics**: `bcrypt_queue` (queue length), `bcrypt_active` (active operations)
+- **Alerts**: Set alerts for queue length > 50 or active operations > 60
+- **Comprehensive Monitoring**: Use `scripts/run-k6-with-comprehensive-monitoring.sh` for full monitoring:
+  - **tcpdump**: Verifies HTTP/2 (TCP) vs HTTP/3 (UDP/QUIC) protocol usage
+  - **strace**: Monitors system calls during bcrypt operations (proves CPU-intensive nature)
+  - **htop-style monitoring**: Shows CPU spikes in real-time (node, pod, and process level)
+  - **Process-level CPU**: Shows Node.js process CPU usage during bcrypt operations
+  - **Protocol Verification**: Proves under the wire that HTTP/3 uses QUIC (UDP) not HTTP/2 (TCP)
+
 ### HTTP/3 (QUIC) Benefits
 
 **Performance Improvements**:
 - Reduced latency with 0-RTT connection establishment
 - Better performance on lossy networks
 - Multiplexing without head-of-line blocking
+- **Significantly better performance under extreme load** (17.94% error rate vs 80.77% for HTTP/2 at 500 VUs)
 
 **Implementation**:
 - Caddy handles QUIC automatically
 - Fallback to HTTP/2 if QUIC unavailable
 - Client support required (modern browsers, curl with HTTP/3)
+- **k6 HTTP/3 Testing**: Use `HTTP_VERSION=HTTP/3` environment variable or `scripts/load/k6-http3-toolchain.js`
 
 ### k6 HTTP/3 Toolchain
 
@@ -1077,17 +1236,19 @@ notes.
 - **Build Script**: `scripts/build-k6-http3.sh`
 - **Extension**: `github.com/record-platform/xk6-http3` (local development using quic-go)
 - **Documentation**: See `test-results/K6_HTTP3_TOOLCHAIN_STATUS_12-22_tom.md` for complete status
+- **Toolchain Script**: `scripts/load/k6-http3-toolchain.js` - Custom toolchain for HTTP/3 testing
 
 **How It Works**:
 - **xk6 Extension**: Custom Go extension using `quic-go` library for HTTP/3 (QUIC) support
 - **Build Process**: Uses xk6 to build custom k6 binary with local extension via replace directive
 - **Extension Registration**: Automatically registers as `k6/x/http3` module
 - **QUIC Client**: Implements HTTP/3 client with proper QUIC configuration (HandshakeIdleTimeout 10s, MaxIdleTimeout 60s)
+- **Toolchain Script**: `k6-http3-toolchain.js` provides HTTP/3 request helpers and fallback to standard k6
 
 **Current Limitation**:
 - ⚠️ **NodePort UDP Routing**: HTTP/3 (QUIC) over NodePort (30443) has UDP routing issues causing connection timeouts
 - **Root Cause**: External k6 runs outside Kind cluster, NodePort UDP may not route QUIC correctly
-- **Workaround**: Use curl-based HTTP/3 testing (`scripts/test-microservices-http2-http3.sh`) which runs inside Kind node network namespace
+- **Workaround**: Use `HTTP_VERSION=HTTP/3` environment variable with standard k6, or curl-based HTTP/3 testing (`scripts/test-microservices-http2-http3.sh`) which runs inside Kind node network namespace
 
 **Extension Features**:
 - ✅ HTTP/3 client using `quic-go` library
@@ -1101,7 +1262,10 @@ notes.
 # Build custom k6 with HTTP/3 extension
 ./scripts/build-k6-http3.sh
 
-# Run HTTP/3 test (experimental, may timeout due to NodePort UDP routing)
+# Run HTTP/3 test using environment variable (recommended)
+HTTP_VERSION=HTTP/3 k6 run scripts/load/k6-e2e-find-limit.js
+
+# Run HTTP/3 test with custom toolchain (experimental, may timeout due to NodePort UDP routing)
 ./scripts/run-k6-http3-test.sh
 
 # Or directly
@@ -1109,9 +1273,15 @@ notes.
 ```
 
 **For Reliable HTTP/3 Testing**:
+- ✅ **Use environment variable**: `HTTP_VERSION=HTTP/3 k6 run <script>` (works with standard k6)
 - ✅ **Use curl-based testing**: `scripts/test-microservices-http2-http3.sh`
 - ✅ **Verified working**: tcpdump confirms QUIC (UDP) usage
 - ✅ **Production-ready**: Reliable and tested
+
+**Test Results** (December 27, 2025):
+- **HTTP/3 Performance**: 17.94% error rate at 500 VUs (vs 80.77% for HTTP/2)
+- **Service Success Rates**: 85-95% for most services (vs 15-20% for HTTP/2)
+- **Auth Service**: Still bottleneck (0% success) due to bcrypt CPU limits, not protocol
 
 **Future Improvements**:
 - Run k6 inside Kubernetes cluster (use ClusterIP directly)

@@ -69,6 +69,7 @@ const socialSuccess = new Rate('social_success_rate');
 const shoppingSuccess = new Rate('shopping_success_rate');
 const analyticsSuccess = new Rate('analytics_success_rate');
 const pythonAISuccess = new Rate('python_ai_success_rate');
+const webappSuccess = new Rate('webapp_success_rate');
 
 // Latency trends per service
 const authLatency = new Trend('auth_latency_ms', true);
@@ -78,6 +79,7 @@ const socialLatency = new Trend('social_latency_ms', true);
 const shoppingLatency = new Trend('shopping_latency_ms', true);
 const analyticsLatency = new Trend('analytics_latency_ms', true);
 const pythonAILatency = new Trend('python_ai_latency_ms', true);
+const webappLatency = new Trend('webapp_latency_ms', true);
 
 // Error counters
 const authErrors = new Counter('auth_errors');
@@ -87,6 +89,7 @@ const socialErrors = new Counter('social_errors');
 const shoppingErrors = new Counter('shopping_errors');
 const analyticsErrors = new Counter('analytics_errors');
 const pythonAIErrors = new Counter('python_ai_errors');
+const webappErrors = new Counter('webapp_errors');
 
 // Auth service budgeting: Since auth is the gatekeeper, we need to:
 // 1. Limit concurrent auth requests (bcrypt is CPU-intensive)
@@ -117,6 +120,7 @@ export const options = {
     'shopping_success_rate': ['rate>0.95'],
     'analytics_success_rate': ['rate>0.90'],
     'python_ai_success_rate': ['rate>0.90'],
+    'webapp_success_rate': ['rate>0.95'],
   },
 };
 
@@ -524,9 +528,54 @@ export default function (data) {
       
       pythonAILatency.add(latency);
       pythonAISuccess.add(success);
-      if (!success) pythonAIErrors.add(1);
+      if (!success)       pythonAIErrors.add(1);
     }
   });
+  
+  // Webapp (Frontend) - excluded from E2E tests as it's just the UI
+  // Uncomment if you want to include webapp testing:
+  /*
+  group('Webapp (Frontend)', () => {
+    // Test webapp landing page
+    if (Math.random() > 0.3) {
+      const { res, latency, success } = makeRequest(
+        'GET',
+        `${BASE_URL}/`,
+        null,
+        {},
+        'webapp'
+      );
+      
+      webappLatency.add(latency);
+      webappSuccess.add(success);
+      if (!success) webappErrors.add(1);
+      
+      // Check that we got HTML content
+      if (success && res.status === 200) {
+        const isHTML = res.body && (res.body.includes('<html') || res.body.includes('<!DOCTYPE'));
+        if (!isHTML) {
+          webappErrors.add(1);
+          webappSuccess.add(false);
+        }
+      }
+    }
+    
+    // Test webapp health endpoint
+    if (Math.random() > 0.5) {
+      const { res, latency, success } = makeRequest(
+        'GET',
+        `${BASE_URL}/api/health`,
+        null,
+        {},
+        'webapp'
+      );
+      
+      webappLatency.add(latency);
+      webappSuccess.add(success);
+      if (!success) webappErrors.add(1);
+    }
+  });
+  */
   
   sleep(Math.random() * 2);
 }
@@ -551,7 +600,7 @@ export function handleSummary(data) {
   };
   
   const serviceMetrics = {};
-  const services = ['auth', 'records', 'listings', 'social', 'shopping', 'analytics', 'python_ai'];
+  const services = ['auth', 'records', 'listings', 'social', 'shopping', 'analytics', 'python_ai']; // webapp excluded from E2E
   
   services.forEach(service => {
     const latencyMetric = data.metrics[`${service}_latency_ms`];

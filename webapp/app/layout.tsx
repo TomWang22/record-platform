@@ -10,6 +10,9 @@ import { Providers } from './providers'
 export const metadata: Metadata = {
   title: config.appName,
   description: 'Operational console for the Record Platform.',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

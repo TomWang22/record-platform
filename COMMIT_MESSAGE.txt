@@ -224,6 +224,57 @@ feat(performance): Optimize auth service, fix Kafka connectivity, implement k6 H
 - **Impact**: k6 can now find and use CA certificate for strict TLS verification during rotation
 - **Documentation**: `test-results/ROTATION_CHAOS_STRICT_TLS_FIX_12-22_tom.md`
 
+## Comprehensive k6 Monitoring with Protocol Verification
+
+### Monitoring Script Implementation
+- **Created**: `scripts/run-k6-with-comprehensive-monitoring.sh`
+- **Purpose**: Run k6 HTTP/2 and HTTP/3 limit tests with full monitoring to prove protocol usage and CPU bottlenecks
+- **Features**:
+  - **tcpdump**: Captures and verifies HTTP/2 (TCP) vs HTTP/3 (UDP/QUIC) protocols
+  - **strace**: Monitors system calls during bcrypt operations (proves CPU-intensive nature)
+  - **htop-style monitoring**: Real-time CPU monitoring every 2 seconds (node, pod, process level)
+  - **Process-level CPU**: Shows Node.js CPU spikes during bcrypt operations
+  - **Protocol verification**: Proves under the wire that HTTP/3 uses QUIC (UDP) not HTTP/2 (TCP)
+
+### Documentation Updates
+- **ENGINEERING.md**: Updated with comprehensive monitoring approach
+  - Documented 12 cores total node capacity
+  - Explained why auth service is the bottleneck (bcrypt CPU-intensive)
+  - Documented monitoring tools (tcpdump, strace, htop-style)
+  - Explained how to prove the bottleneck under the wire
+  - Added security budget planning with 12 cores context
+
+### Monitoring Capabilities
+1. **tcpdump Protocol Verification**:
+   - HTTP/2: Captures TCP packets on port 443 (proves HTTP/2 uses TCP)
+   - HTTP/3: Captures UDP packets on port 443 (proves HTTP/3 uses QUIC/UDP)
+   - Analysis: Counts TCP vs UDP packets to verify protocol usage
+   - Proof: Shows HTTP/3 actually uses QUIC (UDP), not HTTP/2 (TCP)
+
+2. **strace System Call Monitoring**:
+   - Monitors: System calls during bcrypt operations (clone, fork, execve, gettimeofday, nanosleep)
+   - Frequency: Samples every 10 seconds during load tests
+   - Shows: High frequency of system calls during bcrypt operations
+   - Proof: Demonstrates CPU-intensive nature of bcrypt (frequent system calls)
+
+3. **htop-Style CPU Monitoring**:
+   - Node-Level: Shows overall node CPU usage (12 cores total)
+   - Pod-Level: Shows auth-service pod CPU approaching 2000m limit
+   - Process-Level: Shows Node.js process CPU spikes during bcrypt.hash()
+   - Frequency: Every 2 seconds (real-time CPU spike monitoring)
+   - Includes: /proc/stat for actual CPU time, process CPU percentage
+   - Proof: Visual evidence of CPU spikes during bcrypt operations
+
+### Known Limitations
+- **Metrics API**: `kubectl top` requires metrics-server (not installed in dev cluster)
+  - **Impact**: Non-fatal - script continues and collects other data (tcpdump, strace, pod-level CPU)
+  - **Workaround**: Pod-level monitoring via `ps aux` and `/proc/stat` provides CPU data
+  - **Note**: Metrics API errors are expected in dev environment, monitoring still works
+
+### Files Changed
+- `scripts/run-k6-with-comprehensive-monitoring.sh` - NEW: Comprehensive monitoring script
+- `ENGINEERING.md` - Updated with monitoring approach and 12 cores documentation
+
 ## Next Steps
 
 1. **Fix Kafka Connectivity**: Extract PEM certificates from JKS keystore or use PLAINTEXT for dev
@@ -234,3 +285,4 @@ feat(performance): Optimize auth service, fix Kafka connectivity, implement k6 H
 6. **Add Redis/Lua Diagram**: Document Redis caching strategy and Lua script usage in README.md
 7. **Clarify Solo Endeavor**: Update README.md to clarify this is a solo project
 8. **Rebuild Webapp Image**: Rebuild webapp Docker image with new pages (landing, about, privacy, terms)
+9. **Optional: Install metrics-server**: For `kubectl top` support (not required - pod-level monitoring works)

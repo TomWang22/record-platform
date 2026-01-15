@@ -35,16 +35,16 @@ async def get_pool() -> Optional[asyncpg.Pool]:
     
     try:
         # Parse connection string and create pool
-        # Increased pool size for production load (handles 50+ VUs with headroom)
+        # Balanced for baseline (1 replica) - not too small, not too large
         # Formula: max_size = (VUs * concurrent_per_vu) + headroom
-        # For 50 VUs with 2-3 concurrent requests each: 100-150 + 50 headroom = 150-200
-        # Increased to 150 to handle peak load and prevent connection exhaustion
+        # For 50 VUs with 1-2 concurrent requests each: 50-100 + 50 headroom = 100-150
+        # Set to 75 for baseline (balanced - not too aggressive)
         # Optimization: Add connection timeout to prevent hanging
         _pool = await asyncio.wait_for(
             asyncpg.create_pool(
                 POSTGRES_URL_PYTHON_AI,
-                min_size=15,  # Increased from 10 for better warm pool (3 replicas * 5 = 15)
-                max_size=150,  # Increased from 100 (handles 50+ VUs with 2-3 concurrent requests + headroom)
+                min_size=10,  # Balanced (not too small)
+                max_size=75,  # Balanced (not too small, not too large)
                 command_timeout=60,
                 max_queries=50000,  # Max queries per connection before recycling
                 max_inactive_connection_lifetime=300,  # Recycle idle connections after 5min

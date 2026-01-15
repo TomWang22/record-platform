@@ -370,11 +370,20 @@ export function startGrpcServer(port: number = 50054) {
       console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)");
     }
     
+    // For dev: Don't require client cert verification (use false)
+    // For production: Enable client cert verification (use checkClientCert)
+    const requireClientCert = process.env.GRPC_REQUIRE_CLIENT_CERT === 'true' ? checkClientCert : false;
+    
     credentials = grpc.ServerCredentials.createSsl(
       rootCerts,
       [{ private_key: key, cert_chain: cert }],
-      checkClientCert as any
+      requireClientCert as any
     );
+    if (requireClientCert) {
+      console.log("[gRPC] Client certificate verification is ENABLED.");
+    } else {
+      console.log("[gRPC] Client certificate verification is DISABLED (dev mode).");
+    }
   } else {
     console.warn("[gRPC] TLS certs not found, starting insecure server (dev only)");
     credentials = grpc.ServerCredentials.createInsecure();

@@ -13,12 +13,13 @@ logger = logging.getLogger(__name__)
 _ebay_client: Optional[httpx.AsyncClient] = None
 _discogs_client: Optional[httpx.AsyncClient] = None
 
-# Connection pool limits for external APIs
+# Connection pool limits for external APIs (balanced for baseline - 1 replica)
 # Formula: max_connections = (concurrent_requests * avg_duration) + headroom
-# For 50 VUs with 2-3 concurrent external API calls: 100-150 + 50 headroom = 150-200
-EXTERNAL_API_MAX_CONNECTIONS = int(os.getenv("EXTERNAL_API_MAX_CONNECTIONS", "500"))  # Increased to 500 for high concurrency
-EXTERNAL_API_MAX_KEEPALIVE = int(os.getenv("EXTERNAL_API_MAX_KEEPALIVE", "125"))  # Increased to 125 for better reuse
-EXTERNAL_API_KEEPALIVE_EXPIRY = float(os.getenv("EXTERNAL_API_KEEPALIVE_EXPIRY", "120.0"))  # Increased to 120s
+# For 50 VUs with 1-2 concurrent external API calls: 50-100 + 50 headroom = 100-150
+# Set to 125 for baseline (balanced - not too aggressive)
+EXTERNAL_API_MAX_CONNECTIONS = int(os.getenv("EXTERNAL_API_MAX_CONNECTIONS", "125"))  # Balanced
+EXTERNAL_API_MAX_KEEPALIVE = int(os.getenv("EXTERNAL_API_MAX_KEEPALIVE", "75"))  # Balanced
+EXTERNAL_API_KEEPALIVE_EXPIRY = float(os.getenv("EXTERNAL_API_KEEPALIVE_EXPIRY", "90.0"))  # Balanced
 
 
 async def get_ebay_client() -> httpx.AsyncClient:

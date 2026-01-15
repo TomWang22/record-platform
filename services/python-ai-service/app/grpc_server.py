@@ -281,12 +281,21 @@ async def serve(port: int = 50060):
         else:
             print("[python-ai-grpc] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)")
         
+        # For dev: Don't require client cert verification (use False)
+        # For production: Enable client cert verification (use require_client_auth)
+        grpc_require_client_cert = os.getenv('GRPC_REQUIRE_CLIENT_CERT', 'false').lower() == 'true'
+        final_require_client_auth = grpc_require_client_cert and require_client_auth
+        
         # Create server credentials
         server_credentials = grpc.ssl_server_credentials(
             [(private_key, certificate_chain)],
             root_certificates=root_certificates,
-            require_client_auth=require_client_auth
+            require_client_auth=final_require_client_auth
         )
+        if final_require_client_auth:
+            print("[python-ai-grpc] Client certificate verification is ENABLED.")
+        else:
+            print("[python-ai-grpc] Client certificate verification is DISABLED (dev mode).")
         server.add_secure_port(f'[::]:{port}', server_credentials)
         print(f"[python-ai-grpc] server listening on {port} (TLS enabled, HTTP/2 only)")
     else:

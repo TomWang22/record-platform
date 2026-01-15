@@ -82,12 +82,12 @@ spec:
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
                 - -tls-server-name=record.local
-                - -connect-timeout=5s
-                - -rpc-timeout=5s
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 10
-            failureThreshold: 3
+                - -connect-timeout=10s
+                - -rpc-timeout=10s
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 6
           livenessProbe:
             exec:
               command:
@@ -100,12 +100,19 @@ spec:
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
                 - -tls-server-name=record.local
-                - -connect-timeout=5s
-                - -rpc-timeout=5s
+                - -connect-timeout=10s
+                - -rpc-timeout=10s
             initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 10
-            failureThreshold: 3
+            periodSeconds: 20
+            timeoutSeconds: 15
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
       volumes:
         - name: proto-files
           configMap:

@@ -82,15 +82,15 @@ class SellingAdvisor:
             
             # Ingest analytics data (already uses Redis singleflight internally)
             # Make this non-blocking with timeout to prevent hanging
-            # Phase 1 optimization: Reduced timeout to 5s (fail fast, use cached data on timeout)
+            # Optimized for baseline: Reduced timeout to 5s (fail fast, use cached data on timeout)
             try:
                 analytics_data = await asyncio.wait_for(
                     ingest_analytics_data(query, user_id),
-                    timeout=8.0  # Increased from 5s to 8s (analytics service can be slow under 50 VUs load)
+                    timeout=5.0  # Reduced from 8s to 5s (fail faster, use cache on timeout)
                 )
             except asyncio.TimeoutError:
-                logger.warning(f"[selling-advisor] Analytics data ingestion timeout for {query}")
-                analytics_data = {}  # Continue with empty data
+                logger.warning(f"[selling-advisor] Analytics data ingestion timeout for {query} (using cached data if available)")
+                analytics_data = {}  # Continue with empty data (will use cache if available)
         
             # Get price trend
             price_trend = analytics_data.get("price_trend", {})
@@ -108,11 +108,11 @@ class SellingAdvisor:
             }]
             
             # Use timeout with retry logic (predict_price_from_analytics now has retries built-in)
-            # Increased timeout to 10s to handle slow analytics service under load (was 5s, too aggressive)
+            # Optimized for baseline: Reduced timeout to 6s (fail faster, use fallback pricing)
             try:
                 prediction = await asyncio.wait_for(
-                    predict_price_from_analytics(prediction_items, timeout=5.0, max_retries=3),
-                    timeout=10.0  # Increased from 5s to 10s (analytics service can be slow under 50 VUs load)
+                    predict_price_from_analytics(prediction_items, timeout=3.0, max_retries=2),  # Reduced timeout and retries
+                    timeout=6.0  # Reduced from 10s to 6s (fail faster, use fallback pricing)
                 )
                 if prediction and prediction.get("suggested"):
                     recommended_price = float(prediction["suggested"])

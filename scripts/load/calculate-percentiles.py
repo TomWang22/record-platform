@@ -51,24 +51,47 @@ def calculate_percentiles(values: List[float]) -> Dict[str, float]:
         'median': percentile(50),
     }
 
-def extract_values_from_k6_data(data: Dict[str, Any], metric_name: str) -> List[float]:
-    """Extract raw values from k6 summary data"""
+def extract_percentiles_from_k6(data: Dict[str, Any], metric_name: str) -> Dict[str, float]:
+    """Extract percentiles from k6 JSON output format"""
     metric = data.get('metrics', {}).get(metric_name, {})
     
-    # k6 stores values in different places depending on metric type
-    # For Trend metrics: values are in values dict
-    # For Counter/Rate: values are in values.count or values.rate
-    # For http_req_duration: values are in values dict with keys like p(50), avg, min, max
-    
+    # k6 stores percentiles in values dict with keys like 'p(50)', 'p(95)', etc.
+    # Values are in microseconds, need to convert to milliseconds
     values = metric.get('values', {})
+    percentiles = metric.get('percentiles', {})
     
-    # If we have raw samples, use them
-    if 'samples' in values:
-        return [float(v) for v in values['samples']]
+    # Merge percentiles and values (percentiles take precedence)
+    all_values = {**values, **percentiles}
     
-    # If we have percentiles, we can't reconstruct raw data, but we can use them
-    # For now, return empty list - we'll need to collect raw data in k6 script
-    return []
+    result = {}
+    
+    # Helper to get percentile value and convert to ms
+    def get_percentile(p: float) -> float:
+        key = f'p({p})'
+        value = all_values.get(key, 0)
+        # Convert from microseconds to milliseconds if > 1000
+        if value > 1000:
+            value = value / 1000
+        return value
+    
+    # Extract all percentiles
+    for p in [1, 5, 10, 25, 50, 75, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999, 99.99999, 99.999999]:
+        value = get_percentile(p)
+        if p == int(p):
+            result[f'p{int(p)}'] = value
+        else:
+            # Convert 99.9 -> p999, 99.99 -> p9999, etc.
+            p_key = str(p).replace('.', '')
+            result[f'p{p_key}'] = value
+    
+    # Add min, max, avg, med
+    result['min'] = all_values.get('min', 0) / 1000 if all_values.get('min', 0) > 1000 else all_values.get('min', 0)
+    result['max'] = all_values.get('max', 0) / 1000 if all_values.get('max', 0) > 1000 else all_values.get('max', 0)
+    result['avg'] = all_values.get('avg', 0) / 1000 if all_values.get('avg', 0) > 1000 else all_values.get('avg', 0)
+    result['med'] = all_values.get('med', 0) / 1000 if all_values.get('med', 0) > 1000 else all_values.get('med', 0)
+    result['p100'] = result.get('max', 0)
+    
+    return result
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -78,10 +101,27 @@ if __name__ == '__main__':
     with open(sys.argv[1], 'r') as f:
         data = json.load(f)
     
-    # Try to extract http_req_duration values
-    http_duration = data.get('metrics', {}).get('http_req_duration', {})
-    http_values = http_duration.get('values', {})
+    print("=== Extended Percentile Analysis from k6 JSON ===")
+    print("")
     
-    # k6 doesn't store raw samples by default, but we can use available percentiles
-    # For now, this is a placeholder - we'll need to modify k6 script to collect raw data
-    print(json.dumps({}, indent=2))
+    # Analyze http_req_duration
+    http_duration = data.get('metrics', {}).get('http_req_duration', {})
+    if http_duration:
+        print("=== HTTP Request Duration Percentiles ===")
+        http_percentiles = extract_percentiles_from_k6(data, 'http_req_duration')
+        for key in ['p1', 'p5', 'p10', 'p25', 'p50', 'p75', 'p90', 'p95', 'p99', 'p999', 'p9999', 'p99999', 'p999999', 'p9999999', 'p100', 'min', 'max', 'avg', 'med']:
+            if key in http_percentiles:
+                print(f"  {key:12s}: {http_percentiles[key]:10.2f} ms")
+        print("")
+    
+    # Analyze service-specific latency metrics
+    services = ['auth', 'records', 'listings', 'social', 'shopping', 'analytics', 'python_ai']
+    print("=== Service-Specific Latency Percentiles ===")
+    for service in services:
+        metric_name = f'{service}_latency_ms'
+        if metric_name in data.get('metrics', {}):
+            print(f"\n{service}:")
+            service_percentiles = extract_percentiles_from_k6(data, metric_name)
+            for key in ['p50', 'p90', 'p95', 'p99', 'p999', 'p9999', 'p99999', 'p999999', 'p100', 'avg', 'min', 'max']:
+                if key in service_percentiles:
+                    print(f"    {key:12s}: {service_percentiles[key]:10.2f} ms")

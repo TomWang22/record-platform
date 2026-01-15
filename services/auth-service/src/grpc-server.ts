@@ -23,11 +23,41 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 
 const authProto = grpc.loadPackageDefinition(packageDefinition) as any;
 
-// gRPC logging middleware
+// gRPC logging middleware with detailed request/response logging
 function withLogging(handler: any, methodName: string) {
   return async (call: any, callback: any) => {
     const start = Date.now();
-    console.log(`[gRPC] ${methodName} called`);
+    
+    // Log request metadata and connection details
+    try {
+      const metadata = call.metadata?.getMap() || {};
+      const peer = call.getPeer?.() || 'unknown';
+      const host = call.host || 'unknown';
+      
+      // CRITICAL: Log all headers to diagnose Caddy gRPC handling
+      const allHeaders: any = {};
+      if (metadata) {
+        Object.keys(metadata).forEach(key => {
+          allHeaders[key] = metadata[key];
+        });
+      }
+      
+      console.log(`[gRPC] ${methodName} called`, {
+        peer,
+        host,
+        headers: allHeaders,
+        contentType: allHeaders['content-type'] || 'MISSING',
+        te: allHeaders['te'] || 'MISSING',
+        userAgent: allHeaders['user-agent'] || 'MISSING',
+        metadata: Object.keys(metadata).length > 0 ? metadata : 'none',
+        timestamp: new Date().toISOString()
+      });
+    } catch (metaErr: any) {
+      console.log(`[gRPC] ${methodName} called (metadata unavailable)`, {
+        error: metaErr.message
+      });
+    }
+    
     try {
       await handler(call, callback);
       const duration = Date.now() - start;

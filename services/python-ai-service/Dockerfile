@@ -20,17 +20,11 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt \
     apt-get update \
  && apt-get install -y --no-install-recommends build-essential curl wget ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
- && GRPC_HEALTH_PROBE_VERSION=v0.4.33 \
- && ARCH=$(dpkg --print-architecture 2>/dev/null || uname -m) \
- && if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then \
-      echo "Installing ARM64 grpc-health-probe" && \
-      wget --no-check-certificate -qO/usr/local/bin/grpc-health-probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc-health-probe-linux-arm64; \
-    else \
-      echo "Installing AMD64 grpc-health-probe" && \
-      wget --no-check-certificate -qO/usr/local/bin/grpc-health-probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc-health-probe-linux-amd64; \
-    fi \
- && chmod +x /usr/local/bin/grpc-health-probe \
- && /usr/local/bin/grpc-health-probe --version || echo "grpc-health-probe installed (version check may fail in build)"
+ && echo "Installing AMD64 grpc-health-probe (Kind clusters use amd64 even on ARM Macs)" \
+ && (curl -L --fail --silent --show-error -o /usr/local/bin/grpc-health-probe "https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.24/grpc-health-probe-linux-amd64" 2>/dev/null || \
+     wget --no-check-certificate -qO/usr/local/bin/grpc-health-probe "https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.24/grpc-health-probe-linux-amd64" 2>/dev/null || \
+     echo "Warning: Failed to download grpc-health-probe, will continue without it") \
+ && (test -f /usr/local/bin/grpc-health-probe && chmod +x /usr/local/bin/grpc-health-probe && echo "grpc-health-probe installed (amd64 for Kind cluster compatibility)" || echo "grpc-health-probe not installed (non-critical)")
 
 # Install Python dependencies with pip cache mount (persists between builds)
 RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
@@ -82,8 +76,12 @@ COPY --from=build --chown=python:python /usr/local/lib/python3.11/site-packages 
 COPY --from=build --chown=python:python /usr/local/bin /usr/local/bin
 COPY --from=build --chown=python:python /app /app
 # Copy grpc-health-probe from build stage with proper permissions (root:root so it can be executed)
+# CRITICAL: Use platform-specific binary (amd64 for Kind clusters, even on ARM Macs)
 COPY --from=deps --chown=root:root /usr/local/bin/grpc-health-probe /usr/local/bin/grpc-health-probe
-RUN chmod 755 /usr/local/bin/grpc-health-probe && ls -la /usr/local/bin/grpc-health-probe || echo "grpc-health-probe not found"
+RUN chmod 755 /usr/local/bin/grpc-health-probe && \
+    # Verify binary is executable and correct architecture
+    /usr/local/bin/grpc-health-probe --version 2>&1 | head -1 || echo "grpc-health-probe version check failed (may be wrong arch)" && \
+    ls -la /usr/local/bin/grpc-health-probe || echo "grpc-health-probe not found"
 
 # Remove unnecessary files (cache only - keep .dist-info for package metadata)
 RUN find /usr/local/lib/python3.11/site-packages -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \

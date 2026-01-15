@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { withRetry } from './db.js';
 
 // Create a separate pool for listings DB queries
 // Listings database is on port 5435 (record-platform-postgres-listings-1)
@@ -49,12 +50,16 @@ export async function checkCartAvailability(
 ): Promise<Array<{ cartItemId: string; itemId: string; itemType: string; reason: string }>> {
   // Use the same pool for listings queries (listings schema is in records DB)
   try {
-    // Get all cart items
-    const cartItems = await pool.query(
-      `SELECT id, item_type, item_id, listing_id
-       FROM shopping.shopping_cart
-       WHERE user_id = $1`,
-      [userId]
+    // Get all cart items (with retry for connection errors)
+    const cartItems = await withRetry(
+      () => pool.query(
+        `SELECT id, item_type, item_id, listing_id
+         FROM shopping.shopping_cart
+         WHERE user_id = $1`,
+        [userId]
+      ),
+      3,
+      'get cart items for availability check'
     );
 
     const unavailable: Array<{ cartItemId: string; itemId: string; itemType: string; reason: string }> = [];

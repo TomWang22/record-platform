@@ -22,29 +22,37 @@ This document provides in-depth technical documentation for the Record Platform 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           Client Layer                                       │
-│                    HTTP/3 (QUIC) | HTTP/2 | HTTP/1.1                        │
+│                    HTTP/3 (QUIC) | HTTP/2 | HTTP/1.1 | gRPC                  │
 │                    Web App (Next.js) | Mobile | API Clients                 │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Edge Layer (Caddy)                                   │
-│              TLS Termination (TLS 1.2/1.3) + mkcert CA                      │
-│         HTTP/2 + HTTP/3 (QUIC) + gRPC Routing (protocol grpc)              │
-│         NodePort Service (30443 TCP/UDP) | Port 8443 (HTTPS) | Port 5000 (h2c) │
-│                                                                              │
-│  Architecture:                                                               │
-│  - NodePort Service: Multiple replicas with load balancing                   │
-│  - RollingUpdate: maxUnavailable=0 for zero-downtime deployments            │
-│  - Pod Anti-Affinity: Distributes pods across nodes for HA                  │
-│                                                                              │
-│  Features:                                                                   │
-│  - Zero-downtime CA rotation via admin API (localhost:2019)                │
-│  - True zero-downtime: Pod-by-pod rotation with multiple replicas          │
-│  - Strict TLS enforcement (TLS 1.2/1.3 only)                                │
-│  - Protocol detection and routing                                            │
-│  - QUIC (HTTP/3) support with automatic fallback                            │
-└──────────────────────────────────────┬──────────────────────────────────────┘
+                    ┌──────────────────┴──────────────────┐
+                    │                                      │
+        HTTP/3 + Web + REST                    gRPC Requests
+                    │                                      │
+                    ▼                                      ▼
+┌──────────────────────────────────┐      ┌──────────────────────────────────┐
+│      Edge Layer (Caddy)          │      │      gRPC Proxy (Envoy)            │
+│  TLS Termination (TLS 1.2/1.3)   │      │  First-Class gRPC Support         │
+│  HTTP/2 + HTTP/3 (QUIC)          │      │  HTTP/2 with TLS                  │
+│  NodePort: 30443 (TCP/UDP)       │      │  Port: 10000                      │
+│                                  │      │  Never routes through HTTP        │
+│  Architecture:                   │      │  Preserves trailers correctly     │
+│  - NodePort Service              │      │  Forbids HTTP error pages          │
+│  - Multiple replicas              │      │  Enforces HEADERS/DATA ordering   │
+│  - RollingUpdate (maxUnavailable=0)│     │                                  │
+│  - Pod Anti-Affinity              │      │  Features:                       │
+│                                  │      │  - First-class gRPC awareness     │
+│  Features:                       │      │  - No HTTP handler interference   │
+│  - Zero-downtime CA rotation      │      │  - Trailer preservation            │
+│  - Strict TLS (1.2/1.3 only)     │      │  - Error handling for gRPC         │
+│  - QUIC (HTTP/3) support          │      │  - Proven functionality            │
+│  - Web App (Next.js)              │      │                                  │
+│  - REST API (/api/*)              │      │  Decision: Envoy for gRPC,        │
+│  - Static Assets                  │      │  Caddy for HTTP/3 + web + REST     │
+└──────────────────┬───────────────┘      └──────────────────┬───────────────┘
+                   │                                          │
+                   └──────────────────┬──────────────────────┘
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -55,11 +63,11 @@ This document provides in-depth technical documentation for the Record Platform 
 │  Routing Rules:                                                              │
 │  - / → Nginx Edge (static assets + micro-cache)                            │
 │  - /api/* → API Gateway (JWT verification + gRPC proxy)                    │
-│  - gRPC requests → Direct service routing via protocol detection            │
+│  - gRPC requests → Envoy (port 10000) → gRPC services                      │
 └──────────────────────┬───────────────────────────┬──────────────────────────┘
                        │                           │
         REST /api/*    │                           │  gRPC /service.*
-        (HTTP/2/3)     │                           │  (HTTP/2 h2c/TLS)
+        (HTTP/2/3)     │                           │  (HTTP/2 TLS via Envoy)
                        ▼                           ▼
         ┌──────────────────────┐      ┌──────────────────────────────┐
         │  Nginx Edge (8080)   │      │    API Gateway (4000)        │
@@ -207,20 +215,47 @@ This document provides in-depth technical documentation for the Record Platform 
 
 ### Why Caddy Over Nginx/Traefik?
 
-**Decision**: Use Caddy as the edge reverse proxy instead of Nginx or Traefik.
+**Decision**: Use Caddy as the edge reverse proxy for HTTP/3, web, and REST API traffic instead of Nginx or Traefik.
 
 **Rationale**:
 1. **Native HTTP/3 (QUIC) Support**: Caddy has first-class HTTP/3 support without complex configuration
 2. **Automatic TLS**: Built-in Let's Encrypt integration (though we use mkcert for local dev)
 3. **Admin API**: Critical for zero-downtime CA rotation via `localhost:2019`
-4. **Protocol Detection**: Native `protocol grpc` matcher for gRPC routing
-5. **Simpler Configuration**: Caddyfile syntax is more readable than Nginx configs
-6. **Performance**: Competitive with Nginx for our use case
+4. **Simpler Configuration**: Caddyfile syntax is more readable than Nginx configs
+5. **Performance**: Competitive with Nginx for our use case
+6. **Web & REST Focus**: Excels at HTTP/3, web app serving, and REST API routing
 
 **Trade-offs**:
 - Less mature ecosystem than Nginx
 - Smaller community, but active development
 - Admin API security considerations (bound to localhost only)
+- **gRPC Limitations**: Caddy generates HTTP responses for gRPC requests, making it incompatible with grpc-js (see Issue #17 in Runbook.md)
+
+### Why Envoy for gRPC?
+
+**Decision**: Use Envoy as a dedicated gRPC proxy instead of routing gRPC through Caddy.
+
+**Rationale**:
+1. **First-Class gRPC Support**: Envoy has native gRPC awareness and never routes gRPC through HTTP handlers
+2. **Proven Functionality**: Envoy test passed immediately - same Node.js server works with Envoy, fails with Caddy
+3. **Trailer Preservation**: Envoy correctly handles gRPC trailers
+4. **Error Handling**: Envoy forbids HTTP error pages on gRPC streams
+5. **HEADERS/DATA Ordering**: Envoy enforces correct gRPC frame ordering
+6. **Industry Standard**: Many production systems use Envoy for gRPC, Caddy for HTTP/3
+7. **Clean Separation**: Each proxy does what it's best at
+
+**Architecture**:
+- **Envoy**: Handles all gRPC traffic (port 10000)
+- **Caddy**: Handles HTTP/3, web app, and REST API traffic (port 30443)
+- **Clean Separation**: No mixing of concerns, each proxy optimized for its use case
+
+**Trade-offs**:
+- Two proxies to manage (more operational complexity)
+- Two configs to maintain (Caddyfile + Envoy YAML)
+- Additional resource usage (two proxy processes)
+- **Mitigation**: Clear documentation, automation scripts, unified monitoring
+
+**Investigation**: See `Runbook.md` Issue #17 and `test-results/CADDY_ENVOY_DECISION.md` for complete investigation, proof, and decision rationale.
 
 ### Why 8 Separate PostgreSQL Instances?
 
@@ -264,8 +299,8 @@ This document provides in-depth technical documentation for the Record Platform 
 **Implementation**:
 - All services expose gRPC servers on dedicated ports (50051-50060)
 - API Gateway proxies HTTP requests to gRPC backend services
-- Caddy routes gRPC requests using `protocol grpc` matcher
-- Dual transport: h2c (port 5000) for internal testing, TLS (port 8443) for production
+- **Envoy routes all gRPC traffic** with first-class gRPC support (port 10000)
+- TLS transport: All gRPC traffic uses HTTP/2 with TLS
 
 **Trade-offs**:
 - Less human-readable than JSON (requires tooling to inspect)
@@ -325,7 +360,8 @@ This document provides in-depth technical documentation for the Record Platform 
 ## Technology Stack
 
 ### Edge & Routing
-- **Caddy**: HTTP/2, HTTP/3 (QUIC), gRPC routing, TLS termination
+- **Caddy**: HTTP/2, HTTP/3 (QUIC), TLS termination for web and REST API traffic
+- **Envoy**: First-class gRPC support for all gRPC traffic (port 10000)
 - **ingress-nginx**: Kubernetes ingress controller
 - **Nginx**: Static asset serving, micro-caching
 - **HAProxy**: Keep-alive pools, load balancing
@@ -400,7 +436,7 @@ Caddy → ingress-nginx → API Gateway
     │
     ├─► JWT Verification
     │
-    └─► Records Service (gRPC:50051)
+    └─► Envoy (gRPC Proxy:10000) → Records Service (gRPC:50051)
         │
         ├─► Redis Cache Check
         │   └─► Cache Hit → Return Results
@@ -421,7 +457,7 @@ Client: POST /api/social/messages
     ▼
 Caddy → ingress-nginx → API Gateway
     │
-    └─► Social Service (gRPC:50056)
+    └─► Envoy (gRPC Proxy:10000) → Social Service (gRPC:50056)
         │
         ├─► Social DB (5434) - social schema
         │   └─► Store Message
@@ -468,7 +504,11 @@ All inter-service communication uses gRPC with protocol buffers:
 
 1. **API Gateway → Backend Services**: HTTP request converted to gRPC call
 2. **Service-to-Service**: Direct gRPC calls using service discovery
-3. **Caddy gRPC Routing**: Routes gRPC requests by service name in path
+3. **Envoy gRPC Routing**: Envoy handles all gRPC traffic with first-class gRPC support (port 10000)
+   - **Never routes through HTTP handlers**: Envoy has native gRPC awareness
+   - **Trailer preservation**: Correctly handles gRPC trailers
+   - **Error handling**: Forbids HTTP error pages on gRPC streams
+   - **Proven functionality**: Same Node.js server works with Envoy, fails with Caddy
 
 **Protocol Buffer Definitions**:
 - `proto/auth.proto`: Authentication and user management
@@ -1462,6 +1502,76 @@ wireshark test-results/YYYYMMDD-HHMMSS-http3-verification/quic-capture.pcap
 - **Service Configuration**: Python AI service and other services use SSL port (9093)
 - **Certificate Management**: Certificates mounted from Kubernetes secret, passwords stored securely
 - **Documentation**: See `docs/kafka-ssl-setup.md` for complete setup guide
+
+## Performance Optimizations
+
+### Incremental CA Rotation Limit Finding
+
+**Purpose**: Systematically find maximum sustainable throughput during CA and leaf certificate rotation with zero downtime.
+
+**Implementation**:
+- **`scripts/load/k6-find-ca-rotation-limit.js`**: k6 script that incrementally increases load
+  - Starts at baseline: H2=80 req/s, H3=40 req/s
+  - Increments: H2 by 10 req/s, H3 by 5 req/s each iteration
+  - Stops when: Error rate > 0% or dropped iterations > 1%
+  - Past performance target: 460 req/s combined (280 H2 + 180 H3)
+  - Uses constant-arrival-rate executor for precise rate control
+  - Strict TLS verification with CA certificate validation
+  
+- **`scripts/find-ca-rotation-limit.sh`**: Wrapper script that orchestrates limit finding
+  - Runs certificate rotation during each test iteration
+  - Finds maximum sustainable throughput with zero downtime
+  - Tracks results across iterations
+  - Reports last successful rates
+  - Integrates with `scripts/rotation-suite.sh` for certificate rotation
+
+**Enhanced Smoke Test**:
+- **`scripts/test-microservices-http2-http3.sh`**: Added explicit protocol verification
+  - HTTP/2: `--http2 --tlsv1.3 --tls-max 1.3` flags (no prior knowledge, forced)
+  - HTTP/3: `--http3-only --tlsv1.3 --tls-max 1.3` flags (QUIC verification)
+  - Verbose logging to verify protocol negotiation
+  - Ready for tcpdump and netstat verification
+
+**Certificate Overlap Window**:
+- **7-day grace period**: New certificates start validity 7 days before now (notBefore)
+- **Purpose**: Allows clients with old certificates to connect during transition
+- **Real Application Pattern**: Production-grade certificate rotation strategy
+- **Implementation**: `scripts/rotation-suite.sh` - Certificate generation with overlap
+- **Benefits**: Zero-downtime certificate rotation with client compatibility
+
+**Limit Test Configuration**:
+- **HTTP/2**: H2_MAX_VUS increased from 50 → 60 (+10)
+- **HTTP/3**: H3_MAX_VUS increased from 20 → 30 (+10)
+- **Rationale**: Each limit test should increment by 10 VUs to find breaking point
+- **File**: `scripts/rotation-suite.sh`
+
+### Health Probe and Resource Optimizations
+
+**Health Probe Timeouts Increased**:
+- **Records Service**: HTTP probe timeout 3s → 10s, period 5s → 10s
+- **Social Service**: gRPC probe timeout 5s → 10s, Kubernetes timeout 10s → 15s
+- **Impact**: Prevents pod restarts under load due to probe timeouts
+- **Files**: 
+  - `infra/k8s/base/records-service/deploy.yaml`
+  - `infra/k8s/base/social-service/deploy.yaml`
+
+**Resource Limits Added**:
+- **Records & Social Services**: 
+  - Requests: 100m CPU / 256Mi memory
+  - Limits: 500m CPU / 512Mi memory (Records), 1024Mi memory (Social)
+- **Impact**: Prevents Docker Desktop VM corruption while allowing normal operation
+- **Rationale**: Reasonable limits that don't overwhelm Docker Desktop
+
+**Database Retry Logic**:
+- **Shopping Service**: Added `withRetry` function for database queries
+  - Exponential backoff: 1s, 2s, 4s (max 5s)
+  - 3 retry attempts for connection errors
+  - Applied to critical queries (cart operations, availability checks)
+- **Impact**: Reduces 503 errors from database connection timeouts
+- **Files**:
+  - `services/shopping-service/src/lib/db.ts` - Retry logic implementation
+  - `services/shopping-service/src/lib/availability.ts` - Retry for cart availability
+  - `services/shopping-service/src/routes/cart.ts` - Retry for cart operations
 
 ## Deployment Strategy
 

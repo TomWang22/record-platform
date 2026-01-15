@@ -1,7 +1,7 @@
 import { Router, type Response, type Router as ExpressRouter } from 'express'
 import type Redis from 'ioredis'
 import type { AuthedRequest } from '../lib/auth.js'
-import { pool } from '../lib/db.js'
+import { pool, withRetry } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
 
 export default function historyRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
@@ -18,19 +18,27 @@ export default function historyRouter(redis: Redis | null, cacheManager: CacheMa
     const offset = parseInt(req.query.offset as string) || 0
 
     try {
-      const result = await pool.query(
-        `SELECT id, order_id, listing_id, item_type, item_id, quantity, price_paid, currency,
-                purchase_type, status, purchased_at, metadata
-         FROM shopping.purchase_history
-         WHERE user_id = $1
-         ORDER BY purchased_at DESC
-         LIMIT $2 OFFSET $3`,
-        [userId, limit, offset]
+      const result = await withRetry(
+        () => pool.query(
+          `SELECT id, order_id, listing_id, item_type, item_id, quantity, price_paid, currency,
+                  purchase_type, status, purchased_at, metadata
+           FROM shopping.purchase_history
+           WHERE user_id = $1
+           ORDER BY purchased_at DESC
+           LIMIT $2 OFFSET $3`,
+          [userId, limit, offset]
+        ),
+        3,
+        'get purchase history'
       )
 
-      const countResult = await pool.query(
-        `SELECT COUNT(*) as total FROM shopping.purchase_history WHERE user_id = $1`,
-        [userId]
+      const countResult = await withRetry(
+        () => pool.query(
+          `SELECT COUNT(*) as total FROM shopping.purchase_history WHERE user_id = $1`,
+          [userId]
+        ),
+        3,
+        'count purchase history'
       )
 
       res.json({
@@ -70,24 +78,28 @@ export default function historyRouter(redis: Redis | null, cacheManager: CacheMa
     }
 
     try {
-      const result = await pool.query(
-        `INSERT INTO shopping.purchase_history 
-         (user_id, order_id, item_type, item_id, listing_id, quantity, price_paid, currency, purchase_type, status, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
-         RETURNING id`,
-        [
-          userId,
-          order_id,
-          item_type,
-          item_id,
-          listing_id || null,
-          quantity,
-          price_paid,
-          currency,
-          purchase_type,
-          status,
-          metadata ? JSON.stringify(metadata) : null,
-        ]
+      const result = await withRetry(
+        () => pool.query(
+          `INSERT INTO shopping.purchase_history 
+           (user_id, order_id, item_type, item_id, listing_id, quantity, price_paid, currency, purchase_type, status, metadata)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
+           RETURNING id`,
+          [
+            userId,
+            order_id,
+            item_type,
+            item_id,
+            listing_id || null,
+            quantity,
+            price_paid,
+            currency,
+            purchase_type,
+            status,
+            metadata ? JSON.stringify(metadata) : null,
+          ]
+        ),
+        3,
+        'add purchase'
       )
 
       res.status(201).json({
@@ -127,7 +139,11 @@ export default function historyRouter(redis: Redis | null, cacheManager: CacheMa
       query += ` ORDER BY searched_at DESC LIMIT $${paramIndex}`
       params.push(limit)
 
-      const result = await pool.query(query, params)
+      const result = await withRetry(
+        () => pool.query(query, params),
+        3,
+        'get search history'
+      )
 
       res.json({ items: result.rows })
     } catch (err) {
@@ -150,17 +166,21 @@ export default function historyRouter(redis: Redis | null, cacheManager: CacheMa
     }
 
     try {
-      await pool.query(
-        `INSERT INTO shopping.search_history (user_id, query, query_type, filters, result_count, clicked_item)
-         VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
-        [
-          userId,
-          query,
-          query_type,
-          filters ? JSON.stringify(filters) : null,
-          result_count || null,
-          clicked_item || null,
-        ]
+      await withRetry(
+        () => pool.query(
+          `INSERT INTO shopping.search_history (user_id, query, query_type, filters, result_count, clicked_item)
+           VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
+          [
+            userId,
+            query,
+            query_type,
+            filters ? JSON.stringify(filters) : null,
+            result_count || null,
+            clicked_item || null,
+          ]
+        ),
+        3,
+        'add search history'
       )
 
       // Update LFU cache for search queries
@@ -209,7 +229,11 @@ export default function historyRouter(redis: Redis | null, cacheManager: CacheMa
       `
       params.push(limit)
 
-      const result = await pool.query(query, params)
+      const result = await withRetry(
+        () => pool.query(query, params),
+        3,
+        'get trending searches'
+      )
 
       res.json({
         items: result.rows.map((row) => ({

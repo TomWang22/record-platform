@@ -1,7 +1,7 @@
 import { Router, type Response, type Router as ExpressRouter } from 'express'
 import type Redis from 'ioredis'
 import type { AuthedRequest } from '../lib/auth.js'
-import { pool } from '../lib/db.js'
+import { pool, withRetry } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
 import axios from 'axios'
 
@@ -19,22 +19,30 @@ export default function resellRouter(redis: Redis | null, cacheManager: CacheMan
     const offset = parseInt(req.query.offset as string) || 0
 
     try {
-      const result = await pool.query(
-        `SELECT ph.id, ph.order_id, ph.listing_id, ph.item_type, ph.item_id,
-                ph.quantity, ph.price_paid, ph.currency, ph.purchase_type,
-                ph.status, ph.purchased_at, ph.metadata, ph.resellable
-         FROM shopping.purchase_history ph
-         WHERE ph.user_id = $1 AND ph.resellable = TRUE
-         ORDER BY ph.purchased_at DESC
-         LIMIT $2 OFFSET $3`,
-        [userId, limit, offset]
+      const result = await withRetry(
+        () => pool.query(
+          `SELECT ph.id, ph.order_id, ph.listing_id, ph.item_type, ph.item_id,
+                  ph.quantity, ph.price_paid, ph.currency, ph.purchase_type,
+                  ph.status, ph.purchased_at, ph.metadata, ph.resellable
+           FROM shopping.purchase_history ph
+           WHERE ph.user_id = $1 AND ph.resellable = TRUE
+           ORDER BY ph.purchased_at DESC
+           LIMIT $2 OFFSET $3`,
+          [userId, limit, offset]
+        ),
+        3,
+        'get resellable purchases'
       )
 
-      const countResult = await pool.query(
-        `SELECT COUNT(*) as total
-         FROM shopping.purchase_history
-         WHERE user_id = $1 AND resellable = TRUE`,
-        [userId]
+      const countResult = await withRetry(
+        () => pool.query(
+          `SELECT COUNT(*) as total
+           FROM shopping.purchase_history
+           WHERE user_id = $1 AND resellable = TRUE`,
+          [userId]
+        ),
+        3,
+        'count resellable purchases'
       )
 
       res.json({
@@ -80,11 +88,15 @@ export default function resellRouter(redis: Redis | null, cacheManager: CacheMan
 
     try {
       // Verify purchase belongs to user and is resellable
-      const purchaseResult = await pool.query(
-        `SELECT ph.id, ph.item_type, ph.item_id, ph.listing_id, ph.metadata, ph.resellable
-         FROM shopping.purchase_history ph
-         WHERE ph.id = $1::uuid AND ph.user_id = $2::uuid AND ph.resellable = TRUE`,
-        [purchaseId, userId]
+      const purchaseResult = await withRetry(
+        () => pool.query(
+          `SELECT ph.id, ph.item_type, ph.item_id, ph.listing_id, ph.metadata, ph.resellable
+           FROM shopping.purchase_history ph
+           WHERE ph.id = $1::uuid AND ph.user_id = $2::uuid AND ph.resellable = TRUE`,
+          [purchaseId, userId]
+        ),
+        3,
+        'verify purchase for resell'
       )
 
       if (purchaseResult.rows.length === 0) {
@@ -134,12 +146,16 @@ export default function resellRouter(redis: Redis | null, cacheManager: CacheMan
 
         // Mark purchase as resold (if requested)
         if (mark_as_resold) {
-          await pool.query(
-            `UPDATE shopping.purchase_history
-             SET resellable = FALSE,
-                 metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('resold_listing_id', $1::text, 'resold_at', NOW())
-             WHERE id = $2::uuid`,
-            [newListing.id, purchaseId]
+          await withRetry(
+            () => pool.query(
+              `UPDATE shopping.purchase_history
+               SET resellable = FALSE,
+                   metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('resold_listing_id', $1::text, 'resold_at', NOW())
+               WHERE id = $2::uuid`,
+              [newListing.id, purchaseId]
+            ),
+            3,
+            'mark purchase as resold'
           )
         }
 
@@ -172,15 +188,19 @@ export default function resellRouter(redis: Redis | null, cacheManager: CacheMan
     const { purchaseId } = req.params
 
     try {
-      const result = await pool.query(
-        `SELECT ph.id, ph.order_id, ph.listing_id, ph.item_type, ph.item_id,
-                ph.quantity, ph.price_paid, ph.currency, ph.purchase_type,
-                ph.status, ph.purchased_at, ph.metadata, ph.resellable,
-                o.order_number
-         FROM shopping.purchase_history ph
-         LEFT JOIN shopping.orders o ON ph.order_id = o.id
-         WHERE ph.id = $1::uuid AND ph.user_id = $2::uuid`,
-        [purchaseId, userId]
+      const result = await withRetry(
+        () => pool.query(
+          `SELECT ph.id, ph.order_id, ph.listing_id, ph.item_type, ph.item_id,
+                  ph.quantity, ph.price_paid, ph.currency, ph.purchase_type,
+                  ph.status, ph.purchased_at, ph.metadata, ph.resellable,
+                  o.order_number
+           FROM shopping.purchase_history ph
+           LEFT JOIN shopping.orders o ON ph.order_id = o.id
+           WHERE ph.id = $1::uuid AND ph.user_id = $2::uuid`,
+          [purchaseId, userId]
+        ),
+        3,
+        'get purchase details for resell'
       )
 
       if (result.rows.length === 0) {

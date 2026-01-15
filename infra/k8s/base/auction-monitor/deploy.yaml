@@ -29,8 +29,9 @@ spec:
           envFrom:
             - configMapRef: { name: app-config }
             - secretRef:    { name: app-secrets }
-            - secretRef:    { name: ebay-credentials }
-              optional: true  # Optional - service can run without eBay credentials
+            - secretRef:
+                name: ebay-credentials
+                optional: true  # Optional - service can run without eBay credentials
           env:
             # You used this in compose
             - name: BASE_URL
@@ -70,24 +71,64 @@ spec:
             - name: dev-root-ca
               mountPath: /certs
               readOnly: true
+            - name: service-tls
+              mountPath: /etc/certs
+              readOnly: true
+          # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2 only
           readinessProbe:
-            httpGet: { path: /healthz, port: http }
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 10
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50059
+                - -service=auction_monitor.AuctionMonitorService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
+                - -connect-timeout=30s
+                - -rpc-timeout=30s
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 35
+            failureThreshold: 6
           livenessProbe:
-            httpGet: { path: /healthz, port: http }
-            initialDelaySeconds: 15
-            periodSeconds: 10
-            timeoutSeconds: 3
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50059
+                - -service=auction_monitor.AuctionMonitorService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
+                - -connect-timeout=30s
+                - -rpc-timeout=30s
+            initialDelaySeconds: 150
+            periodSeconds: 30
+            timeoutSeconds: 35
             failureThreshold: 6
           startupProbe:
-            httpGet: { path: /healthz, port: http }
-            initialDelaySeconds: 30  # Give more time for DB connections
-            periodSeconds: 5
-            timeoutSeconds: 5  # Increase timeout
-            failureThreshold: 30  # More attempts
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50059
+                - -service=auction_monitor.AuctionMonitorService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
+                - -connect-timeout=30s
+                - -rpc-timeout=30s
+            initialDelaySeconds: 45
+            periodSeconds: 15
+            timeoutSeconds: 35
+            failureThreshold: 30
       volumes:
         - name: proto-files
           configMap:
@@ -98,3 +139,11 @@ spec:
             items:
               - key: dev-root.pem
                 path: dev-root.pem
+        - name: service-tls
+          secret:
+            secretName: service-tls
+            items:
+              - key: tls.key
+                path: tls.key
+              - key: tls.crt
+                path: tls.crt

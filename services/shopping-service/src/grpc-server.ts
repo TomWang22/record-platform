@@ -4,7 +4,7 @@ import * as protoLoader from '@grpc/proto-loader'
 import * as path from 'path'
 import * as fs from 'fs'
 import os from 'os'
-import { pool } from './lib/db.js'
+import { pool, withRetry } from './lib/db.js'
 import { makeRedis, CacheManager } from './lib/cache.js'
 import { kafka } from '@common/utils/kafka'
 import { registerHealthService } from '@common/utils'
@@ -83,25 +83,37 @@ const shoppingService = {
   async AddToCart(call: any, callback: any) {
     const { user_id, item_type, item_id, quantity = 1, listing_id, price, metadata } = call.request
     try {
-      const existing = await pool.query(
-        `SELECT id, quantity FROM shopping.shopping_cart
-         WHERE user_id = $1 AND item_type = $2 AND item_id = $3`,
-        [user_id, item_type, item_id]
+      const existing = await withRetry(
+        () => pool.query(
+          `SELECT id, quantity FROM shopping.shopping_cart
+           WHERE user_id = $1 AND item_type = $2 AND item_id = $3`,
+          [user_id, item_type, item_id]
+        ),
+        3,
+        'gRPC AddToCart: check existing'
       )
 
       let cartItemId: string
       if (existing.rows.length > 0) {
         const newQuantity = existing.rows[0].quantity + quantity
-        await pool.query(
-          `UPDATE shopping.shopping_cart SET quantity = $1, updated_at = now() WHERE id = $2`,
-          [newQuantity, existing.rows[0].id]
+        await withRetry(
+          () => pool.query(
+            `UPDATE shopping.shopping_cart SET quantity = $1, updated_at = now() WHERE id = $2`,
+            [newQuantity, existing.rows[0].id]
+          ),
+          3,
+          'gRPC AddToCart: update quantity'
         )
         cartItemId = existing.rows[0].id
       } else {
-        const result = await pool.query(
-          `INSERT INTO shopping.shopping_cart (user_id, item_type, item_id, listing_id, quantity, price, metadata)
-           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) RETURNING id`,
-          [user_id, item_type, item_id, listing_id || null, quantity, price || null, metadata || null]
+        const result = await withRetry(
+          () => pool.query(
+            `INSERT INTO shopping.shopping_cart (user_id, item_type, item_id, listing_id, quantity, price, metadata)
+             VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) RETURNING id`,
+            [user_id, item_type, item_id, listing_id || null, quantity, price || null, metadata || null]
+          ),
+          3,
+          'gRPC AddToCart: insert new'
         )
         cartItemId = result.rows[0].id
       }
@@ -124,10 +136,14 @@ const shoppingService = {
   async GetCart(call: any, callback: any) {
     const { user_id } = call.request
     try {
-      const result = await pool.query(
-        `SELECT id, listing_id, item_type, item_id, quantity, price, metadata, created_at, updated_at
-         FROM shopping.shopping_cart WHERE user_id = $1 ORDER BY created_at DESC`,
-        [user_id]
+      const result = await withRetry(
+        () => pool.query(
+          `SELECT id, listing_id, item_type, item_id, quantity, price, metadata, created_at, updated_at
+           FROM shopping.shopping_cart WHERE user_id = $1 ORDER BY created_at DESC`,
+          [user_id]
+        ),
+        3,
+        'gRPC GetCart'
       )
 
       const totalPrice = result.rows.reduce((sum: number, item: any) => sum + (Number(item.price || 0) * item.quantity), 0)
@@ -155,9 +171,13 @@ const shoppingService = {
   async RemoveFromCart(call: any, callback: any) {
     const { user_id, cart_item_id } = call.request
     try {
-      const result = await pool.query(
-        `DELETE FROM shopping.shopping_cart WHERE id = $1 AND user_id = $2 RETURNING id`,
-        [cart_item_id, user_id]
+      const result = await withRetry(
+        () => pool.query(
+          `DELETE FROM shopping.shopping_cart WHERE id = $1 AND user_id = $2 RETURNING id`,
+          [cart_item_id, user_id]
+        ),
+        3,
+        'gRPC RemoveFromCart'
       )
 
       if (result.rows.length === 0) {
@@ -173,9 +193,13 @@ const shoppingService = {
   async ClearCart(call: any, callback: any) {
     const { user_id } = call.request
     try {
-      const result = await pool.query(
-        `DELETE FROM shopping.shopping_cart WHERE user_id = $1 RETURNING id`,
-        [user_id]
+      const result = await withRetry(
+        () => pool.query(
+          `DELETE FROM shopping.shopping_cart WHERE user_id = $1 RETURNING id`,
+          [user_id]
+        ),
+        3,
+        'gRPC ClearCart'
       )
 
       callback(null, { success: true, items_removed: result.rows.length })
@@ -188,13 +212,17 @@ const shoppingService = {
   async AddToWatchlist(call: any, callback: any) {
     const { user_id, item_type, item_id, listing_id, notify_on = [], metadata } = call.request
     try {
-      const result = await pool.query(
-        `INSERT INTO shopping.watchlist (user_id, item_type, item_id, listing_id, notify_on, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6::jsonb)
-         ON CONFLICT (user_id, item_type, item_id)
-         DO UPDATE SET notify_on = $5, metadata = $6::jsonb, updated_at = now()
-         RETURNING id`,
-        [user_id, item_type, item_id, listing_id || null, notify_on, metadata || null]
+      const result = await withRetry(
+        () => pool.query(
+          `INSERT INTO shopping.watchlist (user_id, item_type, item_id, listing_id, notify_on, metadata)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+           ON CONFLICT (user_id, item_type, item_id)
+           DO UPDATE SET notify_on = $5, metadata = $6::jsonb, updated_at = now()
+           RETURNING id`,
+          [user_id, item_type, item_id, listing_id || null, notify_on, metadata || null]
+        ),
+        3,
+        'gRPC AddToWatchlist'
       )
 
       await cacheManager.incrementLFU(`watchlist:${item_type}:${item_id}`, user_id)
@@ -208,15 +236,23 @@ const shoppingService = {
   async GetWatchlist(call: any, callback: any) {
     const { user_id, limit = 50, offset = 0 } = call.request
     try {
-      const result = await pool.query(
-        `SELECT id, listing_id, item_type, item_id, notify_on, metadata, created_at
-         FROM shopping.watchlist WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-        [user_id, limit, offset]
+      const result = await withRetry(
+        () => pool.query(
+          `SELECT id, listing_id, item_type, item_id, notify_on, metadata, created_at
+           FROM shopping.watchlist WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+          [user_id, limit, offset]
+        ),
+        3,
+        'gRPC GetWatchlist'
       )
 
-      const countResult = await pool.query(
-        `SELECT COUNT(*) as total FROM shopping.watchlist WHERE user_id = $1`,
-        [user_id]
+      const countResult = await withRetry(
+        () => pool.query(
+          `SELECT COUNT(*) as total FROM shopping.watchlist WHERE user_id = $1`,
+          [user_id]
+        ),
+        3,
+        'gRPC GetWatchlist: count'
       )
 
       callback(null, {
@@ -240,12 +276,16 @@ const shoppingService = {
   async AddRecentlyViewed(call: any, callback: any) {
     const { user_id, item_type, item_id, metadata } = call.request
     try {
-      await pool.query(
-        `INSERT INTO shopping.recently_viewed (user_id, item_type, item_id, metadata)
-         VALUES ($1, $2, $3, $4::jsonb)
-         ON CONFLICT (user_id, item_type, item_id)
-         DO UPDATE SET viewed_at = now(), metadata = $4::jsonb`,
-        [user_id, item_type, item_id, metadata || null]
+      await withRetry(
+        () => pool.query(
+          `INSERT INTO shopping.recently_viewed (user_id, item_type, item_id, metadata)
+           VALUES ($1, $2, $3, $4::jsonb)
+           ON CONFLICT (user_id, item_type, item_id)
+           DO UPDATE SET viewed_at = now(), metadata = $4::jsonb`,
+          [user_id, item_type, item_id, metadata || null]
+        ),
+        3,
+        'gRPC AddRecentlyViewed'
       )
 
       await cacheManager.addRecentlyViewed(user_id, item_type, item_id, metadata)
@@ -268,7 +308,11 @@ const shoppingService = {
       query += ` ORDER BY viewed_at DESC LIMIT $${params.length + 1}`
       params.push(limit)
 
-      const result = await pool.query(query, params)
+      const result = await withRetry(
+        () => pool.query(query, params),
+        3,
+        'gRPC GetRecentlyViewed'
+      )
 
       callback(null, {
         items: result.rows.map((row: any) => ({
@@ -287,13 +331,17 @@ const shoppingService = {
   async AddToWishlist(call: any, callback: any) {
     const { user_id, item_type, item_id, listing_id, priority = 0, notes, metadata } = call.request
     try {
-      const result = await pool.query(
-        `INSERT INTO shopping.wishlist (user_id, item_type, item_id, listing_id, priority, notes, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
-         ON CONFLICT (user_id, item_type, item_id)
-         DO UPDATE SET priority = $5, notes = $6, metadata = $7::jsonb, updated_at = now()
-         RETURNING id`,
-        [user_id, item_type, item_id, listing_id || null, priority, notes || null, metadata || null]
+      const result = await withRetry(
+        () => pool.query(
+          `INSERT INTO shopping.wishlist (user_id, item_type, item_id, listing_id, priority, notes, metadata)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+           ON CONFLICT (user_id, item_type, item_id)
+           DO UPDATE SET priority = $5, notes = $6, metadata = $7::jsonb, updated_at = now()
+           RETURNING id`,
+          [user_id, item_type, item_id, listing_id || null, priority, notes || null, metadata || null]
+        ),
+        3,
+        'gRPC AddToWishlist'
       )
 
       await cacheManager.incrementLFU(`wishlist:${item_type}:${item_id}`, user_id)
@@ -307,15 +355,23 @@ const shoppingService = {
   async GetWishlist(call: any, callback: any) {
     const { user_id, limit = 50, offset = 0 } = call.request
     try {
-      const result = await pool.query(
-        `SELECT id, listing_id, item_type, item_id, priority, notes, metadata, created_at
-         FROM shopping.wishlist WHERE user_id = $1 ORDER BY priority DESC, created_at DESC LIMIT $2 OFFSET $3`,
-        [user_id, limit, offset]
+      const result = await withRetry(
+        () => pool.query(
+          `SELECT id, listing_id, item_type, item_id, priority, notes, metadata, created_at
+           FROM shopping.wishlist WHERE user_id = $1 ORDER BY priority DESC, created_at DESC LIMIT $2 OFFSET $3`,
+          [user_id, limit, offset]
+        ),
+        3,
+        'gRPC GetWishlist'
       )
 
-      const countResult = await pool.query(
-        `SELECT COUNT(*) as total FROM shopping.wishlist WHERE user_id = $1`,
-        [user_id]
+      const countResult = await withRetry(
+        () => pool.query(
+          `SELECT COUNT(*) as total FROM shopping.wishlist WHERE user_id = $1`,
+          [user_id]
+        ),
+        3,
+        'gRPC GetWishlist: count'
       )
 
       callback(null, {
@@ -353,11 +409,15 @@ const shoppingService = {
     } = call.request
 
     try {
-      const result = await pool.query(
-        `INSERT INTO shopping.purchase_history 
-         (user_id, order_id, item_type, item_id, listing_id, quantity, price_paid, currency, purchase_type, status, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb) RETURNING id`,
-        [user_id, order_id, item_type, item_id, listing_id || null, quantity, price_paid, currency, purchase_type, status, metadata || null]
+      const result = await withRetry(
+        () => pool.query(
+          `INSERT INTO shopping.purchase_history 
+           (user_id, order_id, item_type, item_id, listing_id, quantity, price_paid, currency, purchase_type, status, metadata)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb) RETURNING id`,
+          [user_id, order_id, item_type, item_id, listing_id || null, quantity, price_paid, currency, purchase_type, status, metadata || null]
+        ),
+        3,
+        'gRPC AddPurchase'
       )
 
       // Publish to Kafka
@@ -376,16 +436,24 @@ const shoppingService = {
   async GetPurchaseHistory(call: any, callback: any) {
     const { user_id, limit = 50, offset = 0 } = call.request
     try {
-      const result = await pool.query(
-        `SELECT id, order_id, listing_id, item_type, item_id, quantity, price_paid, currency,
-                purchase_type, status, purchased_at, metadata
-         FROM shopping.purchase_history WHERE user_id = $1 ORDER BY purchased_at DESC LIMIT $2 OFFSET $3`,
-        [user_id, limit, offset]
+      const result = await withRetry(
+        () => pool.query(
+          `SELECT id, order_id, listing_id, item_type, item_id, quantity, price_paid, currency,
+                  purchase_type, status, purchased_at, metadata
+           FROM shopping.purchase_history WHERE user_id = $1 ORDER BY purchased_at DESC LIMIT $2 OFFSET $3`,
+          [user_id, limit, offset]
+        ),
+        3,
+        'gRPC GetPurchaseHistory'
       )
 
-      const countResult = await pool.query(
-        `SELECT COUNT(*) as total FROM shopping.purchase_history WHERE user_id = $1`,
-        [user_id]
+      const countResult = await withRetry(
+        () => pool.query(
+          `SELECT COUNT(*) as total FROM shopping.purchase_history WHERE user_id = $1`,
+          [user_id]
+        ),
+        3,
+        'gRPC GetPurchaseHistory: count'
       )
 
       callback(null, {
@@ -414,10 +482,14 @@ const shoppingService = {
   async AddSearch(call: any, callback: any) {
     const { user_id, query, query_type, filters, result_count, clicked_item } = call.request
     try {
-      await pool.query(
-        `INSERT INTO shopping.search_history (user_id, query, query_type, filters, result_count, clicked_item)
-         VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
-        [user_id, query, query_type, filters || null, result_count || null, clicked_item || null]
+      await withRetry(
+        () => pool.query(
+          `INSERT INTO shopping.search_history (user_id, query, query_type, filters, result_count, clicked_item)
+           VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
+          [user_id, query, query_type, filters || null, result_count || null, clicked_item || null]
+        ),
+        3,
+        'gRPC AddSearch'
       )
 
       await cacheManager.incrementLFU(`search:${query_type}:${query}`, user_id)
@@ -441,7 +513,11 @@ const shoppingService = {
       query += ` ORDER BY searched_at DESC LIMIT $${params.length + 1}`
       params.push(limit)
 
-      const result = await pool.query(query, params)
+      const result = await withRetry(
+        () => pool.query(query, params),
+        3,
+        'gRPC GetSearchHistory'
+      )
 
       callback(null, {
         items: result.rows.map((row: any) => ({
@@ -476,7 +552,11 @@ const shoppingService = {
       query += ` GROUP BY query, query_type ORDER BY count DESC LIMIT $${params.length + 1}`
       params.push(limit)
 
-      const result = await pool.query(query, params)
+      const result = await withRetry(
+        () => pool.query(query, params),
+        3,
+        'gRPC GetTrendingSearches'
+      )
 
       callback(null, {
         items: result.rows.map((row: any) => ({
@@ -528,7 +608,11 @@ const shoppingService = {
   // Note: Standard health check is now handled by grpc.health.v1.Health service
   async HealthCheck(_call: any, callback: any) {
     try {
-      await pool.query('SELECT 1')
+      await withRetry(
+        () => pool.query('SELECT 1'),
+        3,
+        'gRPC HealthCheck: database'
+      )
       if (redis && redis.status !== 'ready') {
         await redis.ping()
       }
@@ -562,7 +646,11 @@ export function startGrpcServer(port: number) {
   registerHealthService(server, 'shopping.ShoppingService', async () => {
     try {
       // Check database connectivity
-      await pool.query('SELECT 1')
+      await withRetry(
+        () => pool.query('SELECT 1'),
+        3,
+        'gRPC health service: database'
+      )
       
       // Check Redis connectivity (if Redis is available)
       if (redis && redis.status !== 'ready') {
@@ -607,11 +695,20 @@ export function startGrpcServer(port: number) {
       console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)");
     }
     
+    // For dev: Don't require client cert verification (use false)
+    // For production: Enable client cert verification (use checkClientCert)
+    const requireClientCert = process.env.GRPC_REQUIRE_CLIENT_CERT === 'true' ? checkClientCert : false;
+    
     credentials = grpc.ServerCredentials.createSsl(
       rootCerts,
       [{ private_key: key, cert_chain: cert }],
-      checkClientCert as any
+      requireClientCert as any
     );
+    if (requireClientCert) {
+      console.log("[gRPC] Client certificate verification is ENABLED.");
+    } else {
+      console.log("[gRPC] Client certificate verification is DISABLED (dev mode).");
+    }
   } else {
     console.warn("[gRPC] TLS certs not found, starting insecure server (dev only)");
     credentials = grpc.ServerCredentials.createInsecure();

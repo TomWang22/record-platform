@@ -4,6 +4,7 @@ import * as protoLoader from '@grpc/proto-loader'
 import * as path from 'path'
 import * as fs from 'fs'
 import { Pool } from 'pg'
+import { registerHealthService } from '@common/utils'
 
 // Dual-DB setup
 const POSTGRES_URL_LISTINGS = process.env.POSTGRES_URL_LISTINGS || process.env.POSTGRES_URL!;
@@ -319,6 +320,19 @@ export function startGrpcServer(port: number) {
     }, 'StopMonitoring'),
   })
 
+  // Register standard gRPC Health Service (grpc.health.v1.Health)
+  registerHealthService(server, 'auction_monitor.AuctionMonitorService', async () => {
+    try {
+      // Check both databases
+      await listingsPool.query('SELECT 1')
+      await auctionPool.query('SELECT 1')
+      return true
+    } catch (err) {
+      console.error('[gRPC] Health check failed:', err)
+      return false
+    }
+  })
+
   // Enable gRPC reflection for tooling (grpcurl, etc.)
   if (process.env.ENABLE_GRPC_REFLECTION !== "false") {
     try {
@@ -351,11 +365,20 @@ export function startGrpcServer(port: number) {
       console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)");
     }
     
+    // For dev: Don't require client cert verification (use false)
+    // For production: Enable client cert verification (use checkClientCert)
+    const requireClientCert = process.env.GRPC_REQUIRE_CLIENT_CERT === 'true' ? checkClientCert : false;
+    
     credentials = grpc.ServerCredentials.createSsl(
       rootCerts,
       [{ private_key: key, cert_chain: cert }],
-      checkClientCert as any
+      requireClientCert as any
     );
+    if (requireClientCert) {
+      console.log("[gRPC] Client certificate verification is ENABLED.");
+    } else {
+      console.log("[gRPC] Client certificate verification is DISABLED (dev mode).");
+    }
   } else {
     console.warn("[gRPC] TLS certs not found, starting insecure server (dev only)");
     credentials = grpc.ServerCredentials.createInsecure();

@@ -1,7 +1,7 @@
 import { Router, type Response, type Router as ExpressRouter } from 'express'
 import type Redis from 'ioredis'
 import type { AuthedRequest } from '../lib/auth.js'
-import { pool } from '../lib/db.js'
+import { pool, withRetry } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
 
 export default function ordersRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
@@ -37,13 +37,21 @@ export default function ordersRouter(redis: Redis | null, cacheManager: CacheMan
       query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
       params.push(limit, offset)
 
-      const result = await pool.query(query, params)
+      const result = await withRetry(
+        () => pool.query(query, params),
+        3,
+        'get orders'
+      )
 
       const countQuery = status
         ? `SELECT COUNT(*) as total FROM shopping.orders WHERE user_id = $1 AND status = $2`
         : `SELECT COUNT(*) as total FROM shopping.orders WHERE user_id = $1`
       const countParams = status ? [userId, status] : [userId]
-      const countResult = await pool.query(countQuery, countParams)
+      const countResult = await withRetry(
+        () => pool.query(countQuery, countParams),
+        3,
+        'count orders'
+      )
 
       res.json({
         orders: result.rows,
@@ -67,14 +75,18 @@ export default function ordersRouter(redis: Redis | null, cacheManager: CacheMan
     const { orderId } = req.params
 
     try {
-      const orderResult = await pool.query(
-        `SELECT id, order_number, status, payment_status, payment_method, payment_transaction_id,
-                subtotal, shipping_cost, tax, total, currency,
-                shipping_address, billing_address, notes, metadata,
-                created_at, updated_at, completed_at, cancelled_at
-         FROM shopping.orders
-         WHERE id = $1::uuid AND user_id = $2::uuid`,
-        [orderId, userId]
+      const orderResult = await withRetry(
+        () => pool.query(
+          `SELECT id, order_number, status, payment_status, payment_method, payment_transaction_id,
+                  subtotal, shipping_cost, tax, total, currency,
+                  shipping_address, billing_address, notes, metadata,
+                  created_at, updated_at, completed_at, cancelled_at
+           FROM shopping.orders
+           WHERE id = $1::uuid AND user_id = $2::uuid`,
+          [orderId, userId]
+        ),
+        3,
+        'get order details'
       )
 
       if (orderResult.rows.length === 0) {
@@ -82,13 +94,17 @@ export default function ordersRouter(redis: Redis | null, cacheManager: CacheMan
       }
 
       // Get purchase history items for this order
-      const purchasesResult = await pool.query(
-        `SELECT id, listing_id, item_type, item_id, quantity, price_paid, currency,
-                purchase_type, status, purchased_at, metadata, resellable
-         FROM shopping.purchase_history
-         WHERE order_id = $1
-         ORDER BY purchased_at DESC`,
-        [orderId]
+      const purchasesResult = await withRetry(
+        () => pool.query(
+          `SELECT id, listing_id, item_type, item_id, quantity, price_paid, currency,
+                  purchase_type, status, purchased_at, metadata, resellable
+           FROM shopping.purchase_history
+           WHERE order_id = $1
+           ORDER BY purchased_at DESC`,
+          [orderId]
+        ),
+        3,
+        'get order purchase history'
       )
 
       res.json({

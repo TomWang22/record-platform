@@ -15,13 +15,13 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis.record-platform.svc.cluster.local:6379/0")
-# Increased Redis connection pool for better concurrency
-# With 50+ VUs and singleflight, we need more connections for lock polling
+# Redis connection pool balanced for baseline (1 replica)
+# With 50 VUs and singleflight, we need connections for lock polling
 # Formula: max_connections = (VUs * concurrent_per_vu) + headroom
-# For 50 VUs with 2-3 concurrent requests: 100-150 + 50 headroom = 150-200
-# Increased to 150 to handle peak load and prevent connection exhaustion
-REDIS_MAX_CONNECTIONS = int(os.getenv("REDIS_MAX_CONNECTIONS", "150"))  # Increased from 100
-REDIS_POOL_SIZE = int(os.getenv("REDIS_POOL_SIZE", "75"))  # Increased from 50
+# For 50 VUs with 1-2 concurrent requests: 50-100 + 50 headroom = 100-150
+# Set to 100 for baseline (balanced - not too aggressive)
+REDIS_MAX_CONNECTIONS = int(os.getenv("REDIS_MAX_CONNECTIONS", "100"))  # Balanced
+REDIS_POOL_SIZE = int(os.getenv("REDIS_POOL_SIZE", "50"))  # Balanced
 
 # Global Redis connection pool
 _redis_pool: Optional[ConnectionPool] = None

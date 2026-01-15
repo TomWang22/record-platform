@@ -24,5 +24,6 @@ resources:
   - social-service
   - shopping-service
   - auction-monitor
+  - envoy-test                # Envoy gRPC proxy (port 10000)
   # - cron-jobs              # Temporarily disabled - k6 files missing
   # - webapp                 # Webapp frontend (port 3001) - excluded as requested (externalized)

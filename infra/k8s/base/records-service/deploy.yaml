@@ -57,24 +57,68 @@ spec:
             - name: tls-certs
               mountPath: /etc/certs
               readOnly: true
+          # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2 only
           readinessProbe:
-            httpGet: { path: /_ping, port: http }
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 10
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50051
+                - -service=records.RecordsService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
+                - -connect-timeout=30s
+                - -rpc-timeout=30s
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 35
+            failureThreshold: 6
           livenessProbe:
-            httpGet: { path: /_ping, port: http }
-            initialDelaySeconds: 15
-            periodSeconds: 10
-            timeoutSeconds: 3
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50051
+                - -service=records.RecordsService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
+                - -connect-timeout=30s
+                - -rpc-timeout=30s
+            initialDelaySeconds: 150
+            periodSeconds: 30
+            timeoutSeconds: 35
             failureThreshold: 6
           startupProbe:
-            httpGet: { path: /_ping, port: http }
-            initialDelaySeconds: 15
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 20
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50051
+                - -service=records.RecordsService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
+                - -connect-timeout=30s
+                - -rpc-timeout=30s
+            initialDelaySeconds: 45
+            periodSeconds: 15
+            timeoutSeconds: 35
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
       volumes:
         - name: proto-files
           configMap:

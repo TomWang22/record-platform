@@ -1,0 +1,380 @@
+#!/usr/bin/env bash
+# Enhanced Microservices Test with Explicit Protocol Flags and Packet-Level Verification
+# - Explicit curl flags for HTTP/2 and HTTP/3 (no prior knowledge, forced)
+# - Packet capture (tcpdump) for each test
+# - Network monitoring (netstat) for connection verification
+# - Protocol verification at wire level
+
+set -euo pipefail
+
+NS="record-platform"
+HOST="${HOST:-record.local}"
+CURL_BIN="${CURL_BIN:-/opt/homebrew/opt/curl/bin/curl}"
+
+# Auto-detect port based on cluster
+if [[ -z "${PORT:-}" ]] || [[ "${PORT:-}" == "443" ]]; then
+  CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
+  if [[ "$CURRENT_CONTEXT" == "kind-h3-multi" ]]; then
+    for p in 8445 8446 8444; do
+      if curl -k -s --http2 --max-time 1 -H "Host: ${HOST}" "https://127.0.0.1:${p}/_caddy/healthz" >/dev/null 2>&1; then
+        PORT=$p
+        break
+      fi
+    done
+    PORT="${PORT:-8445}"
+  else
+    PORT="${PORT:-30443}"
+    DETECTED_PORT=$(kubectl -n ingress-nginx get svc caddy-h3 -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || echo "")
+    if [[ -n "$DETECTED_PORT" ]]; then
+      PORT=$DETECTED_PORT
+    fi
+  fi
+fi
+
+say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+ok() { echo "✅ $*"; }
+warn() { echo "⚠️  $*"; }
+fail() { echo "❌ $*" >&2; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/lib/http3.sh"
+
+HTTP3_SVC_IP=$(kubectl -n ingress-nginx get svc caddy-h3 -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
+if [[ -n "$HTTP3_SVC_IP" ]]; then
+  HTTP3_RESOLVE="${HOST}:443:${HTTP3_SVC_IP}"
+else
+  HTTP3_RESOLVE="${HOST}:443:127.0.0.1"
+fi
+
+TOKEN=""
+TOKEN_USER2=""
+USER1_ID=""
+USER2_ID=""
+GROUP_ID=""
+TEST_EMAIL=""
+TEST_PASSWORD="test123"
+
+# Packet capture directory
+CAPTURE_DIR="/tmp/smoke-test-captures-$(date +%s)"
+mkdir -p "$CAPTURE_DIR"
+
+# Network monitoring log
+NETSTAT_LOG="$CAPTURE_DIR/netstat.log"
+touch "$NETSTAT_LOG"
+
+say "=== Enhanced Microservices Test with Packet-Level Verification ==="
+echo "Capture directory: $CAPTURE_DIR"
+echo ""
+
+# Helper: Start packet capture for a test
+start_test_capture() {
+  local test_name="$1"
+  local capture_file="$CAPTURE_DIR/${test_name}.pcap"
+  
+  # Try to capture on host (if we have access to the network interface)
+  # For Kind clusters, we can capture on the Docker network
+  if command -v tcpdump >/dev/null 2>&1; then
+    # Find the Docker network interface for Kind
+    local iface=$(docker network ls | grep kind | head -1 | awk '{print $1}' | xargs docker network inspect 2>/dev/null | grep -o '"Name":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+    if [[ -n "$iface" ]]; then
+      # Start background capture (will be stopped after test)
+      sudo tcpdump -i "$iface" -w "$capture_file" "host ${HOST} or port ${PORT} or port 443" >/dev/null 2>&1 &
+      echo $! > "$CAPTURE_DIR/${test_name}.tcpdump.pid"
+    fi
+  fi
+  
+  # Also capture netstat state before and after
+  netstat -an | grep -E "ESTABLISHED|TIME_WAIT|CLOSE_WAIT" | wc -l >> "$NETSTAT_LOG"
+  echo "=== $test_name START ===" >> "$NETSTAT_LOG"
+}
+
+# Helper: Stop packet capture for a test
+stop_test_capture() {
+  local test_name="$1"
+  local pid_file="$CAPTURE_DIR/${test_name}.tcpdump.pid"
+  
+  if [[ -f "$pid_file" ]]; then
+    local pid=$(cat "$pid_file")
+    kill "$pid" 2>/dev/null || true
+    rm -f "$pid_file"
+  fi
+  
+  # Record netstat state after
+  netstat -an | grep -E "ESTABLISHED|TIME_WAIT|CLOSE_WAIT" | wc -l >> "$NETSTAT_LOG"
+  echo "=== $test_name END ===" >> "$NETSTAT_LOG"
+}
+
+# Helper: Verify protocol at packet level (using tshark if available)
+verify_protocol() {
+  local capture_file="$1"
+  local expected_protocol="$2"  # "http2" or "http3"
+  
+  if [[ ! -f "$capture_file" ]] || [[ ! -s "$capture_file" ]]; then
+    warn "Capture file not available for protocol verification"
+    return 1
+  fi
+  
+  if command -v tshark >/dev/null 2>&1; then
+    if [[ "$expected_protocol" == "http2" ]]; then
+      # Check for HTTP/2 frames
+      local http2_frames=$(tshark -r "$capture_file" -Y "http2" -T fields -e http2.type 2>/dev/null | wc -l | tr -d ' ')
+      if [[ "$http2_frames" -gt 0 ]]; then
+        ok "HTTP/2 verified at packet level ($http2_frames frames)"
+        return 0
+      else
+        warn "No HTTP/2 frames found in capture"
+        return 1
+      fi
+    elif [[ "$expected_protocol" == "http3" ]]; then
+      # Check for QUIC packets
+      local quic_packets=$(tshark -r "$capture_file" -Y "quic" 2>/dev/null | wc -l | tr -d ' ')
+      if [[ "$quic_packets" -gt 0 ]]; then
+        ok "HTTP/3 (QUIC) verified at packet level ($quic_packets packets)"
+        return 0
+      else
+        warn "No QUIC packets found in capture"
+        return 1
+      fi
+    fi
+  else
+    warn "tshark not available for protocol verification"
+    return 1
+  fi
+}
+
+# Helper: HTTP/2 request with explicit flags (no prior knowledge, forced)
+http2_request() {
+  local method="$1"
+  local url="$2"
+  shift 2
+  local extra_flags=("$@")
+  
+  # Explicit HTTP/2 flags:
+  # --http2: Use HTTP/2 (will negotiate via ALPN)
+  # --tlsv1.2 or --tlsv1.3: Force TLS version
+  # --http2-prior-knowledge: Use HTTP/2 without ALPN (for h2c, but we use TLS)
+  # For TLS, we use --http2 with explicit TLS version
+  "$CURL_BIN" -k -sS -w "\n%{http_code}\n%{http_version}\n%{alpn_negotiated}" \
+    --http2 \
+    --tlsv1.3 \
+    --tls-max 1.3 \
+    --max-time 30 \
+    --resolve "$HOST:${PORT}:127.0.0.1" \
+    -H "Host: $HOST" \
+    "${extra_flags[@]}" \
+    -X "$method" "$url" 2>&1
+}
+
+# Helper: HTTP/3 request with explicit flags
+http3_request() {
+  local method="$1"
+  local url="$2"
+  shift 2
+  local extra_flags=("$@")
+  
+  # HTTP/3 uses --http3-only (already in http3_curl helper)
+  http3_curl -k -sS -w "\n%{http_code}\n%{http_version}" \
+    --http3-only \
+    --max-time 30 \
+    -H "Host: $HOST" \
+    --resolve "$HTTP3_RESOLVE" \
+    "${extra_flags[@]}" \
+    -X "$method" "$url" 2>&1
+}
+
+# Pre-flight checks
+say "Pre-flight: Checking database schema..."
+AUTH_SCHEMA_FOUND=false
+AUTH_DB_CHECK=$(PGCONNECT_TIMEOUT=3 PGPASSWORD=postgres psql -h localhost -p 5437 -U postgres -d records -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema='auth' AND table_name='users'" 2>&1 || echo "CONNECTION_FAILED")
+if echo "$AUTH_DB_CHECK" | grep -q "1"; then
+  ok "Auth schema exists"
+  AUTH_SCHEMA_FOUND=true
+fi
+
+# Service readiness checks
+say "Checking service readiness..."
+check_service_ready() {
+  local service=$1
+  local max_wait=${2:-60}
+  local waited=0
+  
+  while [[ $waited -lt $max_wait ]]; do
+    if kubectl -n "$NS" get deployment "$service" >/dev/null 2>&1; then
+      if kubectl -n "$NS" rollout status deployment/"$service" --timeout=5s >/dev/null 2>&1; then
+        ok "$service is ready"
+        return 0
+      fi
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  
+  warn "$service may not be ready (waited ${max_wait}s)"
+  return 1
+}
+
+check_service_ready "auth-service" 30 || warn "auth-service readiness check failed, continuing..."
+check_service_ready "records-service" 30 || warn "records-service readiness check failed, continuing..."
+check_service_ready "api-gateway" 30 || warn "api-gateway readiness check failed, continuing..."
+
+# Extract user ID from JWT
+extract_user_id() {
+  local token=$1
+  if [[ -z "$token" ]]; then
+    echo ""
+    return
+  fi
+  local payload=$(echo "$token" | cut -d'.' -f2)
+  payload=$(echo "$payload" | tr '_-' '/+')
+  local mod=$((${#payload} % 4))
+  if [[ $mod -eq 2 ]]; then
+    payload="${payload}=="
+  elif [[ $mod -eq 3 ]]; then
+    payload="${payload}="
+  fi
+  echo "$payload" | base64 -d 2>/dev/null | grep -o '"sub":"[^"]*"' | cut -d'"' -f4 || echo ""
+}
+
+# Test 1: Auth Service - Registration (HTTP/2) with explicit flags and packet capture
+say "Test 1: Auth Service - Registration via HTTP/2 (with packet capture)"
+TEST_EMAIL="microservice-test-$(date +%s)@example.com"
+TEST_PASSWORD="test123"
+
+start_test_capture "test1-register-http2"
+REGISTER_RESPONSE=$(http2_request "POST" "https://$HOST:${PORT}/api/auth/register" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}")
+stop_test_capture "test1-register-http2"
+
+# Verify protocol
+verify_protocol "$CAPTURE_DIR/test1-register-http2.pcap" "http2" || warn "HTTP/2 protocol verification failed"
+
+if [[ -n "$REGISTER_RESPONSE" ]]; then
+  REGISTER_CODE=$(echo "$REGISTER_RESPONSE" | tail -3 | head -1)
+  HTTP_VERSION=$(echo "$REGISTER_RESPONSE" | tail -2 | head -1)
+  ALPN=$(echo "$REGISTER_RESPONSE" | tail -1)
+  
+  echo "HTTP Version: $HTTP_VERSION"
+  echo "ALPN Negotiated: $ALPN"
+  
+  if [[ "$REGISTER_CODE" == "201" ]]; then
+    TOKEN=$(echo "$REGISTER_RESPONSE" | sed '$d' | sed '$d' | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+    USER1_ID=$(extract_user_id "$TOKEN")
+    ok "User 1 registration works via HTTP/2"
+    [[ -n "$TOKEN" ]] && echo "Token: ${TOKEN:0:50}..."
+    [[ -n "$USER1_ID" ]] && echo "User 1 ID: $USER1_ID"
+    
+    # Verify HTTP/2 was actually used
+    if [[ "$HTTP_VERSION" == "2" ]] || [[ "$ALPN" == "h2" ]]; then
+      ok "HTTP/2 confirmed (version: $HTTP_VERSION, ALPN: $ALPN)"
+    else
+      warn "HTTP/2 not confirmed (version: $HTTP_VERSION, ALPN: $ALPN)"
+    fi
+  elif [[ "$REGISTER_CODE" == "409" ]]; then
+    ok "User 1 exists (expected) - will try login instead"
+  else
+    warn "User 1 registration failed - HTTP $REGISTER_CODE"
+  fi
+fi
+
+# Test 2: Auth Service - Login (HTTP/3) with explicit flags and packet capture
+say "Test 2: Auth Service - Login via HTTP/3 (with packet capture)"
+if [[ -z "$TOKEN" ]]; then
+  start_test_capture "test2-login-http3"
+  LOGIN_RESPONSE=$(http3_request "POST" "https://$HOST/api/auth/login" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}")
+  stop_test_capture "test2-login-http3"
+  
+  # Verify protocol
+  verify_protocol "$CAPTURE_DIR/test2-login-http3.pcap" "http3" || warn "HTTP/3 protocol verification failed"
+  
+  if [[ -n "$LOGIN_RESPONSE" ]]; then
+    LOGIN_CODE=$(echo "$LOGIN_RESPONSE" | tail -2 | head -1)
+    HTTP_VERSION=$(echo "$LOGIN_RESPONSE" | tail -1)
+    
+    echo "HTTP Version: $HTTP_VERSION"
+    
+    if [[ "$LOGIN_CODE" == "200" ]]; then
+      TOKEN=$(echo "$LOGIN_RESPONSE" | sed '$d' | sed '$d' | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || echo "")
+      USER1_ID=$(extract_user_id "$TOKEN")
+      ok "User 1 login works via HTTP/3"
+      [[ -n "$TOKEN" ]] && echo "Token: ${TOKEN:0:50}..."
+      
+      # Verify HTTP/3 was actually used
+      if [[ "$HTTP_VERSION" == "3" ]]; then
+        ok "HTTP/3 confirmed (version: $HTTP_VERSION)"
+      else
+        warn "HTTP/3 not confirmed (version: $HTTP_VERSION)"
+      fi
+    else
+      warn "User 1 login failed - HTTP $LOGIN_CODE"
+    fi
+  fi
+else
+  ok "User 1 already has token from registration"
+fi
+
+# Test 3: Records Service - Create Record (HTTP/2) with packet capture
+say "Test 3: Records Service - Create Record via HTTP/2 (with packet capture)"
+if [[ -n "${TOKEN:-}" ]]; then
+  start_test_capture "test3-create-record-http2"
+  CREATE_RESPONSE=$(http2_request "POST" "https://$HOST:${PORT}/api/records" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d '{"artist":"Test Artist","name":"Test Record","format":"LP","catalog_number":"TEST-001"}')
+  stop_test_capture "test3-create-record-http2"
+  
+  verify_protocol "$CAPTURE_DIR/test3-create-record-http2.pcap" "http2" || warn "HTTP/2 protocol verification failed"
+  
+  CREATE_CODE=$(echo "$CREATE_RESPONSE" | tail -3 | head -1)
+  if [[ "$CREATE_CODE" =~ ^(200|201)$ ]]; then
+    ok "Create record works via HTTP/2"
+    RECORD_ID=$(echo "$CREATE_RESPONSE" | sed '$d' | sed '$d' | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
+  else
+    warn "Create record failed - HTTP $CREATE_CODE"
+  fi
+else
+  warn "Skipping record creation - no auth token available"
+fi
+
+# Test 4: Health Checks with protocol verification
+say "Test 4: Health Checks with Protocol Verification"
+
+# HTTP/2 health check
+start_test_capture "test4-health-http2"
+H2_HEALTH=$(http2_request "GET" "https://$HOST:${PORT}/_caddy/healthz")
+stop_test_capture "test4-health-http2"
+verify_protocol "$CAPTURE_DIR/test4-health-http2.pcap" "http2" || warn "HTTP/2 protocol verification failed"
+
+H2_CODE=$(echo "$H2_HEALTH" | tail -3 | head -1)
+if [[ "$H2_CODE" == "200" ]]; then
+  ok "Caddy health check works via HTTP/2"
+else
+  warn "Caddy health check failed via HTTP/2 - HTTP $H2_CODE"
+fi
+
+# HTTP/3 health check
+start_test_capture "test4-health-http3"
+H3_HEALTH=$(http3_request "GET" "https://$HOST/_caddy/healthz")
+stop_test_capture "test4-health-http3"
+verify_protocol "$CAPTURE_DIR/test4-health-http3.pcap" "http3" || warn "HTTP/3 protocol verification failed"
+
+H3_CODE=$(echo "$H3_HEALTH" | tail -2 | head -1)
+if [[ "$H3_CODE" == "200" ]]; then
+  ok "Caddy health check works via HTTP/3"
+else
+  warn "Caddy health check failed via HTTP/3 - HTTP $H3_CODE"
+fi
+
+say "=== Test Summary ==="
+echo "Capture directory: $CAPTURE_DIR"
+echo "Network statistics log: $NETSTAT_LOG"
+echo ""
+echo "Capture files:"
+ls -lh "$CAPTURE_DIR"/*.pcap 2>/dev/null | head -10 || echo "No capture files generated"
+echo ""
+echo "Network connection states:"
+cat "$NETSTAT_LOG" | tail -20
+
+say "=== Enhanced Test Complete ==="

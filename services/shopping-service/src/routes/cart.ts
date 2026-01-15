@@ -1,7 +1,7 @@
 import { Router, type Response, type Router as ExpressRouter } from 'express'
 import type Redis from 'ioredis'
 import type { AuthedRequest } from '../lib/auth.js'
-import { pool } from '../lib/db.js'
+import { pool, withRetry } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
 import { cleanupUnavailableItems, removeSoldOutFromCarts, markWatchlistSoldOut } from '../lib/availability.js'
 
@@ -35,12 +35,16 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
     }
 
     try {
-      // Get cart items with prices
-      const cartItems = await pool.query(
-        `SELECT c.id, c.item_type, c.item_id, c.listing_id, c.quantity, c.price, c.metadata
-         FROM shopping.shopping_cart c
-         WHERE c.user_id = $1::uuid AND c.item_id = ANY($2::uuid[])`,
-        [userId, items.map((item) => item.item_id)]
+      // Get cart items with prices (with retry for connection errors)
+      const cartItems = await withRetry(
+        () => pool.query(
+          `SELECT c.id, c.item_type, c.item_id, c.listing_id, c.quantity, c.price, c.metadata
+           FROM shopping.shopping_cart c
+           WHERE c.user_id = $1::uuid AND c.item_id = ANY($2::uuid[])`,
+          [userId, items.map((item) => item.item_id)]
+        ),
+        3,
+        'get cart items'
       )
 
       if (cartItems.rows.length === 0) {
@@ -74,11 +78,16 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
       const total = subtotal + shippingCost + tax
 
       // Generate order number
-      const orderNumberResult = await pool.query('SELECT shopping.generate_order_number() as order_number')
+      const orderNumberResult = await withRetry(
+        () => pool.query('SELECT shopping.generate_order_number() as order_number'),
+        3,
+        'generate order number'
+      )
       const orderNumber = orderNumberResult.rows[0].order_number
 
       // Create order
-      const orderResult = await pool.query(
+      const orderResult = await withRetry(
+        () => pool.query(
         `INSERT INTO shopping.orders (
           user_id, order_number, status, payment_status, payment_method,
           subtotal, shipping_cost, tax, total, currency,
@@ -102,6 +111,9 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
           notes || null,
           JSON.stringify({ simulated_payment: true }),
         ]
+        ),
+        3,
+        'create order'
       )
 
       const order = orderResult.rows[0]
@@ -111,14 +123,18 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
       const paymentTransactionId = `PAY-SIM-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
       // Update order with payment success
-      await pool.query(
-        `UPDATE shopping.orders
-         SET payment_status = 'paid',
-             payment_transaction_id = $1,
-             status = 'completed',
-             completed_at = NOW()
-         WHERE id = $2`,
-        [paymentTransactionId, orderId]
+      await withRetry(
+        () => pool.query(
+          `UPDATE shopping.orders
+           SET payment_status = 'paid',
+               payment_transaction_id = $1,
+               status = 'completed',
+               completed_at = NOW()
+           WHERE id = $2`,
+          [paymentTransactionId, orderId]
+        ),
+        3,
+        'update order payment status'
       )
 
       // Process each item: mark as sold, create purchase history, clean up carts
@@ -157,14 +173,15 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
               )
 
               // Create purchase history entry
-              const purchaseResult = await pool.query(
-                `INSERT INTO shopping.purchase_history (
-                  user_id, order_id, listing_id, item_type, item_id,
-                  quantity, price_paid, currency, purchase_type, status,
-                  metadata, resellable
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12)
-                RETURNING id`,
+              const purchaseResult = await withRetry(
+                () => pool.query(
+                  `INSERT INTO shopping.purchase_history (
+                    user_id, order_id, listing_id, item_type, item_id,
+                    quantity, price_paid, currency, purchase_type, status,
+                    metadata, resellable
+                  )
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12)
+                  RETURNING id`,
                 [
                   userId,
                   orderId,
@@ -183,6 +200,9 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
                   }),
                   true, // Resellable by default (eBay-style)
                 ]
+                ),
+                3,
+                'create purchase history (checkout)'
               )
 
               purchaseResults.push({
@@ -196,14 +216,15 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
             // Listings DB connection may fail - log but continue
             console.warn('[shopping] Could not update listing in listings DB:', listingErr.message)
             // Still create purchase history even if listing update failed
-            const purchaseResult = await pool.query(
-              `INSERT INTO shopping.purchase_history (
-                user_id, order_id, listing_id, item_type, item_id,
-                quantity, price_paid, currency, purchase_type, status,
-                metadata, resellable
-              )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12)
-              RETURNING id`,
+            const purchaseResult = await withRetry(
+              () => pool.query(
+                `INSERT INTO shopping.purchase_history (
+                  user_id, order_id, listing_id, item_type, item_id,
+                  quantity, price_paid, currency, purchase_type, status,
+                  metadata, resellable
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12)
+                RETURNING id`,
               [
                 userId,
                 orderId,
@@ -222,6 +243,9 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
                 }),
                 true,
               ]
+              ),
+              3,
+              'create purchase history (fallback)'
             )
             purchaseResults.push({
               purchase_id: purchaseResult.rows[0].id,
@@ -230,14 +254,15 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
           }
         } else {
           // For non-listing items, still create purchase history
-          const purchaseResult = await pool.query(
-            `INSERT INTO shopping.purchase_history (
-              user_id, order_id, item_type, item_id,
-              quantity, price_paid, currency, purchase_type, status,
-              metadata, resellable
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11)
-            RETURNING id`,
+          const purchaseResult = await withRetry(
+            () => pool.query(
+              `INSERT INTO shopping.purchase_history (
+                user_id, order_id, item_type, item_id,
+                quantity, price_paid, currency, purchase_type, status,
+                metadata, resellable
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11)
+              RETURNING id`,
             [
               userId,
               orderId,
@@ -255,6 +280,9 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
               }),
               true,
             ]
+            ),
+            3,
+            'create purchase history (non-listing)'
           )
 
           purchaseResults.push({
@@ -266,19 +294,27 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
 
       // Remove checked-out items from buyer's cart
       const cartItemIds = cartItems.rows.map((item) => item.id)
-      await pool.query(
-        `DELETE FROM shopping.shopping_cart
-         WHERE user_id = $1::uuid AND id = ANY($2::uuid[])`,
-        [userId, cartItemIds]
+      await withRetry(
+        () => pool.query(
+          `DELETE FROM shopping.shopping_cart
+           WHERE user_id = $1::uuid AND id = ANY($2::uuid[])`,
+          [userId, cartItemIds]
+        ),
+        3,
+        'remove checked-out items from cart'
       )
 
       // Get final order details
-      const finalOrder = await pool.query(
+      const finalOrder = await withRetry(
+        () => pool.query(
         `SELECT id, order_number, status, payment_status, payment_transaction_id,
                 subtotal, shipping_cost, tax, total, currency, created_at, completed_at
          FROM shopping.orders
          WHERE id = $1`,
         [orderId]
+        ),
+        3,
+        'get final order details'
       )
 
       res.json({
@@ -308,12 +344,16 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
       }
 
       // Get remaining cart items with notes
-      const result = await pool.query(
-        `SELECT c.id, c.listing_id, c.item_type, c.item_id, c.quantity, c.price, c.metadata, c.notes, c.created_at, c.updated_at
-         FROM shopping.shopping_cart c
-         WHERE c.user_id = $1
-         ORDER BY c.created_at DESC`,
-        [userId]
+      const result = await withRetry(
+        () => pool.query(
+          `SELECT c.id, c.listing_id, c.item_type, c.item_id, c.quantity, c.price, c.metadata, c.notes, c.created_at, c.updated_at
+           FROM shopping.shopping_cart c
+           WHERE c.user_id = $1
+           ORDER BY c.created_at DESC`,
+          [userId]
+        ),
+        3,
+        'get cart items'
       )
 
       // Fetch listing details from listings DB for items that have listing_id
@@ -417,10 +457,14 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
 
     try {
       // Check if item already in cart
-      const existing = await pool.query(
-        `SELECT id, quantity FROM shopping.shopping_cart
-         WHERE user_id = $1 AND item_type = $2 AND item_id = $3`,
-        [userId, item_type, item_id]
+      const existing = await withRetry(
+        () => pool.query(
+          `SELECT id, quantity FROM shopping.shopping_cart
+           WHERE user_id = $1 AND item_type = $2 AND item_id = $3`,
+          [userId, item_type, item_id]
+        ),
+        3,
+        'check existing cart item'
       )
 
       let cartItemId: string
@@ -437,15 +481,23 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
         const updateParams = notes !== undefined
           ? [newQuantity, notes || null, existing.rows[0].id]
           : [newQuantity, existing.rows[0].id]
-        await pool.query(updateQuery, updateParams)
+        await withRetry(
+          () => pool.query(updateQuery, updateParams),
+          3,
+          'update cart item quantity'
+        )
         cartItemId = existing.rows[0].id
       } else {
         // Insert new item
-        const result = await pool.query(
+        const result = await withRetry(
+          () => pool.query(
           `INSERT INTO shopping.shopping_cart (user_id, item_type, item_id, listing_id, quantity, price, metadata, notes)
            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
            RETURNING id`,
           [userId, item_type, item_id, listing_id || null, quantity, price || null, metadata ? JSON.stringify(metadata) : null, notes || null]
+          ),
+          3,
+          'insert new cart item'
         )
         cartItemId = result.rows[0].id
       }
@@ -474,11 +526,15 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
     const { itemId } = req.params
 
     try {
-      const result = await pool.query(
-        `DELETE FROM shopping.shopping_cart
-         WHERE id = $1 AND user_id = $2
-         RETURNING id`,
-        [itemId, userId]
+      const result = await withRetry(
+        () => pool.query(
+          `DELETE FROM shopping.shopping_cart
+           WHERE id = $1 AND user_id = $2
+           RETURNING id`,
+          [itemId, userId]
+        ),
+        3,
+        'remove item from cart'
       )
 
       if (result.rows.length === 0) {
@@ -526,12 +582,16 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
 
       updates.push('updated_at = now()')
 
-      const result = await pool.query(
-        `UPDATE shopping.shopping_cart
-         SET ${updates.join(', ')}
-         WHERE id = $1 AND user_id = $2
-         RETURNING id`,
-        values
+      const result = await withRetry(
+        () => pool.query(
+          `UPDATE shopping.shopping_cart
+           SET ${updates.join(', ')}
+           WHERE id = $1 AND user_id = $2
+           RETURNING id`,
+          values
+        ),
+        3,
+        'update cart item'
       )
 
       if (result.rows.length === 0) {
@@ -553,11 +613,15 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
     }
 
     try {
-      const result = await pool.query(
-        `DELETE FROM shopping.shopping_cart
-         WHERE user_id = $1
-         RETURNING id`,
-        [userId]
+      const result = await withRetry(
+        () => pool.query(
+          `DELETE FROM shopping.shopping_cart
+           WHERE user_id = $1
+           RETURNING id`,
+          [userId]
+        ),
+        3,
+        'clear cart'
       )
 
       res.json({

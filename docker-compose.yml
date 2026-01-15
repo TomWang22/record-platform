@@ -341,7 +341,7 @@ services:
       analytics-service: { condition: service_healthy }
       python-ai-service: { condition: service_healthy }
       social-service: { condition: service_healthy }
-    ports: ["8080:4000"]
+    expose: ["4000"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD","wget","-qO-","http://localhost:4000/healthz"]

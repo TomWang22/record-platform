@@ -112,17 +112,17 @@ async def fetch_analytics_data(endpoint: str, params: Optional[Dict] = None, tim
     # (Express) doesn't support HTTP/2 anyway, so we stick with HTTP/1.1 with connection pooling
     for attempt in range(max_retries):
         try:
-            # Use connection pooling with increased limits for better concurrency
-            # Increased for 50+ VUs: need more connections for concurrent requests
+            # Use connection pooling balanced for baseline (1 replica)
+            # Baseline: 50 VUs with 1 replica = need balanced connections
             # Formula: max_connections = (VUs * concurrent_per_vu) + headroom
-            # For 50 VUs with 2-3 concurrent requests: 100-150 + 100 headroom = 200-250
-            # Increased to 300 to handle peak load and prevent connection exhaustion
+            # For 50 VUs with 1-2 concurrent requests: 50-100 + 100 headroom = 150-200
+            # Set to 150 for baseline (balanced - not too aggressive)
             async with httpx.AsyncClient(
-                timeout=httpx.Timeout(timeout, connect=5.0, read=timeout),
+                timeout=httpx.Timeout(timeout, connect=3.0, read=timeout),  # Reduced connect timeout (fail faster)
                 limits=httpx.Limits(
-                    max_connections=500,  # Increased from 300 (handles 50+ VUs with concurrent requests + more headroom)
-                    max_keepalive_connections=150,  # Increased to 150 for better connection reuse
-                    keepalive_expiry=120.0  # Keep connections alive for 120s
+                    max_connections=150,  # Balanced (not too small, not too large)
+                    max_keepalive_connections=75,  # Balanced
+                    keepalive_expiry=90.0  # Balanced (not too short)
                 ),
                 http2=False,  # Explicitly disable HTTP/2 (analytics service doesn't support it)
             ) as client:
@@ -214,15 +214,15 @@ async def predict_price_from_analytics(items: List[Dict], timeout: float = 8.0, 
     
     for attempt in range(max_retries):
         try:
-            # Use connection pooling with keepalive for better performance
+            # Use connection pooling balanced for baseline (1 replica)
             # Note: HTTP/1.1 limitation - no multiplexing, but connection reuse helps
-            # Increased limits for better concurrency with 50+ VUs
+            # Balanced limits for baseline performance
             async with httpx.AsyncClient(
-                timeout=httpx.Timeout(timeout, connect=2.0, read=timeout),
+                timeout=httpx.Timeout(timeout, connect=3.0, read=timeout),  # Reduced connect timeout
                 limits=httpx.Limits(
-                    max_connections=500,  # Increased to 500 for high concurrency
-                    max_keepalive_connections=150,  # Increased to 150 for better connection reuse
-                    keepalive_expiry=120.0  # Increased to 120s for better connection reuse
+                    max_connections=150,  # Balanced (not too small, not too large)
+                    max_keepalive_connections=75,  # Balanced
+                    keepalive_expiry=90.0  # Balanced (not too short)
                 ),
                 http2=False,  # Analytics service (Express) doesn't support HTTP/2
             ) as client:
@@ -339,12 +339,13 @@ async def ingest_analytics_data(query: str, user_id: Optional[str] = None) -> Di
     # Use singleflight to prevent thundering herd
     async def fetch_data():
         """Fetch data from analytics service in parallel with fault tolerance"""
-        # Fetch data from analytics service in parallel with reasonable timeouts
-        # Increased timeouts to 3s to allow analytics service to respond (it's slow but we retry)
+        # Fetch data from analytics service in parallel with optimized timeouts
+        # Reduced timeouts for baseline (fail faster, use cached data on timeout)
+        # Analytics service can be slow under load, but we want to fail fast and use cache
         # Use asyncio.wait_for to enforce strict timeouts and prevent hanging
-        price_trend_task = asyncio.create_task(asyncio.wait_for(fetch_price_trend(query, days=30), timeout=3.0))
-        similar_searches_task = asyncio.create_task(asyncio.wait_for(fetch_similar_searches(query, user_id, limit=10), timeout=3.0))
-        user_history_task = asyncio.create_task(asyncio.wait_for(fetch_user_history(user_id, limit=20), timeout=3.0)) if user_id else asyncio.create_task(asyncio.sleep(0))
+        price_trend_task = asyncio.create_task(asyncio.wait_for(fetch_price_trend(query, days=30), timeout=2.0))  # Reduced from 3s
+        similar_searches_task = asyncio.create_task(asyncio.wait_for(fetch_similar_searches(query, user_id, limit=10), timeout=2.0))  # Reduced from 3s
+        user_history_task = asyncio.create_task(asyncio.wait_for(fetch_user_history(user_id, limit=20), timeout=2.0)) if user_id else asyncio.create_task(asyncio.sleep(0))  # Reduced from 3s
         
         price_trend, similar_searches, user_history = await asyncio.gather(
             price_trend_task,

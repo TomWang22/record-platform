@@ -12,22 +12,24 @@ import {
   invalidateWatchlistCache,
 } from './redis-cache.js';
 
-// Optimized connection pool for high-volume listings service
-// Increased pool size for concurrent listing operations and search queries
+// Balanced connection pool for baseline (1 replica)
+// Balanced pool size for baseline performance testing
 // Formula: max = (VUs * avg_concurrent_per_vu) + headroom
-// For 50 VUs with 2-3 concurrent requests each: 100-150 + 50 headroom = 150-200
-// Increased to 100 to handle peak load and prevent connection exhaustion
+// For 50 VUs with 1-2 concurrent requests each: 50-100 + 50 headroom = 100-150
+// Set to 75 for baseline (balanced - not too aggressive)
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL_LISTINGS || 'postgresql://postgres:postgres@localhost:5435/records',
-  max: parseInt(process.env.DB_POOL_MAX || '100', 10), // Increased from 20 to 100 for high concurrency
-  min: parseInt(process.env.DB_POOL_MIN || '10', 10), // Keep minimum connections warm
-  idleTimeoutMillis: 60000, // Increased idle timeout (1 minute)
-  connectionTimeoutMillis: 10000, // Increased connection timeout (10 seconds)
+  max: parseInt(process.env.DB_POOL_MAX || '75', 10), // Balanced (not too small)
+  min: parseInt(process.env.DB_POOL_MIN || '10', 10), // Balanced
+  idleTimeoutMillis: 45000, // Balanced (not too short)
+  connectionTimeoutMillis: 12000, // Balanced (fail faster but not too aggressive)
   statement_timeout: 30000, // 30 second statement timeout to prevent runaway queries
   query_timeout: 30000, // 30 second query timeout
   // Enable keep-alive for connection reuse
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
+  // Connection retry settings
+  allowExitOnIdle: false, // Keep pool alive even when idle
 });
 
 // Test connection
@@ -37,9 +39,51 @@ pool.on('connect', () => {
 
 pool.on('error', (err) => {
   console.error('[listings-db] Unexpected error on idle client', err);
+  // On connection errors, try to reconnect
+  if (err.message && (err.message.includes('terminated') || err.message.includes('timeout') || err.message.includes('ECONNREFUSED'))) {
+    console.warn('[listings-db] Connection error detected, pool will retry on next query');
+  }
 });
 
-export { pool };
+// Connection retry wrapper for database queries
+// Retries queries up to 3 times with exponential backoff on connection errors
+async function withRetry<T>(
+  queryFn: () => Promise<T>,
+  maxRetries: number = 3,
+  operation: string = 'query'
+): Promise<T> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await queryFn();
+    } catch (err: any) {
+      lastError = err;
+      const isConnectionError = err?.message && (
+        err.message.includes('terminated') ||
+        err.message.includes('timeout') ||
+        err.message.includes('ECONNREFUSED') ||
+        err.message.includes('Connection terminated') ||
+        err.code === 'ECONNRESET' ||
+        err.code === 'ETIMEDOUT'
+      );
+      
+      if (isConnectionError && attempt < maxRetries - 1) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000); // Exponential backoff, max 5s
+        console.warn(`[listings-db] ${operation} failed (attempt ${attempt + 1}/${maxRetries}): ${err.message}, retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      // Not a connection error or max retries reached
+      throw err;
+    }
+  }
+  
+  throw lastError || new Error('Query failed after retries');
+}
+
+export { pool, withRetry };
 
 // Helper functions for listings
 export async function getListingsByUser(userId: string, limit = 50, offset = 0) {
@@ -380,6 +424,15 @@ export async function getUserWatchlist(userId: string) {
   return watchlist;
 }
 
+// Wrapper for pool.query with retry logic
+async function queryWithRetry(text: string, params?: any[], operation: string = 'query'): Promise<any> {
+  return withRetry(
+    () => pool.query(text, params),
+    3,
+    operation
+  );
+}
+
 export async function searchListings(query: string, filters?: {
   listing_type?: string;
   category?: string;
@@ -482,16 +535,17 @@ export async function searchListings(query: string, filters?: {
   }
 
   // Get total count for pagination
-  const countResult = await pool.query(
+  const countResult = await queryWithRetry(
     `SELECT COUNT(*) as total
      FROM listings.listings l
      LEFT JOIN listings.auction_details ad ON l.id = ad.listing_id AND l.listing_type = 'auction'
      WHERE ${conditions.join(' AND ')}`,
-    params
+    params,
+    'searchListings-count'
   );
   const total = parseInt(countResult.rows[0]?.total || '0', 10);
 
-  const result = await pool.query(
+  const result = await queryWithRetry(
     `SELECT l.*, 
             (SELECT json_agg(
               json_build_object(
@@ -533,7 +587,8 @@ export async function searchListings(query: string, filters?: {
      WHERE ${conditions.join(' AND ')}
      ORDER BY ${orderBy}
      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-    [...params, limit, offset]
+    [...params, limit, offset],
+    'searchListings-query'
   );
 
   const searchResult = {

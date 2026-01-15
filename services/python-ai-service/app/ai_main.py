@@ -742,8 +742,7 @@ async def startup_event():
         try:
             # Import grpc_server from the same directory
             import sys
-            import os as os_module
-            sys.path.insert(0, os_module.path.dirname(os_module.path.abspath(__file__)))
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
             from grpc_server import serve
             grpc_port = int(os.getenv("GRPC_PORT", "50060"))
             # Start gRPC server in background task

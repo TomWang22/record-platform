@@ -107,6 +107,12 @@ export const options = {
     { duration: DURATION, target: VUS }, // Sustained load
     { duration: '30s', target: 0 },    // Ramp down
   ],
+  // STRICT TLS: k6 uses SSL_CERT_FILE environment variable for CA certificate
+  // Set SSL_CERT_FILE=/path/to/ca.crt before running k6
+  // Example: SSL_CERT_FILE=/tmp/k6-ca.crt k6 run ...
+  // If SSL_CERT_FILE is not set, k6 will fail with certificate verification errors
+  // NEVER use insecureSkipTLSVerify in production - always use strict TLS
+  setupTimeout: '120s', // Allow time for setup (registration + login)
   thresholds: {
     'http_req_duration': ['p(50)<200', 'p(95)<500', 'p(99)<1000'],
     'http_req_failed': ['rate<0.05'],
@@ -614,13 +620,43 @@ export function handleSummary(data) {
     };
   });
   
+  // Parse pod counts from environment variable (set by wrapper script)
+  let podCounts = null;
+  try {
+    if (__ENV.POD_COUNTS) {
+      podCounts = JSON.parse(__ENV.POD_COUNTS);
+    }
+  } catch (e) {
+    console.warn('[handleSummary] Failed to parse POD_COUNTS:', e.message);
+  }
+  
   const summary = {
     timestamp: new Date().toISOString(),
     total_requests: data.metrics.http_reqs?.values.count || 0,
     total_duration: data.metrics.http_req_duration?.values.avg || 0,
     error_rate: data.metrics.http_req_failed?.values.rate || 0,
     services: serviceMetrics,
+    // Include pod counts for honest assessment
+    pod_counts: podCounts || { note: 'Pod counts not available - run via scripts/run-k6-comprehensive-strict-tls.sh' },
+    test_config: {
+      vus: VUS,
+      duration: DURATION,
+      base_url: BASE_URL,
+      host: HOST,
+      strict_tls: true, // Always strict TLS (SSL_CERT_FILE required)
+    },
   };
+  
+  // Display pod counts if available (for honest assessment)
+  if (podCounts && podCounts.deployments) {
+    console.log('\n=== Service Pod Counts (for honest assessment) ===');
+    podCounts.deployments.forEach(deploy => {
+      const namespace = deploy.namespace || 'record-platform';
+      const ready = deploy.ready || 0;
+      const replicas = deploy.replicas || 0;
+      console.log(`  ${deploy.name} (${namespace}): ${replicas} replicas, ${ready} ready`);
+    });
+  }
   
   console.log('\n=== Service Success Rates ===');
   services.forEach(service => {
@@ -647,10 +683,13 @@ export function handleSummary(data) {
     console.log(`  max:      ${lat.max?.toFixed(2) || 'N/A'} ms`);
   });
   
+  // Generate filename based on HTTP_VERSION env var if present
+  const httpVersion = __ENV.HTTP_VERSION === 'HTTP/3' ? 'http3' : 'http2';
+  
   return {
     'stdout': textSummary(data, { indent: ' ', enableColors: true }),
-    'k6-service-metrics.json': JSON.stringify(summary, null, 2),
-    'k6-report.html': htmlReport(data),
+    [`k6-service-metrics-${httpVersion}.json`]: JSON.stringify(summary, null, 2),
+    [`k6-report-${httpVersion}.html`]: htmlReport(data),
   };
 }
 

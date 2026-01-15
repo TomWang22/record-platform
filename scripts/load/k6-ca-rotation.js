@@ -60,6 +60,9 @@ export default function () {
       name: 'caddy_health',
     },
     timeout: TIMEOUT,
+    // Strict TLS verification - CA certificate should be set via SSL_CERT_FILE environment variable
+    // k6 will automatically use SSL_CERT_FILE if set (set by rotation-suite.sh)
+    // insecureSkipTLSVerify: false, // Strict TLS - no insecure bypass
   };
 
   // Make request

@@ -35,13 +35,13 @@ This isn't a tutorial project—it's a production-grade system solving real prob
 - **Zero-downtime deployments** with RollingUpdate strategies
 
 ## Highlights
-- **✅ Multi-protocol edge (HTTP/2, HTTP/3, gRPC)** - Caddy terminates TLS/QUIC and forwards into nginx-ingress; **all tests passing** including HTTP/2, HTTP/3, and gRPC flows via `scripts/test-microservices-http2-http3.sh`.
+- **✅ Multi-protocol edge (HTTP/2, HTTP/3, gRPC)** - **Caddy** handles HTTP/2, HTTP/3 (QUIC), web app, and REST API traffic; **Envoy** handles all gRPC traffic with first-class gRPC support; **all tests passing** including HTTP/2, HTTP/3, and gRPC flows via `scripts/test-microservices-http2-http3.sh`.
 - **✅ Zero-downtime CA rotation** - Certificate authority rotation with **100% success rate** and **1-2 second rotation time** via optimized Kubernetes RollingUpdate; validated with continuous health checks:
   - `scripts/test-full-chain-with-rotation.sh`: **15000/15000 requests succeeded (100%)** during rotation (real stress test at ~120 req/s average, 100-150 req/s observed)
   - `scripts/test-http2-http3-strict-tls.sh`: **60/60 requests succeeded (100%)** during rotation
   - Zero downtime achieved with pod-by-pod rotation using RollingUpdate strategy
 - **✅ Strict TLS enforcement** - **All k6 load tests use strict TLS verification** with CA certificate validation (no insecure TLS bypass); TLS 1.2 and 1.3 only (TLS 1.1 and below rejected); validated via `scripts/test-http2-http3-strict-tls.sh` and `scripts/test-full-chain-with-rotation.sh`. All k6 test scripts (`run-k6-shopping.sh`, `run-k6-social-with-graphs.sh`, `run-k6-listings-with-graphs.sh`, `find-bottlenecks.sh`) enforce strict TLS with `SSL_CERT_FILE` and CA certificate ConfigMaps. **Shopping service load tests** (`k6-shopping-stress.js`, `k6-shopping-ramp.js`, `k6-shopping-db-validation.js`, `k6-bottleneck-finder.js`) all use strict TLS verification for production-ready testing.
-- **✅ Full gRPC inter-service communication** - All services communicate via gRPC with protocol buffers; Caddy routes gRPC requests using `protocol grpc` matcher with h2c transport to backend services. **gRPC client certificate verification** configurable via `GRPC_REQUIRE_CLIENT_CERT` environment variable (disabled for dev, enabled for production).
+- **✅ Full gRPC inter-service communication** - All services communicate via gRPC with protocol buffers; **Envoy handles all gRPC traffic** with first-class gRPC support (port 10000). **gRPC client certificate verification** configurable via `GRPC_REQUIRE_CLIENT_CERT` environment variable (disabled for dev, enabled for production). **Architecture Decision**: Envoy for gRPC (proven functionality), Caddy for HTTP/3 + web + REST (clean separation of concerns).
 - **✅ Multi-database architecture** - **8 dedicated PostgreSQL instances** for service isolation, scalability, and independent scaling (auth, records, social, listings, shopping, auction-monitor, analytics, python-ai).
 - **✅ Dual-database connections** - Services like auction-monitor and analytics-service connect to multiple databases for cross-service data access while maintaining data isolation.
 - **✅ Analytics & AI Pipeline** - Platform-wide business intelligence pipeline for seller and buyer optimization:
@@ -75,6 +75,8 @@ This isn't a tutorial project—it's a production-grade system solving real prob
   - **Rotation time**: **1-2 seconds** (consistently fast)
   - **Full chain validation**: Client → Caddy → Ingress → Backend
   - **Production-ready**: Validated with k6 constant-arrival-rate executor and connection reuse
+  - **Incremental limit finder**: `scripts/find-ca-rotation-limit.sh` finds maximum sustainable throughput
+  - **Certificate overlap window**: 7-day grace period for old certificates (production pattern)
   
 - ✅ **`scripts/test-full-chain-with-rotation.sh`**: **15000/15000 requests succeeded (100%)** during rotation
   - Rotation time: **1-2 seconds** (consistently fast)
@@ -118,13 +120,14 @@ This isn't a tutorial project—it's a production-grade system solving real prob
   - **15h**: Shopping Service gRPC (port 50058)
   - **15i**: Auction Monitor gRPC (port 50059)
   - **15j**: Python AI Service gRPC (port 50060)
-- ✅ **Caddy gRPC routing**: Uses `protocol grpc` matcher with service-specific path routing for all services
-- ✅ **Dual transport support**: h2c (port 5000) for internal testing, TLS (port 8443) for production
+- ✅ **Envoy gRPC routing**: Envoy handles all gRPC traffic with first-class gRPC support (port 10000)
+- ✅ **TLS transport**: All gRPC traffic uses HTTP/2 with TLS via Envoy
 - ✅ **Complete test coverage**: Registration, login, CRUD operations, messaging, group chats, listings search, auction monitoring, AI predictions
 
 Key technical achievements:
-- **Caddy gRPC routing**: Implemented service-specific gRPC routing using `protocol grpc` matcher and `path_regexp` for service identification
-- **h2c support**: Added internal port 5000 for plaintext HTTP/2 gRPC testing, with automatic fallback to TLS port 8443
+- **Envoy gRPC routing**: Envoy handles all gRPC traffic with first-class gRPC support (port 10000)
+- **Caddy HTTP/3**: Caddy excels at HTTP/3 (QUIC), web app serving, and REST API routing
+- **Clean separation**: Envoy for gRPC, Caddy for HTTP/3 + web + REST (industry standard pattern)
 - **Proto file management**: All proto files loaded from ConfigMap, with lazy loading in analytics-service to prevent startup crashes
 - **Timeout handling**: Fixed grpcurl timeout conflicts by using native `-max-time` flag instead of wrapper functions
 - **Health checks**: Caddy health endpoint (`/_caddy/healthz`) working for both HTTP/2 and HTTP/3
@@ -190,16 +193,26 @@ For detailed technical documentation, system design diagrams, and deep dives int
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           Client (Browser/Mobile)                            │
-│                    HTTP/3 (QUIC) | HTTP/2 | HTTP/1.1                        │
+│                    HTTP/3 (QUIC) | HTTP/2 | HTTP/1.1 | gRPC                  │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Caddy (Host-Side Edge)                              │
-│              TLS Termination (TLS 1.2/1.3) + mkcert CA                      │
-│         HTTP/2 + HTTP/3 (QUIC) + gRPC Routing (protocol grpc)              │
-│              Port 443 (HTTPS) | Port 8443 (HTTPS) | Port 5000 (h2c)        │
-└──────────────────────────────────────┬──────────────────────────────────────┘
+                    ┌──────────────────┴──────────────────┐
+                    │                                      │
+        HTTP/3 + Web + REST                    gRPC Requests
+                    │                                      │
+                    ▼                                      ▼
+┌──────────────────────────────────┐      ┌──────────────────────────────────┐
+│      Caddy (Edge Proxy)          │      │      Envoy (gRPC Proxy)           │
+│  TLS Termination (TLS 1.2/1.3)   │      │  First-Class gRPC Support         │
+│  HTTP/2 + HTTP/3 (QUIC)          │      │  HTTP/2 with TLS                  │
+│  NodePort: 30443 (TCP/UDP)       │      │  Port: 10000                      │
+│                                  │      │  Never routes through HTTP        │
+│  - Web App (Next.js)             │      │  Preserves trailers correctly     │
+│  - REST API (/api/*)             │      │  Forbids HTTP error pages          │
+│  - Static Assets                 │      │  Enforces HEADERS/DATA ordering   │
+└──────────────────┬───────────────┘      └──────────────────┬───────────────┘
+                   │                                          │
+                   └──────────────────┬──────────────────────┘
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -208,7 +221,7 @@ For detailed technical documentation, system design diagrams, and deep dives int
 └──────────────────────┬───────────────────────────┬──────────────────────────┘
                        │                           │
         REST /api/*    │                           │  gRPC /service.*
-        (HTTP/2/3)     │                           │  (HTTP/2 h2c/TLS)
+        (HTTP/2/3)     │                           │  (HTTP/2 TLS)
                        ▼                           ▼
         ┌──────────────────────┐      ┌──────────────────────────────┐
         │  Nginx Edge (8080)   │      │    API Gateway (4000)        │
@@ -368,23 +381,29 @@ For detailed technical documentation, system design diagrams, and deep dives int
 - **Documentation**: Complete guide in `infra/IAC-GUIDE.md`
 
 **Edge & Routing:**
-- **Caddy** runs in Kubernetes with **NodePort service** (port 30443), terminates TLS (TLS 1.2/1.3 only - strict TLS enforcement), and supports HTTP/2 + HTTP/3 (QUIC) + gRPC
-- **NodePort Architecture**: Migrated from `hostNetwork` to `NodePort` service type for true zero-downtime CA rotation
-  - **Multiple Replicas**: 2+ replicas with pod anti-affinity for high availability
-  - **RollingUpdate Strategy**: `maxUnavailable: 0` ensures at least one pod is always available
-  - **Load Balancing**: Kubernetes Service provides built-in load balancing across replicas
-  - **Port Access**: External access via NodePort 30443 (TCP/UDP for HTTPS, port 30050 for gRPC h2c)
-- **Strict TLS**: Configured with `protocols tls1.2 tls1.3` - TLS 1.1 and below are rejected; validated via test scripts
-- **CA Rotation**: Supports certificate authority rotation with `scripts/rotate-ca-and-fix-tls.sh`; **zero-downtime rotation achieved** via admin API reload (~16s, 100% success rate) + pod-by-pod rotation with multiple replicas
-- **Caddy gRPC routing**: Uses `protocol grpc` matcher to detect gRPC requests and routes by service name in path (e.g., `/auth.*` → auth-service)
-- **Dual gRPC transport**: Port 5000 (h2c/plaintext) for internal testing, Port 8443 (TLS) for production
+- **Caddy** runs in Kubernetes with **NodePort service** (port 30443), terminates TLS (TLS 1.2/1.3 only - strict TLS enforcement), and supports HTTP/2 + HTTP/3 (QUIC) for web and REST API traffic
+  - **NodePort Architecture**: Migrated from `hostNetwork` to `NodePort` service type for true zero-downtime CA rotation
+    - **Multiple Replicas**: 2+ replicas with pod anti-affinity for high availability
+    - **RollingUpdate Strategy**: `maxUnavailable: 0` ensures at least one pod is always available
+    - **Load Balancing**: Kubernetes Service provides built-in load balancing across replicas
+    - **Port Access**: External access via NodePort 30443 (TCP/UDP for HTTPS)
+  - **Strict TLS**: Configured with `protocols tls1.2 tls1.3` - TLS 1.1 and below are rejected; validated via test scripts
+  - **CA Rotation**: Supports certificate authority rotation with `scripts/rotate-ca-and-fix-tls.sh`; **zero-downtime rotation achieved** via admin API reload (~16s, 100% success rate) + pod-by-pod rotation with multiple replicas
+  - **Traffic Handled**: Web App (Next.js), REST API (/api/*), Static Assets
+- **Envoy** handles all gRPC traffic with first-class gRPC support (port 10000)
+  - **First-Class gRPC**: Never routes gRPC through HTTP handlers
+  - **Trailer Preservation**: Correctly handles gRPC trailers
+  - **Error Handling**: Forbids HTTP error pages on gRPC streams
+  - **HEADERS/DATA Ordering**: Enforces correct gRPC frame ordering
+  - **Proven Functionality**: Envoy test passed immediately (same Node.js server works with Envoy, fails with Caddy)
+  - **Architecture Decision**: Clean separation of concerns - Envoy for gRPC, Caddy for HTTP/3 + web + REST
 - **ingress-nginx** routes `/` to Nginx edge (static assets + micro-cache) and `/api/*` directly to API Gateway
 - **Nginx Edge** serves the Next.js webapp and proxies API requests through HAProxy
 - **HAProxy** maintains keep-alive pools and load balances to API Gateway
 
 **Inter-Service Communication:**
 - **API Gateway** communicates with backend services via **gRPC** for all services
-- **Caddy gRPC proxy**: Routes gRPC requests directly to services using h2c (HTTP/2 cleartext) transport
+- **Envoy gRPC proxy**: Routes all gRPC requests with first-class gRPC support (port 10000, HTTP/2 with TLS)
 - Services expose both HTTP (for health/metrics) and gRPC endpoints on separate ports
 - gRPC provides type-safe, efficient inter-service communication with protocol buffers
 - Proto definitions in `proto/` directory (auth.proto, records.proto, listings.proto, social.proto, analytics.proto, shopping.proto, auction-monitor.proto, python-ai.proto)
@@ -927,7 +946,7 @@ This end-to-end simulation **finds system limits** by testing the complete flow 
 
 ## Auth & Identity Flow
 
-1. **Client Authentication**: Clients obtain JWTs via `/api/auth/login` (Caddy → ingress → gateway → auth-service via gRPC)
+1. **Client Authentication**: Clients obtain JWTs via `/api/auth/login` (Caddy → ingress → gateway → Envoy → auth-service via gRPC)
 2. **API Gateway Processing**:
    - Strips inbound `x-user-*` headers
    - Verifies JWT and checks Redis for revoked JTI

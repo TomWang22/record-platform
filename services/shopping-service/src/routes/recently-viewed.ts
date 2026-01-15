@@ -1,7 +1,7 @@
 import { Router, type Response, type Router as ExpressRouter } from 'express'
 import type Redis from 'ioredis'
 import type { AuthedRequest } from '../lib/auth.js'
-import { pool } from '../lib/db.js'
+import { pool, withRetry } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
 
 export default function recentlyViewedRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
@@ -34,7 +34,11 @@ export default function recentlyViewedRouter(redis: Redis | null, cacheManager: 
       query += ` ORDER BY viewed_at DESC LIMIT $${paramIndex}`
       params.push(limit)
 
-      const result = await pool.query(query, params)
+      const result = await withRetry(
+        () => pool.query(query, params),
+        3,
+        'get recently viewed'
+      )
 
       res.json({ items: result.rows })
     } catch (err) {
@@ -58,12 +62,16 @@ export default function recentlyViewedRouter(redis: Redis | null, cacheManager: 
 
     try {
       // Upsert (update viewed_at if exists, insert if not)
-      await pool.query(
-        `INSERT INTO shopping.recently_viewed (user_id, item_type, item_id, metadata)
-         VALUES ($1, $2, $3, $4::jsonb)
-         ON CONFLICT (user_id, item_type, item_id)
-         DO UPDATE SET viewed_at = now(), metadata = $4::jsonb`,
-        [userId, item_type, item_id, metadata ? JSON.stringify(metadata) : null]
+      await withRetry(
+        () => pool.query(
+          `INSERT INTO shopping.recently_viewed (user_id, item_type, item_id, metadata)
+           VALUES ($1, $2, $3, $4::jsonb)
+           ON CONFLICT (user_id, item_type, item_id)
+           DO UPDATE SET viewed_at = now(), metadata = $4::jsonb`,
+          [userId, item_type, item_id, metadata ? JSON.stringify(metadata) : null]
+        ),
+        3,
+        'add recently viewed'
       )
 
       // Update LRU cache

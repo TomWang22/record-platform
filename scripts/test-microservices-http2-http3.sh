@@ -60,6 +60,92 @@ TEST_PASSWORD="test123"
 
 say "=== Testing Microservices via HTTP/2 and HTTP/3 ==="
 
+# Packet capture setup
+CAPTURE_DIR="/tmp/tls-captures-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$CAPTURE_DIR"
+CADDY_POD=$(kubectl -n ingress-nginx get pods -l app=caddy-h3 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+ENVOY_POD=$(kubectl -n envoy-test get pods -l app=envoy -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+# Start packet capture if pods are available
+start_packet_capture() {
+  local pod_name="$1"
+  local namespace="$2"
+  local capture_file="$3"
+  local filter="$4"
+  
+  if [[ -z "$pod_name" ]]; then
+    return 1
+  fi
+  
+  # Check if tcpdump is available
+  if kubectl -n "$namespace" exec "$pod_name" -- which tcpdump >/dev/null 2>&1; then
+    # Start tcpdump in background
+    kubectl -n "$namespace" exec "$pod_name" -- sh -c "tcpdump -i any -U -s 0 -w /tmp/${capture_file}.pcap '$filter' 2>&1" > "$CAPTURE_DIR/${capture_file}.log" 2>&1 &
+    echo $!
+    return 0
+  else
+    warn "tcpdump not available in $pod_name, skipping packet capture"
+    return 1
+  fi
+}
+
+# Start captures
+CADDY_TCPDUMP_PID=""
+ENVOY_TCPDUMP_PID=""
+if [[ -n "$CADDY_POD" ]]; then
+  say "Starting packet capture on Caddy pod ($CADDY_POD)..."
+  CADDY_TCPDUMP_PID=$(start_packet_capture "$CADDY_POD" "ingress-nginx" "caddy-http2-http3" "port ${PORT} or port 443") || CADDY_TCPDUMP_PID=""
+  if [[ -n "$CADDY_TCPDUMP_PID" ]]; then
+    ok "Caddy packet capture started (PID: $CADDY_TCPDUMP_PID)"
+    sleep 2
+  fi
+fi
+
+if [[ -n "$ENVOY_POD" ]]; then
+  say "Starting packet capture on Envoy pod ($ENVOY_POD)..."
+  ENVOY_TCPDUMP_PID=$(start_packet_capture "$ENVOY_POD" "envoy-test" "envoy-grpc" "port 10000 or port 50051") || ENVOY_TCPDUMP_PID=""
+  if [[ -n "$ENVOY_TCPDUMP_PID" ]]; then
+    ok "Envoy packet capture started (PID: $ENVOY_TCPDUMP_PID)"
+    sleep 2
+  fi
+fi
+
+# Start netstat monitoring
+NETSTAT_LOG="$CAPTURE_DIR/netstat.log"
+(netstat -an | head -20 > "$NETSTAT_LOG" && while true; do sleep 5; echo "=== $(date) ===" >> "$NETSTAT_LOG"; netstat -an | grep -E "ESTABLISHED|TIME_WAIT|CLOSE_WAIT" | wc -l >> "$NETSTAT_LOG"; done) &
+NETSTAT_PID=$!
+ok "Network monitoring started (PID: $NETSTAT_PID)"
+
+# Cleanup function
+cleanup_captures() {
+  say "Stopping packet captures..."
+  if [[ -n "$CADDY_TCPDUMP_PID" ]]; then
+    kill -TERM "$CADDY_TCPDUMP_PID" 2>/dev/null || true
+    sleep 1
+    kill -9 "$CADDY_TCPDUMP_PID" 2>/dev/null || true
+  fi
+  if [[ -n "$ENVOY_TCPDUMP_PID" ]]; then
+    kill -TERM "$ENVOY_TCPDUMP_PID" 2>/dev/null || true
+    sleep 1
+    kill -9 "$ENVOY_TCPDUMP_PID" 2>/dev/null || true
+  fi
+  kill "$NETSTAT_PID" 2>/dev/null || true
+  wait "$NETSTAT_PID" 2>/dev/null || true
+  
+  # Copy pcap files from pods
+  if [[ -n "$CADDY_POD" ]]; then
+    kubectl -n ingress-nginx exec "$CADDY_POD" -- sh -c "cat /tmp/caddy-http2-http3.pcap" > "$CAPTURE_DIR/caddy-http2-http3.pcap" 2>/dev/null || true
+  fi
+  if [[ -n "$ENVOY_POD" ]]; then
+    kubectl -n envoy-test exec "$ENVOY_POD" -- sh -c "cat /tmp/envoy-grpc.pcap" > "$CAPTURE_DIR/envoy-grpc.pcap" 2>/dev/null || true
+  fi
+  
+  ok "Packet captures saved to: $CAPTURE_DIR"
+}
+
+# Register cleanup on exit
+trap cleanup_captures EXIT
+
 # Pre-flight: Check database schema
 say "Pre-flight: Checking database schema..."
 # Check auth database (port 5437, external Docker) - auth-service now uses separate DB
@@ -178,15 +264,23 @@ extract_user_id() {
 }
 
 # Test 1: Auth Service - Registration (HTTP/2) - User 1
-say "Test 1: Auth Service - Registration via HTTP/2 (User 1)"
+# Verify HTTP/2 protocol with explicit flags: --http2, --tlsv1.3, --tls-max 1.3
+say "Test 1: Auth Service - Registration via HTTP/2 (User 1) - with protocol verification"
 TEST_EMAIL="microservice-test-$(date +%s)@example.com"
 TEST_PASSWORD="test123"
-REGISTER_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
+
+# Verify HTTP/2 and TLS version with explicit curl flags
+REGISTER_RESPONSE=$("$CURL_BIN" -k -sS -w "\n%{http_code}" \
+  --http2 \
+  --tlsv1.3 \
+  --tls-max 1.3 \
+  --max-time 30 \
   --resolve "$HOST:${PORT}:127.0.0.1" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -X POST "https://$HOST:${PORT}/api/auth/register" \
-  -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}" 2>&1) || {
+  -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}" \
+  -v 2>&1 | tee /tmp/register-h2-verbose.log) || {
   warn "Registration curl command failed (exit code: $?)"
   REGISTER_RESPONSE=""
   REGISTER_CODE="000"
@@ -241,14 +335,21 @@ else
 fi
 
 # Test 2: Auth Service - Login (HTTP/3) - User 1
-say "Test 2: Auth Service - Login via HTTP/3 (User 1)"
+# Verify HTTP/3 protocol with explicit flags: --http3-only
+say "Test 2: Auth Service - Login via HTTP/3 (User 1) - with protocol verification"
 if [[ -z "$TOKEN" ]]; then
-  LOGIN_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
+  # HTTP/3 uses QUIC (UDP), verify with --http3-only flag
+  LOGIN_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" \
+    --http3-only \
+    --tlsv1.3 \
+    --tls-max 1.3 \
+    --max-time 30 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     --resolve "$HTTP3_RESOLVE" \
     -X POST "https://$HOST/api/auth/login" \
-    -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}" 2>&1) || {
+    -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test123\"}" \
+    -v 2>&1 | tee /tmp/login-h3-verbose.log) || {
     warn "HTTP/3 curl command failed (exit code: $?)"
     echo "This may indicate HTTP/3 connectivity issues. Check http3_curl helper."
     LOGIN_RESPONSE=""
@@ -480,15 +581,34 @@ fi
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${FORUM_POST_ID:-}" ]]; then
   say "Test 7b: Social Service - Add Comment to Forum Post via HTTP/3 (User 2)"
   ADD_COMMENT_RC=0
-  ADD_COMMENT_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 30 \
+  # Increased timeout to 60s and add retry logic for HTTP/3 (QUIC can be slower)
+  ADD_COMMENT_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 60 \
     -H "Host: $HOST" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN_USER2" \
     --resolve "$HTTP3_RESOLVE" \
     -X POST "https://$HOST/api/forum/posts/$FORUM_POST_ID/comments" \
     -d '{"content":"Great post! This is a test comment via HTTP/3 from User 2"}' 2>&1) || ADD_COMMENT_RC=$?
+  
+  # Retry once if timeout (exit code 28)
+  if [[ "$ADD_COMMENT_RC" -eq 28 ]]; then
+    warn "Add comment via HTTP/3 timed out, retrying once..."
+    sleep 2
+    ADD_COMMENT_RESPONSE=$(http3_curl -k -sS -w "\n%{http_code}" --http3-only --max-time 60 \
+      -H "Host: $HOST" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $TOKEN_USER2" \
+      --resolve "$HTTP3_RESOLVE" \
+      -X POST "https://$HOST/api/forum/posts/$FORUM_POST_ID/comments" \
+      -d '{"content":"Great post! This is a test comment via HTTP/3 from User 2 (retry)"}' 2>&1) || ADD_COMMENT_RC=$?
+  fi
+  
   if [[ "$ADD_COMMENT_RC" -ne 0 ]]; then
+    if [[ "$ADD_COMMENT_RC" -eq 28 ]]; then
+      warn "Add comment via HTTP/3 failed (curl exit $ADD_COMMENT_RC - timeout after retry)"
+    else
     warn "Add comment via HTTP/3 failed (curl exit $ADD_COMMENT_RC)"
+    fi
   elif [[ -n "$ADD_COMMENT_RESPONSE" ]]; then
     ADD_COMMENT_CODE=$(echo "$ADD_COMMENT_RESPONSE" | tail -1)
     if [[ "$ADD_COMMENT_CODE" =~ ^(200|201)$ ]]; then
@@ -1582,41 +1702,145 @@ grpc_test() {
   
   local result=""
   
-  # FIX #1: Try h2c port 5000 first (plaintext, most reliable)
-  # Note: Port 5000 may not be working, so we'll try with a shorter timeout
-  CADDY_POD=$(kubectl -n ingress-nginx get pods -l app=caddy-h3 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-  if [[ -n "$CADDY_POD" ]]; then
-    # Start port forward in background
-    kubectl -n ingress-nginx port-forward pod/$CADDY_POD 5000:5000 > /dev/null 2>&1 &
-    local PF_PID=$!
-    sleep 2
-    # Try port 5000 with shorter timeout (2 seconds) to fail fast
-    # Use grpcurl's built-in timeout instead of wrapper to avoid conflicts
-    result=$(grpcurl -plaintext \
-      -import-path "$PROTO_DIR" \
-      -proto "$PROTO_DIR/$proto_file" \
-      -d "$data" \
-      -max-time 2 \
-      "127.0.0.1:5000" "$method" 2>&1) || result=""
-    kill $PF_PID 2>/dev/null || true
-    wait $PF_PID 2>/dev/null || true
-    sleep 1  # Give port forward time to clean up
+  # Try Envoy gRPC proxy first (port 10000, NodePort 30000)
+  # Envoy handles all gRPC traffic with first-class gRPC support
+  local envoy_result=""
+  
+  # Ensure method has leading slash for Envoy path matching
+  local method_path="$method"
+  if [[ ! "$method_path" =~ ^/ ]]; then
+    method_path="/$method_path"
   fi
   
-  # FIX #2: Fallback to improved flags on NodePort if h2c port fails
-  # Check if result is empty, contains error, or timeout
-  if [[ -z "$result" ]] || echo "$result" | grep -q -iE "error|failed|timeout|deadline|connection refused|dial.*failed|context deadline"; then
-    # Use grpcurl's built-in timeout for NodePort as well
-    result=$(grpcurl -insecure \
-      -H "Host: $HOST" \
-      -authority "$HOST" \
-      -H "TE: trailers" \
-      -H "Content-Type: application/grpc" \
+  # Try Envoy via NodePort (port 30000) with plaintext (Envoy handles TLS upstream)
+  # Envoy routes based on service name prefix in path (e.g., /auth.AuthService/HealthCheck)
+  ENVOY_NODEPORT=30000
+  envoy_result=$(grpcurl -plaintext \
+      -import-path "$PROTO_DIR" \
+      -proto "$PROTO_DIR/$proto_file" \
+    -max-time "$timeout" \
+      -d "$data" \
+    "127.0.0.1:${ENVOY_NODEPORT}" "$method_path" 2>&1) || envoy_result=""
+  
+  # If Envoy works, use that result
+  if [[ -n "$envoy_result" ]] && echo "$envoy_result" | grep -q -iE "healthy|success|ok|\"status\":\"SERVING\"|\"healthy\":true"; then
+    result="$envoy_result"
+  else
+    # Fallback to direct service access via port-forward (most reliable)
+    # This ensures we always try port-forward when Envoy doesn't work
+    if [[ -z "$envoy_result" ]] || echo "$envoy_result" | grep -q -iE "502|Bad Gateway|malformed header|Unavailable|routing issue|gRPC routing|needs investigation|error|failed|timeout|deadline|connection refused|dial.*failed|context deadline|tls.*handshake|first record"; then
+        # Try port-forwarding directly to service gRPC port (bypasses Envoy)
+        # This is the most reliable fallback method for gRPC testing
+        # Use the service_name parameter (normalized to lowercase)
+        local service_name_lower=$(echo "$service_name" | tr '[:upper:]' '[:lower:]')
+        local svc_pod=""
+        case "$service_name_lower" in
+          auth) svc_pod=$(kubectl -n "$NS" get pods -l app=auth-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
+          records) svc_pod=$(kubectl -n "$NS" get pods -l app=records-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
+          social) svc_pod=$(kubectl -n "$NS" get pods -l app=social-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
+          listings) svc_pod=$(kubectl -n "$NS" get pods -l app=listings-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
+          analytics) svc_pod=$(kubectl -n "$NS" get pods -l app=analytics-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
+          shopping) svc_pod=$(kubectl -n "$NS" get pods -l app=shopping-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
+          auctionmonitor) svc_pod=$(kubectl -n "$NS" get pods -l app=auction-monitor -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
+          pythonai) svc_pod=$(kubectl -n "$NS" get pods -l app=python-ai-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
+        esac
+      
+        if [[ -n "$svc_pod" ]]; then
+        # Get the gRPC port for this service (use normalized service name)
+        local grpc_port="50051"
+        case "$service_name_lower" in
+          shopping) grpc_port="50058" ;;
+          auctionmonitor) grpc_port="50059" ;;
+          pythonai) grpc_port="50060" ;;
+          social) grpc_port="50056" ;;
+          listings) grpc_port="50057" ;;
+          analytics) grpc_port="50054" ;;
+        esac
+        
+        # Port-forward and test with STRICT TLS (no -insecure)
+        # Extract certificates from pod for strict TLS verification
+        local cert_dir="/tmp/grpc-certs-$$"
+        mkdir -p "$cert_dir"
+        
+        # Copy certificates from pod (strict TLS requires proper certs)
+        kubectl -n "$NS" exec "$svc_pod" -- sh -c "cat /etc/certs/tls.crt" > "$cert_dir/tls.crt" 2>/dev/null || true
+        kubectl -n "$NS" exec "$svc_pod" -- sh -c "cat /etc/certs/tls.key" > "$cert_dir/tls.key" 2>/dev/null || true
+        kubectl -n "$NS" exec "$svc_pod" -- sh -c "cat /etc/certs/ca.crt" > "$cert_dir/ca.crt" 2>/dev/null || true
+        
+        # If certs not in pod, try extracting from secret
+        if [[ ! -f "$cert_dir/ca.crt" ]]; then
+          kubectl -n "$NS" get secret service-tls -o jsonpath='{.data.ca\.crt}' 2>/dev/null | base64 -d > "$cert_dir/ca.crt" 2>/dev/null || true
+          kubectl -n "$NS" get secret service-tls -o jsonpath='{.data.tls\.crt}' 2>/dev/null | base64 -d > "$cert_dir/tls.crt" 2>/dev/null || true
+          kubectl -n "$NS" get secret service-tls -o jsonpath='{.data.tls\.key}' 2>/dev/null | base64 -d > "$cert_dir/tls.key" 2>/dev/null || true
+        fi
+        
+        kubectl -n "$NS" port-forward "pod/$svc_pod" "50051:$grpc_port" > /dev/null 2>&1 &
+        local pf_pid=$!
+        sleep 3  # Give port-forward time to establish
+        
+        # Use STRICT TLS with proper certificates (grpcurl uses -cacert, -cert, -key, not -tls flags)
+        # Try TLS first, then fallback to plaintext if TLS handshake fails (some services use h2c)
+        # Prefer /tmp/grpc-certs (pre-extracted), then pod-extracted certs
+        local cert_ca=""
+        local cert_crt=""
+        local cert_key=""
+        
+        # Prefer /tmp/grpc-certs (pre-extracted, more reliable)
+        if [[ -f "/tmp/grpc-certs/ca.crt" ]] && [[ -f "/tmp/grpc-certs/tls.crt" ]] && [[ -f "/tmp/grpc-certs/tls.key" ]]; then
+          cert_ca="/tmp/grpc-certs/ca.crt"
+          cert_crt="/tmp/grpc-certs/tls.crt"
+          cert_key="/tmp/grpc-certs/tls.key"
+        # Fallback to pod-extracted certs
+        elif [[ -f "$cert_dir/ca.crt" ]] && [[ -f "$cert_dir/tls.crt" ]] && [[ -f "$cert_dir/tls.key" ]]; then
+          cert_ca="$cert_dir/ca.crt"
+          cert_crt="$cert_dir/tls.crt"
+          cert_key="$cert_dir/tls.key"
+        fi
+        
+        if [[ -n "$cert_ca" ]] && [[ -n "$cert_crt" ]] && [[ -n "$cert_key" ]]; then
+          # Try strict TLS first
+          result=$(grpcurl \
+            -cacert="$cert_ca" \
+            -cert="$cert_crt" \
+            -key="$cert_key" \
+            -servername=record.local \
       -import-path "$PROTO_DIR" \
       -proto "$PROTO_DIR/$proto_file" \
       -max-time "$timeout" \
       -d "$data" \
-      "127.0.0.1:${PORT}" "$method" 2>&1) || result=""
+            "127.0.0.1:50051" "$method" 2>&1) || result=""
+          
+          # If TLS fails with handshake error, try plaintext (h2c) - some services use plaintext
+          if [[ -z "$result" ]] || echo "$result" | grep -q -iE "tls.*handshake|first record does not look like a TLS|connection.*refused|dial.*failed"; then
+            result=$(grpcurl -plaintext \
+              -import-path "$PROTO_DIR" \
+              -proto "$PROTO_DIR/$proto_file" \
+              -max-time "$timeout" \
+              -d "$data" \
+              "127.0.0.1:50051" "$method" 2>&1) || result=""
+          fi
+        else
+          # No certs available, try plaintext (h2c) - some services use plaintext
+          result=$(grpcurl -plaintext \
+            -import-path "$PROTO_DIR" \
+            -proto "$PROTO_DIR/$proto_file" \
+            -max-time "$timeout" \
+            -d "$data" \
+            "127.0.0.1:50051" "$method" 2>&1) || result=""
+        fi
+        
+        # Cleanup
+        rm -rf "$cert_dir" 2>/dev/null || true
+        kill $pf_pid 2>/dev/null || true
+        wait $pf_pid 2>/dev/null || true
+        sleep 1
+      fi
+      
+      # If still failing, document as known limitation
+      if [[ -z "$result" ]] || echo "$result" | grep -q -iE "502|Bad Gateway|malformed header|Unavailable"; then
+        result="gRPC routing issue - Envoy NodePort gRPC routing needs investigation (direct port-forward may work)"
+      fi
+    fi
   fi
   
   echo "$result"

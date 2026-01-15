@@ -16,11 +16,13 @@ function buildCredentials() {
   const clientKeyPath = process.env.GRPC_CLIENT_KEY || process.env.TLS_KEY_PATH || "/etc/certs/tls.key";
   const serverName = process.env.GRPC_SERVER_NAME || process.env.TLS_SERVER_NAME || "record.local";
   
+  // STRICT TLS: Always require certificates, no insecure fallback
   // For strict TLS with client certificate verification
   if (fs.existsSync(caPath) && fs.existsSync(clientCertPath) && fs.existsSync(clientKeyPath)) {
     const rootCert = fs.readFileSync(caPath);
     const clientCert = fs.readFileSync(clientCertPath);
     const clientKey = fs.readFileSync(clientKeyPath);
+    console.log(`[grpc-client] Using STRICT TLS with client certificates: CA=${caPath}, Cert=${clientCertPath}, Key=${clientKeyPath}`);
     // Create credentials with server name override to match certificate
     const credentials = grpc.credentials.createSsl(rootCert, clientKey, clientCert);
     // Note: @grpc/grpc-js doesn't support server name override directly in createSsl
@@ -28,17 +30,17 @@ function buildCredentials() {
     return credentials;
   }
   
-  // Fallback: CA cert only (no client cert verification)
+  // Fallback: CA cert only (no client cert verification) - still STRICT TLS
   if (fs.existsSync(caPath)) {
     const rootCert = fs.readFileSync(caPath);
+    console.log(`[grpc-client] Using STRICT TLS with CA certificate only: ${caPath}`);
     return grpc.credentials.createSsl(rootCert);
   }
 
-  if (process.env.NODE_ENV === "production") {
-    return grpc.credentials.createSsl();
-  }
-
-  return grpc.credentials.createInsecure();
+  // STRICT TLS ENFORCEMENT: Never use insecure, throw error if certs not found
+  const errorMsg = `[grpc-client] STRICT TLS REQUIRED: Certificates not found. CA: ${caPath}, Cert: ${clientCertPath}, Key: ${clientKeyPath}. Cannot create insecure connection.`;
+  console.error(errorMsg);
+  throw new Error(errorMsg);
 }
 
 // Load auth proto
@@ -169,38 +171,163 @@ export function createPythonAIClient(address: string = "python-ai-service:50060"
   return createClientWithOptions(PythonAIService, address, buildCredentials());
 }
 
-// Helper to promisify gRPC calls with timeout
-export function promisifyGrpcCall<T>(
+// Helper to promisify gRPC calls with timeout, retry logic, and detailed logging
+export async function promisifyGrpcCall<T>(
   client: any,
   method: string,
   request: any,
-  timeoutMs: number = 10000 // Default 10 second timeout
+  timeoutMs: number = 10000, // Default 10 second timeout
+  maxRetries: number = 3,    // Maximum retry attempts
+  retryDelayMs: number = 1000 // Initial retry delay (exponential backoff)
 ): Promise<T> {
-  return new Promise((resolve, reject) => {
-    let completed = false;
-    const timeout = setTimeout(() => {
-      if (!completed) {
-        completed = true;
-        reject(new Error(`gRPC call ${method} timed out after ${timeoutMs}ms`));
-      }
-    }, timeoutMs);
+  const serviceName = client?.constructor?.name || "UnknownService";
+  const callId = `${serviceName}.${method}.${Date.now()}.${Math.random().toString(36).substr(2, 9)}`;
+  
+  const attemptCall = (attempt: number): Promise<T> => {
+    return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      console.log(`[grpc-client] ${callId} Attempt ${attempt}/${maxRetries} - Calling ${serviceName}.${method}`, {
+        service: serviceName,
+        method,
+        attempt,
+        maxRetries,
+        timeoutMs,
+        requestKeys: Object.keys(request || {}),
+      });
 
-    try {
-      client[method](request, (error: any, response: T) => {
+      let completed = false;
+      const timeout = setTimeout(() => {
+        if (!completed) {
+          completed = true;
+          const duration = Date.now() - startTime;
+          console.error(`[grpc-client] ${callId} TIMEOUT after ${duration}ms (attempt ${attempt}/${maxRetries})`, {
+            service: serviceName,
+            method,
+            attempt,
+            timeoutMs,
+            duration,
+          });
+          reject(new Error(`gRPC call ${method} timed out after ${timeoutMs}ms (attempt ${attempt}/${maxRetries})`));
+        }
+      }, timeoutMs);
+
+      try {
+        // Log client state before call
+        const clientState = client?.$channel?.getConnectivityState?.() || "unknown";
+        console.log(`[grpc-client] ${callId} Client state before call: ${clientState}`, {
+          service: serviceName,
+          method,
+          clientState,
+        });
+
+        client[method](request, (error: any, response: T) => {
+          if (completed) return;
+          completed = true;
+          clearTimeout(timeout);
+          const duration = Date.now() - startTime;
+
+          if (error) {
+            const errorCode = error?.code || "UNKNOWN";
+            const errorMessage = error?.message || String(error);
+            const errorDetails = error?.details || "";
+            
+            console.error(`[grpc-client] ${callId} ERROR (attempt ${attempt}/${maxRetries})`, {
+              service: serviceName,
+              method,
+              attempt,
+              errorCode,
+              errorMessage,
+              errorDetails,
+              duration,
+              stack: error?.stack,
+              // Check for connection-related errors
+              isConnectionError: errorCode === "UNAVAILABLE" || 
+                                errorCode === "DEADLINE_EXCEEDED" ||
+                                errorMessage.includes("ECONNREFUSED") ||
+                                errorMessage.includes("No connection established") ||
+                                errorMessage.includes("connect") ||
+                                errorMessage.includes("Connection"),
+            });
+            reject(error);
+          } else {
+            console.log(`[grpc-client] ${callId} SUCCESS (attempt ${attempt}/${maxRetries})`, {
+              service: serviceName,
+              method,
+              attempt,
+              duration,
+              responseKeys: response ? Object.keys(response as any) : [],
+            });
+            resolve(response);
+          }
+        });
+      } catch (err: any) {
         if (completed) return;
         completed = true;
         clearTimeout(timeout);
-        if (error) {
-          reject(error);
-        } else {
-          resolve(response);
-        }
+        const duration = Date.now() - startTime;
+        console.error(`[grpc-client] ${callId} EXCEPTION (attempt ${attempt}/${maxRetries})`, {
+          service: serviceName,
+          method,
+          attempt,
+          error: err?.message || String(err),
+          duration,
+          stack: err?.stack,
+        });
+        reject(err);
+      }
+    });
+  };
+
+  // Retry logic with exponential backoff
+  let lastError: any = null;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await attemptCall(attempt);
+    } catch (error: any) {
+      lastError = error;
+      const errorCode = error?.code || "UNKNOWN";
+      const errorMessage = error?.message || String(error);
+      
+      // Check if error is retryable
+      const isRetryable = 
+        errorCode === "UNAVAILABLE" ||
+        errorCode === "DEADLINE_EXCEEDED" ||
+        errorCode === "RESOURCE_EXHAUSTED" ||
+        errorMessage.includes("ECONNREFUSED") ||
+        errorMessage.includes("No connection established") ||
+        errorMessage.includes("connect") ||
+        errorMessage.includes("Connection") ||
+        errorMessage.includes("timeout");
+
+      if (!isRetryable || attempt >= maxRetries) {
+        console.error(`[grpc-client] ${callId} NOT RETRYING`, {
+          service: serviceName,
+          method,
+          attempt,
+          maxRetries,
+          reason: !isRetryable ? "error not retryable" : "max retries reached",
+          errorCode,
+          errorMessage,
+        });
+        throw error;
+      }
+
+      // Calculate exponential backoff delay
+      const delay = retryDelayMs * Math.pow(2, attempt - 1);
+      console.warn(`[grpc-client] ${callId} RETRYING after ${delay}ms`, {
+        service: serviceName,
+        method,
+        attempt,
+        nextAttempt: attempt + 1,
+        maxRetries,
+        delay,
+        errorCode,
+        errorMessage,
       });
-    } catch (err) {
-      if (completed) return;
-      completed = true;
-      clearTimeout(timeout);
-      reject(err);
+
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-  });
+  }
+
+  throw lastError || new Error(`gRPC call ${method} failed after ${maxRetries} attempts`);
 }

@@ -21,6 +21,12 @@ service PythonAIService {
   // Chatbot interface
   rpc Chat(ChatRequest) returns (ChatResponse);
   
+  // Platform-wide intelligence (analytics engine piped to Python AI)
+  // Used by auction-monitor, shopping, listings, social services
+  rpc AuctionHeat(AuctionHeatRequest) returns (AuctionHeatResponse);
+  rpc SellerBuyerInsight(SellerBuyerInsightRequest) returns (SellerBuyerInsightResponse);
+  rpc SocialNegotiationInsight(SocialNegotiationInsightRequest) returns (SocialNegotiationInsightResponse);
+  
   // Health check
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
@@ -110,6 +116,61 @@ message ChatResponse {
   string response = 2;
   map<string, string> analytics_context = 3;
   int64 timestamp = 4;
+}
+
+// Platform-wide intelligence messages
+
+// Auction monitor: read the "heat" of an auction (bidding activity, sentiment, urgency)
+message AuctionHeatRequest {
+  string auction_id = 1;
+  string listing_id = 2;
+  int32 bid_count = 3;
+  double current_bid = 4;
+  double reserve_price = 5;
+  int64 ends_at_unix = 6;
+  repeated string recent_bidder_ids = 7;
+}
+
+message AuctionHeatResponse {
+  double heat_score = 1;      // 0–1, higher = more active
+  string sentiment = 2;       // e.g. "high_urgency", "lukewarm", "cold"
+  string recommendation = 3;  // AI-generated suggestion for seller/buyer
+  int32 t_ms = 4;
+}
+
+// Shopping/listings: seller and buyer intelligence (pricing, demand, negotiation)
+message SellerBuyerInsightRequest {
+  string service = 1;         // "shopping" | "listings"
+  string user_id = 2;
+  string role = 3;            // "seller" | "buyer"
+  string listing_id = 4;
+  double asking_price = 5;
+  double offer_price = 6;     // for buyers
+  string query = 7;
+}
+
+message SellerBuyerInsightResponse {
+  double suggested_price = 1;
+  string demand_level = 2;    // e.g. "high", "medium", "low"
+  string recommendation = 3;
+  map<string, string> context = 4;
+  int32 t_ms = 5;
+}
+
+// Social: negotiation, planning, psychology (read psychology, help plan)
+message SocialNegotiationInsightRequest {
+  string user_id = 1;
+  string thread_id = 2;
+  repeated string message_preview = 3;  // recent messages for context
+  string intent = 4;                    // "negotiation", "planning", "general"
+}
+
+message SocialNegotiationInsightResponse {
+  string sentiment_analysis = 1;
+  string negotiation_tips = 2;
+  string planning_suggestion = 3;
+  map<string, string> psychology_notes = 4;
+  int32 t_ms = 5;
 }
 
 // Health check

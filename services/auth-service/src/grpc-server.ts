@@ -351,8 +351,16 @@ const authService = {
 
       console.log(`[gRPC] User ${user.email} (${user.id}) - mfaEnabled: ${user.mfaEnabled} (type: ${typeof user.mfaEnabled})`);
 
-      // Use queued bcrypt compare (faster than hash, but still use the optimized function)
-      const ok = await comparePassword(password, user.passwordHash);
+      // Use queued bcrypt compare. Catch throws (e.g. corrupt hash from stale cache) so we return UNAUTHENTICATED, not INTERNAL.
+      let ok = false;
+      try {
+        ok = await comparePassword(password, user.passwordHash);
+      } catch {
+        return callback({
+          code: grpc.status.UNAUTHENTICATED,
+          message: "invalid credentials",
+        });
+      }
       if (!ok) {
         return callback({
           code: grpc.status.UNAUTHENTICATED,
@@ -419,6 +427,15 @@ const authService = {
       callback(null, response);
     } catch (error: any) {
       console.error("[gRPC] Authenticate error:", error);
+      // Return UNAUTHENTICATED for credential/not-found so gateway returns 401, not 500
+      const msg = (error?.message ?? String(error)).toLowerCase();
+      const code = error?.code ?? "";
+      if (code === "P2025" || msg.includes("not found") || msg.includes("record not found") || msg.includes("invalid") || msg.includes("credential")) {
+        return callback({
+          code: grpc.status.UNAUTHENTICATED,
+          message: "invalid credentials",
+        });
+      }
       callback({
         code: grpc.status.INTERNAL,
         message: error.message || "internal error",

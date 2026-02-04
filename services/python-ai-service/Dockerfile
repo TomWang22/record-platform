@@ -21,10 +21,16 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt \
  && apt-get install -y --no-install-recommends build-essential curl wget ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
  && echo "Installing AMD64 grpc-health-probe (Kind clusters use amd64 even on ARM Macs)" \
- && (curl -L --fail --silent --show-error -o /usr/local/bin/grpc-health-probe "https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.24/grpc-health-probe-linux-amd64" 2>/dev/null || \
-     wget --no-check-certificate -qO/usr/local/bin/grpc-health-probe "https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.24/grpc-health-probe-linux-amd64" 2>/dev/null || \
-     echo "Warning: Failed to download grpc-health-probe, will continue without it") \
- && (test -f /usr/local/bin/grpc-health-probe && chmod +x /usr/local/bin/grpc-health-probe && echo "grpc-health-probe installed (amd64 for Kind cluster compatibility)" || echo "grpc-health-probe not installed (non-critical)")
+ && GRPC_HEALTH_PROBE_VERSION=v0.4.24 \
+ && curl -Lf -o /tmp/grpc-health-probe \
+    "https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-amd64" \
+ && chmod +x /tmp/grpc-health-probe \
+ && /tmp/grpc-health-probe -version >/dev/null 2>&1 || (echo "ERROR: grpc-health-probe binary is corrupted or invalid" && exit 1) \
+ && mv /tmp/grpc-health-probe /usr/local/bin/grpc-health-probe \
+ && echo "Verifying installed binary..." \
+ && /usr/local/bin/grpc-health-probe -version >/dev/null 2>&1 \
+ && ls -lh /usr/local/bin/grpc-health-probe \
+ && echo "✅ grpc-health-probe installed and verified successfully"
 
 # Install Python dependencies with pip cache mount (persists between builds)
 RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \

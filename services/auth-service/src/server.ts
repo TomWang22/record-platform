@@ -21,9 +21,10 @@ const app = express();
 type WithJti = TokenPayload & { jti?: string; exp?: number };
 
 // --- Redis (revocation list) ---
-// Support both REDIS_URL (with password) and REDIS_PASSWORD env var
+// Support both REDIS_URL (with password) and REDIS_PASSWORD env var. Empty = no auth (externalized Redis).
 let REDIS_URL = process.env.REDIS_URL || "redis://redis:6379/0";
-const REDIS_PASSWORD = process.env.REDIS_PASSWORD;
+const rawRedisPassword = process.env.REDIS_PASSWORD;
+const REDIS_PASSWORD = rawRedisPassword && String(rawRedisPassword).trim() ? rawRedisPassword : undefined;
 // If REDIS_PASSWORD is set and URL doesn't have password, add it
 if (REDIS_PASSWORD && !REDIS_URL.includes('@') && !REDIS_URL.includes('://:')) {
   // Insert password after redis://
@@ -258,10 +259,18 @@ app.post("/login", async (req: Request, res: Response) => {
     } else {
       console.log(`[LOGIN] User not found for email: ${email}`);
     }
-    if (!user || !user.passwordHash) return res.status(401).json({ error: "invalid credentials" });
+    if (!user || !user.passwordHash) {
+      // User doesn't exist or has no password - return 401 (not 500)
+      return res.status(401).json({ error: "invalid credentials" });
+    }
 
-    // Use queued bcrypt compare (faster than hash, but still use the optimized function)
-    const ok = await comparePassword(password, user.passwordHash);
+    // Use queued bcrypt compare (faster than hash). Catch throws (e.g. corrupt hash) so we return 401, not 500.
+    let ok = false;
+    try {
+      ok = await comparePassword(password, user.passwordHash);
+    } catch (_) {
+      return res.status(401).json({ error: "invalid credentials" });
+    }
     if (!ok) return res.status(401).json({ error: "invalid credentials" });
 
     // Check if MFA is enabled - use explicit boolean check
@@ -295,6 +304,12 @@ app.post("/login", async (req: Request, res: Response) => {
     res.json({ token });
   } catch (e: any) {
     console.error("login error:", e);
+    // Return 401 for credential/not-found errors so we never leak 500 for auth failures (e.g. deleted user, DB blip)
+    const msg = (e?.message ?? String(e)).toLowerCase();
+    const code = e?.code ?? "";
+    if (code === "P2025" || msg.includes("not found") || msg.includes("record not found") || msg.includes("invalid") || msg.includes("credential")) {
+      return res.status(401).json({ error: "invalid credentials" });
+    }
     res.status(500).json({ error: "internal" });
   }
 });
@@ -463,15 +478,15 @@ app.delete("/account", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "user not found" });
     }
 
+    // Invalidate user cache BEFORE delete so concurrent login gets cache miss then DB "not found" → 401
+    if (user.email) {
+      await invalidateUserCache(user.email);
+    }
+
     // Delete user (cascade will handle related records: oauth_providers, mfa_settings, verification_codes, passkeys)
     await prisma.$executeRaw`
       DELETE FROM auth.users WHERE id = ${userId}::uuid
     `;
-
-    // Invalidate user cache
-    if (user.email) {
-      await invalidateUserCache(user.email);
-    }
 
     // Revoke all tokens for this user by setting a marker
     // Note: We can't revoke all tokens individually, but we can mark the user as deleted

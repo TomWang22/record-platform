@@ -740,20 +740,31 @@ async def startup_event():
     # Start gRPC server if enabled
     if os.getenv("ENABLE_GRPC") == "true":
         try:
+            print("[python-ai] Starting gRPC server...")
             # Import grpc_server from the same directory
             import sys
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
             from grpc_server import serve
             grpc_port = int(os.getenv("GRPC_PORT", "50060"))
+            print(f"[python-ai] gRPC server module imported, starting on port {grpc_port}")
             # Start gRPC server in background task
             async def start_grpc():
-                server = await serve(grpc_port)
-                if server:
-                    print(f"[python-ai] gRPC server started on port {grpc_port}")
-                    # Keep server running
-                    await server.wait_for_termination()
+                try:
+                    print(f"[python-ai] gRPC server startup task started")
+                    server = await serve(grpc_port)
+                    if server:
+                        print(f"[python-ai] gRPC server started on port {grpc_port}")
+                        # Keep server running
+                        await server.wait_for_termination()
+                    else:
+                        print(f"[python-ai] gRPC server returned None (proto stubs may not be loaded)")
+                except Exception as e:
+                    import traceback
+                    print(f"[python-ai] Error in gRPC server startup task: {e}")
+                    traceback.print_exc()
             # Create background task
             asyncio.create_task(start_grpc())
+            print("[python-ai] gRPC server background task created")
         except Exception as e:
             import traceback
             print(f"[python-ai] Failed to start gRPC server: {e}")

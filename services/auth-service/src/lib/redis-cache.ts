@@ -18,7 +18,8 @@ export function getRedisClient(): RedisClientType | null {
 
   try {
     let REDIS_URL = process.env.REDIS_URL || "redis://redis:6379/0";
-    const REDIS_PASSWORD = process.env.REDIS_PASSWORD;
+    const rawPassword = process.env.REDIS_PASSWORD;
+    const REDIS_PASSWORD = rawPassword && String(rawPassword).trim() ? rawPassword : undefined;
     
     if (REDIS_PASSWORD && !REDIS_URL.includes('@') && !REDIS_URL.includes('://:')) {
       REDIS_URL = REDIS_URL.replace('redis://', `redis://:${REDIS_PASSWORD}@`);

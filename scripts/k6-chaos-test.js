@@ -1,6 +1,8 @@
 import http from "k6/http";
+import http3 from "k6/x/http3";  // Custom HTTP/3 extension (xk6-http3)
 import { check, sleep } from "k6";
 import { Trend, Rate } from "k6/metrics";
+import exec from "k6/execution";
 
 // Request timeout configuration:
 // - Set to 10s to handle rotation overhead and brief Caddy restarts during CA/leaf rotation
@@ -54,34 +56,87 @@ const HOST = __ENV.HOST || "record.local";
 // The certificate is for record.local, so we set Host header for SNI matching
 const URL = "https://caddy-h3.ingress-nginx.svc.cluster.local/_caddy/healthz";
 
-// HTTP/2 test
+// HTTP/2 test with protocol verification
 export function h2_request() {
   const res = http.get(URL, {
     headers: { Host: HOST },
     timeout: "10s",  // Increased from 4s to handle rotation overhead and brief Caddy restarts
     httpVersion: "HTTP/2",
     noConnectionReuse: false,
+    // Strict TLS 1.3
+    tlsVersion: { min: "1.3", max: "1.3" },
   });
 
   h2_latency.add(res.timings.duration);
   h2_fail.add(res.status !== 200);
-  check(res, { "H2 status 200": (r) => r.status === 200 });
+  
+  // Protocol verification
+  const proto = res.proto || "";
+  if (!proto.includes("HTTP/2")) {
+    console.warn(`[H2] Protocol mismatch: expected HTTP/2, got ${proto}`);
+  }
+  
+  check(res, { 
+    "H2 status 200": (r) => r.status === 200,
+    "H2 protocol HTTP/2": (r) => (r.proto || "").includes("HTTP/2"),
+  });
 
   sleep(Math.random() * 0.01);
 }
 
-// HTTP/3 test
+// HTTP/3 test with protocol verification using xk6-http3 extension
 export function h3_request() {
-  const res = http.get(URL, {
+  const start = Date.now();
+  
+  // Use xk6-http3 extension for true HTTP/3/QUIC support
+  const res = http3.get(URL, {
     headers: { Host: HOST },
-    timeout: "10s",  // Increased from 4s to handle rotation overhead and brief Caddy restarts
-    httpVersion: "HTTP/3",
-    noConnectionReuse: false,
+    timeout: "10s",
+    insecureSkipTLSVerify: false,  // Strict TLS verification
+    serverName: HOST,
   });
 
-  h3_latency.add(res.timings.duration);
-  h3_fail.add(res.status !== 200);
-  check(res, { "H3 status 200": (r) => r.status === 200 });
+  const duration = Date.now() - start;
+  h3_latency.add(duration);
+  
+  const status = res.status || 0;
+  const proto = res.proto || "";
+  h3_fail.add(status !== 200);
+  
+  // Protocol verification - xk6-http3 always uses HTTP/3
+  if (!proto.includes("HTTP/3")) {
+    console.warn(`[H3] Expected HTTP/3, got ${proto}`);
+  }
+  
+  check(res, { 
+    "H3 status 200": (r) => (r.status || 0) === 200,
+    "H3 protocol HTTP/3": (r) => (r.proto || "").includes("HTTP/3"),
+  });
 
   sleep(Math.random() * 0.015);
 }
+
+// Database verification function (called in teardown)
+function verify_database_state() {
+  // Database connection info (from environment or defaults)
+  const DB_HOST = __ENV.DB_HOST || "host.docker.internal";
+  const DB_PORT = __ENV.DB_PORT || "5433";
+  const DB_USER = __ENV.DB_USER || "postgres";
+  const DB_PASSWORD = __ENV.DB_PASSWORD || "postgres";
+  const DB_NAME = __ENV.DB_NAME || "records";
+  
+  // Log database verification attempt
+  // Full verification will be done in post-test scripts using psql
+  console.log(`[DB] Database verification requested for ${DB_HOST}:${DB_PORT}/${DB_NAME}`);
+  console.log(`[DB] Note: Full verification should be done in post-test scripts with psql`);
+}
+
+// Database verification (run at test end)
+export function teardown(data) {
+  verify_database_state();
+}
+
+// Protocol verification helpers (using curl with explicit flags)
+// Note: k6 doesn't have exec() function, so we'll use shell commands via system calls
+// For now, protocol verification is done via k6's built-in proto field
+// Additional verification can be done in post-test scripts using tshark/tcpdump

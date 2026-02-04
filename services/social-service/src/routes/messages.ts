@@ -94,12 +94,14 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
               FROM (
                 SELECT * FROM messages.messages 
                 WHERE recipient_id = $1
+                AND (thread_id IS NULL OR thread_id NOT IN (SELECT thread_id FROM messages.user_deleted_threads WHERE user_id = $1))
                 ${type ? 'AND message_type = $2' : ''}
                 
                 UNION ALL
                 
                 SELECT * FROM messages.messages 
                 WHERE group_id = ANY($${type ? '3' : '2'}::uuid[])
+                AND (thread_id IS NULL OR thread_id NOT IN (SELECT thread_id FROM messages.user_deleted_threads WHERE user_id = $1))
                 ${type ? 'AND message_type = $2' : ''}
               ) m
               LEFT JOIN messages.groups g ON m.group_id = g.id
@@ -143,6 +145,7 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
               LEFT JOIN messages.groups g ON m.group_id = g.id
               LEFT JOIN messages.messages pm ON m.parent_message_id = pm.id
               WHERE m.recipient_id = $1
+              AND (m.thread_id IS NULL OR m.thread_id NOT IN (SELECT thread_id FROM messages.user_deleted_threads WHERE user_id = $1))
               ${type ? 'AND m.message_type = $2' : ''}
               ORDER BY m.created_at DESC
               LIMIT $${type ? '3' : '2'} OFFSET $${type ? '4' : '3'}
@@ -303,6 +306,95 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     } catch (err: any) {
       console.error('[social] Error creating message:', err)
       res.status(500).json({ error: 'Failed to create message' })
+    }
+  })
+
+  // GET /messages/archived - List archived threads (chat archive)
+  router.get('/archived', async (req: AuthedRequest, res: Response) => {
+    const userId = req.userId
+    try {
+      const { rows } = await pool.query(
+        `SELECT t.thread_id, t.archived_at,
+          (SELECT m.subject FROM messages.messages m WHERE m.thread_id = t.thread_id
+           AND (m.recipient_id = $1 OR m.sender_id = $1 OR m.group_id IN (SELECT group_id FROM messages.group_members WHERE user_id = $1))
+           ORDER BY m.created_at ASC LIMIT 1) AS subject,
+          (SELECT m.created_at FROM messages.messages m WHERE m.thread_id = t.thread_id
+           AND (m.recipient_id = $1 OR m.sender_id = $1 OR m.group_id IN (SELECT group_id FROM messages.group_members WHERE user_id = $1))
+           ORDER BY m.created_at ASC LIMIT 1) AS created_at
+         FROM messages.user_archived_threads t
+         WHERE t.user_id = $1
+         ORDER BY t.archived_at DESC`,
+        [userId]
+      )
+      res.json({ archived: rows })
+    } catch (err: any) {
+      const code = (err as { code?: string })?.code
+      if (code === '42P01') {
+        return res.json({ archived: [] })
+      }
+      console.error('[social] Error listing archived:', { code, message: err?.message, status: 500 })
+      res.status(500).json({ error: 'Failed to list archived' })
+    }
+  })
+
+  // POST /messages/thread/:threadId/archive - Archive chat (hide from inbox, still accessible)
+  router.post('/thread/:threadId/archive', async (req: AuthedRequest, res: Response) => {
+    const { threadId } = req.params
+    const userId = req.userId
+    try {
+      // Verify user has access to this thread
+      const access = await pool.query(
+        `SELECT 1 FROM messages.messages WHERE thread_id = $1
+         AND (recipient_id = $2 OR sender_id = $2 OR group_id IN (SELECT group_id FROM messages.group_members WHERE user_id = $2))
+         LIMIT 1`,
+        [threadId, userId]
+      )
+      if (access.rows.length === 0) {
+        return res.status(404).json({ error: 'Thread not found' })
+      }
+      await pool.query(
+        `INSERT INTO messages.user_archived_threads (user_id, thread_id)
+         VALUES ($1, $2) ON CONFLICT (user_id, thread_id) DO NOTHING`,
+        [userId, threadId]
+      )
+      res.status(201).json({ thread_id: threadId, archived: true })
+    } catch (err: any) {
+      const code = (err as { code?: string })?.code
+      if (code === '42P01') {
+        console.error('[social] Archive thread: missing table user_archived_threads (501)', { code })
+        return res.status(501).json({ error: 'user_archived_threads table not found; run migration 04-social-schema-archive-recall-kickban.sql' })
+      }
+      console.error('[social] Error archiving thread:', { code, message: err?.message, status: 500 })
+      res.status(500).json({ error: 'Failed to archive thread' })
+    }
+  })
+
+  // POST /messages/thread/:threadId/delete - Delete chat for me (hide thread from list; messages stay for others)
+  router.post('/thread/:threadId/delete', async (req: AuthedRequest, res: Response) => {
+    const { threadId } = req.params
+    const userId = req.userId
+    try {
+      const access = await pool.query(
+        `SELECT 1 FROM messages.messages WHERE thread_id = $1
+         AND (recipient_id = $2 OR sender_id = $2 OR group_id IN (SELECT group_id FROM messages.group_members WHERE user_id = $2))
+         LIMIT 1`,
+        [threadId, userId]
+      )
+      if (access.rows.length === 0) {
+        return res.status(404).json({ error: 'Thread not found' })
+      }
+      await pool.query(
+        `INSERT INTO messages.user_deleted_threads (user_id, thread_id)
+         VALUES ($1, $2) ON CONFLICT (user_id, thread_id) DO NOTHING`,
+        [userId, threadId]
+      )
+      res.status(201).json({ thread_id: threadId, deleted_for_me: true })
+    } catch (err: any) {
+      if ((err as { code?: string })?.code === '42P01') {
+        return res.status(501).json({ error: 'user_deleted_threads table not found; run migration 04-social-schema-archive-recall-kickban.sql' })
+      }
+      console.error('[social] Error deleting thread for user:', err)
+      res.status(500).json({ error: 'Failed to delete thread' })
     }
   })
 
@@ -585,6 +677,37 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     }
   })
 
+  // POST /messages/:messageId/recall - Recall message (sender only; replaces content with [Message recalled])
+  router.post('/:messageId/recall', async (req: AuthedRequest, res: Response) => {
+    const { messageId } = req.params
+    const userId = req.userId
+    try {
+      const check = await pool.query(
+        'SELECT sender_id FROM messages.messages WHERE id = $1',
+        [messageId]
+      )
+      if (check.rows.length === 0) {
+        return res.status(404).json({ error: 'Message not found' })
+      }
+      if (check.rows[0].sender_id !== userId) {
+        return res.status(403).json({ error: 'Only the sender can recall a message' })
+      }
+      await pool.query(
+        `UPDATE messages.messages SET content = '[Message recalled]', recalled_at = now(), updated_at = now() WHERE id = $1`,
+        [messageId]
+      )
+      res.json({ id: messageId, recalled: true })
+    } catch (err: any) {
+      const code = (err as { code?: string })?.code
+      if (code === '42703') {
+        console.error('[social] Recall message: missing column recalled_at (501)', { code })
+        return res.status(501).json({ error: 'recalled_at not available; run migration 04-social-schema-archive-recall-kickban.sql' })
+      }
+      console.error('[social] Error recalling message:', { code, message: err?.message, status: 500 })
+      res.status(500).json({ error: 'Failed to recall message' })
+    }
+  })
+
   // DELETE /messages/:messageId - Delete message (sender or recipient)
   router.delete('/:messageId', async (req: AuthedRequest, res: Response) => {
     const { messageId } = req.params
@@ -736,12 +859,12 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
         return res.status(499).end()
       }
 
-      // Add creator as admin
-      console.log('[social] Adding creator as admin...')
+      // Add creator as owner (highest role; admin = promoted, owner = creator)
+      console.log('[social] Adding creator as owner...')
       await Promise.race([
         pool.query(
           'INSERT INTO messages.group_members (group_id, user_id, role) VALUES ($1, $2, $3)',
-          [group.id, created_by, 'admin']
+          [group.id, created_by, 'owner']
         ),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Database query timeout')), 5000)
@@ -780,12 +903,21 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     }
 
     try {
+      // Check if user is banned from this group
+      const banCheck = await pool.query(
+        `SELECT 1 FROM messages.group_bans WHERE group_id = $1 AND user_id = $2
+         AND (expires_at IS NULL OR expires_at > now())`,
+        [groupId, user_id]
+      )
+      if (banCheck.rows.length > 0) {
+        return res.status(403).json({ error: 'User is banned from this group' })
+      }
       // Verify requester is admin or moderator
       const roleCheck = await pool.query(
         'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
         [groupId, requester_id]
       )
-      if (roleCheck.rows.length === 0 || !['admin', 'moderator'].includes(roleCheck.rows[0].role)) {
+      if (roleCheck.rows.length === 0 || !['owner', 'admin', 'moderator'].includes(roleCheck.rows[0].role)) {
         return res.status(403).json({ error: 'Only admins and moderators can add members' })
       }
 
@@ -799,6 +931,117 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     } catch (err: any) {
       console.error('[social] Error adding group member:', err)
       res.status(500).json({ error: 'Failed to add group member' })
+    }
+  })
+
+  // POST /messages/groups/:groupId/kick - Kick user from group (admin/owner/moderator only)
+  router.post('/groups/:groupId/kick', async (req: AuthedRequest, res: Response) => {
+    const { groupId } = req.params
+    const { user_id: targetUserId } = req.body
+    const requester_id = req.userId
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'user_id required' })
+    }
+
+    try {
+      const roleCheck = await pool.query(
+        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, requester_id]
+      )
+      if (roleCheck.rows.length === 0 || !['owner', 'admin', 'moderator'].includes(roleCheck.rows[0].role)) {
+        return res.status(403).json({ error: 'Only owners, admins, or moderators can kick members' })
+      }
+      // Cannot kick owner (unless you are owner)
+      const targetRole = await pool.query(
+        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, targetUserId]
+      )
+      if (targetRole.rows.length === 0) {
+        return res.status(404).json({ error: 'User is not a member of this group' })
+      }
+      if (targetRole.rows[0].role === 'owner' && roleCheck.rows[0].role !== 'owner') {
+        return res.status(403).json({ error: 'Only the owner can kick the owner' })
+      }
+
+      await pool.query(
+        'DELETE FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, targetUserId]
+      )
+      res.json({ group_id: groupId, kicked_user_id: targetUserId })
+    } catch (err: any) {
+      const code = (err as { code?: string })?.code
+      console.error('[social] Error kicking member:', { code, message: err?.message, status: 500 })
+      res.status(500).json({ error: 'Failed to kick member' })
+    }
+  })
+
+  // POST /messages/groups/:groupId/ban - Ban user from group (admin/owner only)
+  router.post('/groups/:groupId/ban', async (req: AuthedRequest, res: Response) => {
+    const { groupId } = req.params
+    const { user_id: targetUserId, reason, expires_at } = req.body
+    const requester_id = req.userId
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'user_id required' })
+    }
+
+    try {
+      const roleCheck = await pool.query(
+        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, requester_id]
+      )
+      if (roleCheck.rows.length === 0 || !['owner', 'admin'].includes(roleCheck.rows[0].role)) {
+        return res.status(403).json({ error: 'Only owners or admins can ban members' })
+      }
+
+      await pool.query(
+        `INSERT INTO messages.group_bans (group_id, user_id, banned_by, reason, expires_at)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (group_id, user_id) DO UPDATE SET banned_by = $3, reason = $4, expires_at = $5`,
+        [groupId, targetUserId, requester_id, reason || null, expires_at || null]
+      )
+      await pool.query(
+        'DELETE FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, targetUserId]
+      )
+      res.status(201).json({ group_id: groupId, banned_user_id: targetUserId, reason: reason || null })
+    } catch (err: any) {
+      const code = (err as { code?: string })?.code
+      if (code === '42P01') {
+        console.error('[social] Ban member: missing table group_bans (501)', { code })
+        return res.status(501).json({ error: 'group_bans table not found; run migration 04-social-schema-archive-recall-kickban.sql' })
+      }
+      console.error('[social] Error banning member:', { code, message: err?.message, status: 500 })
+      res.status(500).json({ error: 'Failed to ban member' })
+    }
+  })
+
+  // DELETE /messages/groups/:groupId/ban/:userId - Unban user
+  router.delete('/groups/:groupId/ban/:userId', async (req: AuthedRequest, res: Response) => {
+    const { groupId, userId: targetUserId } = req.params
+    const requester_id = req.userId
+
+    try {
+      const roleCheck = await pool.query(
+        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, requester_id]
+      )
+      if (roleCheck.rows.length === 0 || !['owner', 'admin'].includes(roleCheck.rows[0].role)) {
+        return res.status(403).json({ error: 'Only owners or admins can unban' })
+      }
+
+      const result = await pool.query(
+        'DELETE FROM messages.group_bans WHERE group_id = $1 AND user_id = $2 RETURNING 1',
+        [groupId, targetUserId]
+      )
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: 'User is not banned from this group' })
+      }
+      res.status(204).end()
+    } catch (err: any) {
+      console.error('[social] Error unbanning:', err)
+      res.status(500).json({ error: 'Failed to unban' })
     }
   })
 
@@ -853,8 +1096,9 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       const { rows } = await pool.query(query, [userId])
 
       res.json({ groups: rows })
-    } catch (err) {
-      console.error('[social] Error fetching groups:', err)
+    } catch (err: any) {
+      const code = (err as { code?: string })?.code
+      console.error('[social] Error fetching groups:', { code, message: err?.message, status: 500 })
       res.status(500).json({ error: 'Failed to fetch groups' })
     }
   })
@@ -865,19 +1109,19 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     const userId = req.userId
 
     try {
-      // Optimized: Single query to get user role and admin count using CTE
+      // Optimized: Single query to get user role and elevated-role count (owner/admin)
       const result = await pool.query(
         `WITH user_member AS (
           SELECT role FROM messages.group_members 
           WHERE group_id = $1 AND user_id = $2
         ),
-        admin_count AS (
+        elevated_count AS (
           SELECT COUNT(*)::int as count FROM messages.group_members 
-          WHERE group_id = $1 AND role = 'admin'
+          WHERE group_id = $1 AND role IN ('owner', 'admin')
         )
         SELECT 
           (SELECT role FROM user_member) as user_role,
-          (SELECT count FROM admin_count) as admin_count
+          (SELECT count FROM elevated_count) as elevated_count
         `,
         [groupId, userId]
       )
@@ -887,12 +1131,12 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       }
 
       const userRole = result.rows[0].user_role
-      const adminCount = result.rows[0].admin_count || 0
+      const elevatedCount = result.rows[0].elevated_count || 0
 
-      // Prevent leaving if user is the only admin
-      if (userRole === 'admin' && adminCount === 1) {
+      // Prevent leaving if user is the only owner/admin (must transfer role or delete group)
+      if (['owner', 'admin'].includes(userRole) && elevatedCount === 1) {
         return res.status(400).json({ 
-          error: 'Cannot leave group: you are the only admin. Transfer admin role or delete the group instead.' 
+          error: 'Cannot leave group: you are the only owner/admin. Transfer role or delete the group instead.' 
         })
       }
 
@@ -916,7 +1160,7 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     const archive = req.query.archive === 'true' // Optional: archive instead of delete
 
     try {
-      // Verify user is admin
+      // Verify user is owner or admin
       const memberCheck = await pool.query(
         'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
         [groupId, userId]
@@ -924,8 +1168,8 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       if (memberCheck.rows.length === 0) {
         return res.status(403).json({ error: 'You are not a member of this group' })
       }
-      if (memberCheck.rows[0].role !== 'admin') {
-        return res.status(403).json({ error: 'Only admins can delete/archive groups' })
+      if (!['owner', 'admin'].includes(memberCheck.rows[0].role)) {
+        return res.status(403).json({ error: 'Only owners or admins can delete/archive groups' })
       }
 
       if (archive) {

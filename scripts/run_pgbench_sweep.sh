@@ -165,8 +165,10 @@ CREATE_BENCH_BACKUP="${CREATE_BENCH_BACKUP:-false}"  # if true, create backup af
 RUN_OPTIMIZE_DB="${RUN_OPTIMIZE_DB:-false}"      # if true, run optimize-db-for-performance.sh (default: false, run once after restore)
 SKIP_DISK_CHECK="${SKIP_DISK_CHECK:-false}"      # if true, skip disk space checks (faster for dev runs)
 RUN_NOOP_BASELINE="${RUN_NOOP_BASELINE:-false}"  # if true, run NOOP baseline test (default: false for fast dev mode)
+NOOP_TARGET_TPS="${NOOP_TARGET_TPS:-30000}"     # target NOOP TPS (tune clients/threads to reach this at scale)
 RUN_PLAN_DUMP="${RUN_PLAN_DUMP:-true}"           # if true, run comprehensive query plan analysis (default: true)
 DISABLE_AUTOVACUUM="${DISABLE_AUTOVACUUM:-true}" # if true, disable autovacuum during benchmarks (default: true to prevent pauses)
+RUN_TELEMETRY="${RUN_TELEMETRY:-false}"          # if true, collect perf/strace/htop snapshots for latency analysis (not packet capture)
 # OPTIMIZED_FAST_MODE: DEPRECATED - SQL function now uses aggressive tuning by default
 # SQL function fast mode: candidate_cap=24, min_rank=0.55 (15-25% additional CPU reduction vs candidate_cap=32)
 # PL/pgSQL function fast mode: candidate_cap=40, min_rank=0.50 (gold compatibility)
@@ -628,6 +630,13 @@ calc_latency_metrics() {
   echo "$avg $std $p50 $p95 $p99 $p999 $p9999 $p99999 $p999999 $p9999999 $max"
 }
 
+# Optional: Verify port 5433 has data (standalone script can load from backups)
+CHECK_RECORDS_DB="${CHECK_RECORDS_DB:-false}"
+if [[ "$CHECK_RECORDS_DB" == "true" ]] && [[ -x "$REPO_ROOT/scripts/check-records-db.sh" ]]; then
+  echo "=== Checking records DB (port 5433) via check-records-db.sh ==="
+  "$REPO_ROOT/scripts/check-records-db.sh" --load 2>&1 | head -30
+fi
+
 # step 0: Check if database exists, restore if needed
 echo "=== Checking if database exists ==="
 # Check if database exists and has data
@@ -687,49 +696,60 @@ if [[ "$DB_EXISTS" != "true" ]] || [[ "$TABLE_EXISTS" != "true" ]] || [[ "$ROW_C
     exit 1
   fi
   echo "⚠️  Database missing or insufficient data (only $ROW_COUNT rows), attempting restore..."
-  if [[ -f "./scripts/restore-to-external-docker.sh" ]]; then
-    # Try to find the most recent backup
-    LATEST_BACKUP=$(find backups -name "*.dump" -type f | sort -r | head -1)
+  RESTORED=false
+  BACKUPS_DIR="${REPO_ROOT}/backups"
+  # Prefer reference backup record-platform-postgres-1-all-*.sql (2.4M+ rows, records + records_hot), then any .sql, then .dump
+  LATEST_SQL=$(find "$BACKUPS_DIR" -maxdepth 1 -name "record-platform-postgres-1-all-*.sql" -type f 2>/dev/null | sort -r | head -1)
+  [[ -z "$LATEST_SQL" ]] && LATEST_SQL=$(find "$BACKUPS_DIR" -maxdepth 1 -name "*.sql" -type f 2>/dev/null | sort -r | head -1)
+  if [[ -n "$LATEST_SQL" ]] && [[ -f "$LATEST_SQL" ]]; then
+    echo "Loading from SQL: $LATEST_SQL (into DB records on port ${RECORDS_DB_PORT:-5433})"
+    if PGPASSWORD="$RECORDS_DB_PASS" psql -h "$RECORDS_DB_HOST" -p "$RECORDS_DB_PORT" -U "$RECORDS_DB_USER" -d postgres -c "SELECT 1 FROM pg_database WHERE datname = 'records';" 2>/dev/null | grep -q 1; then
+      PGPASSWORD="$RECORDS_DB_PASS" psql -h "$RECORDS_DB_HOST" -p "$RECORDS_DB_PORT" -U "$RECORDS_DB_USER" -d records -f "$LATEST_SQL" 2>&1 | tail -30
+    else
+      PGPASSWORD="$RECORDS_DB_PASS" psql -h "$RECORDS_DB_HOST" -p "$RECORDS_DB_PORT" -U "$RECORDS_DB_USER" -d postgres -f "$LATEST_SQL" 2>&1 | tail -30
+    fi
+    sleep 3
+    NEW_ROW_COUNT=$(psql_in_pod -tAc "SELECT count(*) FROM records.records;" 2>/dev/null | tr -d ' ' || echo "0")
+    if [[ "$NEW_ROW_COUNT" -gt 1000000 ]]; then
+      echo "✅ Database loaded from SQL: $NEW_ROW_COUNT rows"
+      RESTORED=true
+    fi
+  fi
+  if [[ "$RESTORED" != "true" ]] && [[ -f "$REPO_ROOT/scripts/restore-to-external-docker.sh" ]]; then
+    LATEST_BACKUP=$(find "$BACKUPS_DIR" -maxdepth 1 -name "*.dump" -type f 2>/dev/null | sort -r | head -1)
     if [[ -n "$LATEST_BACKUP" ]] && [[ -f "$LATEST_BACKUP" ]]; then
       echo "Restoring from backup: $LATEST_BACKUP"
-      ./scripts/restore-to-external-docker.sh "$LATEST_BACKUP" 2>&1 | tail -20
-      # Wait for restore to complete
+      "$REPO_ROOT/scripts/restore-to-external-docker.sh" "$LATEST_BACKUP" 2>&1 | tail -20
       sleep 5
-      # Verify restore
       NEW_ROW_COUNT=$(psql_in_pod -tAc "SELECT count(*) FROM records.records;" 2>/dev/null | tr -d ' ' || echo "0")
       if [[ "$NEW_ROW_COUNT" -gt 1000000 ]]; then
         echo "✅ Database restored successfully with $NEW_ROW_COUNT rows"
+        RESTORED=true
       else
         echo "❌ Restore failed! Database still has only $NEW_ROW_COUNT rows." >&2
         exit 1
       fi
-    else
-      echo "❌ No backup file found in backups/ directory!" >&2
-      exit 1
     fi
-  elif [[ -f "./scripts/restore-from-local-backup.sh" ]]; then
-    # Try to find the most recent backup
-    LATEST_BACKUP=$(find backups -name "*.dump" -type f | sort -r | head -1)
+  fi
+  if [[ "$RESTORED" != "true" ]] && [[ -f "$REPO_ROOT/scripts/restore-from-local-backup.sh" ]]; then
+    LATEST_BACKUP=$(find "$BACKUPS_DIR" -maxdepth 1 -name "*.dump" -type f 2>/dev/null | sort -r | head -1)
     if [[ -n "$LATEST_BACKUP" ]] && [[ -f "$LATEST_BACKUP" ]]; then
       echo "Restoring from backup: $LATEST_BACKUP"
-      ./scripts/restore-from-local-backup.sh "$LATEST_BACKUP" 2>&1 | tail -20
-      # Wait for restore to complete
+      "$REPO_ROOT/scripts/restore-from-local-backup.sh" "$LATEST_BACKUP" 2>&1 | tail -20
       sleep 5
-      # Verify restore
       NEW_ROW_COUNT=$(psql_in_pod -tAc "SELECT count(*) FROM records.records;" 2>/dev/null | tr -d ' ' || echo "0")
       if [[ "$NEW_ROW_COUNT" -gt 1000000 ]]; then
         echo "✅ Database restored successfully with $NEW_ROW_COUNT rows"
+        RESTORED=true
       else
         echo "❌ Restore failed! Database still has only $NEW_ROW_COUNT rows." >&2
         exit 1
       fi
-    else
-      echo "❌ No backup file found in backups/ directory!" >&2
-      exit 1
     fi
-  else
-    echo "❌ Restore script not found!" >&2
-    exit 1
+  fi
+  if [[ "$RESTORED" != "true" ]]; then
+    echo "⚠️  No backup found in $BACKUPS_DIR (add record-platform-postgres-1-all-*.sql or *.dump for 2.4M+ rows). Continuing with current data ($ROW_COUNT rows); benchmarks may be less meaningful." >&2
+    echo "   To populate: place record-platform-postgres-1-all-*.sql (or *.dump) in backups/ and re-run, or set SKIP_RESTORE=true to fail instead of continuing." >&2
   fi
 else
   echo "✅ Database verification passed: $ROW_COUNT rows"
@@ -1728,10 +1748,13 @@ else
 fi
 
 # CRITICAL: Quick NOOP baseline test to measure environment overhead (optional)
-# This helps identify if slowdowns are from query plan or system overhead
+# Target NOOP_TARGET_TPS (default 30k); tune clients/threads to reach it at scale
 if [[ "$RUN_NOOP_BASELINE" == "true" ]]; then
-  echo "--- Quick NOOP baseline test (measuring environment overhead) ---"
-  echo "Running barebones pgbench NOOP test: 8 clients, 8 threads, 3s"
+  echo "--- NOOP baseline test (target ${NOOP_TARGET_TPS} TPS) ---"
+  NOOP_CLIENTS=64
+  NOOP_THREADS=64
+  NOOP_DUR=5
+  echo "Running pgbench NOOP: $NOOP_CLIENTS clients, $NOOP_THREADS threads, ${NOOP_DUR}s"
   NOOP_OUTPUT=$(mktemp)
   export PGHOST="$RECORDS_DB_HOST"
   export PGPORT="$RECORDS_DB_PORT"
@@ -1741,7 +1764,7 @@ if [[ "$RUN_NOOP_BASELINE" == "true" ]]; then
   export PGOPTIONS="-c search_path=public,records,pg_catalog"
   pgbench \
     -n -M prepared \
-    -c 8 -j 8 -T 3 \
+    -c "$NOOP_CLIENTS" -j "$NOOP_THREADS" -T "$NOOP_DUR" \
     -f "$bench_sql_dir/bench_noop.sql" \
     > "$NOOP_OUTPUT" 2>&1 || true
   unset PGOPTIONS
@@ -1750,20 +1773,16 @@ if [[ "$RUN_NOOP_BASELINE" == "true" ]]; then
     NOOP_TPS=$(sed -n "s/^tps = \([0-9.][0-9.]*\) .*/\1/p" "$NOOP_OUTPUT" | tail -n1 || echo "")
     NOOP_LAT=$(sed -n 's/^latency average = \([0-9.][0-9.]*\) ms$/\1/p' "$NOOP_OUTPUT" | tail -n1 || echo "")
     if [[ -n "$NOOP_TPS" ]] && [[ -n "$NOOP_LAT" ]]; then
-      echo "  NOOP baseline: ${NOOP_TPS} TPS, ${NOOP_LAT} ms avg latency"
-      # Reference: good run had ~9.4K TPS, ~0.85 ms at 8 clients
-      # If we're significantly slower, that's environment overhead
-      if (( $(echo "$NOOP_TPS < 7000" | bc -l 2>/dev/null || echo 0) )); then
-        echo "  ⚠️  WARNING: NOOP TPS is low (${NOOP_TPS} < 7000). This indicates environment overhead." >&2
-        echo "     Reference: ~9.4K TPS expected. Check Docker/host load, logging settings, extensions." >&2
-      elif (( $(echo "$NOOP_LAT > 1.5" | bc -l 2>/dev/null || echo 0) )); then
-        echo "  ⚠️  WARNING: NOOP latency is high (${NOOP_LAT} ms > 1.5 ms). This indicates environment overhead." >&2
-        echo "     Reference: ~0.85 ms expected. Check Docker/host load, logging settings, extensions." >&2
+      echo "  NOOP baseline: ${NOOP_TPS} TPS, ${NOOP_LAT} ms avg latency (target ${NOOP_TARGET_TPS} TPS)"
+      if (( $(echo "$NOOP_TPS < $NOOP_TARGET_TPS" | bc -l 2>/dev/null || echo 0) )); then
+        echo "  ⚠️  NOOP below target (${NOOP_TPS} < ${NOOP_TARGET_TPS}). Increase clients/threads or tune DB/host (shared_buffers, max_connections)." >&2
       else
-        echo "  ✅ NOOP baseline looks good (environment overhead is minimal)"
+        echo "  ✅ NOOP meets or exceeds target (${NOOP_TARGET_TPS} TPS)"
+      fi
+      if (( $(echo "$NOOP_LAT > 2" | bc -l 2>/dev/null || echo 0) )); then
+        echo "  ⚠️  NOOP latency high (${NOOP_LAT} ms). Check Docker/host load, logging, extensions." >&2
       fi
     fi
-    # Save NOOP output to log directory
     cp "$NOOP_OUTPUT" "$LOG_DIR/noop_baseline_test.txt" 2>/dev/null || true
     rm -f "$NOOP_OUTPUT"
   fi
@@ -1950,6 +1969,46 @@ if [[ ${#client_array[@]} -eq 0 ]]; then
   exit 1
 fi
 echo "Running with client counts: ${client_array[*]}"
+
+# --- Telemetry (perf, strace, htop) for latency analysis ---
+# When RUN_TELEMETRY=true, collect host/process snapshots and optional perf stat for one short run.
+# Valgrind: use only for single-query profiling (too heavy for full sweep); see PGBENCH_HARDENING.md.
+if [[ "$RUN_TELEMETRY" == "true" ]]; then
+  TELEMETRY_DIR="${LOG_DIR}/telemetry"
+  mkdir -p "$TELEMETRY_DIR"
+  echo "--- Telemetry: perf, strace, htop (latency analysis) ---"
+  # Host snapshot (htop-style)
+  ( ps aux --sort=-%cpu 2>/dev/null | head -25; echo "---"; top -b -n 1 2>/dev/null | head -20 ) > "$TELEMETRY_DIR/htop-before.txt" 2>/dev/null || true
+  ( ps aux 2>/dev/null | head -5; uname -a ) >> "$TELEMETRY_DIR/htop-before.txt" 2>/dev/null || true
+  # Postgres process snapshot inside Docker (port 5433)
+  pg_container=$(docker ps --filter "name=postgres" --filter "publish=5433" --format "{{.Names}}" 2>/dev/null | head -1)
+  if [[ -n "$pg_container" ]]; then
+    docker exec "$pg_container" ps aux 2>/dev/null | head -30 > "$TELEMETRY_DIR/pg-ps-before.txt" || true
+    docker exec "$pg_container" cat /proc/stat 2>/dev/null | head -1 >> "$TELEMETRY_DIR/pg-ps-before.txt" || true
+  fi
+  # One short pgbench run with perf stat (if available)
+  if command -v perf >/dev/null 2>&1; then
+    export PGHOST="$RECORDS_DB_HOST" PGPORT="$RECORDS_DB_PORT" PGUSER="$RECORDS_DB_USER" PGDATABASE="$RECORDS_DB_NAME" PGPASSWORD="$RECORDS_DB_PASS"
+    export PGOPTIONS="-c jit=off -c synchronous_commit=off -c search_path=public,records,pg_catalog"
+    perf stat -d -d -d -o "$TELEMETRY_DIR/perf-stat.txt" -- pgbench -n -M prepared -T 10 -c 8 -j 4 -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" -f "$bench_sql_dir/bench_knn.sql" 2>/dev/null || true
+    unset PGOPTIONS
+    echo "  perf stat -> $TELEMETRY_DIR/perf-stat.txt"
+  fi
+  # Optional: strace summary (5s run; heavy; summary goes to stderr)
+  if command -v strace >/dev/null 2>&1; then
+    export PGHOST="$RECORDS_DB_HOST" PGPORT="$RECORDS_DB_PORT" PGUSER="$RECORDS_DB_USER" PGDATABASE="$RECORDS_DB_NAME" PGPASSWORD="$RECORDS_DB_PASS"
+    export PGOPTIONS="-c jit=off -c synchronous_commit=off -c search_path=public,records,pg_catalog"
+    timeout 8 strace -c -f -o /dev/null pgbench -n -M prepared -T 5 -c 2 -j 2 -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" -f "$bench_sql_dir/bench_knn.sql" 2> "$TELEMETRY_DIR/strace-summary.txt" || true
+    unset PGOPTIONS
+    echo "  strace -c -> $TELEMETRY_DIR/strace-summary.txt"
+  fi
+  # After snapshot
+  ( ps aux --sort=-%cpu 2>/dev/null | head -25 ) > "$TELEMETRY_DIR/htop-after.txt" 2>/dev/null || true
+  if [[ -n "${pg_container:-}" ]]; then
+    docker exec "$pg_container" ps aux 2>/dev/null | head -30 > "$TELEMETRY_DIR/pg-ps-after.txt" || true
+  fi
+  echo "  Telemetry written to $TELEMETRY_DIR (htop-before/after, pg-ps-*, perf-stat, strace-summary). Valgrind: single-query only; see PGBENCH_HARDENING.md."
+fi
 
 read_metrics() {
   psql_in_pod -At < "$tmpdir/read_metrics.sql" | tr '|' ' '
@@ -3311,6 +3370,7 @@ SQL
 
 echo ""
 echo "📊 Quick summary saved to: $LOG_DIR/quick_summary.txt"
+[[ "$RUN_TELEMETRY" == "true" ]] && [[ -d "${LOG_DIR:-}/telemetry" ]] && echo "📊 Telemetry (perf, strace, htop): $LOG_DIR/telemetry/"
 echo ""
 
 # Create automatic backup after benchmark (only if explicitly requested)

@@ -55,13 +55,31 @@ FROM node:20-bookworm-slim
 WORKDIR /app/services/records-service
 ENV NODE_ENV=production
 
-# Install OpenSSL for Prisma runtime (with apt cache mount)
-RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt \
-    --mount=type=cache,id=apt-lib,target=/var/lib/apt \
-    (apt-get update --allow-releaseinfo-change 2>&1 | grep -v "GPG error" || true) \
- && (apt-get install -y --no-install-recommends --allow-unauthenticated curl ca-certificates openssl 2>&1 | grep -v "GPG error" || \
-     (command -v openssl >/dev/null 2>&1 && echo "OpenSSL already available" || (apt-get update && apt-get install -y --no-install-recommends curl ca-certificates openssl))) \
- && rm -rf /var/lib/apt/lists/* || true
+# Install grpc-health-probe for Kubernetes gRPC health checks (HTTP/2/3, NOT HTTP/1.1)
+# Detect architecture and download appropriate binary with verification
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates openssl file && \
+    GRPC_HEALTH_PROBE_VERSION=v0.4.24 && \
+    ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+      BINARY_ARCH="amd64"; \
+    elif [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then \
+      BINARY_ARCH="arm64"; \
+    else \
+      echo "Unsupported architecture: $ARCH"; exit 1; \
+    fi && \
+    echo "Downloading grpc-health-probe ${GRPC_HEALTH_PROBE_VERSION} for ${BINARY_ARCH}..." && \
+    curl -Lf -o /tmp/grpc-health-probe \
+    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-${BINARY_ARCH} && \
+    echo "Verifying binary..." && \
+    file /tmp/grpc-health-probe | grep -q "ELF.*executable" || (echo "ERROR: Downloaded file is not a valid ELF executable" && exit 1) && \
+    chmod +x /tmp/grpc-health-probe && \
+    /tmp/grpc-health-probe -version >/dev/null 2>&1 || (echo "ERROR: grpc-health-probe binary is corrupted or invalid" && exit 1) && \
+    mv /tmp/grpc-health-probe /usr/local/bin/grpc-health-probe && \
+    echo "Verifying installed binary..." && \
+    /usr/local/bin/grpc-health-probe -version >/dev/null 2>&1 && \
+    ls -lh /usr/local/bin/grpc-health-probe && \
+    echo "✅ grpc-health-probe installed and verified successfully" && \
+    apt-get purge -y curl file && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/services/records-service/node_modules ./node_modules

@@ -34,6 +34,8 @@ spec:
               value: "50057"
             - name: ENABLE_GRPC
               value: "true"
+            - name: GRPC_REQUIRE_CLIENT_CERT
+              value: "true"  # Enable mTLS (mutual TLS) - client cert verification
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
@@ -76,7 +78,8 @@ spec:
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
                 - -tls-server-name=record.local
-                - -connect-timeout=5s
+                - -connect-timeout=10s
+                - -rpc-timeout=5s
             initialDelaySeconds: 90
             periodSeconds: 15
             timeoutSeconds: 20
@@ -111,7 +114,7 @@ spec:
                 - -tls-client-key=/etc/certs/tls.key
                 - -tls-server-name=record.local
                 - -connect-timeout=10s
-                - -rpc-timeout=15s
+                - -rpc-timeout=5s
             initialDelaySeconds: 45
             periodSeconds: 15
             timeoutSeconds: 20

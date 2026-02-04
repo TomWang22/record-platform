@@ -162,6 +162,41 @@ class PythonAIServicer:
             'timestamp': result.get('timestamp', 0),
         })()
 
+    async def AuctionHeat(self, request, context):
+        """Platform intelligence: auction monitor - read heat of auction"""
+        # Stub: compute simple heat from bid_count; full ML in data_pipeline
+        bid_count = getattr(request, 'bid_count', 0) or 0
+        heat = min(1.0, bid_count / 10.0) if bid_count else 0.0
+        sentiment = 'high_urgency' if heat > 0.7 else 'lukewarm' if heat > 0.3 else 'cold'
+        return type('AuctionHeatResponse', (), {
+            'heat_score': heat,
+            'sentiment': sentiment,
+            'recommendation': 'Monitor bidding; consider reserve adjustment.' if heat < 0.5 else 'Active auction.',
+            't_ms': 0,
+        })()
+
+    async def SellerBuyerInsight(self, request, context):
+        """Platform intelligence: shopping/listings - seller and buyer insights"""
+        # Stub: return placeholder; full pipeline from analytics + ML
+        return type('SellerBuyerInsightResponse', (), {
+            'suggested_price': getattr(request, 'asking_price', 0) or 0,
+            'demand_level': 'medium',
+            'recommendation': 'Check analytics for demand trends.',
+            'context': {},
+            't_ms': 0,
+        })()
+
+    async def SocialNegotiationInsight(self, request, context):
+        """Platform intelligence: social - negotiation, planning, psychology"""
+        # Stub: return placeholder; full pipeline from message analysis
+        return type('SocialNegotiationInsightResponse', (), {
+            'sentiment_analysis': 'neutral',
+            'negotiation_tips': 'Listen actively; clarify goals.',
+            'planning_suggestion': 'Break into steps; set deadlines.',
+            'psychology_notes': {},
+            't_ms': 0,
+        })()
+
 # Standard gRPC Health Service implementation
 class HealthServicer:
     """Standard grpc.health.v1.Health service implementation"""
@@ -170,29 +205,51 @@ class HealthServicer:
         """Check health status"""
         # ServingStatus enum: UNKNOWN=0, SERVING=1, NOT_SERVING=2, SERVICE_UNKNOWN=3
         try:
-            # Simple health check - service is healthy if we can respond
-            return type('HealthCheckResponse', (), {
-                'status': 1,  # SERVING
-                'message': 'Service is healthy'
-            })()
+            # Import health_pb2 dynamically if not already imported
+            try:
+                import health_pb2
+            except ImportError:
+                # Try to import from /app directory
+                import sys
+                sys.path.insert(0, '/app')
+                import health_pb2
+            
+            # Create proper protobuf response message
+            response = health_pb2.HealthCheckResponse()
+            response.status = health_pb2.HealthCheckResponse.SERVING  # SERVING = 1
+            return response
         except Exception as e:
             print(f"[python-ai-grpc] Health check failed: {e}")
-            return type('HealthCheckResponse', (), {
-                'status': 2,  # NOT_SERVING
-                'message': f'Service unhealthy: {str(e)}'
-            })()
+            import traceback
+            traceback.print_exc()
+            # Return NOT_SERVING on error
+            try:
+                import health_pb2
+            except ImportError:
+                import sys
+                sys.path.insert(0, '/app')
+                import health_pb2
+            response = health_pb2.HealthCheckResponse()
+            response.status = health_pb2.HealthCheckResponse.NOT_SERVING  # NOT_SERVING = 2
+            return response
     
     async def Watch(self, request, context):
         """Watch health status (streaming)"""
         # Simple implementation - send periodic health checks
         import asyncio
         try:
+            # Import health_pb2
+            try:
+                import health_pb2
+            except ImportError:
+                import sys
+                sys.path.insert(0, '/app')
+                import health_pb2
+            
             while True:
                 await asyncio.sleep(5)
-                response = type('HealthCheckResponse', (), {
-                    'status': 1,  # SERVING
-                    'message': 'Service is healthy'
-                })()
+                response = health_pb2.HealthCheckResponse()
+                response.status = health_pb2.HealthCheckResponse.SERVING
                 await context.write(response)
         except Exception as e:
             context.abort(grpc.StatusCode.INTERNAL, f'Health watch failed: {str(e)}')
@@ -296,12 +353,15 @@ async def serve(port: int = 50060):
             print("[python-ai-grpc] Client certificate verification is ENABLED.")
         else:
             print("[python-ai-grpc] Client certificate verification is DISABLED (dev mode).")
-        server.add_secure_port(f'[::]:{port}', server_credentials)
-        print(f"[python-ai-grpc] server listening on {port} (TLS enabled, HTTP/2 only)")
+        # Use 0.0.0.0 to bind to both IPv4 and IPv6 (dual-stack)
+        # This ensures health probes connecting to localhost (IPv4) can reach the server
+        server.add_secure_port(f'0.0.0.0:{port}', server_credentials)
+        print(f"[python-ai-grpc] server listening on 0.0.0.0:{port} (TLS enabled, HTTP/2 only)")
     else:
         print("[python-ai-grpc] TLS certs not found, starting insecure server (dev only)")
-        server.add_insecure_port(f'[::]:{port}')
-        print(f"[python-ai-grpc] server listening on {port}")
+        # Use 0.0.0.0 to bind to both IPv4 and IPv6 (dual-stack)
+        server.add_insecure_port(f'0.0.0.0:{port}')
+        print(f"[python-ai-grpc] server listening on 0.0.0.0:{port}")
     
     await server.start()
     return server

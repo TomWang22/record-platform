@@ -147,8 +147,17 @@ const grpcStatusToHttp: Record<number, number> = {
 };
 
 function handleGrpcError(res: Response, err: any) {
-  const status = grpcStatusToHttp[err?.code ?? -1] ?? 500;
+  const code = err?.code ?? -1;
+  const status = grpcStatusToHttp[code] ?? 500;
   const message = err?.details || err?.message || "grpc error";
+  // Diagnostic: log gRPC failure for strict TLS/cert-chain and backend debugging (Runbook #42)
+  console.error("[gw] gRPC error → HTTP", status, {
+    grpcCode: code,
+    grpcMessage: err?.message,
+    details: err?.details,
+    route: (res as any).req?.path,
+    hint: code === 2 ? "auth-service returned INTERNAL (check auth pod logs, DB/Redis)" : code === 14 ? "UNAVAILABLE (connection/TLS? verify cert chain)" : undefined,
+  });
   res.status(status).json({ error: message });
 }
 
@@ -364,9 +373,9 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
     }
     // Rewrite URL by removing /api prefix
     const newUrl = originalUrl.replace(/^\/api/, '') || '/';
-    // Modify req.url which is mutable (req.path is read-only)
+    // Only set req.url (mutable). Do NOT set req.path or req.originalUrl — they are read-only
+    // getters on IncomingMessage; setting them throws "has only a getter".
     (req as any).url = newUrl;
-    (req as any).originalUrl = newUrl;
   }
   next();
 });
@@ -743,7 +752,8 @@ const registerHandler = async (req: Request, res: Response) => {
       token: response?.token ?? "",
       user: response?.user ?? null,
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error("[gw] Register gRPC failed:", err?.code, err?.message, err?.details);
     handleGrpcError(res, err);
   }
 };
@@ -811,7 +821,8 @@ const loginHandler = async (req: Request, res: Response) => {
       refreshToken: response?.refresh_token ?? "",
       user: response?.user ?? null,
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error("[gw] Login gRPC failed:", err?.code, err?.message, err?.details);
     handleGrpcError(res, err);
   }
 };
@@ -1547,6 +1558,25 @@ app.post("/forum/comments/:commentId/attachments", injectIdentityHeadersIfAny, c
   },
 }));
 
+// GET /forum/comments/:commentId/attachments - Get attachments for comment (MUST be before /forum/comments/:commentId)
+app.get("/forum/comments/:commentId/attachments", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization as string);
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/comments/*/attachments GET proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
 app.get("/forum/posts/:postId", async (req: AuthedRequest, res: Response) => {
   const userId = requireUserIdFromRequest(req, res);
   if (!userId) return;
@@ -1577,6 +1607,42 @@ app.post("/forum/posts/:postId/vote", jsonParser, async (req: AuthedRequest, res
     handleGrpcError(res, err);
   }
 });
+
+// PUT /forum/posts/:postId, DELETE /forum/posts/:postId - HTTP proxy (social REST)
+app.put("/forum/posts/:postId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization as string);
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/posts/:postId PUT proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+app.delete("/forum/posts/:postId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization as string);
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/posts/:postId DELETE proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
 
 app.get("/forum/posts/:postId/comments", async (req: AuthedRequest, res: Response) => {
   const userId = requireUserIdFromRequest(req, res);
@@ -1647,6 +1713,59 @@ app.post("/forum/posts/:postId/comments", injectIdentityHeadersIfAny, createProx
         console.warn("[gw] Connection reset/refused - may be HTTP/3 conversion issue. Client should retry with HTTP/2.");
       }
       
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// PUT /forum/comments/:commentId, DELETE /forum/comments/:commentId, POST /forum/comments/:commentId/vote - HTTP proxy
+app.put("/forum/comments/:commentId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization as string);
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/comments/:commentId PUT proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+app.delete("/forum/comments/:commentId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization as string);
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/comments/:commentId DELETE proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+app.post("/forum/comments/:commentId/vote", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization as string);
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/comments/:commentId/vote POST proxy error:", err);
       sendJson502(res as NodeServerResponse | Socket, "social upstream error");
     },
   },
@@ -1783,6 +1902,25 @@ app.delete("/messages/groups/:groupId/leave", injectIdentityHeadersIfAny, create
   },
 }));
 
+// DELETE /messages/groups/:groupId - Delete/archive group (admin only)
+app.delete("/messages/groups/:groupId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: { "^/messages": "/messages" },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization as string);
+    },
+    error(err, _req, res) {
+      console.error("[gw] messages/groups/:groupId DELETE proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
 app.get("/messages/groups/:groupId", injectIdentityHeadersIfAny, createProxyMiddleware({
   target: "http://social-service:4006",
   changeOrigin: true,
@@ -1822,6 +1960,217 @@ app.get("/messages/groups", injectIdentityHeadersIfAny, createProxyMiddleware({
     },
     error(err, _req, res) {
       console.error("[gw] messages/groups proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+/* ----------------------- Specific Messages Routes (MUST be BEFORE general /messages) ----------------------- */
+
+// GET /messages/archived - List archived threads
+app.get("/messages/archived", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization);
+    },
+    error(err, _req, res) {
+      console.error("[gw] GET /messages/archived proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// GET /messages/thread/:threadId - Get full thread
+app.get("/messages/thread/:threadId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization);
+    },
+    error(err, _req, res) {
+      console.error("[gw] GET /messages/thread/:threadId proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// POST /messages/thread/:threadId/archive - Archive thread
+app.post("/messages/thread/:threadId/archive", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization);
+    },
+    error(err, _req, res) {
+      console.error("[gw] POST /messages/thread/:threadId/archive proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// POST /messages/thread/:threadId/delete - Delete thread for user
+app.post("/messages/thread/:threadId/delete", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization);
+    },
+    error(err, _req, res) {
+      console.error("[gw] POST /messages/thread/:threadId/delete proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// POST /messages/:messageId/read - Mark message as read
+app.post("/messages/:messageId/read", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization);
+    },
+    error(err, _req, res) {
+      console.error("[gw] POST /messages/:messageId/read proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// POST /messages/:messageId/recall - Recall message
+app.post("/messages/:messageId/recall", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization);
+    },
+    error(err, _req, res) {
+      console.error("[gw] POST /messages/:messageId/recall proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// GET /messages/:messageId - Get single message
+app.get("/messages/:messageId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization);
+    },
+    error(err, _req, res) {
+      console.error("[gw] GET /messages/:messageId proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// PUT /messages/:messageId - Edit message
+app.put("/messages/:messageId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization);
+    },
+    error(err, _req, res) {
+      console.error("[gw] PUT /messages/:messageId proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// POST /messages/groups/:groupId/kick - Kick user from group
+app.post("/messages/groups/:groupId/kick", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization);
+    },
+    error(err, _req, res) {
+      console.error("[gw] POST /messages/groups/:groupId/kick proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// POST /messages/groups/:groupId/ban - Ban user from group
+app.post("/messages/groups/:groupId/ban", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization);
+    },
+    error(err, _req, res) {
+      console.error("[gw] POST /messages/groups/:groupId/ban proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
+
+// DELETE /messages/groups/:groupId/ban/:userId - Unban user from group
+app.delete("/messages/groups/:groupId/ban/:userId", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization);
+    },
+    error(err, _req, res) {
+      console.error("[gw] DELETE /messages/groups/:groupId/ban/:userId proxy error:", err);
       sendJson502(res as NodeServerResponse | Socket, "social upstream error");
     },
   },
@@ -2632,7 +2981,8 @@ app.use(
 /* ----------------------- Final safety net ----------------------- */
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const msg = err instanceof Error ? err.message : String(err);
-  console.error("gateway error:", msg);
+  const stack = err instanceof Error ? err.stack : undefined;
+  console.error("[gw] Unhandled error (catch-all):", msg, stack || "");
   if (!res.headersSent) res.status(500).json({ error: "internal" });
 });
 

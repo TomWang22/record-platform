@@ -5,11 +5,12 @@ resources:
   - namespaces.yaml           # ensure namespaces exist first
   - config                    # configmaps (app-config, proto-files)
   - secrets                   # TLS/CA secrets (service-tls, dev-root-ca)
-  - postgres
+  # - postgres                # Permanently externalized: all DBs via host.docker.internal (Docker Compose)
   # - pgbouncer               # Disabled for direct DB tuning
   - redis
-  - zookeeper
-  - kafka
+  # - zookeeper               # External Kafka only: Docker Compose ZK
+  # - kafka                   # External Kafka only: Docker Compose :29092
+  - kafka-external
   - exporters
   - monitoring
   - observability

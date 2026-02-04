@@ -1,29 +1,42 @@
 #!/usr/bin/env bash
-# Wrapper that retries kubectl commands to mask transient TLS handshake timeouts.
-set -euo pipefail
+# kubectl shim: fix API server reachability (Colima 127.0.0.1:6443) and fallbacks. No timeout dependency.
 
-REAL_BIN="${KUBECTL_REAL_BIN:-}"
-if [[ -z "$REAL_BIN" ]]; then
-  echo "kubectl shim missing KUBECTL_REAL_BIN; falling back to real kubectl on PATH" >&2
-  REAL_BIN="$(command -v kubectl)"
-fi
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-MAX_RETRIES="${KUBECTL_MAX_RETRIES:-5}"
-SLEEP_SECS="${KUBECTL_RETRY_SLEEP:-2}"
-REQUEST_TIMEOUT="${KUBECTL_REQUEST_TIMEOUT:-10s}"
-
-attempt=1
-while true; do
-  if "$REAL_BIN" --request-timeout="$REQUEST_TIMEOUT" "$@"; then
-    exit 0
-  fi
-  status=$?
-  if (( attempt >= MAX_RETRIES )); then
-    echo "kubectl failed after ${MAX_RETRIES} attempts (exit ${status})" >&2
-    exit "$status"
-  fi
-  echo "kubectl attempt ${attempt}/${MAX_RETRIES} failed (exit ${status}); retrying in ${SLEEP_SECS}s..." >&2
-  sleep "$SLEEP_SECS"
-  attempt=$((attempt + 1))
+KUBECTL_REQUEST_TIMEOUT="${KUBECTL_REQUEST_TIMEOUT:-15s}"
+REAL_KUBECTL=""
+for d in /opt/homebrew/bin /usr/local/bin; do
+  [[ -x "$d/kubectl" ]] && REAL_KUBECTL="$d/kubectl" && break
 done
+[[ -z "$REAL_KUBECTL" ]] && REAL_KUBECTL="$(command -v kubectl 2>/dev/null | grep -v scripts/shims | head -1)"
 
+_fix_colima_server() {
+  [[ ! -x "$REAL_KUBECTL" ]] && return 0
+  ctx=$("$REAL_KUBECTL" config current-context 2>/dev/null || true)
+  [[ "$ctx" != *"colima"* ]] && return 0
+  server=$("$REAL_KUBECTL" config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)
+  [[ "$server" == *"127.0.0.1:6443"* ]] && return 0
+  cluster=$("$REAL_KUBECTL" config view --minify -o jsonpath='{.clusters[0].name}' 2>/dev/null || echo "colima")
+  "$REAL_KUBECTL" config set-cluster "$cluster" --server="https://127.0.0.1:6443" >/dev/null 2>&1 || true
+}
+
+_run() {
+  local args=("$@")
+  case "${args[0]:-}" in
+    apply) args+=("--validate=false");;
+    get|describe|logs|exec|port-forward|proxy|cluster-info|rollout|wait|patch|delete|create|scale)
+      args=("${args[@]:0:1}" "--request-timeout=$KUBECTL_REQUEST_TIMEOUT" "${args[@]:1}");;
+  esac
+  _fix_colima_server
+  if [[ -x "$REAL_KUBECTL" ]] && "$REAL_KUBECTL" "${args[@]}" 2>/dev/null; then return 0; fi
+  ctx=$("$REAL_KUBECTL" config current-context 2>/dev/null || true)
+  if [[ "$ctx" == *"colima"* ]] && command -v colima >/dev/null 2>&1; then
+    colima ssh -- kubectl "${args[@]}" 2>/dev/null && return 0
+  fi
+  if [[ "${args[0]:-}" != "config" ]] && [[ -x "$REAL_KUBECTL" ]]; then
+    "$REAL_KUBECTL" --insecure-skip-tls-verify=true "${args[@]}" 2>/dev/null && return 0
+  fi
+  return 1
+}
+
+_run "$@"

@@ -37,11 +37,19 @@ spec:
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_REQUIRE_CLIENT_CERT
-              value: "false"  # Disable client cert verification for dev (like auth-service)
+              value: "true"  # Enable client cert verification for production (like auth-service)
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
               value: "/certs/dev-root.pem"
+            - name: KAFKA_BROKER
+              value: "kafka-external.record-platform.svc.cluster.local:9093"
+            - name: KAFKA_USE_SSL
+              value: "true"
+            - name: KAFKA_SSL_ENABLED
+              value: "true"
+            - name: KAFKA_CA_CERT
+              value: "/etc/kafka/secrets/ca-cert.pem"
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto
@@ -52,6 +60,9 @@ spec:
             - name: service-tls
               mountPath: /etc/certs
               readOnly: true
+            - name: kafka-ssl-certs
+              mountPath: /etc/kafka/secrets
+              readOnly: true
           startupProbe:
             exec:
               command:
@@ -59,7 +70,6 @@ spec:
                 - -addr=localhost:50056
                 - -service=social.SocialService
                 - -tls
-                - -tls-no-verify=false
                 - -tls-ca-cert=/etc/certs/ca.crt
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
@@ -77,7 +87,6 @@ spec:
                 - -addr=localhost:50056
                 - -service=social.SocialService
                 - -tls
-                - -tls-no-verify=false
                 - -tls-ca-cert=/etc/certs/ca.crt
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
@@ -95,7 +104,6 @@ spec:
                 - -addr=localhost:50056
                 - -service=social.SocialService
                 - -tls
-                - -tls-no-verify=false
                 - -tls-ca-cert=/etc/certs/ca.crt
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
@@ -126,4 +134,7 @@ spec:
         - name: service-tls
           secret:
             secretName: service-tls
+        - name: kafka-ssl-certs
+          secret:
+            secretName: kafka-ssl-secret
 

@@ -6,10 +6,41 @@ import { register, httpCounter } from '@common/utils';
 const POSTGRES_URL_LISTINGS = process.env.POSTGRES_URL_LISTINGS || process.env.POSTGRES_URL!;
 const POSTGRES_URL_AUCTION_MONITOR = process.env.POSTGRES_URL_AUCTION_MONITOR || process.env.POSTGRES_URL!;
 
-// Pool for reading watchlist from listings DB
-const listingsPool = new Pool({ connectionString: POSTGRES_URL_LISTINGS });
-// Pool for writing auction results to auction-monitor DB
-const auctionPool = new Pool({ connectionString: POSTGRES_URL_AUCTION_MONITOR });
+// Connection pools for auction-monitor service
+// Low concurrency: Background worker service
+// Standard pool size: 50 connections per pool (reading watchlist, writing results)
+const listingsPool = new Pool({
+  connectionString: POSTGRES_URL_LISTINGS,
+  max: parseInt(process.env.DB_POOL_MAX || '50', 10), // Low concurrency: background worker
+  min: parseInt(process.env.DB_POOL_MIN || '5', 10),
+  idleTimeoutMillis: 60000, // 1 minute
+  connectionTimeoutMillis: 10000, // 10 seconds
+  statement_timeout: 30000, // 30 second statement timeout
+  query_timeout: 30000, // 30 second query timeout
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
+});
+
+const auctionPool = new Pool({
+  connectionString: POSTGRES_URL_AUCTION_MONITOR,
+  max: parseInt(process.env.DB_POOL_MAX || '50', 10), // Low concurrency: background worker
+  min: parseInt(process.env.DB_POOL_MIN || '5', 10),
+  idleTimeoutMillis: 60000, // 1 minute
+  connectionTimeoutMillis: 10000, // 10 seconds
+  statement_timeout: 30000, // 30 second statement timeout
+  query_timeout: 30000, // 30 second query timeout
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
+});
+
+// Error handling for connection pools
+listingsPool.on('error', (err) => {
+  console.error('[auction-monitor] Listings DB pool error:', err);
+});
+
+auctionPool.on('error', (err) => {
+  console.error('[auction-monitor] Auction DB pool error:', err);
+});
 
 const app = express();
 app.use(express.json());

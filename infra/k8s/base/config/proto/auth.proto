@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package auth;
 
+import "health.proto";
+
 option go_package = "github.com/yourorg/record-platform/proto/auth";
 
 // Auth service for gRPC

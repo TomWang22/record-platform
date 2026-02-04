@@ -53,9 +53,19 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: POSTGRES_URL_AUCTION_MONITOR
-            # Only if you actually have Kafka in K8s; otherwise remove/override in app-config
             - name: KAFKA_BOOTSTRAP_SERVERS
-              value: "kafka.record-platform.svc.cluster.local:9092"
+              value: "kafka-external.record-platform.svc.cluster.local:9093"
+            - name: KAFKA_BROKER
+              value: "kafka-external.record-platform.svc.cluster.local:9093"
+            - name: KAFKA_USE_SSL
+              value: "true"
+            - name: KAFKA_SSL_ENABLED
+              value: "true"
+            - name: KAFKA_CA_CERT
+              value: "/etc/kafka/secrets/ca-cert.pem"
+            # Ensure Node.js uses the CA cert for Kafka TLS verification
+            - name: NODE_EXTRA_CA_CERTS
+              value: "/etc/kafka/secrets/ca-cert.pem:/certs/dev-root.pem"
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_PORT
@@ -64,6 +74,8 @@ spec:
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
               value: "/certs/dev-root.pem"
+            - name: GRPC_REQUIRE_CLIENT_CERT
+              value: "true"  # Enable mTLS (mutual TLS) - client cert verification
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto
@@ -73,6 +85,9 @@ spec:
               readOnly: true
             - name: service-tls
               mountPath: /etc/certs
+              readOnly: true
+            - name: kafka-ssl-certs
+              mountPath: /etc/kafka/secrets
               readOnly: true
           # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2 only
           readinessProbe:
@@ -147,3 +162,8 @@ spec:
                 path: tls.key
               - key: tls.crt
                 path: tls.crt
+              - key: ca.crt
+                path: ca.crt
+        - name: kafka-ssl-certs
+          secret:
+            secretName: kafka-ssl-secret

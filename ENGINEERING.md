@@ -141,6 +141,8 @@ This document provides in-depth technical documentation for the Record Platform 
         │  │              │  │              │  │ - JWT Cache  │       │
         │  │ - analytics  │  │ - python_ai  │  │ - Search     │       │
         │  │   schema     │  │   schema     │  │   Cache      │       │
+        │  │              │  │              │  │ - Lua: singleflight,  │
+        │  │              │  │              │  │   LFU/LRU, rate limit│
         │  └──────────────┘  └──────────────┘  └──────────────┘       │
         │                                                               │
         │  ┌──────────────┐                                           │
@@ -229,7 +231,7 @@ This document provides in-depth technical documentation for the Record Platform 
 - Less mature ecosystem than Nginx
 - Smaller community, but active development
 - Admin API security considerations (bound to localhost only)
-- **gRPC Limitations**: Caddy generates HTTP responses for gRPC requests, making it incompatible with grpc-js (see Issue #17 in Runbook.md)
+- **gRPC Limitations**: Caddy generates HTTP responses for gRPC requests, making it incompatible with grpc-js (see Issue #17 in docs/Runbook.md)
 
 ### Why Envoy for gRPC?
 
@@ -255,7 +257,7 @@ This document provides in-depth technical documentation for the Record Platform 
 - Additional resource usage (two proxy processes)
 - **Mitigation**: Clear documentation, automation scripts, unified monitoring
 
-**Investigation**: See `Runbook.md` Issue #17 and `test-results/CADDY_ENVOY_DECISION.md` for complete investigation, proof, and decision rationale.
+**Investigation**: See `docs/Runbook.md` Issue #17 and `test-results/CADDY_ENVOY_DECISION.md` for complete investigation, proof, and decision rationale.
 
 ### Why 8 Separate PostgreSQL Instances?
 
@@ -274,15 +276,53 @@ This document provides in-depth technical documentation for the Record Platform 
 - More complex connection management
 - Cross-service queries require dual-DB connections (auction-monitor, analytics-service)
 
-**Implementation**: Services connect via Kubernetes Service names (e.g., `postgres-auth-external.record-platform.svc.cluster.local:5437`) which route through Kubernetes Endpoints to Docker Compose postgres containers at `host.docker.internal:PORT` (192.168.65.254 on macOS with Docker Desktop). All 8 postgres databases have corresponding Kubernetes Services and Endpoints configured. Dedicated ports:
-- Main DB: 5433 (records schema)
-- Auth DB: 5437 (auth schema)
-- Social DB: 5434 (social schema)
-- Listings DB: 5435 (listings schema)
-- Shopping DB: 5436 (shopping schema)
-- Auction Monitor DB: 5438 (auction_monitor schema)
-- Analytics DB: 5439 (analytics schema)
-- Python AI DB: 5440 (python_ai schema)
+**Implementation**: Services connect via Kubernetes Service names (e.g., `postgres-auth-external.record-platform.svc.cluster.local:5437`) which route through Kubernetes Endpoints to Docker Compose postgres containers at `host.docker.internal:PORT` (192.168.65.254 on macOS with Docker Desktop). All 8 postgres databases have corresponding Kubernetes Services and Endpoints configured. Dedicated ports: 5433–5440 (records, social, listings, shopping, auth, auction-monitor, analytics, python-ai).
+
+### Strict TLS/mTLS and Preflight (Single Source of Truth)
+
+**Decision**: All services that are tested and need to exist use strict TLS and mTLS. A single shared script (`ensure-strict-tls-mtls-preflight.sh`) validates and provisions `service-tls` + `dev-root-ca`; when the secret is created or updated, gRPC/TLS workloads are restarted so pods pick up the new CA and certs.
+
+**Rationale**:
+1. **Auth 503 / "self-signed certificate in certificate chain"**: API Gateway and other clients read CA/certs at process start. If `service-tls` is updated later (e.g. by reissue or OpenSSL provision), existing pods keep using the old CA in memory; verification then fails. Restarting deployments that mount `service-tls` after any update fixes this.
+2. **Single source of truth**: One script (validate → try repo certs → provision with OpenSSL → restart if updated) is used by both the preflight pipeline and the test-suites runner, so we never run suites with invalid or stale certs.
+3. **Preflight before suites**: `run-preflight-scale-and-all-suites.sh` runs the strict TLS preflight in step 5 and fails fast if the chain cannot be established; `run-all-test-suites.sh` runs the same script unless `SKIP_TLS_PREFLIGHT=1` (set when invoked from the preflight pipeline).
+
+**Implementation**:
+- **Script**: `scripts/ensure-strict-tls-mtls-preflight.sh` — validates full chain (CA + leaf + key), provisions from repo or OpenSSL, restarts api-gateway, auth-service, social-service, listings-service, shopping-service, auction-monitor, python-ai-service, analytics-service when `service-tls` is updated.
+- **Preflight pipeline**: Step 5 runs the script then `ensure-all-services-tls.sh` (deploy manifest check). Step 7 runs `run-all-test-suites.sh` with `SKIP_TLS_PREFLIGHT=1`.
+- **Standalone**: `./scripts/run-all-test-suites.sh` runs the script as cert preflight so standalone runs also get valid certs.
+
+**Trade-offs**:
+- Restarting 8 deployments after cert update adds ~30–90s to preflight when the secret is replaced; acceptable for correctness and to avoid flaky auth/503.
+
+**References**: Runbook items 24–25; README Testing section; COMMIT_MESSAGE.txt (Strict TLS/mTLS preflight).
+
+### Platform-Wide Intelligence (Analytics Engine → Python AI)
+
+**Decision**: Analytics engine piped into Python AI for per-service AI-powered insights.
+
+**Use Cases**:
+- **Auction Monitor**: `AuctionHeat` — read "heat" of auction (bidding activity, sentiment, urgency)
+- **Shopping/Listings**: `SellerBuyerInsight` — seller and buyer intelligence (pricing, demand, negotiation)
+- **Social**: `SocialNegotiationInsight` — negotiation, planning, psychology (read psychology, help plan)
+
+**Proto**: `proto/python-ai.proto` — AuctionHeat, SellerBuyerInsight, SocialNegotiationInsight RPCs. Stub implementations in `services/python-ai-service/app/grpc_server.py`. Full pipeline from analytics DB / Kafka is future work.
+
+**Test Suite**: Protocol-aware (HTTP/2, HTTP/3, strict TLS/mTLS); packet capture (tcpdump/tshark) to prove wire-level traffic.
+
+**Doc**: `PLATFORM-AI-ENGINE.md`
+
+### Social Service Roles (owner, admin, moderator, member)
+
+**Decision**: Group members have role hierarchy: owner > admin > moderator > member.
+
+**Implementation**:
+- **Owner**: Creator of group (was "admin"); highest privilege
+- **Admin**: Promoted by owner; can add/remove members, delete group
+- **Moderator**: Can moderate; cannot delete group or change owner
+- **Member**: Standard participant
+
+**DB**: `messages.group_members` CHECK (role IN ('owner', 'admin', 'moderator', 'member')). Migration: `infra/db/04-social-schema-roles-migration.sql`.
 
 ### Why gRPC Over REST for Inter-Service Communication?
 
@@ -309,7 +349,7 @@ This document provides in-depth technical documentation for the Record Platform 
 
 ### Why Kubernetes Over Docker Compose?
 
-**Decision**: Migrate from Docker Compose to Kubernetes (Kind for local dev).
+**Decision**: Migrate from Docker Compose to Kubernetes for local dev (see below: Colima + k3s; Kind retired).
 
 **Rationale**:
 1. **Production Parity**: Local dev environment matches production
@@ -325,6 +365,23 @@ This document provides in-depth technical documentation for the Record Platform 
 - Higher resource requirements
 - Steeper learning curve
 - Databases still run in Docker Compose (stability and easier management)
+
+### Why Colima + k3s (Kind retired)
+
+**Decision**: Use **Colima with k3s** as the local Kubernetes cluster. **Kind is no longer the default or supported path** for record-platform local dev and test pipelines.
+
+**Rationale (why we moved)**:
+1. **Docker Desktop limitations**: Docker Desktop’s embedded Linux VM and storage layer became a single point of failure under sustained load (many containers, 8 Postgres instances, Kafka, Redis, plus K8s control plane and workloads). API server timeouts, TLS handshake timeouts, and “cluster unreachable” were common when Kind ran on top of Docker Desktop.
+2. **Storage/metadata wedge at ~256 GB**: At large Docker disk usage (e.g. ~256 GB or when metadata/overlay grew unbounded), Docker Desktop’s VM could **wedge** — daemon unresponsive, build and run operations hanging, host disk pressure. This made Kind-based dev and long-running test suites (preflight + 8 suites + pgbench) unreliable and at times impossible without a full Docker reset.
+3. **Colima + k3s**: Colima provisions a Lima VM with containerd and optional k3s. k3s is a single-binary Kubernetes distribution with a smaller footprint than full K8s. Running **k3s inside Colima** (instead of Kind on Docker Desktop) reduces reliance on Docker Desktop’s VM and storage; API server is at 127.0.0.1:6443 and preflight scripts target this explicitly. Secret updates and kubectl from the host can require `colima ssh` when the host cannot reach 127.0.0.1:6443 (e.g. network or firewall); Runbook documents this.
+4. **Hygiene and reproducibility**: Preflight pipeline (`run-preflight-scale-and-all-suites.sh`) **requires** Colima + k3s by default (`REQUIRE_COLIMA=1`). This avoids accidental runs against a stale or wrong cluster and aligns everyone on one supported path.
+
+**Trade-offs**:
+- Kind is still referenced in some docs and scripts for historical or optional use; new work assumes Colima + k3s.
+- Colima/k3s on macOS may still hit resource limits (CPU/memory) on a single node; scaling and cleanup (trim completed pods, aggressive ReplicaSet cleanup) are part of preflight to keep the cluster responsive.
+- NodePort UDP for HTTP/3 (QUIC) can still be environment-dependent; in-cluster k6 and curl-based HTTP/3 tests remain the reliable way to prove QUIC.
+
+**References**: Runbook (control plane, port mapping, resource pressure); README/ENGINEERING (preflight, “What is preflight?”); COMMIT_MESSAGE.txt (major overhaul, Colima migration).
 
 ### Why Zero-Downtime CA Rotation?
 
@@ -357,6 +414,88 @@ This document provides in-depth technical documentation for the Record Platform 
 - Certificate file updates may require pod restart (Caddy caches in memory)
 - Multi-node cluster recommended for true zero-downtime with pod restarts
 
+## Test Suite: Preflight and Control Plane
+
+The full test pipeline is structured as **preflight** followed by **eight suites**, with DB & cache verification after each suite and a comprehensive verification at the end. Optional k6 load and pgbench sweeps (e.g. `RUN_FULL_LOAD=1`) provide total platform coverage. This section explains why we run preflight, how suites are ordered, and how to run everything (including strict TLS for k6 and HTTP/1.1 vs HTTP/2 vs HTTP/3).
+
+### Why Preflight First?
+- **Kubeconfig**: Colima (or Kind, if still in use) kubeconfig may point at wrong host/port or stale API server. `preflight-fix-kubeconfig.sh` ensures `127.0.0.1:6443` (or Colima API) is reachable and fixes `KUBECONFIG` so `kubectl` works from the host.
+- **API server readiness**: Under load or after restarts, the Kubernetes API server can be temporarily unreachable (TLS handshake timeout, context deadline exceeded). `ensure-api-server-ready.sh` retries until the API server responds so suites do not fail with spurious "cluster unreachable" errors.
+- **Rationale**: Running suites without preflight leads to misleading failures (e.g. "rotation failed" when the real cause was API server timeout). Preflight is skipped when `SKIP_PREFLIGHT=1` (e.g. when called from `run-preflight-scale-and-all-suites.sh` after preflight has already run).
+
+### Suite Order and Completion
+- **Order**: 1) auth (test-auth-service.sh), 2) baseline (test-microservices-http2-http3.sh), 3) enhanced (test-microservices-http2-http3-enhanced.sh), 4) adversarial (enhanced-adversarial-tests.sh), 5) rotation (rotation-suite.sh), 6) standalone-capture (test-packet-capture-standalone.sh), 7) tls-mtls (test-tls-mtls-comprehensive.sh), 8) social (test-social-service-comprehensive.sh). Each suite is tee'd to `$SUITE_LOG_DIR/<suite>.log`; verification to `$SUITE_LOG_DIR/<suite>-verification.log`.
+- **Completion**: The runner prints "=== All Test Suites Complete ===" after all eight suites finish. Only suites that exited non-zero are reported in the error summary. There is no artificial timeout; run with `2>&1 | tee /tmp/full-run-$(date +%s).log` for live output and saved log. If a suite appears to hang, see docs/Runbook.md for packet-capture and gRPC/Envoy NodePort issues.
+
+### How to run (command center)
+
+- **Full pipeline:** `./scripts/run-preflight-scale-and-all-suites.sh` (preflight + scale + reissue + all 8 suites).
+- **Suites only:** `./scripts/run-all-test-suites.sh 2>&1 | tee /tmp/full-run-$(date +%s).log` (assumes cluster and certs ready; runs strict TLS preflight unless `SKIP_TLS_PREFLIGHT=1`).
+- **Total platform coverage:** `RUN_FULL_LOAD=1 ./scripts/run-preflight-scale-and-all-suites.sh` — enables `RUN_K6=1` and `RUN_PGBENCH=1` (default pgbench mode: deep) for full load and DB sweep validation.
+
+**Why 8+ suites and a command center:** We run 8 core suites plus optional k6 and pgbench (15+ scripts when counting limit-finding, service-specific k6, and DB verification). The platform spans multiple protocols (HTTP/1.1, HTTP/2, HTTP/3, gRPC), strict TLS/mTLS, zero-downtime rotation, and 8 databases. A single entry point (`run-all-test-suites.sh` or `run-preflight-scale-and-all-suites.sh`) orchestrates order, preflight, and DB/cache verification. See `scripts/load/LOAD_TESTS_CATALOG.md` for the full catalog.
+
+**Strict TLS for k6:** All k6 runs use strict TLS (no `-k`). The runner sets `SSL_CERT_FILE` to the dev-root CA (from K8s secret or `certs/dev-root.pem`) so `record.local` x509 verification succeeds. If you see `x509: certificate is not trusted`, set `K6_CA_CERT=/path/to/dev-root.pem` or run after preflight.
+
+**HTTP/1.1, HTTP/2, and HTTP/3 (xk6-http3 and HOLB):**
+- **HTTP/2:** Standard k6 uses HTTP/2 by default over TLS; we use it for baseline and limit tests.
+- **HTTP/3:** k6 does not ship HTTP/3; we use **xk6-http3** (custom binary via `scripts/build-k6-http3.sh`, e.g. `.k6-build/bin/k6-http3`) for HTTP/3 (QUIC) load tests. Curl-based tests (`scripts/test-microservices-http2-http3.sh`) also verify HTTP/3 with strict TLS.
+- **HTTP/1.1:** Supported for legacy clients; we test that the edge accepts HTTP/1.1 and returns 200 where applicable.
+- **Head-of-line blocking (HOLB):** HTTP/2 multiplexes streams over one TCP connection — a single lost packet can block all streams. HTTP/3 (QUIC) uses independent streams over UDP. We run **both** HTTP/2 and HTTP/3 tests to demonstrate latency/throughput differences and to prove HOLB is real (e.g. `k6-limit-test-comprehensive.js` H2 vs H3, or `scripts/compare-http2-http3.sh`).
+
+### Database Verification (8 DBs: 5433–5440)
+- All **8 PostgreSQL instances** are checked: 5433 records, 5434 social, 5435 listings, 5436 shopping, 5437 auth, 5438 auction-monitor, 5439 analytics, 5440 python-ai. Scripts: `verify-db-cache-quick.sh` (after each suite), `verify-db-and-cache-comprehensive.sh` (at end). We do not limit checks to 5 DBs; full port range 5433–5440 is used for correctness.
+
+### Strict TLS and Packet Capture
+- **Strict TLS**: All gRPC and HTTP tests use CA verification (no insecure skip). `test-tls-mtls-comprehensive.sh` validates certificate chain and mTLS configuration; gRPC via Envoy must use strict TLS where applicable.
+- **Packet capture**: HTTP/2 (TCP 443) and HTTP/3/QUIC (UDP 443) are verified at wire level via tcpdump/tshark on Caddy/Envoy pods. **All HTTP/3 tests use the same pattern as rotation-suite**: (1) drain (5–15s before stopping tcpdump so in-flight QUIC packets are captured), (2) copy pcaps from pods to host (`CAPTURE_COPY_DIR`), (3) tshark verification when available (`scripts/lib/protocol-verification.sh`). Wire summary (TCP 443 / UDP 443) proves traffic when TLS prevents http2 decode. Set `CAPTURE_DRAIN_SECONDS=5` and `CAPTURE_COPY_DIR` before `stop_and_analyze_captures`; see `scripts/lib/packet-capture.sh` and docs/Runbook.md #44. Empty pcaps or "No QUIC packets detected" indicate capture or traffic routing issues; see docs/Runbook.md and TEST_SUITE_REALITY_AND_K6_TUNING.md.
+- **Profiling / live telemetry**: Debug tools include tshark, tcpdump, netstat, **perf**, htop, strace (Runbook "Debug Tools"). For future optimization, live telemetry (Prometheus/Grafana, OpenTelemetry) and on-demand profiling (perf, htop) at end of suites can show how the system is performing.
+
+### Preflight pipeline: run-preflight-scale-and-all-suites.sh (in depth)
+
+The **single entry point** for “cluster ready → certs valid → all suites (and optional k6/pgbench)” is `scripts/run-preflight-scale-and-all-suites.sh`. It is the **command center** for hygiene and reproducibility: one run fixes kubeconfig, reissues CA/leaf, ensures strict TLS/mTLS, brings up dependencies (Postgres, Kafka, social migrations), scales to baseline, and then runs all eight test suites (and optionally pgbench and k6). Why each step exists:
+
+| Step | What it does | Why we need it |
+|------|----------------|----------------|
+| **0** | Kill stale pipeline/test processes (optional, `KILL_STALE_FIRST=1`) | Avoids multiple runners and stuck jobs competing for API server and ports. |
+| **1** | Require Colima + k3s context (127.0.0.1:6443); trim completed pods | Ensures we target the correct cluster; trimming reduces API server load and etcd bloat. |
+| **2** | Preflight kubeconfig (`preflight-fix-kubeconfig.sh`) | Kubeconfig may point at wrong host/port or stale API server; fixes `KUBECONFIG` so `kubectl` works from host. |
+| **3** | Ensure API server ready (`ensure-api-server-ready.sh`) | Under load or after restarts, the API server can be unreachable; retries until it responds so suites don’t fail with “cluster unreachable”. |
+| **3a** | Reissue CA + leaf (dev-root-ca, record-local-tls); `KAFKA_SSL=1` | Aligns CA and Caddy certs so strict TLS works (no curl 60); Kafka SSL uses same CA. |
+| **3b–3f** | Kafka SSL secret, Docker Kafka/Postgres up, social migrations, app-config/kafka-external apply, remove in-cluster Kafka/ZK/Postgres, patch kafka-external, restart Kafka-consuming services | All 8 Postgres and Kafka (strict TLS :29093) must be up and externalized; social suite needs archive/recall/kick/ban migrations. |
+| **4** | Scale to baseline (service 1, exporters 1, Envoy 1, Caddy 2) | Consistent baseline so suites don’t hit scaled-down or missing deployments. |
+| **4c–4d** | Re-ensure API server; verify Caddy strict TLS (no curl 60) | Confirms cluster and edge are usable after reissue and scale. |
+| **5** | Strict TLS/mTLS preflight (`ensure-strict-tls-mtls-preflight.sh`); sync CA to `certs/dev-root.pem` | Single source of truth for service-tls + dev-root-ca; restarts gRPC/TLS workloads so pods pick up CA/certs; k6 uses repo CA. |
+| **6** | Pod health, DB, Redis; aggressive cleanup of rogue ReplicaSets; wait for all services ready; optional pgbench (6c) | No suite runs until pods and 8 DBs are healthy; cleanup avoids stuck ReplicaSets; pgbench (RUN_PGBENCH=1) runs reference + 7 service sweeps (default deep). |
+| **7** | Run all test suites (`run-all-test-suites.sh` with SKIP_PREFLIGHT/SKIP_TLS_PREFLIGHT); optional k6 | Eight suites in fixed order; RUN_FULL_LOAD=1 adds k6 + pgbench for total platform coverage. |
+
+**Env vars:** `RUN_SUITES=0` skips suites; `RUN_FULL_LOAD=1` sets `RUN_K6=1` and `RUN_PGBENCH=1` (PGBENCH_MODE=deep); `REQUIRE_COLIMA=1` (default) fails if context is not Colima.
+
+### Why eight suites (and what each one is for)
+
+We run **eight** suites because the platform has **multiple protocols**, **strict TLS/mTLS**, **zero-downtime rotation**, **wire-level proof**, and **eight databases**; a single “e2e” test cannot cover failure modes, rotation, and protocol behavior. Each suite has a distinct role:
+
+| # | Suite | Script | Why we need it |
+|---|--------|--------|------------------|
+| 1 | **Auth** | test-auth-service.sh | Register, login, MFA, passkeys — auth is the gatekeeper for all services; must pass before any other suite. |
+| 2 | **Baseline** | test-microservices-http2-http3.sh | Smoke: HTTP/2, HTTP/3, gRPC health and business logic (all 10 services), packet capture. Proves edge and Envoy and DB connectivity. |
+| 3 | **Enhanced** | test-microservices-http2-http3-enhanced.sh | Deeper HTTP/2 vs HTTP/3 and packet capture; adversarial-style checks. |
+| 4 | **Adversarial** | enhanced-adversarial-tests.sh | Malformed requests, protocol downgrade, invalid certs — proves we don’t break under abuse. |
+| 5 | **Rotation** | rotation-suite.sh | CA/leaf rotation under k6 load; zero-downtime and wire-level capture. Proves rotation and Caddy reload. |
+| 6 | **Standalone capture** | test-packet-capture-standalone.sh | Packet capture in isolation (drain → stop → copy → tshark); same pattern as rotation for QUIC verification. |
+| 7 | **TLS/mTLS** | test-tls-mtls-comprehensive.sh | Full chain validation, mTLS, gRPC strict TLS; proves cert chain and client cert handling. |
+| 8 | **Social** | test-social-service-comprehensive.sh | Forum, messages, archive/recall/kick/ban, groups; requires social DB migrations. |
+
+**Why so many tests:** One “e2e” cannot (1) prove HTTP/2 vs HTTP/3 at the wire, (2) prove zero-downtime rotation under load, (3) validate strict TLS/mTLS and cert chain, (4) stress auth and social and DBs in isolation, (5) run pgbench across 8 DBs. Splitting into eight suites gives clear failure scope (e.g. “rotation failed” vs “social 501”) and allows optional k6/pgbench without re-running auth/baseline every time. DB and cache verification (8 DBs, 5433–5440) after each suite keeps the platform honest.
+
+### xk6-http3: what it is and why we use it
+
+- **What:** Custom k6 binary built with **xk6** and the **xk6-http3** extension (quic-go). Built via `scripts/build-k6-http3.sh`; binary at `.k6-build/bin/k6-http3`. k6 does not ship HTTP/3; this extension adds QUIC support so we can run load tests over HTTP/3.
+- **Why:** We need to **prove** that the edge and tests use HTTP/3 (QUIC) under load, not just HTTP/2. Limit tests (e.g. `k6-limit-test-comprehensive.js`) and rotation chaos use H2 and H3; xk6-http3 is the only way to drive real QUIC traffic from k6.
+- **Limitation:** When k6 runs **outside** the cluster (e.g. on the host), NodePort UDP routing for QUIC (port 30443) can fail or time out — so external k6-http3 may not reach the edge over HTTP/3.
+- **Workaround:** (1) **Curl-based HTTP/3** in `scripts/test-microservices-http2-http3.sh` (runs inside cluster/node network namespace where QUIC works). (2) **In-cluster k6 jobs** (e.g. rotation-suite) that use ClusterIP and run inside the cluster so QUIC is used. (3) **Packet capture** (tcpdump/tshark) to verify UDP 443 (QUIC) vs TCP 443 (HTTP/2) so we have wire-level proof regardless of where k6 runs.
+- **Documentation:** `test-results/K6_HTTP3_TOOLCHAIN_STATUS_12-22_tom.md`, `scripts/load/LOAD_TESTS_CATALOG.md`.
+
 ## Technology Stack
 
 ### Edge & Routing
@@ -375,7 +514,7 @@ This document provides in-depth technical documentation for the Record Platform 
 
 ### Data Layer
 - **PostgreSQL 16**: 8 dedicated instances for service isolation
-- **Redis 7**: JWT revocation cache, search result caching
+- **Redis 7**: JWT revocation cache, search result caching. **Cache layer (see architecture diagram)**: Redis is used by API Gateway (JWT revocation), records-service (search cache), auth-service (user lookup), listings-service (listing cache), social-service and auction-monitor (singleflight + rate limiting). **Lua scripts** in Redis provide singleflight (cache stampede prevention), LFU/LRU eviction (e.g. shopping-service), and token-bucket/sliding-window rate limiting. See README “Caching & Redis Lua Scripts” for script list and data flow.
 - **Kafka**: Event streaming, real-time messaging. **Strict TLS enabled** with SSL listener on port 9093. SSL certificates stored in `kafka-ssl-secret`.
 
 ### Inter-Service Communication
@@ -384,7 +523,7 @@ This document provides in-depth technical documentation for the Record Platform 
 - **HTTP/2**: Transport for gRPC (h2c and TLS)
 
 ### Infrastructure
-- **Kubernetes (Kind)**: Local development cluster
+- **Kubernetes (Colima + k3s)**: Local development cluster (Kind retired; see “Why Colima + k3s” above). API server at 127.0.0.1:6443; preflight requires Colima context by default.
 - **Kustomize**: Configuration management
 - **Terraform**: Infrastructure as Code
 - **Ansible**: Configuration management and deployment
@@ -400,6 +539,24 @@ This document provides in-depth technical documentation for the Record Platform 
 - **pnpm**: Package manager
 - **Docker**: Containerization
 - **mkcert**: Local certificate generation
+
+### Technology stack: justification and trade-offs (senior-design review)
+
+This section justifies the main technology choices as for a **senior design review**: what we chose, why it fits the problem, and what we gave up. The goal is to show that the stack is **deliberate**, not accidental, and that trade-offs are understood and documented.
+
+| Area | Choice | Justification | Trade-offs |
+|------|--------|----------------|------------|
+| **Edge (HTTP/3 + REST)** | Caddy | First-class HTTP/3 (QUIC), automatic HTTPS, admin API for zero-downtime reload, simple Caddyfile. We need QUIC and web + REST in one place. | gRPC handling is poor (HTTP response for gRPC); we don’t use Caddy for gRPC. Smaller ecosystem than Nginx. |
+| **gRPC** | Envoy | First-class gRPC (frame ordering, trailers, no HTTP handler interference). Same Node server works with Envoy, failed with Caddy. | Two proxies (Caddy + Envoy), two configs. Extra operational surface. |
+| **Databases** | 8 dedicated Postgres | Service isolation, independent scaling and backup, clear schema boundaries. Aligns with microservice ownership. | More connections and ops; cross-service queries need dual-DB (auction-monitor, analytics). |
+| **Cache** | Redis + Lua | Singleflight (stampede prevention), LFU/LRU (shopping), rate limiting (token bucket, sliding window). Atomic ops without thundering herd. | Lua is niche; onboarding requires reading scripts. Redis is single point of failure without Sentinel/Cluster. |
+| **Messaging** | Kafka (strict TLS) | Event pipeline (forum, DMs, group chat); Python AI consumes from Kafka. SSL on 9093 with kafka-ssl-secret. | More moving parts; SSL cert and endpoint patching (e.g. kafka-external) required. |
+| **Local K8s** | Colima + k3s | Docker Desktop VM wedged at ~256 GB; Kind on Docker Desktop was unstable. Colima + k3s gives a single, reproducible cluster and preflight targets it explicitly. | Kind no longer default; some docs still mention Kind. Single-node limits; trim/cleanup in preflight to avoid API overload. |
+| **IAC** | Terraform + Ansible | Terraform for declarative infra (namespaces, ConfigMaps); Ansible for deploy and config (K8s collections). Dry-run and idempotency for safe ops. | Two tools to learn; Ansible playbooks skip cert/Caddy by default to avoid clobbering local state. |
+| **Testing** | Preflight + 8 suites + k6 + pgbench | Multi-protocol (HTTP/2, HTTP/3, gRPC), strict TLS/mTLS, rotation, 8 DBs — one “e2e” cannot cover failure modes and wire-level proof. Eight suites give clear scope; RUN_FULL_LOAD=1 adds load and DB sweep. | Many scripts and long runtimes; we accept complexity for reproducibility and debuggability. |
+| **HTTP/3 load** | xk6-http3 + curl | k6 doesn’t ship HTTP/3; xk6-http3 (quic-go) adds QUIC for load tests. NodePort UDP can fail externally; curl-based and in-cluster k6 are workarounds. | External xk6-http3 may not reach QUIC; we rely on in-cluster and packet capture for proof. |
+
+**Summary:** Every major choice (Caddy, Envoy, 8 Postgres, Redis+Lua, Kafka, Colima+k3s, Terraform+Ansible, preflight+8 suites) is justified by a concrete need (QUIC, gRPC correctness, isolation, cache safety, event pipeline, cluster stability, reproducibility, test coverage). Trade-offs are documented so a reviewer can see that we did not choose “everything”; we chose a coherent set and accepted the costs.
 
 ## Data Flow Diagrams
 
@@ -552,8 +709,8 @@ Services expose HTTP endpoints for:
 - **Idempotent**: Safe to run multiple times
 
 **Features**:
-- Prerequisites checking (Terraform, Ansible, kubectl, kind, docker)
-- Kind cluster creation/verification
+- Prerequisites checking (Terraform, Ansible, kubectl, docker; Colima + k3s or optional Kind)
+- Cluster creation/verification (Colima: `colima start --with-kubernetes`; or Kind if still used)
 - Terraform initialization and application
 - Ansible collection installation and service deployment
 - Docker image building and loading
@@ -1004,6 +1161,8 @@ notes.
 - **I/O metrics**: Disk I/O timing and statistics
 - **CPU usage**: CPU share and utilization
 
+**Load tests catalog**: For a full map of k6 scripts (read, soak, sweep, limit, constant stress, Little's Law, p99…p100) and pgbench integration, see **`scripts/load/LOAD_TESTS_CATALOG.md`**. Future integration of k6 and pgbench into `run-all-test-suites.sh` is documented there.
+
 ### Database Optimizations
 
 **Partitioning**:
@@ -1287,8 +1446,8 @@ We use comprehensive monitoring to prove why auth is the bottleneck:
 
 **Current Limitation**:
 - ⚠️ **NodePort UDP Routing**: HTTP/3 (QUIC) over NodePort (30443) has UDP routing issues causing connection timeouts
-- **Root Cause**: External k6 runs outside Kind cluster, NodePort UDP may not route QUIC correctly
-- **Workaround**: Use `HTTP_VERSION=HTTP/3` environment variable with standard k6, or curl-based HTTP/3 testing (`scripts/test-microservices-http2-http3.sh`) which runs inside Kind node network namespace
+- **Root Cause**: External k6 runs outside the cluster (Colima/k3s or Kind); NodePort UDP may not route QUIC correctly
+- **Workaround**: Use curl-based HTTP/3 testing (`scripts/test-microservices-http2-http3.sh`) or in-cluster k6 jobs; packet capture (tcpdump/tshark) verifies QUIC at wire level
 
 **Extension Features**:
 - ✅ HTTP/3 client using `quic-go` library
@@ -1326,7 +1485,7 @@ HTTP_VERSION=HTTP/3 k6 run scripts/load/k6-e2e-find-limit.js
 **Future Improvements**:
 - Run k6 inside Kubernetes cluster (use ClusterIP directly)
 - Port-forward UDP port 443 from Caddy pod
-- Use Kind node network namespace (similar to http3.sh)
+- Use cluster node network namespace or in-cluster k6 (similar to http3.sh)
 - Wait for native k6 HTTP/3 support in future versions
 
 ### HTTP/3 Protocol Verification
@@ -1443,7 +1602,7 @@ wireshark test-results/YYYYMMDD-HHMMSS-http3-verification/quic-capture.pcap
 - **Validation**: Tests fail if CA certificate is missing, ensuring strict TLS is always enforced
 - **Shopping Service Tests**: All shopping service k6 tests (`k6-shopping-stress.js`, `k6-shopping-ramp.js`, `k6-shopping-db-validation.js`, `k6-bottleneck-finder.js`) use strict TLS verification with CA certificate validation
 - **Test Scripts**: `run-k6-shopping.sh` and `find-bottlenecks.sh` enforce strict TLS by mounting CA certificate ConfigMap and setting `SSL_CERT_FILE` environment variable
-- **ClusterIP Access**: Tests use ClusterIP FQDN (`caddy-h3.ingress-nginx.svc.cluster.local:443`) for in-cluster testing to avoid NodePort TLS passthrough issues in Kind clusters
+- **ClusterIP Access**: Tests use ClusterIP FQDN (`caddy-h3.ingress-nginx.svc.cluster.local:443`) for in-cluster testing to avoid NodePort TLS passthrough issues in Colima/k3s (or Kind)
 
 **Strict TLS Enforcement**:
 - **Edge Layer**: Caddy configured with `protocols tls1.2 tls1.3` - only TLS 1.2 and 1.3 are accepted; TLS 1.1 and below are rejected.
@@ -1630,7 +1789,7 @@ wireshark test-results/YYYYMMDD-HHMMSS-http3-verification/quic-capture.pcap
 
 ## Recovery Procedures & Troubleshooting
 
-> **📖 Comprehensive Troubleshooting Guide**: For detailed documentation of all cluster stabilization issues, root causes, and solutions, see [`Runbook.md`](../Runbook.md). The Runbook covers 12 major issues including TLS handshake timeouts, missing secrets/configmaps, Kafka SSL configuration, Caddy errors, resource constraints, probe issues, and more.
+> **📖 Comprehensive Troubleshooting Guide**: For detailed documentation of all cluster stabilization issues, root causes, and solutions, see [`docs/Runbook.md`](docs/Runbook.md). The Runbook covers 12 major issues including TLS handshake timeouts, missing secrets/configmaps, Kafka SSL configuration, Caddy errors, resource constraints, probe issues, and more.
 
 ### Service Recovery
 

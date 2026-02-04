@@ -9,12 +9,22 @@ A production-ready, full-stack microservices platform demonstrating modern cloud
 
 **Note**: This is a **solo endeavor** - a personal project built by a single developer to explore and demonstrate advanced distributed systems concepts, microservices architecture, and cloud-native patterns. All design decisions, implementations, and optimizations were made independently as a learning and portfolio project.
 
+**Highlights at a glance**
+| Area | Achievement |
+|------|-------------|
+| **Uptime** | 100% during CA rotation; zero-downtime RollingUpdate |
+| **Protocols** | HTTP/2, HTTP/3 (QUIC), gRPC — all tested with strict TLS |
+| **Services** | 8+ microservices, 8 dedicated Postgres DBs, gRPC + REST |
+| **Security** | Strict TLS/mTLS everywhere; single preflight ensures valid certs |
+| **Testing** | 8 suites (auth, baseline, enhanced, adversarial, rotation, capture, tls-mtls, social); DB verification on all 8 DBs; optional k6 + pgbench for full load |
+| **Ops** | One-command preflight + suites; Runbook (docs/Runbook.md) catalogs 25+ issues and fixes |
+
 **Key Technical Highlights:**
-- **Zero-Downtime Operations**: Achieved 100% uptime during certificate rotation (16-second rotation time, 0 failed requests)
+- **Zero-Downtime Operations**: Achieved 100% uptime during certificate rotation (1–2s rotation time, 0 failed requests)
 - **Multi-Protocol Edge**: HTTP/2, HTTP/3 (QUIC), and gRPC support with automatic protocol negotiation
 - **Microservices Architecture**: 8+ services with dedicated databases, gRPC inter-service communication, and event-driven messaging
 - **Kubernetes-Native**: Complete infrastructure as code (Terraform + Ansible), observability stack (Prometheus, Grafana, Jaeger), and disaster recovery automation
-- **Production-Ready Features**: Strict TLS enforcement, JWT authentication, rate limiting, caching strategies, and comprehensive monitoring
+- **Production-Ready Features**: Strict TLS/mTLS for all services (single preflight script), JWT authentication, rate limiting, caching strategies, and comprehensive monitoring
 
 **What skills does this demonstrate?**
 - **Backend**: Node.js/Express, TypeScript, gRPC, PostgreSQL, Redis, Kafka, Prisma ORM
@@ -52,7 +62,7 @@ This isn't a tutorial project—it's a production-grade system solving real prob
   - **Granular Percentiles**: p1-p99 calculation for precise price positioning
   - **Kafka Integration**: Real-time data pipeline from Analytics → Python AI Service
 - **✅ k6 HTTP/3 Toolchain** - Custom k6 binary with HTTP/3 extension built using xk6 and quic-go. Extension loads successfully, but NodePort UDP routing limits external testing. For reliable HTTP/3 testing, use `scripts/test-microservices-http2-http3.sh` (curl-based, verified with tcpdump). See `test-results/K6_HTTP3_TOOLCHAIN_STATUS_12-22_tom.md` for complete status and `scripts/build-k6-http3.sh` for build instructions.
-- **✅ HTTP/3 Protocol Verification** - tcpdump/Wireshark verification confirms HTTP/3 uses QUIC (UDP) protocol. Verification script (`scripts/verify-http3-with-tcpdump.sh`) captures UDP packets on port 443 during HTTP/3 requests, proving QUIC usage. See `test-results/E2E_TEST_RESULTS_SUMMARY_12-22_tom.md` and `ENGINEERING.md` for complete verification methodology.
+- **✅ HTTP/3 Protocol Verification** - tcpdump/Wireshark verification confirms HTTP/3 uses QUIC (UDP) protocol. **Wire-level capture** is aligned across all suites (baseline, enhanced, standalone, rotation): drain before stop (so in-flight QUIC packets are captured), copy pcaps to host, tshark verification (HTTP/2 + QUIC). See `scripts/lib/packet-capture.sh`, Runbook #44, and `ENGINEERING.md` for the shared pattern.
 - **✅ Production-Ready Performance** - **99%+ success rates** across all services with **45-77% latency reduction** (p95 latencies improved from 2-5s to 0.5-2s). See `test-results/E2E_RETEST_RESULTS_12-21_tom.md` and `test-results/E2E_TEST_RESULTS_SUMMARY_12-22_tom.md` for complete test results.
 - **✅ Comprehensive E2E Testing** - HTTP/2 vs HTTP/3 comparison tests with organized timestamped results. See `scripts/compare-http2-http3.sh` and `test-results/` directory for all test results. **307+ shell scripts** support constant debugging and iterative development (see `test-results/REPO_STRUCTURE_EXPLANATION.md` for structure rationale).
 - **✅ One-command bootstrap & disaster recovery** - `scripts/bootstrap-platform.sh` deploys entire platform instantly; Terraform + Ansible enable instant cluster recreation for disaster recovery scenarios.
@@ -153,6 +163,22 @@ Key architectural benefits:
 - **Kafka integration**: Real-time messaging for forum posts, direct messages, and group chats
 
 ## Why This Exists
+
+### Use cases (canonical to edge)
+
+Record Platform supports a range of use cases from everyday collection management to edge cases that generic marketplaces don’t handle well:
+
+| Use case | Description | Why RP |
+|----------|-------------|--------|
+| **Collection CRUD** | Add, search, filter, update, delete records (vinyl, etc.) with ownership and catalog IDs | Single source of truth, full-text and faceted search, Redis-backed cache |
+| **Price and auction tracking** | Monitor auctions, store results, compute percentiles (p1–p99), feed analytics and AI | Dedicated auction_monitor DB, Discogs/eBay integration, Kafka pipeline |
+| **Seller/buyer intelligence** | Get pricing guidance (OBO, starting bid, fixed price), deal detection, negotiation context | Analytics + Python AI pipeline, granular percentiles, social/shopping integration |
+| **Forum and messaging** | Reddit-style forum (posts, comments, votes), DMs, group chats with real-time delivery | Social DB, Kafka strict TLS, Lua+Redis cache (singleflight, rate limits) |
+| **Shopping cart and orders** | Cart, checkout, wishlist, purchase history, resell workflow | Shopping schema, cart differentiation by catalog ID, cache (LFU/LRU Lua scripts) |
+| **Multi-protocol edge** | HTTP/2, HTTP/3 (QUIC), gRPC with strict TLS and zero-downtime CA rotation | Caddy + Envoy, one preflight validates certs and readiness for all suites |
+| **Scale and load testing** | Millions of rows per DB, pgbench sweeps, k6 E2E and adversarial tests | 8 dedicated Postgres DBs, load scripts (with fast staging for GIN-heavy tables), preflight + 8 suites + optional k6/pgbench |
+
+Examples of “things people might not think it’s used for”: auction result scraping and normalization, passkey/WebAuthn auth, MFA/TOTP, rate limiting and cache stampede prevention (Redis Lua), and full-chain TLS/mTLS verification across Caddy, Envoy, and services.
 
 ### The Problem with Record Collecting
 
@@ -690,6 +716,63 @@ cd ansible && ansible-playbook playbooks/deploy-services.yml --check
 - Comprehensive validation: Checks prerequisites and validates configurations
 - **Disaster Recovery**: One-command platform restoration
 
+## Testing
+
+**To the point:** One pipeline runs **preflight** (kubeconfig, API server, **strict TLS/mTLS**), then **8 suites**; DB verification runs after each suite. All services use strict TLS and mTLS. Optional load (k6 + pgbench) and **total platform coverage** are documented below.
+
+### What is preflight?
+
+**Preflight** is a single entry point that makes the cluster and certs ready for all test suites and load tests. It typically:
+
+1. Verifies **kubeconfig** and API server reachability (with timeouts).
+2. Optionally **scales** deployments (e.g. Caddy, gateway) and **reissues** TLS material (dev-root CA, leaf certs) so strict TLS/mTLS checks pass.
+3. Runs **strict TLS/mTLS preflight** (`ensure-strict-tls-mtls-preflight.sh`): ensures `service-tls` and `dev-root-ca` secrets exist and are valid; restarts gRPC/TLS workloads if certs were updated so there’s no “self-signed certificate in certificate chain” or auth 503.
+4. Leaves the cluster in a state where **all 8 suites** (auth, baseline, enhanced, adversarial, rotation, packet capture, tls-mtls, social) and optional k6/pgbench can run without manual cert or scale steps.
+
+**Full pipeline (preflight + scale + reissue + suites):** `./scripts/run-preflight-scale-and-all-suites.sh`  
+**Suites only (cluster and certs already ready):** `./scripts/run-all-test-suites.sh` (still runs strict TLS preflight internally unless `SKIP_TLS_PREFLIGHT=1`).  
+**Total platform coverage (preflight + suites + k6 + pgbench):** `RUN_FULL_LOAD=1 ./scripts/run-preflight-scale-and-all-suites.sh`
+
+### How to run
+
+- Use the commands in the **What is preflight?** section above. For **suites only** (no scale/reissue), run `./scripts/run-all-test-suites.sh 2>&1 | tee /tmp/full-run-$(date +%s).log` (still runs strict TLS preflight unless `SKIP_TLS_PREFLIGHT=1`).
+
+**Order of suites (8)**  
+1. Auth (register, login, MFA, passkeys)  
+2. Baseline (smoke: HTTP/2, HTTP/3, gRPC, packet capture)  
+3. Enhanced (packet capture + adversarial)  
+4. Adversarial  
+5. Rotation (CA/leaf rotation + k6 chaos)  
+6. Standalone packet capture  
+7. TLS/mTLS comprehensive  
+8. Social (forum + messages, archive/recall/kick/ban; requires social DB migrations — see `scripts/ensure-social-migrations.sh`)
+
+**Why 8+ suites and a “command center”**  
+We run **8 core suites** plus optional k6 load and pgbench sweeps (15+ scripts when counting limit-finding, service-specific k6, and DB verification). This breadth exists because the platform spans multiple protocols (HTTP/1.1, HTTP/2, HTTP/3, gRPC), strict TLS/mTLS, zero-downtime rotation, and 8 databases. A single “command center” entry point (`run-all-test-suites.sh` or `run-preflight-scale-and-all-suites.sh`) orchestrates order, preflight, and DB/cache verification so you don’t have to remember sequence or cert steps. See `scripts/load/LOAD_TESTS_CATALOG.md` and `ENGINEERING.md` for the full testing strategy.
+
+**Strict TLS/mTLS (including k6)**  
+- **Preflight:** `scripts/ensure-strict-tls-mtls-preflight.sh` validates `service-tls` + `dev-root-ca`; if missing/invalid, provisions from repo or OpenSSL and restarts gRPC/TLS workloads. Used by both preflight pipeline (step 5) and `run-all-test-suites.sh`.
+- **k6:** All k6 runs use **strict TLS** (no `-k`). The runner sets `SSL_CERT_FILE` to the dev-root CA (from K8s secret or `certs/dev-root.pem`) so `record.local` x509 verification succeeds. If you see `x509: certificate is not trusted`, set `K6_CA_CERT=/path/to/dev-root.pem` or run after preflight.
+- Prevents auth 503 / "self-signed certificate in certificate chain" by restarting pods after any cert update.
+
+**HTTP/1.1, HTTP/2, and HTTP/3 (and why we test both)**  
+- **HTTP/2:** Standard k6 uses HTTP/2 by default over TLS. We use it for baseline load and limit tests.
+- **HTTP/3:** k6 does not ship HTTP/3; we use **xk6-http3** (custom binary via `scripts/build-k6-http3.sh`, e.g. `.k6-build/bin/k6-http3`) to run HTTP/3 (QUIC) load tests. Curl-based tests (`scripts/test-microservices-http2-http3.sh`) also verify HTTP/3 with strict TLS.
+- **HTTP/1.1:** Supported for legacy clients; we test that the edge accepts HTTP/1.1 and returns 200 where applicable.
+- **Head-of-line blocking (HOLB):** HTTP/2 multiplexes streams over one TCP connection — a single lost packet can block all streams. HTTP/3 (QUIC) uses independent streams over UDP, so we run **both** HTTP/2 and HTTP/3 tests to demonstrate latency and throughput differences and to validate that HOLB is real (e.g. compare scripts like `k6-limit-test-comprehensive.js` with H2 vs H3 or use `scripts/compare-http2-http3.sh`).
+
+**Where results go**  
+- Suite logs: `$SUITE_LOG_DIR` (default `/tmp/suite-logs-<timestamp>`).  
+- Quick scan: `grep -E '(✅|❌|⚠️|FAILED|error)' $SUITE_LOG_DIR/*.log`
+
+**Daily run and self-analyze**  
+- **Host cron:** Run `./scripts/run-daily-test-suite-with-results.sh` (saves to timestamped dir and prints a short failure summary). Example: `0 6 * * * /path/to/scripts/run-daily-test-suite-with-results.sh`.  
+- **CI:** Use `.github/workflows/rotation-chaos.yml` or add a workflow that runs the preflight + suites and uploads artifacts.  
+- **Self-analyze:** The daily script greps for failures and narrows scope (which suite, which test). See `scripts/run-daily-test-suite-with-results.sh` and `services/cron-jobs/README.md` for wiring daily runs.
+
+**DB verification**  
+- All **8 PostgreSQL instances** (ports 5433–5440) are checked by `verify-db-cache-quick.sh` after each suite. See `docs/Runbook.md` for known issues and fixes.
+
 ## Repository Layout
 - `infra/k8s/base/*` - canonical manifests for services, data stores, ingress, monitoring, and cron jobs.
 - `infra/k8s/overlays/dev/*` - dev overlay, ingress, patches, bootstrap scripts, job templates, and PVC helpers.
@@ -702,7 +785,7 @@ cd ansible && ansible-playbook playbooks/deploy-services.yml --check
 - `tests-local.sh`, `verify.sh`, `inventory.txt` - sanity checks and current cluster inventory snapshots.
 
 ## Prerequisites
-- Docker 24+, Kind, kubectl >=1.30, Helm >=3.13.
+- Docker 24+, Colima, kubectl >=1.30, Helm >=3.13.
 - mkcert (or another local CA tool) to mint and trust `record.local` certificates.
 - Node 20+ and pnpm 9.x for service builds.
 - Optional: `curl` with HTTP/3 support (Homebrew `curl --with-quic`) and `k6` for load tests.
@@ -1052,6 +1135,11 @@ export async function cached<T>(
 - **Linkerd Viz** dashboard: `linkerd viz dashboard`
 - Auto-injection: `kubectl annotate namespace record-platform linkerd.io/inject=enabled`
 
+### Test Suite (Preflight + Control Plane)
+- See **[Testing](#testing)** for the dedicated testing section (how to run, order, strict TLS, daily run, self-analyze).
+- **Quick run**: `./scripts/run-preflight-scale-and-all-suites.sh` (full preflight + scale + reissue + all 8 suites) or `./scripts/run-all-test-suites.sh 2>&1 | tee /tmp/full-run-$(date +%s).log`. For total platform coverage (k6 + pgbench): `RUN_FULL_LOAD=1 ./scripts/run-preflight-scale-and-all-suites.sh`.
+- **DB verification**: All **8 PostgreSQL instances** (ports 5433–5440) are checked after each suite. See `docs/Runbook.md` for issues and fixes.
+
 ### Diagnostic Scripts
 - `scripts/verify-dev.sh` - End-to-end cluster sanity checks
 - `scripts/diag-caddy.sh`, `scripts/diag-gateway.sh`, `scripts/quic-tune-kind.sh` - Ingress and QUIC inspection
@@ -1059,6 +1147,11 @@ export async function cached<T>(
 - `scripts/pg-connectivity-check.sh` - Database connectivity from Kubernetes pods to Docker Compose
 - `infra/k8s/scripts/access-observability.sh` - Quick access to Grafana, Prometheus, Jaeger
 - `infra/k8s/scripts/install-observability.sh` - Complete observability stack installer
+
+### Debug Tools (Packet Capture & Profiling)
+- **Packet capture**: `tshark`, `tcpdump`, `netstat` for HTTP/2 (TCP 443), HTTP/3/QUIC (UDP 443), and gRPC verification. Captures run on Caddy and Envoy pods; pcaps must be non-empty for wire-level verification.
+- **Profiling**: `valgrind`, `htop`, `strace` for memory/CPU and system-call debugging. CI/workflows can install as needed; see `docs/Runbook.md` for packet-capture and TLS/mTLS issues.
+- **Strict TLS**: All gRPC and HTTP tests use strict TLS (CA verification); `scripts/test-tls-mtls-comprehensive.sh` validates certificate chain and mTLS configuration.
 
 ### Documentation
 - `infra/k8s/OBSERVABILITY.md` - Comprehensive observability guide
@@ -1296,7 +1389,11 @@ kubectl -n record-platform rollout restart deployment/<service>
 
 **Run Integration Tests**:
 ```bash
-# Full test suite
+# Full pipeline (preflight + all 8 suites + DB/cache verification, 8 DBs 5433–5440)
+./scripts/run-preflight-scale-and-all-suites.sh
+# Or: ./scripts/run-all-test-suites.sh 2>&1 | tee /tmp/full-run-$(date +%s).log
+
+# Baseline smoke only
 ./scripts/test-microservices-http2-http3.sh
 
 # Check test results
@@ -1354,7 +1451,7 @@ kubectl -n record-platform wait --for=condition=ready pod --all --timeout=300s
 ```
 
 ### Documentation References
-- **Runbook**: `Runbook.md` - Comprehensive troubleshooting guide for all cluster stabilization issues and solutions
+- **Runbook**: `docs/Runbook.md` - Comprehensive troubleshooting guide for all cluster stabilization issues and solutions
 - **Postgres Recovery**: `docs/postgres-infra-setup.md` - Complete database recovery procedures
 - **Linkerd Recovery**: `LINKERD_FIX.md` - Linkerd re-enablement process
 - **Observability**: `infra/k8s/OBSERVABILITY.md` - Observability stack troubleshooting

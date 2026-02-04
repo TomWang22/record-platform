@@ -20,7 +20,8 @@ const connectionString = process.env.POSTGRES_URL_AUTH || '';
 // k6 tests can generate: 20 VUs × 2 req/s = 40 concurrent requests
 // Each request needs a DB connection, and requests take 2-3s each
 // With connection_limit=100, we can handle burst load better
-const connectionLimit = 100; // Increased from 50 to handle peak concurrent load (database max_connections is 100)
+// Database max_connections=500 (configured in docker-compose.yml), so 100 is safe
+const connectionLimit = 100; // High concurrency: authentication and user operations
 const poolTimeout = 30; // Increased timeout to handle connection pool contention under load
 
 // Build connection string with pool parameters

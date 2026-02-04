@@ -22,13 +22,24 @@ export function getRedisClient(): RedisClientType | null {
 
   try {
     let REDIS_URL = process.env.REDIS_URL || "redis://redis:6379/0";
-    const REDIS_PASSWORD = process.env.REDIS_PASSWORD;
+    const rawPassword = process.env.REDIS_PASSWORD;
+    const REDIS_PASSWORD = rawPassword && String(rawPassword).trim() ? rawPassword : undefined;
     
+    // Only add password to URL if it exists and URL doesn't already have auth
     if (REDIS_PASSWORD && !REDIS_URL.includes('@') && !REDIS_URL.includes('://:')) {
       REDIS_URL = REDIS_URL.replace('redis://', `redis://:${REDIS_PASSWORD}@`);
     }
 
-    redisClient = createClient({ url: REDIS_URL }) as RedisClientType;
+    // Create client with explicit socket configuration to prevent auto-auth
+    // If no password (or empty string when Redis is externalized without auth), don't send AUTH
+    const clientConfig: any = { url: REDIS_URL };
+    if (!REDIS_PASSWORD) {
+      // Explicitly disable password authentication if no password is set
+      // This prevents the redis client from sending AUTH with empty password
+      clientConfig.password = undefined;
+    }
+
+    redisClient = createClient(clientConfig) as RedisClientType;
     
     redisClient.on('error', (err: Error) => {
       console.warn('[listings-redis] Redis error (non-fatal):', err.message);

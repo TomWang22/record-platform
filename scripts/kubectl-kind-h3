@@ -1,4 +1,0 @@
-#!/bin/bash
-# kubectl workaround for Kind cluster h3 when port mapping is missing
-# Usage: ./scripts/kubectl-kind-h3 <kubectl-args>
-docker exec -i h3-control-plane kubectl "$@"

@@ -7,7 +7,9 @@ export function getRedis(): Redis {
   if (!client) {
     // Support both REDIS_URL (with password) and REDIS_PASSWORD env var
     let url = process.env.REDIS_URL || 'redis://redis:6379/0'
-    const password = process.env.REDIS_PASSWORD
+    const rawPassword = process.env.REDIS_PASSWORD
+    // Treat empty string as no password (externalized Redis often has no requirepass)
+    const password = rawPassword && String(rawPassword).trim() ? rawPassword : undefined
     // If REDIS_PASSWORD is set and URL doesn't have password, add it
     if (password && !url.includes('@') && !url.includes('://:')) {
       // Insert password after redis://

@@ -9,24 +9,33 @@ if (!LISTINGS_DB_URL || !ANALYTICS_DB_URL) {
 }
 
 // Pool for listings DB (search_history)
-// Increased pool size to handle 50+ VUs with headroom for concurrent requests
-// Formula: max = (VUs * avg_concurrent_per_vu) + headroom
-// For 50 VUs with 2 concurrent requests each: 100 + 50 headroom = 150
-// But we cap at reasonable limit to avoid overwhelming DB
+// Moderate concurrency: Cross-database queries for analytics
+// Standard pool size: 100 connections (configurable via DB_POOL_MAX)
 export const listingsPool = new Pool({
   connectionString: LISTINGS_DB_URL,
-  max: 100,  // Increased from 50 to handle 50+ VUs with headroom (2 replicas * 50 = 100, but we need more for concurrent requests)
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  max: parseInt(process.env.DB_POOL_MAX || '100', 10), // Moderate concurrency
+  min: parseInt(process.env.DB_POOL_MIN || '10', 10),
+  idleTimeoutMillis: 60000, // 1 minute
+  connectionTimeoutMillis: 10000, // 10 seconds
+  statement_timeout: 30000, // 30 second statement timeout
+  query_timeout: 30000, // 30 second query timeout
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 })
 
 // Pool for analytics DB (price_snapshots, search_analytics, etc.)
-// Increased pool size to handle 50+ VUs with headroom
+// Moderate concurrency: Analytics queries and writes
+// Standard pool size: 100 connections (configurable via DB_POOL_MAX)
 export const analyticsPool = new Pool({
   connectionString: ANALYTICS_DB_URL,
-  max: 100,  // Increased from 50 to handle 50+ VUs with headroom
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  max: parseInt(process.env.DB_POOL_MAX || '100', 10), // Moderate concurrency
+  min: parseInt(process.env.DB_POOL_MIN || '10', 10),
+  idleTimeoutMillis: 60000, // 1 minute
+  connectionTimeoutMillis: 10000, // 10 seconds
+  statement_timeout: 30000, // 30 second statement timeout
+  query_timeout: 30000, // 30 second query timeout
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 })
 
 // Legacy pool for backward compatibility (defaults to analytics DB)

@@ -33,7 +33,7 @@ COPY proto ./proto
 
 # Build with cache mount for faster subsequent builds
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -C services/common build \
+    pnpm -w --filter @common/utils build \
  && pnpm -C services/api-gateway build \
  && pnpm -C services/api-gateway prune --prod
 

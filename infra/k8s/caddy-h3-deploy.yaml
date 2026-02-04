@@ -50,12 +50,14 @@ spec:
         - { name: https, containerPort: 443, protocol: TCP }
         - { name: https-udp, containerPort: 443, protocol: UDP }
         - { name: grpc-h2c, containerPort: 5000, protocol: TCP }
+        - { name: admin, containerPort: 2019, protocol: TCP }
         volumeMounts:
         - { name: caddy-conf,  mountPath: /etc/caddy }                       # Caddyfile
         - { name: caddy-certs, mountPath: /etc/caddy/certs, readOnly: true } # tls.crt,tls.key
         - { name: caddy-ca,    mountPath: /etc/caddy/ca,    readOnly: true } # dev-root.pem
+        # HTTP/3 (QUIC) on 443/UDP; tcpSocket validates TLS listener. /_caddy/healthz for explicit HTTP/3 checks.
         readinessProbe:
-          tcpSocket: { port: 443 }  # avoid TLS validation issues on pod IP
+          tcpSocket: { port: 443 }
           periodSeconds: 2
           failureThreshold: 3
           initialDelaySeconds: 2

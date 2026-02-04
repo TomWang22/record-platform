@@ -22,10 +22,41 @@ const ebayAdapter = EBAY_APP_ID ? new eBayAdapter({
 // When running with server.ts, the Express server handles health checks on port 4008
 const healthPort = Number(process.env.AUCTION_MONITOR_HEALTH_PORT) || 4010;
 
-// Pool for reading watchlist from listings DB
-const listingsPool = new Pool({ connectionString: POSTGRES_URL_LISTINGS });
-// Pool for writing auction results to auction-monitor DB
-const auctionPool = new Pool({ connectionString: POSTGRES_URL_AUCTION_MONITOR });
+// Connection pools for auction-monitor service
+// Low concurrency: Background worker service
+// Standard pool size: 50 connections per pool (reading watchlist, writing results)
+const listingsPool = new Pool({
+  connectionString: POSTGRES_URL_LISTINGS,
+  max: parseInt(process.env.DB_POOL_MAX || '50', 10), // Low concurrency: background worker
+  min: parseInt(process.env.DB_POOL_MIN || '5', 10),
+  idleTimeoutMillis: 60000, // 1 minute
+  connectionTimeoutMillis: 10000, // 10 seconds
+  statement_timeout: 30000, // 30 second statement timeout
+  query_timeout: 30000, // 30 second query timeout
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
+});
+
+const auctionPool = new Pool({
+  connectionString: POSTGRES_URL_AUCTION_MONITOR,
+  max: parseInt(process.env.DB_POOL_MAX || '50', 10), // Low concurrency: background worker
+  min: parseInt(process.env.DB_POOL_MIN || '5', 10),
+  idleTimeoutMillis: 60000, // 1 minute
+  connectionTimeoutMillis: 10000, // 10 seconds
+  statement_timeout: 30000, // 30 second statement timeout
+  query_timeout: 30000, // 30 second query timeout
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
+});
+
+// Error handling for connection pools
+listingsPool.on('error', (err) => {
+  console.error('[auction-monitor-worker] Listings DB pool error:', err);
+});
+
+auctionPool.on('error', (err) => {
+  console.error('[auction-monitor-worker] Auction DB pool error:', err);
+});
 
 // Use common Kafka client with strict TLS support
 const admin = kafka.admin();

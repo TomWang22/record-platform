@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS messages.group_members (
   id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id  UUID NOT NULL REFERENCES messages.groups(id) ON DELETE CASCADE,
   user_id   UUID NOT NULL,
-  role      VARCHAR(16) NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'moderator', 'member')),
+  role      VARCHAR(16) NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'moderator', 'member')),
   joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(group_id, user_id)
 );

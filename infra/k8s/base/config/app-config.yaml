@@ -24,11 +24,11 @@ data:
   AI_PORT: "5005"
   SHOPPING_PORT: "4007"
 
-  # Redis URL with password (password is in redis-auth secret)
-  # Format: redis://:password@host:port/db
-  # Note: Services should use REDIS_PASSWORD env var from secret, but REDIS_URL is also supported
-  # Updated to use correct password: postgres (matches redis-auth secret)
-  REDIS_URL: redis://:postgres@redis.record-platform.svc.cluster.local:6379/0
+  # Redis URL (Docker Compose Redis has NO password configured)
+  # Format: redis://host:port/db
+  # CRITICAL: Using host.docker.internal to reach external Docker Compose Redis (exposed on port 6379)
+  # Note: Docker Compose redis service doesn't require authentication
+  REDIS_URL: redis://host.docker.internal:6379/0
 
   PROTO_ROOT: /app/proto
 
@@ -41,7 +41,7 @@ data:
 
   # optional compatibility (literal duplicates, not $(…))
   POSTGRES_URL:         postgresql://postgres:postgres@host.docker.internal:5433/records?connect_timeout=5
-  POSTGRES_URL_AUTH:    postgresql://postgres:postgres@postgres-auth-external.record-platform.svc.cluster.local:5437/records?connect_timeout=5
+  POSTGRES_URL_AUTH:    postgresql://postgres:postgres@host.docker.internal:5437/records?connect_timeout=5
   POSTGRES_URL_RECORDS: postgresql://postgres:postgres@host.docker.internal:5433/records?connect_timeout=5
   POSTGRES_URL_SOCIAL:  postgresql://postgres:postgres@host.docker.internal:5434/records?connect_timeout=5
   # Database port mappings (external:internal):
@@ -50,12 +50,12 @@ data:
   # Listings DB: 5435:5432 (standalone, separate from Analytics)
   POSTGRES_URL_LISTINGS: postgresql://postgres:postgres@host.docker.internal:5435/records?connect_timeout=5
   POSTGRES_URL_SHOPPING: postgresql://postgres:postgres@host.docker.internal:5436/records?connect_timeout=5
-  POSTGRES_URL_AUCTION_MONITOR: postgresql://postgres:postgres@postgres-auction-monitor-external.record-platform.svc.cluster.local:5432/auction_monitor?connect_timeout=5
+  POSTGRES_URL_AUCTION_MONITOR: postgresql://postgres:postgres@host.docker.internal:5438/postgres?connect_timeout=5
   POSTGRES_URL_ANALYTICS: postgresql://postgres:postgres@host.docker.internal:5439/analytics?connect_timeout=5
   # NOTE: asyncpg doesn't support connect_timeout parameter - removed for Python AI service
   POSTGRES_URL_PYTHON_AI: postgresql://postgres:postgres@host.docker.internal:5440/python_ai
   
-  # Kafka Configuration - Strict TLS (SSL on port 9093)
-  KAFKA_BROKER: kafka.record-platform.svc.cluster.local:9093
+  # Kafka: external strict TLS (Docker Compose :29093). Same CA as Caddy (dev-root-ca).
+  KAFKA_BROKER: kafka-external.record-platform.svc.cluster.local:9093
   KAFKA_USE_SSL: "true"
   KAFKA_SSL_ENABLED: "true"

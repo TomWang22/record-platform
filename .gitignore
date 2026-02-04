@@ -3,6 +3,7 @@ dist/
 .env
 .DS_Store
 coverage/
+.reissue-tmp.*
 *.log
 __pycache__/
 *.pyc
@@ -66,16 +67,24 @@ bench_export_*.csv
 **/prisma/migrations/migration_lock.toml
 **/prisma/.env
 
-# Documentation notes (user-specific)
-docs/
+# Documentation: only README.md and ENGINEERING.md at repo root; all other .md and .gz live under docs/
 records_chunks/
 records_chunks_small/
+docs/records_chunks/
+docs/records_chunks_small/
 
-# Random files in root directory (keep only README.md, ENGINEERING.md, and Runbook.md)
-*.md
-!README.md
-!ENGINEERING.md
-!Runbook.md
+# Root: ignore all .md and .gz at top level (canonical docs are README.md, ENGINEERING.md; Runbook and archive in docs/)
+/*.md
+!/README.md
+!/ENGINEERING.md
+/*.gz
+# Allow docs content (Runbook, archive, ADRs, etc.)
+!docs/
+!docs/**/*.md
+!docs/**/*.gz
+
+# Generated CSV: pgbench/scripts write to test-results/ or LOG_DIR; keep *.csv ignored to avoid committing large outputs
+# (See scripts/PGBENCH_HARDENING.md and run_pgbench_sweep.sh for where CSVs are written.)
 *.txt
 !COMMIT_MESSAGE.txt
 *.csv

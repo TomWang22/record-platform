@@ -99,6 +99,7 @@ infra/docs/EIGHT-DATABASES_ARCHITECTURE.md
 *.tsv
 *.html
 *.sh
+!scripts/check-no-ip-quic.sh
 *.yaml
 !docker-compose.yml
 !pnpm-workspace.yaml

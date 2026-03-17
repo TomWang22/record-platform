@@ -64,6 +64,7 @@ jobs:
           if [ ! -f "services/common/dist/index.d.ts" ]; then
             echo "Common cache miss; building common..."
             pnpm -C services/common build
+            test -f "services/common/dist/index.d.ts" || (echo "ERROR: common build failed" && exit 1)
           fi
       - name: Build ${{ matrix.service }}
         run: |
@@ -76,7 +77,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: No IP-based HTTP/3 usage
-        run: ./scripts/check-no-ip-quic.sh
+        run: |
+          if [ ! -f scripts/check-no-ip-quic.sh ]; then
+            echo "::error::scripts/check-no-ip-quic.sh not found. Add and commit it (see README Recent Breakthroughs)."
+            exit 1
+          fi
+          bash scripts/check-no-ip-quic.sh
 
   transport-validation:
     name: Transport validation gate
@@ -88,9 +94,10 @@ jobs:
           python-version: "3.11"
       - name: Validate transport tooling (no pcap)
         run: |
-          python3 scripts/lib/transport_validator.py 2>/dev/null; e=$?
-          if [ "$e" -eq 2 ]; then
-            echo "Validator correctly requires pcap when none provided (exit 2)."
+          out=$(python3 scripts/lib/transport_validator.py 2>&1); e=$?
+          echo "$out"
+          if [ "$e" -ne 0 ] && echo "$out" | grep -q "no pcap provided"; then
+            echo "Validator correctly requires pcap when none provided; treating as success."
             exit 0
           fi
           exit $e

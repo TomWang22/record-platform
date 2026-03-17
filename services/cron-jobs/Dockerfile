@@ -35,7 +35,7 @@ COPY services/cron-jobs ./services/cron-jobs
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm -C services/common build \
  && pnpm -C services/cron-jobs build \
- && pnpm -C services/cron-jobs prune --prod
+ && pnpm -C services/cron-jobs prune --prod --config.confirmModulesPurge=false
 
 # Produce isolated deploy bundle (production deps only). Use same store mount so deploy copies from cache — no network.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \

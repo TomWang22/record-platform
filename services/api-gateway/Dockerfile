@@ -28,7 +28,7 @@ COPY --from=deps /app /app
 # Let workspace orchestrate build (topological order); then prune this service for prod
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm -w build \
- && pnpm -C services/api-gateway prune --prod
+ && pnpm -C services/api-gateway prune --prod --config.confirmModulesPurge=false
 
 # Produce isolated deploy bundle (production deps only). Use same store mount so deploy copies from cache — no network.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \

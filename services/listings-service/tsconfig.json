@@ -3,12 +3,7 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "types": ["node"],
-    "baseUrl": ".",
-    "paths": {
-      "@common/utils": ["../common/src"],
-      "@common/utils/*": ["../common/src/*"]
-    }
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"]
 }

@@ -4,12 +4,7 @@
     "rootDir": "src",
     "outDir": "dist",
     "types": ["node"],
-    "composite": true,
-    "baseUrl": ".",
-    "paths": {
-      "@common/utils": ["../common/src"],
-      "@common/utils/*": ["../common/src/*"]
-    }
+    "composite": true
   },
   "include": ["src/**/*.ts"],
   "references": [

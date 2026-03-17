@@ -9,11 +9,6 @@
     "resolveJsonModule": true,
     "types": ["node"],
     "declaration": true,
-    "declarationMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@common/utils": ["services/common/src"],
-      "@common/utils/*": ["services/common/src/*"]
-    }
+    "declarationMap": true
   }
 }

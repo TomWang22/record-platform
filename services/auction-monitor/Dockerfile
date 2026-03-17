@@ -29,7 +29,7 @@ COPY --from=deps /app /app
 # Let workspace orchestrate build (topological order); then prune this service for prod
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm -w build \
- && pnpm -C services/auction-monitor prune --prod \
+ && pnpm -C services/auction-monitor prune --prod --config.confirmModulesPurge=false \
  && pnpm -C services/auction-monitor install --prod --ignore-scripts --shamefully-hoist
 
 # Verify express is installed before proceeding

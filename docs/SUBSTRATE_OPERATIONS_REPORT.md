@@ -6,6 +6,23 @@
 
 ---
 
+## 0. Housing-platform alignment (global-scale ready)
+
+The substrate bundle produced by `scripts/build-substrate-bundle.sh` is aligned with a **housing-platform global-scale spec**:
+
+- **7 domain services:** auth-service (ported), listings-service, booking-service, messaging-service, notification-service, trust-service, analytics-service. Event-driven; cross-domain only via Kafka. No cross-service DB access.
+- **Root layout:** `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `docker-compose.yml` (Postgres + Kafka + Redis), `services/`, `webapp/`, `proto/`, `infra/k8s/base` and `overlays/`, `scripts/`, `docs/`.
+- **Infra set in stone:** Caddy, Envoy, MetalLB, strict TLS, Kafka mTLS required. Each service: own DB/Prisma, /health, /metrics, multi-stage Dockerfile (build common first), non-root user, CI-ready.
+- **Spec docs in bundle:** When building with the housing spec, the bundle includes **docs/ARCHITECTURE.md** (full architecture and service boundaries) and **docs/CURSOR_SCAFFOLD_INSTRUCTIONS.md** (Cursor instruction block to scaffold workspace, Dockerfiles, and CI). Use them in the new repo to scaffold from the spec without over-coupling.
+- **Kafka in tarball:** Strict TLS (SSL only on 9093), mTLS required (`KAFKA_SSL_CLIENT_AUTH=required`), and exactly-once semantics (idempotent producer, read_committed consumer). Bundle includes **kafka-external** (Service+Endpoints to external broker), **kafka** (in-cluster optional), **scripts/kafka-ssl-from-dev-root.sh**, and **docs/KAFKA_SUBSTRATE.md**. After apply, patch kafka-external Endpoints IP to host.
+- **infra copied (excl. db, ansible):** Bundle copies **infra/docs**, **infra/haproxy**, **infra/kafka**, **infra/nginx**, **infra/k8s** from RP. **infra/db** and **infra/ansible** are not included.
+- **K8s base = substrate only:** **infra/k8s/base/** contains only substrate (namespaces, config, kafka-external, kafka, envoy-test, redis, haproxy, nginx, observability, monitoring, exporters). **No** RP app services; you add `base/<service>/` per app and register in **base/kustomization.yaml**. **overlays/dev** includes HPA example (hpa-api-gateway.yaml). Replace `record-platform` namespace in all manifests.
+- **REPO_SETUP_SPEC.md:** In-depth spec (objective, root structure, service responsibilities, event-driven, DB policy, CI, Docker, security, scaling, phase 1 order, Cursor instruction block) is in the bundle as **docs/REPO_SETUP_SPEC.md**.
+
+See **docs/SUBSTRATE_BUNDLE_OPERATIONS.md** for what the tarball contains and how to add the 7 services.
+
+---
+
 ## 1. Substrate definition
 
 The substrate is the shared infrastructure layer that provides:

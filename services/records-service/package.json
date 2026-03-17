@@ -5,7 +5,7 @@
   "type": "commonjs",
   "main": "dist/server.js",
   "scripts": {
-    "build": "prisma generate && tsc -p tsconfig.json && mkdir -p dist/lib && cp src/lib/*.lua dist/lib/",
+    "build": "prisma generate && tsc -b && mkdir -p dist/lib && cp src/lib/*.lua dist/lib/",
     "dev": "tsx watch src/server.ts",
     "prestart": "test -f dist/lib/singleflight_cache.lua || (echo '❌ dist/lib/singleflight_cache.lua missing' && exit 1)",
     "start": "node dist/server.js",

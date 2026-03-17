@@ -4,17 +4,9 @@
     "rootDir": "src",
     "outDir": "dist",
     "types": ["node"],
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "composite": true,
-    "baseUrl": ".",
-    "paths": {
-      "@common/utils": ["../common/dist"],
-      "@common/utils/*": ["../common/dist/*"]
-    }
+    "incremental": true,
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../common" }
-  ]
+  "references": [{ "path": "../common" }]
 }

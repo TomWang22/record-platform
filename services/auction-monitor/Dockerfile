@@ -5,38 +5,31 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Copy package manifests (changes rarely, good for caching)
+# Copy full workspace source for common + this service + proto so pnpm install sees real tree
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY .npmrc ./
-COPY services/common/package.json ./services/common/package.json
-COPY services/auction-monitor/package.json ./services/auction-monitor/package.json
+COPY services/common ./services/common
+COPY services/auction-monitor ./services/auction-monitor
+COPY proto ./proto
 
-# Use BuildKit cache mounts for pnpm store (persists between builds)
-# Also cache Puppeteer Chrome downloads to avoid 10+ minute downloads
+# Install with workspace intact so @common/utils symlinks point at services/common
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
     --mount=type=cache,id=puppeteer-cache,target=/root/.cache/puppeteer \
-    pnpm -w \
-      --filter @common/utils... \
-      --filter auction-monitor... \
-      install --frozen-lockfile --ignore-scripts
+    pnpm -w --filter @common/utils... --filter auction-monitor... install --frozen-lockfile --ignore-scripts
 
 # ---------- build ----------
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Copy installed dependencies from deps stage
+# Use deps stage as-is: do not COPY services/* again or symlinks break
 COPY --from=deps /app /app
 
-# Copy source code (changes frequently, invalidates cache)
-COPY services/common ./services/common
-COPY services/auction-monitor ./services/auction-monitor
-COPY proto ./proto
-
-# Build workspace: pnpm builds deps (e.g. @common/utils) then this service in topological order
+# Build in dependency order so common/dist exists before service tsc runs
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm --filter auction-monitor... run build \
+    pnpm --filter @common/utils run build \
+ && pnpm -C services/auction-monitor run build \
  && pnpm -C services/auction-monitor prune --prod \
  && pnpm -C services/auction-monitor install --prod --ignore-scripts --shamefully-hoist
 

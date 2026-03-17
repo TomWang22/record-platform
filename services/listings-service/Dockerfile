@@ -5,37 +5,29 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Copy package manifests (changes rarely, good for caching)
+# Copy full workspace source for common + this service so pnpm install sees real tree
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY .npmrc ./
-COPY services/common/package.json ./services/common/package.json
-COPY services/common/tsconfig.json ./services/common/tsconfig.json
-COPY services/listings-service/package.json ./services/listings-service/package.json
-COPY services/listings-service/tsconfig.json ./services/listings-service/tsconfig.json
+COPY services/common ./services/common
+COPY services/listings-service ./services/listings-service
 
-# Use BuildKit cache mounts for pnpm store (persists between builds)
+# Install with workspace intact so @common/utils symlinks point at services/common
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm -w \
-      --filter @common/utils... \
-      --filter listings-service... \
-      install --frozen-lockfile --ignore-scripts
+    pnpm -w --filter @common/utils... --filter listings-service... install --frozen-lockfile --ignore-scripts
 
 # ---------- build ----------
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Copy installed dependencies from deps stage
+# Use deps stage as-is: do not COPY services/* again or symlinks break
 COPY --from=deps /app /app
 
-# Copy source code (changes frequently, invalidates cache)
-COPY services/common ./services/common
-COPY services/listings-service ./services/listings-service
-
-# Build workspace: pnpm builds deps (e.g. @common/utils) then this service in topological order
+# Build in dependency order so common/dist exists before service tsc runs
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm --filter listings-service... run build
+    pnpm --filter @common/utils run build \
+ && pnpm -C services/listings-service run build
 
 # Produce isolated deploy bundle (production deps only). Use same store mount so deploy copies from cache — no network.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \

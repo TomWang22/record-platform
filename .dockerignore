@@ -15,6 +15,9 @@ dist/
 build/
 .next/
 out/
+webapp/.next/
+.pnpm-store/
+backups/
 *.log
 *.pid
 *.seed

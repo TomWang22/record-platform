@@ -12,10 +12,12 @@ COPY services/common ./services/common
 COPY services/auction-monitor ./services/auction-monitor
 COPY proto ./proto
 
+# Skip Puppeteer's Chrome download in Docker (~100MB, 6+ min). Use puppeteer-core + system Chromium if browser needed.
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 # Install with workspace intact so @common/utils symlinks point at services/common
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    --mount=type=cache,id=puppeteer-cache,target=/root/.cache/puppeteer \
     pnpm -w --filter @common/utils... --filter auction-monitor... install --frozen-lockfile --ignore-scripts
 
 # ---------- build ----------

@@ -8,6 +8,9 @@ RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 # Copy entire monorepo before install so pnpm can create workspace symlinks (@common/utils, etc.)
 COPY . .
 
+# Prevent Puppeteer (pulled in by other workspace deps, e.g. auction-monitor) from downloading Chrome (~100MB, 6+ min every build)
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
     pnpm install --frozen-lockfile

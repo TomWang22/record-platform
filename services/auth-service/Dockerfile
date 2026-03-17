@@ -28,19 +28,9 @@ COPY services/common ./services/common
 COPY services/auth-service ./services/auth-service
 COPY proto ./proto
 
-# Build common first, then ensure service node_modules sees common+dist (pnpm symlinks can miss dist in Docker)
+# Build workspace: pnpm builds deps (@common/utils) then auth-service (prisma generate + tsc) in topological order
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm --filter @common/utils run build \
- && mkdir -p services/auth-service/node_modules/@common \
- && rm -rf services/auth-service/node_modules/@common/utils \
- && cp -r services/common services/auth-service/node_modules/@common/utils \
- && cd services/auth-service \
- && rm -rf prisma/generated dist \
- && pnpm exec prisma generate \
- && ls -la prisma/generated/client/ | head -3 \
- && test -f prisma/generated/client/index.d.ts && echo "✓ index.d.ts exists" \
- && test -f prisma/generated/client/index.js && echo "✓ index.js exists" \
- && pnpm run build
+    pnpm --filter auth-service... run build
 
 # --- runtime ---
 FROM node:20-bookworm-slim

@@ -31,13 +31,9 @@ COPY --from=deps /app /app
 COPY services/common ./services/common
 COPY services/analytics-service ./services/analytics-service
 
-# Build common first, then ensure service node_modules sees common+dist (pnpm symlinks can miss dist in Docker)
+# Build workspace: pnpm builds deps (e.g. @common/utils) then this service in topological order
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm --filter @common/utils run build \
- && mkdir -p services/analytics-service/node_modules/@common \
- && rm -rf services/analytics-service/node_modules/@common/utils \
- && cp -r services/common services/analytics-service/node_modules/@common/utils \
- && pnpm -C services/analytics-service build \
+    pnpm --filter analytics-service... run build \
  && pnpm -C services/analytics-service prune --prod
 
 # Produce isolated deploy bundle (production deps only). Use same store mount so deploy copies from cache — no network.

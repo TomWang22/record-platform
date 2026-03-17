@@ -7,7 +7,7 @@
 
 ## Overview
 
-This document catalogs all bugs, issues, and solutions encountered during the stabilization of the Kind h3 Kubernetes cluster running the record-platform microservices stack. This serves as a reference for troubleshooting similar issues in the future.
+This document catalogs all bugs, issues, and solutions encountered during the stabilization of the record-platform stack on **Colima + k3s** with MetalLB (control plane, MetalLB webhook, k3s crash-loop, Envoy CA drift, packet capture, rotation, HTTP/3 route, and 80+ items). It serves as a reference for troubleshooting and for understanding the decisions that shaped the current setup.
 
 ## Bugs and decisions index (explicit)
 

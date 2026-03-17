@@ -19,7 +19,7 @@ A production-ready, full-stack microservices platform demonstrating modern cloud
 | **Services** | 8+ microservices, 8 dedicated Postgres DBs, gRPC + REST |
 | **Security** | Strict TLS/mTLS everywhere; single preflight ensures valid certs |
 | **Testing** | 8 suites (auth, baseline, enhanced, adversarial, rotation, capture, tls-mtls, social); DB verification on all 8 DBs; optional k6 + pgbench for full load |
-| **Ops** | One-command preflight + suites; Runbook (docs/Runbook.md) catalogs 25+ issues and fixes |
+| **Ops** | One-command preflight + suites; Runbook (docs/Runbook.md) catalogs 80+ issues and fixes |
 
 **Key Technical Highlights:**
 - **Zero-Downtime Operations**: Achieved 100% uptime during certificate rotation (1–2s rotation time, 0 failed requests)
@@ -72,7 +72,7 @@ This isn't a tutorial project—it's a production-grade system solving real prob
 - **Hardened gateway path** - API Gateway keeps the JWT guard, adds optional `DEBUG_FAKE_AUTH`, injects identity headers, and exposes detailed metrics.
 - **Redis-assisted records caching** - `services/records-service/src/lib/cache.ts` adds normalized search keys, safe JSON encoding, and targeted invalidation hooks.
 - **Kafka messaging with strict TLS** - Real-time messaging for forum posts, direct messages, and group chats via Kafka integration in social-service. **Strict TLS enabled** with SSL listener on port 9093, certificates managed via `kafka-ssl-secret`.
-- **Operational tooling** - `scripts/` covers smoke tests, TLS helpers, QUIC tuning, backup/restore, load tests, and rollout automation. **307+ scripts** organized by purpose (testing, load testing, service management, database management, infrastructure, debugging, utilities) to support constant debugging and iterative development.
+- **Operational tooling** - `scripts/` covers smoke tests, TLS helpers, QUIC tuning, backup/restore, load tests, and rollout automation. **307+ scripts** organized by purpose (testing, load testing, service management, database management, infrastructure, debugging, utilities) to support constant debugging and iterative development. **CI** (`.github/workflows/ci.yml`): common package is built once and cached for matrix build jobs; transport-validation skips tshark when no pcap is present to keep checks fast.
 - **Webapp** - Next.js 14 frontend with landing pages, dashboard, authentication, and comprehensive documentation. See `webapp/README.md` for frontend architecture and connection guide.
 
 ## 🎉 Recent Breakthroughs
@@ -130,16 +130,34 @@ This isn't a tutorial project—it's a production-grade system solving real prob
   - Last successful rates: H2=320 req/s, H3=180 req/s; combined 500 req/s.
   See `scripts/rotation-suite.sh`, `scripts/lib/packet-capture.sh`, and Runbook #44 for the capture pattern.
 
-### Cluster architecture (k3d + Colima)
+### Preflight pipeline, transport proof, and rotation stages
 
-Preflight and suites are designed to run on **k3d (2-node)** by default so the control plane stays stable (Colima k3s can be overwhelmed under heavy apply/suite load). Colima is used only optionally for **MetalLB L2 verification** (real ARP and asymmetric routing tests).
+- **`scripts/run-preflight-scale-and-all-suites.sh`** — Single entrypoint for the full stack: context (Colima vs k3d), API ready, reissue CA+leaf, MetalLB (Colima), Caddy strict TLS, scale to baseline, strict TLS/mTLS preflight, then **all 8 test suites** (auth, baseline, enhanced, adversarial, rotation, k6, standalone, tls-mtls, social) and optional pgbench. Uses **packet capture** during suites (in-pod tcpdump, drain-then-copy, tshark verification). Run: `METALLB_ENABLED=1 ./scripts/run-preflight-scale-and-all-suites.sh`. See script header for env flags (e.g. `RUN_SUITES`, `RUN_FULL_LOAD`, `RUN_K6`, `CAPTURE_STOP_TIMEOUT`).
+
+- **`scripts/lib/`** — Network and transport tooling that **proved QUIC on the wire**:
+  - **`packet-capture.sh`** — In-pod tcpdump start/stop, BPF filters (port 443 for in-pod; `dst host $TARGET_IP` for host/VM), drain-before-stop, copy pcaps to host; used by baseline, enhanced, and rotation suites.
+  - **`transport_validator.py`** — Validates a pcap: QUIC version, 1-RTT/Initial counts, handshake RTT, loss estimate, optional ALPN; outputs a **transport proof** (e.g. `out.json`).
+  - **`protocol-verification.sh`** — tshark helpers: QUIC SNI `record.local`, UDP to LB IP, stray UDP checks; used by `verify-k6-protocols.sh` and rotation wire verification.
+  - **`http3.sh`** — Shared HTTP/3 curl timeouts and options for tests.
+
+- **`out.json`** (repo root) — Example **transport proof** from a run: `valid: true`, `quic_version`, `quic_packet_count`, `quic_1rtt_packets`, `handshake_rtt_ms_estimated`, `transport_confidence_score: 100`, and breakdown (quic_detected, version_detected, no_http2_fallback, 1rtt_data_phase, low_loss, no_retry, fast_handshake). Proves QUIC end-to-end from pcap analysis.
+
+- **`scripts/rotation-suite.sh`** — **Three stages** so performance, wire capture, and decryption don’t interfere:
+  - **`--mode=perf`** (default) — Adaptive limit finding, k6 load, no keylog; pure throughput and zero-downtime validation.
+  - **`--mode=wire`** — One baseline iteration with packet capture only; no rotation; for tshark/SNI/UDP verification.
+  - **`--mode=forensic`** — Host k6, SSLKEYLOGFILE, HTTP/2 only; for decrypted HTTP/2 frame analysis (not for throughput).
+  - **`--mode=all`** — Runs perf, then wire (skip rotation), then forensic (skip rotation). Use for full validation in one go.
+
+### Cluster architecture (Colima + k3s)
+
+The platform **moved from k3d to Colima + k3s for real L2 networking**: MetalLB gets a stable LoadBalancer IP on the VM bridge, so HTTP/2 and HTTP/3 (QUIC) traffic from host to LB IP behaves like production (no Docker port mapping or NodePort quirks). The stack runs on **Colima + k3s** with **MetalLB**; preflight and all 8 suites target this setup by default. A one-time host route may be needed so the host can reach the MetalLB pool for HTTP/3 (Runbook item 68). The bugs and fixes we hit (control plane, MetalLB webhook, k3s crash-loop, Envoy CA drift, packet capture, rotation, and 80+ others) are cataloged in **Runbook.md**.
 
 | Cluster | Role | When |
 |--------|------|------|
-| **k3d (2-node)** | Primary: preflight, apply, scale, MetalLB install/verify, all 8 suites, k6, pgbench | Default with `REQUIRE_COLIMA=0`. LB IP is used for HTTP/2 and HTTP/3 when MetalLB is enabled (socat makes LB IP host-reachable on k3d). |
-| **Colima k3s** | Optional: MetalLB **real** L2/BGP only (step 3c1c, isolated) | Set `METALLB_VERIFY_COLIMA_L2=1`; preflight discovers Colima kubeconfig, switches to Colima for 3c1c only, runs L2-only verification, then restores k3d. Requires Colima running (`colima start --with-kubernetes`). |
+| **Colima + k3s** | Primary: preflight, apply, scale, MetalLB, all 8 suites, k6, pgbench | Default (`REQUIRE_COLIMA=1`). Start with `--network-address` (bridged); API at 127.0.0.1:6443; LB IP for HTTP/2 and HTTP/3. See Runbook items 65, 68, 80. |
+| **k3d (2-node)** | Optional: CI or lighter local runs | Set `REQUIRE_COLIMA=0`. MetalLB and socat can make LB IP host-reachable; see `docs/adr/010-k3d-primary-colima-l2-isolated.md` and Runbook. |
 
-**Run:** `REQUIRE_COLIMA=0 METALLB_ENABLED=1 ./scripts/run-preflight-scale-and-all-suites.sh` (k3d only). Add `METALLB_VERIFY_COLIMA_L2=1` to run real L2/BGP checks on Colima (step 3c1c). HTTP/2 and HTTP/3 prefer **LB IP** when available; NodePort is fallback. See `ENGINEERING.md` (Cluster topology), `docs/adr/010-k3d-primary-colima-l2-isolated.md`, and `Runbook.md` (cluster wiring).
+**Run (Colima + k3s):** `METALLB_ENABLED=1 ./scripts/run-preflight-scale-and-all-suites.sh`. For k3d: `REQUIRE_COLIMA=0 METALLB_ENABLED=1 ./scripts/run-preflight-scale-and-all-suites.sh`. HTTP/2 and HTTP/3 use **LB IP** when available; NodePort is fallback. See `ENGINEERING.md` (Cluster topology) and `Runbook.md` (cluster wiring and bugs).
 
 ### Environment and test limitations
 Some tests may error or be skipped due to **environment limitations** and **strict TLS**:

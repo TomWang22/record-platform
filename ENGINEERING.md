@@ -380,7 +380,7 @@ Preflight and all suites run on **Colima + k3s** by default. Colima is started w
 
 ### Why Kubernetes Over Docker Compose?
 
-**Decision**: Migrate from Docker Compose to Kubernetes for local dev (see below: Colima + k3s; Kind retired).
+**Decision**: Migrate from Docker Compose to Kubernetes for local dev (see below: Colima + k3s primary; k3d optional).
 
 **Rationale**:
 1. **Production Parity**: Local dev environment matches production
@@ -397,18 +397,18 @@ Preflight and all suites run on **Colima + k3s** by default. Colima is started w
 - Steeper learning curve
 - Databases still run in Docker Compose (stability and easier management)
 
-### Why Colima + k3s (Kind retired)
+### Why Colima + k3s
 
-**Decision**: Use **Colima with k3s** as the local Kubernetes cluster. **Kind is no longer the default or supported path** for record-platform local dev and test pipelines.
+**Decision**: Use **Colima with k3s** as the primary local Kubernetes cluster, with **MetalLB** for the LoadBalancer (real L2, HTTP/2 and HTTP/3 to the LB IP). **k3d** remains supported with `REQUIRE_COLIMA=0` for CI or lighter local runs. Kind is not used.
 
-**Rationale (why we moved)**:
+**Rationale (why Colima + k3s)**:
 1. **Docker Desktop limitations**: Docker Desktop’s embedded Linux VM and storage layer became a single point of failure under sustained load (many containers, 8 Postgres instances, Kafka, Redis, plus K8s control plane and workloads). API server timeouts, TLS handshake timeouts, and “cluster unreachable” were common when Kind ran on top of Docker Desktop.
 2. **Storage/metadata wedge at ~256 GB**: At large Docker disk usage (e.g. ~256 GB or when metadata/overlay grew unbounded), Docker Desktop’s VM could **wedge** — daemon unresponsive, build and run operations hanging, host disk pressure. This made Kind-based dev and long-running test suites (preflight + 8 suites + pgbench) unreliable and at times impossible without a full Docker reset.
 3. **Colima + k3s**: Colima provisions a Lima VM with containerd and optional k3s. k3s is a single-binary Kubernetes distribution with a smaller footprint than full K8s. Running **k3s inside Colima** (instead of Kind on Docker Desktop) reduces reliance on Docker Desktop’s VM and storage; API server is at 127.0.0.1:6443 and preflight scripts target this explicitly. Secret updates and kubectl from the host can require `colima ssh` when the host cannot reach 127.0.0.1:6443 (e.g. network or firewall); Runbook documents this.
 4. **Hygiene and reproducibility**: Preflight pipeline (`run-preflight-scale-and-all-suites.sh`) **requires** Colima + k3s by default (`REQUIRE_COLIMA=1`). This avoids accidental runs against a stale or wrong cluster and aligns everyone on one supported path.
 
 **Trade-offs**:
-- k3d is supported with `REQUIRE_COLIMA=0`; Kind is no longer supported.
+- k3d is supported with `REQUIRE_COLIMA=0` for CI or lighter runs; Kind is not used.
 - Colima/k3s on macOS may still hit resource limits (CPU/memory) on a single node; scaling and cleanup (trim completed pods, aggressive ReplicaSet cleanup) are part of preflight to keep the cluster responsive.
 - NodePort UDP for HTTP/3 (QUIC) can still be environment-dependent; in-cluster k6 and curl-based HTTP/3 tests remain the reliable way to prove QUIC.
 
@@ -557,7 +557,7 @@ We run **eight** suites because the platform has **multiple protocols**, **stric
 - **HTTP/2**: Transport for gRPC (h2c and TLS)
 
 ### Infrastructure
-- **Kubernetes (k3d or Colima + k3s)**: Local development cluster (k3d default; Kind retired; see “Why Colima + k3s” above). API server at 127.0.0.1:6443; preflight accepts REQUIRE_COLIMA=0 for k3d (in-cluster Caddy verify) or Colima when REQUIRE_COLIMA=1.
+- **Kubernetes (Colima + k3s or k3d)**: Local development cluster (Colima + k3s primary; k3d with REQUIRE_COLIMA=0; see “Why Colima + k3s” above). API server at 127.0.0.1:6443; preflight accepts REQUIRE_COLIMA=0 for k3d (in-cluster Caddy verify) or Colima when REQUIRE_COLIMA=1.
 - **Kustomize**: Configuration management
 - **Terraform**: Infrastructure as Code
 - **Ansible**: Configuration management and deployment

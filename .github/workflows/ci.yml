@@ -2,7 +2,35 @@ name: ci
 on: [push, pull_request]
 
 jobs:
+  build-common:
+    name: Build @common/utils (once)
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
+      - run: pnpm install --frozen-lockfile
+      - name: Build common package
+        run: |
+          rm -rf services/common/dist services/common/tsconfig.tsbuildinfo
+          pnpm -C services/common build
+          test -f services/common/dist/index.d.ts || (echo "ERROR: common build failed" && exit 1)
+      - uses: actions/cache/save@v4
+        with:
+          path: services/common/dist
+          key: common-${{ hashFiles('pnpm-lock.yaml', 'services/common/**') }}
+
   build:
+    needs: build-common
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
@@ -16,106 +44,30 @@ jobs:
         service: [api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, auction-monitor, cron-jobs]
     steps:
       - uses: actions/checkout@v4
-
-      # install pnpm first (adds the pnpm binary reliably)
       - uses: pnpm/action-setup@v4
         with:
           version: 9.11.0
-
-      # then setup node and enable pnpm cache
-      # Use a unique cache key per service to avoid conflicts
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'pnpm'
           cache-dependency-path: 'pnpm-lock.yaml'
-
-      # (optional) fix rare git safe-directory hiccups
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-      - run: pnpm -v
       - run: pnpm install --frozen-lockfile
-
-      # Set working directory explicitly to repo root
-      - name: Verify working directory
+      - name: Restore common build
+        uses: actions/cache/restore@v4
+        with:
+          path: services/common/dist
+          key: common-${{ hashFiles('pnpm-lock.yaml', 'services/common/**') }}
+      - name: Build common if cache miss
         run: |
-          echo "Working directory: $(pwd)"
-          echo "Repository root contents:"
-          ls -la | head -10
-          echo "Services directory exists:"
-          test -d services && echo "✅ services/ exists" || echo "❌ services/ missing"
-
-      # ensure workspace lib is compiled first
-      # This must happen before any service builds since they depend on @common/utils
-      - name: Build common package
-        run: |
-          echo "Building @common/utils package..."
-          echo "Current directory: $(pwd)"
-          echo "Cleaning dist and buildinfo to ensure fresh build:"
-          rm -rf services/common/dist services/common/tsconfig.tsbuildinfo
-          echo "Running build command:"
-          cd services/common
-          pnpm build
-          echo ""
-          echo "Build command exit code: $?"
-          echo ""
-          echo "Verifying build output exists..."
-          echo "Current directory after cd: $(pwd)"
-          echo "Checking: dist/ (relative to services/common)"
-          if [ -d "dist" ]; then
-            ls -la dist/ 2>&1 | head -15
-          else
-            echo "ERROR: dist directory not found!"
-            echo "Current working directory: $(pwd)"
-            echo "Listing current directory contents:"
-            ls -la | head -15
-            echo "Checking for TypeScript errors:"
-            pnpm exec tsc --noEmit 2>&1 | head -20
-            exit 1
+          if [ ! -f "services/common/dist/index.d.ts" ]; then
+            echo "Common cache miss; building common..."
+            pnpm -C services/common build
           fi
-          echo ""
-          if [ -z "$(ls -A dist 2>/dev/null)" ]; then
-            echo "ERROR: dist directory is empty!"
-            echo "Current working directory: $(pwd)"
-            echo "Listing current directory:"
-            ls -la | head -15
-            echo "Running TypeScript with verbose output:"
-            pnpm exec tsc -p tsconfig.json --listEmittedFiles 2>&1 | head -20
-            exit 1
-          fi
-          echo "Build output verified:"
-          ls -la dist/ | head -15
-          echo ""
-          echo "Verifying key files exist:"
-          if [ -f "dist/index.d.ts" ]; then
-            echo "✅ dist/index.d.ts exists ($(wc -l < dist/index.d.ts) lines)"
-          else
-            echo "❌ dist/index.d.ts missing!"
-            echo "Files in dist/:"
-            ls -la dist/ || echo "dist/ doesn't exist"
-            echo "Checking TypeScript compilation:"
-            pnpm exec tsc --listFiles 2>&1 | head -10
-            exit 1
-          fi
-          test -f dist/grpc-clients.d.ts && echo "✅ dist/grpc-clients.d.ts exists" || echo "⚠️  dist/grpc-clients.d.ts missing (may be ok)"
-          test -f dist/proto.d.ts && echo "✅ dist/proto.d.ts exists" || echo "⚠️  dist/proto.d.ts missing (may be ok)"
-          echo ""
-          echo "Verifying package.json exports point to dist:"
-          cat package.json | grep -A 2 '"main"'
-          echo ""
-          echo "Returning to repo root for service builds..."
-          cd ../..
-
-      # build each service from the matrix
       - name: Build ${{ matrix.service }}
         run: |
-          echo "Building ${{ matrix.service }}..."
-          # Verify common package is available before building
-          if [ ! -f "services/common/dist/index.d.ts" ]; then
-            echo "ERROR: @common/utils dist/index.d.ts not found!"
-            echo "This should have been built in the previous step."
-            exit 1
-          fi
+          test -f "services/common/dist/index.d.ts" || (echo "ERROR: @common/utils dist missing" && exit 1)
           pnpm -C services/${{ matrix.service }} build
 
   quic-invariants:
@@ -134,19 +86,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install tshark (Wireshark CLI)
-        run: sudo apt-get update -qq && sudo apt-get install -y tshark
-      - name: Validate transport tooling
+      - name: Validate transport tooling (no pcap)
         run: |
-          out=$(python3 scripts/lib/transport_validator.py 2>&1) || true
-          echo "$out" | head -1
-          python3 scripts/lib/transport_validator.py 2>/dev/null; test $? -eq 2
-      - name: Transport validation (fatal if pcap present and invalid)
+          python3 scripts/lib/transport_validator.py 2>/dev/null; e=$?
+          if [ "$e" -eq 2 ]; then
+            echo "Validator correctly requires pcap when none provided (exit 2)."
+            exit 0
+          fi
+          exit $e
+      - name: Transport validation with pcap (only if vm.pcap present)
         run: |
           if [ -f vm.pcap ]; then
+            sudo apt-get update -qq && sudo apt-get install -y tshark
             python3 scripts/run_transport_validation.py --pcap vm.pcap --v2 --require-transport-proof
           else
-            echo "No vm.pcap in workspace; skip full gate. To run: add pcap or use --capture with live cluster."
+            echo "No vm.pcap; skip tshark install and full gate."
           fi
 
   python-ai:

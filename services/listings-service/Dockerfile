@@ -24,10 +24,10 @@ RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 # Use deps stage as-is: do not COPY services/* again or symlinks break
 COPY --from=deps /app /app
 
-# Build in dependency order so common/dist exists before service tsc runs
+# Prisma on Alpine needs openssl; then let workspace orchestrate build (topological order)
+RUN apk add --no-cache openssl
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm --filter @common/utils run build \
- && pnpm -C services/listings-service run build
+    pnpm -w build
 
 # Produce isolated deploy bundle (production deps only). Use same store mount so deploy copies from cache — no network.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \

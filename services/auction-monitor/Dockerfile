@@ -26,10 +26,9 @@ RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 # Use deps stage as-is: do not COPY services/* again or symlinks break
 COPY --from=deps /app /app
 
-# Build in dependency order so common/dist exists before service tsc runs
+# Let workspace orchestrate build (topological order); then prune this service for prod
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm --filter @common/utils run build \
- && pnpm -C services/auction-monitor run build \
+    pnpm -w build \
  && pnpm -C services/auction-monitor prune --prod \
  && pnpm -C services/auction-monitor install --prod --ignore-scripts --shamefully-hoist
 

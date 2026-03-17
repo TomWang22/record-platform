@@ -12,7 +12,7 @@ This document catalogs all k6 scripts in `scripts/load/` and related pgbench scr
 | **2) Enhanced (sustained limit)** | Find limit the system can stay at for a long period; stability at high load | `k6-limit-test-comprehensive.js` (MODE=persistence), `k6-analytics-soak.js`, `k6-shopping-stress.js`, `k6-pipeline-tail-latency.js` | — |
 | **3) Read / sweep / soak** | Read-heavy, rate sweep, long soak | **Read**: `k6-reads.js` (MODE=rate). **Sweep**: `k6-reads.js` (MODE=sweep, STAGES or RATE_START/STEP). **Soak**: `k6-reads.js` (MODE=soak), `k6-analytics-soak.js` | **Sweep**: `run_pgbench_sweep.sh`, `run_*_pgbench_sweep.sh` (see `scripts/PGBENCH_HARDENING.md`) |
 
-**Root-cause focus**: For "no HTTP/2 frames or ALPN h2" / "No QUIC packets" in packet capture, ensure capture runs with **tcpdump in foreground inside the pod** and **kubectl exec in background on the host** (see `scripts/lib/packet-capture.sh` and `scripts/rotation-suite.sh`). Use `CAPTURE_DRAIN_SECONDS=5` (or 10) before stop so in-flight QUIC/HTTP/3 packets are captured. For timing-sensitive assertions (e.g. MFA visibility), allow propagation delay or run verification after a short wait.
+**Root-cause focus**: (1) **HTTP/2/QUIC capture**: Use **tcpdump in foreground inside the pod** and **kubectl exec in background** (see `scripts/lib/packet-capture.sh`, `scripts/rotation-suite.sh`). Set `CAPTURE_DRAIN_SECONDS=5` (or 10) before stop so in-flight QUIC is captured. **ALPN h2** in TLS Client Hello is definitive for HTTP/2 without keylog; for frame-level proof set **SSLKEYLOGFILE** (H2_KEYLOG). QUIC may appear only on one Caddy pod—both pods are captured; if neither shows QUIC, add a short drain (e.g. 2s) before stop. (2) **Shopping checkout duplicate key**: Run **`scripts/ensure-shopping-order-number-sequence.sh`** (applies `infra/db/09-shopping-order-number-sequence.sql` on port 5436 **database `shopping`**; preflight and run-all run it before suites). (3) **Rotation suite k6 ConfigMap**: Namespace **k6-load** is created by the rotation script; ConfigMap uses `--from-file=ca.crt=$CA_ROOT` on k3d/kind. (4) **xk6-http3**: Same k6 phases (read, soak, limit, max) with HTTP/3: set **K6_HTTP3=1 K6_HTTP3_PHASES=1** in `run-k6-phases.sh`, or run **`scripts/load/run-k6-http3-phases.sh`** (requires built xk6: `./scripts/build-k6-http3.sh`). Adversarial: **Test 5** malformed hardening (oversized header, invalid method, garbage body); **Test 6** connection flood via k6 (k6-reads.js 15s from host).
 
 ---
 
@@ -108,9 +108,18 @@ pgbench is **not** currently invoked from `run-all-test-suites.sh`; it is intend
 
 ## k6 in `run-all-test-suites.sh` and preflight
 
-**Implemented:** Set **RUN_K6=1** to run a k6 load phase after the 8 suites and comprehensive verification. Used by `run-all-test-suites.sh` and `run-preflight-scale-and-all-suites.sh`. Default script: `scripts/load/k6-reads.js` (override with `K6_SCRIPT`). Default: MODE=rate, RATE=50, DURATION=30s, VUS=20. Requires `k6` on PATH. Example: `RUN_K6=1 ./scripts/run-all-test-suites.sh`.
+**Implemented:** RUN_K6=1 runs k6 after the 8 suites (strict TLS). If K6_PHASES is set (e.g. read,soak,sweep,limit,max), runs `scripts/load/run-k6-phases.sh`; else single `k6-reads.js` (MODE=rate). RUN_FULL_LOAD=1 sets K6_PHASES and K6_HTTP3=1 for xk6-http3.
 
-**Planned (pgbench):** RUN_PGBENCH=1 not yet wired; run `run_pgbench_sweep.sh` when DB is available.
+**pgbench:** RUN_PGBENCH=1 is used by run-preflight-scale-and-all-suites.sh (step 8). K6_PHASES runs run-k6-phases.sh (read, soak, sweep, limit, max, http3). Preflight 3b4e applies analytics/auction_monitor/python_ai schemas for pgbench.
+
+---
+
+## Test coverage and known gaps
+
+- **MetalLB and HTTP/3:** `scripts/verify-metallb-and-traffic-policy.sh` verifies (1) MetalLB controller/speaker and LB IP, (2) in-cluster Caddy over LB, (3) host HTTPS to LB IP (step 5), (4) **HTTP/3 (QUIC) to LB IP** (step 6) when the host can reach the LB IP. This proves MetalLB forwards **UDP 443** for QUIC. On k3d the host often cannot reach the LB IP; use **NodePort 30443** for HTTP/2 and HTTP/3 from the host (see docs/K3D_PREFLIGHT_AND_SUITES_INVESTIGATION.md).
+- **Records pgbench statement timeouts:** Under high client count, `search_records_fuzzy_ids` can hit **statement timeout** (default 30s in quick mode, 60s in deep). If you see many "canceling statement due to statement timeout" in records sweep logs: (1) set **`USE_AUTO_WRAPPER=true`** to use `search_records_fuzzy_ids_auto` (200ms cap + fast→deep fallback, production-like), or (2) raise **`STATEMENT_TIMEOUT`** (e.g. `STATEMENT_TIMEOUT=60000` or higher) for capacity runs. See `scripts/run_pgbench_sweep.sh` and `scripts/PGBENCH_HARDENING.md`.
+- **Disk space:** Preflight and pgbench check host disk; at **>90%** they warn and suggest **`./scripts/emergency-disk-cleanup.sh`**. At **>95%** preflight/pgbench refuse to run. Run `./scripts/emergency-disk-cleanup.sh --dry-run` to see what would be removed; the script also prints a **disk usage breakdown** (bench_logs, test-results, webapp/.next, Docker, backups, /tmp logs). Safe targets: old bench_logs, test-results, Next.js cache, Docker prune, old /tmp preflight/suite logs.
+- **Suite checklist (run-all-test-suites):** Auth, baseline, enhanced, adversarial, rotation, standalone-capture, tls-mtls, social. Auth/baseline/enhanced/adversarial and tls-mtls are core; rotation requires k6 CA ConfigMap in `k6-load`; social runs after DBs are up. MFA/OAuth and some auth paths are env-dependent (secrets). Shopping checkout (Test 13c): migration no longer run in preflight or run-all. If 13c fails (e.g. fresh DB), run **`scripts/ensure-shopping-order-number-sequence.sh`** once (applies 09 on port 5436, database **shopping**). **Known failures/warnings:** see **`scripts/TEST-FAILURES-AND-WARNINGS.md`** (auth MFA/OAuth/email, Envoy gRPC on Colima, Caddy admin reload, malformed test, rotation duration).
 
 ---
 

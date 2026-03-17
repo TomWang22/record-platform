@@ -2,7 +2,7 @@ import { Router } from "express";
 import { Pool } from "pg";
 import { verifyJwt } from "@common/utils/auth";
 
-const pool = new Pool({ connectionString: process.env.POSTGRES_URL });
+const pool = new Pool({ connectionString: process.env.POSTGRES_URL_LISTINGS || process.env.POSTGRES_URL });
 const r: Router = Router();
 
 r.use((req,res,next)=>{

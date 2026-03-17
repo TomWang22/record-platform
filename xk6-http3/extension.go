@@ -6,12 +6,25 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"go.k6.io/k6/js/modules"
 )
+
+// closeAfterRoundTripper wraps http3.RoundTripper and closes it after the first RoundTrip.
+// Used when noReuse=1 to avoid stale QUIC sessions after Caddy cert reload.
+type closeAfterRoundTripper struct {
+	rt *http3.RoundTripper
+}
+
+func (c *closeAfterRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := c.rt.RoundTrip(req)
+	_ = c.rt.Close() // Release QUIC connection immediately
+	return resp, err
+}
 
 func init() {
 	modules.Register("k6/x/http3", New())
@@ -28,7 +41,67 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 }
 
 type ModuleInstance struct {
-	vu modules.VU
+	vu     modules.VU
+	client *http.Client
+	rt     *http3.RoundTripper
+	once   sync.Once
+}
+
+// noReuseOption checks env K6_HTTP3_NO_REUSE or options["noReuse"].
+// When set: create fresh QUIC connection per request (avoids stale sessions after Caddy cert reload).
+func (mi *ModuleInstance) noReuseOption(options map[string]interface{}) bool {
+	if getBoolOption(options, "noReuse", false) {
+		return true
+	}
+	// Env var (set by rotation suite) — k6 exposes __ENV to JS; JS can pass to options
+	return false
+}
+
+// getOrCreateClient returns a per-VU HTTP/3 client, reusing the QUIC connection across iterations.
+// When noReuse: create fresh transport per request and close after (avoids stale sessions during cert rotation).
+func (mi *ModuleInstance) getOrCreateClient(options map[string]interface{}) *http.Client {
+	if options == nil {
+		options = make(map[string]interface{})
+	}
+	if mi.noReuseOption(options) {
+		rt := &http3.RoundTripper{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: getBoolOption(options, "insecureSkipTLSVerify", false),
+				ServerName:         getStringOption(options, "serverName", ""),
+			},
+			QuicConfig: &quic.Config{
+				HandshakeIdleTimeout: 3 * time.Second,  // Fail fast on handshake stall
+				MaxIdleTimeout:       5 * time.Second,  // Prevent 15s zombie sessions
+				KeepAlivePeriod:      2 * time.Second,  // Aggressive keepalive for rotation
+			},
+		}
+		timeout := getDurationOption(options, "timeout", 60*time.Second)
+		// Wrap to close RoundTripper after request (releases QUIC connection)
+		return &http.Client{
+			Transport: &closeAfterRoundTripper{rt: rt},
+			Timeout:   timeout,
+		}
+	}
+	mi.once.Do(func() {
+		// Per-VU client: one QUIC connection per VU, reused across iterations.
+		mi.rt = &http3.RoundTripper{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: getBoolOption(options, "insecureSkipTLSVerify", false),
+				ServerName:         getStringOption(options, "serverName", ""),
+			},
+			QuicConfig: &quic.Config{
+				HandshakeIdleTimeout: 3 * time.Second,  // Fail fast on handshake stall
+				MaxIdleTimeout:       5 * time.Second,  // Prevent 15s zombie sessions (reused path)
+				KeepAlivePeriod:      2 * time.Second,  // Aggressive keepalive
+			},
+		}
+		timeout := getDurationOption(options, "timeout", 60*time.Second)
+		mi.client = &http.Client{
+			Transport: mi.rt,
+			Timeout:   timeout,
+		}
+	})
+	return mi.client
 }
 
 func (mi *ModuleInstance) Exports() modules.Exports {
@@ -42,25 +115,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 }
 
 func (mi *ModuleInstance) request(method, url string, options map[string]interface{}) map[string]interface{} {
-	// Create HTTP/3 client with proper configuration
-	roundTripper := &http3.RoundTripper{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: getBoolOption(options, "insecureSkipTLSVerify", true), // Default to true for dev
-			ServerName:         getStringOption(options, "serverName", ""),
-		},
-		QuicConfig: &quic.Config{
-			HandshakeIdleTimeout: 10 * time.Second, // Increased for QUIC handshake
-			MaxIdleTimeout:        60 * time.Second, // Increased for connection reuse
-			KeepAlivePeriod:       10 * time.Second, // Keep connection alive
-		},
-	}
-	defer roundTripper.Close()
-
-	timeout := getDurationOption(options, "timeout", 60*time.Second) // Increased default for QUIC
-	client := &http.Client{
-		Transport: roundTripper,
-		Timeout:   timeout,
-	}
+	client := mi.getOrCreateClient(options)
 
 	// Create request
 	req, err := http.NewRequest(method, url, nil)
@@ -104,6 +159,9 @@ func (mi *ModuleInstance) request(method, url string, options map[string]interfa
 		}
 	}
 
+	// CRITICAL: quic-go does not populate resp.Proto reliably (often empty even for successful HTTP/3).
+	// Since this request went through http3.RoundTripper, we KNOW it's HTTP/3.
+	// Always set protocol explicitly rather than relying on resp.Proto.
 	return map[string]interface{}{
 		"status": resp.StatusCode,
 		"body":   string(body),
@@ -116,7 +174,8 @@ func (mi *ModuleInstance) request(method, url string, options map[string]interfa
 			}
 			return h
 		}(),
-		"proto": "HTTP/3",
+		"proto":    "HTTP/3",
+		"protocol": "HTTP/3",
 	}
 }
 

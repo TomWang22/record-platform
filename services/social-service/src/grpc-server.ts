@@ -174,12 +174,33 @@ const socialService = {
   },
 
   async VotePost(call: any, callback: any) {
-    const { post_id, vote } = call.request
-    callback(null, {
-      post_id,
-      upvotes: vote === 'up' ? 1 : 0,
-      downvotes: vote === 'down' ? 1 : 0,
-    })
+    const { post_id, user_id, vote } = call.request
+    if (!post_id || !user_id || !vote || !['up', 'down'].includes(vote)) {
+      callback({ code: 3, message: 'post_id, user_id, and vote (up/down) required' })
+      return
+    }
+    try {
+      await pool.query(
+        `INSERT INTO forum.post_votes (post_id, user_id, vote_type)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (post_id, user_id) DO UPDATE SET vote_type = $3, created_at = now()`,
+        [post_id, user_id, vote]
+      )
+      const { rows } = await pool.query(
+        'SELECT upvotes, downvotes FROM forum.posts WHERE id = $1',
+        [post_id]
+      )
+      callback(null, {
+        post_id,
+        user_id,
+        vote,
+        upvotes: rows[0]?.upvotes ?? (vote === 'up' ? 1 : 0),
+        downvotes: rows[0]?.downvotes ?? (vote === 'down' ? 1 : 0),
+      })
+    } catch (err: any) {
+      console.error('[gRPC] VotePost error:', err)
+      callback({ code: 13, message: err.message || 'Failed to vote on post' })
+    }
   },
 
   async ListComments(call: any, callback: any) {
@@ -249,12 +270,33 @@ const socialService = {
   },
 
   async VoteComment(call: any, callback: any) {
-    const { comment_id, vote } = call.request
-    callback(null, {
-      comment_id,
-      upvotes: vote === 'up' ? 1 : 0,
-      downvotes: vote === 'down' ? 1 : 0,
-    })
+    const { comment_id, user_id, vote } = call.request
+    if (!comment_id || !user_id || !vote || !['up', 'down'].includes(vote)) {
+      callback({ code: 3, message: 'comment_id, user_id, and vote (up/down) required' })
+      return
+    }
+    try {
+      await pool.query(
+        `INSERT INTO forum.comment_votes (comment_id, user_id, vote_type)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (comment_id, user_id) DO UPDATE SET vote_type = $3, created_at = now()`,
+        [comment_id, user_id, vote]
+      )
+      const { rows } = await pool.query(
+        'SELECT upvotes, downvotes FROM forum.comments WHERE id = $1',
+        [comment_id]
+      )
+      callback(null, {
+        comment_id,
+        user_id,
+        vote,
+        upvotes: rows[0]?.upvotes ?? (vote === 'up' ? 1 : 0),
+        downvotes: rows[0]?.downvotes ?? (vote === 'down' ? 1 : 0),
+      })
+    } catch (err: any) {
+      console.error('[gRPC] VoteComment error:', err)
+      callback({ code: 13, message: err.message || 'Failed to vote on comment' })
+    }
   },
 
   // Messaging methods (with Kafka integration)

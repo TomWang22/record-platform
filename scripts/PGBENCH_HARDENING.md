@@ -60,6 +60,12 @@ When scaling to millions/tens of millions of rows across all DBs:
 - Monitor pg_stat_user_tables (n_live_tup, n_dead_tup, last_vacuum, last_analyze).
 - Use same regression and TPS targets (1k–5.1k TPS consistently, even with observability overhead) as guardrails; tune work_mem, shared_buffers, and checkpoint/WAL settings per instance.
 
+## Connection pool and observability
+
+- **No pgbouncer**: Benchmarks and production use direct Postgres connections; connection reuse is per-client (pgbench uses one connection per client, reused for the run).
+- **Postgres max_connections**: All 8 DBs use **max_connections=800** (within 500–1000 target) in docker-compose; no external pooler.
+- **Observability**: Preflight keeps observability **on** (1 pod each: Grafana, Prometheus, OTel, Jaeger) for clean metrics. Set **REDUCE_OBSERVABILITY_FOR_BENCH=1** only if you want to scale otel-collector to 0 during pgbench for maximum TPS.
+
 ## Service scripts and ports
 
 | Script | Port | DB / schemas |
@@ -94,7 +100,18 @@ All should expose the same env toggles (REG_*, RUN_DIFF_MODE, BASELINE_CSV, RUN_
   - **Analytics (5439)**, **Auction-monitor (5438)**, **Python-AI (5440)**: event/aggregate tables; populate with bulk inserts or backups; apply hot-tenant/heatmap patterns where the schema has natural “hot” dimensions.
 - **Heatmap and hot tenant/shard**: Like records (records_hot.records_hot for the benchmark user), other services should identify hot tenants, hot shards, or hot segments and tune for them: partial indexes (e.g. `WHERE user_id = ?` or `WHERE forum_id IN (hot list)`), partitioning by tenant or time, and EXPLAIN ANALYZE on hot-path queries. Social, shopping, and listings in particular need this heatmap-style tuning and millions of rows to be meaningful.
 - **pg_settings (tune like records)**: All service pgbench scripts should use the same PGOPTIONS-style tuning as records: `jit=off`, `synchronous_commit=off`, `work_mem`, `effective_cache_size`, `random_page_cost`, `plan_cache_mode`, `statement_timeout`, `lock_timeout`, `deadlock_timeout`, `join_collapse_limit=1`, `from_collapse_limit=1`. Social and auth sweeps already align; others should match.
-- **Cold then warm**: Cold testing is key across the whole layer. Social sweep: set `RUN_COLD_CACHE=true` and `COLD_FIRST=1` to run cold phase first, then warm, per client count. Records sweep: `RUN_COLD_CACHE=true` runs cold after warm.
+- **Cold then warm**: Cold testing is key across the whole layer. All 8 pgbench sweeps support **COLD_FIRST=1**: run cold phase first (pure cold), then warm (warm cache), per client count. Set **RUN_COLD_CACHE=true** to enable the cold phase. Preflight (step 8) exports **COLD_FIRST=1** and **RUN_COLD_CACHE=true** when running pgbench.
+- **Pipeline order**: All 8 pgbench sweeps run **at the end** of preflight (step 8, after step 7 test suites) so they do not block or slow earlier steps. Set **RUN_PGBENCH=1** (or **RUN_FULL_LOAD=1**) to run them.
+
+### Single command (preflight + suites + k6 + pgbench)
+
+Execution order: **Steps 1–6** (Colima, scale, TLS, DB/Redis) → **Step 7** (all test suites + k6 if `RUN_K6=1`) → **Step 8** (all 8 pgbench sweeps if `RUN_PGBENCH=1`). Shopping order-number sequence is applied in preflight step 3b4d so checkout does not hit advisory-lock timeouts.
+
+```bash
+RUN_FULL_LOAD=1 ./scripts/run-preflight-scale-and-all-suites.sh
+```
+
+Optional: `KILL_STALE_FIRST=1` to clear stale pipeline processes; `COLIMA_START=1` if Colima is stopped. Log to file: `2>&1 | tee preflight-full-$(date +%Y%m%d-%H%M%S).log`.
 - **NOOP target 30k TPS**: Records sweep uses `NOOP_TARGET_TPS=30000` (default). With `RUN_NOOP_BASELINE=true` the script runs NOOP at 64 clients/64 threads and reports against this target; tune DB/host (shared_buffers, max_connections) to reach it at scale.
 - **EXPLAIN ANALYZE**: Run for all key operations; plans are logged to LOG_DIR. Re-run after major data loads and ANALYZE to avoid planner lag.
 

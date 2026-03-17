@@ -5,7 +5,8 @@
   vars:
     namespace: "{{ namespace | default('record-platform') }}"
     environment: "{{ environment | default('dev') }}"
-    kind_cluster: "{{ kind_cluster | default('h3') }}"
+    # Local dev: Colima k3s (context colima). Use kubeconfig_context: colima when needed.
+    kubeconfig_context: "{{ kubeconfig_context | default(omit) }}"
     skip_cert_management: true
     skip_caddy_config: true
 

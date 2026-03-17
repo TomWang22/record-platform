@@ -1,5 +1,7 @@
 # Record Platform
 
+**Repository:** https://github.com/TomWang22/record-platform.git
+
 Record Platform is a Kubernetes-first microservices stack for managing a personal record collection while exercising modern edge patterns. The stack spans Node.js/Express services, Prisma/Postgres data, Redis-backed caching, and a suite of observability and operational tools. The latest revamp replaces the Docker Compose dev story with Kustomize-driven Kubernetes, adds a Caddy front door that speaks HTTP/2 and HTTP/3, and ships automation scripts for day-to-day ops.
 
 ## 👋 For Recruiters & Hiring Managers
@@ -121,6 +123,33 @@ This isn't a tutorial project—it's a production-grade system solving real prob
 - **Throughput optimization**: k6 constant-arrival-rate executor with connection reuse achieves optimal performance
 - **Optimizations**: Removed PORT detection overhead, eliminated output overhead, direct merge patch for fastest restart
 
+**Preflight rotation at 500 req/s (captured):** Full preflight runs (e.g. `preflight-full-20260206-215733.log`) have captured **500 req/s combined** in the rotation suite (H2=320 req/s, H3=180 req/s), with wire-level proof:
+  - Starting rates: H2=320 req/s, H3=180 req/s (combined: 500 req/s); iteration 1/30.
+  - Real req/s: 487.35 (expected 500); 87,724 requests in 180s; **0% failures**; 2.52% drops at capacity.
+  - HTTP/3 (QUIC) verified in packet captures (e.g. 276341 packets per Caddy pcap); quick drain (5–20s) then copy pcaps to host; tshark verification.
+  - Last successful rates: H2=320 req/s, H3=180 req/s; combined 500 req/s.
+  See `scripts/rotation-suite.sh`, `scripts/lib/packet-capture.sh`, and Runbook #44 for the capture pattern.
+
+### Cluster architecture (k3d + Colima)
+
+Preflight and suites are designed to run on **k3d (2-node)** by default so the control plane stays stable (Colima k3s can be overwhelmed under heavy apply/suite load). Colima is used only optionally for **MetalLB L2 verification** (real ARP and asymmetric routing tests).
+
+| Cluster | Role | When |
+|--------|------|------|
+| **k3d (2-node)** | Primary: preflight, apply, scale, MetalLB install/verify, all 8 suites, k6, pgbench | Default with `REQUIRE_COLIMA=0`. LB IP is used for HTTP/2 and HTTP/3 when MetalLB is enabled (socat makes LB IP host-reachable on k3d). |
+| **Colima k3s** | Optional: MetalLB **real** L2/BGP only (step 3c1c, isolated) | Set `METALLB_VERIFY_COLIMA_L2=1`; preflight discovers Colima kubeconfig, switches to Colima for 3c1c only, runs L2-only verification, then restores k3d. Requires Colima running (`colima start --with-kubernetes`). |
+
+**Run:** `REQUIRE_COLIMA=0 METALLB_ENABLED=1 ./scripts/run-preflight-scale-and-all-suites.sh` (k3d only). Add `METALLB_VERIFY_COLIMA_L2=1` to run real L2/BGP checks on Colima (step 3c1c). HTTP/2 and HTTP/3 prefer **LB IP** when available; NodePort is fallback. See `ENGINEERING.md` (Cluster topology), `docs/adr/010-k3d-primary-colima-l2-isolated.md`, and `Runbook.md` (cluster wiring).
+
+### Environment and test limitations
+Some tests may error or be skipped due to **environment limitations** and **strict TLS**:
+- **Port-forward / NodePort**: gRPC direct port-forward can fail (connection to 50xxx:50xxx refused) when the tunnel is not ready; tls-mtls suite skips Test 3 on Colima when port-forward is unavailable. Envoy NodePort (UDP for HTTP/3) may not be exposed to host on Colima.
+- **Strict TLS**: All suites use strict TLS (no `-k`); k6 and curl require `SSL_CERT_FILE` / `certs/dev-root.pem` (from preflight). Missing CA causes x509 "record.local certificate is not trusted".
+- **HTTP/3 curl**: macOS system curl does not support HTTP/3. Use Homebrew curl (`brew install curl`); run `./scripts/verify-curl-http3.sh` to confirm the active curl has `--http3` so tests use native curl (avoids Docker-bridge timeout/exit 28). See `docs/RCA-HTTP3-CURL-EXIT-28.md`.
+- **MFA / OAuth / Email**: MFA verify, email verification send, and OAuth Google endpoint can return HTTP 500 in dev (not configured or mocked).
+- **Social suite**: Archive thread, list archived, delete thread, list groups, kick, ban, recall can fail with 501 (migrations not applied) or 403 (role: requester not owner/admin). Preflight runs `ensure-social-migrations.sh`; run it manually if needed (Runbook #45).
+- **Rotation suite**: May report "limit at iteration 1" (drops >1.5%) or a shell substitution warning in verification; wire-level HTTP/3 and cert rotation are still verified. DB foreign-key checks may show violations under load.
+
 ### Full Multi-Protocol Support ✅
 **All tests passing** - Complete end-to-end validation of HTTP/2, HTTP/3 (QUIC), and gRPC communication:
 
@@ -145,14 +174,14 @@ Key technical achievements:
 ### Multi-Database Architecture ✅
 **8 dedicated PostgreSQL instances** for complete service isolation and independent scaling:
 
-- ✅ **Main DB (5433)**: `records` schema for core record collection data
-- ✅ **Auth DB (5437)**: Dedicated `auth` schema for user authentication and JWT management
-- ✅ **Social DB (5434)**: `social` schema for forum posts, comments, and messaging
-- ✅ **Listings DB (5435)**: `listings` schema for marketplace data, auctions, and watchlists
-- ✅ **Shopping DB (5436)**: `shopping` schema for carts, orders, and purchase history
-- ✅ **Auction Monitor DB (5438)**: `auction_monitor` schema for auction results and price tracking
-- ✅ **Analytics DB (5439)**: `analytics` schema for price snapshots and analytics data
-- ✅ **Python AI DB (5440)**: `python_ai` schema for AI model persistence and predictions
+- ✅ **Postgres (Main DB)** (5433): database `records`
+- ✅ **Postgres Social** (5434): database `social`
+- ✅ **Postgres Listings** (5435): database `listings`
+- ✅ **Postgres Shopping** (5436): database `shopping`
+- ✅ **Postgres Auth** (5437): database `auth`
+- ✅ **Postgres Auction Mon** (5438): database `postgres`, schema `auction_monitor` (auction monitoring)
+- ✅ **Postgres Analytics** (5439): database `analytics`
+- ✅ **Postgres Python AI** (5440): database `python_ai`
 
 Key architectural benefits:
 - **Service isolation**: Each service has its own database, preventing cross-service data conflicts
@@ -438,18 +467,18 @@ For detailed technical documentation, system design diagrams, and deep dives int
 **Data Layer:**
 - **All databases run outside Kubernetes** in Docker Compose for stability and easier management
 - **8 dedicated PostgreSQL instances** for service isolation and independent scaling:
-  - **Main DB (5433)**: `records` schema for core record collection data
-  - **Auth DB (5437)**: Dedicated `auth` schema for user authentication and JWT management
-  - **Social DB (5434)**: `social` schema for forum posts, comments, and messaging
-  - **Listings DB (5435)**: `listings` schema for marketplace data, auctions, and watchlists
-  - **Shopping DB (5436)**: `shopping` schema for carts, orders, and purchase history
-  - **Auction Monitor DB (5438)**: `auction_monitor` schema for auction results and price tracking
-  - **Analytics DB (5439)**: `analytics` schema for price snapshots and analytics data
-  - **Python AI DB (5440)**: `python_ai` schema for AI model persistence and predictions
+  - **Postgres (Main DB)** (5433): database `records`
+  - **Postgres Social** (5434): database `social`
+  - **Postgres Listings** (5435): database `listings`
+  - **Postgres Shopping** (5436): database `shopping`
+  - **Postgres Auth** (5437): database `auth`
+  - **Postgres Auction Mon** (5438): database `postgres`, schema `auction_monitor` (auction monitoring)
+  - **Postgres Analytics** (5439): database `analytics`
+  - **Postgres Python AI** (5440): database `python_ai`
 - **Dual-DB connections**: Services like auction-monitor and analytics-service connect to multiple databases:
   - **Auction Monitor**: Reads from `listings.watchlist` (port 5435), writes to `auction_monitor.auction_results` (port 5438)
   - **Analytics Service**: Reads from `listings.search_history` (port 5435), writes to `analytics.price_snapshots` (port 5439)
-- **Redis** (6379): Password-protected JWT revocation cache, search result caching, rate limiting
+- **Redis** (6379): JWT Cache, Search (result cache), Cache (general). May be password-protected; rate limiting and singleflight use Redis.
 - **Kafka** (PLAINTEXT:9092, SSL:9093): Event streaming, real-time messaging for forum posts, direct messages, and group chats. **Strict TLS enabled** with SSL certificates stored in `kafka-ssl-secret`. Services use SSL port (9093) for secure communication.
 - Services connect via `host.docker.internal:PORT` from Kubernetes pods
 
@@ -488,14 +517,46 @@ For detailed technical documentation, system design diagrams, and deep dives int
 **All databases run outside Kubernetes** in Docker Compose for stability and easier management:
 
 #### PostgreSQL Instances (8 dedicated databases)
-- **Postgres Main** (`docker-compose.yml:postgres`) - Port 5433, hosts `records` schema for core collection data
-- **Postgres Auth** (`docker-compose.yml:postgres-auth`) - Port 5437, dedicated `auth` schema for user authentication and JWT management
-- **Postgres Social** (`docker-compose.yml:postgres-social`) - Port 5434, hosts `social` schema (forum posts, comments, messages)
-- **Postgres Listings** (`docker-compose.yml:postgres-listings`) - Port 5435, hosts `listings` schema (marketplace data, auctions, watchlists, search_history)
-- **Postgres Shopping** (`docker-compose.yml:postgres-shopping`) - Port 5436, hosts `shopping` schema (carts, orders, wishlists, purchase history)
-- **Postgres Auction Monitor** (`docker-compose.yml:postgres-auction-monitor`) - Port 5438, hosts `auction_monitor` schema (auction results, price tracking)
-- **Postgres Analytics** (`docker-compose.yml:postgres-analytics`) - Port 5439, hosts `analytics` schema (price snapshots, analytics data)
-- **Postgres Python AI** (`docker-compose.yml:postgres-python-ai`) - Port 5440, hosts `python_ai` schema (AI model persistence, predictions)
+
+Canonical names and ports (match architecture diagram). Each port has one **database name**; schemas live inside that database:
+
+| Instance name | Port | Database name | Schema(s) |
+|---------------|------|---------------|-----------|
+| **Postgres (Main DB)** | 5433 | `records` | records |
+| **Postgres Social** | 5434 | `social` | forum, messages |
+| **Postgres Listings** | 5435 | `listings` | listings |
+| **Postgres Shopping** | 5436 | `shopping` | shopping |
+| **Postgres Auth** | 5437 | `auth` | auth |
+| **Postgres Auction Mon** | 5438 | `postgres` | auction_monitor |
+| **Postgres Analytics** | 5439 | `analytics` | analytics |
+| **Postgres Python AI** | 5440 | `python_ai` | ai |
+
+**Port → service → database (quick reference):**  
+5433 = **records** (DB `records`) · 5434 = **social** (DB `social`) · 5435 = **listings** (DB `listings`) · 5436 = **shopping** (DB `shopping`) · 5437 = **auth** (DB `auth`) · 5438 = **auction_monitor** (DB `postgres`, schema `auction_monitor`) · 5439 = **analytics** (DB `analytics`) · 5440 = **python_ai** (DB `python_ai`).  
+Schema/table breakdown: **docs/SCHEMA_TABLE_BREAKDOWN.md**. Current state: `./scripts/inspect-external-db-schemas.sh docs/CURRENT_DB_SCHEMA_REPORT.md`.
+
+- **Postgres (Main DB)** – Port 5433, database `records`, `records` schema (core collection data). Docker: `docker-compose.yml:postgres`.
+- **Postgres Social** – Port 5434, database `social`, schemas `forum`, `messages` (forum posts, comments, messages). Docker: `postgres-social`.
+- **Postgres Listings** – Port 5435, database `listings`, `listings` schema (marketplace data, auctions, watchlists). Docker: `postgres-listings`.
+- **Postgres Shopping** – Port 5436, database `shopping`, `shopping` schema (carts, orders, wishlist). Docker: `postgres-shopping`.
+- **Postgres Auth** – Port 5437, database `auth`, `auth` schema (user authentication, JWT). Docker: `postgres-auth`.
+- **Postgres Auction Mon** – Port 5438, **service name auction_monitor**, database `postgres`, schema `auction_monitor` (auction monitoring, price tracking). Docker: `postgres-auction-monitor`.
+- **Postgres Analytics** – Port 5439, database `analytics`, `analytics` schema. Docker: `postgres-analytics`.
+- **Postgres Python AI** – Port 5440, database `python_ai`, schema `ai`. Docker: `postgres-python-ai`.
+
+Connection strings and database names used by the app are in `infra/k8s/base/config/app-config.yaml`. See **infra/docs/EIGHT-DATABASES-ARCHITECTURE.md** for port → database name → schema details.
+
+#### Backups and restore
+
+- **Hard backup (all 8 DBs):** `PGPASSWORD=postgres ./scripts/backup-all-8-dbs.sh` writes to `backups/all-8-YYYYMMDD-HHMMSS/` (schema, indexes, data, and tuning metadata for ports 5433–5440). Restore with `BACKUP_DIR=backups/all-8-YYYYMMDD-HHMMSS ./scripts/restore-all-8-from-backup.sh`. See **docs/EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md**.
+- **Legacy:** Backups are also written to **`backups/`** (e.g. `record-platform-postgres-1-all-*.sql`, or per-DB dumps). To restore **social** (5434), **listings** (5435), or **shopping** (5436) after applying schemas:
+
+1. Apply schemas: `PGPASSWORD=postgres ./scripts/apply-external-db-schemas.sh`
+2. Restore from a dump in `backups/` into the matching instance, e.g.  
+   `psql -h 127.0.0.1 -p 5434 -U postgres -d social -f backups/social-YYYYMMDD.sql`  
+   (or use `scripts/restore-to-external-docker.sh` with the correct port and database name).
+
+Full checklist: **docs/EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md**.
 
 #### Dual-Database Connections
 Some services connect to multiple databases for cross-service data access:
@@ -506,8 +567,8 @@ Some services connect to multiple databases for cross-service data access:
   - Reads from `listings.search_history` (port 5435) for search analytics
   - Writes to `analytics.price_snapshots` (port 5439) for price trend analysis
 
-#### Supporting Infrastructure
-- **Redis** (`docker-compose.yml:redis`) - Port 6379, password-protected, JWT revocation cache, search result caching, rate limiting
+#### Redis
+- **Redis** – Port 6379. Uses: **JWT Cache**, **Search** (result caching), **Cache** (general). Docker: `docker-compose.yml:redis`. May be password-protected; rate limiting and singleflight use Redis.
 - **Kafka** (`infra/k8s/base/kafka/deploy.yaml`) - **Strict TLS enabled**:
   - **PLAINTEXT listener**: Port 9092 (available for migration)
   - **SSL listener**: Port 9093 (primary, strict TLS)
@@ -697,6 +758,22 @@ cd terraform && terraform plan
 # Test Ansible (dry-run, safe)
 cd ansible && ansible-playbook playbooks/deploy-services.yml --check
 ```
+
+**Full disaster recovery protocol (Colima + external infra + DB)**  
+To recover from a lost cluster or host, run these three steps in order. Use the **newest** backup directory under `backups/` and a **MetalLB pool** that matches your Colima subnet (e.g. `192.168.64.240-192.168.64.250`); exact values vary by environment.
+
+```bash
+# 1. New Colima cluster with MetalLB (set pool for your subnet)
+METALLB_POOL=192.168.64.240-192.168.64.250 ./scripts/setup-new-colima-cluster.sh
+
+# 2. Bring up external infra (Docker Compose: 8 Postgres, Redis, Kafka) and restore DBs from backup
+RESTORE_BACKUP_DIR=backups/all-8-20260312-091418 ./scripts/bring-up-external-infra.sh
+
+# 3. Inspect and document DB schemas (optional verification)
+PGPASSWORD=postgres ./scripts/inspect-external-db-schemas.sh docs/CURRENT_DB_SCHEMA_REPORT.md
+```
+
+Then run preflight and test suites as needed. See **Runbook.md** (item 82) and **docs/EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md**.
 
 **Disaster Recovery Capabilities**:
 - ✅ **Instant Cluster Recreation**: Bootstrap script recreates entire Kubernetes cluster
@@ -899,14 +976,14 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
 
 ### Database Architecture
 - **8 dedicated PostgreSQL instances** running in Docker Compose (outside Kubernetes) for service isolation and independent scaling:
-  - **Main DB (5433)**: `records` schema for core record collection data
-  - **Auth DB (5437)**: Dedicated `auth` schema for user authentication and JWT management
-  - **Social DB (5434)**: `social` schema (forum posts, comments, messages, groups)
-  - **Listings DB (5435)**: `listings` schema (marketplace data, auctions, watchlists, search_history)
-  - **Shopping DB (5436)**: `shopping` schema (carts, orders, wishlists, purchase history)
-  - **Auction Monitor DB (5438)**: `auction_monitor` schema (auction results, price tracking)
-  - **Analytics DB (5439)**: `analytics` schema (price snapshots, analytics data)
-  - **Python AI DB (5440)**: `python_ai` schema (AI model persistence, predictions)
+  - **Main DB (5433)**: database `records` for core record collection data
+  - **Social (5434)**: database `social` (forum posts, comments, messages, groups)
+  - **Listings (5435)**: database `listings` (marketplace data, auctions, watchlists, search_history)
+  - **Shopping (5436)**: database `shopping` (carts, orders, wishlists, purchase history)
+  - **Auth (5437)**: database `auth` for user authentication and JWT management
+  - **Auction Monitor (5438)**: database `postgres`, schema `auction_monitor` (auction monitoring, price tracking)
+  - **Analytics (5439)**: database `analytics` (price snapshots, analytics data)
+  - **Python AI (5440)**: database `python_ai`, schema `ai` (AI model persistence, predictions)
 - **Dual-DB connections**: Services like auction-monitor and analytics-service connect to multiple databases for cross-service queries while maintaining data isolation
 - **Redis (6379)**: Password-protected, JWT revocation cache, search result caching, rate limiting
 - **Kafka (PLAINTEXT:9092, SSL:9093)**: Event streaming, real-time messaging for forum posts, direct messages, and group chats. **Strict TLS enabled** with SSL certificates in `kafka-ssl-secret`. Services use SSL port (9093).

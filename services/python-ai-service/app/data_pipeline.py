@@ -51,22 +51,21 @@ def _get_kafka_ssl_context() -> Optional[ssl.SSLContext]:
             ssl_context.check_hostname = True
             ssl_context.verify_mode = ssl.CERT_REQUIRED
         else:
-            # If CA cert not found, disable verification for dev (self-signed certs)
-            # In production, this should fail and require proper certificates
-            logger.warning(f"[data-pipeline] Kafka CA certificate not found at {KAFKA_SSL_CA_CERT}")
-            logger.warning(f"[data-pipeline] Disabling SSL verification for dev (self-signed certificates)")
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-        
+            # Strict TLS: no cleartext fallback. Refuse to connect without valid CA.
+            logger.error(f"[data-pipeline] Kafka CA certificate not found at {KAFKA_SSL_CA_CERT}")
+            raise FileNotFoundError(
+                f"KAFKA_USE_SSL=true but CA cert missing at {KAFKA_SSL_CA_CERT}. "
+                "Mount kafka-ssl-secret and set KAFKA_SSL_CA_CERT. No plaintext fallback."
+            )
+
         return ssl_context
+    except FileNotFoundError:
+        raise
     except Exception as e:
         logger.error(f"[data-pipeline] Failed to create Kafka SSL context: {e}")
-        # Fallback: disable verification for dev
-        logger.warning(f"[data-pipeline] Falling back to unverified SSL context for dev")
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        return ssl_context
+        raise RuntimeError(
+            "Strict TLS: cannot create Kafka SSL context. Fix CA cert or disable KAFKA_USE_SSL. No unverified fallback."
+        ) from e
 
 
 async def get_kafka_producer() -> Optional[AIOKafkaProducer]:
@@ -408,17 +407,21 @@ async def ingest_analytics_data(query: str, user_id: Optional[str] = None) -> Di
 
 
 async def start_kafka_consumer():
-    """Start Kafka consumer for real-time analytics events with SSL support for strict TLS"""
+    """Start Kafka consumer for real-time analytics events with SSL support for strict TLS.
+    Non-blocking: if Kafka is unreachable (e.g. external broker not reachable from pod), logs once and exits
+    so the service stays healthy; gRPC and HTTP (selling-advice, etc.) work without Kafka.
+    """
     if not ENABLE_KAFKA:
         return
     
     global kafka_consumer
+    consumer = None
     try:
         # Configure SSL if enabled
         ssl_context = _get_kafka_ssl_context() if KAFKA_USE_SSL else None
         security_protocol = "SSL" if KAFKA_USE_SSL else "PLAINTEXT"
         
-        kafka_consumer = AIOKafkaConsumer(
+        consumer = AIOKafkaConsumer(
             "analytics-predictions",
             "analytics-searches",
             bootstrap_servers=KAFKA_BROKER,
@@ -432,7 +435,8 @@ async def start_kafka_consumer():
             security_protocol=security_protocol,
             ssl_context=ssl_context,
         )
-        await kafka_consumer.start()
+        await consumer.start()
+        kafka_consumer = consumer
         logger.info(f"[data-pipeline] Kafka consumer started, connected to {KAFKA_BROKER} with {security_protocol}")
         
         async for message in kafka_consumer:
@@ -460,7 +464,16 @@ async def start_kafka_consumer():
                 logger.error(f"[data-pipeline] Error processing Kafka message: {e}")
     
     except Exception as e:
-        logger.error(f"[data-pipeline] Kafka consumer failed: {e}")
+        logger.warning(
+            "[data-pipeline] Kafka consumer unavailable (service continues without it): %s. "
+            "Set ENABLE_KAFKA=false or ensure Kafka is reachable from pods (e.g. kafka-external Endpoints -> host:29093).",
+            e,
+        )
+        if consumer is not None:
+            try:
+                await consumer.stop()
+            except Exception as stop_err:
+                logger.debug("[data-pipeline] Error stopping failed Kafka consumer: %s", stop_err)
         kafka_consumer = None
 
 

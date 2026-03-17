@@ -398,6 +398,441 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     }
   })
 
+  // ============================================================
+  // GROUP CHAT ENDPOINTS (MUST be before /:messageId routes — else GET /groups matches /:messageId)
+  // ============================================================
+
+  // POST /messages/groups - Create a new group
+  router.post('/groups', async (req: AuthedRequest, res: Response) => {
+    console.log('[social] POST /messages/groups called', { name: req.body?.name, userId: req.userId })
+    const { name, description } = req.body
+    const created_by = req.userId
+
+    if (!name) {
+      console.warn('[social] Group creation failed: name required')
+      return res.status(400).json({ error: 'name required' })
+    }
+
+    // Check if request was aborted
+    if (req.aborted) {
+      console.warn('[social] Request aborted before processing group creation')
+      return res.status(499).end() // 499 Client Closed Request
+    }
+
+    try {
+      console.log('[social] Starting group creation query...')
+      // Use pool.query directly instead of pool.connect() to avoid connection pool exhaustion
+      // Add timeout to prevent hanging on slow database operations
+      const groupResult = await Promise.race([
+        pool.query(`
+          INSERT INTO messages.groups (name, description, created_by)
+          VALUES ($1, $2, $3)
+          RETURNING id, name, description, created_by, created_at, updated_at
+        `, [name, description || null, created_by]),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Database query timeout')), 5000)
+        )
+      ]) as any
+
+      const group = groupResult.rows[0]
+      console.log('[social] Group created:', group.id)
+
+      // Check if request was aborted after first query
+      if (req.aborted) {
+        console.warn('[social] Request aborted after group creation, before adding admin')
+        return res.status(499).end()
+      }
+
+      // Add creator as owner (highest role; admin = promoted, owner = creator)
+      console.log('[social] Adding creator as owner...')
+      await Promise.race([
+        pool.query(
+          'INSERT INTO messages.group_members (group_id, user_id, role) VALUES ($1, $2, $3)',
+          [group.id, created_by, 'owner']
+        ),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Database query timeout')), 5000)
+        )
+      ])
+
+      // Check if request was aborted before sending response
+      if (req.aborted) {
+        console.warn('[social] Request aborted before sending response')
+        return res.status(499).end()
+      }
+
+      console.log('[social] Group creation successful, sending response')
+      res.status(201).json(group)
+    } catch (err: any) {
+      // Don't send response if request was aborted
+      if (req.aborted) {
+        console.warn('[social] Request aborted during error handling')
+        return
+      }
+      console.error('[social] Error creating group:', err?.message || err)
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to create group', details: err?.message || 'Unknown error' })
+      }
+    }
+  })
+
+  // POST /messages/groups/:groupId/members - Add member to group
+  router.post('/groups/:groupId/members', async (req: AuthedRequest, res: Response) => {
+    const { groupId } = req.params
+    const { user_id } = req.body
+    const requester_id = req.userId
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id required' })
+    }
+
+    try {
+      // Check if user is banned from this group
+      const banCheck = await pool.query(
+        `SELECT 1 FROM messages.group_bans WHERE group_id = $1 AND user_id = $2
+         AND (expires_at IS NULL OR expires_at > now())`,
+        [groupId, user_id]
+      )
+      if (banCheck.rows.length > 0) {
+        return res.status(403).json({ error: 'User is banned from this group' })
+      }
+      // Verify requester is admin or moderator
+      const roleCheck = await pool.query(
+        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, requester_id]
+      )
+      if (roleCheck.rows.length === 0 || !['owner', 'admin', 'moderator'].includes(roleCheck.rows[0].role)) {
+        return res.status(403).json({ error: 'Only admins and moderators can add members' })
+      }
+
+      // Add member
+      await pool.query(
+        'INSERT INTO messages.group_members (group_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [groupId, user_id, 'member']
+      )
+
+      res.status(201).json({ group_id: groupId, user_id, role: 'member' })
+    } catch (err: any) {
+      console.error('[social] Error adding group member:', err)
+      res.status(500).json({ error: 'Failed to add group member' })
+    }
+  })
+
+  // POST /messages/groups/:groupId/kick - Kick user from group (admin/owner/moderator only)
+  router.post('/groups/:groupId/kick', async (req: AuthedRequest, res: Response) => {
+    const { groupId } = req.params
+    const { user_id: targetUserId } = req.body
+    const requester_id = req.userId
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'user_id required' })
+    }
+
+    try {
+      const roleCheck = await pool.query(
+        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, requester_id]
+      )
+      if (roleCheck.rows.length === 0 || !['owner', 'admin', 'moderator'].includes(roleCheck.rows[0].role)) {
+        return res.status(403).json({ error: 'Only owners, admins, or moderators can kick members' })
+      }
+      // Cannot kick owner (unless you are owner)
+      const targetRole = await pool.query(
+        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, targetUserId]
+      )
+      if (targetRole.rows.length === 0) {
+        return res.status(404).json({ error: 'User is not a member of this group' })
+      }
+      if (targetRole.rows[0].role === 'owner' && roleCheck.rows[0].role !== 'owner') {
+        return res.status(403).json({ error: 'Only the owner can kick the owner' })
+      }
+
+      await pool.query(
+        'DELETE FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, targetUserId]
+      )
+      res.json({ group_id: groupId, kicked_user_id: targetUserId })
+    } catch (err: any) {
+      const code = (err as { code?: string })?.code
+      console.error('[social] Error kicking member:', { code, message: err?.message, status: 500 })
+      res.status(500).json({ error: 'Failed to kick member' })
+    }
+  })
+
+  // POST /messages/groups/:groupId/ban - Ban user from group (admin/owner only)
+  router.post('/groups/:groupId/ban', async (req: AuthedRequest, res: Response) => {
+    const { groupId } = req.params
+    const { user_id: targetUserId, reason, expires_at } = req.body
+    const requester_id = req.userId
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'user_id required' })
+    }
+
+    try {
+      const roleCheck = await pool.query(
+        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, requester_id]
+      )
+      if (roleCheck.rows.length === 0 || !['owner', 'admin'].includes(roleCheck.rows[0].role)) {
+        return res.status(403).json({ error: 'Only owners or admins can ban members' })
+      }
+
+      await pool.query(
+        `INSERT INTO messages.group_bans (group_id, user_id, banned_by, reason, expires_at)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (group_id, user_id) DO UPDATE SET banned_by = $3, reason = $4, expires_at = $5`,
+        [groupId, targetUserId, requester_id, reason || null, expires_at || null]
+      )
+      await pool.query(
+        'DELETE FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, targetUserId]
+      )
+      res.status(201).json({ group_id: groupId, banned_user_id: targetUserId, reason: reason || null })
+    } catch (err: any) {
+      const code = (err as { code?: string })?.code
+      if (code === '42P01') {
+        console.error('[social] Ban member: missing table group_bans (501)', { code })
+        return res.status(501).json({ error: 'group_bans table not found; run migration 04-social-schema-archive-recall-kickban.sql' })
+      }
+      console.error('[social] Error banning member:', { code, message: err?.message, status: 500 })
+      res.status(500).json({ error: 'Failed to ban member' })
+    }
+  })
+
+  // DELETE /messages/groups/:groupId/ban/:userId - Unban user
+  router.delete('/groups/:groupId/ban/:userId', async (req: AuthedRequest, res: Response) => {
+    const { groupId, userId: targetUserId } = req.params
+    const requester_id = req.userId
+
+    try {
+      const roleCheck = await pool.query(
+        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, requester_id]
+      )
+      if (roleCheck.rows.length === 0 || !['owner', 'admin'].includes(roleCheck.rows[0].role)) {
+        return res.status(403).json({ error: 'Only owners or admins can unban' })
+      }
+
+      const result = await pool.query(
+        'DELETE FROM messages.group_bans WHERE group_id = $1 AND user_id = $2 RETURNING 1',
+        [groupId, targetUserId]
+      )
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: 'User is not banned from this group' })
+      }
+      res.status(204).end()
+    } catch (err: any) {
+      console.error('[social] Error unbanning:', err)
+      res.status(500).json({ error: 'Failed to unban' })
+    }
+  })
+
+  // GET /messages/groups - List user's groups (MUST be before /groups/:groupId so exact path matches first)
+  router.get('/groups', async (req: AuthedRequest, res: Response) => {
+    const userId = req.userId
+
+    try {
+      const query = `
+        SELECT g.id, g.name, g.description, g.created_by, g.created_at, g.updated_at,
+               gm.role, gm.joined_at
+        FROM messages.groups g
+        INNER JOIN messages.group_members gm ON g.id = gm.group_id
+        WHERE gm.user_id = $1
+        ORDER BY COALESCE(g.updated_at, g.created_at) DESC
+      `
+      const { rows } = await pool.query(query, [userId])
+
+      res.json({ groups: rows })
+    } catch (err: any) {
+      const code = (err as { code?: string })?.code
+      const msg = (err as Error)?.message
+      console.error('[social] Error fetching groups:', { code, message: msg, status: 500 })
+      res.status(500).json({ error: 'Failed to fetch groups' })
+    }
+  })
+
+  // GET /messages/groups/:groupId - Get group details
+  router.get('/groups/:groupId', async (req: AuthedRequest, res: Response) => {
+    const { groupId } = req.params
+    const userId = req.userId
+
+    try {
+      // Verify user is a member
+      const memberCheck = await pool.query(
+        'SELECT 1 FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, userId]
+      )
+      if (memberCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'You are not a member of this group' })
+      }
+
+      // Get group with members
+      const groupQuery = await pool.query(
+        'SELECT id, name, description, created_by, created_at, updated_at FROM messages.groups WHERE id = $1',
+        [groupId]
+      )
+      const membersQuery = await pool.query(
+        'SELECT user_id, role, joined_at FROM messages.group_members WHERE group_id = $1 ORDER BY joined_at ASC',
+        [groupId]
+      )
+
+      res.json({
+        ...groupQuery.rows[0],
+        members: membersQuery.rows,
+      })
+    } catch (err) {
+      console.error('[social] Error fetching group:', err)
+      res.status(500).json({ error: 'Failed to fetch group' })
+    }
+  })
+
+  // DELETE /messages/groups/:groupId/leave - User leaves a group (MUST be before /groups/:groupId)
+  router.delete('/groups/:groupId/leave', async (req: AuthedRequest, res: Response) => {
+    const { groupId } = req.params
+    const userId = req.userId
+
+    try {
+      // Optimized: Single query to get user role and elevated-role count (owner/admin)
+      const result = await pool.query(
+        `WITH user_member AS (
+          SELECT role FROM messages.group_members
+          WHERE group_id = $1 AND user_id = $2
+        ),
+        elevated_count AS (
+          SELECT COUNT(*)::int as count FROM messages.group_members
+          WHERE group_id = $1 AND role IN ('owner', 'admin')
+        )
+        SELECT
+          (SELECT role FROM user_member) as user_role,
+          (SELECT count FROM elevated_count) as elevated_count
+        `,
+        [groupId, userId]
+      )
+
+      if (!result.rows[0]?.user_role) {
+        return res.status(403).json({ error: 'You are not a member of this group' })
+      }
+
+      const userRole = result.rows[0].user_role
+      const elevatedCount = result.rows[0].elevated_count || 0
+
+      // Prevent leaving if user is the only owner/admin (must transfer role or delete group)
+      if (['owner', 'admin'].includes(userRole) && elevatedCount === 1) {
+        return res.status(400).json({
+          error: 'Cannot leave group: you are the only owner/admin. Transfer role or delete the group instead.'
+        })
+      }
+
+      // Remove user from group (optimized with index)
+      await pool.query(
+        'DELETE FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, userId]
+      )
+
+      res.status(204).end()
+    } catch (err: any) {
+      console.error('[social] Error leaving group:', err)
+      res.status(500).json({ error: 'Failed to leave group' })
+    }
+  })
+
+  // DELETE /messages/groups/:groupId - Delete/Archive a group (admin only)
+  router.delete('/groups/:groupId', async (req: AuthedRequest, res: Response) => {
+    const { groupId } = req.params
+    const userId = req.userId
+    const archive = req.query.archive === 'true' // Optional: archive instead of delete
+
+    try {
+      // Verify user is owner or admin
+      const memberCheck = await pool.query(
+        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, userId]
+      )
+      if (memberCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'You are not a member of this group' })
+      }
+      if (!['owner', 'admin'].includes(memberCheck.rows[0].role)) {
+        return res.status(403).json({ error: 'Only owners or admins can delete/archive groups' })
+      }
+
+      if (archive) {
+        // Archive: Mark group as archived (soft delete)
+        // Use transaction for consistency
+        const client = await pool.connect()
+        try {
+          await client.query('BEGIN')
+
+          // Mark group as archived
+          await client.query(
+            'UPDATE messages.groups SET archived = true, updated_at = now() WHERE id = $1',
+            [groupId]
+          )
+
+          // Optionally archive all group messages (if schema supports it)
+          // This is a soft delete - messages remain but marked as archived
+          await client.query(
+            'UPDATE messages.messages SET archived = true WHERE group_id = $1',
+            [groupId]
+          ).catch(() => {
+            // Ignore if archived column doesn't exist on messages table
+          })
+
+          await client.query('COMMIT')
+
+          res.json({
+            id: groupId,
+            archived: true,
+            message: 'Group archived successfully'
+          })
+        } catch (err: any) {
+          await client.query('ROLLBACK')
+          throw err
+        } finally {
+          client.release()
+        }
+      } else {
+        // Delete: Remove all group members and messages, then delete the group
+        // Use transaction for atomicity
+        const client = await pool.connect()
+        try {
+          await client.query('BEGIN')
+
+          // Delete all group members (cascade will handle related data if configured)
+          await client.query(
+            'DELETE FROM messages.group_members WHERE group_id = $1',
+            [groupId]
+          )
+
+          // Delete all group messages
+          await client.query(
+            'DELETE FROM messages.messages WHERE group_id = $1',
+            [groupId]
+          )
+
+          // Finally delete the group
+          await client.query(
+            'DELETE FROM messages.groups WHERE id = $1',
+            [groupId]
+          )
+
+          await client.query('COMMIT')
+
+          res.status(204).end()
+        } catch (err: any) {
+          await client.query('ROLLBACK')
+          throw err
+        } finally {
+          client.release()
+        }
+      }
+    } catch (err: any) {
+      console.error('[social] Error deleting/archiving group:', err)
+      res.status(500).json({ error: 'Failed to delete/archive group' })
+    }
+  })
+
   // POST /messages/:messageId/attachments - Add attachment to message (MUST be before /:messageId)
   router.post('/:messageId/attachments', async (req: AuthedRequest, res: Response) => {
     const { messageId } = req.params
@@ -811,440 +1246,6 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     } catch (err) {
       console.error('[social] Error marking message as read:', err)
       res.status(500).json({ error: 'Failed to mark message as read' })
-    }
-  })
-
-  // ============================================================
-  // GROUP CHAT ENDPOINTS
-  // ============================================================
-
-  // POST /messages/groups - Create a new group
-  router.post('/groups', async (req: AuthedRequest, res: Response) => {
-    console.log('[social] POST /messages/groups called', { name: req.body?.name, userId: req.userId })
-    const { name, description } = req.body
-    const created_by = req.userId
-
-    if (!name) {
-      console.warn('[social] Group creation failed: name required')
-      return res.status(400).json({ error: 'name required' })
-    }
-
-    // Check if request was aborted
-    if (req.aborted) {
-      console.warn('[social] Request aborted before processing group creation')
-      return res.status(499).end() // 499 Client Closed Request
-    }
-
-    try {
-      console.log('[social] Starting group creation query...')
-      // Use pool.query directly instead of pool.connect() to avoid connection pool exhaustion
-      // Add timeout to prevent hanging on slow database operations
-      const groupResult = await Promise.race([
-        pool.query(`
-          INSERT INTO messages.groups (name, description, created_by)
-          VALUES ($1, $2, $3)
-          RETURNING id, name, description, created_by, created_at, updated_at
-        `, [name, description || null, created_by]),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Database query timeout')), 5000)
-        )
-      ]) as any
-      
-      const group = groupResult.rows[0]
-      console.log('[social] Group created:', group.id)
-
-      // Check if request was aborted after first query
-      if (req.aborted) {
-        console.warn('[social] Request aborted after group creation, before adding admin')
-        return res.status(499).end()
-      }
-
-      // Add creator as owner (highest role; admin = promoted, owner = creator)
-      console.log('[social] Adding creator as owner...')
-      await Promise.race([
-        pool.query(
-          'INSERT INTO messages.group_members (group_id, user_id, role) VALUES ($1, $2, $3)',
-          [group.id, created_by, 'owner']
-        ),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Database query timeout')), 5000)
-        )
-      ])
-
-      // Check if request was aborted before sending response
-      if (req.aborted) {
-        console.warn('[social] Request aborted before sending response')
-        return res.status(499).end()
-      }
-
-      console.log('[social] Group creation successful, sending response')
-      res.status(201).json(group)
-    } catch (err: any) {
-      // Don't send response if request was aborted
-      if (req.aborted) {
-        console.warn('[social] Request aborted during error handling')
-        return
-      }
-      console.error('[social] Error creating group:', err?.message || err)
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Failed to create group', details: err?.message || 'Unknown error' })
-      }
-    }
-  })
-
-  // POST /messages/groups/:groupId/members - Add member to group
-  router.post('/groups/:groupId/members', async (req: AuthedRequest, res: Response) => {
-    const { groupId } = req.params
-    const { user_id } = req.body
-    const requester_id = req.userId
-
-    if (!user_id) {
-      return res.status(400).json({ error: 'user_id required' })
-    }
-
-    try {
-      // Check if user is banned from this group
-      const banCheck = await pool.query(
-        `SELECT 1 FROM messages.group_bans WHERE group_id = $1 AND user_id = $2
-         AND (expires_at IS NULL OR expires_at > now())`,
-        [groupId, user_id]
-      )
-      if (banCheck.rows.length > 0) {
-        return res.status(403).json({ error: 'User is banned from this group' })
-      }
-      // Verify requester is admin or moderator
-      const roleCheck = await pool.query(
-        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, requester_id]
-      )
-      if (roleCheck.rows.length === 0 || !['owner', 'admin', 'moderator'].includes(roleCheck.rows[0].role)) {
-        return res.status(403).json({ error: 'Only admins and moderators can add members' })
-      }
-
-      // Add member
-      await pool.query(
-        'INSERT INTO messages.group_members (group_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-        [groupId, user_id, 'member']
-      )
-
-      res.status(201).json({ group_id: groupId, user_id, role: 'member' })
-    } catch (err: any) {
-      console.error('[social] Error adding group member:', err)
-      res.status(500).json({ error: 'Failed to add group member' })
-    }
-  })
-
-  // POST /messages/groups/:groupId/kick - Kick user from group (admin/owner/moderator only)
-  router.post('/groups/:groupId/kick', async (req: AuthedRequest, res: Response) => {
-    const { groupId } = req.params
-    const { user_id: targetUserId } = req.body
-    const requester_id = req.userId
-
-    if (!targetUserId) {
-      return res.status(400).json({ error: 'user_id required' })
-    }
-
-    try {
-      const roleCheck = await pool.query(
-        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, requester_id]
-      )
-      if (roleCheck.rows.length === 0 || !['owner', 'admin', 'moderator'].includes(roleCheck.rows[0].role)) {
-        return res.status(403).json({ error: 'Only owners, admins, or moderators can kick members' })
-      }
-      // Cannot kick owner (unless you are owner)
-      const targetRole = await pool.query(
-        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, targetUserId]
-      )
-      if (targetRole.rows.length === 0) {
-        return res.status(404).json({ error: 'User is not a member of this group' })
-      }
-      if (targetRole.rows[0].role === 'owner' && roleCheck.rows[0].role !== 'owner') {
-        return res.status(403).json({ error: 'Only the owner can kick the owner' })
-      }
-
-      await pool.query(
-        'DELETE FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, targetUserId]
-      )
-      res.json({ group_id: groupId, kicked_user_id: targetUserId })
-    } catch (err: any) {
-      const code = (err as { code?: string })?.code
-      console.error('[social] Error kicking member:', { code, message: err?.message, status: 500 })
-      res.status(500).json({ error: 'Failed to kick member' })
-    }
-  })
-
-  // POST /messages/groups/:groupId/ban - Ban user from group (admin/owner only)
-  router.post('/groups/:groupId/ban', async (req: AuthedRequest, res: Response) => {
-    const { groupId } = req.params
-    const { user_id: targetUserId, reason, expires_at } = req.body
-    const requester_id = req.userId
-
-    if (!targetUserId) {
-      return res.status(400).json({ error: 'user_id required' })
-    }
-
-    try {
-      const roleCheck = await pool.query(
-        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, requester_id]
-      )
-      if (roleCheck.rows.length === 0 || !['owner', 'admin'].includes(roleCheck.rows[0].role)) {
-        return res.status(403).json({ error: 'Only owners or admins can ban members' })
-      }
-
-      await pool.query(
-        `INSERT INTO messages.group_bans (group_id, user_id, banned_by, reason, expires_at)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (group_id, user_id) DO UPDATE SET banned_by = $3, reason = $4, expires_at = $5`,
-        [groupId, targetUserId, requester_id, reason || null, expires_at || null]
-      )
-      await pool.query(
-        'DELETE FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, targetUserId]
-      )
-      res.status(201).json({ group_id: groupId, banned_user_id: targetUserId, reason: reason || null })
-    } catch (err: any) {
-      const code = (err as { code?: string })?.code
-      if (code === '42P01') {
-        console.error('[social] Ban member: missing table group_bans (501)', { code })
-        return res.status(501).json({ error: 'group_bans table not found; run migration 04-social-schema-archive-recall-kickban.sql' })
-      }
-      console.error('[social] Error banning member:', { code, message: err?.message, status: 500 })
-      res.status(500).json({ error: 'Failed to ban member' })
-    }
-  })
-
-  // DELETE /messages/groups/:groupId/ban/:userId - Unban user
-  router.delete('/groups/:groupId/ban/:userId', async (req: AuthedRequest, res: Response) => {
-    const { groupId, userId: targetUserId } = req.params
-    const requester_id = req.userId
-
-    try {
-      const roleCheck = await pool.query(
-        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, requester_id]
-      )
-      if (roleCheck.rows.length === 0 || !['owner', 'admin'].includes(roleCheck.rows[0].role)) {
-        return res.status(403).json({ error: 'Only owners or admins can unban' })
-      }
-
-      const result = await pool.query(
-        'DELETE FROM messages.group_bans WHERE group_id = $1 AND user_id = $2 RETURNING 1',
-        [groupId, targetUserId]
-      )
-      if (result.rowCount === 0) {
-        return res.status(404).json({ error: 'User is not banned from this group' })
-      }
-      res.status(204).end()
-    } catch (err: any) {
-      console.error('[social] Error unbanning:', err)
-      res.status(500).json({ error: 'Failed to unban' })
-    }
-  })
-
-  // GET /messages/groups/:groupId - Get group details
-  router.get('/groups/:groupId', async (req: AuthedRequest, res: Response) => {
-    const { groupId } = req.params
-    const userId = req.userId
-
-    try {
-      // Verify user is a member
-      const memberCheck = await pool.query(
-        'SELECT 1 FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, userId]
-      )
-      if (memberCheck.rows.length === 0) {
-        return res.status(403).json({ error: 'You are not a member of this group' })
-      }
-
-      // Get group with members
-      const groupQuery = await pool.query(
-        'SELECT id, name, description, created_by, created_at, updated_at FROM messages.groups WHERE id = $1',
-        [groupId]
-      )
-      const membersQuery = await pool.query(
-        'SELECT user_id, role, joined_at FROM messages.group_members WHERE group_id = $1 ORDER BY joined_at ASC',
-        [groupId]
-      )
-
-      res.json({
-        ...groupQuery.rows[0],
-        members: membersQuery.rows,
-      })
-    } catch (err) {
-      console.error('[social] Error fetching group:', err)
-      res.status(500).json({ error: 'Failed to fetch group' })
-    }
-  })
-
-  // GET /messages/groups - List user's groups
-  router.get('/groups', async (req: AuthedRequest, res: Response) => {
-    const userId = req.userId
-
-    try {
-      const query = `
-        SELECT g.id, g.name, g.description, g.created_by, g.created_at, g.updated_at,
-               gm.role, gm.joined_at
-        FROM messages.groups g
-        INNER JOIN messages.group_members gm ON g.id = gm.group_id
-        WHERE gm.user_id = $1
-        ORDER BY g.updated_at DESC
-      `
-      const { rows } = await pool.query(query, [userId])
-
-      res.json({ groups: rows })
-    } catch (err: any) {
-      const code = (err as { code?: string })?.code
-      console.error('[social] Error fetching groups:', { code, message: err?.message, status: 500 })
-      res.status(500).json({ error: 'Failed to fetch groups' })
-    }
-  })
-
-  // DELETE /messages/groups/:groupId/leave - User leaves a group (MUST be before /groups/:groupId)
-  router.delete('/groups/:groupId/leave', async (req: AuthedRequest, res: Response) => {
-    const { groupId } = req.params
-    const userId = req.userId
-
-    try {
-      // Optimized: Single query to get user role and elevated-role count (owner/admin)
-      const result = await pool.query(
-        `WITH user_member AS (
-          SELECT role FROM messages.group_members 
-          WHERE group_id = $1 AND user_id = $2
-        ),
-        elevated_count AS (
-          SELECT COUNT(*)::int as count FROM messages.group_members 
-          WHERE group_id = $1 AND role IN ('owner', 'admin')
-        )
-        SELECT 
-          (SELECT role FROM user_member) as user_role,
-          (SELECT count FROM elevated_count) as elevated_count
-        `,
-        [groupId, userId]
-      )
-
-      if (!result.rows[0]?.user_role) {
-        return res.status(403).json({ error: 'You are not a member of this group' })
-      }
-
-      const userRole = result.rows[0].user_role
-      const elevatedCount = result.rows[0].elevated_count || 0
-
-      // Prevent leaving if user is the only owner/admin (must transfer role or delete group)
-      if (['owner', 'admin'].includes(userRole) && elevatedCount === 1) {
-        return res.status(400).json({ 
-          error: 'Cannot leave group: you are the only owner/admin. Transfer role or delete the group instead.' 
-        })
-      }
-
-      // Remove user from group (optimized with index)
-      await pool.query(
-        'DELETE FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, userId]
-      )
-
-      res.status(204).end()
-    } catch (err: any) {
-      console.error('[social] Error leaving group:', err)
-      res.status(500).json({ error: 'Failed to leave group' })
-    }
-  })
-
-  // DELETE /messages/groups/:groupId - Delete/Archive a group (admin only)
-  router.delete('/groups/:groupId', async (req: AuthedRequest, res: Response) => {
-    const { groupId } = req.params
-    const userId = req.userId
-    const archive = req.query.archive === 'true' // Optional: archive instead of delete
-
-    try {
-      // Verify user is owner or admin
-      const memberCheck = await pool.query(
-        'SELECT role FROM messages.group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, userId]
-      )
-      if (memberCheck.rows.length === 0) {
-        return res.status(403).json({ error: 'You are not a member of this group' })
-      }
-      if (!['owner', 'admin'].includes(memberCheck.rows[0].role)) {
-        return res.status(403).json({ error: 'Only owners or admins can delete/archive groups' })
-      }
-
-      if (archive) {
-        // Archive: Mark group as archived (soft delete)
-        // Use transaction for consistency
-        const client = await pool.connect()
-        try {
-          await client.query('BEGIN')
-          
-          // Mark group as archived
-          await client.query(
-            'UPDATE messages.groups SET archived = true, updated_at = now() WHERE id = $1',
-            [groupId]
-          )
-          
-          // Optionally archive all group messages (if schema supports it)
-          // This is a soft delete - messages remain but marked as archived
-          await client.query(
-            'UPDATE messages.messages SET archived = true WHERE group_id = $1',
-            [groupId]
-          ).catch(() => {
-            // Ignore if archived column doesn't exist on messages table
-          })
-          
-          await client.query('COMMIT')
-          
-          res.json({ 
-            id: groupId, 
-            archived: true, 
-            message: 'Group archived successfully' 
-          })
-        } catch (err: any) {
-          await client.query('ROLLBACK')
-          throw err
-        } finally {
-          client.release()
-        }
-      } else {
-        // Delete: Remove all group members and messages, then delete the group
-        // Use transaction for atomicity
-        const client = await pool.connect()
-        try {
-          await client.query('BEGIN')
-          
-          // Delete all group members (cascade will handle related data if configured)
-          await client.query(
-            'DELETE FROM messages.group_members WHERE group_id = $1',
-            [groupId]
-          )
-          
-          // Delete all group messages
-          await client.query(
-            'DELETE FROM messages.messages WHERE group_id = $1',
-            [groupId]
-          )
-          
-          // Finally delete the group
-          await client.query(
-            'DELETE FROM messages.groups WHERE id = $1',
-            [groupId]
-          )
-          
-          await client.query('COMMIT')
-          
-          res.status(204).end()
-        } catch (err: any) {
-          await client.query('ROLLBACK')
-          throw err
-        } finally {
-          client.release()
-        }
-      }
-    } catch (err: any) {
-      console.error('[social] Error deleting/archiving group:', err)
-      res.status(500).json({ error: 'Failed to delete/archive group' })
     }
   })
 

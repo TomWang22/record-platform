@@ -1,8 +1,9 @@
 -- Auction Monitor Extended Schema
--- This migration adds the comprehensive data pipeline tables for multi-platform auction monitoring
--- Based on AUCTION_MONITOR_DATA_PIPELINE.md architecture
+-- Run as postgres (record_owner not created on this instance).
+SET ROLE postgres;
 
-SET ROLE record_owner;
+-- Required for idx_normalized_listings_title_trgm (gin_trgm_ops)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Ensure auction_monitor schema exists
 CREATE SCHEMA IF NOT EXISTS auction_monitor;
@@ -145,7 +146,8 @@ CREATE INDEX IF NOT EXISTS idx_price_history_status ON auction_monitor.price_his
 
 CREATE TABLE IF NOT EXISTS auction_monitor.user_watches (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+-- User ID references auth service (port 5437); no FK across instances
+  user_id UUID NOT NULL,
   search_criteria JSONB NOT NULL,  -- Artist, title, format, condition, price range
   platforms JSONB NOT NULL,  -- Array of platforms to monitor: ['ebay', 'discogs', ...]
   notification_preferences JSONB,  -- Email, in-app, push
@@ -248,12 +250,17 @@ CREATE TRIGGER trg_normalized_listings_seen
   EXECUTE FUNCTION auction_monitor.touch_last_seen_at();
 
 -- ============================================================================
--- GRANTS
+-- GRANTS (only if record_app role exists on this instance)
 -- ============================================================================
 
-GRANT USAGE ON SCHEMA auction_monitor TO record_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA auction_monitor TO record_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA auction_monitor TO record_app;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'record_app') THEN
+    GRANT USAGE ON SCHEMA auction_monitor TO record_app;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA auction_monitor TO record_app;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA auction_monitor TO record_app;
+  END IF;
+END $$;
 
 RESET ROLE;
 

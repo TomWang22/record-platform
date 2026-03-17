@@ -8,5 +8,5 @@ spec:
     spec:
       containers:
         - name: app
-          image: shopping-service:dev
+          image: record-platform-shopping-service:latest
 

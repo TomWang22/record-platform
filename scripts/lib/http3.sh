@@ -1,16 +1,42 @@
 #!/usr/bin/env bash
 
-# Shared helpers for issuing HTTP/3 requests against the kind cluster by
-# reusing the control-plane node's network namespace. This avoids macOS/Docker
-# UDP limitations so QUIC traffic reliably reaches the in-cluster Caddy pod.
+# Shared helpers for issuing HTTP/3 (QUIC) requests. Paths (in order of use):
+#   1. Native curl + MetalLB LB IP (HTTP3_USE_NATIVE_CURL=1): host curl → LB IP:443 → socat → NodePort 30443 → Caddy.
+#   2. Docker + host network + Docker bridge (HTTP3_DOCKER_FORWARD_PORT=18443): container curl → 127.0.0.1:18443 → host socat → NodePort → Caddy.
+#   3. NodePort fallback (HTTP3_USE_LB_IP=0): resolve record.local to 127.0.0.1:30443.
+#
+# MetalLB + k3d on macOS: The baseline sets HTTP3_USE_NATIVE_CURL=1 when TARGET_IP
+# (LB IP) and PORT=443 are set. Host curl then hits LB IP:443; socat (started by
+# setup-lb-ip-host-access.sh) forwards UDP 443 to 127.0.0.1:NodePort. If socat is not bound (e.g. "Address already in use"), run:
+#   sudo LB_IP=<LB_IP> NODEPORT=30443 ./scripts/setup-lb-ip-host-access.sh
+# then re-run the suite or diagnostic. See docs/HTTP3-CURL-EXIT-CODES.md and
+# scripts/diagnose-http3-lb-ip-under-the-hood.sh.
+#
+# When native curl to LB IP fails (host↔NodePort UDP limit on macOS):
+# The baseline sets HTTP3_USE_NATIVE_CURL=0 and HTTP3_DOCKER_FORWARD_PORT=18443 so
+# http3_curl uses a container (--network host) hitting 127.0.0.1:18443 (Docker bridge socat). To force that path:
+#   HTTP3_USE_NATIVE_CURL=0 HTTP3_DOCKER_FORWARD_PORT=18443
+# To skip the Docker bridge and use only native curl to LB IP:
+#   HTTP3_SKIP_DOCKER_BRIDGE=1
+#
+# By default, runner setup failures (Docker/node/image) are reported and return 1
+# so the process does not exit; set HTTP3_STRICT=1 to restore legacy exit behaviour.
 
+# When HTTP3_STRICT=1, we call the caller's fail() or exit 1 so the process stops (legacy).
+# Otherwise we only warn and return 1 so callers can continue and "make it all the way"
+# (e.g. HTTP/3 runner unavailable → http3_curl returns 1, suite skips or marks HTTP/3 tests).
 _http3_fail() {
-  if declare -F fail >/dev/null 2>&1; then
-    fail "$1"
-  else
-    echo "HTTP/3 helper error: $1" >&2
-    exit 1
+  if [[ "${HTTP3_STRICT:-0}" == "1" ]]; then
+    if declare -F fail >/dev/null 2>&1; then
+      fail "$1"
+    else
+      echo "HTTP/3 helper error: $1" >&2
+      exit 1
+    fi
+    return
   fi
+  echo "HTTP/3 helper error: $1" >&2
+  return 1
 }
 
 _http3_warn() {
@@ -149,22 +175,30 @@ _http3_ensure_runner() {
         docker_cmd="podman"
       else
         _HTTP3_RUNNER_READY="no"
-        _http3_fail "Docker or Podman is required for HTTP/3 tests. Install docker or set DOCKER_HOST."
+        _http3_fail "Docker or Podman is required for HTTP/3 tests. Install docker or set DOCKER_HOST." || true
+        return 1
       fi
     else
       _HTTP3_RUNNER_READY="no"
-      _http3_fail "Docker is required for HTTP/3 tests. Install docker or set DOCKER_HOST."
+      _http3_fail "Docker is required for HTTP/3 tests. Install docker or set DOCKER_HOST." || true
+      return 1
     fi
   fi
   
   # Store docker command globally for use in http3_curl
   _HTTP3_DOCKER_CMD="$docker_cmd"
 
+  # Docker-bridge path (host.docker.internal:18443): use HOST_NETWORK so container can reach host; no kind node needed
+  if [[ -n "${HTTP3_DOCKER_FORWARD_PORT:-}" ]]; then
+    HTTP3_KIND_NODE="${HTTP3_KIND_NODE:-HOST_NETWORK}"
+  fi
+
   local node="${HTTP3_KIND_NODE:-}"
   if [[ -z "$node" ]]; then
     node="$(_http3_detect_kind_node)" || {
       _HTTP3_RUNNER_READY="no"
-      _http3_fail "Unable to detect kind node; set HTTP3_KIND_NODE manually."
+      _http3_fail "Unable to detect kind node; set HTTP3_KIND_NODE manually (or HTTP3_DOCKER_FORWARD_PORT=18443 for Docker bridge)." || true
+      return 1
     }
     HTTP3_KIND_NODE="$node"
   fi
@@ -195,16 +229,119 @@ _http3_ensure_runner() {
   
   if [[ "$image_exists" == "false" ]]; then
     _http3_warn "Pulling HTTP/3 image: $HTTP3_IMAGE (this may take a moment)..."
-    docker pull "$HTTP3_IMAGE" >/dev/null 2>&1 || {
-      _HTTP3_RUNNER_READY="no"
-      _http3_fail "Failed to pull HTTP/3 image: $HTTP3_IMAGE"
-    }
+    if ! docker pull "$HTTP3_IMAGE" >/dev/null 2>&1; then
+      # Fallback: try alternative image when default pull fails (e.g. rate limit, registry issue)
+      local fallback_images=("rmarx/curl-http3:latest" "alpine/curl-http3")
+      for _img in "${fallback_images[@]}"; do
+        [[ "$_img" == "$HTTP3_IMAGE" ]] && continue
+        _http3_warn "Trying fallback image: $_img"
+        if docker pull "$_img" >/dev/null 2>&1; then
+          HTTP3_IMAGE="$_img"
+          image_exists=true
+          break
+        fi
+      done
+      if [[ "$image_exists" != "true" ]]; then
+        _HTTP3_RUNNER_READY="no"
+        _http3_fail "Failed to pull HTTP/3 image. Set HTTP3_IMAGE to a local image (e.g. after building: ./scripts/build-http3-image.sh or docker build -t my-curl-http3 docker/http3-curl-enhanced/) or pull manually: docker pull alpine/curl-http3:latest" || true
+        return 1
+      fi
+    fi
   fi
   
   _HTTP3_RUNNER_READY="yes"
 }
 
 http3_curl() {
+  # --- Colima / MetalLB-only: never use NodePort (127.0.0.1:30443) — host cannot reach it ---
+  local _ctx
+  _ctx=$(kubectl config current-context 2>/dev/null || echo "")
+  if [[ "${FORCE_METALLB_ONLY:-0}" == "1" ]] || [[ "$_ctx" == *"colima"* ]]; then
+    if [[ -z "${TARGET_IP:-}" ]]; then
+      TARGET_IP=$(kubectl -n ingress-nginx get svc caddy-h3 -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+    fi
+    if [[ -n "${TARGET_IP:-}" ]]; then
+      export HTTP3_USE_LB_IP=1
+      export HTTP3_SKIP_DOCKER_BRIDGE=1
+    fi
+  fi
+
+  # --- QUIC Hostname Invariant Enforcement ---
+  local expected_host="${HTTP3_EXPECTED_HOST:-record.local}"
+  local request_host=""
+  if [[ "${HTTP3_ENFORCE_HOSTNAME:-1}" == "1" ]]; then
+    for arg in "$@"; do
+      if [[ "$arg" =~ ^https://([^/:]+) ]]; then
+        request_host="${BASH_REMATCH[1]}"
+        break
+      fi
+    done
+    if [[ -z "${request_host:-}" ]]; then
+      echo "HTTP/3 invariant violation: no https:// URL provided." >&2
+      return 98
+    fi
+    if [[ "$request_host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      echo "HTTP/3 invariant violation: QUIC must not use raw IP ($request_host)." >&2
+      return 97
+    fi
+    if [[ "$request_host" != "$expected_host" ]]; then
+      echo "HTTP/3 invariant violation: host '$request_host' != expected '$expected_host'." >&2
+      return 96
+    fi
+  fi
+  # --- End Enforcement ---
+
+  local lb_ip="${TARGET_IP:-}"
+  [[ -z "$lb_ip" ]] && lb_ip="127.0.0.1"
+  local resolve_port="${HTTP3_RESOLVE_PORT:-${PORT:-443}}"
+  # Colima/MetalLB-only: force LB IP and port 443 — never NodePort
+  if [[ "${FORCE_METALLB_ONLY:-0}" == "1" ]] || [[ "${_ctx:-}" == *"colima"* ]]; then
+    if [[ -n "${TARGET_IP:-}" ]]; then
+      lb_ip="$TARGET_IP"
+      resolve_port="443"
+    fi
+  fi
+
+  # Disable GSO to avoid sendmsg errno 5 (EIO) on macOS / Docker VM (QUIC)
+  export NGTCP2_ENABLE_GSO="${NGTCP2_ENABLE_GSO:-0}"
+  # When HTTP3_USE_NATIVE_CURL=1 (Darwin + LB IP): try native curl first — host can reach LB IP:443; avoids Docker bridge
+  local curl_cmd="curl"
+  [[ -n "${CURL_BIN:-}" ]] && [[ -x "${CURL_BIN}" ]] && curl_cmd="$CURL_BIN"
+  if [[ "${HTTP3_USE_NATIVE_CURL:-0}" == "1" ]] && "$curl_cmd" --help all 2>/dev/null | grep -q -- "--http3"; then
+    # Pace HTTP/3 calls to reduce QUIC burst and UDP drop (Colima/MetalLB)
+    sleep "${HTTP3_PACE_SECONDS:-0.15}" 2>/dev/null || true
+    local output
+    local native_args=()
+    # Never reuse QUIC connection (avoids curl exit 55 after long run / QUIC idle reuse)
+    native_args+=(--no-keepalive)
+    # Fresh connection per request (avoids QUIC reuse issues)
+    native_args+=(-H "Connection: close")
+    # Deterministic timeouts: 10s max, 2s connect (stabilizes H3 handshake and checkout on Colima)
+    # 10s default helps checkout/QUIC on Colima; override with HTTP3_MAX_TIME if needed
+echo " $* " | grep -qE ' --max-time [0-9]+' || native_args+=(--max-time "${HTTP3_MAX_TIME:-10}")
+    echo " $* " | grep -qE ' --connect-timeout [0-9]+' || native_args+=(--connect-timeout "${HTTP3_CONNECT_TIMEOUT:-2}")
+    # Retry on timeout/refused to reduce exit 28/55 under load
+    echo " $* " | grep -qE ' --retry [0-9]+' || native_args+=(--retry 2 --retry-delay 0 --retry-connrefused)
+    if [[ "${HTTP3_AUTO_RESOLVE:-1}" == "1" ]]; then
+      native_args+=(--resolve "${expected_host}:${resolve_port}:${lb_ip}")
+    fi
+    native_args+=("$@")
+    output=$(NGTCP2_ENABLE_GSO=0 "$curl_cmd" "${native_args[@]}" 2>&1)
+    local exit_code=$?
+    # Retry once on exit 55 (QUIC send failure) or 28 (timeout)
+    if [[ "${HTTP3_RETRY_ON_55:-1}" == "1" ]] && { [[ "$exit_code" -eq 55 ]] || [[ "$exit_code" -eq 28 ]]; }; then
+      sleep 0.5
+      output=$(NGTCP2_ENABLE_GSO=0 "$curl_cmd" "${native_args[@]}" 2>&1)
+      exit_code=$?
+    fi
+    if [[ "${HTTP3_ASSERT_ALPN:-0}" == "1" ]] && ! echo "$output" | grep -qi "using HTTP/3"; then
+      echo "❌ ALPN invariant violation: connection did not negotiate HTTP/3." >&2
+      return 95
+    fi
+    echo "$output"
+    return $exit_code
+  fi
+
   _http3_ensure_runner || return 1
   
   local output exit_code
@@ -281,7 +418,21 @@ http3_curl() {
     curl_args+=("$arg")
     i=$((i+1))
   done
+
+  # Auto-inject --resolve so hostname/SNI is correct (avoid accidental IP QUIC; Caddy serves record.local so SNI must match).
+  # Docker bridge: use 127.0.0.1:DOCKER_FORWARD_PORT so container (--network host) hits host's socat when native curl to LB IP failed.
+  local _resolve_ip="$lb_ip"
+  local _resolve_port="$resolve_port"
+  if [[ -n "${HTTP3_DOCKER_FORWARD_PORT:-}" ]]; then
+    _resolve_port="${HTTP3_DOCKER_FORWARD_PORT}"
+    _resolve_ip="${DOCKER_HOST_IP:-127.0.0.1}"
+  fi
+  if [[ "${HTTP3_AUTO_RESOLVE:-1}" == "1" ]]; then
+    curl_args=(--resolve "${expected_host}:${_resolve_port}:${_resolve_ip}" "${curl_args[@]}")
+  fi
   
+  # Skip Docker bridge when requested (use only native curl to LB IP; fewer hops)
+  [[ "${HTTP3_SKIP_DOCKER_BRIDGE:-0}" == "1" ]] && unset HTTP3_DOCKER_FORWARD_PORT
   # Check if we should use host network (for Colima/k3s or when no container network available)
   if [[ "$HTTP3_KIND_NODE" == "HOST_NETWORK" ]]; then
     # Use host network mode - works for Colima/k3s and direct host access
@@ -298,21 +449,29 @@ http3_curl() {
           local resolve_host="${BASH_REMATCH[1]}"
           local resolve_port="${BASH_REMATCH[2]}"
           local resolve_ip="${BASH_REMATCH[3]}"
-          # If IP is a service IP (10.x.x.x), replace with 127.0.0.1
-          # For HTTP/3 with NodePort, we need to use the NodePort (typically 30443)
-          # HTTP/3 (QUIC) uses UDP, but still needs to go through NodePort
-          if [[ "$resolve_ip" =~ ^10\. ]] || [[ "$resolve_ip" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || [[ "$resolve_ip" =~ ^192\.168\. ]]; then
-            # Detect NodePort from environment or use default
+          # Colima/MetalLB-only: NEVER rewrite to NodePort (127.0.0.1:30443) — host cannot reach it.
+          # Docker-on-macOS bridge: port 18443 = host.docker.internal; never rewrite to NodePort.
+          local docker_fwd_port="${HTTP3_DOCKER_FORWARD_PORT:-18443}"
+          if [[ "${FORCE_METALLB_ONLY:-0}" == "1" ]]; then
+            : # never rewrite to NodePort on Colima
+          elif [[ "$resolve_port" == "$docker_fwd_port" ]]; then
+            : # keep resolve as-is (host.docker.internal:18443)
+          elif [[ "${HTTP3_USE_LB_IP:-0}" == "1" ]]; then
+            : # keep LB IP / Docker host IP
+          elif [[ -n "${TARGET_IP:-}" ]] && [[ "$resolve_ip" == "${TARGET_IP}" ]] && [[ "$resolve_port" == "443" ]]; then
+            : # MetalLB: keep record.local:443:LB_IP; do not rewrite to 127.0.0.1:30443
+          elif [[ "$resolve_ip" == "127.0.0.1" ]] && [[ "$resolve_port" == "30443" ]]; then
+            # Caller passed NodePort — on Colima this fails. Override to LB IP when available.
+            if [[ -n "${TARGET_IP:-}" ]]; then
+              resolve_val="${resolve_host}:443:${TARGET_IP}"
+            fi
+          elif [[ "$resolve_ip" =~ ^10\. ]] || [[ "$resolve_ip" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || [[ "$resolve_ip" =~ ^192\.168\. ]]; then
             local nodeport="${CADDY_NODEPORT:-${PORT:-30443}}"
-            # Use 127.0.0.1 with NodePort for HTTP/3
             resolve_val="${resolve_host}:${nodeport}:127.0.0.1"
-            # Also update the URL port if it's using default 443
             local url_idx=0
             for ((url_i=0; url_i<${#final_curl_args[@]}; url_i++)); do
               if [[ "${final_curl_args[$url_i]}" =~ ^https://${resolve_host}(:443)?(/.*)?$ ]]; then
-                # Replace :443 with :${nodeport} in URL
                 final_curl_args[$url_i]="${final_curl_args[$url_i]//:443/:${nodeport}}"
-                # If no port specified, add NodePort
                 if [[ "${final_curl_args[$url_i]}" =~ ^https://${resolve_host}/ ]]; then
                   final_curl_args[$url_i]="${final_curl_args[$url_i]//https:\/\/${resolve_host}\//https:\/\/${resolve_host}:${nodeport}\/}"
                 fi
@@ -328,19 +487,29 @@ http3_curl() {
       i=$((i+1))
     done
     
-    # Update any URL arguments to use NodePort instead of 443
-    # This is needed for HTTP/3 with NodePort setup
-    local nodeport="${CADDY_NODEPORT:-${PORT:-30443}}"
-    for ((url_idx=0; url_idx<${#final_curl_args[@]}; url_idx++)); do
-      local url_arg="${final_curl_args[$url_idx]}"
-      # Match URLs like https://host:443/path or https://host/path
-      if [[ "$url_arg" =~ ^https://([^:/]+)(:443)?(/.*)?$ ]]; then
-        local host_part="${BASH_REMATCH[1]}"
-        local path_part="${BASH_REMATCH[3]:-/}"
-        # Replace with NodePort
-        final_curl_args[$url_idx]="https://${host_part}:${nodeport}${path_part}"
-      fi
-    done
+    # Update URL arguments: NodePort (when not using LB IP), Docker forward port (when HTTP3_DOCKER_FORWARD_PORT), or keep 443
+    if [[ -n "${HTTP3_DOCKER_FORWARD_PORT:-}" ]]; then
+      # Docker-on-macOS bridge: resolve uses host.docker.internal:18443; URLs must use that port
+      local df_port="$HTTP3_DOCKER_FORWARD_PORT"
+      for ((url_idx=0; url_idx<${#final_curl_args[@]}; url_idx++)); do
+        local url_arg="${final_curl_args[$url_idx]}"
+        if [[ "$url_arg" =~ ^https://([^:/]+)(:443)?(/.*)?$ ]]; then
+          local host_part="${BASH_REMATCH[1]}"
+          local path_part="${BASH_REMATCH[3]:-/}"
+          final_curl_args[$url_idx]="https://${host_part}:${df_port}${path_part}"
+        fi
+      done
+    elif [[ "${HTTP3_USE_LB_IP:-0}" != "1" ]]; then
+      local nodeport="${CADDY_NODEPORT:-${PORT:-30443}}"
+      for ((url_idx=0; url_idx<${#final_curl_args[@]}; url_idx++)); do
+        local url_arg="${final_curl_args[$url_idx]}"
+        if [[ "$url_arg" =~ ^https://([^:/]+)(:443)?(/.*)?$ ]]; then
+          local host_part="${BASH_REMATCH[1]}"
+          local path_part="${BASH_REMATCH[3]:-/}"
+          final_curl_args[$url_idx]="https://${host_part}:${nodeport}${path_part}"
+        fi
+      done
+    fi
     
     # For --network host, volume mounts may not work reliably with Colima
     # Use base64 encoding to pass CA cert content via environment variable
@@ -393,6 +562,7 @@ http3_curl() {
       
       output=$($docker_cmd run --rm \
         --network host \
+        -e "NGTCP2_ENABLE_GSO=0" \
         -e "CA_CERT_B64=$ca_cert_b64" \
         "$HTTP3_IMAGE" \
         sh -c "echo \"\$CA_CERT_B64\" | base64 -d > $cert_path && curl $curl_cmd_str" 2>&1)
@@ -401,6 +571,7 @@ http3_curl() {
       # Fallback to mount if no CA cert (shouldn't happen, but safe fallback)
       output=$($docker_cmd run --rm \
         --network host \
+        -e "NGTCP2_ENABLE_GSO=0" \
         "${mount_args[@]}" \
         "$HTTP3_IMAGE" \
         curl "${final_curl_args[@]}" 2>&1)
@@ -409,6 +580,7 @@ http3_curl() {
   else
     # Use container network namespace (for Kind clusters)
     output=$($docker_cmd run --rm \
+      -e "NGTCP2_ENABLE_GSO=0" \
       --network "container:${HTTP3_KIND_NODE}" \
       "${mount_args[@]}" \
       "$HTTP3_IMAGE" \
@@ -419,6 +591,12 @@ http3_curl() {
   # Filter out Docker pull messages (they appear on stderr but get mixed with curl output)
   # Keep everything else, including legitimate curl errors
   output=$(echo "$output" | grep -v "Unable to find image\|Pulling from\|Pull complete\|Digest:\|Status:")
+  
+  # ALPN invariant: require HTTP/3 negotiated (use -v in caller for "using HTTP/3" in output)
+  if [[ "${HTTP3_ASSERT_ALPN:-0}" == "1" ]] && ! echo "$output" | grep -qi "using HTTP/3"; then
+    echo "❌ ALPN invariant violation: connection did not negotiate HTTP/3." >&2
+    return 95
+  fi
   
   # Print the filtered output
   echo "$output"

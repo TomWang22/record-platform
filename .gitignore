@@ -4,6 +4,7 @@ dist/
 .DS_Store
 coverage/
 .reissue-tmp.*
+.reissue-ssh-*
 *.log
 __pycache__/
 *.pyc
@@ -82,6 +83,13 @@ docs/records_chunks_small/
 !docs/
 !docs/**/*.md
 !docs/**/*.gz
+
+# Internal DB/schema docs (keep out of repo / hidden)
+docs/SCHEMAS_AND_TABLES.md
+docs/COLD_TUNING_AND_SEEDING.md
+docs/BACKUPS_AND_TUNING.md
+docs/ANALYTICS_PYTHON_AI_DUAL_WRITE_AND_AUTH.md
+infra/docs/EIGHT-DATABASES_ARCHITECTURE.md
 
 # Generated CSV: pgbench/scripts write to test-results/ or LOG_DIR; keep *.csv ignored to avoid committing large outputs
 # (See scripts/PGBENCH_HARDENING.md and run_pgbench_sweep.sh for where CSVs are written.)

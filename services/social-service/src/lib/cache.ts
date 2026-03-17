@@ -53,8 +53,8 @@ export function makeRedis(): Redis | null {
     enableAutoPipelining: true,
     enableOfflineQueue: false,
     lazyConnect: true,
-    maxRetriesPerRequest: 1,
-    connectTimeout: 2000,
+    maxRetriesPerRequest: 3,
+    connectTimeout: 10_000, // Colima/host.docker.internal may need a moment on first packet
     keepAlive: 10_000,
     autoResubscribe: false,
   } as const

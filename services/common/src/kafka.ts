@@ -1,9 +1,9 @@
 import { Kafka } from 'kafkajs'
 import * as fs from 'fs'
 
-// Strict TLS configuration for production
-// Set KAFKA_SSL_ENABLED=true to enable TLS connections
-// When enabled, must provide KAFKA_CA_CERT, KAFKA_CLIENT_CERT, KAFKA_CLIENT_KEY
+// Strict TLS configuration: no cleartext. All Kafka client connections use SSL (port 9093).
+// Set KAFKA_SSL_ENABLED=true to enable TLS connections (required by platform policy).
+// When enabled, must provide KAFKA_CA_CERT; optionally KAFKA_CLIENT_CERT/KAFKA_CLIENT_KEY for mTLS.
 const sslConfig = process.env.KAFKA_SSL_ENABLED === 'true' ? (() => {
   try {
     const config: any = {
@@ -22,16 +22,17 @@ const sslConfig = process.env.KAFKA_SSL_ENABLED === 'true' ? (() => {
       config.key = fs.readFileSync(process.env.KAFKA_CLIENT_KEY, 'utf-8')
     }
     
-    // If no certs provided, return undefined to use PLAINTEXT
+    // Strict TLS: do not fall back to PLAINTEXT when SSL is enabled. Require at least CA or client cert.
     if (!config.ca && !config.cert) {
-      console.warn('[kafka] KAFKA_SSL_ENABLED=true but no certificates provided, falling back to PLAINTEXT')
-      return undefined
+      const msg = '[kafka] KAFKA_SSL_ENABLED=true but no certificates provided. Set KAFKA_CA_CERT (and optionally KAFKA_CLIENT_CERT/KAFKA_CLIENT_KEY for mTLS). No plaintext fallback.'
+      console.error(msg)
+      throw new Error(msg)
     }
-    
+
     return config
   } catch (error) {
     console.error('[kafka] Error loading SSL certificates:', error)
-    return undefined
+    throw error
   }
 })() : undefined
 

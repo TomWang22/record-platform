@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
+	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"go.k6.io/k6/js/modules"
 )
@@ -27,7 +29,34 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 }
 
 type ModuleInstance struct {
-	vu modules.VU
+	vu   modules.VU
+	rt   *http3.RoundTripper
+	cli  *http.Client
+	once sync.Once
+}
+
+func (mi *ModuleInstance) getOrCreateClient(options map[string]interface{}) *http.Client {
+	if options == nil {
+		options = make(map[string]interface{})
+	}
+	mi.once.Do(func() {
+		mi.rt = &http3.RoundTripper{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: getBoolOption(options, "insecureSkipTLSVerify", false),
+				ServerName:         getStringOption(options, "serverName", ""),
+			},
+			QuicConfig: &quic.Config{
+				HandshakeIdleTimeout: 3 * time.Second,  // Fail fast on handshake stall
+				MaxIdleTimeout:       5 * time.Second,  // Prevent 15s zombie sessions
+				KeepAlivePeriod:      2 * time.Second,  // Aggressive keepalive
+			},
+		}
+		mi.cli = &http.Client{
+			Transport: mi.rt,
+			Timeout:   getDurationOption(options, "timeout", 30*time.Second),
+		}
+	})
+	return mi.cli
 }
 
 func (mi *ModuleInstance) Exports() modules.Exports {
@@ -41,18 +70,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 }
 
 func (mi *ModuleInstance) request(method, url string, options map[string]interface{}) map[string]interface{} {
-	// Create HTTP/3 client
-	roundTripper := &http3.RoundTripper{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: getBoolOption(options, "insecureSkipTLSVerify", false),
-		},
-	}
-	defer roundTripper.Close()
-
-	client := &http.Client{
-		Transport: roundTripper,
-		Timeout:   getDurationOption(options, "timeout", 30*time.Second),
-	}
+	client := mi.getOrCreateClient(options)
 
 	// Create request
 	req, err := http.NewRequest(method, url, nil)
@@ -132,6 +150,13 @@ func getDurationOption(options map[string]interface{}, key string, defaultValue 
 		if d, err := time.ParseDuration(val); err == nil {
 			return d
 		}
+	}
+	return defaultValue
+}
+
+func getStringOption(options map[string]interface{}, key string, defaultValue string) string {
+	if val, ok := options[key].(string); ok {
+		return val
 	}
 	return defaultValue
 }

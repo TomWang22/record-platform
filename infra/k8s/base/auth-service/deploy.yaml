@@ -7,10 +7,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0  # Zero-downtime deployments
-      maxSurge: 1
+    type: Recreate
   selector: { matchLabels: { app: auth-service } }
   template:
     metadata:
@@ -21,10 +18,15 @@ spec:
         prometheus.io/path: "/metrics"
         linkerd.io/inject: enabled  # Enable Linkerd sidecar injection
     spec:
+      hostAliases:
+        - ip: "192.168.5.2"
+          hostnames:
+            - "host.docker.internal"
+            - "host.lima.internal"
       containers:
         - name: app
           image: auth-service:dev
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 4001
@@ -41,7 +43,9 @@ spec:
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_REQUIRE_CLIENT_CERT
-              value: "true"  # Enable mTLS (mutual TLS) - client cert verification
+              value: "true"  # Strict mTLS: Envoy presents client cert to backends
+            - name: TLS_CA_PATH
+              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert (envoy-client-tls)
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
@@ -51,6 +55,8 @@ spec:
             - name: TLS_CERT_PATH
               value: "/etc/certs/tls.crt"
             - name: KAFKA_SSL_CA_CERT
+              value: "/etc/kafka/secrets/ca-cert.pem"
+            - name: KAFKA_CA_CERT
               value: "/etc/kafka/secrets/ca-cert.pem"
             # Debug logging for gRPC 403 investigation
             - name: GRPC_VERBOSITY

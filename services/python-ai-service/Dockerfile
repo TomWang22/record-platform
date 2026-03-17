@@ -1,4 +1,10 @@
 # syntax=docker/dockerfile:1
+#
+# Build context MUST be repo root (so proto/ and services/ paths resolve).
+# From repo root run:
+#   docker build -f services/python-ai-service/Dockerfile -t python-ai-service:dev .
+# Do NOT run: docker build -t python-ai-service:dev services/python-ai-service
+# (that uses service dir as context and COPY paths will fail).
 
 # ---------- deps ----------
 FROM python:3.11-slim AS deps
@@ -10,7 +16,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Copy requirements (changes rarely, good for caching)
-# Build from root: docker build -f services/python-ai-service/Dockerfile -t python-ai-service:dev .
+# Context = repo root: COPY services/python-ai-service/requirements.txt
 COPY services/python-ai-service/requirements.txt /tmp/requirements.txt
 
 # Install build deps with apt cache mount (faster installs)
@@ -60,9 +66,8 @@ RUN python -m grpc_tools.protoc \
     /tmp/proto/health.proto \
     && ls -la /app/*.py | head -5 || echo "Proto generation completed"
 
-    # Copy the app from monorepo path
-    # Build from root: docker build -f services/python-ai-service/Dockerfile -t python-ai-service:dev .
-    COPY services/python-ai-service/app /app/app
+# Copy the app from monorepo path (build from repo root)
+COPY services/python-ai-service/app /app/app
 
 # ---------- runtime ----------
 FROM python:3.11-slim

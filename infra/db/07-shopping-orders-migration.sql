@@ -27,11 +27,11 @@ CREATE TABLE IF NOT EXISTS shopping.orders (
   cancelled_at TIMESTAMPTZ -- When order was cancelled
 );
 
-CREATE INDEX idx_orders_user_id ON shopping.orders(user_id);
-CREATE INDEX idx_orders_order_number ON shopping.orders(order_number);
-CREATE INDEX idx_orders_status ON shopping.orders(status);
-CREATE INDEX idx_orders_payment_status ON shopping.orders(payment_status);
-CREATE INDEX idx_orders_created_at ON shopping.orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON shopping.orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_order_number ON shopping.orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON shopping.orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON shopping.orders(payment_status);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON shopping.orders(created_at DESC);
 
 -- Function to generate order number
 CREATE OR REPLACE FUNCTION shopping.generate_order_number()
@@ -55,6 +55,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Add updated_at trigger for orders
+DROP TRIGGER IF EXISTS trigger_orders_updated_at ON shopping.orders;
 CREATE TRIGGER trigger_orders_updated_at
   BEFORE UPDATE ON shopping.orders
   FOR EACH ROW
@@ -66,9 +67,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                  WHERE table_schema = 'shopping' AND table_name = 'purchase_history' AND column_name = 'resellable') THEN
     ALTER TABLE shopping.purchase_history ADD COLUMN resellable BOOLEAN NOT NULL DEFAULT TRUE;
-    CREATE INDEX idx_purchase_history_resellable ON shopping.purchase_history(user_id, resellable) WHERE resellable = TRUE;
   END IF;
 END $$;
+CREATE INDEX IF NOT EXISTS idx_purchase_history_resellable ON shopping.purchase_history(user_id, resellable) WHERE resellable = TRUE;
 
 COMMENT ON TABLE shopping.orders IS 'Orders table for managing checkout and purchases';
 COMMENT ON COLUMN shopping.orders.order_number IS 'Human-readable order number (e.g., ORD-2024-001234)';

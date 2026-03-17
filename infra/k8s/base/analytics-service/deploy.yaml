@@ -7,9 +7,7 @@ metadata:
 spec:
   replicas: 1  # Scaled to 1 for development
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0  # Zero-downtime deployments
+    type: Recreate
   selector: { matchLabels: { app: analytics-service } }
   template:
     metadata:
@@ -19,10 +17,28 @@ spec:
         prometheus.io/port: "4004"
         prometheus.io/path: "/metrics"
     spec:
+      hostAliases:
+        - ip: "192.168.5.2"
+          hostnames:
+            - "host.docker.internal"
+            - "host.lima.internal"
+      initContainers:
+        - name: wait-db
+          image: alpine:3.19
+          command:
+            - /bin/sh
+            - -c
+            - |
+              for i in $(seq 1 60); do
+                nc -zv host.docker.internal 5433 2>/dev/null && exit 0
+                sleep 2
+              done
+              echo "Records DB (5433) unreachable; ensure: 1) docker compose up -d (Postgres), 2) hostAliases correct for Colima: ./scripts/colima-apply-host-aliases.sh (see docs/COLIMA_POD_STABILITY_AND_HOST_ALIASES.md)"
+              exit 1
       containers:
         - name: app
           image: analytics-service:dev
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 4004
@@ -36,12 +52,25 @@ spec:
           env:
             - name: NODE_ENV
               value: "development"
+            # Pool sizing for rotation/load: avoid 5433 timeouts and connection starvation (Little's Law; 50/25 + no idle recycle during chaos)
+            - name: DB_POOL_MAX
+              value: "50"
+            - name: DB_POOL_MIN
+              value: "25"
+            - name: DB_IDLE_TIMEOUT_MS
+              value: "0"
             - name: GRPC_PORT
               value: "50054"
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_REQUIRE_CLIENT_CERT
-              value: "true"  # Enable client cert verification for production
+              value: "true"  # Strict mTLS: Envoy presents client cert to backends
+            - name: TLS_CA_PATH
+              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert
+            - name: TLS_KEY_PATH
+              value: "/etc/certs/tls.key"
+            - name: TLS_CERT_PATH
+              value: "/etc/certs/tls.crt"
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "1"
             - name: NODE_EXTRA_CA_CERTS

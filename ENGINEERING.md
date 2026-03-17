@@ -1,6 +1,6 @@
 # Record Platform - Engineering Documentation
 
-This document provides in-depth technical documentation for the Record Platform architecture, design decisions, and implementation details. For a high-level overview, see [`README.md`](README.md).
+This document provides in-depth technical documentation for the Record Platform architecture, design decisions, and implementation details. For a high-level overview, see [`README.md`](README.md). *Last updated to reflect Colima k3s primary, 8-DB deterministic restore and schema inspection, preflight step 7c (in-cluster k6), and Runbook 79–80.*
 
 ## Table of Contents
 
@@ -35,10 +35,10 @@ This document provides in-depth technical documentation for the Record Platform 
 │      Edge Layer (Caddy)          │      │      gRPC Proxy (Envoy)            │
 │  TLS Termination (TLS 1.2/1.3)   │      │  First-Class gRPC Support         │
 │  HTTP/2 + HTTP/3 (QUIC)          │      │  HTTP/2 with TLS                  │
-│  NodePort: 30443 (TCP/UDP)       │      │  Port: 10000                      │
-│                                  │      │  Never routes through HTTP        │
+│  NodePort: 30443 or LoadBalancer  │      │  Port: 10000                      │
+│  (MetalLB LB IP when enabled)    │      │  Never routes through HTTP        │
 │  Architecture:                   │      │  Preserves trailers correctly     │
-│  - NodePort Service              │      │  Forbids HTTP error pages          │
+│  - NodePort / LoadBalancer       │      │  Forbids HTTP error pages          │
 │  - Multiple replicas              │      │  Enforces HEADERS/DATA ordering   │
 │  - RollingUpdate (maxUnavailable=0)│     │                                  │
 │  - Pod Anti-Affinity              │      │  Features:                       │
@@ -129,10 +129,11 @@ This document provides in-depth technical documentation for the Record Platform 
         │                                                               │
         │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
         │  │Postgres      │  │Postgres      │  │Postgres      │       │
-        │  │Listings(5435)│  │Shopping(5436)│  │Auction Mon(5438)│     │
-        │  │              │  │              │  │              │       │
-        │  │ - listings   │  │ - shopping   │  │ - auction_   │       │
-        │  │   schema     │  │   schema     │  │   monitor    │       │
+        │  │Listings(5435)│  │Shopping(5436)│  │Auction (5438) │       │
+        │  │              │  │              │  │ default DB   │       │
+        │  │ - listings   │  │ - shopping   │  │ postgres;    │       │
+        │  │   schema     │  │   schema     │  │ in-place     │       │
+        │  │              │  │              │  │ restore      │       │
         │  └──────────────┘  └──────────────┘  └──────────────┘       │
         │                                                               │
         │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
@@ -213,6 +214,36 @@ This document provides in-depth technical documentation for the Record Platform 
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Cluster topology: Colima k3s primary, k3d supported
+
+Preflight and all suites run on **Colima + k3s** by default. Colima is started with **`--network-address`** (bridged networking) so the MetalLB LoadBalancer IP is directly reachable from the host for HTTP/3 (QUIC). API is at **127.0.0.1:6443** via tunnel. **k3d** remains supported with `REQUIRE_COLIMA=0` for CI or lighter local runs.
+
+```
+                    Developer host
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+         ▼                 ▼                 ▼
+   ┌─────────────┐   ┌───────────┐    ┌─────────────┐
+   │  Colima     │   │  k3d      │    │  Data       │
+   │  k3s        │   │  2-node   │    │  (Docker    │
+   │  (primary)  │   │ (optional)│    │   Compose)  │
+   │             │   │           │    │  Postgres,  │
+   │ --network-  │   │ Preflight │    │  Redis,     │
+   │ address     │   │ when      │    │  Kafka      │
+   │ MetalLB L2  │   │ REQUIRE_  │    │  8 DBs      │
+   │ LB IP       │   │ COLIMA=0  │    │             │
+   └─────────────┘   └───────────┘    └─────────────┘
+        ▲                  ▲
+        │                  │
+   REQUIRE_COLIMA=1    REQUIRE_COLIMA=0
+   (default)           (k3d path)
+```
+
+**Colima bring-back:** If Colima is stopped, use `./scripts/colima-start-and-ready.sh` (start only, with `--network-address`) or `./scripts/colima-teardown-and-start.sh` (full reset). See Runbook item 80.
+
+**Usage:** Run preflight on Colima: `./scripts/run-preflight-scale-and-all-suites.sh` (default). With MetalLB enabled (`METALLB_ENABLED=1`), HTTP/2 and HTTP/3 use the **LB IP**; a one-time host route may be needed so the host can reach the LB IP for HTTP/3 (Runbook item 68). For k3d: `REQUIRE_COLIMA=0 METALLB_ENABLED=1 ./scripts/run-preflight-scale-and-all-suites.sh`. See `README.md`, `Runbook.md` (items 65, 68, 80), and `docs/adr/011-colima-k3s-primary-again.md`.
+
 ## Design Decisions
 
 ### Why Caddy Over Nginx/Traefik?
@@ -276,7 +307,7 @@ This document provides in-depth technical documentation for the Record Platform 
 - More complex connection management
 - Cross-service queries require dual-DB connections (auction-monitor, analytics-service)
 
-**Implementation**: Services connect via Kubernetes Service names (e.g., `postgres-auth-external.record-platform.svc.cluster.local:5437`) which route through Kubernetes Endpoints to Docker Compose postgres containers at `host.docker.internal:PORT` (192.168.65.254 on macOS with Docker Desktop). All 8 postgres databases have corresponding Kubernetes Services and Endpoints configured. Dedicated ports: 5433–5440 (records, social, listings, shopping, auth, auction-monitor, analytics, python-ai).
+**Implementation**: Services connect via Kubernetes Service names (e.g., `postgres-auth-external.record-platform.svc.cluster.local:5437`) which route through Kubernetes Endpoints to Docker Compose postgres containers at `host.docker.internal:PORT`. All 8 instances have corresponding Kubernetes Services and Endpoints. Ports: 5433 records, 5434 social, 5435 listings, 5436 shopping, 5437 auth, 5438 auction-monitor (default DB `postgres`), 5439 analytics, 5440 python_ai. **Restore and schema:** Deterministic restore via `scripts/restore-external-postgres-from-backup.sh` (optional hook in `bring-up-external-infra.sh` with `RESTORE_BACKUP_DIR`); schema inspection and expected-DB assertion via `scripts/inspect-external-db-schemas.sh`. See *Database Redundancy & Disaster Recovery* and `docs/RUNBOOK_EXTERNAL_POSTGRES_RECOVERY.md`.
 
 ### Strict TLS/mTLS and Preflight (Single Source of Truth)
 
@@ -377,11 +408,13 @@ This document provides in-depth technical documentation for the Record Platform 
 4. **Hygiene and reproducibility**: Preflight pipeline (`run-preflight-scale-and-all-suites.sh`) **requires** Colima + k3s by default (`REQUIRE_COLIMA=1`). This avoids accidental runs against a stale or wrong cluster and aligns everyone on one supported path.
 
 **Trade-offs**:
-- Kind is still referenced in some docs and scripts for historical or optional use; new work assumes Colima + k3s.
+- k3d is supported with `REQUIRE_COLIMA=0`; Kind is no longer supported.
 - Colima/k3s on macOS may still hit resource limits (CPU/memory) on a single node; scaling and cleanup (trim completed pods, aggressive ReplicaSet cleanup) are part of preflight to keep the cluster responsive.
 - NodePort UDP for HTTP/3 (QUIC) can still be environment-dependent; in-cluster k6 and curl-based HTTP/3 tests remain the reliable way to prove QUIC.
 
-**References**: Runbook (control plane, port mapping, resource pressure); README/ENGINEERING (preflight, “What is preflight?”); COMMIT_MESSAGE.txt (major overhaul, Colima migration).
+**Bring-back:** Start Colima with `--network-address` (bridged) so the MetalLB LB IP is reachable. Use `./scripts/colima-start-and-ready.sh` (start only) or `./scripts/colima-teardown-and-start.sh` (full reset). See Runbook item 80.
+
+**References**: Runbook (items 65, 68, 78, 80); README/ENGINEERING (preflight); docs/adr/011-colima-k3s-primary-again.md.
 
 ### Why Zero-Downtime CA Rotation?
 
@@ -466,10 +499,11 @@ The **single entry point** for “cluster ready → certs valid → all suites (
 | **4** | Scale to baseline (service 1, exporters 1, Envoy 1, Caddy 2) | Consistent baseline so suites don’t hit scaled-down or missing deployments. |
 | **4c–4d** | Re-ensure API server; verify Caddy strict TLS (no curl 60) | Confirms cluster and edge are usable after reissue and scale. |
 | **5** | Strict TLS/mTLS preflight (`ensure-strict-tls-mtls-preflight.sh`); sync CA to `certs/dev-root.pem` | Single source of truth for service-tls + dev-root-ca; restarts gRPC/TLS workloads so pods pick up CA/certs; k6 uses repo CA. |
-| **6** | Pod health, DB, Redis; aggressive cleanup of rogue ReplicaSets; wait for all services ready; optional pgbench (6c) | No suite runs until pods and 8 DBs are healthy; cleanup avoids stuck ReplicaSets; pgbench (RUN_PGBENCH=1) runs reference + 7 service sweeps (default deep). |
+| **6** | Pod health, DB, Redis; aggressive cleanup of rogue ReplicaSets; wait for all services ready; optional pgbench (6c) | No suite runs until pods and 8 DBs are healthy; cleanup avoids stuck ReplicaSets; pgbench runs when `RUN_PGBENCH=1` (default deep); set `RUN_PGBENCH=0` to skip. |
 | **7** | Run all test suites (`run-all-test-suites.sh` with SKIP_PREFLIGHT/SKIP_TLS_PREFLIGHT); optional k6 | Eight suites in fixed order; RUN_FULL_LOAD=1 adds k6 + pgbench for total platform coverage. |
+| **7c** | In-cluster k6 (transport isolation) | When `RUN_K6=1` and `RUN_K6_IN_CLUSTER=1` (default), runs `scripts/run-k6-in-cluster.sh` (ClusterIP-only, no host/MetalLB); duration via `K6_IN_CLUSTER_DURATION` (default 30s). Proves HTTP/2 and HTTP/3 under load inside the cluster. |
 
-**Env vars:** `RUN_SUITES=0` skips suites; `RUN_FULL_LOAD=1` sets `RUN_K6=1` and `RUN_PGBENCH=1` (PGBENCH_MODE=deep); `REQUIRE_COLIMA=1` (default) fails if context is not Colima.
+**Env vars:** `RUN_SUITES=0` skips suites; `RUN_FULL_LOAD=1` sets `RUN_K6=1` and `RUN_PGBENCH=1` (PGBENCH_MODE=deep); `REQUIRE_COLIMA=1` (default) fails if context is not Colima. Use `./scripts/ensure-ready-for-preflight.sh` before preflight to verify API, DBs, and Kafka.
 
 ### Why eight suites (and what each one is for)
 
@@ -523,10 +557,12 @@ We run **eight** suites because the platform has **multiple protocols**, **stric
 - **HTTP/2**: Transport for gRPC (h2c and TLS)
 
 ### Infrastructure
-- **Kubernetes (Colima + k3s)**: Local development cluster (Kind retired; see “Why Colima + k3s” above). API server at 127.0.0.1:6443; preflight requires Colima context by default.
+- **Kubernetes (k3d or Colima + k3s)**: Local development cluster (k3d default; Kind retired; see “Why Colima + k3s” above). API server at 127.0.0.1:6443; preflight accepts REQUIRE_COLIMA=0 for k3d (in-cluster Caddy verify) or Colima when REQUIRE_COLIMA=1.
 - **Kustomize**: Configuration management
 - **Terraform**: Infrastructure as Code
 - **Ansible**: Configuration management and deployment
+
+**Kubernetes base images (fix once and for all):** All app deployments in `infra/k8s/base` use `imagePullPolicy: IfNotPresent` (not `Never`). This avoids `ErrImageNeverPull` when images are provided by the k3d registry or loaded into nodes. On k3d, preflight patches `host.docker.internal` to the host gateway (on macOS, Docker Desktop uses `192.168.65.2`) so Redis and Postgres on the host are reachable from pods. Do not revert to `Never`.
 
 ### Observability
 - **Prometheus**: Metrics collection
@@ -551,12 +587,14 @@ This section justifies the main technology choices as for a **senior design revi
 | **Databases** | 8 dedicated Postgres | Service isolation, independent scaling and backup, clear schema boundaries. Aligns with microservice ownership. | More connections and ops; cross-service queries need dual-DB (auction-monitor, analytics). |
 | **Cache** | Redis + Lua | Singleflight (stampede prevention), LFU/LRU (shopping), rate limiting (token bucket, sliding window). Atomic ops without thundering herd. | Lua is niche; onboarding requires reading scripts. Redis is single point of failure without Sentinel/Cluster. |
 | **Messaging** | Kafka (strict TLS) | Event pipeline (forum, DMs, group chat); Python AI consumes from Kafka. SSL on 9093 with kafka-ssl-secret. | More moving parts; SSL cert and endpoint patching (e.g. kafka-external) required. |
-| **Local K8s** | Colima + k3s | Docker Desktop VM wedged at ~256 GB; Kind on Docker Desktop was unstable. Colima + k3s gives a single, reproducible cluster and preflight targets it explicitly. | Kind no longer default; some docs still mention Kind. Single-node limits; trim/cleanup in preflight to avoid API overload. |
+| **Local K8s** | Colima + k3s (primary) or k3d | Colima: primary path; start with `--network-address`, API at 127.0.0.1:6443, MetalLB LB IP for HTTP/3. k3d: `REQUIRE_COLIMA=0` for CI or lighter runs. See ADR 011. | Kind/h3 not supported. Single-node limits; 2-node minimum for reissue/MetalLB (ADR 008). |
 | **IAC** | Terraform + Ansible | Terraform for declarative infra (namespaces, ConfigMaps); Ansible for deploy and config (K8s collections). Dry-run and idempotency for safe ops. | Two tools to learn; Ansible playbooks skip cert/Caddy by default to avoid clobbering local state. |
 | **Testing** | Preflight + 8 suites + k6 + pgbench | Multi-protocol (HTTP/2, HTTP/3, gRPC), strict TLS/mTLS, rotation, 8 DBs — one “e2e” cannot cover failure modes and wire-level proof. Eight suites give clear scope; RUN_FULL_LOAD=1 adds load and DB sweep. | Many scripts and long runtimes; we accept complexity for reproducibility and debuggability. |
 | **HTTP/3 load** | xk6-http3 + curl | k6 doesn’t ship HTTP/3; xk6-http3 (quic-go) adds QUIC for load tests. NodePort UDP can fail externally; curl-based and in-cluster k6 are workarounds. | External xk6-http3 may not reach QUIC; we rely on in-cluster and packet capture for proof. |
 
 **Summary:** Every major choice (Caddy, Envoy, 8 Postgres, Redis+Lua, Kafka, Colima+k3s, Terraform+Ansible, preflight+8 suites) is justified by a concrete need (QUIC, gRPC correctness, isolation, cache safety, event pipeline, cluster stability, reproducibility, test coverage). Trade-offs are documented so a reviewer can see that we did not choose “everything”; we chose a coherent set and accepted the costs.
+
+**Architecture rationale (why this setup):** The overall design aims for **control-plane stability**, **service isolation**, and **reproducible testing** on a single developer machine. (1) **Colima + k3s** (primary) with `--network-address` gives real L2/MetalLB and API at 127.0.0.1:6443; k3d supported with `REQUIRE_COLIMA=0`. (2) **Eight dedicated Postgres** (5433–5440) in Docker Compose with deterministic restore and schema inspection (see Database Redundancy & Disaster Recovery). (3) **Redis + Lua** for atomic singleflight, LFU/LRU, and rate limiting. (4) **Data plane outside the cluster** keeps heavy I/O off the control plane. (5) **MetalLB** provides LB IP for Caddy when enabled; one-time host route for HTTP/3 to LB IP on Colima (Runbook 68). (6) **Strict TLS and one CA** (dev-root-ca, reissue in preflight). (7) **Preflight + ensure scripts** (ensure-k8s-api, ensure-pgbench-dbs-ready, ensure-ready-for-preflight) bring API, DBs, and Kafka to a known-good state. See ADR 007, ADR 011, Runbook 50–51, 79–80.
 
 ## Data Flow Diagrams
 
@@ -736,12 +774,12 @@ Services expose HTTP endpoints for:
 ```
 
 **Disaster Recovery Workflow**:
-1. **Teardown**: `./scripts/bootstrap-platform.sh --destroy` (removes infrastructure)
-2. **Recreate**: `./scripts/bootstrap-platform.sh` (instantly recreates everything)
-3. **Database Restoration**: Restore from backups (see Backup Strategy section)
-4. **Verification**: Run integration tests to verify platform health
+1. **Cluster**: Colima bring-back (`./scripts/colima-start-and-ready.sh` or `./scripts/colima-teardown-and-start.sh`) or bootstrap destroy/recreate.
+2. **Data plane**: `./scripts/bring-up-external-infra.sh` (optionally with `RESTORE_BACKUP_DIR=backups/all-8-<timestamp>` to restore Postgres from backup).
+3. **Standalone restore**: If not using bring-up hook, run `./scripts/restore-external-postgres-from-backup.sh <backup_dir>` after infra is up.
+4. **Verification**: `./scripts/inspect-external-db-schemas.sh`, then preflight or integration tests.
 
-**Documentation**: See `docs/BOOTSTRAP.md` for complete guide.
+**Documentation**: See `docs/BOOTSTRAP.md`, `docs/RUNBOOK_EXTERNAL_POSTGRES_RECOVERY.md`, and Runbook items 79–80.
 
 ### Terraform
 
@@ -798,42 +836,27 @@ ansible-playbook playbooks/deploy-services.yml          # Deploy
 
 ### Database Redundancy & Disaster Recovery
 
-**Current State**: Databases run in Docker Compose (external to Kubernetes) for stability and easier management.
+**Current State**: Eight PostgreSQL instances run in Docker Compose (external to Kubernetes) on ports 5433–5440 (records, social, listings, shopping, auth, auction-monitor, analytics, python_ai). Pods reach them via `host.docker.internal`. Restore and schema inspection are deterministic and automated.
 
-**Production Requirements**:
-- **PostgreSQL**: 
-  - Use managed database services (AWS RDS, Google Cloud SQL, Azure Database)
-  - **Automatic backups**: Point-in-time recovery, daily snapshots
-  - **Read replicas**: For read-heavy workloads and failover
-  - **Multi-AZ deployment**: High availability across availability zones
-  - **Connection pooling**: PgBouncer for efficient connection management
-- **Redis**:
-  - Use managed Redis (AWS ElastiCache, Google Cloud Memorystore)
-  - **Replication**: Master-replica setup for failover
-  - **Persistence**: RDB snapshots and AOF for data durability
-  - **High availability**: Automatic failover to replica
-- **Kafka**:
-  - Use managed Kafka (AWS MSK, Confluent Cloud)
-  - **Replication**: Multi-broker replication for fault tolerance
-  - **High availability**: Automatic leader election and partition reassignment
-  - **Durability**: Replicated topics with configurable replication factor
-  - **Strict TLS**: SSL/TLS encryption enabled on port 9093
-  - **SSL Certificates**: Managed via Kubernetes secrets (`kafka-ssl-secret`)
-  - **Client Authentication**: Configurable (`none` for now, `required` for strict TLS)
+**External Postgres layout (8 DBs)**:
+- **5433** records, **5434** social, **5435** listings, **5436** shopping, **5437** auth, **5438** auction-monitor (default DB `postgres`, in-place restore), **5439** analytics, **5440** python_ai.
+- **Schema inspection**: `scripts/inspect-external-db-schemas.sh` reports tables/schemas per port and enforces **expected DBs per port** (e.g. 5434 must have `postgres` and `social`). Use `SKIP_EXPECTED_DB_CHECK=1` to bypass. Output: `docs/CURRENT_DB_SCHEMA_REPORT.md` (refresh with the same script).
 
-**Backup Strategy** (Current):
-- Nightly `pg_dump` for all databases
-- Weekly `pg_basebackup` for point-in-time recovery
-- Redis snapshots nightly
-- WAL archiving for continuous backup
-- **Restore**: `scripts/restore-from-pvc.sh` or `scripts/restore-from-upload.sh`
+**Deterministic restore**:
+- **Script**: `scripts/restore-external-postgres-from-backup.sh` — restores all 8 DBs from a backup directory (e.g. `backups/all-8-20260312-091418`). Requires `pg_restore`/`psql` 16.x; terminates active sessions before drop (except 5438); port **5438** uses in-place restore into `postgres` (no drop). Runs `ANALYZE` after each restore and prints a **snapshot fingerprint** (table counts). For CI/prod use an explicit snapshot path; `latest` is for local dev only (`RESTORE_ALLOW_LATEST=1` when calling the script with `latest`).
+- **Bring-up hook**: `RESTORE_BACKUP_DIR=backups/all-8-<timestamp> ./scripts/bring-up-external-infra.sh` runs restore after infra is healthy. Use `RESTORE_BACKUP_DIR=latest` for latest backup when bring-up is used locally.
+- **Runbook**: `docs/RUNBOOK_EXTERNAL_POSTGRES_RECOVERY.md` — preconditions, version guard, 5438 special case, verification, password (PGPASSWORD / ~/.pgpass).
+
+**Production Requirements** (future):
+- **PostgreSQL**: Managed services (AWS RDS, Google Cloud SQL, Azure Database); automatic backups; read replicas; multi-AZ; connection pooling (e.g. PgBouncer).
+- **Redis**: Managed Redis; replication; RDB/AOF; automatic failover.
+- **Kafka**: Managed Kafka (AWS MSK, Confluent Cloud); replication; strict TLS on 9093; certs via Kubernetes secrets.
 
 **Disaster Recovery Plan**:
-1. **Infrastructure**: Bootstrap script recreates Kubernetes cluster
-2. **Services**: Ansible playbooks deploy all services
-3. **Databases**: Restore from backups (managed services handle this automatically)
-4. **Data**: Restore from latest backup or point-in-time recovery
-5. **Verification**: Run integration tests to verify platform health
+1. **Infrastructure**: Bootstrap or Colima bring-back (`colima-start-and-ready.sh` / `colima-teardown-and-start.sh`).
+2. **Data plane**: `./scripts/bring-up-external-infra.sh` (optionally with `RESTORE_BACKUP_DIR`).
+3. **Restore**: If not done via bring-up, run `./scripts/restore-external-postgres-from-backup.sh <backup_dir>`.
+4. **Verification**: `./scripts/inspect-external-db-schemas.sh docs/CURRENT_DB_SCHEMA_REPORT.md`; run preflight/integration tests.
 
 ## Observability & Monitoring
 
@@ -1734,6 +1757,13 @@ wireshark test-results/YYYYMMDD-HHMMSS-http3-verification/quic-capture.pcap
 
 ## Deployment Strategy
 
+### Local development cluster (k3d and Colima)
+
+- **Default path:** **Colima + k3s** with `--network-address` (bridged), API at 127.0.0.1:6443, MetalLB LB IP for HTTP/2 and HTTP/3. Run: `./scripts/run-preflight-scale-and-all-suites.sh`. Bring-back: `./scripts/colima-start-and-ready.sh` or `./scripts/colima-teardown-and-start.sh`. See **ADR 011: Colima k3s primary again** and Runbook items 65, 80.
+- **k3d:** Supported with `REQUIRE_COLIMA=0` for CI or lighter local runs. MetalLB and in-cluster Caddy verification; host gateway via hostAliases for Redis/Postgres.
+- **9/9 services:** Base app deployments use `imagePullPolicy: IfNotPresent`. Preflight sets `host.docker.internal` in pods via hostAliases so Redis/Postgres on the host are reachable from pods.
+- **Guardrails:** Kind/h3 clusters are not supported. MetalLB and custom traffic policy (L2, optional nodeSelector) are verified by `scripts/verify-metallb-and-traffic-policy.sh` (see `docs/METALLB_TRAFFIC_POLICY_AND_SCALE.md`).
+
 ### Zero-Downtime Deployments
 
 **NodePort Service Architecture**:
@@ -1742,6 +1772,8 @@ wireshark test-results/YYYYMMDD-HHMMSS-http3-verification/quic-capture.pcap
 - **Service Type**: NodePort (ports 30443 TCP/UDP for HTTPS, 30050 for gRPC h2c)
 - **Load Balancing**: Kubernetes Service provides built-in load balancing across replicas
 - **Benefits**: Enables multiple pods to run simultaneously, true zero-downtime CA rotation
+- **MetalLB (implemented):** LoadBalancer services get a stable external IP from an L2 pool (default `192.168.106.240-192.168.106.250` for Colima). Preflight runs `scripts/install-metallb.sh` and applies Caddy as `type: LoadBalancer`; verify-caddy-strict-tls uses the LB IP:443 when assigned. Override pool with `METALLB_POOL=192.168.x.240-192.168.x.250`. See Runbook: MetalLB.
+- **Traffic strategy (no plain RR):** Caddy service uses **sessionAffinity: ClientIP** (timeout 3600s) so each client is pinned to one Caddy pod — avoids round-robin connection churn and reduces reconnects/TLS handshakes. For gRPC/Envoy, in-cluster callers use ClusterIP; custom LB (e.g. ring hash) can be added later if needed.
 
 **RollingUpdate Strategy**:
 - `maxUnavailable: 0`: Never have zero pods running

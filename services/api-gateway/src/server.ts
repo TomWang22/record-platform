@@ -239,7 +239,10 @@ if (FAKE_AUTH) {
 
 /* ----------------------- Redis (revocation check) ----------------------- */
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
-const redis = createClient({ url: REDIS_URL });
+const redis = createClient({
+  url: REDIS_URL,
+  socket: { connectTimeout: 10_000 }, // Colima/host.docker.internal may need a moment on first packet
+});
 redis.on("error", (e: unknown) => console.error("gateway redis error:", e));
 (async () => {
   try {
@@ -370,6 +373,10 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
     }
     if (originalUrl.startsWith('/api/ai')) {
       return next(); // Already handled by /api/ai route above
+    }
+    // Listings settings/ratings: keep /api prefix so later put/post routes match
+    if (originalUrl.startsWith('/api/listings/settings') || originalUrl.startsWith('/api/listings/ratings')) {
+      return next();
     }
     // Rewrite URL by removing /api prefix
     const newUrl = originalUrl.replace(/^\/api/, '') || '/';
@@ -505,6 +512,34 @@ app.get("/api/shopping/cache/stats", createProxyMiddleware({
     error(err, _req, res) {
       console.error("[gw] api/shopping/cache/stats proxy error:", err);
       sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+// Python AI and Auction Monitor health (Caddy routes /ai/healthz and /auctions/healthz here; must be public, no auth)
+app.get("/ai/healthz", createProxyMiddleware({
+  target: "http://python-ai-service:5005",
+  changeOrigin: true,
+  pathRewrite: () => "/healthz",
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] ai/healthz proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "python-ai upstream error");
+    },
+  },
+}));
+app.get("/auctions/healthz", createProxyMiddleware({
+  target: "http://auction-monitor:4008",
+  changeOrigin: true,
+  pathRewrite: () => "/healthz",
+  proxyTimeout: 10000,
+  agent: keepAliveAgent,
+  on: {
+    error(err, _req, res) {
+      console.error("[gw] auctions/healthz proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "auction-monitor upstream error");
     },
   },
 }));
@@ -697,9 +732,11 @@ const OPEN_ROUTES: RouteRule[] = [
   { method: "GET",  pattern: /^\/(?:api\/)?metrics\/?$/ },
   { method: "HEAD", pattern: /^\/(?:api\/)?metrics\/?$/ },
 
-  // service health checks (public)
-  { method: "GET",  pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics|ai|auctions)\/healthz\/?$/ },
-  { method: "HEAD", pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics|ai|auctions)\/healthz\/?$/ },
+  // service health checks (public; Caddy routes /auctions/healthz and /ai/healthz here — must be open)
+  { method: "GET",  pattern: /^\/auctions\/healthz\/?$/ },
+  { method: "GET",  pattern: /^\/ai\/healthz\/?$/ },
+  { method: "GET",  pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics|ai|auctions|auction-monitor|python-ai)\/healthz\/?$/ },
+  { method: "HEAD", pattern: /^\/(?:api\/)?(auth|records|listings|social|shopping|analytics|ai|auctions|auction-monitor|python-ai)\/healthz\/?$/ },
 
   // cache stats endpoints (public)
   { method: "GET",  pattern: /^\/(?:api\/)?(listings|shopping)\/cache\/stats\/?$/ },
@@ -981,6 +1018,43 @@ app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
     return res.status(401).json({ error: "invalid token" });
   }
 });
+
+/* ----------------------- Listings settings/ratings (first after auth so path /api/listings/* matches) ----------------------- */
+// Note: Don't use jsonParser for proxy routes - http-proxy-middleware needs the raw body stream
+app.put(["/listings/settings", "/api/listings/settings"], injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://listings-service:4003",
+  changeOrigin: true,
+  pathRewrite: () => "/settings",
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader("x-user-id", req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader("Authorization", req.headers.authorization as string);
+    },
+    error(err, _req, res) {
+      console.error("[gw] listings/settings proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "listings upstream error");
+    },
+  },
+}));
+app.post(["/listings/ratings", "/api/listings/ratings"], injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://listings-service:4003",
+  changeOrigin: true,
+  pathRewrite: () => "/ratings",
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader("x-user-id", req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader("Authorization", req.headers.authorization as string);
+    },
+    error(err, _req, res) {
+      console.error("[gw] listings/ratings proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "listings upstream error");
+    },
+  },
+}));
 
 /* ----------------------- Auth Service HTTP Proxy Routes (protected, after auth guard) ----------------------- */
 // These routes require authentication and are proxied to the auth service HTTP endpoint
@@ -1281,7 +1355,7 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
    - Identity headers are injected via middleware *before* the proxy.
    ========================================================= */
 
-/* Listings — public GETs, but forward identity if present */
+/* Listings — settings and ratings are handled above (first after auth guard). Other /listings/* below. */
 // Note: /listings/healthz is handled by specific route above (line 298)
 app.use(
   "/listings",
@@ -1291,13 +1365,23 @@ app.use(
     changeOrigin: true,
     // http-proxy-middleware strips the matched path prefix (/listings), so we need to add it back
     // If path is empty or just "/", it means POST /listings, so we keep it as /listings
+    // /listings/settings and /listings/ratings are mounted at root on listings-service
     pathRewrite: (path, req) => {
-      // path is already stripped (e.g., /search becomes /search, / becomes empty)
-      // listings-service expects /listings/search, /listings/, etc.
-      if (!path || path === "/") {
+      const raw = path || req.url || "";
+      const p = raw.replace(/^\/+/, "") || "";
+      if (!p) {
         return "/listings";
       }
-      return `/listings${path}`;
+      // listings-service has app.use("/settings") and app.use("/ratings") at root
+      const withoutListings = p.replace(/^listings\/?/, "");
+      if (withoutListings === "settings" || withoutListings.startsWith("settings/")) {
+        return "/" + withoutListings;
+      }
+      if (withoutListings === "ratings" || withoutListings.startsWith("ratings/")) {
+        return "/" + withoutListings;
+      }
+      const rest = withoutListings || p;
+      return rest ? `/listings/${rest}` : "/listings";
     },
     proxyTimeout: 30000, // Increased timeout for HTTP/3 requests
     agent: keepAliveAgent,
@@ -1592,21 +1676,24 @@ app.get("/forum/posts/:postId", async (req: AuthedRequest, res: Response) => {
   }
 });
 
-app.post("/forum/posts/:postId/vote", jsonParser, async (req: AuthedRequest, res: Response) => {
-  const userId = requireUserIdFromRequest(req, res);
-  if (!userId) return;
-
-  try {
-    const response = await promisifyGrpcCall<any>(socialGrpcClient, "VotePost", {
-      post_id: req.params.postId,
-      user_id: userId,
-      vote: req.body.vote,
-    });
-    res.json(response);
-  } catch (err) {
-    handleGrpcError(res, err);
-  }
-});
+// Note: Don't use jsonParser for proxy routes - http-proxy-middleware needs the raw body stream
+app.post("/forum/posts/:postId/vote", injectIdentityHeadersIfAny, createProxyMiddleware({
+  target: "http://social-service:4006",
+  changeOrigin: true,
+  pathRewrite: (path) => path,
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      if (req.user?.sub) proxyReq.setHeader('x-user-id', req.user.sub);
+      if (req.headers.authorization) proxyReq.setHeader('Authorization', req.headers.authorization as string);
+    },
+    error(err, _req, res) {
+      console.error("[gw] forum/posts/:postId/vote proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "social upstream error");
+    },
+  },
+}));
 
 // PUT /forum/posts/:postId, DELETE /forum/posts/:postId - HTTP proxy (social REST)
 app.put("/forum/posts/:postId", injectIdentityHeadersIfAny, createProxyMiddleware({
@@ -2443,6 +2530,30 @@ app.use("/history", createProxyMiddleware({
   },
 }));
 
+// /api/resell/* — same as /resell but for clients that call /api/resell (e.g. Test 13j7/13j8 via HTTP/3)
+// Without this, GET /api/resell/purchases and POST /api/resell/:id return 404.
+// pathRewrite: request path is full e.g. /api/resell/<uuid> → upstream must be /resell/<uuid> (shopping mounts router at /resell).
+app.use("/api/resell", injectIdentityHeadersIfAny);
+app.use("/api/resell", createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: (path) => (path?.replace(/^\/api\/resell/, "/resell") || "/resell"),
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      const authHeader = req.headers.authorization;
+      if (authHeader) proxyReq.setHeader("Authorization", authHeader);
+      const userId = req.headers["x-user-id"];
+      if (userId) proxyReq.setHeader("x-user-id", userId as string);
+    },
+    error(err, _req, res) {
+      console.error("[gw] /api/resell proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
 app.use("/resell", injectIdentityHeadersIfAny);
 app.use("/resell", createProxyMiddleware({
   target: "http://shopping-service:4007",
@@ -2471,6 +2582,37 @@ app.use("/resell", createProxyMiddleware({
     },
     error(err, _req, res) {
       console.error("[gw] /resell proxy error:", err);
+      sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+    },
+  },
+}));
+
+// Returns (eBay-style) — Test 13g; shopping-service has /returns with GET / and POST /
+app.use("/returns", injectIdentityHeadersIfAny);
+app.use("/returns", createProxyMiddleware({
+  target: "http://shopping-service:4007",
+  changeOrigin: true,
+  pathRewrite: (path, req) => {
+    const rewritten = path === '/' || !path ? '/returns' : `/returns${path}`;
+    console.log(`[gw] pathRewrite returns: originalPath=${req.originalUrl}, path=${path}, rewritten=${rewritten}`);
+    return rewritten;
+  },
+  proxyTimeout: 15000,
+  agent: keepAliveAgent,
+  on: {
+    proxyReq: (proxyReq: any, req: AuthedRequest) => {
+      console.log(`[gw] Proxying ${req.method} ${req.path} to shopping-service${proxyReq.path}`);
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        proxyReq.setHeader('Authorization', authHeader);
+      }
+      const userId = req.headers['x-user-id'];
+      if (userId) {
+        proxyReq.setHeader('x-user-id', userId as string);
+      }
+    },
+    error(err, _req, res) {
+      console.error("[gw] /returns proxy error:", err);
       sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
     },
   },

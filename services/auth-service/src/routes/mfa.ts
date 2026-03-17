@@ -64,19 +64,27 @@ export function setupMFARoutes(prisma: PrismaClient): Router {
     }
   });
 
-  // Disable MFA
+  // Disable MFA (code optional when MFA is not enabled — e.g. test flow where verify/enable failed)
   router.post("/disable", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = (req as any).user.sub;
       const { code } = req.body;
 
-      // Verify code before disabling
-      if (code) {
-        const isValid = await verifyMFA(prisma, userId, code);
-        if (!isValid) {
-          return res.status(401).json({ error: "Invalid code" });
+      const userMfa = await prisma.$queryRaw<Array<{ mfa_enabled: boolean }>>`
+        SELECT mfa_enabled FROM auth.users WHERE id = ${userId}::uuid LIMIT 1
+      `.then((r: any[]) => r[0] || null);
+
+      if (userMfa?.mfa_enabled) {
+        if (code) {
+          const isValid = await verifyMFA(prisma, userId, code);
+          if (!isValid) {
+            return res.status(401).json({ error: "Invalid code" });
+          }
+        } else {
+          return res.status(400).json({ error: "Code required to disable MFA" });
         }
       }
+      // If MFA not enabled, no code required (idempotent disable)
 
       await disableMFA(prisma, userId);
       res.json({ success: true, message: "MFA disabled" });

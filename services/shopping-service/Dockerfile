@@ -1,12 +1,14 @@
 # syntax=docker/dockerfile:1
 
 # ---------- deps ----------
+# Use npm to install pnpm (avoids corepack network fetch / GSSAPI issues in some environments)
 FROM node:20-alpine AS deps
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+RUN npm install -g pnpm@9.11.0
 
 # Copy package manifests (changes rarely, good for caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY .npmrc ./
 COPY services/common/package.json ./services/common/package.json
 COPY services/common/tsconfig.json ./services/common/tsconfig.json
 COPY services/shopping-service/package.json ./services/shopping-service/package.json
@@ -23,7 +25,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 # ---------- build ----------
 FROM node:20-alpine AS build
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+RUN npm install -g pnpm@9.11.0
 
 # Copy installed dependencies from deps stage
 COPY --from=deps /app /app
@@ -51,11 +53,12 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
       echo "✓ Common JS files already exist"; \
       ls -la services/common/dist/*.js 2>&1 | head -3; \
     fi && \
-    (pnpm -C services/shopping-service build || echo "Build had errors, will compile lib files separately") && \
+    _build_ok=0; pnpm -C services/shopping-service build && _build_ok=1; true && \
+    if [ "$_build_ok" = "0" ]; then echo "Build had errors; will compile lib and routes from source so cart.js and others are fresh"; fi && \
     echo "Checking compiled lib files..." && \
     ls -la services/shopping-service/dist/lib/ 2>/dev/null | head -10 && \
-    # If lib JS files are missing, compile them explicitly
-    if [ ! -f services/shopping-service/dist/lib/auth.js ] || [ ! -f services/shopping-service/dist/lib/db.js ] || [ ! -f services/shopping-service/dist/lib/cache.js ]; then \
+    # If main build failed or lib JS files are missing, compile lib and routes from source (so cart.js is never stale from host dist)
+    if [ "$_build_ok" = "0" ] || [ ! -f services/shopping-service/dist/lib/auth.js ] || [ ! -f services/shopping-service/dist/lib/db.js ] || [ ! -f services/shopping-service/dist/lib/cache.js ]; then \
       echo "Lib JS files missing, compiling them explicitly..." && \
       cd services/shopping-service && \
       for file in src/lib/auth.ts src/lib/db.ts src/lib/cache.ts src/lib/availability.ts; do \
@@ -79,8 +82,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
       echo "✓ All lib JS files present"; \
     fi && \
     echo "Checking route files..." && \
-    if [ ! -f services/shopping-service/dist/routes/watchlist.js ] || [ ! -f services/shopping-service/dist/routes/wishlist.js ]; then \
-      echo "Route JS files missing, compiling them explicitly..." && \
+    if [ "$_build_ok" = "0" ] || [ ! -f services/shopping-service/dist/routes/watchlist.js ] || [ ! -f services/shopping-service/dist/routes/wishlist.js ]; then \
+      echo "Route JS files missing or build failed — compiling all routes from source..." && \
       cd services/shopping-service && \
       for file in src/routes/*.ts; do \
         if [ -f "$file" ]; then \
@@ -98,10 +101,20 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
       fi && \
       echo "Verifying route files..." && \
       ls -la dist/routes/*.js 2>/dev/null | head -10 && \
-      test -f dist/routes/watchlist.js && echo "✓ watchlist.js compiled" || echo "✗ watchlist.js still missing"; \
+      test -f dist/routes/watchlist.js && echo "✓ watchlist.js compiled" || echo "✗ watchlist.js still missing" && \
+      cd ../..; \
     else \
       echo "✓ All route JS files present"; \
-    fi
+    fi && \
+    echo "Always compiling cart.ts from source (root-cause fix: atomic order_number in INSERT)..." && \
+    (cd services/shopping-service && \
+      pnpm exec tsc src/routes/cart.ts --outDir dist/routes --module Node16 --target ES2022 --moduleResolution node16 --esModuleInterop --skipLibCheck --declaration false --resolveJsonModule --baseUrl . --rootDir src 2>&1 | head -5 && \
+      if [ -d dist/routes/routes ] && [ -f dist/routes/routes/cart.js ]; then mv dist/routes/routes/cart.js dist/routes/cart.js; rmdir dist/routes/routes 2>/dev/null || true; fi && \
+      test -f dist/routes/cart.js || (echo "ERROR: cart.js missing after tsc" && exit 1) && \
+      grep -q "generate_order_number()" dist/routes/cart.js || (echo "ERROR: cart.js must use atomic INSERT (SELECT shopping.generate_order_number()) — rebuild from clean source" && exit 1) && \
+      echo "✓ cart.js from source (atomic INSERT)" && \
+      ls -la dist/routes/cart.js 2>/dev/null) && \
+    echo "✓ Cart route hardened from source"
 
 # ---------- runtime ----------
 FROM node:20-alpine

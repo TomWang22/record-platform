@@ -8,7 +8,7 @@ import { Pool } from 'pg'
 // For 50 VUs with 2-3 concurrent requests each: 100-150 + 50 headroom = 150-200
 // Increased to 100 to handle peak load and prevent connection exhaustion
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL_SHOPPING || 'postgresql://postgres:postgres@localhost:5436/records',
+  connectionString: process.env.POSTGRES_URL_SHOPPING || 'postgresql://postgres:postgres@localhost:5436/shopping',
   max: parseInt(process.env.DB_POOL_MAX || '100', 10), // Increased from 20 to 100 for high concurrency
   min: parseInt(process.env.DB_POOL_MIN || '10', 10), // Keep minimum connections warm
   idleTimeoutMillis: 60000, // Increased idle timeout (1 minute)
@@ -33,6 +33,28 @@ pool.on('error', (err) => {
 pool.on('connect', () => {
   console.log('[shopping] Database connection established')
 })
+
+/** Sync order_number_seq with MAX(orders) so next nextval() never collides (fixes duplicate key after restore/manual insert). Run once at startup. */
+export async function syncOrderNumberSequence(): Promise<void> {
+  try {
+    await pool.query(`
+      SELECT setval('shopping.order_number_seq',
+        GREATEST(1,
+          COALESCE((SELECT MAX(CAST(SUBSTRING(order_number FROM 'ORD-[0-9]{4}-([0-9]+)') AS BIGINT))
+            FROM shopping.orders WHERE order_number ~ '^ORD-[0-9]{4}-[0-9]+$'), 0)
+        )
+      )
+    `)
+    console.log('[shopping] order_number_seq synced to max(orders)')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('order_number_seq') && (msg.includes('does not exist') || msg.includes('relation'))) {
+      console.warn('[shopping] order_number_seq not found (run 09-shopping-order-number-sequence.sql on 5436/shopping)')
+    } else {
+      console.warn('[shopping] syncOrderNumberSequence failed:', msg)
+    }
+  }
+}
 
 // Connection retry wrapper for database queries
 // Retries queries up to 3 times with exponential backoff on connection errors

@@ -118,6 +118,37 @@ jobs:
           fi
           pnpm -C services/${{ matrix.service }} build
 
+  quic-invariants:
+    name: Enforce QUIC hostname invariant
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No IP-based HTTP/3 usage
+        run: ./scripts/check-no-ip-quic.sh
+
+  transport-validation:
+    name: Transport validation gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tshark (Wireshark CLI)
+        run: sudo apt-get update -qq && sudo apt-get install -y tshark
+      - name: Validate transport tooling
+        run: |
+          out=$(python3 scripts/lib/transport_validator.py 2>&1) || true
+          echo "$out" | head -1
+          python3 scripts/lib/transport_validator.py 2>/dev/null; test $? -eq 2
+      - name: Transport validation (fatal if pcap present and invalid)
+        run: |
+          if [ -f vm.pcap ]; then
+            python3 scripts/run_transport_validation.py --pcap vm.pcap --v2 --require-transport-proof
+          else
+            echo "No vm.pcap in workspace; skip full gate. To run: add pcap or use --capture with live cluster."
+          fi
+
   python-ai:
     runs-on: ubuntu-latest
     steps:

@@ -18,12 +18,18 @@ CREATE EXTENSION IF NOT EXISTS citext;
 -- ============================================================
 
 -- Users table (moved from main database)
+-- Extended columns (email_verified, phone_verified, mfa_enabled) required by auth-service and pgbench
 CREATE TABLE IF NOT EXISTS auth.users (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email         CITEXT UNIQUE NOT NULL,
   password_hash TEXT,
   settings      JSONB DEFAULT '{}'::jsonb,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  phone         TEXT,
+  email_verified BOOLEAN DEFAULT FALSE,
+  phone_verified BOOLEAN DEFAULT FALSE,
+  mfa_enabled   BOOLEAN DEFAULT FALSE,
+  updated_at    TIMESTAMPTZ DEFAULT now()
 );
 
 -- Indexes

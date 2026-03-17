@@ -12,7 +12,7 @@ import logging
 # Import new modules
 from app.data_pipeline import ingest_analytics_data, start_kafka_consumer, shutdown as pipeline_shutdown
 from app.ai_advisor import SellingAdvisor, BuyingAdvisor, NegotiationAdvisor, BiddingAdvisor
-from app.db import close_pool as close_db_pool, log_inference
+from app.db import close_pool as close_db_pool, get_last_pool_error, get_pool, log_inference
 from app.redis_cache import close_redis
 from app.http_client import get_ebay_client, get_discogs_client, close_clients as close_http_clients
 
@@ -579,32 +579,86 @@ class SellingAdviceRequest(BaseModel):
     current_price: Optional[float] = Field(None, ge=0)
 
 
+def _coerce_user_id(user_id: Optional[str]) -> Optional[str]:
+    """Coerce 'null' string (from test scripts) to None; validate UUID-ish for non-null."""
+    if user_id is None or user_id in ("", "null", "None"):
+        return None
+    return user_id
+
+
+def _fallback_selling_advice(body: SellingAdviceRequest, reason: str = "dependency_unavailable"):
+    """Minimal fallback when DB/analytics are unavailable; callers should set reason for debugging."""
+    return {
+        "query": body.query,
+        "recommended_price": body.current_price or 0.0,
+        "market_analysis": {"demand_level": "unknown", "price_trend": "stable", "competition": "unknown"},
+        "pricing_strategy": "market_price",
+        "timing": {"best_time": "now", "reason": f"Fallback: {reason}"},
+        "confidence": "low",
+        "data_sources": {},
+        "_fallback": True,
+        "_reason": reason,
+    }
+
+
 @app.post("/ai/selling-advice")
 async def selling_advice(body: SellingAdviceRequest):
     """
-    Get AI-powered selling advice for listing records
-    
-    Returns:
-    - Recommended listing price
-    - Market analysis
-    - Timing recommendations
-    - Pricing strategy
+    Get AI-powered selling advice for listing records.
+
+    Returns real advice when DB and analytics are available; on dependency failure
+    returns 503 with clear error_code/message, or 200 with _fallback: true and _reason when appropriate.
     """
     try:
+        user_id = _coerce_user_id(body.user_id)
+        pool = await get_pool()
+        if not pool:
+            err_detail = get_last_pool_error() or "Pool creation failed"
+            logger.warning("[selling-advice] DB pool unavailable: %s", err_detail)
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "Service temporarily unavailable",
+                    "error_code": "db_pool_unavailable",
+                    "message": "Database connection pool not available",
+                    "detail": err_detail,
+                    "hint": "Check POSTGRES_URL_PYTHON_AI and python_ai DB (port 5440). Run ./scripts/diagnose-502-and-analytics.sh",
+                },
+            )
         advice = await SellingAdvisor.get_selling_advice(
             query=body.query,
             record_grade=body.record_grade,
             sleeve_grade=body.sleeve_grade,
-            user_id=body.user_id,
+            user_id=user_id,
             current_price=body.current_price,
         )
+        if not advice:
+            return JSONResponse(content=_fallback_selling_advice(body, "no_advice_generated"))
         REQS.labels("/ai/selling-advice", "200").inc()
         return JSONResponse(content=advice)
+    except asyncio.TimeoutError as e:
+        logger.warning("[selling-advice] timeout: %s", e)
+        REQS.labels("/ai/selling-advice", "504").inc()
+        return JSONResponse(
+            status_code=504,
+            content={
+                "error": "Upstream timeout",
+                "error_code": "timeout",
+                "message": str(e),
+                "hint": "Analytics or external APIs may be slow; retry or check ANALYTICS_URL.",
+            },
+        )
     except Exception as e:
+        logger.exception("[selling-advice] %s", e)
         REQS.labels("/ai/selling-advice", "500").inc()
         return JSONResponse(
             status_code=500,
-            content={"error": "Internal server error", "details": str(e)}
+            content={
+                "error": "Internal server error",
+                "error_code": "selling_advice_failed",
+                "message": str(e),
+                "hint": "Check python-ai-service logs and DB/Redis/Analytics connectivity.",
+            },
         )
 
 
@@ -618,15 +672,24 @@ class BuyingAdviceRequest(BaseModel):
 @app.post("/ai/buying-advice")
 async def buying_advice(body: BuyingAdviceRequest):
     """
-    Get AI-powered buying advice for purchasing records
-    
-    Returns:
-    - Fair price estimate
-    - Deal assessment
-    - Alternative recommendations
-    - Best time to buy
+    Get AI-powered buying advice for purchasing records.
+    Returns real advice when DB/analytics are available; on failure returns 503/500 with error_code, message, hint.
     """
     try:
+        pool = await get_pool()
+        if not pool:
+            err_detail = get_last_pool_error() or "Pool creation failed"
+            logger.warning("[buying-advice] DB pool unavailable: %s", err_detail)
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "Service temporarily unavailable",
+                    "error_code": "db_pool_unavailable",
+                    "message": "Database connection pool not available",
+                    "detail": err_detail,
+                    "hint": "Check POSTGRES_URL_PYTHON_AI and python_ai DB (port 5440). Run ./scripts/diagnose-502-and-analytics.sh",
+                },
+            )
         advice = await BuyingAdvisor.get_buying_advice(
             query=body.query,
             max_budget=body.max_budget,
@@ -635,11 +698,29 @@ async def buying_advice(body: BuyingAdviceRequest):
         )
         REQS.labels("/ai/buying-advice", "200").inc()
         return JSONResponse(content=advice)
+    except asyncio.TimeoutError as e:
+        logger.warning("[buying-advice] timeout: %s", e)
+        REQS.labels("/ai/buying-advice", "504").inc()
+        return JSONResponse(
+            status_code=504,
+            content={
+                "error": "Upstream timeout",
+                "error_code": "timeout",
+                "message": str(e),
+                "hint": "Analytics or external APIs may be slow; retry or check ANALYTICS_URL.",
+            },
+        )
     except Exception as e:
+        logger.exception("[buying-advice] %s", e)
         REQS.labels("/ai/buying-advice", "500").inc()
         return JSONResponse(
             status_code=500,
-            content={"error": "Internal server error", "details": str(e)}
+            content={
+                "error": "Internal server error",
+                "error_code": "buying_advice_failed",
+                "message": str(e),
+                "hint": "Check python-ai-service logs and DB/Redis/Analytics connectivity.",
+            },
         )
 
 

@@ -1,0 +1,19 @@
+# Minimal .bash_profile for macOS — use if your current one causes slow or broken terminals in Cursor.
+# Copy to ~/.bash_profile.backup first, then replace ~/.bash_profile with this (or merge the good parts).
+#
+# Cursor runs: /bin/bash -l
+# So this file runs on every new terminal tab. Keep it fast; avoid Docker/Colima/NVM here unless needed.
+
+# PATH: only what you need for a quick prompt (Homebrew if present)
+if [ -x /opt/homebrew/bin/brew ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null)" || true
+elif [ -x /usr/local/bin/brew ]; then
+  eval "$(/usr/local/bin/brew shellenv 2>/dev/null)" || true
+fi
+
+# Optional: load heavier env only when requested (e.g. RUN_FULL_ENV=1)
+if [ -n "$RUN_FULL_ENV" ]; then
+  [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
+fi
+
+export PS1='\h:\W \u\$ '

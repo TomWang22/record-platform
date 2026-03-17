@@ -52,8 +52,14 @@ MODE="${MODE:-quick}"  # quick | deep
 # Set CLIENTS based on MODE
 if [[ "$MODE" == "deep" ]]; then
   CLIENTS="8,16,24,32,48,64,96,128,192,256"
+  # At 192+ clients, KNN/trigram search can exceed 30s; use 60s to reduce "statement timeout" aborts
+  STATEMENT_TIMEOUT="${STATEMENT_TIMEOUT:-60000}"
+  # Reduce parallel workers at 96+ clients for knn/trgm to lower contention and tail latency
+  PGBENCH_REDUCE_PARALLEL_AT_HIGH_CLIENTS="${PGBENCH_REDUCE_PARALLEL_AT_HIGH_CLIENTS:-1}"
 else
   CLIENTS="8,16,24,32,48,64"
+  STATEMENT_TIMEOUT="${STATEMENT_TIMEOUT:-30000}"
+  PGBENCH_REDUCE_PARALLEL_AT_HIGH_CLIENTS="${PGBENCH_REDUCE_PARALLEL_AT_HIGH_CLIENTS:-0}"
 fi
 THREADS=12 # Keep at 12 for consistency with gold run
 LIMIT=50   # Keep at 50 for consistency with gold run
@@ -111,19 +117,20 @@ EFFECTIVE_CACHE_SIZE="${EFFECTIVE_CACHE_SIZE:-4GB}"
 # NOTE: checkpoint_completion_target and max_wal_size require PostgreSQL restart (cannot be set via PGOPTIONS)
 #       They are documented here for reference but must be set via ALTER SYSTEM or postgresql.conf
 # Enhanced tuning for lower latency and delayed saturation:
-# - statement_timeout: prevent runaway queries (30s default, can be tuned)
+# - statement_timeout: prevent runaway queries (30s quick / 60s deep; KNN at 192 clients often needs 60s)
 # - lock_timeout: prevent deadlocks from waiting too long (10s default)
 # - idle_in_transaction_session_timeout: prevent idle transactions (60s default)
 # - tcp_keepalives_idle: keep connections alive (600s default)
 # - tcp_keepalives_interval: keepalive probe interval (30s default)
 # - tcp_keepalives_count: keepalive probe count (3 default)
-# - log_lock_waits: log lock waits for debugging (off by default for performance)
+# - log_lock_waits: log lock waits for debugging (off by default). Set LOG_LOCK_WAITS=on to diagnose stalls/lock contention in server log.
 # - deadlock_timeout: faster deadlock detection (500ms for aggressive tuning)
 # - commit_delay: batch commits (0 = disabled, can be tuned for throughput)
 # - commit_siblings: minimum concurrent transactions for commit_delay (5 default)
 # - plan_cache_mode: force generic plans to reduce planning overhead (for high-concurrency benchmarks)
 # - join_collapse_limit/from_collapse_limit: reduce planning overhead for simple queries
-STATEMENT_TIMEOUT="${STATEMENT_TIMEOUT:-30000}"  # 30s in ms
+# STATEMENT_TIMEOUT set above from MODE (quick=30s, deep=60s); override with env if needed
+STATEMENT_TIMEOUT="${STATEMENT_TIMEOUT:-30000}"  # 30s in ms (overridden to 60s when MODE=deep)
 LOCK_TIMEOUT="${LOCK_TIMEOUT:-10000}"  # 10s in ms
 IDLE_IN_TRANSACTION_TIMEOUT="${IDLE_IN_TRANSACTION_TIMEOUT:-60000}"  # 60s in ms
 DEADLOCK_TIMEOUT="${DEADLOCK_TIMEOUT:-500}"  # 500ms for aggressive tuning (faster deadlock detection)
@@ -149,6 +156,7 @@ fi
 # Feature toggles (controllable via env)
 RUN_SMOKE_TESTS="${RUN_SMOKE_TESTS:-true}"       # pre-bench pgbench sanity checks
 RUN_COLD_CACHE="${RUN_COLD_CACHE:-false}"        # run a cold-cache phase too
+COLD_FIRST="${COLD_FIRST:-0}"                    # 1 = cold then warm (pure cold first); 0 = warm then cold
 GENERATE_PLOTS="${GENERATE_PLOTS:-true}"         # auto-generate PNG graphs
 RUN_DIFF_MODE="${RUN_DIFF_MODE:-false}"          # compare against baseline CSV
 BASELINE_CSV="${BASELINE_CSV:-}"                 # path to "golden" CSV for diff mode
@@ -159,6 +167,7 @@ INCLUDE_RAW_TRGM_EXPLAIN="${INCLUDE_RAW_TRGM_EXPLAIN:-false}"  # if true, includ
 # USE_AUTO_WRAPPER: if true, use search_records_fuzzy_ids_auto wrapper (with 200ms timeout and fast->deep fallback)
 # Recommended for production: true (caps worst-case latency, avoids mega-slow outliers, smoother throughput)
 # Recommended for benchmarks: false (while tuning pure engine capacity), then true (to see real-user behavior)
+# If you see "canceling statement due to statement timeout" in records sweep: try USE_AUTO_WRAPPER=true or STATEMENT_TIMEOUT=60000+
 USE_AUTO_WRAPPER="${USE_AUTO_WRAPPER:-false}"    # if true, use search_records_fuzzy_ids_auto (with timeout) instead of bare function
 USE_SQL_FUNCTION="${USE_SQL_FUNCTION:-false}"    # if true, use SQL-language function (NOTE: Currently MUCH slower than PL/pgSQL - 78ms vs 2-4ms. ALWAYS use false for best performance)
 CREATE_BENCH_BACKUP="${CREATE_BENCH_BACKUP:-false}"  # if true, create backup after benchmark (default: false to avoid disk bloat)
@@ -166,13 +175,18 @@ RUN_OPTIMIZE_DB="${RUN_OPTIMIZE_DB:-false}"      # if true, run optimize-db-for-
 SKIP_DISK_CHECK="${SKIP_DISK_CHECK:-false}"      # if true, skip disk space checks (faster for dev runs)
 RUN_NOOP_BASELINE="${RUN_NOOP_BASELINE:-false}"  # if true, run NOOP baseline test (default: false for fast dev mode)
 NOOP_TARGET_TPS="${NOOP_TARGET_TPS:-30000}"     # target NOOP TPS (tune clients/threads to reach this at scale)
-RUN_PLAN_DUMP="${RUN_PLAN_DUMP:-true}"           # if true, run comprehensive query plan analysis (default: true)
+RUN_PLAN_DUMP="${RUN_PLAN_DUMP:-true}"           # if true/1, run comprehensive query plan analysis (default: true)
+# Normalize: RUN_PLAN_DUMP=1 (from run-all-8-pgbench-standalone.sh) must enable plan dump like "true"
+[[ "$RUN_PLAN_DUMP" == "true" || "$RUN_PLAN_DUMP" == "1" ]] && RUN_PLAN_DUMP_ENABLED=1 || RUN_PLAN_DUMP_ENABLED=0
 DISABLE_AUTOVACUUM="${DISABLE_AUTOVACUUM:-true}" # if true, disable autovacuum during benchmarks (default: true to prevent pauses)
 RUN_TELEMETRY="${RUN_TELEMETRY:-false}"          # if true, collect perf/strace/htop snapshots for latency analysis (not packet capture)
 # OPTIMIZED_FAST_MODE: DEPRECATED - SQL function now uses aggressive tuning by default
 # SQL function fast mode: candidate_cap=24, min_rank=0.55 (15-25% additional CPU reduction vs candidate_cap=32)
 # PL/pgSQL function fast mode: candidate_cap=40, min_rank=0.50 (gold compatibility)
 OPTIMIZED_FAST_MODE="${OPTIMIZED_FAST_MODE:-false}"  # DEPRECATED: SQL function uses aggressive tuning by default
+# High-concurrency tuning: 1 = reduce parallel workers for knn/trgm at 96+ clients (default 1 in deep mode, 0 in quick)
+PGBENCH_REDUCE_PARALLEL_AT_HIGH_CLIENTS="${PGBENCH_REDUCE_PARALLEL_AT_HIGH_CLIENTS:-0}"
+HIGH_LATENCY_TIP_SHOWN=0  # print tuning tip once when high latency is first seen
 
 # FAST DEV MODE: For quick iteration, use this combo:
 # USE_SQL_FUNCTION=true USE_AUTO_WRAPPER=false RUN_COLD_CACHE=false RUN_SMOKE_TESTS=false \
@@ -675,12 +689,16 @@ if [[ "$TABLE_EXISTS" == "true" ]]; then
     echo "⚠️  WARNING: Benchmark user has only $BENCH_USER_COUNT records (expected 1M+)" >&2
   fi
   
-  # Check search_tsv is populated
-  TSV_COUNT=$(psql_in_pod -tAc "SELECT count(*) FROM records.records WHERE search_tsv IS NOT NULL AND user_id = '0dc268d0-a86f-4e12-8d10-9db0f1b735e0'::uuid;" 2>/dev/null | tr -d ' ' || echo "0")
-  echo "✅ Benchmark user has $TSV_COUNT records with search_tsv populated"
-  
-  if [[ "$TSV_COUNT" -lt 1000 ]]; then
-    echo "⚠️  WARNING: Only $TSV_COUNT records have search_tsv (may need to populate)" >&2
+  # Check search_tsv is populated (only if column exists)
+  TSV_COL_EXISTS=$(psql_in_pod -tAc "SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='records' AND table_name='records' AND column_name='search_tsv');" 2>/dev/null | tr -d ' ' || echo "f")
+  if [[ "$TSV_COL_EXISTS" == "t" ]]; then
+    TSV_COUNT=$(psql_in_pod -tAc "SELECT count(*) FROM records.records WHERE search_tsv IS NOT NULL AND user_id = '0dc268d0-a86f-4e12-8d10-9db0f1b735e0'::uuid;" 2>/dev/null | tr -d ' ' || echo "0")
+    echo "✅ Benchmark user has $TSV_COUNT records with search_tsv populated"
+    if [[ "$TSV_COUNT" -lt 1000 ]]; then
+      echo "⚠️  WARNING: Only $TSV_COUNT records have search_tsv (will be populated in FTS setup)" >&2
+    fi
+  else
+    echo "✅ search_tsv column will be added and populated in FTS setup"
   fi
   
   # Check search_norm is populated
@@ -899,6 +917,30 @@ if [[ "$MAX_CONNECTIONS" == "200" ]]; then
   fi
 fi
 
+# CRITICAL: Ensure search_norm and search_tsv exist and are populated (required for FTS indexes and search_records_fuzzy_ids)
+# This runs before prepare_table (which is later); so we populate search_norm here too.
+echo "=== Ensuring search_norm and search_tsv columns exist and are populated (records.records) ==="
+psql_in_pod <<'SQL'
+SET search_path = records, public;
+-- search_norm: add and populate from artist, name, catalog_number (base schema does not include it)
+ALTER TABLE records.records ADD COLUMN IF NOT EXISTS search_norm text;
+UPDATE records.records
+SET search_norm = lower(concat_ws(' ', artist, name, catalog_number))
+WHERE search_norm IS NULL;
+-- search_tsv: add and populate from search_norm (for FTS GIN indexes)
+ALTER TABLE records.records ADD COLUMN IF NOT EXISTS search_tsv tsvector;
+UPDATE records.records
+SET search_tsv = to_tsvector('simple', COALESCE(search_norm, ''))
+WHERE search_tsv IS NULL;
+SQL
+if [[ $? -eq 0 ]]; then
+  echo "✅ search_tsv column added and populated"
+else
+  echo "⚠️  WARNING: search_tsv setup had issues (continuing)" >&2
+fi
+# Brief analyze so planner has stats before we create indexes
+psql_in_pod -c "ANALYZE records.records;" >/dev/null 2>&1 || true
+
 # CRITICAL: FTS Index Strategy
 # PL/pgSQL function uses format() with %L to inline user_id as a literal, so partial index CAN be used!
 # The query becomes: WHERE r.user_id = '0dc268d0-a86f-4e12-8d10-9db0f1b735e0'::uuid
@@ -1010,6 +1052,17 @@ else
     echo "   Queries will be very slow (78ms+ instead of 2-4ms)" >&2
   fi
 fi
+
+# Verify planner uses FTS index (EXPLAIN ANALYZE) for benchmark tenant query
+echo "=== Verifying FTS index usage (EXPLAIN ANALYZE) ==="
+psql_in_pod -tAc "
+  EXPLAIN (ANALYZE, COSTS OFF, FORMAT text)
+  SELECT r.id FROM records.records r
+  WHERE r.user_id = '0dc268d0-a86f-4e12-8d10-9db0f1b735e0'::uuid
+    AND r.search_tsv @@ plainto_tsquery('simple', 'test')
+  LIMIT 20;
+" 2>/dev/null | head -15 || true
+echo "   (Look for Bitmap Index Scan on idx_records_search_tsv_bench or idx_records_search_tsv_all above)"
 
 # CRITICAL: Recreate bench-specific search_norm indexes (required for good deep-mode performance)
 # These indexes were part of the "good" run and may be used by TRGM benchmark or other paths
@@ -1552,7 +1605,7 @@ else
   # MODE=deep -> use 'deep' mode (candidate_cap=150, min_rank=0.35)
   # MODE=quick -> use 'fast' mode (candidate_cap=40, min_rank=0.50)
   # This ensures deep mode benchmarks actually use deep mode!
-  local search_mode="fast"
+  search_mode="fast"
   if [[ "$MODE" == "deep" ]]; then
     search_mode="deep"
   fi
@@ -1606,6 +1659,36 @@ EOF
 cat > "$bench_sql_dir/bench_noop.sql" <<'EOF'
 SELECT 1;
 EOF
+
+# Randomized query pattern: multiple query strings so each transaction uses a different query (8..256 clients, realistic load).
+PGBENCH_RANDOMIZED="${PGBENCH_RANDOMIZED:-0}"
+if [[ "$PGBENCH_RANDOMIZED" == "1" || "$PGBENCH_RANDOMIZED" == "true" ]]; then
+  RANDOM_QUERIES=(
+    "鄧麗君 album 263 cn-041 polygram"
+    "beatles help vinyl"
+    "jazz blue note 1960"
+    "classical mozart symphony"
+    "rock lp 70s"
+  )
+  search_mode="fast"
+  [[ "$MODE" == "deep" ]] && search_mode="deep"
+  for i in "${!RANDOM_QUERIES[@]}"; do
+    q="${RANDOM_QUERIES[$i]}"
+    # SQL escape: double any single quote in query
+    q_sql="${q//\'/\'\'}"
+    cat > "$bench_sql_dir/bench_random_q$((i+1)).sql" <<EOFR
+SET search_path = records, public, pg_catalog;
+SELECT count(*) FROM public.search_records_fuzzy_ids(
+  :uid::uuid,
+  '${q_sql}'::text,
+  :lim::bigint,
+  0::bigint,
+  '${search_mode}'::text
+);
+EOFR
+  done
+  echo "✅ Randomized query files: bench_random_q1.sql .. bench_random_q${#RANDOM_QUERIES[@]}.sql"
+fi
 
 echo "Verifying SQL files are clean..."
 if grep -q "<<<<<<<" "$bench_sql_dir/bench_knn.sql" 2>/dev/null || \
@@ -1805,9 +1888,37 @@ SQL
   fi
 }
 
-# Helper: Cold cache reset (DB-level)
+# Real cold: restart Postgres once per run when COLD_POSTGRES_RESTART=1 (evicts shared_buffers; true cold path).
+_cold_postgres_restart_done="${_cold_postgres_restart_done:-0}"
+
+# Helper: Cold cache reset (DB-level). Best-effort: CHECKPOINT + DISCARD + pg_stat_reset + brief sleep.
+# When COLD_POSTGRES_RESTART=1: restart Postgres once before first cold phase for true cold (shared_buffers evicted).
 cold_cache_reset() {
   echo "--- Cold cache reset (DB-level) ---"
+  
+  # Real cold: restart Postgres once so shared_buffers is truly cold (optional; set COLD_POSTGRES_RESTART=1).
+  if [[ "${COLD_POSTGRES_RESTART:-0}" == "1" ]] && [[ "${_cold_postgres_restart_done:-0}" != "1" ]]; then
+    _cold_postgres_restart_done=1
+    local pg_container
+    pg_container=$(docker ps --filter "name=postgres" --filter "publish=5433" --format "{{.Names}}" 2>/dev/null | head -1)
+    if [[ -n "$pg_container" ]]; then
+      echo "   Real cold: restarting Postgres container $pg_container (COLD_POSTGRES_RESTART=1)..."
+      docker restart "$pg_container" 2>/dev/null || true
+      sleep 5
+      if ! wait_for_db_ready; then
+        echo "❌ Postgres not ready after restart. Continuing with DB-level reset only." >&2
+      else
+        echo "   ✅ Postgres ready after restart (true cold)"
+      fi
+    else
+      if command -v kubectl >/dev/null 2>&1 && kubectl get deploy -n "${NS:-record-platform}" 2>/dev/null | grep -q postgres; then
+        echo "   Real cold: restarting Postgres deploy (COLD_POSTGRES_RESTART=1)..."
+        kubectl rollout restart deploy/postgres -n "${NS:-record-platform}" 2>/dev/null || true
+        sleep 15
+        wait_for_db_ready || echo "⚠️  Postgres may still be rolling; continuing with DB-level reset" >&2
+      fi
+    fi
+  fi
   
   # Check if database is in recovery mode before attempting checkpoint
   local recovery_status
@@ -1844,6 +1955,14 @@ SQL
     echo "   Check Docker container: docker logs $pg_container" >&2
     return 1
   fi
+  # Optional: try to evict working set from shared_buffers (best-effort; true cold needs restart or drop_caches).
+  if [[ "${REAL_COLD_CACHE:-0}" == "1" ]]; then
+    echo "   Evicting working set (REAL_COLD_CACHE=1)..."
+    psql_in_pod -tA -c "SELECT sum(length(coalesce(artist,'')||coalesce(name,'')||coalesce(notes,''))) FROM records.records;" >/dev/null 2>&1 || true
+    sleep 1
+  fi
+  # Allow checkpoint I/O to settle.
+  sleep 2
 }
 
 # CRITICAL: Warm cache and ensure fresh statistics before benchmarks
@@ -2075,11 +2194,11 @@ git_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo na)
 
 run_variant() {
   local variant="$1" sql_file="$2" clients="$3"
-  local wd
+  local wd=""
   wd=$(mktemp -d)
   pushd "$wd" >/dev/null
-  # CRITICAL: Always return to repo root before cleanup
-  trap 'cd "$REPO_ROOT" 2>/dev/null || true; popd >/dev/null 2>&1 || true; rm -rf "$wd"' RETURN
+  # CRITICAL: Always return to repo root before cleanup (${wd:-} safe with set -u)
+  trap 'cd "$REPO_ROOT" 2>/dev/null || true; popd >/dev/null 2>&1 || true; [[ -n "${wd:-}" ]] && rm -rf "${wd:-}"' RETURN
 
   # CRITICAL: Disable autovacuum at TABLE level during benchmark to prevent pauses (optional)
   # Note: We disable autovacuum ONLY during the benchmark run, then re-enable it after
@@ -2127,6 +2246,10 @@ SQL
   if [[ "$variant" == "trgm_simple" ]]; then
     pgopts="$pgopts -c max_parallel_workers_per_gather=0 -c max_parallel_workers=1"
   fi
+  # Optional: at high client counts, reduce parallel query for knn/trgm to reduce contention (can improve tail latency)
+  if [[ "${PGBENCH_REDUCE_PARALLEL_AT_HIGH_CLIENTS:-0}" == "1" ]] && (( clients >= 96 )) && [[ "$variant" == "knn" || "$variant" == "trgm" ]]; then
+    pgopts="$pgopts -c max_parallel_workers_per_gather=0 -c max_parallel_workers=1"
+  fi
   
   # Verify PGOPTIONS are being applied (first run only, for debugging)
   if [[ "$clients" == "${client_array[0]}" ]] && [[ "$variant" == "knn" ]] && [[ "$PHASE" == "warm" ]]; then
@@ -2162,12 +2285,21 @@ SQL
   export PGDATABASE="$RECORDS_DB_NAME"
   export PGPASSWORD="$RECORDS_DB_PASS"
   
-  pgbench \
-    -n -M prepared \
-    -P 5 -r \
-    -T "$duration" -c "$clients" -j "$actual_threads" \
-    -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
-    -l -f "$bench_sql_dir/$sql_file" 2>&1 | tee "$wd/out.txt"
+  # Randomized variant: multiple -f so each transaction picks one of the query files at random
+  if [[ "$variant" == "random" ]] && [[ -f "$bench_sql_dir/bench_random_q1.sql" ]]; then
+    pgbench -n -M prepared -P 5 -r -T "$duration" -c "$clients" -j "$actual_threads" \
+      -D uid="$USER_UUID" -D lim="$LIMIT" \
+      -l -f "$bench_sql_dir/bench_random_q1.sql" -f "$bench_sql_dir/bench_random_q2.sql" \
+      -f "$bench_sql_dir/bench_random_q3.sql" -f "$bench_sql_dir/bench_random_q4.sql" \
+      -f "$bench_sql_dir/bench_random_q5.sql" 2>&1 | tee "$wd/out.txt"
+  else
+    pgbench \
+      -n -M prepared \
+      -P 5 -r \
+      -T "$duration" -c "$clients" -j "$actual_threads" \
+      -D uid="$USER_UUID" -D q="$PG_QUERY_ARG" -D lim="$LIMIT" \
+      -l -f "$bench_sql_dir/$sql_file" 2>&1 | tee "$wd/out.txt"
+  fi
   
   # Unset PGOPTIONS after run
   unset PGOPTIONS
@@ -2361,12 +2493,16 @@ SQL
 
   echo "$ts,$variant,$clients,$actual_threads,$duration,$LIMIT,$tps,$ok,$fail,$err_pct,$avg,$std,$lat_est_ms,$p50,$p95,$p99,$p999,$p9999,$p99999,$p999999,$pmax,$git_rev,$git_branch,$host,$(psql_in_pod -At -c 'SHOW server_version'),$track_io,$d_blks_hit,$d_blks_read,$d_read_ms,$d_write_ms,$d_xact,$d_tup_ret,$d_tup_fetch,$d_stmt_ms,$d_stmt_hit,$d_stmt_read,$d_stmt_dirty,$d_stmt_written,$d_temp_read,$d_temp_written,$d_io_read,$d_io_write,$d_io_extend,$d_io_fsync,$io_total,$active_sessions,$cpu_share_pct,$d_wal_rec,$d_wal_fpi,$d_wal_bytes,$d_ckpt_write,$d_ckpt_sync,$d_buf_ckpt,$d_buf_backend,$d_buf_alloc,$hit_ratio,$PHASE,$notes_str" >> "$results_csv"
   
-  # Optional: Warn about high latency
+  # Optional: Warn about high latency and print tuning tip once
   if [[ -n "$lat_est_ms" ]] && [[ -n "$tps" ]] && (( $(echo "$tps > 0" | bc -l 2>/dev/null || echo 0) )); then
     # Crude heuristic: if latency > ~0.5ms per client, warn
     threshold=$(awk -v c="$clients" 'BEGIN{printf "%.2f", 0.5 * c}')
     if (( $(echo "$lat_est_ms > $threshold" | bc -l 2>/dev/null || echo 0) )); then
       echo "   ⚠️  High latency for $clients clients (lat_est=${lat_est_ms} ms, threshold=${threshold} ms)" >&2
+      if [[ "${HIGH_LATENCY_TIP_SHOWN:-0}" -eq 0 ]]; then
+        echo "   Tuning: RUN_PLAN_DUMP=1 or true (query plan in bench_logs); LOG_LOCK_WAITS=on (lock diagnostics); PGBENCH_REDUCE_PARALLEL_AT_HIGH_CLIENTS=1 (96+ clients); see PGBENCH_HARDENING.md" >&2
+        HIGH_LATENCY_TIP_SHOWN=1
+      fi
     fi
   fi
 
@@ -2438,11 +2574,34 @@ EOSQL
 # Variants: removed trgm_simple from routine sweeps (it's a diagnostic-only path)
 # Keep it available as a manual diagnostic script, but don't run it in regular sweeps
 declare -a variants=("knn" "trgm" "noop")
+[[ "$PGBENCH_RANDOMIZED" == "1" || "$PGBENCH_RANDOMIZED" == "true" ]] && variants+=("random")
 
 for clients in "${client_array[@]}"; do
   echo "=== CLIENTS = $clients ==="
 
+  # -------- COLD PHASE (optional, can run first when COLD_FIRST=1) --------
+  run_cold_phase() {
+    PHASE="cold"
+    echo ">> Cold phase (clients=$clients)"
+    cold_cache_reset
+    for variant in "${variants[@]}"; do
+      variant_label=$(printf '%s' "$variant" | tr '[:lower:]' '[:upper:]')
+      echo "== ${variant_label}, clients=$clients, phase=$PHASE =="
+      case "$variant" in
+        knn) sql_file="bench_knn.sql" ;;
+        trgm) sql_file="bench_trgm.sql" ;;
+        trgm_simple) sql_file="bench_trgm_simple.sql" ;;
+        noop) sql_file="bench_noop.sql" ;;
+        random) sql_file="bench_random_q1.sql" ;;
+        *) sql_file="bench_${variant}.sql" ;;
+      esac
+      run_variant "$variant" "$sql_file" "$clients"
+      echo
+    done
+  }
+
   # -------- WARM PHASE --------
+  run_warm_phase() {
   PHASE="warm"
   echo ">> Warm phase (clients=$clients)"
   for variant in "${variants[@]}"; do
@@ -2450,7 +2609,7 @@ for clients in "${client_array[@]}"; do
     echo "== ${variant_label}, clients=$clients, phase=$PHASE =="
     
     # CRITICAL: Run comprehensive EXPLAIN ANALYZE before first benchmark (optional)
-    if [[ "$RUN_PLAN_DUMP" == "true" ]] && [[ "$clients" == "${client_array[0]}" ]] && [[ "$variant" == "${variants[0]}" ]]; then
+    if [[ "${RUN_PLAN_DUMP_ENABLED:-0}" -eq 1 ]] && [[ "$clients" == "${client_array[0]}" ]] && [[ "$variant" == "${variants[0]}" ]]; then
       echo "--- Running Comprehensive Query Plan Analysis ---"
       echo "📁 Saving full query plans to: $LOG_DIR/"
       timestamp=$(date +%H%M%S)
@@ -2480,7 +2639,8 @@ SELECT count(*) FROM public.search_records_fuzzy_ids(
   '0dc268d0-a86f-4e12-8d10-9db0f1b735e0'::uuid,
   '鄧麗君 album 263 cn-041 polygram',
   50::bigint,
-  0::bigint
+  0::bigint,
+  'fast'::text
 );
 -- Warm the FTS index scan as well
 SELECT count(*) FROM records.records AS r
@@ -2493,6 +2653,8 @@ EOFWARM
       psql_in_pod <<'EOFSQL' | tee "$LOG_DIR/query_plan_full_analysis_${timestamp}.txt"
 SET search_path = records, public, pg_catalog;
 SET jit = off;
+-- Ensure Table Statistics (section 6) show current n_live_tup; pg_stat_user_tables can be stale otherwise
+ANALYZE records.records;
 
 \echo '================================================================================'
 \echo '=== COMPREHENSIVE QUERY PLAN ANALYSIS FOR POSTGRESQL GPT ==='
@@ -2511,7 +2673,8 @@ FROM public.search_records_fuzzy_ids(
   '0dc268d0-a86f-4e12-8d10-9db0f1b735e0'::uuid,
   '鄧麗君 album 263 cn-041 polygram',
   50::bigint,
-  0::bigint
+  0::bigint,
+  'fast'::text
 );
 
 \echo ''
@@ -2647,9 +2810,13 @@ SELECT
 \echo '================================================================================'
 EOFSQL
       echo ""
+      echo "--- Analyze step (refresh stats after EXPLAIN ANALYZE) ---"
+      psql_in_pod -v ON_ERROR_STOP=1 -c "ANALYZE records.records;" -c "ANALYZE records_hot.records_hot;" 2>/dev/null || true
+      echo "✅ Analyze step complete (records.records, records_hot.records_hot)"
+      echo ""
       echo "✅ Full query plan saved to: $LOG_DIR/query_plan_full_analysis_${timestamp}.txt"
       echo "   This file contains all information needed for PostgreSQL GPT analysis"
-    elif [[ "$RUN_PLAN_DUMP" != "true" ]]; then
+    elif [[ "${RUN_PLAN_DUMP_ENABLED:-0}" -ne 1 ]]; then
       echo "--- Skipping query plan analysis (RUN_PLAN_DUMP=${RUN_PLAN_DUMP}) ---"
     fi
     
@@ -2659,31 +2826,22 @@ EOFSQL
       trgm) sql_file="bench_trgm.sql" ;;
       trgm_simple) sql_file="bench_trgm_simple.sql" ;;
       noop) sql_file="bench_noop.sql" ;;
+      random) sql_file="bench_random_q1.sql" ;;
       *) sql_file="bench_${variant}.sql" ;;
     esac
     run_variant "$variant" "$sql_file" "$clients"
     echo
   done
+  }  # end run_warm_phase
 
-  # -------- COLD PHASE (optional) --------
-  if [[ "$RUN_COLD_CACHE" == "true" ]]; then
-    PHASE="cold"
-    echo ">> Cold phase (clients=$clients)"
-    cold_cache_reset
-    for variant in "${variants[@]}"; do
-      variant_label=$(printf '%s' "$variant" | tr '[:lower:]' '[:upper:]')
-      echo "== ${variant_label}, clients=$clients, phase=$PHASE =="
-      # CRITICAL: Run comprehensive EXPLAIN ANALYZE only on first warm run, skip for cold
-      case "$variant" in
-        knn) sql_file="bench_knn.sql" ;;
-        trgm) sql_file="bench_trgm.sql" ;;
-        trgm_simple) sql_file="bench_trgm_simple.sql" ;;
-        noop) sql_file="bench_noop.sql" ;;
-        *) sql_file="bench_${variant}.sql" ;;
-      esac
-      run_variant "$variant" "$sql_file" "$clients"
-      echo
-    done
+  if [[ "${COLD_FIRST:-0}" == "1" ]] && [[ "$RUN_COLD_CACHE" == "true" ]]; then
+    run_cold_phase
+    run_warm_phase
+  else
+    run_warm_phase
+    if [[ "$RUN_COLD_CACHE" == "true" ]]; then
+      run_cold_phase
+    fi
   fi
 done
 
@@ -3342,6 +3500,28 @@ echo "   - expected_vs_reality_analysis.txt (Little's Law validation)"
 echo "   - performance_insights.txt (Actionable recommendations)"
 echo "   - anomaly_detection.txt (Performance degradation alerts)"
 echo ""
+
+# Records DB artifacts for tuning (north star: 5k+ TPS fuzzy search)
+echo "=== Records DB data summary (data-summary-records.txt) ==="
+psql_in_pod <<'SQL' | tee "$LOG_DIR/data-summary-records.txt"
+SET search_path = records, bench, public;
+SELECT 'records.records' AS relation, pg_size_pretty(pg_total_relation_size('records.records'::regclass)) AS total_size, (SELECT count(*) FROM records.records) AS row_count
+UNION ALL
+SELECT 'records.records_hot', pg_size_pretty(pg_total_relation_size('records.records_hot'::regclass)), (SELECT count(*) FROM records.records_hot)
+UNION ALL
+SELECT 'bench.results', pg_size_pretty(pg_total_relation_size('bench.results'::regclass)), (SELECT count(*) FROM bench.results);
+
+SELECT relname, n_live_tup, n_dead_tup, last_vacuum, last_autovacuum, last_analyze, last_autoanalyze
+FROM pg_stat_user_tables WHERE schemaname = 'records' AND relname IN ('records', 'records_hot');
+SQL
+
+if [[ -f "$REPO_ROOT/scripts/diagnose-performance-regression.sh" ]]; then
+  echo "=== Running diagnose-performance-regression.sh (diagnostics-records.log) ==="
+  DIAG_OUT="$LOG_DIR/diagnostics-records.log"
+  "$REPO_ROOT/scripts/diagnose-performance-regression.sh" > "$DIAG_OUT" 2>&1 || true
+  echo "   Written to: $DIAG_OUT"
+fi
+echo "   Key artifacts: query_plan_full_analysis_*.txt, data-summary-records.txt, diagnostics-records.log, config_snapshot.txt"
 
 # Quick Summary Table (readable format)
 echo "=== Quick Performance Summary ==="

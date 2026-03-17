@@ -379,6 +379,15 @@ const listingsService = {
 
 // Format helpers
 function formatListing(listing: any): any {
+  const soldAt = listing.sold_at ? new Date(listing.sold_at) : null;
+  const endedAt = listing.ended_at ? new Date(listing.ended_at) : null;
+  const visibleUntil = listing.visible_until ? new Date(listing.visible_until) : null;
+  const now = new Date();
+  let lifecycle_status: 'active' | 'sold' | 'ended' | 'did_not_sell' = 'active';
+  if (soldAt) lifecycle_status = 'sold';
+  else if (endedAt) lifecycle_status = 'ended';
+  else if (visibleUntil && visibleUntil < now) lifecycle_status = 'did_not_sell';
+
   return {
     id: listing.id,
     user_id: listing.user_id,
@@ -396,6 +405,12 @@ function formatListing(listing: any): any {
     is_featured: listing.is_featured || false,
     view_count: listing.view_count || 0,
     watch_count: listing.watch_count || 0,
+    stock_quantity: listing.stock_quantity != null ? Number(listing.stock_quantity) : 1,
+    lifecycle_status,
+    sold_at: soldAt?.toISOString() || null,
+    ended_at: endedAt?.toISOString() || null,
+    visible_until: visibleUntil?.toISOString() || null,
+    obo_until: listing.obo_until ? new Date(listing.obo_until).toISOString() : null,
     created_at: listing.created_at?.toISOString() || new Date().toISOString(),
     updated_at: listing.updated_at?.toISOString() || new Date().toISOString(),
     expires_at: listing.expires_at?.toISOString() || "",

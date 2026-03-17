@@ -6,6 +6,8 @@ metadata:
   labels: { app: listings-service }
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector: { matchLabels: { app: listings-service } }
   template:
     metadata:
@@ -15,10 +17,28 @@ spec:
         prometheus.io/port: "4003"
         prometheus.io/path: "/metrics"
     spec:
+      hostAliases:
+        - ip: "192.168.5.2"
+          hostnames:
+            - "host.docker.internal"
+            - "host.lima.internal"
+      initContainers:
+        - name: wait-db
+          image: alpine:3.19
+          command:
+            - /bin/sh
+            - -c
+            - |
+              for i in $(seq 1 60); do
+                nc -zv host.docker.internal 5435 2>/dev/null && exit 0
+                sleep 2
+              done
+              echo "Listings DB (5435) unreachable; ensure Postgres up and ./scripts/colima-apply-host-aliases.sh if on Colima (see docs/COLIMA_POD_STABILITY_AND_HOST_ALIASES.md)"
+              exit 1
       containers:
         - name: app
           image: listings-service:dev
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 4003
@@ -35,11 +55,15 @@ spec:
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_REQUIRE_CLIENT_CERT
-              value: "true"  # Enable mTLS (mutual TLS) - client cert verification
+              value: "true"  # Strict mTLS: Envoy presents client cert to backends
+            - name: TLS_CA_PATH
+              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
               value: "/certs/dev-root.pem"
+            - name: KAFKA_CA_CERT
+              value: "/etc/kafka/secrets/ca-cert.pem"
             - name: TLS_KEY_PATH
               value: "/etc/certs/tls.key"
             - name: TLS_CERT_PATH
@@ -60,6 +84,9 @@ spec:
               readOnly: true
             - name: service-tls
               mountPath: /etc/certs
+              readOnly: true
+            - name: kafka-ssl-certs
+              mountPath: /etc/kafka/secrets
               readOnly: true
           # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2/3 only, NOT HTTP/1.1
           # Uses grpc-health-probe binary for standard gRPC health checking protocol
@@ -139,3 +166,10 @@ spec:
                 path: tls.crt
               - key: ca.crt
                 path: ca.crt
+        - name: kafka-ssl-certs
+          secret:
+            secretName: kafka-ssl-secret
+            optional: true
+            items:
+              - key: ca-cert.pem
+                path: ca-cert.pem

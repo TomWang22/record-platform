@@ -33,17 +33,17 @@ data:
         endpoint: jaeger.observability.svc.cluster.local:4317
         tls:
           insecure: true
-      # Alternative: Use Jaeger's gRPC collector if OTLP doesn't work
-      # jaeger:
-      #   endpoint: jaeger.observability.svc.cluster.local:14250
-      #   tls:
-      #     insecure: true
       otlp/newrelic:
         endpoint: https://otlp.nr-data.net:4317
         headers:
-          api-key: ${NEW_RELIC_LICENSE_KEY}
+          api-key: ${env:NEW_RELIC_LICENSE_KEY}
         tls:
           insecure: false
+      splunk_hec:
+        endpoint: ${env:SPLUNK_HEC_URL}
+        token: ${env:SPLUNK_HEC_TOKEN}
+        log_data_enabled: true
+        profiling_data_enabled: false
       prometheus:
         endpoint: "0.0.0.0:8889"
       logging:
@@ -55,15 +55,15 @@ data:
         traces:
           receivers: [otlp]
           processors: [memory_limiter, batch]
-          exporters: [otlp/jaeger, otlp/newrelic]
+          exporters: [otlp/jaeger, otlp/newrelic, splunk_hec]
         metrics:
           receivers: [prometheus, otlp]
           processors: [memory_limiter, batch]
-          exporters: [prometheus, otlp/newrelic]
+          exporters: [prometheus, otlp/newrelic, splunk_hec]
         logs:
           receivers: [otlp]
           processors: [memory_limiter, batch]
-          exporters: [logging, otlp/newrelic]
+          exporters: [logging, otlp/newrelic, splunk_hec]
 
 ---
 apiVersion: apps/v1
@@ -102,6 +102,18 @@ spec:
             secretKeyRef:
               name: newrelic-secret
               key: license-key
+              optional: true
+        - name: SPLUNK_HEC_URL
+          valueFrom:
+            secretKeyRef:
+              name: splunk-secret
+              key: hec-url
+              optional: true
+        - name: SPLUNK_HEC_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: splunk-secret
+              key: hec-token
               optional: true
         volumeMounts:
         - name: config

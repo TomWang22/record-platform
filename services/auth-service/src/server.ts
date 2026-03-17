@@ -30,7 +30,10 @@ if (REDIS_PASSWORD && !REDIS_URL.includes('@') && !REDIS_URL.includes('://:')) {
   // Insert password after redis://
   REDIS_URL = REDIS_URL.replace('redis://', `redis://:${REDIS_PASSWORD}@`);
 }
-const redis = createClient({ url: REDIS_URL });
+const redis = createClient({
+  url: REDIS_URL,
+  socket: { connectTimeout: 10_000 }, // Colima/host.docker.internal may need a moment on first packet
+});
 redis.on("error", (e: unknown) => console.error("auth-service redis error:", e));
 (async () => {
   try {

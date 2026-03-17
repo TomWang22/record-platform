@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS shopping.shopping_cart (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_shopping_cart_user_id ON shopping.shopping_cart(user_id);
-CREATE INDEX idx_shopping_cart_user_item ON shopping.shopping_cart(user_id, item_type, item_id);
+CREATE INDEX IF NOT EXISTS idx_shopping_cart_user_id ON shopping.shopping_cart(user_id);
+CREATE INDEX IF NOT EXISTS idx_shopping_cart_user_item ON shopping.shopping_cart(user_id, item_type, item_id);
 
 -- Watchlist - items user wants to monitor (price changes, availability)
 CREATE TABLE IF NOT EXISTS shopping.watchlist (
@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS shopping.watchlist (
   UNIQUE(user_id, item_type, item_id)
 );
 
-CREATE INDEX idx_watchlist_user_id ON shopping.watchlist(user_id);
-CREATE INDEX idx_watchlist_item ON shopping.watchlist(item_id, item_type);
+CREATE INDEX IF NOT EXISTS idx_watchlist_user_id ON shopping.watchlist(user_id);
+CREATE INDEX IF NOT EXISTS idx_watchlist_item ON shopping.watchlist(item_id, item_type);
 
 -- Recently Viewed - track what user has viewed (LRU cache in Redis, persisted here)
 CREATE TABLE IF NOT EXISTS shopping.recently_viewed (
@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS shopping.recently_viewed (
   UNIQUE(user_id, item_type, item_id)
 );
 
-CREATE INDEX idx_recently_viewed_user_time ON shopping.recently_viewed(user_id, viewed_at DESC);
-CREATE INDEX idx_recently_viewed_item ON shopping.recently_viewed(item_id, item_type);
+CREATE INDEX IF NOT EXISTS idx_recently_viewed_user_time ON shopping.recently_viewed(user_id, viewed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_recently_viewed_item ON shopping.recently_viewed(item_id, item_type);
 
 -- Wishlist - items user wants to buy later
 CREATE TABLE IF NOT EXISTS shopping.wishlist (
@@ -68,8 +68,8 @@ CREATE TABLE IF NOT EXISTS shopping.wishlist (
   UNIQUE(user_id, item_type, item_id)
 );
 
-CREATE INDEX idx_wishlist_user_priority ON shopping.wishlist(user_id, priority DESC);
-CREATE INDEX idx_wishlist_item ON shopping.wishlist(item_id, item_type);
+CREATE INDEX IF NOT EXISTS idx_wishlist_user_priority ON shopping.wishlist(user_id, priority DESC);
+CREATE INDEX IF NOT EXISTS idx_wishlist_item ON shopping.wishlist(item_id, item_type);
 
 -- Purchase History - completed purchases
 CREATE TABLE IF NOT EXISTS shopping.purchase_history (
@@ -88,9 +88,9 @@ CREATE TABLE IF NOT EXISTS shopping.purchase_history (
   metadata JSONB -- Full purchase details
 );
 
-CREATE INDEX idx_purchase_history_user_time ON shopping.purchase_history(user_id, purchased_at DESC);
-CREATE INDEX idx_purchase_history_order ON shopping.purchase_history(order_id);
-CREATE INDEX idx_purchase_history_item ON shopping.purchase_history(item_id, item_type);
+CREATE INDEX IF NOT EXISTS idx_purchase_history_user_time ON shopping.purchase_history(user_id, purchased_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_history_order ON shopping.purchase_history(order_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_history_item ON shopping.purchase_history(item_id, item_type);
 
 -- Search History - track user searches (for recommendations)
 CREATE TABLE IF NOT EXISTS shopping.search_history (
@@ -104,9 +104,9 @@ CREATE TABLE IF NOT EXISTS shopping.search_history (
   searched_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_search_history_user_time ON shopping.search_history(user_id, searched_at DESC);
-CREATE INDEX idx_search_history_query ON shopping.search_history(query);
-CREATE INDEX idx_search_history_type_time ON shopping.search_history(query_type, searched_at DESC);
+CREATE INDEX IF NOT EXISTS idx_search_history_user_time ON shopping.search_history(user_id, searched_at DESC);
+CREATE INDEX IF NOT EXISTS idx_search_history_query ON shopping.search_history(query);
+CREATE INDEX IF NOT EXISTS idx_search_history_type_time ON shopping.search_history(query_type, searched_at DESC);
 
 -- Cache Metadata - track LFU/LRU stats (synced from Redis)
 CREATE TABLE IF NOT EXISTS shopping.cache_metadata (
@@ -120,9 +120,9 @@ CREATE TABLE IF NOT EXISTS shopping.cache_metadata (
   UNIQUE(user_id, cache_key)
 );
 
-CREATE INDEX idx_cache_metadata_user_type ON shopping.cache_metadata(user_id, cache_type);
-CREATE INDEX idx_cache_metadata_lfu ON shopping.cache_metadata(cache_type, access_count DESC); -- For LFU eviction
-CREATE INDEX idx_cache_metadata_lru ON shopping.cache_metadata(cache_type, last_access ASC); -- For LRU eviction
+CREATE INDEX IF NOT EXISTS idx_cache_metadata_user_type ON shopping.cache_metadata(user_id, cache_type);
+CREATE INDEX IF NOT EXISTS idx_cache_metadata_lfu ON shopping.cache_metadata(cache_type, access_count DESC); -- For LFU eviction
+CREATE INDEX IF NOT EXISTS idx_cache_metadata_lru ON shopping.cache_metadata(cache_type, last_access ASC); -- For LRU eviction
 
 -- Triggers for updated_at
 CREATE OR REPLACE FUNCTION shopping.update_updated_at()
@@ -133,16 +133,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_shopping_cart_updated_at ON shopping.shopping_cart;
 CREATE TRIGGER trigger_shopping_cart_updated_at
   BEFORE UPDATE ON shopping.shopping_cart
   FOR EACH ROW
   EXECUTE FUNCTION shopping.update_updated_at();
 
+DROP TRIGGER IF EXISTS trigger_watchlist_updated_at ON shopping.watchlist;
 CREATE TRIGGER trigger_watchlist_updated_at
   BEFORE UPDATE ON shopping.watchlist
   FOR EACH ROW
   EXECUTE FUNCTION shopping.update_updated_at();
 
+DROP TRIGGER IF EXISTS trigger_wishlist_updated_at ON shopping.wishlist;
 CREATE TRIGGER trigger_wishlist_updated_at
   BEFORE UPDATE ON shopping.wishlist
   FOR EACH ROW

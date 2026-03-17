@@ -9,13 +9,15 @@ This document outlines the plan to restore SQL backup files and apply comprehens
 | Backup File | Port | Database | Service |
 |------------|------|----------|---------|
 | `record-platform-postgres-1-all-20260101-223214.sql` | 5433 | records | records (main) |
-| `record-platform-postgres-auth-1-all-20260101-223214.sql` | 5437 | records | auth |
 | `record-platform-postgres-social-1-all-20260101-223214.sql` | 5434 | records | social |
 | `record-platform-postgres-listings-1-all-20260101-223214.sql` | 5435 | records | listings |
-| `record-platform-postgres-shopping-1-all-20260101-223214.sql` | 5436 | records | shopping |
-| `record-platform-postgres-analytics-1-all-20260101-223214.sql` | 5438 | records | analytics |
-| `record-platform-postgres-auction-monitor-1-all-20260101-223214.sql` | 5439 | records | auction-monitor |
-| `record-platform-postgres-python-ai-1-all-20260101-223214.sql` | 5440 | records | python-ai |
+| `record-platform-postgres-shopping-1-all-20260101-223214.sql` | 5436 | shopping | shopping |
+| `record-platform-postgres-auth-1-all-20260101-223214.sql` | 5437 | auth | auth |
+| `record-platform-postgres-auction-monitor-1-all-20260101-223214.sql` | 5438 | postgres | auction-monitor |
+| `record-platform-postgres-analytics-1-all-20260101-223214.sql` | 5439 | analytics | analytics |
+| `record-platform-postgres-python-ai-1-all-20260101-223214.sql` | 5440 | python_ai | python-ai |
+
+**Canonical mapping**: Ports must match `docker-compose.yml` and README (Multi-Database Architecture). Use **docs/BACKUPS_AND_TUNING.md** and **scripts/restore-all-databases-from-dumps.sh** for restore.
 
 ## Step 1: Restore SQL Backups
 

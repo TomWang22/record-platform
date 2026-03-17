@@ -6,6 +6,8 @@ metadata:
   labels: { app: python-ai-service }
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector: { matchLabels: { app: python-ai-service } }
   template:
     metadata:
@@ -15,10 +17,28 @@ spec:
         prometheus.io/port: "5005"
         prometheus.io/path: "/metrics"
     spec:
+      hostAliases:
+        - ip: "192.168.5.2"
+          hostnames:
+            - "host.docker.internal"
+            - "host.lima.internal"
+      initContainers:
+        - name: wait-db
+          image: alpine:3.19
+          command:
+            - /bin/sh
+            - -c
+            - |
+              for i in $(seq 1 60); do
+                nc -zv host.docker.internal 5440 2>/dev/null && exit 0
+                sleep 2
+              done
+              echo "Python AI DB (5440) unreachable; ensure Postgres up and ./scripts/colima-apply-host-aliases.sh if on Colima (see docs/COLIMA_POD_STABILITY_AND_HOST_ALIASES.md)"
+              exit 1
       containers:
         - name: app
           image: python-ai-service:dev
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 5005
@@ -34,7 +54,13 @@ spec:
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_REQUIRE_CLIENT_CERT
-              value: "true"  # Enable mTLS (mutual TLS) - client cert verification
+              value: "true"  # Strict mTLS: Envoy presents client cert to backends
+            - name: TLS_CA_PATH
+              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert
+            - name: TLS_KEY_PATH
+              value: "/etc/certs/tls.key"
+            - name: TLS_CERT_PATH
+              value: "/etc/certs/tls.crt"
             - name: GRPC_PORT
               value: "50060"
             - name: NODE_TLS_REJECT_UNAUTHORIZED
@@ -47,6 +73,12 @@ spec:
               value: "kafka-external.record-platform.svc.cluster.local:9093"
             - name: KAFKA_USE_SSL
               value: "true"
+            - name: KAFKA_SSL_ENABLED
+              value: "true"
+            # Explicit POSTGRES_URL_PYTHON_AI (belt-and-suspenders with envFrom; ensures pool can connect)
+            - name: POSTGRES_URL_PYTHON_AI
+              valueFrom:
+                configMapKeyRef: { name: app-config, key: POSTGRES_URL_PYTHON_AI }
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto
@@ -60,7 +92,8 @@ spec:
             - name: kafka-ssl-certs
               mountPath: /etc/kafka/secrets
               readOnly: true
-          # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2 only
+          # gRPC Health (grpc.health.v1.Health) with TLS — keep; memory and long timeouts for slow TLS/startup.
+          # Start probing at 90s so we can become ready sooner when service is up; failureThreshold 60 still allows long startup.
           readinessProbe:
             exec:
               command:
@@ -73,12 +106,12 @@ spec:
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
                 - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=5s
+                - -connect-timeout=30s
+                - -rpc-timeout=15s
             initialDelaySeconds: 90
             periodSeconds: 15
-            timeoutSeconds: 20
-            failureThreshold: 6
+            timeoutSeconds: 90
+            failureThreshold: 12
           livenessProbe:
             exec:
               command:
@@ -91,12 +124,12 @@ spec:
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
                 - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=5s
-            initialDelaySeconds: 150
-            periodSeconds: 30
-            timeoutSeconds: 20
-            failureThreshold: 6
+                - -connect-timeout=30s
+                - -rpc-timeout=15s
+            initialDelaySeconds: 300
+            periodSeconds: 45
+            timeoutSeconds: 90
+            failureThreshold: 10
           startupProbe:
             exec:
               command:
@@ -109,19 +142,19 @@ spec:
                 - -tls-client-cert=/etc/certs/tls.crt
                 - -tls-client-key=/etc/certs/tls.key
                 - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=5s
-            initialDelaySeconds: 45
+                - -connect-timeout=30s
+                - -rpc-timeout=15s
+            initialDelaySeconds: 90
             periodSeconds: 15
-            timeoutSeconds: 20
-            failureThreshold: 30
+            timeoutSeconds: 90
+            failureThreshold: 60
           resources:
             requests:
-              cpu: "500m"  # Reduced for scheduling
-              memory: "512Mi"  # Reduced for scheduling
+              cpu: "500m"
+              memory: "512Mi"
             limits:
-              cpu: "2"  # Reduced for scheduling
-              memory: "1Gi"  # Reduced for scheduling (was 4Gi, then 2Gi - now 1Gi)
+              cpu: "2"
+              memory: "4Gi"
       volumes:
         - name: proto-files
           configMap:

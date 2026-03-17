@@ -1,33 +1,35 @@
 -- Comprehensive Database Tuning
--- Target: 5.1k TPS with 2.4M+ records, 256 pgbench clients
--- Includes: Partial indexes, composite indexes, worker threads, memory tuning, disable sequential scans
+-- Target: 1.5k–5.1k TPS (gold: 6–8k TPS); hot tenants, hashing, cache-friendly.
+-- Instance-level gold tuning is applied at container start via docker-compose.
+-- This file adds indexes and optional ALTER SYSTEM overrides (restart required).
+-- See scripts/RESTORE-GOLD-PERFORMANCE.md.gz and scripts/apply-gold-tuning-all-dbs.sh.
 
 SET ROLE postgres;
 
 -- ============================================================
--- POSTGRESQL CONFIGURATION (Worker Threads & Memory)
+-- POSTGRESQL CONFIGURATION (Gold: Worker 12/4, Memory, Index-First)
 -- ============================================================
 
--- Worker threads (4 and 12 as mentioned)
-ALTER SYSTEM SET max_parallel_workers_per_gather = 4;  -- Parallel query workers per gather node
-ALTER SYSTEM SET max_worker_processes = 12;  -- Total background worker processes
-ALTER SYSTEM SET max_parallel_workers = 12;  -- Max parallel workers across all queries
+-- Worker threads (gold: 4 and 12)
+ALTER SYSTEM SET max_parallel_workers_per_gather = 4;
+ALTER SYSTEM SET max_worker_processes = 12;
+ALTER SYSTEM SET max_parallel_workers = 12;
 
--- Memory settings (critical for 2.4M+ records with 256 clients)
-ALTER SYSTEM SET work_mem = '16MB';  -- Memory per sort/hash operation (increase for complex queries)
-ALTER SYSTEM SET maintenance_work_mem = '1GB';  -- Memory for VACUUM, CREATE INDEX, etc.
-ALTER SYSTEM SET shared_buffers = '2GB';  -- Shared memory for caching (25% of RAM typical)
-ALTER SYSTEM SET effective_cache_size = '6GB';  -- Estimate of OS cache (50-75% of RAM)
-ALTER SYSTEM SET temp_buffers = '8MB';  -- Per-session temporary buffers
+-- Memory (gold: work_mem 32MB, effective_cache_size 4GB; keep hot data in buffer)
+ALTER SYSTEM SET work_mem = '32MB';
+ALTER SYSTEM SET maintenance_work_mem = '256MB';
+ALTER SYSTEM SET shared_buffers = '1GB';
+ALTER SYSTEM SET effective_cache_size = '4GB';
+ALTER SYSTEM SET temp_buffers = '8MB';
+ALTER SYSTEM SET effective_io_concurrency = 200;
 
 -- Write-ahead log (WAL) settings
 ALTER SYSTEM SET wal_buffers = '16MB';  -- WAL buffer size
 ALTER SYSTEM SET checkpoint_completion_target = 0.9;  -- Spread checkpoint writes over 90% of interval
 ALTER SYSTEM SET max_wal_size = '2GB';  -- Max WAL size before checkpoint
 
--- Connection and transaction settings
-ALTER SYSTEM SET max_connections = 256;  -- Match pgbench client count
-ALTER SYSTEM SET default_statistics_target = 1000;  -- Increase stats accuracy for large tables
+-- Connection and stats (keep 500 for platform; gold uses default_statistics_target 100)
+ALTER SYSTEM SET default_statistics_target = 100;
 
 -- ============================================================
 -- QUERY PLANNER SETTINGS (Disable Sequential Scans, Prefer Indexes)

@@ -645,18 +645,25 @@ export function startGrpcServer(port: number) {
   // This enables Kubernetes health probes and Caddy health checks
   registerHealthService(server, 'shopping.ShoppingService', async () => {
     try {
-      // Check database connectivity
+      // Check database connectivity (required for SERVING)
       await withRetry(
         () => pool.query('SELECT 1'),
         3,
         'gRPC health service: database'
       )
-      
-      // Check Redis connectivity (if Redis is available)
-      if (redis && redis.status !== 'ready') {
-        await redis.ping()
+      // Redis is optional for readiness: service can run with degraded cache. Do not fail health if Redis is down.
+      if (redis && (redis.status === 'ready' || redis.status === 'connect')) {
+        try {
+          await Promise.race([
+            redis.ping(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Redis ping timeout')), 2000)
+            ),
+          ])
+        } catch (redisErr: any) {
+          console.warn('[shopping] Health: Redis unreachable (non-fatal):', redisErr?.message ?? redisErr)
+        }
       }
-      
       return true
     } catch (err: any) {
       console.error('[shopping] Health check failed:', err.message)

@@ -7,6 +7,20 @@ This Node.js service runs scheduled jobs for analytics snapshots and S3 backups.
 - **Snapshot trends** (daily 03:15 UTC): Writes `analytics.price_snapshots` from recent auction data.
 - **Backup to S3** (daily 03:30 UTC): Uploads auctions payload to `s3://<bucket>/backups/auctions-<date>.json` when `S3_BUCKET` is set.
 
+## Daily pgbench (all 8 DBs, standalone)
+
+To run **all 8 pgbench sweeps** daily (no preflight; deep mode, EXPLAIN for all schemas) and collect results:
+
+1. **Host cron:**  
+   ```bash
+   ./scripts/install-pgbench-daily-cron.sh          # print crontab line
+   ./scripts/install-pgbench-daily-cron.sh --install # append to crontab
+   ```
+   Default schedule: 05:00 local. Results: `PGBENCH_RESULTS_PARENT/daily-pgbench-<timestamp>/` (default parent: `/tmp`).  
+   Prereq: Postgres 5433–5440 up (e.g. docker-compose), migrations applied.
+
+2. **Colima/k3s storage:** If k3s is flaky, run `./scripts/colima-k3s-storage-diagnostic.sh` to check VM disk, etcd size, and node resources. See `docs/COLIMA_K3S_FORENSIC_AND_TUNING.md`.
+
 ## Daily test suite (preflight + all suites)
 
 To run the **preflight and full test suite** daily and collect results:

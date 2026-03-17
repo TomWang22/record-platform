@@ -17,7 +17,7 @@ variable "kubeconfig_path" {
 }
 
 variable "kubeconfig_context" {
-  description = "Kubernetes context to use"
+  description = "Kubernetes context to use (e.g. colima for local Colima k3s)"
   type        = string
   default     = null
 }

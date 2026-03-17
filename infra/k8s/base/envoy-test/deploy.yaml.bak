@@ -30,52 +30,69 @@ data:
                 - name: local_service
                   domains: ["*"]
                   routes:
+                  # Explicit route for gRPC health protocol (avoids 404/hang; timeout 15s for stability under load)
+                  - match:
+                      prefix: "/grpc.health.v1.Health/"
+                    route:
+                      cluster: auth_service
+                      timeout: 15s
                   # Route by service name in path (e.g., /auth.AuthService/HealthCheck)
                   - match:
                       path: "/auth."
                     route:
                       cluster: auth_service
+                      timeout: 15s
                   - match:
                       path: "/records."
                     route:
                       cluster: records_service
+                      timeout: 15s
                   - match:
                       path: "/social."
                     route:
                       cluster: social_service
+                      timeout: 15s
                   - match:
                       path: "/listings."
                     route:
                       cluster: listings_service
+                      timeout: 15s
                   - match:
                       path: "/analytics."
                     route:
                       cluster: analytics_service
+                      timeout: 15s
                   - match:
                       path: "/shopping."
                     route:
                       cluster: shopping_service
+                      timeout: 15s
                   - match:
                       path: "/auction_monitor."
                     route:
                       cluster: auction_monitor_service
+                      timeout: 15s
                   - match:
                       path: "/auction-monitor."
                     route:
                       cluster: auction_monitor_service
+                      timeout: 15s
                   - match:
                       path: "/python_ai."
                     route:
                       cluster: python_ai_service
+                      timeout: 15s
                   - match:
                       path: "/python-ai."
                     route:
                       cluster: python_ai_service
+                      timeout: 15s
                   # Default route (fallback to auth for backward compatibility)
                   - match:
                       prefix: "/"
                     route:
                       cluster: auth_service
+                      timeout: 15s
               http_filters:
               - name: envoy.filters.http.router
                 typed_config:

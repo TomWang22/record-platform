@@ -25,7 +25,10 @@ export function getRedisClient(): RedisClientType | null {
       REDIS_URL = REDIS_URL.replace('redis://', `redis://:${REDIS_PASSWORD}@`);
     }
 
-    redisClient = createClient({ url: REDIS_URL }) as RedisClientType;
+    redisClient = createClient({
+      url: REDIS_URL,
+      socket: { connectTimeout: 10_000 },
+    }) as RedisClientType;
     
     redisClient.on('error', (err) => {
       console.warn('[auth-redis] Redis error (non-fatal):', err.message);

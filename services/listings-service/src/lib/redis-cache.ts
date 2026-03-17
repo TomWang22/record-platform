@@ -32,7 +32,10 @@ export function getRedisClient(): RedisClientType | null {
 
     // Create client with explicit socket configuration to prevent auto-auth
     // If no password (or empty string when Redis is externalized without auth), don't send AUTH
-    const clientConfig: any = { url: REDIS_URL };
+    const clientConfig: any = {
+      url: REDIS_URL,
+      socket: { connectTimeout: 10_000 },
+    };
     if (!REDIS_PASSWORD) {
       // Explicitly disable password authentication if no password is set
       // This prevents the redis client from sending AUTH with empty password

@@ -14,7 +14,7 @@ spec:
       containers:
         - name: app
           image: cron-jobs:dev
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef: { name: app-config }
             - secretRef:    { name: app-secrets }

@@ -6,6 +6,8 @@ metadata:
   labels: { app: auction-monitor }
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels: { app: auction-monitor }
   template:
@@ -17,10 +19,15 @@ spec:
         prometheus.io/port: "4008"
         prometheus.io/path: "/metrics"
     spec:
+      hostAliases:
+        - ip: "192.168.5.2"
+          hostnames:
+            - "host.docker.internal"
+            - "host.lima.internal"
       containers:
         - name: app
           image: auction-monitor:dev
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 4008
@@ -63,9 +70,6 @@ spec:
               value: "true"
             - name: KAFKA_CA_CERT
               value: "/etc/kafka/secrets/ca-cert.pem"
-            # Ensure Node.js uses the CA cert for Kafka TLS verification
-            - name: NODE_EXTRA_CA_CERTS
-              value: "/etc/kafka/secrets/ca-cert.pem:/certs/dev-root.pem"
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_PORT
@@ -75,7 +79,13 @@ spec:
             - name: NODE_EXTRA_CA_CERTS
               value: "/certs/dev-root.pem"
             - name: GRPC_REQUIRE_CLIENT_CERT
-              value: "true"  # Enable mTLS (mutual TLS) - client cert verification
+              value: "true"  # Strict mTLS: Envoy presents client cert to backends
+            - name: TLS_CA_PATH
+              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert
+            - name: TLS_KEY_PATH
+              value: "/etc/certs/tls.key"
+            - name: TLS_CERT_PATH
+              value: "/etc/certs/tls.crt"
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto

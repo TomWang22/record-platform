@@ -1,6 +1,15 @@
 # DB Tuning: All 7 Service DBs (Ports 5434–5440)
 
-Target: **sub-20ms** overall latency, **millions of rows**, raw DB (no pgbouncer). Apply EXPLAIN ANALYZE, indexes (B-tree, GIST, partial, composite), VACUUM, and pg_settings per service.
+Target: **sub-20ms** overall latency (ideally **8–20ms** per query), **millions of rows**, raw DB (no pgbouncer). Apply EXPLAIN ANALYZE, indexes (B-tree, GIST, partial, composite), VACUUM, and pg_settings per service.
+
+## Targets (cold tuning, no warm-cache tricks)
+
+- **Latency:** 8–20ms per query in EXPLAIN (ANALYZE); script warns if Execution Time > 20ms (`EXPLAIN_TARGET_MS=20`).
+- **Throughput:** Cold run **1.5k–5k+ TPS** per workload (records KNN/TRGM, social, auth, etc.); NOOP shows connection ceiling.
+- **Scale:** Tuning must hold at **7–8 figure row counts** (millions to tens of millions); data summary shows per-schema/table rows and sizes.
+- **Workers:** `max_parallel_workers=12`, `max_parallel_workers_per_gather=4` (gold + docker-compose); prefer index scans and parallel plans.
+
+**Data transparency:** `apply-tune-and-explain-all-dbs.sh` writes **data-summary-&lt;name&gt;.txt** per DB (schema, table, approx rows, size) so it’s clear how much data each schema has before interpreting EXPLAIN or pgbench.
 
 ## Scope
 
@@ -54,6 +63,22 @@ psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -c "EXPLAIN (ANALYZE, BUFFERS)
 
 Use `RUN_PLAN_DUMP=1` in the corresponding `run_*_pgbench_sweep.sh` to capture EXPLAIN ANALYZE for the script’s workload (see PGBENCH_HARDENING.md).
 
+**One-shot: tune and EXPLAIN all 8 DBs (sub-20ms target):** run `./scripts/apply-tune-and-explain-all-dbs.sh`. It applies: (1) gold defaults (tuple cost, parallel 12/4, random_page_cost 0.8), (2) content-hash migrations (set `SKIP_CONTENT_HASH=1` to skip on large tables), (3) records KNN/trigram (43) + VACUUM ANALYZE, (4) service-specific tuning, (5) listings covering index + ANALYZE, (6) one `EXPLAIN (ANALYZE, BUFFERS)` per DB → `bench_logs/explain-all-<timestamp>/*.txt`. **Same 8 DBs as step 8 of run-preflight-scale-and-all-suites.sh.** Optional: `RUN_QUICK_PGBENCH=1` for a fast pgbench -S latency check; `RUN_FULL_PGBENCH=1` to run the same 8 pgbench sweep scripts as preflight (run_pgbench_sweep.sh, run_social_pgbench_sweep.sh, … run_python-ai_pgbench_sweep.sh) with `PGBENCH_MODE=quick` (or `deep`). No pgbouncer; connection pool `max_connections=800` per instance (500–1000; see below). **Parallel sweeps:** `PGBENCH_PARALLEL=1` (default) runs all 8 sweeps at once so total time ≈ one sweep; `PGBENCH_PARALLEL=0` for sequential.
+
+## Little's Law and TPS/latency
+
+**Little's Law:** L = λW (steady state: concurrency = throughput × latency). The scripts use it for reporting:
+
+- **lat_est_ms** = 1000 × clients / tps (physics-based mean latency in ms).
+- TPS and pgbench-reported latency are consistent with this; `expected_vs_reality_analysis.txt` validates L = λW.
+
+So when interpreting TPS: higher concurrency with same TPS implies higher latency (L = λW); to improve latency at fixed concurrency, increase TPS (query/plan/index tuning).
+
+## Connection pool (500–1000 per instance)
+
+- **docker-compose:** each Postgres service uses `max_connections=800` (ballpark 500–1000). Reuse connections; pgbench uses one connection per client, so peak clients per DB (e.g. 256) must stay below max_connections.
+- When **all 8 pgbench sweeps run in parallel**, each DB runs one sweep (one set of clients); 800 allows headroom. If you run multiple app replicas per DB, ensure sum of pool sizes < max_connections.
+
 ## Optional pgbench phase in pipeline
 
-`RUN_PGBENCH=1` in **run-preflight-scale-and-all-suites.sh** runs all pgbench sweeps (records + 7 services) before test suites. Raw DB only (no pgbouncer). See PGBENCH_HARDENING.md and LOAD_TESTS_CATALOG.md.
+`RUN_PGBENCH=1` in **run-preflight-scale-and-all-suites.sh** runs all pgbench sweeps (records + 7 services) **after** test suites (step 8). **Step 7.5 runs performance tuning once** (gold defaults, indexes, EXPLAIN, data summary, bottleneck check) before step 8 when `RUN_TUNING_ONCE=1` (default). Set `RUN_TUNING_ONCE=0` to skip. Raw DB only (no pgbouncer). **PGBENCH_PARALLEL=1** (default) runs all 8 in parallel. See PGBENCH_HARDENING.md and LOAD_TESTS_CATALOG.md.

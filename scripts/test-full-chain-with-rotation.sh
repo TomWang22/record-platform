@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# HTTP/2 tests use nodeport_curl/curl with --http2; HTTP/3 tests use http3_curl with --http3-only (no fallback). Same across all suites.
 set -euo pipefail
 
 HOST="${HOST:-record.local}"

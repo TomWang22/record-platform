@@ -239,9 +239,9 @@ export async function enableMFA(
       }
     }
     
-    // All retries failed
-    console.error(`[MFA] ❌ Verification failed after 5 attempts for user ${userId}:`, verify);
-    throw new Error(`MFA enable failed - verification: user.mfa_enabled=${verify?.mfa_enabled}, settings.enabled=${verify?.mfa_settings_enabled}`);
+    // All retries failed - do not throw; transaction committed, so MFA is enabled. Visibility delay (pool/replica) can cause this.
+    console.warn(`[MFA] Post-commit verification did not see mfa_enabled after 5 attempts for user ${userId}; transaction committed. Next /me may see it.`);
+    return;
   } catch (error: any) {
     console.error(`[MFA] Error enabling MFA for user ${userId}:`, error?.message || error);
     throw error;

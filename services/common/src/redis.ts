@@ -15,16 +15,16 @@ export function getRedis(): Redis {
       // Insert password after redis://
       url = url.replace('redis://', `redis://:${password}@`)
     }
-    client = new Redis(url, { 
-      lazyConnect: true,  // Don't connect immediately - allows graceful degradation
-      maxRetriesPerRequest: 2,
-      password: password, // Also set password directly (ioredis supports both)
+    client = new Redis(url, {
+      lazyConnect: true,
+      connectTimeout: 10_000, // host.docker.internal/Colima may need a moment on first packet
+      maxRetriesPerRequest: 5,
+      password: password,
       retryStrategy: (times) => {
-        // Exponential backoff, max 2s
-        const delay = Math.min(times * 50, 2000);
-        return delay;
+        if (times > 5) return null
+        return Math.min(times * 200, 3000)
       },
-      enableOfflineQueue: false,  // Don't queue commands when disconnected
+      enableOfflineQueue: false,
     })
     // Handle errors gracefully - don't crash the app
     client.on('error', (err) => {

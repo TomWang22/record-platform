@@ -3,45 +3,45 @@
 
 -- ============================================================
 -- SOCIAL SERVICE (Port 5434) - Write-Heavy, Messaging
+-- Schemas: forum.posts, messages.messages (see 04-social-schema.sql)
 -- ============================================================
 
--- Composite indexes for user + message lookups
-CREATE INDEX IF NOT EXISTS idx_messages_user_created 
-  ON social.messages (user_id, created_at DESC);
+-- Composite indexes for message lookups (messages schema)
+CREATE INDEX IF NOT EXISTS idx_messages_sender_created 
+  ON messages.messages (sender_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_messages_recipient_created 
-  ON social.messages (recipient_id, created_at DESC) 
+  ON messages.messages (recipient_id, created_at DESC) 
   WHERE recipient_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_messages_group_created 
-  ON social.messages (group_id, created_at DESC) 
+  ON messages.messages (group_id, created_at DESC) 
   WHERE group_id IS NOT NULL;
 
--- Forum posts indexes
+-- Forum posts indexes (forum schema)
 CREATE INDEX IF NOT EXISTS idx_forum_posts_created 
-  ON social.forum_posts (created_at DESC, flair);
+  ON forum.posts (created_at DESC, flair);
 
 CREATE INDEX IF NOT EXISTS idx_forum_posts_user_created 
-  ON social.forum_posts (user_id, created_at DESC);
+  ON forum.posts (user_id, created_at DESC);
 
--- Partial index for active messages
-CREATE INDEX IF NOT EXISTS idx_messages_active_user 
-  ON social.messages (user_id, created_at DESC) 
-  WHERE created_at > NOW() - INTERVAL '90 days';
+-- Partial index for recent messages (omit predicate with NOW() - not immutable; use non-partial or application filter)
+CREATE INDEX IF NOT EXISTS idx_messages_active_sender 
+  ON messages.messages (sender_id, created_at DESC);
 
 -- Autovacuum (write-heavy)
-ALTER TABLE IF EXISTS social.messages SET (
+ALTER TABLE IF EXISTS messages.messages SET (
   autovacuum_vacuum_scale_factor = 0.1,
   autovacuum_analyze_scale_factor = 0.05
 );
 
-ALTER TABLE IF EXISTS social.forum_posts SET (
+ALTER TABLE IF EXISTS forum.posts SET (
   autovacuum_vacuum_scale_factor = 0.1,
   autovacuum_analyze_scale_factor = 0.05
 );
 
-ANALYZE social.messages;
-ANALYZE social.forum_posts;
+ANALYZE messages.messages;
+ANALYZE forum.posts;
 
 -- ============================================================
 -- AUTH SERVICE (Port 5437) - Read-Heavy, User Lookups
@@ -82,24 +82,24 @@ ANALYZE auth.users;
 ANALYZE auth.oauth_tokens;
 
 -- ============================================================
--- ANALYTICS SERVICE (Port 5438) - Read-Heavy, Aggregations
+-- ANALYTICS SERVICE (Port 5439) - Read-Heavy, Aggregations
 -- ============================================================
 
--- Time-series indexes (for price snapshots, analytics)
-CREATE INDEX IF NOT EXISTS idx_price_snapshots_timestamp 
-  ON analytics.price_snapshots (timestamp DESC, item_id);
+-- Time-series indexes (08-analytics-schema: snapshot_date, record_id)
+CREATE INDEX IF NOT EXISTS idx_price_snapshots_snapshot_record 
+  ON analytics.price_snapshots (snapshot_date DESC, record_id);
 
-CREATE INDEX IF NOT EXISTS idx_price_snapshots_item_timestamp 
-  ON analytics.price_snapshots (item_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_price_snapshots_record_snapshot 
+  ON analytics.price_snapshots (record_id, snapshot_date DESC);
 
--- User behavior indexes
+-- User behavior indexes (event_timestamp in 08-analytics-schema)
 CREATE INDEX IF NOT EXISTS idx_user_behavior_user_timestamp 
-  ON analytics.user_behavior (user_id, timestamp DESC);
+  ON analytics.user_behavior (user_id, event_timestamp DESC);
 
 -- Partial index for recent data (most queries)
 CREATE INDEX IF NOT EXISTS idx_price_snapshots_recent 
-  ON analytics.price_snapshots (timestamp DESC, item_id) 
-  WHERE timestamp > NOW() - INTERVAL '90 days';
+  ON analytics.price_snapshots (snapshot_date DESC, record_id) 
+  WHERE snapshot_date > CURRENT_DATE - INTERVAL '90 days';
 
 -- GIN index for metadata (JSON queries)
 CREATE INDEX IF NOT EXISTS idx_user_behavior_metadata 
@@ -116,7 +116,7 @@ ANALYZE analytics.price_snapshots;
 ANALYZE analytics.user_behavior;
 
 -- ============================================================
--- AUCTION MONITOR SERVICE (Port 5439) - Read-Heavy, Price Tracking
+-- AUCTION MONITOR SERVICE (Port 5438) - Read-Heavy, Price Tracking
 -- ============================================================
 
 -- Auction results indexes
@@ -150,38 +150,38 @@ ALTER TABLE IF EXISTS auction_monitor.auction_results SET (
 ANALYZE auction_monitor.auction_results;
 
 -- ============================================================
--- PYTHON AI SERVICE (Port 5440) - Read/Write Mix, AI Data
+-- PYTHON AI SERVICE (Port 5440) - Read/Write Mix, AI Data (schema: ai)
 -- ============================================================
 
--- Inference log indexes
-CREATE INDEX IF NOT EXISTS idx_inference_log_timestamp 
-  ON python_ai.inference_log (timestamp DESC, user_id);
+-- Inference log indexes (python-ai-schema: created_at)
+CREATE INDEX IF NOT EXISTS idx_inference_log_created_user 
+  ON ai.inference_log (created_at DESC, user_id);
 
-CREATE INDEX IF NOT EXISTS idx_inference_log_user_timestamp 
-  ON python_ai.inference_log (user_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_inference_log_user_created 
+  ON ai.inference_log (user_id, created_at DESC);
 
--- Analytics cache indexes (read-heavy)
-CREATE INDEX IF NOT EXISTS idx_analytics_cache_key 
-  ON python_ai.analytics_cache (cache_key);
+-- Analytics cache indexes (query_hash, created_at, expires_at)
+CREATE INDEX IF NOT EXISTS idx_analytics_cache_query_hash 
+  ON ai.analytics_cache (query_hash);
 
-CREATE INDEX IF NOT EXISTS idx_analytics_cache_updated 
-  ON python_ai.analytics_cache (updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_analytics_cache_created 
+  ON ai.analytics_cache (created_at DESC);
 
 -- Partial index for recent inferences
 CREATE INDEX IF NOT EXISTS idx_inference_log_recent 
-  ON python_ai.inference_log (timestamp DESC) 
-  WHERE timestamp > NOW() - INTERVAL '30 days';
+  ON ai.inference_log (created_at DESC) 
+  WHERE created_at > NOW() - INTERVAL '30 days';
 
 -- Autovacuum (balanced)
-ALTER TABLE IF EXISTS python_ai.inference_log SET (
+ALTER TABLE IF EXISTS ai.inference_log SET (
   autovacuum_vacuum_scale_factor = 0.1,
   autovacuum_analyze_scale_factor = 0.05
 );
 
-ALTER TABLE IF EXISTS python_ai.analytics_cache SET (
+ALTER TABLE IF EXISTS ai.analytics_cache SET (
   autovacuum_vacuum_scale_factor = 0.2,
   autovacuum_analyze_scale_factor = 0.1
 );
 
-ANALYZE python_ai.inference_log;
-ANALYZE python_ai.analytics_cache;
+ANALYZE ai.inference_log;
+ANALYZE ai.analytics_cache;

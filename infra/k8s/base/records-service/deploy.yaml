@@ -6,6 +6,8 @@ metadata:
   labels: { app: records-service }
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector: { matchLabels: { app: records-service } }
   template:
     metadata:
@@ -15,10 +17,15 @@ spec:
         prometheus.io/port: "4002"
         prometheus.io/path: "/metrics"
     spec:
+      hostAliases:
+        - ip: "192.168.5.2"
+          hostnames:
+            - "host.docker.internal"
+            - "host.lima.internal"
       containers:
         - name: app
           image: records-service:dev
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 4002
@@ -41,11 +48,19 @@ spec:
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_REQUIRE_CLIENT_CERT
-              value: "true"  # Enable mTLS (mutual TLS) - client cert verification
+              value: "true"  # Strict mTLS: Envoy presents client cert to backends
+            - name: TLS_CA_PATH
+              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert
+            - name: TLS_KEY_PATH
+              value: "/etc/certs/tls.key"
+            - name: TLS_CERT_PATH
+              value: "/etc/certs/tls.crt"
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
               value: "/certs/dev-root.pem"
+            - name: KAFKA_CA_CERT
+              value: "/etc/kafka/secrets/ca-cert.pem"
             # Use external Docker Postgres (port 5433) as per run_pgbench_sweep.sh reference
             # DATABASE_URL from app-config.yaml is already set correctly to host.docker.internal:5433
           volumeMounts:
@@ -58,7 +73,29 @@ spec:
             - name: tls-certs
               mountPath: /etc/certs
               readOnly: true
-          # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2 only
+            - name: kafka-ssl-certs
+              mountPath: /etc/kafka/secrets
+              readOnly: true
+          # gRPC Health Checks (grpc.health.v1.Health/Check) — strict TLS/mTLS
+          # gRPC server starts async after HTTP; allow time for bind before first probe
+          startupProbe:
+            exec:
+              command:
+                - /usr/local/bin/grpc-health-probe
+                - -addr=localhost:50051
+                - -service=records.RecordsService
+                - -tls
+                - -tls-no-verify=false
+                - -tls-ca-cert=/etc/certs/ca.crt
+                - -tls-client-cert=/etc/certs/tls.crt
+                - -tls-client-key=/etc/certs/tls.key
+                - -tls-server-name=record.local
+                - -connect-timeout=10s
+                - -rpc-timeout=5s
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 20
+            failureThreshold: 30
           readinessProbe:
             exec:
               command:
@@ -73,7 +110,7 @@ spec:
                 - -tls-server-name=record.local
                 - -connect-timeout=10s
                 - -rpc-timeout=5s
-            initialDelaySeconds: 90
+            initialDelaySeconds: 120
             periodSeconds: 15
             timeoutSeconds: 20
             failureThreshold: 6
@@ -91,28 +128,10 @@ spec:
                 - -tls-server-name=record.local
                 - -connect-timeout=10s
                 - -rpc-timeout=5s
-            initialDelaySeconds: 150
+            initialDelaySeconds: 180
             periodSeconds: 30
             timeoutSeconds: 20
             failureThreshold: 6
-          startupProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50051
-                - -service=records.RecordsService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=5s
-            initialDelaySeconds: 45
-            periodSeconds: 15
-            timeoutSeconds: 20
-            failureThreshold: 30
           resources:
             requests:
               cpu: "100m"
@@ -140,3 +159,10 @@ spec:
                 path: tls.crt
               - key: ca.crt
                 path: ca.crt
+        - name: kafka-ssl-certs
+          secret:
+            secretName: kafka-ssl-secret
+            optional: true
+            items:
+              - key: ca-cert.pem
+                path: ca-cert.pem

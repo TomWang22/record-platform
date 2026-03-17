@@ -3,7 +3,7 @@ import type Redis from 'ioredis'
 import type { AuthedRequest } from '../lib/auth.js'
 import { pool, withRetry } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
-import { cleanupUnavailableItems, removeSoldOutFromCarts, markWatchlistSoldOut } from '../lib/availability.js'
+import { cleanupUnavailableItems, removeSoldOutFromCarts, markWatchlistSoldOut, notifyCartItemRemoved } from '../lib/availability.js'
 
 export default function cartRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
   const router: Router = Router()
@@ -77,47 +77,40 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
       const tax = subtotal * 0.08 // 8% tax (simulated)
       const total = subtotal + shippingCost + tax
 
-      // Generate order number
-      const orderNumberResult = await withRetry(
-        () => pool.query('SELECT shopping.generate_order_number() as order_number'),
-        3,
-        'generate order number'
-      )
-      const orderNumber = orderNumberResult.rows[0].order_number
-
-      // Create order
+      // Atomic: generate order_number inside INSERT so nextval and insert are one statement (root-cause fix for duplicate key).
       const orderResult = await withRetry(
-        () => pool.query(
-        `INSERT INTO shopping.orders (
-          user_id, order_number, status, payment_status, payment_method,
-          subtotal, shipping_cost, tax, total, currency,
-          shipping_address, billing_address, notes, metadata
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13, $14::jsonb)
-        RETURNING id, order_number, status, payment_status, total, created_at`,
-        [
-          userId,
-          orderNumber,
-          'processing',
-          'processing',
-          payment_method,
-          subtotal,
-          shippingCost,
-          tax,
-          total,
-          'USD',
-          shipping_address ? JSON.stringify(shipping_address) : null,
-          billing_address ? JSON.stringify(billing_address) : null,
-          notes || null,
-          JSON.stringify({ simulated_payment: true }),
-        ]
-        ),
+        () =>
+          pool.query(
+            `INSERT INTO shopping.orders (
+              user_id, order_number, status, payment_status, payment_method,
+              subtotal, shipping_cost, tax, total, currency,
+              shipping_address, billing_address, notes, metadata
+            )
+            VALUES ($1, (SELECT shopping.generate_order_number()), $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13::jsonb)
+            RETURNING id, order_number, status, payment_status, total, created_at`,
+            [
+              userId,
+              'processing',
+              'processing',
+              payment_method,
+              subtotal,
+              shippingCost,
+              tax,
+              total,
+              'USD',
+              shipping_address ? JSON.stringify(shipping_address) : null,
+              billing_address ? JSON.stringify(billing_address) : null,
+              notes || null,
+              JSON.stringify({ simulated_payment: true }),
+            ]
+          ),
         3,
         'create order'
       )
 
       const order = orderResult.rows[0]
       const orderId = order.id
+      const orderNumber = order.order_number
 
       // Simulate payment processing (always succeeds in simulation)
       const paymentTransactionId = `PAY-SIM-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -137,33 +130,57 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
         'update order payment status'
       )
 
+      // Create shipment with random tracking number (eBay-style simulation)
+      let trackingNumber: string | null = null
+      try {
+        const shipResult = await withRetry(
+          () => pool.query(
+            `INSERT INTO shopping.shipments (order_id, tracking_number, carrier, status)
+             VALUES ($1, (SELECT shopping.generate_tracking_number()), 'SIMULATED', 'shipped')
+             RETURNING id, tracking_number, carrier, status`,
+            [orderId]
+          ),
+          3,
+          'create shipment with tracking'
+        )
+        if (shipResult.rows[0]) trackingNumber = shipResult.rows[0].tracking_number
+      } catch (shipErr: any) {
+        console.warn('[shopping] Could not create shipment (table may not exist yet):', shipErr.message)
+      }
+
       // Process each item: mark as sold, create purchase history, clean up carts
-      const purchaseResults = []
+      const purchaseResults: Array<{ purchase_id: string; item_id: string; listing_id?: string; quantity: number; tracking_number?: string; removed_from_carts?: number; marked_in_watchlist?: number }> = []
 
       for (const item of orderItems) {
-        // Mark listing as sold (if it's a listing)
+        // Mark listing as sold (if it's a listing) — decrement stock; set sold_at only when stock hits 0
         if (item.item_type === 'listing' && item.listing_id) {
-          // Update listing in listings database (port 5435)
+          const qty = Math.max(1, item.quantity ?? 1)
           try {
             const { listingsPool } = await import('../lib/availability.js')
             const listingsDbResult = await listingsPool.query(
               `UPDATE listings.listings
-               SET sold_at = NOW(),
-                   sold_to = $1::uuid,
-                   is_active = FALSE,
-                   stock_quantity = 0
-               WHERE id = $2::uuid AND is_active = TRUE AND stock_quantity > 0`,
-              [userId, item.listing_id]
+               SET stock_quantity = GREATEST(0, COALESCE(stock_quantity, 1) - $1),
+                   sold_at = CASE WHEN COALESCE(stock_quantity, 1) - $1 <= 0 THEN NOW() ELSE sold_at END,
+                   sold_to = CASE WHEN COALESCE(stock_quantity, 1) - $1 <= 0 THEN $2::uuid ELSE sold_to END,
+                   is_active = (COALESCE(stock_quantity, 1) - $1) > 0
+               WHERE id = $3::uuid AND is_active = TRUE AND COALESCE(stock_quantity, 1) >= $1
+               RETURNING id`,
+              [qty, userId, item.listing_id]
             )
 
             if (listingsDbResult.rowCount && listingsDbResult.rowCount > 0) {
-              // Remove from all other users' carts
-              const removedFromCarts = await removeSoldOutFromCarts(
+              // Remove from all other users' carts and notify them (so they don't have to remove manually)
+              const { count: removedFromCarts, rows: removedRows } = await removeSoldOutFromCarts(
                 pool,
                 item.item_type,
                 item.item_id,
                 userId
               )
+              if (removedRows.length > 0) {
+                await notifyCartItemRemoved(pool, removedRows, {
+                  listingTitle: (item.metadata as any)?.title ?? undefined,
+                })
+              }
 
               // Mark in watchlist/wishlist as sold out
               const markedInWatchlist = await markWatchlistSoldOut(
@@ -208,6 +225,9 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
               purchaseResults.push({
                 purchase_id: purchaseResult.rows[0].id,
                 item_id: item.item_id,
+                listing_id: item.listing_id,
+                quantity: item.quantity ?? 1,
+                tracking_number: trackingNumber ?? undefined,
                 removed_from_carts: removedFromCarts,
                 marked_in_watchlist: markedInWatchlist,
               })
@@ -250,6 +270,9 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
             purchaseResults.push({
               purchase_id: purchaseResult.rows[0].id,
               item_id: item.item_id,
+              listing_id: item.listing_id,
+              quantity: item.quantity ?? 1,
+              tracking_number: trackingNumber ?? undefined,
             })
           }
         } else {
@@ -288,6 +311,8 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
           purchaseResults.push({
             purchase_id: purchaseResult.rows[0].id,
             item_id: item.item_id,
+            quantity: item.quantity ?? 1,
+            tracking_number: trackingNumber ?? undefined,
           })
         }
       }
@@ -304,7 +329,7 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
         'remove checked-out items from cart'
       )
 
-      // Get final order details
+      // Get final order details and shipment (tracking)
       const finalOrder = await withRetry(
         () => pool.query(
         `SELECT id, order_number, status, payment_status, payment_transaction_id,
@@ -316,10 +341,12 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
         3,
         'get final order details'
       )
+      const orderPayload = finalOrder.rows[0] as Record<string, unknown>
+      if (trackingNumber) orderPayload.tracking_number = trackingNumber
 
       res.json({
         success: true,
-        order: finalOrder.rows[0],
+        order: orderPayload,
         purchases: purchaseResults,
         message: 'Checkout completed successfully',
       })
@@ -390,6 +417,8 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
                 
                 return {
                   ...item,
+                  id: item.id, // Cart line id (eBay-style: each cart item has an id)
+                  item_id: item.item_id, // Listing/item id
                   // Enrich with listing details
                   title: listing.title || item.metadata?.title,
                   condition: listing.condition || item.metadata?.condition,
@@ -415,6 +444,8 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
           // Return item with existing metadata (for non-listing items or if listing fetch failed)
           return {
             ...item,
+            id: item.id,
+            item_id: item.item_id,
             title: item.metadata?.title,
             condition: item.metadata?.condition,
             catalog_id: item.metadata?.catalog_id,

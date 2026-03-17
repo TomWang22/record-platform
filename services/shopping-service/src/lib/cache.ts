@@ -2,12 +2,17 @@ import Redis from 'ioredis'
 import * as fs from 'fs'
 import * as path from 'path'
 
-// Redis client factory (similar to social-service)
+/** Singleton Redis client. HTTP and gRPC servers share this to avoid duplicate connections and startup flakiness. */
+let redisInstance: Redis | null = null
+
+// Redis client factory - returns singleton so server.ts and grpc-server.ts share one connection
 export function makeRedis(): Redis | null {
+  if (redisInstance !== null) return redisInstance
+
   const url = process.env.REDIS_URL
   const rawPassword = process.env.REDIS_PASSWORD
   const password = rawPassword && String(rawPassword).trim() ? rawPassword : undefined
-  
+
   if (!url) {
     console.warn('[shopping] REDIS_URL not set, Redis caching disabled')
     return null
@@ -16,22 +21,22 @@ export function makeRedis(): Redis | null {
   // Support both REDIS_URL (with password) and REDIS_PASSWORD env var. Empty = no auth (externalized Redis).
   let redisUrl = url
   if (password && !redisUrl.includes('@') && !redisUrl.includes('://:')) {
-    // Insert password after redis://
     redisUrl = redisUrl.replace('redis://', `redis://:${password}@`)
   }
 
   try {
     const redis = new Redis(redisUrl, {
       password: password,
-      maxRetriesPerRequest: 3,
       lazyConnect: true,
+      connectTimeout: 10_000, // Colima/host.docker.internal may need a moment on first packet
+      maxRetriesPerRequest: 5,
       retryStrategy: (times) => {
-        if (times > 3) return null
-        return Math.min(times * 50, 2000)
+        if (times > 5) return null
+        return Math.min(times * 200, 3000) // 200, 400, 600, 800, 1000ms - gives external Redis time
       },
+      enableOfflineQueue: false,
     })
-    
-    // Connect asynchronously
+
     redis.connect().catch((err) => {
       console.warn('[shopping] Redis connection failed (non-fatal):', err.message)
     })
@@ -44,6 +49,7 @@ export function makeRedis(): Redis | null {
       console.log('[shopping] Redis connected')
     })
 
+    redisInstance = redis
     return redis
   } catch (err) {
     console.error('[shopping] Failed to create Redis client:', err)

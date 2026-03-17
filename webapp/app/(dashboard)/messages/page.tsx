@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AttachmentUpload, type AttachmentFile } from '@/components/ui/attachment-upload'
 import { Users, Plus, LogOut, Image as ImageIcon } from 'lucide-react'
+import { getClientSessionToken } from '@/lib/session'
 
 type ActivityEvent = {
   id: string
@@ -96,6 +97,13 @@ const messageTypeLabels: Record<MessageType, string> = {
   system: 'System',
 }
 
+function authHeaders(): Record<string, string> {
+  const token = getClientSessionToken()
+  const h: Record<string, string> = {}
+  if (token) h['Authorization'] = `Bearer ${token}`
+  return h
+}
+
 export default function MessagesPage() {
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [connected, setConnected] = useState(false)
@@ -157,14 +165,18 @@ export default function MessagesPage() {
 
   async function fetchConversations() {
     try {
-      const response = await fetch('/api/messages/conversations')
+      const response = await fetch('/api/messages/conversations', {
+        headers: authHeaders(),
+      })
       const data = await response.json()
       const messages = data.messages || Array.isArray(data) ? (data.messages || data) : []
       // Fetch attachments for each message
       const messagesWithAttachments = await Promise.all(
         messages.map(async (msg: UserMessage) => {
           try {
-            const attResponse = await fetch(`/api/messages/${msg.id}/attachments`)
+            const attResponse = await fetch(`/api/messages/${msg.id}/attachments`, {
+              headers: authHeaders(),
+            })
             if (attResponse.ok) {
               const attData = await attResponse.json()
               return { ...msg, attachments: attData.attachments || [] }
@@ -183,7 +195,9 @@ export default function MessagesPage() {
 
   async function fetchGroups() {
     try {
-      const response = await fetch('/api/messages/groups')
+      const response = await fetch('/api/messages/groups', {
+        headers: authHeaders(),
+      })
       if (response.ok) {
         const data = await response.json()
         setGroups(data.groups || [])
@@ -199,7 +213,7 @@ export default function MessagesPage() {
     try {
       const response = await fetch('/api/messages/groups', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(newGroup),
       })
       if (response.ok) {
@@ -219,6 +233,7 @@ export default function MessagesPage() {
     try {
       const response = await fetch(`/api/messages/groups/${groupId}/leave`, {
         method: 'DELETE',
+        headers: authHeaders(),
       })
       if (response.ok) {
         if (selectedGroup === groupId) {
@@ -243,7 +258,7 @@ export default function MessagesPage() {
     try {
       const response = await fetch('/api/messages/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           recipient_id: recipientId,
           group_id: groupIdToUse,
@@ -261,7 +276,7 @@ export default function MessagesPage() {
             try {
               await fetch(`/api/messages/${messageData.id}/attachments`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
                 body: JSON.stringify({
                   file_url: attachment.file_url || URL.createObjectURL(attachment.file),
                   file_type: attachment.file_type,

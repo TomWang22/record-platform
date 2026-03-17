@@ -2,7 +2,7 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import os from 'os'
 import { register, httpCounter } from '@common/utils'
 import { requireUser, type AuthedRequest } from './lib/auth.js'
-import { pool } from './lib/db.js'
+import { pool, syncOrderNumberSequence } from './lib/db.js'
 import { makeRedis, CacheManager, getCacheStats } from './lib/cache.js'
 import cartRouter from './routes/cart.js'
 import watchlistRouter from './routes/watchlist.js'
@@ -12,6 +12,7 @@ import historyRouter from './routes/history.js'
 import recommendationsRouter from './routes/recommendations.js'
 import resellRouter from './routes/resell.js'
 import ordersRouter from './routes/orders.js'
+import returnsRouter from './routes/returns.js'
 
 const app = express()
 app.use(express.json())
@@ -94,6 +95,7 @@ app.use('/history', requireUser, historyRouter(redis, cacheManager))
 app.use('/recommendations', requireUser, recommendationsRouter(redis, cacheManager))
 app.use('/resell', requireUser, resellRouter(redis, cacheManager))
 app.use('/orders', requireUser, ordersRouter(redis, cacheManager))
+app.use('/returns', requireUser, returnsRouter(redis, cacheManager))
 
 // Error handler
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
@@ -104,10 +106,19 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   }
 })
 
-// Start HTTP server
+// Start HTTP server (sync order_number sequence first so checkout never hits duplicate key after restore)
 const PORT = process.env.SHOPPING_PORT || 4007
-const server = app.listen(PORT, () => {
-  console.log(`[shopping] HTTP server listening on port ${PORT}`)
+async function start() {
+  await syncOrderNumberSequence()
+  const server = app.listen(PORT, () => {
+    console.log(`[shopping] HTTP server listening on port ${PORT}`)
+  })
+  return server
+}
+let server: ReturnType<typeof app.listen> | undefined
+start().then((s) => { server = s }).catch((e) => {
+  console.error('[shopping] startup failed:', e)
+  process.exit(1)
 })
 
 // Start gRPC server
@@ -123,7 +134,10 @@ if (process.env.ENABLE_GRPC !== 'false') {
 // Graceful shutdown
 function shutdown(signal: string) {
   console.log(`[shopping] received ${signal}, shutting down gracefully`)
-  server.close(async () => {
+  const close = (typeof server !== 'undefined' && server)
+    ? server.close.bind(server)
+    : (cb: () => void) => setImmediate(cb)
+  close(async () => {
     pool.end(() => {
       console.log('[shopping] DB pool closed')
     })

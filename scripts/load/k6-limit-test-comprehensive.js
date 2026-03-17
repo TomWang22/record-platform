@@ -37,6 +37,19 @@ const throughput = new Counter('throughput', true);
 const HOST = __ENV.HOST || 'record.local';
 const BASE_URL = __ENV.BASE_URL || 'https://record.local:30443';
 const ENDPOINT = __ENV.ENDPOINT || '/_caddy/healthz';
+
+// K6_RESOLVE: "host:port:ip" (e.g. record.local:443:192.168.64.240) — pin hostname to MetalLB IP (avoids 127.0.0.1 NodePort split-brain)
+const K6_RESOLVE = __ENV.K6_RESOLVE || '';
+function parseHostsFromResolve() {
+  if (!K6_RESOLVE || typeof K6_RESOLVE !== 'string') return {};
+  const parts = K6_RESOLVE.split(':');
+  if (parts.length < 3) return {};
+  const host = parts[0];
+  const ip = parts[parts.length - 1];
+  if (!host || !ip) return {};
+  return { [host]: ip };
+}
+const hosts = parseHostsFromResolve();
 const MODE = __ENV.MODE || 'limit'; // 'persistence', 'limit', or 'both'
 
 // Persistence test configuration
@@ -67,8 +80,10 @@ if (MODE === 'persistence') {
   current_duration = LIMIT_DURATION;
 }
 
-export const options = {
-  insecureSkipTLSVerify: true, // Development mode
+// Respect K6_INSECURE_SKIP_TLS: 0 = strict TLS (rotation suite); 1 = dev skip
+const INSECURE_SKIP = (__ENV.K6_INSECURE_SKIP_TLS || '0') === '1' || (__ENV.K6_INSECURE_SKIP_TLS || '0') === 'true';
+const opts = {
+  insecureSkipTLSVerify: INSECURE_SKIP,
   scenarios: {
     h2: {
       executor: 'constant-arrival-rate',
@@ -119,6 +134,13 @@ export const options = {
     'dropped_iterations': ['rate<0.01'], // < 1% drops
   },
 };
+if (Object.keys(hosts).length) opts.hosts = hosts;
+export const options = opts;
+
+// Default export for k6 when scenario is overridden to "default" (e.g. by env or runner)
+export default function () {
+  h2_request();
+}
 
 // HTTP/2 request
 export function h2_request() {

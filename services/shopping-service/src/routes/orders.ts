@@ -107,8 +107,32 @@ export default function ordersRouter(redis: Redis | null, cacheManager: CacheMan
         'get order purchase history'
       )
 
+      // Get shipment(s) and tracking number for this order
+      let shipments: Array<{ id: string; tracking_number: string; carrier: string; status: string }> = []
+      try {
+        const shipResult = await withRetry(
+          () => pool.query(
+            `SELECT id, tracking_number, carrier, status
+             FROM shopping.shipments
+             WHERE order_id = $1`,
+            [orderId]
+          ),
+          2,
+          'get order shipments'
+        )
+        shipments = shipResult.rows
+      } catch {
+        // shipments table may not exist yet
+      }
+
+      const orderPayload = { ...orderResult.rows[0] } as Record<string, unknown>
+      if (shipments.length > 0) {
+        orderPayload.tracking_number = shipments[0].tracking_number
+        orderPayload.shipments = shipments
+      }
+
       res.json({
-        order: orderResult.rows[0],
+        order: orderPayload,
         items: purchasesResult.rows,
       })
     } catch (err) {

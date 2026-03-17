@@ -6,6 +6,8 @@ metadata:
   labels: { app: api-gateway }
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector: { matchLabels: { app: api-gateway } }
   template:
     metadata:
@@ -15,10 +17,15 @@ spec:
         prometheus.io/port: "4000"
         prometheus.io/path: "/metrics"
     spec:
+      hostAliases:
+        - ip: "192.168.5.2"
+          hostnames:
+            - "host.docker.internal"
+            - "host.lima.internal"
       containers:
         - name: app
           image: api-gateway:dev
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 4000
@@ -32,6 +39,8 @@ spec:
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
               value: "/certs/dev-root.pem"
+            - name: KAFKA_CA_CERT
+              value: "/etc/kafka/secrets/ca-cert.pem"
             - name: GRPC_CA_CERT
               value: "/etc/certs/ca.crt"
             - name: GRPC_CLIENT_CERT
@@ -47,6 +56,9 @@ spec:
               readOnly: true
             - name: proto-files
               mountPath: /app/proto
+              readOnly: true
+            - name: kafka-ssl-certs
+              mountPath: /etc/kafka/secrets
               readOnly: true
           startupProbe:
             httpGet: { path: /healthz, port: http }
@@ -93,3 +105,10 @@ spec:
                 path: tls.crt
               - key: ca.crt
                 path: ca.crt
+        - name: kafka-ssl-certs
+          secret:
+            secretName: kafka-ssl-secret
+            optional: true
+            items:
+              - key: ca-cert.pem
+                path: ca-cert.pem

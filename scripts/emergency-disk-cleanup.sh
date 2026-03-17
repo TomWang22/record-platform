@@ -11,6 +11,7 @@ cd "$ROOT"
 # Defaults - more aggressive than normal cleanup
 KEEP_BENCH_LOGS_DAYS="${KEEP_BENCH_LOGS_DAYS:-1}"  # Keep only last 1 day of bench logs
 KEEP_BACKUPS="${KEEP_BACKUPS:-2}"  # Keep only last 2 backups
+KEEP_ROTATION_WIRE_N="${KEEP_ROTATION_WIRE_N:-2}"  # Keep last N /tmp/rotation-wire-* dirs (can be 2GB+ each)
 DRY_RUN="${DRY_RUN:-false}"
 CLEAN_DOCKER="${CLEAN_DOCKER:-true}"
 CLEAN_K8S_BACKUPS="${CLEAN_K8S_BACKUPS:-true}"
@@ -31,6 +32,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --keep-backups)
       KEEP_BACKUPS="$2"
+      shift 2
+      ;;
+    --keep-rotation-wire)
+      KEEP_ROTATION_WIRE_N="$2"
       shift 2
       ;;
     --no-docker)
@@ -54,7 +59,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "Unknown option: $1" >&2
-      echo "Usage: $0 [--dry-run] [--keep-bench-days N] [--keep-backups N] [--no-docker] [--no-k8s] [--aggressive] [--no-nextjs]" >&2
+      echo "Usage: $0 [--dry-run] [--keep-bench-days N] [--keep-backups N] [--keep-rotation-wire N] [--no-docker] [--no-k8s] [--aggressive] [--no-nextjs]" >&2
       exit 1
       ;;
   esac
@@ -71,6 +76,7 @@ echo ""
 echo "Configuration:"
 echo "  Keep bench logs: last $KEEP_BENCH_LOGS_DAYS day(s)"
 echo "  Keep backups: last $KEEP_BACKUPS"
+echo "  Keep /tmp rotation-wire dirs: last $KEEP_ROTATION_WIRE_N"
 echo "  Clean Docker: $CLEAN_DOCKER"
 echo "  Clean K8s backups: $CLEAN_K8S_BACKUPS"
 echo "  Clean Next.js cache: $CLEAN_NEXTJS"
@@ -87,6 +93,32 @@ fi
 # Check current disk usage
 log "Current disk usage:"
 df -h . | head -2
+echo ""
+
+# 0. Disk usage breakdown (where space is used)
+log "Step 0: Disk usage breakdown (where space is used)"
+for dir in bench_logs test-results webapp/.next backups; do
+  if [[ -d "$dir" ]]; then
+    sz=$(du -sh "$dir" 2>/dev/null | awk '{print $1}' || echo "?")
+    info "  $dir: $sz"
+  fi
+done
+if command -v docker >/dev/null 2>&1; then
+  docker system df 2>/dev/null | head -6 | while read -r line; do info "  $line"; done || true
+fi
+for pattern in "/tmp/preflight*.log" "/tmp/suite-logs"; do
+  if ls $pattern 2>/dev/null | head -1 | grep -q .; then
+    sz=$(du -ch $pattern 2>/dev/null | tail -1 | awk '{print $1}' || echo "?")
+    info "  $pattern: $sz"
+  fi
+done
+# /tmp/rotation-wire-* (transport study) can be 2GB+ total
+if ls /tmp/rotation-wire-* 2>/dev/null | head -1 | grep -q .; then
+  sz=$(du -ch /tmp/rotation-wire-* 2>/dev/null | tail -1 | awk '{print $1}' || echo "?")
+  count=$(ls -d /tmp/rotation-wire-* 2>/dev/null | wc -l | tr -d ' ')
+  info "  /tmp/rotation-wire-*: $sz ($count dirs)"
+fi
+[[ -d /tmp/transport-captures ]] && info "  /tmp/transport-captures: $(du -sh /tmp/transport-captures 2>/dev/null | awk '{print $1}')" || true
 echo ""
 
 TOTAL_FREED=0
@@ -404,8 +436,94 @@ if [[ "$CLEAN_NODE_MODULES" == "true" ]]; then
   echo ""
 fi
 
-# 7. Clean up old CSV files in repo root
-log "Step 7: Cleaning old benchmark CSV files in repo root..."
+# 7. Clean up old test-results (pcaps, suite logs) and /tmp suite/preflight logs
+KEEP_TEST_RESULTS_DAYS="${KEEP_TEST_RESULTS_DAYS:-$KEEP_BENCH_LOGS_DAYS}"
+log "Step 7: Cleaning test-results and /tmp logs older than $KEEP_TEST_RESULTS_DAYS day(s)..."
+if [[ -d "test-results" ]]; then
+  OLD_TR=$(find test-results/ -type f -mtime +$KEEP_TEST_RESULTS_DAYS 2>/dev/null || true)
+  if [[ -n "$OLD_TR" ]]; then
+    TR_COUNT=$(echo "$OLD_TR" | wc -l | tr -d ' ')
+    TR_SIZE=$(echo "$OLD_TR" | xargs du -cb 2>/dev/null | tail -1 | awk '{print $1}' || echo "0")
+    if [[ "$DRY_RUN" == "true" ]]; then
+      info "Would delete $TR_COUNT old test-results file(s)"
+    else
+      echo "$OLD_TR" | xargs rm -f 2>/dev/null || true
+      find test-results/ -type d -empty -delete 2>/dev/null || true
+      ok "Deleted $TR_COUNT old test-results file(s)"
+      TOTAL_FREED=$((TOTAL_FREED + TR_SIZE))
+    fi
+  else
+    info "No old test-results found"
+  fi
+else
+  info "No test-results directory"
+fi
+# /tmp preflight and suite logs
+OLD_TMP=$(find /tmp -maxdepth 1 -name "preflight*.log" -type f -mtime +$KEEP_TEST_RESULTS_DAYS 2>/dev/null || true)
+[[ -d /tmp/suite-logs ]] && OLD_TMP=$(echo "$OLD_TMP"; find /tmp/suite-logs -type f -mtime +$KEEP_TEST_RESULTS_DAYS 2>/dev/null || true)
+if [[ -n "$OLD_TMP" ]]; then
+  if [[ "$DRY_RUN" != "true" ]]; then
+    echo "$OLD_TMP" | xargs rm -f 2>/dev/null || true
+    ok "Deleted old /tmp log(s)"
+  else
+    info "Would delete old /tmp log(s)"
+  fi
+fi
+echo ""
+
+# 7b. Clean up /tmp/rotation-wire-* (transport study wire captures — can be 2GB+ total)
+log "Step 7b: Cleaning /tmp/rotation-wire-* (keep last $KEEP_ROTATION_WIRE_N dirs)..."
+ROTATION_WIRE_DIRS=$(ls -dt /tmp/rotation-wire-* 2>/dev/null || true)
+if [[ -n "$ROTATION_WIRE_DIRS" ]]; then
+  ROTATION_TOTAL=$(echo "$ROTATION_WIRE_DIRS" | wc -l | tr -d ' ')
+  if [[ "$ROTATION_TOTAL" -gt "$KEEP_ROTATION_WIRE_N" ]]; then
+    TO_REMOVE=$(echo "$ROTATION_WIRE_DIRS" | tail -n +$((KEEP_ROTATION_WIRE_N + 1)))
+    REMOVE_COUNT=$(echo "$TO_REMOVE" | wc -l | tr -d ' ')
+    REMOVE_SIZE=$(echo "$TO_REMOVE" | xargs du -ch 2>/dev/null | tail -1 | awk '{print $1}' || echo "0")
+    if [[ "$DRY_RUN" == "true" ]]; then
+      info "Would remove $REMOVE_COUNT old rotation-wire dir(s) (~$REMOVE_SIZE)"
+    else
+      echo "$TO_REMOVE" | while read -r d; do rm -rf "$d" 2>/dev/null && info "  Removed: $d"; done
+      ok "Removed $REMOVE_COUNT old /tmp/rotation-wire-* dir(s): ~$REMOVE_SIZE freed"
+      # TOTAL_FREED not easily in bytes from du -ch; skip for summary
+    fi
+  else
+    info "Only $ROTATION_TOTAL rotation-wire dir(s), keeping all (keep last $KEEP_ROTATION_WIRE_N)"
+  fi
+else
+  info "No /tmp/rotation-wire-* dirs found"
+fi
+# /tmp packet-capture and three-layer session dirs (transport harness; safe to remove)
+log "Step 7c: Cleaning /tmp packet-capture and three-layer-capture dirs..."
+for pattern in "/tmp/packet-captures-*" "/tmp/packet-captures-v2-*" "/tmp/three-layer-capture-*"; do
+  CAPTURE_DIRS=$(ls -d $pattern 2>/dev/null || true)
+  if [[ -n "$CAPTURE_DIRS" ]]; then
+    CAPTURE_COUNT=$(echo "$CAPTURE_DIRS" | wc -l | tr -d ' ')
+    if [[ "$DRY_RUN" == "true" ]]; then
+      info "Would remove $CAPTURE_COUNT dir(s) matching $pattern"
+    else
+      echo "$CAPTURE_DIRS" | while read -r d; do rm -rf "$d" 2>/dev/null && info "  Removed: $d"; done
+      ok "Removed $CAPTURE_COUNT $pattern dir(s)"
+    fi
+  fi
+done
+# Optional: clean /tmp/transport-captures older than KEEP_BENCH_LOGS_DAYS
+if [[ -d /tmp/transport-captures ]]; then
+  OLD_TC=$(find /tmp/transport-captures -type f -mtime +$KEEP_BENCH_LOGS_DAYS 2>/dev/null || true)
+  if [[ -n "$OLD_TC" ]]; then
+    if [[ "$DRY_RUN" == "true" ]]; then
+      info "Would remove old files in /tmp/transport-captures"
+    else
+      echo "$OLD_TC" | xargs rm -f 2>/dev/null || true
+      find /tmp/transport-captures -type d -empty -delete 2>/dev/null || true
+      ok "Cleaned old /tmp/transport-captures"
+    fi
+  fi
+fi
+echo ""
+
+# 8. Clean up old CSV files in repo root
+log "Step 8: Cleaning old benchmark CSV files in repo root..."
 OLD_CSVS=$(find . -maxdepth 1 -name "bench_*.csv" -type f -mtime +$KEEP_BENCH_LOGS_DAYS 2>/dev/null || true)
 if [[ -n "$OLD_CSVS" ]]; then
   CSV_COUNT=$(echo "$OLD_CSVS" | wc -l | tr -d ' ')
@@ -425,7 +543,7 @@ fi
 echo ""
 
 # 8. Clean up temporary files and caches
-log "Step 8: Cleaning temporary files and caches..."
+log "Step 9: Cleaning temporary files and caches..."
 TEMP_PATTERNS=(
   "*.tmp"
   "*.log"
@@ -465,7 +583,7 @@ fi
 echo ""
 
 # 9. Summary
-log "Step 9: Final disk usage:"
+log "Step 10: Final disk usage:"
 df -h . | head -2
 echo ""
 

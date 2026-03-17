@@ -2,8 +2,8 @@
 
 **Author**: Tom  
 **Date**: December 17, 2025  
-**Last Updated**: February 2, 2026  
-**Cluster**: Kind h3 / Colima (record-platform)
+**Last Updated**: February 28, 2026  
+**Cluster**: Colima + k3s (record-platform). **Primary path:** Colima + k3s with bridged networking and MetalLB; one-time host route to LB pool for HTTP/3 (see item 68). k3d remains supported with REQUIRE_COLIMA=0. Pipeline and connection-reset runbook are Colima-first; no Kind.
 
 ## Overview
 
@@ -40,12 +40,68 @@ This document catalogs all bugs, issues, and solutions encountered during the st
 | 37 | Rotation | DNS resolution (record.local) + shell substitution error in rotation-suite.sh | Issue #37 (January 31) |
 | 38 | Standalone capture | Missing `info` function in grpc-http3-health.sh | Issue #38 (January 31) |
 | 39 | Social | 11 API operations failing (update, delete, archive, vote, kick/ban) | Issue #39 (January 31) |
-| 40 | Colima 6443 | Pin Kubernetes API to 127.0.0.1:6443 so we don't keep fixing the port | Colima 6443 pin (below) |
+| 40 | Colima API | Pipeline uses native port only (no 6443 tunnel); see "Colima API" below | Colima API (below) |
 | 41 | Baseline curl | Registration/login 500 and "Response body: Note: Unnecessary use of -X" — curl -v 2>&1 merged stderr into response | Baseline test curl stderr (below) |
 | 42 | Auth/gateway 500 | Strict TLS/mTLS: 500 with `{"error":"internal"}` on register/login, gateway /healthz, listings /healthz | Auth and gateway 500 – cert chain vs backend (below) |
 | 43 | API Gateway req.path | 500 and "records service error: Cannot set property path of #<IncomingMessage> which has only a getter" | API Gateway req.path getter (below) |
 | 44 | HTTP/3 packet capture | All HTTP/3 tests use same pattern as rotation-suite: drain before stop, copy pcaps to host, tshark verification | HTTP/3 packet capture (below) |
 | 45 | Social suite known failures | Archive thread, list archived, delete thread, list groups, kick, ban, recall may fail (migration or role) | Social suite known failures (below) |
+| 46 | Reissue | API not reachable before updating secrets (tunnel drops between step 0b and step 2) | Item 28 (Reissue) below |
+| 47 | Reissue / Colima | Cluster not reachable at reissue step 0b (after kubeconfig hygiene); worst-case Colima tear-down | Item 29 below |
+| 48 | Reissue | Step 2 "Updating secrets" fails with no clear error (transient API under load) | Item 30 below |
+| 49 | Reissue | Step 5 Caddy rollout times out ("spec update to be observed" / pod wait fails) | Item 31 below |
+| 50 | API / Preflight readiness | API unreachable after step 1; pgbench "Connection refused" / "Database did not become ready" when Docker or Postgres not up | Bug report: API and Preflight Readiness (below) |
+| 51 | Ensure scripts | ensure-k8s-api, ensure-pgbench-dbs-ready, ensure-ready-for-preflight — layered readiness before preflight | ADR 007; docs/PREFLIGHT_AND_DIAGNOSTICS.md |
+| 52 | Control plane derailing | API ServiceUnavailable / k3s activating or crash-looping; tests keep failing due to unstable control plane | Control plane fix for good (below) |
+| 53 | k3d | kubectl "Unable to connect to the server: EOF" — another process (e.g. SSH) bound to 6443 or 55617 | Issue #53 (k3d port conflict, below) |
+| 54 | k3d | Full setup: base + registry + MetalLB + pod wait in one script | setup-k3d-and-metallb (below) |
+| 55 | Future | Shedding, priority-based access, QoS (traffic classes, PriorityClasses, L2/nodeSelector) | Future work (below) |
+| 56 | Caddy / Envoy | Caddy H3: 2 pods in ingress-nginx; Envoy: 1 pod in envoy-test; secret dev-root-ca in envoy-test | Caddy and Envoy (below) |
+| 57 | Observability | Full stack: Prometheus, Grafana, Jaeger, Otel (New Relic + Splunk HEC). Linkerd/Istio: install-linkerd.sh, install-istio.sh. See PLATFORM_CLUSTER_AND_METALLB_AI_HANDOFF.md |
+| 58 | HTTP/3 Docker bridge | curl exit 7 (QUIC connection refused) or exit 28 (timeout) when using host.docker.internal:18443 from k3d/Colima — resolve was rewritten to 127.0.0.1 | HTTP/3 Docker bridge (below) |
+| 59 | Packet capture | stop_and_analyze_captures hangs waiting for tcpdump/kubectl; full pcap copy slow or stuck | Packet capture no-hang (below) |
+| 59b | Packet capture | tcpdump install timed out on Caddy/Envoy pods; CAPTURE_TRAFFIC_TARGET shows NodePort vs LB IP | Packet capture tcpdump install timeout (below) |
+| 60 | Shopping Test 13 | duplicate key value violates unique constraint "orders_order_number_key" on checkout | Shopping order_number duplicate key (below) |
+| 61 | HTTP/3 GSO | curl: (28) sendmsg() returned -1 (errno 5); disable GSO — QUIC on macOS / Docker VM | HTTP/3 GSO (below) |
+| 62 | HTTP/3 fallback | run-all falls back to NodePort 30443 when LB IP HTTP/3 probe fails (curl 7/28) on k3d | HTTP/3 fallback (below) |
+| 63 | Packet capture tcpdump | tcpdump install timeout in Caddy/Envoy pods; pre-install in image or increase CAPTURE_INSTALL_TIMEOUT; CAPTURE_TRAFFIC_TARGET shows NodePort vs LB IP | Packet capture tcpdump (below) |
+| 64 | Caddy / QUIC restore | Restore production Caddyfile (record.local, strict TLS) and make QUIC work again after debugging | Restore production Caddy + QUIC (below) |
+| 65 | Colima real network (MetalLB L2) | One-shot bring-up, API pin, control-plane telemetry, prevent drift | Colima MetalLB bring-up and telemetry (below) |
+| 66 | MetalLB webhook never ready | Webhook has no endpoints → controller pod not Running; k3s 1.33 + MetalLB 0.14.5 may be incompatible | MetalLB controller debug (below) |
+| 67 | k3s crash-loop in Colima VM | k3s.service restart counter 200+ → API keeps dying → MetalLB/webhook never ready; fix k3s first | k3s crash-loop (below) |
+| 68 | Colima host → LB IP (HTTP/3) | Mac not on MetalLB subnet; add one-time route so host can reach LB IP; verify writes REACHABLE_LB_IP for suites | Colima route + MetalLB (below) |
+| 69 | MetalLB advanced: real L2/ARP/asymmetric | On Colima we have real ARP and real asymmetric; script now says "real L2/ARP" and prints path (host→LB, node→LB) | MetalLB real L2/ARP (below) |
+| 70 | MetalLB hairpin | Pod → LB IP failed (000); hairpin pod now uses hostNetwork so node network can reach LB IP on L2; Colima fallback = info not warn | MetalLB hairpin (below) |
+| 71 | MetalLB multi-subnet | Temp LoadBalancer got invalid loadBalancerIP ".1" when pool used CIDR; parse range/CIDR and validate full IP; fallback from lb_ip | MetalLB multi-subnet (below) |
+| 72 | HTTP/3 --http3-only | All HTTP/3 tests must use --http3-only (no HTTP/2 fallback); strict_http3_curl now adds --http3-only if missing | HTTP/3 only (below) |
+| 73 | Suite run policy banner | run-all prints: strict TLS/mTLS enforced; HTTP/3 uses --http3-only; traffic target (LB IP or NodePort) for packet capture | Suite run policy (below) |
+| 74 | k3d → Colima k3s primary | Decision to use Colima k3s as primary again for preflight/suites (real L2, real MetalLB, HTTP/3 via route) | ADR 011 (below) |
+| 75 | Colima pods 0/1 Ready | App pods need host.docker.internal → Mac so they can reach Postgres/Redis/Kafka on the host; start Docker Compose and apply host aliases | Colima pods 0/1 (below) |
+| 76 | Envoy client cert / CA drift | Test 4c fails with "upstream connect error…remote connection failure"; envoy-client-tls signed by different CA than dev-root-ca; preflight step 5 now auto-aligns | Envoy client cert / CA drift (below) |
+| 77 | Colima gRPC strict TLS | Strict TLS port-forward to each gRPC service (~11 min) removed on Colima; gRPC validated via Caddy (TARGET_IP:443) and in-cluster only | Colima gRPC strict TLS (below) |
+| 78 | Colima connection refused / Docker / empty value | kubectl 6443 refused; docker socket unreachable; colima status "empty value" | Colima Docker + API recovery (below) |
+| 79 | PostgreSQL restore and recover | Full recovery of all 8 external Postgres DBs from backup; preconditions, pg_restore version, per-DB steps, 5438 special case, verification | PostgreSQL restore and recover (below) |
+| 80 | Colima bring-back | Start or reset Colima with same setup (--network-address, 127.0.0.1:6443); scripts and env vars | Colima bring-back (below) |
+| 81 | Validation & SLO | Stateful preflight, rotation-stable, CI platform check, SLO evaluator; diagnose-502 live-only summary | Validation and SLO (below) |
+| 82 | Disaster recovery | Full protocol: new Colima cluster + external infra (Docker/Postgres) + restore from backup + schema report | Disaster recovery protocol (below) |
+
+**PostgreSQL restore and recover (item 79)**  
+**When:** Restoring from backup after failure or to a known state. **Preconditions:** All 8 Docker Postgres containers healthy (ports 5433–5440). **Client version:** `pg_restore`/`psql` must match dump version (e.g. 16.x); `brew install postgresql@16` if needed. **Procedure:** (1) Per-DB: drop DB, create DB, `pg_restore -h localhost -p <PORT> -U postgres -d <DB> --clean --if-exists -v backups/all-8-<timestamp>/<PORT>-<DB>.dump`. (2) Port 5438 (auction_monitor): restore into `postgres` (or `auction_monitor` per your backup) without dropping if using default DB. (3) Verify: `\dn`, `\dt *.*`, row counts (e.g. `shopping.orders`, `social.messages`). **Checklist:** All schemas present, row counts non-zero, sequences OK, app pods connect, no crash loops. **Full runbook:** **docs/RUNBOOK_EXTERNAL_POSTGRES_RECOVERY.md**. **Scripts:** `scripts/restore-all-8-from-backup.sh` (BACKUP_DIR or suffix), `scripts/full-restore-postgres-from-all-8.sh`, `scripts/restore_full_backup_strict.sh`. **Lessons:** pg_restore version match; `\dt *.*` for all schemas; 5438 is special-case DB name.
+
+**Colima bring-back (item 80)**  
+**When:** Colima is stopped (`colima list` → Stopped) or you want a full reset with the same network setup. **Same setup** = `--network-address` (bridged) so MetalLB LB IP is directly reachable from the host (HTTP/3, no socat), API at **127.0.0.1:6443** via tunnel. **Start only (no teardown):** `./scripts/colima-start-and-ready.sh` — starts Colima with `--network-address` by default (12 CPU, 16 GiB, 256 GiB), establishes 127.0.0.1:6443 tunnel, waits for API. Set `COLIMA_NETWORK_ADDRESS=0` to start without bridged networking. **Full reset (teardown + start):** `./scripts/colima-teardown-and-start.sh` — stop → delete VM → start with `--network-address` by default, then tunnel and wait for API. **Canonical bridged (pinned k3s version):** `./scripts/colima-start-k3s-bridged-clean.sh` — stop, then start with `--network-address`, k3s v1.29.6+k3s1, no etcd tuning; uses refresh-kubeconfig + fix-kubeconfig-localhost (no 6443 tunnel). **After cluster is back:** `./scripts/ensure-ready-for-preflight.sh` (API + Redis + Postgres + Kafka), then `./scripts/colima-recover-and-bring-up.sh` for MetalLB + bring-up, or run preflight. **See:** docs/COLIMA_NETWORK_ADDRESS_AND_LB_IP.md, item 65 (MetalLB bring-up), item 68 (route to LB IP).
+
+**Disaster recovery protocol (item 82)**  
+**When:** Full platform recovery after loss of cluster or host (new Colima VM, fresh Kubernetes, external Postgres/Redis/Kafka from Docker Compose, restore DBs from backup). **Canonical three-step sequence:** (1) **New Colima cluster with MetalLB:** `METALLB_POOL=<start>-<end> ./scripts/setup-new-colima-cluster.sh` — use a pool in your Colima VM subnet (e.g. `192.168.64.240-192.168.64.250`; the exact range depends on your Colima network). (2) **Bring up external infra and restore Postgres from backup:** `RESTORE_BACKUP_DIR=backups/all-8-<timestamp> ./scripts/bring-up-external-infra.sh` — use the **newest** (or desired) backup directory under `backups/` (e.g. `backups/all-8-20260312-091418`); the script starts Docker Compose (8 Postgres, Redis, Kafka) and restores all 8 DBs from that backup. (3) **Inspect and document DB schemas:** `PGPASSWORD=postgres ./scripts/inspect-external-db-schemas.sh docs/CURRENT_DB_SCHEMA_REPORT.md` — writes a schema report for verification. **Note:** `RESTORE_BACKUP_DIR` and `METALLB_POOL` vary by environment; always use the newest backup dir and a MetalLB pool that matches your Colima/network setup. After this, run preflight and suites as needed. **See:** docs/EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md, item 79 (PostgreSQL restore).
+
+**Validation and SLO (item 81)**
+**Diagnostic (live truth only):** `./scripts/diagnose-502-and-analytics.sh` — uses `nc` only (no `/dev/tcp`); summary reflects **live** host and pod→host checks. Pass → "All live DB connectivity checks passed"; fail → exit 1 and context-specific hint (k3d: `apply-k3d-host-aliases.sh`, Colima: `colima-apply-host-aliases.sh`). No stale blame messages. **Stateful preflight:** `./scripts/preflight-stateful.sh` — layered checks: L0 host Postgres ports, L1 pod→host DB, L2 API Gateway health, L3 TLS, L4 HTTP/3. Failures stop at the correct layer. Use as first gate before full preflight or CI. **Rotation resilience (correctness only):** `./scripts/rotation-stable.sh` — baseline HTTP/3 → Caddy rollout restart → post-rotation HTTP/3; no host k6 load (avoids UDP NAT noise). For load use `rotation-suite.sh` (in-cluster k6). **CI platform check:** `./scripts/ci-platform-check.sh` — tiered: Tier 1 preflight-stateful, Tier 2 http2/http3, Tier 3 tls-mtls, Tier 4 social; optional Tier 5 (RUN_LOAD=1) rotation-stable and suites. **SLO evaluator:** `./scripts/slo-evaluator.sh` — parses k6 JSON, checks availability/latency SLOs, appends to `bench_logs/error-budget.txt`. **TLS Test 4 transport hardening:** Registration uses HTTP/3 when curl supports `--http3-only`; captures `http_version` and `time_appconnect`, logs to `bench_logs/tls-handshake.log`; curl exit 1 treated as non-fatal when HTTP 200/201. Env: `STRICT_HTTP3=1` fail if not H3; `MAX_TLS_HANDSHAKE=0.3` warn if handshake &gt; 300ms; `TLS_H2_H3_COMPARE=1` run H2 and write `bench_logs/handshake-compare.log`; `PUSH_TLS_METRICS=1` push handshake to Pushgateway via `./scripts/push-tls-metrics.sh` (set `PUSHGATEWAY_URL`, default localhost:9091). **SLO evaluation:** `./scripts/slo-evaluator.sh [path/to/k6-summary.json]` or `K6_JSON=... ./scripts/slo-evaluator.sh` — parses k6 output for availability and p95/p99; appends one line to `bench_logs/error-budget.txt` per run; exits 1 if SLO breached. Targets: availability ≥ 99.9%, p95 ≤ 200 ms, p99 ≤ 350 ms (overridable via env). **Preflight default:** Full preflight exports `ROTATION_H2_KEYLOG=0` so rotation uses in-cluster k6 by default (stable HTTP/3 on Colima). **Coordinated LB (suite 9/9):** HAProxy must resolve the api-gateway FQDN at runtime for health checks. Config uses `resolvers k8s` (nameserver 10.43.0.10:53 for k3s CoreDNS) and `server api ... resolvers k8s`; without this, backend stays DOWN (503). After editing `infra/k8s/base/haproxy/configmap.yaml` run `kubectl apply -k infra/k8s/base/haproxy` and `kubectl -n record-platform rollout restart deploy/haproxy`. **Rotation H3 stability (stale QUIC under cert rotation):** rotation-suite.sh sets at top: `K6_HTTP3_NO_REUSE=1` (no connection reuse during H3 load — required so cert reload doesn’t leave k6 on a dead session) and defaults `ROTATION_H2_KEYLOG=0` (in-cluster k6, no SSH/keylog). After deploy rollouts it waits for Caddy + Envoy rollout status and `ROTATION_GRACE_SECONDS=8` before starting k6. Caddyfile `grace_period 15s` and `shutdown_delay 10s` drain QUIC on reload. For Colima also run `./scripts/colima-quic-sysctl.sh` (UDP buffers + BBR). **Readiness gate:** run-all runs `./scripts/ensure-readiness-before-suites.sh` before suites (rollout status for caddy, api-gateway, auth, listings, records, shopping, analytics + 8s grace); skip with SKIP_READINESS_GATE=1. **Rotation hardening:** K6_HTTP2_NO_REUSE=1 with K6_HTTP3_NO_REUSE=1; connection drain before secret swap; ROTATION_PREWARM_SLEEP=15; strict tcpdump filter when TARGET_IP set; rotation-report.json. **Analytics/records:** app-config connect_timeout=10; analytics deploy DB_POOL_MAX=50, DB_POOL_MIN=25; optional records DB statement_timeout 5s via `infra/db/records-statement-timeout.sql` (run once per records instance if analytics still times out under load). **TLS Test 4 warmup:** curl _caddy/healthz + sleep 3 before gRPC auth.
+
+**Control plane fix for good (item 52)**  
+**Symptoms:** `kubectl get nodes` returns ServiceUnavailable for minutes; preflight or reissue derail; k3s is "activating" or crash-looping (SubState=auto-restart). **Profile:** Lock 12 CPU / 16 GiB RAM / 256 GiB disk so the control plane has headroom. **Diagnose when API is down (no host kubectl):** `./scripts/colima-diagnose-when-api-down.sh` — uses only `colima status` and `colima ssh` to show VM resources, k3s process state (ActiveState/SubState), and in-VM API; recommends tunnel fix vs full fix. **One-shot fix:** `./scripts/colima-fix-control-plane-for-good.sh` — full teardown (delete VM), start with 12/16/256, **180s undisturbed boot** (POST_START_SLEEP=180 in teardown) so k3s can finish startup without 51820 race, wait for API (up to 240s), apply etcd/k3s tuning (CONSERVATIVE=1), then cross-layer diagnostic. After this, re-deploy workloads and run preflight. Skip tuning: `SKIP_TUNE=1`; skip diagnostic: `SKIP_DIAGNOSTIC=1`. **Stabilize + MetalLB + diagnostic:** When API is stable, run `./scripts/colima-stabilize-metallb-and-diagnose.sh` to apply tuning (if not already), install MetalLB (controller + speaker + pool + L2), and run cross-layer diagnostic. Use `SKIP_TUNE=1` if tuning was already applied by fix-control-plane-for-good. **MetalLB only when API is stable:** Run `./scripts/install-metallb.sh` when `kubectl get nodes` works for 1–2 min; if 503 or connection refused, wait and retry. **See:** docs/COLIMA_K3S_CRASH_LOOP_51820.md, docs/COLIMA_K3S_CONTROL_PLANE_STABILIZATION_PLAN.md.
+
+**Bug report: API and Preflight Readiness (item 50)**  
+**Symptoms:** (1) Preflight step 3 (ensure-api-server-ready) fails with 503 or "connection reset by peer" even though step 1 reported API OK — tunnel 6443 can be stale. (2) Daily pgbench or preflight 3b3 fails: auth (5437) "Connection refused"; shopping/listings/analytics/auction-monitor/python-ai "Database did not become ready" after 5 attempts — Docker or Colima was stopped or Postgres containers were not started. **Root causes:** (1) No re-verification of API/tunnel between step 1 and step 3; single success at step 1 does not guarantee tunnel for later steps. (2) No automatic bring-up of Postgres before pgbench; cron or manual run can execute when DBs are down. **Fix:** (1) Preflight calls `ensure-k8s-api.sh` at step 1b (after Colima check) so tunnel is re-established and retried before kubeconfig/preflight. (2) `ensure-pgbench-dbs-ready.sh` starts all 8 Postgres via docker compose and waits for ports 5433–5440; `run-daily-pgbench-standalone-with-results.sh` runs it at start. (3) Use `./scripts/ensure-ready-for-preflight.sh` to run diagnostic + ensure API + DBs + Kafka, then run preflight (or `--run`). See ADR 007, docs/PREFLIGHT_AND_DIAGNOSTICS.md "Get ready to run preflight".
 
 **HTTP/3 packet capture:** Baseline, enhanced, standalone, and rotation all use the same wire-level pattern for HTTP/3/QUIC: (1) **nohup** — tcpdump is started with `nohup` so it survives the exec session end (otherwise SIGHUP kills it → 0-byte pcaps). (2) **Drain** — sleep 5–15s before stopping tcpdump so in-flight QUIC packets are captured (UDP can arrive late). (3) **Copy** — copy pcaps from Caddy/Envoy pods to host (`CAPTURE_COPY_DIR`) so tshark can analyze. (4) **tshark** — when available, `scripts/lib/protocol-verification.sh` verifies HTTP/2 and QUIC in pcaps. Set `CAPTURE_DRAIN_SECONDS=5` (or 10) and `CAPTURE_COPY_DIR` before `stop_and_analyze_captures`; see `scripts/lib/packet-capture.sh`.
 
@@ -53,13 +109,87 @@ This document catalogs all bugs, issues, and solutions encountered during the st
 
 **API Gateway req.path getter:** The API gateway URL-rewrite middleware was setting `(req as any).path` and `(req as any).originalUrl` so `/api/*` routes matched as `/*`. On Node/Express, `req.path` and `req.originalUrl` are read-only getters; assigning to them throws. Fix: only set `(req as any).url = newUrl`; Express derives `req.path` from `req.url`, so route matching still sees the rewritten path. See `services/api-gateway/src/server.ts` "API Prefix Middleware".
 
-**Auth and gateway 500 – cert chain vs backend:** When using strict TLS/mTLS, 500 with `{"error":"internal"}` from the API gateway: (0) **First check gateway logs** for `Cannot set property path of #<IncomingMessage> which has only a getter` — if present, fix per Runbook #43 (req.path getter). Otherwise: (1) **gRPC call to auth-service failed** — the gateway converts gRPC errors via `handleGrpcError`. Check **api-gateway** pod logs for `[gw] gRPC error → HTTP` and `[gw] Register gRPC failed` / `[gw] Login gRPC failed`: **grpcCode 2 (INTERNAL)** = request reached auth-service and auth-service returned INTERNAL (cert chain is fine; check **auth-service** pod logs and DB/Redis from inside the pod). **grpcCode 14 (UNAVAILABLE)** = connection or TLS failure (verify cert chain: same `service-tls` + `dev-root-ca` after reissue; ensure all gRPC workloads restarted after reissue; Runbook "Strict TLS/mTLS" and items 24–25). (2) **Gateway /healthz 500** — the `/healthz` handler is sync and should return 200; 500 implies an unhandled error in middleware or a catch-all (check gateway logs for `[gw] Unhandled error (catch-all)`). (3) **Listings /healthz 500** — returned by listings-service; check listings-service logs and its DB/connectivity. **Cert chain checklist:** Reissue creates one CA + leaf; `service-tls` holds the leaf (signed by dev-root-ca), `dev-root-ca` holds the CA. All services must mount the same secrets and restart after reissue so they use the same chain. api-gateway gRPC client uses `/etc/certs/ca.crt`, `/etc/certs/tls.crt`, `/etc/certs/tls.key` (from service-tls + dev-root-ca). auth-service gRPC server uses the same paths and, when `GRPC_REQUIRE_CLIENT_CERT=true`, verifies the client cert with the same CA.
+**Auth and gateway 500 – cert chain vs backend:** When using strict TLS/mTLS, 500 with `{"error":"internal"}` from the API gateway: (0) **First check gateway logs** for `Cannot set property path of #<IncomingMessage> which has only a getter` — if present, fix per Runbook #43 (req.path getter). Otherwise: (1) **gRPC call to auth-service failed** — the gateway converts gRPC errors via `handleGrpcError`. Check **api-gateway** pod logs for `[gw] gRPC error → HTTP` and `[gw] Register gRPC failed` / `[gw] Login gRPC failed`: **grpcCode 2 (INTERNAL)** = request reached auth-service and auth-service returned INTERNAL (cert chain is fine; check **auth-service** pod logs and DB/Redis from inside the pod). **grpcCode 14 (UNAVAILABLE)** = connection or TLS failure (verify cert chain: same `service-tls` + `dev-root-ca` after reissue; ensure all gRPC workloads restarted after reissue; Runbook "Strict TLS/mTLS" and items 24–25). **Envoy "upstream connect error or disconnect/reset before headers. reset reason: remote connection failure"** — backends have `GRPC_REQUIRE_CLIENT_CERT=true` but Envoy is not presenting a client cert. **Fix:** (1) Ensure `record-local-tls` exists in namespace **envoy-test** (e.g. run `./scripts/strict-tls-bootstrap.sh` from repo root; it deletes/recreates the secret and restarts Envoy). (2) Ensure Envoy deploy has the `client-tls` volume (from `infra/k8s/base/envoy-test/deploy.yaml`); apply base if needed: `kubectl apply -k infra/k8s/base`. (3) Restart Envoy so it mounts the secret: `kubectl -n envoy-test rollout restart deployment/envoy-test`. Caddy terminates TLS at the edge; Envoy uses the same leaf cert as **client** cert for mTLS to gRPC backends. (3) **Gateway /healthz 500** — the `/healthz` handler is sync and should return 200; 500 implies an unhandled error in middleware or a catch-all (check gateway logs for `[gw] Unhandled error (catch-all)`). (4) **Listings /healthz 500** — returned by listings-service; check listings-service logs and its DB/connectivity. **Cert chain checklist:** Reissue creates one CA + leaf; `service-tls` holds the leaf (signed by dev-root-ca), `dev-root-ca` holds the CA. All services must mount the same secrets and restart after reissue so they use the same chain. api-gateway gRPC client uses `/etc/certs/ca.crt`, `/etc/certs/tls.crt`, `/etc/certs/tls.key` (from service-tls + dev-root-ca). auth-service gRPC server uses the same paths and, when `GRPC_REQUIRE_CLIENT_CERT=true`, verifies the client cert with the same CA.
+
+**Envoy client cert / CA drift (item 76)**  
+**Symptom:** Test 4c (gRPC via Caddy) fails with `upstream connect error or disconnect/reset before headers. reset reason: remote connection failure`. Manual grpcurl to auth-service (port-forward) works; grpcurl via Caddy → Envoy fails. **Root cause:** **CA drift** — `envoy-client-tls` contains a client cert signed by one CA (e.g. record-platform `dev-root-ca` or mkcert), while the cluster `dev-root-ca` secret holds a different CA. After step 3a (reissue), the CA changes; `envoy-client-tls` was never updated. Backends verify Envoy's client cert against `dev-root-ca` → verification fails → TLS handshake fails. **Fix:** (1) `ensure-strict-tls-mtls-preflight.sh` (preflight step 5) now **auto-aligns** envoy-client-tls: checks if the current cert verifies against cluster `dev-root-ca`; if not, regenerates with `certs/dev-root.pem` + `certs/dev-root.key` (from reissue) or mkcert, updates the secret, restarts Envoy. (2) Manual fix if needed: `CA_CRT=certs/dev-root.pem CA_KEY=certs/dev-root.key ./scripts/generate-envoy-client-cert.sh`, then `kubectl -n envoy-test delete secret envoy-client-tls --ignore-not-found && kubectl -n envoy-test create secret generic envoy-client-tls --from-file=envoy.crt=certs/envoy-client.crt --from-file=envoy.key=certs/envoy-client.key`, then `kubectl -n envoy-test rollout restart deploy/envoy-test`. **Rule:** Envoy client cert must be signed by whichever CA is in `dev-root-ca`. Run `openssl verify -CAfile <cluster-dev-root.pem> certs/envoy-client.crt` — must succeed before deploying. **See:** docs/PKI_ALIGNMENT_FIX.md.
+
+**Colima gRPC strict TLS (item 77)**  
+On Colima, the strict TLS port-forward to each gRPC service (Auth, Records, Social, etc.) is **permanently skipped**. That block took ~11 min, hit SSH multiplex limits, and was redundant: gRPC is validated via **Caddy (TARGET_IP:443)** and **in-cluster** grpcurl to Envoy. Primary path: grpcurl → Caddy → Envoy (h2c) → backends. No host port-forward to individual service gRPC ports on Colima.
+
+**Colima Docker + API recovery (item 78)**  
+**Symptoms:** `kubectl get svc` → connection refused to 127.0.0.1:6443; `docker ps` → Cannot connect to the Docker daemon at unix://.../colima/default/docker.sock; `colima status` → "error retrieving current runtime: empty value" (VM may still show Running in `colima list`). **Cause:** Colima VM is up but the runtime (Docker + k3s) inside the VM is not responding — often after reboot, OOM, or VM hiccup. **Fix:** Run `./scripts/colima-start-docker-and-api.sh` — it restarts Colima (stop/start), establishes the 6443 SSH tunnel, fixes kubeconfig to 127.0.0.1:6443, and sets DOCKER_HOST to the Colima socket. If you only need tunnel + kubeconfig (no restart): `./scripts/colima-start-docker-and-api.sh --no-restart`. If restart does not fix the runtime: `./scripts/colima-start-docker-and-api.sh --full` (full teardown + clean bridged start; note: clean start is k3s-only, no Docker in VM — use host Docker for compose or start Colima again with Docker). **Forward script:** `colima-forward-6443.sh` now detects the k3s port via `colima ssh` when `colima status` fails. **Docker in scripts:** `bring-up-external-infra.sh` sets DOCKER_HOST from the Colima socket when `colima list` shows default Running (not only when `colima status` succeeds). **After recovery:** `./scripts/ensure-dependencies-ready.sh` then `./scripts/colima-recover-and-bring-up.sh`.
 
 **Baseline test curl stderr:** In `test-microservices-http2-http3.sh`, registration and login used `-v 2>&1 | tee ...`, so curl's stderr (e.g. "Note: Unnecessary use of -X or --request, POST is already inferred") was captured as the response body and broke status parsing (`tail -1` could be a verbose line). Fix: remove `-v` and send stderr to a log file only (e.g. `2>/tmp/register-h2-verbose.log`) so the variable gets only stdout (body + `\n` + http_code). Also use `-d` without `-X POST` so curl infers POST and doesn't print that note.
 
-**Colima 6443 pin:** Ensure `~/.colima/default/colima.yaml` has `kubernetes.port: 6443`. Run `scripts/ensure-colima-6443-pinned.sh` to set kubeconfig server to `https://127.0.0.1:6443` and optionally verify Colima config. When host `kubectl` gets connection refused to 127.0.0.1:6443, scripts that use `PATH=scripts/shims:...` get the kubectl shim, which falls back to `colima ssh -- kubectl` automatically.
+**Colima MetalLB bring-up and telemetry (item 65)**
+**When using Colima with real (bridged) networking** (`--network-address`): (1) **Bring cluster back:** Use `./scripts/colima-start-and-ready.sh` (start only, uses `--network-address` by default) or `./scripts/colima-teardown-and-start.sh` (full reset). Or canonical bridged: `./scripts/colima-start-k3s-bridged-clean.sh` then bring-up. (2) **One-shot:** After Colima is running (and "API ready"), run `./scripts/colima-metallb-bring-up.sh` — it runs `./scripts/colima-refresh-kubeconfig.sh` (or uses Colima's kubeconfig file when `colima kubeconfig` is not available), then fixes host to 127.0.0.1, installs MetalLB (pool from `METALLB_POOL`, default 192.168.5.240–192.168.5.250), and brings up the cluster (namespaces, TLS, kustomize, Caddy LoadBalancer). (3) **Kubeconfig drift:** Colima can assign a new random API port after each restart; if you see "connection refused" to 127.0.0.1:PORT, run `./scripts/colima-fix-kubeconfig-localhost.sh` (it refreshes the port then fixes the host) and retry. Scripts do refresh + fix at start. (4) **API pin:** Use one kubeconfig decision per run; do not mutate mid-pipeline (ADR-005). (5) **Telemetry:** Run `./scripts/capture-control-plane-telemetry.sh --once` for a single snapshot (readyz, healthz, kubectl top, /metrics sample). For 3 snapshots 10s apart, run without `--once`. Save to file: `./scripts/capture-control-plane-telemetry.sh --once > telemetry-$(date +%Y%m%d-%H%M%S).txt`. During preflight or load, run the script in a loop in another terminal (see docs/CONTROL_PLANE_TELEMETRY.md). (6) **Prevent drift:** Serialize applies (bring-up does namespaces → TLS → kustomize → Caddy); no overlapping phases that write to the API. Control plane is rate-limited (phase-gated preflight, no cert churn during load). **See:** docs/COLIMA-K3S-METALLB-PRIMARY.md, docs/CONTROL_PLANE_TELEMETRY.md, docs/COLIMA_K3S_CONTROL_PLANE_STABILIZATION_PLAN.md, docs/adr/005-control-plane-is-rate-limited.md.
+
+**MetalLB controller debug (item 66)**  
+**Symptom:** Webhook endpoint never appears after 2 min, or pool apply fails with "endpoints metallb-webhook-service not found". **Cause:** Either (1) **k3s is crash-looping** in the VM (restart counter 200+) — fix that first (item 67), or (2) MetalLB **controller pod** is not Running. **Do not keep retrying bring-up.** If k3s is stable: `kubectl get pods -n metallb-system -o wide`, `describe pod -l app=metallb,component=controller`, `kubectl logs deployment/controller -n metallb-system`; or `./scripts/diagnose-metallb-controller.sh`. If controller is CrashLoopBackOff: k3s 1.33 + MetalLB 0.14.5 may be incompatible; pin k3s with `K8S_VERSION=v1.29.0` or try MetalLB main. **See:** docs/METALLB_CONTROLLER_DEBUG.md.
+
+**Caddy ImagePullBackOff on Colima bridged (item 66b)**  
+**Symptom:** Caddy pods stay in ImagePullBackOff; events show `lookup registry-1.docker.io on 192.168.5.1:53: no such host`. **Cause:** With bridged networking, the VM may use 192.168.5.1 (gateway/DHCP) as DNS; that host often does not resolve Docker Hub. **Fix:** (1) Add a working nameserver in the VM: `colima ssh -- sudo sed -i '1i nameserver 1.1.1.1' /etc/resolv.conf`. (2) Restart Caddy rollout so k3s retries the pull: `kubectl -n ingress-nginx rollout restart deploy/caddy-h3`. Bring-up now pre-pulls `caddy:2.8` and adds 1.1.1.1 as fallback if the first pull fails; if you already hit this, use the manual fix above.
+
+**k3s crash-loop (item 67)**  
+**Symptom:** kubectl flaky (connection refused), MetalLB webhook never ready, or `colima ssh -- sudo systemctl status k3s` shows **restart counter is at 295** (or any high number). **Cause:** **k3s.service is crash-looping** inside the Colima VM. API keeps dying → controller never stabilizes → webhook has no endpoints. This is not MetalLB; it is k3s boot failure (often corrupted etcd or state after network/mode changes). **Diagnose:** `colima ssh -- sudo journalctl -u k3s -n 200 --no-pager` (paste output). Or run `./scripts/colima-diagnose-k3s-crash-loop.sh`. **Surgical fix (in VM):** `sudo systemctl stop k3s`, `sudo rm -rf /var/lib/rancher/k3s/server/db`, `sudo systemctl start k3s`; then verify `systemctl status k3s` shows active (running). **Nuclear option (recommended):** On Mac: `colima stop`, `colima delete`; then `COLIMA_NETWORK_ADDRESS=1 ./scripts/colima-start-k3s-bridged.sh`. Fresh VM, fresh k3s. **Order:** Stabilize k3s → then install MetalLB → then pool → then bring-up. **See:** docs/COLIMA_K3S_CRASH_LOOP.md.
+
+**Colima route + MetalLB (item 68)**
+**Symptom:** Host cannot reach Caddy via MetalLB LB IP (e.g. 192.168.5.240); HTTP/3 to LB IP fails (QUIC connection refused). **Cause:** On Colima bridged, the Mac is not on the MetalLB subnet (e.g. 192.168.5.x). **Fix:** One-time route so host traffic to the pool goes via the Colima node. **Alternative (direct LB IP, no socat):** Start Colima with `--network-address` (and optionally `--network-driver slirp`) so the VM has a reachable ADDRESS; set MetalLB pool in that subnet and fix kubeconfig to 127.0.0.1:6443 — see **docs/COLIMA_NETWORK_ADDRESS_AND_LB_IP.md**. Use the node’s **IPv4** address only (InternalIP can be IPv6 and `route` will fail): `NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' | tr ' ' '\n' | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$' | head -1); [[ -n "$NODE_IP" ]] && sudo route -n add 192.168.5.0/24 "$NODE_IP"`. Or get IPv4 from `kubectl get nodes -o wide` and run `sudo route -n add 192.168.5.0/24 <ipv4>`. After that, MetalLB verify step 5 sees LB IP reachable and writes `/tmp/metallb-reachable.env` with `REACHABLE_LB_IP` and `PORT=443`; run-all and suites then use LB IP for HTTP/2 and HTTP/3 (no socat/127.0.0.1:8443 needed). **See:** scripts/RUN-PREFLIGHT.md "Colima + MetalLB: host → LB IP and HTTP/3 (one-time route)".
+
+**MetalLB real L2/ARP (item 69)**  
+On Colima k3s we have **real L2 and real ARP** (no simulation). `verify-metallb-advanced.sh` now: (1) Titles step 3 "Real L2 / ARP (Colima k3s — real ARP, no simulation)" and prints the path (MetalLB speaker on VM bridge; host → LB via route or 127.0.0.1). (2) Titles step 4 "Real asymmetric routing" and prints Path A / Path B (node → LB IP) when 2+ nodes; single node explains "real asymmetric needs 2+ nodes". (3) Colima env_type: "Colima (real L2, real ARP, real asymmetric when 2+ nodes)".
+
+**MetalLB hairpin (item 70)**  
+**Symptom:** Hairpin test (pod → LB IP) returned 000. **Cause:** Pod network (10.42.x) has no route to MetalLB pool; hairpin needs the node’s network. **Fix:** Hairpin verification pod now uses `hostNetwork: true` so it uses the node’s stack and can reach the LB IP on L2. On Colima when it still fails (e.g. rp_filter), the script prints an **info** (not warn): "Hairpin: pod returned 000 (on Colima nodes may have no route to LB IP or rp_filter blocks hairpin; host path is verified)".
+
+**MetalLB multi-subnet (item 71)**  
+**Symptom:** Multi-pool test failed with MetalLB error "invalid spec.loadBalancerIP \".1\"". **Cause:** Second-pool IP was parsed from main pool’s `addresses[0]`; when that was CIDR or empty, sed produced ".1". **Fix:** Parse both range (a-b) and single/CIDR; validate full 4-octet IP; fallback from lb_ip (e.g. lb_ip + 11) or 192.168.5.251 so the temp Service always gets a valid loadBalancerIP.
+
+**HTTP/3 only (item 72)**  
+**Policy:** All HTTP/3 tests must use `--http3-only` so QUIC is verified and there is no silent fallback to HTTP/2. **Fix:** In `test-microservices-http2-http3.sh`, `strict_http3_curl` now prepends `--http3-only` when the caller does not pass it. Baseline and enhanced already pass it; the helper guarantees it for any future call.
+
+**Suite run policy (item 73)**  
+Before running suites, `run-all-test-suites.sh` prints: **"Suite run policy: strict TLS/mTLS enforced (CA cert, no -k); HTTP/3 uses --http3-only (no HTTP/2 fallback)"** and **"Traffic target: &lt;CAPTURE_TRAFFIC_TARGET&gt; — packet capture and all suites use this IP and port"**. So it is explicit that strict TLS is enforced, HTTP/3 is QUIC-only, and packet capture uses the same target (LB IP:443 or NodePort).
+
+**ADR 011 — Colima k3s primary again (item 74)**  
+We moved from k3d-as-primary back to **Colima k3s as the primary cluster** for preflight and test suites. Rationale: real L2/MetalLB, host → LB IP via one-time route for HTTP/3, control plane stabilized (etcd tuning, native port). **See:** docs/adr/011-colima-k3s-primary-again.md.
+
+**Carts/orders “lost” after k3d → k3s (Colima):** Shopping and all app data live in **external** Postgres (Docker Compose, ports 5433–5440), not inside the cluster. If you see far fewer carts/orders (e.g. 5k vs millions) after switching to Colima, the usual cause is a **new** Postgres stack (new machine or new `docker compose` = new volumes). **See:** docs/K3D_TO_K3S_DATA.md for why and how to re-seed or restore.
+
+**Colima pods 0/1 Ready (item 75)**
+App pods (records-service, auth-service, etc.) stay **0/1** when they cannot reach **host.docker.internal** (Postgres/Redis/Kafka on the Mac host). **analytics-service** can stay **Init:0/1** because its init container waits for port 5433; **auction-monitor**, **social-service** and others stay 0/1 Ready when readiness (DB/Redis) fails. **Fix:** (1) Start Postgres and Redis on the host: `cd <repo> && docker compose up -d` so ports 5433–5440 and 6379 are listening. (2) Ensure **host.docker.internal** resolves: on **Colima** run **`./scripts/colima-apply-host-aliases.sh`** (or preflight step 3c0-colima); on **k3d** (REQUIRE_COLIMA=0) run **`./scripts/apply-k3d-host-aliases.sh`** (preflight runs it in 3c0 and after 3c). Both patch all app deployments so `host.docker.internal` → host gateway. Base YAML uses 192.168.5.2 (Colima); if your gateway is different (e.g. after `colima-undo-host-aliases.sh`), re-run the alias script. **502 on Test 12f** or **logged:false on 13k/13k2** on k3d: run **apply-k3d-host-aliases.sh** then **diagnose-502-and-analytics.sh**. **Override IP:** `HOST_GATEWAY_IP=<ip> ./scripts/colima-apply-host-aliases.sh` or `HOST_GATEWAY_IP=<ip> ./scripts/apply-k3d-host-aliases.sh`. **See:** docs/COLIMA_POD_STABILITY_AND_HOST_ALIASES.md.
+
+**Colima API (native port, no 6443 tunnel):** The pipeline uses **Colima's native API port** (e.g. 127.0.0.1:49400 or 51819) only. The 6443 SSH tunnel is **not** used in preflight/reissue (it was flaky under load — "apiserver not ready", "connection reset by peer"). Preflight and reissue use kubeconfig as-is from `~/.colima/default/kubernetes/kubeconfig` (or merged `~/.kube/config`); do **not** overwrite the server to 6443. If you need 6443 for another tool, run `./scripts/colima-forward-6443.sh` manually. When host `kubectl` gets connection refused, scripts that use `PATH=scripts/shims:...` get the kubectl shim, which falls back to `colima ssh -- kubectl` automatically.
+
+**RCA — Why native port only (no 6443 in pipeline):** When the pipeline was changed to "fix 6443 once and for all" and used `colima-forward-6443.sh` plus pinning kubeconfig to 127.0.0.1:6443, reissue step 2 (many rapid `kubectl create/delete secret`) and step 5 (Caddy patch/rollout) began failing with "connection reset by peer", "apiserver not ready", and "API still not responding after 120s". The 6443 path is an **SSH tunnel** (host:6443 → VM:k3s); under burst traffic the tunnel or the API behind it drops connections. Colima's **native port** is a direct host↔VM mapping (Lima/Colima), which is more stable under load. Successful full preflight runs (e.g. 2026-02-05) used native port and had zero secret-update retries and no step 5 failures. **Do not** re-introduce 6443 in the main pipeline; use native port only. **Additional cause of "API unreachable" then reissue on 6443:** (1) `scripts/lib/kubectl-helper.sh` used to call `_fix_colima_server()` on every `kctl` use, which overwrote the cluster server to 6443. (2) **`scripts/shims/kubectl`** also had `_fix_colima_server()` and ran it on **every** kubectl call; reissue has `PATH=.../shims:...`, so the first kubectl in step 2 went through the shim, which set the config to 6443 — so even after preflight restored native port in step 2c2, reissue step 2 was still using 6443 and hit connection resets. Both the helper and the shim no longer set 6443.
+
+**Why failures show up "in the later part" (reissue step 2):** Pipeline order is: trim → preflight → ensure-api-server-ready → **reissue** (step 0, 0b, 1, **step 2** …) → Kafka SSL → … → suites → pgbench/k6. So **pgbench and k6 run after reissue** — workload did not increase in the steps before failure. Failures appear at reissue **step 2** because: (1) Step 2 is the **first phase that does many rapid API writes** (delete/create/patch secrets in two namespaces). Earlier steps are mostly reads (get nodes, cluster-info) or single operations. (2) The 6443 tunnel (or API behind it) tends to drop under that burst. (3) The kubectl shim was overwriting the config to 6443 on every call, so by step 2 the active config was 6443 and every secret create hit the flaky tunnel. With the shim fixed and a defensive "refuse 6443 at step 2" check in reissue, step 2 uses native port only.
 
 **Packet capture verification (HTTP/2, HTTP/3):** tcpdump on Caddy/Envoy pods; tshark for protocol detail; netstat for connection state. Wire summary (TCP 443 / UDP 443) proves traffic when TLS prevents http2 decode. See `scripts/lib/packet-capture.sh`, `scripts/lib/protocol-verification.sh`, `verify_protocol_counts`.
+
+**HTTP/3 Docker bridge (item 58)**  
+**Symptoms:** MetalLB verification step 6/6a or baseline HTTP/3 tests fail with `curl: (7) QUIC: connection to 127.0.0.1 port 18443 refused` or curl exit 28 (timeout). Host curl to LB IP works (HTTP/1.1, HTTP/2); HTTP/3 from **inside** k3d/Colima (e.g. verify pod or baseline using host.docker.internal:18443) fails. **Root cause:** On macOS, containers reach the host’s Caddy via a **Docker bridge**: host runs socat `0.0.0.0:18443` → NodePort so containers use `host.docker.internal:18443`. In `scripts/lib/http3.sh`, the HOST_NETWORK block rewrote **any** private IP (including 192.168.x = host.docker.internal) to `127.0.0.1:NodePort`. So `--resolve record.local:18443:192.168.5.2` became `record.local:30443:127.0.0.1`; the **URL** still had port 18443, so curl resolved record.local (e.g. to 127.0.0.1 in the VM) and connected to 127.0.0.1:18443 — i.e. the **container’s** localhost, where nothing listens. **Fix:** In `http3.sh`, do **not** rewrite the resolve when the resolve port is the Docker forward port (18443 or `HTTP3_DOCKER_FORWARD_PORT`). Preserve `host.docker.internal:18443` so curl connects to the host’s socat. **Fixes (addendum):** Prefer native curl with LB IP:443 when host has `--http3`; baseline sets `HTTP3_USE_NATIVE_CURL=1` so `http3_curl` uses native curl instead of Docker. **Check:** Re-run MetalLB verification and baseline; step 6 and HTTP/3 tests should pass when native curl supports `--http3` or socat is running (`scripts/setup-lb-ip-host-access.sh`).
+
+**Packet capture no-hang (item 59)**  
+**Symptoms:** After suites, `stop_and_analyze_captures` hangs; kubectl exec/cp to get pcaps never returns or takes very long. **Fix:** Set `CAPTURE_STOP_TIMEOUT` (e.g. 30) so the stop phase times out. When set, the script still runs **first-packet analysis** (short timeouts: 2s + 5s kubectl + 8s outer) and prints TCP/UDP 443 counts; it skips the full pcap copy to avoid hanging. Message: "Done (timeout set; first-packet analyzed; full pcap copy skipped)". See `scripts/lib/packet-capture.sh` and `docs/PACKET_CAPTURE_DIAGNOSTICS.md`.
+
+**Packet capture tcpdump install (item 63)**  
+**Symptoms:** Baseline/enhanced shows `[packet-capture] tcpdump install timed out (35s) on caddy-h3-xxx; skipping capture for this pod`. Caddy/Envoy pods don’t ship tcpdump; the script installs it at runtime via `apk add tcpdump` or `apt-get install tcpdump`. **Fix:** (1) **Longer timeout:** Install is capped at 35s in quick mode (when `CAPTURE_STOP_TIMEOUT` is set) and 60s otherwise. Set `CAPTURE_INSTALL_TIMEOUT=60` (or higher when not using quick mode) if your network is slow. (2) **Pre-install in images:** To avoid runtime install, add tcpdump to the image (e.g. custom Caddy Dockerfile: `FROM caddy:2.8` then `RUN apk add --no-cache tcpdump`). Envoy image (`envoyproxy/envoy`) may be distroless and not support in-pod install; capture will skip that pod. (3) **Traffic path in logs:** `CAPTURE_TRAFFIC_TARGET` is set by run-all (e.g. "NodePort 127.0.0.1:30443" or "LB IP 192.168.x.x:443"); baseline prints "Traffic path (HTTP/2 + HTTP/3): ..." and the capture report includes it so you see whether tests used NodePort or LB IP.
+
+**Packet capture tcpdump install timeout (item 59b)**  
+**Symptoms:** Baseline/enhanced show `[packet-capture] tcpdump install timed out (35s) on caddy-h3-xxx; skipping capture for this pod`. **Cause:** Caddy (`caddy:2.8`) and Envoy (`envoyproxy/envoy`) images don’t include tcpdump; the script installs it via `apk add tcpdump` / `apt-get install tcpdump` inside the pod, which can exceed the cap (35s in quick mode, 60s otherwise). **Fix:** (1) Increase timeout: `CAPTURE_INSTALL_TIMEOUT=60` (or 90 for slow networks). (2) Pre-install in images: build a custom Caddy/Envoy image with `RUN apk add --no-cache tcpdump` (Alpine) or equivalent so no runtime install is needed. (3) Traffic path is always printed: `CAPTURE_TRAFFIC_TARGET` shows "NodePort 127.0.0.1:30443" or "LB IP x.x.x.x:443" so you know which path tests used.
+
+**Shopping order_number duplicate key (item 60)**  
+**Symptoms:** Baseline or shopping suite fails with `duplicate key value violates unique constraint "orders_order_number_key"` on checkout (Test 13). **Cause:** High concurrency or multiple test runs advancing the sequence while old values are still in use. **Fix:** `ensure-shopping-order-number-sequence.sh` syncs the sequence above existing max order_number and uses a larger sequence buffer (200). Preflight and baseline run this script before tests. If it still fails, re-run the ensure script and ensure no other process is inserting orders without the sequence.
+
+**Restore production Caddy + QUIC (item 64)**  
+**Full reset:** `./scripts/restore-k3d-quic-known-good.sh` (delete + recreate k3d with 30443 tcp+udp), then deploy base, `./scripts/ensure-caddy-http3-config.sh`, `./scripts/check-quic-invariants.sh`, `./scripts/verify-caddy-http3-in-cluster.sh`. **Config only:** Apply production Caddyfile and restart Caddy: `./scripts/ensure-caddy-http3-config.sh` (repo root `Caddyfile` — record.local, strict TLS, no on_demand). Validate QUIC: `./scripts/verify-caddy-http3-in-cluster.sh`. All QUIC tests must use `--resolve record.local:443:<ip>` and `https://record.local`. Guard: `./scripts/check-quic-invariants.sh`. See **docs/QUIC_INVARIANTS.md** and **docs/QUIC_INVARIANT_CHECKLIST.md**.
+
+**HTTP/3 GSO (item 61)**  
+**Symptoms:** MetalLB step 6/6a or baseline HTTP/3 tests fail with `curl: (28) sendmsg() returned -1 (errno 5); disable GSO`. **Cause:** ngtcp2’s GSO (Generic Segmentation Offload) can fail on macOS or in Docker VM where the NIC doesn’t support it; sendmsg returns EIO. **Fix:** (1) Scripts set `NGTCP2_ENABLE_GSO=0`. (2) Re-run `setup-lb-ip-host-access.sh` — it now uses socat UDP without fork (fork broke QUIC). Kill old socat first. (3) Test uses CURL_BIN when available. See docs/METALLB_ADVANCED.md. **HTTP/3 path (L3/L4), curl 28:** LB IP path = host UDP to 127.0.0.1:443 (socat); can hit GSO. Docker bridge = curl in container to host.docker.internal:18443; 28 = timeout. For real L2 (ARP, asymmetric) run on Colima: `./scripts/verify-metallb-colima-l2-only.sh`. **Use the right curl:** macOS system curl does not support HTTP/3; install Homebrew curl (`brew install curl`) and ensure it is used for tests. Run `./scripts/verify-curl-http3.sh` to confirm which curl is in PATH and that it has `--http3` (script checks `curl --help all`). Tests prefer Homebrew curl at `/opt/homebrew/opt/curl/bin/curl` or `/usr/local/opt/curl/bin/curl` when it has HTTP/3, so native curl is used and Docker-bridge exit 28 is avoided.
+
+**HTTP/3 fallback (LB IP first, NodePort fallback on k3d):** **Policy:** Use the **LB IP** as the first choice for HTTP/2 and HTTP/3 when MetalLB is enabled and the LB IP is reachable (socat or native); use NodePort only when the LB IP is unavailable. When running suites with MetalLB, `run-all-test-suites.sh` runs `setup-lb-ip-host-access.sh` (socat TCP+UDP 443) so HTTP/2 and HTTP/3 work via the LB IP. If the HTTP/3 probe to the LB IP fails (e.g. curl exit 7 or 28), the script falls back to NodePort 30443 and sets `TARGET_IP=127.0.0.1` so HTTP/3 tests complete. Check the run-all log for `HTTP/3 probe to LB IP failed; falling back to NodePort 30443`.
 
 **Strict TLS/mTLS (fix once and for all):** Shared script `ensure-strict-tls-mtls-preflight.sh` validates and provisions `service-tls` + `dev-root-ca`; restarts gRPC/TLS workloads when the secret is updated. Prevents auth 503 / "self-signed certificate in certificate chain". See items 24–25 below and ENGINEERING.md "Strict TLS/mTLS and Preflight".
 
@@ -137,6 +267,73 @@ docker ps --filter name=h3-control-plane --format '{{.Names}}\t{{.Ports}}'
 ### Related Files
 - `kind-h3.yaml`: Kind cluster configuration with `apiServerPort: 16443`
 - `/tmp/kind-h3.yaml`: Kubeconfig file (regenerated via `kind get kubeconfig --name h3`)
+
+---
+
+## Issue #53: k3d — kubectl "Unable to connect to the server: EOF" (port conflict)
+
+### Symptoms
+- `kubectl get nodes` or `kubectl get pods -n record-platform` fails with: **Unable to connect to the server: EOF**
+- Sometimes: **x509: certificate signed by unknown authority** or **ServiceUnavailable** when using a different port
+- k3d cluster is running (`k3d cluster list` shows record-platform; `docker ps` shows k3d-record-platform-server-0 and agent)
+
+### Root Cause
+Another process on the host is bound to the k3d API ports **6443** and/or **55617**. k3d exposes the API on these ports (via the serverlb container). If an SSH tunnel, another cluster, or any other process listens on them first, kubectl connects to that process instead of k3d, which produces EOF or TLS/credential errors.
+
+### Check
+```bash
+lsof -i :6443 -i :55617
+```
+If you see `ssh` or any process other than Docker/containerd, that process is stealing traffic from k3d.
+
+### Fix
+1. **Free the ports**  
+   - If it's an SSH tunnel: close the SSH session or the terminal that started `ssh -L 6443:... -L 55617:...`.  
+   - If you don't need the process: `kill <PID>` (e.g. `kill 42597`). Only do this if you're sure nothing important uses that process.
+2. **Confirm ports are free**  
+   ```bash
+   lsof -i :6443 -i :55617
+   ```  
+   You want no output (or only Docker-related lines).
+3. **Refresh kubeconfig and verify**  
+   ```bash
+   k3d kubeconfig merge record-platform --kubeconfig-merge-default
+   kubectl get nodes
+   kubectl get pods -n record-platform
+   ```
+
+### Prevention
+- Avoid binding host ports 6443 and 55617 to other services or SSH tunnels when using k3d record-platform.
+- If you need a tunnel to a remote cluster, use different host ports (e.g. `-L 16443:...` instead of `-L 6443:...`).
+
+### Related
+- **docs/PLATFORM_CLUSTER_AND_METALLB_AI_HANDOFF.md** — same "Unable to connect: EOF" note and k3d registry/build flow.
+
+---
+
+## setup-k3d-and-metallb (item 54)
+
+**Purpose:** One script to get k3d cluster ready: apply base, push images to registry and patch deployments, install MetalLB (pool from k3d network), wait for pods.
+
+**When to use:** After Docker is running and ports 6443/55617 are free (Runbook #53). Cluster must already exist (`./scripts/k3d-create-2-node-cluster.sh`).
+
+**Usage:** `./scripts/setup-k3d-and-metallb.sh [cluster-name]`  
+Optional: `SKIP_BASE=1`, `SKIP_REGISTRY=1`, `SKIP_METALLB=1`, `SKIP_POD_WAIT=1`.
+
+**Order:** Docker up → k3d cluster up → this script → then preflight when ready (`./scripts/run-preflight-scale-and-all-suites.sh`).
+
+**MetalLB:** Script sets `METALLB_POOL` from k3d Docker network (e.g. 172.18.0.240-172.18.0.250) so LoadBalancer IPs are routable. Verify: `kubectl get svc -A | grep LoadBalancer`.
+
+**Colima + k3d registry (HTTP):** If `docker push k3d-record-platform-registry:5000/...` fails with "server gave HTTP response to HTTPS client", add the registry as an insecure registry. In `~/.colima/default/colima.yaml` set `docker: { insecure-registries: [ "k3d-record-platform-registry:5000", "127.0.0.1:5000" ] }`, then `colima stop` and `colima start`. After Colima restarts, start the registry with `docker start k3d-record-platform-registry` and k3d with `k3d cluster start record-platform`, then push again.
+
+---
+
+## Future work (item 55): Shedding, priority-based access, QoS
+
+**Shedding:** Load-shed when overloaded (reject or defer low-priority requests; circuit breakers; rate limits).  
+**Priority-based access:** Traffic classes or user tiers (e.g. premium vs best-effort); can align with MetalLB L2/nodeSelector and app-level routing.  
+**QoS:** Kubernetes PriorityClasses, resource requests/limits, eviction order; MetalLB L2 advertisement with nodeSelector for preferred nodes (see **docs/METALLB_TRAFFIC_POLICY_AND_SCALE.md**).  
+Not blocking current validation; extend Runbook and ADRs as these are implemented.
 
 ---
 
@@ -1078,6 +1275,201 @@ These fixes address rotation-suite failures and make packet capture reliable acr
    - **k6 CA ConfigMap on Colima:** When rotation-suite runs on Colima, `kctl` may run kubectl inside the VM; `--from-file=ca.crt=$CA_ROOT` then points to a host path not visible in the VM, so ConfigMap create fails and the chaos job never starts. **Fix:** Create the k6 CA ConfigMap by piping CA content: `cat "$CA_ROOT" | kctl create configmap ... --from-file=ca.crt=-` so it works when kctl runs on host or inside Colima VM.
    - **Post-rotation Kafka "unable to verify the first certificate":** After CA rotation, `dev-root-ca` in K8s is updated to the new CA; Kafka (Docker) still uses certs signed by the old CA. Social-service and auction-monitor (and any restarted pod) load the new CA and fail to verify Kafka’s server cert. **Fix:** Set **`ROTATION_UPDATE_KAFKA_SSL=1`** when using external Kafka with strict TLS. Rotation-suite will then copy the new CA to `certs/`, run **`kafka-ssl-from-dev-root.sh`**, restart the Kafka container, and rollout-restart social-service and auction-monitor so they pick up the new CA and can verify Kafka.
    - **Caddy Admin API 400:** Caddy has no `/config/reload` endpoint; POST to that path returns **400**. Reloading TLS requires **POST /load** with full config or a process restart. **Fix:** Rotation-suite uses rolling restart (fallback); the warning message now states that Caddy has no `/config/reload` and 400 is expected.
+
+28. **Reissue: API not reachable before updating secrets (February 2026)**
+   - **Symptom:** Preflight passes (API server ready, reissue step 0b "Cluster reachable", step 1 certs generated), then fails with: `❌ API not reachable before updating secrets (try 6443 or 49400). Run ./scripts/colima-forward-6443.sh and re-run.` and `⚠️ Reissue failed — suites may hit curl 60.`
+   - **Root cause:** The SSH tunnel to **127.0.0.1:6443** (or the host’s connection to Colima’s API) **drops between reissue step 0b and step 2**. Step 1 (cert generation) does not touch the API; in that ~10–30s window the tunnel can exit (idle timeout, SSH drop, or process exit). The "re-pin before step 2" logic only checked 6443/49400 and failed; it did not re-establish the tunnel.
+   - **Fix (script):** In `scripts/reissue-ca-and-leaf-load-all-services.sh`, before "Updating secrets" (step 2): (1) Try 6443 and 49400; if either is reachable (`nc -z` and `kubectl get nodes`), set cluster and continue. (2) **If neither is reachable**, run **`scripts/colima-forward-6443.sh`** to re-establish the tunnel, **sleep 3**, then retry 6443 and 49400. (3) Only exit with "API not reachable" if both attempts fail. This makes reissue resilient to the tunnel dropping during cert generation.
+   - **Operational:** If reissue still fails, run once: `./scripts/colima-forward-6443.sh`, then re-run the preflight/reissue. Ensure Colima is running (`colima status`); use `COLIMA_START=1` (default) so preflight starts Colima if it is not running.
+
+29. **Reissue step 0b: Cluster not reachable after kubeconfig hygiene (February 2026)**
+   - **Symptom:** Preflight reports "API server ready" and "Cluster reachable" in step 0 preflight, then reissue fails at **step 0b** with: `❌ Cluster not reachable (kubectl cluster-info). Colima: colima start --with-kubernetes (no --network-address).`
+   - **Root cause:** Step **2b** (kubeconfig hygiene) replaces **`~/.kube/config`** with a minified single-context config. That minified config’s cluster **server** can be Colima’s **native port** (e.g. **49400**) instead of **127.0.0.1:6443**. When **COLIMA_KUBE** (`~/.colima/default/kubernetes/kubeconfig`) **does not exist** (Colima often merges only into `~/.kube/config`), the pipeline keeps using `~/.kube/config`. Steps **2c** and **3a** previously only pinned the server to 6443/49400 when **COLIMA_KUBE** existed, so the active config could still point at an unreachable URL and **reissue step 0b** (which runs `kubectl cluster-info` from the host) then fails.
+   - **Fix (script):** (1) **Preflight:** Step **2c** and the block before **3a** now pin the **active** kubeconfig (COLIMA_KUBE if present, else `~/.kube/config`) to a reachable port (6443 or 49400) whenever context is Colima, so reissue always sees a reachable server. (2) **Reissue step 0b:** If `kubectl cluster-info` fails, reissue now tries pinning the cluster to **6443** and **49400** in turn, then runs **`colima-forward-6443.sh`**, sleeps, and retries before exiting with the "Cluster not reachable" error.
+   - **Worst-case recovery (Colima tear-down and redo):** If the cluster remains unreachable or the pipeline keeps failing:
+     1. **Stop and delete Colima:** `colima stop` then `colima delete -f`.
+     2. **Restore kubeconfig if needed:** If you had a backup from step 2b, `cp ~/.kube/config.bak.YYYYMMDD-HHMMSS ~/.kube/config` (optional; a new Colima will repopulate).
+     3. **Start Colima again:** Use **`colima start --with-kubernetes --vm-type vz`** (required on Apple Silicon so the VZ driver is used; without `--vm-type vz` a new profile may default to QEMU and fail with "accelerator hvf is not supported").
+     4. **Wait for kubeconfig:** Ensure `~/.kube/config` is populated (Colima merges into it); switch context if needed: `kubectl config use-context colima`.
+     5. **Establish tunnel and pin:** Run `./scripts/colima-forward-6443.sh` so host 6443 is reachable and kubeconfig is set to `https://127.0.0.1:6443`.
+     6. **Re-run preflight:** `RUN_FULL_LOAD=1 KILL_STALE_FIRST=1 PGBENCH_PARALLEL=1 bash ./scripts/run-preflight-scale-and-all-suites.sh 2>&1 | tee preflight-full-$(date +%Y%m%d-%H%M%S).log`.
+   - **Operational:** Preflight now (1) runs **colima-forward-6443.sh** after step 2b (2b-post) so the tunnel and 6443 are always re-established after kubeconfig hygiene, and (2) pins the active kubeconfig at 2c and 3a. If you still see "Cluster not reachable" at reissue 0b, run `./scripts/colima-forward-6443.sh`, then re-run the pipeline. **One-command teardown and redo:** `./scripts/colima-teardown-and-start.sh` (then re-run preflight).
+
+30. **Reissue step 2: "Updating secrets" fails with no clear error (February 2026)**
+   - **Symptom:** Reissue gets past step 0b and step 1 (CA/leaf generated), then step 2 prints "Updating secrets (record-platform + ingress-nginx)…" and some secret create/apply lines, then the script exits with "⚠️ Reissue failed — suites may hit curl 60" and **no** "record-local-tls (with full chain) and dev-root-ca updated" or "service-tls updated" message.
+   - **Root cause:** A **kubectl** command in step 2 (create secret tls, create secret generic dev-root-ca, apply -f -, or create secret generic service-tls) failed with a non-zero exit. With **set -e**, the script exits immediately. Common causes: (1) **Transient API load** — right after heavy pgbench/k6 or many kubectl operations, the API can return "the server is currently unable to handle the request" or time out. (2) **Tunnel drop** — connection to 127.0.0.1:6443 can drop so a later kubectl in the same step fails. (3) **Pipe flakiness** — the pipeline `kubectl create ... -o yaml | kctl apply -f -` can fail on the right-hand side and the error was not visible.
+   - **Fix (script):** In `scripts/reissue-ca-and-leaf-load-all-services.sh`, step 2 now: (1) Uses an **_apply_with_retry** helper that retries each create/apply **up to 5 times** (8s between attempts). dev-root-ca **apply** uses **`--validate=false`** to skip OpenAPI discovery when the API is under load ("failed to download openapi"), so transient API errors don’t fail the run. (2) On final failure, prints **"❌ Reissue step 2 failed after 5 attempts"** and the **last command** and **stderr**, so you see the real error. (3) Writes dev-root-ca to a temp YAML and runs **kubectl apply -f file** instead of piping, to avoid pipe-related failures.
+   - **Operational:** If reissue still fails, look for "Reissue step 2 failed after 5 attempts" line and the stderr below it. Re-run once; if it’s API load, trim pods or wait a minute and re-run. Ensure tunnel is up: `./scripts/colima-forward-6443.sh`.
+   - **Step 3 (Envoy TLS sync):** If you see "dev-root-ca missing in record-platform" right after step 2, the API may still be applying the new secrets. The sync script now **retries** the secret check up to 8 times (3s apart) before giving up.
+   - **ServiceUnavailable / "unable to handle the request" / 6443 connection reset:** Step 2 now runs **via colima ssh** by default (**REISSUE_VIA_SSH=1**): certs are copied to `/tmp/colima/reissue-$$` (mount visible in VM), then all kubectl delete/create/patch for secrets run as `colima ssh -- kubectl ...`. So the API is hit from **inside the VM**, not from the host over 6443 — no connection reset, no host-side ServiceUnavailable. Same strict TLS/mTLS. If you see "no such file" when using SSH, set **REISSUE_VIA_SSH=0** to use host kubectl. Step 2 also uses delete+create (not apply) so we avoid apply's GET. Retries: 12 attempts, 18s backoff on errors.
+   - **Why step 2 was still using 6443 (Feb 2026):** The **kubectl shim** (`scripts/shims/kubectl`) used to run `_fix_colima_server()` on every kubectl call, which overwrote the cluster server to 6443. The pipeline restored native port in step 2c2, but reissue (invoked with the same PATH) used the shim, so the first kubectl in step 2 set the config back to 6443 and all secret creates hit the flaky tunnel. **Fix:** The shim no longer sets 6443. Reissue step 2 also has a **defensive check**: if using host kubectl and the current server is 6443, it tries COLIMA_NATIVE_SERVER / 51819 / 49400; if still 6443, it exits with "Reissue step 2 refuses to use 127.0.0.1:6443" so we never run the burst of secret creates against the tunnel.
+   - **Pipeline 6443 + "connection reset by peer" (Feb 2026):** When the pipeline pins to 6443, reissue step 2 used host kubectl → SSH tunnel; under a **burst** of secret creates the tunnel resets. **Fix (max stability):** Preflight passes **REISSUE_STEP2_VIA_SSH=1** so reissue **always** uses **colima ssh** for step 2 on Colima: certs are copied to a dir under REPO_ROOT, and all `kubectl create/delete/patch secret` run **inside the VM** (`colima ssh -- kubectl ...`). The burst hits k3s on localhost in the VM, not the host tunnel — no RST. You should see: "Using colima ssh for step 2 (REISSUE_STEP2_VIA_SSH=1 — bypass tunnel for stability)." If resets still occur (e.g. other steps use tunnel): re-establish tunnel before 3b (Kafka SSL); or tune k3s (playbook 7b: `--kube-apiserver-arg=max-requests-inflight=2000`).
+   - **Why reissue step 2 is slow / was "almost instant" before (Feb 2026):** In-VM step 2 uses the API URL from **k3s.yaml** (ephemeral port, e.g. 59560). When k3s is under load, restarting, or returning 503, that port can **connection refused** or **apiserver not ready**; re-resolve often fails (API not ready in VM), so we burn many retries on the same dead port. **Script fix:** When in-VM re-resolve fails, we **fall back to host kubectl** (tunnel 6443) for the rest of step 2 so the run can complete. You’ll see: "(in-VM API unreachable — using host kubectl / tunnel 6443 for rest of step 2)". **To get "instant" step 2 again:** If the host tunnel is stable, force host path: **REISSUE_STEP2_VIA_SSH=0** when running reissue or preflight (e.g. `REISSUE_STEP2_VIA_SSH=0 bash ./scripts/run-preflight-scale-and-all-suites.sh`). Then step 2 uses host kubectl only; no in-VM ephemeral port.
+   - **MetalLB (LoadBalancer for Caddy):** Preflight installs MetalLB (step 3c1) and applies Caddy as `LoadBalancer` (step 3c2). Caddy gets an external IP from the L2 pool (default `192.168.106.240-192.168.106.250`). **Manual install:** `./scripts/install-metallb.sh`. **Override pool:** `METALLB_POOL=192.168.5.240-192.168.5.250 ./scripts/install-metallb.sh` (use a range in your Colima VM subnet). **record.local:** Point `/etc/hosts` at the Caddy LoadBalancer IP (`kubectl -n ingress-nginx get svc caddy-h3`) and use port 443. `verify-caddy-strict-tls.sh` uses the LB IP:443 when the service has `status.loadBalancer.ingress[0].ip`.
+   - **Traffic policy (no plain RR):** Caddy service uses **sessionAffinity: ClientIP** (timeout 3600s) so each client sticks to one Caddy pod — avoids round-robin churn, fewer reconnects and TLS handshakes. Envoy (gRPC) remains NodePort; in-cluster callers can use ClusterIP. For custom strategies (e.g. ring hash) see ENGINEERING.md Deployment Strategy.
+   - **MetalLB pool / Caddy service not applied (503):** If install-metallb.sh or preflight step 3c1/3c2 fail with ServiceUnavailable, the API is under load. **When cluster is idle** run: `./scripts/apply-metallb-pool-and-caddy-service.sh` (script waits for API and retries). If webhook "endpoints not found", script prints MetalLB diagnostic; see METALLB_AND_API_503_REPORT.md Option B2. **Why preflight used to work / what’s broken now:** **`PREFLIGHT_WHY_IT_WORKED_AND_WHATS_BROKEN.md`** — Docker, Kind, observability checklist; run **`./scripts/preflight-environment-check.sh`** for a one-shot status.
+
+31. **Reissue step 5: Caddy rollout times out (February 2026)** — Step 5 may show "Waiting for deployment spec update to be observed..." or "apiserver not ready" / "ServiceUnavailable". **Cause:** The API can be overloaded right after step 2 (many secret creates). **Script behaviour:** Before step 5, the script now **waits for the API to settle** (up to 120s: repeated `kubectl get ns record-platform` every 10s). On failure it prints diagnostics; if those also show ServiceUnavailable, it adds: "API was overloaded after step 2. Wait 1–2 min, then run the commands above manually; Caddy may already be Running." **Operational:** Run the printed `kubectl` commands after a short wait; if Caddy pods are already 1/1 Running, re-run reissue or continue. Optional: `CADDY_ROLLOUT_TIMEOUT=300`. See reissue script step 5.
+
+32. **"Connection reset by peer" / "apiserver not ready" / 503 ServiceUnavailable — playbook (February 2026)**
+   - **Root cause and fixes (what’s really going on):** **`docs/RCA-PREFLIGHT-CONTROL-PLANE-FAILURES.md`** — RCA: symptoms, root cause, evidence, mitigations (etcd/k3s tuning), current situation, what still breaks, MetalLB (opt-in, webhook). **ADR-005** (rate-limited, MetalLB opt-in), **ADR-006** (etcd tuning). **`docs/PREFLIGHT_ROOT_CAUSE_AND_FIXES.md`** — short "what's going on".
+   - **Control-plane stabilization (phase-gated preflight):** **`docs/COLIMA_K3S_CONTROL_PLANE_STABILIZATION_PLAN.md`** — phases A–D, rate limiting, MetalLB opt-in, fail-fast. **`docs/adr/005-control-plane-is-rate-limited.md`**; **`docs/PREFLIGHT_PHASES_README.md`**; **`docs/CERT_LIFECYCLE.md`**.
+   - **Full command playbook (symptom → layer → action):** **`scripts/CONNECTION-RESET-PLAYBOOK.md`**. Use it when the sauce breaks; never debug everything at once.
+   - **Mantra:** Reads test reachability. Writes test stability. Resets test assumptions.
+   - **Quick status (what is running / what is not):** `./scripts/colima-api-status.sh` — Colima, port 6443, host API, in-VM API, k3s service in VM, and recovery one-liners. Run when stuck.
+   - **Quick diagnostic (5-layer teaching):** `./scripts/diagnose-reset-by-peer.sh [PORT]` — Layer 1 (read vs write) → 2 (transport/RST) → 3 (TLS) → 4 (path divergence) → 5 (load). **When it's really broken:** `DEEP=1 DIAG_GATHER=1 ./scripts/diagnose-reset-by-peer.sh` for low-level Colima/ports/tunnel/sockets and a timestamped log in `scripts/diag-reset-*.log`. Preflight **automatically** runs DEEP+GATHER when reissue fails.
+   - **503 ServiceUnavailable (API overloaded / still starting):** Not a tunnel issue — the API server is up but refusing requests. **Do:** (1) `./scripts/colima-api-status.sh` (shows k3s status + recovery). (2) Wait 30–60s and retry; or (3) `colima ssh -- sudo systemctl restart k3s` (then wait ~60s); or (4) full teardown: `./scripts/colima-teardown-and-start.sh` (stops Colima, deletes profile, starts fresh, establishes tunnel, waits for API). See runbook subsection "When you see 503 ServiceUnavailable" below.
+   - **🔑 Fix pattern (when reissue keeps failing):** (1) Stop retries. (2) Re-establish stable API — `./scripts/colima-forward-6443.sh` or pin to native port. (3) Wait for apiserver to settle (30–60s). (4) Resume — run reissue (step 2 via colima ssh when REISSUE_STEP2_VIA_SSH=1) or full preflight. (5) Nuclear: `colima ssh` → `sudo systemctl restart k3s`; or tune k3s (playbook 7b); or `./scripts/colima-teardown-and-start.sh`. See CONNECTION-RESET-PLAYBOOK.md and the full Runbook below.
+
+---
+
+### 📕 RUNBOOK: Kubernetes API connection reset by peer
+
+**Colima + k3s + strict TLS/mTLS + heavy preflight**
+
+**Audience:** Teammates who did not build the system; future-you at 3am; AI assistants that must not hallucinate fixes.
+
+**Non-goal:** This is not a generic Kubernetes guide. Not for Kind, Minikube, EKS, or GKE. **Colima + k3s only.**
+
+#### 🔒 Guardrails (READ FIRST)
+
+Hard rules. Violating them recreates the bug.
+
+**❌ Forbidden**
+- No Kind clusters
+- No mixing kubeconfigs (~/.kube/config + Colima) in the same phase
+- No "restart everything"
+- No disabling TLS to "see if it works"
+- No blind retries of `kubectl create secret`
+
+**✅ Required**
+- Single cluster: Colima + k3s
+- Single API endpoint per phase (host or in-VM, never both)
+- Explicit port awareness (6443 = host tunnel; k3s.yaml port = ephemeral, unstable under load)
+- Layered diagnosis — never skip layers
+
+**Invariant:** Health ≠ Capacity. TLS success ≠ API write success.
+
+#### 🧠 Canonical Mental Model
+
+Connection reset ≠ network flakiness. **Connection reset = intent.** Someone decided to drop the connection: tunnel, apiserver, proxy, or resource pressure. Your job: **Who reset? At what layer? Why at that moment?**
+
+#### 🧭 The 5-Layer Model (spine of every investigation)
+
+1. **Layer 1** → Symptom class (read vs write)
+2. **Layer 2** → Transport truth (RST vs timeout)
+3. **Layer 3** → TLS boundary (eliminate cert myths)
+4. **Layer 4** → Path divergence (host vs VM)
+5. **Layer 5** → Load correlation (pressure)
+
+`scripts/diagnose-reset-by-peer.sh` implements this order. This runbook explains how to read it.
+
+#### 🧪 Layer 1 — Symptom Classification
+
+**Goal:** Stop panic.
+
+**Commands:** `kubectl get nodes` then `kubectl create ns reset-test`
+
+| Outcome | Meaning |
+|--------|--------|
+| get nodes OK | API reachable |
+| create ns fails | Write-path instability |
+| both fail | Transport / kubeconfig issue |
+
+**📌 Key insight:** Reissue step 2 = burst writes. If this layer fails, retries make it worse.
+
+#### 🚨 When you see 503 ServiceUnavailable (not connection reset)
+
+**Symptom:** `kubectl get nodes` or in-VM `kubectl get nodes` returns **"Error from server (ServiceUnavailable): the server is currently unable to handle the request"**. Port 6443 may be up (tunnel OK), TLS may work — but the **API server is overloaded or still starting**.
+
+**Meaning:** This is **not** a tunnel or cert issue. The k3s API server process is reachable but refusing work (capacity or startup).
+
+**Actions (in order):**
+1. **One-screen status:** `./scripts/colima-api-status.sh` — confirms 503, shows k3s state (active vs **activating**), **NRestarts**, and last 12 journal lines. If state is **activating**, k3s is still starting (Docker CRI + API often 1–2 min).
+2. **Wait for k3s (poll until ready):** `./scripts/wait-for-k3s-ready.sh` — polls `systemctl is-active k3s` until active (max 180s), then `kubectl get nodes` until OK (max 120s). Use when you want to block until the API is ready instead of guessing.
+3. **Wait:** 30–60s then re-run preflight or reissue (k3s may have been starting).
+4. **Restart k3s in VM:** `colima ssh -- sudo systemctl restart k3s` then wait ~60s or run `wait-for-k3s-ready.sh`; retry.
+5. **Full teardown + tunnel:** `./scripts/colima-teardown-and-start.sh` — stops Colima, deletes profile, starts fresh, establishes tunnel, waits for API (up to TEARDOWN_API_WAIT=180s). Then re-run preflight.
+
+**k3s stuck in "activating":** If `colima-api-status.sh` shows state **activating** and high **Restarts**, k3s may be in a restart loop; check journal for errors. Otherwise activating is normal for 1–2 min after start; use `wait-for-k3s-ready.sh` to block until ready.
+
+**Optional:** If 503 recurs under load, consider tuning k3s (playbook 7b: `--kube-apiserver-arg=max-requests-inflight=2000`).
+
+#### 🌐 Layer 2 — Transport Truth
+
+**Goal:** Prove reality.
+
+**Commands:** `sudo tcpdump -nn -i lo0 tcp port 6443 | tee /tmp/rst-6443.log`; reproduce failure; then `grep -E 'RST|Flags \[R\]' /tmp/rst-6443.log`
+
+| Result | Meaning |
+|--------|--------|
+| RST seen | Active reset (intentional) |
+| No RST | Timeout / drop (different runbook) |
+
+**📌 Key insight:** Once you see RST, retry logic is invalid.
+
+#### 🔐 Layer 3 — TLS Boundary
+
+**Goal:** Kill red herrings.
+
+**Commands:** `openssl s_client -connect 127.0.0.1:6443 -servername kubernetes`; `curl -k https://127.0.0.1:6443/version`
+
+| Result | Meaning |
+|--------|--------|
+| TLS handshake OK | Certs are not the cause |
+| /version = 200 | API is alive |
+| kubectl still resets | Failure is after TLS |
+
+**📌 Key insight:** "TLS worked" does not mean "system works". This is where juniors get stuck for hours.
+
+#### 🔀 Layer 4 — Path Divergence (ROOT CAUSE ZONE)
+
+**Check all paths:** `kubectl get nodes`; `colima ssh -- kubectl get nodes`; inside VM `grep server: /etc/rancher/k3s/k3s.yaml`; `lsof -i :6443`
+
+| Host | In-VM | Meaning |
+|------|-------|--------|
+| ✅ | ❌ | VM k3s port stale/ephemeral |
+| ❌ | ✅ | Host tunnel dead |
+| ❌ | ❌ | Colima / kubeconfig broken |
+| ✅ | ✅ | Move to Layer 5 |
+
+**📌 Key insight:** Same API, different access paths, different behavior. Tunnels are stateful and fragile under burst writes.
+
+#### 📈 Layer 5 — Load Correlation
+
+**Goal:** Explain timing. Reproduce with `pgbench` / `k6 run` / `kubectl create secret generic test --from-literal=a=b`.
+
+| Observation | Meaning |
+|-------------|--------|
+| Fails only under load | Control plane pressure |
+| Fails on first write | Tunnel cold / burst |
+| Works after spacing | Confirms pressure hypothesis |
+
+**📌 Key insight:** Burst ≠ scale. This is a control-plane bottleneck, not app failure.
+
+#### 🛠 Canonical Fixes (Ranked)
+
+**🥇 Gold standard:** Use one path only. For reissue step 2: **REISSUE_STEP2_VIA_SSH=1** — writes happen inside the VM, not through the tunnel.
+
+**🥈 Acceptable:** Re-establish tunnel once; space secret creation; pin kubeconfig before burst.
+
+**❌ Anti-patterns:** Restart Colima repeatedly; delete certs blindly; disable TLS; increase retries.
+
+#### 🧷 Structural Guardrails (enforce in repo)
+
+1. **Cluster enforcement:** `kubectl config get-contexts` — pipeline must use Colima context only; scripts exit with clear error if context is Kind.
+2. **Single kubeconfig source:** After preflight, prefer `KUBECONFIG=~/.colima/default/kubernetes/kubeconfig` when running burst writes.
+3. **Path-aware writes:** All burst writes (secrets, certs, configmaps) → VM-local kubectl only (colima ssh) when REISSUE_STEP2_VIA_SSH=1.
+4. **Explicit port awareness:** Document: 6443 = host tunnel; k3s.yaml port = ephemeral, unstable under load.
+
+#### Bugs addressed (Feb 2026 — once and for all)
+
+- **In-VM k3s detection failing:** Inside the Colima VM the default shell often does not have `KUBECONFIG` set. Reissue now tries first `colima ssh -- env KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl get nodes`. If that works, step 2 uses that for all secret create/delete/patch (stable path). When detection still fails, a one-line diagnostic is printed (e.g. connection refused).
+- **Step 2 falling back to host kubectl:** When in-VM detection fails, step 2 falls back to host kubectl → 6443 tunnel → connection reset under burst. Fix: ensure in-VM path works (above). If it still fails, run `DEEP=1 ./scripts/diagnose-reset-by-peer.sh` and see Layer 4 (path divergence).
+- **Step 7 (service restarts) failing for some deployments:** Restarts were using host `kctl`; after step 2 burst the tunnel is flaky so rollout restart fails. Reissue now uses colima ssh with `KUBECONFIG=/etc/rancher/k3s/k3s.yaml` for step 7 when that works on Colima, so restarts don’t depend on the host tunnel.
+- **Kafka SSL apply failing after reissue:** Preflight re-establishes the tunnel before 3b but apply can still fail. `kafka-ssl-from-dev-root.sh` now tries host `kubectl apply` first; on failure it tries `colima ssh -- env KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f <yaml>` (repo path is the same in the VM when mounted).
+
+---
 
 ### Strict TLS and mTLS for services
 

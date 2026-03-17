@@ -7,6 +7,7 @@ RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
 # Copy package manifests (changes rarely, good for caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY .npmrc ./
 COPY services/common/package.json ./services/common/package.json
 COPY services/auction-monitor/package.json ./services/auction-monitor/package.json
 

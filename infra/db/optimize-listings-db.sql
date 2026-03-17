@@ -43,6 +43,12 @@ INCLUDE (url, fetched_at);
 CREATE INDEX IF NOT EXISTS idx_watchlist_user_created 
 ON listings.watchlist(user_id, created_at DESC);
 
+-- Covering index for listing search (sub-20ms: index-only scan, avoid heap fetches)
+CREATE INDEX IF NOT EXISTS idx_listings_active_covering 
+ON listings.listings (is_active, created_at DESC) 
+INCLUDE (id, user_id, title, price, currency, listing_type, condition, category, location) 
+WHERE is_active = true;
+
 -- ============================================================
 -- TRIGRAM OPTIMIZATION FOR TEXT SEARCH
 -- ============================================================
@@ -91,6 +97,7 @@ END $$;
 -- ============================================================
 
 -- Update statistics for better query planning
+ANALYZE listings.listings;
 ANALYZE listings.auctions;
 ANALYZE listings.watchlist;
 ANALYZE listings.search_history;

@@ -26,6 +26,7 @@ const navItems = [
   { href: '/insights', label: 'Insights & AI' },
   { href: '/messages', label: 'Messages' },
   { href: '/integrations', label: 'Integrations' },
+  { href: '/observation-deck', label: 'Observation deck' },
   { href: '/settings', label: 'Settings' },
 ]
 

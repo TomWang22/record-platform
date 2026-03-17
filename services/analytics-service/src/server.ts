@@ -15,6 +15,7 @@ import { kafka } from '@common/utils/kafka'
 import { getRedis } from '@common/utils/redis'
 import {
   pool,
+  recordsPool,
   listingsPool,
   analyticsPool,
   getUserSearchHistory,
@@ -90,19 +91,20 @@ app.get('/metrics', async (_req, res) => {
 })
 
 // Cache DB health status to avoid blocking health checks
-let dbHealthCache = { listings: true, analytics: true, lastCheck: 0 }
+let dbHealthCache = { records: true, listings: true, analytics: true, lastCheck: 0 }
 const DB_HEALTH_CACHE_TTL = 5000 // 5 seconds
 
 // Background health check (non-blocking)
 setInterval(async () => {
   try {
     await Promise.all([
+      recordsPool.query('SELECT 1').catch(() => ({ rows: [] })),
       listingsPool.query('SELECT 1').catch(() => ({ rows: [] })),
       analyticsPool.query('SELECT 1').catch(() => ({ rows: [] }))
     ])
-    dbHealthCache = { listings: true, analytics: true, lastCheck: Date.now() }
+    dbHealthCache = { records: true, listings: true, analytics: true, lastCheck: Date.now() }
   } catch {
-    dbHealthCache = { listings: false, analytics: false, lastCheck: Date.now() }
+    dbHealthCache = { records: false, listings: false, analytics: false, lastCheck: Date.now() }
   }
 }, DB_HEALTH_CACHE_TTL)
 
@@ -113,16 +115,18 @@ app.get('/healthz', async (_req, res) => {
     if (age > DB_HEALTH_CACHE_TTL * 2) {
       // Cache too old, do quick check (but don't wait for both)
       Promise.all([
+        recordsPool.query('SELECT 1').catch(() => null),
         listingsPool.query('SELECT 1').catch(() => null),
         analyticsPool.query('SELECT 1').catch(() => null)
       ]).then(() => {
-        dbHealthCache = { listings: true, analytics: true, lastCheck: Date.now() }
+        dbHealthCache = { records: true, listings: true, analytics: true, lastCheck: Date.now() }
       })
     }
     
     res.json({ 
-      ok: dbHealthCache.listings && dbHealthCache.analytics, 
-      db: dbHealthCache.listings && dbHealthCache.analytics ? 'connected' : 'checking',
+      ok: dbHealthCache.records && dbHealthCache.listings && dbHealthCache.analytics, 
+      db: dbHealthCache.records && dbHealthCache.listings && dbHealthCache.analytics ? 'connected' : 'checking',
+      records: dbHealthCache.records ? 'ok' : 'checking',
       listings: dbHealthCache.listings ? 'ok' : 'checking',
       analytics: dbHealthCache.analytics ? 'ok' : 'checking',
       cacheAge: age
@@ -309,27 +313,107 @@ app.post('/analytics/log-search', async (req, res) => {
     return res.status(400).json({ error: 'source and query required' })
   }
 
+  if (!recordsPool) {
+    console.error('[analytics] log-search: records pool not available')
+    return res.status(503).json({
+      ok: false,
+      logged: false,
+      error: 'service_unavailable',
+      error_code: 'records_pool_unavailable',
+      message: 'Records DB pool not available',
+      hint: 'Check POSTGRES_URL_RECORDS and that analytics-service can reach records DB (port 5433).',
+    })
+  }
+
+  const uid = (userId && userId !== 'null' && String(userId).trim()) ? userId : null
+  let logged = false
+  const isConnectionError = (e: any) => {
+    const code = e?.code ?? ''
+    const msg = (e?.message ?? String(e)).toLowerCase()
+    return code === 'ECONNREFUSED' || code === 'ETIMEDOUT' || code === 'ENOTFOUND' ||
+      /connection refused|timeout|connect econnrefused|getaddrinfo/.test(msg)
+  }
+  let err: any = null
   try {
-    await logSearch(userId || null, source, query, results || null)
-    
-    // Publish search event to Kafka
+    await logSearch(uid, source, query, results ?? null)
+    logged = true
+  } catch (e: any) {
+    err = e
+    // One retry on connection errors (pod→DB transient)
+    if (isConnectionError(e)) {
+      await new Promise((r) => setTimeout(r, 500))
+      try {
+        await logSearch(uid, source, query, results ?? null)
+        logged = true
+      } catch (retryErr: any) {
+        err = retryErr
+      }
+    }
+  }
+  if (!logged && err) {
+    const errCode = err?.code ?? 'DB_ERROR'
+    // FK violation: user_id references auth.users(id) on records DB; test user may exist only in auth DB (5437)
+    if (errCode === '23503' && uid) {
+      try {
+        await logSearch(null, source, query, results ?? null)
+        logged = true
+      } catch (retryErr: any) {
+        const rMsg = retryErr?.message ?? String(retryErr)
+        console.error('[analytics] log search retry (without user_id) failed:', rMsg)
+        const rCode = retryErr?.code ?? 'DB_ERROR'
+        const rHint =
+          rCode === '42P01' || /relation .* does not exist/i.test(rMsg)
+            ? 'listings.search_history missing: run 03-database.sql against records DB (port 5433).'
+            : /ECONNREFUSED|timeout|connection/i.test(rMsg)
+              ? 'Cannot reach records DB: check POSTGRES_URL_RECORDS and pod→host.docker.internal:5433.'
+              : 'Check POSTGRES_URL_RECORDS and that listings.search_history exists on records DB (port 5433).'
+        return res.status(200).json({
+          ok: true,
+          logged: false,
+          error: 'db_write_failed',
+          error_code: rCode,
+          message: rMsg,
+          hint: rHint,
+        })
+      }
+    } else {
+      const msg = err?.message ?? String(err)
+      console.error('[analytics] log search DB error:', errCode, msg)
+      const hint =
+        errCode === '42P01' || /relation .* does not exist/i.test(msg)
+          ? 'listings.search_history missing: run 03-database.sql against records DB (port 5433).'
+          : /ECONNREFUSED|timeout|connection/i.test(msg)
+            ? 'Cannot reach records DB: check POSTGRES_URL_RECORDS and pod→host.docker.internal:5433.'
+            : 'Check POSTGRES_URL_RECORDS and that listings.search_history exists on records DB (port 5433).'
+      return res.status(200).json({
+        ok: true,
+        logged: false,
+        error: 'db_write_failed',
+        error_code: errCode,
+        message: msg,
+        hint,
+      })
+    }
+  }
+
+  try {
     await publishAnalyticsEvent('analytics-searches', {
       event_type: 'search_logged',
       user_id: userId || null,
       source,
       query,
-      results_count: results?.length || 0,
+      results_count: Array.isArray(results) ? results.length : (typeof results === 'number' ? results : 0),
     })
-    
-    res.json({ ok: true, logged: true })
-  } catch (err) {
-    console.error('[analytics] log search error:', err)
-    res.status(500).json({ error: 'Internal server error', details: String(err) })
+  } catch (_) {
+    // publishAnalyticsEvent already catches; ignore any unexpected throw
   }
+
+  res.json({ ok: true, logged: true })
 })
 
 // Fuzzy search across multiple data sources (data science core)
 // This endpoint combs through search history, price snapshots, and listings
+// Each source is queried independently so missing tables/extensions in one DB don't cause 500
 app.get('/analytics/fuzzy-search', async (req, res) => {
   const query = req.query.q as string
   const userId = req.query.userId as string | undefined
@@ -339,12 +423,13 @@ app.get('/analytics/fuzzy-search', async (req, res) => {
     return res.status(400).json({ error: 'query parameter required (min 2 chars)' })
   }
 
+  const similarSearches: Awaited<ReturnType<typeof getSimilarSearches>> = []
+  let priceMatches: { rows: Array<{ artist: string; name: string; format: string | null; median_price: number | null; sample_count: number; snap_date: Date }> } = { rows: [] }
+  let searchHistory: { rows: Array<{ q: string; source: string; count: number; last_searched: Date }> } = { rows: [] }
+
   try {
-    // Search across multiple sources using fuzzy matching
-    const [similarSearches, priceMatches, searchHistory] = await Promise.all([
-      // Similar searches from search history
+    const [similarRes, priceRes, historyRes] = await Promise.allSettled([
       getSimilarSearches(query, userId, limit),
-      // Price snapshots matching query (fuzzy artist/name match)
       analyticsPool.query(
         `SELECT artist, name, format, median_price, sample_count, snap_date
          FROM analytics.price_snapshots
@@ -353,8 +438,7 @@ app.get('/analytics/fuzzy-search', async (req, res) => {
          LIMIT $2`,
         [query, limit]
       ),
-      // Recent search history matching query
-      listingsPool.query(
+      recordsPool.query(
         `SELECT q, source, COUNT(*)::int as count, MAX(created_at) as last_searched
          FROM listings.search_history
          WHERE ($3::uuid IS NULL OR user_id = $3)
@@ -366,19 +450,32 @@ app.get('/analytics/fuzzy-search', async (req, res) => {
       ),
     ])
 
-    res.json({
-      query,
-      results: {
-        similarSearches: similarSearches,
-        priceMatches: priceMatches.rows,
-        searchHistory: searchHistory.rows,
-      },
-      count: similarSearches.length + priceMatches.rows.length + searchHistory.rows.length,
-    })
-  } catch (err) {
+    if (similarRes.status === 'fulfilled' && Array.isArray(similarRes.value)) similarSearches.push(...similarRes.value)
+    else if (similarRes.status === 'rejected') console.warn('[analytics] fuzzy-search getSimilarSearches failed:', similarRes.reason?.message)
+    if (priceRes.status === 'fulfilled' && priceRes.value?.rows) priceMatches = priceRes.value
+    else if (priceRes.status === 'rejected') console.warn('[analytics] fuzzy-search price_snapshots failed:', priceRes.reason?.message)
+    if (historyRes.status === 'fulfilled' && historyRes.value?.rows) searchHistory = historyRes.value
+    else if (historyRes.status === 'rejected') console.warn('[analytics] fuzzy-search search_history failed:', historyRes.reason?.message)
+  } catch (err: any) {
     console.error('[analytics] fuzzy search error:', err)
-    res.status(500).json({ error: 'Internal server error', details: String(err) })
+    return res.status(500).json({
+      error: 'Internal server error',
+      error_code: 'FUZZY_SEARCH_ERROR',
+      message: err?.message ?? String(err),
+      hint: 'Check POSTGRES_URL_RECORDS and POSTGRES_URL_ANALYTICS; ensure listings.search_history and analytics.price_snapshots exist; pg_trgm extension on records DB.',
+    })
   }
+
+  const count = similarSearches.length + priceMatches.rows.length + searchHistory.rows.length
+  res.json({
+    query,
+    results: {
+      similarSearches,
+      priceMatches: priceMatches.rows,
+      searchHistory: searchHistory.rows,
+    },
+    count,
+  })
 })
 
 const PORT = process.env.ANALYTICS_PORT || 4004
@@ -410,13 +507,13 @@ process.on('SIGTERM', async () => {
     
     if (grpcServer) {
       grpcServer.tryShutdown(() => {
-        Promise.all([listingsPool.end(), analyticsPool.end()]).then(() => {
+        Promise.all([recordsPool.end(), listingsPool.end(), analyticsPool.end()]).then(() => {
           console.log('[analytics] DB pools closed')
           process.exit(0)
         })
       })
     } else {
-      Promise.all([listingsPool.end(), analyticsPool.end()]).then(() => {
+      Promise.all([recordsPool.end(), listingsPool.end(), analyticsPool.end()]).then(() => {
         console.log('[analytics] DB pools closed')
         process.exit(0)
       })

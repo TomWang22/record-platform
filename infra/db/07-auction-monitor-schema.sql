@@ -88,11 +88,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Triggers for updated_at
+DROP TRIGGER IF EXISTS update_auction_results_updated_at ON auction_monitor.auction_results;
 CREATE TRIGGER update_auction_results_updated_at
     BEFORE UPDATE ON auction_monitor.auction_results
     FOR EACH ROW
     EXECUTE FUNCTION auction_monitor.update_updated_at();
 
+DROP TRIGGER IF EXISTS update_monitoring_jobs_updated_at ON auction_monitor.monitoring_jobs;
 CREATE TRIGGER update_monitoring_jobs_updated_at
     BEFORE UPDATE ON auction_monitor.monitoring_jobs
     FOR EACH ROW

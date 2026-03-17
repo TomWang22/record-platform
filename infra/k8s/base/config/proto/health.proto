@@ -23,6 +23,4 @@ message HealthCheckResponse {
     SERVICE_UNKNOWN = 3;
   }
   ServingStatus status = 1;
-  string message = 2; // Optional status message
-  map<string, string> details = 3; // Optional details (e.g., db: "connected", redis: "connected")
 }

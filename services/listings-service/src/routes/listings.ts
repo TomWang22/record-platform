@@ -88,7 +88,19 @@ router.get('/:id', async (req, res) => {
     if (!listing) {
       return res.status(404).json({ error: 'Listing not found' });
     }
-    res.json(listing);
+    const L = listing as Record<string, unknown>;
+    const soldAt = L.sold_at ? new Date(L.sold_at as string) : null;
+    const endedAt = L.ended_at ? new Date(L.ended_at as string) : null;
+    const visibleUntil = L.visible_until ? new Date(L.visible_until as string) : null;
+    const now = new Date();
+    let lifecycle_status: 'active' | 'sold' | 'ended' | 'did_not_sell' = 'active';
+    if (soldAt) lifecycle_status = 'sold';
+    else if (endedAt) lifecycle_status = 'ended';
+    else if (visibleUntil && visibleUntil < now) lifecycle_status = 'did_not_sell';
+    if (L.id) L.item_id = L.id;
+    L.stock_quantity = L.stock_quantity != null ? Number(L.stock_quantity) : 1;
+    L.lifecycle_status = lifecycle_status;
+    res.json(L);
   } catch (err) {
     console.error('[listings] get by id error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -120,7 +132,10 @@ router.post('/', async (req, res) => {
       duration_days: req.body.duration_days || 30,
       visible_from: req.body.visible_from ? new Date(req.body.visible_from) : undefined,
     });
-    res.status(201).json(listing);
+    // eBay-style: each listing has an id; expose as item_id for cart/order flows
+    const payload = listing as Record<string, unknown>;
+    if (payload.id) payload.item_id = payload.id;
+    res.status(201).json(payload);
   } catch (err) {
     console.error('[listings] create error:', err);
     res.status(500).json({ error: 'Internal server error', details: String(err) });
@@ -173,6 +188,9 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/images', async (req, res) => {
   try {
     const userId = (req as any).user.sub;
+    if (!req.body?.image_url || typeof req.body.image_url !== 'string') {
+      return res.status(400).json({ error: 'image_url is required' });
+    }
     // Verify ownership
     const listing = await getListingById(req.params.id);
     if (!listing || listing.user_id !== userId) {
@@ -183,7 +201,6 @@ router.post('/:id/images', async (req, res) => {
       image_url: req.body.image_url,
       image_path: req.body.image_path,
       thumbnail_url: req.body.thumbnail_url,
-      file_name: req.body.file_name,
       file_size: req.body.file_size,
       mime_type: req.body.mime_type,
       width: req.body.width,

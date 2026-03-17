@@ -286,7 +286,6 @@ export async function addListingImage(listingId: string, imageData: {
   image_url: string;
   image_path?: string;
   thumbnail_url?: string;
-  file_name?: string;
   file_size?: number;
   mime_type?: string;
   width?: number;
@@ -296,16 +295,15 @@ export async function addListingImage(listingId: string, imageData: {
 }) {
   const result = await pool.query(
     `INSERT INTO listings.listing_images (
-      listing_id, image_url, image_path, thumbnail_url, file_name,
+      listing_id, image_url, image_path, thumbnail_url,
       file_size, mime_type, width, height, display_order, is_primary
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING *`,
     [
       listingId,
       imageData.image_url,
       imageData.image_path || null,
       imageData.thumbnail_url || null,
-      imageData.file_name || null,
       imageData.file_size || null,
       imageData.mime_type || null,
       imageData.width || null,

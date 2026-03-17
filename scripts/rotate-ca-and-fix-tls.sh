@@ -33,6 +33,7 @@ mkcert -cert-file "$CERT_DIR/tls.crt" -key-file "$CERT_DIR/tls.key" \
   "*.ingress-nginx.svc.cluster.local" \
   "*.record-platform.svc.cluster.local" \
   "auth-service.record-platform.svc.cluster.local" \
+  "records-service.record-platform.svc.cluster.local" \
   "social-service.record-platform.svc.cluster.local" \
   "shopping-service.record-platform.svc.cluster.local" \
   "listings-service.record-platform.svc.cluster.local" \
@@ -59,6 +60,14 @@ ROTATION_START=$(date +%s)
   kubectl -n record-platform create secret tls record-local-tls \
     --cert="$CERT_DIR/tls.crt" \
     --key="$CERT_DIR/tls.key" >/dev/null 2>&1 || true
+) &
+
+(
+  kubectl -n record-platform delete secret service-tls >/dev/null 2>&1 || true
+  kubectl -n record-platform create secret generic service-tls \
+    --from-file=ca.crt="$CA_PATH" \
+    --from-file=tls.crt="$CERT_DIR/tls.crt" \
+    --from-file=tls.key="$CERT_DIR/tls.key" >/dev/null 2>&1 || true
 ) &
 
 (

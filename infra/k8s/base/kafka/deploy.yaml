@@ -61,6 +61,8 @@ spec:
             - { name: KAFKA_SSL_TRUSTSTORE_FILENAME, value: "kafka.truststore.jks" }
             - { name: KAFKA_SSL_TRUSTSTORE_LOCATION, value: "/etc/kafka/secrets/kafka.truststore.jks" }
             - { name: KAFKA_SSL_TRUSTSTORE_CREDENTIALS, value: "/etc/kafka/secrets/kafka.truststore-password" }
+            # mTLS: clients must present a valid client cert (same CA as broker; supply client keystore to app env if needed).
+            - { name: KAFKA_SSL_CLIENT_AUTH, value: "required" }
             - { name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "1" }
             - { name: KAFKA_AUTO_CREATE_TOPICS_ENABLE, value: "true" }
             # Enable verbose logging to debug startup issues

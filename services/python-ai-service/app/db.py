@@ -3,6 +3,7 @@ Database module for Python AI Service
 Handles database connections and operations for AI predictions, cache, and logging
 """
 import os
+import re
 import asyncio
 import json
 import hashlib
@@ -15,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 # Database connection pool
 _pool: Optional[asyncpg.Pool] = None
+# Last pool creation error (for 503 diagnostic; safe message, no creds)
+_last_pool_error: Optional[str] = None
 
 POSTGRES_URL_PYTHON_AI = os.getenv(
     "POSTGRES_URL_PYTHON_AI",
@@ -23,52 +26,80 @@ POSTGRES_URL_PYTHON_AI = os.getenv(
 
 # Remove connect_timeout parameter if present (asyncpg doesn't support it)
 if "connect_timeout" in POSTGRES_URL_PYTHON_AI:
-    import re
     POSTGRES_URL_PYTHON_AI = re.sub(r'[&?]connect_timeout=[^&]*', '', POSTGRES_URL_PYTHON_AI)
+
+# Retry config for pool init (survives DB not ready after cluster restore)
+POOL_INIT_MAX_ATTEMPTS = int(os.getenv("POOL_INIT_MAX_ATTEMPTS", "15"))
+POOL_INIT_RETRY_DELAY = float(os.getenv("POOL_INIT_RETRY_DELAY", "2.0"))
+
+
+async def create_pool_with_retry(
+    max_attempts: int = POOL_INIT_MAX_ATTEMPTS,
+    delay: float = POOL_INIT_RETRY_DELAY,
+) -> Optional[asyncpg.Pool]:
+    """Create DB pool with retries so startup works when DB is not ready yet (e.g. after cluster restore)."""
+    global _pool, _last_pool_error
+    for attempt in range(1, max_attempts + 1):
+        try:
+            pool = await asyncio.wait_for(
+                asyncpg.create_pool(
+                    POSTGRES_URL_PYTHON_AI,
+                    min_size=2,
+                    max_size=75,
+                    command_timeout=60,
+                    max_queries=50000,
+                    max_inactive_connection_lifetime=300,
+                    timeout=10,
+                    server_settings={
+                        "application_name": "python-ai-service",
+                        "tcp_keepalives_idle": "600",
+                        "tcp_keepalives_interval": "30",
+                        "tcp_keepalives_count": "3",
+                    },
+                ),
+                timeout=15.0,
+            )
+            logger.info("[db] Database connection pool created successfully")
+            _last_pool_error = None
+            return pool
+        except asyncio.TimeoutError as e:
+            logger.warning(
+                "[db] DB pool init attempt %s/%s timed out: %s",
+                attempt, max_attempts, e,
+            )
+            _last_pool_error = "Pool creation timed out (cannot reach python_ai DB)"
+        except Exception as e:
+            err_msg = str(e)
+            _last_pool_error = err_msg if len(err_msg) < 200 else err_msg[:197] + "..."
+            logger.warning(
+                "[db] DB pool init failed (attempt %s/%s): %s",
+                attempt, max_attempts, e,
+            )
+        if attempt < max_attempts:
+            await asyncio.sleep(delay)
+    logger.error("[db] Database unavailable after %s retries", max_attempts)
+    return None
 
 
 async def get_pool() -> Optional[asyncpg.Pool]:
-    """Get or create database connection pool"""
+    """Get or create database connection pool. Self-healing: reinit if pool is None (e.g. after DB restart)."""
     global _pool
     if _pool:
         return _pool
-    
-    try:
-        # Parse connection string and create pool
-        # Balanced for baseline (1 replica) - not too small, not too large
-        # Formula: max_size = (VUs * concurrent_per_vu) + headroom
-        # For 50 VUs with 1-2 concurrent requests each: 50-100 + 50 headroom = 100-150
-        # Set to 75 for baseline (balanced - not too aggressive)
-        # Optimization: Add connection timeout to prevent hanging
-        _pool = await asyncio.wait_for(
-            asyncpg.create_pool(
-                POSTGRES_URL_PYTHON_AI,
-                min_size=10,  # Balanced (not too small)
-                max_size=75,  # Balanced (not too small, not too large)
-                command_timeout=60,
-                max_queries=50000,  # Max queries per connection before recycling
-                max_inactive_connection_lifetime=300,  # Recycle idle connections after 5min
-                timeout=10,  # Connection timeout (seconds) - prevents hanging
-                server_settings={
-                    # Optimize connection settings
-                    'application_name': 'python-ai-service',
-                    'tcp_keepalives_idle': '600',  # 10 minutes
-                    'tcp_keepalives_interval': '30',  # 30 seconds
-                    'tcp_keepalives_count': '3',
-                }
-            ),
-            timeout=15.0  # Overall pool creation timeout
-        )
-        logger.info("[db] Database connection pool created")
+
+    _pool = await create_pool_with_retry()
+    if _pool:
         return _pool
-    except asyncio.TimeoutError:
-        logger.error("[db] Database connection pool creation timed out after 15s")
-        _pool = None
-        return None
-    except Exception as e:
-        logger.warning(f"[db] Database connection failed: {e}")
-        _pool = None
-        return None
+
+    # Lazy recovery: one retry on next request (e.g. DB became ready after startup)
+    logger.warning("[db] Pool missing — attempting reinit")
+    _pool = await create_pool_with_retry(max_attempts=5, delay=1.0)
+    return _pool
+
+
+def get_last_pool_error() -> Optional[str]:
+    """Return last pool creation error for 503 diagnostics (no credentials)."""
+    return _last_pool_error
 
 
 async def close_pool():
@@ -158,6 +189,19 @@ async def store_prediction(
     return None
 
 
+def _valid_user_id(user_id: Optional[str]) -> Optional[str]:
+    """Coerce 'null' string or invalid UUID to None for DB insert."""
+    if user_id is None or user_id in ("", "null", "None"):
+        return None
+    s = str(user_id).strip()
+    if not s:
+        return None
+    # Basic UUID format check (8-4-4-4-12 hex)
+    if not re.match(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$', s):
+        return None
+    return s
+
+
 async def log_inference(
     user_id: Optional[str],
     query: str,
@@ -172,7 +216,8 @@ async def log_inference(
     pool = await get_pool()
     if not pool:
         return None
-    
+
+    uid = _valid_user_id(user_id)
     try:
         inference_id = await pool.fetchval(
             """
@@ -182,7 +227,7 @@ async def log_inference(
             ) VALUES ($1::uuid, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8)
             RETURNING id
             """,
-            user_id,
+            uid,
             query,
             inference_type,
             json.dumps(input_data),

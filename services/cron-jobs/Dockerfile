@@ -7,6 +7,7 @@ RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
 # Copy package manifests (changes rarely, good for caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY .npmrc ./
 COPY services/common/package.json ./services/common/package.json
 COPY services/cron-jobs/package.json ./services/cron-jobs/package.json
 
@@ -36,8 +37,9 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
  && pnpm -C services/cron-jobs build \
  && pnpm -C services/cron-jobs prune --prod
 
-# Produce isolated deploy bundle (production deps only)
-RUN pnpm deploy --filter cron-jobs --prod /app/deploy
+# Produce isolated deploy bundle (production deps only). Use same store mount so deploy copies from cache — no network.
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm deploy --filter cron-jobs --prod /app/deploy
 
 # ---------- runtime ----------
 FROM node:20-alpine

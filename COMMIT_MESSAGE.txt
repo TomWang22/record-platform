@@ -1,4 +1,197 @@
-feat(platform): Major overhaul — Colima/k3s (Kind retired), preflight+suites doc, tech stack justification, test depth, hygiene
+feat(platform): Major overhaul — Colima/k3s (Kind retired), preflight+suites doc, tech stack justification, test depth, hygiene; API/preflight stability, ensure scripts, ADR 007, Runbook 50–51
+
+## 2026-03: Repo URL, disaster recovery protocol, Runbook/README, diagram & UML
+
+### Repository and docs
+- **Canonical repo URL:** https://github.com/TomWang22/record-platform.git — documented in README (top) and used as git remote `origin`.
+- **Runbook.md:** Added item 82 — **Disaster recovery protocol (full Colima + external infra + DB restore)**. Three-step sequence: (1) `METALLB_POOL=<start>-<end> ./scripts/setup-new-colima-cluster.sh`, (2) `RESTORE_BACKUP_DIR=backups/all-8-<timestamp> ./scripts/bring-up-external-infra.sh`, (3) `PGPASSWORD=postgres ./scripts/inspect-external-db-schemas.sh docs/CURRENT_DB_SCHEMA_REPORT.md`. Notes: use newest backup dir and MetalLB pool for your Colima subnet; Runbook references EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md and item 79.
+- **README.md:** Added **Repository** line (URL). Added **Full disaster recovery protocol** subsection under IAC & Disaster Recovery with the same three commands and note about newest backup / MetalLB pool; pointer to Runbook item 82 and EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md. After the System Architecture ASCII diagram, added pointer to **docs/ARCHITECTURE_SETUP_AND_USER_STORY.md** for Mermaid and PlantUML (UML) diagrams.
+- **COMMIT_MESSAGE.txt:** This section.
+
+### Files touched
+- `Runbook.md` — index row 82, disaster recovery protocol (item 82) section
+- `README.md` — Repository URL, full disaster recovery protocol, diagram/UML ref
+- `COMMIT_MESSAGE.txt` — this section
+
+---
+
+## 2026-03: Transport Hardening V4 — strict QUIC validation, macOS-proof capture, H3 fallback detection
+
+### Strict H3 enforcement (no silent fallback)
+- **STRICT_H3=1** in k6: when set, any H3 request that does not negotiate HTTP/3 (or status ≠ 200) **throws** and fails the iteration. Threshold `errors: rate<0.01` added so the run fails if fallback occurs.
+- **scripts/k6-chaos-test.js**: In `h3_request()`, if `STRICT_H3=1` and `res.proto` is not `"HTTP/3"`, throw. No more logging-only mismatch.
+- **scripts/load/k6-http3-complete.js**: Uses actual `result.proto` from extension; when `STRICT_H3=1`, throw if status ≠ 200 or proto is not HTTP/3. Same errors threshold.
+
+### Capture redesign (macOS-proof)
+- **Node-only by default on Colima:** When `colima` is available, **CAPTURE_NODE_ONLY=1** is set so L2/L3 (kubectl exec tcpdump) are skipped — avoids macOS killing pipe processes (SIGKILL) and empty pcaps.
+- **Ring buffer:** **CAPTURE_RING_BUFFER=1** (default) uses tcpdump `-C 100 -W 5` on the node to prevent OOM; rotated files are copied and merged with mergecap.
+- **SIGINT-only stop:** Node capture is stopped with **kill -INT** and up to 10s wait; **no kill -9** so tcpdump can flush. Partial pcap copied if it does not exit.
+- **scripts/lib/packet-capture-v2.sh**: L2/L3 gated by `CAPTURE_NODE_ONLY!=1`; ring-buffer copy/merge from VM; strict validation hooks.
+
+### QUIC presence and ALPN guards
+- **STRICT_QUIC_VALIDATION=1**: After capture, if no QUIC packets in node pcap or no **h3** ALPN in QUIC TLS → harness **exit 1**. Implemented in `stop_and_analyze_captures_v2()`.
+
+### Docs and env
+- **docs/TRANSPORT_HARDENING_V4.md**: Full spec — why H3 falls back in Colima (NAT exhaustion, curl vs k6), strict validation, capture redesign, caddy-h3 UDP 443 check, quick reference.
+- Env: `CAPTURE_NODE_ONLY`, `CAPTURE_RING_BUFFER`, `STRICT_QUIC_VALIDATION`, `STRICT_H3`.
+
+### Files touched (Transport Hardening V4)
+- `scripts/k6-chaos-test.js` — STRICT_H3 throw + errors threshold
+- `scripts/load/k6-http3-complete.js` — STRICT_H3, real proto from extension, errors threshold
+- `scripts/lib/packet-capture-v2.sh` — CAPTURE_NODE_ONLY default on Colima, ring buffer, SIGINT-only node stop, ring-buffer copy/merge, STRICT_QUIC_VALIDATION
+- `docs/TRANSPORT_HARDENING_V4.md` — new
+- `COMMIT_MESSAGE.txt` — this section
+
+---
+
+## 2026-03: Transport Hardening V4 — strict QUIC validation, macOS-proof capture, H3 fallback
+
+### Transport Hardening V4
+- **Strict H3 in k6:** When `STRICT_H3=1`, any H3 request that does not negotiate HTTP/3 (or returns non-200) throws; no silent fallback. Added to `scripts/k6-chaos-test.js` and `scripts/load/k6-http3-complete.js`. Threshold `errors: rate<0.01` fails the run on fallback.
+- **Capture redesign (macOS-proof):** Node-level capture only by default on Colima (`CAPTURE_NODE_ONLY=1` when colima present) so `kubectl exec` tcpdump (L2/L3) is not run and cannot be killed by macOS. Node tcpdump runs via `colima ssh -- sudo tcpdump` (no pipe). Ring buffer `-C 100 -W 5` default (`CAPTURE_RING_BUFFER=1`) to prevent OOM. Stop with SIGINT only (no kill -9) so pcap flushes; copy rotated files and merge with mergecap when ring buffer used.
+- **QUIC presence + ALPN guards:** When `STRICT_QUIC_VALIDATION=1`, after capture the harness exits 1 if node pcap has no QUIC packets or no h3 ALPN in QUIC TLS.
+- **Docs:** `docs/TRANSPORT_HARDENING_V4.md` — QUIC validation harness, capture redesign, and why H3 falls back in Colima (NAT exhaustion, curl vs k6).
+
+### Files touched (Transport Hardening V4)
+- `scripts/k6-chaos-test.js` — STRICT_H3=1 throw + errors threshold
+- `scripts/load/k6-http3-complete.js` — STRICT_H3=1, use real result.proto
+- `scripts/lib/packet-capture-v2.sh` — CAPTURE_NODE_ONLY default on Colima, CAPTURE_RING_BUFFER, SIGINT-only node stop, ring-buffer copy/merge, STRICT_QUIC_VALIDATION
+- `docs/TRANSPORT_HARDENING_V4.md` — new
+- `COMMIT_MESSAGE.txt` — this section
+
+---
+
+## 2026-03: Transport-layer study (7b) — all experiments by default, baseline H3 timeouts
+
+### 7b: All six experiments run by default
+- **Experiment 2 (QUIC congestion / latency):** Script now looks for `rotation-summary.json` in (1) `WIRE_CAPTURE_DIR`, (2) latest `/tmp/rotation-wire-*`, (3) latest `bench_logs/preflight-*/suite-logs`, (4) repo root, so latency/limits are printed whenever the file exists after rotation.
+- **Experiment 4 (NodePort check):** NodePort reachability check runs by default. Default `TRANSPORT_STUDY_RUN_EXP4=1` (set `=0` to skip).
+- **Experiment 5 (Caddy outside VM):** Native Caddy setup check runs by default. Default `TRANSPORT_STUDY_RUN_EXP5=1` (set `=0` to skip).
+- **Experiment 6 (k6 inside cluster):** Short in-cluster k6 job runs by default. Default `TRANSPORT_STUDY_RUN_EXP6=1` (set `=0` to skip).
+- **Copy:** Removed “Set TRANSPORT_STUDY_RUN_EXP4/5/6=1” from messages; added one line: “All 6 experiments run by default. Set …=0 to skip.”
+
+### Baseline suite: HTTP/3 probe and verify timeouts
+- **Defaults:** `BASELINE_H3_PROBE_MAX_TIME` and `BASELINE_H3_VERIFY_MAX_TIME` default to **40** seconds (was 25).
+- **Rationale:** Gives HTTP/3 probes and verification more time under load so baseline suite is less flaky without requiring env vars.
+
+### Files touched (2026-03 transport study + baseline H3)
+- `scripts/run-transport-study-experiments.sh` – Exp 2 fallback paths for rotation-summary.json; EXP4/5/6 default to 1; message updates
+- `scripts/test-microservices-http2-http3.sh` – BASELINE_H3_PROBE_MAX_TIME, BASELINE_H3_VERIFY_MAX_TIME default 40
+- `COMMIT_MESSAGE.txt` – this section
+
+---
+
+## 2026-02: Preflight suite timing (suite 2 baseline), Test 15b visibility, schema E2E roadmap, expansion ideas
+
+### Preflight and suite 2 (baseline) timing for packet capture
+- **Per-suite timing:** `run-all-test-suites.sh` writes each suite’s start/end (UTC ISO) to `SUITE_LOG_DIR/suite-timing.txt`. Suite 2/9 (baseline) is the one that runs packet capture; its window can be correlated with this file so capture is “captured properly” for analysis.
+- **Preflight step 7:** Logs that suite 2 (baseline) timing is in `$SUITE_LOG_DIR/suite-timing.txt` for capture correlation. Same SUITE_LOG_DIR is used so preflight runs have one place for timing.
+- **Files:** `scripts/run-all-test-suites.sh` (_run_suite: append start/end to suite-timing.txt; baseline run logs timing file), `scripts/run-preflight-scale-and-all-suites.sh` (step 7 info line).
+
+### Test 15b (Delete Account via HTTP/3) before packet capture
+- **Order:** Logout (14b/14) → Delete Account HTTP/2 (15) → **Delete Account HTTP/3 (15b)** → **stop packet capture** → gRPC tests. Test 15b runs before capture stop so HTTP/3 delete is included in the pcap.
+- **Visibility:** Script always prints “Test 15b: Auth Service - Delete Account via HTTP/3” and step-wise progress (register via HTTP/3, DELETE account, verify 401/404). If HTTP/3 is unavailable, prints “Test 15b: skipped (…); packet capture next”.
+- **File:** `scripts/test-microservices-http2-http3.sh`.
+
+### Schema E2E roadmap and services/webapp alignment
+- **SCHEMA_AND_E2E_ROADMAP.md:** §2.5 baseline order (15b, packet capture); §2.6 new tables from CURRENT_DB_SCHEMA_REPORT (records, listings, shopping, location) with checklist for shopping-service, listings-service, webapp, and E2E; §2.7 **ideas for schema expansion** (location/address, wishlist/price alerts, listings detail/ratings/shipping, catalog/analytics, social votes/reads, auction/bids) with suggested expansion order.
+- **Checklist (to do):** Shopping service — wire new tables (wishlist, price_alerts, notifications, bundle_shipping, address). Listings service — align schema (listing_images, shipping_options, ratings, seller_availability). Webapp — checkout/profile (address), shopping (wishlist, alerts), listings (detail, shipping, ratings). E2E — add baseline or verify-db-cache steps for new endpoints once APIs exist.
+
+### Files touched (2026-02 preflight/suite timing, 15b, roadmap)
+- `scripts/run-all-test-suites.sh` – suite-timing.txt start/end per suite; baseline (2/9) log line
+- `scripts/run-preflight-scale-and-all-suites.sh` – step 7: suite 2 timing file info
+- `scripts/test-microservices-http2-http3.sh` – Test 15b progress and skip message; capture after 15b
+- `docs/SCHEMA_AND_E2E_ROADMAP.md` – §2.5, §2.6, §2.7 (expansion ideas)
+- `COMMIT_MESSAGE.txt` – this section
+
+---
+
+## 2026-02: k3d API HA, Rotation Suite Exit 107, jslib Option, Preflight Visibility, Infra/Observability Alignment
+
+### Summary and justification
+- **Goal:** Reliable preflight on k3d (no indefinite hangs), rotation suite that completes (no exit 107), optional jslib for k6 when egress exists, and clear visibility so failures are debuggable. Align infra (Terraform, Ansible, Chef/Jenkins per ADR), observability (Prometheus, Grafana, Jaeger, OpenTelemetry, New Relic, Splunk, Linkerd, Istio), and MetalLB verification with strict TLS/mTLS and HTTP/1.1, 2, 3 proof.
+- **Why:** Preflight was stalling at “Ensuring API server ready” and at “k3d API stabilize” with no visible cause; rotation chaos job exited 107 (script exception) due to remote jslib import in-cluster; k3d API often failed after node restart due to stale kubeconfig. Fixes address root causes without masking failures.
+
+### API server and ensure-api-server-ready.sh
+- **Initial block timeout:** The “Checking API server (kubeconfig + optional localhost→127.0.0.1 fix)” block runs in a subshell with a **60s cap** (`ENSURE_INITIAL_CAP`). Prevents hang on `kubectl config view` or `_one_attempt` before the main wait loop.
+- **Progress:** Message “Checking API server…” printed immediately after preflight so the script never appears stuck with no output.
+- **Timeout on initial fix:** If the cap is hit, script prints “Initial API check timed out after 60s; continuing to wait loop” and proceeds to the main API wait loop (with per-attempt timeout and diagnostics).
+- **Post-restart wait:** When `K3D_AUTO_RESTART=1` and the API check fails, after `k3d cluster start` the script now waits **60s** (`K3D_POST_RESTART_WAIT`) before retrying so k3s/etcd have time to come up (HA: one restart should suffice).
+- **Diagnostics:** On failure, “What’s going on” shows API server URL, TCP reachability, and suggests 127.0.0.1 when TCP OK but kubectl fails (TLS/SNI).
+
+### k3d cluster create (one-time tuning and HA)
+- **TLS SANs:** `scripts/k3d-create-2-node-cluster.sh` now passes `--tls-san=127.0.0.1` and `--tls-san=localhost` to k3s so the API server cert is valid for host access with strict TLS (no x509 after restart).
+- **etcd:** Added `--etcd-arg=quota-backend-bytes=8589934592` and `--etcd-arg=max-request-bytes=1572864` (same as Colima stabilization) for stability under load.
+- **Docs:** `docs/PLATFORM_CLUSTER_AND_METALLB_AI_HANDOFF.md` and `scripts/K3D_API_HA_AND_TLS.md` (when created) describe one-time tuning and worst-case restart behavior.
+
+### k3d API stabilize (3c0b) — visibility and root cause
+- **Kubeconfig refresh:** At start of 3c0b run **`k3d kubeconfig merge <cluster>`** and **preflight-fix-kubeconfig.sh** so we use the current API port after node restart. Every **60s** during the wait, re-run **`k3d kubeconfig merge`** so we pick up the port once the serverlb is ready.
+- **Last error shown:** When progress is printed and the last `kubectl get nodes` was FAIL, the script captures and prints the **last error** (stderr) so we see connection refused, x509, timeout, etc. On final failure, the same error and a one-line “→ k3d kubeconfig merge …; kubectl get nodes; or ensure-api-server-ready.sh” are printed.
+- **No masking:** We fix the typical cause (stale kubeconfig) and surface the real error when it still fails.
+
+### Rotation suite and k6 chaos (exit 107)
+- **Cause:** Exit 107 = k6 script exception at load/init. The chaos script imported `textSummary` from `https://jslib.k6.io/...`; in-cluster pods often have no egress, so the fetch failed and k6 exited before running.
+- **Fix (default):** **`scripts/k6-chaos-test.js`** no longer imports jslib. An **inline summary** (`inlineTextSummary`) is used so the script loads without network. Numeric formatting is guarded (no NaN from `toFixed`).
+- **jslib option:** When **`K6_USE_JSLIB=1`** (or **`ROTATION_USE_JSLIB=1`** for the rotation suite), **`scripts/run-k6-chaos.sh`** uses **`scripts/k6-chaos-test-jslib.js`** (same logic but with jslib import). Requires egress to jslib.k6.io from the pod (or run k6 on host). **Rotation suite** exports `K6_USE_JSLIB="${K6_USE_JSLIB:-${ROTATION_USE_JSLIB:-0}}"` before starting the chaos job, so CA/leaf rotation can use jslib when you set `ROTATION_USE_JSLIB=1`.
+- **Diagnostics:** On k6 job failure the suite prints **container exit code** in the header and **last 50 lines** of logs. For **exit 107** it prints actionable hints (rebuild k6 image with xk6-http3, check k6-ca-cert ConfigMap, see logs for GoError). Diagnostic file includes “Container exit code: N (107 = script exception/load failure)”.
+- **Docs:** `scripts/ROTATION-SUITE-DEPENDENCIES.md` documents exit 107, jslib, and “Using jslib” via `K6_USE_JSLIB=1` / `ROTATION_USE_JSLIB=1`.
+
+### Registry push and 3c0a/3c0b messaging
+- **`scripts/k3d-registry-push-and-patch.sh`:** After “Rollout restarted…”, added a line: “Preflight (3c0b) will wait for API to stabilize after this; kubeconfig is refreshed so you see progress and any get nodes error.”
+
+### Chef, Terraform, Jenkins, Ansible
+- **As documented:** No code changes in this commit. **Terraform:** `infra/terraform/` (e.g. variables.tf). **Ansible:** `infra/ansible/` (requirements.yml, inventory, playbooks/deploy-services.yml). **Chef/Jenkins:** `infra/docs/CHEF-JENKINS.md` and `docs/adr/002-chef-jenkins-alongside-terraform-ansible.md`. System remains correct per these references; ensure playbooks and workflows point at the same cluster and image sources as preflight.
+
+### Observability (Prometheus, Grafana, Jaeger, OpenTelemetry, New Relic, Splunk, Linkerd, Istio)
+- **Wired per handoff:** Base deploys Prometheus, Grafana, Jaeger, Otel-collector in `observability` namespace. New Relic and Splunk are wired via secrets and **`scripts/setup-observability-secrets.sh`** (NEW_RELIC_LICENSE_KEY, SPLUNK_HEC_*). ServiceMonitor/PodMonitor: run **`./scripts/install-prometheus-operator-crds.sh`** once per cluster. **Linkerd:** **`./scripts/install-linkerd.sh`**. **Istio:** **`./scripts/install-istio.sh`** (istio-1.21.0). See **Observability** section in `docs/PLATFORM_CLUSTER_AND_METALLB_AI_HANDOFF.md`. No changes in this commit; observability stack is set up and running when base is applied and optional scripts/CRDs are run.
+
+### MetalLB and strict TLS/mTLS stress and traffic policy
+- **Verification:** **`scripts/verify-metallb-and-traffic-policy.sh`** is run in preflight when **`METALLB_ENABLED=1`** (step 3c1b). It checks MetalLB components, pool, L2Advertisement, LoadBalancer IPs, **in-cluster Caddy strict TLS** (via `verify-caddy-strict-tls-in-cluster.sh`), and optionally host curl and **HTTP/3 (QUIC) to LB IP** with dev-root-ca when host can reach the LB IP. Traffic policy (L2, optional nodeSelector) is documented in `docs/METALLB_TRAFFIC_POLICY_AND_SCALE.md`.
+- **Strict TLS/mTLS:** In-cluster Caddy check uses strict TLS (no -k). HTTP/3 check uses CA when available. Full test suites (baseline, enhanced, adversarial, rotation, tls-mtls) stress **HTTP/1.1, HTTP/2, and HTTP/3** with strict TLS and mTLS where applicable; rotation and tls-mtls suites prove cert rotation and gRPC mTLS.
+- **Run:** **`METALLB_ENABLED=1 REQUIRE_COLIMA=0 RUN_PGBENCH=0 ./scripts/run-preflight-scale-and-all-suites.sh`** runs preflight with MetalLB install and verification (and all suites including H1/H2/H3 and strict TLS/mTLS). On k3d, host may not reach LB IP; NodePort 30443 is used for host-originated HTTP/2 and HTTP/3; in-cluster path still proves MetalLB + Caddy.
+
+### Files touched (2026-02 k3d/rotation/observability/MetalLB)
+- `scripts/ensure-api-server-ready.sh` – initial block timeout, _do_initial_fix, progress, K3D_POST_RESTART_WAIT, exit 137/143 message
+- `scripts/k3d-create-2-node-cluster.sh` – tls-san 127.0.0.1/localhost, etcd args
+- `scripts/run-preflight-scale-and-all-suites.sh` – 3c0b kubeconfig refresh, last error, _k3d_cluster, final failure message
+- `scripts/k3d-registry-push-and-patch.sh` – 3c0b messaging line
+- `scripts/k6-chaos-test.js` – remove jslib import, inlineTextSummary, remove unused exec import
+- `scripts/k6-chaos-test-jslib.js` – NEW: jslib variant for K6_USE_JSLIB=1
+- `scripts/run-k6-chaos.sh` – K6_USE_JSLIB / script choice, say when using jslib
+- `scripts/rotation-suite.sh` – export K6_USE_JSLIB from ROTATION_USE_JSLIB; k6 failure diagnostics (exit code, 107 hints, debug file)
+- `scripts/ROTATION-SUITE-DEPENDENCIES.md` – exit 107 and jslib section, K6_USE_JSLIB
+- `docs/PLATFORM_CLUSTER_AND_METALLB_AI_HANDOFF.md` – k3d API HA / TLS para, script table
+- `COMMIT_MESSAGE.txt` – this section
+
+---
+
+## 2026-02-08: API and Preflight Stability — Ensure Scripts, ADR 007, Runbook, README Breakthrough
+
+### API and preflight readiness (ADR 007, Runbook 50–51)
+- **ensure-k8s-api.sh** called at preflight step 1b so tunnel 6443 is re-verified (retries + re-forward) before kubeconfig and ensure-api-server-ready; reduces 503 / connection reset after step 1.
+- **ensure-pgbench-dbs-ready.sh**: Starts all 8 Postgres (docker compose), waits for 5433–5440; wired into run-daily-pgbench-standalone-with-results.sh so cron runs don’t fail when DBs are down.
+- **ensure-ready-for-preflight.sh**: Single entry point — cross-layer diagnostic (optional), ensure API, ensure 8 DBs, ensure Kafka, then print "run preflight" or run with --run.
+- **ADR 007**: docs/adr/007-api-preflight-stability-and-ensure-scripts.md (context, decision, consequences).
+- **Runbook**: Bug #50 (API/preflight readiness symptoms and fix), #51 (ensure scripts); "Bug report: API and Preflight Readiness" section.
+
+### README: Preflight breakthrough and limitations
+- **Breakthrough**: Preflight log (e.g. preflight-full-20260206-215733.log) captured **500 req/s** combined (H2=320, H3=180) in rotation suite; wire-level HTTP/3 (QUIC) verified (e.g. 276341+ packets per Caddy pcap); real req/s 487.35, 0% failures, 2.52% drops at capacity; quick packet drain/copy pattern for QUIC.
+- **Limitations**: Some tests error due to environment (port-forward flakiness, NodePort UDP on Colima, strict TLS requiring dev-root-ca). Rotation suite may report "limit at iteration 1" (drops >1.5%) or shell substitution error in verification; MFA/email/OAuth 500 in dev; social archive/kick/ban/recall need migrations and roles.
+
+### Documentation and scripts breakdown
+- **PREFLIGHT_AND_DIAGNOSTICS.md**: "Get ready to run preflight" (diagnostic, ensure-ready-for-preflight, layers).
+- **docs/SCRIPTS_BREAKDOWN.md**: Breakdown of scripts/ — preflight & ensure, Colima/k3s, test suites, pgbench, DB/cache, observability.
+- **ENGINEERING.md**: Architecture justification — why Colima+k3s, 8 DBs, Redis+Lua, MetalLB optional, external data plane; single place for "why this setup".
+
+### Diagram and user story
+- **docs/ARCHITECTURE_SETUP_AND_USER_STORY.md**: Updated setup (MetalLB optional, Redis+Lua, 8 DBs, Kafka strict TLS); user case and user story; PlantUML/Mermaid for high-level flow.
+
+### Files touched (2026-02-08)
+- scripts/ensure-pgbench-dbs-ready.sh, ensure-ready-for-preflight.sh; run-daily-pgbench-standalone-with-results.sh (wire ensure-pgbench-dbs-ready); run-preflight-scale-and-all-suites.sh (step 1b ensure-k8s-api).
+- docs/adr/007-api-preflight-stability-and-ensure-scripts.md, docs/PREFLIGHT_AND_DIAGNOSTICS.md, docs/ARCHITECTURE_SETUP_AND_USER_STORY.md (new).
+- Runbook.md (items 50–51, bug report, Last Updated); README.md (breakthrough snippet, limitations); ENGINEERING.md (architecture rationale); COMMIT_MESSAGE.txt (this section); docs/SCRIPTS_BREAKDOWN.md; docs/ARCHITECTURE_SETUP_AND_USER_STORY.md.
+
+---
 
 ## 2026-02: Major Overhaul — Colima/k3s, Preflight & Test Rationale, Tech Stack Justification, Hygiene
 

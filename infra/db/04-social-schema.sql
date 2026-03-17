@@ -1,6 +1,6 @@
 -- Social Service Database Schema
--- Run on PostgreSQL port 5433
--- Database: social (or records, depending on setup)
+-- Run on PostgreSQL port 5434 (social DB). Database name: social.
+-- app-config: POSTGRES_URL_SOCIAL = ...@host:5434/social
 -- User: postgres / postgres (or configure as needed)
 
 SET ROLE postgres;
@@ -53,6 +53,19 @@ CREATE TABLE IF NOT EXISTS forum.post_attachments (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Comments table (nested replies via parent_id) — must exist before comment_attachments
+CREATE TABLE IF NOT EXISTS forum.comments (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id    UUID NOT NULL REFERENCES forum.posts(id) ON DELETE CASCADE,
+  user_id    UUID NOT NULL,
+  parent_id  UUID REFERENCES forum.comments(id) ON DELETE CASCADE,
+  content    TEXT NOT NULL,
+  upvotes    INT NOT NULL DEFAULT 0,
+  downvotes  INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Comment attachments (images, videos, files)
 CREATE TABLE IF NOT EXISTS forum.comment_attachments (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -69,19 +82,6 @@ CREATE TABLE IF NOT EXISTS forum.comment_attachments (
   duration      INT,
   display_order INT NOT NULL DEFAULT 0,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- Comments table (nested replies via parent_id)
-CREATE TABLE IF NOT EXISTS forum.comments (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  post_id    UUID NOT NULL REFERENCES forum.posts(id) ON DELETE CASCADE,
-  user_id    UUID NOT NULL,
-  parent_id  UUID REFERENCES forum.comments(id) ON DELETE CASCADE,
-  content    TEXT NOT NULL,
-  upvotes    INT NOT NULL DEFAULT 0,
-  downvotes  INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- Post votes table
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS messages.group_members (
   UNIQUE(group_id, user_id)
 );
 
--- Messages table (supports both direct and group messages)
+-- Messages table (WhatsApp-style: 1:1 or group; user + timestamp; content supports emoji; read state in message_reads)
 CREATE TABLE IF NOT EXISTS messages.messages (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sender_id        UUID NOT NULL,
@@ -137,9 +137,10 @@ CREATE TABLE IF NOT EXISTS messages.messages (
   parent_message_id UUID REFERENCES messages.messages(id) ON DELETE SET NULL, -- for replies
   thread_id        UUID REFERENCES messages.messages(id) ON DELETE SET NULL, -- root message ID
   message_type     VARCHAR(32) NOT NULL DEFAULT 'General',
-  subject          VARCHAR(512) NOT NULL,
+  subject          VARCHAR(512), -- optional for DMs
   content          TEXT NOT NULL,
   is_read          BOOLEAN NOT NULL DEFAULT FALSE,
+  sender_display_name VARCHAR(128), -- denormalized from auth for display
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (
@@ -158,7 +159,7 @@ CREATE TABLE IF NOT EXISTS messages.message_attachments (
   file_name        VARCHAR(512),
   file_size        BIGINT,
   mime_type        VARCHAR(128),
-  file_type        VARCHAR(32) NOT NULL CHECK (file_type IN ('image', 'video', 'audio', 'document', 'other')),
+  file_type        VARCHAR(32) NOT NULL CHECK (file_type IN ('image', 'video', 'audio', 'document', 'sticker', 'other')),
   width            INT, -- For images/videos
   height           INT, -- For images/videos
   duration         INT, -- For videos/audio (seconds)
@@ -166,7 +167,7 @@ CREATE TABLE IF NOT EXISTS messages.message_attachments (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Message reads table (track read receipts - iOS Messages style)
+-- Message reads table (track read receipts - WhatsApp / iOS style)
 CREATE TABLE IF NOT EXISTS messages.message_reads (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   message_id      UUID NOT NULL REFERENCES messages.messages(id) ON DELETE CASCADE,

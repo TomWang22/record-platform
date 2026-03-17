@@ -6,6 +6,8 @@ metadata:
   labels: { app: shopping-service }
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector: { matchLabels: { app: shopping-service } }
   template:
     metadata:
@@ -15,6 +17,13 @@ spec:
         prometheus.io/port: "4007"
         prometheus.io/path: "/metrics"
     spec:
+      # Colima/k3s: pods do not resolve host.docker.internal; alias to VM host gateway so externalized Redis/Postgres (Docker Compose) are reachable.
+      # Default Lima/Colima host IP is 192.168.5.2. Override with a Colima overlay if your network uses a different gateway (e.g. 192.168.106.1).
+      hostAliases:
+        - ip: "192.168.5.2"
+          hostnames:
+            - "host.docker.internal"
+            - "host.lima.internal"
       containers:
         - name: app
           image: shopping-service:dev
@@ -37,7 +46,9 @@ spec:
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_REQUIRE_CLIENT_CERT
-              value: "true"  # Enable mTLS (mutual TLS) - client cert verification
+              value: "true"  # Strict mTLS: Envoy presents client cert to backends
+            - name: TLS_CA_PATH
+              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
@@ -46,13 +57,14 @@ spec:
               value: "/etc/certs/tls.key"
             - name: TLS_CERT_PATH
               value: "/etc/certs/tls.crt"
-          resources:
-            requests:
-              cpu: 200m
-              memory: 256Mi
-            limits:
-              cpu: 750m
-              memory: 1Gi
+            - name: KAFKA_BROKER
+              value: "kafka-external.record-platform.svc.cluster.local:9093"
+            - name: KAFKA_USE_SSL
+              value: "true"
+            - name: KAFKA_SSL_ENABLED
+              value: "true"
+            - name: KAFKA_CA_CERT
+              value: "/etc/kafka/secrets/ca-cert.pem"
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto
@@ -63,6 +75,16 @@ spec:
             - name: service-tls
               mountPath: /etc/certs
               readOnly: true
+            - name: kafka-ssl-certs
+              mountPath: /etc/kafka/secrets
+              readOnly: true
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 1Gi
           # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2/3 only, NOT HTTP/1.1
           # Uses grpc-health-probe binary for standard gRPC health checking protocol
           # Protocol: HTTP/2 with TLS (strict TLS with client cert verification)
@@ -142,4 +164,6 @@ spec:
                 path: tls.crt
               - key: ca.crt
                 path: ca.crt
-
+        - name: kafka-ssl-certs
+          secret:
+            secretName: kafka-ssl-secret

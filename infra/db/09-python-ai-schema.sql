@@ -119,6 +119,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger for updated_at
+DROP TRIGGER IF EXISTS update_model_metadata_updated_at ON ai.model_metadata;
 CREATE TRIGGER update_model_metadata_updated_at
     BEFORE UPDATE ON ai.model_metadata
     FOR EACH ROW

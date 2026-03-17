@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # --- deps ---
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
@@ -7,6 +5,7 @@ RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
 # Copy package manifests (changes rarely, good for caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY .npmrc ./
 COPY services/common/package.json ./services/common/package.json
 COPY services/common/tsconfig.json ./services/common/tsconfig.json
 COPY services/auth-service/package.json ./services/auth-service/package.json
@@ -44,31 +43,20 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 FROM node:20-bookworm-slim
 WORKDIR /app/services/auth-service
 
-# Install grpc-health-probe for Kubernetes gRPC health checks (HTTP/2/3, NOT HTTP/1.1)
-# Detect architecture and download appropriate binary with verification
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates file && \
-    GRPC_HEALTH_PROBE_VERSION=v0.4.24 && \
-    ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "amd64" ]; then \
-      BINARY_ARCH="amd64"; \
-    elif [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then \
-      BINARY_ARCH="arm64"; \
+# Vendored grpc-health-probe (run: curl -Lf -o scripts/vendor/grpc_health_probe-linux-arm64 https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.24/grpc_health_probe-linux-arm64)
+COPY scripts/vendor/ /tmp/grpc-vendor/
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi && \
+    if [ -f /tmp/grpc-vendor/grpc_health_probe-linux-${ARCH} ]; then \
+      cp /tmp/grpc-vendor/grpc_health_probe-linux-${ARCH} /usr/local/bin/grpc-health-probe && chmod +x /usr/local/bin/grpc-health-probe && /usr/local/bin/grpc-health-probe -version && echo "✅ grpc-health-probe (vendored)"; \
     else \
-      echo "Unsupported architecture: $ARCH"; exit 1; \
-    fi && \
-    echo "Downloading grpc-health-probe ${GRPC_HEALTH_PROBE_VERSION} for ${BINARY_ARCH}..." && \
-    curl -Lf -o /tmp/grpc-health-probe \
-    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-${BINARY_ARCH} && \
-    echo "Verifying binary..." && \
-    file /tmp/grpc-health-probe | grep -q "ELF.*executable" || (echo "ERROR: Downloaded file is not a valid ELF executable" && exit 1) && \
-    chmod +x /tmp/grpc-health-probe && \
-    /tmp/grpc-health-probe -version >/dev/null 2>&1 || (echo "ERROR: grpc-health-probe binary is corrupted or invalid" && exit 1) && \
-    mv /tmp/grpc-health-probe /usr/local/bin/grpc-health-probe && \
-    echo "Verifying installed binary..." && \
-    /usr/local/bin/grpc-health-probe -version >/dev/null 2>&1 && \
-    ls -lh /usr/local/bin/grpc-health-probe && \
-    echo "✅ grpc-health-probe installed and verified successfully" && \
-    apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+      apt-get update && apt-get install -y --no-install-recommends curl ca-certificates file && \
+      BINARY_ARCH="$ARCH" && \
+      curl -Lf -o /tmp/grpc-health-probe \
+        https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.24/grpc_health_probe-linux-${BINARY_ARCH} && \
+      file /tmp/grpc-health-probe | grep -q "ELF.*executable" && chmod +x /tmp/grpc-health-probe && mv /tmp/grpc-health-probe /usr/local/bin/grpc-health-probe && \
+      apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/* && echo "✅ grpc-health-probe (downloaded)"; \
+    fi
 
 ENV NODE_ENV=production
 

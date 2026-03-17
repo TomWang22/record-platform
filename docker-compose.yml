@@ -20,9 +20,10 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # Strict TLS: SSL on 9093 (host 29093). PLAINTEXT 9092 inter-broker only.
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,SSL://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://192.168.5.1:29093
+      # Strict TLS: no cleartext for client connections. SSL on 9093 (host 29093) for all clients.
+      # PLAINTEXT bound to 127.0.0.1 only (healthcheck); not reachable from other containers/host.
+      KAFKA_LISTENERS: PLAINTEXT://127.0.0.1:9092,SSL://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,SSL://192.168.5.1:29093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,SSL:SSL
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -33,6 +34,8 @@ services:
       KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.truststore.jks
       KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.truststore.jks
       KAFKA_SSL_TRUSTSTORE_CREDENTIALS: kafka.truststore-password
+      # mTLS: require client certs (services must present client cert; substrate standard for strict TLS/mTLS).
+      KAFKA_SSL_CLIENT_AUTH: required
     volumes: ["./certs/kafka-ssl:/etc/kafka/secrets:ro"]
     ports: ["29093:9093"]
     restart: unless-stopped
@@ -73,7 +76,8 @@ services:
     ports: ["5433:5432"]  # Changed to 5433 to avoid conflict with Postgres.app
     volumes: ["pgdata:/var/lib/postgresql/data"]
     shm_size: 1g  # Increased from 256m to prevent shared memory errors at high concurrency
-    command: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=16MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "default_statistics_target=100"]
+    # Gold tuning (RESTORE-GOLD-PERFORMANCE): 32MB work_mem, index-first, parallel 12/4, cache-friendly
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U postgres"]
       interval: 5s
@@ -88,7 +92,8 @@ services:
     ports: ["5434:5432"]
     volumes: ["pgdata-social:/var/lib/postgresql/data"]
     shm_size: 1g  # High concurrency: messages, forums, real-time features
-    command: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=16MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "default_statistics_target=100"]
+    # Gold tuning: index-first, parallel 12/4, cache-friendly (hot tenants, hashing)
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U postgres"]
       interval: 5s
@@ -103,7 +108,8 @@ services:
     ports: ["5435:5432"]
     volumes: ["pgdata-listings:/var/lib/postgresql/data"]
     shm_size: 1g  # Moderate concurrency: search, listings, watchlist
-    command: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=16MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "default_statistics_target=100"]
+    # Gold tuning: index-first, parallel 12/4, cache-friendly
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U postgres"]
       interval: 5s
@@ -118,7 +124,8 @@ services:
     ports: ["5436:5432"]
     volumes: ["pgdata-shopping:/var/lib/postgresql/data"]
     shm_size: 1g  # High concurrency: cart, checkout, orders
-    command: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=16MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "default_statistics_target=100"]
+    # Gold tuning: index-first, parallel 12/4, cache-friendly
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U postgres"]
       interval: 5s
@@ -133,7 +140,8 @@ services:
     ports: ["5437:5432"]
     volumes: ["pgdata-auth:/var/lib/postgresql/data"]
     shm_size: 1g  # High concurrency: authentication and user operations
-    command: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=16MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "default_statistics_target=100"]
+    # Gold tuning: index-first, parallel 12/4, cache-friendly
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U postgres"]
       interval: 5s
@@ -148,7 +156,8 @@ services:
     ports: ["5438:5432"]
     volumes: ["pgdata-auction-monitor:/var/lib/postgresql/data"]
     shm_size: 1g
-    command: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB"]
+    # Gold tuning: index-first, parallel 12/4, cache-friendly
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U postgres"]
       interval: 5s
@@ -163,7 +172,8 @@ services:
     ports: ["5439:5432"]
     volumes: ["pgdata-analytics:/var/lib/postgresql/data"]
     shm_size: 1g  # Moderate concurrency: analytics queries and writes
-    command: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=16MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "default_statistics_target=100"]
+    # Gold tuning: index-first, parallel 12/4, cache-friendly
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U postgres"]
       interval: 5s
@@ -178,7 +188,8 @@ services:
     ports: ["5440:5432"]
     volumes: ["pgdata-python-ai:/var/lib/postgresql/data"]
     shm_size: 1g  # Moderate concurrency: AI predictions and cache
-    command: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=16MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "default_statistics_target=100"]
+    # Gold tuning: index-first, parallel 12/4, cache-friendly
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U postgres"]
       interval: 5s

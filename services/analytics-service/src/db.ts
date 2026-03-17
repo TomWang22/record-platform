@@ -1,45 +1,63 @@
 import { Pool, type QueryResult } from 'pg'
 
-// Dual-DB setup: listings DB for search_history, analytics DB for price_snapshots
+// Triple-DB setup: records for listings.search_history (table lives in records), listings for future, analytics for price_snapshots
+const RECORDS_DB_URL = process.env.POSTGRES_URL_RECORDS || process.env.DATABASE_URL || ''
 const LISTINGS_DB_URL = process.env.POSTGRES_URL_LISTINGS || process.env.DATABASE_URL || ''
 const ANALYTICS_DB_URL = process.env.POSTGRES_URL_ANALYTICS || process.env.DATABASE_URL || ''
 
-if (!LISTINGS_DB_URL || !ANALYTICS_DB_URL) {
-  console.warn('[analytics] POSTGRES_URL_LISTINGS or POSTGRES_URL_ANALYTICS is empty at startup')
+if (!RECORDS_DB_URL || !ANALYTICS_DB_URL) {
+  console.warn('[analytics] POSTGRES_URL_RECORDS or POSTGRES_URL_ANALYTICS is empty at startup')
 }
 
-// Pool for listings DB (search_history)
-// Moderate concurrency: Cross-database queries for analytics
-// Standard pool size: 100 connections (configurable via DB_POOL_MAX)
+// Idle timeout: 0 = never expire (avoids recycle during rotation/chaos); else use env or 60s
+const IDLE_MS = process.env.DB_IDLE_TIMEOUT_MS != null ? parseInt(process.env.DB_IDLE_TIMEOUT_MS, 10) : 60000
+
+// Pool for records DB — listings.search_history lives in records (port 5433), not listings DB (5435)
+// See CURRENT_DB_SCHEMA_REPORT.md and infra/db/03-database.sql
+export const recordsPool = new Pool({
+  connectionString: RECORDS_DB_URL,
+  max: parseInt(process.env.DB_POOL_MAX || '100', 10),
+  min: parseInt(process.env.DB_POOL_MIN || '10', 10),
+  idleTimeoutMillis: IDLE_MS === 0 ? 0 : IDLE_MS,
+  connectionTimeoutMillis: 10000,
+  statement_timeout: 30000,
+  query_timeout: 30000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
+})
+
+// Pool for listings DB (used for cross-DB queries if needed; search_history is in records)
 export const listingsPool = new Pool({
   connectionString: LISTINGS_DB_URL,
-  max: parseInt(process.env.DB_POOL_MAX || '100', 10), // Moderate concurrency
+  max: parseInt(process.env.DB_POOL_MAX || '100', 10),
   min: parseInt(process.env.DB_POOL_MIN || '10', 10),
-  idleTimeoutMillis: 60000, // 1 minute
-  connectionTimeoutMillis: 10000, // 10 seconds
-  statement_timeout: 30000, // 30 second statement timeout
-  query_timeout: 30000, // 30 second query timeout
+  idleTimeoutMillis: IDLE_MS === 0 ? 0 : IDLE_MS,
+  connectionTimeoutMillis: 10000,
+  statement_timeout: 30000,
+  query_timeout: 30000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
 })
 
 // Pool for analytics DB (price_snapshots, search_analytics, etc.)
-// Moderate concurrency: Analytics queries and writes
-// Standard pool size: 100 connections (configurable via DB_POOL_MAX)
 export const analyticsPool = new Pool({
   connectionString: ANALYTICS_DB_URL,
-  max: parseInt(process.env.DB_POOL_MAX || '100', 10), // Moderate concurrency
+  max: parseInt(process.env.DB_POOL_MAX || '100', 10),
   min: parseInt(process.env.DB_POOL_MIN || '10', 10),
-  idleTimeoutMillis: 60000, // 1 minute
-  connectionTimeoutMillis: 10000, // 10 seconds
-  statement_timeout: 30000, // 30 second statement timeout
-  query_timeout: 30000, // 30 second query timeout
+  idleTimeoutMillis: IDLE_MS === 0 ? 0 : IDLE_MS,
+  connectionTimeoutMillis: 10000,
+  statement_timeout: 30000,
+  query_timeout: 30000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
 })
 
 // Legacy pool for backward compatibility (defaults to analytics DB)
 export const pool = analyticsPool
+
+recordsPool.on('error', (err) => {
+  console.error('[analytics] Records DB pool error:', err)
+})
 
 listingsPool.on('error', (err) => {
   console.error('[analytics] Listings DB pool error:', err)
@@ -74,12 +92,12 @@ export interface SimilarSearch {
   similarity: number
 }
 
-// User search history analysis (from listings DB)
+// User search history analysis — table is in records DB (listings.search_history)
 export async function getUserSearchHistory(
   userId: string,
   limit: number = 50
 ): Promise<SearchHistoryRow[]> {
-  const result = await listingsPool.query<SearchHistoryRow>(
+  const result = await recordsPool.query<SearchHistoryRow>(
     `SELECT id, user_id, source, q, results, created_at
      FROM listings.search_history
      WHERE user_id = $1
@@ -90,13 +108,13 @@ export async function getUserSearchHistory(
   return result.rows
 }
 
-// Get similar searches (for recommendations) - from listings DB
+// Get similar searches (for recommendations) — table is in records DB
 export async function getSimilarSearches(
   query: string,
   userId?: string,
   limit: number = 10
 ): Promise<SimilarSearch[]> {
-  const result = await listingsPool.query<SimilarSearch>(
+  const result = await recordsPool.query<SimilarSearch>(
     `SELECT q as query, COUNT(*)::int as count,
             MAX(similarity(q, $1)) as similarity
      FROM listings.search_history
@@ -111,12 +129,12 @@ export async function getSimilarSearches(
   return result.rows
 }
 
-// Get trending searches (most popular in last N days) - from listings DB
+// Get trending searches (most popular in last N days) — table is in records DB
 export async function getTrendingSearches(
   days: number = 7,
   limit: number = 20
 ): Promise<Array<{ query: string; count: number }>> {
-  const result = await listingsPool.query<{ query: string; count: number }>(
+  const result = await recordsPool.query<{ query: string; count: number }>(
     `SELECT q as query, COUNT(*)::int as count
      FROM listings.search_history
      WHERE created_at >= NOW() - INTERVAL '${days} days'
@@ -165,14 +183,14 @@ export async function getHistoricalAveragePrice(
   return null
 }
 
-// Log a search (for building history) - writes to listings DB
+// Log a search (for building history) — writes to records DB (listings.search_history lives there)
 export async function logSearch(
   userId: string | null,
   source: string,
   query: string,
   results: number | null = null
 ): Promise<void> {
-  await listingsPool.query(
+  await recordsPool.query(
     `INSERT INTO listings.search_history (user_id, source, q, results)
      VALUES ($1, $2, $3, $4)`,
     [userId, source, query, results]

@@ -2,35 +2,7 @@ name: ci
 on: [push, pull_request]
 
 jobs:
-  build-common:
-    name: Build @common/utils (once)
-    runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-      POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.11.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-          cache-dependency-path: 'pnpm-lock.yaml'
-      - run: pnpm install --frozen-lockfile
-      - name: Build common package
-        run: |
-          rm -rf services/common/dist services/common/tsconfig.tsbuildinfo
-          pnpm -C services/common build
-          test -f services/common/dist/index.d.ts || (echo "ERROR: common build failed" && exit 1)
-      - uses: actions/cache/save@v4
-        with:
-          path: services/common/dist
-          key: common-${{ hashFiles('pnpm-lock.yaml', 'services/common/**') }}
-
   build:
-    needs: build-common
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
@@ -54,22 +26,12 @@ jobs:
           cache-dependency-path: 'pnpm-lock.yaml'
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: pnpm install --frozen-lockfile
-      - name: Restore common build
-        uses: actions/cache/restore@v4
-        with:
-          path: services/common/dist
-          key: common-${{ hashFiles('pnpm-lock.yaml', 'services/common/**') }}
-      - name: Build common if cache miss
+      - name: Build common package
         run: |
-          if [ ! -f "services/common/dist/index.d.ts" ]; then
-            echo "Common cache miss; building common..."
-            pnpm -C services/common build
-            test -f "services/common/dist/index.d.ts" || (echo "ERROR: common build failed" && exit 1)
-          fi
+          pnpm -C services/common build
+          test -f services/common/dist/index.d.ts || (echo "ERROR: common build failed" && exit 1)
       - name: Build ${{ matrix.service }}
-        run: |
-          test -f "services/common/dist/index.d.ts" || (echo "ERROR: @common/utils dist missing" && exit 1)
-          pnpm -C services/${{ matrix.service }} build
+        run: pnpm -C services/${{ matrix.service }} build
 
   quic-invariants:
     name: Enforce QUIC hostname invariant
@@ -94,7 +56,10 @@ jobs:
           python-version: "3.11"
       - name: Validate transport tooling (no pcap)
         run: |
-          out=$(python3 scripts/lib/transport_validator.py 2>&1); e=$?
+          set +e
+          out=$(python3 scripts/lib/transport_validator.py 2>&1)
+          e=$?
+          set -e
           echo "$out"
           if [ "$e" -ne 0 ] && echo "$out" | grep -q "no pcap provided"; then
             echo "Validator correctly requires pcap when none provided; treating as success."

@@ -31,8 +31,11 @@ jobs:
           echo "Node: $(node -v) | pwd: $(pwd)"
           test -f tsconfig.base.json || (echo "Missing tsconfig.base.json" && exit 1)
           test -f services/common/package.json || (echo "Missing services/common/package.json" && exit 1)
-          (cd services/common && pnpm exec tsc -p tsconfig.json 2>&1) || true
-          test -f services/common/dist/index.d.ts || (echo "ERROR: common build failed (no dist/index.d.ts); see tsc output above" && exit 1)
+          cd services/common && pnpm exec tsc -p tsconfig.json > ../tsc-out.log 2>&1; tsc_exit=$?
+          cd ../..
+          echo "--- tsc output (exit $tsc_exit) ---"
+          cat tsc-out.log 2>/dev/null || true
+          test -f services/common/dist/index.d.ts || (echo "ERROR: common build failed (no dist/index.d.ts)" && exit 1)
       - name: Build ${{ matrix.service }}
         run: pnpm -C services/${{ matrix.service }} build
 

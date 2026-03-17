@@ -28,9 +28,12 @@ COPY services/common ./services/common
 COPY services/auth-service ./services/auth-service
 COPY proto ./proto
 
-# Build common first (run only @common/utils build script, not root's parallel build), then service
+# Build common first, then ensure service node_modules sees common+dist (pnpm symlinks can miss dist in Docker)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm --filter @common/utils run build \
+ && mkdir -p services/auth-service/node_modules/@common \
+ && rm -rf services/auth-service/node_modules/@common/utils \
+ && cp -r services/common services/auth-service/node_modules/@common/utils \
  && cd services/auth-service \
  && rm -rf prisma/generated dist \
  && pnpm exec prisma generate \

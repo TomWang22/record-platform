@@ -34,9 +34,12 @@ COPY services/common ./services/common
 COPY services/auction-monitor ./services/auction-monitor
 COPY proto ./proto
 
-# Build common first (run only @common/utils build script, not root's parallel build), then service
+# Build common first, then ensure service node_modules sees common+dist (pnpm symlinks can miss dist in Docker)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm --filter @common/utils run build \
+ && mkdir -p services/auction-monitor/node_modules/@common \
+ && rm -rf services/auction-monitor/node_modules/@common/utils \
+ && cp -r services/common services/auction-monitor/node_modules/@common/utils \
  && pnpm -C services/auction-monitor build \
  && pnpm -C services/auction-monitor prune --prod \
  && pnpm -C services/auction-monitor install --prod --ignore-scripts --shamefully-hoist

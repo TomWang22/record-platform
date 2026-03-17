@@ -5,32 +5,23 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Copy full workspace source for common + this service so pnpm install creates correct symlinks (no overwrite later)
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
-COPY .npmrc ./
-COPY services/common ./services/common
-COPY services/analytics-service ./services/analytics-service
+# Copy entire monorepo before install so pnpm can create workspace symlinks (@common/utils, etc.)
+COPY . .
 
-# Install with workspace intact so @common/utils symlinks point at services/common
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm -w --filter @common/utils... --filter analytics-service... install --frozen-lockfile --ignore-scripts
+    pnpm install --frozen-lockfile --ignore-scripts
 
 # ---------- build ----------
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Use deps stage as-is: do not COPY services/* again or symlinks break
 COPY --from=deps /app /app
 
-# Build common first so @common/utils dist/ exists before any service tsc runs (CI-safe)
+# Build this service and its deps (topological order: common then analytics-service)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -C services/common build
-
-# Let workspace orchestrate build (topological order); then prune this service for prod
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -w build \
+    pnpm --filter analytics-service... build \
  && pnpm -C services/analytics-service prune --prod --config.confirmModulesPurge=false
 
 # Produce isolated deploy bundle (production deps only). Use same store mount so deploy copies from cache — no network.

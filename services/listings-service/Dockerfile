@@ -5,33 +5,24 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Copy full workspace source for common + this service so pnpm install sees real tree
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
-COPY .npmrc ./
-COPY services/common ./services/common
-COPY services/listings-service ./services/listings-service
+# Copy entire monorepo before install so pnpm can create workspace symlinks (@common/utils, etc.)
+COPY . .
 
-# Install with workspace intact so @common/utils symlinks point at services/common
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm -w --filter @common/utils... --filter listings-service... install --frozen-lockfile --ignore-scripts
+    pnpm install --frozen-lockfile --ignore-scripts
 
 # ---------- build ----------
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Use deps stage as-is: do not COPY services/* again or symlinks break
 COPY --from=deps /app /app
 
-# Build common first so @common/utils dist/ exists before any service tsc runs (CI-safe)
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -C services/common build
-
-# Prisma on Alpine needs openssl; then let workspace orchestrate build (topological order)
+# Prisma on Alpine needs openssl; then build this service and its deps (common then listings-service)
 RUN apk add --no-cache openssl
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -w build
+    pnpm --filter listings-service... build
 
 # Produce isolated deploy bundle (production deps only). Use same store mount so deploy copies from cache — no network.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \

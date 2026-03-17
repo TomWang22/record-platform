@@ -5,38 +5,24 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Copy package manifests (changes rarely, good for caching)
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
-COPY .npmrc ./
-COPY services/common/package.json ./services/common/package.json
-COPY services/common/tsconfig.json ./services/common/tsconfig.json
-COPY services/social-service/package.json ./services/social-service/package.json
-COPY services/common/src ./services/common/src
+# Copy entire monorepo before install so pnpm can create workspace symlinks (@common/utils, etc.)
+COPY . .
 
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm -w \
-      --filter @common/utils... \
-      --filter social-service... \
-      install --frozen-lockfile
+    pnpm install --frozen-lockfile
 
 # --- build ---
-# No apk add here: avoids Alpine CDN (dl-cdn.alpinelinux.org) during build; node:20-alpine has OpenSSL for Prisma.
 FROM node:20-alpine AS build
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 COPY --from=deps /app /app
 
-COPY services/common ./services/common
-COPY services/social-service ./services/social-service
-COPY proto ./proto
-
+# Build this service and its deps; then copy Lua scripts (not in package.json build)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -C services/common build \
- && rm -rf services/social-service/generated \
- && pnpm -C services/social-service exec prisma generate --schema prisma/schema.prisma \
- && pnpm -C services/social-service build \
+    rm -rf services/social-service/generated \
+ && pnpm --filter social-service... build \
  && mkdir -p services/social-service/dist/lib \
  && cp services/social-service/src/lib/*.lua services/social-service/dist/lib/ \
  && test -f services/social-service/dist/lib/singleflight_cache.lua

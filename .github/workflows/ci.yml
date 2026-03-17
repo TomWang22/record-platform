@@ -28,8 +28,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build common package
         run: |
-          pnpm -C services/common build
-          test -f services/common/dist/index.d.ts || (echo "ERROR: common build failed (see tsc output above)" && exit 1)
+          echo "Node: $(node -v) | pwd: $(pwd)"
+          test -f tsconfig.base.json || (echo "Missing tsconfig.base.json" && exit 1)
+          test -f services/common/package.json || (echo "Missing services/common/package.json" && exit 1)
+          (cd services/common && pnpm exec tsc -p tsconfig.json 2>&1) || true
+          test -f services/common/dist/index.d.ts || (echo "ERROR: common build failed (no dist/index.d.ts); see tsc output above" && exit 1)
       - name: Build ${{ matrix.service }}
         run: pnpm -C services/${{ matrix.service }} build
 

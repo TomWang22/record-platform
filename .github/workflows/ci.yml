@@ -29,7 +29,7 @@ jobs:
       - name: Build common package
         run: |
           pnpm -C services/common build
-          test -f services/common/dist/index.d.ts || (echo "ERROR: common build failed" && exit 1)
+          test -f services/common/dist/index.d.ts || (echo "ERROR: common build failed (see tsc output above)" && exit 1)
       - name: Build ${{ matrix.service }}
         run: pnpm -C services/${{ matrix.service }} build
 
@@ -70,7 +70,9 @@ jobs:
         run: |
           if [ -f vm.pcap ]; then
             sudo apt-get update -qq && sudo apt-get install -y tshark
-            python3 scripts/run_transport_validation.py --pcap vm.pcap --v2 --require-transport-proof
+            out=$(python3 scripts/lib/transport_validator.py vm.pcap 2>&1)
+            echo "$out"
+            echo "$out" | grep -q '"valid": true' || (echo "Pcap validation failed or not valid." && exit 1)
           else
             echo "No vm.pcap; skip tshark install and full gate."
           fi

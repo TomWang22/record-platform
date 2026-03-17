@@ -23,7 +23,7 @@ def _run(cmd: list[str], cwd: Path | None = None, timeout: int = 10) -> str | No
         )
         if r.returncode == 0 and r.stdout:
             return r.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         pass
     return None
 
@@ -38,7 +38,7 @@ def git_branch(repo_root: Path) -> str | None:
 
 def k6_version(k6_bin: str | Path) -> str | None:
     p = Path(k6_bin).expanduser()
-    if not p.is_absolute():
+    if not p.is_absolute() or not p.exists():
         return None
     out = _run([str(p), "version"], timeout=5)
     if out:

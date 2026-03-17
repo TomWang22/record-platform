@@ -1,99 +1,261 @@
+# Production CI: build (matrix), test, docker-build (cached), QUIC invariant, transport validation, python-ai, artifacts.
+# Uses stable major tags; .vscode/settings.json treats workflows as yaml to avoid IDE action-resolution noise.
 name: ci
-on: [push, pull_request]
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 20
+  PYTHON_VERSION: "3.11"
 
 jobs:
   build:
+    name: Build (${{ matrix.service }})
     runs-on: ubuntu-latest
+
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
       POSTGRES_URL_AUTH: postgresql://postgres:postgres@localhost:5432/postgres?schema=auth
       POSTGRES_URL_RECORDS: postgresql://postgres:postgres@localhost:5432/postgres?schema=records
-      REDIS_URL: redis://localhost:6379
       POSTGRES_URL_LISTINGS: postgresql://postgres:postgres@localhost:5432/postgres
+      REDIS_URL: redis://localhost:6379
+
     strategy:
+      fail-fast: false
       matrix:
-        service: [api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, auction-monitor, cron-jobs]
+        service:
+          - api-gateway
+          - auth-service
+          - records-service
+          - listings-service
+          - analytics-service
+          - social-service
+          - shopping-service
+          - auction-monitor
+          - cron-jobs
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 9.11.0
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'pnpm'
-          cache-dependency-path: 'pnpm-lock.yaml'
-      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - run: pnpm install --frozen-lockfile
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Mark workspace safe
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Build common package
+        shell: bash
         run: |
-          echo "Node: $(node -v) | pwd: $(pwd)"
-          test -f tsconfig.base.json || (echo "Missing tsconfig.base.json" && exit 1)
-          test -f services/common/package.json || (echo "Missing services/common/package.json" && exit 1)
-          echo "Sources: $(ls services/common/src/*.ts 2>/dev/null | wc -l) .ts files"
+          set -euo pipefail
           rm -rf services/common/dist services/common/tsconfig.tsbuildinfo
-          pnpm --filter @common/utils run build 2>&1 | tee tsc-out.log
-          echo "--- dist contents ---"
-          ls -la services/common/dist 2>/dev/null || true
-          test -f services/common/dist/index.d.ts || (echo "ERROR: common build failed (no dist/index.d.ts)"; cat tsc-out.log 2>/dev/null; exit 1)
-      - name: Build ${{ matrix.service }}
+          pnpm --filter @common/utils run build
+          test -f services/common/dist/index.d.ts
+
+      - name: Build service
         run: pnpm -C services/${{ matrix.service }} build
+
+  test:
+    name: Test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    needs: build
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - auth-service
+          - records-service
+          - listings-service
+          - analytics-service
+          - social-service
+          - shopping-service
+          - auction-monitor
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.11.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test service
+        run: pnpm -C services/${{ matrix.service }} test --if-present
+
+  docker-build:
+    name: Docker build (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    needs: build
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - auth-service
+          - records-service
+          - listings-service
+          - analytics-service
+          - social-service
+          - shopping-service
+          - auction-monitor
+          - python-ai-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker layer cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-${{ matrix.service }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.service }}-
+
+      - name: Build image
+        run: |
+          docker buildx build \
+            --load \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
+            -t ${{ matrix.service }}:ci \
+            -f services/${{ matrix.service }}/Dockerfile \
+            .
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
   quic-invariants:
     name: Enforce QUIC hostname invariant
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: No IP-based HTTP/3 usage
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure no IP-based HTTP/3 usage
+        shell: bash
         run: |
-          if [ ! -f scripts/check-no-ip-quic.sh ]; then
-            echo "::error::scripts/check-no-ip-quic.sh not found. Add and commit it (see README Recent Breakthroughs)."
-            exit 1
-          fi
+          set -euo pipefail
+          test -f scripts/check-no-ip-quic.sh
           bash scripts/check-no-ip-quic.sh
 
   transport-validation:
     name: Transport validation gate
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Validate transport tooling (no pcap)
+        shell: bash
         run: |
-          set +e
-          out=$(python3 scripts/lib/transport_validator.py 2>&1)
-          e=$?
-          set -e
+          set -euo pipefail
+          out=$(python3 scripts/lib/transport_validator.py 2>&1) || true
           echo "$out"
-          if [ "$e" -ne 0 ] && echo "$out" | grep -q "no pcap provided"; then
-            echo "Validator correctly requires pcap when none provided; treating as success."
+          if echo "$out" | grep -q "no pcap provided"; then
+            echo "Validator correctly requires pcap when none provided."
             exit 0
           fi
-          exit $e
-      - name: Transport validation with pcap (only if vm.pcap present)
+          echo "$out" | grep -q '"valid": true'
+
+      - name: Transport validation with pcap (if present)
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -f vm.pcap ]; then
-            sudo apt-get update -qq && sudo apt-get install -y tshark
+            sudo apt-get update -qq
+            sudo apt-get install -y tshark
             out=$(python3 scripts/lib/transport_validator.py vm.pcap 2>&1)
             echo "$out"
-            echo "$out" | grep -q '"valid": true' || (echo "Pcap validation failed or not valid." && exit 1)
+            echo "$out" | grep -q '"valid": true'
           else
-            echo "No vm.pcap; skip tshark install and full gate."
+            echo "No vm.pcap present — skipping full gate."
           fi
 
   python-ai:
+    name: Python AI validation
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - run: |
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install and sanity check
+        shell: bash
+        run: |
+          set -euo pipefail
           cd services/python-ai-service
           python -m venv .venv
           . .venv/bin/activate
+          pip install --upgrade pip
           pip install -r requirements.txt
-          python -c "import fastapi,uvicorn; print('ai ok')"
+          python -c "import fastapi, uvicorn; print('ai ok')"
+
+  artifacts:
+    name: Upload rotation artifacts
+    if: always()
+    runs-on: ubuntu-latest
+    needs: [build, test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload reports (if exist)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rotation-reports
+          path: |
+            rotation-summary.json
+            rotation-report.json
+          if-no-files-found: ignore

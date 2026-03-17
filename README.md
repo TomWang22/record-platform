@@ -68,7 +68,7 @@ This isn't a tutorial project—it's a production-grade system solving real prob
 - **✅ Production-Ready Performance** - **99%+ success rates** across all services with **45-77% latency reduction** (p95 latencies improved from 2-5s to 0.5-2s). See `test-results/E2E_RETEST_RESULTS_12-21_tom.md` and `test-results/E2E_TEST_RESULTS_SUMMARY_12-22_tom.md` for complete test results.
 - **✅ Comprehensive E2E Testing** - HTTP/2 vs HTTP/3 comparison tests with organized timestamped results. See `scripts/compare-http2-http3.sh` and `test-results/` directory for all test results. **307+ shell scripts** support constant debugging and iterative development (see `test-results/REPO_STRUCTURE_EXPLANATION.md` for structure rationale).
 - **✅ One-command bootstrap & disaster recovery** - `scripts/bootstrap-platform.sh` deploys entire platform instantly; Terraform + Ansible enable instant cluster recreation for disaster recovery scenarios.
-- **Kubernetes-native workflows** - `infra/k8s` provides composable bases and overlays, with bootstrapping scripts that stand up Kind, build images, load them, and apply manifests.
+- **Kubernetes-native workflows** - `infra/k8s` provides composable bases and overlays; Colima + k3s is the primary cluster (bootstrapping via `scripts/setup-new-colima-cluster.sh`); build images, apply manifests, and run preflight/suites.
 - **Hardened gateway path** - API Gateway keeps the JWT guard, adds optional `DEBUG_FAKE_AUTH`, injects identity headers, and exposes detailed metrics.
 - **Redis-assisted records caching** - `services/records-service/src/lib/cache.ts` adds normalized search keys, safe JSON encoding, and targeted invalidation hooks.
 - **Kafka messaging with strict TLS** - Real-time messaging for forum posts, direct messages, and group chats via Kafka integration in social-service. **Strict TLS enabled** with SSL listener on port 9093, certificates managed via `kafka-ssl-secret`.
@@ -140,7 +140,9 @@ This isn't a tutorial project—it's a production-grade system solving real prob
   - **`protocol-verification.sh`** — tshark helpers: QUIC SNI `record.local`, UDP to LB IP, stray UDP checks; used by `verify-k6-protocols.sh` and rotation wire verification.
   - **`http3.sh`** — Shared HTTP/3 curl timeouts and options for tests.
 
-- **`out.json`** (repo root) — Example **transport proof** from a run: `valid: true`, `quic_version`, `quic_packet_count`, `quic_1rtt_packets`, `handshake_rtt_ms_estimated`, `transport_confidence_score: 100`, and breakdown (quic_detected, version_detected, no_http2_fallback, 1rtt_data_phase, low_loss, no_retry, fast_handshake). Proves QUIC end-to-end from pcap analysis.
+- **QUIC proof artifacts (repo root)** — JSON files produced by transport validation and rotation runs prove HTTP/3 (QUIC) on the wire:
+  - **`out.json`** — Example **transport proof** from `scripts/lib/transport_validator.py`: `valid: true`, `quic_version`, `quic_packet_count`, `quic_1rtt_packets`, `handshake_rtt_ms_estimated`, `transport_confidence_score: 100`, and breakdown (quic_detected, version_detected, no_http2_fallback, 1rtt_data_phase, low_loss, no_retry, fast_handshake). Proves QUIC end-to-end from pcap analysis.
+  - Other QUIC-related outputs (e.g. `transport_ceiling_report.json`, `rotation-summary.json`, or validator `--output` files) may appear in repo root or under `bench_logs/` / run directories after preflight or rotation; all document QUIC version, packet counts, and confidence scores.
 
 - **`scripts/rotation-suite.sh`** — **Three stages** so performance, wire capture, and decryption don’t interfere:
   - **`--mode=perf`** (default) — Adaptive limit finding, k6 load, no keylog; pure throughput and zero-downtime validation.
@@ -517,7 +519,7 @@ For detailed technical documentation, system design diagrams, and deep dives int
 | **Listings Service** | 4003/50057 | HTTP/gRPC | Public catalogue endpoints, eBay integration, gRPC interface on port 50057 for marketplace data |
 | **Analytics Service** | 4004/50054 | HTTP/gRPC | Authenticated aggregations, price snapshots, dual-DB (listings + analytics), multi-core worker pool, gRPC on port 50054 |
 | **Social Service** | 4006/50056 | HTTP/gRPC | Forum posts, comments, votes, user messaging, threaded conversations, gRPC on port 50056 |
-| **Shopping Service** | 4007/50058 | HTTP/gRPC | Shopping cart, checkout, order management, wishlist, purchase history, gRPC on port 50058. **Strict TLS enforced** in all k6 load tests (`run-k6-shopping.sh`, `find-bottlenecks.sh`) with CA certificate validation. Tests use ClusterIP (`caddy-h3.ingress-nginx.svc.cluster.local:443`) for in-cluster testing to avoid NodePort TLS issues in Kind.
+| **Shopping Service** | 4007/50058 | HTTP/gRPC | Shopping cart, checkout, order management, wishlist, purchase history, gRPC on port 50058. **Strict TLS enforced** in all k6 load tests (`run-k6-shopping.sh`, `find-bottlenecks.sh`) with CA certificate validation. Tests use ClusterIP for in-cluster testing; Colima + k3s uses MetalLB LB IP for host-originated HTTP/2 and HTTP/3.
 | **Auction Monitor** | 4008/50059 | HTTP/gRPC | Monitors auction trends, price tracking, dual-DB (listings read + auction-monitor write), **granular percentiles (p1-p99)**, **Discogs price history scraping**, **service integrations** (Social, Shopping, Listings), gRPC on port 50059 |
 | **Python AI Service** | 5005/50060 | HTTP/gRPC | FastAPI service for AI/ML predictions, grade recommendations, Discogs/eBay integration, chatbot interface, gRPC on port 50060 |
 | **Web App (Next.js)** | 3001 | HTTP | React/Next.js frontend with TypeScript, serves via Nginx edge, includes dashboard, forum, messaging, collection management, auction monitoring, insights, and integrations pages |
@@ -528,7 +530,7 @@ For detailed technical documentation, system design diagrams, and deep dives int
 
 ### Edge & Routing
 - **Caddy** (`Caddyfile`, `caddy-*.yaml`) - Host-side HTTP/2 + HTTP/3 front door with TLS termination. Mounts local cert bundle under `/etc/caddy/certs`, trusts `certs/dev-root.pem`. Supports QUIC (HTTP/3) and HTTP/2.
-- **Ingress** (`infra/k8s/overlays/dev/ingress.yaml`) - nginx ingress controller routing for Kind. Routes `/` to Nginx edge and `/api/*` to API Gateway. Supports gRPC with `backend-protocol: "GRPC"` annotations.
+- **Ingress** (`infra/k8s/overlays/dev/ingress.yaml`) - nginx ingress controller routing for the cluster (Colima + k3s primary). Routes `/` to Nginx edge and `/api/*` to API Gateway. Supports gRPC with `backend-protocol: "GRPC"` annotations.
 - **HAProxy** (`infra/k8s/base/haproxy`) - Maintains keep-alive pools to gateway, load balancing, stats on `:8404`, keeps gateway replicas warm.
 
 ### Data Layer (External - Docker Compose)
@@ -566,7 +568,9 @@ Connection strings and database names used by the app are in `infra/k8s/base/con
 
 #### Backups and restore
 
-- **Hard backup (all 8 DBs):** `PGPASSWORD=postgres ./scripts/backup-all-8-dbs.sh` writes to `backups/all-8-YYYYMMDD-HHMMSS/` (schema, indexes, data, and tuning metadata for ports 5433–5440). Restore with `BACKUP_DIR=backups/all-8-YYYYMMDD-HHMMSS ./scripts/restore-all-8-from-backup.sh`. See **docs/EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md**.
+- **Hard backup (all 8 DBs):** Run **`scripts/backup-all-8-dbs.sh`** to snapshot all 8 Postgres instances (ports 5433–5440). Writes to `backups/all-8-YYYYMMDD-HHMMSS/` (schema, indexes, data, tuning metadata). Use for disaster recovery; run regularly or before major changes.
+  - **How to run:** `PGPASSWORD=postgres ./scripts/backup-all-8-dbs.sh` (optional: `BACKUP_DIR=/path/to/backups`, `PGHOST=127.0.0.1`).
+  - **Restore:** `RESTORE_BACKUP_DIR=backups/all-8-YYYYMMDD-HHMMSS ./scripts/bring-up-external-infra.sh` or per-DB restore; see **docs/EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md** and the **Full disaster recovery protocol** section above.
 - **Legacy:** Backups are also written to **`backups/`** (e.g. `record-platform-postgres-1-all-*.sql`, or per-DB dumps). To restore **social** (5434), **listings** (5435), or **shopping** (5436) after applying schemas:
 
 1. Apply schemas: `PGPASSWORD=postgres ./scripts/apply-external-db-schemas.sh`
@@ -595,7 +599,7 @@ Some services connect to multiple databases for cross-service data access:
   - **Services**: Python AI service and other services use SSL port (9093)
   - **Event streaming**: Real-time messaging for forum posts, direct messages, and group chats
 
-Services connect via Kubernetes Service names (e.g., `postgres-auth-external.record-platform.svc.cluster.local:5437`) which route through Kubernetes Endpoints to Docker Compose postgres containers at `host.docker.internal:PORT` (192.168.65.254). Connection strings are configured in `infra/k8s/base/config/app-config.yaml` with `POSTGRES_URL_*` environment variables. All 8 postgres databases have corresponding Kubernetes Services and Endpoints configured for reliable connectivity from Kind cluster to Docker Compose.
+Services connect via Kubernetes Service names (e.g., `postgres-auth-external.record-platform.svc.cluster.local:5437`) which route through Kubernetes Endpoints to Docker Compose postgres containers at `host.docker.internal:PORT`. Connection strings are in `infra/k8s/base/config/app-config.yaml` (`POSTGRES_URL_*`). All 8 Postgres instances have corresponding Kubernetes Services and Endpoints for connectivity from the cluster (Colima + k3s) to external Docker Compose.
 
 ### Observability & Monitoring Stack 📊
 **Comprehensive observability** - Full-stack monitoring, tracing, and visualization:
@@ -706,17 +710,12 @@ linkerd viz dashboard
 **One-Command Bootstrap** - Deploy entire platform instantly for disaster recovery:
 
 - **Bootstrap Script** (`scripts/bootstrap-platform.sh`) - **Complete platform deployment in one command**
-  - ✅ Checks all prerequisites (Terraform, Ansible, kubectl, kind, docker)
-  - ✅ Creates/verifies Kind cluster
+  - ✅ Checks prerequisites (Terraform, Ansible, kubectl, docker)
+  - ✅ Creates/verifies cluster (for Colima + k3s use `scripts/setup-new-colima-cluster.sh` first)
   - ✅ Initializes and applies Terraform (creates namespace, base configs)
-  - ✅ Installs Ansible collections
-  - ✅ Deploys all services with Ansible
-  - ✅ Builds and loads Docker images
-  - ✅ Applies Kubernetes resources via Kustomize
-  - ✅ Waits for all deployments to be ready
-  - ✅ Shows status and next steps
-  - **Usage**: `./scripts/bootstrap-platform.sh` (see `docs/BOOTSTRAP.md` for complete guide)
-  - **Disaster Recovery**: Instant cluster spin-up with `--destroy` flag for teardown
+  - ✅ Installs Ansible collections and deploys services
+  - ✅ Builds and loads Docker images, applies Kustomize, waits for rollouts
+  - **Usage**: `./scripts/bootstrap-platform.sh` (see `docs/BOOTSTRAP.md`). **Disaster recovery**: use `setup-new-colima-cluster.sh` → `bring-up-external-infra.sh` → `inspect-external-db-schemas.sh` as in the Full disaster recovery protocol above.
 
 - **Terraform** (`infra/terraform/`) - Kubernetes infrastructure provisioning with declarative configuration
   - `main.tf` - Main configuration with Kubernetes provider
@@ -777,21 +776,35 @@ cd terraform && terraform plan
 cd ansible && ansible-playbook playbooks/deploy-services.yml --check
 ```
 
-**Full disaster recovery protocol (Colima + external infra + DB)**  
-To recover from a lost cluster or host, run these three steps in order. Use the **newest** backup directory under `backups/` and a **MetalLB pool** that matches your Colima subnet (e.g. `192.168.64.240-192.168.64.250`); exact values vary by environment.
+**Disaster recovery: backup and bring-back (Colima + k3s)**  
+The platform uses **Colima + k3s**; recovery is a four-script process: **backup** (before loss), then **cluster → external infra → schema inspect**.
+
+**1. Backup (run regularly or before major changes)**  
+Creates a timestamped snapshot of all 8 Postgres DBs (schema, data, tuning metadata). Output: `backups/all-8-YYYYMMDD-HHMMSS/`.
 
 ```bash
-# 1. New Colima cluster with MetalLB (set pool for your subnet)
+PGPASSWORD=postgres ./scripts/backup-all-8-dbs.sh
+# Optional: BACKUP_DIR=/path/to/backups PGHOST=127.0.0.1 ./scripts/backup-all-8-dbs.sh
+```
+
+See **docs/EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md** for restore commands (e.g. `restore-all-8-from-backup.sh`).
+
+**2–4. Bring-back (after cluster or host loss)**  
+Use the **newest** backup under `backups/` and a **MetalLB pool** that matches your Colima subnet (e.g. `192.168.64.240-192.168.64.250`); exact values vary by environment.
+
+```bash
+# 2. New Colima + k3s cluster with MetalLB (set pool for your subnet)
 METALLB_POOL=192.168.64.240-192.168.64.250 ./scripts/setup-new-colima-cluster.sh
 
-# 2. Bring up external infra (Docker Compose: 8 Postgres, Redis, Kafka) and restore DBs from backup
+# 3. Bring up external infra (Docker Compose: 8 Postgres, Redis, Kafka) and restore DBs from backup
 RESTORE_BACKUP_DIR=backups/all-8-20260312-091418 ./scripts/bring-up-external-infra.sh
+# Or: RESTORE_BACKUP_DIR=latest ./scripts/bring-up-external-infra.sh   # uses newest backups/all-8-*
 
-# 3. Inspect and document DB schemas (optional verification)
+# 4. Inspect and document DB schemas (optional verification)
 PGPASSWORD=postgres ./scripts/inspect-external-db-schemas.sh docs/CURRENT_DB_SCHEMA_REPORT.md
 ```
 
-Then run preflight and test suites as needed. See **Runbook.md** (item 82) and **docs/EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md**.
+Then run preflight and test suites as needed. See **Runbook.md** (item 82), **ENGINEERING.md** (Disaster recovery: shell script breakdown), and **docs/EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md**.
 
 **Disaster Recovery Capabilities**:
 - ✅ **Instant Cluster Recreation**: Bootstrap script recreates entire Kubernetes cluster
@@ -891,11 +904,11 @@ We run **8 core suites** plus optional k6 load and pgbench sweeps (15+ scripts w
    ```bash
    echo '127.0.0.1 record.local' | sudo tee -a /etc/hosts
    ```
-2. Bootstrap (or refresh) the Kind cluster and dev overlay:
+2. Bootstrap (or refresh) the cluster and dev overlay:
    ```bash
    ./infra/k8s/overlays/dev/bootstrap.sh
    ```
-   The script verifies tooling, creates the `record-platform` Kind cluster if missing, builds `:dev` images, loads them into Kind, applies the Kustomize overlay, installs `kube-prometheus-stack`, waits for rollouts, and prints port-forward tips.
+   For Colima + k3s (primary), run `./scripts/setup-new-colima-cluster.sh` first, then apply overlays. The bootstrap script verifies tooling, builds `:dev` images, applies the Kustomize overlay, and waits for rollouts. See **ENGINEERING.md** (Disaster recovery: shell script breakdown) and the **Full disaster recovery protocol** section above.
 3. Iterate after the initial bootstrap with the faster dev loop:
    ```bash
    KIND_CLUSTER=h3 ./scripts/dev-up.sh

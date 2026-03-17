@@ -858,6 +858,25 @@ ansible-playbook playbooks/deploy-services.yml          # Deploy
 3. **Restore**: If not done via bring-up, run `./scripts/restore-external-postgres-from-backup.sh <backup_dir>`.
 4. **Verification**: `./scripts/inspect-external-db-schemas.sh docs/CURRENT_DB_SCHEMA_REPORT.md`; run preflight/integration tests.
 
+### Disaster recovery: shell script breakdown
+
+Four scripts form the backup and bring-back flow for **Colima + k3s** and the 8-DB data plane. Run **backup** regularly or before major changes; run **bring-back** (steps 2–4) after cluster or host loss.
+
+| Script | Purpose | How to run |
+|--------|---------|------------|
+| **`scripts/backup-all-8-dbs.sh`** | Hard backup of all 8 external Postgres instances (schema, indexes, data, tuning metadata). | `PGPASSWORD=postgres ./scripts/backup-all-8-dbs.sh`. Optional: `BACKUP_DIR=/path`, `PGHOST=127.0.0.1`. Output: `backups/all-8-YYYYMMDD-HHMMSS/` (or `BACKUP_DIR`). |
+| **`scripts/setup-new-colima-cluster.sh`** | One-shot: create a new Colima + k3s cluster and install MetalLB (L2). Use after `colima delete` or when no Colima instance exists. | `./scripts/setup-new-colima-cluster.sh`. Set `METALLB_POOL=192.168.64.240-192.168.64.250` (or your subnet range). Env: `CPU`, `MEMORY`, `DISK`, `COLIMA_K3S_VERSION`. |
+| **`scripts/bring-up-external-infra.sh`** | Bring up external stack: Zookeeper, Kafka (SSL), Redis, 8 Postgres. Uses Docker Compose; run before preflight or k8s so pods can reach `host.docker.internal:5433–5440`, 6379, 29093. | `./scripts/bring-up-external-infra.sh`. To restore DBs: `RESTORE_BACKUP_DIR=backups/all-8-YYYYMMDD-HHMMSS ./scripts/bring-up-external-infra.sh` or `RESTORE_BACKUP_DIR=latest`. Optional: `SKIP_KAFKA=1`, `SKIP_COMPOSE_UP=1`, `MAX_WAIT=180`. |
+| **`scripts/inspect-external-db-schemas.sh`** | Inspect external Postgres DBs and write a schema report (tables, schemas per port). Optional verification after restore. | `PGPASSWORD=postgres ./scripts/inspect-external-db-schemas.sh [report-dir]`. Default report: `reports/schema-report-<timestamp>.md`. To refresh current schema doc: `PGPASSWORD=postgres ./scripts/inspect-external-db-schemas.sh docs/CURRENT_DB_SCHEMA_REPORT.md` (or pass a dir and use the generated filename). |
+
+**Order for full bring-back (after loss)**:
+1. **Backup** (before loss): `PGPASSWORD=postgres ./scripts/backup-all-8-dbs.sh`.
+2. **Cluster**: `METALLB_POOL=<start>-<end> ./scripts/setup-new-colima-cluster.sh`.
+3. **External infra + restore**: `RESTORE_BACKUP_DIR=backups/all-8-<newest-timestamp> ./scripts/bring-up-external-infra.sh`.
+4. **Schema check**: `PGPASSWORD=postgres ./scripts/inspect-external-db-schemas.sh docs/CURRENT_DB_SCHEMA_REPORT.md`.
+
+See **README.md** (Full disaster recovery protocol), **Runbook.md** (item 82), and **docs/EXTERNAL_POSTGRES_BACKUP_AND_RESTORE.md**.
+
 ## Observability & Monitoring
 
 ### Complete Observability Stack

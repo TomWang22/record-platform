@@ -24,6 +24,10 @@ RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 # Use deps stage as-is: do not COPY services/* again or symlinks break
 COPY --from=deps /app /app
 
+# Build common first so @common/utils dist/ exists before any service tsc runs (CI-safe)
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm -C services/common build
+
 # Let workspace orchestrate build (topological order); then prune this service for prod
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm -w build \

@@ -32,9 +32,9 @@ COPY services/common ./services/common
 COPY services/api-gateway ./services/api-gateway
 COPY proto ./proto
 
-# Build with cache mount for faster subsequent builds
+# Build common first (run only @common/utils build script, not root's parallel build), then service
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -w --filter @common/utils build \
+    pnpm --filter @common/utils run build \
  && pnpm -C services/api-gateway build \
  && pnpm -C services/api-gateway prune --prod
 

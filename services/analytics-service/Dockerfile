@@ -31,9 +31,9 @@ COPY --from=deps /app /app
 COPY services/common ./services/common
 COPY services/analytics-service ./services/analytics-service
 
-# Build with cache mount for faster subsequent builds
+# Build common first (run only @common/utils build script, not root's parallel build), then service
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -w --filter @common/utils build \
+    pnpm --filter @common/utils run build \
  && pnpm -C services/analytics-service build \
  && pnpm -C services/analytics-service prune --prod
 

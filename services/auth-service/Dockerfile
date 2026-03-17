@@ -28,9 +28,9 @@ COPY services/common ./services/common
 COPY services/auth-service ./services/auth-service
 COPY proto ./proto
 
-# Build with cache mount for faster subsequent builds
+# Build common first (run only @common/utils build script, not root's parallel build), then service
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -w --filter @common/utils build \
+    pnpm --filter @common/utils run build \
  && cd services/auth-service \
  && rm -rf prisma/generated dist \
  && pnpm exec prisma generate \

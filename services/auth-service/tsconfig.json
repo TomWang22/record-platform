@@ -8,7 +8,9 @@
     "baseUrl": ".",
     "paths": {
       "@prisma/client": ["./prisma/generated/client/index"],
-      "@prisma/client/*": ["./prisma/generated/client/*"]
+      "@prisma/client/*": ["./prisma/generated/client/*"],
+      "@common/utils": ["../common/dist"],
+      "@common/utils/*": ["../common/dist/*"]
     }
   },
   "include": ["src/**/*.ts", "src/types/**/*.d.ts", "prisma/generated/**/*"]

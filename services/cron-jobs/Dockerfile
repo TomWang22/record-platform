@@ -5,23 +5,36 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Copy entire monorepo before install so pnpm can create workspace symlinks (@common/utils, etc.)
-COPY . .
+# Copy package manifests (changes rarely, good for caching)
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY .npmrc ./
+COPY services/common/package.json ./services/common/package.json
+COPY services/cron-jobs/package.json ./services/cron-jobs/package.json
 
+# Use BuildKit cache mounts for pnpm store (persists between builds)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm install --frozen-lockfile --ignore-scripts
+    pnpm -w \
+      --filter @common/utils... \
+      --filter cron-jobs... \
+      install --frozen-lockfile --ignore-scripts
 
 # ---------- build ----------
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
+# Copy installed dependencies from deps stage
 COPY --from=deps /app /app
 
-# Build this service and its deps; then prune for prod
+# Copy source code (changes frequently, invalidates cache)
+COPY services/common ./services/common
+COPY services/cron-jobs ./services/cron-jobs
+
+# Build with cache mount for faster subsequent builds
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm --filter cron-jobs... build \
+    pnpm -C services/common build \
+ && pnpm -C services/cron-jobs build \
  && pnpm -C services/cron-jobs prune --prod --config.confirmModulesPurge=false
 
 # Produce isolated deploy bundle (production deps only). Use same store mount so deploy copies from cache — no network.

@@ -3,12 +3,21 @@ FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 
-# Copy entire monorepo before install so pnpm can create workspace symlinks (@common/utils, etc.)
-COPY . .
+# Copy package manifests (changes rarely, good for caching)
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY .npmrc ./
+COPY services/common/package.json ./services/common/package.json
+COPY services/common/tsconfig.json ./services/common/tsconfig.json
+COPY services/records-service/package.json ./services/records-service/package.json
+COPY services/common/src ./services/common/src
 
+# Use BuildKit cache mounts for pnpm store (persists between builds)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm install --frozen-lockfile
+    pnpm -w \
+      --filter @common/utils... \
+      --filter records-service... \
+      install --frozen-lockfile
 
 # --- build ---
 FROM node:20-bookworm-slim AS build
@@ -25,10 +34,18 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt \
 RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
 COPY --from=deps /app /app
 
-# Build this service and its deps (common then records-service; build script does prisma generate + tsc + lua copy)
+# Copy source code (changes frequently, invalidates cache)
+COPY services/common ./services/common
+COPY services/records-service ./services/records-service
+
+# Build with cache mount for faster subsequent builds
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    rm -rf services/records-service/generated/records-client \
- && pnpm --filter records-service... build \
+    pnpm -C services/common build \
+ && rm -rf services/records-service/generated/records-client \
+ && pnpm -C services/records-service exec prisma generate --schema prisma/schema.prisma \
+ && pnpm -C services/records-service build \
+ && mkdir -p services/records-service/dist/lib \
+ && cp services/records-service/src/lib/*.lua services/records-service/dist/lib/ \
  && test -f services/records-service/dist/routes/records.js \
  && grep -q "__" services/records-service/dist/routes/records.js || true
 

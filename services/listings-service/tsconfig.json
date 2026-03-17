@@ -4,6 +4,8 @@
     "rootDir": "src",
     "outDir": "dist",
     "types": ["node"],
+    "module": "commonjs",
+    "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
       "@common/utils": ["../common/dist"],

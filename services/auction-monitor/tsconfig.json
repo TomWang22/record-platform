@@ -4,6 +4,8 @@
     "rootDir": "src",
     "outDir": "dist",
     "types": ["node"],
+    "module": "commonjs",
+    "moduleResolution": "node",
     "composite": true,
     "baseUrl": ".",
     "paths": {

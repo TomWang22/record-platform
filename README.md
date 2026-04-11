@@ -137,7 +137,7 @@ This isn't a tutorial project—it's a production-grade system solving real prob
 - **`scripts/lib/`** — Network and transport tooling that **proved QUIC on the wire**:
   - **`packet-capture.sh`** — In-pod tcpdump start/stop, BPF filters (port 443 for in-pod; `dst host $TARGET_IP` for host/VM), drain-before-stop, copy pcaps to host; used by baseline, enhanced, and rotation suites.
   - **`transport_validator.py`** — Validates a pcap: QUIC version, 1-RTT/Initial counts, handshake RTT, loss estimate, optional ALPN; outputs a **transport proof** (e.g. `out.json`).
-  - **`protocol-verification.sh`** — tshark helpers: QUIC SNI `record.local`, UDP to LB IP, stray UDP checks; used by `verify-k6-protocols.sh` and rotation wire verification.
+  - **`protocol-verification.sh`** — tshark helpers: QUIC SNI **`record.test`** (edge hostname; avoid `*.local` for mDNS), UDP to LB IP, stray UDP checks; used by `verify-k6-protocols.sh` and rotation wire verification.
   - **`http3.sh`** — Shared HTTP/3 curl timeouts and options for tests.
 
 - **QUIC proof artifacts (repo root)** — JSON files produced by transport validation and rotation runs prove HTTP/3 (QUIC) on the wire:
@@ -164,7 +164,7 @@ The platform **moved from k3d to Colima + k3s for real L2 networking**: MetalLB 
 ### Environment and test limitations
 Some tests may error or be skipped due to **environment limitations** and **strict TLS**:
 - **Port-forward / NodePort**: gRPC direct port-forward can fail (connection to 50xxx:50xxx refused) when the tunnel is not ready; tls-mtls suite skips Test 3 on Colima when port-forward is unavailable. Envoy NodePort (UDP for HTTP/3) may not be exposed to host on Colima.
-- **Strict TLS**: All suites use strict TLS (no `-k`); k6 and curl require `SSL_CERT_FILE` / `certs/dev-root.pem` (from preflight). Missing CA causes x509 "record.local certificate is not trusted".
+- **Strict TLS**: All suites use strict TLS (no `-k`); k6 and curl require `SSL_CERT_FILE` / `certs/dev-root.pem` (from preflight). Missing CA causes x509 errors for the edge hostname (**`record.test`**).
 - **HTTP/3 curl**: macOS system curl does not support HTTP/3. Use Homebrew curl (`brew install curl`); run `./scripts/verify-curl-http3.sh` to confirm the active curl has `--http3` so tests use native curl (avoids Docker-bridge timeout/exit 28). See `docs/RCA-HTTP3-CURL-EXIT-28.md`.
 - **MFA / OAuth / Email**: MFA verify, email verification send, and OAuth Google endpoint can return HTTP 500 in dev (not configured or mocked).
 - **Social suite**: Archive thread, list archived, delete thread, list groups, kick, ban, recall can fail with 501 (migrations not applied) or 403 (role: requester not owner/admin). Preflight runs `ensure-social-migrations.sh`; run it manually if needed (Runbook #45).
@@ -292,7 +292,7 @@ For detailed technical documentation, system design diagrams, and deep dives int
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    ingress-nginx (Kubernetes Cluster)                       │
-│                         host: record.local                                  │
+│                         host: record.test (TLS + ingress)                  │
 └──────────────────────┬───────────────────────────┬──────────────────────────┘
                        │                           │
         REST /api/*    │                           │  gRPC /service.*
@@ -472,7 +472,7 @@ For detailed technical documentation, system design diagrams, and deep dives int
   - **HEADERS/DATA Ordering**: Enforces correct gRPC frame ordering
   - **Proven Functionality**: Envoy test passed immediately (same Node.js server works with Envoy, fails with Caddy)
   - **Architecture Decision**: Clean separation of concerns - Envoy for gRPC, Caddy for HTTP/3 + web + REST
-- **ingress-nginx** routes `/` to Nginx edge (static assets + micro-cache) and `/api/*` directly to API Gateway
+- **ingress-nginx** routes `/` to Nginx edge, **`/api/*` and `/auth/*`** to **API Gateway on port 4000** (see `infra/k8s/overlays/dev/ingress.yaml`; TLS host **`record.test`**)
 - **Nginx Edge** serves the Next.js webapp and proxies API requests through HAProxy
 - **HAProxy** maintains keep-alive pools and load balances to API Gateway
 
@@ -530,7 +530,7 @@ For detailed technical documentation, system design diagrams, and deep dives int
 
 ### Edge & Routing
 - **Caddy** (`Caddyfile`, `caddy-*.yaml`) - Host-side HTTP/2 + HTTP/3 front door with TLS termination. Mounts local cert bundle under `/etc/caddy/certs`, trusts `certs/dev-root.pem`. Supports QUIC (HTTP/3) and HTTP/2.
-- **Ingress** (`infra/k8s/overlays/dev/ingress.yaml`) - nginx ingress controller routing for the cluster (Colima + k3s primary). Routes `/` to Nginx edge and `/api/*` to API Gateway. Supports gRPC with `backend-protocol: "GRPC"` annotations.
+- **Ingress** (`infra/k8s/overlays/dev/ingress.yaml`) - nginx ingress controller routing for the cluster (Colima + k3s primary). Routes `/` to Nginx edge; **`/api/*` and `/auth/*`** to **API Gateway :4000**; TLS host **`record.test`**. Supports gRPC with `backend-protocol: "GRPC"` annotations where used.
 - **HAProxy** (`infra/k8s/base/haproxy`) - Maintains keep-alive pools to gateway, load balancing, stats on `:8404`, keeps gateway replicas warm.
 
 ### Data Layer (External - Docker Compose)
@@ -826,6 +826,8 @@ Then run preflight and test suites as needed. See **Runbook.md** (item 82), **EN
 
 ## Testing
 
+**Command center:** **`docs/COMMAND_CENTER.md`** — edge URL **`https://record.test`**, **api-gateway port 4000** (not 4020), smoke commands, preflight entrypoints, and reference tarball SHAs.
+
 **To the point:** One pipeline runs **preflight** (kubeconfig, API server, **strict TLS/mTLS**), then **8 suites**; DB verification runs after each suite. All services use strict TLS and mTLS. Optional load (k6 + pgbench) and **total platform coverage** are documented below.
 
 ### What is preflight?
@@ -855,12 +857,12 @@ Then run preflight and test suites as needed. See **Runbook.md** (item 82), **EN
 7. TLS/mTLS comprehensive  
 8. Social (forum + messages, archive/recall/kick/ban; requires social DB migrations — see `scripts/ensure-social-migrations.sh`)
 
-**Why 8+ suites and a “command center”**  
-We run **8 core suites** plus optional k6 load and pgbench sweeps (15+ scripts when counting limit-finding, service-specific k6, and DB verification). This breadth exists because the platform spans multiple protocols (HTTP/1.1, HTTP/2, HTTP/3, gRPC), strict TLS/mTLS, zero-downtime rotation, and 8 databases. A single “command center” entry point (`run-all-test-suites.sh` or `run-preflight-scale-and-all-suites.sh`) orchestrates order, preflight, and DB/cache verification so you don’t have to remember sequence or cert steps. See `scripts/load/LOAD_TESTS_CATALOG.md` and `ENGINEERING.md` for the full testing strategy.
+**Why 8+ suites and a command center**  
+We run **8 core suites** plus optional k6 load and pgbench sweeps (15+ scripts when counting limit-finding, service-specific k6, and DB verification). This breadth exists because the platform spans multiple protocols (HTTP/1.1, HTTP/2, HTTP/3, gRPC), strict TLS/mTLS, zero-downtime rotation, and 8 databases. A single command center orchestrates order, preflight, ports, and DB/cache verification — see **`docs/COMMAND_CENTER.md`** (entrypoints, URLs, smoke, reference tarballs). Primary scripts: `run-all-test-suites.sh` and `run-preflight-scale-and-all-suites.sh`. See also `scripts/load/LOAD_TESTS_CATALOG.md` and `ENGINEERING.md`.
 
 **Strict TLS/mTLS (including k6)**  
 - **Preflight:** `scripts/ensure-strict-tls-mtls-preflight.sh` validates `service-tls` + `dev-root-ca`; if missing/invalid, provisions from repo or OpenSSL and restarts gRPC/TLS workloads. Used by both preflight pipeline (step 5) and `run-all-test-suites.sh`.
-- **k6:** All k6 runs use **strict TLS** (no `-k`). The runner sets `SSL_CERT_FILE` to the dev-root CA (from K8s secret or `certs/dev-root.pem`) so `record.local` x509 verification succeeds. If you see `x509: certificate is not trusted`, set `K6_CA_CERT=/path/to/dev-root.pem` or run after preflight.
+- **k6:** All k6 runs use **strict TLS** (no `-k`). The runner sets `SSL_CERT_FILE` to the dev-root CA (from K8s secret or `certs/dev-root.pem`) so **`record.test`** (edge) x509 verification succeeds. If you see `x509: certificate is not trusted`, set `K6_CA_CERT=/path/to/dev-root.pem` or run after preflight.
 - Prevents auth 503 / "self-signed certificate in certificate chain" by restarting pods after any cert update.
 
 **HTTP/1.1, HTTP/2, and HTTP/3 (and why we test both)**  
@@ -894,16 +896,18 @@ We run **8 core suites** plus optional k6 load and pgbench sweeps (15+ scripts w
 
 ## Prerequisites
 - Docker 24+, Colima, kubectl >=1.30, Helm >=3.13.
-- mkcert (or another local CA tool) to mint and trust `record.local` certificates.
+- mkcert (or another local CA tool) to mint and trust the dev edge hostname **`record.test`** certificates (prefer `*.test` over `*.local` in `/etc/hosts` to avoid mDNS conflicts on macOS).
 - Node 20+ and pnpm 9.x for service builds.
 - Optional: `curl` with HTTP/3 support (Homebrew `curl --with-quic`) and `k6` for load tests.
 - Optional: Terraform >=1.0 and Ansible >=2.9 for Infrastructure as Code (IAC) workflows (see `infra/IAC-GUIDE.md`).
 
 ## Local Development Quickstart
-1. Ensure `record.local` resolves locally:
+1. Map **`record.test`** to your **MetalLB** IP for `caddy-h3` (not `127.0.0.1` — avoids broken QUIC/SNI vs real edge):
    ```bash
-   echo '127.0.0.1 record.local' | sudo tee -a /etc/hosts
+   # Example: LB_IP from `kubectl get svc caddy-h3 -n ingress-nginx`
+   echo '<METALLB_IP> record.test' | sudo tee -a /etc/hosts
    ```
+   Or run `./scripts/ensure-edge-hosts.sh` (discovers the LoadBalancer IP and appends the line). Override hostname with `OCH_EDGE_HOSTNAME=record.test`.
 2. Bootstrap (or refresh) the cluster and dev overlay:
    ```bash
    ./infra/k8s/overlays/dev/bootstrap.sh
@@ -1409,8 +1413,8 @@ kubectl -n record-platform rollout restart deployment/api-gateway
 # Verify rollout
 kubectl -n record-platform rollout status deployment/api-gateway --timeout=90s
 
-# Test gateway health
-curl -k https://record.local:8443/api/healthz
+# Test gateway health (edge: https://record.test via MetalLB; strict TLS: use --cacert certs/dev-root.pem)
+curl --cacert certs/dev-root.pem -sS -o /dev/null -w "%{http_code}\n" https://record.test/api/healthz
 ```
 
 **Common Gateway Issues**:
@@ -1471,7 +1475,7 @@ kubectl -n record-platform get pods
 **Check Health Check Status**:
 ```bash
 # Check service health
-curl -k https://record.local:8443/api/<service>/healthz
+curl --cacert certs/dev-root.pem -sS https://record.test/api/<service>/healthz
 
 # Check Kubernetes probes
 kubectl -n record-platform describe pod <pod-name> | grep -A 10 "Liveness\|Readiness"
@@ -1520,7 +1524,7 @@ kubectl -n record-platform logs -l app=<service-name> -c app --tail=100 -f
 kubectl -n record-platform logs -l app=api-gateway -c app --tail=200 -f
 
 # Test specific endpoint manually
-curl -k -v https://record.local:8443/api/<endpoint> \
+curl --cacert certs/dev-root.pem -v https://record.test/api/<endpoint> \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json"
 ```
@@ -1619,16 +1623,13 @@ kubectl -n record-platform wait --for=condition=ready pod --all --timeout=300s
 - Follow conventional commits (`type(scope): summary`) so the changelog stays readable.
 
 ### Commit Messages
-For detailed commit messages, use `COMMIT_MESSAGE.txt`:
+Use conventional commits (`type(scope): summary`). For a long message, put it in any file and pass it to Git:
+
 ```bash
-# Option 1: Use git commit with -F flag
-git commit -F COMMIT_MESSAGE.txt
-
-# Option 2: Use the helper script
-./scripts/commit.sh
-
-# Note: git commit -m "COMMIT_MESSAGE.txt" won't work - use -F flag!
+git commit -F path/to/message.txt
 ```
+
+If your repo still has `./scripts/commit.sh`, you can use that helper when present.
 
 ## License
 MIT (or customize to your needs).

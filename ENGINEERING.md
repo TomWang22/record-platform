@@ -2,6 +2,8 @@
 
 This document provides in-depth technical documentation for the Record Platform architecture, design decisions, and implementation details. For a high-level overview, see [`README.md`](README.md). *Last updated to reflect Colima k3s primary, 8-DB deterministic restore and schema inspection, preflight step 7c (in-cluster k6), and Runbook 79–80.*
 
+**Reference docs:** [`docs/README.md`](docs/README.md) (short index into `docs/`); [`docs/COMMAND_CENTER.md`](docs/COMMAND_CENTER.md) (edge URL **`https://record.test`**, gateway port **4000**, smoke commands, tarball SHA-256 index); [`docs/bundles/TARBALL_SELECTIVE_MERGE.md`](docs/bundles/TARBALL_SELECTIVE_MERGE.md) (how **`~/record-platform*.tar.gz`** bundles are merged into this repo without overwriting the Makefile/Caddyfile wholesale — including the **second-pass** additive merge of protos, dev patches, and **`make resilience-menu`**).
+
 ## Table of Contents
 
 1. [System Architecture](#system-architecture)
@@ -58,7 +60,7 @@ This document provides in-depth technical documentation for the Record Platform 
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    Kubernetes Ingress Layer                                 │
 │                    ingress-nginx (Kubernetes Cluster)                        │
-│                         host: record.local                                  │
+│                         host: record.test (TLS + ingress)                  │
 │                                                                              │
 │  Routing Rules:                                                              │
 │  - / → Nginx Edge (static assets + micro-cache)                            │
@@ -326,7 +328,7 @@ Preflight and all suites run on **Colima + k3s** by default. Colima is started w
 **Trade-offs**:
 - Restarting 8 deployments after cert update adds ~30–90s to preflight when the secret is replaced; acceptable for correctness and to avoid flaky auth/503.
 
-**References**: Runbook items 24–25; README Testing section; COMMIT_MESSAGE.txt (Strict TLS/mTLS preflight).
+**References**: Runbook items 24–25; README Testing section; strict TLS/mTLS preflight notes above.
 
 ### Platform-Wide Intelligence (Analytics Engine → Python AI)
 
@@ -468,7 +470,7 @@ The full test pipeline is structured as **preflight** followed by **eight suites
 
 **Why 8+ suites and a command center:** We run 8 core suites plus optional k6 and pgbench (15+ scripts when counting limit-finding, service-specific k6, and DB verification). The platform spans multiple protocols (HTTP/1.1, HTTP/2, HTTP/3, gRPC), strict TLS/mTLS, zero-downtime rotation, and 8 databases. A single entry point (`run-all-test-suites.sh` or `run-preflight-scale-and-all-suites.sh`) orchestrates order, preflight, and DB/cache verification. See `scripts/load/LOAD_TESTS_CATALOG.md` for the full catalog.
 
-**Strict TLS for k6:** All k6 runs use strict TLS (no `-k`). The runner sets `SSL_CERT_FILE` to the dev-root CA (from K8s secret or `certs/dev-root.pem`) so `record.local` x509 verification succeeds. If you see `x509: certificate is not trusted`, set `K6_CA_CERT=/path/to/dev-root.pem` or run after preflight.
+**Strict TLS for k6:** All k6 runs use strict TLS (no `-k`). The runner sets `SSL_CERT_FILE` to the dev-root CA (from K8s secret or `certs/dev-root.pem`) so the edge hostname **`record.test`** verifies. If you see `x509: certificate is not trusted`, set `K6_CA_CERT=/path/to/dev-root.pem` or run after preflight. (Legacy docs may say **`record.local`**; prefer **`record.test`** in `/etc/hosts` with the MetalLB IP for **`caddy-h3`** to match ingress TLS and avoid mDNS issues on macOS.)
 
 **HTTP/1.1, HTTP/2, and HTTP/3 (xk6-http3 and HOLB):**
 - **HTTP/2:** Standard k6 uses HTTP/2 by default over TLS; we use it for baseline and limit tests.
@@ -1860,7 +1862,7 @@ wireshark test-results/YYYYMMDD-HHMMSS-http3-verification/quic-capture.pcap
 1. Restart service: `kubectl -n record-platform rollout restart deployment/<service>`
 2. Verify rollout: `kubectl -n record-platform rollout status deployment/<service>`
 3. Check logs: Monitor logs for errors after restart
-4. Test endpoint: `curl -k https://record.local:8443/api/<service>/healthz`
+4. Test endpoint: `curl --cacert certs/dev-root.pem -sS https://record.test/api/<service>/healthz`
 
 ### Database Recovery
 
@@ -1888,7 +1890,7 @@ wireshark test-results/YYYYMMDD-HHMMSS-http3-verification/quic-capture.pcap
 1. Check gateway logs: `kubectl -n record-platform logs -l app=api-gateway -c app --tail=500`
 2. Check proxy errors: Filter logs for "proxy error", "502", "upstream error"
 3. Check Redis connection: Filter logs for "redis", "Redis"
-4. Test gateway health: `curl -k https://record.local:8443/api/healthz`
+4. Test gateway health: `curl --cacert certs/dev-root.pem -sS -o /dev/null -w "%{http_code}\n" https://record.test/api/healthz`
 
 **Common Issues**:
 - **502 Bad Gateway**: Downstream service unavailable
@@ -1931,7 +1933,7 @@ wireshark test-results/YYYYMMDD-HHMMSS-http3-verification/quic-capture.pcap
 **Diagnosis**:
 1. Check probe status: `kubectl -n record-platform describe pod <pod> | grep -A 10 "Liveness\|Readiness"`
 2. Check probe failures: `kubectl -n record-platform get events | grep -E "Unhealthy|Failed"`
-3. Test health endpoint: `curl -k https://record.local:8443/api/<service>/healthz`
+3. Test health endpoint: `curl --cacert certs/dev-root.pem -sS https://record.test/api/<service>/healthz`
 4. Check service logs: Look for health check related errors
 
 **Common Issues**:

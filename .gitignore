@@ -94,7 +94,6 @@ infra/docs/EIGHT-DATABASES_ARCHITECTURE.md
 # Generated CSV: pgbench/scripts write to test-results/ or LOG_DIR; keep *.csv ignored to avoid committing large outputs
 # (See scripts/PGBENCH_HARDENING.md and run_pgbench_sweep.sh for where CSVs are written.)
 *.txt
-!COMMIT_MESSAGE.txt
 *.csv
 *.tsv
 *.html
@@ -118,8 +117,8 @@ index.html
 nginx.conf/
 nginx.tmpl
 nginx.tmpl.bak
-# Allow COMMIT_MESSAGE.txt (explicitly allowed above)
-# COMMIT_MESSAGE.*  # Commented out to allow COMMIT_MESSAGE.txt
+# Accidental shell redirect creates a root file literally named `&1`
+/&1
 CURRENT_STATUS.*
 DEEP_OPTIMIZATION_PLAN.*
 PERFORMANCE_ANALYSIS.*

@@ -3,6 +3,7 @@
 See **[`../README.md`](../README.md)** for a short index of `docs/` (this directory, **`TARBALL_SELECTIVE_MERGE.md`**, **`COMMAND_CENTER.md`**, etc.).
 
 - **`TARBALL_SELECTIVE_MERGE.md`** — How **all** `record-platform*.tar.gz` archives under **`~/`** were audited; what merges safely; what to **never** overwrite blindly; **second-pass** additive merge (base protos, strict-envelope / transport-routing, dev overlay patches, **`scripts/resilience-interactive-menu.sh`**). Linked from **`ENGINEERING.md`** (intro), **`docs/COMMAND_CENTER.md`** (SHA table), and **`docs/README.md`**.
+- **`quic-transport-porting-20260416/`** — In-tree copy of **`record-platform-quic-transport-porting-bundle-20260416-192801.tar.gz`** (`README_PORTING.txt`, **`MANIFEST.txt`**, **`make-fragments/`**). Scripts live under **`scripts/lib/`** (QUIC analyzers v5–v7, **`quic_command_center/`**, **`packet-capture-v2.sh`**); Make targets **`transport-quic-v6-prove`**, **`transport-quic-v7-prove`**, **`transport-quic-v6-v7-prove`** in root **`Makefile`**.
 - **`kafka-kraft-3broker-kafka-certs-20260410/README-BUNDLE.md`** — Standalone **`infra/k8s/kafka-kraft-metallb/`** + **`infra/k8s/kafka-certs/`** (SHA **`e547496e…`**).
 
 - **`preflight-kafka-caddy-20260409/`** — Extracted from `record-platform-och-preflight-kafka-kraft-certs-caddy-reference-20260409.tar.gz` (SHA-256 in **`docs/COMMAND_CENTER.md`**): `README-BUNDLE.md`, `PLATFORM_REUSE_AND_PREFLIGHT.md`, `CADDY_IMAGE_XCADDY_TCPDUMP_TSHARK.md`.

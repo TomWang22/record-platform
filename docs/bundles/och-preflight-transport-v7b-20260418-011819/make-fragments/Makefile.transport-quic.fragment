@@ -1,0 +1,107 @@
+packet-capture-standalone: ## gRPC/HTTP2/HTTP3 capture smoke (needs cluster + MetalLB IP; sets PORT=443 if TARGET_IP set)
+	bash "$(SCRIPTS)/test-packet-capture-standalone.sh"
+
+# Replicable HTTP/3 proof: MetalLB IP + curl --http3-only + STRICT capture + transport-summary-v6.json + jq assert.
+transport-quic-v6-prove: ## Colima/MetalLB: standalone capture + v6 artifact (needs kubectl, tshark, jq, curl w/ HTTP3)
+	@command -v tshark >/dev/null 2>&1 || { echo "tshark required (e.g. brew install --cask wireshark)"; exit 1; }
+	@command -v jq >/dev/null 2>&1 || { echo "jq required"; exit 1; }
+	cd "$(REPO_ROOT)" && \
+	  _lb="$$(kubectl get svc -n ingress-nginx caddy-h3 -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)" && \
+	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
+	  _kl="$(REPO_ROOT)/bench_logs/sslkeys-och-transport-$$(date +%Y%m%d-%H%M%S).log" && \
+	  rm -f "$$_kl" && touch "$$_kl" && \
+	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
+	    bash "$(SCRIPTS)/test-packet-capture-standalone.sh" && \
+	  _dir="$$(ls -dt /tmp/packet-captures-v2-* | head -1)" && \
+	  mkdir -p "$(REPO_ROOT)/bench_logs" && echo "$$_dir" > "$(REPO_ROOT)/bench_logs/.last-transport-quic-prove-dir" && \
+	  echo "Capture dir: $$_dir" && \
+	  echo "Key log: $$_kl" && \
+	  echo "" && \
+	  echo "Validating QUIC v6 artifact..." && \
+	  jq -e '.valid == true and (.quic_frame_count > 0) and (.packet_number_spaces | length > 0) and (.tls.selected_cipher_suite != null and (.tls.selected_cipher_suite | tostring | length > 0))' "$$_dir/transport-summary-v6.json" >/dev/null && \
+	  echo "✅ Core QUIC validation OK" && \
+	  echo "" && \
+	  echo "--- transport-summary-v6.json ---" && \
+	  jq . "$$_dir/transport-summary-v6.json" && \
+	  echo "" && \
+	  echo "--- QUIC packet numbers (tshark, sample) ---" && \
+	  ( tshark -r "$$_dir/caddy-capture.pcap" -Y quic -T fields -e quic.packet_number 2>/dev/null | head || true ) && \
+	  echo "" && \
+	  echo "--- ALPN h3 check ---" && \
+	  ( tshark -r "$$_dir/caddy-capture.pcap" -o tls.keylog_file:"$$_kl" -Y 'tls.handshake.extensions_alpn_str == "h3"' -T fields -e tls.handshake.extensions_alpn_str 2>/dev/null | head || true ) && \
+	  echo "" && \
+	  echo "HTTP/3 transport v6 proven. Latest capture dir: $$_dir"
+
+# One capture, two jq gates (reproducible single pcap dir for v6 + v7 artifacts).
+transport-quic-v6-v7-prove: ## Single standalone run; strict jq on transport-summary-v6.json then v7 (writes bench_logs/.last-transport-quic-prove-dir)
+	@command -v tshark >/dev/null 2>&1 || { echo "tshark required"; exit 1; }
+	@command -v jq >/dev/null 2>&1 || { echo "jq required"; exit 1; }
+	cd "$(REPO_ROOT)" && \
+	  mkdir -p "$(REPO_ROOT)/bench_logs" && \
+	  _lb="$$(kubectl get svc -n ingress-nginx caddy-h3 -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)" && \
+	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
+	  _kl="$(REPO_ROOT)/bench_logs/sslkeys-och-transport-$$(date +%Y%m%d-%H%M%S).log" && \
+	  rm -f "$$_kl" && touch "$$_kl" && \
+	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
+	    bash "$(SCRIPTS)/test-packet-capture-standalone.sh" && \
+	  _dir="$$(ls -dt /tmp/packet-captures-v2-* | head -1)" && \
+	  echo "$$_dir" > "$(REPO_ROOT)/bench_logs/.last-transport-quic-prove-dir" && \
+	  echo "Capture dir: $$_dir" && echo "Key log: $$_kl" && \
+	  echo "Validating v6 artifact..." && \
+	  jq -e '.valid == true and (.quic_frame_count > 0) and (.packet_number_spaces | length > 0) and (.tls.selected_cipher_suite != null and (.tls.selected_cipher_suite | tostring | length > 0))' "$$_dir/transport-summary-v6.json" >/dev/null && \
+	  echo "Validating v7 invariant..." && \
+	  jq -e '.valid == true and (.quic.frame_count > 0) and (.quic.packet_number_spaces | length > 0) and (.tls.selected_cipher_suite != null and (.tls.selected_cipher_suite | tostring | length > 0)) and (.tls.alpn_protocol == "h3") and (.quic.version_negotiation_packets == 0) and ([.quic.packet_number_spaces[] | select(.space == "1RTT")] | length > 0)' "$$_dir/transport-summary-v7.json" >/dev/null && \
+	  echo "" && \
+	  echo "--- transport-summary-v6.json ---" && \
+	  jq . "$$_dir/transport-summary-v6.json" && \
+	  echo "" && \
+	  echo "--- transport-summary-v7.json ---" && \
+	  jq . "$$_dir/transport-summary-v7.json" && \
+	  echo "" && \
+	  ( if [[ -n "$${JAEGER_QUERY_BASE:-}" ]]; then \
+	      QUIC_JAEGER_CORRELATION_REQUIRE="$${QUIC_JAEGER_CORRELATION_REQUIRE:-0}" \
+	      node "$(REPO_ROOT)/scripts/verify-quic-jaeger-correlation.mjs" \
+	        --v7-json "$$_dir/transport-summary-v7.json" --write-back || exit 1; \
+	    else \
+	      echo "JAEGER_QUERY_BASE unset: skip QUIC-Jaeger correlation"; \
+	    fi ) && \
+	  echo "v6 + v7 strict gates passed on $$_dir"
+
+# v7 invariant: reshaped JSON + capture window + spin metadata + cert/ALPN; optional Jaeger correlation when JAEGER_QUERY_BASE is set.
+transport-quic-v7-prove: ## Same capture as v6; transport-summary-v7.json + strict jq (ALPN h3, 1RTT space, VN=0)
+	@command -v tshark >/dev/null 2>&1 || { echo "tshark required (e.g. brew install --cask wireshark)"; exit 1; }
+	@command -v jq >/dev/null 2>&1 || { echo "jq required"; exit 1; }
+	cd "$(REPO_ROOT)" && \
+	  mkdir -p "$(REPO_ROOT)/bench_logs" && \
+	  _lb="$$(kubectl get svc -n ingress-nginx caddy-h3 -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)" && \
+	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
+	  _kl="$(REPO_ROOT)/bench_logs/sslkeys-och-transport-$$(date +%Y%m%d-%H%M%S).log" && \
+	  rm -f "$$_kl" && touch "$$_kl" && \
+	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
+	    bash "$(SCRIPTS)/test-packet-capture-standalone.sh" && \
+	  _dir="$$(ls -dt /tmp/packet-captures-v2-* | head -1)" && \
+	  echo "$$_dir" > "$(REPO_ROOT)/bench_logs/.last-transport-quic-prove-dir" && \
+	  echo "Capture dir: $$_dir" && \
+	  echo "Key log: $$_kl" && \
+	  echo "" && \
+	  echo "Validating QUIC v7 invariant..." && \
+	  jq -e '.valid == true and (.quic.frame_count > 0) and (.quic.packet_number_spaces | length > 0) and (.tls.selected_cipher_suite != null and (.tls.selected_cipher_suite | tostring | length > 0)) and (.tls.alpn_protocol == "h3") and (.quic.version_negotiation_packets == 0) and ([.quic.packet_number_spaces[] | select(.space == "1RTT")] | length > 0)' "$$_dir/transport-summary-v7.json" >/dev/null && \
+	  echo "Core QUIC v7 validation OK" && \
+	  ( if [[ -n "$${JAEGER_QUERY_BASE:-}" ]]; then \
+	      QUIC_JAEGER_CORRELATION_REQUIRE="$${QUIC_JAEGER_CORRELATION_REQUIRE:-0}" \
+	      node "$(REPO_ROOT)/scripts/verify-quic-jaeger-correlation.mjs" \
+	        --v7-json "$$_dir/transport-summary-v7.json" --write-back || exit 1; \
+	    else \
+	      echo "JAEGER_QUERY_BASE unset: skip QUIC-Jaeger correlation (optional)"; \
+	    fi ) && \
+	  echo "" && \
+	  echo "--- transport-summary-v7.json ---" && \
+	  jq . "$$_dir/transport-summary-v7.json" && \
+	  echo "" && \
+	  echo "--- QUIC packet numbers (tshark, sample) ---" && \
+	  ( tshark -r "$$_dir/caddy-capture.pcap" -Y quic -T fields -e quic.packet_number 2>/dev/null | head || true ) && \
+	  echo "" && \
+	  echo "--- ALPN h3 check ---" && \
+	  ( tshark -r "$$_dir/caddy-capture.pcap" -o tls.keylog_file:"$$_kl" -Y 'tls.handshake.extensions_alpn_str == "h3"' -T fields -e tls.handshake.extensions_alpn_str 2>/dev/null | head || true ) && \
+	  echo "" && \
+	  echo "HTTP/3 transport v7 proven. Latest capture dir: $$_dir"

@@ -1,0 +1,84 @@
+# Static guardrails for Kafka verification tooling. Does not reach a real cluster (GitHub runners have no k3s/MetalLB).
+# Run the full ritual locally: make verify-kafka-cluster  (or pnpm verify:kafka-cluster)
+name: Kafka cluster verify (static)
+
+on:
+  # Every PR runs (stable CI surface). Push to main/master stays path-filtered to save minutes.
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+      - fix/**
+      - feat/**
+      - feature/**
+      - chore/**
+      - hotfix/**
+    paths:
+      - "infra/k8s/kafka-kraft-metallb/**"
+      - "scripts/verify-kafka-*.sh"
+      - "scripts/verify-kafka-metallb-pin-formula.sh"
+      - "scripts/lib/kafka-metallb-pin-formula.sh"
+      - "scripts/verify-preflight-edge-routing.sh"
+      - "scripts/kafka-ssl-from-dev-root.sh"
+      - "scripts/tests/kafka-alignment-suite.sh"
+      - "scripts/kafka-runtime-sync.sh"
+      - "scripts/check-kafka-config-drift.sh"
+      - "Makefile"
+      - ".github/workflows/kafka-cluster-verify.yml"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Shellcheck Kafka verification scripts
+        run: |
+          set -euo pipefail
+          shellcheck -S error scripts/verify-kafka-tls-sans.sh
+          shellcheck -S error scripts/verify-kafka-kraft-advertised-listeners.sh
+          shellcheck -S error scripts/verify-kafka-cluster.sh
+          shellcheck -S error scripts/verify-preflight-edge-routing.sh
+
+      - name: Bash syntax validation
+        run: |
+          set -euo pipefail
+          bash -n scripts/verify-kafka-tls-sans.sh
+          bash -n scripts/verify-kafka-kraft-advertised-listeners.sh
+          bash -n scripts/verify-kafka-cluster.sh
+          bash -n scripts/verify-preflight-edge-routing.sh
+          bash -n scripts/kafka-ssl-from-dev-root.sh
+          bash -n scripts/kafka-runtime-sync.sh
+          bash -n scripts/tests/kafka-alignment-suite.sh
+          bash -n scripts/verify-kafka-metallb-pin-formula.sh
+          bash -n scripts/lib/kafka-metallb-pin-formula.sh
+
+      - name: Kafka MetalLB pin formula (table tests, no cluster)
+        run: chmod +x scripts/verify-kafka-metallb-pin-formula.sh && ./scripts/verify-kafka-metallb-pin-formula.sh
+
+      - name: Makefile target exists
+        run: |
+          set -euo pipefail
+          grep -q '^verify-kafka-cluster:' Makefile
+          grep -q '^kafka-health:' Makefile
+          grep -q '^kafka-alignment-suite:' Makefile
+
+      - name: KRaft StatefulSet is three replicas (source manifest)
+        run: |
+          set -euo pipefail
+          grep -qE 'replicas:[[:space:]]+3\b' infra/k8s/kafka-kraft-metallb/statefulset.yaml || {
+            echo "::error::infra/k8s/kafka-kraft-metallb/statefulset.yaml must set replicas: 3 for KRaft quorum."
+            exit 1
+          }

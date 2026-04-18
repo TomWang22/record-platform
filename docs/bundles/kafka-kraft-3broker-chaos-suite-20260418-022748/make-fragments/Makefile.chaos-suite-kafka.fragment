@@ -1,0 +1,6 @@
+chaos-suite: ## Safe baseline chaos artifacts + report (override CHAOS_SUITE_ARTIFACT_DIR, CHAOS_SUITE=full for more)
+	CHAOS_SUITE=baseline bash "$(SCRIPTS)/run-chaos-suite.sh"
+
+chaos-suite-kafka: ## baseline + stochastic Kafka/LB/TLS chaos (needs CHAOS_CONFIRM=1 KAFKA_ALIGNMENT_TEST_MODE=1)
+	CHAOS_SUITE=baseline-kafka CHAOS_KAFKA_ALIGNMENT=1 CHAOS_CONFIRM=1 KAFKA_ALIGNMENT_TEST_MODE=1 bash "$(SCRIPTS)/run-chaos-suite.sh"
+

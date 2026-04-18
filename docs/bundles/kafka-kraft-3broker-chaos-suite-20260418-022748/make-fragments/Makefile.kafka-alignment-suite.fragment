@@ -1,0 +1,16 @@
+kafka-alignment-report-venv: ## Venv + matplotlib for generate-kafka-alignment-report.py (PEP 668–safe)
+	@test -x "$(KAFKA_ALIGNMENT_REPORT_VENV)/bin/python" || python3 -m venv "$(KAFKA_ALIGNMENT_REPORT_VENV)"
+	"$(KAFKA_ALIGNMENT_REPORT_VENV)/bin/pip" install -q -r "$(REPO_ROOT)/scripts/requirements-kafka-alignment-report.txt"
+
+kafka-alignment-suite: kafka-alignment-report-venv ## Alignment test suite (safe by default; full chaos: KAFKA_ALIGNMENT_TEST_MODE=1 make kafka-alignment-suite)
+	bash -n "$(REPO_ROOT)/scripts/ensure-dev-root-ca.sh"
+	bash -n "$(REPO_ROOT)/scripts/kafka-refresh-tls-from-lb.sh"
+	bash -n "$(REPO_ROOT)/scripts/wait-for-kafka-external-lb-ips.sh"
+	bash -n "$(REPO_ROOT)/scripts/kafka-after-rollout-verify-brokers.sh"
+	bash -n "$(REPO_ROOT)/scripts/kafka-tls-guard.sh"
+	bash -n "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+	bash -n "$(REPO_ROOT)/scripts/tests/kafka-alignment-suite.sh"
+	chmod +x "$(REPO_ROOT)/scripts/ensure-dev-root-ca.sh" "$(REPO_ROOT)/scripts/kafka-refresh-tls-from-lb.sh" "$(REPO_ROOT)/scripts/wait-for-kafka-external-lb-ips.sh" "$(REPO_ROOT)/scripts/kafka-after-rollout-verify-brokers.sh" "$(REPO_ROOT)/scripts/kafka-tls-guard.sh" "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh" "$(REPO_ROOT)/scripts/tests/kafka-alignment-suite.sh"
+	HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+	"$(KAFKA_ALIGNMENT_REPORT_VENV)/bin/python" -m py_compile "$(REPO_ROOT)/scripts/generate-kafka-alignment-report.py"
+	PATH="$(KAFKA_ALIGNMENT_REPORT_VENV)/bin:$(PATH)" "$(REPO_ROOT)/scripts/tests/kafka-alignment-suite.sh"

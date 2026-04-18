@@ -1,5 +1,6 @@
 node_modules/
 dist/
+!tools/kafka-contract/dist/
 .env
 .DS_Store
 coverage/
@@ -15,6 +16,7 @@ tmp/
 !package-lock.json
 !pnpm-lock.yaml
 !tsconfig*.json
+!infra/observability/*.json
 *.ndjson
 *.csv
 
@@ -94,6 +96,8 @@ infra/docs/EIGHT-DATABASES_ARCHITECTURE.md
 # Generated CSV: pgbench/scripts write to test-results/ or LOG_DIR; keep *.csv ignored to avoid committing large outputs
 # (See scripts/PGBENCH_HARDENING.md and run_pgbench_sweep.sh for where CSVs are written.)
 *.txt
+!certs/README.txt
+!docs/bundles/*.txt
 *.csv
 *.tsv
 *.html

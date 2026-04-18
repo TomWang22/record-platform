@@ -1,0 +1,10 @@
+# ROLE: SRE — packet capture with explicit edge IP
+packet-capture: ## Run packet capture standalone with TARGET_IP
+	@if [ -z "$(TARGET_IP)" ]; then \
+		echo "❌ TARGET_IP required. Example: make packet-capture TARGET_IP=192.168.64.245"; \
+		exit 1; \
+	fi
+	@mkdir -p $(BENCH)
+	export SSLKEYLOGFILE="$(BENCH)/sslkeylog-capture-$$(date +%Y%m%d-%H%M%S).log"; \
+	export TARGET_IP="$(TARGET_IP)"; \
+	bash "$(SCRIPTS)/test-packet-capture-standalone.sh"

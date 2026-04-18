@@ -115,12 +115,17 @@ start_capture_v2() {
   fi
 
   # --- Layer 1: Node (Colima VM) — authoritative, before DNAT ---
-  # BPF: when CAPTURE_V2_LB_IP is set, match TCP/443 or UDP/443 with the LB as src or dst (dst-only misses QUIC on some Colima/stf0 paths).
+  # BPF: when CAPTURE_V2_LB_IP is set, TCP/443 is restricted to the LB. UDP/443 defaults wide (QUIC may show pod IPs after DNAT).
+  # Set CAPTURE_V2_L1_UDP_HOST_MATCH=1 to require udp port 443 and host <LB> (cuts background QUIC; may miss QUIC on paths without LB in IPv4).
   local node_filter="(tcp or udp) and port 443"
   if [[ -n "${CAPTURE_V2_LB_IP:-}" ]]; then
-    # UDP:443 without host match — on Colima, QUIC may not match "host <LB>" on stf0; TCP still restricted to LB.
-    node_filter="(udp port 443) or ((tcp port 443) and host ${CAPTURE_V2_LB_IP})"
-    echo "  [packet-capture-v2] L1 (node): BPF udp port 443 OR (tcp port 443 and host $CAPTURE_V2_LB_IP)"
+    if [[ "${CAPTURE_V2_L1_UDP_HOST_MATCH:-0}" == "1" ]]; then
+      node_filter="((udp port 443) and (host ${CAPTURE_V2_LB_IP})) or ((tcp port 443) and host ${CAPTURE_V2_LB_IP})"
+      echo "  [packet-capture-v2] L1 (node): BPF (udp port 443 and host $CAPTURE_V2_LB_IP) OR (tcp port 443 and host $CAPTURE_V2_LB_IP) [CAPTURE_V2_L1_UDP_HOST_MATCH=1]"
+    else
+      node_filter="(udp port 443) or ((tcp port 443) and host ${CAPTURE_V2_LB_IP})"
+      echo "  [packet-capture-v2] L1 (node): BPF udp port 443 OR (tcp port 443 and host $CAPTURE_V2_LB_IP)"
+    fi
   fi
   if command -v colima >/dev/null 2>&1; then
     echo "  [packet-capture-v2] L1 (node): starting tcpdump on Colima VM (sudo -n if available, else tcpdump)..."
@@ -708,7 +713,8 @@ TRANSPORT_JSON
               zero_rtt_detected: false,
               spin_bit: {supported: false, observed: false, transitions: 0, estimated_rtt_seconds: null},
               loss_estimate: 0,
-              congestion_estimate_packets_in_flight: 0
+              congestion_estimate_packets_in_flight: 0,
+              congestion_estimate_heuristic: "analyzer-failed-stub"
             },
             connection: {unique_destination_cids: 0, cid_rotation_detected: false, key_phase_transitions: 0},
             correlation: {trace_ids_seen: [], jaeger_trace_linked: false},

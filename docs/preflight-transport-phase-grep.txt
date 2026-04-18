@@ -1,0 +1,78 @@
+99:#   Step 7 auto-wiring (no manual exports): E2E_API_BASE defaults to https://record.test; JAEGER_QUERY_BASE
+104:#   Phase Barrier Contract (scripts/phase-barrier.sh; docs/preflight-phase-barrier-contract.md): isolates heavy phases (Kafka, Vitest, k6, edge suites).
+112:#   PREFLIGHT_STRICT_EXIT=1: TRANSPORT_STUDY_PCAP defaults to 1; step 7b transport study is fatal; end-of-run artifact seal
+113:#     requires trace-validation/*.json|*.prom and transport-forensics/*.pcap|quic-invariants.json (unless early exit skips 7b).
+114:#   PREFLIGHT_TRANSPORT_STUDY_REQUIRED=1 — step 7b Experiment 6: Colima L1 capture during in-cluster k6 → transport-study-v7.json
+115:#     (v7b: scripts/transport-study-v7b.mjs --enforce-gates + Jaeger overlap + strict span-tree flows; JAEGER_QUERY_BASE + tshark + node).
+116:#     Skips Experiment 8 host curl PCAP when that artifact exists. See scripts/run-transport-study-experiments.sh header.
+117:#   PREFLIGHT_RUN_QUIC_V7_FORENSIC=1 (default) — when PREFLIGHT_STRICT_EXIT=1, after housing suites succeed run QUIC v6+v7 jq gates + optional Jaeger.
+121:#     PREFLIGHT_TRANSPORT_PHASE1_STYLE=controlled (default) | make | skip — make = only `make transport-quic-v6-v7-prove`; skip = no Phase 1.
+124:#     7a8b/7a8c reuse Phase 1 capture dir when present (no second `make transport-quic-v6-v7-prove` unless Phase 1 was skipped or failed to emit v7).
+235:#   End-of-run perf packaging (after step 7b/7c and step 8 when enabled; always before final exit when suites ran):
+250:#     PREFLIGHT_TRANSPORT_LAB=1 — after step 9 perf packaging, run scripts/transport/run-transport-lab.sh → bench_logs/transport-lab/ + final-transport-artifact.json
+251:#     PREFLIGHT_TRANSPORT_LAB_QUIC=1 — with PREFLIGHT_TRANSPORT_LAB=1, set TRANSPORT_LAB_QUIC=1 (tcpdump udp/443 + scripts/lib QUIC analyzers; often needs sudo)
+300:#     3) ./scripts/run-transport-study-experiments.sh  (if needed)
+312:#     / transport). PLAYWRIGHT_E2E_MATRIX=full → all projects. JAEGER_QUERY_BASE is required (Jaeger query :16686); after tests
+397:#         Optional 7a7b: PREFLIGHT_K6_MESSAGING_LIMIT_FINDER=1. 7a8: Playwright. 7a9: run-k6-phases.sh when RUN_K6=1 (PREFLIGHT_RUN_K6_PHASES=1).
+398:#   7b    Transport-layer study experiments (UDP drops, QUIC cwnd, BBR, NodePort, Caddy native, in-cluster k6). TRANSPORT_STUDY=1.
+480:  # Full continuation runs transport study with PCAP; early exit skips 7b so do not require PCAP there.
+1004:  if [[ "${PREFLIGHT_TRANSPORT_LAB:-0}" == "1" ]]; then
+1006:    say "9d. Transport lab → $REPO_ROOT/bench_logs/transport-lab (QUIC capture: PREFLIGHT_TRANSPORT_LAB_QUIC=1)"
+1007:    export TRANSPORT_LAB_QUIC="${PREFLIGHT_TRANSPORT_LAB_QUIC:-0}"
+2981:      chmod +x "$SCRIPT_DIR/phase-barrier.sh" 2>/dev/null || true
+2983:        bash "$SCRIPT_DIR/phase-barrier.sh" "post-kafka-alignment" || fail "Phase barrier post-kafka-alignment failed"
+3201:if [[ -z "${JAEGER_QUERY_BASE:-}" ]] && command -v kubectl >/dev/null 2>&1; then
+3206:      [[ -n "$_jq_ip" ]] && export JAEGER_QUERY_BASE="http://${_jq_ip}:16686" && info "  Auto-set JAEGER_QUERY_BASE=$JAEGER_QUERY_BASE ($_jq_ns/svc/$_jq_name LoadBalancer)" && break 2
+3211:if [[ -z "${JAEGER_QUERY_BASE:-}" ]] && [[ "${PREFLIGHT_JAEGER_PORT_FORWARD:-1}" != "0" ]] && command -v kubectl >/dev/null 2>&1; then
+3225:        export JAEGER_QUERY_BASE="http://127.0.0.1:${_jp}"
+3226:        info "  Auto-set JAEGER_QUERY_BASE=$JAEGER_QUERY_BASE (kubectl port-forward $_pf_ns/svc/$_pf_svc pid=$PREFLIGHT_JAEGER_PF_PID; tear down on preflight exit)"
+3236:      warn "  Jaeger port-forward to $_pf_ns/$_pf_svc did not become ready on 127.0.0.1:${_jp} (install observability stack or export JAEGER_QUERY_BASE)"
+3294:# PREFLIGHT_RUN_TRANSPORT_PHASE1=1 (default): run before heavy matrix. PREFLIGHT_TRANSPORT_PHASE1_STYLE=controlled|make|skip.
+3297:if [[ "${PREFLIGHT_CLUSTER_STABILITY_GUARD:-1}" == "1" ]] && [[ -f "$SCRIPT_DIR/cluster-stability-guard.sh" ]]; then
+3298:  chmod +x "$SCRIPT_DIR/cluster-stability-guard.sh" 2>/dev/null || true
+3299:  "$SCRIPT_DIR/cluster-stability-guard.sh" || fail "Phase 0 cluster stability guard failed (set PREFLIGHT_CLUSTER_STABILITY_GUARD=0 to bypass)."
+3303:  _p1_style="${PREFLIGHT_TRANSPORT_PHASE1_STYLE:-controlled}"
+3305:    info "Phase 1 transport skipped (PREFLIGHT_TRANSPORT_PHASE1_STYLE=skip)"
+3312:      ( cd "$REPO_ROOT" && "$(command -v make)" transport-quic-v6-v7-prove ) \
+3313:        || fail "Phase 1 make transport-quic-v6-v7-prove failed"
+3314:      [[ -f "$REPO_ROOT/bench_logs/.last-transport-quic-prove-dir" ]] || fail "Missing bench_logs/.last-transport-quic-prove-dir after make prove"
+3315:      _PREFLIGHT_PHASE1_TRANSPORT_DIR="$(tr -d '\r\n' <"$REPO_ROOT/bench_logs/.last-transport-quic-prove-dir")"
+3324:      ( cd "$REPO_ROOT" && "$(command -v make)" transport-quic-v6-v7-prove ) \
+3325:        || fail "Phase 1 make transport-quic-v6-v7-prove failed (non-Colima or STYLE!=controlled)"
+3326:      _PREFLIGHT_PHASE1_TRANSPORT_DIR="$(tr -d '\r\n' <"$REPO_ROOT/bench_logs/.last-transport-quic-prove-dir")"
+3334:if [[ "${RUN_PREFLIGHT_PLAYWRIGHT:-1}" != "0" ]] && [[ -z "${JAEGER_QUERY_BASE:-}" ]]; then
+3335:  fail "JAEGER_QUERY_BASE is unset after auto-discovery (LoadBalancer on jaeger/jaeger-query, then kubectl port-forward to observability svc). Export JAEGER_QUERY_BASE=http://<host>:16686, apply observability (infra/k8s/base/observability/), or fix port-forward (JAEGER_PF_LOCAL_PORT if 16686 busy; PREFLIGHT_JAEGER_PORT_FORWARD=0 to skip forward and require LB)."
+3337:info "  Wired for suites: E2E_API_BASE=$E2E_API_BASE JAEGER_QUERY_BASE=${JAEGER_QUERY_BASE:-<unset>}"
+3346:# Colima rotation diagnostics (docs/RCA-HTTP3-QUIC-AND-METALLB-NETWORKING.md section 7b): UDP stats + BBR wired in so you don't forget.
+3572:      if [[ -x "$SCRIPT_DIR/verify-jaeger-liveness.sh" ]] && [[ -n "${JAEGER_QUERY_BASE:-}" ]]; then
+3640:    chmod +x "$SCRIPT_DIR/phase-barrier.sh" 2>/dev/null || true
+3643:      bash "$SCRIPT_DIR/phase-barrier.sh" "post-integration" || return 1
+3702:        chmod +x "$SCRIPT_DIR/phase-barrier.sh" 2>/dev/null || true
+3704:          bash "$SCRIPT_DIR/phase-barrier.sh" "post-k6-service-grid" || return 1
+3739:      say "7a7b. k6 messaging limit-finder (PREFLIGHT_K6_MESSAGING_LIMIT_FINDER=1; scripts/load/k6-messaging-limit-finder.js)…"
+3752:      warn "7a7b limit-finder skipped: missing certs/dev-root.pem"
+3785:    warn "L1 span capture failed to start — will use isolated make transport-quic-v6-v7-prove after suites"
+3794:    printf '%s\n' "$_PREFLIGHT_SUITE_CAPTURE_DIR" >"$REPO_ROOT/bench_logs/.last-transport-quic-prove-dir" 2>/dev/null || true
+3796:    ok "L1 span capture stopped; QUIC v6+v7 artifacts in $_PREFLIGHT_SUITE_CAPTURE_DIR"
+3798:    warn "L1 span capture did not produce transport-summary-v7.json — 7a8b will fall back to make transport-quic-v6-v7-prove"
+3808:# Phase Barrier — pre step-7: headroom, housing-namespace pods, gateway restart (shaper reset), watchdog DEL (best-effort), Jaeger (if JAEGER_QUERY_BASE).
+3813:  chmod +x "$SCRIPT_DIR/phase-barrier.sh" 2>/dev/null || true
+3814:  say "7-prep. Phase barrier (pre-step7-suites) - see docs/preflight-phase-barrier-contract.md"
+3816:    bash "$SCRIPT_DIR/phase-barrier.sh" "pre-step7-suites" || fail "Phase barrier pre-step7-suites failed"
+3837:  command -v jq >/dev/null 2>&1 || fail "QUIC v6+v7 strict gates require jq (brew install jq)"
+3838:  _prove_dir_file="$REPO_ROOT/bench_logs/.last-transport-quic-prove-dir"
+3840:    say "7a8b. QUIC v6+v7 (Phase 1 quiet capture — jq + Jaeger; no suite-time recapture)"
+3843:    say "7a8b. QUIC v6+v7 (step-7 matrix + Colima L1 background capture — same pcap as suites; jq + Jaeger)"
+3847:    say "7a8b. QUIC v6+v7 transport invariant (make transport-quic-v6-v7-prove) — standalone capture + jq + Jaeger"
+3848:    ( cd "$REPO_ROOT" && "$(command -v make)" transport-quic-v6-v7-prove ) \
+3849:      || fail "QUIC transport prove failed (make transport-quic-v6-v7-prove). See Makefile; set PREFLIGHT_RUN_QUIC_V7_FORENSIC=0 to skip."
+3850:    [[ -f "$_prove_dir_file" ]] || fail "Missing $_prove_dir_file after make transport-quic-v6-v7-prove"
+3856:    || fail "QUIC v6 jq gate failed on $_cap_d/transport-summary-v6.json"
+3879:  if [[ -n "${JAEGER_QUERY_BASE:-}" ]] && [[ -f "$_cap_d/transport-summary-v7.json" ]]; then
+3883:      || fail "QUIC ↔ Jaeger correlation failed (set JAEGER_QUERY_BASE correctly or PREFLIGHT_STRICT_EXIT=0 for warn-only)."
+3885:    warn "7a8c skipped: JAEGER_QUERY_BASE unset — QUIC v7 artifact present but trace correlation not run"
+3887:  ok "7a8b QUIC v6+v7 transport invariant passed"
+3922:if [[ -f "$SCRIPT_DIR/run-transport-study-experiments.sh" ]]; then
+3923:  say "7b. Transport-layer study experiments"
+3939:    TRANSPORT_STUDY=1 "$SCRIPT_DIR/run-transport-study-experiments.sh" || fail "Step 7b transport study failed (set PREFLIGHT_STRICT_EXIT=0 to warn-only; TRANSPORT_STUDY_PCAP=0 to skip QUIC PCAP gate)"
+3941:    ( set +e; TRANSPORT_STUDY=1 "$SCRIPT_DIR/run-transport-study-experiments.sh" ) || warn "Transport study had issues"

@@ -43,6 +43,8 @@ SKIP_VERIFY_CURL_HTTP3 ?= 0
 	protocol-matrix packet-capture perf-lab perf-full generate-report graph-capacity heatmap-tail compare-run regression-guard \
 	slack-report discord-report ci ci-full certify ceiling-default performance-lab-interpret performance-lab-interpret-latest performance-lab-one capacity-recommend capacity-one protocol-happiness transport-routing-hints transport-routing-hints-sync-k8s perf-lab-dashboards bundle-performance-lab-10 strict-envelope-check adaptive-pool-suggest declare-readiness shellcheck-preflight transport-lab full-edge-transport-validation endpoint-coverage collapse-smoke explain-all-dbs demo demo-network demo-full demo-k3d stack images images-all kustomize-apply \
 	deploy-dev rollouts preflight-metallb test-e2e-integrated packet-capture-standalone transport-quic-v6-prove transport-quic-v6-v7-prove transport-quic-v7-prove certify-production \
+	validate-jaeger-lb verify-jaeger-liveness verify-jaeger-tracing-services jaeger-seed-edge-health cluster-stability-guard \
+	phase-barrier preflight-transport-otel-prove transport-study-experiments \
 	cluster-forensic-sweep forensic-log-sweep network-command-center deploy-monitoring-help tls-secrets-expiry-textfile \
 	chaos-suite governed-chaos failure-budget resilience-menu generate-chaos-report-md \
 	metrics-server-ready trust-integration-tests test-vitest-stack
@@ -213,6 +215,8 @@ menu: ## Friendly workflow menu (default target)
 	@echo "  make packet-capture TARGET_IP=<ip>"
 	@echo "  make packet-capture-standalone   # HTTP/2+gRPC+HTTP/3 capture (set TARGET_IP or use cluster LB)"
 	@echo "  make transport-quic-v6-prove | transport-quic-v7-prove | transport-quic-v6-v7-prove  # QUIC v6/v7 JSON gates + jq"
+	@echo "  make validate-jaeger-lb | verify-jaeger-liveness | verify-jaeger-tracing-services | jaeger-seed-edge-health"
+	@echo "  make cluster-stability-guard | phase-barrier | preflight-transport-otel-prove | transport-study-experiments"
 	@echo "  make cluster-forensic-sweep | make forensic-log-sweep | make network-command-center"
 	@echo "  make chaos-suite | make governed-chaos | make resilience-menu"
 	@echo "  make demo-network"
@@ -1173,6 +1177,30 @@ transport-quic-v7-prove: ## Same capture as v6; transport-summary-v7.json + stri
 	  echo "" && \
 	  echo "HTTP/3 transport v7 proven. Latest capture dir: $$_dir"
 
+validate-jaeger-lb: ## Jaeger Service ports + optional LoadBalancer IP (JAEGER_REQUIRE_LOADBALANCER=1)
+	bash $(SCRIPTS)/validate-jaeger-lb.sh
+
+verify-jaeger-liveness: ## In-cluster Jaeger + OTLP health checks (needs observability ns applied)
+	bash $(SCRIPTS)/verify-jaeger-liveness.sh
+
+verify-jaeger-tracing-services: ## Verify tracing env wiring on record-platform Deployments
+	bash $(SCRIPTS)/verify-jaeger-tracing-services.sh
+
+jaeger-seed-edge-health: ## Hit edge /api/healthz to seed traces (HOST=record.test, TARGET_IP from caddy-h3 LB by default)
+	bash $(SCRIPTS)/seed-jaeger-via-edge-health.sh
+
+cluster-stability-guard: ## Preconditions for strict preflight / transport (kubectl + core namespaces)
+	bash $(SCRIPTS)/cluster-stability-guard.sh
+
+phase-barrier: ## Phase barrier helper (see docs/preflight-phase-barrier-contract.md)
+	bash $(SCRIPTS)/phase-barrier.sh
+
+preflight-transport-otel-prove: ## Controlled Colima L1 capture + OTEL/QUIC proof (strict labs)
+	bash $(SCRIPTS)/preflight-controlled-transport-otel-prove.sh
+
+transport-study-experiments: ## Run transport study matrix (see scripts/run-transport-study-experiments.sh)
+	bash $(SCRIPTS)/run-transport-study-experiments.sh
+
 cluster-forensic-sweep: ## Restart + log keyword sweep → bench_logs/forensics/cluster-sweep-*.log
 	@mkdir -p $(BENCH)/forensics
 	bash $(SCRIPTS)/cluster-log-sweep.sh
@@ -1184,6 +1212,8 @@ network-command-center: ## Capture + QUIC/TLS/HTTP3 analysis → bench_logs/fore
 deploy-monitoring-help: ## Print paths for Prometheus rules + Grafana stubs (apply via your stack)
 	@echo "Prometheus rules: $(REPO_ROOT)/infra/monitoring/prometheus/rules/"
 	@echo "Grafana stubs:      $(REPO_ROOT)/infra/monitoring/grafana/dashboards/"
+	@echo "Jaeger manifest:    $(REPO_ROOT)/infra/k8s/base/observability/jaeger-deploy.yaml"
+	@echo "Trace flow schema:  $(REPO_ROOT)/infra/observability/trace-flows.json"
 	@echo "Docs:               $(REPO_ROOT)/docs/CLUSTER_FORENSICS_AND_OBSERVABILITY.md"
 
 tls-secrets-expiry-textfile: ## Emit Prometheus textfile lines (stdout); pipe to node_exporter textfile dir

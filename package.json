@@ -4,9 +4,23 @@
   "version": "0.4.0",
   "workspaces": [
     "services/*",
-    "webapp"
+    "webapp",
+    "tools/kafka-contract"
   ],
   "packageManager": "pnpm@9.11.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@smithy/types": "^4.13.1",
+      "rollup": "npm:@rollup/wasm-node@4.9.6"
+    },
+    "supportedArchitectures": {
+      "os": ["darwin", "linux"],
+      "cpu": ["arm64", "x64"]
+    }
+  },
   "scripts": {
     "build": "pnpm -r run build",
     "dev": "pnpm -r --parallel dev",
@@ -17,7 +31,13 @@
     "reissue": "bash scripts/reissue-ca-and-leaf-load-all-services.sh",
     "kafka-ssl": "bash scripts/kafka-ssl-from-dev-root.sh",
     "verify-tls": "bash scripts/verify-caddy-strict-tls.sh",
-    "preflight-and-suites": "bash scripts/run-preflight-scale-and-all-suites.sh"
+    "preflight-and-suites": "bash scripts/run-preflight-scale-and-all-suites.sh",
+    "test:system": "bash scripts/run-vitest-system.sh",
+    "kafka-contract:build": "pnpm --filter kafka-contract run build",
+    "verify:kafka-bootstrap": "bash scripts/verify-housing-kafka-bootstrap.sh",
+    "verify:kafka-tls-sans": "bash scripts/verify-kafka-tls-sans.sh",
+    "validate-observability": "node scripts/trace-validators/run-step7-observability-gates.mjs --report-dir bench_logs/step7-observability-ci",
+    "observability:drift-append": "node scripts/observability-drift-append.mjs"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -27,7 +47,8 @@
     "@types/node": "^20.19.19",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.10.2",
-    "otplib": "^12.0.1"
+    "otplib": "^12.0.1",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
     "@types/jsonwebtoken": "^9.0.5",

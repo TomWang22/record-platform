@@ -1,0 +1,8 @@
+preflight-cluster-quic-scripts bundle (preflight + cluster gates + QUIC/packet capture + load/perf orchestration)
+generated_utc=2026-04-18T20:54:15Z
+path_count=276
+
+Excluded by policy: scripts/tests/*, OCH bash HTTP suites (test-microservices-*, test-messaging-*), Playwright driver (run-playwright-e2e-preflight.sh), __pycache__, *.pyc, .DS_Store
+
+Entry: scripts/run-preflight-scale-and-all-suites.sh
+Full path list: sibling file preflight-cluster-quic-scripts-20260418-165415.MANIFEST.txt in $HOME

@@ -1,5 +1,6 @@
 # ==============================================================================
-# Off-Campus-Housing-Tracker — Unified Orchestration Makefile
+# Record Platform — Unified Orchestration Makefile
+# (Lineage: Off-Campus-Housing / OCH flows; hostnames and ns default to record.test / record-platform.)
 # ==============================================================================
 # ROLE: DEV   - local bootstrap and test flows
 # ROLE: PERF  - ceiling/model/report/graph workflows
@@ -28,6 +29,13 @@ SKIP_AUTO_RESTORE ?= 0
 # apply-kafka-kraft: scale brokers to 0 before kafka-ssl-secret refresh (single JKS view). dev-onboard exports 1.
 KAFKA_TLS_ATOMIC_BEFORE_REFRESH ?= 0
 HOUSING_NS ?= record-platform
+# Colima+MetalLB lab: canonical entry `make preflight-lab` (= preflight-strict). Jaeger: set PREFLIGHT_STRICT_JAEGER_QUERY_BASE, or leave empty for discovery inside preflight.
+#   SKIP_MACOS_DEV_CA_TRUST=1 make preflight-lab
+#   make preflight-lab PREFLIGHT_STRICT_JAEGER_QUERY_BASE=
+#   PREFLIGHT_TRANSPORT_STUDY_REQUIRED=1 make preflight-lab  — step 7b transport study (see scripts/run-transport-study-experiments.sh).
+# Manual phase barrier: make phase-barrier PHASE_NAME=post-kafka-alignment
+# Declarative phase map (audit / tooling): infra/observability/preflight-state-machine.json
+PREFLIGHT_STRICT_JAEGER_QUERY_BASE ?=
 KAFKA_BROKER_REPLICAS ?= 3
 # tls-first-time: skip kafka-ssl-from-dev-root.sh here; apply-kafka-kraft / kafka-refresh-tls-from-lb creates JKS after LB SANs exist.
 TLS_FIRST_TIME_DEFER_KAFKA_JKS ?= 0
@@ -39,10 +47,10 @@ SKIP_VERIFY_CURL_HTTP3 ?= 0
 .DEFAULT_GOAL := menu
 
 .PHONY: menu help setup reset verify diagnose clean-data-modeling-png generate-diagrams generate-uml generate-architecture bundle-2.1-submission generate-architecture-docs kafka-broker-status-stub db-schema-er-docs index-audit-md real-query-plan-suite up up-fast deps kubeconfig-colima cluster colima-net colima-patch-app-config-db-gateway tls-first-time trust-ca-macos verify-curl-http3 verify-docker-ports recycle-postgres-infra infra-host infra-cluster \
-	metallb-fix hosts-sanity ensure-edge-hosts wait-for-caddy-ip preflight-gate sslkeylog-seed ollama-note ollama-env verify-network-coherence verify-kafka-dns diagnose-kafka-broker-dns verify-kafka-bootstrap verify-kafka-cluster check-kafka-config-drift kafka-runtime-sync kafka-sync-metallb kafka-heal-inter-broker-tls kafka-alignment-suite kafka-health kafka-smoke kafka-smoke-with-health k8s-diagnose-restarts post-deploy-verify golden-snapshot chaos-suite-kafka verify-preflight-edge-routing diagnose-k6-edge cleanup-kafka-ops-pods apply-kafka-kraft kafka-refresh-tls-from-lb kafka-tls-rotate-atomic kafka-tls-guard kafka-tls-guard-remediate kafka-quorum-stable service-tls-alias-guard edge-readiness-gate rollout-och-full onboarding-kafka-preflight kafka-onboarding-reset kafka-lb-reset kafka-headless-reset kafka-clean-slate kafka-rolling-restart onboarding-edge dev-onboard dev-onboard-hardened-reset dev-onboard-eks dev-onboard-lite ephemeral-k3s-smoke chaos-kafka-broker chaos-metallb-kafka-lb chaos-test sync-prometheus-kafka-rules colima-bridged colima-bridged-clean metallb-bring-up test test-current model summarize-ceiling strict-canonical ceiling collapse-trust collapse-messaging collapse-all \
+	metallb-fix hosts-sanity ensure-edge-hosts wait-for-caddy-ip preflight-gate preflight-cluster-stability-guard preflight-live-triage-snapshot sslkeylog-seed ollama-note ollama-env verify-network-coherence verify-kafka-dns diagnose-kafka-broker-dns verify-kafka-bootstrap verify-kafka-cluster check-kafka-config-drift kafka-runtime-sync kafka-sync-metallb kafka-heal-inter-broker-tls kafka-alignment-suite kafka-health kafka-smoke kafka-smoke-with-health k8s-diagnose-restarts post-deploy-verify golden-snapshot chaos-suite-kafka verify-preflight-edge-routing diagnose-k6-edge cleanup-kafka-ops-pods apply-kafka-kraft kafka-refresh-tls-from-lb kafka-tls-rotate-atomic kafka-tls-guard kafka-tls-guard-remediate kafka-quorum-stable service-tls-alias-guard edge-readiness-gate rollout-och-full onboarding-kafka-preflight kafka-onboarding-reset kafka-lb-reset kafka-headless-reset kafka-clean-slate kafka-rolling-restart onboarding-edge dev-onboard dev-onboard-hardened-reset dev-onboard-eks dev-onboard-lite ephemeral-k3s-smoke chaos-kafka-broker chaos-metallb-kafka-lb chaos-test sync-prometheus-kafka-rules colima-bridged colima-bridged-clean metallb-bring-up test test-current model summarize-ceiling strict-canonical ceiling collapse-trust collapse-messaging collapse-all \
 	protocol-matrix packet-capture perf-lab perf-full generate-report graph-capacity heatmap-tail compare-run regression-guard \
 	slack-report discord-report ci ci-full certify ceiling-default performance-lab-interpret performance-lab-interpret-latest performance-lab-one capacity-recommend capacity-one protocol-happiness transport-routing-hints transport-routing-hints-sync-k8s perf-lab-dashboards bundle-performance-lab-10 strict-envelope-check adaptive-pool-suggest declare-readiness shellcheck-preflight transport-lab full-edge-transport-validation endpoint-coverage collapse-smoke explain-all-dbs demo demo-network demo-full demo-k3d stack images images-all kustomize-apply \
-	deploy-dev rollouts preflight-metallb test-e2e-integrated packet-capture-standalone transport-quic-v6-prove transport-quic-v6-v7-prove transport-quic-v7-prove certify-production \
+	deploy-dev rollouts preflight-metallb preflight-colima-metallb-edge preflight-strict preflight-lab preflight-strict-full-matrix validate-observability e2e-full-strict test-e2e-integrated packet-capture-standalone transport-quic-v6-prove transport-quic-v6-v7-prove transport-quic-v7-prove certify-production \
 	validate-jaeger-lb verify-jaeger-liveness verify-jaeger-tracing-services jaeger-seed-edge-health cluster-stability-guard \
 	phase-barrier preflight-transport-otel-prove transport-study-experiments \
 	cluster-forensic-sweep forensic-log-sweep network-command-center deploy-monitoring-help tls-secrets-expiry-textfile \
@@ -88,6 +96,8 @@ RESTORE_BACKUP_DIR ?= latest
 # Default 1: append record.test → MetalLB IP via sudo when needed (set 0 for hints only).
 HOSTS_AUTO ?= 1
 EXTERNAL_IP ?=
+# phase-barrier.sh phase id (default generic). Example: make phase-barrier PHASE_NAME=post-kafka-alignment
+PHASE_NAME ?= generic
 
 # Public entrypoints (teammates): full bootstrap, health checks, Kafka nuclear reset, diagnostics.
 setup: dev-onboard ## Alias: deterministic local onboarding (same as make dev-onboard)
@@ -137,13 +147,13 @@ real-query-plan-suite: ## Realistic EXPLAIN ANALYZE → reports/real-query-plans
 	$(SCRIPTS)/run-real-query-plan-suite.sh
 
 help: ## List targets and short descriptions
-	@echo "Off-Campus-Housing-Tracker — common make targets"
+	@echo "Record Platform — common make targets"
 	@echo ""
 	@grep -hE '^[a-zA-Z0-9_.-]+:.*##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*##"} {printf "  \033[36m%-26s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Core:"
 	@echo "  make up               Full bootstrap (cluster + infra + TLS + /etc/hosts for edge; no KRaft / no deploy-dev)"
-	@echo "  make dev-onboard      deps + zero-trust CA + up-fast + Kafka TLS + och-kafka-ssl-secret verify (Phase 10: alignment; SAFE_ONLY=1 → kafka-health); make setup alias"
+	@echo "  make dev-onboard      deps + zero-trust CA + up-fast + Kafka TLS + kafka-ssl-secret verify (Phase 10: alignment; SAFE_ONLY=1 → kafka-health); make setup alias"
 	@echo "  make rollout-och-full  After Kafka/TLS secret fixes: ensure cluster secrets + restart all housing apps + Caddy (ordered)"
 	@echo "  make kafka-heal-inter-broker-tls  Recreate kafka-0..N-1 if CrashLoop / PKIX JKS drift (see Runbook.md)"
 	@echo "  make dev-onboard-eks  EKS: verify Kafka + edge only (no MetalLB/hosts reset)"
@@ -176,7 +186,7 @@ help: ## List targets and short descriptions
 	@echo "  make collapse-messaging"
 	@echo "  make collapse-all"
 	@echo "  make protocol-matrix"
-	@echo "  make strict-canonical"
+	@echo "  make strict-canonical | make preflight-lab"
 	@echo "  make packet-capture TARGET_IP=<ip>"
 	@echo "  make graph-capacity"
 	@echo "  make heatmap-tail"
@@ -189,14 +199,14 @@ help: ## List targets and short descriptions
 menu: ## Friendly workflow menu (default target)
 	@echo ""
 	@echo "=============================================================="
-	@echo " Off-Campus-Housing-Tracker Make Menu"
+	@echo " Record Platform Make Menu"
 	@echo "=============================================================="
 	@echo ""
 	@echo "Core (most people use):"
 	@echo "  make up"
 	@echo "  make dev-onboard   # full stack incl. KRaft + deploy (see docs/DEV_ONBOARDING.md)"
 	@echo "  make up-fast"
-	@echo "  make strict-canonical"
+	@echo "  make strict-canonical   # or: make preflight-lab (Colima+MetalLB strict + Jaeger + Step7 obs gates)"
 	@echo "  make test-current"
 	@echo ""
 	@echo "Performance / modeling (advanced):"
@@ -216,7 +226,7 @@ menu: ## Friendly workflow menu (default target)
 	@echo "  make packet-capture-standalone   # HTTP/2+gRPC+HTTP/3 capture (set TARGET_IP or use cluster LB)"
 	@echo "  make transport-quic-v6-prove | transport-quic-v7-prove | transport-quic-v6-v7-prove  # QUIC v6/v7 JSON gates + jq"
 	@echo "  make validate-jaeger-lb | verify-jaeger-liveness | verify-jaeger-tracing-services | jaeger-seed-edge-health"
-	@echo "  make cluster-stability-guard | phase-barrier | preflight-transport-otel-prove | transport-study-experiments"
+	@echo "  make cluster-stability-guard | preflight-lab | phase-barrier | validate-observability | preflight-transport-otel-prove | transport-study-experiments"
 	@echo "  make cluster-forensic-sweep | make forensic-log-sweep | make network-command-center"
 	@echo "  make chaos-suite | make governed-chaos | make resilience-menu"
 	@echo "  make demo-network"
@@ -1066,6 +1076,46 @@ demo-k3d: ## stack + preflight for k3d (no Colima): set kubectl context to k3d f
 preflight-metallb: ## Run preflight only (MetalLB + k6 LB IP). Example: RUN_PGBENCH=0 RUN_FULL_LOAD=0 make preflight-metallb
 	REQUIRE_COLIMA=1 METALLB_USE_K3D=0 METALLB_ENABLED=1 K6_USE_METALLB=1 bash $(SCRIPTS)/run-preflight-scale-and-all-suites.sh
 
+# Canonical Colima + MetalLB edge preflight without host pgbench / full load (matches common manual one-liner).
+preflight-colima-metallb-edge: ## Colima+MetalLB edge preflight; RUN_PGBENCH=0 RUN_FULL_LOAD=0
+	REQUIRE_COLIMA=1 METALLB_USE_K3D=0 METALLB_ENABLED=1 K6_USE_METALLB=1 RUN_PGBENCH=0 RUN_FULL_LOAD=0 bash $(SCRIPTS)/run-preflight-scale-and-all-suites.sh
+
+preflight-strict: ## Strict lab: Colima+MetalLB+Jaeger+OTel+k6+Kafka alignment (KAFKA_ALIGNMENT_TEST_MODE=1). Prefer: make preflight-lab
+	cd "$(REPO_ROOT)" && \
+	  export HOUSING_NS="$(HOUSING_NS)" METALLB_ENABLED=1 METALLB_USE_K3D=0 REQUIRE_COLIMA=1 K6_USE_METALLB=1 && \
+	  export OTEL_PREFLIGHT_TRACE_SAMPLE=1 RUN_K6=1 && \
+	  export PREFLIGHT_SKIP_KAFKA_ALIGNMENT_SUITE=0 KAFKA_ALIGNMENT_TEST_MODE=1 && \
+	  if [ -n "$(PREFLIGHT_STRICT_JAEGER_QUERY_BASE)" ]; then export JAEGER_QUERY_BASE="$(PREFLIGHT_STRICT_JAEGER_QUERY_BASE)"; fi && \
+	  bash "$(SCRIPTS)/cluster-stability-guard.sh" && \
+	  $(MAKE) transport-quic-v6-v7-prove && \
+	  export PREFLIGHT_STRICT_EXIT=1 PREFLIGHT_PERF_ARTIFACTS=1 && \
+	  export PREFLIGHT_STEP7_OBSERVABILITY_GATES=1 && \
+	  pnpm preflight-and-suites
+
+preflight-lab: preflight-strict ## ONE canonical Colima lab command (same recipe as preflight-strict; see header comments).
+	@true
+
+preflight-strict-full-matrix: ## Like preflight-strict but PLAYWRIGHT_E2E_MATRIX=full (same lab + Kafka alignment exports)
+	cd "$(REPO_ROOT)" && \
+	  export HOUSING_NS="$(HOUSING_NS)" METALLB_ENABLED=1 METALLB_USE_K3D=0 REQUIRE_COLIMA=1 K6_USE_METALLB=1 && \
+	  export OTEL_PREFLIGHT_TRACE_SAMPLE=1 RUN_K6=1 && \
+	  export PREFLIGHT_SKIP_KAFKA_ALIGNMENT_SUITE=0 KAFKA_ALIGNMENT_TEST_MODE=1 && \
+	  if [ -n "$(PREFLIGHT_STRICT_JAEGER_QUERY_BASE)" ]; then export JAEGER_QUERY_BASE="$(PREFLIGHT_STRICT_JAEGER_QUERY_BASE)"; fi && \
+	  bash "$(SCRIPTS)/cluster-stability-guard.sh" && \
+	  $(MAKE) transport-quic-v6-v7-prove && \
+	  export PREFLIGHT_STRICT_EXIT=1 PREFLIGHT_PERF_ARTIFACTS=1 PLAYWRIGHT_E2E_MATRIX=full && \
+	  export PREFLIGHT_STEP7_OBSERVABILITY_GATES=1 && \
+	  pnpm preflight-and-suites
+
+validate-observability: ## Jaeger Step7 span-tree + overlap gates (needs JAEGER_QUERY_BASE; see docs/observability/och-observability-integrity-spec-v1.md)
+	cd "$(REPO_ROOT)" && pnpm run validate-observability
+
+e2e-full-strict: ## Playwright E2E against record.test (strict env; requires cluster + TLS + dev-root.pem)
+	cd "$(REPO_ROOT)" && \
+	  export NODE_EXTRA_CA_CERTS="$(REPO_ROOT)/certs/dev-root.pem" && \
+	  export E2E_API_BASE="https://record.test" && \
+	  pnpm --filter webapp exec playwright test
+
 test-e2e-integrated: ## Port-forward api-gateway + Playwright (needs running cluster)
 	cd $(REPO_ROOT) && pnpm run test:e2e:integrated
 
@@ -1079,7 +1129,7 @@ transport-quic-v6-prove: ## Colima/MetalLB: standalone capture + v6 artifact (ne
 	cd $(REPO_ROOT) && \
 	  _lb="$$(kubectl get svc -n ingress-nginx caddy-h3 -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)" && \
 	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
-	  _kl="$(BENCH)/sslkeys-och-transport-$$(date +%Y%m%d-%H%M%S).log" && \
+	  _kl="$(BENCH)/sslkeys-record-transport-$$(date +%Y%m%d-%H%M%S).log" && \
 	  rm -f "$$_kl" && touch "$$_kl" && \
 	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
 	    bash $(SCRIPTS)/test-packet-capture-standalone.sh && \
@@ -1111,7 +1161,7 @@ transport-quic-v6-v7-prove: ## Single standalone run; strict jq on transport-sum
 	  mkdir -p $(BENCH) && \
 	  _lb="$$(kubectl get svc -n ingress-nginx caddy-h3 -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)" && \
 	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
-	  _kl="$(BENCH)/sslkeys-och-transport-$$(date +%Y%m%d-%H%M%S).log" && \
+	  _kl="$(BENCH)/sslkeys-record-transport-$$(date +%Y%m%d-%H%M%S).log" && \
 	  rm -f "$$_kl" && touch "$$_kl" && \
 	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
 	    bash $(SCRIPTS)/test-packet-capture-standalone.sh && \
@@ -1146,7 +1196,7 @@ transport-quic-v7-prove: ## Same capture as v6; transport-summary-v7.json + stri
 	  mkdir -p $(BENCH) && \
 	  _lb="$$(kubectl get svc -n ingress-nginx caddy-h3 -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)" && \
 	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
-	  _kl="$(BENCH)/sslkeys-och-transport-$$(date +%Y%m%d-%H%M%S).log" && \
+	  _kl="$(BENCH)/sslkeys-record-transport-$$(date +%Y%m%d-%H%M%S).log" && \
 	  rm -f "$$_kl" && touch "$$_kl" && \
 	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
 	    bash $(SCRIPTS)/test-packet-capture-standalone.sh && \
@@ -1189,11 +1239,25 @@ verify-jaeger-tracing-services: ## Verify tracing env wiring on record-platform 
 jaeger-seed-edge-health: ## Hit edge /api/healthz to seed traces (HOST=record.test, TARGET_IP from caddy-h3 LB by default)
 	bash $(SCRIPTS)/seed-jaeger-via-edge-health.sh
 
+preflight-cluster-stability-guard: ## Phase 0 guard: node headroom + metrics-server (alias for cluster-stability-guard)
+	$(MAKE) cluster-stability-guard
+
+preflight-live-triage-snapshot: ## Capture immediate OOM/restart evidence (pods + jaeger/gateway/auth logs)
+	kubectl get pods -A
+	kubectl describe pod -n observability -l app=jaeger 2>/dev/null || true
+	kubectl logs -n observability -l app=jaeger --tail=200 2>/dev/null || true
+	kubectl logs -n $(HOUSING_NS) -l app=api-gateway --tail=200 2>/dev/null || true
+	kubectl logs -n $(HOUSING_NS) -l app=auth-service --tail=200 2>/dev/null || true
+
 cluster-stability-guard: ## Preconditions for strict preflight / transport (kubectl + core namespaces)
 	bash $(SCRIPTS)/cluster-stability-guard.sh
 
-phase-barrier: ## Phase barrier helper (see docs/preflight-phase-barrier-contract.md)
-	bash $(SCRIPTS)/phase-barrier.sh
+# Phase Barrier Contract — optional Jaeger base when PREFLIGHT_STRICT_JAEGER_QUERY_BASE is set (see docs/preflight-phase-barrier-contract.md)
+phase-barrier: ## Manual barrier: make phase-barrier PHASE_NAME=post-kafka-alignment
+	cd "$(REPO_ROOT)" && \
+	  export HOUSING_NS="$(HOUSING_NS)" METALLB_ENABLED=1 METALLB_USE_K3D=0 REQUIRE_COLIMA=1 K6_USE_METALLB=1 && \
+	  if [ -n "$(PREFLIGHT_STRICT_JAEGER_QUERY_BASE)" ]; then export JAEGER_QUERY_BASE="$(PREFLIGHT_STRICT_JAEGER_QUERY_BASE)"; fi && \
+	  bash "$(SCRIPTS)/phase-barrier.sh" "$(PHASE_NAME)"
 
 preflight-transport-otel-prove: ## Controlled Colima L1 capture + OTEL/QUIC proof (strict labs)
 	bash $(SCRIPTS)/preflight-controlled-transport-otel-prove.sh
@@ -1214,6 +1278,7 @@ deploy-monitoring-help: ## Print paths for Prometheus rules + Grafana stubs (app
 	@echo "Grafana stubs:      $(REPO_ROOT)/infra/monitoring/grafana/dashboards/"
 	@echo "Jaeger manifest:    $(REPO_ROOT)/infra/k8s/base/observability/jaeger-deploy.yaml"
 	@echo "Trace flow schema:  $(REPO_ROOT)/infra/observability/trace-flows.json"
+	@echo "Preflight state map: $(REPO_ROOT)/infra/observability/preflight-state-machine.json"
 	@echo "Docs:               $(REPO_ROOT)/docs/CLUSTER_FORENSICS_AND_OBSERVABILITY.md"
 
 tls-secrets-expiry-textfile: ## Emit Prometheus textfile lines (stdout); pipe to node_exporter textfile dir

@@ -1,0 +1,37 @@
+{
+  "host": "record-platform.test",
+  "strictTls": true,
+  "resolveViaMetalLb": true,
+  "ca": "certs/dev-chain.pem",
+  "protocols": ["h2", "h3"],
+  "critical": [
+    {"path": "/_caddy/healthz", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/api/healthz", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/api/readyz", "methods": ["GET"], "codes": [200], "attempts": {"h2": 10, "h3": 10}},
+    {"path": "/", "methods": ["GET"], "codes": [200], "attempts": {"h2": 10, "h3": 10}},
+    {"path": "/login", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/records", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/listings", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/market", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/messages", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/cart", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/dashboard", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/insights", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/settings", "methods": ["GET"], "codes": [200, 302, 307, 308], "attempts": {"h2": 1, "h3": 1}}
+  ],
+  "api": [
+    {"path": "/api/auth/healthz", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/api/listings/healthz", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}},
+    {"path": "/api/trust/healthz", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}}
+  ],
+  "observability": [
+    {"path": "/grafana/", "methods": ["GET"], "codes": [200, 302, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false},
+    {"path": "/jaeger/", "methods": ["GET"], "codes": [200, 302, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false},
+    {"path": "/prometheus/", "methods": ["GET"], "codes": [200, 302, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false}
+  ],
+  "negative": [
+    {"host": "wrong-record-platform.test", "path": "/", "codes": [421], "verdicts": ["CERT_FAIL", "EDGE_MISROUTE"], "critical": false, "protocols": ["h2", "h3"]},
+    {"path": "/social/healthz", "codes": [404, 421], "protocols": ["h2", "h3"], "critical": false},
+    {"path": "/booking/healthz", "codes": [404, 421], "protocols": ["h2", "h3"], "critical": false}
+  ]
+}

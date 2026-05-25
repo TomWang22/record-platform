@@ -1,6 +1,6 @@
 # ==============================================================================
 # Record Platform — Unified Orchestration Makefile
-# (Lineage: Off-Campus-Housing / OCH flows; hostnames and ns default to record.test / record-platform.)
+# Record Platform: edge host record-platform.test (MetalLB + SNI); namespace record-platform.
 # ==============================================================================
 # ROLE: DEV   - local bootstrap and test flows
 # ROLE: PERF  - ceiling/model/report/graph workflows
@@ -47,12 +47,13 @@ SKIP_VERIFY_CURL_HTTP3 ?= 0
 .DEFAULT_GOAL := menu
 
 .PHONY: menu help setup reset verify diagnose clean-data-modeling-png generate-diagrams generate-uml generate-architecture bundle-2.1-submission generate-architecture-docs kafka-broker-status-stub db-schema-er-docs index-audit-md real-query-plan-suite up up-fast deps kubeconfig-colima cluster colima-net colima-patch-app-config-db-gateway tls-first-time trust-ca-macos verify-curl-http3 verify-docker-ports recycle-postgres-infra infra-host infra-cluster \
-	metallb-fix hosts-sanity ensure-edge-hosts wait-for-caddy-ip preflight-gate preflight-cluster-stability-guard preflight-live-triage-snapshot sslkeylog-seed ollama-note ollama-env verify-network-coherence verify-kafka-dns diagnose-kafka-broker-dns verify-kafka-bootstrap verify-kafka-cluster check-kafka-config-drift kafka-runtime-sync kafka-sync-metallb kafka-heal-inter-broker-tls kafka-alignment-suite kafka-health kafka-smoke kafka-smoke-with-health k8s-diagnose-restarts post-deploy-verify golden-snapshot chaos-suite-kafka verify-preflight-edge-routing diagnose-k6-edge cleanup-kafka-ops-pods apply-kafka-kraft kafka-refresh-tls-from-lb kafka-tls-rotate-atomic kafka-tls-guard kafka-tls-guard-remediate kafka-quorum-stable service-tls-alias-guard edge-readiness-gate rollout-och-full onboarding-kafka-preflight kafka-onboarding-reset kafka-lb-reset kafka-headless-reset kafka-clean-slate kafka-rolling-restart onboarding-edge dev-onboard dev-onboard-hardened-reset dev-onboard-eks dev-onboard-lite ephemeral-k3s-smoke chaos-kafka-broker chaos-metallb-kafka-lb chaos-test sync-prometheus-kafka-rules colima-bridged colima-bridged-clean metallb-bring-up test test-current model summarize-ceiling strict-canonical ceiling collapse-trust collapse-messaging collapse-all \
+	metallb-fix hosts-sanity ensure-edge-hosts wait-for-caddy-ip preflight-gate preflight-cluster-stability-guard preflight-live-triage-snapshot sslkeylog-seed ollama-note ollama-env verify-network-coherence verify-kafka-dns diagnose-kafka-broker-dns verify-kafka-bootstrap verify-kafka-cluster check-kafka-config-drift kafka-runtime-sync kafka-sync-metallb kafka-heal-inter-broker-tls kafka-alignment-suite kafka-health kafka-smoke kafka-smoke-with-health k8s-diagnose-restarts post-deploy-verify golden-snapshot chaos-suite-kafka verify-preflight-edge-routing diagnose-k6-edge cleanup-kafka-ops-pods apply-kafka-kraft kafka-refresh-tls-from-lb kafka-tls-rotate-atomic kafka-tls-guard kafka-tls-guard-remediate kafka-quorum-stable service-tls-alias-guard edge-readiness-gate rollout-rp-full onboarding-kafka-preflight kafka-onboarding-reset kafka-lb-reset kafka-headless-reset kafka-clean-slate kafka-rolling-restart onboarding-edge dev-onboard dev-onboard-hardened-reset dev-onboard-eks dev-onboard-lite ephemeral-k3s-smoke chaos-kafka-broker chaos-metallb-kafka-lb chaos-test sync-prometheus-kafka-rules colima-bridged colima-bridged-clean metallb-bring-up test test-current model summarize-ceiling strict-canonical ceiling collapse-trust collapse-messaging collapse-all \
 	protocol-matrix packet-capture perf-lab perf-full generate-report graph-capacity heatmap-tail compare-run regression-guard \
 	slack-report discord-report ci ci-full certify ceiling-default performance-lab-interpret performance-lab-interpret-latest performance-lab-one capacity-recommend capacity-one protocol-happiness transport-routing-hints transport-routing-hints-sync-k8s perf-lab-dashboards bundle-performance-lab-10 strict-envelope-check adaptive-pool-suggest declare-readiness shellcheck-preflight transport-lab full-edge-transport-validation endpoint-coverage collapse-smoke explain-all-dbs demo demo-network demo-full demo-k3d stack images images-all kustomize-apply \
 	deploy-dev rollouts preflight-metallb preflight-colima-metallb-edge preflight-strict preflight-lab preflight-strict-full-matrix validate-observability e2e-full-strict test-e2e-integrated packet-capture-standalone transport-quic-v6-prove transport-quic-v6-v7-prove transport-quic-v7-prove certify-production \
 	validate-jaeger-lb verify-jaeger-liveness verify-jaeger-tracing-services jaeger-seed-edge-health cluster-stability-guard \
 	phase-barrier preflight-transport-otel-prove transport-study-experiments \
+	rp-audit-network-contract rp-smoke-ingress-sni rp-preflight-network-contract rp-verify-image-contract rp-audit-bootstrap-contract cluster-doctor detect-drift verify-bootstrap-state bootstrap-invariants-order visualize-bootstrap-dag bootstrap bootstrap-drift-check cold-bootstrap cold-bootstrap-dry \
 	cluster-forensic-sweep forensic-log-sweep network-command-center deploy-monitoring-help tls-secrets-expiry-textfile \
 	chaos-suite governed-chaos failure-budget resilience-menu generate-chaos-report-md \
 	metrics-server-ready trust-integration-tests test-vitest-stack
@@ -92,8 +93,18 @@ TARGET_IP ?=
 CI_MODE ?= 0
 HEADLESS ?= 0
 KUBECONFIG_COLIMA ?= $(HOME)/.colima/default/kubeconfig
-RESTORE_BACKUP_DIR ?= latest
-# Default 1: append record.test → MetalLB IP via sudo when needed (set 0 for hints only).
+RESTORE_BACKUP_DIR ?= backups/hybrid-rp-och/assembled
+RP_SKIP_SOCIAL_SERVICE ?= 1
+RP_PAUSE_FOR_HOSTS ?= 1
+COLD_BOOTSTRAP_CONFIRM ?=
+COLD_BOOTSTRAP_DEFAULT_RESTORE ?= backups/hybrid-rp-och/materialized-rp-runtime
+RP_CLUSTER_DOCTOR_MIN_SCORE ?= 90
+RP_ENABLE_OLLAMA ?= 0
+RP_ENABLE_ANALYTICS_AI ?= 0
+RP_ENABLE_HEAVY_OBS ?= 0
+RP_SKIP_BOOKING_DB ?= 1
+RP_SKIP_BOOKING_SERVICE ?= 1
+# Default 1: append record-platform.test → MetalLB IP via sudo when needed (set 0 for hints only).
 HOSTS_AUTO ?= 1
 EXTERNAL_IP ?=
 # phase-barrier.sh phase id (default generic). Example: make phase-barrier PHASE_NAME=post-kafka-alignment
@@ -154,7 +165,7 @@ help: ## List targets and short descriptions
 	@echo "Core:"
 	@echo "  make up               Full bootstrap (cluster + infra + TLS + /etc/hosts for edge; no KRaft / no deploy-dev)"
 	@echo "  make dev-onboard      deps + zero-trust CA + up-fast + Kafka TLS + kafka-ssl-secret verify (Phase 10: alignment; SAFE_ONLY=1 → kafka-health); make setup alias"
-	@echo "  make rollout-och-full  After Kafka/TLS secret fixes: ensure cluster secrets + restart all housing apps + Caddy (ordered)"
+	@echo "  make rollout-rp-full  After Kafka/TLS secret fixes: ensure cluster secrets + restart all housing apps + Caddy (ordered)"
 	@echo "  make kafka-heal-inter-broker-tls  Recreate kafka-0..N-1 if CrashLoop / PKIX JKS drift (see Runbook.md)"
 	@echo "  make dev-onboard-eks  EKS: verify Kafka + edge only (no MetalLB/hosts reset)"
 	@echo "  make dev-onboard-lite CI-safe static checks (scripts + kustomize + client dry-run)"
@@ -412,8 +423,9 @@ kafka-sync-metallb: ## Drift-aware: verify-only if aligned; else refresh TLS fro
 	HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash $(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh
 	$(REPO_ROOT)/scripts/kafka-sync-metallb.sh
 
-kafka-alignment-report-venv: ## Venv + matplotlib for generate-kafka-alignment-report.py (PEP 668–safe)
+kafka-alignment-report-venv: ## Venv + matplotlib for generate-kafka-alignment-report.py (PEP 668–safe; pip==26.1.1)
 	@test -x "$(KAFKA_ALIGNMENT_REPORT_VENV)/bin/python" || python3 -m venv "$(KAFKA_ALIGNMENT_REPORT_VENV)"
+	"$(KAFKA_ALIGNMENT_REPORT_VENV)/bin/python" -m pip install -q --upgrade 'pip==26.1.1'
 	"$(KAFKA_ALIGNMENT_REPORT_VENV)/bin/pip" install -q -r "$(REPO_ROOT)/scripts/requirements-kafka-alignment-report.txt"
 
 kafka-alignment-suite: kafka-alignment-report-venv ## Alignment test suite (safe by default; full chaos: KAFKA_ALIGNMENT_TEST_MODE=1 make kafka-alignment-suite)
@@ -485,7 +497,7 @@ verify-preflight-edge-routing: ## Ingress /api+/auth parity, DNS→LB, curl /api
 	chmod +x $(REPO_ROOT)/scripts/verify-preflight-edge-routing.sh
 	$(REPO_ROOT)/scripts/verify-preflight-edge-routing.sh
 
-diagnose-k6-edge: ## DNS/TLS/curl checks for record.test (k6 edge timeouts)
+diagnose-k6-edge: ## DNS/TLS/curl checks for record-platform.test (k6 edge timeouts)
 	bash -n $(REPO_ROOT)/scripts/diagnose-k6-edge-connectivity.sh
 	bash $(REPO_ROOT)/scripts/diagnose-k6-edge-connectivity.sh
 
@@ -527,7 +539,7 @@ kafka-rolling-restart: ## Ordered delete kafka pods 2→1→0 with verify-kafka-
 	chmod +x $(SCRIPTS)/kafka-rolling-restart.sh
 	bash $(SCRIPTS)/kafka-rolling-restart.sh
 
-kafka-tls-guard: ## Mounted CA + JKS uniformity across brokers, och-kafka CA, logs, verify-kafka-cluster (fail-fast)
+kafka-tls-guard: ## Mounted CA + JKS uniformity across brokers, Kafka CA, logs, verify-kafka-cluster (fail-fast)
 	chmod +x $(SCRIPTS)/kafka-tls-guard.sh
 	KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) HOUSING_NS=$(HOUSING_NS) bash $(SCRIPTS)/kafka-tls-guard.sh
 
@@ -542,7 +554,7 @@ kafka-quorum-stable: ## Gate: no QuorumController "leader is (none)" in kafka-0 
 	chmod +x $(SCRIPTS)/kafka-quorum-stable.sh
 	HOUSING_NS=$(HOUSING_NS) bash $(SCRIPTS)/kafka-quorum-stable.sh
 
-service-tls-alias-guard: ## Fail if service-tls vs och-service-tls ca.crt fingerprints differ
+service-tls-alias-guard: ## Fail if service-tls vs edge-service-tls ca.crt fingerprints differ
 	chmod +x $(SCRIPTS)/service-tls-alias-guard.sh
 	HOUSING_NS=$(HOUSING_NS) bash $(SCRIPTS)/service-tls-alias-guard.sh
 
@@ -551,9 +563,9 @@ edge-readiness-gate: ## MetalLB IP on caddy-h3 + in-pod Caddy + api-gateway /hea
 	NS_ING=$(NS_ING) HOUSING_NS=$(HOUSING_NS) bash $(SCRIPTS)/edge-readiness-gate.sh
 
 # Refresh Kafka TLS alias + ordered restart of every housing Deployment and caddy-h3 (picks up Secret mounts).
-rollout-och-full: ## ensure-housing-cluster-secrets then rollout-deferred-after-kafka-tls; skip secrets: SKIP_ENSURE_CLUSTER_SECRETS=1
-	chmod +x $(SCRIPTS)/ensure-housing-cluster-secrets.sh $(SCRIPTS)/rollout-deferred-after-kafka-tls.sh $(SCRIPTS)/rollout-restart-och-full-stack.sh
-	NS_ING=$(NS_ING) HOUSING_NS=$(HOUSING_NS) OCH_ROLLOUT_STATUS_TIMEOUT=$(OCH_ROLLOUT_STATUS_TIMEOUT) SKIP_ENSURE_CLUSTER_SECRETS=$(SKIP_ENSURE_CLUSTER_SECRETS) bash $(SCRIPTS)/rollout-restart-och-full-stack.sh
+rollout-rp-full: ## ensure-housing-cluster-secrets then rollout-deferred-after-kafka-tls; skip secrets: SKIP_ENSURE_CLUSTER_SECRETS=1
+	chmod +x $(SCRIPTS)/ensure-housing-cluster-secrets.sh $(SCRIPTS)/rollout-deferred-after-kafka-tls.sh $(SCRIPTS)/rollout-restart-rp-full-stack.sh
+	NS_ING=$(NS_ING) HOUSING_NS=$(HOUSING_NS) RP_ROLLOUT_STATUS_TIMEOUT=$(RP_ROLLOUT_STATUS_TIMEOUT) SKIP_ENSURE_CLUSTER_SECRETS=$(SKIP_ENSURE_CLUSTER_SECRETS) bash $(SCRIPTS)/rollout-restart-rp-full-stack.sh
 
 # DESTRUCTIVE: wipes Kafka; requires existing cluster + ingress NS. Does not run make up or Docker.
 dev-onboard-hardened-reset: ## Kafka clean slate → canonical TLS reissue-only → ensure secrets → apply-kafka → guards → housing rollouts
@@ -588,16 +600,16 @@ wait-for-caddy-ip: ## Poll caddy-h3 EXTERNAL-IP up to ~120s (ingress-nginx)
 	echo "❌ Timed out waiting for caddy-h3 EXTERNAL-IP (~120s). Check: kubectl -n ingress-nginx get svc caddy-h3"; \
 	exit 1
 
-# ROLE: DEV — after deploy-dev (Caddy/ingress up): curl / API health via record.test
+# ROLE: DEV — after deploy-dev (Caddy/ingress up): curl / API health via record-platform.test
 onboarding-edge: ## verify-preflight-edge-routing (MetalLB + hosts + TLS)
 	$(MAKE) verify-preflight-edge-routing
 
 # ROLE: DEV — deterministic local onboard (EKS: dev-onboard-eks). Wrapper: scripts/dev-onboard-local.sh (set -euo pipefail).
-# Local path: Phase 0.25 deps + 0.5 dev-root CA → up-fast → Kafka apply → och-kafka-ssl-secret sync+verify → … (see script header).
+# Local path: Phase 0.25 deps + 0.5 dev-root CA → up-fast → Kafka apply → kafka-ssl-secret sync+verify → … (see script header).
 dev-onboard: ## LOCAL: deps + zero-trust CA + up-fast + Kafka/housing TLS gates + alignment (DEV_ONBOARD_KAFKA_ALIGNMENT_SAFE_ONLY=1 → kafka-health); EKS: verify-only
 	@chmod +x $(SCRIPTS)/detect-k8s-environment.sh $(SCRIPTS)/dev-onboard-local.sh $(SCRIPTS)/dev-onboard-zero-trust-preflight.sh $(SCRIPTS)/ensure-dev-root-ca.sh $(SCRIPTS)/ensure-housing-cluster-secrets.sh
-	@_och_env=$$(bash $(SCRIPTS)/detect-k8s-environment.sh 2>/dev/null || echo LOCAL); \
-	if [ "$$_och_env" = "EKS" ]; then \
+	@_cluster_env=$$(bash $(SCRIPTS)/detect-k8s-environment.sh 2>/dev/null || echo LOCAL); \
+	if [ "$$_cluster_env" = "EKS" ]; then \
 	  $(MAKE) dev-onboard-eks; \
 	else \
 	  DEV_ONBOARD_STRICT="$(DEV_ONBOARD_STRICT)" RESTORE_BACKUP_DIR="$(RESTORE_BACKUP_DIR)" bash $(SCRIPTS)/dev-onboard-local.sh; \
@@ -710,12 +722,365 @@ ensure-edge-hosts: ## Idempotent hosts line for OCH edge hostname (EDGE_HOSTS_ST
 preflight-gate: ## Run ensure-ready-for-preflight gate
 	$(SCRIPTS)/ensure-ready-for-preflight.sh
 
+rp-verify-compose-contract: ## Fail if docker-compose.yml includes Kafka/apps/OCH ports (external infra only)
+	@bash -n $(SCRIPTS)/rp-verify-compose-contract.sh
+	@chmod +x $(SCRIPTS)/rp-verify-compose-contract.sh
+	@REPO_ROOT="$(REPO_ROOT)" bash $(SCRIPTS)/rp-verify-compose-contract.sh
+
+rp-audit-network-contract: rp-verify-compose-contract ## Static audit + compose contract (RP_NETWORK_CONTRACT)
+	@bash -n $(SCRIPTS)/rp-audit-no-localhost-nodeport.sh
+	@chmod +x $(SCRIPTS)/rp-audit-no-localhost-nodeport.sh $(SCRIPTS)/rp-audit-metallb-sni.sh $(SCRIPTS)/lib/rp-network-contract.sh
+	@REPO_ROOT="$(REPO_ROOT)" bash $(SCRIPTS)/rp-audit-no-localhost-nodeport.sh
+
+rp-smoke-ingress-sni: ## Live MetalLB + SNI record-platform.test (curl h1/h2/h3 /api/healthz)
+	@bash -n $(SCRIPTS)/rp-audit-metallb-sni.sh
+	@chmod +x $(SCRIPTS)/rp-audit-metallb-sni.sh $(SCRIPTS)/lib/rp-network-contract.sh
+	@REPO_ROOT="$(REPO_ROOT)" bash $(SCRIPTS)/rp-audit-metallb-sni.sh
+
+rp-preflight-network-contract: rp-audit-network-contract rp-smoke-ingress-sni ## Static + live edge contract before bootstrap
+
+cluster-doctor: ## Live health + drift + DAG → bench_logs/cluster-doctor.json (CLUSTER_DOCTOR_STRICT=1 → exit if score < 95)
+	@chmod +x $(SCRIPTS)/cluster_health_dag.py
+	@cd "$(REPO_ROOT)" && \
+	if [ "$${CLUSTER_DOCTOR_STRICT:-}" = "1" ]; then \
+	  python3 $(SCRIPTS)/cluster_health_dag.py doctor --repo "$(REPO_ROOT)" --strict; \
+	else \
+	  python3 $(SCRIPTS)/cluster_health_dag.py doctor --repo "$(REPO_ROOT)"; \
+	fi
+
+detect-drift: ## Drift vs bootstrap-artifact.json → bench_logs/drift-detection.json
+	@python3 $(SCRIPTS)/cluster_health_dag.py drift --repo "$(REPO_ROOT)"
+
+verify-bootstrap-state: ## Machine-verifiable bootstrap contract JSON (VERIFY_BOOTSTRAP_CONTEXT=post-bootstrap)
+	@mkdir -p $(BENCH)
+	@cd "$(REPO_ROOT)" && HOUSING_NS="$(HOUSING_NS)" VERIFY_BOOTSTRAP_CONTEXT="$${VERIFY_BOOTSTRAP_CONTEXT:-post-bootstrap}" \
+	  node $(SCRIPTS)/verify-bootstrap-state.mjs --json-out "$(BENCH)/bootstrap-state-verify-latest.json"
+
+bootstrap-invariants-order: ## Topological order from infra/bootstrap_invariants.graph.json
+	@mkdir -p $(BENCH)
+	@node $(SCRIPTS)/derive-bootstrap-order.mjs --json-out "$(BENCH)/bootstrap_allowed_order.json"
+
+visualize-bootstrap-dag: ## Render bench_logs/bootstrap_dag.html from invariant graph
+	@mkdir -p $(BENCH)
+	@node $(SCRIPTS)/render-bootstrap-dag-html.mjs --html-out "$(BENCH)/bootstrap_dag.html"
+
+bootstrap: ## Colima/k3s cluster bootstrap (BOOTSTRAP_CONFIRM=yes; BOOTSTRAP_SKIP_INFRA=1 when host DBs already restored)
+	@echo "Destructive cluster reset. Run: BOOTSTRAP_CONFIRM=yes make bootstrap"
+	@chmod +x $(SCRIPTS)/bootstrap-cluster.sh $(SCRIPTS)/dev-kill-all.sh $(SCRIPTS)/bring-up-external-infra.sh \
+	  $(SCRIPTS)/strict-tls-bootstrap.sh $(SCRIPTS)/deploy-dev.sh $(SCRIPTS)/verify-app-runtime.sh
+	@cd "$(REPO_ROOT)" && HOUSING_NS="$(HOUSING_NS)" bash $(SCRIPTS)/bootstrap-cluster.sh
+
+rp-verify-slo-sla: ## RP SLO/SLA gates → bench_logs/rp_slo_sla_report.json + rp_slo_sla_metrics.prom
+	@chmod +x $(SCRIPTS)/rp-verify-slo-sla.sh $(SCRIPTS)/rp-export-bootstrap-slo-prom.sh $(SCRIPTS)/rp-probe-edge-route-latency.sh
+	@cd "$(REPO_ROOT)" && RP_SLO_SKIP_EDGE_PROBES="$${RP_SLO_SKIP_EDGE_PROBES:-0}" bash $(SCRIPTS)/rp-verify-slo-sla.sh
+
+bootstrap-drift-check: ## verify-bootstrap-state drift + bench_logs/drift-report (VERIFY_BOOTSTRAP_STATE_SKIP=1 skips contract)
+	@chmod +x $(SCRIPTS)/bootstrap-drift-detector.sh
+	@cd "$(REPO_ROOT)" && bash $(SCRIPTS)/bootstrap-drift-detector.sh
+
+rp-build-required-images: ## Build caddy-with-tcpdump:dev + envoy-with-tcpdump:dev on host Docker (C.images)
+	@chmod +x $(SCRIPTS)/rp-build-required-images.sh
+	@bash $(SCRIPTS)/rp-build-required-images.sh
+
+rp-verify-required-images: ## Verify required_images.json on host + Colima VM Docker
+	@chmod +x $(SCRIPTS)/rp-build-required-images.sh $(SCRIPTS)/verify-required-images.sh \
+	  $(SCRIPTS)/lib/rp-colima-running.sh
+	@bash $(SCRIPTS)/verify-required-images.sh
+
+rp-verify-kafka-cert-chain: ## Fail if Kafka PEM/JKS do not verify against RP dev-chain.pem
+	@chmod +x $(SCRIPTS)/rp-verify-kafka-cert-chain.sh $(SCRIPTS)/kafka-ssl-from-dev-root.sh \
+	  $(SCRIPTS)/apply-rp-kafka-ssl-secret.sh $(SCRIPTS)/rp-audit-kafka-ssl-secret-writers.sh \
+	  $(SCRIPTS)/lib/rp-kafka-ssl-fingerprint.sh
+	@bash $(SCRIPTS)/rp-verify-kafka-cert-chain.sh
+
+rp-verify-three-stage-cert-contract: ## Root → intermediate → leaf + Kafka JKS/secret chain gate
+	@chmod +x $(SCRIPTS)/rp-verify-three-stage-cert-contract.sh $(SCRIPTS)/lib/rp-cert-proof.sh
+	@bash $(SCRIPTS)/rp-verify-three-stage-cert-contract.sh
+
+rp-audit-kafka-ssl-secret-writers: ## Fail if rp.dev/ca-fingerprint-sha256 is written outside apply-rp-kafka-ssl-secret.sh
+	@chmod +x $(SCRIPTS)/rp-audit-kafka-ssl-secret-writers.sh
+	@bash $(SCRIPTS)/rp-audit-kafka-ssl-secret-writers.sh
+
+rp-bootstrap-host-deps: ## P1: Node 22 + pnpm 11.1.3 (auto fnm/corepack), docker, curl HTTP/3, openssl, kubectl
+	@chmod +x $(SCRIPTS)/rp-bootstrap-host-deps.sh $(SCRIPTS)/rp-verify-toolchain-contract.sh \
+	  $(SCRIPTS)/lib/rp-ensure-node-pnpm.sh $(SCRIPTS)/lib/rp-ensure-pnpm-corepack.sh
+	@bash $(SCRIPTS)/rp-bootstrap-host-deps.sh
+
+rp-verify-toolchain-contract: ## Node >=22.13 <23 + pnpm 11.1.3 + lockfile contract (image contract in C.image_contract)
+	@chmod +x $(SCRIPTS)/rp-verify-toolchain-contract.sh $(SCRIPTS)/lib/rp-ensure-node-pnpm.sh
+	@env RP_VERIFY_TOOLCHAIN_SKIP_IMAGE_CONTRACT=1 bash $(SCRIPTS)/rp-verify-toolchain-contract.sh
+
+rp-audit-porting-docs: ## OCH/booking strings in docs/porting (non-blocking unless RP_STRICT_DOC_PORTING_AUDIT=1)
+	@chmod +x $(SCRIPTS)/rp-audit-porting-docs.sh
+	@bash $(SCRIPTS)/rp-audit-porting-docs.sh
+
+rp-audit-runtime-service-list: ## No booking/social in active image/deploy lists; Dockerfiles exist
+	@chmod +x $(SCRIPTS)/rp-audit-runtime-service-list.sh
+	@bash $(SCRIPTS)/rp-audit-runtime-service-list.sh
+
+rp-verify-image-contract: ## Static Docker image contract (RP_WEBAPP_CONTRACT_MODE=static by default; docker mode optional)
+	@chmod +x $(SCRIPTS)/rp-verify-image-build-contract.sh $(SCRIPTS)/test-rp-webapp-standalone-contract.sh \
+	  $(SCRIPTS)/rp-audit-dockerfiles-pnpm.sh
+	@bash $(SCRIPTS)/rp-verify-image-build-contract.sh
+	@env RP_WEBAPP_CONTRACT_MODE=static bash $(SCRIPTS)/test-rp-webapp-standalone-contract.sh
+
+rp-verify-kustomize-app-services: ## Render dev overlay; assert RP app Service+Deployment manifests exist
+	@chmod +x $(SCRIPTS)/rp-verify-kustomize-app-services.sh
+	@bash $(SCRIPTS)/rp-verify-kustomize-app-services.sh
+
+rp-audit-cert-coverage: ## Disk PKI: all certPolicy mTLS services have 3-stage leaves
+	@chmod +x $(SCRIPTS)/audit-rp-cert-coverage.sh $(SCRIPTS)/lib/rp-service-cert-contract.sh
+	@bash $(SCRIPTS)/audit-rp-cert-coverage.sh
+
+rp-audit-k8s-service-tls-secrets: ## K8s: per-service + bundle mTLS secrets (generation-id, cert count, chain verify)
+	@chmod +x $(SCRIPTS)/audit-rp-k8s-service-tls-secrets.sh
+	@bash $(SCRIPTS)/audit-rp-k8s-service-tls-secrets.sh
+
+rp-audit-no-stale-pki: ## Fail if any cert/key/secret is stale vs certs/.rp-pki-generation-id
+	@chmod +x $(SCRIPTS)/audit-rp-no-stale-pki.sh
+	@bash $(SCRIPTS)/audit-rp-no-stale-pki.sh
+
+rp-audit-webapp-internal-calls: ## webapp must not call internal services unless mtlsRequired
+	@chmod +x $(SCRIPTS)/audit-rp-webapp-internal-calls.sh
+	@bash $(SCRIPTS)/audit-rp-webapp-internal-calls.sh
+
+rp-audit-webapp-service-contract: ## webapp Service render/selector/port + Caddy upstream contract
+	@chmod +x $(SCRIPTS)/audit-rp-webapp-service-contract.sh
+	@bash $(SCRIPTS)/audit-rp-webapp-service-contract.sh
+
+rp-audit-runtime-health-contract: ## Static runtime health contract (JSON only; no kubectl)
+	@chmod +x $(SCRIPTS)/audit-rp-runtime-health-contract.sh $(SCRIPTS)/lib/rp-runtime-health-contract.sh
+	@bash $(SCRIPTS)/audit-rp-runtime-health-contract.sh --mode static
+
+rp-audit-runtime-health-contract-live: ## Live runtime health contract vs K8s Service ports/endpoints
+	@chmod +x $(SCRIPTS)/audit-rp-runtime-health-contract.sh $(SCRIPTS)/lib/rp-runtime-health-contract.sh
+	@bash $(SCRIPTS)/audit-rp-runtime-health-contract.sh --mode live
+
+rp-audit-k8s-service-tls-mounts: ## mTLS Deployments must mount service-tls-<svc>, not edge service-tls
+	bash $(SCRIPTS)/audit-rp-k8s-service-tls-mounts.sh
+
+rp-audit-grpc-cert-sans: ## mTLS leaf SANs match certPolicy (+ optional cluster secret check)
+	bash $(SCRIPTS)/audit-rp-grpc-cert-sans.sh
+
+rp-audit-grpc-health-source: ## gRPC health service names appear in workload logs
+	bash $(SCRIPTS)/audit-rp-grpc-health-source.sh
+
+rp-audit-caddyfile: ## Caddyfile edge routing contract (RP vhost, paths, no OCH leakage)
+	@chmod +x $(SCRIPTS)/audit-rp-caddyfile.sh
+	@bash $(SCRIPTS)/audit-rp-caddyfile.sh
+
+rp-test-colima-k3s-args: ## Regression: Colima argv passes --disable=servicelb and --disable=traefik
+	@chmod +x $(SCRIPTS)/test-rp-colima-k3s-start-args.sh $(SCRIPTS)/lib/rp-colima-k3s-start-args.sh $(SCRIPTS)/rp-colima-start-clean.sh
+	@bash $(SCRIPTS)/test-rp-colima-k3s-start-args.sh
+
+rp-test-edge-http3-smoke-parser: ## Regression: HTTP/3 smoke classifier (legacy alias; see rp-test-edge-curl-probe-parser)
+	@chmod +x $(SCRIPTS)/test-rp-edge-http3-smoke-parser.sh $(SCRIPTS)/lib/rp-http3-smoke-classify.sh $(SCRIPTS)/smoke-rp-edge-http3-strict.sh
+	@bash $(SCRIPTS)/test-rp-edge-http3-smoke-parser.sh
+
+rp-test-edge-curl-probe-parser: ## Regression: h2/h3 edge curl probe classifier (PASS/TIMEOUT/CERT_FAIL/protocol)
+	@chmod +x $(SCRIPTS)/test-rp-edge-curl-probe-parser.sh $(SCRIPTS)/lib/rp-edge-curl-probe.sh
+	@bash $(SCRIPTS)/test-rp-edge-curl-probe-parser.sh
+
+rp-test-kafka-gate-ssl: ## Regression: cold-bootstrap kafka gate uses SSL topic verify (not plaintext :9093)
+	@chmod +x $(SCRIPTS)/test-rp-kafka-gate-ssl.sh
+	@bash $(SCRIPTS)/test-rp-kafka-gate-ssl.sh
+
+rp-test-pki-secret-annotations: ## Regression: PKI generation-id annotations on K8s TLS secrets
+	@chmod +x $(SCRIPTS)/test-rp-pki-secret-annotations.sh
+	@bash $(SCRIPTS)/test-rp-pki-secret-annotations.sh
+
+rp-test-metallb-only-no-nodeport-verifier: ## Regression: verify-bootstrap-state enforces MetalLB-only (no nodePort)
+	@chmod +x $(SCRIPTS)/test-rp-metallb-only-no-nodeport-verifier.sh
+	@bash $(SCRIPTS)/test-rp-metallb-only-no-nodeport-verifier.sh
+
+rp-reannotate-pki-secrets: ## Repair: annotate all K8s PKI secrets with generation-id (no cert regeneration)
+	@chmod +x $(SCRIPTS)/rp-reannotate-pki-secrets.sh
+	@bash $(SCRIPTS)/rp-reannotate-pki-secrets.sh
+
+rp-audit-bootstrap-contract: rp-test-colima-k3s-args rp-test-edge-curl-probe-parser rp-test-kafka-gate-ssl rp-test-pki-secret-annotations rp-test-metallb-only-no-nodeport-verifier rp-verify-toolchain-contract rp-audit-network-contract rp-audit-runtime-contract rp-audit-runtime-health-contract rp-audit-cert-coverage rp-audit-no-stale-pki rp-audit-k8s-service-tls-mounts rp-audit-grpc-cert-sans rp-audit-grpc-health-source rp-audit-webapp-internal-calls rp-audit-webapp-service-contract rp-audit-api-gateway rp-audit-k8s-service-ports rp-audit-probes rp-audit-health-endpoints rp-audit-caddyfile ## Post-image-contract audits (image/kustomize in cold-bootstrap C.image_contract)
+	@echo "✅ rp-audit-bootstrap-contract OK"
+
+rp-audit-metallb-only-edge: ## Hard gate: MetalLB-only caddy-h3 edge (no svclb/nodePorts)
+	@chmod +x $(SCRIPTS)/audit-rp-metallb-only-edge.sh $(SCRIPTS)/lib/rp-colima-k3s-start-args.sh
+	@bash $(SCRIPTS)/audit-rp-metallb-only-edge.sh
+
+rp-cold-run-prep: ## Cold-bootstrap preflight bundle (MetalLB edge + mTLS + runtime gates); writes bench_logs/cold-run-prep/summary.md
+	@chmod +x $(SCRIPTS)/rp-cold-run-prep.sh $(SCRIPTS)/audit-rp-metallb-only-edge.sh $(SCRIPTS)/audit-rp-metallb-quic-edge.sh $(SCRIPTS)/smoke-rp-edge-http2-strict.sh $(SCRIPTS)/smoke-rp-edge-http3-strict.sh $(SCRIPTS)/smoke-rp-edge-contract.sh $(SCRIPTS)/test-rp-edge-curl-probe-parser.sh $(SCRIPTS)/rca-rp-http3-timeout.sh $(SCRIPTS)/rollout-caddy.sh $(SCRIPTS)/rca-rp-grpc-mtls.sh $(SCRIPTS)/lib/rp-grpc-mtls-matrix-report.sh
+	@bash $(SCRIPTS)/rp-cold-run-prep.sh
+
+rp-prepull-base-images: ## Pre-pull Dockerfile base images with retry (before build-images)
+	@chmod +x $(SCRIPTS)/rp-prepull-base-images.sh
+	@bash $(SCRIPTS)/rp-prepull-base-images.sh
+
+rp-audit-image-freshness: ## Local :dev images must match rp.dev.source-sha (optional: RP_IMAGE_TARGETS=trust-service)
+	@chmod +x $(SCRIPTS)/audit-rp-image-freshness.sh $(SCRIPTS)/lib/rp-compute-source-sha.sh
+	@bash $(SCRIPTS)/audit-rp-image-freshness.sh
+
+rp-write-source-sha-plan: ## Freeze expected rp.dev.source-sha per active image (bench_logs/image-freshness/source-sha-plan.tsv)
+	@chmod +x $(SCRIPTS)/rp-write-source-sha-plan.sh $(SCRIPTS)/lib/rp-source-sha-inputs-summary.sh
+	@bash $(SCRIPTS)/rp-write-source-sha-plan.sh
+
+rp-build-missing-images: ## Build only stale/missing :dev images, then 14/14 freshness audit
+	@chmod +x $(SCRIPTS)/rp-build-missing-images.sh
+	@bash $(SCRIPTS)/rp-build-missing-images.sh
+
+rp-build-and-audit-images: ## Build missing/stale images + full freshness audit (prepull once inside script)
+	@chmod +x $(SCRIPTS)/rp-build-missing-images.sh
+	@bash $(SCRIPTS)/rp-build-missing-images.sh
+
+.PHONY: rp-audit-runtime-contract rp-audit-k8s-service-ports rp-audit-probes rp-audit-api-gateway-routes rp-audit-image-freshness rp-build-and-audit-images rp-build-missing-images rp-write-source-sha-plan rp-audit-health-endpoints sync-rp-k8s-from-contract audit-rp-edge-contract audit-rp-observability rp-test-colima-k3s-args rp-test-edge-http3-smoke-parser rp-test-edge-curl-probe-parser rp-test-kafka-gate-ssl
+rp-audit-health-endpoints:
+	@chmod +x $(SCRIPTS)/audit-health-endpoints-source.sh && bash $(SCRIPTS)/audit-health-endpoints-source.sh
+rp-audit-api-gateway-routes:
+	@chmod +x $(SCRIPTS)/audit-rp-api-gateway-routes.sh && bash $(SCRIPTS)/audit-rp-api-gateway-routes.sh
+rp-audit-api-gateway: rp-audit-api-gateway-routes ## Build + test + route audit for api-gateway
+	pnpm -C services/api-gateway build
+	pnpm -C services/api-gateway test
+audit-rp-edge-contract:
+	@chmod +x $(SCRIPTS)/audit-rp-edge-contract.sh && bash $(SCRIPTS)/audit-rp-edge-contract.sh
+audit-rp-observability:
+	@chmod +x $(SCRIPTS)/audit-rp-observability.sh && bash $(SCRIPTS)/audit-rp-observability.sh
+rp-audit-runtime-contract:
+	@chmod +x $(SCRIPTS)/audit-rp-runtime-contract.sh && bash $(SCRIPTS)/audit-rp-runtime-contract.sh
+rp-audit-k8s-service-ports:
+	@chmod +x $(SCRIPTS)/audit-rp-k8s-service-ports.sh && bash $(SCRIPTS)/audit-rp-k8s-service-ports.sh
+rp-audit-probes:
+	@chmod +x $(SCRIPTS)/audit-rp-probes.sh && bash $(SCRIPTS)/audit-rp-probes.sh
+sync-rp-k8s-from-contract:
+	@python3 $(SCRIPTS)/sync-rp-k8s-from-contract.py
+
+.PHONY: test-rp-toolchain-contract test-rp-runtime-audit-scope test-rp-runtime-service-list test-rp-webapp-standalone-contract
+test-rp-webapp-standalone-contract:
+	@chmod +x $(SCRIPTS)/test-rp-webapp-standalone-contract.sh
+	@bash $(SCRIPTS)/test-rp-webapp-standalone-contract.sh
+
+.PHONY: test-rp-toolchain-contract test-rp-runtime-audit-scope test-rp-runtime-service-list
+test-rp-toolchain-contract:
+	@chmod +x $(SCRIPTS)/test-rp-toolchain-contract.sh && bash $(SCRIPTS)/test-rp-toolchain-contract.sh
+test-rp-runtime-audit-scope:
+	@chmod +x $(SCRIPTS)/test-rp-runtime-audit-scope.sh && bash $(SCRIPTS)/test-rp-runtime-audit-scope.sh
+test-rp-runtime-service-list:
+	@chmod +x $(SCRIPTS)/test-rp-runtime-service-list.sh $(SCRIPTS)/rp-audit-runtime-service-list.sh && bash $(SCRIPTS)/test-rp-runtime-service-list.sh
+
+rp-bootstrap-prereqs: ## Certs + Kafka TLS + proto contract + materialized hybrid backup + static network audit (no cluster bootstrap)
+	@chmod +x $(SCRIPTS)/rp-bootstrap-prereqs.sh $(SCRIPTS)/rp-bootstrap-crypto.sh \
+	  $(SCRIPTS)/build-rp-hybrid-runtime-backup.sh \
+	  $(SCRIPTS)/sync-rp-proto-contract.sh $(SCRIPTS)/audit-rp-proto-contract.sh \
+	  $(SCRIPTS)/rp-align-colima-kubeconfig.sh $(SCRIPTS)/rp-kube-api-health.sh $(SCRIPTS)/rp-ensure-kube-api.sh $(SCRIPTS)/assert-rp-shell-output-clean.sh
+	@bash $(SCRIPTS)/rp-bootstrap-prereqs.sh
+
+rp-kube-api-health: ## Colima bridge kubeconfig API check (no 127.0.0.1:6443 tunnel)
+	@bash -n $(SCRIPTS)/rp-kube-api-health.sh
+	@chmod +x $(SCRIPTS)/rp-kube-api-health.sh $(SCRIPTS)/rp-align-colima-kubeconfig.sh
+	@bash $(SCRIPTS)/rp-kube-api-health.sh
+
+# ROLE: DEV — RP cold bootstrap (DAG A–J; embeds cluster-doctor + verify-bootstrap-state + drift)
+cold-bootstrap: ## COLD_BOOTSTRAP_CONFIRM=yes RESTORE_BACKUP_DIR=backups/all-8-<date> — full DAG (pauses at /etc/hosts)
+	@chmod +x $(SCRIPTS)/cold-bootstrap.sh $(SCRIPTS)/cold-bootstrap-post-hosts.sh $(SCRIPTS)/colima-factory-reset.sh \
+	  $(SCRIPTS)/rp-ensure-kube-api.sh $(SCRIPTS)/lib/rp-ensure-node-toolchain.sh \
+	  $(SCRIPTS)/lib/rp-ensure-node-pnpm.sh $(SCRIPTS)/rp-verify-toolchain-contract.sh \
+	  $(SCRIPTS)/rp-audit-runtime-service-list.sh $(SCRIPTS)/rp-audit-porting-docs.sh \
+	  $(SCRIPTS)/rp-bootstrap-crypto.sh $(SCRIPTS)/rp-verify-kafka-cert-chain.sh \
+	  $(SCRIPTS)/apply-rp-kafka-ssl-secret.sh $(SCRIPTS)/kafka-refresh-tls-from-lb.sh \
+	  $(SCRIPTS)/lib/rp-kafka-ssl-fingerprint.sh $(SCRIPTS)/rp-audit-kafka-ssl-secret-writers.sh \
+	  $(SCRIPTS)/rp-hard-reset.sh $(SCRIPTS)/rp-colima-start-clean.sh $(SCRIPTS)/rp-colima-cold-reset.sh \
+	  $(SCRIPTS)/rp-install-colima-vm-tools.sh $(SCRIPTS)/rp-build-required-images.sh \
+	  $(SCRIPTS)/ensure-required-images.sh $(SCRIPTS)/verify-required-images.sh \
+	  $(SCRIPTS)/lib/rp-cold-bootstrap-lib.sh $(SCRIPTS)/lib/rp-log.sh $(SCRIPTS)/lib/rp-colima-vm-tools.sh \
+	  $(SCRIPTS)/lib/rp-colima-running.sh \
+	  $(SCRIPTS)/test-rp-cold-bootstrap-order-and-ux.sh \
+	  $(SCRIPTS)/restore-rp-hybrid-backup.sh $(SCRIPTS)/wait-caddy-metallb-ip.sh \
+	  $(SCRIPTS)/resolve-rp-restore-backup-dir.sh $(SCRIPTS)/lib/rp-restore-resolve.sh \
+	  $(SCRIPTS)/bootstrap-cluster.sh $(SCRIPTS)/bootstrap-phase-guard.mjs
+	@set -euo pipefail; cd "$(REPO_ROOT)"; \
+	_rb="$${RESTORE_BACKUP_DIR:-}"; \
+	case "$$_rb" in \
+	  ""|latest) \
+	    if [ -d "$(COLD_BOOTSTRAP_DEFAULT_RESTORE)" ]; then \
+	      export RESTORE_BACKUP_DIR="$(COLD_BOOTSTRAP_DEFAULT_RESTORE)"; \
+	      echo "Using RESTORE_BACKUP_DIR=$(COLD_BOOTSTRAP_DEFAULT_RESTORE)"; \
+	    elif compgen -G "backups/all-8-*" >/dev/null 2>&1; then \
+	      export RESTORE_BACKUP_DIR=latest; echo "Using RESTORE_BACKUP_DIR=latest"; \
+	    fi ;; \
+	  *) export RESTORE_BACKUP_DIR="$$_rb"; echo "Using RESTORE_BACKUP_DIR=$$RESTORE_BACKUP_DIR" ;; \
+	esac; \
+	COLD_BOOTSTRAP_CONFIRM=$(COLD_BOOTSTRAP_CONFIRM) \
+	  RP_CLUSTER_DOCTOR_MIN_SCORE=$(RP_CLUSTER_DOCTOR_MIN_SCORE) \
+	  RESTORE_BACKUP_DIR="$${RESTORE_BACKUP_DIR:-}" \
+	  bash $(SCRIPTS)/cold-bootstrap.sh
+
+cold-bootstrap-plan: ## Dry-run cold-bootstrap DAG (phase order + command plan; no JSON spam)
+	@COLD_BOOTSTRAP_DRY_RUN=1 COLD_BOOTSTRAP_SKIP_COLIMA_RESET=1 COLD_BOOTSTRAP_CONFIRM=yes \
+	  RESTORE_BACKUP_DIR="$(RESTORE_BACKUP_DIR)" \
+	  $(MAKE) cold-bootstrap
+
+test-cold-bootstrap-ux test-rp-cold-bootstrap-ux: ## Phase order + nested bootstrap skip flags + no k3s trace spam (optional: LOG=/tmp/rp-ux.log)
+	@chmod +x $(SCRIPTS)/test-cold-bootstrap-ux.sh $(SCRIPTS)/test-rp-cold-bootstrap-order-and-ux.sh $(SCRIPTS)/test-rp-cold-bootstrap-terminal-ux.sh $(SCRIPTS)/cold-bootstrap-logs.sh
+	@bash $(SCRIPTS)/test-rp-cold-bootstrap-order-and-ux.sh $(LOG)
+	@bash $(SCRIPTS)/test-rp-cold-bootstrap-terminal-ux.sh
+
+test-rp-cold-bootstrap-terminal-ux: ## Runner UX: rp_run_quiet/native_tty, no exec tee, no forced color
+	@chmod +x $(SCRIPTS)/test-rp-cold-bootstrap-terminal-ux.sh
+	@bash $(SCRIPTS)/test-rp-cold-bootstrap-terminal-ux.sh
+
+test-rp-cold-bootstrap-order-and-ux: ## RP phase order A→P0→Z→P1 + terminal shape regression
+	@chmod +x $(SCRIPTS)/test-rp-cold-bootstrap-order-and-ux.sh
+	@bash $(SCRIPTS)/test-rp-cold-bootstrap-order-and-ux.sh
+
+test-rp-preflight-lab-parity: ## Static checks: preflight-lab ordering + Kafka/QUIC/lab env exports
+	@chmod +x $(SCRIPTS)/test-rp-preflight-lab-parity.sh
+	@bash $(SCRIPTS)/test-rp-preflight-lab-parity.sh
+
+cold-bootstrap-logs: ## List cold-bootstrap + command-logs paths and tail hints
+	@chmod +x $(SCRIPTS)/cold-bootstrap-logs.sh
+	@bash $(SCRIPTS)/cold-bootstrap-logs.sh
+
+cold-bootstrap-resume-post-kafka-tls: ## Resume F.cluster_deploy after Kafka TLS (re-annotate secrets + audit + G.app_runtime onward)
+	@chmod +x $(SCRIPTS)/rp-reannotate-pki-secrets.sh $(SCRIPTS)/audit-rp-k8s-service-tls-secrets.sh \
+	  $(SCRIPTS)/audit-rp-no-stale-pki.sh $(SCRIPTS)/rp-verify-kafka-cert-chain.sh \
+	  $(SCRIPTS)/rca-rp-grpc-mtls.sh $(SCRIPTS)/cold-bootstrap-post-hosts.sh
+	@echo "▶ Resume from F.cluster_deploy post-Kafka TLS"
+	@bash $(SCRIPTS)/rp-reannotate-pki-secrets.sh
+	@bash $(SCRIPTS)/audit-rp-no-stale-pki.sh
+	@RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES=$${RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES:-1} bash $(SCRIPTS)/rca-rp-grpc-mtls.sh --all --required --strict-integrity
+	@bash $(SCRIPTS)/rp-verify-kafka-cert-chain.sh
+	@echo "✅ PKI annotation + audit gates passed — continuing to post-hosts"
+	@COLD_BOOTSTRAP_CONFIRM=$(COLD_BOOTSTRAP_CONFIRM) bash $(SCRIPTS)/cold-bootstrap-post-hosts.sh
+
+cold-bootstrap-post-hosts: ## After /etc/hosts updated: preflight + verify + doctor + drift + SLO
+	@echo "cold-bootstrap-post-hosts: requires record-platform.test in /etc/hosts"
+	@chmod +x $(SCRIPTS)/cold-bootstrap-post-hosts.sh
+	@COLD_BOOTSTRAP_CONFIRM=$(COLD_BOOTSTRAP_CONFIRM) bash $(SCRIPTS)/cold-bootstrap-post-hosts.sh
+
+package-rp-hybrid-toolkit: ## record-platform-hybrid-cold-bootstrap-toolkit-<stamp>.tar.gz (RP_HYBRID_TOOLKIT_INCLUDE_DUMPS=0|1)
+	@chmod +x $(SCRIPTS)/package-rp-hybrid-cold-bootstrap-toolkit-bundle.sh $(SCRIPTS)/check-rp-hybrid-cold-bootstrap-toolkit.sh
+	@RP_HYBRID_TOOLKIT_INCLUDE_DUMPS="$(RP_HYBRID_TOOLKIT_INCLUDE_DUMPS)" bash $(SCRIPTS)/package-rp-hybrid-cold-bootstrap-toolkit-bundle.sh
+
+check-rp-hybrid-toolkit: ## Verify hybrid toolkit tarball (TOOLKIT_TARBALL=path)
+	@bash $(SCRIPTS)/check-rp-hybrid-cold-bootstrap-toolkit.sh "$(TOOLKIT_TARBALL)"
+
+init-hybrid-backup-layout: ## Symlink RP+OCH sources and rebuild materialized-rp-runtime
+	@chmod +x $(SCRIPTS)/init-hybrid-rp-och-backup-layout.sh $(SCRIPTS)/rp-stop-och-external-containers.sh $(SCRIPTS)/rp-verify-external-runtime-ports.sh
+	@bash $(SCRIPTS)/init-hybrid-rp-och-backup-layout.sh
+
+rp-wait-caddy-metallb: ## Block until caddy-h3 has MetalLB IP; print /etc/hosts instructions
+	@chmod +x $(SCRIPTS)/wait-caddy-metallb-ip.sh
+	@bash $(SCRIPTS)/wait-caddy-metallb-ip.sh
+
+cold-bootstrap-dry: ## Materialize + validate hybrid backup + proto audit (no Colima)
+	@bash $(SCRIPTS)/build-rp-hybrid-runtime-backup.sh
+	@bash $(REPO_ROOT)/backups/hybrid-rp-och/validate-hybrid-backup.sh $(REPO_ROOT)/backups/hybrid-rp-och/materialized-rp-runtime
+	@bash $(SCRIPTS)/sync-rp-proto-contract.sh
+	@bash $(SCRIPTS)/audit-rp-proto-contract.sh
+	@$(MAKE) rp-audit-network-contract
+	@$(MAKE) rp-verify-image-contract
+
 # ROLE: SRE — create SSL keylog file and seed QUIC handshake
 sslkeylog-seed: ## Rotate SSLKEYLOGFILE and generate one HTTP/3 handshake
 	@mkdir -p $(BENCH)
 	@export SSLKEYLOGFILE="$(BENCH)/sslkeylog-$$(date +%Y%m%d-%H%M%S).log"; \
 	  echo "SSLKEYLOGFILE=$$SSLKEYLOGFILE"; \
-	  curl --cacert certs/dev-root.pem -sS -I --http3 https://record.test/ >/dev/null || true
+	  curl --cacert certs/dev-root.pem -sS -I --http3 https://record-platform.test/ >/dev/null || true
 
 # ROLE: DEV — optional note only; does not mutate cluster
 ollama-note: ## Show optional Ollama steps for analytics listing-feel
@@ -726,7 +1091,7 @@ ollama-note: ## Show optional Ollama steps for analytics listing-feel
 
 # ROLE: DEV — optional env set for analytics-service
 ollama-env: ## Point analytics-service to host Ollama
-	kubectl set env deployment/analytics-service -n $(HOUSING_NS) OLLAMA_BASE_URL=http://host.docker.internal:11434
+	kubectl set env deployment/analytics-service -n $(HOUSING_NS) OLLAMA_BASE_URL=http://ollama.record-platform.svc.cluster.local:11434
 
 # ROLE: PERF — current performance suite
 test-current: ## Current perf model suite: run default service ceiling sweep + auto model derivation
@@ -859,7 +1224,7 @@ shellcheck-preflight: ## ShellCheck scripts/run-preflight-scale-and-all-suites.s
 	@command -v shellcheck >/dev/null 2>&1 || { echo "Install shellcheck (brew install shellcheck / apt install shellcheck)"; exit 1; }
 	shellcheck $(SCRIPTS)/run-preflight-scale-and-all-suites.sh
 
-# ROLE: DEV — after docker compose up: assert 5441–5448 + 6380 are published (see docker-compose.yml)
+# ROLE: DEV — after docker compose up: assert Postgres 5433–5443 + Redis 6379 are published (see docker-compose.yml)
 verify-docker-ports: ## Require mapped host ports for OCH Postgres + Redis (docker ps)
 	bash $(SCRIPTS)/ci/verify-docker-ports.sh
 
@@ -869,7 +1234,7 @@ verify-deletion-flow: ## VERIFY_AUTH_URL, POSTGRES_URL_AUTH (or 5441 defaults); 
 
 # ROLE: DEV — recreate 8 Postgres containers so compose `command:` (e.g. max_connections) applies; keeps volumes
 recycle-postgres-infra: ## Safe stop/rm/up for OCH Postgres + optional psql max_connections check
-	bash $(SCRIPTS)/recycle-och-postgres-compose.sh
+	bash $(SCRIPTS)/recycle-rp-postgres-compose.sh
 
 # ROLE: PERF / SRE — MetalLB edge H2/H3 strict + gRPC roll-up (needs live cluster + curl --http3-only)
 full-edge-transport-validation: ## Write bench_logs/transport-lab/transport-validation-report.json
@@ -1033,7 +1398,7 @@ ci-full: ## CI-safe full perf + regression guard
 	$(MAKE) generate-report
 	@echo "Set RUN1 and RUN2 for regression-guard to enforce comparison."
 
-images: ## Build Record Platform :dev images and load into Colima/k3s (./scripts/build-record-platform-images-k3s.sh)
+images build-images: ## Build Record Platform :dev images and load into Colima/k3s (./scripts/build-record-platform-images-k3s.sh)
 	bash $(SCRIPTS)/build-record-platform-images-k3s.sh
 
 images-all: ## Build all :dev images (default service list), load Colima, rollout each deploy (OCH transport-watchdog → api-gateway)
@@ -1080,11 +1445,23 @@ preflight-metallb: ## Run preflight only (MetalLB + k6 LB IP). Example: RUN_PGBE
 preflight-colima-metallb-edge: ## Colima+MetalLB edge preflight; RUN_PGBENCH=0 RUN_FULL_LOAD=0
 	REQUIRE_COLIMA=1 METALLB_USE_K3D=0 METALLB_ENABLED=1 K6_USE_METALLB=1 RUN_PGBENCH=0 RUN_FULL_LOAD=0 bash $(SCRIPTS)/run-preflight-scale-and-all-suites.sh
 
-preflight-strict: ## Strict lab: Colima+MetalLB+Jaeger+OTel+k6+Kafka alignment (KAFKA_ALIGNMENT_TEST_MODE=1). Prefer: make preflight-lab
+# Node 22.x required for pnpm@11.1.3 (see .nvmrc).
+.PHONY: ensure-node22 ensure-node20
+ensure-node22:
+	@chmod +x $(SCRIPTS)/rp-verify-toolchain-contract.sh $(SCRIPTS)/lib/rp-ensure-node-pnpm.sh
+	@bash $(SCRIPTS)/rp-verify-toolchain-contract.sh
+ensure-node20: ensure-node22 ## Deprecated alias — RP toolchain is Node 22 + pnpm 11.1.3
+
+# Ordered lab body (OCH parity): cluster-stability → QUIC packet capture prove → preflight-and-suites (Kafka alignment 6a2c9 inside).
+_rp_preflight_strict_body = \
 	cd "$(REPO_ROOT)" && \
 	  export HOUSING_NS="$(HOUSING_NS)" METALLB_ENABLED=1 METALLB_USE_K3D=0 REQUIRE_COLIMA=1 K6_USE_METALLB=1 && \
 	  export OTEL_PREFLIGHT_TRACE_SAMPLE=1 RUN_K6=1 && \
+	  export PREFLIGHT_LAB=1 && \
 	  export PREFLIGHT_SKIP_KAFKA_ALIGNMENT_SUITE=0 KAFKA_ALIGNMENT_TEST_MODE=1 && \
+	  export PREFLIGHT_RUN_REPO_VITEST_STACK=1 && \
+	  export PREFLIGHT_RUN_CLUSTER_STABILITY_GUARD=1 PREFLIGHT_ENSURE_METRICS_SERVER=1 && \
+	  export SKIP_K6_BOOKING_SEARCH=1 SKIP_K6_BOOKING_HEALTH=1 && \
 	  if [ -n "$(PREFLIGHT_STRICT_JAEGER_QUERY_BASE)" ]; then export JAEGER_QUERY_BASE="$(PREFLIGHT_STRICT_JAEGER_QUERY_BASE)"; fi && \
 	  bash "$(SCRIPTS)/cluster-stability-guard.sh" && \
 	  $(MAKE) transport-quic-v6-v7-prove && \
@@ -1092,14 +1469,22 @@ preflight-strict: ## Strict lab: Colima+MetalLB+Jaeger+OTel+k6+Kafka alignment (
 	  export PREFLIGHT_STEP7_OBSERVABILITY_GATES=1 && \
 	  pnpm preflight-and-suites
 
-preflight-lab: preflight-strict ## ONE canonical Colima lab command (same recipe as preflight-strict; see header comments).
+preflight-strict: ensure-node22 ## Strict lab: Colima+MetalLB+Jaeger+OTel+k6+Kafka alignment (KAFKA_ALIGNMENT_TEST_MODE=1). Prefer: make preflight-lab
+	$(_rp_preflight_strict_body)
+
+.PHONY: preflight-lab
+preflight-lab: preflight-strict ## ONE canonical Colima lab command (= preflight-strict; Kafka alignment + QUIC capture + Step7 obs gates).
 	@true
 
-preflight-strict-full-matrix: ## Like preflight-strict but PLAYWRIGHT_E2E_MATRIX=full (same lab + Kafka alignment exports)
+preflight-strict-full-matrix: ensure-node22 ## Like preflight-strict but PLAYWRIGHT_E2E_MATRIX=full (same lab + Kafka alignment exports)
 	cd "$(REPO_ROOT)" && \
 	  export HOUSING_NS="$(HOUSING_NS)" METALLB_ENABLED=1 METALLB_USE_K3D=0 REQUIRE_COLIMA=1 K6_USE_METALLB=1 && \
 	  export OTEL_PREFLIGHT_TRACE_SAMPLE=1 RUN_K6=1 && \
+	  export PREFLIGHT_LAB=1 && \
 	  export PREFLIGHT_SKIP_KAFKA_ALIGNMENT_SUITE=0 KAFKA_ALIGNMENT_TEST_MODE=1 && \
+	  export PREFLIGHT_RUN_REPO_VITEST_STACK=1 && \
+	  export PREFLIGHT_RUN_CLUSTER_STABILITY_GUARD=1 PREFLIGHT_ENSURE_METRICS_SERVER=1 && \
+	  export SKIP_K6_BOOKING_SEARCH=1 SKIP_K6_BOOKING_HEALTH=1 && \
 	  if [ -n "$(PREFLIGHT_STRICT_JAEGER_QUERY_BASE)" ]; then export JAEGER_QUERY_BASE="$(PREFLIGHT_STRICT_JAEGER_QUERY_BASE)"; fi && \
 	  bash "$(SCRIPTS)/cluster-stability-guard.sh" && \
 	  $(MAKE) transport-quic-v6-v7-prove && \
@@ -1107,13 +1492,46 @@ preflight-strict-full-matrix: ## Like preflight-strict but PLAYWRIGHT_E2E_MATRIX
 	  export PREFLIGHT_STEP7_OBSERVABILITY_GATES=1 && \
 	  pnpm preflight-and-suites
 
-validate-observability: ## Jaeger Step7 span-tree + overlap gates (needs JAEGER_QUERY_BASE; see docs/observability/och-observability-integrity-spec-v1.md)
+.PHONY: preflight-lab-coverage
+preflight-lab-coverage: ensure-node22 ## Optional post-lab coverage matrix (route hits + Vitest matrix report); not part of default preflight-lab
+	cd "$(REPO_ROOT)" && \
+	  chmod +x "$(SCRIPTS)/coverage/gateway-image-source-staleness-guard.sh" 2>/dev/null || true && \
+	  bash "$(SCRIPTS)/coverage/gateway-image-source-staleness-guard.sh" || true && \
+	  $(MAKE) fetch-gateway-route-hits && \
+	  SKIP_MATRIX_VITEST=0 bash "$(SCRIPTS)/coverage/run-matrix-vitest-coverage.sh" && \
+	  node "$(SCRIPTS)/coverage/verify-api-docs.mjs" && \
+	  node "$(SCRIPTS)/coverage/och-coverage-model-v1.mjs" && \
+	  SERVICE_COVERAGE_MATRIX_ENFORCE=1 node "$(SCRIPTS)/coverage/och-service-coverage-matrix.mjs" && \
+	  node "$(SCRIPTS)/coverage/generate-preflight-lab-report.mjs"
+
+fetch-gateway-route-hits: ## Copy api-gateway pod route-hit JSONL → bench_logs/routes-hit.jsonl (coverage matrix)
+	@chmod +x "$(SCRIPTS)/coverage/kubectl-fetch-route-log.sh"
+	@bash "$(SCRIPTS)/coverage/kubectl-fetch-route-log.sh"
+
+coverage-phase-vi2-verify: ensure-node22 ## Alias for pnpm run coverage:phase-vi2-verify (matrix + suite attribution)
+	cd "$(REPO_ROOT)" && pnpm run coverage:phase-vi2-verify
+
+.PHONY: observe
+observe: ensure-node22 ## Phase-vi2 matrix + analytics QA + sample k6 (best-effort; OCH parity)
+	@echo "=== Running Coverage + Kafka Skew (phase vi2) ==="
+	cd "$(REPO_ROOT)" && pnpm run coverage:phase-vi2-verify || true
+	@echo "=== Running Analytics QA ==="
+	cd "$(REPO_ROOT)" && BASE_URL="$${BASE_URL:-https://record-platform.test}" ANALYTICS_QA_TLS_INSECURE="$${ANALYTICS_QA_TLS_INSECURE:-1}" node scripts/analytics-qa/run-all.mjs || true
+	@echo "=== Generating Load (k6 h2) ==="
+	cd "$(REPO_ROOT)" && k6 run scripts/load/k6-transport-h2.js || true
+	@echo ""
+	@echo "Open (after /etc/hosts + edge TLS):"
+	@echo "  https://record-platform.test/jaeger"
+	@echo "  https://record-platform.test/grafana"
+	@echo "  https://record-platform.test/prometheus"
+
+validate-observability: ## Jaeger Step7 span-tree + overlap gates (needs JAEGER_QUERY_BASE; see docs/observability/rp-observability-integrity-spec-v1.md)
 	cd "$(REPO_ROOT)" && pnpm run validate-observability
 
-e2e-full-strict: ## Playwright E2E against record.test (strict env; requires cluster + TLS + dev-root.pem)
+e2e-full-strict: ## Playwright E2E against record-platform.test (strict env; requires cluster + TLS + dev-root.pem)
 	cd "$(REPO_ROOT)" && \
 	  export NODE_EXTRA_CA_CERTS="$(REPO_ROOT)/certs/dev-root.pem" && \
-	  export E2E_API_BASE="https://record.test" && \
+	  export E2E_API_BASE="https://record-platform.test" && \
 	  pnpm --filter webapp exec playwright test
 
 test-e2e-integrated: ## Port-forward api-gateway + Playwright (needs running cluster)
@@ -1131,7 +1549,7 @@ transport-quic-v6-prove: ## Colima/MetalLB: standalone capture + v6 artifact (ne
 	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
 	  _kl="$(BENCH)/sslkeys-record-transport-$$(date +%Y%m%d-%H%M%S).log" && \
 	  rm -f "$$_kl" && touch "$$_kl" && \
-	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
+	  HOST=record-platform.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
 	    bash $(SCRIPTS)/test-packet-capture-standalone.sh && \
 	  _dir="$$(ls -dt /tmp/packet-captures-v2-* | head -1)" && \
 	  mkdir -p $(BENCH) && echo "$$_dir" > "$(BENCH)/.last-transport-quic-prove-dir" && \
@@ -1163,7 +1581,7 @@ transport-quic-v6-v7-prove: ## Single standalone run; strict jq on transport-sum
 	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
 	  _kl="$(BENCH)/sslkeys-record-transport-$$(date +%Y%m%d-%H%M%S).log" && \
 	  rm -f "$$_kl" && touch "$$_kl" && \
-	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
+	  HOST=record-platform.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
 	    bash $(SCRIPTS)/test-packet-capture-standalone.sh && \
 	  _dir="$$(ls -dt /tmp/packet-captures-v2-* | head -1)" && \
 	  echo "$$_dir" > "$(BENCH)/.last-transport-quic-prove-dir" && \
@@ -1198,7 +1616,7 @@ transport-quic-v7-prove: ## Same capture as v6; transport-summary-v7.json + stri
 	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
 	  _kl="$(BENCH)/sslkeys-record-transport-$$(date +%Y%m%d-%H%M%S).log" && \
 	  rm -f "$$_kl" && touch "$$_kl" && \
-	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
+	  HOST=record-platform.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
 	    bash $(SCRIPTS)/test-packet-capture-standalone.sh && \
 	  _dir="$$(ls -dt /tmp/packet-captures-v2-* | head -1)" && \
 	  echo "$$_dir" > "$(BENCH)/.last-transport-quic-prove-dir" && \
@@ -1236,7 +1654,7 @@ verify-jaeger-liveness: ## In-cluster Jaeger + OTLP health checks (needs observa
 verify-jaeger-tracing-services: ## Verify tracing env wiring on record-platform Deployments
 	bash $(SCRIPTS)/verify-jaeger-tracing-services.sh
 
-jaeger-seed-edge-health: ## Hit edge /api/healthz to seed traces (HOST=record.test, TARGET_IP from caddy-h3 LB by default)
+jaeger-seed-edge-health: ## Hit edge /api/healthz to seed traces (HOST=record-platform.test, TARGET_IP from caddy-h3 LB by default)
 	bash $(SCRIPTS)/seed-jaeger-via-edge-health.sh
 
 preflight-cluster-stability-guard: ## Phase 0 guard: node headroom + metrics-server (alias for cluster-stability-guard)

@@ -5,7 +5,7 @@ import type { PrismaClient } from '../generated/records-client';
 import { PrismaClient as PrismaClientCtor, Prisma } from '../generated/records-client';
 import path from "path";
 import fs from "fs";
-import { registerHealthService } from "@common/utils";
+import { registerHealthService, createOchGrpcServerCredentialsForBind } from "@common/utils";
 
 type LoadedRecord = Awaited<ReturnType<PrismaClient["record"]["findFirst"]>>;
 
@@ -240,17 +240,12 @@ export function startGrpcServer(port: number = 50051, prismaClient?: PrismaClien
   }
 
   let credentials: grpc.ServerCredentials;
-  const keyPath = process.env.TLS_KEY_PATH || "/etc/certs/tls.key";
-  const certPath = process.env.TLS_CERT_PATH || "/etc/certs/tls.crt";
-
-  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-    const key = fs.readFileSync(keyPath);
-    const cert = fs.readFileSync(certPath);
-    credentials = grpc.ServerCredentials.createSsl(null, [{ private_key: key, cert_chain: cert }], false as any);
-    console.log("[records gRPC] Starting secure server with ALPN h2");
-  } else {
-    credentials = grpc.ServerCredentials.createInsecure();
-    console.warn("[records gRPC] TLS certs missing – starting insecure (dev)");
+  try {
+    credentials = createOchGrpcServerCredentialsForBind("records gRPC");
+    console.log("[gRPC] strict mTLS (client cert required)");
+  } catch (e) {
+    console.error(e);
+    process.exit(1);
   }
 
   server.bindAsync(`0.0.0.0:${port}`, credentials, (error) => {

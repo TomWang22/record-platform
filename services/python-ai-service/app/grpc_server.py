@@ -315,51 +315,36 @@ async def serve(port: int = 50060):
         print(f"[python-ai-grpc] Error setting up health service: {e}")
         # Continue without health service
     
-    # Try to load TLS certs (for production with ALPN = h2)
     key_path = os.getenv('TLS_KEY_PATH', '/etc/certs/tls.key')
     cert_path = os.getenv('TLS_CERT_PATH', '/etc/certs/tls.crt')
     ca_path = os.getenv('TLS_CA_PATH', os.getenv('GRPC_CA_CERT', '/etc/certs/ca.crt'))
     
     if os.path.exists(key_path) and os.path.exists(cert_path):
-        # Read certificate files
         with open(key_path, 'rb') as f:
             private_key = f.read()
         with open(cert_path, 'rb') as f:
             certificate_chain = f.read()
         
-        # For strict TLS: verify client certificates if CA cert exists
-        root_certificates = None
-        require_client_auth = False
-        if os.path.exists(ca_path):
-            with open(ca_path, 'rb') as f:
-                root_certificates = f.read()
-            require_client_auth = True
-            print("[python-ai-grpc] Starting secure HTTP/2-only server with strict TLS (client cert verification)")
-        else:
-            print("[python-ai-grpc] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)")
+        if not os.path.exists(ca_path):
+            print(f"[python-ai-grpc] FATAL: CA cert not found at {ca_path}", file=sys.stderr)
+            sys.exit(1)
         
-        # For dev: Don't require client cert verification (use False)
-        # For production: Enable client cert verification (use require_client_auth)
-        grpc_require_client_cert = os.getenv('GRPC_REQUIRE_CLIENT_CERT', 'false').lower() == 'true'
-        final_require_client_auth = grpc_require_client_cert and require_client_auth
+        with open(ca_path, 'rb') as f:
+            root_certificates = f.read()
         
-        # Create server credentials
         server_credentials = grpc.ssl_server_credentials(
             [(private_key, certificate_chain)],
             root_certificates=root_certificates,
-            require_client_auth=final_require_client_auth
+            require_client_auth=True
         )
-        if final_require_client_auth:
-            print("[python-ai-grpc] Client certificate verification is ENABLED.")
-        else:
-            print("[python-ai-grpc] Client certificate verification is DISABLED (dev mode).")
-        # Use 0.0.0.0 to bind to both IPv4 and IPv6 (dual-stack)
-        # This ensures health probes connecting to localhost (IPv4) can reach the server
+        print("[python-ai-grpc] strict mTLS (client cert required)")
         server.add_secure_port(f'0.0.0.0:{port}', server_credentials)
         print(f"[python-ai-grpc] server listening on 0.0.0.0:{port} (TLS enabled, HTTP/2 only)")
     else:
+        if os.getenv('NODE_ENV') == 'production':
+            print(f"[python-ai-grpc] FATAL: TLS certs not found at {key_path}, {cert_path}", file=sys.stderr)
+            sys.exit(1)
         print("[python-ai-grpc] TLS certs not found, starting insecure server (dev only)")
-        # Use 0.0.0.0 to bind to both IPv4 and IPv6 (dual-stack)
         server.add_insecure_port(f'0.0.0.0:{port}')
         print(f"[python-ai-grpc] server listening on 0.0.0.0:{port}")
     

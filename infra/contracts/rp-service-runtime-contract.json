@@ -1,0 +1,433 @@
+{
+  "version": 3,
+  "description": "Canonical RP runtime ports + TLS/mTLS cert policy. Source: service Dockerfiles + server bind defaults.",
+  "services": {
+    "api-gateway": {
+      "httpPort": 4000,
+      "grpcPort": null,
+      "healthPath": "/healthz",
+      "readyPath": "/readyz",
+      "httpEnv": [
+        "GATEWAY_PORT"
+      ],
+      "dockerfile": "services/api-gateway/Dockerfile",
+      "k8sService": "api-gateway",
+      "deployment": "api-gateway",
+      "k8sName": "api-gateway",
+      "runtimeHealthMode": "http",
+      "tlsPolicy": "plaintext",
+      "grpcRequiredForRuntime": false
+    },
+    "auth-service": {
+      "httpPort": 4001,
+      "grpcPort": 50061,
+      "healthPath": "/healthz",
+      "readyPath": "/healthz",
+      "httpEnv": [
+        "AUTH_PORT"
+      ],
+      "grpcEnv": [
+        "GRPC_PORT"
+      ],
+      "dockerfile": "services/auth-service/Dockerfile",
+      "k8sService": "auth-service",
+      "deployment": "auth-service",
+      "k8sName": "auth-service",
+      "runtimeHealthMode": "both",
+      "tlsPolicy": "service-mtls",
+      "grpcRequiredForRuntime": true,
+      "grpcService": "auth.AuthService",
+      "grpcTlsServerName": "auth-service"
+    },
+    "records-service": {
+      "httpPort": 4002,
+      "grpcPort": 50051,
+      "healthPath": "/healthz",
+      "readyPath": "/healthz",
+      "httpEnv": [
+        "RECORDS_PORT"
+      ],
+      "grpcEnv": [
+        "GRPC_PORT"
+      ],
+      "dockerfile": "services/records-service/Dockerfile",
+      "k8sService": "records-service",
+      "deployment": "records-service",
+      "k8sName": "records-service",
+      "runtimeHealthMode": "both",
+      "tlsPolicy": "service-mtls",
+      "grpcRequiredForRuntime": false,
+      "grpcService": "records.RecordsService",
+      "grpcTlsServerName": "records-service"
+    },
+    "shopping-service": {
+      "httpPort": 4007,
+      "grpcPort": 50058,
+      "healthPath": "/healthz",
+      "readyPath": "/healthz",
+      "httpEnv": [
+        "SHOPPING_PORT"
+      ],
+      "grpcEnv": [
+        "GRPC_PORT"
+      ],
+      "dockerfile": "services/shopping-service/Dockerfile",
+      "k8sService": "shopping-service",
+      "deployment": "shopping-service",
+      "k8sName": "shopping-service",
+      "runtimeHealthMode": "both",
+      "tlsPolicy": "service-mtls",
+      "grpcRequiredForRuntime": false,
+      "grpcService": "shopping.ShoppingService",
+      "grpcTlsServerName": "shopping-service"
+    },
+    "auction-monitor": {
+      "httpPort": 4008,
+      "grpcPort": 50059,
+      "healthPath": "/healthz",
+      "readyPath": "/healthz",
+      "httpEnv": [
+        "HTTP_PORT"
+      ],
+      "grpcEnv": [
+        "GRPC_PORT"
+      ],
+      "dockerfile": "services/auction-monitor/Dockerfile",
+      "k8sService": "auction-monitor",
+      "deployment": "auction-monitor",
+      "k8sName": "auction-monitor",
+      "runtimeHealthMode": "both",
+      "tlsPolicy": "service-mtls",
+      "grpcRequiredForRuntime": false,
+      "grpcService": "auction_monitor.AuctionMonitorService",
+      "grpcTlsServerName": "auction-monitor"
+    },
+    "listings-service": {
+      "httpPort": 4012,
+      "grpcPort": 50062,
+      "healthPath": "/healthz",
+      "readyPath": "/healthz",
+      "httpEnv": [
+        "HTTP_PORT"
+      ],
+      "grpcEnv": [
+        "GRPC_PORT"
+      ],
+      "dockerfile": "services/listings-service/Dockerfile",
+      "k8sService": "listings-service",
+      "deployment": "listings-service",
+      "k8sName": "listings-service",
+      "runtimeHealthMode": "both",
+      "tlsPolicy": "service-mtls",
+      "grpcRequiredForRuntime": false,
+      "grpcService": "listings.ListingsService",
+      "grpcTlsServerName": "listings-service"
+    },
+    "messaging-service": {
+      "httpPort": 4014,
+      "grpcPort": 50064,
+      "healthPath": "/healthz",
+      "readyPath": "/healthz",
+      "httpEnv": [
+        "HTTP_PORT"
+      ],
+      "grpcEnv": [
+        "GRPC_PORT"
+      ],
+      "dockerfile": "services/messaging-service/Dockerfile",
+      "k8sService": "messaging-service",
+      "deployment": "messaging-service",
+      "k8sName": "messaging-service",
+      "runtimeHealthMode": "both",
+      "tlsPolicy": "service-mtls",
+      "grpcRequiredForRuntime": false,
+      "grpcService": "messaging.v1.MessagingService",
+      "grpcTlsServerName": "messaging-service",
+      "grpcHealthProbeSupported": true,
+      "grpcOptionalReason": "health probe returns NOT_SERVING when messaging DB (host.docker.internal:5444) is unreachable; gRPC server itself is functional"
+    },
+    "notification-service": {
+      "httpPort": 4015,
+      "grpcPort": 50065,
+      "healthPath": "/healthz",
+      "readyPath": "/healthz",
+      "httpEnv": [
+        "HTTP_PORT"
+      ],
+      "grpcEnv": [
+        "GRPC_PORT"
+      ],
+      "dockerfile": "services/notification-service/Dockerfile",
+      "k8sService": "notification-service",
+      "deployment": "notification-service",
+      "k8sName": "notification-service",
+      "runtimeHealthMode": "both",
+      "tlsPolicy": "service-mtls",
+      "grpcRequiredForRuntime": false,
+      "grpcService": "notification.NotificationService",
+      "grpcTlsServerName": "notification-service"
+    },
+    "trust-service": {
+      "httpPort": 4016,
+      "grpcPort": 50066,
+      "healthPath": "/healthz",
+      "readyPath": "/readyz",
+      "httpEnv": [
+        "HTTP_PORT"
+      ],
+      "grpcEnv": [
+        "GRPC_PORT"
+      ],
+      "dockerfile": "services/trust-service/Dockerfile",
+      "k8sService": "trust-service",
+      "deployment": "trust-service",
+      "k8sName": "trust-service",
+      "runtimeHealthMode": "both",
+      "tlsPolicy": "service-mtls",
+      "grpcRequiredForRuntime": false,
+      "grpcService": "trust.TrustService",
+      "grpcTlsServerName": "trust-service"
+    },
+    "analytics-service": {
+      "httpPort": 4017,
+      "grpcPort": 50067,
+      "healthPath": "/healthz",
+      "readyPath": "/readyz",
+      "httpEnv": [
+        "HTTP_PORT"
+      ],
+      "grpcEnv": [
+        "GRPC_PORT"
+      ],
+      "dockerfile": "services/analytics-service/Dockerfile",
+      "k8sService": "analytics-service",
+      "deployment": "analytics-service",
+      "k8sName": "analytics-service",
+      "runtimeHealthMode": "both",
+      "tlsPolicy": "service-mtls",
+      "grpcRequiredForRuntime": false,
+      "grpcService": "analytics.AnalyticsService",
+      "grpcTlsServerName": "analytics-service"
+    },
+    "media-service": {
+      "httpPort": 4018,
+      "grpcPort": 50068,
+      "healthPath": "/healthz",
+      "readyPath": "/healthz",
+      "httpEnv": [
+        "HTTP_PORT",
+        "MEDIA_HTTP_PORT"
+      ],
+      "grpcEnv": [
+        "GRPC_PORT"
+      ],
+      "dockerfile": "services/media-service/Dockerfile",
+      "k8sService": "media-service",
+      "deployment": "media-service",
+      "k8sName": "media-service",
+      "runtimeHealthMode": "both",
+      "tlsPolicy": "service-mtls",
+      "grpcRequiredForRuntime": false,
+      "grpcService": "media.MediaService",
+      "grpcTlsServerName": "media-service"
+    },
+    "python-ai-service": {
+      "httpPort": 5005,
+      "grpcPort": 50060,
+      "healthPath": "/healthz",
+      "readyPath": "/healthz",
+      "httpEnv": [
+        "HTTP_PORT",
+        "AI_PORT"
+      ],
+      "grpcEnv": [
+        "GRPC_PORT"
+      ],
+      "dockerfile": "services/python-ai-service/Dockerfile",
+      "k8sService": "python-ai-service",
+      "deployment": "python-ai-service",
+      "k8sName": "python-ai-service",
+      "runtimeHealthMode": "both",
+      "tlsPolicy": "service-mtls",
+      "grpcRequiredForRuntime": false,
+      "grpcService": "python_ai.PythonAIService",
+      "grpcTlsServerName": "python-ai-service",
+      "grpcHealthProbeSupported": true
+    },
+    "webapp": {
+      "httpPort": 3001,
+      "grpcPort": null,
+      "healthPath": "/",
+      "readyPath": "/",
+      "httpEnv": [
+        "PORT"
+      ],
+      "dockerfile": "webapp/Dockerfile",
+      "k8sService": "webapp",
+      "deployment": "webapp"
+    },
+    "transport-watchdog": {
+      "httpPort": null,
+      "grpcPort": null,
+      "healthPath": null,
+      "readyPath": null,
+      "httpEnv": [],
+      "dockerfile": "services/transport-watchdog/Dockerfile",
+      "k8sService": null,
+      "deployment": null,
+      "notes": "api-gateway sidecar; no in-cluster gRPC mTLS leaf"
+    },
+    "ollama": {
+      "httpPort": 11434,
+      "grpcPort": null,
+      "healthPath": "/",
+      "readyPath": "/",
+      "httpEnv": [],
+      "dockerfile": null,
+      "k8sService": "ollama",
+      "deployment": "ollama",
+      "notes": "ML runtime; optional (RP_ENABLE_OLLAMA)"
+    },
+    "ollama-gateway": {
+      "httpPort": 8080,
+      "grpcPort": null,
+      "healthPath": "/healthz",
+      "readyPath": "/healthz",
+      "httpEnv": [],
+      "dockerfile": null,
+      "k8sService": "ollama-gateway",
+      "deployment": "ollama-gateway",
+      "notes": "Prometheus metrics gateway; optional stack"
+    },
+    "ollama-worker": {
+      "httpPort": null,
+      "grpcPort": null,
+      "healthPath": null,
+      "readyPath": null,
+      "httpEnv": [],
+      "dockerfile": null,
+      "k8sService": "ollama-worker",
+      "deployment": "ollama-worker",
+      "notes": "Kafka worker for Ollama jobs; optional stack"
+    }
+  },
+  "certPolicy": {
+    "edgeHost": "record-platform.test",
+    "edgeEku": "serverAuth",
+    "k8sSecretModel": "per-service-and-bundle",
+    "k8sPerServiceSecretPrefix": "service-tls-",
+    "k8sBundleSecret": "rp-service-mtls-bundle",
+    "mtlsServices": [
+      {
+        "serviceName": "api-gateway",
+        "certCommonName": "api-gateway",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      },
+      {
+        "serviceName": "auth-service",
+        "certCommonName": "auth-service",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      },
+      {
+        "serviceName": "records-service",
+        "certCommonName": "records-service",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      },
+      {
+        "serviceName": "listings-service",
+        "certCommonName": "listings-service",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      },
+      {
+        "serviceName": "shopping-service",
+        "certCommonName": "shopping-service",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      },
+      {
+        "serviceName": "messaging-service",
+        "certCommonName": "messaging-service",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      },
+      {
+        "serviceName": "media-service",
+        "certCommonName": "media-service",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      },
+      {
+        "serviceName": "trust-service",
+        "certCommonName": "trust-service",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      },
+      {
+        "serviceName": "notification-service",
+        "certCommonName": "notification-service",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      },
+      {
+        "serviceName": "analytics-service",
+        "certCommonName": "analytics-service",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      },
+      {
+        "serviceName": "python-ai-service",
+        "certCommonName": "python-ai-service",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      },
+      {
+        "serviceName": "auction-monitor",
+        "certCommonName": "auction-monitor",
+        "mtlsRequired": true,
+        "eku": "serverAndClient"
+      }
+    ],
+    "nonMtls": [
+      {
+        "serviceName": "webapp",
+        "mtlsRequired": false,
+        "reason": "Browser\u2192Caddy edge TLS only; server-side calls via api-gateway (no service mTLS leaf unless direct internal mTLS)"
+      },
+      {
+        "serviceName": "transport-watchdog",
+        "mtlsRequired": false,
+        "reason": "api-gateway sidecar loopback probe only"
+      },
+      {
+        "serviceName": "ollama",
+        "mtlsRequired": false,
+        "reason": "in-cluster HTTP to Ollama; no gRPC mTLS leaf"
+      },
+      {
+        "serviceName": "ollama-gateway",
+        "mtlsRequired": false,
+        "reason": "HTTP metrics gateway; optional ML stack"
+      },
+      {
+        "serviceName": "ollama-worker",
+        "mtlsRequired": false,
+        "reason": "Kafka consumer worker; optional ML stack"
+      }
+    ],
+    "specialChains": [
+      {
+        "name": "kafka",
+        "reason": "broker/client chain via kafka-ssl-secret (not service mTLS leaves)"
+      },
+      {
+        "name": "envoy-client",
+        "eku": "clientAuth",
+        "reason": "Envoy gRPC client cert only"
+      }
+    ]
+  }
+}

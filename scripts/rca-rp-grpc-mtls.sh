@@ -69,10 +69,26 @@ _disk_cert_fp() {
 }
 
 _mounted_cert_fp() {
-  local dep="$1" container="$2" raw
+  local dep="$1" container="$2"
+  local mount_path
+  mount_path="$(kubectl -n "$NS" get deployment "$dep" -o json 2>/dev/null | \
+    python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for c in d.get('spec',{}).get('template',{}).get('spec',{}).get('containers',[]):
+  for vm in c.get('volumeMounts',[]):
+    if 'tls' in vm.get('name','').lower() or 'cert' in vm.get('name','').lower():
+      print(vm['mountPath']); sys.exit(0)
+print('/etc/certs')
+" 2>/dev/null)" || mount_path="/etc/certs"
+  local raw
   raw="$(kubectl -n "$NS" exec "deploy/$dep" -c "$container" -- \
-    sh -c 'awk '\''BEGIN{n=0} /BEGIN CERTIFICATE/{n++} n==1{print} /END CERTIFICATE/ && n==1{exit}'\'' /etc/certs/tls.crt | openssl x509 -noout -fingerprint -sha256' 2>&1)" || { echo "unavailable"; return; }
-  echo "$raw" | sed 's/^.*=//' | tr -d ':'
+    sh -c "awk 'BEGIN{n=0} /BEGIN CERTIFICATE/{n++} n==1{print} /END CERTIFICATE/ && n==1{exit}' ${mount_path}/tls.crt 2>/dev/null | openssl x509 -noout -fingerprint -sha256 2>/dev/null || echo UNAVAILABLE" 2>/dev/null)" || { echo "unavailable"; return; }
+  if echo "$raw" | grep -q "UNAVAILABLE"; then
+    echo "unavailable"
+  else
+    echo "$raw" | sed 's/^.*=//' | tr -d ':'
+  fi
 }
 
 _classify_failure() {
@@ -158,13 +174,23 @@ _run_probe() {
     local dca=/tmp/ca.crt dcc=/tmp/client.crt dck=/tmp/client.key
     [[ "$tls_mode" == "mtls" ]] && args=(-addr="$addr" -service="$gsvc" -connect-timeout=5s -rpc-timeout=15s -tls -tls-no-verify=false \
       -tls-ca-cert="$dca" -tls-client-cert="$dcc" -tls-client-key="$dck" -tls-server-name="$sname")
-    kubectl exec -n "$NS" "$pod" -- /tmp/grpc-health-probe "${args[@]}" >"$out" 2>"$stderr_file" && ec=0 || ec=$?
+    local combined
+    combined="$(kubectl exec -n "$NS" "$pod" -- sh -c "/tmp/grpc-health-probe $(printf '%q ' "${args[@]}") >/tmp/_rca_out 2>/tmp/_rca_err; echo EXIT=\$?; echo '---STDOUT---'; cat /tmp/_rca_out; echo '---STDERR---'; cat /tmp/_rca_err" 2>/dev/null)" || true
+    ec="$(echo "$combined" | grep '^EXIT=' | head -1 | cut -d= -f2)"
+    ec="${ec:-1}"
+    echo "$combined" | awk '/^---STDOUT---$/{s=1;next} /^---STDERR---$/{s=0;next} s{print}' >"$out"
+    echo "$combined" | awk '/^---STDERR---$/{s=1;next} s{print}' >"$stderr_file"
     kubectl delete pod "$pod" -n "$NS" --wait=false >/dev/null 2>&1 || true
   else
     local dep="$ns_exec"
     local container
     container="$(kubectl get deployment "$dep" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].name}' 2>/dev/null || echo app)"
-    kubectl -n "$NS" exec "deploy/$dep" -c "$container" -- /usr/local/bin/grpc-health-probe "${args[@]}" >"$out" 2>"$stderr_file" && ec=0 || ec=$?
+    local combined
+    combined="$(kubectl -n "$NS" exec "deploy/$dep" -c "$container" -- sh -c "/usr/local/bin/grpc-health-probe $(printf '%q ' "${args[@]}") >/tmp/_rca_out 2>/tmp/_rca_err; echo EXIT=\$?; echo '---STDOUT---'; cat /tmp/_rca_out; echo '---STDERR---'; cat /tmp/_rca_err" 2>/dev/null)" || true
+    ec="$(echo "$combined" | grep '^EXIT=' | head -1 | cut -d= -f2)"
+    ec="${ec:-1}"
+    echo "$combined" | awk '/^---STDOUT---$/{s=1;next} /^---STDERR---$/{s=0;next} s{print}' >"$out"
+    echo "$combined" | awk '/^---STDERR---$/{s=1;next} s{print}' >"$stderr_file"
   fi
 
   t1="$(date +%s%N 2>/dev/null || date +%s)"

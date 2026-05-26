@@ -143,8 +143,7 @@
       "grpcRequiredForRuntime": false,
       "grpcService": "messaging.v1.MessagingService",
       "grpcTlsServerName": "messaging-service",
-      "grpcHealthProbeSupported": true,
-      "grpcOptionalReason": "health probe returns NOT_SERVING when messaging DB (host.docker.internal:5444) is unreachable; gRPC server itself is functional"
+      "grpcHealthProbeSupported": true
     },
     "notification-service": {
       "httpPort": 4015,

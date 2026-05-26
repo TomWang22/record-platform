@@ -71,7 +71,7 @@ _disk_cert_fp() {
 _mounted_cert_fp() {
   local dep="$1" container="$2" raw
   raw="$(kubectl -n "$NS" exec "deploy/$dep" -c "$container" -- \
-    openssl x509 -in /etc/certs/tls.crt -noout -fingerprint -sha256 2>&1)" || { echo "unavailable"; return; }
+    sh -c 'awk '\''BEGIN{n=0} /BEGIN CERTIFICATE/{n++} n==1{print} /END CERTIFICATE/ && n==1{exit}'\'' /etc/certs/tls.crt | openssl x509 -noout -fingerprint -sha256' 2>&1)" || { echo "unavailable"; return; }
   echo "$raw" | sed 's/^.*=//' | tr -d ':'
 }
 
@@ -79,25 +79,33 @@ _classify_failure() {
   local stderr_file="$1"
   [[ -f "$stderr_file" ]] || { echo "unknown"; return; }
   local txt
-  txt="$(head -c 2000 "$stderr_file" 2>/dev/null || true)"
-  if echo "$txt" | grep -qi 'certificate required'; then
-    echo "client_cert_required"
-  elif echo "$txt" | grep -qi 'NOT_SERVING\|not.*serving\|service unhealthy'; then
-    echo "not_serving"
-  elif echo "$txt" | grep -qi 'certificate.*verify\|x509\|unknown authority\|certificate signed by unknown'; then
-    echo "cert_verify"
-  elif echo "$txt" | grep -qi 'SAN\|subject alternative name\|server name'; then
-    echo "san_mismatch"
-  elif echo "$txt" | grep -qi 'connection refused'; then
+  txt="$(head -c 4000 "$stderr_file" 2>/dev/null || true)"
+  if echo "$txt" | grep -qi 'NOT_SERVING\|not.*serving\|service unhealthy'; then
+    echo "grpc_not_serving"
+  elif echo "$txt" | grep -qi 'connection refused\|ECONNREFUSED'; then
     echo "connection_refused"
+  elif echo "$txt" | grep -qi 'no such host\|could not resolve\|Name or service not known\|getaddrinfo'; then
+    echo "dns_failure"
+  elif echo "$txt" | grep -qi 'certificate required'; then
+    echo "client_cert_rejected"
+  elif echo "$txt" | grep -qi 'unknown authority\|certificate signed by unknown\|x509.*certificate'; then
+    echo "cert_unknown_authority"
+  elif echo "$txt" | grep -qi 'SAN\|subject alternative name\|server name.*mismatch'; then
+    echo "cert_san_mismatch"
+  elif echo "$txt" | grep -qi 'certificate.*verify\|x509'; then
+    echo "tls_handshake_failed"
+  elif echo "$txt" | grep -qi 'tls.*handshake\|handshake failure'; then
+    echo "tls_handshake_failed"
   elif echo "$txt" | grep -qi 'i/o timeout\|deadline\|context deadline\|failed to connect.*within'; then
     echo "timeout"
+  elif echo "$txt" | grep -qi 'health.*not.*found\|unknown service grpc.health'; then
+    echo "grpc_unimplemented"
+  elif echo "$txt" | grep -qi 'not implemented\|Unimplemented'; then
+    echo "grpc_unimplemented"
+  elif echo "$txt" | grep -qi 'unknown service\|Unknown service'; then
+    echo "grpc_service_unknown"
   elif echo "$txt" | grep -qi 'transport.*closing\|connection reset\|broken pipe'; then
-    echo "transport_error"
-  elif echo "$txt" | grep -qi 'health.*not.*found\|unknown service\|not implemented'; then
-    echo "no_health_service"
-  elif echo "$txt" | grep -qi 'tls.*handshake\|handshake failure'; then
-    echo "tls_handshake"
+    echo "port_closed"
   else
     echo "unknown"
   fi
@@ -123,6 +131,7 @@ _run_probe() {
   local svc_name="$1" scope="$2" ns_exec="$3" addr="$4" tls_mode="$5" sname="$6" gsvc="$7" ca="$8" cc="$9" ck="${10}"
   local out="$OUT/${svc_name}-${scope}-${tls_mode}.txt"
   local stderr_file="$OUT/${svc_name}-${scope}-${tls_mode}.stderr"
+  local meta_file="$OUT/${svc_name}-${scope}-${tls_mode}.meta"
   local args=(-addr="$addr" -service="$gsvc" -connect-timeout=5s -rpc-timeout=15s)
   case "$tls_mode" in
     mtls)
@@ -131,6 +140,10 @@ _run_probe() {
     plaintext) ;;
     *) return 1 ;;
   esac
+
+  local t0 t1 elapsed_ms ec=0
+  t0="$(date +%s%N 2>/dev/null || date +%s)"
+
   if [[ "$ns_exec" == "debug" ]]; then
     local pod
     pod="rca-$(echo "${svc_name}-${scope}" | tr '_.' '-' | cut -c1-50)-$$"
@@ -145,21 +158,31 @@ _run_probe() {
     local dca=/tmp/ca.crt dcc=/tmp/client.crt dck=/tmp/client.key
     [[ "$tls_mode" == "mtls" ]] && args=(-addr="$addr" -service="$gsvc" -connect-timeout=5s -rpc-timeout=15s -tls -tls-no-verify=false \
       -tls-ca-cert="$dca" -tls-client-cert="$dcc" -tls-client-key="$dck" -tls-server-name="$sname")
-    if kubectl exec -n "$NS" "$pod" -- /tmp/grpc-health-probe "${args[@]}" >"$out" 2>"$stderr_file"; then
-      kubectl delete pod "$pod" -n "$NS" --wait=false >/dev/null 2>&1 || true
-      echo "ok"
-      return 0
-    fi
+    kubectl exec -n "$NS" "$pod" -- /tmp/grpc-health-probe "${args[@]}" >"$out" 2>"$stderr_file" && ec=0 || ec=$?
     kubectl delete pod "$pod" -n "$NS" --wait=false >/dev/null 2>&1 || true
-    return 1
+  else
+    local dep="$ns_exec"
+    local container
+    container="$(kubectl get deployment "$dep" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].name}' 2>/dev/null || echo app)"
+    kubectl -n "$NS" exec "deploy/$dep" -c "$container" -- /usr/local/bin/grpc-health-probe "${args[@]}" >"$out" 2>"$stderr_file" && ec=0 || ec=$?
   fi
-  local dep="$ns_exec"
-  local container
-  container="$(kubectl get deployment "$dep" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].name}' 2>/dev/null || echo app)"
-  if kubectl -n "$NS" exec "deploy/$dep" -c "$container" -- /usr/local/bin/grpc-health-probe "${args[@]}" >"$out" 2>"$stderr_file"; then
-    echo "ok"
-    return 0
+
+  t1="$(date +%s%N 2>/dev/null || date +%s)"
+  if [[ ${#t0} -gt 10 ]]; then
+    elapsed_ms=$(( (t1 - t0) / 1000000 ))
+  else
+    elapsed_ms=$(( (t1 - t0) * 1000 ))
   fi
+
+  {
+    echo "exit_code=$ec"
+    echo "elapsed_ms=$elapsed_ms"
+    echo "command=grpc-health-probe ${args[*]}"
+    echo "stdout_file=$out"
+    echo "stderr_file=$stderr_file"
+  } >"$meta_file"
+
+  [[ "$ec" -eq 0 ]] && { echo "ok"; return 0; }
   return 1
 }
 
@@ -297,14 +320,22 @@ for svc in "${ALL_SVCS[@]}"; do
 
     if [[ "$st" == "fail" ]]; then
       stderr_file="$OUT/${svc}-${scope}-mtls.stderr"
+      meta_file="$OUT/${svc}-${scope}-mtls.meta"
       fc="$(_classify_failure "$stderr_file")"
       if [[ "$svc_failure_class" == "none" ]]; then
         svc_failure_class="$fc"
       fi
       _print_probe_cmd "$scope" "$addr" "$sname" "$gsvc" "$ca_use" "$cc_use" "$ck_use"
+      if [[ -f "$meta_file" ]]; then
+        echo "    exit_code: $(grep '^exit_code=' "$meta_file" | cut -d= -f2-)"
+        echo "    elapsed_ms: $(grep '^elapsed_ms=' "$meta_file" | cut -d= -f2-)"
+      fi
+      if [[ -f "$OUT/${svc}-${scope}-mtls.txt" ]] && [[ -s "$OUT/${svc}-${scope}-mtls.txt" ]]; then
+        echo "    stdout: $(head -c 300 "$OUT/${svc}-${scope}-mtls.txt" 2>/dev/null | tr '\n' ' ')"
+      fi
       if [[ -f "$stderr_file" ]] && [[ -s "$stderr_file" ]]; then
-        echo "    stderr: $(head -c 200 "$stderr_file" 2>/dev/null | tr '\n' ' ')"
-        [[ -z "$svc_stderr" ]] && svc_stderr="$(head -c 200 "$stderr_file" 2>/dev/null | tr '\n' ' ')"
+        echo "    stderr: $(head -c 500 "$stderr_file" 2>/dev/null | tr '\n' ' ')"
+        [[ -z "$svc_stderr" ]] && svc_stderr="$(head -c 500 "$stderr_file" 2>/dev/null | tr '\n' ' ')"
       fi
       echo "    failure_class: $fc"
 
@@ -324,11 +355,15 @@ for svc in "${ALL_SVCS[@]}"; do
       fi
     elif [[ "$st" == "not_serving" ]]; then
       stderr_file="$OUT/${svc}-${scope}-mtls.stderr"
-      fc="not_serving"
+      meta_file="$OUT/${svc}-${scope}-mtls.meta"
+      fc="grpc_not_serving"
       if [[ "$svc_failure_class" == "none" ]]; then
         svc_failure_class="$fc"
       fi
       echo "    status: NOT_SERVING (gRPC TLS handshake succeeded, health check reports unhealthy)"
+      if [[ -f "$meta_file" ]]; then
+        echo "    elapsed_ms: $(grep '^elapsed_ms=' "$meta_file" | cut -d= -f2-)"
+      fi
       if [[ -n "$grpc_optional_reason" ]]; then
         echo "    contract_reason: $grpc_optional_reason"
       fi

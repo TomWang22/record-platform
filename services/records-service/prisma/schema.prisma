@@ -15,7 +15,7 @@ model Record {
   @@schema("records")
   @@map("records")
 
-  id                 String   @db.Uuid @default(uuid())
+  id                 String   @id @db.Uuid @default(uuid())
   userId             String   @db.Uuid @map("user_id")
 
   artist             String   @db.VarChar(256)
@@ -43,6 +43,16 @@ model Record {
   notes              String?  @db.Text
 
   purchasedAt        DateTime?                            @map("purchased_at")
+  receivedAt         DateTime?                            @map("received_at")
+  purchaseType       PurchaseType?                        @map("purchase_type")
+  purchaseSource     String?   @db.VarChar(256)           @map("purchase_source")
+  sellerName         String?   @db.VarChar(256)           @map("seller_name")
+  orderReference     String?   @db.VarChar(128)           @map("order_reference")
+  purchasePriceCents Int?                                   @map("purchase_price_cents")
+  shippingPaidCents  Int?                                   @map("shipping_paid_cents")
+  taxesFeesPaidCents Int?                                   @map("taxes_fees_paid_cents")
+  purchaseCurrency   String    @db.VarChar(8) @default("USD") @map("purchase_currency")
+  purchaseNotes      String?   @db.Text                    @map("purchase_notes")
   pricePaid          Decimal?  @db.Decimal(10, 2)         @map("price_paid")
 
   releaseYear        Int?      @map("release_year")
@@ -52,11 +62,11 @@ model Record {
   labelCode          String?   @db.VarChar(64)            @map("label_code")
 
   mediaPieces        RecordMedium[]
+  revisions          RecordRevision[]
 
   createdAt          DateTime @default(now())             @map("created_at")
   updatedAt          DateTime @updatedAt                  @map("updated_at")
 
-  @@id([id, userId])
   @@index([userId])
   @@index([artist])
   @@index([catalogNumber])
@@ -65,14 +75,47 @@ model Record {
   @@index([label])
 }
 
+model RecordRevision {
+  @@schema("records")
+  @@map("record_revisions")
+
+  id             String   @id @db.Uuid @default(uuid())
+  recordId       String   @db.Uuid @map("record_id")
+  userId         String   @db.Uuid @map("user_id")
+  revisionNumber Int      @map("revision_number")
+  changedFields  Json     @map("changed_fields")
+  previousValues Json?    @map("previous_values")
+  newValues      Json?    @map("new_values")
+  createdBy      String   @db.Uuid @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  record Record @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@unique([recordId, userId, revisionNumber])
+  @@index([recordId, userId, createdAt])
+}
+
+enum PurchaseType {
+  fixed_price
+  negotiated_obo
+  auction_win
+  trade
+  gift
+  retail
+  other
+
+  @@schema("records")
+  @@map("purchase_type")
+}
+
 model RecordMedium {
   @@schema("records")
   @@map("record_media")
 
-  id         String   @db.Uuid @default(uuid())
+  id         String   @id @db.Uuid @default(uuid())
   recordId   String   @db.Uuid @map("record_id")
   userId     String   @db.Uuid @map("user_id")
-  record     Record   @relation(fields: [recordId, userId], references: [id, userId], onDelete: Cascade)
+  record     Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
 
   index      Int
   kind       String   @db.Text
@@ -86,7 +129,6 @@ model RecordMedium {
   createdAt  DateTime @default(now())  @map("created_at")
   updatedAt  DateTime @updatedAt       @map("updated_at")
 
-  @@id([id, userId])
   @@unique([recordId, userId, index])
 }
 

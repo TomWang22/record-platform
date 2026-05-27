@@ -1,7 +1,11 @@
 node_modules/
 dist/
+
+# Local reference toolkits (not part of RP product repo)
+toolkit-reference/
 !tools/kafka-contract/dist/
 .env
+webapp/.env.local
 .DS_Store
 coverage/
 .reissue-tmp.*
@@ -17,6 +21,7 @@ tmp/
 !pnpm-lock.yaml
 !tsconfig*.json
 !infra/observability/*.json
+!docs/bundles/INTEGRITY_*.json
 *.ndjson
 *.csv
 
@@ -49,6 +54,8 @@ certs/
 pg_bundle_*/
 pg_bundle_*.zip
 bundle-*/
+# In-repo accidental local bundle staging (canonical path is ~/bundle-staging/)
+bundle-staging/
 records_dump_*/
 records-*/
 backups/
@@ -102,7 +109,13 @@ infra/docs/EIGHT-DATABASES_ARCHITECTURE.md
 *.tsv
 *.html
 *.sh
-!scripts/check-no-ip-quic.sh
+# Track first-party shell automation (vendor trees like istio-*/samples remain ignored).
+!scripts/**/*.sh
+!tools/bundle-audit/*.sh
+!infra/**/*.sh
+!deploy.sh
+!webapp/*.sh
+!services/**/*.sh
 *.yaml
 !docker-compose.yml
 !pnpm-workspace.yaml

@@ -4,7 +4,7 @@ type Config = {
 }
 
 const config: Config = {
-  gatewayUrl: process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:8080',
+  gatewayUrl: process.env.NEXT_PUBLIC_GATEWAY_URL ?? '',
   appName: 'Record Platform',
 }
 

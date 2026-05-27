@@ -1,11 +1,13 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { AuthRequiredCard } from '@/components/auth/auth-required-card'
+import { ApiErrorAlert } from '@/components/ui/api-error-alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ApiError, apiFetch } from '@/lib/api-client'
+import { apiFetch } from '@/lib/api-client'
+import { useRequireAuth } from '@/lib/use-require-auth'
 
 type Settings = {
   country_code: string
@@ -22,9 +24,10 @@ const defaults: Settings = {
 }
 
 export default function SettingsPage() {
-  const router = useRouter()
+  const { authRequired, onApiError } = useRequireAuth()
   const [settings, setSettings] = useState<Settings>(defaults)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<unknown>(null)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -33,11 +36,13 @@ export default function SettingsPage() {
 
   async function loadSettings() {
     setLoading(true)
+    setError(null)
     try {
-      const data = await apiFetch<Settings>('/listings/settings', { auth: true })
+      const data = await apiFetch<Settings>('/api/settings', { auth: true })
       setSettings(data)
-    } catch (error) {
-      handleError(error)
+    } catch (err) {
+      if (onApiError(err)) return
+      setError(err)
     } finally {
       setLoading(false)
     }
@@ -46,26 +51,20 @@ export default function SettingsPage() {
   async function saveSettings() {
     setLoading(true)
     setMessage('')
+    setError(null)
     try {
-      await apiFetch('/listings/settings', {
+      await apiFetch('/api/settings', {
         method: 'PUT',
         auth: true,
         data: settings,
       })
       setMessage('Preferences saved')
-    } catch (error) {
-      handleError(error)
+    } catch (err) {
+      if (onApiError(err)) return
+      setError(err)
     } finally {
       setLoading(false)
     }
-  }
-
-  function handleError(error: unknown) {
-    if (error instanceof ApiError && error.status === 401) {
-      router.replace('/login')
-      return
-    }
-    setMessage(error instanceof Error ? error.message : 'Unable to process request')
   }
 
   return (
@@ -75,6 +74,19 @@ export default function SettingsPage() {
         <p className="text-sm text-slate-500 dark:text-slate-400">Control listing defaults, currency, and fees per tenant.</p>
       </header>
 
+      {authRequired && (
+        <AuthRequiredCard
+          title="Sign in to manage settings"
+          description="Marketplace defaults, currency, and fee preferences are saved to your account."
+          returnTo="/settings"
+        />
+      )}
+
+      {!authRequired && error && (
+        <ApiErrorAlert title="Settings request failed" error={error} onRetry={() => void loadSettings()} />
+      )}
+
+      {!authRequired && (
       <Card title="Marketplace defaults">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
@@ -110,6 +122,7 @@ export default function SettingsPage() {
           {message && <p className="text-sm text-slate-500 dark:text-slate-400">{message}</p>}
         </div>
       </Card>
+      )}
     </div>
   )
 }

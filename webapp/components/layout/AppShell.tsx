@@ -2,14 +2,16 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { ReactNode } from 'react'
 
+import { UserMenu } from '@/components/auth/user-menu'
+import { CartIndicator } from '@/components/shell/cart-indicator'
+import { NotificationBell } from '@/components/shell/notification-bell'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import config from '@/lib/config'
 import { clearSession } from '@/lib/session'
-import { cn } from '@/lib/utils'
+import { isSessionAuthenticated, useSession } from '@/lib/use-session'
 
 import { NavLink } from './NavLink'
 
@@ -30,13 +32,62 @@ const navItems = [
   { href: '/settings', label: 'Settings' },
 ]
 
-export function AppShell({ children }: AppShellProps) {
-  const router = useRouter()
+function SidebarUserCard() {
+  const session = useSession()
 
-  function logout() {
+  const signOut = () => {
     clearSession()
-    router.replace('/login')
+    window.location.href = '/login'
   }
+
+  if (!isSessionAuthenticated(session)) {
+    return (
+      <Link
+        href="/login"
+        className="block w-full rounded-xl bg-brand px-4 py-2 text-center text-sm font-medium text-white hover:bg-brand/90"
+      >
+        Sign in
+      </Link>
+    )
+  }
+  const { user } = session
+  return (
+    <div className="rounded-xl border border-slate-200/70 p-3 dark:border-white/10">
+      <div className="flex items-center gap-3">
+        {user.avatarUrl ? (
+          <img
+            src={user.avatarUrl}
+            alt={user.name ?? 'User'}
+            className="h-9 w-9 rounded-full object-cover"
+          />
+        ) : (
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">
+            {user.initials}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
+            {user.name ?? 'User'}
+          </p>
+          {user.email && (
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
+          )}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={signOut}
+        className="mt-3 w-full rounded-lg border border-slate-200/70 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
+      >
+        Sign out
+      </button>
+    </div>
+  )
+}
+
+export function AppShell({ children }: AppShellProps) {
+  const session = useSession()
+  const isSignedIn = isSessionAuthenticated(session)
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -55,15 +106,8 @@ export function AppShell({ children }: AppShellProps) {
           ))}
         </nav>
 
-        <div className="mt-auto space-y-4 pt-6">
-          <div className="rounded-xl border border-slate-200/70 p-4 dark:border-white/10">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Kafka</p>
-            <p className={cn('text-sm font-semibold text-emerald-600', 'dark:text-emerald-400')}>Placeholder</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Streaming status</p>
-          </div>
-          <Button variant="secondary" onClick={logout} className="w-full">
-            Sign out
-          </Button>
+        <div className="mt-auto space-y-3 pt-6">
+          <SidebarUserCard />
         </div>
       </aside>
 
@@ -78,9 +122,12 @@ export function AppShell({ children }: AppShellProps) {
           </div>
           <div className="flex items-center gap-3">
             <Button variant="secondary" className="hidden text-xs uppercase tracking-wide text-slate-500 lg:inline-flex">
-              Live mode
+              {isSignedIn ? 'Live mode' : 'Guest'}
             </Button>
             <ThemeToggle />
+            <NotificationBell />
+            <CartIndicator />
+            <UserMenu />
           </div>
         </header>
 

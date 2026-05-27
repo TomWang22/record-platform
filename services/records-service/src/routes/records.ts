@@ -46,6 +46,15 @@ const UUID_RX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UUID_ROUTE =
   "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}";
+const PURCHASE_TYPES = new Set([
+  "fixed_price",
+  "negotiated_obo",
+  "auction_win",
+  "trade",
+  "gift",
+  "retail",
+  "other",
+]);
 
 function requireUserId(req: AuthedReq, res: Response): string | undefined {
   let userId = req.userId;
@@ -95,6 +104,10 @@ function toPlainRecord(r: any) {
     ...r,
     pricePaid: r.pricePaid == null ? null : toNum(r.pricePaid),
     purchasedAt: toIso(r.purchasedAt),
+    receivedAt: toIso(r.receivedAt),
+    purchasePriceCents: r.purchasePriceCents ?? null,
+    shippingPaidCents: r.shippingPaidCents ?? null,
+    taxesFeesPaidCents: r.taxesFeesPaidCents ?? null,
     releaseDate: toIso(r.releaseDate),
     createdAt: toIso(r.createdAt),
     updatedAt: toIso(r.updatedAt),
@@ -108,6 +121,23 @@ function toPlainRecord(r: any) {
   };
 }
 
+function jsonDiff(prev: Record<string, any>, next: Record<string, any>) {
+  const changed: string[] = [];
+  const previousValues: Record<string, any> = {};
+  const newValues: Record<string, any> = {};
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  for (const key of keys) {
+    const a = prev[key] ?? null;
+    const b = next[key] ?? null;
+    if (JSON.stringify(a) !== JSON.stringify(b)) {
+      changed.push(key);
+      previousValues[key] = a;
+      newValues[key] = b;
+    }
+  }
+  return { changed, previousValues, newValues };
+}
+
 // -------------------------- update/patch shaper -----------------------------
 function pickUpdate(body: any) {
   const allow = [
@@ -117,6 +147,16 @@ function pickUpdate(body: any) {
     "catalogNumber",
     "notes",
     "purchasedAt",
+    "receivedAt",
+    "purchaseType",
+    "purchaseSource",
+    "sellerName",
+    "orderReference",
+    "purchasePriceCents",
+    "shippingPaidCents",
+    "taxesFeesPaidCents",
+    "purchaseCurrency",
+    "purchaseNotes",
     "pricePaid",
     "isPromo",
     "hasInsert",
@@ -144,6 +184,10 @@ function pickUpdate(body: any) {
     const d = new Date(out.purchasedAt);
     if (!Number.isNaN(+d)) out.purchasedAt = d;
   }
+  if (typeof out.receivedAt === "string") {
+    const d = new Date(out.receivedAt);
+    if (!Number.isNaN(+d)) out.receivedAt = d;
+  }
   if (typeof out.releaseDate === "string") {
     const d = new Date(out.releaseDate);
     if (!Number.isNaN(+d)) out.releaseDate = d;
@@ -153,6 +197,23 @@ function pickUpdate(body: any) {
 
   // store as DECIMAL string; toPlainRecord will emit a number
   if (out.pricePaid != null) out.pricePaid = String(out.pricePaid);
+  if (out.purchasePriceCents != null) out.purchasePriceCents = Number(out.purchasePriceCents);
+  if (out.shippingPaidCents != null) out.shippingPaidCents = Number(out.shippingPaidCents);
+  if (out.taxesFeesPaidCents != null) out.taxesFeesPaidCents = Number(out.taxesFeesPaidCents);
+  if (out.purchaseCurrency != null) out.purchaseCurrency = String(out.purchaseCurrency || "USD").toUpperCase();
+  if (out.purchaseType != null && !PURCHASE_TYPES.has(String(out.purchaseType))) {
+    throw Object.assign(new Error("invalid purchaseType"), { status: 400 });
+  }
+  if (out.receivedAt && out.purchasedAt && out.receivedAt < out.purchasedAt) {
+    throw Object.assign(new Error("receivedAt cannot be before purchasedAt"), {
+      status: 400,
+    });
+  }
+  for (const centsField of ["purchasePriceCents", "shippingPaidCents", "taxesFeesPaidCents"] as const) {
+    if (out[centsField] != null && out[centsField] < 0) {
+      throw Object.assign(new Error(`${centsField} must be >= 0`), { status: 400 });
+    }
+  }
 
   ["hasInsert", "hasBooklet", "hasObiStrip", "hasFactorySleeve", "isPromo"].forEach(
     (k) => {
@@ -609,6 +670,20 @@ export function recordsRouter(
 
   // ------------------------------- GET BY ID --------------------------------
   r.get(
+    "/:id(" + UUID_ROUTE + ")/revisions",
+    asyncHandler(async (req, res) => {
+      const userId = requireUserId(req as AuthedReq, res);
+      if (!userId) return;
+      const id = req.params.id;
+      const rows = await db.recordRevision.findMany({
+        where: { recordId: id, userId },
+        orderBy: { revisionNumber: "desc" },
+      });
+      res.json(rows);
+    })
+  );
+
+  r.get(
     "/:id(" + UUID_ROUTE + ")",
     asyncHandler(async (req, res) => {
       const userId = requireUserId(req as AuthedReq, res);
@@ -653,8 +728,9 @@ export function recordsRouter(
         patch.recordGrade = deriveOverallGrade(patch.mediaPieces);
       }
 
-      const created = await db.record.create({
-        data: {
+      const created = await db.$transaction(async (tx: any) => {
+        const rec = await tx.record.create({
+          data: {
           userId,
           artist: String(patch.artist ?? artist),
           name: String(patch.name ?? name),
@@ -662,6 +738,16 @@ export function recordsRouter(
           catalogNumber: patch.catalogNumber ?? null,
           notes: patch.notes ?? null,
           purchasedAt: patch.purchasedAt ?? null,
+          receivedAt: patch.receivedAt ?? null,
+          purchaseType: patch.purchaseType ?? null,
+          purchaseSource: patch.purchaseSource ?? null,
+          sellerName: patch.sellerName ?? null,
+          orderReference: patch.orderReference ?? null,
+          purchasePriceCents: patch.purchasePriceCents ?? null,
+          shippingPaidCents: patch.shippingPaidCents ?? null,
+          taxesFeesPaidCents: patch.taxesFeesPaidCents ?? null,
+          purchaseCurrency: patch.purchaseCurrency ?? "USD",
+          purchaseNotes: patch.purchaseNotes ?? null,
           pricePaid: patch.pricePaid ?? null,
           isPromo: !!patch.isPromo,
           hasInsert: !!patch.hasInsert,
@@ -690,7 +776,20 @@ export function recordsRouter(
               }
             : {}),
         },
-        include: { mediaPieces: { orderBy: { index: "asc" } } },
+          include: { mediaPieces: { orderBy: { index: "asc" } } },
+        });
+        await tx.recordRevision.create({
+          data: {
+            recordId: rec.id,
+            userId,
+            revisionNumber: 1,
+            changedFields: Object.keys(rec),
+            previousValues: {},
+            newValues: toPlainRecord(rec),
+            createdBy: userId,
+          },
+        });
+        return rec;
       });
 
       // warm doc cache (best-effort)
@@ -748,9 +847,10 @@ export function recordsRouter(
         recordData.recordGrade = deriveOverallGrade(mediaPieces);
       }
 
-      await db.record.update({
-        where: { id },
-        data: {
+      const updated = await db.$transaction(async (tx: any) => {
+        await tx.record.update({
+          where: { id },
+          data: {
           ...recordData,
           ...(formatUpdate ? { format: formatUpdate } : {}),
           ...(Array.isArray(mediaPieces)
@@ -764,7 +864,34 @@ export function recordsRouter(
                 },
               }
             : {}),
-        },
+          },
+        });
+        const freshRow = await tx.record.findFirst({
+          where: { id, userId },
+          include: { mediaPieces: { orderBy: { index: "asc" } } },
+        });
+        const prevPlain = toPlainRecord(existing);
+        const nextPlain = toPlainRecord(freshRow);
+        const diff = jsonDiff(prevPlain, nextPlain);
+        const last = await tx.recordRevision.findFirst({
+          where: { recordId: id, userId },
+          orderBy: { revisionNumber: "desc" },
+        });
+        const nextRevision = Number(last?.revisionNumber ?? 0) + 1;
+        if (diff.changed.length > 0) {
+          await tx.recordRevision.create({
+            data: {
+              recordId: id,
+              userId,
+              revisionNumber: nextRevision,
+              changedFields: diff.changed,
+              previousValues: diff.previousValues,
+              newValues: diff.newValues,
+              createdBy: userId,
+            },
+          });
+        }
+        return freshRow;
       });
 
       // purge doc cache for this record (fresh read will refill)
@@ -775,11 +902,7 @@ export function recordsRouter(
       if (redis) await redis.incr(verKey(userId));
       await invalidateSearchKeysForUser(redis ?? null, userId);
 
-      const fresh = await db.record.findFirst({
-        where: { id, userId },
-        include: { mediaPieces: { orderBy: { index: "asc" } } },
-      });
-      res.json(toPlainRecord(fresh));
+      res.json(toPlainRecord(updated));
     })
   );
 

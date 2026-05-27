@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import type { ReactElement, MouseEvent } from 'react'
-import { useRouter } from 'next/navigation'
-
+import { AuthRequiredCard } from '@/components/auth/auth-required-card'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ApiError, apiFetch } from '@/lib/api-client'
+import { useRequireAuth } from '@/lib/use-require-auth'
 
 type AuctionItem = {
   id: string
@@ -27,7 +27,7 @@ type AuctionTrend = {
 }
 
 export default function AuctionsPage(): ReactElement {
-  const router = useRouter()
+  const { authRequired, onApiError } = useRequireAuth()
   const [auctions, setAuctions] = useState<AuctionItem[]>([])
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
@@ -89,10 +89,7 @@ export default function AuctionsPage(): ReactElement {
         setStatus(`Monitoring ${data.length} active auction${data.length !== 1 ? 's' : ''}`)
       }
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        router.replace('/login')
-        return
-      }
+      if (onApiError(error)) return
       // Service not available - return empty array
       setAuctions([])
       if (error instanceof ApiError && error.status !== 404) {
@@ -126,10 +123,7 @@ export default function AuctionsPage(): ReactElement {
   }
 
   function handleApiError(error: unknown) {
-    if (error instanceof ApiError && error.status === 401) {
-      router.replace('/login')
-      return
-    }
+    if (onApiError(error)) return
     setStatus(error instanceof Error ? error.message : 'Something went wrong')
   }
 
@@ -147,13 +141,21 @@ export default function AuctionsPage(): ReactElement {
         </Button>
       </div>
 
-      {status && (
+      {authRequired && (
+        <AuthRequiredCard
+          title="Sign in to monitor auctions"
+          description="Track watchlists, bids, and auction results from your collection."
+          returnTo="/auctions"
+        />
+      )}
+
+      {!authRequired && status && (
         <Card>
           <p className="text-sm text-slate-600 dark:text-slate-300">{status}</p>
         </Card>
       )}
 
-      {auctions.length === 0 && !loading && (
+      {!authRequired && auctions.length === 0 && !loading && (
         <Card>
           <div className="py-12 text-center">
             <svg
@@ -186,7 +188,7 @@ export default function AuctionsPage(): ReactElement {
         </Card>
       )}
 
-      {auctions.length > 0 && (
+      {!authRequired && auctions.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {auctions.map((auction) => (
             <div

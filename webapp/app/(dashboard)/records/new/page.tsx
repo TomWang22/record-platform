@@ -3,9 +3,12 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
+import { AuthRequiredCard } from '@/components/auth/auth-required-card'
+import { RecordMediaUpload, recordMediaToApiPieces, type RecordMediaDraft } from '@/components/records/record-media-upload'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ApiError, apiFetch } from '@/lib/api-client'
+import { apiFetch } from '@/lib/api-client'
+import { useRequireAuth } from '@/lib/use-require-auth'
 
 type NewRecord = {
   artist: string
@@ -26,6 +29,16 @@ type NewRecord = {
   isPromo?: boolean
   pricePaid?: number
   purchasedAt?: string
+  purchaseType?: string
+  receivedAt?: string
+  purchaseSource?: string
+  sellerName?: string
+  orderReference?: string
+  purchasePriceCents?: number
+  shippingPaidCents?: number
+  taxesFeesPaidCents?: number
+  purchaseCurrency?: string
+  purchaseNotes?: string
   notes?: string
 }
 
@@ -48,12 +61,24 @@ const defaultRecord: NewRecord = {
   isPromo: false,
   pricePaid: undefined,
   purchasedAt: '',
+  purchaseType: 'fixed_price',
+  receivedAt: '',
+  purchaseSource: '',
+  sellerName: '',
+  orderReference: '',
+  purchasePriceCents: undefined,
+  shippingPaidCents: undefined,
+  taxesFeesPaidCents: undefined,
+  purchaseCurrency: 'USD',
+  purchaseNotes: '',
   notes: '',
 }
 
 export default function NewRecordPage() {
   const router = useRouter()
+  const { authRequired, onApiError } = useRequireAuth()
   const [record, setRecord] = useState<NewRecord>(defaultRecord)
+  const [media, setMedia] = useState<RecordMediaDraft[]>([])
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -65,8 +90,13 @@ export default function NewRecordPage() {
 
     setSaving(true)
     setMessage('')
+    if (record.receivedAt && record.purchasedAt && record.receivedAt < record.purchasedAt) {
+      setMessage('Received date cannot be before purchased date')
+      setSaving(false)
+      return
+    }
     try {
-      const data = await apiFetch<{ id: string }>('/records', {
+      const data = await apiFetch<{ id: string }>('/api/records', {
         method: 'POST',
         auth: true,
         data: {
@@ -81,15 +111,23 @@ export default function NewRecordPage() {
           pressingYear: record.pressingYear || undefined,
           pricePaid: record.pricePaid || undefined,
           purchasedAt: record.purchasedAt ? `${record.purchasedAt}T00:00:00Z` : undefined,
+          receivedAt: record.receivedAt ? `${record.receivedAt}T00:00:00Z` : undefined,
+          purchaseType: record.purchaseType || undefined,
+          purchaseSource: record.purchaseSource || undefined,
+          sellerName: record.sellerName || undefined,
+          orderReference: record.orderReference || undefined,
+          purchasePriceCents: record.purchasePriceCents || undefined,
+          shippingPaidCents: record.shippingPaidCents || undefined,
+          taxesFeesPaidCents: record.taxesFeesPaidCents || undefined,
+          purchaseCurrency: record.purchaseCurrency || 'USD',
+          purchaseNotes: record.purchaseNotes || undefined,
           notes: record.notes || undefined,
+          mediaPieces: media.length ? recordMediaToApiPieces(media) : undefined,
         },
       })
       router.push(`/records/${data.id}`)
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        router.replace('/login')
-        return
-      }
+      if (onApiError(error)) return
       setMessage(error instanceof Error ? error.message : 'Failed to create record')
       setSaving(false)
     }
@@ -107,6 +145,14 @@ export default function NewRecordPage() {
         </Button>
       </div>
 
+      {authRequired ? (
+        <AuthRequiredCard
+          title="Sign in to add a record"
+          description="Save artist, pressing, grading, and purchase details to your catalog."
+          returnTo="/records/new"
+        />
+      ) : (
+      <>
       {message && (
         <div className="rounded-xl border border-rose-200/80 bg-rose-50 p-3 text-sm text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/50 dark:text-rose-400">
           {message}
@@ -223,6 +269,51 @@ export default function NewRecordPage() {
         </div>
       </Card>
 
+      <Card title="Media">
+        <RecordMediaUpload value={media} onChange={setMedia} disabled={saving} />
+      </Card>
+
+      <Card title="Purchase details">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+            Purchase type
+            <select
+              value={record.purchaseType || 'fixed_price'}
+              onChange={(event) => setRecord((prev) => ({ ...prev, purchaseType: event.target.value }))}
+              className="mt-1 w-full rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand focus:outline-none dark:border-white/10 dark:bg-slate-950 dark:text-white"
+            >
+              <option value="fixed_price">Fixed price</option>
+              <option value="negotiated_obo">OBO / negotiated</option>
+              <option value="auction_win">Auction win</option>
+              <option value="trade">Trade</option>
+              <option value="gift">Gift</option>
+              <option value="retail">Retail</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <Field label="Bought on" type="date" value={record.purchasedAt || ''} onChange={(value) => setRecord((prev) => ({ ...prev, purchasedAt: value }))} />
+          <Field label="Received on" type="date" value={record.receivedAt || ''} onChange={(value) => setRecord((prev) => ({ ...prev, receivedAt: value }))} />
+          <Field label="Purchased from" value={record.purchaseSource || ''} onChange={(value) => setRecord((prev) => ({ ...prev, purchaseSource: value }))} />
+          <Field label="Seller" value={record.sellerName || ''} onChange={(value) => setRecord((prev) => ({ ...prev, sellerName: value }))} />
+          <Field label="Order/reference #" value={record.orderReference || ''} onChange={(value) => setRecord((prev) => ({ ...prev, orderReference: value }))} />
+          <NumberField label="Item price (cents)" value={record.purchasePriceCents || 0} onChange={(value) => setRecord((prev) => ({ ...prev, purchasePriceCents: value || undefined }))} />
+          <NumberField label="Shipping paid (cents)" value={record.shippingPaidCents || 0} onChange={(value) => setRecord((prev) => ({ ...prev, shippingPaidCents: value || undefined }))} />
+          <NumberField label="Taxes/fees (cents)" value={record.taxesFeesPaidCents || 0} onChange={(value) => setRecord((prev) => ({ ...prev, taxesFeesPaidCents: value || undefined }))} />
+          <Field label="Currency" value={record.purchaseCurrency || 'USD'} onChange={(value) => setRecord((prev) => ({ ...prev, purchaseCurrency: value.toUpperCase() }))} />
+        </div>
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
+            Purchase notes
+            <textarea
+              value={record.purchaseNotes || ''}
+              onChange={(event) => setRecord((prev) => ({ ...prev, purchaseNotes: event.target.value }))}
+              rows={3}
+              className="mt-1 w-full rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand focus:outline-none dark:border-white/10 dark:bg-slate-950 dark:text-white"
+            />
+          </label>
+        </div>
+      </Card>
+
       <div className="flex gap-3">
         <Button onClick={createRecord} disabled={saving || !record.artist || !record.name || !record.format}>
           {saving ? 'Creating…' : 'Create record'}
@@ -231,6 +322,8 @@ export default function NewRecordPage() {
           Cancel
         </Button>
       </div>
+      </>
+      )}
     </div>
   )
 }

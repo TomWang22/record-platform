@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-
+import { AuthRequiredCard } from '@/components/auth/auth-required-card'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ApiError, apiFetch } from '@/lib/api-client'
+import { apiFetch } from '@/lib/api-client'
+import { useRequireAuth } from '@/lib/use-require-auth'
 
 type RecordStats = {
   total: number
@@ -17,7 +17,7 @@ type RecordStats = {
 }
 
 export default function DashboardHome() {
-  const router = useRouter()
+  const { authRequired, onApiError } = useRequireAuth()
   const [stats, setStats] = useState<RecordStats>({
     total: 0,
     formats: {},
@@ -35,7 +35,7 @@ export default function DashboardHome() {
     setLoading(true)
     try {
       // Fetch all records to calculate stats
-      const records = await apiFetch<any[]>('/records', { auth: true })
+      const records = await apiFetch<any[]>('/api/records', { auth: true })
       
       const formats: Record<string, number> = {}
       let recentlyAdded = 0
@@ -62,10 +62,7 @@ export default function DashboardHome() {
         inAuctions: 0, // TODO: integrate with auction-monitor
       })
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        router.replace('/login')
-        return
-      }
+      if (onApiError(error)) return
       console.error('Failed to fetch stats:', error)
     } finally {
       setLoading(false)
@@ -90,55 +87,46 @@ export default function DashboardHome() {
         </Button>
       </div>
 
+      {authRequired && (
+        <AuthRequiredCard
+          title="Sign in to view your dashboard"
+          description="Your collection stats, listings summary, and quick actions appear here after you sign in."
+          returnTo="/dashboard"
+        />
+      )}
+
+      {!authRequired && (
+      <>
       {/* Main Stats Grid */}
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-gradient-to-br from-brand/10 to-brand/5 dark:from-brand/20 dark:to-brand/10">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Total Records
-          </p>
-          <p className="mt-2 text-4xl font-bold text-slate-900 dark:text-white">
-            {loading ? '...' : stats.total.toLocaleString()}
-          </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {stats.recentlyAdded > 0 && `+${stats.recentlyAdded} this month`}
-          </p>
-        </Card>
-
-        <Card>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            For Sale
-          </p>
-          <p className="mt-2 text-4xl font-bold text-slate-900 dark:text-white">
-            {loading ? '...' : stats.forSale}
-          </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Active listings
-          </p>
-        </Card>
-
-        <Card>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            In Auctions
-          </p>
-          <p className="mt-2 text-4xl font-bold text-slate-900 dark:text-white">
-            {loading ? '...' : stats.inAuctions}
-          </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Being monitored
-          </p>
-        </Card>
-
-        <Card>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Formats
-          </p>
-          <p className="mt-2 text-4xl font-bold text-slate-900 dark:text-white">
-            {loading ? '...' : Object.keys(stats.formats).length}
-          </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Different formats
-          </p>
-        </Card>
+        <Link href="/records" className="block rounded-2xl focus-visible:outline focus-visible:ring-2 focus-visible:ring-brand">
+          <Card className="h-full bg-gradient-to-br from-brand/10 to-brand/5 transition hover:shadow-md dark:from-brand/20 dark:to-brand/10">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Total Records</p>
+            <p className="mt-2 text-4xl font-bold text-slate-900 dark:text-white">{loading ? '…' : stats.total.toLocaleString()}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{stats.recentlyAdded > 0 && `+${stats.recentlyAdded} this month`}</p>
+          </Card>
+        </Link>
+        <Link href="/profile/selling" className="block rounded-2xl focus-visible:outline focus-visible:ring-2 focus-visible:ring-brand">
+          <Card className="h-full transition hover:shadow-md">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">For Sale</p>
+            <p className="mt-2 text-4xl font-bold text-slate-900 dark:text-white">{loading ? '…' : stats.forSale}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Active listings</p>
+          </Card>
+        </Link>
+        <Link href="/auctions" className="block rounded-2xl focus-visible:outline focus-visible:ring-2 focus-visible:ring-brand">
+          <Card className="h-full transition hover:shadow-md">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">In Auctions</p>
+            <p className="mt-2 text-4xl font-bold text-slate-900 dark:text-white">{loading ? '…' : stats.inAuctions}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Being monitored</p>
+          </Card>
+        </Link>
+        <Link href="/profile/collection-stats" className="block rounded-2xl focus-visible:outline focus-visible:ring-2 focus-visible:ring-brand">
+          <Card className="h-full transition hover:shadow-md">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Formats</p>
+            <p className="mt-2 text-4xl font-bold text-slate-900 dark:text-white">{loading ? '…' : Object.keys(stats.formats).length}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Collection breakdown</p>
+          </Card>
+        </Link>
       </section>
 
       {/* Format Breakdown */}
@@ -190,7 +178,7 @@ export default function DashboardHome() {
         </Card>
 
         <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <Link href="/market">
+          <Link href="/sell">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
                 <svg className="h-6 w-6 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -221,6 +209,8 @@ export default function DashboardHome() {
           </Link>
         </Card>
       </section>
+      </>
+      )}
     </div>
   )
 }

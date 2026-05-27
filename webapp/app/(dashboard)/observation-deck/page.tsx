@@ -104,8 +104,41 @@ export default function ObservationDeckPage() {
         k6, pgbench, latency and observability stack (Istio, Splunk, Grafana, Prometheus, New Relic, Linkerd, Jaeger, OpenTelemetry). Data from <code>bench_logs/preflight-results.json</code> after running full preflight.
       </p>
 
-      {loading && <p>Loading…</p>}
-      {error && <p className="text-destructive">{error}</p>}
+      {loading && <p className="text-sm text-slate-500">Loading observation data…</p>}
+      {error && (
+        <Card>
+          <div className="space-y-4 text-center py-6">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+              <svg className="h-6 w-6 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">Authentication required</h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Sign in to view runtime metrics and observability data.
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              <a href="/login" className="inline-flex items-center rounded-xl bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand/90">
+                Sign in
+              </a>
+              <a href="https://record-platform.test/grafana/" target="_blank" rel="noreferrer"
+                className="inline-flex items-center rounded-xl border border-slate-200 dark:border-white/10 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                Open Grafana
+              </a>
+              <a href="https://record-platform.test/prometheus/" target="_blank" rel="noreferrer"
+                className="inline-flex items-center rounded-xl border border-slate-200 dark:border-white/10 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                Open Prometheus
+              </a>
+              <a href="https://record-platform.test/jaeger/" target="_blank" rel="noreferrer"
+                className="inline-flex items-center rounded-xl border border-slate-200 dark:border-white/10 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                Open Jaeger
+              </a>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {data && (
         <>

@@ -1,291 +1,279 @@
 'use client'
 
-import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { RecordRevisionTimeline } from '@/components/records/record-revision-timeline'
+import { RecordThumbnail } from '@/components/records/record-thumbnail'
+import { AuthRequiredCard } from '@/components/auth/auth-required-card'
+import { ApiErrorAlert } from '@/components/ui/api-error-alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ApiError, apiFetch } from '@/lib/api-client'
+import { apiFetch } from '@/lib/api-client'
+import {
+  formatDate,
+  formatMoneyCents,
+  gradeSummary,
+  purchaseTypeLabel,
+  recordSubtitle,
+} from '@/lib/records-format'
+import type { CollectionRecord, RecordRevision } from '@/lib/records-types'
+import { useRequireAuth } from '@/lib/use-require-auth'
 
-type RecordDetail = {
-  id: string
-  artist: string
-  name: string
-  format: string
-  catalogNumber?: string
-  recordGrade?: string
-  sleeveGrade?: string
-  pricePaid?: number
-  purchasedAt?: string
-  notes?: string
-  isPromo?: boolean
-  hasInsert?: boolean
-  hasBooklet?: boolean
-  hasObiStrip?: boolean
-  hasFactorySleeve?: boolean
-}
+type Tab = 'overview' | 'purchase' | 'media' | 'revisions' | 'listing'
 
 export default function RecordDetailPage() {
-  const router = useRouter()
   const params = useParams()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const id = params.id as string
+  const { authRequired, onApiError } = useRequireAuth()
 
-  const [record, setRecord] = useState<RecordDetail | null>(null)
+  const tabParam = searchParams.get('tab') as Tab | null
+  const [tab, setTab] = useState<Tab>(tabParam ?? 'overview')
+  const [record, setRecord] = useState<CollectionRecord | null>(null)
+  const [revisions, setRevisions] = useState<RecordRevision[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
-  const [isEditing, setIsEditing] = useState(false)
+  const [error, setError] = useState<unknown>(null)
 
   useEffect(() => {
-    if (id) void loadRecord()
-  }, [id])
+    if (tabParam) setTab(tabParam)
+  }, [tabParam])
 
-  async function loadRecord() {
+  useEffect(() => {
+    if (id && !authRequired) void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, authRequired])
+
+  async function load() {
     setLoading(true)
-    setMessage('')
+    setError(null)
     try {
-      const data = await apiFetch<RecordDetail>(`/records/${id}`, { auth: true })
-      setRecord(data)
-    } catch (error) {
-      handleError(error)
+      const [rec, revs] = await Promise.all([
+        apiFetch<CollectionRecord>(`/api/records/${id}`, { auth: true }),
+        apiFetch<RecordRevision[]>(`/api/records/${id}/revisions`, { auth: true }),
+      ])
+      setRecord(rec)
+      setRevisions(revs)
+    } catch (err) {
+      if (onApiError(err)) return
+      setError(err)
     } finally {
       setLoading(false)
     }
   }
 
-  async function saveRecord() {
-    if (!record) return
-    setSaving(true)
-    setMessage('')
-    try {
-      await apiFetch(`/records/${id}`, {
-        method: 'PUT',
-        auth: true,
-        data: record,
-      })
-      setMessage('Record updated')
-      setIsEditing(false)
-    } catch (error) {
-      handleError(error)
-    } finally {
-      setSaving(false)
-    }
-  }
-
   async function deleteRecord() {
-    if (!confirm('Delete this record? This cannot be undone.')) return
-    setSaving(true)
+    if (!confirm('Delete this record from your collection?')) return
     try {
-      await apiFetch(`/records/${id}`, { method: 'DELETE', auth: true })
+      await apiFetch(`/api/records/${id}`, { method: 'DELETE', auth: true })
       router.push('/records')
-    } catch (error) {
-      handleError(error)
-      setSaving(false)
+    } catch (err) {
+      if (onApiError(err)) return
+      setError(err)
     }
   }
 
-  function handleError(error: unknown) {
-    if (error instanceof ApiError && error.status === 401) {
-      router.replace('/login')
-      return
-    }
-    setMessage(error instanceof Error ? error.message : 'Something went wrong')
-  }
-
-  if (loading) {
+  if (authRequired) {
     return (
       <div className="space-y-6">
-        <p className="text-sm text-slate-500">Loading record…</p>
+        <h1 className="text-2xl font-semibold">Record</h1>
+        <AuthRequiredCard title="Sign in to view this record" returnTo={`/records/${id}`} />
       </div>
     )
   }
 
-  if (!record) {
+  if (loading) {
+    return <p className="text-sm text-slate-500">Loading record…</p>
+  }
+
+  if (error || !record) {
     return (
-      <div className="space-y-6">
-        <p className="text-sm text-rose-600">Record not found</p>
-        <Button variant="ghost" onClick={() => router.push('/records')}>
-          Back to records
+      <div className="space-y-4">
+        <ApiErrorAlert title="Record not found" error={error ?? new Error('Not found')} onRetry={() => void load()} />
+        <Button variant="ghost" asChild>
+          <Link href="/records">Back to collection</Link>
         </Button>
       </div>
     )
   }
 
+  const grades = gradeSummary(record)
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'purchase', label: 'Purchase' },
+    { id: 'media', label: 'Media' },
+    { id: 'revisions', label: `Revisions (${revisions.length})` },
+    { id: 'listing', label: 'Listing' },
+  ]
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
-            {record.artist} — {record.name}
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{record.format}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex gap-4">
+          <RecordThumbnail record={record} size="lg" />
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">{record.artist}</p>
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">{record.name}</h1>
+            <p className="mt-1 text-slate-500">{recordSubtitle(record)}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {record.purchaseType && (
+                <Badge variant="primary">{purchaseTypeLabel(record.purchaseType)}</Badge>
+              )}
+              {grades && <Badge variant="outline">{grades}</Badge>}
+              <Badge variant="info">Not listed</Badge>
+            </div>
+          </div>
         </div>
-        <div className="flex gap-2">
-          {isEditing ? (
-            <>
-              <Button onClick={saveRecord} disabled={saving}>
-                {saving ? 'Saving…' : 'Save'}
-              </Button>
-              <Button variant="ghost" onClick={() => { setIsEditing(false); void loadRecord() }} disabled={saving}>
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="secondary" onClick={() => setIsEditing(true)}>
-                Edit
-              </Button>
-              <Button variant="ghost" onClick={() => router.push('/records')}>
-                Back
-              </Button>
-            </>
-          )}
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href={`/market?record=${record.id}`}>Create listing</Link>
+          </Button>
+          <Button variant="secondary" asChild>
+            <Link href={`/records/${id}/edit`}>Edit record</Link>
+          </Button>
+          <Button variant="ghost" asChild>
+            <Link href={`/records/${id}/revisions`}>Revision history</Link>
+          </Button>
+          <Button variant="ghost" asChild>
+            <Link href="/records">Back</Link>
+          </Button>
         </div>
       </div>
 
-      {message && (
-        <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3 text-sm text-slate-600 dark:border-white/10 dark:bg-slate-900 dark:text-slate-300">
-          {message}
+      <nav className="flex flex-wrap gap-1 border-b border-slate-200 dark:border-white/10">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
+              tab === t.id
+                ? 'border-brand text-brand'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      {tab === 'overview' && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card title="Catalog">
+            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              <Detail label="Format" value={record.format} />
+              <Detail label="Label" value={record.label} />
+              <Detail label="Catalog #" value={record.catalogNumber} />
+              <Detail label="Pressing year" value={record.pressingYear} />
+              <Detail label="Release year" value={record.releaseYear} />
+              <Detail label="Record grade" value={record.recordGrade} />
+              <Detail label="Sleeve grade" value={record.sleeveGrade} />
+            </dl>
+            {record.notes && (
+              <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">{record.notes}</p>
+            )}
+          </Card>
+          <Card title="Acquisition summary">
+            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              <Detail label="Purchased" value={formatDate(record.purchasedAt)} />
+              <Detail label="Received" value={formatDate(record.receivedAt)} />
+              <Detail
+                label="Paid"
+                value={formatMoneyCents(record.purchasePriceCents, record.purchaseCurrency ?? 'USD')}
+              />
+              <Detail label="Source" value={record.purchaseSource} />
+            </dl>
+          </Card>
         </div>
       )}
 
-      <Card title="Details">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label="Artist"
-            value={record.artist}
-            disabled={!isEditing}
-            onChange={(value) => setRecord((prev) => prev && { ...prev, artist: value })}
-          />
-          <Field
-            label="Album/Release"
-            value={record.name}
-            disabled={!isEditing}
-            onChange={(value) => setRecord((prev) => prev && { ...prev, name: value })}
-          />
-          <Field
-            label="Format"
-            value={record.format}
-            disabled={!isEditing}
-            onChange={(value) => setRecord((prev) => prev && { ...prev, format: value })}
-          />
-          <Field
-            label="Catalog Number"
-            value={record.catalogNumber || ''}
-            disabled={!isEditing}
-            onChange={(value) => setRecord((prev) => prev && { ...prev, catalogNumber: value || undefined })}
-          />
-          <Field
-            label="Record Grade"
-            value={record.recordGrade || ''}
-            disabled={!isEditing}
-            onChange={(value) => setRecord((prev) => prev && { ...prev, recordGrade: value || undefined })}
-          />
-          <Field
-            label="Sleeve Grade"
-            value={record.sleeveGrade || ''}
-            disabled={!isEditing}
-            onChange={(value) => setRecord((prev) => prev && { ...prev, sleeveGrade: value || undefined })}
-          />
-          <NumberField
-            label="Price Paid"
-            value={record.pricePaid || 0}
-            disabled={!isEditing}
-            onChange={(value) => setRecord((prev) => prev && { ...prev, pricePaid: value || undefined })}
-          />
-          <Field
-            label="Purchased At"
-            type="date"
-            value={record.purchasedAt ? record.purchasedAt.split('T')[0] : ''}
-            disabled={!isEditing}
-            onChange={(value) =>
-              setRecord((prev) => prev && { ...prev, purchasedAt: value ? `${value}T00:00:00Z` : undefined })
-            }
-          />
-        </div>
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
-            Notes
-            <textarea
-              value={record.notes || ''}
-              disabled={!isEditing}
-              onChange={(event) => setRecord((prev) => prev && { ...prev, notes: event.target.value || undefined })}
-              rows={3}
-              className="mt-1 w-full rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand focus:outline-none disabled:bg-slate-50 disabled:text-slate-500 dark:border-white/10 dark:bg-slate-950 dark:text-white disabled:dark:bg-slate-900"
+      {tab === 'purchase' && (
+        <Card title="Purchase details">
+          <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <Detail label="Type" value={purchaseTypeLabel(record.purchaseType)} />
+            <Detail label="Purchased" value={formatDate(record.purchasedAt)} />
+            <Detail label="Received" value={formatDate(record.receivedAt)} />
+            <Detail label="Source" value={record.purchaseSource} />
+            <Detail label="Seller" value={record.sellerName} />
+            <Detail label="Order ref" value={record.orderReference} />
+            <Detail
+              label="Item price"
+              value={formatMoneyCents(record.purchasePriceCents, record.purchaseCurrency ?? 'USD')}
             />
-          </label>
-        </div>
-      </Card>
-
-      {!isEditing && (
-        <Card title="Actions">
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => setIsEditing(true)}>
-              Edit record
-            </Button>
-            <Button variant="ghost" onClick={deleteRecord} disabled={saving} className="text-rose-600 hover:text-rose-700">
-              Delete record
-            </Button>
-          </div>
+            <Detail
+              label="Shipping"
+              value={formatMoneyCents(record.shippingPaidCents, record.purchaseCurrency ?? 'USD')}
+            />
+            <Detail
+              label="Taxes/fees"
+              value={formatMoneyCents(record.taxesFeesPaidCents, record.purchaseCurrency ?? 'USD')}
+            />
+          </dl>
+          {record.purchaseNotes && (
+            <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-900">{record.purchaseNotes}</p>
+          )}
         </Card>
       )}
+
+      {tab === 'media' && (
+        <Card title="Media">
+          {(record.mediaPieces?.length ?? 0) === 0 ? (
+            <p className="text-sm text-slate-500">No media attached. Add images when editing the record.</p>
+          ) : (
+            <ul className="grid gap-3 sm:grid-cols-3">
+              {record.mediaPieces!.map((m) => (
+                <li key={m.id} className="rounded-lg border border-slate-200 p-2 text-sm dark:border-white/10">
+                  {m.kind} #{m.index}
+                  {m.grade ? ` · ${m.grade}` : ''}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+
+      {tab === 'revisions' && (
+        <Card title="Revision history">
+          <RecordRevisionTimeline revisions={revisions} />
+        </Card>
+      )}
+
+      {tab === 'listing' && (
+        <Card title="Marketplace listing">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            This record is not linked to an active listing. Use Create listing to start a draft on Sell/List.
+          </p>
+          <Button className="mt-4" asChild>
+            <Link href={`/market?record=${record.id}`}>Create listing</Link>
+          </Button>
+        </Card>
+      )}
+
+      <Card title="Danger zone">
+        <Button variant="ghost" className="text-rose-600" onClick={() => void deleteRecord()}>
+          Delete record
+        </Button>
+      </Card>
     </div>
   )
 }
 
-type FieldProps = {
+function Detail({
+  label,
+  value,
+}: {
   label: string
-  value: string
-  disabled?: boolean
-  onChange: (value: string) => void
-  type?: string
-}
-
-function Field({ label, value, disabled, onChange, type = 'text' }: FieldProps) {
+  value?: string | number | null
+}) {
+  const display =
+    value == null || value === '' ? '—' : typeof value === 'number' ? String(value) : value
   return (
-    <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
-      {label}
-      <input
-        type={type}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand focus:outline-none disabled:bg-slate-50 disabled:text-slate-500 dark:border-white/10 dark:bg-slate-950 dark:text-white disabled:dark:bg-slate-900"
-      />
-    </label>
+    <div>
+      <dt className="text-xs uppercase text-slate-400">{label}</dt>
+      <dd className="font-medium text-slate-800 dark:text-slate-100">{display}</dd>
+    </div>
   )
 }
-
-type NumberFieldProps = {
-  label: string
-  value: number
-  disabled?: boolean
-  onChange: (value: number) => void
-}
-
-function NumberField({ label, value, disabled, onChange }: NumberFieldProps) {
-  return (
-    <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
-      {label}
-      <input
-        type="number"
-        step="0.01"
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-1 w-full rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand focus:outline-none disabled:bg-slate-50 disabled:text-slate-500 dark:border-white/10 dark:bg-slate-950 dark:text-white disabled:dark:bg-slate-900"
-      />
-    </label>
-  )
-}
-
-
-
-
-
-
-
-
-
-
-

@@ -4,9 +4,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+import { AuthRequiredCard } from '@/components/auth/auth-required-card'
+import { ApiErrorAlert } from '@/components/ui/api-error-alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ApiError, apiFetch } from '@/lib/api-client'
+import { apiFetch } from '@/lib/api-client'
+import { useRequireAuth } from '@/lib/use-require-auth'
 
 type CartItem = {
   id: string
@@ -38,29 +41,42 @@ type Cart = {
 
 export default function CartPage() {
   const router = useRouter()
+  const { authRequired, onApiError, session, isReady } = useRequireAuth()
   const [cart, setCart] = useState<Cart | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<unknown>(null)
+  const [warning, setWarning] = useState('')
   const [checkingOut, setCheckingOut] = useState(false)
 
   useEffect(() => {
-    void loadCart()
-  }, [])
+    if (!isReady) return
+    if (session.status === 'unauthenticated') {
+      setLoading(false)
+      return
+    }
+    if (session.status === 'authenticated') {
+      void loadCart()
+    }
+  }, [isReady, session.status])
 
   async function loadCart() {
     setLoading(true)
-    setError('')
+    setError(null)
+    setWarning('')
     try {
-      const data = await apiFetch<Cart>('/shopping/cart', { auth: true })
-      setCart(data)
+      const data = await apiFetch<Cart>('/api/cart', { auth: true })
+      setCart({
+        items: Array.isArray(data?.items) ? data.items : [],
+        total_items: data?.total_items ?? data?.items?.length ?? 0,
+        total_price: data?.total_price ?? 0,
+        removed_items: data?.removed_items,
+      })
       if (data.removed_items && data.removed_items > 0) {
-        setError(`${data.removed_items} item(s) were removed from your cart because they are no longer available.`)
+        setWarning(`${data.removed_items} item(s) were removed from your cart because they are no longer available.`)
       }
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        router.replace('/login')
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to load cart')
+      if (!onApiError(err)) {
+        setError(err)
       }
     } finally {
       setLoading(false)
@@ -69,13 +85,13 @@ export default function CartPage() {
 
   async function removeItem(itemId: string) {
     try {
-      await apiFetch(`/shopping/cart/${itemId}`, {
+      await apiFetch(`/api/cart/${itemId}`, {
         method: 'DELETE',
         auth: true,
       })
       void loadCart()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove item')
+      setError(err)
     }
   }
 
@@ -85,20 +101,20 @@ export default function CartPage() {
       return
     }
     try {
-      await apiFetch(`/shopping/cart/${itemId}`, {
+      await apiFetch(`/api/cart/${itemId}`, {
         method: 'PUT',
         auth: true,
         data: { quantity },
       })
       void loadCart()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update quantity')
+      setError(err)
     }
   }
 
   async function updateNotes(itemId: string, notes: string) {
     try {
-      await apiFetch(`/shopping/cart/${itemId}`, {
+      await apiFetch(`/api/cart/${itemId}`, {
         method: 'PUT',
         auth: true,
         data: { notes },
@@ -113,18 +129,18 @@ export default function CartPage() {
         })
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update notes')
+      setError(err)
     }
   }
 
   async function checkout() {
     if (!cart || cart.items.length === 0) {
-      setError('Your cart is empty')
+      setWarning('Your cart is empty')
       return
     }
 
     setCheckingOut(true)
-    setError('')
+    setError(null)
     try {
       const items = cart.items.map((item) => ({
         item_type: item.item_type,
@@ -132,7 +148,7 @@ export default function CartPage() {
         listing_id: item.listing_id,
       }))
 
-      await apiFetch('/shopping/cart/checkout', {
+      await apiFetch('/api/cart/checkout', {
         method: 'POST',
         auth: true,
         data: { items },
@@ -143,7 +159,7 @@ export default function CartPage() {
       alert('Checkout successful! Items have been purchased.')
       router.push('/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Checkout failed')
+      setError(err)
     } finally {
       setCheckingOut(false)
     }
@@ -169,17 +185,26 @@ export default function CartPage() {
         </p>
       </header>
 
-      {error && (
-        <div className={`rounded-xl border p-3 text-sm ${
-          error.includes('removed') 
-            ? 'border-yellow-200/80 bg-yellow-50 text-yellow-800 dark:border-yellow-900/50 dark:bg-yellow-950/50 dark:text-yellow-400'
-            : 'border-rose-200/80 bg-rose-50 text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/50 dark:text-rose-400'
-        }`}>
-          {error}
+      {authRequired && (
+        <AuthRequiredCard
+          title="Sign in to view your cart"
+          description="Your shopping cart and checkout are available after you sign in."
+          returnTo="/cart"
+        />
+      )}
+
+      {warning && !authRequired && (
+        <div className="rounded-xl border border-yellow-200/80 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-900/50 dark:bg-yellow-950/50 dark:text-yellow-400">
+          {warning}
         </div>
       )}
 
-      {!cart || cart.items.length === 0 ? (
+      {!authRequired && error && (
+        <ApiErrorAlert title="Cart request failed" error={error} onRetry={() => void loadCart()} />
+      )}
+
+      {!authRequired &&
+        (cart === null || cart.items.length === 0 ? (
         <Card>
           <div className="text-center py-12">
             <p className="text-slate-500 dark:text-slate-400 mb-4">Your cart is empty</p>
@@ -337,7 +362,7 @@ export default function CartPage() {
             </Card>
           </div>
         </div>
-      )}
+      ))}
     </div>
   )
 }

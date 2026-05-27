@@ -14,8 +14,6 @@ function buildCredentials() {
   
   const clientCertPath = process.env.GRPC_CLIENT_CERT || process.env.TLS_CERT_PATH || "/etc/certs/tls.crt";
   const clientKeyPath = process.env.GRPC_CLIENT_KEY || process.env.TLS_KEY_PATH || "/etc/certs/tls.key";
-  const serverName = process.env.GRPC_SERVER_NAME || process.env.TLS_SERVER_NAME || "record.local";
-  
   // STRICT TLS: Always require certificates, no insecure fallback
   // For strict TLS with client certificate verification
   if (fs.existsSync(caPath) && fs.existsSync(clientCertPath) && fs.existsSync(clientKeyPath)) {
@@ -120,17 +118,26 @@ const pythonAiPackageDefinition = protoLoader.loadSync(PYTHON_AI_PROTO_PATH, {
 });
 const pythonAiProto = grpc.loadPackageDefinition(pythonAiPackageDefinition) as any;
 
+/** TLS SNI must match upstream service cert SAN (e.g. auth-service), never public edge host. */
+function grpcTlsServerNameFromAddress(address: string): string {
+  const explicit =
+    process.env.GRPC_SERVER_NAME ||
+    process.env.TLS_SERVER_NAME ||
+    process.env.RP_GRPC_TLS_SERVER_NAME;
+  if (explicit && explicit !== "record.test" && explicit !== "record-platform.test") {
+    return explicit;
+  }
+  const host = address.split(":")[0] ?? address;
+  // auth-service.record-platform.svc.cluster.local → auth-service
+  return host.split(".")[0] || host;
+}
+
 // Create gRPC clients with proper channel options for TLS server name
 function createClientWithOptions(ServiceClass: any, address: string, credentials: grpc.ChannelCredentials) {
-  const serverName = process.env.GRPC_SERVER_NAME || process.env.TLS_SERVER_NAME || "record.local";
-  // Extract hostname from address (e.g., "auth-service:50051" -> "auth-service")
-  const addressHost = address.split(':')[0];
-  // If address uses service name, override with certificate hostname
-  const options: grpc.ChannelOptions = {};
-  if (addressHost.includes('service') || addressHost.includes('-')) {
-    // Service name detected, use server name override for certificate validation
-    options['grpc.ssl_target_name_override'] = serverName;
-  }
+  const tlsServerName = grpcTlsServerNameFromAddress(address);
+  const options: grpc.ChannelOptions = {
+    "grpc.ssl_target_name_override": tlsServerName,
+  };
   return new ServiceClass(address, credentials, options);
 }
 

@@ -7,14 +7,41 @@ import { FormEvent, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ApiError, apiFetch } from '@/lib/api-client'
-import { persistSessionToken } from '@/lib/session'
+import { isDevAuthEnabled } from '@/lib/dev-auth'
+import { persistDevSessionProfile, persistSessionToken } from '@/lib/session'
 
 export default function LoginPage() {
   const router = useRouter()
+  const devAuthEnabled = isDevAuthEnabled()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+
+  async function handleDevLogin() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const res = await fetch('/api/dev-auth/login', { method: 'POST' })
+      const data = (await res.json()) as {
+        token?: string
+        profile?: { name: string; email: string; initials: string; provider: 'google' }
+        error?: string
+      }
+      if (!res.ok || !data.token) {
+        throw new Error(data.error ?? 'Dev login failed')
+      }
+      persistSessionToken(data.token)
+      if (data.profile) {
+        persistDevSessionProfile(data.profile)
+      }
+      router.replace('/dashboard')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Dev login failed')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -76,6 +103,23 @@ export default function LoginPage() {
             {busy ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
+
+        {devAuthEnabled && (
+          <div className="mt-4 border-t border-slate-200/80 pt-4 dark:border-white/10">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy}
+              className="w-full"
+              onClick={() => void handleDevLogin()}
+            >
+              Continue as Test Collector
+            </Button>
+            <p className="mt-2 text-center text-xs text-slate-500">
+              Dev auth only — not available in production unless explicitly enabled.
+            </p>
+          </div>
+        )}
 
         {message && (
           <div className="mt-4 rounded-xl border border-rose-200/80 bg-rose-50 p-3 text-sm text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/50 dark:text-rose-400">

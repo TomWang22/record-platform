@@ -6,6 +6,7 @@ import {
   signInWithToken,
 } from './helpers/auth'
 import { createListingWithShipping } from './helpers/listing-contract'
+import { fillComposeAndSend } from './helpers/messaging-compose'
 import {
   capturePageContentScreenshot,
   contractScreenshotPath,
@@ -38,8 +39,7 @@ test.describe.serial('Message notification event contract (7.4N)', () => {
     await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 45_000 })
     await page.getByTestId('contact-seller-button').click()
     await page.waitForURL(/\/messages\?/, { timeout: 30_000 })
-    await page.getByTestId('messages-compose-body').fill(buyerMessage)
-    await page.getByTestId('messages-compose-send').click()
+    await fillComposeAndSend(page, buyerMessage)
     await expect(
       page.getByTestId('messages-thread-bubble').filter({ hasText: buyerMessage }).first(),
     ).toBeVisible({

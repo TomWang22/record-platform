@@ -2,9 +2,9 @@ import type { NextRequest } from 'next/server'
 
 import { getApiGatewayUrl } from './server-api'
 
-/** Inbox thread list: api-gateway /threads → messaging-service /threads */
+/** Inbox thread list: api-gateway /api/messaging/threads → messaging-service /threads */
 export function messagingThreadsBaseUrl(): string {
-  return `${getApiGatewayUrl()}/threads`
+  return `${getApiGatewayUrl()}/api/messaging/threads`
 }
 
 /** Messaging REST: api-gateway /api/messages/* → messaging-service /messages/* */

@@ -6,6 +6,7 @@ import {
   signInWithToken,
 } from './helpers/auth'
 import { createListingWithShipping } from './helpers/listing-contract'
+import { fillComposeAndSend } from './helpers/messaging-compose'
 import { capturePageContentScreenshot, contractScreenshotPath } from './helpers/screenshot-readiness'
 import { timed } from './helpers/seed-lean'
 
@@ -33,8 +34,7 @@ test.describe.serial('Notification message product contract (8.9E)', () => {
     await signInWithToken(page, buyerToken)
     await page.goto(`/listings/${listingId}`)
     await page.getByTestId('contact-seller-button').click()
-    await page.getByTestId('messages-compose-body').fill(buyerMessage)
-    await page.getByTestId('messages-compose-send').click()
+    await fillComposeAndSend(page, buyerMessage)
     await expect(page.getByTestId('messages-bubble-text').filter({ hasText: buyerMessage }).first()).toBeVisible({
       timeout: 45_000,
     })

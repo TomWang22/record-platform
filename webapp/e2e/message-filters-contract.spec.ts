@@ -5,9 +5,12 @@ import { ensureInboxThreadForFilters } from './helpers/seed-messaging-inbox'
 import { capturePageContentScreenshot, contractScreenshotPath } from './helpers/screenshot-readiness'
 
 test.describe('Message filters contract (8.9D)', () => {
+  let searchNeedle = 'Filter'
+
   test.beforeAll(async ({ request }) => {
     test.setTimeout(120_000)
-    await ensureInboxThreadForFilters(request)
+    const seed = await ensureInboxThreadForFilters(request)
+    searchNeedle = seed.listingTitle.split(/\s+/).find((w) => w.length > 4) ?? 'Filter'
   })
 
   test.beforeEach(async ({ page }) => {
@@ -41,14 +44,7 @@ test.describe('Message filters contract (8.9D)', () => {
     await page.getByTestId('messages-filter-all').click()
     const itemCount = await page.getByTestId('messages-inbox-item').count()
     expect(itemCount, 'inbox threads seeded in beforeAll').toBeGreaterThan(0)
-    const term =
-      (await page
-        .getByTestId('messages-inbox-item')
-        .first()
-        .innerText()
-        .catch(() => '')) || 'message'
-    const needle = term.split(/\s+/).find((w) => w.length > 3) ?? 'message'
-    await page.getByTestId('messages-inbox-search').fill(needle)
+    await page.getByTestId('messages-inbox-search').fill(searchNeedle)
     await expect(page.getByTestId('messages-inbox-item').first()).toBeVisible({ timeout: 15_000 })
     await capturePageContentScreenshot(page, contractScreenshotPath('messages-search-listing.png'))
   })

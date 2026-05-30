@@ -9,6 +9,7 @@ import {
 } from './helpers/auth'
 import { createListingWithShipping } from './helpers/listing-contract'
 import { assertNoUuidInMessagesUi, inboxListingTitleVisible } from './helpers/messaging-contract'
+import { fillComposeAndSend } from './helpers/messaging-compose'
 import { capturePageContentScreenshot, contractScreenshotPath } from './helpers/screenshot-readiness'
 import { timed } from './helpers/seed-lean'
 
@@ -46,8 +47,7 @@ test.describe.serial('Direct message product contract (8.9A–B)', () => {
     })
     await assertNoUuidInMessagesUi(page)
     await capturePageContentScreenshot(page, contractScreenshotPath('direct-message-compose.png'))
-    await page.getByTestId('messages-compose-body').fill(buyerMsg)
-    await page.getByTestId('messages-compose-send').click()
+    await fillComposeAndSend(page, buyerMsg)
     await expect(page.getByTestId('messages-bubble-text').filter({ hasText: buyerMsg }).first()).toBeVisible({
       timeout: 45_000,
     })
@@ -67,8 +67,7 @@ test.describe.serial('Direct message product contract (8.9A–B)', () => {
     await capturePageContentScreenshot(page, contractScreenshotPath('direct-message-seller-inbox.png'))
     await page.getByTestId('messages-inbox-item').filter({ hasText: inboxTitle }).first().click()
     await expect(page.getByTestId('messages-bubble-text').filter({ hasText: buyerMsg }).first()).toBeVisible()
-    await page.getByTestId('messages-compose-body').fill(sellerReply)
-    await page.getByTestId('messages-compose-send').click()
+    await fillComposeAndSend(page, sellerReply)
     await expect(page.getByTestId('messages-bubble-text').filter({ hasText: sellerReply }).first()).toBeVisible({
       timeout: 45_000,
     })

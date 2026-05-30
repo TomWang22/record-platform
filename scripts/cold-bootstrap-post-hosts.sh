@@ -80,6 +80,8 @@ RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES="${RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES:-0}" \
   rp_cb_phase_fail J.final_contract "rca-rp-grpc-mtls failed (grpc_integrity)" "RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES=1 bash scripts/rca-rp-grpc-mtls.sh --all --required --strict-integrity"
 
 if [[ "${RP_ENABLE_OLLAMA_EFFECTIVE:-1}" == "1" ]]; then
+  export RP_CB_RUN_LABEL="apply-ollama-metallb-lb"
+  rp_cb_run bash "$SCRIPT_DIR/apply-ollama-metallb-lb.sh" 2>/dev/null || true
   export RP_CB_RUN_LABEL="audit-rp-ollama-stack"
   rp_cb_run bash "$SCRIPT_DIR/audit-rp-ollama-stack.sh" || \
     rp_cb_phase_fail J.final_contract "audit-rp-ollama-stack failed" "bash scripts/audit-rp-ollama-stack.sh"
@@ -109,6 +111,7 @@ fi
 make -C "$REPO_ROOT" bootstrap-drift-check || echo "⚠️  drift check reported issues (review bench_logs/drift-detection.json)"
 
 chmod +x "$SCRIPT_DIR/rp-verify-slo-sla.sh" "$SCRIPT_DIR/rp-export-bootstrap-slo-prom.sh" 2>/dev/null || true
+export RP_CB_SKIP_FINAL_SUMMARY=1
 RP_SLO_SKIP_EDGE_PROBES=0 bash "$SCRIPT_DIR/rp-verify-slo-sla.sh" || \
   rp_cb_phase_fail J.final_contract "rp-verify-slo-sla failed" "bash scripts/rp-verify-slo-sla.sh"
 
@@ -123,3 +126,6 @@ node "$SCRIPT_DIR/render-bootstrap-dag-html.mjs" --html-out "$RP_CB_BENCH/bootst
 
 rp_cb_phase_complete J.final_contract
 rp_cb_ok "cold-bootstrap post-hosts contract complete (h2+h3 strict TLS + edge contract matrix)"
+
+# shellcheck source=scripts/lib/rp-cold-bootstrap-final-summary.sh
+source "$SCRIPT_DIR/lib/rp-cold-bootstrap-final-summary.sh"

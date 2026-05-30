@@ -64,6 +64,19 @@ else
   bad "missing service/ollama"
 fi
 
+if kubectl get svc ollama-lb -n "$NS" >/dev/null 2>&1; then
+  stype="$(kubectl get svc ollama-lb -n "$NS" -o jsonpath='{.spec.type}' 2>/dev/null || true)"
+  if [[ "$stype" != "LoadBalancer" ]]; then
+    bad "service/ollama-lb must be LoadBalancer (got ${stype:-?})"
+  else
+    lb_ip="$(kubectl get svc ollama-lb -n "$NS" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+    [[ -n "$lb_ip" ]] && ok "service/ollama-lb MetalLB IP=${lb_ip}" \
+      || info "service/ollama-lb LoadBalancer IP pending (MetalLB may still assign)"
+  fi
+else
+  bad "missing service/ollama-lb (MetalLB host access — infra/k8s/base/ollama/service-metallb.yaml)"
+fi
+
 if kubectl get configmap ollama-gateway-config -n "$NS" >/dev/null 2>&1 \
   || kubectl get configmap ollama-worker-config -n "$NS" >/dev/null 2>&1; then
   ok "ollama gateway/worker configmaps present"

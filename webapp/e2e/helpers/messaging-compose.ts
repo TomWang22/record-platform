@@ -8,5 +8,13 @@ export async function fillComposeAndSend(page: Page, body: string): Promise<void
   await field.fill(body)
   const send = page.getByTestId('messages-compose-send')
   await expect(send).toBeEnabled({ timeout: 15_000 })
+  const sendRes = page.waitForResponse(
+    (res) =>
+      res.request().method() === 'POST' &&
+      (res.url().includes('/api/messages/send') || res.url().includes('/api/messages/start')) &&
+      res.status() < 400,
+    { timeout: 60_000 },
+  )
   await send.click()
+  await sendRes
 }

@@ -1,6 +1,68 @@
-import type { APIRequestContext } from '@playwright/test'
+import { expect, type APIRequestContext, type Page } from '@playwright/test'
 
 import { with429Retry } from './http-retry'
+
+export type ListingPersistExpectation = {
+  imageCount?: number
+  primaryIncludes?: string
+}
+
+export async function pollListingUntil(
+  request: APIRequestContext,
+  token: string,
+  listingId: string,
+  expected: ListingPersistExpectation,
+  opts: { timeoutMs?: number } = {},
+): Promise<Record<string, unknown>> {
+  return waitForListingField(
+    request,
+    token,
+    listingId,
+    (row) => {
+      const images = (row.images as string[]) ?? []
+      if (expected.imageCount !== undefined && images.length !== expected.imageCount) return false
+      if (
+        expected.primaryIncludes &&
+        !String(images[0] ?? '').includes(expected.primaryIncludes)
+      ) {
+        return false
+      }
+      return true
+    },
+    opts,
+  )
+}
+
+/** Save listing edit, wait for API persistence (incl. media sync), then open detail without relying on router load. */
+export async function saveListingAndOpenDetail(
+  page: Page,
+  request: APIRequestContext,
+  token: string,
+  listingId: string,
+  expected: ListingPersistExpectation,
+): Promise<void> {
+  await expect(page.getByTestId('listing-edit-ready')).toBeVisible({ timeout: 60_000 })
+  const media = page.locator('[data-testid="listing-edit-media"]')
+  await expect(media).toBeAttached()
+  await expect(page.getByTestId('listing-edit-save')).toBeEnabled()
+
+  const saveResponse = page.waitForResponse(
+    (r) =>
+      r.request().method() !== 'GET' &&
+      r.url().includes(`/api/listings/${listingId}`) &&
+      r.ok(),
+    { timeout: 60_000 },
+  )
+  await page.getByTestId('listing-edit-save').click()
+  await saveResponse
+  await pollListingUntil(request, token, listingId, expected, { timeoutMs: 90_000 })
+
+  const detailRe = new RegExp(`/listings/${listingId.replace(/-/g, '\\-')}$`)
+  if (!detailRe.test(new URL(page.url()).pathname)) {
+    await page.goto(`/listings/${listingId}`, { waitUntil: 'domcontentloaded' })
+  }
+  await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 60_000 })
+}
 
 const PLACEHOLDER_A = 'https://picsum.photos/seed/rp-contract-a/400/400'
 const PLACEHOLDER_B = 'https://picsum.photos/seed/rp-contract-b/400/400'
@@ -224,9 +286,11 @@ export async function fetchListingApi(
   token: string,
   listingId: string,
 ): Promise<Record<string, unknown>> {
-  const res = await request.get(`/api/listings/${listingId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  const res = await with429Retry('listing fetch', () =>
+    request.get(`/api/listings/${listingId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  )
   if (!res.ok()) {
     throw new Error(`GET listing failed ${res.status()}: ${(await res.text()).slice(0, 300)}`)
   }

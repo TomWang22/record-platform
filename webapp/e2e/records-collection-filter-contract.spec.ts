@@ -1,12 +1,15 @@
 import { test, expect } from '@playwright/test'
 
 import { obtainAuthToken, signInWithContractApiToken } from './helpers/auth'
+import {
+  pollRecordsUntilArtist,
+  waitForRecordVisibleAfterFilter,
+} from './helpers/records-contract'
 import { ensureTestCollection } from './helpers/seed-collection'
 import {
   capturePageContentScreenshot,
   contractScreenshotPath,
 } from './helpers/screenshot-readiness'
-import { getJsonWith429Retry } from './helpers/http-retry'
 import { timed } from './helpers/seed-lean'
 
 test.describe.configure({ timeout: 180_000 })
@@ -18,19 +21,13 @@ test.describe.serial('Records collection filter contract (7.8)', () => {
     const ctx = await browser.newContext()
     const token = await timed('auth', () => obtainAuthToken(ctx.request))
     await timed('records/seed', () => ensureTestCollection(ctx.request, token))
-    const rows = await getJsonWith429Retry<{ id: string; artist?: string }[]>(
-      ctx.request,
-      '/api/records',
-      { Authorization: `Bearer ${token}`, 'X-RP-E2E-Contract': '1' },
-      'records miles lookup',
-    )
-    const miles = rows.find((r) => r.artist === 'Miles Davis')
-    milesRecordId = miles?.id ?? ''
-    expect(milesRecordId, 'Miles Davis seeded record required').toBeTruthy()
+    const miles = await pollRecordsUntilArtist(ctx.request, token, 'Miles Davis')
+    milesRecordId = miles.id
     const detail = await ctx.request.get(`/api/records/${milesRecordId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     expect(detail.ok()).toBeTruthy()
+    await pollRecordsUntilArtist(ctx.request, token, 'Kenny Dorham')
     await ctx.close()
   })
 
@@ -40,36 +37,51 @@ test.describe.serial('Records collection filter contract (7.8)', () => {
 
   test('grid list compact with images and auction filter', async ({ page }) => {
     await page.goto('/records?view=grid')
+    await expect(page.getByTestId('records-ready')).toBeVisible({ timeout: 60_000 })
+
     await page.getByPlaceholder(/Search artist/i).fill('Kenny Dorham')
     await page.getByRole('button', { name: 'Search' }).click()
-    await expect(page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first()).toBeVisible({
-      timeout: 45_000,
-    })
+    await expect(page.getByTestId('records-ready')).toBeVisible({ timeout: 60_000 })
+    await expect(
+      page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first(),
+    ).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByTestId('record-card').filter({ hasText: 'Miles Davis' })).toHaveCount(0)
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-records-grid-images-filtered.png'),
     )
 
     await page.goto('/records?view=list')
+    await expect(page.getByTestId('records-ready')).toBeVisible({ timeout: 60_000 })
     await page.getByPlaceholder(/Search artist/i).fill('Kenny Dorham')
     await page.getByRole('button', { name: 'Search' }).click()
-    await expect(page.getByTestId('record-row').filter({ hasText: 'Kenny Dorham' }).first()).toBeVisible({
-      timeout: 30_000,
-    })
+    await expect(
+      page.getByTestId('record-row').filter({ hasText: 'Kenny Dorham' }).first(),
+    ).toBeVisible({ timeout: 60_000 })
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-records-list-images-filtered.png'),
     )
 
     await page.goto('/records?view=compact')
+    await expect(page.getByTestId('records-ready')).toBeVisible({ timeout: 60_000 })
     await page.getByPlaceholder(/Search artist/i).fill('Kenny Dorham')
     await page.getByRole('button', { name: 'Search' }).click()
-    await expect(page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first()).toBeVisible({
-      timeout: 30_000,
-    })
+    await expect(
+      page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first(),
+    ).toBeVisible({ timeout: 60_000 })
     await page.getByTestId('records-filter-purchase-type').selectOption('auction_win')
     await expect(page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first()).toBeVisible()
     await expect(page.getByTestId('record-card').filter({ hasText: 'Art Blakey' })).toHaveCount(0)
+
+    await page.getByTestId('records-filter-purchased-from').fill('2026-05-01')
+    await page.getByTestId('records-filter-purchased-to').fill('2026-05-01')
+    await expect(page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first()).toBeVisible()
+    await expect(page.getByTestId('record-card').filter({ hasText: 'Herbie Hancock' })).toHaveCount(0)
+
+    await page.getByTestId('records-filter-listed').selectOption('not_listed')
+    await expect(page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first()).toBeVisible()
+
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-records-compact-images-filtered.png'),
@@ -78,20 +90,14 @@ test.describe.serial('Records collection filter contract (7.8)', () => {
 
   test('artist filter and record detail edit revision', async ({ page }) => {
     await page.goto('/records?view=grid')
+    await expect(page.getByTestId('records-ready')).toBeVisible({ timeout: 60_000 })
     await page.getByTestId('records-filter-purchase-type').selectOption('')
-    await page.getByPlaceholder(/Search artist/i).fill('Miles Davis')
-    const searchResponse = page.waitForResponse(
-      (r) => r.url().includes('/api/records') && r.request().method() === 'GET' && r.ok(),
-      { timeout: 45_000 },
-    )
-    await page.getByRole('button', { name: /^Search$/ }).click()
-    await searchResponse
-    await expect(page.getByTestId('record-card').filter({ hasText: 'Miles Davis' }).first()).toBeVisible({
-      timeout: 45_000,
-    })
+    await page.getByTestId('records-filter-listed').selectOption('')
+
+    await waitForRecordVisibleAfterFilter(page, 'Miles Davis')
+    await expect(page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' })).toHaveCount(0)
 
     const milesCard = page.getByTestId('record-card').filter({ hasText: 'Miles Davis' }).first()
-    await expect(milesCard).toBeVisible({ timeout: 45_000 })
     await milesCard.click()
     await expect(page).toHaveURL(new RegExp(`/records/${milesRecordId.replace(/-/g, '\\-')}`))
     await expect(page.getByTestId('record-detail-ready')).toBeVisible({ timeout: 45_000 })

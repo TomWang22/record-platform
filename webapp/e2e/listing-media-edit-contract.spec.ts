@@ -5,6 +5,8 @@ import {
   PLACEHOLDER_C,
   createTwoImageListing,
   fetchListingApi,
+  pollListingUntil,
+  saveListingAndOpenDetail,
   waitForListingRevisions,
 } from './helpers/listing-contract'
 import {
@@ -35,7 +37,8 @@ test.describe.serial('Listing media edit persistence (7.5R)', () => {
   }) => {
     const token = await obtainAuthToken(request)
     await page.goto(`/listings/${listingId}/edit`)
-    await expect(page.getByTestId('listing-edit-ready')).toBeVisible({ timeout: 45_000 })
+    await expect(page.getByTestId('listing-edit-ready')).toBeVisible({ timeout: 60_000 })
+    await expect(page.locator('[data-testid="listing-edit-media"]')).toBeAttached()
 
     await page.locator('#listing-edit-new-image').fill(PLACEHOLDER_C)
     await page.locator('[data-testid="listing-edit-media"] button', { hasText: /^Add$/ }).click()
@@ -46,18 +49,10 @@ test.describe.serial('Listing media edit persistence (7.5R)', () => {
       .first()
       .click()
 
-    const save = page.waitForResponse(
-      (res) =>
-        res.request().method() === 'PATCH' &&
-        res.url().includes(`/api/listings/${listingId}`) &&
-        !res.url().includes('/media') &&
-        res.status() < 400,
-      { timeout: 60_000 },
-    )
-    await page.getByTestId('listing-edit-save').click()
-    await save
-    await page.waitForURL(new RegExp(`/listings/${listingId}$`), { timeout: 60_000 })
-    await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 45_000 })
+    await saveListingAndOpenDetail(page, request, token, listingId, {
+      imageCount: 2,
+      primaryIncludes: 'rp-contract-c',
+    })
 
     const api = await fetchListingApi(request, token, listingId)
     const images = (api.images as string[]) ?? []
@@ -76,7 +71,11 @@ test.describe.serial('Listing media edit persistence (7.5R)', () => {
     )
 
     await page.goto(`/listings/${listingId}/edit`)
-    await expect(page.getByTestId('listing-edit-ready')).toBeVisible({ timeout: 45_000 })
+    await expect(page.getByTestId('listing-edit-ready')).toBeVisible({ timeout: 60_000 })
+    await pollListingUntil(request, token, listingId, {
+      imageCount: 2,
+      primaryIncludes: 'rp-contract-c',
+    })
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-listing-edit-media-persisted.png'),

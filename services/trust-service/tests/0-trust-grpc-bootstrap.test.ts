@@ -1,11 +1,8 @@
 /**
- * Phase III: messaging `startGrpcServer` bootstrap (bind success/error, credentials → process.exit).
- * Skips registering SIGTERM (Vitest teardown can emit SIGTERM; mock Server has no forceShutdown).
+ * Phase III: trust `startGrpcServer` bootstrap (bind success/error, credentials → process.exit).
  */
 import * as grpc from "@grpc/grpc-js";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-
-const origProcessOn = process.on.bind(process);
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const credBind = vi.hoisted(() => vi.fn());
 const regHealth = vi.hoisted(() => vi.fn());
@@ -19,18 +16,7 @@ vi.mock("@common/utils", async (importOriginal) => {
   };
 });
 
-describe("messaging grpc-server bootstrap", () => {
-  beforeAll(() => {
-    vi.spyOn(process, "on").mockImplementation(((ev: string, listener: (...a: unknown[]) => void) => {
-      if (ev === "SIGTERM") return process;
-      return origProcessOn(ev as "beforeExit", listener as () => void);
-    }) as typeof process.on);
-  });
-
-  afterAll(() => {
-    vi.mocked(process.on).mockRestore();
-  });
-
+describe("trust grpc-server bootstrap", () => {
   beforeEach(() => {
     credBind.mockReset();
     regHealth.mockReset();
@@ -39,10 +25,6 @@ describe("messaging grpc-server bootstrap", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.spyOn(process, "on").mockImplementation(((ev: string, listener: (...a: unknown[]) => void) => {
-      if (ev === "SIGTERM") return process;
-      return origProcessOn(ev as "beforeExit", listener as () => void);
-    }) as typeof process.on);
   });
 
   it("startGrpcServer calls bindAsync on success", async () => {
@@ -50,17 +32,18 @@ describe("messaging grpc-server bootstrap", () => {
     const addService = vi.fn();
     const bindAsync = vi.fn(
       (_host: string, _c: grpc.ServerCredentials, cb: (e: Error | null, p?: number) => void) => {
-        queueMicrotask(() => cb(null, 50_064));
+        queueMicrotask(() => cb(null, 50_066));
       },
     );
     vi.spyOn(grpc, "Server").mockImplementation(() => ({ addService, bindAsync } as any));
 
     const { startGrpcServer } = await import("../src/grpc-server.js");
-    startGrpcServer(50_064);
+    const srv = startGrpcServer(50_066);
+    expect(srv).toBeDefined();
 
     expect(addService).toHaveBeenCalled();
     expect(bindAsync).toHaveBeenCalledWith(
-      "0.0.0.0:50064",
+      "0.0.0.0:50066",
       expect.anything(),
       expect.any(Function),
     );
@@ -70,7 +53,7 @@ describe("messaging grpc-server bootstrap", () => {
     credBind.mockReturnValue({} as grpc.ServerCredentials);
     const bindAsync = vi.fn(
       (_host: string, _c: grpc.ServerCredentials, cb: (e: Error | null, p?: number) => void) => {
-        queueMicrotask(() => cb(new Error("bind fail")));
+        queueMicrotask(() => cb(new Error("bind failed")));
       },
     );
     vi.spyOn(grpc, "Server").mockImplementation(
@@ -79,7 +62,7 @@ describe("messaging grpc-server bootstrap", () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { startGrpcServer } = await import("../src/grpc-server.js");
-    startGrpcServer(50_172);
+    startGrpcServer(50_166);
     await new Promise<void>((r) => setImmediate(r));
 
     expect(errSpy).toHaveBeenCalled();
@@ -88,7 +71,7 @@ describe("messaging grpc-server bootstrap", () => {
 
   it("createRpGrpcServerCredentialsForBind throws → process.exit(1)", async () => {
     credBind.mockImplementation(() => {
-      throw new Error("no server creds");
+      throw new Error("cert");
     });
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
     vi.spyOn(grpc, "Server").mockImplementation(
@@ -96,7 +79,7 @@ describe("messaging grpc-server bootstrap", () => {
     );
 
     const { startGrpcServer } = await import("../src/grpc-server.js");
-    startGrpcServer(50_173);
+    startGrpcServer(50_167);
     await new Promise<void>((r) => setImmediate(r));
 
     expect(exitSpy).toHaveBeenCalledWith(1);

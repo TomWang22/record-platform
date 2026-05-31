@@ -7,7 +7,7 @@ import os from 'os'
 import { pool, withRetry } from './lib/db.js'
 import { makeRedis, CacheManager } from './lib/cache.js'
 import { kafka } from '@common/utils/kafka'
-import { registerHealthService, createOchGrpcServerCredentialsForBind } from '@common/utils'
+import { registerHealthService, createRpGrpcServerCredentialsForBind } from '@common/utils'
 
 // Load proto file (try both relative paths for dev vs production, and K8s mount)
 function findProtoPath(): string {
@@ -267,6 +267,37 @@ const shoppingService = {
         })),
         total: parseInt(countResult.rows[0].total),
       })
+    } catch (err: any) {
+      callback({ code: grpc.status.INTERNAL, message: err.message })
+    }
+  },
+
+  async RemoveFromWatchlist(call: any, callback: any) {
+    const { user_id, item_type, item_id } = call.request
+    try {
+      const result = await withRetry(
+        () => pool.query(
+          `DELETE FROM shopping.watchlist
+           WHERE user_id = $1 AND item_type = $2 AND item_id = $3
+           RETURNING id`,
+          [user_id, item_type, item_id]
+        ),
+        3,
+        'gRPC RemoveFromWatchlist'
+      )
+
+      if (result.rows.length === 0) {
+        return callback({
+          code: grpc.status.NOT_FOUND,
+          message: 'Item not found in watchlist',
+        })
+      }
+
+      if (redis) {
+        await redis.del(`shopping:watchlist:${user_id}`)
+      }
+
+      callback(null, { success: true, message: 'Item removed from watchlist' })
     } catch (err: any) {
       callback({ code: grpc.status.INTERNAL, message: err.message })
     }
@@ -683,7 +714,7 @@ export function startGrpcServer(port: number) {
 
   let credentials: grpc.ServerCredentials;
   try {
-    credentials = createOchGrpcServerCredentialsForBind("shopping gRPC");
+    credentials = createRpGrpcServerCredentialsForBind("shopping gRPC");
     console.log("[gRPC] strict mTLS (client cert required)");
   } catch (e) {
     console.error(e);

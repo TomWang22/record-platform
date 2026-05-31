@@ -4,7 +4,7 @@
 #
 # Usage (repo root):
 #   ./scripts/seed-jaeger-via-edge-health.sh
-# Env: E2E_API_BASE (default https://record.test), NODE_EXTRA_CA_CERTS (default certs/dev-root.pem)
+# Env: E2E_API_BASE (default https://record-platform.test), NODE_EXTRA_CA_CERTS (default certs/dev-root.pem)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

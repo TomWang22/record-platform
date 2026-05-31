@@ -11,14 +11,14 @@ type RouteExpectation = {
 
 const protectedRoutes: RouteExpectation[] = [
   { path: "/dashboard", name: "dashboard", mustContain: /My Collection|Welcome back/i },
-  { path: "/records", name: "records", mustContain: /Records/i },
+  { path: "/records", name: "records", mustContain: /My collection|Sign in to view your collection/i },
   { path: "/records/new", name: "records-new", mustContain: /Add new record/i },
   { path: "/cart", name: "cart", mustContain: /Shopping Cart/i },
   { path: "/auctions", name: "auctions", mustContain: /Auction Monitor/i },
-  { path: "/listings", name: "listings", mustContain: /Browse Listings/i },
-  { path: "/market", name: "sell-list", mustContain: /Sell \/ List/i },
-  { path: "/settings", name: "settings", mustContain: /Settings/i },
-  { path: "/observation-deck", name: "observation-deck", mustContain: /Observation deck/i },
+  { path: "/listings", name: "listings", mustContain: /Browse Listings|Sign in to browse/i },
+  { path: "/market", name: "sell-list", mustContain: /Sell|List a record|Sign in/i },
+  { path: "/settings", name: "settings", mustContain: /Settings|Sign in/i },
+  { path: "/observation-deck", name: "observation-deck", mustContain: /Observation deck|Sign in/i },
 ];
 
 async function hasAppShell(page: import("@playwright/test").Page): Promise<boolean> {

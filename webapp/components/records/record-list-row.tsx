@@ -24,7 +24,10 @@ export function RecordListRow({ record, compact }: Props) {
   const grades = gradeSummary(record)
 
   return (
-    <tr className="group border-b border-slate-100 last:border-0 hover:bg-slate-50/80 dark:border-white/5 dark:hover:bg-white/[0.02]">
+    <tr
+      data-testid="record-row"
+      className="group border-b border-slate-100 last:border-0 hover:bg-slate-50/80 dark:border-white/5 dark:hover:bg-white/[0.02]"
+    >
       <td className="py-3 pl-2 pr-3">
         <Link href={`/records/${record.id}`} className="flex items-center gap-3">
           <RecordThumbnail record={record} size="sm" />

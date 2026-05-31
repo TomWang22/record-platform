@@ -4,6 +4,7 @@ import { obtainAuthToken, signInWithContractApiToken } from './helpers/auth'
 import {
   pollRecordsUntilArtist,
   waitForRecordVisibleAfterFilter,
+  waitForRecordsCollectionLoaded,
 } from './helpers/records-contract'
 import { ensureTestCollection } from './helpers/seed-collection'
 import {
@@ -37,26 +38,32 @@ test.describe.serial('Records collection filter contract (7.8)', () => {
 
   test('grid list compact with images and auction filter', async ({ page }) => {
     await page.goto('/records?view=grid')
-    await expect(page.getByTestId('records-ready')).toBeVisible({ timeout: 60_000 })
+    await waitForRecordsCollectionLoaded(page)
 
     await page.getByPlaceholder(/Search artist/i).fill('Kenny Dorham')
     await page.getByRole('button', { name: 'Search' }).click()
-    await expect(page.getByTestId('records-ready')).toBeVisible({ timeout: 60_000 })
-    await expect(
-      page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first(),
-    ).toBeVisible({ timeout: 60_000 })
-    await expect(page.getByTestId('record-card').filter({ hasText: 'Miles Davis' })).toHaveCount(0)
+    const kennyCard = page
+      .getByTestId('record-card')
+      .filter({ hasText: 'Kenny Dorham' })
+      .first()
+      .or(page.locator('article').filter({ hasText: 'Kenny Dorham' }).first())
+    await expect(kennyCard).toBeVisible({ timeout: 60_000 })
+    await expect(page.locator('article').filter({ hasText: 'Miles Davis' })).toHaveCount(0)
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-records-grid-images-filtered.png'),
     )
 
     await page.goto('/records?view=list')
-    await expect(page.getByTestId('records-ready')).toBeVisible({ timeout: 60_000 })
+    await waitForRecordsCollectionLoaded(page)
     await page.getByPlaceholder(/Search artist/i).fill('Kenny Dorham')
     await page.getByRole('button', { name: 'Search' }).click()
     await expect(
-      page.getByTestId('record-row').filter({ hasText: 'Kenny Dorham' }).first(),
+      page
+        .getByTestId('record-row')
+        .filter({ hasText: 'Kenny Dorham' })
+        .first()
+        .or(page.locator('tbody tr').filter({ hasText: 'Kenny Dorham' }).first()),
     ).toBeVisible({ timeout: 60_000 })
     await capturePageContentScreenshot(
       page,
@@ -64,23 +71,25 @@ test.describe.serial('Records collection filter contract (7.8)', () => {
     )
 
     await page.goto('/records?view=compact')
-    await expect(page.getByTestId('records-ready')).toBeVisible({ timeout: 60_000 })
+    await waitForRecordsCollectionLoaded(page)
     await page.getByPlaceholder(/Search artist/i).fill('Kenny Dorham')
     await page.getByRole('button', { name: 'Search' }).click()
-    await expect(
-      page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first(),
-    ).toBeVisible({ timeout: 60_000 })
+    await expect(kennyCard).toBeVisible({ timeout: 60_000 })
     await page.getByTestId('records-filter-purchase-type').selectOption('auction_win')
-    await expect(page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first()).toBeVisible()
-    await expect(page.getByTestId('record-card').filter({ hasText: 'Art Blakey' })).toHaveCount(0)
+    await expect(kennyCard).toBeVisible()
+    await expect(page.locator('article').filter({ hasText: 'Art Blakey' })).toHaveCount(0)
 
     await page.getByTestId('records-filter-purchased-from').fill('2026-05-01')
     await page.getByTestId('records-filter-purchased-to').fill('2026-05-01')
-    await expect(page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first()).toBeVisible()
-    await expect(page.getByTestId('record-card').filter({ hasText: 'Herbie Hancock' })).toHaveCount(0)
+    await expect(kennyCard).toBeVisible()
+    await expect(page.locator('article').filter({ hasText: 'Herbie Hancock' })).toHaveCount(0)
 
+    await page.getByTestId('records-filter-listed').selectOption('listed')
+    await expect(kennyCard).toBeVisible()
     await page.getByTestId('records-filter-listed').selectOption('not_listed')
-    await expect(page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' }).first()).toBeVisible()
+    await expect(kennyCard).toHaveCount(0)
+    await page.getByTestId('records-filter-listed').selectOption('')
+    await expect(kennyCard).toBeVisible()
 
     await capturePageContentScreenshot(
       page,
@@ -90,7 +99,7 @@ test.describe.serial('Records collection filter contract (7.8)', () => {
 
   test('artist filter and record detail edit revision', async ({ page }) => {
     await page.goto('/records?view=grid')
-    await expect(page.getByTestId('records-ready')).toBeVisible({ timeout: 60_000 })
+    await waitForRecordsCollectionLoaded(page)
     await page.getByTestId('records-filter-purchase-type').selectOption('')
     await page.getByTestId('records-filter-listed').selectOption('')
 

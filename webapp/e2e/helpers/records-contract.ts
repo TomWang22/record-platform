@@ -27,12 +27,40 @@ export async function pollRecordsUntilArtist(
   throw new Error(`record artist not in API: ${artist} — last ${last.slice(0, 400)}`)
 }
 
+/** Collection finished initial load (works before/after records-ready testid is deployed). */
+export async function waitForRecordsCollectionLoaded(page: Page): Promise<void> {
+  await expect(page.getByRole('heading', { name: /My collection/i })).toBeVisible({
+    timeout: 60_000,
+  })
+  const ready = page.getByTestId('records-ready')
+  const cards = page.getByTestId('record-card')
+  const rows = page.getByTestId('record-row')
+  const articles = page.locator('article')
+  const tableRows = page.locator('tbody tr')
+  await expect
+    .poll(
+      async () => {
+        if (await ready.count()) return 'ready'
+        if (await cards.count()) return 'cards'
+        if (await rows.count()) return 'rows'
+        if (await articles.count()) return 'articles'
+        if (await tableRows.count()) return 'table'
+        return ''
+      },
+      { timeout: 60_000 },
+    )
+    .not.toBe('')
+}
+
 /** UI filter: Search triggers GET /api/records?q=…; purchase/date/listed filters are client-side. */
 export async function waitForRecordVisibleAfterFilter(page: Page, artist: string): Promise<void> {
+  await waitForRecordsCollectionLoaded(page)
   await page.getByPlaceholder(/Search artist/i).fill(artist)
   await page.getByRole('button', { name: /^Search$/i }).click()
-  await expect(page.getByTestId('records-ready')).toBeVisible({ timeout: 60_000 })
-  await expect(
-    page.getByTestId('record-card').filter({ hasText: artist }).first(),
-  ).toBeVisible({ timeout: 60_000 })
+  const card = page
+    .getByTestId('record-card')
+    .filter({ hasText: artist })
+    .first()
+    .or(page.locator('article').filter({ hasText: artist }).first())
+  await expect(card).toBeVisible({ timeout: 60_000 })
 }

@@ -52,7 +52,7 @@ export async function sendExternalEmail(params: {
     const info = await transporter.sendMail({
       from,
       to: params.to,
-      subject: params.subject || "Message from Off-Campus Housing",
+      subject: params.subject || "Message from Record Platform",
       text: params.text,
       ...(params.replyTo ? { replyTo: params.replyTo } : {}),
     });

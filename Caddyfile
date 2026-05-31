@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 # PORTING: When reusing this substrate in another project, change:
-#   1. Hostname: replace "record.local" with your hostname (vhost line below and all --resolve in scripts).
+#   1. Hostname: record-platform.test (vhost below; scripts use --resolve record-platform.test:443:<LB_IP>).
 #   2. Service targets: replace "record-platform" in *.record-platform.svc.cluster.local with your app namespace.
 #   3. Paths: adjust /api/, /auctions/, /ai/, /privacy, /terms if your routes differ.
 #   Keep: grace_period, servers.protocols (h1 h2 h3), transport h2c, TLS paths, log format.
@@ -33,14 +33,13 @@
 }
 
 # Primary vhost - HTTP/3, Web App, REST API, and gRPC (via Envoy)
-# gRPC: Caddy terminates TLS and proxies to Envoy (h2c). Clients use Caddy LB IP with -authority record.local.
-# QUIC: clients must use SNI = record.local (e.g. --resolve record.local:443:<ip> and https://record.local). See docs/QUIC_INVARIANT_CHECKLIST.md.
+# gRPC: Caddy terminates TLS and proxies to Envoy (h2c). Clients use Caddy LB IP with -authority record-platform.test.
+# QUIC: clients must use SNI = record-platform.test (e.g. --resolve record-platform.test:443:<ip>). See docs/QUIC_INVARIANT_CHECKLIST.md.
 #
-# H2 vs H3 routing debug: if resell returns 404 on H3 but 200 on H2, compare Host/SNI/authority:
-#   curl --http2 -v --resolve record.local:443:<LB_IP> --cacert certs/dev-root.pem https://record.local/api/resell/...
-#   curl --http3 -v --resolve record.local:443:<LB_IP> --cacert certs/dev-root.pem https://record.local/api/resell/...
-# Check: Host header, :authority, path. Ensure k6 and curl use same Host (record.local) and --resolve so SNI matches.
-https://record.local {
+# H2 vs H3 routing debug:
+#   curl --http2 -v --resolve record-platform.test:443:<LB_IP> --cacert certs/dev-chain.pem https://record-platform.test/api/resell/...
+#   curl --http3 -v --resolve record-platform.test:443:<LB_IP> --cacert certs/dev-chain.pem https://record-platform.test/api/resell/...
+https://record-platform.test {
 	tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key {
 		protocols tls1.2 tls1.3
 	}
@@ -206,7 +205,7 @@ https://record.local {
 		}
 	}
 
-	# Catch-all for non-record.local hosts (ingress-nginx-controller not deployed; use api-gateway)
+	# Catch-all for non-record-platform.test hosts (ingress-nginx-controller not deployed; use api-gateway)
 	# Fixes "no such host" DNS failures that poisoned Caddy readiness
 	handle {
 		reverse_proxy http://api-gateway.record-platform.svc.cluster.local:4000 {

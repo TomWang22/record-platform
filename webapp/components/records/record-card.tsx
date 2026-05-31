@@ -24,7 +24,10 @@ export function RecordCard({ record, compact }: Props) {
   const grades = gradeSummary(record)
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:border-brand/40 hover:shadow-md dark:border-white/10 dark:bg-slate-950">
+    <article
+      data-testid="record-card"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:border-brand/40 hover:shadow-md dark:border-white/10 dark:bg-slate-950"
+    >
       <Link href={`/records/${record.id}`} className="flex flex-1 flex-col p-4">
         <div className="flex gap-3">
           <RecordThumbnail record={record} size={compact ? 'sm' : 'md'} />

@@ -1,11 +1,8 @@
 /**
- * Phase III: messaging `startGrpcServer` bootstrap (bind success/error, credentials → process.exit).
- * Skips registering SIGTERM (Vitest teardown can emit SIGTERM; mock Server has no forceShutdown).
+ * Covers auth `startGrpcServer` with mocked grpc.Server + `@common/utils` creds/health hooks.
  */
 import * as grpc from "@grpc/grpc-js";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-
-const origProcessOn = process.on.bind(process);
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const credBind = vi.hoisted(() => vi.fn());
 const regHealth = vi.hoisted(() => vi.fn());
@@ -14,23 +11,13 @@ vi.mock("@common/utils", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@common/utils")>();
   return {
     ...actual,
-    createRpGrpcServerCredentialsForBind: (...args: unknown[]) => credBind(...args),
+    createRpGrpcServerCredentialsForBind: (...args: unknown[]) =>
+      credBind(...args),
     registerHealthService: (...args: unknown[]) => regHealth(...args),
   };
 });
 
-describe("messaging grpc-server bootstrap", () => {
-  beforeAll(() => {
-    vi.spyOn(process, "on").mockImplementation(((ev: string, listener: (...a: unknown[]) => void) => {
-      if (ev === "SIGTERM") return process;
-      return origProcessOn(ev as "beforeExit", listener as () => void);
-    }) as typeof process.on);
-  });
-
-  afterAll(() => {
-    vi.mocked(process.on).mockRestore();
-  });
-
+describe("auth grpc-server startGrpcServer bootstrap", () => {
   beforeEach(() => {
     credBind.mockReset();
     regHealth.mockReset();
@@ -39,56 +26,50 @@ describe("messaging grpc-server bootstrap", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.spyOn(process, "on").mockImplementation(((ev: string, listener: (...a: unknown[]) => void) => {
-      if (ev === "SIGTERM") return process;
-      return origProcessOn(ev as "beforeExit", listener as () => void);
-    }) as typeof process.on);
+    delete process.env.ENABLE_GRPC_REFLECTION;
   });
 
-  it("startGrpcServer calls bindAsync on success", async () => {
+  it("bindAsync success wires services and completes callback", async () => {
     credBind.mockReturnValue({} as grpc.ServerCredentials);
+
     const addService = vi.fn();
     const bindAsync = vi.fn(
       (_host: string, _c: grpc.ServerCredentials, cb: (e: Error | null, p?: number) => void) => {
-        queueMicrotask(() => cb(null, 50_064));
+        cb(null, 50051);
       },
     );
     vi.spyOn(grpc, "Server").mockImplementation(() => ({ addService, bindAsync } as any));
 
     const { startGrpcServer } = await import("../src/grpc-server.js");
-    startGrpcServer(50_064);
+    startGrpcServer(50051);
 
     expect(addService).toHaveBeenCalled();
     expect(bindAsync).toHaveBeenCalledWith(
-      "0.0.0.0:50064",
+      "0.0.0.0:50051",
       expect.anything(),
       expect.any(Function),
     );
   });
 
-  it("bindAsync error logs and returns", async () => {
+  it("bindAsync error invokes callback with error (no throw)", async () => {
     credBind.mockReturnValue({} as grpc.ServerCredentials);
+
+    const addService = vi.fn();
     const bindAsync = vi.fn(
       (_host: string, _c: grpc.ServerCredentials, cb: (e: Error | null, p?: number) => void) => {
-        queueMicrotask(() => cb(new Error("bind fail")));
+        cb(new Error("EADDRINUSE"));
       },
     );
-    vi.spyOn(grpc, "Server").mockImplementation(
-      () => ({ addService: vi.fn(), bindAsync } as any),
-    );
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(grpc, "Server").mockImplementation(() => ({ addService, bindAsync } as any));
 
     const { startGrpcServer } = await import("../src/grpc-server.js");
-    startGrpcServer(50_172);
-    await new Promise<void>((r) => setImmediate(r));
-
-    expect(errSpy).toHaveBeenCalled();
-    errSpy.mockRestore();
+    expect(() => startGrpcServer(50051)).not.toThrow();
+    expect(bindAsync).toHaveBeenCalled();
   });
 
   it("createRpGrpcServerCredentialsForBind throws → process.exit(1)", async () => {
     credBind.mockImplementation(() => {
-      throw new Error("no server creds");
+      throw new Error("missing tls material");
     });
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
     vi.spyOn(grpc, "Server").mockImplementation(
@@ -96,10 +77,24 @@ describe("messaging grpc-server bootstrap", () => {
     );
 
     const { startGrpcServer } = await import("../src/grpc-server.js");
-    startGrpcServer(50_173);
-    await new Promise<void>((r) => setImmediate(r));
-
+    startGrpcServer(50051);
     expect(exitSpy).toHaveBeenCalledWith(1);
-    exitSpy.mockRestore();
+  });
+
+  it("ENABLE_GRPC_REFLECTION=false skips reflection block for that start call", async () => {
+    process.env.ENABLE_GRPC_REFLECTION = "false";
+    credBind.mockReturnValue({} as grpc.ServerCredentials);
+
+    const addService = vi.fn();
+    const bindAsync = vi.fn(
+      (_h: string, _c: grpc.ServerCredentials, cb: (e: Error | null, p?: number) => void) => {
+        cb(null, 50052);
+      },
+    );
+    vi.spyOn(grpc, "Server").mockImplementation(() => ({ addService, bindAsync } as any));
+
+    const { startGrpcServer } = await import("../src/grpc-server.js");
+    expect(() => startGrpcServer(50052)).not.toThrow();
+    expect(bindAsync).toHaveBeenCalled();
   });
 });

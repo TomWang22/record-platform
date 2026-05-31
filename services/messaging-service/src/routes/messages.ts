@@ -28,7 +28,7 @@ async function checkExternalContactDailyLimit(redis: Redis | null, userId: strin
   if (!redis) return true
   try {
     const day = new Date().toISOString().slice(0, 10)
-    const key = `och:extcontact:${userId}:${day}`
+    const key = `rp:extcontact:${userId}:${day}`
     const n = await redis.incr(key)
     if (n === 1) await redis.expire(key, 172800)
     const raw = Number(process.env.MESSAGING_EXTERNAL_CONTACT_DAILY_CAP || '80')
@@ -452,6 +452,19 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       })
 
       await bustThreadCachesAfterWrite([message.thread_id, dmThreadId])
+      try {
+        await pool.query(
+          `DELETE FROM messages.user_archived_threads
+           WHERE user_id = ANY($1::uuid[])
+             AND thread_id::text = ANY($2::text[])`,
+          [[renter_id, lj.landlord_id], [dmThreadId, String(message.thread_id ?? ''), String(message.id ?? '')]],
+        )
+      } catch (archErr: unknown) {
+        const code = (archErr as { code?: string })?.code
+        if (code !== '42P01') {
+          console.error('[messaging] unarchive listing thread failed', archErr)
+        }
+      }
 
       void pushMessageReceivedNotification({
         recipientId: String(lj.landlord_id),
@@ -466,8 +479,8 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       return res.status(201).json({
         listing_id,
         landlord_id: lj.landlord_id,
-        thread_id: message.thread_id || dmThreadId,
-        message,
+        thread_id: dmThreadId,
+        message: { ...message, thread_id: dmThreadId },
       })
     } catch (err: unknown) {
       console.error('[messaging] Error starting listing thread:', err)
@@ -761,7 +774,7 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       }
       const sent = await sendExternalEmail({
         to: toEmail,
-        subject: String(subject || '').trim() || 'Message from Off-Campus Housing',
+        subject: String(subject || '').trim() || 'Message from Record Platform',
         text: msgBody,
         replyTo: process.env.SMTP_REPLY_TO?.trim() || undefined,
       })

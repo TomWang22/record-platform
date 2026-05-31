@@ -4,12 +4,16 @@ import * as protoLoader from "@grpc/proto-loader";
 import { signJwt, verifyJwt } from "@common/utils/auth";
 import { hashPassword, comparePassword, getQueueStatus } from "./lib/bcrypt-queue.js";
 import { getUserFromCache, cacheUser, invalidateUserCache, checkEmailExistsInCache } from "./lib/redis-cache.js"; // Redis caching with Lua scripts
+import { isJtiRevoked } from "./lib/revocation.js";
 import { randomUUID } from "node:crypto";
-import * as fs from "fs";
 import { resolveProtoPath } from "@common/utils/proto";
 import { verifyMFA } from "./lib/mfa.js";
 import { prisma } from "./lib/prisma.js"; // Use shared PrismaClient instance
-import { registerHealthService } from "@common/utils"; // Standard gRPC health service
+import { resolveLoginUserByEmail } from "./resolve-login-user.js";
+import {
+  registerHealthService,
+  createRpGrpcServerCredentialsForBind,
+} from "@common/utils";
 
 // Load proto file
 const PROTO_PATH = resolveProtoPath("auth.proto");
@@ -22,6 +26,55 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 });
 
 const authProto = grpc.loadPackageDefinition(packageDefinition) as any;
+
+type GrpcAuthErrorCode =
+  | "INVALID_CREDENTIALS"
+  | "MISSING_TOKEN"
+  | "EXPIRED_TOKEN"
+  | "INVALID_TOKEN"
+  | "TOKEN_REVOKED"
+  | "USER_NOT_FOUND"
+  | "ACCOUNT_DELETED"
+  | "VALIDATION_ERROR"
+  | "EMAIL_ALREADY_EXISTS"
+  | "MFA_REQUIRED"
+  | "INVALID_MFA_CODE"
+  | "INTERNAL_ERROR";
+
+function grpcAuthError(
+  status: grpc.status,
+  code: GrpcAuthErrorCode,
+  message: string,
+) {
+  return {
+    code: status,
+    message: JSON.stringify({ code, message }),
+  };
+}
+
+function classifyGrpcJwtError(err: unknown): { code: GrpcAuthErrorCode; message: string } {
+  const name = err instanceof Error ? err.name : "";
+
+  if (name === "TokenExpiredError") {
+    return { code: "EXPIRED_TOKEN", message: "Token has expired" };
+  }
+
+  return { code: "INVALID_TOKEN", message: "Token is invalid" };
+}
+
+/** `auth.users.username` is NOT NULL — derive a unique CITEXT handle from the email local-part. */
+function allocateUsernameFromEmail(email: string): { username: string; displayUsername: string } {
+  const rawLocal = (email.includes("@") ? email.split("@")[0] : email) || "user";
+  const base =
+    rawLocal
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "user";
+  const suffix = randomUUID().replace(/-/g, "").slice(0, 10);
+  const username = `${base}_${suffix}`.slice(0, 128);
+  const displayUsername = base.slice(0, 128);
+  return { username, displayUsername };
+}
 
 // gRPC logging middleware with detailed request/response logging
 function withLogging(handler: any, methodName: string) {
@@ -65,10 +118,9 @@ function withLogging(handler: any, methodName: string) {
     } catch (err: any) {
       const duration = Date.now() - start;
       console.error(`[gRPC] ${methodName} failed after ${duration}ms:`, err);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: err.message || "internal error",
-      });
+      callback(
+        grpcAuthError(grpc.status.INTERNAL, "INTERNAL_ERROR", "Internal server error")
+      );
     }
   };
 }
@@ -188,10 +240,9 @@ const authService = {
     try {
       const { email, password } = call.request;
       if (!email || !password) {
-        return callback({
-          code: grpc.status.INVALID_ARGUMENT,
-          message: "email and password required",
-        });
+        return callback(
+          grpcAuthError(grpc.status.INVALID_ARGUMENT, "VALIDATION_ERROR", "Email and password are required")
+        );
       }
 
       const checkStart = Date.now();
@@ -201,15 +252,14 @@ const authService = {
       if (emailExists) {
         const checkDuration = Date.now() - checkStart;
         console.log(`[gRPC] Register: Email exists (cache hit) took ${checkDuration}ms`);
-        return callback({
-          code: grpc.status.ALREADY_EXISTS,
-          message: "email already exists",
-        });
+        return callback(
+          grpcAuthError(grpc.status.ALREADY_EXISTS, "EMAIL_ALREADY_EXISTS", "Email already exists")
+        );
       }
       
       // Cache miss - check database
       const existing = await prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM auth.users WHERE email = ${email}
+        SELECT id FROM auth.users WHERE email = ${email} AND COALESCE(is_deleted, false) = false
       `.then((r: Array<any>) => r[0] || null);
       const checkDuration = Date.now() - checkStart;
       console.log(`[gRPC] Register: SELECT existing user took ${checkDuration}ms (cache miss)`);
@@ -225,10 +275,9 @@ const authService = {
           phoneVerified: false,
           createdAt: new Date(),
         });
-        return callback({
-          code: grpc.status.ALREADY_EXISTS,
-          message: "email already exists",
-        });
+        return callback(
+          grpcAuthError(grpc.status.ALREADY_EXISTS, "EMAIL_ALREADY_EXISTS", "Email already exists")
+        );
       }
 
       const hashStart = Date.now();
@@ -241,11 +290,12 @@ const authService = {
       }
       
       const insertStart = Date.now();
+      const { username, displayUsername } = allocateUsernameFromEmail(email);
       const user = await prisma.$queryRaw<
         Array<{ id: string; email: string; createdAt: Date }>
       >`
-        INSERT INTO auth.users (email, password_hash, created_at)
-        VALUES (${email}, ${passwordHash}, NOW())
+        INSERT INTO auth.users (email, password_hash, username, display_username, created_at)
+        VALUES (${email}, ${passwordHash}, ${username}, ${displayUsername}, NOW())
         RETURNING id, email, created_at as "createdAt"
       `.then((r: Array<{ id: string; email: string; createdAt: Date }>) => r[0]);
       const insertDuration = Date.now() - insertStart;
@@ -260,11 +310,17 @@ const authService = {
         emailVerified: false,
         phoneVerified: false,
         createdAt: user.createdAt,
+        username: String(username).trim().slice(0, 128),
       });
 
       const tokenStart = Date.now();
       const jti = randomUUID();
-      const token = signJwt({ sub: user.id, email: user.email, jti } as any);
+      const token = signJwt({
+        sub: user.id,
+        email: user.email,
+        jti,
+        username: String(username).trim().slice(0, 128),
+      } as any);
       const tokenDuration = Date.now() - tokenStart;
       console.log(`[gRPC] Register: signJwt took ${tokenDuration}ms`);
 
@@ -282,10 +338,9 @@ const authService = {
     } catch (error: any) {
       const totalDuration = Date.now() - startTime;
       console.error(`[gRPC] Register error after ${totalDuration}ms:`, error);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
-      });
+      callback(
+        grpcAuthError(grpc.status.INTERNAL, "INTERNAL_ERROR", "Internal server error")
+      );
     }
   },
 
@@ -294,10 +349,9 @@ const authService = {
       const { email, password, mfa_code, mfaCode } = call.request; // Support both mfa_code (proto) and mfaCode (legacy)
       const mfaCodeValue = mfa_code || mfaCode; // Use proto field first, fallback to legacy
       if (!email || !password) {
-        return callback({
-          code: grpc.status.INVALID_ARGUMENT,
-          message: "email and password required",
-        });
+        return callback(
+          grpcAuthError(grpc.status.INVALID_ARGUMENT, "VALIDATION_ERROR", "Email and password are required")
+        );
       }
 
       console.log(`[gRPC] Authenticate attempt for email: ${email}, hasMfaCode: ${!!mfaCodeValue}`);
@@ -312,24 +366,22 @@ const authService = {
       } else {
         console.log(`[gRPC] Authenticate: Cache miss, fetching from database (took ${cacheDuration}ms)`);
         // Cache miss - fetch from database
-        const dbUser = await prisma.$queryRaw<Array<{ 
-          id: string; 
-          email: string; 
-          passwordHash: string; 
-          mfaEnabled: boolean;
-          emailVerified: boolean;
-          phoneVerified: boolean;
-          createdAt: Date 
-        }>>`
-          SELECT id, email, password_hash as "passwordHash", mfa_enabled as "mfaEnabled",
-                 email_verified as "emailVerified", phone_verified as "phoneVerified", created_at as "createdAt"
-          FROM auth.users
-          WHERE email = ${email}
-        `.then((r: Array<any>) => r[0] || null);
-        
+        const dbUser = await resolveLoginUserByEmail(prisma, email);
+
         if (dbUser) {
+          const un = String(dbUser.username ?? "").trim().slice(0, 128);
           // Cache the user for future lookups
           await cacheUser({
+            id: dbUser.id,
+            email,
+            passwordHash: dbUser.passwordHash,
+            mfaEnabled: dbUser.mfaEnabled,
+            emailVerified: dbUser.emailVerified,
+            phoneVerified: dbUser.phoneVerified,
+            createdAt: dbUser.createdAt,
+            ...(un ? { username: un } : {}),
+          });
+          user = {
             id: dbUser.id,
             email: dbUser.email,
             passwordHash: dbUser.passwordHash,
@@ -337,16 +389,15 @@ const authService = {
             emailVerified: dbUser.emailVerified,
             phoneVerified: dbUser.phoneVerified,
             createdAt: dbUser.createdAt,
-          });
-          user = dbUser;
+            ...(un ? { username: un } : {}),
+          };
         }
       }
 
       if (!user || !user.passwordHash) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "invalid credentials",
-        });
+        return callback(
+          grpcAuthError(grpc.status.UNAUTHENTICATED, "INVALID_CREDENTIALS", "Invalid email or password")
+        );
       }
 
       console.log(`[gRPC] User ${user.email} (${user.id}) - mfaEnabled: ${user.mfaEnabled} (type: ${typeof user.mfaEnabled})`);
@@ -356,16 +407,14 @@ const authService = {
       try {
         ok = await comparePassword(password, user.passwordHash);
       } catch {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "invalid credentials",
-        });
+        return callback(
+          grpcAuthError(grpc.status.UNAUTHENTICATED, "INVALID_CREDENTIALS", "Invalid email or password")
+        );
       }
       if (!ok) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "invalid credentials",
-        });
+        return callback(
+          grpcAuthError(grpc.status.UNAUTHENTICATED, "INVALID_CREDENTIALS", "Invalid email or password")
+        );
       }
 
       // Check if MFA is enabled - use explicit boolean check
@@ -396,10 +445,9 @@ const authService = {
         const mfaValid = await verifyMFA(prisma, user.id, mfaCodeValue);
         if (!mfaValid) {
           console.log(`[gRPC] MFA code verification failed for user ${user.id}`);
-          return callback({
-            code: grpc.status.UNAUTHENTICATED,
-            message: "invalid MFA code",
-          });
+          return callback(
+            grpcAuthError(grpc.status.UNAUTHENTICATED, "INVALID_MFA_CODE", "Invalid MFA code")
+          );
         }
         console.log(`[gRPC] ✅ MFA code verified successfully for user ${user.id}, proceeding to generate token`);
       } else {
@@ -407,7 +455,8 @@ const authService = {
       }
 
       const jti = randomUUID();
-      const token = signJwt({ sub: user.id, email: user.email, jti } as any);
+      const un = String((user as { username?: string }).username ?? "").trim().slice(0, 128);
+      const token = signJwt({ sub: user.id, email: user.email, jti, ...(un ? { username: un } : {}) } as any);
       
       console.log(`[gRPC] Token generated for user ${user.id}, token length: ${token.length}`);
 
@@ -431,15 +480,13 @@ const authService = {
       const msg = (error?.message ?? String(error)).toLowerCase();
       const code = error?.code ?? "";
       if (code === "P2025" || msg.includes("not found") || msg.includes("record not found") || msg.includes("invalid") || msg.includes("credential")) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "invalid credentials",
-        });
+        return callback(
+          grpcAuthError(grpc.status.UNAUTHENTICATED, "INVALID_CREDENTIALS", "Invalid email or password")
+        );
       }
-      callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
-      });
+      callback(
+        grpcAuthError(grpc.status.INTERNAL, "INTERNAL_ERROR", "Internal server error")
+      );
     }
   },
 
@@ -448,10 +495,9 @@ const authService = {
     try {
       const { token } = call.request;
       if (!token) {
-        return callback({
-          code: grpc.status.INVALID_ARGUMENT,
-          message: "token required",
-        });
+        return callback(
+          grpcAuthError(grpc.status.INVALID_ARGUMENT, "MISSING_TOKEN", "Token is required")
+        );
       }
 
       // Verify JWT token
@@ -459,10 +505,9 @@ const authService = {
       const userId = payload.sub;
       
       if (!userId) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "invalid token",
-        });
+        return callback(
+          grpcAuthError(grpc.status.UNAUTHENTICATED, "INVALID_TOKEN", "Token is invalid")
+        );
       }
 
       // Check if token is revoked (Redis)
@@ -470,34 +515,36 @@ const authService = {
       if (jti) {
         const { getRedisClient } = await import("./lib/redis-cache.js");
         const redis = getRedisClient();
-        if (redis) {
-          try {
-            const revoked = await redis.get(`revoked:${jti}`);
-            if (revoked) {
-              console.log(`[gRPC] ValidateToken: token revoked (jti: ${jti})`);
-              return callback({
-                code: grpc.status.UNAUTHENTICATED,
-                message: "token revoked",
-              });
-            }
-          } catch (redisErr) {
-            console.warn("[gRPC] ValidateToken: Redis check failed, continuing:", redisErr);
+        try {
+          if (await isJtiRevoked(redis ?? undefined, jti)) {
+            console.log(`[gRPC] ValidateToken: token revoked (jti: ${jti})`);
+            return callback(
+              grpcAuthError(grpc.status.UNAUTHENTICATED, "TOKEN_REVOKED", "Token has been revoked")
+            );
           }
+        } catch (redisErr) {
+          console.warn("[gRPC] ValidateToken: Redis check failed, continuing:", redisErr);
         }
       }
 
-      // Verify user exists
-      const user = await prisma.$queryRaw<Array<{ id: string; email: string; createdAt: Date }>>`
-        SELECT id, email, created_at as "createdAt"
+      // Verify user exists and is not deleted
+      const user = await prisma.$queryRaw<
+        Array<{ id: string; email: string | null; createdAt: Date; isDeleted: boolean }>
+      >`
+        SELECT id, email, created_at as "createdAt", COALESCE(is_deleted, false) as "isDeleted"
         FROM auth.users
         WHERE id = ${userId}::uuid
-      `.then((r: Array<{ id: string; email: string; createdAt: Date }>) => r[0] || null);
+      `.then((r: Array<{ id: string; email: string | null; createdAt: Date; isDeleted: boolean }>) => r[0] || null);
       
       if (!user) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "user not found",
-        });
+        return callback(
+          grpcAuthError(grpc.status.UNAUTHENTICATED, "USER_NOT_FOUND", "User not found")
+        );
+      }
+      if (user.isDeleted) {
+        return callback(
+          grpcAuthError(grpc.status.UNAUTHENTICATED, "ACCOUNT_DELETED", "Account has been deleted")
+        );
       }
 
       const duration = Date.now() - startTime;
@@ -514,10 +561,10 @@ const authService = {
     } catch (error: any) {
       const duration = Date.now() - startTime;
       console.error(`[gRPC] ValidateToken error after ${duration}ms:`, error);
-      callback({
-        code: grpc.status.UNAUTHENTICATED,
-        message: error.message || "invalid token",
-      });
+      const jwtErr = classifyGrpcJwtError(error);
+      callback(
+        grpcAuthError(grpc.status.UNAUTHENTICATED, jwtErr.code, jwtErr.message)
+      );
     }
   },
 
@@ -531,10 +578,9 @@ const authService = {
           requestKeys: Object.keys(call.request),
           requestPreview: JSON.stringify(call.request).substring(0, 100),
         });
-        return callback({
-          code: grpc.status.INVALID_ARGUMENT,
-          message: "token required",
-        });
+        return callback(
+          grpcAuthError(grpc.status.INVALID_ARGUMENT, "MISSING_TOKEN", "Token is required")
+        );
       }
 
       // Verify JWT token
@@ -542,10 +588,9 @@ const authService = {
       const userId = payload.sub;
       
       if (!userId) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "invalid token",
-        });
+        return callback(
+          grpcAuthError(grpc.status.UNAUTHENTICATED, "INVALID_TOKEN", "Token is invalid")
+        );
       }
 
       // Check if token is revoked (Redis)
@@ -553,39 +598,43 @@ const authService = {
       if (jti) {
         const { getRedisClient } = await import("./lib/redis-cache.js");
         const redis = getRedisClient();
-        if (redis) {
-          try {
-            const revoked = await redis.get(`revoked:${jti}`);
-            if (revoked) {
-              console.log(`[gRPC] RefreshToken: token revoked (jti: ${jti})`);
-              return callback({
-                code: grpc.status.UNAUTHENTICATED,
-                message: "token revoked",
-              });
-            }
-          } catch (redisErr) {
-            console.warn("[gRPC] RefreshToken: Redis check failed, continuing:", redisErr);
+        try {
+          if (await isJtiRevoked(redis ?? undefined, jti)) {
+            console.log(`[gRPC] RefreshToken: token revoked (jti: ${jti})`);
+            return callback(
+              grpcAuthError(grpc.status.UNAUTHENTICATED, "TOKEN_REVOKED", "Token has been revoked")
+            );
           }
+        } catch (redisErr) {
+          console.warn("[gRPC] RefreshToken: Redis check failed, continuing:", redisErr);
         }
       }
 
-      // Verify user exists
-      const user = await prisma.$queryRaw<Array<{ id: string; email: string }>>`
-        SELECT id, email
+      // Verify user exists and is not deleted
+      const user = await prisma.$queryRaw<
+        Array<{ id: string; email: string | null; isDeleted: boolean; username: string | null }>
+      >`
+        SELECT id, email, COALESCE(is_deleted, false) as "isDeleted",
+               COALESCE(NULLIF(TRIM(username::text), ''), NULLIF(TRIM(display_username::text), '')) AS username
         FROM auth.users
         WHERE id = ${userId}::uuid
-      `.then((r: Array<{ id: string; email: string }>) => r[0] || null);
+      `.then((r: Array<{ id: string; email: string | null; isDeleted: boolean; username: string | null }>) => r[0] || null);
       
       if (!user) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "user not found",
-        });
+        return callback(
+          grpcAuthError(grpc.status.UNAUTHENTICATED, "USER_NOT_FOUND", "User not found")
+        );
+      }
+      if (user.isDeleted) {
+        return callback(
+          grpcAuthError(grpc.status.UNAUTHENTICATED, "ACCOUNT_DELETED", "Account has been deleted")
+        );
       }
 
       // Generate new token
       const newJti = randomUUID();
-      const newPayload: any = { sub: user.id, email: user.email, jti: newJti };
+      const un = String(user.username ?? "").trim().slice(0, 128);
+      const newPayload: any = { sub: user.id, email: user.email ?? "", jti: newJti, ...(un ? { username: un } : {}) };
       const newToken = signJwt(newPayload);
 
       const duration = Date.now() - startTime;
@@ -597,10 +646,10 @@ const authService = {
     } catch (error: any) {
       const duration = Date.now() - startTime;
       console.error(`[gRPC] RefreshToken error after ${duration}ms:`, error);
-      callback({
-        code: grpc.status.UNAUTHENTICATED,
-        message: error.message || "invalid token",
-      });
+      const jwtErr = classifyGrpcJwtError(error);
+      callback(
+        grpcAuthError(grpc.status.UNAUTHENTICATED, jwtErr.code, jwtErr.message)
+      );
     }
   },
 
@@ -620,6 +669,19 @@ const authService = {
     }
   },
 };
+
+/** Invoked by Vitest without binding TCP — covers RPC handlers + withLogging */
+export const grpcHandlersForTest = {
+  Register: authService.Register,
+  Authenticate: authService.Authenticate,
+  ValidateToken: authService.ValidateToken,
+  RefreshToken: authService.RefreshToken,
+  HealthCheck: authService.HealthCheck,
+  healthV1Check: healthService.Check,
+  healthWatch: healthService.Watch,
+};
+
+export { withLogging as grpcWithLoggingForTest };
 
 // Create and start gRPC server with HTTP/2 only
 // @grpc/grpc-js uses HTTP/2 internally, we just need to configure it properly
@@ -664,45 +726,13 @@ export function startGrpcServer(port: number = 50051) {
     }
   }
 
-  // Try to load TLS certs (for production with ALPN = h2)
   let credentials: grpc.ServerCredentials;
-  const keyPath = process.env.TLS_KEY_PATH || "/etc/certs/tls.key";
-  const certPath = process.env.TLS_CERT_PATH || "/etc/certs/tls.crt";
-  const caPath = process.env.TLS_CA_PATH || process.env.GRPC_CA_CERT || "/etc/certs/ca.crt";
-  
-  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-    const key = fs.readFileSync(keyPath);
-    const cert = fs.readFileSync(certPath);
-    
-    // For strict TLS: verify client certificates if CA cert exists
-    let rootCerts: Buffer | null = null;
-    let checkClientCert = false;
-    if (fs.existsSync(caPath)) {
-      rootCerts = fs.readFileSync(caPath);
-      checkClientCert = true;
-      console.log("[gRPC] Starting secure HTTP/2-only server with strict TLS (client cert verification)");
-    } else {
-      console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)");
-    }
-    
-    // For dev: Don't require client cert verification (use false)
-    // For production: Enable client cert verification (use checkClientCert)
-    const requireClientCert = process.env.GRPC_REQUIRE_CLIENT_CERT === 'true' ? checkClientCert : false;
-    
-    credentials = grpc.ServerCredentials.createSsl(
-      rootCerts,
-      [{ private_key: key, cert_chain: cert }],
-      requireClientCert as any
-    );
-    
-    if (requireClientCert) {
-      console.log("[gRPC] Client certificate verification: ENABLED (strict TLS)");
-    } else {
-      console.log("[gRPC] Client certificate verification: DISABLED (dev mode)");
-    }
-  } else {
-    console.warn("[gRPC] TLS certs not found, starting insecure server (dev only)");
-    credentials = grpc.ServerCredentials.createInsecure();
+  try {
+    credentials = createRpGrpcServerCredentialsForBind("auth gRPC");
+    console.log("[gRPC] strict mTLS (client cert required)");
+  } catch (e) {
+    console.error(e);
+    process.exit(1);
   }
 
   server.bindAsync(
@@ -713,7 +743,6 @@ export function startGrpcServer(port: number = 50051) {
         console.error("[gRPC] Server bind error:", error);
         return;
       }
-      server.start();
       console.log(`[gRPC] Server started on port ${actualPort} (HTTP/2 only, no HTTP/1.1 fallback)`);
     }
   );

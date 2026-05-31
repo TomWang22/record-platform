@@ -48,6 +48,7 @@ import {
   validateCreateListingInput,
   validateListingId,
   validateSearchFilters,
+  rpAmenityEntriesFromBody,
 } from "./validation.js";
 import { computeListingRevisionChanges } from "./listing-revision-diff.js";
 import { insertListingRevisionEntry } from "./listing-revision-write.js";
@@ -57,6 +58,7 @@ import {
   normalizeResidenceType,
 } from "./location-display.js";
 import { toPublicListingShape } from "./listing-public-privacy.js";
+import { applyRpListingFields, parseRpListingFields } from "./rp-listing-fields.js";
 import { geocodeStructuredAddress } from "./geocode-address.js";
 import settingsRouter from "./settings.js";
 
@@ -341,7 +343,9 @@ function listingDetailMarketplace(
   const bathrooms =
     ba != null && Number.isFinite(Number(ba)) ? Math.round(Number(ba) * 10) / 10 : null;
   const pricingRaw = String(row.pricing_mode ?? "fixed").trim().toLowerCase();
-  const pricing_mode = pricingRaw === "obo" ? "obo" : "fixed";
+  const rpEarly = parseRpListingFields(row);
+  const pricing_mode =
+    rpEarly.saleType === "auction" ? "auction" : pricingRaw === "obo" ? "obo" : "fixed";
   let soft_hold_until: string | null = null;
   const sh = row.soft_hold_until;
   if (sh instanceof Date) soft_hold_until = sh.toISOString();
@@ -382,17 +386,24 @@ function listingDetailMarketplace(
     listing_on_hold,
     media_items,
   };
+  const rpPayload = applyRpListingFields(base, row);
   if (opts?.includePrivateAddress) {
-    base.address_line1 = row.address_line1 ?? null;
-    base.address_line2 = row.address_line2 ?? null;
-    base.postal_code = row.postal_code ?? null;
+    rpPayload.address_line1 = row.address_line1 ?? null;
+    rpPayload.address_line2 = row.address_line2 ?? null;
+    rpPayload.postal_code = row.postal_code ?? null;
     if (lat != null && lng != null) {
-      base.latitude = lat;
-      base.longitude = lng;
+      rpPayload.latitude = lat;
+      rpPayload.longitude = lng;
     }
-    return base;
+    return toPublicListingShape(rpPayload, {
+      includePrivateAddress: true,
+      includeOwnerIds: true,
+    });
   }
-  return toPublicListingShape(base, { includePrivateAddress: false, includeOwnerIds: false });
+  return toPublicListingShape(rpPayload, {
+    includePrivateAddress: false,
+    includeOwnerIds: false,
+  });
 }
 
 function requesterUserId(req: Request): string | null {
@@ -556,7 +567,10 @@ function rowToJson(row: Record<string, unknown>) {
     soft_hold_until,
     listing_on_hold,
   };
-  return toPublicListingShape(out, { includePrivateAddress: false, includeOwnerIds: false });
+  return toPublicListingShape(applyRpListingFields(out, row), {
+    includePrivateAddress: false,
+    includeOwnerIds: false,
+  });
 }
 
 function dedupeListingsById(
@@ -644,19 +658,10 @@ export function createListingsHttpApp() {
       }
       const items = rows.map((row) => {
         const id = String(row.id ?? "");
-        const price_cents = Number(row.price_cents);
-        const price_usd =
-          Number.isFinite(price_cents) ? Math.round(price_cents) / 100 : null;
-        const sq = row.size_sqft;
-        const square_feet =
-          sq != null && Number.isFinite(Number(sq)) ? Math.max(0, Math.floor(Number(sq))) : null;
-        return {
+        return rowToJson({
           ...row,
-          price_usd_monthly: price_usd,
-          square_feet,
-          location: formatListingPublicLocation(row),
           watch_count: id ? wc[id] ?? 0 : 0,
-        };
+        });
       });
       res.json({ items });
     } catch (e) {
@@ -2094,7 +2099,7 @@ export function createListingsHttpApp() {
             : String(row.effective_until).slice(0, 10);
 
       let residence_type =
-        row.residence_type == null ? "apartment" : String(row.residence_type).toLowerCase();
+        row.residence_type == null ? "other" : String(row.residence_type).toLowerCase();
       let size_sqft =
         row.size_sqft != null && Number.isFinite(Number(row.size_sqft))
           ? Math.floor(Number(row.size_sqft))
@@ -2242,12 +2247,30 @@ export function createListingsHttpApp() {
 
       if (body.pricing_mode !== undefined) {
         const pm = String(body.pricing_mode ?? "").trim().toLowerCase();
-        if (pm !== "fixed" && pm !== "obo") {
+        if (pm !== "fixed" && pm !== "obo" && pm !== "auction") {
           await client.query("ROLLBACK");
-          res.status(400).json({ error: "pricing_mode must be fixed or obo" });
+          res.status(400).json({ error: "pricing_mode must be fixed, obo, or auction" });
           return;
         }
-        pricing_mode = pm;
+        pricing_mode = pm === "auction" ? "fixed" : pm;
+      }
+
+      const rpPatchEntries = rpAmenityEntriesFromBody(body as Record<string, unknown>);
+      const pmBody = String(body.pricing_mode ?? "").trim().toLowerCase();
+      if (pmBody === "auction") rpPatchEntries.push("sale_type:auction");
+      else if (pmBody === "obo") rpPatchEntries.push("sale_type:obo");
+      else if (pmBody === "fixed") rpPatchEntries.push("sale_type:fixed");
+      if (rpPatchEntries.length > 0) {
+        const mergedMap = new Map<string, string>();
+        for (const item of amenitiesToStrings(amenities)) {
+          const colon = item.indexOf(":");
+          if (colon > 0) mergedMap.set(item.slice(0, colon).toLowerCase(), item.slice(colon + 1));
+        }
+        for (const item of rpPatchEntries) {
+          const colon = item.indexOf(":");
+          if (colon > 0) mergedMap.set(item.slice(0, colon).toLowerCase(), item.slice(colon + 1));
+        }
+        amenities = [...mergedMap.entries()].map(([k, v]) => `${k}:${v}`);
       }
       if (body.soft_hold_until !== undefined) {
         if (body.soft_hold_until === null || body.soft_hold_until === "") {
@@ -2526,7 +2549,7 @@ export function createListingsHttpApp() {
         mediaUrlRaw.startsWith("/api/media/") ||
         mediaUrlRaw.startsWith("/media/");
       if (!vidOk) {
-        res.status(400).json({ error: "video url must be https or an OCH /api/media/... path" });
+        res.status(400).json({ error: "video url must be https or an /api/media/... path" });
         return;
       }
     }
@@ -2856,10 +2879,20 @@ export function createListingsHttpApp() {
     async (req: AuthedRequest, res: Response) => {
       try {
         const body = req.body && typeof req.body === "object" ? req.body : {};
+        const bodyRec = body as Record<string, unknown>;
+        const rpAmenities = rpAmenityEntriesFromBody(bodyRec);
+        const baseAmenities = Array.isArray(bodyRec.amenities)
+          ? (bodyRec.amenities as unknown[])
+          : bodyRec.amenities != null
+            ? [bodyRec.amenities]
+            : [];
+        const mergedAmenities =
+          rpAmenities.length > 0 ? [...baseAmenities.map(String), ...rpAmenities] : bodyRec.amenities;
         // validate first, outside risky logic
         const validation = validateCreateListingInput(
           {
             ...body,
+            amenities: mergedAmenities,
             user_id: req.userId,
           },
           { requireUserId: true },
@@ -2900,7 +2933,6 @@ export function createListingsHttpApp() {
         }
         // THEN do DB / side effects inside try
         const input = validation.value;
-        const bodyRec = body as Record<string, unknown>;
         const rawInit = String(bodyRec.initial_status ?? bodyRec.listing_status ?? "active")
           .trim()
           .toLowerCase();

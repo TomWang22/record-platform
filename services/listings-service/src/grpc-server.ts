@@ -1,27 +1,48 @@
-/* cspell:ignore grpc */
+import { randomUUID } from "node:crypto";
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
-import * as fs from "fs";
-import { resolveProtoPath } from "@common/utils/proto";
-import { registerHealthService } from "@common/utils";
 import {
-  getListingById,
-  getListingsByUser,
-  searchListings,
-  createListing,
-  updateListing,
-  deleteListing,
-  placeBid,
-  makeOffer,
-  addToWatchlist,
-  removeFromWatchlist,
-  getUserWatchlist,
-  pool,
-} from './lib/db.js';
+  registerHealthService,
+  resolveProtoPath,
+  createRpGrpcServerCredentialsForBind,
+} from "@common/utils";
+import { publishListingEventForCreateResponse } from "./listing-kafka.js";
+import { syncListingCreatedToAnalytics } from "./analytics-sync.js";
+import { pool } from "./db.js";
+import {
+  buildListingsSearchQuery,
+  parseAmenitySlugs,
+  parseResidenceTypesCsv,
+} from "./search-listings-query.js";
 
-// Load proto file
-const PROTO_PATH = resolveProtoPath("listings.proto");
-const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+import { validateCreateListingInput, validateListingId } from "./validation.js";
+import { buildDisplayLocationForCreate } from "./location-display.js";
+import { geocodeStructuredAddress } from "./geocode-address.js";
+import { fireSavedSearchNotifyForNewListing } from "./notify-saved-search-on-create.js";
+
+// Logs per-request gRPC latency and marks requests over 100ms as slow.
+function logGrpcTiming(method: string, start: number) {
+  const ms = Date.now() - start;
+  const slow = ms > 100;
+
+  console.log(
+    `[listings gRPC] ${slow ? "SLOW REQUEST " : ""}method=${method} latency_ms=${ms}`,
+  );
+}
+
+function grpcMetaUsername(call: grpc.ServerUnaryCall<any, any>): string {
+  try {
+    const arr = call.metadata?.get("x-user-username");
+    const first = arr?.[0];
+    const s = Buffer.isBuffer(first) ? first.toString("utf8") : String(first ?? "");
+    return s.trim().slice(0, 120);
+  } catch {
+    return "";
+  }
+}
+
+const LISTINGS_PROTO = resolveProtoPath("listings.proto");
+const packageDefinition = protoLoader.loadSync(LISTINGS_PROTO, {
   keepCase: true,
   longs: String,
   enums: String,
@@ -30,531 +51,519 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 });
 
 const listingsProto = grpc.loadPackageDefinition(packageDefinition) as any;
+function amenitiesToStrings(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (raw && typeof raw === "object")
+    return Object.values(raw as object).map(String);
+  return [];
+}
 
-// gRPC logging middleware
-function withLogging(handler: any, methodName: string) {
-  return async (call: any, callback: any) => {
-    const start = Date.now();
-    console.log(`[gRPC] ${methodName} called`);
-    try {
-      await handler(call, callback);
-      const duration = Date.now() - start;
-      console.log(`[gRPC] ${methodName} completed in ${duration}ms`);
-    } catch (err: any) {
-      const duration = Date.now() - start;
-      console.error(`[gRPC] ${methodName} failed after ${duration}ms:`, err);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: err.message || "internal error",
-      });
-    }
+function rowToResponse(row: Record<string, unknown>) {
+  return {
+    listing_id: String(row.id),
+    user_id: String(row.user_id),
+    title: String(row.title ?? ""),
+    description: String(row.description ?? ""),
+    price_cents: Number(row.price_cents ?? 0),
+    amenities: amenitiesToStrings(row.amenities),
+    smoke_free: Boolean(row.smoke_free),
+    pet_friendly: Boolean(row.pet_friendly),
+    furnished: row.furnished != null ? Boolean(row.furnished) : false,
+    status: String(row.status ?? "active"),
+    residence_type: row.residence_type != null ? String(row.residence_type) : "",
+    size_sqft: row.size_sqft != null ? Number(row.size_sqft) : 0,
+    city: row.city != null ? String(row.city) : "",
+    state_or_province: row.state_or_province != null ? String(row.state_or_province) : "",
+    country: row.country != null ? String(row.country) : "",
+    created_at: row.created_at
+      ? new Date(row.created_at as string | Date).toISOString()
+      : new Date().toISOString(),
   };
 }
 
-// Helper to extract user_id from metadata
-function getUserId(call: any): string | null {
-  const metadata = call.metadata.getMap();
-  const auth = metadata.authorization || metadata["authorization"];
-  if (!auth || typeof auth !== "string") return null;
-  
-  try {
-    // Extract token from "Bearer <token>"
-    const token = auth.replace(/^Bearer\s+/i, "");
-    const { verifyJwt } = require("@common/utils/auth");
-    const payload = verifyJwt(token);
-    return payload.sub || null;
-  } catch {
-    return null;
+function dedupeListingsById(
+  rows: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const seen = new Set<string>();
+  const out: Record<string, unknown>[] = [];
+  for (const row of rows) {
+    const id = String(row.id ?? "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(row);
   }
+  return out;
 }
 
-// Implement ListingsService
-const listingsService = {
-  async GetListing(call: any, callback: any) {
-    try {
-      const { listing_id } = call.request;
-      if (!listing_id) {
-        return callback({
-          code: grpc.status.INVALID_ARGUMENT,
-          message: "listing_id required",
-        });
-      }
+/** Exported for unit tests (no bind / no TLS). */
+export const listingsGrpcHandlersForTest = {
+  CreateListing(
+    call: grpc.ServerUnaryCall<any, any>,
+    callback: grpc.sendUnaryData<any>,
+  ) {
+    const start = Date.now();
+    const req = call.request;
 
-      const listing = await getListingById(listing_id);
-      if (!listing) {
-        return callback({
-          code: grpc.status.NOT_FOUND,
-          message: "listing not found",
-        });
-      }
-
-      callback(null, { listing: formatListing(listing) });
-    } catch (error: any) {
-      console.error("[gRPC] GetListing error:", error);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
-      });
-    }
-  },
-
-  async ListMyListings(call: any, callback: any) {
-    try {
-      const userId = getUserId(call);
-      if (!userId) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "authentication required",
-        });
-      }
-
-      const limit = call.request.limit || 50;
-      const offset = call.request.offset || 0;
-      const listings = await getListingsByUser(userId, limit, offset);
-
-      callback(null, {
-        listings: (Array.isArray(listings) ? listings : (listings as any).listings || []).map(formatListing),
-        count: Array.isArray(listings) ? listings.length : ((listings as any).total || ((listings as any).listings?.length || 0)),
-      });
-    } catch (error: any) {
-      console.error("[gRPC] ListMyListings error:", error);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
-      });
-    }
-  },
-
-  async SearchListings(call: any, callback: any) {
-    try {
-      const filters = {
-        listing_type: call.request.listing_type || undefined,
-        category: call.request.category || undefined,
-        min_price: call.request.min_price || undefined,
-        max_price: call.request.max_price || undefined,
-        condition: call.request.condition || undefined,
-        limit: call.request.limit || 50,
-        offset: call.request.offset || 0,
-      };
-
-      const result = await searchListings(call.request.query || "", filters);
-
-      callback(null, {
-        listings: (result.listings || []).map(formatListing),
-        count: result.total || 0,
-      });
-    } catch (error: any) {
-      console.error("[gRPC] SearchListings error:", error);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
-      });
-    }
-  },
-
-  async CreateListing(call: any, callback: any) {
-    try {
-      const userId = getUserId(call);
-      if (!userId) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "authentication required",
-        });
-      }
-
-      const listing = await createListing({
-        user_id: userId,
-        title: call.request.title,
-        description: call.request.description,
-        price: call.request.price,
-        currency: call.request.currency || "USD",
-        listing_type: call.request.listing_type || "fixed_price",
-        condition: call.request.condition,
-        category: call.request.category,
-        location: call.request.location,
-        shipping_cost: call.request.shipping_cost || 0,
-        shipping_method: call.request.shipping_method,
-        expires_at: call.request.expires_at ? new Date(call.request.expires_at) : undefined,
-      });
-
-      callback(null, { listing: formatListing(listing) });
-    } catch (error: any) {
-      console.error("[gRPC] CreateListing error:", error);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
-      });
-    }
-  },
-
-  async UpdateListing(call: any, callback: any) {
-    try {
-      const userId = getUserId(call);
-      if (!userId) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "authentication required",
-        });
-      }
-
-      const updates: any = {};
-      if (call.request.title !== undefined) updates.title = call.request.title;
-      if (call.request.description !== undefined) updates.description = call.request.description;
-      if (call.request.price !== undefined) updates.price = call.request.price;
-      if (call.request.condition !== undefined) updates.condition = call.request.condition;
-      if (call.request.category !== undefined) updates.category = call.request.category;
-      if (call.request.location !== undefined) updates.location = call.request.location;
-      if (call.request.shipping_cost !== undefined) updates.shipping_cost = call.request.shipping_cost;
-      if (call.request.shipping_method !== undefined) updates.shipping_method = call.request.shipping_method;
-      if (call.request.is_active !== undefined) updates.is_active = call.request.is_active;
-
-      const listing = await updateListing(call.request.listing_id, userId, updates);
-      if (!listing) {
-        return callback({
-          code: grpc.status.NOT_FOUND,
-          message: "listing not found or unauthorized",
-        });
-      }
-
-      callback(null, { listing: formatListing(listing) });
-    } catch (error: any) {
-      console.error("[gRPC] UpdateListing error:", error);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
-      });
-    }
-  },
-
-  async DeleteListing(call: any, callback: any) {
-    try {
-      const userId = getUserId(call);
-      if (!userId) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "authentication required",
-        });
-      }
-
-      const deleted = await deleteListing(call.request.listing_id, userId);
-      callback(null, { success: deleted });
-    } catch (error: any) {
-      console.error("[gRPC] DeleteListing error:", error);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
-      });
-    }
-  },
-
-  async PlaceBid(call: any, callback: any) {
-    try {
-      const userId = getUserId(call);
-      if (!userId) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "authentication required",
-        });
-      }
-
-      const bid = await placeBid(call.request.listing_id, userId, call.request.bid_amount);
-      callback(null, { bid: formatBid(bid) });
-    } catch (error: any) {
-      console.error("[gRPC] PlaceBid error:", error);
+    const validation = validateCreateListingInput(req, { requireUserId: true });
+    if (!validation.ok) {
+      logGrpcTiming("CreateListing", start);
       callback({
         code: grpc.status.INVALID_ARGUMENT,
-        message: error.message || "internal error",
+        message: validation.message,
       });
+      return;
     }
-  },
 
-  async MakeOffer(call: any, callback: any) {
-    try {
-      const userId = getUserId(call);
-      if (!userId) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "authentication required",
+    const input = validation.value;
+    const bodyRec = req as Record<string, unknown>;
+    let lat =
+      req.latitude != null && Number.isFinite(Number(req.latitude))
+        ? Number(req.latitude)
+        : null;
+    let lng =
+      req.longitude != null && Number.isFinite(Number(req.longitude))
+        ? Number(req.longitude)
+        : null;
+    let displayLocation = buildDisplayLocationForCreate(bodyRec, lat, lng, input.title);
+
+    const query = `
+    INSERT INTO listings.listings (
+      user_id,
+      username_display,
+      title,
+      description,
+      price_cents,
+      amenities,
+      smoke_free,
+      pet_friendly,
+      furnished,
+      effective_from,
+      effective_until,
+      listed_at,
+      latitude,
+      longitude,
+      display_location,
+      residence_type,
+      size_sqft,
+      address_line1,
+      address_line2,
+      city,
+      state_or_province,
+      postal_code,
+      country,
+      neighborhood,
+      bedrooms,
+      bathrooms
+    )
+    VALUES (
+      $1::uuid,
+      NULLIF(TRIM($2::text), ''),
+      $3,
+      $4,
+      $5,
+      $6::jsonb,
+      $7,
+      $8,
+      $9,
+      $10::date,
+      NULLIF($11, '')::date,
+      CURRENT_DATE,
+      $12,
+      $13,
+      $14,
+      $15::text,
+      $16::int,
+      $17,
+      $18,
+      $19,
+      $20,
+      $21,
+      $22,
+      $23,
+      $24::int,
+      $25::numeric
+    )
+    RETURNING
+      id,
+      user_id,
+      title,
+      description,
+      price_cents,
+      amenities,
+      smoke_free,
+      pet_friendly,
+      furnished,
+      status,
+      created_at,
+      listed_at,
+      latitude,
+      longitude,
+      display_location,
+      residence_type,
+      size_sqft,
+      address_line1,
+      address_line2,
+      city,
+      state_or_province,
+      postal_code,
+      country,
+      neighborhood,
+      bedrooms,
+      bathrooms
+  `;
+
+    const geoMaybe =
+      (lat == null || lng == null) &&
+      input.address_line1 &&
+      input.city &&
+      input.state_or_province &&
+      input.country
+        ? geocodeStructuredAddress({
+            address_line1: input.address_line1,
+            address_line2: input.address_line2,
+            city: input.city,
+            state_or_province: input.state_or_province,
+            postal_code: input.postal_code,
+            country: input.country,
+          })
+        : Promise.resolve(null);
+
+    void geoMaybe
+      .then((g) => {
+        if (g) {
+          lat = g.lat;
+          lng = g.lng;
+        }
+        displayLocation =
+          buildDisplayLocationForCreate(bodyRec, lat, lng, input.title) ?? displayLocation;
+        const hostHandle = grpcMetaUsername(call);
+        const values = [
+          input.user_id,
+          hostHandle || "",
+          input.title,
+          input.description,
+          input.price_cents,
+          JSON.stringify(input.amenities),
+          input.smoke_free,
+          input.pet_friendly,
+          input.furnished,
+          input.effective_from,
+          input.effective_until,
+          lat,
+          lng,
+          displayLocation,
+          input.residence_type,
+          input.size_sqft,
+          input.address_line1,
+          input.address_line2,
+          input.city,
+          input.state_or_province,
+          input.postal_code,
+          input.country,
+          input.neighborhood,
+          input.bedrooms,
+          input.bathrooms,
+        ];
+        return pool.query(query, values);
+      })
+      .then(async (result) => {
+        const row = result.rows[0];
+        const listedDay =
+          row.listed_at != null
+            ? new Date(row.listed_at as string | Date)
+                .toISOString()
+                .slice(0, 10)
+            : new Date().toISOString().slice(0, 10);
+        const eventId = randomUUID();
+        try {
+          await syncListingCreatedToAnalytics({
+            eventId,
+            listedAtDay: listedDay,
+          });
+        } catch (e) {
+          console.error("[CreateListing] analytics sync", e);
+          callback({
+            code: grpc.status.INTERNAL,
+            message: "analytics projection sync failed",
+          });
+          return;
+        }
+        try {
+          await publishListingEventForCreateResponse(
+            "ListingCreatedV1",
+            row.id,
+            {
+              listing_id: row.id,
+              user_id: row.user_id,
+              title: row.title,
+              price_cents: row.price_cents,
+              listed_at_day: listedDay,
+            },
+            eventId,
+          );
+        } catch (e) {
+          console.error("[CreateListing] kafka", e);
+          callback({
+            code: grpc.status.INTERNAL,
+            message: "listing event publish failed",
+          });
+          return;
+        }
+        fireSavedSearchNotifyForNewListing({
+          listing_id: String(row.id),
+          landlord_user_id: String(row.user_id),
+          title: String(row.title),
+          price_cents: Number(row.price_cents),
+          residence_type: input.residence_type,
+          size_sqft: input.size_sqft,
+          bedrooms: input.bedrooms,
+          bathrooms: input.bathrooms,
+          latitude: lat,
+          longitude: lng,
+          status: row.status != null ? String(row.status) : "active",
         });
-      }
-
-      const offer = await makeOffer(
-        call.request.listing_id,
-        userId,
-        call.request.offer_amount,
-        call.request.message
-      );
-      callback(null, { offer: formatOffer(offer) });
-    } catch (error: any) {
-      console.error("[gRPC] MakeOffer error:", error);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
-      });
-    }
-  },
-
-  async AddToWatchlist(call: any, callback: any) {
-    try {
-      const userId = getUserId(call);
-      if (!userId) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "authentication required",
+        logGrpcTiming("CreateListing", start);
+        callback(null, rowToResponse(row));
+      })
+      .catch((error) => {
+        console.error("[CreateListing]", error);
+        logGrpcTiming("CreateListing", start);
+        callback({
+          code: grpc.status.INTERNAL,
+          message: "failed to create listing",
         });
-      }
-
-      await addToWatchlist(userId, call.request.listing_id);
-      callback(null, { success: true });
-    } catch (error: any) {
-      console.error("[gRPC] AddToWatchlist error:", error);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
       });
-    }
   },
 
-  async RemoveFromWatchlist(call: any, callback: any) {
-    try {
-      const userId = getUserId(call);
-      if (!userId) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "authentication required",
-        });
-      }
-
-      const removed = await removeFromWatchlist(userId, call.request.listing_id);
-      callback(null, { success: removed });
-    } catch (error: any) {
-      console.error("[gRPC] RemoveFromWatchlist error:", error);
+  GetListing(
+    call: grpc.ServerUnaryCall<any, any>,
+    callback: grpc.sendUnaryData<any>,
+  ) {
+    const start = Date.now();
+    const validation = validateListingId(call.request?.listing_id);
+    if (!validation.ok) {
+      logGrpcTiming("GetListing", start);
       callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
+        code: grpc.status.INVALID_ARGUMENT,
+        message: validation.message,
       });
+      return;
     }
+
+    const id = validation.value;
+    pool
+      .query(
+        `SELECT id, user_id, title, description, price_cents, amenities, smoke_free, pet_friendly, furnished,
+                status::text AS status, created_at,
+                residence_type, size_sqft, city, state_or_province, country
+         FROM listings.listings
+         WHERE id = $1::uuid
+           AND (deleted_at IS NULL)
+         LIMIT 1`,
+        [id],
+      )
+      .then((res) => {
+        if (!res.rows[0]) {
+          logGrpcTiming("GetListing", start);
+          callback({
+            code: grpc.status.NOT_FOUND,
+            message: "listing not found",
+          });
+          return;
+        }
+        logGrpcTiming("GetListing", start);
+        callback(null, rowToResponse(res.rows[0]));
+      })
+      .catch((e) => {
+        console.error("[GetListing]", e);
+        logGrpcTiming("GetListing", start);
+        callback({ code: grpc.status.INTERNAL, message: "internal" });
+      });
   },
 
-  async GetWatchlist(call: any, callback: any) {
-    try {
-      const userId = getUserId(call);
-      if (!userId) {
-        return callback({
-          code: grpc.status.UNAUTHENTICATED,
-          message: "authentication required",
-        });
-      }
+  SearchListings(
+    call: grpc.ServerUnaryCall<any, any>,
+    callback: grpc.sendUnaryData<any>,
+  ) {
+    const start = Date.now();
+    const req = call.request || {};
+    const q = String(req.query || "").trim();
+    const minP =
+      req.min_price != null && req.min_price !== ""
+        ? Number(req.min_price)
+        : null;
+    const maxP =
+      req.max_price != null && req.max_price !== ""
+        ? Number(req.max_price)
+        : null;
+    const smoke = Boolean(req.smoke_free);
+    const pets = Boolean(req.pet_friendly);
+    const furnished = Boolean(req.furnished);
+    const amenitySlugs = parseAmenitySlugs(
+      String(req.amenities_contains || ""),
+    );
+    const nwdRaw =
+      req.new_within_days != null && req.new_within_days !== ""
+        ? Number(req.new_within_days)
+        : null;
+    const newWithin =
+      nwdRaw != null && Number.isFinite(nwdRaw) && nwdRaw > 0 && nwdRaw <= 365
+        ? Math.floor(nwdRaw)
+        : null;
+    const sort = String(req.sort || "created_desc").trim();
 
-      const watchlist = await getUserWatchlist(userId);
-      callback(null, {
-        listings: watchlist.map(formatListing),
-        count: watchlist.length,
-      });
-    } catch (error: any) {
-      console.error("[gRPC] GetWatchlist error:", error);
-      callback({
-        code: grpc.status.INTERNAL,
-        message: error.message || "internal error",
-      });
-    }
-  },
+    const limitRaw =
+      req.limit != null && req.limit !== "" ? Number(req.limit) : null;
+    const offsetRaw =
+      req.offset != null && req.offset !== "" ? Number(req.offset) : null;
 
-  async HealthCheck(call: any, callback: any) {
-    try {
-      await pool.query("SELECT 1");
-      callback(null, {
-        healthy: true,
-        version: process.env.SERVICE_VERSION || "1.0.0",
+    const limit =
+      limitRaw != null && Number.isFinite(limitRaw) && limitRaw > 0
+        ? Math.floor(limitRaw)
+        : null;
+
+    const offset =
+      offsetRaw != null && Number.isFinite(offsetRaw) && offsetRaw >= 0
+        ? Math.floor(offsetRaw)
+        : null;
+
+    const residenceTypes = parseResidenceTypesCsv(
+      String(req.residence_types || req.residence_type || ""),
+    );
+    const minSqftRaw =
+      req.min_sqft != null && req.min_sqft !== "" ? Number(req.min_sqft) : null;
+    const minSqft =
+      minSqftRaw != null && Number.isFinite(minSqftRaw) && minSqftRaw > 0
+        ? Math.floor(minSqftRaw)
+        : null;
+    const maxSqftRaw =
+      req.max_sqft != null && req.max_sqft !== "" ? Number(req.max_sqft) : null;
+    const maxSqft =
+      maxSqftRaw != null && Number.isFinite(maxSqftRaw) && maxSqftRaw > 0
+        ? Math.floor(maxSqftRaw)
+        : null;
+    const city = String(req.city || "").trim().slice(0, 120) || null;
+    const state = String(req.state || "").trim().slice(0, 80) || null;
+    const neighborhood = String(req.neighborhood || "").trim().slice(0, 160) || null;
+    const campusWithinRaw =
+      req.campus_within_miles != null && req.campus_within_miles !== ""
+        ? Number(req.campus_within_miles)
+        : null;
+    const campusWithinMiles =
+      campusWithinRaw != null && Number.isFinite(campusWithinRaw) && campusWithinRaw > 0
+        ? Math.min(50, campusWithinRaw)
+        : null;
+
+    const { sql, params } = buildListingsSearchQuery({
+      q,
+      minP: minP != null && !Number.isNaN(minP) ? minP : null,
+      maxP: maxP != null && !Number.isNaN(maxP) ? maxP : null,
+      smoke,
+      pets,
+      furnished,
+      amenitySlugs,
+      newWithin,
+      sort,
+      limit,
+      offset,
+      residenceTypes,
+      minSqft,
+      maxSqft,
+      city,
+      state,
+      neighborhood,
+      campusWithinMiles,
+    });
+
+    pool
+      .query(sql, params)
+      .then((res) => {
+        logGrpcTiming("SearchListings", start);
+        const uniqueRows = dedupeListingsById(
+          res.rows as Record<string, unknown>[],
+        );
+        callback(null, { listings: uniqueRows.map((r) => rowToResponse(r)) });
+      })
+      .catch((e) => {
+        console.error("[SearchListings]", e);
+        logGrpcTiming("SearchListings", start);
+        callback({ code: grpc.status.INTERNAL, message: "search failed" });
       });
-    } catch (error: any) {
-      console.error("[gRPC] HealthCheck error:", error);
-      callback(null, {
-        healthy: false,
-        version: process.env.SERVICE_VERSION || "1.0.0",
-      });
-    }
   },
 };
 
-// Format helpers
-function formatListing(listing: any): any {
-  const soldAt = listing.sold_at ? new Date(listing.sold_at) : null;
-  const endedAt = listing.ended_at ? new Date(listing.ended_at) : null;
-  const visibleUntil = listing.visible_until ? new Date(listing.visible_until) : null;
-  const now = new Date();
-  let lifecycle_status: 'active' | 'sold' | 'ended' | 'did_not_sell' = 'active';
-  if (soldAt) lifecycle_status = 'sold';
-  else if (endedAt) lifecycle_status = 'ended';
-  else if (visibleUntil && visibleUntil < now) lifecycle_status = 'did_not_sell';
-
-  return {
-    id: listing.id,
-    user_id: listing.user_id,
-    title: listing.title,
-    description: listing.description || "",
-    price: parseFloat(listing.price) || 0,
-    currency: listing.currency || "USD",
-    listing_type: listing.listing_type,
-    condition: listing.condition || "",
-    category: listing.category || "",
-    location: listing.location || "",
-    shipping_cost: parseFloat(listing.shipping_cost) || 0,
-    shipping_method: listing.shipping_method || "",
-    is_active: listing.is_active,
-    is_featured: listing.is_featured || false,
-    view_count: listing.view_count || 0,
-    watch_count: listing.watch_count || 0,
-    stock_quantity: listing.stock_quantity != null ? Number(listing.stock_quantity) : 1,
-    lifecycle_status,
-    sold_at: soldAt?.toISOString() || null,
-    ended_at: endedAt?.toISOString() || null,
-    visible_until: visibleUntil?.toISOString() || null,
-    obo_until: listing.obo_until ? new Date(listing.obo_until).toISOString() : null,
-    created_at: listing.created_at?.toISOString() || new Date().toISOString(),
-    updated_at: listing.updated_at?.toISOString() || new Date().toISOString(),
-    expires_at: listing.expires_at?.toISOString() || "",
-    images: (listing.images || []).map((img: any) => ({
-      id: img.id,
-      image_url: img.image_url,
-      thumbnail_url: img.thumbnail_url || "",
-      display_order: img.display_order || 0,
-      is_primary: img.is_primary || false,
-    })),
-    auction_details: listing.auction_details ? {
-      starting_bid: parseFloat(listing.auction_details.starting_bid) || 0,
-      current_bid: parseFloat(listing.auction_details.current_bid) || 0,
-      current_bidder: listing.auction_details.current_bidder || "",
-      reserve_price: parseFloat(listing.auction_details.reserve_price) || 0,
-      end_time: listing.auction_details.end_time?.toISOString() || "",
-      bid_count: listing.auction_details.bid_count || 0,
-    } : undefined,
-  };
-}
-
-function formatBid(bid: any): any {
-  return {
-    id: bid.id,
-    listing_id: bid.listing_id,
-    user_id: bid.user_id,
-    bid_amount: parseFloat(bid.bid_amount) || 0,
-    is_winning: bid.is_winning || false,
-    created_at: bid.created_at?.toISOString() || new Date().toISOString(),
-  };
-}
-
-function formatOffer(offer: any): any {
-  return {
-    id: offer.id,
-    listing_id: offer.listing_id,
-    user_id: offer.user_id,
-    offer_amount: parseFloat(offer.offer_amount) || 0,
-    message: offer.message || "",
-    status: offer.status || "pending",
-    created_at: offer.created_at?.toISOString() || new Date().toISOString(),
-  };
-}
-
-// Create and start gRPC server with HTTP/2 only
-export function startGrpcServer(port: number = 50057) {
-  const server = new grpc.Server({
-    'grpc.keepalive_time_ms': 30000,
-    'grpc.keepalive_timeout_ms': 5000,
-    'grpc.keepalive_permit_without_calls': 1,
-    'grpc.http2.max_pings_without_data': 0,
-    'grpc.http2.min_time_between_pings_ms': 10000,
-    'grpc.http2.min_ping_interval_without_data_ms': 300000,
-  });
-  
-  server.addService(listingsProto.listings.ListingsService.service, {
-    GetListing: withLogging(listingsService.GetListing, "GetListing"),
-    ListMyListings: withLogging(listingsService.ListMyListings, "ListMyListings"),
-    SearchListings: withLogging(listingsService.SearchListings, "SearchListings"),
-    CreateListing: withLogging(listingsService.CreateListing, "CreateListing"),
-    UpdateListing: withLogging(listingsService.UpdateListing, "UpdateListing"),
-    DeleteListing: withLogging(listingsService.DeleteListing, "DeleteListing"),
-    PlaceBid: withLogging(listingsService.PlaceBid, "PlaceBid"),
-    MakeOffer: withLogging(listingsService.MakeOffer, "MakeOffer"),
-    AddToWatchlist: withLogging(listingsService.AddToWatchlist, "AddToWatchlist"),
-    RemoveFromWatchlist: withLogging(listingsService.RemoveFromWatchlist, "RemoveFromWatchlist"),
-    GetWatchlist: withLogging(listingsService.GetWatchlist, "GetWatchlist"),
-    HealthCheck: withLogging(listingsService.HealthCheck, "HealthCheck"),
-  });
-
-  // Register standard gRPC Health Service (grpc.health.v1.Health)
-  registerHealthService(server, 'listings.ListingsService', async () => {
-    try {
-      await pool.query('SELECT 1');
-      return true;
-    } catch (err) {
-      console.error('[gRPC] Health check failed:', err);
-      return false;
-    }
-  });
-
-  // Enable gRPC reflection for tooling (grpcurl, etc.)
-  if (process.env.ENABLE_GRPC_REFLECTION !== "false") {
-    try {
-      const { enableReflection } = require("@common/utils/grpc-reflection");
-      enableReflection(server, [PROTO_PATH], ["listings.ListingsService"]);
-    } catch (err) {
-      console.warn("[listings gRPC] Failed to enable reflection:", err);
-    }
+export async function listingsGrpcHealthCheckForTest(): Promise<boolean> {
+  try {
+    await pool.query("SELECT 1");
+    return true;
+  } catch {
+    return false;
   }
+}
 
-  // Try to load TLS certs (for production with ALPN = h2)
-  let credentials: grpc.ServerCredentials;
-  const keyPath = process.env.TLS_KEY_PATH || "/etc/certs/tls.key";
-  const certPath = process.env.TLS_CERT_PATH || "/etc/certs/tls.crt";
-  const caPath = process.env.TLS_CA_PATH || process.env.GRPC_CA_CERT || "/etc/certs/ca.crt";
-  
-  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-    const key = fs.readFileSync(keyPath);
-    const cert = fs.readFileSync(certPath);
-    
-    // For strict TLS: verify client certificates if CA cert exists
-    let rootCerts: Buffer | null = null;
-    let checkClientCert = false;
-    if (fs.existsSync(caPath)) {
-      rootCerts = fs.readFileSync(caPath);
-      checkClientCert = true;
-      console.log("[gRPC] Starting secure HTTP/2-only server with strict TLS (client cert verification)");
-    } else {
-      console.log("[gRPC] Starting secure HTTP/2-only server with ALPN = h2 (no client cert verification)");
-    }
-    
-    // For dev: Don't require client cert verification (use false)
-    // For production: Enable client cert verification (use checkClientCert)
-    const requireClientCert = process.env.GRPC_REQUIRE_CLIENT_CERT === 'true' ? checkClientCert : false;
-    
-    credentials = grpc.ServerCredentials.createSsl(
-      rootCerts,
-      [{ private_key: key, cert_chain: cert }],
-      requireClientCert as any
-    );
-    if (requireClientCert) {
-      console.log("[gRPC] Client certificate verification is ENABLED.");
-    } else {
-      console.log("[gRPC] Client certificate verification is DISABLED (dev mode).");
-    }
-  } else {
-    console.warn("[gRPC] TLS certs not found, starting insecure server (dev only)");
-    credentials = grpc.ServerCredentials.createInsecure();
+function createListingsGrpcServerCredentials(): grpc.ServerCredentials {
+  try {
+    return createRpGrpcServerCredentialsForBind("listings gRPC");
+  } catch (e) {
+    console.error(e);
+    process.exit(1);
+    throw e;
   }
+}
 
-  server.bindAsync(
-    `0.0.0.0:${port}`,
-    credentials,
-    (error, actualPort) => {
-      if (error) {
-        console.error("[gRPC] Server bind error:", error);
-        return;
-      }
-      server.start();
-      console.log(`[gRPC] Listings server started on port ${actualPort} (HTTP/2 only)`);
-    }
+function buildListingsGrpcServer(): grpc.Server {
+  const server = new grpc.Server();
+  server.addService(
+    listingsProto.listings.ListingsService.service,
+    listingsGrpcHandlersForTest,
+  );
+
+  registerHealthService(
+    server,
+    "listings.ListingsService",
+    listingsGrpcHealthCheckForTest,
   );
 
   return server;
 }
 
+export function startGrpcServer(port: number): grpc.Server {
+  const server = buildListingsGrpcServer();
+  const credentials = createListingsGrpcServerCredentials();
+
+  server.bindAsync(
+    `0.0.0.0:${port}`,
+    credentials,
+    (err: Error | null, boundPort: number) => {
+      if (err) {
+        console.error("[listings gRPC] bind error:", err);
+        return;
+      }
+      console.log(`[listings gRPC] listening on ${boundPort}`);
+    },
+  );
+
+  return server;
+}
+
+/** Resolves after successful `bindAsync` (for integration tests). */
+export function startGrpcServerAndWait(port: number): Promise<grpc.Server> {
+  const server = buildListingsGrpcServer();
+  const credentials = createListingsGrpcServerCredentials();
+
+  return new Promise((resolve, reject) => {
+    server.bindAsync(
+      `0.0.0.0:${port}`,
+      credentials,
+      (err: Error | null, boundPort: number) => {
+        if (err) {
+          console.error("[listings gRPC] bind error:", err);
+          reject(err);
+          return;
+        }
+        console.log(`[listings gRPC] listening on ${boundPort}`);
+        resolve(server);
+      },
+    );
+  });
+}

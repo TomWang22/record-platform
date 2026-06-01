@@ -42,23 +42,16 @@ test.describe.serial('Message reply, edit, and reaction contract', () => {
     await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 45_000 })
     await page.getByTestId('contact-seller-button').click()
     await page.waitForURL(/\/messages\?/, { timeout: 30_000 })
+    await expect(page.getByTestId('messages-compose-listing-context')).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('[data-testid="messages-thread-panel"] p').first()).toBeVisible({
+      timeout: 15_000,
+    })
     await fillComposeAndSend(page, buyerMessage)
     await expect(
       page.getByTestId('messages-bubble-text').filter({ hasText: buyerMessage }).first(),
     ).toBeVisible({ timeout: 45_000 })
-    await expect
-      .poll(async () => {
-        const fromUrl = new URL(page.url()).searchParams.get('thread')
-        if (fromUrl) return fromUrl
-        await page.goto('/messages')
-        const item = page.getByTestId('messages-inbox-item').filter({ hasText: inboxTitle }).first()
-        if (!(await item.isVisible().catch(() => false))) return ''
-        await item.click()
-        return new URL(page.url()).searchParams.get('thread') ?? ''
-      }, { timeout: 45_000 })
-      .not.toBe('')
     threadId = new URL(page.url()).searchParams.get('thread') ?? ''
-    expect(threadId).toBeTruthy()
+    expect(threadId, 'thread id must appear in URL after send').toBeTruthy()
   })
 
   test('seller replies with threaded reply action', async ({ page, request }) => {

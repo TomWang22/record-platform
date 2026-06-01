@@ -1,0 +1,27 @@
+#!/bin/bash
+# Quick script to help get eBay OAuth token
+
+APP_ID="DailinWa-recordpl-PRD-672dab605-b3c26e79"
+
+echo "🔑 eBay OAuth Token Helper"
+echo "=========================="
+echo ""
+echo "Your App ID: $APP_ID"
+echo ""
+echo "Option 1: Use eBay Developer Portal"
+echo "  1. Go to: https://developer.ebay.com/my/keys"
+echo "  2. Click on your App ID: $APP_ID"
+echo "  3. Look for 'User Tokens' or 'Get a User Token'"
+echo "  4. Click and authorize"
+echo "  5. Copy the token"
+echo ""
+echo "Option 2: Direct OAuth URL"
+echo "  Open this URL in your browser:"
+echo ""
+echo "  https://auth.ebay.com/oauth2/authorize?client_id=$APP_ID&redirect_uri=http://localhost:8080/oauth/ebay/callback&response_type=code&scope=https://api.ebay.com/oauth/api_scope/buy.marketplace.search"
+echo ""
+echo "After authorization, you'll get a code. Then exchange it for a token."
+echo ""
+echo "Option 3: Application Token (Simpler, but limited)"
+echo "  This doesn't require OAuth but has limited scopes."
+echo "  See API_KEYS_SETUP.md for details."

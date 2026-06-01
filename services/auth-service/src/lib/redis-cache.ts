@@ -149,6 +149,7 @@ export async function cacheUser(user: {
   emailVerified: boolean;
   phoneVerified: boolean;
   createdAt: Date;
+  username?: string;
 }): Promise<void> {
   const client = getRedisClient();
   if (!client || !client.isOpen) {
@@ -165,6 +166,7 @@ export async function cacheUser(user: {
       emailVerified: user.emailVerified,
       phoneVerified: user.phoneVerified,
       createdAt: user.createdAt.toISOString(),
+      ...(user.username ? { username: user.username } : {}),
     });
 
     // Use Lua script for atomic cache update

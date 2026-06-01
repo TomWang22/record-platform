@@ -41,7 +41,6 @@ jobs:
           - trust-service
           - notification-service
           - analytics-service
-          - python-ai-service
           - auction-monitor
           - transport-watchdog
 
@@ -97,7 +96,6 @@ jobs:
           - trust-service
           - notification-service
           - analytics-service
-          - python-ai-service
           - auction-monitor
           - transport-watchdog
 

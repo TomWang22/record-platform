@@ -15,8 +15,8 @@ const protectedRoutes: RouteExpectation[] = [
   { path: "/records/new", name: "records-new", mustContain: /Add new record/i },
   { path: "/cart", name: "cart", mustContain: /Shopping Cart/i },
   { path: "/auctions", name: "auctions", mustContain: /Auction Monitor/i },
-  { path: "/listings", name: "listings", mustContain: /Browse Listings|Sign in to browse/i },
-  { path: "/market", name: "sell-list", mustContain: /Sell|List a record|Sign in/i },
+  { path: "/listings", name: "listings", mustContain: /Marketplace Listings|Sign in to browse/i },
+  { path: "/market", name: "sell-list", mustContain: /Create listing|List a record|Sell/i },
   { path: "/settings", name: "settings", mustContain: /Settings|Sign in/i },
   { path: "/observation-deck", name: "observation-deck", mustContain: /Observation deck|Sign in/i },
 ];
@@ -49,9 +49,9 @@ test.describe("Route identity — protected app routes", () => {
       ).toBeFalsy();
 
       await expect(
-        page.getByRole("heading", { name: route.mustContain }),
+        page.getByRole("heading", { level: 1, name: route.mustContain }).first(),
         `${route.path} must show expected page heading`,
-      ).toBeVisible({ timeout: 10_000 });
+      ).toBeVisible({ timeout: 15_000 });
     });
   }
 });

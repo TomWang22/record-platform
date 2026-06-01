@@ -129,11 +129,10 @@ export function exportRouter(prisma: PrismaClient): Router {
         })
       );
 
-      const presign_get = await getSignedUrl(
-        client,
-        new GetObjectCommand({ Bucket: bucket, Key: key }),
-        { expiresIn: 60 }
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AWS SDK client version skew in workspace
+      const presign_get = await getSignedUrl(client as any, new GetObjectCommand({ Bucket: bucket, Key: key }), {
+        expiresIn: 60,
+      });
       res.json({ bucket, key, presign_get });
     })
   );

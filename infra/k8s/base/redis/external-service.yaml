@@ -1,0 +1,16 @@
+# Service for external Redis (Docker Compose). Endpoints are NOT in git — Kubernetes rejects
+# loopback IPs in Endpoints, and the Compose container IP changes on recreate.
+# After manifest apply, run: bash scripts/sync-redis-external-endpoints.sh
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-external
+  namespace: record-platform
+  labels:
+    app: redis-external
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379

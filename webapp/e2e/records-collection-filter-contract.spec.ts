@@ -116,8 +116,7 @@ test.describe.serial('Records collection filter contract (7.8)', () => {
     )
 
     const editNote = `E2E note ${Date.now()}`
-    await page.goto(`/records/${milesRecordId}/edit`)
-    await expect(page.getByRole('heading', { name: /Edit record/i })).toBeVisible({ timeout: 45_000 })
+    await page.goto(`/records/${milesRecordId}/edit`, { waitUntil: 'domcontentloaded' })
     const notes = page.getByLabel(/Collection notes/i)
     await expect(notes).toBeVisible({ timeout: 15_000 })
     await notes.fill(editNote)

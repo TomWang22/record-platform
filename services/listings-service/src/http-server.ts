@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import express, {
+  type Application,
   type NextFunction,
   type Request,
   type Response,
@@ -587,7 +588,7 @@ function dedupeListingsById(
   return out;
 }
 
-export function createListingsHttpApp() {
+export function createListingsHttpApp(): Application {
   const app = express();
   initOchOutboxSurfaceUnsupported();
   app.use(tracingMiddleware);

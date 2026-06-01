@@ -2,9 +2,15 @@
 
 # ---------- deps ----------
 # Use npm to install pnpm (avoids corepack network fetch / GSSAPI issues in some environments)
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
-RUN npm install -g pnpm@9.11.0
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV NPM_CONFIG_CONFIRM_MODULES_PURGE=false
+ENV PNPM_CONFIG_CONFIRM_MODULES_PURGE=false
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 
 # Copy package manifests (changes rarely, good for caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
@@ -17,15 +23,21 @@ COPY services/shopping-service/tsconfig.json ./services/shopping-service/tsconfi
 # Use BuildKit cache mounts for pnpm store (persists between builds)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm -w \
+    rp-pnpm -w \
       --filter @common/utils... \
       --filter shopping-service... \
       install --frozen-lockfile --ignore-scripts
 
 # ---------- build ----------
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
-RUN npm install -g pnpm@9.11.0
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV NPM_CONFIG_CONFIRM_MODULES_PURGE=false
+ENV PNPM_CONFIG_CONFIRM_MODULES_PURGE=false
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 
 # Copy installed dependencies from deps stage
 COPY --from=deps /app /app
@@ -39,7 +51,7 @@ COPY proto ./proto
 # Then build common first, then shopping-service
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile && \
-    pnpm -C services/common build && \
+    rp-pnpm -C services/common build && \
     echo "Verifying common build..." && \
     if ! ls services/common/dist/*.js >/dev/null 2>&1; then \
       echo "No JS files found, forcing compilation of common..." && \
@@ -53,7 +65,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
       echo "✓ Common JS files already exist"; \
       ls -la services/common/dist/*.js 2>&1 | head -3; \
     fi && \
-    _build_ok=0; pnpm -C services/shopping-service build && _build_ok=1; true && \
+    _build_ok=0; rp-pnpm -C services/shopping-service build && _build_ok=1; true && \
     if [ "$_build_ok" = "0" ]; then echo "Build had errors; will compile lib and routes from source so cart.js and others are fresh"; fi && \
     echo "Checking compiled lib files..." && \
     ls -la services/shopping-service/dist/lib/ 2>/dev/null | head -10 && \
@@ -117,7 +129,12 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     echo "✓ Cart route hardened from source"
 
 # ---------- runtime ----------
-FROM node:20-alpine
+FROM node:22-alpine
+ARG RP_SOURCE_SHA=unknown
+ARG GIT_COMMIT=unknown
+LABEL rp.dev.service="shopping-service"
+LABEL rp.dev.source-sha="${RP_SOURCE_SHA}"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 ENV NODE_ENV=production
 WORKDIR /app/services/shopping-service
 
@@ -174,5 +191,5 @@ COPY --from=build /app/services/shopping-service/src/lib/lfu_lru_cache.lua ./dis
 # Copy proto files
 COPY --from=build /app/proto /app/proto
 
+EXPOSE 4007 50058
 CMD ["node","dist/server.js"]
-

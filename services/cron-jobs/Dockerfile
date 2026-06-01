@@ -1,9 +1,13 @@
 # syntax=docker/dockerfile:1
 
 # ---------- deps ----------
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 
 # Copy package manifests (changes rarely, good for caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
@@ -14,15 +18,19 @@ COPY services/cron-jobs/package.json ./services/cron-jobs/package.json
 # Use BuildKit cache mounts for pnpm store (persists between builds)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm -w \
+    rp-pnpm -w \
       --filter @common/utils... \
       --filter cron-jobs... \
       install --frozen-lockfile --ignore-scripts
 
 # ---------- build ----------
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 
 # Copy installed dependencies from deps stage
 COPY --from=deps /app /app
@@ -33,18 +41,22 @@ COPY services/cron-jobs ./services/cron-jobs
 
 # Build with cache mount for faster subsequent builds
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -C services/common build \
- && pnpm -C services/cron-jobs build \
- && pnpm -C services/cron-jobs prune --prod --config.confirmModulesPurge=false
+    rp-pnpm -C services/common build \
+ && rp-pnpm -C services/cron-jobs build \
+ && rp-pnpm -C services/cron-jobs prune --prod --config.confirmModulesPurge=false
 
 # Produce isolated deploy bundle (production deps only). Use same store mount so deploy copies from cache — no network.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm deploy --filter cron-jobs --prod /app/deploy
+    rp-pnpm deploy --legacy --filter cron-jobs --prod /app/deploy
 
 # ---------- runtime ----------
-FROM node:20-alpine
+FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /app
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
 
 # Create non-root user for security (before COPY so chown works)
 RUN addgroup --system --gid 1001 nodejs && \

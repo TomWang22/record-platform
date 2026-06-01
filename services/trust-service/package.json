@@ -1,0 +1,34 @@
+{
+  "name": "trust-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node ./dist/server.js",
+    "test": "ROLLUP_DISABLE_NATIVE=true vitest run",
+    "test:coverage": "ROLLUP_DISABLE_NATIVE=true vitest run --coverage",
+    "test:watch": "ROLLUP_DISABLE_NATIVE=true vitest",
+    "test:integration": "ROLLUP_DISABLE_NATIVE=true vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@common/utils": "workspace:*",
+    "@grpc/grpc-js": "^1.9.0",
+    "@grpc/proto-loader": "^0.7.10",
+    "dotenv": "^16.3.0",
+    "express": "^4.19.2",
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.0",
+    "@types/supertest": "^7.2.0",
+    "@vitest/coverage-v8": "2.1.9",
+    "tsx": "^4.19.0",
+    "supertest": "^7.2.2",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.0"
+  }
+}

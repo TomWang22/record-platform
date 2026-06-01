@@ -5,8 +5,8 @@ metadata:
 data:
   NODE_ENV: production
   ALLOW_MOCK_PASSKEY_DATA: "false"  # Production mode - requires real WebAuthn data (set to "true" for testing)
-  WEBAUTHN_RP_ID: "record.local"  # Relying Party ID (your domain)
-  WEBAUTHN_ORIGIN: "https://record.local:8443"  # WebAuthn origin (must match actual origin)
+  WEBAUTHN_RP_ID: "record-platform.test"  # Relying Party ID (cold-bootstrap edge domain)
+  WEBAUTHN_ORIGIN: "https://record-platform.test"  # WebAuthn origin (must match actual origin)
   
   # SMS Provider Configuration
   # Using Mock SMS Provider (FREE - like MailHog for email)
@@ -14,13 +14,13 @@ data:
   # Access sent messages via: GET /api/auth/sms/mock/messages
   SMS_PROVIDER: "mock"  # Mock provider - FREE, works immediately, no setup needed
   SMS_USE_MOCK: "true"  # Force mock mode (FREE - logs to console, accessible via API)
-  NEXT_PUBLIC_GATEWAY_URL: http://localhost:8080
+  NEXT_PUBLIC_GATEWAY_URL: https://record-platform.test
 
   GATEWAY_PORT: "4000"
   AUTH_PORT: "4001"
   RECORDS_PORT: "4002"
-  LISTINGS_PORT: "4003"
-  ANALYTICS_PORT: "4004"
+  LISTINGS_PORT: "4012"
+  ANALYTICS_PORT: "4017"
   AI_PORT: "5005"
   SHOPPING_PORT: "4007"
 
@@ -55,12 +55,21 @@ data:
   POSTGRES_URL_ANALYTICS: postgresql://postgres:postgres@host.docker.internal:5439/analytics?connect_timeout=10
   # NOTE: asyncpg doesn't support connect_timeout parameter - removed for Python AI service
   POSTGRES_URL_PYTHON_AI: postgresql://postgres:postgres@host.docker.internal:5440/python_ai
-  
+  POSTGRES_URL_MESSAGING: postgresql://postgres:postgres@host.docker.internal:5434/postgres?connect_timeout=5
+  POSTGRES_URL_NOTIFICATION: postgresql://postgres:postgres@host.docker.internal:5441/postgres?connect_timeout=5
+  POSTGRES_URL_TRUST: postgresql://postgres:postgres@host.docker.internal:5442/postgres?connect_timeout=5
+  POSTGRES_URL_MEDIA: postgresql://postgres:postgres@host.docker.internal:5443/postgres?connect_timeout=5
+
+  # In-cluster Ollama (analytics listing-feel). Override in dev overlay for host Metal.
+  OLLAMA_BASE_URL: http://ollama.record-platform.svc.cluster.local:11434
+  OLLAMA_MODEL: llama3.2:1b
+  OLLAMA_WARM_MARKER_PATH: /tmp/ollama-warm.ok
+
   # Kafka: strict TLS only (no plaintext/cleartext). All client connections use port 9093 (SSL).
   # Broker PLAINTEXT is bound to 127.0.0.1 only (healthcheck); clients must use SSL.
   # Required when KAFKA_SSL_ENABLED=true: set KAFKA_CA_CERT to path to CA PEM (e.g. kafka-ssl-secret).
   # Optional mTLS: KAFKA_CLIENT_CERT, KAFKA_CLIENT_KEY. Mount certs via Secret and set env in deployment.
-  # Single broker (Docker Compose: one Kafka, SSL on 9093 / host 29093). Multi-broker when cluster exists — see docs/KAFKA_CURRENT_AND_ROADMAP.md.
-  KAFKA_BROKER: kafka-external.record-platform.svc.cluster.local:9093
+  # KRaft 3-broker bootstrap (INTERNAL SSL :9093 on headless kafka-N.kafka). Comma-separated — services/common kafka.ts splits on ','.
+  KAFKA_BROKER: kafka-0.kafka.record-platform.svc.cluster.local:9093,kafka-1.kafka.record-platform.svc.cluster.local:9093,kafka-2.kafka.record-platform.svc.cluster.local:9093
   KAFKA_USE_SSL: "true"
   KAFKA_SSL_ENABLED: "true"

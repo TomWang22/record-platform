@@ -41,6 +41,9 @@ spec:
               value: "/certs/dev-root.pem"
             - name: KAFKA_CA_CERT
               value: "/etc/kafka/secrets/ca-cert.pem"
+            # transport-watchdog sidecar probes loopback gateway readiness
+            - name: TRANSPORT_WATCHDOG_GATEWAY_URL
+              value: "http://127.0.0.1:4000/readyz"
             - name: GRPC_CA_CERT
               value: "/etc/certs/ca.crt"
             - name: GRPC_CLIENT_CERT
@@ -61,23 +64,28 @@ spec:
               mountPath: /etc/kafka/secrets
               readOnly: true
           startupProbe:
-            httpGet: { path: /healthz, port: http }
-            initialDelaySeconds: 10
+            tcpSocket:
+              port: http
             periodSeconds: 5
             timeoutSeconds: 5
-            failureThreshold: 40
+            failureThreshold: 60
           readinessProbe:
-            httpGet: { path: /healthz, port: http }
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 5
-            failureThreshold: 3
-          livenessProbe:
-            httpGet: { path: /healthz, port: http }
+            httpGet:
+              path: /readyz
+              port: http
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 3
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+
           resources:
             requests:
               cpu: "500m"
@@ -85,6 +93,26 @@ spec:
             limits:
               cpu: "2"
               memory: "2Gi"
+        - name: transport-watchdog
+          image: transport-watchdog:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: REDIS_URL
+            - name: TRANSPORT_WATCHDOG_GATEWAY_URL
+              value: "http://127.0.0.1:4000/readyz"
+            - name: TRANSPORT_WATCHDOG_REDIS_KEY
+              value: "rp:gw:watchdog_throttle"
+          resources:
+            requests:
+              cpu: "25m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
       volumes:
         - name: proto-files
           configMap:
@@ -112,3 +140,7 @@ spec:
             items:
               - key: ca-cert.pem
                 path: ca-cert.pem
+              - key: client.crt
+                path: client.crt
+              - key: client.key
+                path: client.key

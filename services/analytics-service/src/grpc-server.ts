@@ -210,17 +210,19 @@ export async function analyticsGrpcHealthProbe(): Promise<boolean> {
 export function startGrpcServer(port: number): grpc.Server {
   const server = new grpc.Server();
   server.addService(root.analytics.AnalyticsService.service, analyticsGrpcHandlers);
-  server.addService(
-    root.analytics.RecommendationAdminService.service,
-    analyticsRecommendationAdminGrpcHandlers,
-  );
+  const recommendationAdmin = root.analytics?.RecommendationAdminService?.service;
+  const extraHealthServices: string[] = [];
+  if (recommendationAdmin) {
+    server.addService(recommendationAdmin, analyticsRecommendationAdminGrpcHandlers);
+    extraHealthServices.push("analytics.RecommendationAdminService");
+  }
 
   // Primary name must match K8s readiness -service=; register every gRPC service FQ name on this server.
   registerHealthService(
     server,
     "analytics.AnalyticsService",
     analyticsGrpcHealthProbe,
-    ["analytics.RecommendationAdminService"]
+    extraHealthServices
   );
 
   let credentials: grpc.ServerCredentials;

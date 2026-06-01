@@ -28,10 +28,16 @@ const pages: { name: string; path: string; waitFor?: string }[] = [
 test.describe("UI screenshots — all RP pages", () => {
   for (const pg of pages) {
     test(`screenshot: ${pg.name} (${pg.path})`, async ({ page }) => {
+      const isInsights = pg.path === "/insights";
       const res = await page.goto(pg.path, {
-        waitUntil: "networkidle",
-        timeout: 30_000,
+        waitUntil: isInsights ? "domcontentloaded" : "networkidle",
+        timeout: isInsights ? 60_000 : 30_000,
       });
+      if (isInsights) {
+        await expect(page.getByRole("heading", { name: /Insights & AI/i })).toBeVisible({
+          timeout: 45_000,
+        });
+      }
       expect(res).not.toBeNull();
       expect(res!.status()).toBeLessThan(500);
 

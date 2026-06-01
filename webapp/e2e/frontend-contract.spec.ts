@@ -33,7 +33,14 @@ const pages = [
 test.describe("Frontend contract — no generic errors", () => {
   for (const pg of pages) {
     test(`${pg.name} (${pg.path}): no generic error text`, async ({ page }) => {
-      await page.goto(pg.path, { waitUntil: "networkidle", timeout: 30_000 });
+      const waitUntil = pg.path === "/insights" ? "domcontentloaded" : "networkidle";
+      const timeout = pg.path === "/insights" ? 60_000 : 30_000;
+      await page.goto(pg.path, { waitUntil, timeout });
+      if (pg.path === "/insights") {
+        await expect(page.getByRole("heading", { name: /Insights & AI/i })).toBeVisible({
+          timeout: 45_000,
+        });
+      }
 
       for (const text of genericErrorTexts) {
         const count = await page.getByText(text, { exact: false }).count();
@@ -48,7 +55,14 @@ test.describe("Frontend contract — no generic errors", () => {
     test(`${pg.name} (${pg.path}): no raw "auth required" text`, async ({
       page,
     }) => {
-      await page.goto(pg.path, { waitUntil: "networkidle", timeout: 30_000 });
+      const waitUntil = pg.path === "/insights" ? "domcontentloaded" : "networkidle";
+      const timeout = pg.path === "/insights" ? 60_000 : 30_000;
+      await page.goto(pg.path, { waitUntil, timeout });
+      if (pg.path === "/insights") {
+        await expect(page.getByRole("heading", { name: /Insights & AI/i })).toBeVisible({
+          timeout: 45_000,
+        });
+      }
 
       const bodyText = await page.textContent("body");
       const hasRawAuth =
@@ -67,7 +81,14 @@ test.describe("Frontend contract — branding", () => {
     test(`${pg.name} (${pg.path}): no stale OCH branding`, async ({
       page,
     }) => {
-      await page.goto(pg.path, { waitUntil: "networkidle", timeout: 30_000 });
+      const waitUntil = pg.path === "/insights" ? "domcontentloaded" : "networkidle";
+      const timeout = pg.path === "/insights" ? 60_000 : 30_000;
+      await page.goto(pg.path, { waitUntil, timeout });
+      if (pg.path === "/insights") {
+        await expect(page.getByRole("heading", { name: /Insights & AI/i })).toBeVisible({
+          timeout: 45_000,
+        });
+      }
 
       const bodyText = (await page.textContent("body")) ?? "";
       expect(

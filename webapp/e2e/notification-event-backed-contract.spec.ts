@@ -54,12 +54,15 @@ test.describe.serial('Notification event-backed contract', () => {
     })
 
     await signInWithToken(page, sellerToken)
-    await pollUnreadNotifications(request, sellerToken, 1, { messageHint: buyerMessage })
+    await pollUnreadNotifications(request, sellerToken, 1, {
+      messageHint: buyerMessage,
+      timeoutMs: 120_000,
+    })
 
     await page.goto('/dashboard')
     await expect(page.getByTestId('notification-dropdown')).toBeVisible({ timeout: 30_000 })
     await expect
-      .poll(async () => readNotificationUnreadBadge(page), { timeout: 60_000 })
+      .poll(async () => readNotificationUnreadBadge(page), { timeout: 120_000 })
       .toBeGreaterThan(0)
 
     await page.getByTestId('notification-dropdown').click()

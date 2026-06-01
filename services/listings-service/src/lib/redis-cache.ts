@@ -82,16 +82,19 @@ const LISTING_CACHE_UPDATE_SCRIPT = `
   return 'OK'
 `;
 
-// Lua script for atomic cache invalidation (pattern-based)
+// Lua script for pattern invalidation via SCAN (no KEYS — runtime contract)
 const CACHE_INVALIDATE_PATTERN_SCRIPT = `
   local pattern = KEYS[1]
-  local keys = redis.call('KEYS', pattern)
+  local cursor = "0"
   local deleted = 0
-  
-  if #keys > 0 then
-    deleted = redis.call('DEL', unpack(keys))
-  end
-  
+  repeat
+    local scan = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', 200)
+    cursor = scan[1]
+    local keys = scan[2]
+    if #keys > 0 then
+      deleted = deleted + redis.call('DEL', unpack(keys))
+    end
+  until cursor == "0"
   return deleted
 `;
 

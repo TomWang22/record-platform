@@ -1534,6 +1534,14 @@ e2e-full-strict: ## Playwright E2E against record-platform.test (strict env; req
 	  export E2E_API_BASE="https://record-platform.test" && \
 	  pnpm --filter webapp exec playwright test
 
+.PHONY: rp-frontend-screenshot-strict-contract rp-frontend-screenshot-staleness-check
+
+rp-frontend-screenshot-strict-contract: ## Contract screenshot OCR guard (CONTRACT_ONLY=1)
+	CONTRACT_ONLY=1 bash $(SCRIPTS)/rp-frontend-screenshot-strict-guard.sh
+
+rp-frontend-screenshot-staleness-check: ## Fail on undated active contract screenshots
+	bash $(SCRIPTS)/rp-frontend-screenshot-staleness-check.sh
+
 test-e2e-integrated: ## Port-forward api-gateway + Playwright (needs running cluster)
 	cd $(REPO_ROOT) && pnpm run test:e2e:integrated
 

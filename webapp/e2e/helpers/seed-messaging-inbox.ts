@@ -15,17 +15,6 @@ export async function ensureInboxThreadForFilters(
   const listingTitle = `Filter inbox seed ${Date.now()}`
   const token = await obtainAuthToken(request)
   const headers = { Authorization: `Bearer ${token}` }
-  const list = await request.get('/api/messages/conversations', { headers })
-  if (list.ok()) {
-    const body = (await list.json()) as unknown
-    const count = Array.isArray(body)
-      ? body.length
-      : ((body as { items?: unknown[] })?.items?.length ?? 0)
-    if (count > 0) {
-      return { listingTitle: 'Filter' }
-    }
-  }
-
   const sellerToken = await obtainSellerContractToken(request)
   const sellerId = userIdFromJwt(sellerToken)
   if (!sellerId) throw new Error('seller contract user id missing from JWT')

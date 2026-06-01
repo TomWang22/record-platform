@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sync repo proto/ → infra/k8s/base/config/proto for the proto-files ConfigMap.
-# Required before kubectl kustomize (grpc-clients.ts loads records/social/shopping/etc. at import).
+# Required before kubectl kustomize (grpc-clients.ts loads records/messaging/shopping/etc. at import).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$ROOT/proto"
@@ -42,7 +42,12 @@ for f in \
   auction-monitor.proto python-ai.proto; do
   _sync "$f" || FAIL=1
 done
-_sync_optional social.proto
+if [[ "${RP_SKIP_SOCIAL_SERVICE}" != "1" ]] && [[ -f "$SRC/social.proto" ]]; then
+  _sync social.proto || FAIL=$((FAIL + 1))
+else
+  rm -f "$DST/social.proto" "$DST/events/social.proto" 2>/dev/null || true
+  echo "  skipped social.proto (messaging-service replaced social)"
+fi
 if [[ "${RP_SKIP_BOOKING_SERVICE}" != "1" ]] && [[ -f "$SRC/booking.proto" ]]; then
   _sync booking.proto || FAIL=1
 else

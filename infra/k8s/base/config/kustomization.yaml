@@ -23,4 +23,3 @@ configMapGenerator:
       - analytics.proto=proto/analytics.proto
       - auction-monitor.proto=proto/auction-monitor.proto
       - python-ai.proto=proto/python-ai.proto
-      - social.proto=proto/social.proto

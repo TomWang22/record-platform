@@ -63,16 +63,16 @@ const recordsPackageDefinition = protoLoader.loadSync(RECORDS_PROTO_PATH, {
 });
 const recordsProto = grpc.loadPackageDefinition(recordsPackageDefinition) as any;
 
-// Load social proto
-const SOCIAL_PROTO_PATH = resolveProtoPath("social.proto");
-const socialPackageDefinition = protoLoader.loadSync(SOCIAL_PROTO_PATH, {
+// Load messaging proto (forum + DMs; replaces legacy social-service)
+const MESSAGING_PROTO_PATH = resolveProtoPath("messaging.proto");
+const messagingPackageDefinition = protoLoader.loadSync(MESSAGING_PROTO_PATH, {
   keepCase: true,
   longs: String,
   enums: String,
   defaults: true,
   oneofs: true,
 });
-const socialProto = grpc.loadPackageDefinition(socialPackageDefinition) as any;
+const messagingProto = grpc.loadPackageDefinition(messagingPackageDefinition) as any;
 
 // Load listings proto
 const LISTINGS_PROTO_PATH = resolveProtoPath("listings.proto");
@@ -153,9 +153,9 @@ export function createRecordsClient(address: string = "records-service:50051") {
   return createClientWithOptions(RecordsService, address, buildCredentials());
 }
 
-export function createSocialClient(address: string = "social-service:50056") {
-  const SocialService = socialProto.social.SocialService;
-  return createClientWithOptions(SocialService, address, buildCredentials());
+export function createMessagingClient(address: string = "messaging-service:50064") {
+  const MessagingService = messagingProto.messaging.v1.MessagingService;
+  return createClientWithOptions(MessagingService, address, buildCredentials());
 }
 
 export function createListingsClient(address: string = "listings-service:50057") {

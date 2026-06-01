@@ -87,7 +87,7 @@ ok "Base and overlay applied"
 
 # --- 8. Build :dev images (Colima uses host Docker; images must exist for deployments) ---
 SKIP_IMAGES="${SKIP_IMAGES:-0}"
-SERVICES=(api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service auction-monitor)
+SERVICES=(api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service shopping-service auction-monitor)
 if [[ "$SKIP_IMAGES" != "1" ]] && command -v docker &>/dev/null; then
   say "Building :dev images (Colima uses same Docker; pods will use these)..."
   KARCH=$(kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}' 2>/dev/null || uname -m)

@@ -78,7 +78,7 @@ ok "Caddy deploy applied"
 
 # --- 8. Build and import app images into k3d ---
 SKIP_IMAGES="${SKIP_IMAGES:-0}"
-SERVICES=(api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service auction-monitor)
+SERVICES=(api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service shopping-service auction-monitor)
 if [[ "$SKIP_IMAGES" != "1" ]] && command -v docker &>/dev/null; then
   say "Building :dev images and importing into k3d..."
   KARCH=$(kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}' 2>/dev/null || uname -m)

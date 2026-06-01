@@ -47,6 +47,8 @@ if [[ -z "${KUBECTL_PORT_FORWARD:-}" ]]; then
 fi
 
 NS="record-platform"
+# Legacy social-service removed — forum/DMs live on messaging-service (set SKIP_SOCIAL=0 only for old harness experiments).
+export SKIP_SOCIAL="${SKIP_SOCIAL:-1}"
 HOST="${HOST:-record.local}"
 # Prefer a curl that supports HTTP/3 (--http3): Homebrew curl has it; system curl on macOS does not.
 # This avoids Docker-bridge HTTP/3 (exit 28) by using native curl to LB IP when available.
@@ -623,7 +625,7 @@ if [[ "$AUTH_SCHEMA_FOUND" == "false" ]]; then
   warn "  → Or run: kubectl apply -k infra/k8s/overlays/dev (to run seed jobs)"
 fi
 
-# Per-test DB verification: after each test that creates data, check the pertinent DB (canonical map: 5433=records, 5434=social, 5435=listings, 5436=shopping, 5437=auth, 5438=postgres, 5439=analytics, 5440=python_ai)
+# Per-test DB verification: after each test that creates data, check the pertinent DB (canonical map: 5433=records, 5434=messaging/postgres, 5435=listings, 5436=shopping, 5437=auth, 5438=auction-monitor, 5439=analytics, 5440=python_ai)
 verify_db_after_test() {
   local port="$1"
   local db_name="${2:-records}"
@@ -678,21 +680,21 @@ verify_schema_exists 5433 records "SELECT 1 FROM listings.oauth_tokens LIMIT 1" 
 verify_schema_exists 5433 records "SELECT 1 FROM listings.search_history LIMIT 1" "listings.search_history" || true
 verify_schema_exists 5433 records "SELECT 1 FROM listings.user_settings LIMIT 1" "listings.user_settings" || true
 verify_schema_exists 5433 records "SELECT 1 FROM listings.watchlist LIMIT 1" "listings.watchlist (records)" || true
-# Port 5434 (social): forum + messages schemas — try social DB first, then records
-verify_schema_exists 5434 social "SELECT 1 FROM forum.posts LIMIT 1" "forum.posts" || verify_schema_exists 5434 records "SELECT 1 FROM forum.posts LIMIT 1" "forum.posts" || true
-verify_schema_exists 5434 social "SELECT 1 FROM forum.comments LIMIT 1" "forum.comments" || verify_schema_exists 5434 records "SELECT 1 FROM forum.comments LIMIT 1" "forum.comments" || true
-verify_schema_exists 5434 social "SELECT 1 FROM forum.comment_attachments LIMIT 1" "forum.comment_attachments" || verify_schema_exists 5434 records "SELECT 1 FROM forum.comment_attachments LIMIT 1" "forum.comment_attachments" || true
-verify_schema_exists 5434 social "SELECT 1 FROM forum.comment_votes LIMIT 1" "forum.comment_votes" || verify_schema_exists 5434 records "SELECT 1 FROM forum.comment_votes LIMIT 1" "forum.comment_votes" || true
-verify_schema_exists 5434 social "SELECT 1 FROM forum.post_attachments LIMIT 1" "forum.post_attachments" || verify_schema_exists 5434 records "SELECT 1 FROM forum.post_attachments LIMIT 1" "forum.post_attachments" || true
-verify_schema_exists 5434 social "SELECT 1 FROM forum.post_votes LIMIT 1" "forum.post_votes" || verify_schema_exists 5434 records "SELECT 1 FROM forum.post_votes LIMIT 1" "forum.post_votes" || true
-verify_schema_exists 5434 social "SELECT 1 FROM messages.messages LIMIT 1" "messages.messages" || verify_schema_exists 5434 records "SELECT 1 FROM messages.messages LIMIT 1" "messages.messages" || true
-verify_schema_exists 5434 social "SELECT 1 FROM messages.groups LIMIT 1" "messages.groups" || verify_schema_exists 5434 records "SELECT 1 FROM messages.groups LIMIT 1" "messages.groups" || true
-verify_schema_exists 5434 social "SELECT 1 FROM messages.group_members LIMIT 1" "messages.group_members" || verify_schema_exists 5434 records "SELECT 1 FROM messages.group_members LIMIT 1" "messages.group_members" || true
-verify_schema_exists 5434 social "SELECT 1 FROM messages.group_bans LIMIT 1" "messages.group_bans" || verify_schema_exists 5434 records "SELECT 1 FROM messages.group_bans LIMIT 1" "messages.group_bans" || true
-verify_schema_exists 5434 social "SELECT 1 FROM messages.message_attachments LIMIT 1" "messages.message_attachments" || verify_schema_exists 5434 records "SELECT 1 FROM messages.message_attachments LIMIT 1" "messages.message_attachments" || true
-verify_schema_exists 5434 social "SELECT 1 FROM messages.message_reads LIMIT 1" "messages.message_reads" || verify_schema_exists 5434 records "SELECT 1 FROM messages.message_reads LIMIT 1" "messages.message_reads" || true
-verify_schema_exists 5434 social "SELECT 1 FROM messages.user_archived_threads LIMIT 1" "messages.user_archived_threads" || verify_schema_exists 5434 records "SELECT 1 FROM messages.user_archived_threads LIMIT 1" "messages.user_archived_threads" || true
-verify_schema_exists 5434 social "SELECT 1 FROM messages.user_deleted_threads LIMIT 1" "messages.user_deleted_threads" || verify_schema_exists 5434 records "SELECT 1 FROM messages.user_deleted_threads LIMIT 1" "messages.user_deleted_threads" || true
+# Port 5434 (messaging): forum + messages schemas — try postgres DB first, then records
+verify_schema_exists 5434 postgres "SELECT 1 FROM forum.posts LIMIT 1" "forum.posts" || verify_schema_exists 5434 records "SELECT 1 FROM forum.posts LIMIT 1" "forum.posts" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM forum.comments LIMIT 1" "forum.comments" || verify_schema_exists 5434 records "SELECT 1 FROM forum.comments LIMIT 1" "forum.comments" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM forum.comment_attachments LIMIT 1" "forum.comment_attachments" || verify_schema_exists 5434 records "SELECT 1 FROM forum.comment_attachments LIMIT 1" "forum.comment_attachments" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM forum.comment_votes LIMIT 1" "forum.comment_votes" || verify_schema_exists 5434 records "SELECT 1 FROM forum.comment_votes LIMIT 1" "forum.comment_votes" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM forum.post_attachments LIMIT 1" "forum.post_attachments" || verify_schema_exists 5434 records "SELECT 1 FROM forum.post_attachments LIMIT 1" "forum.post_attachments" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM forum.post_votes LIMIT 1" "forum.post_votes" || verify_schema_exists 5434 records "SELECT 1 FROM forum.post_votes LIMIT 1" "forum.post_votes" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM messages.messages LIMIT 1" "messages.messages" || verify_schema_exists 5434 records "SELECT 1 FROM messages.messages LIMIT 1" "messages.messages" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM messages.groups LIMIT 1" "messages.groups" || verify_schema_exists 5434 records "SELECT 1 FROM messages.groups LIMIT 1" "messages.groups" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM messages.group_members LIMIT 1" "messages.group_members" || verify_schema_exists 5434 records "SELECT 1 FROM messages.group_members LIMIT 1" "messages.group_members" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM messages.group_bans LIMIT 1" "messages.group_bans" || verify_schema_exists 5434 records "SELECT 1 FROM messages.group_bans LIMIT 1" "messages.group_bans" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM messages.message_attachments LIMIT 1" "messages.message_attachments" || verify_schema_exists 5434 records "SELECT 1 FROM messages.message_attachments LIMIT 1" "messages.message_attachments" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM messages.message_reads LIMIT 1" "messages.message_reads" || verify_schema_exists 5434 records "SELECT 1 FROM messages.message_reads LIMIT 1" "messages.message_reads" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM messages.user_archived_threads LIMIT 1" "messages.user_archived_threads" || verify_schema_exists 5434 records "SELECT 1 FROM messages.user_archived_threads LIMIT 1" "messages.user_archived_threads" || true
+verify_schema_exists 5434 postgres "SELECT 1 FROM messages.user_deleted_threads LIMIT 1" "messages.user_deleted_threads" || verify_schema_exists 5434 records "SELECT 1 FROM messages.user_deleted_threads LIMIT 1" "messages.user_deleted_threads" || true
 # Port 5435 (listings): listings-service tables
 verify_schema_exists 5435 listings "SELECT 1 FROM listings.listings LIMIT 1" "listings.listings" || true
 verify_schema_exists 5435 listings "SELECT 1 FROM listings.auction_details LIMIT 1" "listings.auction_details" || true
@@ -804,17 +806,11 @@ check_service_ready "auth-service" 90 || warn "auth-service readiness check fail
 check_service_ready "records-service" 90 || warn "records-service readiness check failed, continuing anyway..."
 check_service_ready "api-gateway" 90 || warn "api-gateway readiness check failed, continuing anyway..."
 
-# Check social-service if it exists
-if kubectl -n "$NS" get deployment "social-service" >/dev/null 2>&1; then
-  check_service_ready "social-service" 90 || warn "social-service readiness check failed, continuing anyway..."
+# messaging-service owns forum + DMs (replaced social-service)
+if kubectl -n "$NS" get deployment "messaging-service" >/dev/null 2>&1; then
+  check_service_ready "messaging-service" 90 || warn "messaging-service readiness check failed, continuing anyway..."
 else
-  warn "social-service deployment not found, skipping social-service tests"
-  # Check if deployment files exist but just need to be applied
-  if [[ -f "infra/k8s/base/social-service/deploy.yaml" ]]; then
-    warn "  → Deployment files exist at infra/k8s/base/social-service/deploy.yaml"
-    warn "  → To deploy: kubectl apply -k infra/k8s/overlays/dev"
-  fi
-  SKIP_SOCIAL=1
+  warn "messaging-service deployment not found"
 fi
 
 # Check listings-service if it exists
@@ -1254,7 +1250,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
     ok "Create forum post works via HTTP/2"
     FORUM_POST_ID=$(echo "$FORUM_POST_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
     [[ -n "$FORUM_POST_ID" ]] && echo "Forum post ID: $FORUM_POST_ID"
-    verify_db_after_test 5434 social "SELECT COUNT(*) FROM forum.posts WHERE title = 'Test Forum Post'" "Test 6 DB: forum post in forum.posts" || true
+    verify_db_after_test 5434 postgres "SELECT COUNT(*) FROM forum.posts WHERE title = 'Test Forum Post'" "Test 6 DB: forum post in forum.posts" || true
   else
     warn "Create forum post failed - HTTP $FORUM_POST_CODE"
     echo "Response body: $(echo "$FORUM_POST_RESPONSE" | sed '$d' | head -5)"
@@ -1282,7 +1278,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
     if [[ "$FORUM_POST_H3_CODE" =~ ^(200|201)$ ]]; then
       ok "Create forum post works via HTTP/3"
       FORUM_POST_H3_ID=$(echo "$FORUM_POST_H3_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
-      verify_db_after_test 5434 social "SELECT COUNT(*) FROM forum.posts WHERE title = 'Test Forum Post H3'" "Test 6b DB: H3 forum post in forum.posts" || true
+      verify_db_after_test 5434 postgres "SELECT COUNT(*) FROM forum.posts WHERE title = 'Test Forum Post H3'" "Test 6b DB: H3 forum post in forum.posts" || true
     else
       warn "Create forum post via HTTP/3 failed - HTTP $FORUM_POST_H3_CODE"
       echo "Response body: $(echo "$FORUM_POST_H3_RESPONSE" | sed '$d' | head -5)"
@@ -1369,7 +1365,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${FO
     ADD_COMMENT_CODE=$(echo "$ADD_COMMENT_RESPONSE" | tail -1)
     if [[ "$ADD_COMMENT_CODE" =~ ^(200|201)$ ]]; then
       ok "Add comment to forum post works via HTTP/3"
-      [[ -n "${FORUM_POST_ID:-}" ]] && verify_db_after_test 5434 social "SELECT 1 FROM forum.comments WHERE post_id = '${FORUM_POST_ID}' AND content LIKE '%HTTP/3%' LIMIT 1" "Test 7b DB: comment in forum.comments" || true
+      [[ -n "${FORUM_POST_ID:-}" ]] && verify_db_after_test 5434 postgres "SELECT 1 FROM forum.comments WHERE post_id = '${FORUM_POST_ID}' AND content LIKE '%HTTP/3%' LIMIT 1" "Test 7b DB: comment in forum.comments" || true
       # Extract COMMENT_ID for vote tests
       [[ -z "${COMMENT_ID:-}" ]] && COMMENT_ID=$(echo "$ADD_COMMENT_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
       [[ -z "${COMMENT_ID:-}" ]] && command -v jq >/dev/null 2>&1 && COMMENT_ID=$(echo "$ADD_COMMENT_RESPONSE" | sed '$d' | jq -r '.id // empty' 2>/dev/null || echo "")
@@ -1402,7 +1398,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${FORUM_PO
     warn "Forum post vote via HTTP/2 failed (curl exit $POST_VOTE_RC)"
   elif [[ "$POST_VOTE_CODE" =~ ^(200|201)$ ]]; then
     ok "Forum post vote works via HTTP/2 (forum.post_votes)"
-    [[ -n "${USER1_ID:-}" ]] && ( verify_db_after_test 5434 social "SELECT 1 FROM forum.post_votes WHERE post_id = '${FORUM_POST_ID}'::uuid AND user_id = '${USER1_ID}'::uuid LIMIT 1" "Test 7c DB: post_votes" || verify_db_after_test 5434 records "SELECT 1 FROM forum.post_votes WHERE post_id = '${FORUM_POST_ID}'::uuid AND user_id = '${USER1_ID}'::uuid LIMIT 1" "Test 7c DB: post_votes (records)" ) || true
+    [[ -n "${USER1_ID:-}" ]] && ( verify_db_after_test 5434 postgres "SELECT 1 FROM forum.post_votes WHERE post_id = '${FORUM_POST_ID}'::uuid AND user_id = '${USER1_ID}'::uuid LIMIT 1" "Test 7c DB: post_votes" || verify_db_after_test 5434 records "SELECT 1 FROM forum.post_votes WHERE post_id = '${FORUM_POST_ID}'::uuid AND user_id = '${USER1_ID}'::uuid LIMIT 1" "Test 7c DB: post_votes (records)" ) || true
   else
     warn "Forum post vote via HTTP/2 failed - HTTP $POST_VOTE_CODE"
     [[ "$POST_VOTE_CODE" == "502" ]] && info "  502 on forum vote: If schema preflight passed, run ./scripts/diagnose-502-and-analytics.sh. Ensure Postgres (not SSH) listens on 0.0.0.0:5434 so pods (host.docker.internal) can connect."
@@ -1425,7 +1421,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${FORUM_PO
     warn "Forum post vote via HTTP/3 failed (curl exit $POST_VOTE_H3_RC)"
   elif [[ "$POST_VOTE_H3_CODE" =~ ^(200|201)$ ]]; then
     ok "Forum post vote works via HTTP/3 (forum.post_votes)"
-    [[ -n "${USER1_ID:-}" ]] && ( verify_db_after_test 5434 social "SELECT 1 FROM forum.post_votes WHERE post_id = '${FORUM_POST_ID}'::uuid AND user_id = '${USER1_ID}'::uuid LIMIT 1" "Test 7d DB: H3 post_votes" || verify_db_after_test 5434 records "SELECT 1 FROM forum.post_votes WHERE post_id = '${FORUM_POST_ID}'::uuid AND user_id = '${USER1_ID}'::uuid LIMIT 1" "Test 7d DB: H3 post_votes (records)" ) || true
+    [[ -n "${USER1_ID:-}" ]] && ( verify_db_after_test 5434 postgres "SELECT 1 FROM forum.post_votes WHERE post_id = '${FORUM_POST_ID}'::uuid AND user_id = '${USER1_ID}'::uuid LIMIT 1" "Test 7d DB: H3 post_votes" || verify_db_after_test 5434 records "SELECT 1 FROM forum.post_votes WHERE post_id = '${FORUM_POST_ID}'::uuid AND user_id = '${USER1_ID}'::uuid LIMIT 1" "Test 7d DB: H3 post_votes (records)" ) || true
   else
     warn "Forum post vote via HTTP/3 failed - HTTP $POST_VOTE_H3_CODE"
   fi
@@ -1447,7 +1443,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${COMMENT_
     warn "Forum comment vote via HTTP/2 failed (curl exit $COMMENT_VOTE_RC)"
   elif [[ "$COMMENT_VOTE_CODE" =~ ^(200|201)$ ]]; then
     ok "Forum comment vote works via HTTP/2 (forum.comment_votes)"
-    [[ -n "${USER1_ID:-}" ]] && verify_db_after_test 5434 social "SELECT 1 FROM forum.comment_votes WHERE comment_id = '${COMMENT_ID}' AND user_id = '${USER1_ID}' LIMIT 1" "Test 7e DB: comment_votes" || true
+    [[ -n "${USER1_ID:-}" ]] && verify_db_after_test 5434 postgres "SELECT 1 FROM forum.comment_votes WHERE comment_id = '${COMMENT_ID}' AND user_id = '${USER1_ID}' LIMIT 1" "Test 7e DB: comment_votes" || true
   else
     warn "Forum comment vote via HTTP/2 failed - HTTP $COMMENT_VOTE_CODE"
   fi
@@ -1471,7 +1467,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${COMMENT_
     warn "Forum comment vote via HTTP/3 failed (curl exit $COMMENT_VOTE_H3_RC)"
   elif [[ "$COMMENT_VOTE_H3_CODE" =~ ^(200|201)$ ]]; then
     ok "Forum comment vote works via HTTP/3 (forum.comment_votes)"
-    [[ -n "${USER1_ID:-}" ]] && verify_db_after_test 5434 social "SELECT 1 FROM forum.comment_votes WHERE comment_id = '${COMMENT_ID}' AND user_id = '${USER1_ID}' LIMIT 1" "Test 7f DB: H3 comment_votes" || true
+    [[ -n "${USER1_ID:-}" ]] && verify_db_after_test 5434 postgres "SELECT 1 FROM forum.comment_votes WHERE comment_id = '${COMMENT_ID}' AND user_id = '${USER1_ID}' LIMIT 1" "Test 7f DB: H3 comment_votes" || true
   else
     warn "Forum comment vote via HTTP/3 failed - HTTP $COMMENT_VOTE_H3_CODE"
   fi
@@ -1577,7 +1573,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
     ok "Create group works via HTTP/2"
     GROUP_ID=$(echo "$CREATE_GROUP_RESPONSE" | sed '$d' | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || echo "")
     [[ -n "$GROUP_ID" ]] && echo "Group ID: $GROUP_ID"
-    [[ -n "$GROUP_ID" ]] && verify_db_after_test 5434 social "SELECT 1 FROM messages.groups WHERE id = '${GROUP_ID}' AND name = 'My Custom Group Name' LIMIT 1" "Test 9b DB: group in messages.groups" || true
+    [[ -n "$GROUP_ID" ]] && verify_db_after_test 5434 postgres "SELECT 1 FROM messages.groups WHERE id = '${GROUP_ID}' AND name = 'My Custom Group Name' LIMIT 1" "Test 9b DB: group in messages.groups" || true
   else
     warn "Create group failed - HTTP $CREATE_GROUP_CODE"
     echo "Response body: $(echo "$CREATE_GROUP_RESPONSE" | sed '$d' | head -5)"
@@ -1602,7 +1598,7 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${GROUP_ID
     warn "Add member request failed (curl exit $ADD_MEMBER_RC)"
   elif [[ "$ADD_MEMBER_CODE" =~ ^(200|201)$ ]]; then
     ok "Add member to group works via HTTP/2"
-    [[ -n "${GROUP_ID:-}" ]] && [[ -n "${USER2_ID:-}" ]] && verify_db_after_test 5434 social "SELECT 1 FROM messages.group_members WHERE group_id = '${GROUP_ID}' AND user_id = '${USER2_ID}' LIMIT 1" "Test 9c DB: member in messages.group_members" || true
+    [[ -n "${GROUP_ID:-}" ]] && [[ -n "${USER2_ID:-}" ]] && verify_db_after_test 5434 postgres "SELECT 1 FROM messages.group_members WHERE group_id = '${GROUP_ID}' AND user_id = '${USER2_ID}' LIMIT 1" "Test 9c DB: member in messages.group_members" || true
   else
     warn "Add member to group failed - HTTP $ADD_MEMBER_CODE"
     echo "Response body: $(echo "$ADD_MEMBER_RESPONSE" | sed '$d' | head -5)"
@@ -4086,7 +4082,7 @@ grpc_test() {
         case "$service_name_lower" in
           auth) svc_pod=$(kubectl -n "$NS" get pods -l app=auth-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
           records) svc_pod=$(kubectl -n "$NS" get pods -l app=records-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
-          social) svc_pod=$(kubectl -n "$NS" get pods -l app=social-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
+          messaging) svc_pod=$(kubectl -n "$NS" get pods -l app=messaging-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
           listings) svc_pod=$(kubectl -n "$NS" get pods -l app=listings-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
           analytics) svc_pod=$(kubectl -n "$NS" get pods -l app=analytics-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
           shopping) svc_pod=$(kubectl -n "$NS" get pods -l app=shopping-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
@@ -4101,7 +4097,7 @@ grpc_test() {
           shopping) grpc_port="50058" ;;
           auctionmonitor) grpc_port="50059" ;;
           pythonai) grpc_port="50060" ;;
-          social) grpc_port="50056" ;;
+          messaging) grpc_port="50064" ;;
           listings) grpc_port="50057" ;;
           analytics) grpc_port="50054" ;;
         esac
@@ -4673,33 +4669,33 @@ else
     fi
   fi
 
-  # Test gRPC Social Service - HealthCheck (Envoy + strict TLS with 18s cap)
-  say "Test 15e: gRPC Social Service - HealthCheck via HTTP/2 (Envoy + Strict TLS/mTLS)"
+  # Test gRPC Messaging Service - HealthCheck (replaces legacy social-service)
+  say "Test 15e: gRPC Messaging Service - HealthCheck via HTTP/2 (Envoy + Strict TLS/mTLS)"
   [[ "${ctx:-}" == *"colima"* ]] && sleep 1
-  GRPC_SOCIAL_HEALTH=$(_grpc_test_with_cap 45 "Social" "grpc.health.v1.Health/Check" "health.proto" '{"service":""}' 10)
-  if echo "$GRPC_SOCIAL_HEALTH" | grep -q -iE "\"status\":\"SERVING\"|SERVING"; then
-    ok "gRPC Social HealthCheck works via Envoy (HTTP/2)"
+  GRPC_MESSAGING_HEALTH=$(_grpc_test_with_cap 45 "Messaging" "grpc.health.v1.Health/Check" "health.proto" '{"service":""}' 10)
+  if echo "$GRPC_MESSAGING_HEALTH" | grep -q -iE "\"status\":\"SERVING\"|SERVING"; then
+    ok "gRPC Messaging HealthCheck works via Envoy (HTTP/2)"
   else
-    warn "gRPC Social HealthCheck failed via Envoy"
-    echo "Response: $GRPC_SOCIAL_HEALTH" | head -3
+    warn "gRPC Messaging HealthCheck failed via Envoy"
+    echo "Response: $GRPC_MESSAGING_HEALTH" | head -3
   fi
   [[ "${ctx:-}" == *"colima"* ]] && sleep 1
   if [[ "${ctx:-}" == *"colima"* ]]; then
-    GRPC_SOCIAL_HEALTH_STRICT=""
+    GRPC_MESSAGING_HEALTH_STRICT=""
   else
-    GRPC_SOCIAL_HEALTH_STRICT=$(_run_grpc_strict_never_hang 8 "Social" "grpc.health.v1.Health/Check" "health.proto" '{"service":""}' 8)
+    GRPC_MESSAGING_HEALTH_STRICT=$(_run_grpc_strict_never_hang 8 "Messaging" "grpc.health.v1.Health/Check" "health.proto" '{"service":""}' 8)
   fi
-  if echo "$GRPC_SOCIAL_HEALTH_STRICT" | grep -q -iE "\"status\":\"SERVING\"|SERVING"; then
-    ok "gRPC Social HealthCheck works via port-forward (Strict TLS/mTLS)"
-  elif [[ "${ctx:-}" == *"colima"* ]] || echo "$GRPC_SOCIAL_HEALTH_STRICT" | grep -qE "Session open refused by peer|Port-forward failed to establish|ControlSocket.*already exists"; then
-    if echo "$GRPC_SOCIAL_HEALTH" | grep -q -iE "\"status\":\"SERVING\"|SERVING"; then
+  if echo "$GRPC_MESSAGING_HEALTH_STRICT" | grep -q -iE "\"status\":\"SERVING\"|SERVING"; then
+    ok "gRPC Messaging HealthCheck works via port-forward (Strict TLS/mTLS)"
+  elif [[ "${ctx:-}" == *"colima"* ]] || echo "$GRPC_MESSAGING_HEALTH_STRICT" | grep -qE "Session open refused by peer|Port-forward failed to establish|ControlSocket.*already exists"; then
+    if echo "$GRPC_MESSAGING_HEALTH" | grep -q -iE "\"status\":\"SERVING\"|SERVING"; then
       :  # Envoy path used (Colima / LB IP mode)
     else
-      info "gRPC Social HealthCheck: port-forward limit; Envoy path did not succeed — check Envoy/gRPC routing"
+      info "gRPC Messaging HealthCheck: port-forward limit; Envoy path did not succeed — check Envoy/gRPC routing"
     fi
   else
-    warn "gRPC Social HealthCheck strict TLS/mTLS verification failed"
-    echo "Response: $GRPC_SOCIAL_HEALTH_STRICT" | head -3
+    warn "gRPC Messaging HealthCheck strict TLS/mTLS verification failed"
+    echo "Response: $GRPC_MESSAGING_HEALTH_STRICT" | head -3
   fi
 
   # Test gRPC Listings Service - HealthCheck: Envoy + strict TLS/mTLS port-forward (always run both)

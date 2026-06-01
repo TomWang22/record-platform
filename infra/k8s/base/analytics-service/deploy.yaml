@@ -14,7 +14,7 @@ spec:
       labels: { app: analytics-service }
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "4004"
+        prometheus.io/port: "4017"
         prometheus.io/path: "/metrics"
     spec:
       hostAliases:
@@ -41,9 +41,9 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 4004
+              containerPort: 4017
             - name: grpc
-              containerPort: 50054
+              containerPort: 50067
           # NEW: pull env from shared ConfigMap + Secret
           envFrom:
             - configMapRef: { name: app-config }
@@ -60,7 +60,7 @@ spec:
             - name: DB_IDLE_TIMEOUT_MS
               value: "0"
             - name: GRPC_PORT
-              value: "50054"
+              value: "50067"
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_REQUIRE_CLIENT_CERT
@@ -76,7 +76,10 @@ spec:
             - name: NODE_EXTRA_CA_CERTS
               value: "/certs/dev-root.pem"
             - name: KAFKA_BROKER
-              value: "kafka-external.record-platform.svc.cluster.local:9093"
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: KAFKA_BROKER
             - name: KAFKA_USE_SSL
               value: "true"
             - name: KAFKA_SSL_ENABLED
@@ -96,6 +99,29 @@ spec:
             - name: kafka-ssl-certs
               mountPath: /etc/kafka/secrets
               readOnly: true
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+
           resources:
             requests:
               cpu: "500m"
@@ -103,61 +129,7 @@ spec:
             limits:
               cpu: "2"
               memory: "2Gi"
-          # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2 only
-          readinessProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50054
-                - -service=analytics.AnalyticsService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=30s
-                - -rpc-timeout=30s
-            initialDelaySeconds: 90
-            periodSeconds: 15
-            timeoutSeconds: 35
-            failureThreshold: 6
-          livenessProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50054
-                - -service=analytics.AnalyticsService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=30s
-                - -rpc-timeout=30s
-            initialDelaySeconds: 150
-            periodSeconds: 30
-            timeoutSeconds: 35
-            failureThreshold: 6
-          startupProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50054
-                - -service=analytics.AnalyticsService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=30s
-                - -rpc-timeout=30s
-            initialDelaySeconds: 45
-            periodSeconds: 15
-            timeoutSeconds: 35
-            failureThreshold: 30
+
       volumes:
         - name: proto-files
           configMap:

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package events.messaging.v1;
 
-option go_package = "github.com/yourorg/off-campus-housing/proto/events/messaging/v1";
+option go_package = "github.com/TomWang22/record-platform/proto/events/messaging/v1";
 
 // ===== Envelope (for Kafka) =====
 

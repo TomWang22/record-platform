@@ -60,6 +60,9 @@ elif [[ -d "$KUST_DIR/base/config" ]]; then
   kubectl apply -f "$KUST_DIR/base/config/app-config.yaml" -n "$NS" --request-timeout=30s
   ok "ConfigMap app-config applied (proto sync skipped)"
 fi
+if [[ -x "$SCRIPT_DIR/rp-ensure-kafka-ssl-clients.sh" ]]; then
+  HOUSING_NS="$NS" bash "$SCRIPT_DIR/rp-ensure-kafka-ssl-clients.sh" || warn "kafka-ssl client repair skipped (run kafka-ssl-from-dev-root.sh)"
+fi
 
 # 4b) Strict envelope
 if [[ "${SKIP_STRICT_ENVELOPE:-0}" != "1" ]] && command -v node &>/dev/null; then

@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package media;
 
-option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/media";
+option go_package = "github.com/TomWang22/record-platform/proto/media";
 
-// Media service — signed URLs only. No file streaming via gRPC.
+// Media service — signed URLs only. No file streaming via gRPC. Client uploads directly to object storage (MinIO/S3).
 service MediaService {
   rpc CreateUploadUrl(CreateUploadUrlRequest) returns (CreateUploadUrlResponse);
   rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse);

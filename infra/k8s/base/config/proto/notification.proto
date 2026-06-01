@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package notification;
 
-option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/notification";
+option go_package = "github.com/TomWang22/record-platform/proto/notification";
 
 // Notification service – consumer only. Get preferences; delivery triggered via Kafka only. No SendNotification RPC.
 service NotificationService {

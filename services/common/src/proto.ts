@@ -11,14 +11,25 @@ const DEFAULT_PROTO_DIRS = [
   path.resolve(__dirname, "../../proto"),
 ];
 
+/** ConfigMap keys use '__' instead of '/' for nested paths (proto/events/foo.proto → events__foo.proto). */
+function protoConfigMapKeyVariants(fileName: string): string[] {
+  const variants = [fileName];
+  if (fileName.includes("/")) {
+    variants.push(fileName.replace(/\//g, "__"));
+  }
+  return variants;
+}
+
 export function resolveProtoPath(fileName: string): string {
   const tried: string[] = [];
   for (const candidateRoot of DEFAULT_PROTO_DIRS) {
     if (!candidateRoot) continue;
-    const candidate = path.resolve(candidateRoot, fileName);
-    tried.push(candidate);
-    if (fs.existsSync(candidate)) {
-      return candidate;
+    for (const variant of protoConfigMapKeyVariants(fileName)) {
+      const candidate = path.resolve(candidateRoot, variant);
+      tried.push(candidate);
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
     }
   }
   throw new Error(

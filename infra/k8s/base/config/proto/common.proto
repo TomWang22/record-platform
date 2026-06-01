@@ -4,7 +4,7 @@ package common;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/common";
+option go_package = "github.com/TomWang22/record-platform/proto/common";
 
 // ---------------------------------------------------------------------------
 // Infra-grade common types. Design once, freeze. No domain-specific messages.

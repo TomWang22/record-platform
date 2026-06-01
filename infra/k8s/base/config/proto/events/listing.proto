@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package events.listing;
+
+option go_package = "github.com/TomWang22/record-platform/proto/events/listing";
+
+// Kafka topic: ${ENV_PREFIX}.listing.events (see scripts/lib/rp-kafka-event-topics-from-proto.sh)
+
+// Legacy housing-shaped events (kept for backward compatibility during port).
+message ListingCreatedV1 {
+  string listing_id = 1;
+  string user_id = 2;
+  int32 price_cents = 3;
+  string effective_from = 4;
+  string effective_until = 5;
+  double latitude = 6;
+  double longitude = 7;
+}
+
+message ListingUpdatedV1 {
+  string listing_id = 1;
+  int32 price_cents = 2;
+  string status = 3; // active, paused, closed
+}
+
+message ListingDeletedV1 {
+  string listing_id = 1;
+}
+
+message ListingPriceUpdatedV1 {
+  string listing_id = 1;
+  int32 old_price_cents = 2;
+  int32 new_price_cents = 3;
+}
+
+// Record Platform marketplace listing (vinyl / collectibles).
+// Grades use Japanese goldmine-style tokens (e.g. NM, EX+, VG+) — not integer enums.
+// Canonical Record Platform listing event — no address, phone, email, or coordinates.
+message RecordListingCreatedV1 {
+  string listing_id = 1;
+  string seller_user_id = 2;
+  string record_id = 3;
+  string catalog_id = 4;
+  int32 price_cents = 5;
+  string currency = 6;
+  string record_grade = 7;
+  string sleeve_grade = 8;
+  string obi_grade = 9;
+  bool has_obi = 10;
+  string media_type = 11;
+  string shipping_method = 12;
+  int32 shipping_cost_cents = 13;
+  string seller_city = 14;
+  string seller_region = 15;
+  string created_at = 16;
+  string updated_at = 17;
+}
+
+message RecordListingUpdatedV1 {
+  string listing_id = 1;
+  int32 price_cents = 2;
+  string status = 3;
+  string record_grade = 4;
+  string sleeve_grade = 5;
+  string obi_grade = 6;
+}
+
+message RecordListingSoldV1 {
+  string listing_id = 1;
+  string buyer_user_id = 2;
+  string order_id = 3; // shopping-service order
+}

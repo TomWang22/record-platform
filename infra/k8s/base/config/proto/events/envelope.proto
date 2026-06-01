@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package events;
 
-option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/events";
+option go_package = "github.com/TomWang22/record-platform/proto/events";
 
 // EventEnvelope is the only shape allowed on Kafka. All domain event payloads
 // are serialized into payload; type/version/source/entity_id enable routing and idempotency.

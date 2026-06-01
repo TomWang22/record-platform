@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package messaging.v1;
 
-option go_package = "github.com/yourorg/off-campus-housing/proto/messaging/v1";
+option go_package = "github.com/TomWang22/record-platform/proto/messaging/v1";
 
 // Messaging service (Forum + DMs). RPC layer: messaging.v1.MessagingService.
 // Event layer (Kafka, immutable): proto/events/messaging/v1/messaging_events.proto — topic messaging.events.v1

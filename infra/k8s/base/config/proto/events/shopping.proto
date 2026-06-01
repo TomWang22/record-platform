@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package events.shopping;
+
+option go_package = "github.com/TomWang22/record-platform/proto/events/shopping";
+
+// Payloads for ${ENV_PREFIX}.shopping.events.
+
+message CartUpdatedV1 {
+  string user_id = 1;
+  string cart_item_id = 2;
+  string item_type = 3;
+  string item_id = 4;
+  string updated_at = 5;
+}
+
+message OrderPlacedV1 {
+  string order_id = 1;
+  string user_id = 2;
+  string placed_at = 3;
+}
+
+message WatchlistChangedV1 {
+  string user_id = 1;
+  string item_type = 2;
+  string item_id = 3;
+  string action = 4; // added | removed
+  string changed_at = 5;
+}
+
+message OrderCreatedV1 {
+  string order_id = 1;
+  string buyer_user_id = 2;
+  string seller_user_id = 3;
+  string listing_id = 4;
+  int32 total_cents = 5;
+  string currency = 6;
+  string created_at = 7;
+}
+
+message OrderPaidV1 {
+  string order_id = 1;
+  string paid_at = 2;
+  string payment_ref = 3;
+}
+
+message ShipmentCreatedV1 {
+  string shipment_id = 1;
+  string order_id = 2;
+  string carrier = 3;
+  string created_at = 4;
+}
+
+message ShipmentInTransitV1 {
+  string shipment_id = 1;
+  string in_transit_at = 2;
+}
+
+message ShipmentDeliveredV1 {
+  string shipment_id = 1;
+  string delivered_at = 2;
+}
+
+message ShipmentCancelledV1 {
+  string shipment_id = 1;
+  string order_id = 2;
+  string cancelled_at = 3;
+  string reason = 4;
+}

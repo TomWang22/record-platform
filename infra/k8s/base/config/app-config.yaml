@@ -63,7 +63,11 @@ data:
   # In-cluster Ollama (analytics listing-feel). Override in dev overlay for host Metal.
   OLLAMA_BASE_URL: http://ollama.record-platform.svc.cluster.local:11434
   OLLAMA_MODEL: llama3.2:1b
-  OLLAMA_WARM_MARKER_PATH: /tmp/ollama-warm.ok
+  OLLAMA_WARM_MARKER_PATH: /var/ollama-warm/model-warmed
+  OLLAMA_NUM_PARALLEL: "1"
+  OLLAMA_MAX_QUEUE: "4"
+  OLLAMA_KEEP_ALIVE: "5m"
+  OLLAMA_LOAD_TIMEOUT: "10m"
 
   # Kafka: strict TLS only (no plaintext/cleartext). All client connections use port 9093 (SSL).
   # Broker PLAINTEXT is bound to 127.0.0.1 only (healthcheck); clients must use SSL.

@@ -66,4 +66,14 @@ fi
 
 echo "▶ wait for kafka rollout"
 kubectl rollout status statefulset/kafka -n "$NS" --timeout=480s
+
+echo "▶ apply kafka-metallb-alignment-exporter (LB IP vs EXTERNAL advert drift metrics)"
+kubectl apply -k "$REPO_ROOT/infra/k8s/kafka-kraft-metallb/" --request-timeout=120s
+kubectl rollout status deployment/kafka-metallb-alignment-exporter -n "$NS" --timeout=120s 2>/dev/null || true
+
+if [[ -x "$SCRIPT_DIR/rp-ensure-kafka-ssl-clients.sh" ]]; then
+  HOUSING_NS="$NS" RP_KAFKA_SSL_RESTART_APPS=0 bash "$SCRIPT_DIR/rp-ensure-kafka-ssl-clients.sh" || \
+    echo "⚠️  kafka-ssl-secret client mTLS incomplete — run kafka-ssl-from-dev-root.sh + apply-rp-kafka-ssl-secret.sh" >&2
+fi
+
 echo "✅ apply-kafka-kraft-staged complete"

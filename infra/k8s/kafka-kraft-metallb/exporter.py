@@ -31,6 +31,32 @@ g_runtime_drift = Gauge(
 )
 
 
+def _read_advertised_listeners_line(v1: client.CoreV1Api, pod_name: str) -> str:
+    """Exec into broker to read advertised.listeners (requires pods/exec create+get)."""
+    try:
+        out = stream(
+            v1.connect_get_namespaced_pod_exec,
+            pod_name,
+            NS,
+            container="kafka",
+            command=[
+                "grep",
+                "^advertised.listeners=",
+                "/etc/kafka/kafka.properties",
+            ],
+            stderr=True,
+            stdin=False,
+            stdout=True,
+            tty=False,
+        )
+        return (out or "").strip()
+    except client.exceptions.ApiException:
+        return ""
+    except Exception:
+        # kubernetes-client can raise ApiException(0) with body=None on WS 403 — do not crash loop
+        return ""
+
+
 def external_ip_from_advertised(line: str) -> str:
     m = re.search(r"EXTERNAL://([0-9]+(?:\.[0-9]+){3}):9094", line)
     return m.group(1) if m else ""
@@ -54,25 +80,7 @@ def main() -> None:
             except client.exceptions.ApiException:
                 pass
 
-            adv_line = ""
-            try:
-                adv_line = stream(
-                    v1.connect_get_namespaced_pod_exec,
-                    pod_name,
-                    NS,
-                    container="kafka",
-                    command=[
-                        "grep",
-                        "^advertised.listeners=",
-                        "/etc/kafka/kafka.properties",
-                    ],
-                    stderr=True,
-                    stdin=False,
-                    stdout=True,
-                    tty=False,
-                )
-            except client.exceptions.ApiException:
-                adv_line = ""
+            adv_line = _read_advertised_listeners_line(v1, pod_name)
 
             ext_ip = external_ip_from_advertised(adv_line or "")
             match = 0

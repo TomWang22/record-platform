@@ -1,10 +1,6 @@
 import type { APIRequestContext } from '@playwright/test'
 
-import {
-  obtainAuthToken,
-  obtainBuyerContractToken,
-  obtainSellerContractToken,
-} from './auth'
+import { obtainAuthToken, obtainSellerContractToken } from './auth'
 import { createListingWithShipping } from './listing-contract'
 import { userIdFromJwt } from './messaging-contract'
 
@@ -15,29 +11,17 @@ export async function ensureInboxThreadForFilters(
   const listingTitle = `Filter inbox seed ${Date.now()}`
   const token = await obtainAuthToken(request)
   const headers = { Authorization: `Bearer ${token}` }
-  const list = await request.get('/api/messages/conversations', { headers })
-  if (list.ok()) {
-    const body = (await list.json()) as unknown
-    const count = Array.isArray(body)
-      ? body.length
-      : ((body as { items?: unknown[] })?.items?.length ?? 0)
-    if (count > 0) {
-      return { listingTitle: 'Filter' }
-    }
-  }
-
   const sellerToken = await obtainSellerContractToken(request)
-  const sellerId = userIdFromJwt(sellerToken)
-  if (!sellerId) throw new Error('seller contract user id missing from JWT')
+  const collectorId = userIdFromJwt(token)
+  if (!collectorId) throw new Error('test collector user id missing from JWT')
 
   const listingId = await createListingWithShipping(request, sellerToken, {
     title: listingTitle,
   })
-  const buyerToken = await obtainBuyerContractToken(request)
   const send = await request.post('/api/messages/send', {
-    headers: { Authorization: `Bearer ${buyerToken}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${sellerToken}`, 'Content-Type': 'application/json' },
     data: {
-      recipient_id: sellerId,
+      recipient_id: collectorId,
       message_type: 'direct',
       subject: `[listing:${listingId}] ${listingTitle}`,
       content: `Filter inbox seed ${Date.now()}`,
@@ -46,5 +30,18 @@ export async function ensureInboxThreadForFilters(
   if (!send.ok()) {
     throw new Error(`seed direct message failed ${send.status()}: ${(await send.text()).slice(0, 300)}`)
   }
-  return { listingTitle }
+
+  const deadline = Date.now() + 90_000
+  while (Date.now() < deadline) {
+    const inbox = await request.get('/api/messages/conversations', { headers })
+    if (inbox.ok()) {
+      const body = (await inbox.json()) as unknown
+      const rows = Array.isArray(body)
+        ? body
+        : ((body as { conversations?: unknown[] }).conversations ?? [])
+      if (rows.length > 0) return { listingTitle }
+    }
+    await new Promise((r) => setTimeout(r, 800))
+  }
+  throw new Error('inbox seed: collector conversations empty after direct message')
 }

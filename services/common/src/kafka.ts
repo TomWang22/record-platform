@@ -1,5 +1,17 @@
 import { Kafka } from 'kafkajs'
 import * as fs from 'fs'
+import { recordKafkaPartitionLeaderMetrics } from "./kafkaLeaderMetrics.js";
+
+/**
+ * Optional isolation suffix for tests/CI. Appended to default topic names when env vars are unset.
+ * Producers and consumers must share the same OCH_KAFKA_TOPIC_SUFFIX (or RP_KAFKA_TOPIC_SUFFIX).
+ */
+export function ochKafkaTopicIsolationSuffix(): string {
+  const raw = (process.env.RP_KAFKA_TOPIC_SUFFIX || process.env.OCH_KAFKA_TOPIC_SUFFIX || "").trim();
+  if (!raw) return "";
+  const cleaned = raw.replace(/^\.+/, "");
+  return cleaned ? `.${cleaned}` : "";
+}
 
 // Strict TLS configuration: no cleartext. All Kafka client connections use SSL (port 9093).
 // Set KAFKA_SSL_ENABLED=true to enable TLS connections (required by platform policy).
@@ -38,12 +50,18 @@ const sslConfig = process.env.KAFKA_SSL_ENABLED === 'true' ? (() => {
 
 // Determine broker port based on SSL configuration
 const brokerPort = sslConfig ? '9093' : '9092'
-const brokerHost = process.env.KAFKA_BROKER?.split(':')[0] || 'kafka'
-const broker = process.env.KAFKA_BROKER || `${brokerHost}:${brokerPort}`
+const rawBrokers = (process.env.KAFKA_BROKER || '').trim()
+const brokers = rawBrokers
+  ? rawBrokers
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => (entry.includes(':') ? entry : `${entry}:${brokerPort}`))
+  : [`kafka:${brokerPort}`]
 
 export const kafka = new Kafka({
   clientId: process.env.KAFKA_CLIENT_ID || 'record-platform',
-  brokers: [broker],
+  brokers,
   ssl: sslConfig,
   // Strict connection settings
   connectionTimeout: 3000,
@@ -54,3 +72,88 @@ export const kafka = new Kafka({
     maxRetryTime: 30000,
   }
 })
+
+export type EnsureKafkaBrokerReadyOptions = {
+  requiredTopics?: string[];
+};
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function ensureKafkaBrokerReady(
+  serviceLabel: string,
+  options?: EnsureKafkaBrokerReadyOptions,
+): Promise<void> {
+  const budgetMs = Number(process.env.RP_KAFKA_STARTUP_BARRIER_MS || process.env.OCH_KAFKA_STARTUP_BARRIER_MS || "120000");
+  const minRetryMs = Number(process.env.RP_KAFKA_STARTUP_RETRY_MIN_MS || process.env.OCH_KAFKA_STARTUP_RETRY_MIN_MS || "1000");
+  const maxRetryMs = Number(process.env.RP_KAFKA_STARTUP_RETRY_MAX_MS || process.env.OCH_KAFKA_STARTUP_RETRY_MAX_MS || "8000");
+  const deadline = Date.now() + budgetMs;
+  const fromEnv =
+    (process.env.RP_KAFKA_STARTUP_REQUIRED_TOPICS || process.env.OCH_KAFKA_STARTUP_REQUIRED_TOPICS || "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean) ?? [];
+  const requiredTopics = [...new Set([...(options?.requiredTopics ?? []), ...fromEnv])];
+
+  let attempt = 0;
+  let lastErr: unknown;
+
+  while (Date.now() < deadline) {
+    attempt += 1;
+    const admin = kafka.admin();
+    try {
+      await admin.connect();
+      try {
+        const topics = await admin.listTopics();
+        if (requiredTopics.length > 0) {
+          const missing = requiredTopics.filter((t) => !topics.includes(t));
+          if (missing.length > 0) {
+            throw new Error(
+              `Required Kafka topics missing: ${missing.join(", ")}. Create them before starting services.`,
+            );
+          }
+        }
+        await recordKafkaPartitionLeaderMetrics(admin);
+      } finally {
+        try {
+          await admin.disconnect();
+        } catch {
+          /* ignore */
+        }
+      }
+      console.log(`[kafka] broker ready (${serviceLabel})`);
+      return;
+    } catch (e) {
+      lastErr = e;
+      try {
+        await admin.disconnect();
+      } catch {
+        /* ignore */
+      }
+      if (Date.now() >= deadline) {
+        break;
+      }
+      const backoff = Math.min(maxRetryMs, Math.floor(minRetryMs * 1.35 ** Math.min(attempt, 14)));
+      console.warn(
+        `[kafka] connect/metadata attempt ${attempt} failed for ${serviceLabel}; retry in ${backoff}ms (${e instanceof Error ? e.message : String(e)})`,
+      );
+      await sleepMs(backoff);
+    }
+  }
+
+  const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+  console.error(`[kafka] FATAL: broker not reachable for ${serviceLabel}:`, msg);
+  throw new Error(`[${serviceLabel}] Kafka broker required but unavailable: ${msg}`);
+}
+
+export async function checkKafkaConnectivity(): Promise<boolean> {
+  const admin = kafka.admin();
+  try {
+    await admin.connect();
+    await admin.disconnect();
+    return true;
+  } catch {
+    return false;
+  }
+}

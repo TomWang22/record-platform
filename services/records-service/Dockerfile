@@ -1,7 +1,13 @@
 # --- deps ---
-FROM node:20-bookworm-slim AS deps
+FROM node:22-bookworm-slim AS deps
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV NPM_CONFIG_CONFIRM_MODULES_PURGE=false
+ENV PNPM_CONFIG_CONFIRM_MODULES_PURGE=false
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 
 # Copy package manifests (changes rarely, good for caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
@@ -14,14 +20,20 @@ COPY services/common/src ./services/common/src
 # Use BuildKit cache mounts for pnpm store (persists between builds)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm -w \
+    rp-pnpm -w \
       --filter @common/utils... \
       --filter records-service... \
-      install --frozen-lockfile
+      install --frozen-lockfile --ignore-scripts
 
 # --- build ---
-FROM node:20-bookworm-slim AS build
+FROM node:22-bookworm-slim AS build
 WORKDIR /app
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV NPM_CONFIG_CONFIRM_MODULES_PURGE=false
+ENV PNPM_CONFIG_CONFIRM_MODULES_PURGE=false
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
 
 # Install OpenSSL for Prisma (with apt cache mount for faster installs)
 RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt \
@@ -31,7 +43,7 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt \
      (command -v openssl >/dev/null 2>&1 && echo "OpenSSL already available" || (apt-get update && apt-get install -y --no-install-recommends curl ca-certificates openssl))) \
  && rm -rf /var/lib/apt/lists/* || true
 
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 COPY --from=deps /app /app
 
 # Copy source code (changes frequently, invalidates cache)
@@ -40,17 +52,22 @@ COPY services/records-service ./services/records-service
 
 # Build with cache mount for faster subsequent builds
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -C services/common build \
+    rp-pnpm -C services/common build \
  && rm -rf services/records-service/generated/records-client \
- && pnpm -C services/records-service exec prisma generate --schema prisma/schema.prisma \
- && pnpm -C services/records-service build \
+ && rp-pnpm -C services/records-service exec prisma generate --schema prisma/schema.prisma \
+ && rp-pnpm -C services/records-service build \
  && mkdir -p services/records-service/dist/lib \
  && cp services/records-service/src/lib/*.lua services/records-service/dist/lib/ \
  && test -f services/records-service/dist/routes/records.js \
  && grep -q "__" services/records-service/dist/routes/records.js || true
 
 # --- runtime ---
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
+ARG RP_SOURCE_SHA=unknown
+ARG GIT_COMMIT=unknown
+LABEL rp.dev.service="records-service"
+LABEL rp.dev.source-sha="${RP_SOURCE_SHA}"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 WORKDIR /app/services/records-service
 ENV NODE_ENV=production
 
@@ -75,5 +92,5 @@ COPY --from=build /app/services/records-service/prisma ./prisma
 COPY --from=build /app/services/records-service/generated ./generated
 COPY --from=build /app/services/common /app/services/common
 
-EXPOSE 4002
+EXPOSE 4002 50051
 CMD ["node", "dist/server.js"]

@@ -4,7 +4,7 @@ import * as protoLoader from '@grpc/proto-loader'
 import * as path from 'path'
 import * as fs from 'fs'
 import { Pool } from 'pg'
-import { registerHealthService, createOchGrpcServerCredentialsForBind } from '@common/utils'
+import { registerHealthService, createRpGrpcServerCredentialsForBind } from '@common/utils'
 
 // Dual-DB setup
 const POSTGRES_URL_LISTINGS = process.env.POSTGRES_URL_LISTINGS || process.env.POSTGRES_URL!;
@@ -379,7 +379,7 @@ export function startGrpcServer(port: number) {
 
   let credentials: grpc.ServerCredentials;
   try {
-    credentials = createOchGrpcServerCredentialsForBind("auction-monitor gRPC");
+    credentials = createRpGrpcServerCredentialsForBind("auction-monitor gRPC");
     console.log("[gRPC] strict mTLS (client cert required)");
   } catch (e) {
     console.error(e);

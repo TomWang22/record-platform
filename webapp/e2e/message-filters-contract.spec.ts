@@ -42,10 +42,18 @@ test.describe('Message filters contract (8.9D)', () => {
 
   test('search by listing title', async ({ page }) => {
     await page.getByTestId('messages-filter-all').click()
+    await expect
+      .poll(async () => page.getByTestId('messages-inbox-item').count(), { timeout: 60_000 })
+      .toBeGreaterThan(0)
     const itemCount = await page.getByTestId('messages-inbox-item').count()
     expect(itemCount, 'inbox threads seeded in beforeAll').toBeGreaterThan(0)
     await page.getByTestId('messages-inbox-search').fill(searchNeedle)
-    await expect(page.getByTestId('messages-inbox-item').first()).toBeVisible({ timeout: 15_000 })
+    await expect
+      .poll(async () => page.getByTestId('messages-inbox-item').count(), { timeout: 45_000 })
+      .toBeGreaterThan(0)
+    await expect(
+      page.getByTestId('messages-inbox-item').filter({ hasText: searchNeedle }).first(),
+    ).toBeVisible({ timeout: 30_000 })
     await capturePageContentScreenshot(page, contractScreenshotPath('messages-search-listing.png'))
   })
 })

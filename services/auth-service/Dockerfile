@@ -1,7 +1,13 @@
 # --- deps ---
-FROM node:20-bookworm-slim AS deps
+FROM node:22-bookworm-slim AS deps
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV NPM_CONFIG_CONFIRM_MODULES_PURGE=false
+ENV PNPM_CONFIG_CONFIRM_MODULES_PURGE=false
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 
 # Copy full workspace source for common + auth-service + proto so pnpm install sees real tree
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
@@ -13,26 +19,37 @@ COPY proto ./proto
 # Install with workspace intact so @common/utils symlinks point at services/common
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm -w --filter @common/utils... --filter auth-service... install --frozen-lockfile --ignore-scripts
+    rp-pnpm -w --filter @common/utils... --filter auth-service... install --frozen-lockfile --ignore-scripts
 
 # --- build ---
-FROM node:20-bookworm-slim AS build
+FROM node:22-bookworm-slim AS build
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV NPM_CONFIG_CONFIRM_MODULES_PURGE=false
+ENV PNPM_CONFIG_CONFIRM_MODULES_PURGE=false
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 
 # Use deps stage as-is: do not COPY services/* again or symlinks break
 COPY --from=deps /app /app
 
 # Build common first so @common/utils dist/ exists before any service tsc runs (CI-safe)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -C services/common build
+    rp-pnpm -C services/common build
 
 # Let workspace orchestrate build (topological order)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -w build
+    rp-pnpm -w build
 
 # --- runtime ---
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
+ARG RP_SOURCE_SHA=unknown
+ARG GIT_COMMIT=unknown
+LABEL rp.dev.service="auth-service"
+LABEL rp.dev.source-sha="${RP_SOURCE_SHA}"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 WORKDIR /app/services/auth-service
 
 # Vendored grpc-health-probe (run: curl -Lf -o scripts/vendor/grpc_health_probe-linux-arm64 https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.24/grpc_health_probe-linux-arm64)
@@ -61,5 +78,5 @@ COPY --from=build /app/services/auth-service/prisma ./prisma
 COPY --from=build /app/services/common /app/services/common
 COPY --from=build /app/proto /app/proto
 
-EXPOSE 4001
+EXPOSE 4001 50061
 CMD ["node", "dist/server.js"]

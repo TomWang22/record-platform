@@ -173,8 +173,14 @@ export function startGrpcServer(port: number = 50051, prismaClient?: PrismaClien
         if (!record_id || !user_id || !record) {
           return callback({ code: grpc.status.INVALID_ARGUMENT, message: "record_id, user_id and record required" });
         }
+        const existing = await prisma.record.findFirst({
+          where: { id: record_id, userId: user_id },
+        });
+        if (!existing) {
+          return callback({ code: grpc.status.NOT_FOUND, message: "record not found" });
+        }
         const updated = await prisma.record.update({
-          where: { id_userId: { id: record_id, userId: user_id } },
+          where: { id: record_id },
           data: recordInputFromProto(record, user_id),
         });
         callback(null, { record: mapRecord(updated) });
@@ -191,7 +197,12 @@ export function startGrpcServer(port: number = 50051, prismaClient?: PrismaClien
         if (!record_id || !user_id) {
           return callback({ code: grpc.status.INVALID_ARGUMENT, message: "record_id and user_id required" });
         }
-        await prisma.record.delete({ where: { id_userId: { id: record_id, userId: user_id } } });
+        const deleted = await prisma.record.deleteMany({
+          where: { id: record_id, userId: user_id },
+        });
+        if (deleted.count === 0) {
+          return callback({ code: grpc.status.NOT_FOUND, message: "record not found" });
+        }
         callback(null, { success: true });
       } catch (err: any) {
         const code = err?.code === "P2025" ? grpc.status.NOT_FOUND : grpc.status.INTERNAL;

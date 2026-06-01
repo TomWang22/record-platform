@@ -51,7 +51,15 @@ end
 -- Evict LFU items (remove least frequently used)
 if command == 'evict_lfu' then
   local pattern = cache_key -- pattern is passed as cache_key arg
-  local keys = redis.call('KEYS', pattern)
+  local keys = {}
+  local cursor = "0"
+  repeat
+    local scan = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', 200)
+    cursor = scan[1]
+    for _, key in ipairs(scan[2]) do
+      table.insert(keys, key)
+    end
+  until cursor == "0"
   if #keys <= max_items then
     return 0
   end

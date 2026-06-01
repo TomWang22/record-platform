@@ -1,9 +1,13 @@
 # syntax=docker/dockerfile:1
 
 # ---------- deps ----------
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 
 # Copy full workspace source for common + this service so pnpm install creates correct symlinks (no overwrite later)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
@@ -14,33 +18,46 @@ COPY services/analytics-service ./services/analytics-service
 # Install with workspace intact so @common/utils symlinks point at services/common
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm -w --filter @common/utils... --filter analytics-service... install --frozen-lockfile --ignore-scripts
+    rp-pnpm -w --filter @common/utils... --filter analytics-service... install --frozen-lockfile --ignore-scripts
 
 # ---------- build ----------
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 
 # Use deps stage as-is: do not COPY services/* again or symlinks break
 COPY --from=deps /app /app
 
 # Build common first so @common/utils dist/ exists before any service tsc runs (CI-safe)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -C services/common build
+    rp-pnpm -C services/common build
 
 # Let workspace orchestrate build (topological order); then prune this service for prod
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm -w build \
- && pnpm -C services/analytics-service prune --prod --config.confirmModulesPurge=false
+    rp-pnpm -w build \
+ && rp-pnpm -C services/analytics-service prune --prod --config.confirmModulesPurge=false
 
 # Produce isolated deploy bundle (production deps only). Use same store mount so deploy copies from cache — no network.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm deploy --filter analytics-service --prod /app/deploy
+    rp-pnpm deploy --legacy --filter analytics-service --prod /app/deploy
 
 # ---------- runtime ----------
-FROM node:20-alpine
+FROM node:22-alpine
+ARG RP_SOURCE_SHA=unknown
+ARG GIT_COMMIT=unknown
+LABEL rp.dev.service="analytics-service"
+LABEL rp.dev.source-sha="${RP_SOURCE_SHA}"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 ENV NODE_ENV=production
 WORKDIR /app
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
 
 # Install grpc-health-probe for Kubernetes gRPC health checks (HTTP/2/3, NOT HTTP/1.1)
 RUN apk add --no-cache curl ca-certificates file && \
@@ -81,5 +98,5 @@ RUN rm -rf node_modules/.cache \
 
 USER nodejs
 
-EXPOSE 4004
+EXPOSE 4017 50067
 CMD ["node","dist/server.js"]

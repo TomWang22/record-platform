@@ -15,7 +15,7 @@ import {
 } from './lib/cache.js'
 import { applyCommentVote, applyPostVote } from './lib/forumVotes.js'
 import { kafka } from '@common/utils/kafka'
-import { registerHealthService, createOchGrpcServerCredentialsForBind } from '@common/utils'
+import { registerHealthService, createRpGrpcServerCredentialsForBind } from '@common/utils'
 import { resolveProtoPath } from '@common/utils/proto'
 import { buildMetadata, sendMessagingEvent } from './kafkaMessagingEvents.js'
 import { randomUUID } from 'node:crypto'
@@ -565,7 +565,7 @@ export function startGrpcServer(port: number) {
 
   let credentials: grpc.ServerCredentials
   try {
-    credentials = createOchGrpcServerCredentialsForBind('messaging gRPC')
+    credentials = createRpGrpcServerCredentialsForBind('messaging gRPC')
   } catch (e) {
     console.error(e)
     process.exit(1)

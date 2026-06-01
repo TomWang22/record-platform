@@ -71,6 +71,11 @@ COPY services/python-ai-service/app /app/app
 
 # ---------- runtime ----------
 FROM python:3.11-slim
+ARG RP_SOURCE_SHA=unknown
+ARG GIT_COMMIT=unknown
+LABEL rp.dev.service="python-ai-service"
+LABEL rp.dev.source-sha="${RP_SOURCE_SHA}"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -101,5 +106,5 @@ RUN find /usr/local/lib/python3.11/site-packages -type d -name "__pycache__" -ex
 
 USER python
 
-EXPOSE 5005
+EXPOSE 5005 50060
 CMD ["gunicorn", "-c", "app/gunicorn.conf.py", "app.ai_main:app"]

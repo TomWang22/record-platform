@@ -14,7 +14,7 @@ vi.mock("@common/utils", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@common/utils")>();
   return {
     ...actual,
-    createOchGrpcServerCredentialsForBind: (...args: unknown[]) => credBind(...args),
+    createRpGrpcServerCredentialsForBind: (...args: unknown[]) => credBind(...args),
     registerHealthService: (...args: unknown[]) => regHealth(...args),
   };
 });
@@ -86,7 +86,7 @@ describe("messaging grpc-server bootstrap", () => {
     errSpy.mockRestore();
   });
 
-  it("createOchGrpcServerCredentialsForBind throws → process.exit(1)", async () => {
+  it("createRpGrpcServerCredentialsForBind throws → process.exit(1)", async () => {
     credBind.mockImplementation(() => {
       throw new Error("no server creds");
     });

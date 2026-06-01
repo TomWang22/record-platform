@@ -20,12 +20,15 @@ jobs:
           - auth-service
           - records-service
           - listings-service
-          - analytics-service
-          - social-service
           - shopping-service
-          - auction-monitor
-          - cron-jobs
+          - messaging-service
+          - media-service
+          - trust-service
+          - notification-service
+          - analytics-service
           - python-ai-service
+          - auction-monitor
+          - transport-watchdog
           - webapp
     steps:
       - uses: actions/checkout@v4

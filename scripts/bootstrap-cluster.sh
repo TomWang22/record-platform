@@ -633,16 +633,21 @@ ok "external infra"
 
 # --- P4 Record Platform NS + app-config (no Deployments) ---
 say "[P4] Record Platform namespace + baseline ConfigMap"
-CA_PEM="$REPO_ROOT/certs/dev-root.pem"
+# shellcheck source=scripts/lib/rp-dev-ca.sh
+source "$SCRIPT_DIR/lib/rp-dev-ca.sh"
+CA_PEM="$(rp_dev_root_pem)"
+CHAIN_PEM="$(rp_dev_chain_pem)"
 LEAF_CRT="$REPO_ROOT/certs/record-platform.test.crt"
 LEAF_KEY="$REPO_ROOT/certs/record-platform.test.key"
-for f in "$CA_PEM" "$LEAF_CRT" "$LEAF_KEY"; do
+for f in "$CA_PEM" "$CHAIN_PEM" "$LEAF_CRT" "$LEAF_KEY"; do
   [[ -f "$f" ]] || { bad "missing cert file: $f"; exit 1; }
 done
 openssl x509 -in "$CA_PEM" -noout -subject >/dev/null || { bad "invalid CA"; exit 1; }
 openssl x509 -in "$LEAF_CRT" -noout -subject >/dev/null || { bad "invalid leaf"; exit 1; }
 openssl x509 -in "$LEAF_CRT" -noout -purpose 2>/dev/null | grep -qi 'SSL server' || { bad "leaf openssl -purpose (SSL server) failed"; exit 1; }
-ok "disk TLS guards"
+rp_dev_verify_leaf_chain "$LEAF_CRT" >/dev/null || { bad "leaf does not verify against dev intermediate + root"; exit 1; }
+EDGE_CA_PEM="$(rp_dev_edge_ca_file)" || { bad "missing edge trust bundle (dev-chain.pem)"; exit 1; }
+ok "disk TLS guards (edge curl uses ${EDGE_CA_PEM##*/})"
 
 _bootstrap_force_ns_delete="${BOOTSTRAP_FORCE_NS_DELETE:-${RP_FORCE_NAMESPACE_DELETE:-0}}"
 if [[ "$_bootstrap_force_ns_delete" == "1" ]]; then
@@ -960,17 +965,15 @@ _rz_sleep="${BOOTSTRAP_READYZ_SLEEP_SEC:-3}"
 echo "  ▶ edge /api/readyz (max ${_rz_max} attempts × ${_rz_sleep}s, host=${EDGE_HOST}, caddy_lb=${CADDY_LB_IP:-pending})…"
 _readyz_ok=0
 for ((_rz_i = 1; _rz_i <= _rz_max; _rz_i++)); do
-  _curl_args=(--connect-timeout 15 --max-time 90 --cacert "$CA_PEM" \
+  _curl_args=(--connect-timeout 15 --max-time 90 --cacert "$EDGE_CA_PEM" \
     -H "x-traffic-class: infra" -H "x-suite: ${OCH_X_SUITE}" \
     -o /dev/null -w "%{http_code}")
   if [[ -n "${CADDY_LB_IP:-}" ]]; then
     _curl_args+=(--resolve "${EDGE_HOST}:443:${CADDY_LB_IP}")
-    _curl_url="https://${EDGE_HOST}/api/readyz"
-  else
-    _curl_url="https://${EDGE_HOST}/api/readyz"
   fi
-  _http="$(curl -sS "${_curl_args[@]}" "$_curl_url" 2>/dev/null || echo "000")"
+  _curl_url="https://${EDGE_HOST}/api/readyz"
   _curl_err="$(curl -sS "${_curl_args[@]}" "$_curl_url" 2>&1 >/dev/null || true)"
+  _http="$(curl -sS "${_curl_args[@]}" "$_curl_url" 2>/dev/null || echo "000")"
   if [[ "$_http" == "200" ]]; then
     ok "/api/readyz (HTTP 200, attempt ${_rz_i}, resolve=${CADDY_LB_IP:-dns})"
     _readyz_ok=1
@@ -987,14 +990,14 @@ for ((_rz_i = 1; _rz_i <= _rz_max; _rz_i++)); do
   fi
 done
 if [[ "$_readyz_ok" != "1" ]]; then
-  bad "edge /api/readyz never returned 200 after ${_rz_max} attempts (last HTTP=${_http:-?} caddy_lb=${CADDY_LB_IP:-?}). Try: curl -vk --resolve ${EDGE_HOST}:443:${CADDY_LB_IP:-LB_IP} --cacert \"$CA_PEM\" -H \"x-traffic-class: infra\" \"https://${EDGE_HOST}/api/readyz\""
+  bad "edge /api/readyz never returned 200 after ${_rz_max} attempts (last HTTP=${_http:-?} caddy_lb=${CADDY_LB_IP:-?}). Try: curl -vk --resolve ${EDGE_HOST}:443:${CADDY_LB_IP:-LB_IP} --cacert \"$EDGE_CA_PEM\" -H \"x-traffic-class: infra\" \"https://${EDGE_HOST}/api/readyz\""
   exit 1
 fi
 
 if [[ "${BOOTSTRAP_SKIP_EDGE_LATENCY_SLA:-0}" != "1" ]]; then
   say "[P8a] edge route latency SLA (probe-edge-route-latency.sh)"
   export HOST="$EDGE_HOST"
-  export CA_CERT="$CA_PEM"
+  export CA_CERT="$EDGE_CA_PEM"
   bash "$SCRIPT_DIR/probe-edge-route-latency.sh"
   ok "edge latency SLA"
 fi

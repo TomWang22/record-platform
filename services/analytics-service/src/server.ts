@@ -136,6 +136,16 @@ app.get('/healthz', async (_req, res) => {
   }
 })
 
+// Kubelet readiness (infra/contracts: readyPath /readyz) — strict DB gate; liveness stays on /healthz.
+app.get('/readyz', async (_req, res) => {
+  try {
+    await analyticsPool.query('SELECT 1')
+    res.json({ ok: true, ready: true })
+  } catch (err) {
+    res.status(503).json({ ok: false, ready: false, error: String(err) })
+  }
+})
+
 // Enhanced predict-price: uses historical data + worker threads + Redis caching
 app.post('/analytics/predict-price', async (req, res) => {
   const items = (req.body?.items as any[]) ?? []

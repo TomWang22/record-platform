@@ -52,7 +52,7 @@ fi
 
 # redis-external Endpoints are patched post-apply (Compose IP; cannot use 127.0.0.1 in manifests).
 if [[ -x "$SCRIPT_DIR/sync-redis-external-endpoints.sh" ]]; then
-  HOUSING_NS="$NS" K8S_NAMESPACE="$NS" bash "$SCRIPT_DIR/sync-redis-external-endpoints.sh" || {
+  HOUSING_NS="$NS" K8S_NAMESPACE="$NS" RP_REDIS_SYNC_SKIP_VERIFY=1 bash "$SCRIPT_DIR/sync-redis-external-endpoints.sh" || {
     bad "sync-redis-external-endpoints failed — is Docker Compose redis up?"
     exit 1
   }

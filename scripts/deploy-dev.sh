@@ -188,6 +188,15 @@ if ! kubectl get svc api-gateway -n "$NS" --request-timeout=15s &>/dev/null; the
 fi
 ok "api-gateway Service exists before Caddy rollout"
 
+# 8b) Re-sync redis-external after app pods are ready (gateway IP + pod PING; P6a may run too early)
+if [[ -x "$SCRIPT_DIR/sync-redis-external-endpoints.sh" ]]; then
+  HOUSING_NS="$NS" K8S_NAMESPACE="$NS" bash "$SCRIPT_DIR/sync-redis-external-endpoints.sh" || {
+    bad "redis-external sync/verify failed after rollouts — Compose redis must be reachable from pods"
+    exit 1
+  }
+  ok "redis-external verified from pod (post-rollout)"
+fi
+
 # 9) Caddy + Envoy (after app Services exist)
 [[ -f "$SCRIPT_DIR/rollout-caddy.sh" ]] && "$SCRIPT_DIR/rollout-caddy.sh"
 if kubectl get deployment envoy-test -n envoy-test --request-timeout=15s &>/dev/null; then

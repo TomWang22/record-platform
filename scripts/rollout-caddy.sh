@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 NS=ingress-nginx
+LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-record-platform-local-tls}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
@@ -15,14 +16,17 @@ fi
 
 # When using hostPort or LoadBalancer (Colima+MetalLB), Caddy needs TLS secrets
 if [ "${CADDY_USE_HOSTPORT:-0}" = "1" ] || [ "${CADDY_USE_LOADBALANCER:-0}" = "1" ]; then
-  for sec in record-local-tls dev-root-ca; do
+  for sec in "$LEAF_TLS_SECRET" dev-root-ca; do
     if ! kubectl -n "$NS" get secret "$sec" &>/dev/null; then
       echo "❌ Missing secret $sec in namespace $NS. Create TLS secrets first, e.g.:"
       echo "   ./scripts/strict-tls-bootstrap.sh   # requires certs in ./certs/"
-      echo "   or: scripts/rotate-ca-and-fix-tls.sh"
+      echo "   or: LEAF_TLS_SECRET=$LEAF_TLS_SECRET ./scripts/rotate-ca-and-fix-tls.sh"
       exit 1
     fi
   done
+  if [ "${CADDY_USE_LOADBALANCER:-0}" = "1" ] && [ -x "$ROOT/scripts/apply-rp-mtls-test-ca-secret.sh" ]; then
+    bash "$ROOT/scripts/apply-rp-mtls-test-ca-secret.sh"
+  fi
 fi
 
 # Apply Caddy ConfigMap (gRPC must use h2c://envoy-test...:10000; do not use https:// for Envoy)

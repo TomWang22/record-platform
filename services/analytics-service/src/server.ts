@@ -18,6 +18,7 @@ import {
   recordsPool,
   listingsPool,
   analyticsPool,
+  waitForAnalyticsPools,
   getUserSearchHistory,
   getSimilarSearches,
   getTrendingSearches,
@@ -136,13 +137,23 @@ app.get('/healthz', async (_req, res) => {
   }
 })
 
-// Kubelet readiness (infra/contracts: readyPath /readyz) — strict DB gate; liveness stays on /healthz.
+// Kubelet readiness (infra/contracts: readyPath /readyz) — ephemeral probe avoids stale min-pool connections.
 app.get('/readyz', async (_req, res) => {
+  const url =
+    process.env.POSTGRES_URL_ANALYTICS || process.env.DATABASE_URL || ''
+  if (!url) {
+    return res.status(503).json({ ok: false, ready: false, error: 'POSTGRES_URL_ANALYTICS unset' })
+  }
+  const { Client } = await import('pg')
+  const client = new Client({ connectionString: url })
   try {
-    await analyticsPool.query('SELECT 1')
+    await client.connect()
+    await client.query('SELECT 1')
     res.json({ ok: true, ready: true })
   } catch (err) {
     res.status(503).json({ ok: false, ready: false, error: String(err) })
+  } finally {
+    await client.end().catch(() => {})
   }
 })
 
@@ -488,24 +499,36 @@ app.get('/analytics/fuzzy-search', async (req, res) => {
   })
 })
 
-const PORT = process.env.ANALYTICS_PORT || 4004
-const server = app.listen(PORT, () => {
-  console.log(`[analytics] service listening on port ${PORT}`)
-})
-
-// Start gRPC server if enabled
+let server: ReturnType<typeof app.listen> | null = null
 let grpcServer: any = null
-if (process.env.ENABLE_GRPC === 'true') {
-  const { startGrpcServer } = require('./grpc-server')
-  const grpcPort = parseInt(process.env.GRPC_PORT || '50054', 10)
-  grpcServer = startGrpcServer(grpcPort)
+
+async function main() {
+  await waitForAnalyticsPools()
+
+  const PORT = process.env.ANALYTICS_PORT || process.env.HTTP_PORT || 4004
+  server = app.listen(PORT, () => {
+    console.log(`[analytics] service listening on port ${PORT}`)
+  })
+
+  if (process.env.ENABLE_GRPC === 'true') {
+    const { startGrpcServer } = require('./grpc-server')
+    const grpcPort = parseInt(process.env.GRPC_PORT || '50067', 10)
+    grpcServer = startGrpcServer(grpcPort)
+  }
 }
 
-// Graceful shutdown
+main().catch((err) => {
+  console.error('[analytics] startup failed:', err)
+  process.exit(1)
+})
+
 process.on('SIGTERM', async () => {
   console.log('[analytics] SIGTERM received, shutting down gracefully')
+  if (!server) {
+    process.exit(0)
+    return
+  }
   server.close(async () => {
-    // Disconnect Kafka producer
     if (kafkaProducer) {
       try {
         await kafkaProducer.disconnect()
@@ -514,7 +537,7 @@ process.on('SIGTERM', async () => {
         console.warn('[analytics] Error disconnecting Kafka producer:', err)
       }
     }
-    
+
     if (grpcServer) {
       grpcServer.tryShutdown(() => {
         Promise.all([recordsPool.end(), listingsPool.end(), analyticsPool.end()]).then(() => {

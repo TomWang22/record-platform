@@ -29,11 +29,13 @@ spec:
             - /bin/sh
             - -c
             - |
-              for i in $(seq 1 60); do
-                nc -zv host.docker.internal 5433 2>/dev/null && exit 0
+              for i in $(seq 1 90); do
+                nc -zv host.docker.internal 5433 2>/dev/null && \
+                nc -zv host.docker.internal 5435 2>/dev/null && \
+                nc -zv host.docker.internal 5439 2>/dev/null && exit 0
                 sleep 2
               done
-              echo "Records DB (5433) unreachable; ensure: 1) docker compose up -d (Postgres), 2) hostAliases correct for Colima: ./scripts/colima-apply-host-aliases.sh (see docs/COLIMA_POD_STABILITY_AND_HOST_ALIASES.md)"
+              echo "External Postgres unreachable (need 5433 records, 5435 listings, 5439 analytics); ensure docker compose up and hostAliases (scripts/colima-apply-host-aliases.sh)"
               exit 1
       containers:
         - name: app
@@ -56,7 +58,9 @@ spec:
             - name: DB_POOL_MAX
               value: "50"
             - name: DB_POOL_MIN
-              value: "25"
+              value: "0"
+            - name: ANALYTICS_DB_WARMUP_ATTEMPTS
+              value: "90"
             - name: DB_IDLE_TIMEOUT_MS
               value: "0"
             - name: GRPC_PORT

@@ -36,6 +36,9 @@ COPY --from=deps /app /app
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     rp-pnpm -C services/common build
 
+# Clean stale dist before tsc — incremental .tsbuildinfo can leave old db.js while server.ts updates (breaks /readyz).
+RUN rm -rf services/analytics-service/dist
+
 # Let workspace orchestrate build (topological order); then prune this service for prod
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     rp-pnpm -w build \

@@ -8,8 +8,8 @@ spec:
   selector: { app: analytics-service }
   ports:
     - name: http
-      port: 4004
+      port: 4017
       targetPort: http
     - name: grpc
-      port: 50054
+      port: 50067
       targetPort: grpc

@@ -67,6 +67,30 @@ analyticsPool.on('error', (err) => {
   console.error('[analytics] Analytics DB pool error:', err)
 })
 
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+/** Warm all pools before accepting traffic (avoids poisoned min connections when Postgres warms after pod start). */
+export async function waitForAnalyticsPools(): Promise<void> {
+  const maxAttempts = parseInt(process.env.ANALYTICS_DB_WARMUP_ATTEMPTS || '60', 10)
+  const delayMs = parseInt(process.env.ANALYTICS_DB_WARMUP_DELAY_MS || '2000', 10)
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await Promise.all([
+        recordsPool.query('SELECT 1'),
+        listingsPool.query('SELECT 1'),
+        analyticsPool.query('SELECT 1'),
+      ])
+      console.log('[analytics] DB pools ready')
+      return
+    } catch (err) {
+      const msg = (err as Error)?.message || String(err)
+      console.warn(`[analytics] DB warmup attempt ${attempt}/${maxAttempts}: ${msg}`)
+      if (attempt === maxAttempts) throw err
+      await sleep(delayMs)
+    }
+  }
+}
+
 export interface SearchHistoryRow {
   id: number
   user_id: string | null

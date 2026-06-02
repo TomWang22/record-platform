@@ -60,9 +60,6 @@ elif [[ -d "$KUST_DIR/base/config" ]]; then
   kubectl apply -f "$KUST_DIR/base/config/app-config.yaml" -n "$NS" --request-timeout=30s
   ok "ConfigMap app-config applied (proto sync skipped)"
 fi
-if [[ -x "$SCRIPT_DIR/rp-ensure-kafka-ssl-clients.sh" ]]; then
-  HOUSING_NS="$NS" bash "$SCRIPT_DIR/rp-ensure-kafka-ssl-clients.sh" || warn "kafka-ssl client repair skipped (run kafka-ssl-from-dev-root.sh)"
-fi
 
 # 4b) Strict envelope
 if [[ "${SKIP_STRICT_ENVELOPE:-0}" != "1" ]] && command -v node &>/dev/null; then
@@ -77,6 +74,17 @@ fi
 # 5) Apply RP app manifests (Deployments + Services) — fail fast
 chmod +x "$SCRIPT_DIR/rp-verify-kustomize-app-services.sh" "$SCRIPT_DIR/rp-apply-rp-app-manifests.sh" 2>/dev/null || true
 bash "$SCRIPT_DIR/rp-apply-rp-app-manifests.sh"
+
+# Kustomize must not regenerate kafka-ssl-secret (see base/secrets/kustomization.yaml).
+# Re-apply full broker JKS + client mTLS after manifest apply in case an older overlay wiped keys.
+if [[ -x "$SCRIPT_DIR/rp-ensure-kafka-ssl-clients.sh" ]]; then
+  HOUSING_NS="$NS" RP_KAFKA_SSL_RESTART_APPS=1 bash "$SCRIPT_DIR/rp-ensure-kafka-ssl-clients.sh" || {
+    bad "kafka-ssl-secret missing client mTLS after apply — run: bash scripts/kafka-ssl-from-dev-root.sh && HOUSING_NS=$NS bash scripts/apply-rp-kafka-ssl-secret.sh"
+    exit 1
+  }
+  ok "kafka-ssl client mTLS verified (post-apply)"
+fi
+
 bash "$SCRIPT_DIR/rp-clamp-ollama-hpa-dev.sh" 2>/dev/null || true
 bash "$SCRIPT_DIR/apply-ollama-metallb-lb.sh" 2>/dev/null || true
 

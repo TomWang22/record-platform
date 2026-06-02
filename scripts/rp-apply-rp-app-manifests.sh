@@ -59,6 +59,14 @@ if [[ -x "$SCRIPT_DIR/sync-redis-external-endpoints.sh" ]]; then
   ok "redis-external Endpoints synced from Compose"
 fi
 
+if [[ -x "$SCRIPT_DIR/rp-ensure-kafka-ssl-clients.sh" ]]; then
+  HOUSING_NS="$NS" RP_KAFKA_SSL_RESTART_APPS=0 bash "$SCRIPT_DIR/rp-ensure-kafka-ssl-clients.sh" || {
+    bad "kafka-ssl-secret incomplete after kustomize apply (remove kafka-ssl-secret from secretGenerator)"
+    exit 1
+  }
+  ok "kafka-ssl-secret client mTLS intact after apply"
+fi
+
 rp_record_kustomize_manifest_stamp || bad "could not record manifest checksum"
 ok "Recorded manifest checksum → bench_logs/last-deployed-kustomize-manifest.{sha256,json}"
 

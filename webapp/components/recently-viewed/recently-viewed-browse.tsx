@@ -200,6 +200,19 @@ export function RecentlyViewedBrowse() {
     await load()
   }
 
+  if (loading) {
+    return (
+      <div className="space-y-6" data-testid="recently-viewed-loading">
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Recently viewed</h1>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6" data-testid="recently-viewed-page-ready">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -294,9 +307,7 @@ export function RecentlyViewedBrowse() {
         <ApiErrorAlert title="Could not load history" error={error} onRetry={() => void load()} />
       )}
 
-      {loading && <p className="text-sm text-slate-500">Loading recently viewed…</p>}
-
-      {!loading && filtered.length === 0 && (
+      {filtered.length === 0 && (
         <div data-testid="recently-viewed-empty">
           <Card>
             <p className="text-sm text-slate-500">Open listing details to build your history.</p>
@@ -304,7 +315,7 @@ export function RecentlyViewedBrowse() {
         </div>
       )}
 
-      {!loading && pageItems.length > 0 && view === 'grid' && (
+      {pageItems.length > 0 && view === 'grid' && (
         <div
           data-testid="recently-viewed-grid"
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
@@ -315,7 +326,7 @@ export function RecentlyViewedBrowse() {
         </div>
       )}
 
-      {!loading && pageItems.length > 0 && view === 'compact' && (
+      {pageItems.length > 0 && view === 'compact' && (
         <div
           data-testid="recently-viewed-compact"
           className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
@@ -331,7 +342,7 @@ export function RecentlyViewedBrowse() {
         </div>
       )}
 
-      {!loading && pageItems.length > 0 && view === 'list' && (
+      {pageItems.length > 0 && view === 'list' && (
         <div data-testid="recently-viewed-list" className="space-y-3">
           {pageItems.map((item) => (
             <RecentlyViewedCard key={`${item.id}-${item.viewedAt}`} item={item} view="list" onRemove={handleRemove} />

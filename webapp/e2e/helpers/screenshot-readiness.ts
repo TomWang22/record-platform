@@ -12,6 +12,8 @@ const LOADING_PATTERNS = [
   /Loading feedback/i,
   /Loading records/i,
   /Loading collection/i,
+  /Loading recently viewed/i,
+  /Loading revision preview/i,
   /Searching\.\.\./i,
 ]
 
@@ -94,6 +96,22 @@ export async function capturePageContentScreenshot(page: Page, filePath: string)
   await captureScreenshot(page, filePath, { scope: 'page-content' })
 }
 
+export async function captureBrowseResultsScreenshot(page: Page, filePath: string): Promise<void> {
+  await waitForNoLoadingStates(page, filePath)
+  await assertNoForbiddenContractStrings(page, filePath)
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  await expect(page.getByTestId('marketplace-browse-results')).toBeVisible({ timeout: 30_000 })
+  await page.getByTestId('marketplace-browse-results').screenshot({ path: filePath })
+}
+
+export async function captureToolbarScreenshot(page: Page, filePath: string): Promise<void> {
+  await waitForNoLoadingStates(page, filePath)
+  await assertNoForbiddenContractStrings(page, filePath)
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  await expect(page.getByTestId('records-filter-toolbar')).toBeVisible({ timeout: 30_000 })
+  await page.getByTestId('records-filter-toolbar').screenshot({ path: filePath })
+}
+
 function recordsViewSelector(view: 'grid' | 'list' | 'compact'): string {
   if (view === 'list') return '[data-testid="record-row"]'
   if (view === 'compact') return '[data-testid="record-compact-item"]'
@@ -156,20 +174,29 @@ export async function waitForRecordsReady(
     if (view === 'list') {
       await page.locator('select').filter({ has: page.locator('option[value="24"]') }).last().selectOption('24')
     }
-    await page.getByPlaceholder(/Search artist/i).fill('Kenny Dorham')
+    const apiRows = (await (
+      await page.request.get('/api/records', {
+        headers: { Authorization: `Bearer ${token}`, 'X-RP-E2E-Contract': '1' },
+      })
+    ).json()) as { artist?: string }[]
+    const searchTerm = apiRows.some((r) => r.artist === 'Kenny Dorham')
+      ? 'Kenny Dorham'
+      : (apiRows[0]?.artist ?? '')
+    expect(searchTerm.length, 'records API must return seeded rows').toBeGreaterThan(0)
+    await page.getByPlaceholder(/Search artist/i).fill(searchTerm)
     const searchResponse = page.waitForResponse(
       (r) => r.url().includes('/api/records') && r.request().method() === 'GET' && r.ok(),
       { timeout: 45_000 },
     )
     await page.getByRole('button', { name: /^Search$/ }).click()
     await searchResponse
-    const kenny = page
+    const hit = page
       .getByTestId('record-card')
-      .filter({ hasText: 'Kenny Dorham' })
+      .filter({ hasText: searchTerm })
       .first()
-      .or(page.getByTestId('record-compact-item').filter({ hasText: 'Kenny Dorham' }).first())
-      .or(page.getByTestId('record-row').filter({ hasText: 'Kenny Dorham' }).first())
-    await expect(kenny).toBeVisible({ timeout: 45_000 })
+      .or(page.getByTestId('record-compact-item').filter({ hasText: searchTerm }).first())
+      .or(page.getByTestId('record-row').filter({ hasText: searchTerm }).first())
+    await expect(hit).toBeVisible({ timeout: 45_000 })
     await waitForNoLoadingStates(page, `/records?view=${view}`)
     return
   }
@@ -195,19 +222,36 @@ export async function waitForListingsReady(page: Page, view: 'grid' | 'list' | '
       await retry.click()
       await page.waitForTimeout(2500)
     }
+    await page.locator('select').filter({ has: page.locator('option[value="24"]') }).last().selectOption('24')
     if (view !== 'grid') {
       await page.locator('button').filter({ hasText: new RegExp(`^${view}$`, 'i') }).first().click()
     }
     await expect(page.locator('.animate-pulse')).toHaveCount(0, { timeout: 30_000 }).catch(() => {})
     if ((await page.locator(sel).count()) >= 1) {
+      await expect(page.getByTestId('marketplace-browse-results')).toBeVisible({ timeout: 20_000 })
       await expect(page.locator(sel).first()).toBeVisible({ timeout: 20_000 })
       await waitForNoLoadingStates(page, '/listings')
       return
     }
     await page.waitForTimeout(1500 * (attempt + 1))
   }
+  await expect(page.getByTestId('marketplace-browse-results')).toBeVisible({ timeout: 30_000 })
   await expect(page.locator(sel).first()).toBeVisible({ timeout: 30_000 })
   await waitForNoLoadingStates(page, '/listings')
+}
+
+export async function waitForRecentlyViewedReady(
+  page: Page,
+  token: string,
+  listingIds: string[],
+): Promise<void> {
+  const { pollRecentlyViewedIds } = await import('./seed-lean')
+  await pollRecentlyViewedIds(page.request, token, listingIds, { timeoutMs: 60_000 })
+  await page.goto('/recently-viewed', { waitUntil: 'domcontentloaded', timeout: 45_000 })
+  await expect(page.getByTestId('recently-viewed-loading')).toHaveCount(0, { timeout: 60_000 })
+  await expect(page.getByTestId('recently-viewed-page-ready')).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByTestId('recently-viewed-item').first()).toBeVisible({ timeout: 30_000 })
+  await waitForNoLoadingStates(page, '/recently-viewed')
 }
 
 export async function waitForFeedbackReady(page: Page, token?: string): Promise<void> {
@@ -260,7 +304,8 @@ export async function waitForProfileReady(page: Page, token?: string): Promise<v
   })
   await expect(page.getByTestId('profile-stats-loading')).toHaveCount(0, { timeout: 60_000 })
   await expect(page.getByTestId('profile-stat-records')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByTestId('profile-stat-records').locator('.text-2xl')).not.toHaveText('0')
+  await expect(page.getByTestId('profile-stat-records-value')).not.toHaveText('0')
+  await expect(page.getByTestId('profile-stat-collection-stats-value')).not.toHaveText('View')
 }
 
 export async function waitForWatchlistCard(

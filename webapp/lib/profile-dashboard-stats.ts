@@ -6,6 +6,8 @@ export type ProfileDashboardStats = {
   activeListings: number
   soldListings: number
   purchasesCount: number
+  uniqueArtists: number
+  totalSpendDisplay: string
 }
 
 function listingRows(body: { items?: { status?: string }[]; listings?: { status?: string }[] }) {
@@ -40,6 +42,20 @@ export async function fetchProfileDashboardStats(): Promise<ProfileDashboardStat
     (r) => Boolean(r.purchasedAt) || Boolean(String(r.purchaseType ?? '').trim()),
   ).length
 
+  const artists = new Set(
+    records.map((r) => String((r as { artist?: string }).artist ?? '').trim()).filter(Boolean),
+  )
+  const totalSpendCents = records.reduce(
+    (sum, r) => sum + Number((r as { purchasePriceCents?: number }).purchasePriceCents ?? 0),
+    0,
+  )
+  const totalSpendDisplay =
+    totalSpendCents > 0
+      ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
+          totalSpendCents / 100,
+        )
+      : '—'
+
   const feedbackScore =
     feedback.positivePercent != null
       ? `${Math.round(feedback.positivePercent)}%`
@@ -53,5 +69,7 @@ export async function fetchProfileDashboardStats(): Promise<ProfileDashboardStat
     activeListings: rows.filter((r) => isActiveStatus(r.status)).length,
     soldListings: rows.filter((r) => isSoldStatus(r.status)).length,
     purchasesCount,
+    uniqueArtists: artists.size,
+    totalSpendDisplay,
   }
 }

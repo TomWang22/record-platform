@@ -113,9 +113,29 @@ test.describe.serial('Listing detail product contract (7.4)', () => {
       contractScreenshotPath('authenticated-listing-detail-shipping-dates-readable.png'),
     )
     await expect(page.getByTestId('listing-primary-image')).toBeVisible()
+    const imgBox = await page.getByTestId('listing-primary-image').boundingBox()
+    expect(imgBox?.width ?? 0).toBeGreaterThan(80)
+    expect(imgBox?.width ?? 0).toBeLessThan(500)
+    expect(imgBox?.height ?? 0).toBeGreaterThan(80)
+    expect(imgBox?.height ?? 0).toBeLessThan(500)
+    await expect(page.getByTestId('listing-description-text')).toBeVisible()
+    await expect(page.getByTestId('listing-revision-loading')).toHaveCount(0, { timeout: 30_000 })
+    await expect(page.getByTestId('listing-revision-preview')).toBeVisible()
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-listing-detail-gallery-sized.png'),
+    )
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-listing-detail-product-polished.png'),
+    )
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-listing-detail-gallery-polished.png'),
+    )
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-listing-detail-revision-preview-polished.png'),
     )
   })
 })

@@ -333,6 +333,7 @@ export function ListingsBrowse() {
 
           {!loading && !error && listings.length > 0 && (
             <div
+              data-testid="marketplace-browse-results"
               className={
                 view === 'grid'
                   ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3'

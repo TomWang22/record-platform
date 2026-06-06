@@ -128,8 +128,28 @@ export async function ensureTestCollection(
   const headers = { Authorization: `Bearer ${token}` }
   const list = await request.get('/api/records', { headers })
   if (!list.ok()) return 0
-  const existing = (await list.json()) as RecordRow[]
+  let existing = (await list.json()) as RecordRow[]
   if (Array.isArray(existing) && existing.length > 0) {
+    const haveArtist = new Set(existing.map((r) => r.artist).filter(Boolean))
+    for (const row of SEED_RECORDS) {
+      if (haveArtist.has(row.artist)) continue
+      const res = await request.post('/api/records', {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        data: {
+          ...row,
+          purchasedAt: '2026-05-01T00:00:00Z',
+          shippedAt: '2026-05-03T00:00:00Z',
+          receivedAt: '2026-05-05T00:00:00Z',
+          purchaseSource: 'eBay',
+          sellerName: 'Seed Seller',
+          mediaPieces: [{ kind: 'VINYL', index: 1, urlOrPath: PLACEHOLDER }],
+        },
+      })
+      if (res.ok()) {
+        const body = (await res.json()) as RecordRow
+        if (body.id) existing.push(body)
+      }
+    }
     for (const row of existing.filter((r) => SEED_RECORDS.some((s) => s.artist === r.artist))) {
       if (row.id && !recordHasImage(row)) {
         await patchRecordMedia(request, token, row.id)

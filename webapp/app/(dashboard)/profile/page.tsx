@@ -23,6 +23,7 @@ function maskEmail(email: string): string {
 type StatDef = {
   label: string
   value: string | number
+  helper?: string
   href: string
   testId: string
 }
@@ -31,12 +32,25 @@ function ProfileStatCard({ stat }: { stat: StatDef }) {
   return (
     <Link href={stat.href} className="group block" data-testid={stat.testId}>
       <Card className="transition hover:border-brand/40 hover:shadow-md">
-        <div className="flex items-start justify-between gap-2">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{stat.label}</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
+            <p
+              className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-white"
+              data-testid={`${stat.testId}-value`}
+            >
+              {stat.value}
+            </p>
+            {stat.helper && (
+              <p className="mt-0.5 text-xs text-slate-500" data-testid={`${stat.testId}-helper`}>
+                {stat.helper}
+              </p>
+            )}
           </div>
-          <span className="text-sm font-medium text-brand opacity-80 group-hover:opacity-100">
+          <span
+            className="shrink-0 text-sm font-medium text-brand opacity-80 group-hover:opacity-100"
+            data-testid={`${stat.testId}-link`}
+          >
             View →
           </span>
         </div>
@@ -63,6 +77,8 @@ export default function ProfilePage() {
           activeListings: 0,
           soldListings: 0,
           purchasesCount: 0,
+          uniqueArtists: 0,
+          totalSpendDisplay: '—',
         }),
       )
       .finally(() => setStatsLoading(false))
@@ -115,7 +131,11 @@ export default function ProfilePage() {
         },
         {
           label: 'Collection stats',
-          value: stats.recordsCount > 0 ? 'View' : '—',
+          value: stats.uniqueArtists > 0 ? stats.uniqueArtists : stats.recordsCount,
+          helper:
+            stats.recordsCount > 0
+              ? `${stats.recordsCount} records · ${stats.totalSpendDisplay} spent`
+              : 'Add records to unlock charts',
           href: '/profile/collection-stats',
           testId: 'profile-stat-collection-stats',
         },

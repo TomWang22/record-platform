@@ -4,15 +4,22 @@ import { obtainAuthToken, signInAsTestCollector, signInAsTestCollectorWithSeed }
 import { getJsonWith429Retry } from './helpers/http-retry'
 import { ensureTestCollection } from './helpers/seed-collection'
 import { ensureContractFeedback } from './helpers/seed-feedback'
-import { ensureWatchlistContains, pollRecentlyViewedIds } from './helpers/seed-lean'
+import {
+  clearRecentlyViewedOnApi,
+  clearWatchlist,
+  ensureWatchlistContains,
+} from './helpers/seed-lean'
 import {
   captureScreenshot,
   contractScreenshotPath,
   guestContractScreenshotPath,
   capturePageContentScreenshot,
+  captureBrowseResultsScreenshot,
+  captureToolbarScreenshot,
   waitForFeedbackReady,
   waitForListingsReady,
   waitForProfileReady,
+  waitForRecentlyViewedReady,
   waitForRecordsReady,
   waitForSellingReady,
   waitForWatchlistCard,
@@ -42,7 +49,17 @@ test.describe('Marketplace filled screenshots', () => {
         page,
         contractScreenshotPath(`authenticated-records-${view}-media-filled.png`),
       )
+      await capturePageContentScreenshot(
+        page,
+        contractScreenshotPath(`authenticated-records-${view}-polished.png`),
+      )
     }
+    await page.goto('/records?view=grid')
+    await waitForRecordsReady(page, 'grid', token)
+    await captureToolbarScreenshot(
+      page,
+      contractScreenshotPath('authenticated-records-toolbar-polished.png'),
+    )
     await page.goto('/records?view=grid')
     await waitForRecordsReady(page, 'grid', token)
     await capturePageContentScreenshot(
@@ -63,10 +80,16 @@ test.describe('Marketplace filled screenshots', () => {
     for (const view of ['grid', 'list', 'compact'] as const) {
       await waitForListingsReady(page, view)
       await assertNoStaleProductUi(page)
-      await capturePageContentScreenshot(
+      await captureBrowseResultsScreenshot(
         page,
-        contractScreenshotPath('authenticated-marketplace-browse-product-cards.png'),
+        contractScreenshotPath(`authenticated-marketplace-browse-${view}-polished.png`),
       )
+      if (view === 'grid') {
+        await captureBrowseResultsScreenshot(
+          page,
+          contractScreenshotPath('authenticated-marketplace-browse-product-cards.png'),
+        )
+      }
     }
   })
 
@@ -81,7 +104,15 @@ test.describe('Marketplace filled screenshots', () => {
     )
     await capturePageContentScreenshot(
       page,
+      contractScreenshotPath('authenticated-profile-stats-polished.png'),
+    )
+    await capturePageContentScreenshot(
+      page,
       contractScreenshotPath('authenticated-profile-clickable-stats-filled.png'),
+    )
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-profile-clickable-stats-polished.png'),
     )
 
     await waitForSellingReady(page, 'active')
@@ -124,26 +155,48 @@ test.describe('Marketplace filled screenshots', () => {
         page,
         contractScreenshotPath('authenticated-watchlist-filled-product-cards.png'),
       )
+      await capturePageContentScreenshot(
+        page,
+        contractScreenshotPath('authenticated-watchlist-filled-product-cards-polished.png'),
+      )
 
       await page.goto(`/listings/${listingId}`)
       await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 30_000 })
-      await pollRecentlyViewedIds(page.request, token!, [listingId], { timeoutMs: 45_000 })
-      await page.goto('/recently-viewed')
-      await expect(page.getByTestId('recently-viewed-page-ready')).toBeVisible({ timeout: 30_000 })
-      await expect(page.locator('[data-testid="recently-viewed-item"]').first()).toBeVisible({
-        timeout: 15_000,
-      })
-      await captureScreenshot(
+      await waitForRecentlyViewedReady(page, token!, [listingId])
+      await capturePageContentScreenshot(
         page,
         contractScreenshotPath('authenticated-recently-viewed-filled-product-cards.png'),
+      )
+      await capturePageContentScreenshot(
+        page,
+        contractScreenshotPath('authenticated-recently-viewed-filled-product-cards-polished.png'),
+      )
+
+      await clearRecentlyViewedOnApi(page.request, token!)
+      await page.goto('/recently-viewed')
+      await expect(page.getByTestId('recently-viewed-page-ready')).toBeVisible({ timeout: 30_000 })
+      await expect(page.getByTestId('recently-viewed-empty')).toBeVisible({ timeout: 15_000 })
+      await capturePageContentScreenshot(
+        page,
+        contractScreenshotPath('authenticated-recently-viewed-cleared-empty-state.png'),
+      )
+
+      await clearWatchlist(page.request, token!)
+      await page.goto('/watchlist')
+      await expect(page.getByTestId('watchlist-page-ready')).toBeVisible({ timeout: 30_000 })
+      await expect(page.getByTestId('watchlist-empty-state-ready')).toBeVisible({ timeout: 30_000 })
+      await capturePageContentScreenshot(
+        page,
+        contractScreenshotPath('authenticated-watchlist-cleared-empty-state.png'),
       )
 
       await page.goto(`/listings/${listingId}`)
       await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 30_000 })
       await expect(page.locator('body')).not.toContainText('Loading listing')
-      await captureScreenshot(page, contractScreenshotPath('authenticated-listing-detail-with-image.png'), {
-        fullPage: true,
-      })
+      await capturePageContentScreenshot(
+        page,
+        contractScreenshotPath('authenticated-listing-detail-with-image.png'),
+      )
       await page.goto(`/listings/${listingId}/edit`)
       await expect(page.getByRole('button', { name: /save changes/i })).toBeVisible({
         timeout: 30_000,

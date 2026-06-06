@@ -34,6 +34,8 @@ test.describe.serial('Records collection filter contract (7.8)', () => {
 
   test.beforeEach(async ({ page }) => {
     await signInWithContractApiToken(page)
+    const token = await obtainAuthToken(page.request)
+    await ensureTestCollection(page.request, token)
   })
 
   test('grid list compact with images and auction filter', async ({ page }) => {

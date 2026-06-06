@@ -9,6 +9,7 @@ import {
   ListingSellerCard,
   ListingShippingCard,
 } from '@/components/listings/listing-detail-panels'
+import { ListingImageGallery } from '@/components/listings/listing-image-gallery'
 import { WatchlistHeart } from '@/components/listings/watchlist-heart'
 import { ApiErrorAlert } from '@/components/ui/api-error-alert'
 import { Badge } from '@/components/ui/badge'
@@ -124,54 +125,24 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <Card className="overflow-hidden" data-testid="listing-gallery">
-          {images.length === 0 ? (
-            <div className="flex aspect-[4/3] max-h-80 items-center justify-center bg-slate-100 text-sm text-slate-500 dark:bg-slate-800">
-              No media
-            </div>
-          ) : images.length === 1 ? (
-            <div className="flex items-center justify-center bg-slate-50 p-4 dark:bg-slate-900/40">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={images[0]}
-                alt=""
-                data-testid="listing-primary-image"
-                className="max-h-[min(420px,55vh)] w-full max-w-md rounded-xl object-contain shadow-sm"
-              />
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-3">
-              {images.map((src, i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={`${src}-${i}`}
-                  src={src}
-                  alt=""
-                  data-testid={i === 0 ? 'listing-primary-image' : undefined}
-                  className="aspect-square rounded-lg object-cover"
-                />
-              ))}
-            </div>
-          )}
-        </Card>
-
-        <div className="min-w-0 space-y-4">
-          <ListingShippingCard listing={listing} />
-          <ListingSellerCard listing={listing} listingId={id} />
-        </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)] lg:items-start">
+        <ListingImageGallery images={images} />
+        <ListingShippingCard listing={listing} />
       </div>
 
-      {listing.description && (
-        <Card className="p-4">
-          <p className="text-sm font-medium">Description</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
-            {listing.description}
+      <div className="space-y-4">
+        <ListingSellerCard listing={listing} listingId={id} />
+        <Card className="p-4" data-testid="listing-description-card">
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Description</p>
+          <p
+            className="mt-2 min-h-[3rem] whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300"
+            data-testid="listing-description-text"
+          >
+            {listing.description?.trim() || 'No description provided for this listing.'}
           </p>
         </Card>
-      )}
-
-      <ListingRevisionPanel listingId={id} />
+        <ListingRevisionPanel listingId={id} />
+      </div>
 
       {!authRequired && (
         <p className="text-xs text-slate-400">

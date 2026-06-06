@@ -70,10 +70,10 @@ export function RecordsToolbar({
 }: Props) {
   return (
     <div
-      className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-slate-950"
+      className="space-y-2 rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-slate-950"
       data-testid="records-filter-toolbar"
     >
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <input
           data-testid="records-search-input"
           placeholder="Search artist, album, catalog, label…"
@@ -82,7 +82,7 @@ export function RecordsToolbar({
           onKeyDown={(e) => {
             if (e.key === 'Enter') onSearch()
           }}
-          className="min-w-[200px] flex-1 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
+          className="min-w-[180px] flex-1 rounded-lg border border-slate-200/80 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-brand focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
         />
         <Button onClick={onSearch} disabled={loading}>
           {loading ? 'Loading…' : 'Search'}
@@ -92,8 +92,8 @@ export function RecordsToolbar({
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 dark:border-white/5">
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-2 md:grid-cols-3 lg:grid-cols-6 dark:border-white/5">
+        <label className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300">
           Purchase type
           <select
             data-testid="records-filter-purchase-type"
@@ -101,7 +101,7 @@ export function RecordsToolbar({
             onChange={(e) =>
               onPurchaseTypeFilterChange?.(e.target.value as PurchaseTypeFilter)
             }
-            className="rounded-lg border border-slate-200/80 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-slate-900"
+            className="rounded-md border border-slate-200/80 bg-white px-2 py-1 text-sm dark:border-white/10 dark:bg-slate-900"
           >
             <option value="">All types</option>
             <option value="fixed_price">Fixed price</option>
@@ -114,17 +114,17 @@ export function RecordsToolbar({
           </select>
         </label>
 
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300">
           Purchased from
           <input
             type="date"
             data-testid="records-filter-purchased-from"
             value={purchasedFrom}
             onChange={(e) => onPurchasedFromChange?.(e.target.value)}
-            className="rounded-lg border border-slate-200/80 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-slate-900"
+            className="rounded-md border border-slate-200/80 bg-white px-2 py-1 text-sm dark:border-white/10 dark:bg-slate-900"
           />
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300">
           Purchased to
           <input
             type="date"
@@ -135,7 +135,7 @@ export function RecordsToolbar({
           />
         </label>
 
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300">
           Received from
           <input
             type="date"
@@ -145,7 +145,7 @@ export function RecordsToolbar({
             className="rounded-lg border border-slate-200/80 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-slate-900"
           />
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300">
           Received to
           <input
             type="date"
@@ -156,7 +156,7 @@ export function RecordsToolbar({
           />
         </label>
 
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300">
           Listed
           <select
             data-testid="records-filter-listed"
@@ -173,7 +173,7 @@ export function RecordsToolbar({
         </label>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 dark:border-white/5">
         <p
           className="text-sm text-slate-500 dark:text-slate-400"
           data-testid="records-count"

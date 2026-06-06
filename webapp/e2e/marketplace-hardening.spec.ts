@@ -3,10 +3,13 @@ import { test, expect } from '@playwright/test'
 import { signInAsTestCollector, signInAsTestCollectorWithSeed } from './helpers/auth'
 import { assertNoStaleProductUi } from './helpers/stale-ui-guard'
 import {
+  captureBrowseResultsScreenshot,
+  capturePageContentScreenshot,
   contractScreenshotPath,
   guestContractScreenshotPath,
   waitForFeedbackReady,
   waitForListingsReady,
+  waitForProfileReady,
 } from './helpers/screenshot-readiness'
 
 test.describe('Marketplace hardening', () => {
@@ -15,25 +18,30 @@ test.describe('Marketplace hardening', () => {
   })
 
   test('profile has no dev provider wording and clickable stats', async ({ page }) => {
-    await page.goto('/profile')
+    const { token } = await signInAsTestCollectorWithSeed(page)
+    await waitForProfileReady(page, token)
     await assertNoStaleProductUi(page)
     await expect(page.getByText(/Signed in with/i)).toBeVisible()
     await expect(page.getByText(/Test account|Google|Discogs|Email/i)).toBeVisible()
     await page.getByRole('link').filter({ hasText: 'Records' }).first().click()
     await expect(page).toHaveURL(/\/records/)
-    await page.goto('/profile')
+    await waitForProfileReady(page, token)
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-profile-clickable-stats.png'),
+    )
     await page.getByRole('link').filter({ hasText: 'Feedback score' }).first().click()
     await expect(page).toHaveURL(/\/profile\/feedback/)
-    await page.screenshot({
-      path: contractScreenshotPath('authenticated-profile-clickable-stats.png'),
-      fullPage: true,
-    })
   })
 
   test('marketplace browse grid and watchlist heart', async ({ page }) => {
     await signInAsTestCollectorWithSeed(page)
     await waitForListingsReady(page, 'grid')
     await assertNoStaleProductUi(page)
+    await captureBrowseResultsScreenshot(
+      page,
+      contractScreenshotPath('authenticated-marketplace-browse-grid-polished.png'),
+    )
     const heart = page
       .getByRole('button', { name: /add to watchlist|remove from watchlist/i })
       .first()
@@ -48,11 +56,10 @@ test.describe('Marketplace hardening', () => {
     expect(listingId, 'seeded active listing required').toBeTruthy()
     await page.goto(`/listings/${listingId}`)
     await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 45_000 })
+    await expect(page.getByTestId('listing-revision-loading')).toHaveCount(0, { timeout: 30_000 })
+    await expect(page.getByTestId('listing-revision-preview')).toBeVisible({ timeout: 30_000 })
     await assertNoStaleProductUi(page)
-    await page.screenshot({
-      path: contractScreenshotPath('authenticated-listing-detail.png'),
-      fullPage: true,
-    })
+    await capturePageContentScreenshot(page, contractScreenshotPath('authenticated-listing-detail.png'))
     await page.goto(`/listings/${listingId}/edit`)
     await expect(page.getByTestId('listing-edit-ready')).toBeVisible({ timeout: 45_000 })
     await page.screenshot({

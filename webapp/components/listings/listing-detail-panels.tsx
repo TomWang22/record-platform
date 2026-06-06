@@ -62,7 +62,7 @@ export function ListingShippingCard({ listing }: { listing: MarketplaceListing }
   )
   return (
     <div data-testid="listing-shipping-card">
-    <Card className="space-y-4 p-5" data-testid="listing-price-sale-card">
+    <Card className="space-y-3 p-4" data-testid="listing-price-sale-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Price &amp; sale</p>
         <Badge>{sale}</Badge>
@@ -181,18 +181,20 @@ export function ListingSellerCard({ listing, listingId }: Props) {
 
   return (
     <div data-testid="listing-seller-card">
-    <Card className="space-y-3 p-4">
-      <p className="text-sm font-medium">Seller</p>
-      <Link
-        href={`/users/${sellerSlug || 'seller'}`}
-        className="text-lg font-semibold text-brand hover:underline"
-      >
-        {listing.seller ?? 'Seller'}
-      </Link>
-      <p className="text-sm text-slate-500">
-        Feedback:{' '}
-        {listing.seller_feedback_score != null ? `${listing.seller_feedback_score}%` : '—'}
-      </p>
+    <Card className="flex flex-wrap items-center justify-between gap-4 p-4">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Seller</p>
+        <Link
+          href={`/users/${sellerSlug || 'seller'}`}
+          className="text-lg font-semibold text-brand hover:underline"
+        >
+          {listing.seller ?? 'Seller'}
+        </Link>
+        <p className="text-sm text-slate-500">
+          Feedback:{' '}
+          {listing.seller_feedback_score != null ? `${listing.seller_feedback_score}%` : '—'}
+        </p>
+      </div>
       <Button asChild data-testid="contact-seller-button">
         <Link href={contactHref}>Contact seller</Link>
       </Button>
@@ -247,21 +249,36 @@ export function ListingRevisionPanel({ listingId }: { listingId: string }) {
 
   return (
     <div data-testid="listing-revision-panel">
-    <Card className="p-4">
-      {loaded && lines.length > 0 && previewWhen && (
+    <Card className="space-y-3 p-4">
+      {loaded && (
         <div
           data-testid="listing-revision-preview"
-          className="mb-3 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900/50"
+          className="min-h-[4.5rem] rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-3 text-sm dark:border-white/10 dark:bg-slate-900/50"
         >
-          <p className="text-xs text-slate-500" data-testid="listing-revision-preview-when">
-            Latest change · {previewWhen}
-          </p>
-          <ul className="mt-1 space-y-0.5 text-slate-700 dark:text-slate-200">
-            {lines.slice(0, 2).map((line, i) => (
-              <li key={`preview-${i}`}>{line}</li>
-            ))}
-          </ul>
+          {lines.length > 0 && previewWhen ? (
+            <>
+              <p className="text-xs font-medium text-slate-500" data-testid="listing-revision-preview-when">
+                Latest change · {previewWhen}
+              </p>
+              <ul className="mt-2 space-y-1 text-slate-700 dark:text-slate-200">
+                {lines.slice(0, 3).map((line, i) => (
+                  <li key={`preview-${i}`}>{line}</li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500" data-testid="listing-revision-preview-empty">
+              No revisions yet. Edits to price, shipping, or title will appear here.
+            </p>
+          )}
         </div>
+      )}
+      {!loaded && loading && (
+        <div
+          className="h-16 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800"
+          data-testid="listing-revision-loading"
+          aria-hidden
+        />
       )}
       <button
         type="button"

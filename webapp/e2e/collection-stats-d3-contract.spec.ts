@@ -19,6 +19,7 @@ test.describe('Collection stats D3 contract (7.8)', () => {
   test('D3 charts render on collection stats', async ({ page }) => {
     await signInWithContractApiToken(page)
     await page.goto('/profile/collection-stats')
+    await expect(page.getByTestId('collection-stats-summary')).toBeVisible({ timeout: 45_000 })
     await expect(page.getByTestId('collection-stats-d3-ready')).toBeVisible({ timeout: 45_000 })
     await expect
       .poll(async () => page.getByTestId('collection-chart-acquisition').getAttribute('data-chart-rendered'))
@@ -26,6 +27,14 @@ test.describe('Collection stats D3 contract (7.8)', () => {
     await expect
       .poll(async () => page.getByTestId('collection-chart-spend').getAttribute('data-chart-rendered'))
       .toBe('true')
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-collection-stats-summary-polished.png'),
+    )
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-collection-stats-d3-polished.png'),
+    )
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-collection-stats-d3-clean.png'),

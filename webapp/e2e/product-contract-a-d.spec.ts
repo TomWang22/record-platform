@@ -8,8 +8,7 @@ import {
   ensureWatchlistEntry,
   timed,
 } from './helpers/seed-lean'
-import { waitForRecordsCollectionLoaded } from './helpers/records-contract'
-import { captureScreenshot, contractScreenshotPath } from './helpers/screenshot-readiness'
+import { captureScreenshot, contractScreenshotPath, waitForRecordsReady } from './helpers/screenshot-readiness'
 import { assertNoStaleProductUi } from './helpers/stale-ui-guard'
 import { ensureTestCollection } from './helpers/seed-collection'
 
@@ -88,9 +87,9 @@ test.describe.serial('Product contract A–D', () => {
     )
   })
 
-  test('C — records grid with images', async ({ page }) => {
-    await page.goto('/records?view=grid')
-    await waitForRecordsCollectionLoaded(page)
+  test('C — records grid with images', async ({ page, request }) => {
+    const token = await obtainAuthToken(request)
+    await waitForRecordsReady(page, 'grid', token)
     await expect(page.locator('[data-testid="record-card"]').first()).toBeVisible({
       timeout: 45_000,
     })
@@ -100,15 +99,13 @@ test.describe.serial('Product contract A–D', () => {
       page,
       contractScreenshotPath('authenticated-records-grid-media-filled.png'),
     )
-    await page.goto('/records?view=list')
-    await waitForRecordsCollectionLoaded(page)
+    await waitForRecordsReady(page, 'list', token)
     await expect(page.locator('[data-testid="record-row"]').first()).toBeVisible({ timeout: 30_000 })
     await captureScreenshot(
       page,
       contractScreenshotPath('authenticated-records-list-media-filled.png'),
     )
-    await page.goto('/records?view=compact')
-    await waitForRecordsCollectionLoaded(page)
+    await waitForRecordsReady(page, 'compact', token)
     await expect(page.locator('[data-testid="record-compact-item"]').first()).toBeVisible({
       timeout: 30_000,
     })

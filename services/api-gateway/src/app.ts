@@ -1423,6 +1423,33 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
    - Identity headers are injected via middleware *before* the proxy.
    ========================================================= */
 
+/* OBO offers — /api/offers/* → listings-service /offers/* */
+app.use(
+  "/offers",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: LISTINGS_HTTP_TARGET,
+    changeOrigin: true,
+    pathRewrite: (path) => {
+      const p = (path || "").replace(/^\/+/, "");
+      return p ? `/offers/${p}` : "/offers";
+    },
+    proxyTimeout: 30000,
+    agent: keepAliveAgent,
+    on: {
+      proxyReq: (proxyReq: any, req: AuthedRequest) => {
+        if (req.user?.sub) proxyReq.setHeader("x-user-id", req.user.sub);
+        const authHeader = req.headers.authorization;
+        if (authHeader) proxyReq.setHeader("Authorization", authHeader);
+      },
+      error(err: Error, _req: Request, res: NodeServerResponse | Socket) {
+        console.error("[gw] offers proxy error:", err.message);
+        sendJson502(res as NodeServerResponse | Socket, "offers upstream error");
+      },
+    },
+  }),
+);
+
 /* Listings — settings and ratings are handled above (first after auth guard). Other /listings/* below. */
 // Note: /listings/healthz is handled by specific route above (line 298)
 app.use(

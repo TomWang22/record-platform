@@ -462,7 +462,102 @@ add_flow "$(python3 -c 'import json,sys; print(json.dumps({
 [[ "$FB_STATUS" == "fail" ]] && FAIL=1
 
 # ---------------------------------------------------------------------------
-# 5) Watchlist / RecentlyViewed
+# 5) OBO OfferCreated (Phase 9)
+# ---------------------------------------------------------------------------
+OBO_STATUS="pass"
+OBO_TOPIC="${ENV_PREFIX}.listing.events"
+OBO_PRODUCE_MODE="outbox_then_direct_kafka"
+OBO_OFFER_ID=""
+OBO_LISTING="${LISTING_ID:-}"
+
+if [[ -n "$buyer_t" && -n "$seller_t" && -n "$OBO_LISTING" ]]; then
+  obo_patch="$(curl -sS --max-time 25 --cacert "$CA" "${CURL_EDGE[@]}" -X PATCH "$BASE/api/listings/$OBO_LISTING" \
+    -H "Authorization: Bearer $seller_t" -H 'Content-Type: application/json' -H 'X-RP-E2E-Contract: 1' \
+    -d '{"description":"OBO matrix probe","pricing_mode":"obo","amenities":["sale_type:obo","max_offer_attempts:5","allow_offers:true"]}' \
+    -o /dev/null -w '%{http_code}' 2>/dev/null || echo 000)"
+  if [[ "$obo_patch" == "200" || "$obo_patch" == "204" ]]; then
+    pass "OBO: listing patched to obo mode"
+  else
+    info "OBO: PATCH listing HTTP $obo_patch (may already be obo)"
+  fi
+  obo_tmp="$(mktemp)"
+  obo_code="$(curl -sS --max-time 30 --cacert "$CA" "${CURL_EDGE[@]}" -X POST "$BASE/api/listings/$OBO_LISTING/offers" \
+    -H "Authorization: Bearer $buyer_t" -H 'Content-Type: application/json' -H 'X-RP-E2E-Contract: 1' \
+    -d '{"amountCents":1999,"message":"matrix-obo"}' -o "$obo_tmp" -w '%{http_code}' 2>/dev/null || echo 000)"
+  obo_json="$(cat "$obo_tmp" 2>/dev/null || echo '{}')"
+  rm -f "$obo_tmp"
+  if [[ "$obo_code" == "201" ]]; then
+    OBO_OFFER_ID="$(printf '%s' "$obo_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(str(d.get("id") or "").strip())' 2>/dev/null || true)"
+    pass "OBO: POST /api/listings/:id/offers → 201"
+  else
+    OBO_STATUS="fail"
+    fail "OBO: POST offer → HTTP $obo_code"
+  fi
+else
+  OBO_STATUS="fail"
+  fail "OBO: missing buyer/seller token or listing id"
+fi
+
+OBO_DB_ROW="0"
+OBO_EVT_ROW="0"
+OBO_OUTBOX_ROW="0"
+OBO_NOTIF_ROW="0"
+if [[ -n "$OBO_OFFER_ID" ]]; then
+  OBO_DB_ROW="$(psql_at 5435 listings "SELECT COUNT(*) FROM listings.offers WHERE id='$OBO_OFFER_ID'::uuid")"
+  OBO_EVT_ROW="$(psql_at 5435 listings "SELECT COUNT(*) FROM listings.offer_events WHERE offer_id='$OBO_OFFER_ID'::uuid")"
+  OBO_OUTBOX_ROW="$(psql_at 5435 listings "SELECT COUNT(*) FROM listings.outbox_events WHERE aggregate_id='$OBO_OFFER_ID' AND type='OfferCreated'")"
+  if [[ "${OBO_DB_ROW:-0}" =~ ^[1-9] && "${OBO_EVT_ROW:-0}" =~ ^[1-9] ]]; then
+    pass "OBO: DB offer + offer_events rows"
+  else
+    OBO_STATUS="fail"
+    fail "OBO: DB rows missing (offers=$OBO_DB_ROW events=$OBO_EVT_ROW)"
+  fi
+  if [[ "${OBO_OUTBOX_ROW:-0}" =~ ^[1-9] ]]; then
+    pass "OBO: listings.outbox_events row"
+  else
+    OBO_STATUS="partial"
+    info "OBO: outbox row not found (may be published+marked)"
+  fi
+  if kafka_topic_has_substr "$OBO_TOPIC" "OfferCreated" 2>/dev/null; then
+    pass "OBO: Kafka topic contains OfferCreated"
+    OBO_PRODUCE_MODE="outbox_and_kafka_observed"
+  else
+    info "OBO: Kafka OfferCreated not observed in sample (outbox/Kafka may still be async)"
+  fi
+  seller_uid="$(curl -sfS --max-time 15 --cacert "$CA" "${CURL_EDGE[@]}" "$BASE/api/auth/me" \
+    -H "Authorization: Bearer $seller_t" -H 'X-RP-E2E-Contract: 1' 2>/dev/null \
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); u=d.get("user") or d; print(u.get("sub") or u.get("id") or "")' 2>/dev/null || true)"
+  if [[ -n "$seller_uid" ]]; then
+    OBO_NOTIF_ROW="$(psql_at 5441 notification "SELECT COUNT(*) FROM notification.notifications WHERE user_id='$seller_uid'::uuid AND event_type='OfferCreated' AND created_at > NOW() - INTERVAL '30 minutes'")"
+    if [[ "${OBO_NOTIF_ROW:-0}" =~ ^[1-9] ]]; then
+      pass "OBO: seller notification row"
+    else
+      OBO_STATUS="partial"
+      info "OBO: seller notification not yet in DB (consumer lag)"
+    fi
+  fi
+fi
+
+add_flow "$(python3 -c 'import json,sys; print(json.dumps({
+  "flow":"OfferCreated",
+  "producer":"listings-service",
+  "api_action":"POST /api/listings/:id/offers",
+  "db_table":"listings.offers; listings.offer_events",
+  "outbox_table":"listings.outbox_events",
+  "outbox_result":sys.argv[1],
+  "produce_mode":sys.argv[2],
+  "kafka_topic":sys.argv[3],
+  "kafka_result":"observed_or_async",
+  "consumer":"notification-service",
+  "final_api_state":"GET /api/notifications seller unread; GET /api/offers/:id",
+  "status":sys.argv[4],
+  "offer_id":sys.argv[5],
+  "notification_rows":sys.argv[6],
+}))' "$OBO_OUTBOX_ROW" "$OBO_PRODUCE_MODE" "$OBO_TOPIC" "$OBO_STATUS" "${OBO_OFFER_ID:-}" "$OBO_NOTIF_ROW")"
+[[ "$OBO_STATUS" == "fail" ]] && FAIL=1
+
+# ---------------------------------------------------------------------------
+# 6) Watchlist / RecentlyViewed
 # ---------------------------------------------------------------------------
 WL_STATUS="pass"
 WL_PRODUCE_MODE="db_only_no_outbox_or_kafka"

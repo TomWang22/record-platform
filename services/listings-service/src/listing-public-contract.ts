@@ -253,6 +253,9 @@ function stripInternalKeys(payload: Record<string, unknown>): Record<string, unk
 
 export type BuildPublicListingOptions = PublicListingShapeOptions & {
   watchCount?: number;
+  /** Owner-only OBO stats (never on anonymous browse). */
+  offerCount?: number;
+  bestOfferDisplay?: string | null;
 };
 
 /**
@@ -306,6 +309,13 @@ export function buildPublicListingFromRow(
           ? `Ships from ${shipping.shipsFrom}`
           : null;
 
+  const oboEnabled = saleType === "obo" || rp.allowOffers === true;
+  const acceptsOffers = oboEnabled && status === "active";
+  const maxOfferAttempts =
+    rp.maxOfferAttempts != null && Number.isFinite(Number(rp.maxOfferAttempts))
+      ? Math.max(1, Math.floor(Number(rp.maxOfferAttempts)))
+      : 3;
+
   const merged: Record<string, unknown> = {
     ...stripInternalKeys(rpBase),
     id: row.id != null ? String(row.id) : null,
@@ -318,6 +328,9 @@ export function buildPublicListingFromRow(
     priceDisplay: price != null ? formatMoneyFromDollars(price) : null,
     saleType,
     saleTypeDisplay: saleTypeDisplay(saleType),
+    oboEnabled,
+    acceptsOffers,
+    maxOfferAttempts,
     shipping,
     shippingDisplay,
     listedAt: listedFmt.at,
@@ -336,6 +349,11 @@ export function buildPublicListingFromRow(
     label: rpBase.label ?? null,
     subtitle: rpBase.subtitle ?? null,
   };
+
+  if (opts.includeOwnerIds) {
+    if (opts.offerCount != null) merged.offerCount = opts.offerCount;
+    if (opts.bestOfferDisplay != null) merged.bestOfferDisplay = opts.bestOfferDisplay;
+  }
 
   return toPublicListingShape(merged, opts);
 }

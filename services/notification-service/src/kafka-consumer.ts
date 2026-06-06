@@ -98,6 +98,24 @@ export function extractNotificationEnvelopeMeta(buf: Buffer): {
           eventType,
         };
       }
+      if (
+        eventType === "OfferCreated" ||
+        eventType === "OfferCountered" ||
+        eventType === "OfferAccepted" ||
+        eventType === "OfferRejected" ||
+        eventType === "OfferWithdrawn" ||
+        eventType === "OfferExpired"
+      ) {
+        const recipient =
+          eventType === "OfferCreated" || eventType === "OfferWithdrawn"
+            ? String(payload.seller_user_id || payload.sellerUserId || "").trim()
+            : String(payload.buyer_user_id || payload.buyerUserId || "").trim();
+        return {
+          eventId,
+          userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
+          eventType,
+        };
+      }
       if (eventType === "booking.thread.ensure") {
         return { eventId, userId: null, eventType };
       }
@@ -370,6 +388,54 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
                           : "/messages",
                       });
                     }
+                  }
+                  return;
+                }
+                if (
+                  meta.eventType === "OfferCreated" ||
+                  meta.eventType === "OfferCountered" ||
+                  meta.eventType === "OfferAccepted" ||
+                  meta.eventType === "OfferRejected" ||
+                  meta.eventType === "OfferWithdrawn" ||
+                  meta.eventType === "OfferExpired"
+                ) {
+                  let payloadObj: Record<string, unknown> = { source: "kafka.listing.offer" };
+                  try {
+                    const j = JSON.parse(v.toString("utf8")) as {
+                      payload?: Record<string, unknown>;
+                      metadata?: Record<string, unknown>;
+                    };
+                    const p = j.payload && typeof j.payload === "object" ? j.payload : {};
+                    const listingId = String(p.listing_id || p.listingId || "").trim();
+                    const offerId = String(p.offer_id || p.offerId || meta.eventId).trim();
+                    payloadObj = {
+                      notification_category: "marketplace_offer",
+                      category: "marketplace",
+                      context_type: "offer",
+                      context_id: offerId,
+                      offer_id: offerId,
+                      listing_id: listingId,
+                      listing_title: p.listing_title ?? null,
+                      event_type: meta.eventType,
+                      deep_link: listingId
+                        ? `/listings/${encodeURIComponent(listingId)}`
+                        : "/listings",
+                      source: "kafka.listing.offer",
+                    };
+                  } catch {
+                    /* minimal */
+                  }
+                  if (meta.userId) {
+                    await pool.query(
+                      `INSERT INTO notification.notifications (user_id, event_type, channel, status, payload)
+                       VALUES ($1::uuid, $2, 'push'::notification.notification_channel, 'pending', $3::jsonb)`,
+                      [meta.userId, meta.eventType, JSON.stringify(payloadObj)],
+                    );
+                    await invalidateNotificationListCacheForUser(meta.userId);
+                    await publishRealtimeNotification(meta.userId, {
+                      ...payloadObj,
+                      event: meta.eventType,
+                    });
                   }
                   return;
                 }

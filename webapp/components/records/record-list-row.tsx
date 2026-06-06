@@ -79,13 +79,22 @@ export function RecordListRow({ record, compact }: Props) {
       <td className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 lg:table-cell">
         {displayPaid(record)}
       </td>
-      <td className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 xl:table-cell">
+      <td
+        className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 xl:table-cell"
+        data-testid="record-purchased-date"
+      >
         {purchased}
       </td>
-      <td className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 xl:table-cell">
+      <td
+        className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 xl:table-cell"
+        data-testid="record-ship-date"
+      >
         {shipped !== '—' ? shipped : '—'}
       </td>
-      <td className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 xl:table-cell">
+      <td
+        className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 xl:table-cell"
+        data-testid="record-delivered-date"
+      >
         {delivered}
       </td>
       <td className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 2xl:table-cell">

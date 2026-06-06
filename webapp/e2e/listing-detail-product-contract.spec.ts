@@ -110,7 +110,12 @@ test.describe.serial('Listing detail product contract (7.4)', () => {
     await expect(page.getByTestId('listing-listed-at')).toContainText(/EDT|EST|PDT|PST|UTC/i)
     await capturePageContentScreenshot(
       page,
-      contractScreenshotPath('authenticated-listing-detail-shipping-dates.png'),
+      contractScreenshotPath('authenticated-listing-detail-shipping-dates-readable.png'),
+    )
+    await expect(page.getByTestId('listing-primary-image')).toBeVisible()
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-listing-detail-gallery-sized.png'),
     )
   })
 })

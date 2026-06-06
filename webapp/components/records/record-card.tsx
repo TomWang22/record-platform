@@ -56,7 +56,7 @@ export function RecordCard({ record, compact }: Props) {
 
   return (
     <article
-      data-testid="record-card"
+      data-testid={compact ? 'record-compact-item' : 'record-card'}
       className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:border-brand/40 hover:shadow-md dark:border-white/10 dark:bg-slate-950"
     >
       <Link href={`/records/${record.id}`} className="flex flex-1 flex-col p-4">
@@ -86,25 +86,36 @@ export function RecordCard({ record, compact }: Props) {
 
         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
           <div>
-            <dt className="text-slate-400">Purchased</dt>
-            <dd className="font-medium text-slate-800 dark:text-slate-200">{purchased}</dd>
+            <dt className="text-slate-400">Purchased date</dt>
+            <dd
+              className="font-medium text-slate-800 dark:text-slate-200"
+              data-testid="record-purchased-date"
+            >
+              {purchased}
+            </dd>
           </div>
           <div>
             <dt className="text-slate-400">Paid</dt>
             <dd className="font-medium text-slate-800 dark:text-slate-200">{displayPaid(record)}</dd>
           </div>
-          {(record.shippedAt || record.shipDateDisplay) && (
-            <div>
-              <dt className="text-slate-400">Shipped</dt>
-              <dd className="font-medium text-slate-800 dark:text-slate-200">{shipped}</dd>
-            </div>
-          )}
-          {(record.receivedAt || record.deliveredDateDisplay) && (
-            <div>
-              <dt className="text-slate-400">Delivered</dt>
-              <dd className="font-medium text-slate-800 dark:text-slate-200">{delivered}</dd>
-            </div>
-          )}
+          <div>
+            <dt className="text-slate-400">Ship date</dt>
+            <dd
+              className="font-medium text-slate-800 dark:text-slate-200"
+              data-testid="record-ship-date"
+            >
+              {shipped}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">Delivered date</dt>
+            <dd
+              className="font-medium text-slate-800 dark:text-slate-200"
+              data-testid="record-delivered-date"
+            >
+              {delivered}
+            </dd>
+          </div>
         </dl>
       </Link>
 

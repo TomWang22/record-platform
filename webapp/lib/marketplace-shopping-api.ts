@@ -31,6 +31,7 @@ export function productCardToStoredRef(card: ShoppingProductCard): StoredListing
     format: card.format ?? undefined,
     mediaCondition: card.mediaCondition ?? undefined,
     viewedAt: card.viewedAtDisplay ?? undefined,
+    watchlistedAtDisplay: card.watchlistedAtDisplay ?? undefined,
   }
 }
 

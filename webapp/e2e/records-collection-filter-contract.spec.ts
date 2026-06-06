@@ -46,6 +46,7 @@ test.describe.serial('Records collection filter contract (7.8)', () => {
       .getByTestId('record-card')
       .filter({ hasText: 'Kenny Dorham' })
       .first()
+      .or(page.getByTestId('record-compact-item').filter({ hasText: 'Kenny Dorham' }).first())
       .or(page.locator('article').filter({ hasText: 'Kenny Dorham' }).first())
     await expect(kennyCard).toBeVisible({ timeout: 60_000 })
     await expect(page.locator('article').filter({ hasText: 'Miles Davis' })).toHaveCount(0)

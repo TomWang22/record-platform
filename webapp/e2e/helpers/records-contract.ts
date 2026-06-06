@@ -34,6 +34,7 @@ export async function waitForRecordsCollectionLoaded(page: Page): Promise<void> 
   })
   const ready = page.getByTestId('records-ready')
   const cards = page.getByTestId('record-card')
+  const compactItems = page.getByTestId('record-compact-item')
   const rows = page.getByTestId('record-row')
   const articles = page.locator('article')
   const tableRows = page.locator('tbody tr')
@@ -42,6 +43,7 @@ export async function waitForRecordsCollectionLoaded(page: Page): Promise<void> 
       async () => {
         if (await ready.count()) return 'ready'
         if (await cards.count()) return 'cards'
+        if (await compactItems.count()) return 'compact'
         if (await rows.count()) return 'rows'
         if (await articles.count()) return 'articles'
         if (await tableRows.count()) return 'table'
@@ -61,6 +63,7 @@ export async function waitForRecordVisibleAfterFilter(page: Page, artist: string
     .getByTestId('record-card')
     .filter({ hasText: artist })
     .first()
+    .or(page.getByTestId('record-compact-item').filter({ hasText: artist }).first())
     .or(page.locator('article').filter({ hasText: artist }).first())
   await expect(card).toBeVisible({ timeout: 60_000 })
 }

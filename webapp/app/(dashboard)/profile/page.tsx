@@ -5,22 +5,67 @@ import { useEffect, useState } from 'react'
 
 import { AuthRequiredCard } from '@/components/auth/auth-required-card'
 import { Card } from '@/components/ui/card'
-import { apiFetch } from '@/lib/api-client'
-import { sessionPrimaryLabel } from '@/lib/session-display'
+import { authProviderLabel, sessionPrimaryLabel } from '@/lib/session-display'
+import {
+  fetchProfileDashboardStats,
+  type ProfileDashboardStats,
+} from '@/lib/profile-dashboard-stats'
 import { useRequireAuth } from '@/lib/use-require-auth'
 import { useSession, isSessionAuthenticated } from '@/lib/use-session'
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@')
+  if (!local || !domain) return email
+  if (local.length <= 4) return `${local[0] ?? ''}***@${domain}`
+  return `${local.slice(0, 4)}***@${domain}`
+}
+
+type StatDef = {
+  label: string
+  value: string | number
+  href: string
+  testId: string
+}
+
+function ProfileStatCard({ stat }: { stat: StatDef }) {
+  return (
+    <Link href={stat.href} className="group block" data-testid={stat.testId}>
+      <Card className="transition hover:border-brand/40 hover:shadow-md">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{stat.label}</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
+          </div>
+          <span className="text-sm font-medium text-brand opacity-80 group-hover:opacity-100">
+            View →
+          </span>
+        </div>
+      </Card>
+    </Link>
+  )
+}
 
 export default function ProfilePage() {
   const { authRequired } = useRequireAuth()
   const session = useSession()
-  const [recordsCount, setRecordsCount] = useState(0)
+  const [stats, setStats] = useState<ProfileDashboardStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
 
   useEffect(() => {
-    if (!authRequired) {
-      void apiFetch<unknown[]>('/api/records', { auth: true })
-        .then((rows) => setRecordsCount(rows.length))
-        .catch(() => setRecordsCount(0))
-    }
+    if (authRequired) return
+    setStatsLoading(true)
+    void fetchProfileDashboardStats()
+      .then(setStats)
+      .catch(() =>
+        setStats({
+          recordsCount: 0,
+          feedbackScore: '—',
+          activeListings: 0,
+          soldListings: 0,
+          purchasesCount: 0,
+        }),
+      )
+      .finally(() => setStatsLoading(false))
   }, [authRequired])
 
   if (authRequired) {
@@ -28,9 +73,57 @@ export default function ProfilePage() {
   }
 
   const user = isSessionAuthenticated(session) ? session.user : null
+  const displayEmail = user?.email ? maskEmail(user.email) : null
+
+  const statCards: StatDef[] = stats
+    ? [
+        {
+          label: 'Records',
+          value: stats.recordsCount,
+          href: '/records',
+          testId: 'profile-stat-records',
+        },
+        {
+          label: 'Selling',
+          value: stats.activeListings,
+          href: '/profile/selling',
+          testId: 'profile-stat-selling',
+        },
+        {
+          label: 'Purchases',
+          value: stats.purchasesCount,
+          href: '/profile/purchases',
+          testId: 'profile-stat-purchases',
+        },
+        {
+          label: 'Feedback score',
+          value: stats.feedbackScore,
+          href: '/profile/feedback',
+          testId: 'profile-stat-feedback',
+        },
+        {
+          label: 'Active listings',
+          value: stats.activeListings,
+          href: '/profile/selling?status=active',
+          testId: 'profile-stat-active-listings',
+        },
+        {
+          label: 'Sold listings',
+          value: stats.soldListings,
+          href: '/profile/selling?status=sold',
+          testId: 'profile-stat-sold-listings',
+        },
+        {
+          label: 'Collection stats',
+          value: stats.recordsCount > 0 ? 'View' : '—',
+          href: '/profile/collection-stats',
+          testId: 'profile-stat-collection-stats',
+        },
+      ]
+    : []
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="profile-page-ready">
       <h1 className="text-2xl font-semibold">Your profile</h1>
       <Card>
         <div className="flex items-center gap-4">
@@ -38,58 +131,36 @@ export default function ProfilePage() {
             {user?.initials ?? 'U'}
           </div>
           <div>
-            <p
-              className="text-lg font-semibold"
-              data-testid="profile-display-name"
-            >
+            <p className="text-lg font-semibold" data-testid="profile-display-name">
               {user ? sessionPrimaryLabel(user) : 'Collector'}
             </p>
-            {user?.email && (
+            {displayEmail && (
               <p className="text-sm text-slate-500" data-testid="profile-email">
-                {user.email}
+                {displayEmail}
               </p>
             )}
             {user?.provider && (
               <p className="text-xs text-slate-500" data-testid="profile-sign-in-provider">
-                Signed in with{' '}
-                {user.provider === 'local'
-                  ? 'Email'
-                  : user.provider === 'google'
-                    ? 'Google'
-                    : user.provider === 'discogs'
-                      ? 'Discogs'
-                      : 'Test account'}
+                Signed in with {authProviderLabel(user.provider)}
               </p>
             )}
           </div>
         </div>
       </Card>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Link href="/records" className="block">
-          <Card>
-            <p className="text-xs text-slate-500">Records</p>
-            <p className="text-2xl font-bold">{recordsCount}</p>
-          </Card>
-        </Link>
-        <Link href="/profile/feedback" className="block">
-          <Card>
-            <p className="text-xs text-slate-500">Feedback score</p>
-            <p className="text-2xl font-bold">—</p>
-          </Card>
-        </Link>
-        <Link href="/profile/selling" className="block">
-          <Card>
-            <p className="text-xs text-slate-500">Active listings</p>
-            <p className="text-2xl font-bold">—</p>
-          </Card>
-        </Link>
-      </div>
-      <nav className="flex flex-wrap gap-2">
-        <Link href="/profile/selling" className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/5">Selling</Link>
-        <Link href="/profile/purchases" className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/5">Purchases</Link>
-        <Link href="/profile/feedback" className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/5">Feedback</Link>
-        <Link href="/profile/collection-stats" className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/5">Collection stats</Link>
-      </nav>
+
+      {statsLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="profile-stats-loading">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {statCards.map((stat) => (
+            <ProfileStatCard key={stat.testId} stat={stat} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

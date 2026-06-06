@@ -69,9 +69,13 @@ export function RecordsToolbar({
   onListedFilterChange,
 }: Props) {
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-slate-950">
+    <div
+      className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-slate-950"
+      data-testid="records-filter-toolbar"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <input
+          data-testid="records-search-input"
           placeholder="Search artist, album, catalog, label…"
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
@@ -81,7 +85,7 @@ export function RecordsToolbar({
           className="min-w-[200px] flex-1 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
         />
         <Button onClick={onSearch} disabled={loading}>
-          {loading ? 'Searching…' : 'Search'}
+          {loading ? 'Loading…' : 'Search'}
         </Button>
         <Button variant="ghost" onClick={() => onClear?.()} disabled={loading || !query}>
           Clear
@@ -170,9 +174,12 @@ export function RecordsToolbar({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          {totalCount} record{totalCount === 1 ? '' : 's'}
-          {pageCount > 1 ? ` · page ${page} of ${pageCount}` : ''}
+        <p
+          className="text-sm text-slate-500 dark:text-slate-400"
+          data-testid="records-count"
+        >
+          {loading ? 'Loading records…' : `${totalCount} record${totalCount === 1 ? '' : 's'}`}
+          {!loading && pageCount > 1 ? ` · page ${page} of ${pageCount}` : ''}
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -215,6 +222,7 @@ export function RecordsToolbar({
               <button
                 key={mode}
                 type="button"
+                data-testid={`records-view-${mode}`}
                 onClick={() => onViewModeChange(mode)}
                 className={`rounded-md px-3 py-1.5 text-xs font-medium capitalize transition ${
                   viewMode === mode

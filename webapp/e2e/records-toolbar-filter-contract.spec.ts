@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 
 import { obtainAuthToken, signInWithContractApiToken } from './helpers/auth'
 import { seedRecordsForToolbarFilters } from './helpers/seed-records-filters'
+import { waitForRecordsCollectionLoaded } from './helpers/records-contract'
 import {
   capturePageContentScreenshot,
   contractScreenshotPath,
@@ -37,12 +38,16 @@ test.describe.serial('Records toolbar filter contract (6.1)', () => {
   })
 
   async function focusSeededRecords(page: Page, view: 'grid' | 'list' | 'compact') {
+    await waitForRecordsCollectionLoaded(page)
     await page.getByPlaceholder('Search artist, album, catalog, label…').fill(runTag)
     await page.getByRole('button', { name: 'Search' }).click()
-    const sel = view === 'list' ? 'record-row' : 'record-card'
-    await expect(page.getByTestId(sel).filter({ hasText: midArtist }).first()).toBeVisible({
-      timeout: 45_000,
-    })
+    const hit = page
+      .getByTestId('record-card')
+      .filter({ hasText: midArtist })
+      .first()
+      .or(page.getByTestId('record-compact-item').filter({ hasText: midArtist }).first())
+      .or(page.getByTestId('record-row').filter({ hasText: midArtist }).first())
+    await expect(hit).toBeVisible({ timeout: 45_000 })
   }
 
   test.beforeEach(async ({ page }) => {
@@ -87,7 +92,12 @@ test.describe.serial('Records toolbar filter contract (6.1)', () => {
     await page.getByTestId('records-filter-received-from').fill('')
     await page.getByTestId('records-filter-received-to').fill('')
     await page.getByTestId('records-filter-listed').selectOption('listed')
-    await expect(page.getByTestId('record-card').filter({ hasText: midArtist })).toBeVisible()
+    await expect(
+      page
+        .getByTestId('record-compact-item')
+        .filter({ hasText: midArtist })
+        .or(page.getByTestId('record-card').filter({ hasText: midArtist })),
+    ).toBeVisible()
     await expect(page.getByTestId('record-listing-status').filter({ hasText: 'Listed' }).first()).toBeVisible()
     await capturePageContentScreenshot(
       page,
@@ -95,8 +105,13 @@ test.describe.serial('Records toolbar filter contract (6.1)', () => {
     )
 
     await page.getByTestId('records-filter-listed').selectOption('not_listed')
-    await expect(page.getByTestId('record-card').filter({ hasText: midArtist })).toHaveCount(0)
-    await expect(page.getByTestId('record-card').filter({ hasText: earlyArtist }).first()).toBeVisible()
+    await expect(page.getByTestId('record-compact-item').filter({ hasText: midArtist })).toHaveCount(0)
+    await expect(
+      page
+        .getByTestId('record-compact-item')
+        .filter({ hasText: earlyArtist })
+        .or(page.getByTestId('record-card').filter({ hasText: earlyArtist })),
+    ).toBeVisible()
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-records-filter-not-listed.png'),

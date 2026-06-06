@@ -20,8 +20,12 @@ test.describe('Collection stats D3 contract (7.8)', () => {
     await signInWithContractApiToken(page)
     await page.goto('/profile/collection-stats')
     await expect(page.getByTestId('collection-stats-d3-ready')).toBeVisible({ timeout: 45_000 })
-    await expect(page.getByTestId('collection-chart-acquisition')).toBeVisible()
-    await expect(page.getByTestId('collection-chart-spend')).toBeVisible()
+    await expect
+      .poll(async () => page.getByTestId('collection-chart-acquisition').getAttribute('data-chart-rendered'))
+      .toBe('true')
+    await expect
+      .poll(async () => page.getByTestId('collection-chart-spend').getAttribute('data-chart-rendered'))
+      .toBe('true')
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-collection-stats-d3-clean.png'),

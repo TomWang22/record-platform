@@ -124,28 +124,39 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card data-testid="listing-media-gallery">
-          <div className="grid grid-cols-2 gap-2 p-2">
-            {images.map((src, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <Card className="overflow-hidden" data-testid="listing-gallery">
+          {images.length === 0 ? (
+            <div className="flex aspect-[4/3] max-h-80 items-center justify-center bg-slate-100 text-sm text-slate-500 dark:bg-slate-800">
+              No media
+            </div>
+          ) : images.length === 1 ? (
+            <div className="flex items-center justify-center bg-slate-50 p-4 dark:bg-slate-900/40">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                key={`${src}-${i}`}
-                src={src}
+                src={images[0]}
                 alt=""
-                data-testid={i === 0 ? 'listing-primary-image' : undefined}
-                className="aspect-square rounded-lg object-cover"
+                data-testid="listing-primary-image"
+                className="max-h-[min(420px,55vh)] w-full max-w-md rounded-xl object-contain shadow-sm"
               />
-            ))}
-            {images.length === 0 && (
-              <div className="col-span-2 flex aspect-video items-center justify-center bg-slate-100 text-slate-500 dark:bg-slate-800">
-                No media
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-3">
+              {images.map((src, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`${src}-${i}`}
+                  src={src}
+                  alt=""
+                  data-testid={i === 0 ? 'listing-primary-image' : undefined}
+                  className="aspect-square rounded-lg object-cover"
+                />
+              ))}
+            </div>
+          )}
         </Card>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <ListingShippingCard listing={listing} />
           <ListingSellerCard listing={listing} listingId={id} />
         </div>

@@ -94,12 +94,18 @@ export async function capturePageContentScreenshot(page: Page, filePath: string)
   await captureScreenshot(page, filePath, { scope: 'page-content' })
 }
 
+function recordsViewSelector(view: 'grid' | 'list' | 'compact'): string {
+  if (view === 'list') return '[data-testid="record-row"]'
+  if (view === 'compact') return '[data-testid="record-compact-item"]'
+  return '[data-testid="record-card"]'
+}
+
 async function waitForRecordsShell(
   page: Page,
   view: 'grid' | 'list' | 'compact',
   minCount = 1,
 ): Promise<void> {
-  const sel = view === 'list' ? '[data-testid="record-row"]' : '[data-testid="record-card"]'
+  const sel = recordsViewSelector(view)
   for (let attempt = 0; attempt < 10; attempt++) {
     await page.goto(`/records?view=${view}`, { waitUntil: 'domcontentloaded', timeout: 45_000 })
     const rows = page.locator(sel)
@@ -144,8 +150,12 @@ export async function waitForRecordsReady(
       }, { timeout: 60_000 })
       .toBeGreaterThan(0)
 
-    const sel = view === 'list' ? '[data-testid="record-row"]' : '[data-testid="record-card"]'
     await page.goto(`/records?view=${view}`, { waitUntil: 'domcontentloaded', timeout: 45_000 })
+    await expect(page.getByTestId('records-ready')).toBeAttached({ timeout: 60_000 })
+    await expect(page.getByTestId('records-loading')).toHaveCount(0, { timeout: 60_000 })
+    if (view === 'list') {
+      await page.locator('select').filter({ has: page.locator('option[value="24"]') }).last().selectOption('24')
+    }
     await page.getByPlaceholder(/Search artist/i).fill('Kenny Dorham')
     const searchResponse = page.waitForResponse(
       (r) => r.url().includes('/api/records') && r.request().method() === 'GET' && r.ok(),
@@ -153,9 +163,13 @@ export async function waitForRecordsReady(
     )
     await page.getByRole('button', { name: /^Search$/ }).click()
     await searchResponse
-    await expect(page.locator(sel).filter({ hasText: 'Kenny Dorham' }).first()).toBeVisible({
-      timeout: 45_000,
-    })
+    const kenny = page
+      .getByTestId('record-card')
+      .filter({ hasText: 'Kenny Dorham' })
+      .first()
+      .or(page.getByTestId('record-compact-item').filter({ hasText: 'Kenny Dorham' }).first())
+      .or(page.getByTestId('record-row').filter({ hasText: 'Kenny Dorham' }).first())
+    await expect(kenny).toBeVisible({ timeout: 45_000 })
     await waitForNoLoadingStates(page, `/records?view=${view}`)
     return
   }
@@ -228,6 +242,27 @@ export async function waitForSellingReady(page: Page, tab = 'active'): Promise<v
 }
 
 /** Wait for a specific watchlist product card after API persistence is confirmed. */
+export async function waitForProfileReady(page: Page, token?: string): Promise<void> {
+  if (token) {
+    await expect
+      .poll(async () => {
+        const res = await page.request.get('/api/records', {
+          headers: { Authorization: `Bearer ${token}`, 'X-RP-E2E-Contract': '1' },
+        })
+        if (!res.ok()) return 0
+        return ((await res.json()) as unknown[]).length
+      }, { timeout: 60_000 })
+      .toBeGreaterThan(0)
+  }
+  await page.goto('/profile', { waitUntil: 'domcontentloaded', timeout: 45_000 })
+  await expect(page.getByRole('heading', { name: /Your profile/i })).toBeVisible({
+    timeout: 60_000,
+  })
+  await expect(page.getByTestId('profile-stats-loading')).toHaveCount(0, { timeout: 60_000 })
+  await expect(page.getByTestId('profile-stat-records')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId('profile-stat-records').locator('.text-2xl')).not.toHaveText('0')
+}
+
 export async function waitForWatchlistCard(
   page: Page,
   listingIdOrTitle: string,

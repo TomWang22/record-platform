@@ -9,8 +9,10 @@ import {
   captureScreenshot,
   contractScreenshotPath,
   guestContractScreenshotPath,
+  capturePageContentScreenshot,
   waitForFeedbackReady,
   waitForListingsReady,
+  waitForProfileReady,
   waitForRecordsReady,
   waitForSellingReady,
   waitForWatchlistCard,
@@ -36,14 +38,14 @@ test.describe('Marketplace filled screenshots', () => {
     for (const view of ['grid', 'list', 'compact'] as const) {
       await waitForRecordsReady(page, view, token)
       await assertNoStaleProductUi(page)
-      await captureScreenshot(
+      await capturePageContentScreenshot(
         page,
         contractScreenshotPath(`authenticated-records-${view}-media-filled.png`),
       )
     }
     await page.goto('/records?view=grid')
     await waitForRecordsReady(page, 'grid', token)
-    await captureScreenshot(
+    await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-records-lifecycle-dates.png'),
     )
@@ -61,7 +63,7 @@ test.describe('Marketplace filled screenshots', () => {
     for (const view of ['grid', 'list', 'compact'] as const) {
       await waitForListingsReady(page, view)
       await assertNoStaleProductUi(page)
-      await captureScreenshot(
+      await capturePageContentScreenshot(
         page,
         contractScreenshotPath('authenticated-marketplace-browse-product-cards.png'),
       )
@@ -71,13 +73,13 @@ test.describe('Marketplace filled screenshots', () => {
   test('profile selling feedback cart watchlist recently viewed', async ({ page }) => {
     const { token, seed } = await signInAsTestCollectorWithSeed(page)
 
-    await page.goto('/profile')
+    await waitForProfileReady(page, token!)
     await assertNoStaleProductUi(page)
-    await captureScreenshot(
+    await capturePageContentScreenshot(
       page,
-      contractScreenshotPath('authenticated-profile-human-readable.png'),
+      contractScreenshotPath('authenticated-profile-complete-stats.png'),
     )
-    await captureScreenshot(
+    await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-profile-clickable-stats-filled.png'),
     )

@@ -13,9 +13,9 @@ export function formatListingTimestamp(
   timezone?: string,
 ): string {
   if (display?.trim()) {
-    return timezone && !display.includes(timezone)
-      ? `${display.trim()} (${timezone})`
-      : display.trim()
+    const d = display.trim()
+    if (/EDT|EST|PDT|PST|UTC|GMT|[A-Z]{2,5}$/i.test(d)) return d
+    return timezone ? `${d} (${timezone})` : d
   }
   return formatDate(iso)
 }

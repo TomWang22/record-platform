@@ -112,6 +112,11 @@ function WatchlistCard({
             {sale}
           </span>
           <p className="text-xs text-slate-500">{item.sellerDisplay ?? 'Seller'}</p>
+          {item.watchlistedAtDisplay ? (
+            <p className="text-xs text-slate-400" data-testid="watchlist-saved-date">
+              Saved {item.watchlistedAtDisplay}
+            </p>
+          ) : null}
         </div>
       </Link>
       <div className="flex gap-2 border-t border-slate-100 px-3 py-2 dark:border-white/5">

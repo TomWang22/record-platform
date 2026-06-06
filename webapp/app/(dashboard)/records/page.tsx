@@ -61,6 +61,7 @@ function RecordsPageContent() {
   const [records, setRecords] = useState<CollectionRecord[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [page, setPage] = useState(1)
   const [viewMode, setViewMode] = useState<RecordsViewMode>(() =>
@@ -122,6 +123,7 @@ function RecordsPageContent() {
         setError(err)
       } finally {
         setLoading(false)
+        setHasLoaded(true)
       }
     },
     [query, onApiError],
@@ -286,11 +288,14 @@ function RecordsPageContent() {
             />
           )}
 
-          {!loading && !error && (
-            <div data-testid="records-ready" className="hidden" aria-hidden />
+          {hasLoaded && !loading && !error && (
+            <div data-testid="records-ready" className="sr-only" aria-live="polite">
+              Records loaded
+            </div>
           )}
 
           {loading && (
+            <div data-testid="records-loading" aria-busy="true">
             <div
               className={
                 viewMode === 'grid'
@@ -305,14 +310,14 @@ function RecordsPageContent() {
                 />
               ))}
             </div>
+            </div>
           )}
 
-          {!loading && sorted.length > 0 && (
-            <div data-testid="records-grid-ready" className="hidden" aria-hidden />
-          )}
-
-          {!loading && sorted.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center dark:border-white/15">
+          {hasLoaded && !loading && sorted.length === 0 && (
+            <div
+              data-testid="records-empty"
+              className="rounded-2xl border border-dashed border-slate-300 p-12 text-center dark:border-white/15"
+            >
               <p className="text-lg font-medium text-slate-800 dark:text-slate-200">No records yet</p>
               <p className="mt-2 text-sm text-slate-500">
                 Add your first pressing to start tracking purchase and grading details.
@@ -323,24 +328,33 @@ function RecordsPageContent() {
             </div>
           )}
 
-          {!loading && pageItems.length > 0 && viewMode === 'grid' && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {hasLoaded && !loading && pageItems.length > 0 && viewMode === 'grid' && (
+            <div
+              data-testid="records-grid"
+              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            >
               {pageItems.map((record) => (
                 <RecordCard key={record.id} record={record} />
               ))}
             </div>
           )}
 
-          {!loading && pageItems.length > 0 && viewMode === 'compact' && (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {hasLoaded && !loading && pageItems.length > 0 && viewMode === 'compact' && (
+            <div
+              data-testid="records-compact"
+              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            >
               {pageItems.map((record) => (
                 <RecordCard key={record.id} record={record} compact />
               ))}
             </div>
           )}
 
-          {!loading && pageItems.length > 0 && viewMode === 'list' && (
-            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white dark:border-white/10 dark:bg-slate-950">
+          {hasLoaded && !loading && pageItems.length > 0 && viewMode === 'list' && (
+            <div
+              data-testid="records-list"
+              className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white dark:border-white/10 dark:bg-slate-950"
+            >
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-white/10 dark:bg-slate-900">

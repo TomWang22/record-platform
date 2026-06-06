@@ -7,7 +7,7 @@ import {
   waitForListingRevisions,
 } from './helpers/listing-contract'
 import { timed } from './helpers/seed-lean'
-import { captureScreenshot } from './helpers/screenshot-readiness'
+import { capturePageContentScreenshot, contractScreenshotPath } from './helpers/screenshot-readiness'
 import { assertNoStaleProductUi } from './helpers/stale-ui-guard'
 
 test.describe.configure({ timeout: 120_000 })
@@ -38,15 +38,11 @@ test.describe.serial('Listing detail / edit / revisions contract', () => {
     expect(body).toMatch(/Format/)
     expect(body).not.toMatch(/Format:\s*apartment/i)
     expect(body).not.toMatch(/\bapartment\b/i)
-    const listingImg = page
-      .getByTestId('listing-detail-ready')
-      .locator('img.aspect-square')
-      .first()
-    await expect(listingImg).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('listing-primary-image')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('button', { name: /watchlist/i })).toBeVisible()
-    await captureScreenshot(
+    await capturePageContentScreenshot(
       page,
-      'e2e/screenshots/authenticated/authenticated-listing-detail-rp-fields.png',
+      contractScreenshotPath('authenticated-listing-detail-rp-fields.png'),
     )
   })
 
@@ -81,9 +77,9 @@ test.describe.serial('Listing detail / edit / revisions contract', () => {
       newestMatches: /title|revised|price/i,
     })
 
-    await captureScreenshot(
+    await capturePageContentScreenshot(
       page,
-      'e2e/screenshots/authenticated/authenticated-listing-edit-rp-fields.png',
+      contractScreenshotPath('authenticated-listing-edit-rp-fields.png'),
     )
 
     await page.goto(`/listings/${listingId}/revisions`, { waitUntil: 'domcontentloaded', timeout: 45_000 })
@@ -94,9 +90,9 @@ test.describe.serial('Listing detail / edit / revisions contract', () => {
     expect(revText).toMatch(/Title|Price|Sale type|Listing updated|Gallery|Domestic shipping/i)
     expect(await page.locator('body').innerText()).not.toMatch(/residence_type/i)
     await assertNoStaleProductUi(page, 'listing revisions')
-    await captureScreenshot(
+    await capturePageContentScreenshot(
       page,
-      'e2e/screenshots/authenticated/authenticated-listing-revisions-readable.png',
+      contractScreenshotPath('authenticated-listing-revisions-readable.png'),
     )
   })
 

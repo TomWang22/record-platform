@@ -16,19 +16,26 @@ function useBarChart(
 ) {
   useEffect(() => {
     const el = ref.current
-    if (!el || data.length === 0) return
+    if (!el) return
+    el.setAttribute('data-testid', testId)
+    if (data.length === 0) {
+      el.setAttribute('data-chart-rendered', 'empty')
+      d3.select(el).selectAll('*').remove()
+      return
+    }
     const w = el.clientWidth || 320
     const h = 160
     const margin = { top: 8, right: 8, bottom: 28, left: 36 }
     const innerW = w - margin.left - margin.right
     const innerH = h - margin.top - margin.bottom
     d3.select(el).selectAll('*').remove()
+    el.setAttribute('data-testid', testId)
+    el.setAttribute('data-chart-rendered', 'false')
     const svg = d3
       .select(el)
       .append('svg')
       .attr('width', w)
       .attr('height', h)
-      .attr('data-testid', testId)
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`)
     const x = d3
       .scaleBand()
@@ -52,6 +59,7 @@ function useBarChart(
       .attr('height', (d) => innerH - y(d.value))
       .attr('fill', 'var(--color-brand, #6366f1)')
       .attr('rx', 3)
+    el.setAttribute('data-chart-rendered', 'true')
   }, [ref, data, testId])
 }
 
@@ -107,19 +115,19 @@ export function CollectionStatsCharts({ records }: Props) {
     <div className="grid gap-6 lg:grid-cols-2" data-testid="collection-stats-d3-ready">
       <div>
         <p className="mb-2 text-sm font-semibold">Acquisition frequency</p>
-        <div ref={acquisitionRef} className="min-h-[160px] w-full" />
+        <div ref={acquisitionRef} className="min-h-[160px] w-full" data-testid="collection-chart-acquisition" />
       </div>
       <div>
         <p className="mb-2 text-sm font-semibold">Spend over time (USD)</p>
-        <div ref={spendRef} className="min-h-[160px] w-full" />
+        <div ref={spendRef} className="min-h-[160px] w-full" data-testid="collection-chart-spend" />
       </div>
       <div>
         <p className="mb-2 text-sm font-semibold">Acquisition type breakdown</p>
-        <div ref={typeRef} className="min-h-[160px] w-full" />
+        <div ref={typeRef} className="min-h-[160px] w-full" data-testid="collection-chart-type" />
       </div>
       <div>
         <p className="mb-2 text-sm font-semibold">Artist frequency</p>
-        <div ref={artistRef} className="min-h-[160px] w-full" />
+        <div ref={artistRef} className="min-h-[160px] w-full" data-testid="collection-chart-artist" />
       </div>
     </div>
   )

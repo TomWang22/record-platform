@@ -15,6 +15,7 @@ export type StoredListingRef = {
   format?: string
   mediaCondition?: string
   viewedAt?: string
+  watchlistedAtDisplay?: string
 }
 
 function readJson<T>(key: string, fallback: T): T {

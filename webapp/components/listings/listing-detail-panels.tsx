@@ -62,12 +62,12 @@ export function ListingShippingCard({ listing }: { listing: MarketplaceListing }
   )
   return (
     <div data-testid="listing-shipping-card">
-    <Card className="space-y-3 p-4">
+    <Card className="space-y-4 p-5" data-testid="listing-price-sale-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Price &amp; sale</p>
         <Badge>{sale}</Badge>
       </div>
-      <p className="text-3xl font-bold" data-testid="listing-price-card">
+      <p className="text-3xl font-bold tracking-tight" data-testid="listing-price-card">
         {formatListingPrice(listing)}
       </p>
       {listing.listing_type === 'auction' && listing.auction && (
@@ -105,7 +105,7 @@ export function ListingShippingCard({ listing }: { listing: MarketplaceListing }
         </ul>
       )}
       <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Shipping</p>
-      <dl className="grid grid-cols-2 gap-2 text-sm">
+      <dl className="grid grid-cols-[minmax(6.5rem,auto)_1fr] gap-x-3 gap-y-2 text-sm">
         <dt className="text-slate-500">Domestic</dt>
         <dd>{formatShippingMoney(s, 'domestic')}</dd>
         <dt className="text-slate-500">International</dt>
@@ -126,7 +126,7 @@ export function ListingShippingCard({ listing }: { listing: MarketplaceListing }
           <span className="font-medium">Notes:</span> {s.notes}
         </p>
       )}
-      <dl className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-sm dark:border-white/10">
+      <dl className="grid grid-cols-[minmax(6.5rem,auto)_1fr] gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-sm dark:border-white/10">
         <dt className="text-slate-500">Format</dt>
         <dd>{listing.format ?? '—'}</dd>
         <dt className="text-slate-500">Grade</dt>
@@ -134,22 +134,32 @@ export function ListingShippingCard({ listing }: { listing: MarketplaceListing }
         <dt className="text-slate-500">Status</dt>
         <dd>{listingStatusLabel(listing.status)}</dd>
         <dt className="text-slate-500">Listed</dt>
-        <dd data-testid="listing-listed-at">
-          {formatListingTimestamp(
-            listing.listedAtDisplay,
-            listing.listed_at ?? listing.created_at,
-            listing.timezone,
-          )}
+        <dd
+          className="whitespace-nowrap text-slate-800 dark:text-slate-100"
+          data-testid="listing-shipping-row-listed"
+        >
+          <span data-testid="listing-listed-at">
+            {formatListingTimestamp(
+              listing.listedAtDisplay,
+              listing.listed_at ?? listing.created_at,
+              listing.timezone,
+            )}
+          </span>
         </dd>
         {listing.updatedAtDisplay || listing.updated_at ? (
           <>
             <dt className="text-slate-500">Updated</dt>
-            <dd data-testid="listing-updated-at">
-              {formatListingTimestamp(
-                listing.updatedAtDisplay,
-                listing.updated_at,
-                listing.timezone,
-              )}
+            <dd
+              className="whitespace-nowrap text-slate-800 dark:text-slate-100"
+              data-testid="listing-shipping-row-updated"
+            >
+              <span data-testid="listing-updated-at">
+                {formatListingTimestamp(
+                  listing.updatedAtDisplay,
+                  listing.updated_at,
+                  listing.timezone,
+                )}
+              </span>
             </dd>
           </>
         ) : null}

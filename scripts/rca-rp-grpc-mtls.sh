@@ -16,15 +16,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/rp-runtime-health-contract.sh"
 source "$SCRIPT_DIR/lib/rp-service-cert-contract.sh"
+# shellcheck source=lib/rp-cert-chain-verify.sh
+source "$SCRIPT_DIR/lib/rp-cert-chain-verify.sh"
 
 NS="${HOUSING_NS:-record-platform}"
 CONTRACT="$REPO_ROOT/infra/contracts/rp-service-runtime-contract.json"
 STRICT_INTEGRITY=0
+REQUIRE_ALL_POLICY=0
 FILTER=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --required|--all) shift ;;
-    --strict-integrity) STRICT_INTEGRITY=1; shift ;;
+    --required) REQUIRE_ALL_POLICY=1; shift ;;
+    --all) shift ;;
+    --strict-integrity|--cert-chain) STRICT_INTEGRITY=1; shift ;;
     -h|--help)
       echo "usage: rca-rp-grpc-mtls.sh [--all] [--required] [--strict-integrity] [service ...]"
       exit 0
@@ -83,7 +87,13 @@ print('/etc/certs')
 " 2>/dev/null)" || mount_path="/etc/certs"
   local raw
   raw="$(kubectl -n "$NS" exec "deploy/$dep" -c "$container" -- \
-    sh -c "awk 'BEGIN{n=0} /BEGIN CERTIFICATE/{n++} n==1{print} /END CERTIFICATE/ && n==1{exit}' ${mount_path}/tls.crt 2>/dev/null | openssl x509 -noout -fingerprint -sha256 2>/dev/null || echo UNAVAILABLE" 2>/dev/null)" || { echo "unavailable"; return; }
+    sh -c "if command -v openssl >/dev/null 2>&1; then
+      awk 'BEGIN{n=0} /BEGIN CERTIFICATE/{n++} n==1{print} /END CERTIFICATE/ && n==1{exit}' ${mount_path}/tls.crt 2>/dev/null | openssl x509 -noout -fingerprint -sha256 2>/dev/null
+    elif test -s ${mount_path}/tls.crt; then
+      sha256sum ${mount_path}/tls.crt 2>/dev/null | awk '{print \$1}'
+    else
+      echo UNAVAILABLE
+    fi" 2>/dev/null)" || { echo "unavailable"; return; }
   if echo "$raw" | grep -q "UNAVAILABLE"; then
     echo "unavailable"
   else
@@ -136,6 +146,7 @@ mkdir -p "$OUT"
 
 FAIL=0
 INTEGRITY_FAIL=0
+CERT_CHAIN_FAIL=0
 CHECKED=0
 EXPECTED=0
 SKIPPED_NAMES=()
@@ -233,6 +244,9 @@ for svc in "${ALL_SVCS[@]}"; do
   sname="$(jq -r '.grpcTlsServerName // .k8sName // empty' <<<"$svc_json")"
   tls_policy="$(jq -r '.tlsPolicy // "plaintext"' <<<"$svc_json")"
   grpc_req="$(jq -r '.grpcRequiredForRuntime // false' <<<"$svc_json")"
+  if [[ "$REQUIRE_ALL_POLICY" -eq 1 && "$tls_policy" == "service-mtls" ]]; then
+    grpc_req="true"
+  fi
   grpc_health_supported="$(jq -r 'if .grpcHealthProbeSupported == false then "false" else "true" end' <<<"$svc_json")"
   grpc_optional_reason="$(jq -r '.grpcOptionalReason // ""' <<<"$svc_json")"
 
@@ -244,7 +258,7 @@ for svc in "${ALL_SVCS[@]}"; do
     CHECKED=$((CHECKED + 1))
     jq -cn --arg service "$svc" --arg reason "${grpc_optional_reason:-grpcService empty}" \
       '{service:$service,skipped:true,reason:$reason}' >>"$OUT/summary.ndjson"
-    SUMMARY_ROWS+=("$svc|$grpc_req|$gsvc|$grpc_port|skip|skip|skip|skip|skip|skip")
+    SUMMARY_ROWS+=("$svc|$grpc_req|$gsvc|$grpc_port|skip|skip|skip|skip|skip|skip|skip")
     FULL_MATRIX_SERVICES+=("$(jq -cn --arg s "$svc" --argjson p "$grpc_port" --arg r "$grpc_req" --arg reason "${grpc_optional_reason:-grpcService empty}" \
       '{service:$s,grpc_port:$p,grpc_service:"",required:($r=="true"),localhost:"skip",anyaddr:"skip",cluster_dns:"skip",pod_ip:"skip",runtime_verdict:"pass",grpc_integrity_verdict:"skip",failure_class:"n/a",skip_reason:$reason}')")
     continue
@@ -258,7 +272,7 @@ for svc in "${ALL_SVCS[@]}"; do
     CHECKED=$((CHECKED + 1))
     jq -cn --arg service "$svc" --arg reason "${grpc_optional_reason:-grpcHealthProbeSupported=false}" \
       '{service:$service,skipped:true,reason:$reason}' >>"$OUT/summary.ndjson"
-    SUMMARY_ROWS+=("$svc|$grpc_req|$gsvc|$grpc_port|skip|skip|skip|skip|skip|skip")
+    SUMMARY_ROWS+=("$svc|$grpc_req|$gsvc|$grpc_port|skip|skip|skip|skip|skip|skip|skip")
     FULL_MATRIX_SERVICES+=("$(jq -cn --arg s "$svc" --argjson p "$grpc_port" --arg gs "$gsvc" --arg r "$grpc_req" --arg reason "${grpc_optional_reason:-no health service}" \
       '{service:$s,grpc_port:$p,grpc_service:$gs,required:($r=="true"),localhost:"skip",anyaddr:"skip",cluster_dns:"skip",pod_ip:"skip",runtime_verdict:"pass",grpc_integrity_verdict:"skip",failure_class:"n/a",skip_reason:$reason}')")
     continue
@@ -272,7 +286,7 @@ for svc in "${ALL_SVCS[@]}"; do
     CHECKED=$((CHECKED + 1))
     jq -cn --arg service "$svc" --arg reason "deployment not found" \
       '{service:$service,skipped:true,reason:$reason}' >>"$OUT/summary.ndjson"
-    SUMMARY_ROWS+=("$svc|$grpc_req|$gsvc|$grpc_port|skip|skip|skip|skip|skip|skip")
+    SUMMARY_ROWS+=("$svc|$grpc_req|$gsvc|$grpc_port|skip|skip|skip|skip|skip|skip|skip")
     FULL_MATRIX_SERVICES+=("$(jq -cn --arg s "$svc" --argjson p "$grpc_port" --arg gs "$gsvc" --arg r "$grpc_req" \
       '{service:$s,grpc_port:$p,grpc_service:$gs,required:($r=="true"),localhost:"skip",anyaddr:"skip",cluster_dns:"skip",pod_ip:"skip",runtime_verdict:"skip",grpc_integrity_verdict:"skip",failure_class:"no-deployment"}')")
     continue
@@ -304,14 +318,64 @@ for svc in "${ALL_SVCS[@]}"; do
   [[ "$disk_fp" == "$mounted_fp" ]] && fp_match="match"
   [[ "$mounted_fp" == "unavailable" ]] && fp_match="unavailable"
 
+  cert_chain_ok="skip"
+  cert_chain_parts="—"
+  if [[ "$STRICT_INTEGRITY" -eq 1 ]]; then
+    chain_json="$(rp_cert_chain_verify_mounted "$svc" "$dep" "$container" 2>/dev/null || echo '{"ok":false,"error":"verify unavailable"}')"
+    cert_chain_ok="$(echo "$chain_json" | jq -r 'if .ok then "true" else "false" end')"
+    cert_chain_parts="$(echo "$chain_json" | jq -r '.chain_parts // 0')"
+    secret_name="$(rp_cert_contract_per_service_secret_name "$svc")"
+    secret_leaf_fp="$(rp_cert_chain_secret_fingerprint "$secret_name")"
+    chain_leaf_fp="$(echo "$chain_json" | jq -r '.fingerprint_sha256 // ""')"
+    if [[ "$cert_chain_ok" != "true" ]]; then
+      CERT_CHAIN_FAIL=1
+      INTEGRITY_FAIL=1
+      fp_match="chain_fail"
+    elif [[ "$mounted_fp" == "unavailable" ]]; then
+      CERT_CHAIN_FAIL=1
+      INTEGRITY_FAIL=1
+      fp_match="unavailable"
+    elif [[ "$chain_leaf_fp" != "$secret_leaf_fp" && "$secret_leaf_fp" != "missing" && -n "$chain_leaf_fp" ]]; then
+      CERT_CHAIN_FAIL=1
+      INTEGRITY_FAIL=1
+      fp_match="secret_mismatch"
+    elif [[ "$disk_fp" == "$chain_leaf_fp" && -n "$disk_fp" ]]; then
+      fp_match="match"
+    fi
+    if echo "$chain_json" | jq -e '.record_local == true' >/dev/null 2>&1; then
+      CERT_CHAIN_FAIL=1
+      INTEGRITY_FAIL=1
+      cert_chain_ok="false"
+    fi
+  fi
+
   echo ""
   echo "=== RCA gRPC: $svc (policy=$tls_policy required=$grpc_req) ==="
+  if [[ "$STRICT_INTEGRITY" -eq 1 ]]; then
+    if [[ "$cert_chain_ok" == "true" ]]; then
+      echo "  cert_chain: ok (parts=$cert_chain_parts fp_match=$fp_match)"
+    else
+      echo "  cert_chain: FAIL ($(echo "$chain_json" | jq -r '.verify_out // .error // .hostname_out // "see chain json"'))"
+    fi
+  fi
   echo "  cert fingerprint: disk=${disk_fp:0:16}… mounted=${mounted_fp:0:16}… ${fp_match}"
 
   results=()
   r_localhost="skip" r_anyaddr="skip" r_dns="skip" r_podip="skip"
+  r_plaintext="denied"
   svc_failure_class="none"
   svc_stderr=""
+  # Plaintext must be rejected when mTLS is required.
+  if [[ "$tls_policy" == "service-mtls" && -n "$gsvc" ]]; then
+    if _run_probe "$svc" "inpod_plaintext" "$dep" "127.0.0.1:${grpc_port}" "plaintext" "$sname" "$gsvc" "$ca_inpod" "$cc_inpod" "$ck_inpod"; then
+      r_plaintext="allowed"
+      echo "  inpod_plaintext   plaintext  allowed (FAIL — must deny)"
+      FAIL=1
+    else
+      r_plaintext="denied"
+      echo "  inpod_plaintext   plaintext  denied"
+    fi
+  fi
   for scope_addr in \
     "inpod_localhost|${dep}|127.0.0.1:${grpc_port}" \
     "inpod_0.0.0.0|${dep}|0.0.0.0:${grpc_port}" \
@@ -422,7 +486,7 @@ for svc in "${ALL_SVCS[@]}"; do
     grpc_integrity_verdict="pass-diagnostic"
   fi
 
-  SUMMARY_ROWS+=("$svc|$grpc_req|$gsvc|$grpc_port|$r_localhost|$r_anyaddr|$r_dns|$r_podip|$runtime_verdict|$grpc_integrity_verdict")
+  SUMMARY_ROWS+=("$svc|$grpc_req|$gsvc|$grpc_port|$r_localhost|$r_anyaddr|$r_dns|$r_podip|$runtime_verdict|$grpc_integrity_verdict|$r_plaintext")
   CHECKED=$((CHECKED + 1))
 
   FULL_MATRIX_SERVICES+=("$(jq -cn \
@@ -441,7 +505,8 @@ for svc in "${ALL_SVCS[@]}"; do
     --arg dfp "$disk_fp" \
     --arg mfp "$mounted_fp" \
     --arg fpm "$fp_match" \
-    '{service:$s,grpc_port:$p,grpc_service:$gs,required:($r=="true"),localhost:$rl,anyaddr:$ra,cluster_dns:$rd,pod_ip:$rp,runtime_verdict:$rv,grpc_integrity_verdict:$gv,failure_class:$fc,stderr:$se,disk_cert_fp:$dfp,mounted_cert_fp:$mfp,fp_match:$fpm}')")
+    --arg plain "$r_plaintext" \
+    '{service:$s,grpc_port:$p,grpc_service:$gs,required:($r=="true"),plaintext_denied:($plain=="denied"),localhost:$rl,anyaddr:$ra,cluster_dns:$rd,pod_ip:$rp,runtime_verdict:$rv,grpc_integrity_verdict:$gv,failure_class:$fc,stderr:$se,disk_cert_fp:$dfp,mounted_cert_fp:$mfp,fp_match:$fpm}')")
 
   jq -cn \
     --arg service "$svc" \
@@ -469,14 +534,23 @@ printf '%-24s %-8s %-40s %-6s %-9s %-9s %-11s %-8s %-12s %s\n' \
   "service" "required" "grpcService" "port" "localhost" "anyaddr" "cluster_dns" "pod_ip" "runtime" "integrity"
 printf '%-24s %-8s %-40s %-6s %-9s %-9s %-11s %-8s %-12s %s\n' \
   "-------" "--------" "-----------" "----" "---------" "-------" "-----------" "------" "-------" "---------"
+all_services_required=true
+plaintext_denied_all=true
 for row in "${SUMMARY_ROWS[@]}"; do
-  IFS='|' read -r s req gs gp rl ra rd rp rv gv <<<"$row"
+  IFS='|' read -r s req gs gp rl ra rd rp rv gv plain <<<"$row"
   printf '%-24s %-8s %-40s %-6s %-9s %-9s %-11s %-8s %-12s %s\n' \
     "$s" "$req" "${gs:0:40}" "$gp" "$rl" "$ra" "$rd" "$rp" "$rv" "$gv"
+  [[ "$req" == "true" ]] || all_services_required=false
+  [[ "$plain" == "denied" || "$plain" == "skip" ]] || plaintext_denied_all=false
 done
 
 echo ""
 echo "Coverage: checked=$CHECKED expected=$EXPECTED"
+if [[ "$REQUIRE_ALL_POLICY" -eq 1 ]]; then
+  echo "  all_services_required=$all_services_required plaintext_denied_all=$plaintext_denied_all"
+  [[ "$all_services_required" == "true" ]] || FAIL=1
+  [[ "$plaintext_denied_all" == "true" ]] || FAIL=1
+fi
 if [[ ${#SKIPPED_NAMES[@]} -gt 0 ]]; then
   echo "  skipped: ${SKIPPED_NAMES[*]}"
 fi
@@ -487,11 +561,37 @@ fi
 
 runtime_ok=true
 integrity_ok=true
+cert_chain_ok_all=true
+if [[ "$STRICT_INTEGRITY" -eq 1 && "$CERT_CHAIN_FAIL" -ne 0 ]]; then
+  cert_chain_ok_all=false
+  integrity_ok=false
+fi
 for row in "${SUMMARY_ROWS[@]}"; do
-  IFS='|' read -r s req gs gp rl ra rd rp rv gv <<<"$row"
+  IFS='|' read -r s req gs gp rl ra rd rp rv gv _plain <<<"$row"
   [[ "$rv" == "fail" && "$req" == "true" ]] && runtime_ok=false
   [[ "$gv" == "fail" ]] && integrity_ok=false
 done
+
+SEC_CONTRACT="${RP_GRPC_RCA_DIR:-$REPO_ROOT/bench_logs/security-contract}"
+mkdir -p "$SEC_CONTRACT"
+if [[ "$STRICT_INTEGRITY" -eq 1 ]]; then
+  cat >"$SEC_CONTRACT/grpc-mtls-cert-chain-integrity.md" <<EOF
+# gRPC mTLS cert chain integrity (RCA --strict-integrity)
+
+Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+| field | value |
+|-------|-------|
+| cert_chain_ok | $cert_chain_ok_all |
+| runtime_ok | $runtime_ok |
+| grpc_integrity_ok | $integrity_ok |
+| checked | $CHECKED |
+| expected | $EXPECTED |
+| CERT_CHAIN_FAIL | $CERT_CHAIN_FAIL |
+
+See also: bench_logs/security-contract/service-cert-chain-contract.md (audit-rp-service-cert-chain.sh)
+EOF
+fi
 
 jq -cn \
   --argjson checked "$CHECKED" \
@@ -503,8 +603,12 @@ jq -cn \
   --arg require_cross_pod "${RP_GRPC_RCA_REQUIRE_CROSS_POD:-0}" \
   --argjson runtime_ok "$runtime_ok" \
   --argjson grpc_integrity_ok "$integrity_ok" \
+  --argjson cert_chain_ok "$([ "$cert_chain_ok_all" = true ] && echo true || echo false)" \
   --argjson strict_integrity "$STRICT_INTEGRITY" \
-  '{checked:$checked,expected:$expected,skipped:$skipped,skipped_names:($skipped_names|split(",")),coverage_pct:$coverage_pct,require_all:$require_all,require_cross_pod:$require_cross_pod,runtime_ok:$runtime_ok,grpc_integrity_ok:$grpc_integrity_ok,strict_integrity:$strict_integrity}' \
+  --argjson require_all_policy "$REQUIRE_ALL_POLICY" \
+  --argjson all_services_required "$([ "$all_services_required" = true ] && echo true || echo false)" \
+  --argjson plaintext_denied_all "$([ "$plaintext_denied_all" = true ] && echo true || echo false)" \
+  '{checked:$checked,expected:$expected,skipped:$skipped,skipped_names:($skipped_names|split(",")),coverage_pct:$coverage_pct,require_all:$require_all,require_cross_pod:$require_cross_pod,runtime_ok:$runtime_ok,grpc_integrity_ok:$grpc_integrity_ok,cert_chain_ok:$cert_chain_ok,strict_integrity:$strict_integrity,require_all_policy:$require_all_policy,all_services_required:$all_services_required,plaintext_denied_all:$plaintext_denied_all}' \
   >"$OUT/coverage.json"
 
 {
@@ -525,9 +629,14 @@ echo ""
 echo "Verdicts:"
 echo "  runtime_ok=$runtime_ok"
 echo "  grpc_integrity_ok=$integrity_ok"
+echo "  cert_chain_ok=$cert_chain_ok_all"
 echo "  strict_integrity=$STRICT_INTEGRITY"
 echo "  RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES=${RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES:-0}"
 
+if [[ "$STRICT_INTEGRITY" -eq 1 && "$cert_chain_ok_all" != "true" ]]; then
+  echo "❌ rca-rp-grpc-mtls: cert_chain_ok=false in --strict-integrity mode" >&2
+  FAIL=1
+fi
 if [[ "$STRICT_INTEGRITY" -eq 1 && "$integrity_ok" == "false" && "${RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES:-0}" != "1" ]]; then
   echo "❌ rca-rp-grpc-mtls: grpc_integrity_ok=false in --strict-integrity mode" >&2
   echo "   cluster_dns mTLS failures mean service-to-service gRPC is not proven" >&2
@@ -535,6 +644,15 @@ if [[ "$STRICT_INTEGRITY" -eq 1 && "$integrity_ok" == "false" && "${RP_ALLOW_GRP
   exit 1
 fi
 
-[[ "$FAIL" -eq 0 ]] && { echo "✅ rca-rp-grpc-mtls passed (runtime_ok=$runtime_ok integrity_ok=$integrity_ok)"; exit 0; }
+if [[ "$REQUIRE_ALL_POLICY" -eq 1 && "$all_services_required" != "true" ]]; then
+  echo "❌ rca-rp-grpc-mtls: not all services have required=true (need 11/11)" >&2
+  FAIL=1
+fi
+if [[ "$REQUIRE_ALL_POLICY" -eq 1 && "$plaintext_denied_all" != "true" ]]; then
+  echo "❌ rca-rp-grpc-mtls: plaintext not denied on all mTLS services" >&2
+  FAIL=1
+fi
+
+[[ "$FAIL" -eq 0 ]] && { echo "✅ rca-rp-grpc-mtls passed (runtime_ok=$runtime_ok integrity_ok=$integrity_ok all_required=$all_services_required)"; exit 0; }
 echo "❌ rca-rp-grpc-mtls failed (see $OUT)" >&2
 exit 1

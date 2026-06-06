@@ -1,5 +1,5 @@
 import express from "express";
-import { register, httpCounter } from "@common/utils";
+import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions } from "@common/utils";
 import type { Router } from "express";
 import oauthRouter from "./oauth-discogs.js";
 import axios from "axios";
@@ -22,19 +22,20 @@ try {
 }
 
 app.use(express.json());
-app.get("/healthz", async (_req, res) => {
-  try {
-    // Add a timeout to the database query to prevent hanging
-    const dbCheck = await Promise.race([
-      pool.query('SELECT 1'),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('DB check timeout')), 2000)) // 2 second timeout
-    ]);
-    res.json({ ok: true, db: 'connected' });
-  } catch (err) {
-    // Return 200 with warning instead of 503 - allows service to be marked ready
-    // even if DB is temporarily unavailable (e.g., disk space issues)
-    res.status(200).json({ ok: true, db: 'disconnected', warning: String(err) });
-  }
+mountRpHttpHealth(app, {
+  service: "listings-service",
+  readiness: async () => {
+    try {
+      await Promise.race([
+        pool.query("SELECT 1"),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("DB check timeout")), 2000)),
+      ]);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  grpc: rpGrpcHealthOptions("listings-service", "listings.ListingsService"),
 });
 app.use((req, res, next) => { res.on("finish", () => httpCounter.inc({ service: "listings", route: req.path, method: req.method, code: res.statusCode })); next(); });
 app.get("/metrics", async (_req, res) => { res.setHeader("Content-Type", register.contentType); res.end(await register.metrics()); });
@@ -58,6 +59,70 @@ app.get("/cache/stats", async (_req, res) => {
 });
 
 import ratingsRouter from './routes/ratings.js';
+import { createListingsHttpApp } from "./http-server.js";
+
+/** Gateway rewrites POST /api/listings/create → POST /create (housing-schema contract). */
+const listingsContractHttp = createListingsHttpApp();
+
+const LISTING_UUID_PARAM =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+app.post("/create", (req, res, next) => {
+  listingsContractHttp(req, res, next);
+});
+
+/** Owner inventory (gateway → GET /api/listings/mine → /mine). */
+app.get("/mine", (req, res, next) => {
+  listingsContractHttp(req, res, next);
+});
+
+/** Public marketplace search (gateway → GET /listings/search). */
+app.get("/listings/search", (req, res, next) => {
+  const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  req.url = `/search${qs}`;
+  listingsContractHttp(req, res, next);
+});
+
+/** Public marketplace detail by UUID only — must not capture /listings/search or /listings/mine. */
+app.get("/listings/:id", (req, res, next) => {
+  if (!LISTING_UUID_PARAM.test(String(req.params.id ?? ""))) {
+    return next();
+  }
+  listingsContractHttp(req, res, next);
+});
+
+/** Owner PATCH (title, price, amenities, sale mode) — contract http-server handler, not legacy router stub. */
+app.patch("/listings/:id", (req, res, next) => {
+  if (!LISTING_UUID_PARAM.test(String(req.params.id ?? ""))) {
+    return next();
+  }
+  listingsContractHttp(req, res, next);
+});
+
+/** Gallery media attach/delete/reorder (contract http-server; not legacy /:id/images). */
+app.post("/listings/:id/media", (req, res, next) => {
+  if (!LISTING_UUID_PARAM.test(String(req.params.id ?? ""))) {
+    return next();
+  }
+  listingsContractHttp(req, res, next);
+});
+
+app.delete("/listings/:id/media/:mediaId", (req, res, next) => {
+  if (
+    !LISTING_UUID_PARAM.test(String(req.params.id ?? "")) ||
+    !LISTING_UUID_PARAM.test(String(req.params.mediaId ?? ""))
+  ) {
+    return next();
+  }
+  listingsContractHttp(req, res, next);
+});
+
+app.patch("/listings/:id/media-order", (req, res, next) => {
+  if (!LISTING_UUID_PARAM.test(String(req.params.id ?? ""))) {
+    return next();
+  }
+  listingsContractHttp(req, res, next);
+});
 
 app.use("/oauth", oauthRouter);
 app.use("/settings", settingsRouter);
@@ -107,16 +172,18 @@ app.get("/search/ebay", async (req, res) => {
     res.status(500).json({ error: "ebay search failed" });
   }
 });
-// Start HTTP server
 const port = Number(process.env.LISTINGS_PORT || 4003);
-app.listen(port, () => console.log(`listings HTTP server up on port ${port}`));
 
-// Start gRPC server
+// Start gRPC before HTTP so /readyz local mTLS check can reach a listening server.
 if (process.env.ENABLE_GRPC !== "false") {
-  import('./grpc-server.js').then(({ startGrpcServer }) => {
-    const grpcPort = parseInt(process.env.GRPC_PORT || "50057", 10);
-    startGrpcServer(grpcPort);
-  }).catch((e) => {
-    console.error("Failed to start gRPC server:", e);
-  });
+  import("./grpc-server.js")
+    .then(({ startGrpcServer }) => {
+      const grpcPort = parseInt(process.env.GRPC_PORT || "50062", 10);
+      startGrpcServer(grpcPort);
+    })
+    .catch((e) => {
+      console.error("Failed to start gRPC server:", e);
+    });
 }
+
+app.listen(port, () => console.log(`listings HTTP server up on port ${port}`));

@@ -1,0 +1,31 @@
+{
+  "bundle_extraction_protocol": "v1",
+  "generated_at": "2026-04-19T00:52:11.113086+00:00",
+  "archive": "/Users/tom/record-platform-kafka-kraft-3broker-kafka-certs-20260410.tar.gz",
+  "archive_sha256": "e547496e053877dcbeec678e9b37a13b1f8c132e77285ceb893d4bf2b66359a9",
+  "staging_path": "/Users/tom/bundle-staging/record-platform-kafka-kraft-3broker-kafka-certs-20260410",
+  "archive_root_layout": {
+    "type": "single_top_level",
+    "root": "record-platform-kafka-3broker-kraft-kafka-certs-20260410"
+  },
+  "pre_extract": {
+    "safe": true,
+    "issues": [],
+    "warnings": [],
+    "file_member_count": 16
+  },
+  "post_extract": {
+    "manifest_tar_equals_find": true,
+    "file_count": 16,
+    "case_collision_free": true,
+    "staging_frozen_read_only": true,
+    "apple_double_neutral_manifest": true
+  },
+  "explicit_non_actions": [
+    "tarball_not_mutated",
+    "no_line_endings_normalized",
+    "no_top_level_strip_rewrite",
+    "no_repo_copy",
+    "no_git_add"
+  ]
+}

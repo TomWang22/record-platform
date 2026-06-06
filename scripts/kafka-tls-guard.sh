@@ -226,12 +226,13 @@ else
   echo "   ℹ️  kafka-ssl-secret absent — skipped"
 fi
 
-_ann="$(kubectl get secret kafka-ssl-secret -n "$NS" -o go-template='{{index .metadata.annotations "och.dev/ca-fingerprint-sha256"}}' 2>/dev/null | tr -d '\r' || true)"
-if [[ -n "$_ann" && "$_ann" != "$BROKER_FP" ]]; then
-  bad "Annotation och.dev/ca-fingerprint-sha256 != live CA PEM"
+# shellcheck source=lib/rp-kafka-ssl-fingerprint.sh
+source "$SCRIPT_DIR/lib/rp-kafka-ssl-fingerprint.sh"
+if ! rp_kafka_ssl_verify_secret_ca_annotation "$NS" "$TMP/broker-ca.pem"; then
+  bad "kafka-ssl-secret rp.dev/ca-fingerprint-sha256 != live CA PEM (run apply-rp-kafka-ssl-secret.sh)"
   exit 1
 fi
-[[ -n "$_ann" ]] && ok "Secret CA annotation consistent"
+ok "Secret CA annotation (rp.dev) consistent with live CA PEM"
 
 fi # end !POST_ROLLOUT_ONLY
 

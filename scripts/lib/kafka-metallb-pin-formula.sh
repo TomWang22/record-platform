@@ -3,16 +3,16 @@
 # Sourced by patch script + verify-kafka-metallb-pin-formula.sh (CI).
 # Convention: first IPv4 in METALLB_POOL + KAFKA_METALLB_FIRST_OFFSET + broker_index.
 
-if [[ -n "${_OCH_KAFKA_METALLB_PIN_FORMULA_LOADED:-}" ]]; then
+if [[ -n "${_RP_KAFKA_METALLB_PIN_FORMULA_LOADED:-}" ]]; then
   return 0
 fi
-_OCH_KAFKA_METALLB_PIN_FORMULA_LOADED=1
+_RP_KAFKA_METALLB_PIN_FORMULA_LOADED=1
 
 _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "$_LIB_DIR/metallb-subnet-guard.sh"
 
-och_kafka_metallb_add_last_octet() {
+rp_kafka_metallb_add_last_octet() {
   local ip="$1" delta="$2"
   local o1 o2 o3 o4
   IFS=. read -r o1 o2 o3 o4 <<<"$ip"
@@ -25,9 +25,9 @@ och_kafka_metallb_add_last_octet() {
 }
 
 # Args: METALLB_POOL KAFKA_METALLB_FIRST_OFFSET broker_index (0-based)
-och_kafka_metallb_expected_ip_for_broker() {
+rp_kafka_metallb_expected_ip_for_broker() {
   local pool="$1" offset="$2" broker_index="$3"
   local first
   first="$(och_metallb_pool_first_ip "$pool")" || return 1
-  och_kafka_metallb_add_last_octet "$first" $((offset + broker_index))
+  rp_kafka_metallb_add_last_octet "$first" $((offset + broker_index))
 }

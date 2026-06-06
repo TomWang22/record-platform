@@ -102,6 +102,7 @@ export function ensureMarketplaceFeedbackSchema(pool: Pool): Promise<void> {
   if (!schemaReady) {
     schemaReady = pool
       .query(`
+        CREATE SCHEMA IF NOT EXISTS trust;
         CREATE TABLE IF NOT EXISTS trust.marketplace_transactions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           listing_id UUID NOT NULL,

@@ -2,7 +2,12 @@ import { test, expect } from '@playwright/test'
 
 import { signInAsTestCollector, signInAsTestCollectorWithSeed } from './helpers/auth'
 import { assertNoStaleProductUi } from './helpers/stale-ui-guard'
-import { waitForFeedbackReady, waitForListingsReady } from './helpers/screenshot-readiness'
+import {
+  contractScreenshotPath,
+  guestContractScreenshotPath,
+  waitForFeedbackReady,
+  waitForListingsReady,
+} from './helpers/screenshot-readiness'
 
 test.describe('Marketplace hardening', () => {
   test.beforeEach(async ({ page }) => {
@@ -20,7 +25,7 @@ test.describe('Marketplace hardening', () => {
     await page.getByRole('link').filter({ hasText: 'Feedback score' }).first().click()
     await expect(page).toHaveURL(/\/profile\/feedback/)
     await page.screenshot({
-      path: 'e2e/screenshots/authenticated/authenticated-profile-clickable-stats.png',
+      path: contractScreenshotPath('authenticated-profile-clickable-stats.png'),
       fullPage: true,
     })
   })
@@ -45,19 +50,19 @@ test.describe('Marketplace hardening', () => {
     await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 45_000 })
     await assertNoStaleProductUi(page)
     await page.screenshot({
-      path: 'e2e/screenshots/authenticated/authenticated-listing-detail.png',
+      path: contractScreenshotPath('authenticated-listing-detail.png'),
       fullPage: true,
     })
     await page.goto(`/listings/${listingId}/edit`)
     await expect(page.getByTestId('listing-edit-ready')).toBeVisible({ timeout: 45_000 })
     await page.screenshot({
-      path: 'e2e/screenshots/authenticated/authenticated-listing-edit.png',
+      path: contractScreenshotPath('authenticated-listing-edit.png'),
       fullPage: true,
     })
     await page.getByRole('link', { name: /view revisions/i }).click()
     await expect(page.getByTestId('listing-revisions-ready')).toBeVisible({ timeout: 45_000 })
     await page.screenshot({
-      path: 'e2e/screenshots/authenticated/authenticated-listing-revisions.png',
+      path: contractScreenshotPath('authenticated-listing-revisions.png'),
       fullPage: true,
     })
   })
@@ -70,13 +75,13 @@ test.describe('Marketplace hardening', () => {
   test('selling sold tab and notifications', async ({ page }) => {
     await page.goto('/profile/selling?status=sold')
     await page.screenshot({
-      path: 'e2e/screenshots/authenticated/authenticated-profile-selling-sold.png',
+      path: contractScreenshotPath('authenticated-profile-selling-sold.png'),
       fullPage: true,
     })
     await page.goto('/listings')
     await page.getByRole('button', { name: /Notifications/i }).click()
     await page.screenshot({
-      path: 'e2e/screenshots/authenticated/notification-dropdown.png',
+      path: contractScreenshotPath('notification-dropdown.png'),
     })
   })
 
@@ -84,7 +89,7 @@ test.describe('Marketplace hardening', () => {
     await page.goto('/users/test-collector')
     await assertNoStaleProductUi(page)
     await page.screenshot({
-      path: 'e2e/screenshots/guest/public-user-profile.png',
+      path: guestContractScreenshotPath('public-user-profile.png'),
       fullPage: true,
     })
   })

@@ -50,6 +50,17 @@ if ! rp_kustomize_build | kubectl apply -f - 2>&1 | tee "$_apply_log"; then
   exit 1
 fi
 
+# Restore edge TLS secrets (service-tls / edge-service-tls) after apply — must not come from kustomize secretGenerator.
+if [[ -f "$REPO_ROOT/certs/record-platform.test.crt" && -f "$REPO_ROOT/certs/dev-chain.pem" ]]; then
+  # shellcheck source=scripts/lib/rp-apply-service-mtls-secrets.sh
+  source "$SCRIPT_DIR/lib/rp-apply-service-mtls-secrets.sh"
+  rp_apply_service_mtls_secrets "$NS" "$REPO_ROOT/certs" || {
+    bad "rp_apply_service_mtls_secrets failed after kustomize apply"
+    exit 1
+  }
+  ok "service-tls + edge-service-tls + per-service mTLS secrets refreshed from disk PKI"
+fi
+
 # redis-external Endpoints are patched post-apply (Compose IP; cannot use 127.0.0.1 in manifests).
 if [[ -x "$SCRIPT_DIR/sync-redis-external-endpoints.sh" ]]; then
   HOUSING_NS="$NS" K8S_NAMESPACE="$NS" RP_REDIS_SYNC_SKIP_VERIFY=1 bash "$SCRIPT_DIR/sync-redis-external-endpoints.sh" || {

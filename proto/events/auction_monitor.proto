@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package events.auction_monitor;
+
+option go_package = "github.com/TomWang22/record-platform/proto/events/auction_monitor";
+
+// Payloads for ${ENV_PREFIX}.auction_monitor.events.
+
+message AuctionResultIngestedV1 {
+  string result_id = 1;
+  string source = 2;
+  string external_id = 3;
+  optional string record_id = 4;
+  string sold_at = 5;
+}
+
+message UserSavedAuctionV1 {
+  string user_id = 1;
+  string auction_result_id = 2;
+  string saved_at = 3;
+}

@@ -1,5 +1,5 @@
 import express, { type Application, type NextFunction, type Request, type Response } from "express";
-import { httpCounter, register, createHttpConcurrencyGuard, initOchOutboxSurfaceUnsupported } from "@common/utils";
+import { httpCounter, register, createHttpConcurrencyGuard, initOchOutboxSurfaceUnsupported, mountRpHttpHealth, rpGrpcHealthOptions } from "@common/utils";
 import { inferNetProtoForSpan, mountDebugTraceHeaders, tracingMiddleware } from "@common/utils/otel";
 import {
   createLandlordBookingNotification,
@@ -91,20 +91,18 @@ export function createNotificationHttpApp(): Application {
     next();
   });
 
-  app.get(["/healthz", "/health"], (_req, res) => {
-    res.json({ ok: true, service: "notification-service", process: "up" });
-  });
-  app.get("/readyz", async (_req, res) => {
-    if (!pool) {
-      res.status(503).json({ ok: false, db: "skipped" });
-      return;
-    }
-    try {
-      await pool.query("SELECT 1");
-      res.json({ ok: true, db: "connected" });
-    } catch {
-      res.status(503).json({ ok: false, db: "disconnected" });
-    }
+  mountRpHttpHealth(app, {
+    service: "notification-service",
+    readiness: async () => {
+      if (!pool) return false;
+      try {
+        await pool.query("SELECT 1");
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    grpc: rpGrpcHealthOptions("notification-service", "notification.NotificationService"),
   });
 
   app.get("/metrics", async (_req, res) => {

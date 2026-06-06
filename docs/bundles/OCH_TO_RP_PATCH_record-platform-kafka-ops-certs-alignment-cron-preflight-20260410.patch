@@ -1,0 +1,2576 @@
+# OCH → RP namespace patch (generated; NOT applied)
+# Matrix: /Users/tom/record-platform/docs/bundles/OCH_TO_RP_CONVERSION_MATRIX.md
+# Staging: /Users/tom/bundle-staging/record-platform-kafka-ops-certs-alignment-cron-preflight-20260410
+# Review with: git apply --check <this-file>
+
+--- a/infra/k8s/kafka-certs/kafka-tls-preflight-job.yaml+++ b/infra/k8s/kafka-certs/kafka-tls-preflight-job.yaml@@ -1,5 +1,5 @@ # Optional: mTLS handshake to each headless broker (INTERNAL :9093).
+-# Apply after Kafka + och-kafka-ssl-secret exist:
++# Apply after Kafka + kafka-ssl-secret exist:
+ #   kubectl apply -f infra/k8s/kafka-certs/kafka-tls-preflight-job.yaml
+ #   kubectl -n record-platform wait --for=condition=complete job/kafka-tls-preflight --timeout=120s
+ apiVersion: batch/v1
+@@ -49,4 +49,4 @@       volumes:
+         - name: client
+           secret:
+-            secretName: och-kafka-ssl-secret
++            secretName: kafka-ssl-secret
+
+--- a/infra/k8s/kafka-kraft-metallb/kafka-metallb-alignment-exporter.yaml+++ b/infra/k8s/kafka-kraft-metallb/kafka-metallb-alignment-exporter.yaml@@ -74,7 +74,7 @@           image: python:3.12-slim-bookworm
+           imagePullPolicy: IfNotPresent
+           env:
+-            - { name: HOUSING_NS, value: record-platform }
++            - { name: HOUSING_NS=record-platform, value: record-platform }
+             - { name: KAFKA_BROKER_REPLICAS, value: "3" }
+             - { name: METRICS_PORT, value: "9108" }
+             - { name: PYTHONPATH, value: /deps }
+
+--- a/infra/k8s/kafka-ops/kafka-alignment-cronjob.yaml+++ b/infra/k8s/kafka-ops/kafka-alignment-cronjob.yaml@@ -66,7 +66,7 @@               image: kafka-alignment-cron:latest
+               imagePullPolicy: IfNotPresent
+               env:
+-                - name: HOUSING_NS
++                - name: HOUSING_NS=record-platform
+                   value: record-platform
+                 - name: KAFKA_BROKER_REPLICAS
+                   value: "3"
+
+--- a/scripts/apply-kafka-kraft-staged.sh+++ b/scripts/apply-kafka-kraft-staged.sh@@ -8,7 +8,7 @@ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ R="${KAFKA_BROKER_REPLICAS:-3}"
+ ATOMIC="${KAFKA_TLS_ATOMIC_BEFORE_REFRESH:-0}"
+ 
+
+--- a/scripts/apply-och-messaging-and-restart.sh+++ b/scripts/apply-och-messaging-and-restart.sh@@ -1,6 +1,6 @@ #!/usr/bin/env bash
+ # Final apply and restart (Phases 3–6 applied). Run from repo root.
+-# Prereq: OCH secrets exist (och-service-tls, och-kafka-ssl-secret).
++# Prereq: OCH secrets exist (och-service-tls, kafka-ssl-secret).
+ # Apply uses each resource's namespace (do not force -n so envoy-test, observability, etc. apply).
+ set -euo pipefail
+ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+--- a/scripts/auth-outbox-replay.sh+++ b/scripts/auth-outbox-replay.sh@@ -4,11 +4,11 @@ #
+ # Usage:
+ #   ./scripts/auth-outbox-replay.sh [ticks]   # default 5
+-# Env: HOUSING_NS (default record-platform), AUTH_DEPLOY (default auth-service)
++# Env: HOUSING_NS=record-platform (default record-platform), AUTH_DEPLOY (default auth-service)
+ set -euo pipefail
+ 
+ TICKS="${1:-5}"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ DEPLOY="${AUTH_DEPLOY:-auth-service}"
+ 
+ if ! [[ "$TICKS" =~ ^[0-9]+$ ]] || [[ "$TICKS" -lt 1 ]]; then
+
+--- a/scripts/bring-up-external-infra.sh+++ b/scripts/bring-up-external-infra.sh@@ -35,7 +35,7 @@ SKIP_COMPOSE_UP="${SKIP_COMPOSE_UP:-0}"
+ ENFORCE_DB_TUNING="${ENFORCE_DB_TUNING:-0}"
+ WAIT_K8S_KAFKA="${WAIT_K8S_KAFKA:-0}"
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+ ok() { echo "✅ $*"; }
+@@ -110,13 +110,13 @@ 
+ if [[ "$WAIT_K8S_KAFKA" == "1" ]] && command -v kubectl >/dev/null 2>&1; then
+   step "Waiting for Kubernetes Kafka pods (optional WAIT_K8S_KAFKA=1)"
+-  if kubectl get pod kafka-0 -n "$HOUSING_NS" &>/dev/null; then
++  if kubectl get pod kafka-0 -n "$HOUSING_NS=record-platform" &>/dev/null; then
+     for _i in 0 1 2; do
+-      kubectl wait pod "kafka-${_i}" -n "$HOUSING_NS" --for=condition=Ready --timeout=300s 2>/dev/null || warn "kafka-${_i} not Ready in time"
++      kubectl wait pod "kafka-${_i}" -n "$HOUSING_NS=record-platform" --for=condition=Ready --timeout=300s 2>/dev/null || warn "kafka-${_i} not Ready in time"
+     done
+-    ok "Kubernetes Kafka pods checked ($HOUSING_NS)"
++    ok "Kubernetes Kafka pods checked ($HOUSING_NS=record-platform)"
+   else
+-    warn "No kafka-0 in $HOUSING_NS — deploy KRaft StatefulSet first"
++    warn "No kafka-0 in $HOUSING_NS=record-platform — deploy KRaft StatefulSet first"
+   fi
+ fi
+ 
+
+--- a/scripts/build-and-load-auth-service.sh+++ b/scripts/build-and-load-auth-service.sh@@ -41,4 +41,4 @@ docker save "$IMAGE" | colima ssh -- sudo k3s ctr -n k8s.io images import -
+ ok "Loaded $IMAGE into k3s"
+ 
+-say "Done. Deploy with: kubectl apply -k infra/k8s/base/auth-service (ensure namespace off-campus-housing exists)."
++say "Done. Deploy with: kubectl apply -k infra/k8s/base/auth-service (ensure namespace record-platform exists)."
+
+--- a/scripts/chaos-kafka-alignment-stochastic.sh+++ b/scripts/chaos-kafka-alignment-stochastic.sh@@ -2,12 +2,12 @@ # Stochastic Kafka alignment chaos: random pod delete, external Service churn, or TLS refresh — then reconcile.
+ # Requires CHAOS_CONFIRM=1 and KAFKA_ALIGNMENT_TEST_MODE=1.
+ #
+-# Env: HOUSING_NS, KAFKA_BROKER_REPLICAS, REPO_ROOT (default from script location)
++# Env: HOUSING_NS=record-platform, KAFKA_BROKER_REPLICAS, REPO_ROOT (default from script location)
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ REP="${KAFKA_BROKER_REPLICAS:-3}"
+ [[ "$REP" =~ ^[1-9][0-9]*$ ]] || REP=3
+ 
+@@ -47,7 +47,7 @@     ;;
+   2)
+     echo "▶ TLS refresh from LB (no pod delete)"
+-    HOUSING_NS="$NS" bash "$SCRIPT_DIR/kafka-refresh-tls-from-lb.sh"
++    HOUSING_NS=record-platform="$NS" bash "$SCRIPT_DIR/kafka-refresh-tls-from-lb.sh"
+     kubectl rollout restart statefulset/kafka -n "$NS" --request-timeout=45s
+     kubectl rollout status statefulset/kafka -n "$NS" --timeout="${KAFKA_ROLLOUT_TIMEOUT:-600s}"
+     ;;
+@@ -55,13 +55,13 @@ 
+ echo "▶ kafka-runtime-sync --check-only"
+ set +e
+-HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
++HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
+ rc=$?
+ set -e
+ if [[ "$rc" -ne 0 ]]; then
+   echo "⚠️  Drift after chaos — running --remediate"
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --remediate "$NS" "$REP"
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --remediate "$NS" "$REP"
+ fi
+ 
+-HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
++HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
+ echo "✅ chaos-kafka-alignment-stochastic complete"
+
+--- a/scripts/chaos-kafka-broker.sh+++ b/scripts/chaos-kafka-broker.sh@@ -5,7 +5,7 @@ # Usage: ./scripts/chaos-kafka-broker.sh
+ # Env:
+ #   CHAOS_KAFKA_BROKER_INDEX — pod index to delete (default 1 → kafka-1)
+-#   HOUSING_NS — default record-platform
++#   HOUSING_NS=record-platform — default record-platform
+ #   CHAOS_CONFIRM — must be 1 to run (safety)
+ set -euo pipefail
+ 
+@@ -13,7 +13,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ cd "$REPO_ROOT"
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ IDX="${CHAOS_KAFKA_BROKER_INDEX:-1}"
+ POD="kafka-${IDX}"
+ 
+
+--- a/scripts/chaos-metallb-kafka-lb.sh+++ b/scripts/chaos-metallb-kafka-lb.sh@@ -3,14 +3,14 @@ # Destructive to external LB IP for broker 0 — use only on dev clusters.
+ #
+ # Usage: CHAOS_CONFIRM=1 ./scripts/chaos-metallb-kafka-lb.sh
+-# Env: HOUSING_NS (default record-platform)
++# Env: HOUSING_NS=record-platform (default record-platform)
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ cd "$REPO_ROOT"
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ if [[ "${CHAOS_CONFIRM:-0}" != "1" ]]; then
+   echo "Refusing: set CHAOS_CONFIRM=1 (deletes kafka-0-external Service in $NS)"
+
+--- a/scripts/check-all-pods-and-tls.sh+++ b/scripts/check-all-pods-and-tls.sh@@ -78,7 +78,7 @@ fi
+ 
+ REDIS_PORT="${REDIS_PORT:-6380}"
+-_KNS="${HOUSING_NS:-record-platform}"
++_KNS="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ # 3. Kafka: in-cluster KRaft (Compose broker removed)
+ say "3. Checking Kafka (k8s $_KNS)..."
+@@ -122,7 +122,7 @@ 
+ # 5. App workloads (dynamic): *-service + api-gateway — excludes nginx/haproxy/exporters/caddy/envoy
+ say "5. Checking app pods (record-platform, should be 1/1 Ready)..."
+-HOUSING_CHECK_NS="${HOUSING_NS:-record-platform}"
++HOUSING_CHECK_NS="${HOUSING_NS=record-platform:-record-platform}"
+ if type och_list_app_deployments &>/dev/null; then
+   _listed=$(och_list_app_deployments "$HOUSING_CHECK_NS" | tr '\n' ' ')
+   if [[ -n "${_listed// /}" ]]; then
+@@ -428,11 +428,11 @@ UNWANTED=$(_kubectl get pods -n record-platform -l 'app=postgres' --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+ [[ "${UNWANTED:-0}" -eq 0 ]] && ok "No in-cluster postgres" || warn "Found ${UNWANTED:-0} in-cluster postgres pod(s) (external PG expected)"
+ 
+-# 10. TLS secrets (dev-root-ca + off-campus-housing-local-tls for CA/Caddy match)
++# 10. TLS secrets (dev-root-ca + record-platform-local-tls for CA/Caddy match)
+ say "10. Checking TLS secrets..."
+ [[ -n "$(_kubectl get secret -n ingress-nginx dev-root-ca -o name 2>/dev/null)" ]] && ok "dev-root-ca (ingress-nginx)" || warn "dev-root-ca missing"
+-# off-campus-housing-local-tls should exist in ingress-nginx namespace (for Caddy)
+-LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"
++# record-platform-local-tls should exist in ingress-nginx namespace (for Caddy)
++LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-record-platform-local-tls}"
+ if [[ -n "$(_kubectl get secret -n ingress-nginx "$LEAF_TLS_SECRET" -o name 2>/dev/null)" ]]; then
+   ok "$LEAF_TLS_SECRET (ingress-nginx)"
+ else
+
+--- a/scripts/check-kafka-config-drift.sh+++ b/scripts/check-kafka-config-drift.sh@@ -4,12 +4,12 @@ #
+ # Usage:
+ #   ./scripts/check-kafka-config-drift.sh [namespace] [replicas]
+-# Env: HOUSING_NS, KAFKA_BROKER_REPLICAS, KAFKA_CLUSTER_EXEC_TIMEOUT
++# Env: HOUSING_NS=record-platform, KAFKA_BROKER_REPLICAS, KAFKA_CLUSTER_EXEC_TIMEOUT
+ #
+ # Optional: DRIFT_WRITE_PROM_FILE=/path/to/file.prom — append OpenMetrics lines (for node_exporter textfile)
+ set -euo pipefail
+ 
+-NS="${1:-${HOUSING_NS:-record-platform}}"
++NS="${1:-${HOUSING_NS=record-platform:-record-platform}}"
+ REPLICAS="${2:-${KAFKA_BROKER_REPLICAS:-3}}"
+ EXEC_TO="${KAFKA_CLUSTER_EXEC_TIMEOUT:-45}"
+ 
+
+--- a/scripts/ci/canary-pod-stability.sh+++ b/scripts/ci/canary-pod-stability.sh@@ -1,9 +1,9 @@ #!/usr/bin/env bash
+ # Post-deploy stability: no Failed pods; optional restart budget (last observed restartCount sum).
+-# Usage: HOUSING_NS=record-platform CANARY_MAX_TOTAL_RESTARTS=50 ./scripts/ci/canary-pod-stability.sh
++# Usage: HOUSING_NS=record-platform=record-platform CANARY_MAX_TOTAL_RESTARTS=50 ./scripts/ci/canary-pod-stability.sh
+ set -euo pipefail
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ MAX_RESTARTS="${CANARY_MAX_TOTAL_RESTARTS:-80}"
+ 
+ command -v kubectl >/dev/null 2>&1 || { echo "kubectl required" >&2; exit 1; }
+
+--- a/scripts/ci/generate-kafka-ci-tls.sh+++ b/scripts/ci/generate-kafka-ci-tls.sh@@ -25,7 +25,7 @@ # Ephemeral CI CA (7 days)
+ openssl genrsa -out "$TMP/ca.key" 2048
+ openssl req -x509 -new -nodes -key "$TMP/ca.key" -sha256 -days 7 \
+-  -subj "/CN=och-kafka-ci-ca/O=off-campus-housing-ci" \
++  -subj "/CN=och-kafka-ci-ca/O=record-platform-ci" \
+   -out "$TMP/ca.pem"
+ 
+ KAFKA_SANS="DNS:kafka,DNS:localhost,DNS:host.docker.internal,IP:127.0.0.1"
+
+--- a/scripts/ci/hydrate-certs-for-ci.sh+++ b/scripts/ci/hydrate-certs-for-ci.sh@@ -4,14 +4,14 @@ # Order:
+ #   1) POST_DEPLOY_CERTS_ARCHIVE_B64 — gzip tarball (e.g. tar -czf - certs/kafka-ssl certs/dev-root.pem | base64 -w0)
+ #   2) Secret kafka-ssl-secret → certs/kafka-ssl/* (if kafka-broker.pem missing)
+-#   3) Secret dev-root-ca → certs/dev-root.pem (if missing; tries HOUSING_NS then ingress-nginx)
++#   3) Secret dev-root-ca → certs/dev-root.pem (if missing; tries HOUSING_NS=record-platform then ingress-nginx)
+ #
+ # If nothing applies, verify-kafka-tls-sans.sh still reads broker PEM via kubectl when the secret exists.
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ KSSL="$REPO_ROOT/certs/kafka-ssl"
+ 
+ say() { echo "▶ $*"; }
+
+--- a/scripts/ci/k6-smoke-incluster.sh+++ b/scripts/ci/k6-smoke-incluster.sh@@ -3,7 +3,7 @@ set -euo pipefail
+ 
+ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ JS="$REPO_ROOT/scripts/k6/k6-smoke-gateway.js"
+ JOB="k6-smoke-$(date +%s)"
+ 
+
+--- a/scripts/ci/post-deploy-verify.sh+++ b/scripts/ci/post-deploy-verify.sh@@ -4,8 +4,8 @@ set -euo pipefail
+ 
+ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
+-export HOUSING_NS="$NS"
++NS="${HOUSING_NS=record-platform:-record-platform}"
++export HOUSING_NS=record-platform="$NS"
+ 
+ command -v kubectl >/dev/null 2>&1 || { echo "kubectl required" >&2; exit 1; }
+ 
+
+--- a/scripts/ci/smoke-api-gateway.sh+++ b/scripts/ci/smoke-api-gateway.sh@@ -1,9 +1,9 @@ #!/usr/bin/env bash
+ # In-cluster HTTP smoke: api-gateway /healthz (port 4020). Requires kubectl + reachable api-gateway Service.
+-# Usage: HOUSING_NS=record-platform ./scripts/ci/smoke-api-gateway.sh
++# Usage: HOUSING_NS=record-platform=record-platform ./scripts/ci/smoke-api-gateway.sh
+ set -euo pipefail
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ HOST="api-gateway.${NS}.svc.cluster.local"
+ PORT="${API_GATEWAY_PORT:-4020}"
+ HEALTH_PATH="${API_GATEWAY_HEALTH_PATH:-/healthz}"
+
+--- a/scripts/ci/verify-k8s-images.sh+++ b/scripts/ci/verify-k8s-images.sh@@ -5,7 +5,7 @@ #   VERIFY_K8S_SERVICES="auth-service api-gateway ..." ./scripts/ci/verify-k8s-images.sh
+ #
+ # Env:
+-#   HOUSING_NS — default record-platform
++#   HOUSING_NS=record-platform — default record-platform
+ #   VERIFY_K8S_SERVICES — space-separated deployment names (required)
+ #   VERIFY_K8S_STRICT_DEV — 1: exit 1 if any deployment image does not contain ":dev"
+ #   VERIFY_K8S_CHECK_DRIFT — 1: warn if pod image != deployment template image
+@@ -15,7 +15,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ cd "$REPO_ROOT"
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ SERVICES_RAW="${VERIFY_K8S_SERVICES:-}"
+ if [[ -z "$SERVICES_RAW" ]]; then
+   echo "❌ Set VERIFY_K8S_SERVICES (space-separated deployment names)" >&2
+
+--- a/scripts/cleanup-kafka-ops-cronjob-pods.sh+++ b/scripts/cleanup-kafka-ops-cronjob-pods.sh@@ -8,10 +8,10 @@ #   kubectl apply -k infra/ops/
+ #
+ # Usage: ./scripts/cleanup-kafka-ops-cronjob-pods.sh
+-#   HOUSING_NS=record-platform (default)
++#   HOUSING_NS=record-platform=record-platform (default)
+ set -euo pipefail
+ 
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ if ! command -v kubectl >/dev/null 2>&1; then
+   echo "kubectl not found" >&2
+@@ -21,7 +21,7 @@ delete_finished_jobs_for_cronjob() {
+   local cronjob_name="$1"
+   local names
+-  names="$(kubectl get jobs -n "$HOUSING_NS" \
++  names="$(kubectl get jobs -n "$HOUSING_NS=record-platform" \
+     -l "batch.kubernetes.io/cronjob-name=${cronjob_name}" \
+     -o jsonpath='{range .items[?(@.status.completionTime)]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)"
+   if [[ -z "${names//[$'\n']/}" ]]; then
+@@ -31,7 +31,7 @@   while IFS= read -r job; do
+     [[ -z "$job" ]] && continue
+     echo "Deleting job/$job (CronJob/$cronjob_name)..."
+-    kubectl delete job "$job" -n "$HOUSING_NS" --ignore-not-found
++    kubectl delete job "$job" -n "$HOUSING_NS=record-platform" --ignore-not-found
+   done <<< "$names"
+ }
+ 
+
+--- a/scripts/colima-patch-app-config-db-host-to-gateway.sh+++ b/scripts/colima-patch-app-config-db-host-to-gateway.sh@@ -9,13 +9,13 @@ #
+ # Usage (repo root, kubectl context colima, Colima running):
+ #   ./scripts/colima-patch-app-config-db-host-to-gateway.sh
+-#   DB_HOST_GATEWAY_IP=192.168.5.2 HOUSING_NS=record-platform ./scripts/colima-patch-app-config-db-host-to-gateway.sh
++#   DB_HOST_GATEWAY_IP=192.168.5.2 HOUSING_NS=record-platform=record-platform ./scripts/colima-patch-app-config-db-host-to-gateway.sh
+ #
+ # After apply, restart app pods if needed: ./scripts/rebuild-och-images-and-rollout.sh with ROLLOUT only, or kubectl rollout restart.
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ say() { printf "\033[1m%s\033[0m\n" "$*"; }
+ ok() { echo "✅ $*"; }
+
+--- a/scripts/deploy-dev.sh+++ b/scripts/deploy-dev.sh@@ -37,7 +37,7 @@ if ! kubectl get secret -n "$NS" app-secrets &>/dev/null 2>&1; then
+   warn "app-secrets not found in $NS. Create TLS/secrets first (e.g. scripts/strict-tls-bootstrap.sh)."
+ fi
+-LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"
++LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-record-platform-local-tls}"
+ if ! kubectl get secret -n ingress-nginx "$LEAF_TLS_SECRET" &>/dev/null 2>&1 || ! kubectl get secret -n ingress-nginx dev-root-ca &>/dev/null 2>&1; then
+   warn "Caddy TLS secrets ($LEAF_TLS_SECRET, dev-root-ca) missing in ingress-nginx. Run scripts/rollout-caddy.sh after creating secrets."
+ fi
+
+--- a/scripts/dev-generate-certs.sh+++ b/scripts/dev-generate-certs.sh@@ -35,7 +35,7 @@   say "1. Creating dev CA (dev-root.pem, dev-root.key)..."
+   openssl genrsa -out "$CERTS/dev-root.key" 2048 2>/dev/null
+   openssl req -x509 -new -nodes -key "$CERTS/dev-root.key" -sha256 -days "$DAYS" \
+-    -out "$CERTS/dev-root.pem" -subj "/CN=dev-root-ca/O=off-campus-housing-dev" 2>/dev/null
++    -out "$CERTS/dev-root.pem" -subj "/CN=dev-root-ca/O=record-platform-dev" 2>/dev/null
+   ok "Dev CA created"
+ else
+   ok "Dev CA already exists"
+@@ -66,7 +66,7 @@ say "3. Creating messaging-service leaf..."
+ openssl genrsa -out "$CERTS/messaging-service.key" 2048 2>/dev/null
+ openssl req -new -key "$CERTS/messaging-service.key" -out "$TMP/messaging.csr" \
+-  -subj "/CN=messaging-service/O=off-campus-housing-dev" 2>/dev/null
++  -subj "/CN=messaging-service/O=record-platform-dev" 2>/dev/null
+ openssl x509 -req -in "$TMP/messaging.csr" -CA "$CA_PEM" -CAkey "$CA_KEY" -CAcreateserial \
+   -out "$CERTS/messaging-service.crt" -days "$DAYS" -sha256 2>/dev/null
+ ok "messaging-service.crt, .key"
+@@ -75,7 +75,7 @@ say "4. Creating media-service leaf..."
+ openssl genrsa -out "$CERTS/media-service.key" 2048 2>/dev/null
+ openssl req -new -key "$CERTS/media-service.key" -out "$TMP/media.csr" \
+-  -subj "/CN=media-service/O=off-campus-housing-dev" 2>/dev/null
++  -subj "/CN=media-service/O=record-platform-dev" 2>/dev/null
+ openssl x509 -req -in "$TMP/media.csr" -CA "$CA_PEM" -CAkey "$CA_KEY" \
+   -out "$CERTS/media-service.crt" -days "$DAYS" -sha256 2>/dev/null
+ ok "media-service.crt, .key"
+@@ -85,7 +85,7 @@ cp "$CA_PEM" "$KAFKA_DEV/ca.pem"
+ openssl genrsa -out "$KAFKA_DEV/client.key" 2048 2>/dev/null
+ openssl req -new -key "$KAFKA_DEV/client.key" -out "$TMP/kafka-client.csr" \
+-  -subj "/CN=kafka-client/O=off-campus-housing-dev" 2>/dev/null
++  -subj "/CN=kafka-client/O=record-platform-dev" 2>/dev/null
+ cat > "$TMP/kafka-client.ext" <<'EOF'
+ [v3_client]
+ basicConstraints = CA:FALSE
+@@ -102,7 +102,7 @@ KAFKA_SANS="DNS:kafka,DNS:localhost,DNS:host.docker.internal,IP:127.0.0.1,IP:192.168.5.1"
+ openssl genrsa -out "$TMP/kafka-broker.key" 2048 2>/dev/null
+ openssl req -new -key "$TMP/kafka-broker.key" -out "$TMP/kafka-broker.csr" \
+-  -subj "/CN=kafka/O=off-campus-housing-dev" 2>/dev/null
++  -subj "/CN=kafka/O=record-platform-dev" 2>/dev/null
+ cat > "$TMP/san.ext" <<EOF
+ [kafka_broker_tls]
+ basicConstraints = critical, CA:FALSE
+
+--- a/scripts/dev-onboard-local.sh+++ b/scripts/dev-onboard-local.sh@@ -1,14 +1,14 @@ #!/usr/bin/env bash
+ # Strict local (Colima/k3s + MetalLB) dev-onboard orchestration: set -euo pipefail, no silent success.
+ #
+-# Prevents app CrashLoop when Secret/och-kafka-ssl-secret is missing or incomplete (auth-service,
++# Prevents app CrashLoop when Secret/kafka-ssl-secret is missing or incomplete (auth-service,
+ # analytics-service, etc. mount /etc/kafka/secrets/ca-cert.pem, client.crt, client.key for Kafka mTLS).
+ #
+ # Deterministic contract (gates before later phases):
+ #   Toolchain: Phase 0.25 make deps (pnpm for ensure-dev-root / reissue before Phase 0.5).
+ #   TLS: Phase 0.5 local dev-root CA (dev-onboard-zero-trust-preflight) before make up-fast;
+ #        defer Kafka JKS until LB (TLS_FIRST_TIME_DEFER_KAFKA_JKS); reissue syncs och-service-tls (reissue step 2c);
+-#        Phase 3.5 ensure-housing-cluster-secrets + verify och-kafka-ssl-secret PEM keys right after apply-kafka-kraft;
++#        Phase 3.5 ensure-housing-cluster-secrets + verify kafka-ssl-secret PEM keys right after apply-kafka-kraft;
+ #        Phase 5 kafka-tls-guard + 5a ensure-housing-cluster-secrets (idempotent) + 5a1 service-tls-alias-guard.
+ #   Kafka: Phase 5a2 kafka-quorum-stable (no QuorumController "leader is (none)" in window).
+ #   Edge: Phase 5b deferred rollouts; Phase 7b edge-readiness-gate (MetalLB + Caddy + gateway /healthz + /readyz).
+@@ -74,14 +74,14 @@   command make -C "$REPO_ROOT" "$@"
+ }
+ 
+-# Exit 0 iff Secret/och-kafka-ssl-secret has non-empty data for ca-cert.pem, client.crt, client.key.
++# Exit 0 iff Secret/kafka-ssl-secret has non-empty data for ca-cert.pem, client.crt, client.key.
+ _verify_och_kafka_pem_secret() {
+   local ns="$1"
+   python3 -c "
+ import json, subprocess, sys
+ ns = sys.argv[1]
+ r = subprocess.run(
+-    ['kubectl', '-n', ns, 'get', 'secret', 'och-kafka-ssl-secret', '-o', 'json', '--request-timeout=25s'],
++    ['kubectl', '-n', ns, 'get', 'secret', 'kafka-ssl-secret', '-o', 'json', '--request-timeout=25s'],
+     capture_output=True,
+     text=True,
+ )
+@@ -91,7 +91,7 @@ for k in ('ca-cert.pem', 'client.crt', 'client.key'):
+     if k not in data or not (data[k] or '').strip():
+         sys.exit(1)
+-print('  ✅ och-kafka-ssl-secret verified (ca-cert.pem, client.crt, client.key)')
++print('  ✅ kafka-ssl-secret verified (ca-cert.pem, client.crt, client.key)')
+ " "$ns"
+ }
+ 
+@@ -120,12 +120,12 @@ echo "▶ Phase 3: Kafka Services + atomic TLS refresh (scale-0 → full JKS regen → brokers up; Parallel SS policy kept for KRaft DNS bootstrap)"
+ make apply-kafka-kraft
+ 
+-echo "▶ Phase 3.5: Housing secrets — sync och-kafka-ssl-secret (app Kafka mTLS PEMs) + verify keys"
++echo "▶ Phase 3.5: Housing secrets — sync kafka-ssl-secret (app Kafka mTLS PEMs) + verify keys"
+ chmod +x "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
+-_NS="${HOUSING_NS:-record-platform}"
+-HOUSING_NS="$_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
++_NS="${HOUSING_NS=record-platform:-record-platform}"
++HOUSING_NS=record-platform="$_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
+ if ! _verify_och_kafka_pem_secret "$_NS"; then
+-  echo "▶ Phase 3.5 remediate: kafka-ssl-from-dev-root.sh + re-sync (broker PEM material → och-kafka-ssl-secret)"
++  echo "▶ Phase 3.5 remediate: kafka-ssl-from-dev-root.sh + re-sync (broker PEM material → kafka-ssl-secret)"
+   chmod +x "$SCRIPT_DIR/kafka-ssl-from-dev-root.sh"
+   KAFKA_SSL_NS="$_NS" bash "$SCRIPT_DIR/kafka-ssl-from-dev-root.sh"
+   if kubectl get sts kafka -n "$_NS" --request-timeout=20s >/dev/null 2>&1; then
+@@ -133,9 +133,9 @@     kubectl rollout restart statefulset/kafka -n "$_NS" --request-timeout=30s
+     kubectl rollout status statefulset/kafka -n "$_NS" --timeout=480s
+   fi
+-  HOUSING_NS="$_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
++  HOUSING_NS=record-platform="$_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
+   if ! _verify_och_kafka_pem_secret "$_NS"; then
+-    echo "❌ och-kafka-ssl-secret still incomplete — check kubectl context, namespace $_NS, and certs/dev-root.{pem,key}" >&2
++    echo "❌ kafka-ssl-secret still incomplete — check kubectl context, namespace $_NS, and certs/dev-root.{pem,key}" >&2
+     exit 1
+   fi
+ fi
+@@ -147,13 +147,13 @@ make kafka-tls-guard
+ 
+ echo "▶ Phase 5a: Re-sync och-service-tls / och-kafka aliases (idempotent; after TLS guard churn)"
+-HOUSING_NS="${HOUSING_NS:-record-platform}" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
+ 
+ echo "▶ Phase 5a1: service-tls ↔ och-service-tls CA fingerprint gate (alias drift fail-fast)"
+-HOUSING_NS="${HOUSING_NS:-record-platform}" bash "$SCRIPT_DIR/service-tls-alias-guard.sh"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}" bash "$SCRIPT_DIR/service-tls-alias-guard.sh"
+ 
+ echo "▶ Phase 5a2: Kafka quorum stability gate (no QuorumController 'leader is (none)' in recent window)"
+-HOUSING_NS="${HOUSING_NS:-record-platform}" bash "$SCRIPT_DIR/kafka-quorum-stable.sh"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}" bash "$SCRIPT_DIR/kafka-quorum-stable.sh"
+ 
+ echo "▶ Phase 5b: Deferred edge/service TLS rollouts (housing apps → caddy-h3) after Kafka is canonical"
+ bash "$SCRIPT_DIR/rollout-deferred-after-kafka-tls.sh"
+@@ -161,7 +161,7 @@ echo "▶ Phase 6: Deploy workloads"
+ SKIP_STRICT_ENVELOPE=1 bash "$SCRIPT_DIR/deploy-dev.sh"
+ 
+-echo "▶ Phase 6b: Verify app Deployments mount och-kafka-ssl-secret (KafkaJS CA trust)"
++echo "▶ Phase 6b: Verify app Deployments mount kafka-ssl-secret (KafkaJS CA trust)"
+ if [[ "${VERIFY_KAFKA_CHECK_CLIENT_DEPLOY_MOUNTS:-0}" == "1" ]]; then
+   VERIFY_KAFKA_CLIENT_MOUNTS_ONLY=1 bash "$SCRIPT_DIR/verify-kafka-cluster.sh"
+ fi
+@@ -173,7 +173,7 @@ make wait-for-caddy-ip
+ 
+ echo "▶ Phase 7b: Edge invariants (MetalLB IP + Caddy + api-gateway /healthz in-cluster)"
+-NS_ING="${NS_ING:-ingress-nginx}" HOUSING_NS="${HOUSING_NS:-record-platform}" bash "$SCRIPT_DIR/edge-readiness-gate.sh"
++NS_ING="${NS_ING:-ingress-nginx}" HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}" bash "$SCRIPT_DIR/edge-readiness-gate.sh"
+ 
+ echo "▶ Phase 8: /etc/hosts + resolver check"
+ make ensure-edge-hosts
+
+--- a/scripts/dev-onboard-zero-trust-preflight.sh+++ b/scripts/dev-onboard-zero-trust-preflight.sh@@ -1,7 +1,7 @@ #!/usr/bin/env bash
+ # First step of local dev-onboard (before make up): ensure the dev-root CA exists on disk.
+ # Kafka broker/client TLS and strict mTLS services are signed from this chain; without it,
+-# tls-first-time / kafka-refresh cannot produce kafka-ssl-secret or och-kafka-ssl-secret.
++# tls-first-time / kafka-refresh cannot produce kafka-ssl-secret or kafka-ssl-secret.
+ #
+ # Cluster-agnostic — safe before Colima/k3s. Does not kubectl apply.
+ #
+@@ -14,7 +14,7 @@ cd "$REPO_ROOT"
+ 
+ echo "=== Zero-trust TLS preflight (local CA before cluster) ==="
+-echo "  After Kafka TLS refresh, dev-onboard syncs Secret/och-kafka-ssl-secret (keys: ca-cert.pem, client.crt, client.key) for app pods."
++echo "  After Kafka TLS refresh, dev-onboard syncs Secret/kafka-ssl-secret (keys: ca-cert.pem, client.crt, client.key) for app pods."
+ chmod +x "$SCRIPT_DIR/ensure-dev-root-ca.sh"
+ bash "$SCRIPT_DIR/ensure-dev-root-ca.sh"
+ echo "✅ certs/dev-root.pem + dev-root.key present — continuing to cluster / TLS bootstrap"
+
+--- a/scripts/diagnose-k6-edge-connectivity.sh+++ b/scripts/diagnose-k6-edge-connectivity.sh@@ -1,16 +1,16 @@ #!/usr/bin/env bash
+ # Edge checklist when k6 shows 0 B received / timeouts: DNS → TLS → ingress vs Caddy → paths.
+-# Caddy (ingress-nginx ns) routes /api/* and /auth/* to api-gateway:4020 (see infra/k8s/caddy-h3-configmap.yaml).
++# Caddy (ingress-nginx ns) routes /api/* and /auth/* to api-gateway:4000 (see infra/k8s/caddy-h3-configmap.yaml).
+ # ingress-nginx (housing ns) must also route /auth → gateway (see infra/k8s/overlays/dev/ingress.yaml).
+ #
+ # Usage (repo root):
+ #   ./scripts/diagnose-k6-edge-connectivity.sh
+-#   HOUSING_NS=record-platform CA=certs/dev-root.pem ./scripts/diagnose-k6-edge-connectivity.sh
++#   HOUSING_NS=record-platform=record-platform CA=certs/dev-root.pem ./scripts/diagnose-k6-edge-connectivity.sh
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
+ HOST="${EDGE_HOST:-record.local}"
+ CA="${CA:-$REPO_ROOT/certs/dev-root.pem}"
+ 
+@@ -65,15 +65,15 @@ 
+ if command -v kubectl >/dev/null 2>&1; then
+   say "4) Cluster: ingress + Caddy LoadBalancers (external traffic should match one of these)"
+-  kubectl get svc -n "$HOUSING_NS" -l 'app.kubernetes.io/name=ingress-nginx' 2>/dev/null || true
++  kubectl get svc -n "$HOUSING_NS=record-platform" -l 'app.kubernetes.io/name=ingress-nginx' 2>/dev/null || true
+   kubectl get svc -n ingress-nginx 2>/dev/null | head -20 || true
+-  kubectl get ingress -n "$HOUSING_NS" 2>/dev/null || true
++  kubectl get ingress -n "$HOUSING_NS=record-platform" 2>/dev/null || true
+ fi
+ 
+ say "5) Bypass edge (gateway only — confirms app vs ingress)"
+-echo "  kubectl -n $HOUSING_NS port-forward svc/api-gateway 4020:4020"
+-echo "  curl -sS http://127.0.0.1:4020/healthz   # gateway liveness (no TLS)"
+-echo "  curl -sS http://127.0.0.1:4020/api/healthz"
++echo "  kubectl -n $HOUSING_NS=record-platform port-forward svc/api-gateway 4020api-gateway:4000"
++echo "  curl -sS http://127.0.0.1api-gateway:4000/healthz   # gateway liveness (no TLS)"
++echo "  curl -sS http://127.0.0.1api-gateway:4000/api/healthz"
+ 
+ say "k6 env (from host)"
+ echo "  export SSL_CERT_FILE=$CA"
+
+--- a/scripts/diagnose-och-deployment.sh+++ b/scripts/diagnose-och-deployment.sh@@ -4,7 +4,7 @@ #        ./scripts/diagnose-och-deployment.sh auth-service
+ set -euo pipefail
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ DEPLOY="${1:?usage: $0 <deployment-name>}"
+ 
+ echo "=== kubectl describe pod (first pod for $DEPLOY) ==="
+
+--- a/scripts/edge-readiness-gate.sh+++ b/scripts/edge-readiness-gate.sh@@ -3,13 +3,13 @@ #
+ # Env:
+ #   NS_ING — default ingress-nginx
+-#   HOUSING_NS — default record-platform
++#   HOUSING_NS=record-platform — default record-platform
+ #   EDGE_READINESS_GATE_SKIP=1 — no-op success
+ #   EDGE_GATEWAY_DEPLOY — default api-gateway
+ set -euo pipefail
+ 
+ NS_ING="${NS_ING:-ingress-nginx}"
+-NS_APP="${HOUSING_NS:-record-platform}"
++NS_APP="${HOUSING_NS=record-platform:-record-platform}"
+ GW_DEPLOY="${EDGE_GATEWAY_DEPLOY:-api-gateway}"
+ 
+ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+@@ -50,7 +50,7 @@ if kubectl get deploy "$GW_DEPLOY" -n "$NS_APP" --request-timeout=20s >/dev/null 2>&1; then
+   _gc="$(
+     kubectl exec -n "$NS_APP" "deploy/$GW_DEPLOY" -c app --request-timeout=30s -- \
+-      sh -c 'if command -v curl >/dev/null 2>&1; then curl -gfsS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 15 http://127.0.0.1:4020/healthz; elif command -v wget >/dev/null 2>&1; then wget -q -O /dev/null --timeout=15 http://127.0.0.1:4020/healthz && echo 200; else echo 000; fi' 2>/dev/null || echo "000"
++      sh -c 'if command -v curl >/dev/null 2>&1; then curl -gfsS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 15 http://127.0.0.1api-gateway:4000/healthz; elif command -v wget >/dev/null 2>&1; then wget -q -O /dev/null --timeout=15 http://127.0.0.1api-gateway:4000/healthz && echo 200; else echo 000; fi' 2>/dev/null || echo "000"
+   )"
+   if [[ "$_gc" != "200" ]]; then
+     bad "api-gateway /healthz HTTP $_gc (expected 200)"
+@@ -59,7 +59,7 @@   ok "api-gateway /healthz HTTP 200 (in-pod)"
+   _gz="$(
+     kubectl exec -n "$NS_APP" "deploy/$GW_DEPLOY" -c app --request-timeout=45s -- \
+-      sh -c 'if command -v curl >/dev/null 2>&1; then curl -gfsS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 25 http://127.0.0.1:4020/readyz; elif command -v wget >/dev/null 2>&1; then wget -q -O /dev/null --timeout=25 http://127.0.0.1:4020/readyz && echo 200; else echo 000; fi' 2>/dev/null || echo "000"
++      sh -c 'if command -v curl >/dev/null 2>&1; then curl -gfsS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 25 http://127.0.0.1api-gateway:4000/readyz; elif command -v wget >/dev/null 2>&1; then wget -q -O /dev/null --timeout=25 http://127.0.0.1api-gateway:4000/readyz && echo 200; else echo 000; fi' 2>/dev/null || echo "000"
+   )"
+   if [[ "$_gz" != "200" ]]; then
+     bad "api-gateway /readyz HTTP $_gz (expected 200 — auth gRPC / deps not ready)"
+
+--- a/scripts/ensure-all-services-tls.sh+++ b/scripts/ensure-all-services-tls.sh@@ -51,8 +51,8 @@ 
+   # media-service: HTTP + gRPC (TCP probes) + Kafka mTLS; no service-tls volume in current manifest.
+   if [[ "$svc" == "media-service" ]] && ! _tls_deploy_has_leaf "$DEPLOY_FILE"; then
+-    if grep -qE 'secretName:\s*och-kafka-ssl-secret\b' "$DEPLOY_FILE"; then
+-      ok "$svc: Kafka client mTLS (och-kafka-ssl-secret); gRPC health via TCP (no och-service-tls mount in this Deployment)"
++    if grep -qE 'secretName:\s*kafka-ssl-secret\b' "$DEPLOY_FILE"; then
++      ok "$svc: Kafka client mTLS (kafka-ssl-secret); gRPC health via TCP (no och-service-tls mount in this Deployment)"
+       continue
+     fi
+   fi
+
+--- a/scripts/ensure-caddy-envoy-strict-tls.sh+++ b/scripts/ensure-caddy-envoy-strict-tls.sh@@ -30,8 +30,8 @@ kubectl create namespace "$NS_ENVOY" --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
+ ok "Namespaces $NS_INGRESS, $NS_ENVOY ensured"
+ 
+-# 2. TLS secrets (off-campus-housing-local-tls, dev-root-ca in ingress-nginx; dev-root-ca, envoy-client-tls in envoy-test)
+-TLS_SECRET="${TLS_SECRET:-off-campus-housing-local-tls}"
++# 2. TLS secrets (record-platform-local-tls, dev-root-ca in ingress-nginx; dev-root-ca, envoy-client-tls in envoy-test)
++TLS_SECRET="${TLS_SECRET:-record-platform-local-tls}"
+ if [[ -f "$REPO_ROOT/certs/dev-root.pem" ]] && [[ -f "$REPO_ROOT/certs/record.local.crt" ]] && [[ -f "$REPO_ROOT/certs/record.local.key" ]]; then
+   if ! kubectl -n "$NS_INGRESS" get secret "$TLS_SECRET" &>/dev/null || ! kubectl -n "$NS_INGRESS" get secret dev-root-ca &>/dev/null; then
+     info "Creating TLS secrets (strict-tls-bootstrap)..."
+
+--- a/scripts/ensure-housing-cluster-secrets.sh+++ b/scripts/ensure-housing-cluster-secrets.sh@@ -2,7 +2,7 @@ # Ensure housing namespace has TLS + Kafka secrets expected by Deployments:
+ #   - service-tls + dev-root-ca (strict TLS) via ensure-strict-tls-mtls-preflight.sh when missing/incomplete
+ #   - och-service-tls — alias of service-tls (same ca.crt / tls.crt / tls.key)
+-#   - och-kafka-ssl-secret — from kafka-ssl-secret or by running kafka-ssl-from-dev-root.sh when CA key exists
++#   - kafka-ssl-secret — from kafka-ssl-secret or by running kafka-ssl-from-dev-root.sh when CA key exists
+ #
+ # Called early from run-preflight-scale-and-all-suites.sh (3a0). Idempotent.
+ # Skip: PREFLIGHT_AUTO_ENSURE_CLUSTER_SECRETS=0 or SKIP_AUTO_CLUSTER_SECRETS=1
+@@ -14,8 +14,8 @@ cd "$REPO_ROOT"
+ 
+ # Never use generic NS= from the shell (other repos set NS=record-platform).
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
+-NS="$HOUSING_NS"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
++NS="$HOUSING_NS=record-platform"
+ CERTS_DIR="$REPO_ROOT/certs"
+ 
+ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+@@ -69,22 +69,22 @@ " "$NS" "$1" "$2" 2>/dev/null
+     }
+     if _kf_extract ca-cert.pem "$d/ca-cert.pem" && _kf_extract client.crt "$d/client.crt" && _kf_extract client.key "$d/client.key"; then
+-      kubectl -n "$NS" create secret generic och-kafka-ssl-secret \
++      kubectl -n "$NS" create secret generic kafka-ssl-secret \
+         --from-file=ca-cert.pem="$d/ca-cert.pem" \
+         --from-file=client.crt="$d/client.crt" \
+         --from-file=client.key="$d/client.key" \
+         --dry-run=client -o yaml | kubectl apply -f - --request-timeout=20s
+       rm -rf "$d"
+-      ok "och-kafka-ssl-secret synced from kafka-ssl-secret"
++      ok "kafka-ssl-secret synced from kafka-ssl-secret"
+       return 0
+     fi
+     rm -rf "$d"
+-    warn "kafka-ssl-secret missing ca-cert.pem / client.crt / client.key; cannot sync och-kafka-ssl-secret"
++    warn "kafka-ssl-secret missing ca-cert.pem / client.crt / client.key; cannot sync kafka-ssl-secret"
+   fi
+   if [[ -f "$CERTS_DIR/dev-root.pem" ]] && [[ -f "$CERTS_DIR/dev-root.key" ]] && [[ -x "$SCRIPT_DIR/kafka-ssl-from-dev-root.sh" ]]; then
+     KAFKA_SSL_NS="$NS" "$SCRIPT_DIR/kafka-ssl-from-dev-root.sh" && ok "Kafka SSL secrets (kafka + och) refreshed" || warn "kafka-ssl-from-dev-root.sh failed"
+   else
+-    warn "No kafka-ssl-secret / och-kafka-ssl-secret and no certs/dev-root.{pem,key} — run reissue (KAFKA_SSL=1) then: ./scripts/kafka-ssl-from-dev-root.sh"
++    warn "No kafka-ssl-secret / kafka-ssl-secret and no certs/dev-root.{pem,key} — run reissue (KAFKA_SSL=1) then: ./scripts/kafka-ssl-from-dev-root.sh"
+   fi
+ }
+ 
+@@ -99,7 +99,7 @@ 
+ if [[ "$need_strict" -eq 1 ]] && [[ -f "$SCRIPT_DIR/ensure-strict-tls-mtls-preflight.sh" ]]; then
+   chmod +x "$SCRIPT_DIR/ensure-strict-tls-mtls-preflight.sh" 2>/dev/null || true
+-  if FORCE_TLS_RESTART="${FORCE_TLS_RESTART:-0}" HOUSING_NS="$HOUSING_NS" "$SCRIPT_DIR/ensure-strict-tls-mtls-preflight.sh"; then
++  if FORCE_TLS_RESTART="${FORCE_TLS_RESTART:-0}" HOUSING_NS=record-platform="$HOUSING_NS=record-platform" "$SCRIPT_DIR/ensure-strict-tls-mtls-preflight.sh"; then
+     ok "Strict TLS/mTLS preflight provisioned missing secrets"
+   else
+     warn "ensure-strict-tls-mtls-preflight failed (install mkcert or add certs/*.pem); continuing with alias steps"
+
+--- a/scripts/ensure-ready-for-preflight.sh+++ b/scripts/ensure-ready-for-preflight.sh@@ -128,7 +128,7 @@   fi
+ fi
+ 
+-_KNS="${HOUSING_NS:-record-platform}"
++_KNS="${HOUSING_NS=record-platform:-record-platform}"
+ # --- 5. Ensure Kafka (in-cluster KRaft; Compose broker removed) ---
+ say "5. Ensuring Kafka (k8s $_KNS)..."
+ if command -v kubectl >/dev/null 2>&1 && kubectl get pod kafka-0 -n "$_KNS" &>/dev/null; then
+
+--- a/scripts/ensure-strict-tls-mtls-preflight.sh+++ b/scripts/ensure-strict-tls-mtls-preflight.sh@@ -11,8 +11,8 @@ cd "$REPO_ROOT"
+ 
+ # Housing namespace only — ignore stray NS= from other projects.
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
+-NS="$HOUSING_NS"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
++NS="$HOUSING_NS=record-platform"
+ NS_ING="${NS_ING:-ingress-nginx}"
+ CERTS_DIR="${REPO_ROOT}/certs"
+ SECRET_UPDATED=0
+
+--- a/scripts/export-kafka-ca-metric.sh+++ b/scripts/export-kafka-ca-metric.sh@@ -3,10 +3,10 @@ # Does not start an HTTP server — pipe to Pushgateway or redirect to a file if needed.
+ #
+ # Usage: ./scripts/export-kafka-ca-metric.sh
+-# Env: HOUSING_NS (default record-platform)
++# Env: HOUSING_NS=record-platform (default record-platform)
+ set -euo pipefail
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ command -v kubectl >/dev/null 2>&1 || { echo "kubectl required" >&2; exit 1; }
+ command -v openssl >/dev/null 2>&1 || { echo "openssl required" >&2; exit 1; }
+ 
+
+--- a/scripts/golden-snapshot-verify.sh+++ b/scripts/golden-snapshot-verify.sh@@ -9,14 +9,14 @@ #   GOLDEN_SNAPSHOT_CHAOS=1 ./scripts/golden-snapshot-verify.sh # destructive alignment suite + make chaos-suite-kafka
+ #   GOLDEN_SNAPSHOT_RESTART_ALL_DEPLOYMENTS=0 …                 # skip blanket deploy restart (after rebuild-all rollouts only)
+ #
+-# Env: HOUSING_NS, same as rebuild-all-housing-images-k3s.sh (IMAGE_TAG, SKIP_LOAD, DOCKER_DEFAULT_PLATFORM, …)
++# Env: HOUSING_NS=record-platform, same as rebuild-all-housing-images-k3s.sh (IMAGE_TAG, SKIP_LOAD, DOCKER_DEFAULT_PLATFORM, …)
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ cd "$REPO_ROOT"
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+ ok() { echo "✅ $*"; }
+
+--- a/scripts/k6/k6-smoke-gateway.js+++ b/scripts/k6/k6-smoke-gateway.js@@ -12,7 +12,7 @@ 
+ const BASE =
+   __ENV.BASE_URL ||
+-  "http://api-gateway.record-platform.svc.cluster.local:4020";
++  "http://api-gateway.record-platform.svc.cluster.localapi-gateway:4000";
+ 
+ export default function () {
+   const res = http.get(`${BASE}/healthz`);
+
+--- a/scripts/k8s-diagnose-restarts.sh+++ b/scripts/k8s-diagnose-restarts.sh@@ -3,11 +3,11 @@ # Usage:
+ #   ./scripts/k8s-diagnose-restarts.sh [namespace]
+ # Env:
+-#   HOUSING_NS — used when namespace arg omitted (default: record-platform)
++#   HOUSING_NS=record-platform — used when namespace arg omitted (default: record-platform)
+ #   K8S_DIAG_MIN_RESTARTS — pod included if sum(container restartCount) >= N (default: 1)
+ set -euo pipefail
+ 
+-NS="${1:-${HOUSING_NS:-record-platform}}"
++NS="${1:-${HOUSING_NS=record-platform:-record-platform}}"
+ MIN_R="${K8S_DIAG_MIN_RESTARTS:-1}"
+ 
+ command -v kubectl >/dev/null 2>&1 || { echo "kubectl required" >&2; exit 1; }
+
+--- a/scripts/k8s-rollout-och-ordered.sh+++ b/scripts/k8s-rollout-och-ordered.sh@@ -1,7 +1,7 @@ #!/usr/bin/env bash
+ # Roll out housing workloads in dependency order (reduces gateway→auth and Kafka-consumer races).
+ # Usage: ./scripts/k8s-rollout-och-ordered.sh
+-#   HOUSING_NS=record-platform  (default)
++#   HOUSING_NS=record-platform=record-platform  (default)
+ #   KUBECTL=kubectl  or use Colima via PATH shims
+ 
+ set -euo pipefail
+@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ export PATH="$SCRIPT_DIR/shims:/opt/homebrew/bin:/usr/local/bin:${PATH:-}"
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ KUBECTL=(kubectl --request-timeout=30s)
+ STATUS_TIMEOUT="${ROLLOUT_STATUS_TIMEOUT:-600s}"
+ 
+
+--- a/scripts/kafka-after-rollout-verify-brokers.sh+++ b/scripts/kafka-after-rollout-verify-brokers.sh@@ -4,13 +4,13 @@ # Also scans recent logs for SSL handshake / PKIX failures.
+ #
+ # Usage:
+-#   HOUSING_NS=record-platform KAFKA_BROKER_REPLICAS=3 ./scripts/kafka-after-rollout-verify-brokers.sh
++#   HOUSING_NS=record-platform=record-platform KAFKA_BROKER_REPLICAS=3 ./scripts/kafka-after-rollout-verify-brokers.sh
+ # Env:
+ #   KAFKA_TLS_GUARD_SKIP_LOG_SCAN=1 — skip log tail PKIX grep (faster)
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ REP="${KAFKA_BROKER_REPLICAS:-3}"
+ 
+ echo "▶ Post-rollout: broker Ready + no CrashLoopBackOff (ns=$NS replicas=$REP)…"
+@@ -33,5 +33,5 @@ chmod +x "$SCRIPT_DIR/kafka-tls-guard.sh" 2>/dev/null || true
+ echo "▶ Cross-broker truststore/keystore parity + PKIX log tail (kafka-tls-guard POST_ROLLOUT_ONLY)…"
+ KAFKA_TLS_GUARD_POST_ROLLOUT_ONLY=1 KAFKA_TLS_GUARD_SKIP_VERIFY=1 \
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" \
+   bash "$SCRIPT_DIR/kafka-tls-guard.sh"
+
+--- a/scripts/kafka-auto-heal-inter-broker-tls.sh+++ b/scripts/kafka-auto-heal-inter-broker-tls.sh@@ -3,14 +3,14 @@ # if verification fails or any broker is CrashLoopBackOff, delete all kafka-0..N-1 pods, wait Ready, re-verify.
+ #
+ # Usage:
+-#   HOUSING_NS=record-platform KAFKA_BROKER_REPLICAS=3 ./scripts/kafka-auto-heal-inter-broker-tls.sh
++#   HOUSING_NS=record-platform=record-platform KAFKA_BROKER_REPLICAS=3 ./scripts/kafka-auto-heal-inter-broker-tls.sh
+ # Env:
+ #   KAFKA_INTER_BROKER_TLS_HEAL=0 — no-op (exit 0)
+ #   KAFKA_INTER_BROKER_TLS_HEAL_MAX_DELETE_ROUNDS — max delete+wait cycles after failed verify (default 1)
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ REP="${KAFKA_BROKER_REPLICAS:-3}"
+ 
+ if [[ "${KAFKA_INTER_BROKER_TLS_HEAL:-1}" != "1" ]]; then
+@@ -26,7 +26,7 @@ chmod +x "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" 2>/dev/null || true
+ 
+ _run_verify() {
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh"
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh"
+ }
+ 
+ _any_crashloop() {
+
+--- a/scripts/kafka-clean-slate.sh+++ b/scripts/kafka-clean-slate.sh@@ -2,11 +2,11 @@ # Nuclear reset: StatefulSet + PVCs + Services (corrupted KRaft / cluster.id mismatch / stuck quorum).
+ # Destroys broker data — use only when onboarding is broken beyond repair.
+ #
+-# Env: HOUSING_NS (default record-platform)
++# Env: HOUSING_NS=record-platform (default record-platform)
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ echo "=== kafka-clean-slate (ns=$NS) — deletes broker StatefulSet and PVCs ==="
+ if [[ "${KAFKA_CLEAN_SLATE_CONFIRM:-}" != "YES" ]]; then
+
+--- a/scripts/kafka-onboarding-reset.sh+++ b/scripts/kafka-onboarding-reset.sh@@ -2,10 +2,10 @@ # Remove Kafka LoadBalancer Services + headless Service (and slices) so the next apply-kafka-kraft gets
+ # fresh MetalLB allocations and clean headless DNS. Use in dev-onboard before apply-kafka-kraft.
+ #
+-# Env: HOUSING_NS (default record-platform)
++# Env: HOUSING_NS=record-platform (default record-platform)
+ set -euo pipefail
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ echo "=== kafka-onboarding-reset (ns=$NS) ==="
+ echo "Deleting kafka-0/1/2-external LoadBalancers and headless kafka Service (recreated by apply-kafka-kraft)..."
+
+--- a/scripts/kafka-quorum-stable.sh+++ b/scripts/kafka-quorum-stable.sh@@ -3,14 +3,14 @@ # Absorbs transient election churn before app rollouts / edge checks.
+ #
+ # Env:
+-#   HOUSING_NS — default record-platform
++#   HOUSING_NS=record-platform — default record-platform
+ #   KAFKA_QUORUM_STABLE_WINDOW_SEC — default 30
+ #   KAFKA_QUORUM_STABLE_MAX_WAIT_SEC — default 600 (fail if still churning)
+ #   KAFKA_QUORUM_STABLE_POLL_SEC — default 5
+ #   KAFKA_QUORUM_STABLE_SKIP=1 — no-op success
+ set -euo pipefail
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ WIN="${KAFKA_QUORUM_STABLE_WINDOW_SEC:-30}"
+ MAX_WAIT="${KAFKA_QUORUM_STABLE_MAX_WAIT_SEC:-600}"
+ POLL="${KAFKA_QUORUM_STABLE_POLL_SEC:-5}"
+
+--- a/scripts/kafka-refresh-tls-from-lb.sh+++ b/scripts/kafka-refresh-tls-from-lb.sh@@ -1,10 +1,10 @@ #!/usr/bin/env bash
+-# Regenerate kafka-ssl-secret (and och-kafka-ssl-secret) with SANs that include current
++# Regenerate kafka-ssl-secret (and kafka-ssl-secret) with SANs that include current
+ # kafka-*-external LoadBalancer IPs **and** any IPv4 SANs already on the deployed / on-disk
+ # broker cert (union). Replacing SANs with only today's LB IPs can drop a still-advertised
+ # MetalLB IP after churn and break inter-broker / controller TLS → CrashLoopBackOff.
+ #
+-# Env: HOUSING_NS, KAFKA_BROKER_REPLICAS, KAFKA_SSL_* (see kafka-ssl-from-dev-root.sh)
++# Env: HOUSING_NS=record-platform, KAFKA_BROKER_REPLICAS, KAFKA_SSL_* (see kafka-ssl-from-dev-root.sh)
+ #   KAFKA_SSL_MERGE_EXTRA_IP_SANS — optional comma-separated IPv4s to union in (e.g. stale MetalLB IP
+ #   missing from both secret and disk PEM after a bad refresh; use until brokers advertise new IPs).
+ #   KAFKA_SSL_AUTO_METALLB_IPS=0 after merge (LB + historical IPs already in EXTRA).
+@@ -12,9 +12,9 @@ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ REP="${KAFKA_BROKER_REPLICAS:-3}"
+-export HOUSING_NS="$NS"
++export HOUSING_NS=record-platform="$NS"
+ export KAFKA_BROKER_REPLICAS="$REP"
+ 
+ echo "=== kafka-refresh-tls-from-lb (ns=$NS replicas=$REP) ==="
+
+--- a/scripts/kafka-rolling-restart.sh+++ b/scripts/kafka-rolling-restart.sh@@ -3,13 +3,13 @@ # Before each delete: optional app rollout pause, quorum gate (metadata reports a leader).
+ #
+ # Env:
+-#   HOUSING_NS, KAFKA_BROKER_REPLICAS (default 3)
++#   HOUSING_NS=record-platform, KAFKA_BROKER_REPLICAS (default 3)
+ #   KAFKA_ROLLING_PAUSE_APPS=1 — rollout pause all Deployments in ns during restart (reduces client storm)
+ #   KAFKA_ROLLING_SKIP_VERIFY_STEPS=1 — skip verify-kafka-cluster between pods (faster; less safe)
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ R="${KAFKA_BROKER_REPLICAS:-3}"
+ 
+ # shellcheck source=/dev/null
+@@ -42,7 +42,7 @@   kubectl wait --for=condition=Ready "pod/kafka-$i" -n "$NS" --timeout=300s
+   if [[ "${KAFKA_ROLLING_SKIP_VERIFY_STEPS:-0}" != "1" ]]; then
+     echo "▶ verify-kafka-cluster after kafka-$i"
+-    HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$R" bash "$SCRIPT_DIR/verify-kafka-cluster.sh" "$NS" "$R"
++    HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$R" bash "$SCRIPT_DIR/verify-kafka-cluster.sh" "$NS" "$R"
+   fi
+ done
+ 
+
+--- a/scripts/kafka-runtime-sync.sh+++ b/scripts/kafka-runtime-sync.sh@@ -3,7 +3,7 @@ #
+ # Usage:
+ #   ./scripts/kafka-runtime-sync.sh [--check-only|--remediate] [--quiet] [--skip-tls-sans] [namespace] [replicas]
+-# Env: HOUSING_NS, KAFKA_BROKER_REPLICAS, DRIFT_WRITE_PROM_FILE (forwarded to check-kafka-config-drift)
++# Env: HOUSING_NS=record-platform, KAFKA_BROKER_REPLICAS, DRIFT_WRITE_PROM_FILE (forwarded to check-kafka-config-drift)
+ #
+ # --check-only (default): exit 0 only if no advertised drift and (unless --skip-tls-sans) TLS SANs match LB IPs.
+ # --remediate:          refresh TLS from LB, rollout restart kafka StatefulSet, run verify-kafka-cluster.sh
+@@ -41,11 +41,11 @@   esac
+ done
+ 
+-NS="${POS_NS:-${HOUSING_NS:-record-platform}}"
++NS="${POS_NS:-${HOUSING_NS=record-platform:-record-platform}}"
+ REP="${POS_REP:-${KAFKA_BROKER_REPLICAS:-3}}"
+ 
+ _run_advert_check() {
+-  export HOUSING_NS="$NS"
++  export HOUSING_NS=record-platform="$NS"
+   export KAFKA_BROKER_REPLICAS="$REP"
+   if [[ "$QUIET" == "1" ]]; then
+     bash "$SCRIPT_DIR/check-kafka-config-drift.sh" "$NS" "$REP" >/dev/null 2>&1
+@@ -55,7 +55,7 @@ }
+ 
+ _run_tls_check() {
+-  export HOUSING_NS="$NS"
++  export HOUSING_NS=record-platform="$NS"
+   export KAFKA_BROKER_REPLICAS="$REP"
+   if [[ "$QUIET" == "1" ]]; then
+     bash "$SCRIPT_DIR/verify-kafka-tls-sans.sh" "$NS" "$REP" >/dev/null 2>&1
+@@ -100,7 +100,7 @@ # --- remediate ---
+ echo "=== kafka-runtime-sync --remediate (ns=$NS replicas=$REP) ==="
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+-HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-refresh-tls-from-lb.sh"
++HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-refresh-tls-from-lb.sh"
+ 
+ echo "▶ Verifying broker JKS before Kafka rollout (PrivateKeyEntry + serverAuth + clientAuth EKU)…"
+ chmod +x "$SCRIPT_DIR/verify-kafka-broker-keystore-jks.sh" 2>/dev/null || true
+@@ -118,13 +118,13 @@ kubectl rollout status statefulset/kafka -n "$NS" --timeout="$_rollout_to"
+ 
+ chmod +x "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" 2>/dev/null || true
+-HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" || {
++HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" || {
+   echo "❌ Post-rollout broker TLS parity / Ready check failed (see kafka-tls-guard / PKIX logs above)" >&2
+   exit 1
+ }
+ 
+ echo "▶ Post-rollout drift / SAN check…"
+-if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only "$NS" "$REP"; then
++if ! HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only "$NS" "$REP"; then
+   echo "❌ kafka-runtime-sync --check-only failed after remediate rollout" >&2
+   exit 1
+ fi
+@@ -138,7 +138,7 @@   VERIFY_KAFKA_SKIP_QUORUM_GATE=0 \
+   VERIFY_KAFKA_SKIP_LEADERSHIP_CHURN_GATE=0 \
+   VERIFY_KAFKA_SKIP_BROKER_API_GATE=0 \
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" \
+   bash "$SCRIPT_DIR/verify-kafka-cluster.sh" "$NS" "$REP" || {
+   echo "❌ verify-kafka-cluster failed after remediate" >&2
+   exit 1
+
+--- a/scripts/kafka-ssl-from-dev-root.sh+++ b/scripts/kafka-ssl-from-dev-root.sh@@ -190,19 +190,19 @@   fi
+ fi
+ 
+-say "4b. Creating och-kafka-ssl-secret (same client material; Deployments mount och-kafka-ssl-secret)…"
+-_och_kafka_yaml="${TMP}/och-kafka-ssl-secret.yaml"
+-kubectl create secret generic och-kafka-ssl-secret -n "$NS" \
++say "4b. Creating kafka-ssl-secret (same client material; Deployments mount kafka-ssl-secret)…"
++_och_kafka_yaml="${TMP}/kafka-ssl-secret.yaml"
++kubectl create secret generic kafka-ssl-secret -n "$NS" \
+   --from-file=ca-cert.pem="$OUT/ca-cert.pem" \
+   --from-file=client.crt="$OUT/client.crt" \
+   --from-file=client.key="$OUT/client.key" \
+   --dry-run=client -o yaml >"$_och_kafka_yaml"
+ if kubectl apply -f "$_och_kafka_yaml" --request-timeout=20s 2>/dev/null; then
+-  ok "och-kafka-ssl-secret created/updated"
++  ok "kafka-ssl-secret created/updated"
+ elif [[ "$ctx" == *"colima"* ]] && command -v colima >/dev/null 2>&1 && [[ -f "$_och_kafka_yaml" ]]; then
+-  colima ssh -- env KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f "$_och_kafka_yaml" --request-timeout=20s 2>/dev/null && ok "och-kafka-ssl-secret (via colima ssh)" || warn "och-kafka-ssl-secret apply failed"
++  colima ssh -- env KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f "$_och_kafka_yaml" --request-timeout=20s 2>/dev/null && ok "kafka-ssl-secret (via colima ssh)" || warn "kafka-ssl-secret apply failed"
+ else
+-  warn "och-kafka-ssl-secret apply failed"
++  warn "kafka-ssl-secret apply failed"
+ fi
+ 
+ say "=== Kafka SSL (dev-root-ca) done ==="
+
+--- a/scripts/kafka-sync-metallb.sh+++ b/scripts/kafka-sync-metallb.sh@@ -5,11 +5,11 @@ # If there is no drift (LB ↔ advertised + TLS SAN vs LB), skips TLS regen and rollout and only runs
+ # verify-kafka-cluster.sh. Force full remediation: KAFKA_SYNC_METALLB_FORCE=1 or ./scripts/kafka-sync-metallb.sh --force
+ #
+-# Env: HOUSING_NS, KAFKA_BROKER_REPLICAS, KAFKA_SSL_* (see scripts/kafka-ssl-from-dev-root.sh)
++# Env: HOUSING_NS=record-platform, KAFKA_BROKER_REPLICAS, KAFKA_SSL_* (see scripts/kafka-ssl-from-dev-root.sh)
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ REP="${KAFKA_BROKER_REPLICAS:-3}"
+ FORCE="${KAFKA_SYNC_METALLB_FORCE:-0}"
+ 
+@@ -21,10 +21,10 @@ done
+ 
+ chmod +x "$SCRIPT_DIR/ensure-dev-root-ca.sh" "$SCRIPT_DIR/kafka-runtime-sync.sh" "$SCRIPT_DIR/kafka-refresh-tls-from-lb.sh" "$SCRIPT_DIR/verify-kafka-cluster.sh" "$SCRIPT_DIR/kafka-auto-heal-inter-broker-tls.sh" 2>/dev/null || true
+-HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-auto-heal-inter-broker-tls.sh" || exit 1
++HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-auto-heal-inter-broker-tls.sh" || exit 1
+ 
+ if [[ "$FORCE" != "1" ]]; then
+-  if HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only --quiet "$NS" "$REP"; then
++  if HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only --quiet "$NS" "$REP"; then
+     echo "✅ kafka-sync-metallb: no runtime drift — skipping TLS regen and rollout (ns=$NS)."
+     VERIFY_KAFKA_HEALTH_ONLY=0 \
+       VERIFY_KAFKA_SKIP_META_IDENTITY=0 \
+@@ -34,7 +34,7 @@       VERIFY_KAFKA_SKIP_QUORUM_GATE=0 \
+       VERIFY_KAFKA_SKIP_LEADERSHIP_CHURN_GATE=0 \
+       VERIFY_KAFKA_SKIP_BROKER_API_GATE=0 \
+-      HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \
++      HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" \
+       bash "$SCRIPT_DIR/verify-kafka-cluster.sh" "$NS" "$REP"
+     echo "✅ kafka-sync-metallb complete (verify only)."
+     exit 0
+@@ -46,7 +46,7 @@ 
+ echo "=== kafka-sync-metallb (ns=$NS) ==="
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+-HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-refresh-tls-from-lb.sh"
++HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-refresh-tls-from-lb.sh"
+ 
+ echo "▶ Verifying broker JKS before Kafka rollout…"
+ chmod +x "$SCRIPT_DIR/verify-kafka-broker-keystore-jks.sh" 2>/dev/null || true
+@@ -60,7 +60,7 @@ kubectl rollout status statefulset/kafka -n "$NS" --timeout="${KAFKA_ROLLOUT_TIMEOUT:-600s}"
+ 
+ chmod +x "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" 2>/dev/null || true
+-HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" || exit 1
++HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" || exit 1
+ 
+ VERIFY_KAFKA_HEALTH_ONLY=0 \
+   VERIFY_KAFKA_SKIP_META_IDENTITY=0 \
+@@ -70,7 +70,7 @@   VERIFY_KAFKA_SKIP_QUORUM_GATE=0 \
+   VERIFY_KAFKA_SKIP_LEADERSHIP_CHURN_GATE=0 \
+   VERIFY_KAFKA_SKIP_BROKER_API_GATE=0 \
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" \
+   bash "$SCRIPT_DIR/verify-kafka-cluster.sh" "$NS" "$REP"
+ 
+ echo "✅ kafka-sync-metallb complete"
+
+--- a/scripts/kafka-tls-guard.sh+++ b/scripts/kafka-tls-guard.sh@@ -5,7 +5,7 @@ # Broker SAN contract (DNS + MetalLB IPs): scripts/lib/kafka-broker-sans.sh — consumed by that script and verify-kafka-tls-sans.sh.
+ #
+ # Env:
+-#   HOUSING_NS — default record-platform
++#   HOUSING_NS=record-platform — default record-platform
+ #   KAFKA_BROKER_REPLICAS — default 3
+ #   KAFKA_TLS_GUARD_SKIP_VERIFY — set 1 to skip make verify-kafka-cluster at end
+ #   KAFKA_TLS_GUARD_SKIP_LOG_SCAN — set 1 to skip recent SSL handshake failure grep
+@@ -15,7 +15,7 @@ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ R="${KAFKA_BROKER_REPLICAS:-3}"
+ 
+ command -v kubectl >/dev/null 2>&1 || { echo "❌ kubectl required"; exit 1; }
+@@ -213,17 +213,17 @@ kubectl get secret kafka-ssl-secret -n "$NS" -o jsonpath='{.data.ca-cert\.pem}' --request-timeout=25s | base64 -d >"$TMP/broker-ca.pem"
+ BROKER_FP="$(_ca_fp_from_pem "$TMP/broker-ca.pem")"
+ 
+-say "6) och-kafka-ssl-secret CA vs kafka-ssl-secret"
+-if kubectl get secret och-kafka-ssl-secret -n "$NS" --request-timeout=15s >/dev/null 2>&1; then
+-  kubectl get secret och-kafka-ssl-secret -n "$NS" -o jsonpath='{.data.ca-cert\.pem}' --request-timeout=25s | base64 -d >"$TMP/service-ca.pem"
++say "6) kafka-ssl-secret CA vs kafka-ssl-secret"
++if kubectl get secret kafka-ssl-secret -n "$NS" --request-timeout=15s >/dev/null 2>&1; then
++  kubectl get secret kafka-ssl-secret -n "$NS" -o jsonpath='{.data.ca-cert\.pem}' --request-timeout=25s | base64 -d >"$TMP/service-ca.pem"
+   SERVICE_FP="$(_ca_fp_from_pem "$TMP/service-ca.pem")"
+   if [[ -z "$BROKER_FP" || -z "$SERVICE_FP" || "$BROKER_FP" != "$SERVICE_FP" ]]; then
+-    bad "CA fingerprint mismatch kafka-ssl-secret vs och-kafka-ssl-secret (run: make kafka-refresh-tls-from-lb)"
++    bad "CA fingerprint mismatch kafka-ssl-secret vs kafka-ssl-secret (run: make kafka-refresh-tls-from-lb)"
+     exit 1
+   fi
+   ok "Service client secret CA matches broker secret"
+ else
+-  echo "   ℹ️  och-kafka-ssl-secret absent — skipped"
++  echo "   ℹ️  kafka-ssl-secret absent — skipped"
+ fi
+ 
+ _ann="$(kubectl get secret kafka-ssl-secret -n "$NS" -o go-template='{{index .metadata.annotations "och.dev/ca-fingerprint-sha256"}}' 2>/dev/null | tr -d '\r' || true)"
+
+--- a/scripts/kafka-tls-rotate-atomic.sh+++ b/scripts/kafka-tls-rotate-atomic.sh@@ -2,12 +2,12 @@ # Atomic Kafka TLS refresh: no broker runs while kafka-ssl-secret is replaced (avoids JKS/truststore drift across replicas).
+ # Uses existing dev-root CA + kafka-refresh-tls-from-lb (MetalLB SANs). Does NOT create a new CA.
+ #
+-# Env: HOUSING_NS, KAFKA_BROKER_REPLICAS (default 3), KAFKA_TLS_ROTATE_SKIP_GUARD=1 to skip kafka-tls-guard at end
++# Env: HOUSING_NS=record-platform, KAFKA_BROKER_REPLICAS (default 3), KAFKA_TLS_ROTATE_SKIP_GUARD=1 to skip kafka-tls-guard at end
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ R="${KAFKA_BROKER_REPLICAS:-3}"
+ 
+ cd "$REPO_ROOT"
+@@ -27,7 +27,7 @@   kubectl wait --for=delete "pod/kafka-$i" -n "$NS" --timeout=300s 2>/dev/null || true
+ done
+ 
+-echo "▶ Regenerate kafka-ssl-secret + och-kafka-ssl-secret (full JKS + PEM)"
++echo "▶ Regenerate kafka-ssl-secret + kafka-ssl-secret (full JKS + PEM)"
+ bash "$SCRIPT_DIR/kafka-refresh-tls-from-lb.sh"
+ 
+ echo "▶ Scale Kafka back to $R"
+
+--- a/scripts/lib/edge-test-url.sh+++ b/scripts/lib/edge-test-url.sh@@ -1,5 +1,5 @@ #!/usr/bin/env bash
+-# Shared helpers: edge-only E2E / k6 (https://record.local), no port-forward / :4020.
++# Shared helpers: edge-only E2E / k6 (https://record.local), no port-forward / api-gateway:4000.
+ # shellcheck shell=bash
+ 
+ EDGE_TEST_DEFAULT_BASE="https://record.local"
+@@ -12,8 +12,8 @@     printf '%s\n' "$EDGE_TEST_DEFAULT_BASE"
+     return 0
+   fi
+-  if [[ "$raw" =~ ^http://127\.0\.0\.1:4020 ]] || [[ "$raw" =~ ^http://localhost:4020 ]]; then
+-    echo "⚠️  Ignoring legacy E2E_API_BASE=$raw (port-forward / :4020 removed). Using $EDGE_TEST_DEFAULT_BASE" >&2
++  if [[ "$raw" =~ ^http://127\.0\.0\.1api-gateway:4000 ]] || [[ "$raw" =~ ^http://localhostapi-gateway:4000 ]]; then
++    echo "⚠️  Ignoring legacy E2E_API_BASE=$raw (port-forward / api-gateway:4000 removed). Using $EDGE_TEST_DEFAULT_BASE" >&2
+     printf '%s\n' "$EDGE_TEST_DEFAULT_BASE"
+     return 0
+   fi
+@@ -32,7 +32,7 @@     printf '%s\n' "$EDGE_TEST_DEFAULT_BASE"
+     return 0
+   fi
+-  if [[ "$raw" =~ ^http://127\.0\.0\.1:4020 ]] || [[ "$raw" =~ ^http://localhost:4020 ]]; then
++  if [[ "$raw" =~ ^http://127\.0\.0\.1api-gateway:4000 ]] || [[ "$raw" =~ ^http://localhostapi-gateway:4000 ]]; then
+     echo "⚠️  Ignoring legacy BASE_URL=$raw. Using $EDGE_TEST_DEFAULT_BASE" >&2
+     printf '%s\n' "$EDGE_TEST_DEFAULT_BASE"
+     return 0
+@@ -50,7 +50,7 @@ 
+ # Best-effort: first LoadBalancer IP from common ingress / caddy services (housing cluster).
+ edge_hint_lb_ip_for_och() {
+-  local ns="${HOUSING_NS:-record-platform}"
++  local ns="${HOUSING_NS=record-platform:-record-platform}"
+   local ip=""
+   if command -v kubectl >/dev/null 2>&1; then
+     ip="$(kubectl get svc -n ingress-nginx -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.status.loadBalancer.ingress[0].ip}{"\n"}{end}' 2>/dev/null | head -1 | tr -d '\r')"
+
+--- a/scripts/lib/grpc-utils.sh+++ b/scripts/lib/grpc-utils.sh@@ -2,10 +2,10 @@ # OCH gRPC harness helpers: topology-aware TLS detection and app deployment listing.
+ # Source from bash scripts:  source "$SCRIPT_DIR/lib/grpc-utils.sh"
+ #
+-# Env: HOUSING_NS (default record-platform)
++# Env: HOUSING_NS=record-platform (default record-platform)
+ 
+ och_housing_ns() {
+-  echo "${HOUSING_NS:-record-platform}"
++  echo "${HOUSING_NS=record-platform:-record-platform}"
+ }
+ 
+ # Deployments that are OCH app workloads (gRPC/HTTP microservices), excluding infra sidecars.
+
+--- a/scripts/lib/kafka-kraft-quorum-ok.sh+++ b/scripts/lib/kafka-kraft-quorum-ok.sh@@ -5,7 +5,7 @@ # Intentionally no set -euo: this file is sourced by other scripts.
+ 
+ och_kafka_kraft_quorum_ok() {
+-  local NS="${1:-${HOUSING_NS:-record-platform}}"
++  local NS="${1:-${HOUSING_NS=record-platform:-record-platform}}"
+   local EXEC_TO="${KAFKA_CLUSTER_EXEC_TIMEOUT:-45}"
+   local _qout
+   if ! kubectl get pod kafka-0 -n "$NS" --request-timeout=20s >/dev/null 2>&1; then
+
+--- a/scripts/load-caddy-image-colima.sh+++ b/scripts/load-caddy-image-colima.sh@@ -1,6 +1,6 @@ #!/usr/bin/env bash
+ # Build caddy-with-tcpdump:dev and load into Colima so caddy-h3 pods can pull it (fixes ImagePullBackOff).
+-# Strict TLS/mTLS: Caddy uses off-campus-housing-local-tls + dev-root-ca in ingress-nginx (from strict-tls-bootstrap).
++# Strict TLS/mTLS: Caddy uses record-platform-local-tls + dev-root-ca in ingress-nginx (from strict-tls-bootstrap).
+ #
+ # Usage: ./scripts/load-caddy-image-colima.sh
+ # From repo root. Requires: docker, colima running.
+
+--- a/scripts/load/k6-edge-load-diagnostics.sh+++ b/scripts/load/k6-edge-load-diagnostics.sh@@ -8,12 +8,12 @@ #   k6_diag_kubectl_snapshots "$outdir" "tag"   # needs kubectl + NS
+ #
+ # Env:
+-#   HOUSING_NS — default record-platform
++#   HOUSING_NS=record-platform — default record-platform
+ #   REPO_ROOT  — repo root for grep of infra manifests
+ #
+ # Note: safe to `source` (no set -e — would leak into caller).
+ 
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ k6_diag_repo_snippets() {
+   local f="${1:?output file}"
+@@ -42,13 +42,13 @@     return 0
+   }
+   {
+-    echo "=== $tag @ $(date -u +%Y-%m-%dT%H:%M:%SZ) ns=$HOUSING_NS ==="
++    echo "=== $tag @ $(date -u +%Y-%m-%dT%H:%M:%SZ) ns=$HOUSING_NS=record-platform ==="
+     echo "--- api-gateway container app: ulimit -n ---"
+-    kubectl exec -n "$HOUSING_NS" deploy/api-gateway -c app -- sh -c 'ulimit -n' 2>/dev/null || echo "(exec failed)"
++    kubectl exec -n "$HOUSING_NS=record-platform" deploy/api-gateway -c app -- sh -c 'ulimit -n' 2>/dev/null || echo "(exec failed)"
+     echo "--- somaxconn ---"
+-    _gw_pod="$(kubectl get pods -n "$HOUSING_NS" -l app=api-gateway -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
++    _gw_pod="$(kubectl get pods -n "$HOUSING_NS=record-platform" -l app=api-gateway -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+     if [[ -n "$_gw_pod" ]]; then
+-      kubectl exec -n "$HOUSING_NS" "$_gw_pod" -c app -- sh -c 'cat /proc/sys/net/core/somaxconn 2>/dev/null || true' 2>/dev/null || true
++      kubectl exec -n "$HOUSING_NS=record-platform" "$_gw_pod" -c app -- sh -c 'cat /proc/sys/net/core/somaxconn 2>/dev/null || true' 2>/dev/null || true
+     fi
+   } | tee "$outdir/edge-ulimit-$tag.txt"
+ }
+@@ -64,9 +64,9 @@ 
+   k6_diag_gateway_ulimit_only "$outdir" "$tag"
+ 
+-  kubectl logs -n "$HOUSING_NS" deploy/api-gateway --tail=250 >"$outdir/api-gateway-$tag.log" 2>&1 || true
++  kubectl logs -n "$HOUSING_NS=record-platform" deploy/api-gateway --tail=250 >"$outdir/api-gateway-$tag.log" 2>&1 || true
+ 
+-  kubectl logs -n "$HOUSING_NS" deploy/haproxy --tail=200 >"$outdir/haproxy-${tag}-${HOUSING_NS}.log" 2>&1 || true
++  kubectl logs -n "$HOUSING_NS=record-platform" deploy/haproxy --tail=200 >"$outdir/haproxy-${tag}-${HOUSING_NS=record-platform}.log" 2>&1 || true
+ 
+   for _cns in ingress-nginx record-platform; do
+     kubectl logs -n "$_cns" deploy/caddy-h3 --tail=200 >"$outdir/caddy-${tag}-${_cns}.log" 2>&1 || true
+
+--- a/scripts/load/run-k6-listings-concurrency-instrumented.sh+++ b/scripts/load/run-k6-listings-concurrency-instrumented.sh@@ -12,7 +12,7 @@ # shellcheck source=k6-edge-load-diagnostics.sh
+ source "$SCRIPT_DIR/k6-edge-load-diagnostics.sh"
+ 
+-export HOUSING_NS="${HOUSING_NS:-record-platform}"
++export HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
+ TS="$(date +%Y%m%d-%H%M%S)"
+ OUT="${K6_DIAG_OUT:-$REPO_ROOT/bench_logs/k6-listings-diag-$TS}"
+ mkdir -p "$OUT"
+
+--- a/scripts/probe-kafka-kraft-listeners.sh+++ b/scripts/probe-kafka-kraft-listeners.sh@@ -1,8 +1,8 @@ #!/usr/bin/env bash
+ # When Kafka pods are Running, verify controller port 9095 is listening and TLS answers locally.
+-# Usage: HOUSING_NS=record-platform ./scripts/probe-kafka-kraft-listeners.sh [kafka-0|kafka-1|kafka-2]
++# Usage: HOUSING_NS=record-platform=record-platform ./scripts/probe-kafka-kraft-listeners.sh [kafka-0|kafka-1|kafka-2]
+ set -euo pipefail
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ POD="${1:-kafka-1}"
+ 
+ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+
+--- a/scripts/rebuild-housing-colima.sh+++ b/scripts/rebuild-housing-colima.sh@@ -19,7 +19,7 @@ #   SKIP_ROLLOUT=1           load images but no kubectl restart
+ #   WAIT_ROLLOUT=1           wait rollout status after restart (default 1)
+ #   ROLLOUT_TIMEOUT=180s     rollout status timeout per deployment
+-#   HOUSING_NS               default record-platform
++#   HOUSING_NS=record-platform               default record-platform
+ #   DOCKER_DEFAULT_PLATFORM  unset = native (Colima ARM); linux/amd64 for x86-only targets
+ set -euo pipefail
+ 
+@@ -27,7 +27,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ cd "$REPO_ROOT"
+ 
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
+ IMAGE_TAG="${IMAGE_TAG:-dev}"
+ BACKEND_SERVICES="${SERVICES:-listings-service}"
+ BACKEND_SERVICES="${BACKEND_SERVICES//,/ }"
+@@ -125,25 +125,25 @@   warn "Current kubectl context is '$ctx' (expected colima for this script). Continuing anyway."
+ fi
+ 
+-say "Replacing webapp pod(s) and rolling backend services in ${HOUSING_NS}..."
+-kubectl -n "$HOUSING_NS" delete pod -l app=webapp --grace-period=0 --force 2>/dev/null || true
+-kubectl -n "$HOUSING_NS" rollout restart deployment/webapp --request-timeout=60s
++say "Replacing webapp pod(s) and rolling backend services in ${HOUSING_NS=record-platform}..."
++kubectl -n "$HOUSING_NS=record-platform" delete pod -l app=webapp --grace-period=0 --force 2>/dev/null || true
++kubectl -n "$HOUSING_NS=record-platform" rollout restart deployment/webapp --request-timeout=60s
+ ok "rollout restart deploy/webapp"
+ for s in $BACKEND_SERVICES; do
+-  if kubectl -n "$HOUSING_NS" get deploy "$s" -o name &>/dev/null; then
+-    kubectl -n "$HOUSING_NS" rollout restart "deployment/$s" --request-timeout=60s
++  if kubectl -n "$HOUSING_NS=record-platform" get deploy "$s" -o name &>/dev/null; then
++    kubectl -n "$HOUSING_NS=record-platform" rollout restart "deployment/$s" --request-timeout=60s
+     ok "rollout restart deploy/$s"
+   else
+-    warn "No Deployment $s in $HOUSING_NS (skip rollout restart)"
++    warn "No Deployment $s in $HOUSING_NS=record-platform (skip rollout restart)"
+   fi
+ done
+ 
+ if [[ "$WAIT_ROLLOUT" == "1" ]]; then
+-  say "Wait: kubectl rollout status deployment/webapp -n ${HOUSING_NS} --timeout=${ROLLOUT_TIMEOUT}"
+-  kubectl -n "$HOUSING_NS" rollout status deployment/webapp --timeout="$ROLLOUT_TIMEOUT" || true
++  say "Wait: kubectl rollout status deployment/webapp -n ${HOUSING_NS=record-platform} --timeout=${ROLLOUT_TIMEOUT}"
++  kubectl -n "$HOUSING_NS=record-platform" rollout status deployment/webapp --timeout="$ROLLOUT_TIMEOUT" || true
+   for s in $BACKEND_SERVICES; do
+-    kubectl -n "$HOUSING_NS" get deploy "$s" -o name &>/dev/null || continue
+-    kubectl -n "$HOUSING_NS" rollout status "deployment/$s" --timeout="$ROLLOUT_TIMEOUT" || true
++    kubectl -n "$HOUSING_NS=record-platform" get deploy "$s" -o name &>/dev/null || continue
++    kubectl -n "$HOUSING_NS=record-platform" rollout status "deployment/$s" --timeout="$ROLLOUT_TIMEOUT" || true
+   done
+ fi
+ 
+
+--- a/scripts/rebuild-och-images-and-rollout.sh+++ b/scripts/rebuild-och-images-and-rollout.sh@@ -17,7 +17,7 @@ # Env:
+ #   SERVICES   — space-separated (default: api-gateway media-service)
+ #   IMAGE_TAG  — default dev
+-#   HOUSING_NS — default record-platform
++#   HOUSING_NS=record-platform — default record-platform
+ #   SKIP_LOAD  — passed to build-housing-images-k3s (1 = do not colima docker load)
+ #   DOCKER_DEFAULT_PLATFORM — unset = native (Colima ARM); use linux/amd64 for x86-only
+ #   ROLLOUT    — default 1; set 0 to skip kubectl rollout restart
+@@ -31,7 +31,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ cd "$REPO_ROOT"
+ 
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
+ SERVICES="${SERVICES:-api-gateway media-service}"
+ # Allow SERVICES=api-gateway,listings-service (commas → spaces)
+ SERVICES="${SERVICES//,/ }"
+@@ -61,11 +61,11 @@ 
+ if [[ "${APPLY_APP_CONFIG:-0}" == "1" ]] && [[ -f "$REPO_ROOT/infra/k8s/base/config/app-config.yaml" ]]; then
+   say "Applying ConfigMap app-config (KAFKA_BROKER three-broker bootstrap, etc.)"
+-  kubectl apply -f "$REPO_ROOT/infra/k8s/base/config/app-config.yaml" -n "$HOUSING_NS"
++  kubectl apply -f "$REPO_ROOT/infra/k8s/base/config/app-config.yaml" -n "$HOUSING_NS=record-platform"
+   ok "app-config applied"
+ fi
+ 
+-say "Rollout restart in namespace $HOUSING_NS"
++say "Rollout restart in namespace $HOUSING_NS=record-platform"
+ 
+ # transport-watchdog is a container inside deploy/api-gateway, not its own Deployment.
+ deploy_for_service() {
+@@ -90,24 +90,24 @@ rollout_targets="$(printf '%s\n' "$rollout_targets" | sed '/^$/d' | sort -u)"
+ 
+ for s in $rollout_targets; do
+-  if kubectl -n "$HOUSING_NS" get deploy "$s" -o name &>/dev/null; then
+-    kubectl -n "$HOUSING_NS" rollout restart "deploy/$s" --request-timeout=30s
++  if kubectl -n "$HOUSING_NS=record-platform" get deploy "$s" -o name &>/dev/null; then
++    kubectl -n "$HOUSING_NS=record-platform" rollout restart "deploy/$s" --request-timeout=30s
+     ok "rollout restart deploy/$s"
+     if [[ "$WAIT_ROLLOUT" == "1" ]]; then
+-      kubectl -n "$HOUSING_NS" rollout status "deploy/$s" --timeout="$ROLLOUT_TIMEOUT" || warn "rollout status timeout for deploy/$s"
++      kubectl -n "$HOUSING_NS=record-platform" rollout status "deploy/$s" --timeout="$ROLLOUT_TIMEOUT" || warn "rollout status timeout for deploy/$s"
+     fi
+     if [[ -n "${SCALE_DEPLOY_REPLICAS:-}" ]]; then
+-      kubectl -n "$HOUSING_NS" scale "deploy/$s" --replicas="$SCALE_DEPLOY_REPLICAS"
++      kubectl -n "$HOUSING_NS=record-platform" scale "deploy/$s" --replicas="$SCALE_DEPLOY_REPLICAS"
+       ok "scale deploy/$s --replicas=$SCALE_DEPLOY_REPLICAS"
+       if [[ "$WAIT_ROLLOUT" == "1" ]]; then
+-        kubectl -n "$HOUSING_NS" rollout status "deploy/$s" --timeout="$ROLLOUT_TIMEOUT" || warn "rollout status after scale for deploy/$s"
++        kubectl -n "$HOUSING_NS=record-platform" rollout status "deploy/$s" --timeout="$ROLLOUT_TIMEOUT" || warn "rollout status after scale for deploy/$s"
+       fi
+     fi
+   else
+-    warn "No Deployment $s in $HOUSING_NS (skip)"
++    warn "No Deployment $s in $HOUSING_NS=record-platform (skip)"
+   fi
+ done
+ 
+ if [[ "$WAIT_ROLLOUT" != "1" ]]; then
+-  say "Wait (manual): kubectl rollout status deploy/<name> -n $HOUSING_NS --timeout=$ROLLOUT_TIMEOUT"
++  say "Wait (manual): kubectl rollout status deploy/<name> -n $HOUSING_NS=record-platform --timeout=$ROLLOUT_TIMEOUT"
+ fi
+
+--- a/scripts/record-platform-tls-three-stage-verify.sh+++ b/scripts/record-platform-tls-three-stage-verify.sh@@ -11,20 +11,20 @@ # Usage (repo root):
+ #   ./scripts/record-platform-tls-three-stage-verify.sh
+ #   SKIP_STAGE1=1 SKIP_STAGE3=1 ./scripts/record-platform-tls-three-stage-verify.sh
+-#   HOUSING_NS=record-platform KAFKA_SSL_EXTRA_IP_SANS=1.2.3.4,5.6.7.8 ./scripts/record-platform-tls-three-stage-verify.sh
++#   HOUSING_NS=record-platform=record-platform KAFKA_SSL_EXTRA_IP_SANS=1.2.3.4,5.6.7.8 ./scripts/record-platform-tls-three-stage-verify.sh
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ cd "$REPO_ROOT"
+ 
+-export HOUSING_NS="${HOUSING_NS:-record-platform}"
++export HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+ ok() { echo "✅ $*"; }
+ warn() { echo "⚠️  $*"; }
+ 
+-say "=== record-platform-tls-three-stage-verify (HOUSING_NS=$HOUSING_NS) ==="
++say "=== record-platform-tls-three-stage-verify (HOUSING_NS=record-platform=$HOUSING_NS=record-platform) ==="
+ 
+ if [[ "${SKIP_STAGE1:-0}" != "1" ]]; then
+   say "Stage 1 — dev CA + edge leaf (certs/)"
+@@ -47,35 +47,35 @@ 
+ if [[ "${SKIP_STAGE3:-0}" != "1" ]]; then
+   say "Stage 3 — service mTLS + TLS secrets into cluster"
+-  if command -v kubectl >/dev/null 2>&1 && kubectl get ns "$HOUSING_NS" --request-timeout=15s >/dev/null 2>&1; then
++  if command -v kubectl >/dev/null 2>&1 && kubectl get ns "$HOUSING_NS=record-platform" --request-timeout=15s >/dev/null 2>&1; then
+     chmod +x "$SCRIPT_DIR/reissue-ca-and-leaf-load-all-services.sh" 2>/dev/null || true
+-    HOUSING_NS="$HOUSING_NS" bash "$SCRIPT_DIR/reissue-ca-and-leaf-load-all-services.sh" || {
+-      warn "reissue-ca-and-leaf-load-all-services.sh failed — run manually: HOUSING_NS=$HOUSING_NS pnpm run reissue"
++    HOUSING_NS=record-platform="$HOUSING_NS=record-platform" bash "$SCRIPT_DIR/reissue-ca-and-leaf-load-all-services.sh" || {
++      warn "reissue-ca-and-leaf-load-all-services.sh failed — run manually: HOUSING_NS=record-platform=$HOUSING_NS=record-platform pnpm run reissue"
+     }
+     ok "Stage 3 attempted"
+   else
+-    warn "No kubectl or namespace $HOUSING_NS — skip Stage 3. When cluster exists: HOUSING_NS=$HOUSING_NS pnpm run reissue"
++    warn "No kubectl or namespace $HOUSING_NS=record-platform — skip Stage 3. When cluster exists: HOUSING_NS=record-platform=$HOUSING_NS=record-platform pnpm run reissue"
+   fi
+ else
+   warn "SKIP_STAGE3=1"
+ fi
+ 
+ if [[ "${SKIP_BROKER_PARITY:-0}" != "1" ]]; then
+-  if command -v kubectl >/dev/null 2>&1 && kubectl get ns "$HOUSING_NS" --request-timeout=15s >/dev/null 2>&1 \
+-    && kubectl get pod kafka-0 -n "$HOUSING_NS" --request-timeout=15s >/dev/null 2>&1; then
++  if command -v kubectl >/dev/null 2>&1 && kubectl get ns "$HOUSING_NS=record-platform" --request-timeout=15s >/dev/null 2>&1 \
++    && kubectl get pod kafka-0 -n "$HOUSING_NS=record-platform" --request-timeout=15s >/dev/null 2>&1; then
+     say "Verify — cross-broker keystore/truststore parity (kafka-after-rollout-verify-brokers.sh)"
+     chmod +x "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" 2>/dev/null || true
+-    HOUSING_NS="$HOUSING_NS" KAFKA_BROKER_REPLICAS="${KAFKA_BROKER_REPLICAS:-3}" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh"
++    HOUSING_NS=record-platform="$HOUSING_NS=record-platform" KAFKA_BROKER_REPLICAS="${KAFKA_BROKER_REPLICAS:-3}" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh"
+     ok "Broker parity check complete"
+   else
+-    warn "Skip broker parity (no kafka-0 in $HOUSING_NS yet). After rollout: HOUSING_NS=$HOUSING_NS ./scripts/kafka-after-rollout-verify-brokers.sh"
++    warn "Skip broker parity (no kafka-0 in $HOUSING_NS=record-platform yet). After rollout: HOUSING_NS=record-platform=$HOUSING_NS=record-platform ./scripts/kafka-after-rollout-verify-brokers.sh"
+   fi
+ else
+   warn "SKIP_BROKER_PARITY=1"
+ fi
+ 
+ say "Optional cluster gates (when brokers + MetalLB are up):"
+-echo "  HOUSING_NS=$HOUSING_NS bash scripts/verify-kafka-tls-sans.sh"
+-echo "  HOUSING_NS=$HOUSING_NS bash scripts/validate-kafka-dns.sh"
++echo "  HOUSING_NS=record-platform=$HOUSING_NS=record-platform bash scripts/verify-kafka-tls-sans.sh"
++echo "  HOUSING_NS=record-platform=$HOUSING_NS=record-platform bash scripts/validate-kafka-dns.sh"
+ 
+ ok "record-platform-tls-three-stage-verify done"
+
+--- a/scripts/reissue-ca-and-leaf-load-all-services.sh+++ b/scripts/reissue-ca-and-leaf-load-all-services.sh@@ -2,9 +2,9 @@ # Re-issue CA + leaf certs and load into all services.
+ #
+ # WHEN TO RUN: Test suite fails with "curl exit 60" or "CA and Caddy don't match".
+-# Same CA signs the leaf; dev-root-ca (tests) and off-campus-housing-local-tls (Caddy) stay in sync.
++# Same CA signs the leaf; dev-root-ca (tests) and record-platform-local-tls (Caddy) stay in sync.
+ #
+-# Updates: dev-root-ca, LEAF_TLS_SECRET (default off-campus-housing-local-tls), service-tls (record-platform + ingress-nginx),
++# Updates: dev-root-ca, LEAF_TLS_SECRET (default record-platform-local-tls), service-tls (record-platform + ingress-nginx),
+ # och-service-tls (alias of service-tls for Deployments that mount och-service-tls — auth, listings, …; keeps mTLS trust aligned with api-gateway),
+ # envoy-test (via sync-envoy-tls-secrets), certs/, restarts Caddy and optionally all services.
+ #
+@@ -39,7 +39,7 @@ 
+ NS_ING="ingress-nginx"
+ NS_APP="record-platform"
+-LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"
++LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-record-platform-local-tls}"
+ HOST="${HOST:-record.local}"
+ RESTART_SERVICES="${RESTART_SERVICES:-1}"
+ 
+
+--- a/scripts/rollout-caddy.sh+++ b/scripts/rollout-caddy.sh@@ -1,8 +1,8 @@ #!/usr/bin/env bash
+ set -euo pipefail
+ 
+-# Project-aware: housing uses off-campus-housing-local-tls; override for other projects (e.g. PROJECT_NAME=record-platform).
+-PROJECT_NAME="${PROJECT_NAME:-off-campus-housing}"
++# Project-aware: housing uses record-platform-local-tls; override for other projects (e.g. PROJECT_NAME=record-platform).
++PROJECT_NAME="${PROJECT_NAME:-record-platform}"
+ NAMESPACE_INGRESS="${NAMESPACE_INGRESS:-ingress-nginx}"
+ # macOS sets HOSTNAME to the machine name — do not use it for Caddy/TLS docs.
+ CADDY_PUBLIC_HOSTNAME="${CADDY_PUBLIC_HOSTNAME:-record.local}"
+@@ -46,14 +46,14 @@   fi
+ fi
+ 
+-# Apply Caddy ConfigMap from repo root Caddyfile (api-gateway:4020, auth:4011 per README; gRPC h2c://envoy-test:10000)
++# Apply Caddy ConfigMap from repo root Caddyfile (api-gateway:4000, auth:4011 per README; gRPC h2c://envoy-test:10000)
+ kubectl -n "$NS" create configmap caddy-h3 --from-file=Caddyfile=./Caddyfile -o yaml --dry-run=client | kubectl apply -f -
+ 
+-# Apply Caddy Deployment: substitute TLS secret name so deploy matches project (default off-campus-housing-local-tls in YAML)
++# Apply Caddy Deployment: substitute TLS secret name so deploy matches project (default record-platform-local-tls in YAML)
+ _apply_deploy() {
+   local file="$1"
+   if [[ -f "$file" ]]; then
+-    sed "s/off-campus-housing-local-tls/$TLS_SECRET/g" "$file" | kubectl -n "$NS" apply -f -
++    sed "s/record-platform-local-tls/$TLS_SECRET/g" "$file" | kubectl -n "$NS" apply -f -
+     return 0
+   fi
+   return 1
+
+--- a/scripts/rollout-deferred-after-kafka-tls.sh+++ b/scripts/rollout-deferred-after-kafka-tls.sh@@ -2,7 +2,7 @@ # Housing app Deployments then Caddy — same ordering as reissue step 7 + caddy last.
+ # Use after Kafka TLS guard when REISSUE_SKIP_CADDY_ROLLOUT=1 and RESTART_SERVICES=0 during tls-first-time.
+ #
+-# Env: HOUSING_NS, NS_ING (default ingress-nginx), OCH_ROLLOUT_STATUS_TIMEOUT
++# Env: HOUSING_NS=record-platform, NS_ING (default ingress-nginx), OCH_ROLLOUT_STATUS_TIMEOUT
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+@@ -13,7 +13,7 @@   kubectl --request-timeout=25s "$@"
+ }
+ 
+-export OCH_ROLLOUT_NS="${HOUSING_NS:-record-platform}"
++export OCH_ROLLOUT_NS="${HOUSING_NS=record-platform:-record-platform}"
+ export NS_ING="${NS_ING:-ingress-nginx}"
+ 
+ echo "=== rollout-deferred-after-kafka-tls (ns=$OCH_ROLLOUT_NS) ==="
+
+--- a/scripts/rollout-restart-och-full-stack.sh+++ b/scripts/rollout-restart-och-full-stack.sh@@ -11,7 +11,7 @@ #   api-gateway → caddy-h3 (see scripts/lib/och-sequential-rollout.sh).
+ #
+ # Env:
+-#   HOUSING_NS — default record-platform
++#   HOUSING_NS=record-platform — default record-platform
+ #   NS_ING — default ingress-nginx
+ #   SKIP_ENSURE_CLUSTER_SECRETS=1 — skip ensure-housing-cluster-secrets.sh (rollout only)
+ #   OCH_ROLLOUT_STATUS_TIMEOUT — seconds per rollout status (default 180)
+@@ -22,14 +22,14 @@ cd "$REPO_ROOT"
+ export PATH="$SCRIPT_DIR/shims:/opt/homebrew/bin:/usr/local/bin:${PATH:-}"
+ 
+-export HOUSING_NS="${HOUSING_NS:-record-platform}"
++export HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
+ export NS_ING="${NS_ING:-ingress-nginx}"
+ 
+-echo "=== rollout-restart-och-full-stack (ns=$HOUSING_NS, ingress=$NS_ING) ==="
++echo "=== rollout-restart-och-full-stack (ns=$HOUSING_NS=record-platform, ingress=$NS_ING) ==="
+ 
+ if [[ "${SKIP_ENSURE_CLUSTER_SECRETS:-0}" != "1" ]]; then
+-  echo "▶ ensure-housing-cluster-secrets (och-kafka-ssl-secret + och-service-tls aliases)"
+-  HOUSING_NS="$HOUSING_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
++  echo "▶ ensure-housing-cluster-secrets (kafka-ssl-secret + och-service-tls aliases)"
++  HOUSING_NS=record-platform="$HOUSING_NS=record-platform" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
+ else
+   echo "▶ skip ensure-housing-cluster-secrets (SKIP_ENSURE_CLUSTER_SECRETS=1)"
+ fi
+
+--- a/scripts/rotation-suite.sh+++ b/scripts/rotation-suite.sh@@ -6,7 +6,7 @@ # Do not combine ROTATION_H2_KEYLOG=1 with perf; use forensic for decrypted frame proof.
+ 
+ ### CONFIG
+-# Rotation only affects application TLS (Caddy off-campus-housing-local-tls, service-tls, dev-root-ca in namespaces).
++# Rotation only affects application TLS (Caddy record-platform-local-tls, service-tls, dev-root-ca in namespaces).
+ # It does NOT modify kubeconfig or the cluster API server certs; kubectl continues to use cluster CA (e.g. k3d/k3s).
+ # ROTATION_SKIP_KEYCHAIN_TRUST=1: skip adding CA to macOS keychain (no security prompt); k6/ConfigMap use certs/dev-root.pem. Set by run-all-test-suites.sh so suite 5/9 never requires manual verify.
+ # Defaults: ROTATION_H2_KEYLOG=0 (in-cluster k6, no SSH/keylog) so rotation passes reliably; ROTATE_CA=1 (full cert chain test).
+@@ -16,7 +16,7 @@ NS_ING="ingress-nginx"
+ NS_APP="record-platform"
+ SERVICE="caddy-h3"
+-LEAF_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"
++LEAF_SECRET="${LEAF_TLS_SECRET:-record-platform-local-tls}"
+ CA_SECRET="dev-root-ca"
+ ROTATION_H2_KEYLOG="${ROTATION_H2_KEYLOG:-0}"
+ ROTATE_CA="${ROTATE_CA:-1}"
+@@ -551,7 +551,7 @@   fi
+ fi
+ 
+-# Verify edge TLS secret exists (LEAF_SECRET / off-campus-housing-local-tls; use kctl so Colima shim works when host kubectl would fail)
++# Verify edge TLS secret exists (LEAF_SECRET / record-platform-local-tls; use kctl so Colima shim works when host kubectl would fail)
+ if ! kctl -n "$NS_ING" get secret "$LEAF_SECRET" >/dev/null 2>&1; then
+   fail "$LEAF_SECRET missing in $NS_ING - Caddy pods will fail to mount; fix secret updates above"
+ fi
+
+--- a/scripts/run-all-test-suites.sh+++ b/scripts/run-all-test-suites.sh@@ -189,7 +189,7 @@ if [[ -f "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh" ]]; then
+   # shellcheck source=scripts/lib/ensure-och-grpc-certs.sh
+   source "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh"
+-  och_sync_grpc_certs_to_dir "${GRPC_CERTS_DIR:-/tmp/grpc-certs}" "${HOUSING_NS:-record-platform}" || true
++  och_sync_grpc_certs_to_dir "${GRPC_CERTS_DIR:-/tmp/grpc-certs}" "${HOUSING_NS=record-platform:-record-platform}" || true
+   if [[ -s "${GRPC_CERTS_DIR:-/tmp/grpc-certs}/ca.crt" ]]; then
+     export CA_CERT="${GRPC_CERTS_DIR:-/tmp/grpc-certs}/ca.crt"
+   elif [[ -s "$REPO_ROOT/certs/dev-root.pem" ]]; then
+
+--- a/scripts/run-demo-network-preflight.sh+++ b/scripts/run-demo-network-preflight.sh@@ -62,7 +62,7 @@ fi
+ 
+ say "→ run-preflight-scale-and-all-suites.sh"
+-if ! HOUSING_NS="${HOUSING_NS:-record-platform}" "$SCRIPT_DIR/run-preflight-scale-and-all-suites.sh"; then
++if ! HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}" "$SCRIPT_DIR/run-preflight-scale-and-all-suites.sh"; then
+   warn "Preflight failed — skipping standalone packet test"
+   exit 1
+ fi
+
+--- a/scripts/run-playwright-e2e-preflight.sh+++ b/scripts/run-playwright-e2e-preflight.sh@@ -2,7 +2,7 @@ # Wait for the public edge (/api/readyz) and run Playwright E2E (strict TLS, hostname only).
+ # Invokes scripts/webapp-playwright-strict-edge.sh → playwright test (webapp/e2e — multiple spec files).
+ # Optional: E2E_SCREENSHOTS=1 ./scripts/webapp-playwright-strict-edge.sh e2e/ui-screenshots.spec.ts → webapp/e2e/screenshots/*.png
+-# No kubectl port-forward; no http://127.0.0.1:4020 — legacy E2E_API_BASE values are ignored.
++# No kubectl port-forward; no http://127.0.0.1api-gateway:4000 — legacy E2E_API_BASE values are ignored.
+ # PLAYWRIGHT_EDGE_RECOVERY_STABLE_SEC (default 30) acts as a cluster/edge idle-stability gate before tests run.
+ #
+ # Usage: ./scripts/run-playwright-e2e-preflight.sh
+
+--- a/scripts/run-preflight-scale-and-all-suites.sh+++ b/scripts/run-preflight-scale-and-all-suites.sh@@ -20,7 +20,7 @@ #
+ # Green team / first machine: read docs/PR_SECOND_ONBOARDING.md — Colima + DB restore (RESTORE_BACKUP_DIR=latest),
+ # CA bundle + Kafka JKS (docs/CERT_GENERATION_STRICT_TLS_MTLS.md), curl 8.19+ on PATH, then this script.
+-# Preflight auto-checks local cert material and bootstraps missing files (dev-root.pem/key, off-campus-housing leaf,
++# Preflight auto-checks local cert material and bootstraps missing files (dev-root.pem/key, record-platform leaf,
+ # kafka-ssl JKS/password files) via scripts/dev-generate-certs.sh at step 1c; it also retries kafka-ssl-from-dev-root.sh.
+ #
+ # Use: ./scripts/run-preflight-scale-and-all-suites.sh
+@@ -55,7 +55,7 @@ # Ensures:
+ #   - API server ready (mandatory); re-checked after reissue
+ #   - record-platform: service 1, exporters 1, envoy-test 1, Caddy 2
+-#   - Reissue CA + leaf (dev-root-ca / off-campus-housing-local-tls match); verify no curl 60
++#   - Reissue CA + leaf (dev-root-ca / record-platform-local-tls match); verify no curl 60
+ #   - Strict TLS (CA + leaf); no in-cluster Postgres. Kafka:
+ #     - PREFLIGHT_KAFKA_SUBSTRATE=kraft (default): infra/k8s/base/config app-config targets headless KRaft (:9093).
+ #       Preflight applies infra/k8s/kafka-kraft-metallb/, waits for kafka-0..2, creates topics via create-kafka-event-topics-k8s.sh,
+@@ -73,9 +73,9 @@ #   - PREFLIGHT_SKIP_KAFKA_TLS_SAN_GATE=1 — skip step 6a2c (pnpm verify:kafka-bootstrap + verify:kafka-tls-sans). Do not use in CI you care about.
+ #   - PREFLIGHT_SKIP_KAFKA_ADVERTISED_LISTENERS_GATE=1 — skip step 6a2c2 (KRaft only: each broker advertised.listeners INTERNAL FQDN kafka-N.kafka.<ns>.svc.cluster.local:9093 + EXTERNAL <kafka-N-external LB IP>:9094).
+ #   - PREFLIGHT_SKIP_KAFKA_KRAFT_HEALTH_GATES=1 — skip verify-kafka-cluster.sh entirely (quorum, leadership logs, broker API, and the rest of the ritual). Default: full verify-kafka-cluster.sh (6a2c0, 6a2c, 6a2c2, 6a2c6, 6a2c3–5); preflight does not use VERIFY_KAFKA_HEALTH_ONLY.
+-#   - PREFLIGHT_SKIP_EDGE_ROUTING_GATES=1 — skip 6b1–6b2 (Ingress /api+/auth→api-gateway:4020 order, DNS→caddy-h3 or ingress-nginx-controller LB). Fixes silent k6 0-byte runs from edge drift.
++#   - PREFLIGHT_SKIP_EDGE_ROUTING_GATES=1 — skip 6b1–6b2 (Ingress /api+/auth→api-gateway:4000 order, DNS→caddy-h3 or ingress-nginx-controller LB). Fixes silent k6 0-byte runs from edge drift.
+ #   - PREFLIGHT_SKIP_EDGE_INGRESS_PARITY_GATE=1 / PREFLIGHT_SKIP_EDGE_DNS_LB_GATE=1 — granular edge skips (see scripts/verify-preflight-edge-routing.sh).
+-#   - PREFLIGHT_KAFKA_TLS_PREFLIGHT_JOB=1 — after 6a2c, run infra/k8s/kafka-certs/kafka-tls-preflight-job.yaml (in-cluster mTLS to headless :9093). Default 0 (opt-in: slower, needs brokers + och-kafka-ssl-secret).
++#   - PREFLIGHT_KAFKA_TLS_PREFLIGHT_JOB=1 — after 6a2c, run infra/k8s/kafka-certs/kafka-tls-preflight-job.yaml (in-cluster mTLS to headless :9093). Default 0 (opt-in: slower, needs brokers + kafka-ssl-secret).
+ #   - PREFLIGHT_SKIP_KAFKA_ALIGNMENT_SUITE=1 — skip 6a2c9 scripts/tests/kafka-alignment-suite.sh.
+ #   - PREFLIGHT_KAFKA_ALIGNMENT_SUITE_SAFE_ONLY=1 — alignment suite runs safe tests only (KAFKA_ALIGNMENT_TEST_MODE=0). Default: full mutating suite (simulated drift, auto_remediate, MetalLB churn, broker restart, full rollout; KAFKA_ALIGNMENT_TEST_MODE=1).
+ #   - PREFLIGHT_KAFKA_ALIGNMENT_SUITE_DESTRUCTIVE=1 — no longer required (default is full suite); kept as a no-op alias for older invocations.
+@@ -88,7 +88,7 @@ #   PREFLIGHT_APP_SCOPE=full|core — which Deployments to scale and wait for (default full).
+ #     core = auth-service api-gateway messaging-service media-service (finishes without listings/booking/trust/analytics).
+ #     Override exact list: PREFLIGHT_APP_DEPLOYS="auth-service api-gateway messaging-service"
+-#     (Script IFS=$'\n\t': space-separated lists use _och_preflight_deploys_to_arr / IFS=' ' read -a — not unquoted `for x in $PREFLIGHT_APP_DEPLOYS`.)
++#     (Script IFS=$'\n\t': space-separated lists use _preflight_deploys_to_arr / IFS=' ' read -a — not unquoted `for x in $PREFLIGHT_APP_DEPLOYS`.)
+ #   RUN_MESSAGING_LOAD=1 (default) — after Vitest + housing scripts, run k6 edge smoke grid (run-housing-k6-edge-smoke.sh) if k6 is installed.
+ #   RUN_K6_SERVICE_GRID=0 — skip the full k6 per-service smoke (gateway, auth, listings, booking health, trust, analytics, messaging, media, event-layer + booking/search JWT).
+ #   RUN_PREFLIGHT_PLAYWRIGHT=0 — skip Playwright E2E (https edge /api/readyz wait + tests against E2E_API_BASE).
+@@ -96,7 +96,7 @@ #     OCH_EDGE_IP=<MetalLB-or-NodeIP> — when DNS fails, scripts/lib/edge-test-url.sh prints curl --resolve hints.
+ #     OCH_AUTO_EDGE_HOSTS=1 — if DNS fails, append "$OCH_EDGE_IP hostname" to /etc/hosts (needs sudo on non-root).
+ #       Discovers IP from kubectl LoadBalancer services when OCH_EDGE_IP unset.
+-#     HOUSING_NS — namespace for LB discovery (default record-platform).
++#     HOUSING_NS=record-platform — namespace for LB discovery (default record-platform).
+ #   PREFLIGHT_PLAYWRIGHT_STRICT_HTTP3=1 (default) — set PLAYWRIGHT_VERTICAL_STRICT=1 and PLAYWRIGHT_STRICT_HTTP3=1 before Playwright
+ #     (same env as webapp `test:e2e:strict-verticals-and-integrity`; global-setup TLS probe + strict HTTP/3 assertions in transport.protocol.spec).
+ #     Set to 0 to match legacy relaxed Playwright runs.
+@@ -328,7 +328,7 @@ #   2     2a–2d: Kubeconfig fix, ensure single cluster, API reachability check.
+ #   3     Ensure API server ready (ensure-api-server-ready.sh; k3d ENSURE_CAP=180, Colima 480). Phase 0/1A/1B/D gates.
+ #   3a0   Auto housing secrets: ensure-housing-cluster-secrets.sh (service-tls/dev-root-ca, och-service-tls alias,
+-#         och-kafka-ssl-secret). On by default; PREFLIGHT_AUTO_ENSURE_CLUSTER_SECRETS=0 or SKIP_AUTO_CLUSTER_SECRETS=1 to skip.
++#         kafka-ssl-secret). On by default; PREFLIGHT_AUTO_ENSURE_CLUSTER_SECRETS=0 or SKIP_AUTO_CLUSTER_SECRETS=1 to skip.
+ #   3a    Reissue CA + leaf (secrets) — **default off** when cluster has service-tls + dev-root-ca (PREFLIGHT_REISSUE_CA=0).
+ #         Set PREFLIGHT_REISSUE_CA=1 to rotate CA every run (chaos / recovery). Bootstrap: missing secrets still runs reissue.
+ #         Kafka SSL (3b), Phase 1B write lock.
+@@ -416,7 +416,7 @@ info(){ echo "ℹ️  $*"; }
+ 
+ # kubectl source-of-truth for deployment container images (not host docker store).
+-_och_preflight_verify_k8s_images() {
++_preflight_verify_k8s_images() {
+   local _label="${1:-k8s-verify}"
+   if [[ "${PREFLIGHT_K8S_IMAGE_VERIFY:-1}" != "1" ]]; then
+     return 0
+@@ -424,7 +424,7 @@   if [[ ! -f "$SCRIPT_DIR/ci/verify-k8s-images.sh" ]]; then
+     return 0
+   fi
+-  local _ns="${HOUSING_NS:-record-platform}"
++  local _ns="${HOUSING_NS=record-platform:-record-platform}"
+   local _first="${PREFLIGHT_APP_DEPLOYS%% *}"
+   [[ -z "$_first" ]] && return 0
+   if ! kubectl get deployment "$_first" -n "$_ns" &>/dev/null; then
+@@ -432,13 +432,13 @@   fi
+   say "${_label}. Deployment image refs (kubectl source of truth)…"
+   chmod +x "$SCRIPT_DIR/ci/verify-k8s-images.sh" 2>/dev/null || true
+-  VERIFY_K8S_SERVICES="$PREFLIGHT_APP_DEPLOYS" HOUSING_NS="$_ns" \
++  VERIFY_K8S_SERVICES="$PREFLIGHT_APP_DEPLOYS" HOUSING_NS=record-platform="$_ns" \
+     VERIFY_K8S_CHECK_DRIFT="${PREFLIGHT_K8S_IMAGE_DRIFT:-0}" \
+     bash "$SCRIPT_DIR/ci/verify-k8s-images.sh"
+ }
+ 
+ # Global IFS is $'\n\t' — unquoted $PREFLIGHT_APP_DEPLOYS in `for x in $var` does not split on spaces.
+-_och_preflight_deploys_to_arr() {
++_preflight_deploys_to_arr() {
+   OCH_PREFLIGHT_DEPLOY_ARR=()
+   [[ -z "${PREFLIGHT_APP_DEPLOYS:-}" ]] && return 0
+   IFS=' ' read -r -a OCH_PREFLIGHT_DEPLOY_ARR <<< "$PREFLIGHT_APP_DEPLOYS"
+@@ -506,7 +506,7 @@       if [[ -s "$certs_dir/kafka-ssl/kafka-broker.pem" ]] && [[ -f "$SCRIPT_DIR/verify-kafka-tls-sans.sh" ]] && [[ "${PREFLIGHT_SKIP_KAFKA_TLS_SAN_GATE:-0}" != "1" ]]; then
+         chmod +x "$SCRIPT_DIR/verify-kafka-tls-sans.sh" 2>/dev/null || true
+         KAFKA_TLS_PEM="$certs_dir/kafka-ssl/kafka-broker.pem" \
+-          HOUSING_NS="${HOUSING_NS:-record-platform}" \
++          HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}" \
+           KAFKA_BROKER_REPLICAS="${KAFKA_BROKER_REPLICAS:-3}" \
+           bash "$SCRIPT_DIR/verify-kafka-tls-sans.sh" || warn "Local kafka-broker.pem SAN check failed after kafka-ssl refresh (step 6a2c will re-check against cluster secret)"
+       fi
+@@ -697,7 +697,7 @@ # Apply each housing microservice under infra/k8s/base/<name> so Deployments exist before scale (e.g. notification-service).
+ _apply_housing_app_bases() {
+   local _svc _kd
+-  _och_preflight_deploys_to_arr
++  _preflight_deploys_to_arr
+   for _svc in "${OCH_PREFLIGHT_DEPLOY_ARR[@]}"; do
+     [[ -z "$_svc" ]] && continue
+     _kd="$REPO_ROOT/infra/k8s/base/$_svc"
+@@ -1428,14 +1428,14 @@ echo "[PHASE 1A] READ OK"
+ ok "Phase 1A read-only OK"
+ 
+-# 3a0. TLS + Kafka secrets expected by manifests (service-tls → och-service-tls, kafka-ssl → och-kafka-ssl-secret).
++# 3a0. TLS + Kafka secrets expected by manifests (service-tls → och-service-tls, kafka-ssl → kafka-ssl-secret).
+ # Runs before reissue so fresh clusters get a bundle from repo/mkcert + aliases without manual kubectl.
+ PREFLIGHT_AUTO_ENSURE_CLUSTER_SECRETS="${PREFLIGHT_AUTO_ENSURE_CLUSTER_SECRETS:-1}"
+ if [[ "${PREFLIGHT_AUTO_ENSURE_CLUSTER_SECRETS}" == "1" ]] && [[ "${SKIP_AUTO_CLUSTER_SECRETS:-0}" != "1" ]] && [[ -f "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh" ]]; then
+   _phase_start "3a0_ensure_cluster_secrets"
+   say "3a0. Ensuring housing TLS + Kafka client secrets (if missing)…"
+   chmod +x "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh" 2>/dev/null || true
+-  if HOUSING_NS="${HOUSING_NS:-record-platform}" FORCE_TLS_RESTART=0 "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"; then
++  if HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}" FORCE_TLS_RESTART=0 "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"; then
+     ok "3a0 cluster secrets pass"
+   else
+     warn "3a0 had issues — continue (reissue / 3b Kafka may still fix)"
+@@ -1690,7 +1690,7 @@   fi
+ fi
+ 
+-# 3a. Reissue CA + leaf first (dev-root-ca / off-campus-housing-local-tls, CA/Caddy match). KAFKA_SSL=1 persists CA key for Kafka.
++# 3a. Reissue CA + leaf first (dev-root-ca / record-platform-local-tls, CA/Caddy match). KAFKA_SSL=1 persists CA key for Kafka.
+ # Phase A skips cert work (control-plane sanity only).
+ if ! _phase_a_only; then
+   REISSUE_USE_6443=0
+@@ -1704,7 +1704,7 @@     fi
+   fi
+   _phase_start "3a_reissue"
+-  _housing_ns="${HOUSING_NS:-record-platform}"
++  _housing_ns="${HOUSING_NS=record-platform:-record-platform}"
+   _preflight_3a_bootstrap=0
+   if [[ "${PREFLIGHT_REISSUE_CA:-0}" != "1" ]]; then
+     kubectl get secret service-tls -n "$_housing_ns" -o name --request-timeout=15s &>/dev/null || _preflight_3a_bootstrap=1
+@@ -1722,7 +1722,7 @@       export REISSUE_STEP2_VIA_SSH="${REISSUE_STEP2_VIA_SSH:-1}"
+       if REISSUE_SKIP_PREFLIGHT="$REISSUE_USE_6443" REISSUE_CAP="${REISSUE_CAP:-0}" KAFKA_SSL=1 "$SCRIPT_DIR/reissue-ca-and-leaf-load-all-services.sh"; then
+         ok "Reissue done; CA and Caddy certs aligned"
+-        ok "CA and leaf both rotated (dev-root-ca, off-campus-housing-local-tls, service-tls); certs/dev-root.pem is single source of truth"
++        ok "CA and leaf both rotated (dev-root-ca, record-platform-local-tls, service-tls); certs/dev-root.pem is single source of truth"
+         PREFLIGHT_3A_DID_REISSUE=1
+         export PREFLIGHT_3A_DID_REISSUE
+       else
+@@ -1866,7 +1866,7 @@     say "3c-kraft. Applying in-cluster KRaft (infra/k8s/kafka-kraft-metallb/)..."
+     kubectl apply -k "$REPO_ROOT/infra/k8s/kafka-kraft-metallb/" --request-timeout=60s 2>/dev/null && ok "Applied kafka-kraft-metallb" || warn "kafka-kraft-metallb apply skipped or failed"
+     say "3c-kraft-wait. Waiting for kafka-0..2 Ready (up to 600s)..."
+-    _kraft_ns="${HOUSING_NS:-record-platform}"
++    _kraft_ns="${HOUSING_NS=record-platform:-record-platform}"
+     for _ki in 0 1 2; do
+       if [[ "$ctx" == *"colima"* ]] && command -v colima >/dev/null 2>&1; then
+         colima ssh -- kubectl --request-timeout=60s wait pod "kafka-${_ki}" -n "$_kraft_ns" --for=condition=Ready --timeout=600s 2>/dev/null && ok "kafka-${_ki} Ready" || warn "kafka-${_ki} not Ready in time"
+@@ -1898,7 +1898,7 @@ # Helper: re-apply registry image on all app deployments (k3d only). Call after 4a recovery, which does apply -k base and can overwrite image to e.g. analytics-service:dev (no registry).
+ _reapply_k3d_registry_images() {
+   local _reg_name="k3d-record-platform-registry"
+-  _och_preflight_deploys_to_arr
++  _preflight_deploys_to_arr
+   for _d in "${OCH_PREFLIGHT_DEPLOY_ARR[@]}"; do
+     [[ -z "$_d" ]] && continue
+     if kubectl get deployment "$_d" -n record-platform --request-timeout=5s >/dev/null 2>&1; then
+@@ -1938,7 +1938,7 @@       _host_ip="${_host_ip:-172.20.0.1}"
+     fi
+   fi
+-  _och_preflight_deploys_to_arr
++  _preflight_deploys_to_arr
+   for _d in "${OCH_PREFLIGHT_DEPLOY_ARR[@]}"; do
+     [[ -z "$_d" ]] && continue
+     if kubectl get deployment "$_d" -n record-platform --request-timeout=5s >/dev/null 2>&1; then
+@@ -1967,7 +1967,7 @@     fi
+     _host_ip="${_host_ip:-192.168.5.2}"
+   fi
+-  _och_preflight_deploys_to_arr
++  _preflight_deploys_to_arr
+   for _d in "${OCH_PREFLIGHT_DEPLOY_ARR[@]}"; do
+     [[ -z "$_d" ]] && continue
+     if kubectl get deployment "$_d" -n record-platform --request-timeout=5s >/dev/null 2>&1; then
+@@ -1979,7 +1979,7 @@ if [[ "$ctx" == *"colima"* ]]; then
+   _apply_colima_host_aliases
+   ok "host.docker.internal set for Colima app pods (Mac Postgres/Redis reachable)"
+-  _och_preflight_verify_k8s_images "3c-colima-k8s" || exit 1
++  _preflight_verify_k8s_images "3c-colima-k8s" || exit 1
+ fi
+ 
+ # 3c0a0-pre. Ensure all 8 Postgres (5441–5448) are up for suites; ensure kafka-ssl-secret for Kafka TLS (no SQL applied).
+@@ -2037,7 +2037,7 @@     warn "Registry push/patch had issues (exit $_reg_ret). If 1: cluster missing or :dev images not built — run ./scripts/build-and-load-k3d.sh or run-full-flow-k3d.sh; continuing"
+   fi
+   if [[ $_reg_ret -eq 0 ]]; then
+-    _och_preflight_verify_k8s_images "3c0a-k8s" || exit 1
++    _preflight_verify_k8s_images "3c0a-k8s" || exit 1
+   fi
+ fi
+ 
+@@ -2442,7 +2442,7 @@ }
+ set +e
+ BASELINE_DEPLOYS="$PREFLIGHT_APP_DEPLOYS"
+-_och_preflight_deploys_to_arr
++_preflight_deploys_to_arr
+ for deploy in "${OCH_PREFLIGHT_DEPLOY_ARR[@]}"; do
+   [[ -z "$deploy" ]] && continue
+   _scale_one "$deploy"
+@@ -2475,7 +2475,7 @@     kubectl apply -f "$REPO_ROOT/infra/k8s/caddy-h3-service-nodeport.yaml" --request-timeout=25s 2>/dev/null && ok "Recovery: caddy-h3-service-nodeport" || true
+   fi
+   sleep "${APPLY_RATE_LIMIT_SLEEP:-2}"
+-  _och_preflight_deploys_to_arr
++  _preflight_deploys_to_arr
+   for deploy in "${OCH_PREFLIGHT_DEPLOY_ARR[@]}"; do
+     [[ -z "$deploy" ]] && continue
+     _scale_one "$deploy"
+@@ -2708,7 +2708,7 @@ else
+   if [[ -f "$SCRIPT_DIR/create-kafka-event-topics-k8s.sh" ]]; then
+     chmod +x "$SCRIPT_DIR/create-kafka-event-topics-k8s.sh" 2>/dev/null || true
+-    _k8s_ns="${HOUSING_NS:-record-platform}"
++    _k8s_ns="${HOUSING_NS=record-platform:-record-platform}"
+     if ! kubectl get pod kafka-0 -n "$_k8s_ns" --request-timeout=15s >/dev/null 2>&1; then
+       fail "6a2 KRaft: pod kafka-0 not found in $_k8s_ns — apply infra/k8s/kafka-kraft-metallb/ and wait for brokers (3c-kraft)"
+     fi
+@@ -2734,7 +2734,7 @@         bash "$SCRIPT_DIR/validate-kafka-stack-contract.sh" || fail "Kafka contract not satisfied — refusing preflight"
+     fi
+   else
+-    _k8s_ns_b="${HOUSING_NS:-record-platform}"
++    _k8s_ns_b="${HOUSING_NS=record-platform:-record-platform}"
+     _ip0="$(kubectl get svc kafka-0-external -n "$_k8s_ns_b" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+     [[ -n "$_ip0" ]] || _ip0="$(kubectl get svc kafka-0-external -n "$_k8s_ns_b" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+     _ip1="$(kubectl get svc kafka-1-external -n "$_k8s_ns_b" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+@@ -2768,7 +2768,7 @@ 
+ # 6a2c. Bootstrap seeds + broker leaf SANs (prevents x509 SAN mismatch → KafkaJS TLS failure → CrashLoopBackOff).
+ say "6a2c. Kafka bootstrap + broker TLS SAN gates..."
+-_sk_ns="${HOUSING_NS:-record-platform}"
++_sk_ns="${HOUSING_NS=record-platform:-record-platform}"
+ _sk_rep="${KAFKA_BROKER_REPLICAS:-3}"
+ if [[ "${PREFLIGHT_SKIP_KAFKA_TLS_SAN_GATE:-0}" == "1" ]]; then
+   warn "PREFLIGHT_SKIP_KAFKA_TLS_SAN_GATE=1 — skipping verify:kafka-bootstrap and verify:kafka-tls-sans"
+@@ -2776,10 +2776,10 @@   chmod +x "$SCRIPT_DIR/verify-housing-kafka-bootstrap.sh" "$SCRIPT_DIR/verify-kafka-tls-sans.sh" 2>/dev/null || true
+   if command -v pnpm >/dev/null 2>&1 && [[ -f "$REPO_ROOT/package.json" ]]; then
+     (cd "$REPO_ROOT" && pnpm verify:kafka-bootstrap) || fail "6a2c verify:kafka-bootstrap failed (fix app-config KAFKA_BROKER seeds)"
+-    (cd "$REPO_ROOT" && HOUSING_NS="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" pnpm verify:kafka-tls-sans) || fail "6a2c verify:kafka-tls-sans failed — broker cert missing headless SANs (re-run: KAFKA_SSL_EXTRA_IP_SANS=... pnpm kafka-ssl; rollout restart statefulset/kafka)"
+-  else
+-    HOUSING_NS="$_sk_ns" bash "$SCRIPT_DIR/verify-housing-kafka-bootstrap.sh" || fail "6a2c verify-housing-kafka-bootstrap failed"
+-    HOUSING_NS="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" bash "$SCRIPT_DIR/verify-kafka-tls-sans.sh" || fail "6a2c verify-kafka-tls-sans failed"
++    (cd "$REPO_ROOT" && HOUSING_NS=record-platform="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" pnpm verify:kafka-tls-sans) || fail "6a2c verify:kafka-tls-sans failed — broker cert missing headless SANs (re-run: KAFKA_SSL_EXTRA_IP_SANS=... pnpm kafka-ssl; rollout restart statefulset/kafka)"
++  else
++    HOUSING_NS=record-platform="$_sk_ns" bash "$SCRIPT_DIR/verify-housing-kafka-bootstrap.sh" || fail "6a2c verify-housing-kafka-bootstrap failed"
++    HOUSING_NS=record-platform="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" bash "$SCRIPT_DIR/verify-kafka-tls-sans.sh" || fail "6a2c verify-kafka-tls-sans failed"
+   fi
+   ok "6a2c Kafka bootstrap + TLS SAN gates passed"
+ fi
+@@ -2789,7 +2789,7 @@   say "6a2c2. Kafka KRaft advertised.listeners (INTERNAL FQDN + EXTERNAL LB IP per kafka-N-external)..."
+   chmod +x "$SCRIPT_DIR/verify-kafka-kraft-advertised-listeners.sh" 2>/dev/null || true
+   if [[ -f "$SCRIPT_DIR/verify-kafka-kraft-advertised-listeners.sh" ]]; then
+-    HOUSING_NS="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" bash "$SCRIPT_DIR/verify-kafka-kraft-advertised-listeners.sh" || fail "6a2c2 verify-kafka-kraft-advertised-listeners failed (fix StatefulSet advert, MetalLB, or KAFKA_SSL_EXTRA_IP_SANS / KAFKA_SSL_AUTO_METALLB_IPS=1 + kafka-ssl + rollout)"
++    HOUSING_NS=record-platform="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" bash "$SCRIPT_DIR/verify-kafka-kraft-advertised-listeners.sh" || fail "6a2c2 verify-kafka-kraft-advertised-listeners failed (fix StatefulSet advert, MetalLB, or KAFKA_SSL_EXTRA_IP_SANS / KAFKA_SSL_AUTO_METALLB_IPS=1 + kafka-ssl + rollout)"
+     ok "6a2c2 KRaft advertised.listeners gate passed"
+   else
+     fail "6a2c2 verify-kafka-kraft-advertised-listeners.sh missing"
+@@ -2803,7 +2803,7 @@   say "6a2c2b. kafka-runtime-sync (advertised + TLS SAN vs MetalLB)…"
+   chmod +x "$SCRIPT_DIR/kafka-runtime-sync.sh" 2>/dev/null || true
+   if [[ -f "$SCRIPT_DIR/kafka-runtime-sync.sh" ]]; then
+-    HOUSING_NS="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only "$_sk_ns" "$_sk_rep" \
++    HOUSING_NS=record-platform="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only "$_sk_ns" "$_sk_rep" \
+       || fail "6a2c2b kafka-runtime-sync failed — SAN/advertised/LB drift (run: make kafka-sync-metallb or ./scripts/kafka-runtime-sync.sh --remediate)"
+     ok "6a2c2b kafka-runtime-sync gate passed"
+   else
+@@ -2827,7 +2827,7 @@       VERIFY_KAFKA_SKIP_QUORUM_GATE=0 \
+       VERIFY_KAFKA_SKIP_LEADERSHIP_CHURN_GATE=0 \
+       VERIFY_KAFKA_SKIP_BROKER_API_GATE=0 \
+-      HOUSING_NS="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" \
++      HOUSING_NS=record-platform="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" \
+       bash "$SCRIPT_DIR/verify-kafka-cluster.sh" "$_sk_ns" "$_sk_rep" \
+       || fail "verify-kafka-cluster.sh failed — fix meta/SANs/advertised/CA/quorum/broker API (see script phases)"
+     ok "verify-kafka-cluster.sh (full ritual) passed"
+@@ -2855,7 +2855,7 @@     else
+       _ka_suite_mode=1
+     fi
+-    HOUSING_NS="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" KAFKA_ALIGNMENT_SKIP_TEST1_VERIFY=1 \
++    HOUSING_NS=record-platform="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" KAFKA_ALIGNMENT_SKIP_TEST1_VERIFY=1 \
+       KAFKA_ALIGNMENT_TEST_MODE="$_ka_suite_mode" \
+       bash "$SCRIPT_DIR/tests/kafka-alignment-suite.sh" \
+       || fail "6a2c9 Kafka alignment suite failed — fix MetalLB/TLS/advertised drift (make kafka-sync-metallb / kafka-runtime-sync --remediate) or set PREFLIGHT_SKIP_KAFKA_ALIGNMENT_SUITE=1 to opt out"
+@@ -2865,11 +2865,11 @@   warn "PREFLIGHT_SKIP_KAFKA_ALIGNMENT_SUITE=1 — skipping 6a2c9 Kafka alignment suite"
+ fi
+ 
+-# 6a2d. Optional in-cluster mTLS handshake Job (headless INTERNAL :9093, och-kafka-ssl-secret).
++# 6a2d. Optional in-cluster mTLS handshake Job (headless INTERNAL :9093, kafka-ssl-secret).
+ if [[ "${PREFLIGHT_KAFKA_TLS_PREFLIGHT_JOB:-0}" == "1" ]] && [[ "${PREFLIGHT_KAFKA_SUBSTRATE:-kraft}" == "kraft" ]]; then
+   say "6a2d. Kafka TLS preflight Job (mTLS to kafka-0..2 :9093)..."
+   _jpath="$REPO_ROOT/infra/k8s/kafka-certs/kafka-tls-preflight-job.yaml"
+-  if [[ -f "$_jpath" ]] && kubectl get secret och-kafka-ssl-secret -n "$_sk_ns" --request-timeout=20s >/dev/null 2>&1; then
++  if [[ -f "$_jpath" ]] && kubectl get secret kafka-ssl-secret -n "$_sk_ns" --request-timeout=20s >/dev/null 2>&1; then
+     say "6a2d-wait. Waiting for kafka-0..2 pods Ready (INTERNAL :9093 must accept connections)..."
+     for _kz in kafka-0 kafka-1 kafka-2; do
+       kubectl wait pod "$_kz" -n "$_sk_ns" --for=condition=ready --timeout=360s >/dev/null 2>&1 || \
+@@ -2885,7 +2885,7 @@     kubectl logs "job/kafka-tls-preflight" -n "$_sk_ns" --tail=60 2>/dev/null || true
+     ok "6a2d Kafka TLS preflight Job passed"
+   else
+-    warn "6a2d skipped (missing $_jpath or secret och-kafka-ssl-secret in $_sk_ns)"
++    warn "6a2d skipped (missing $_jpath or secret kafka-ssl-secret in $_sk_ns)"
+   fi
+ fi
+ 
+@@ -2907,14 +2907,14 @@ fi
+ 
+ # 6b1–6b2. Edge routing: Ingress path parity + DNS→LoadBalancer (prevents k6 0 B when /auth misses gateway or /etc/hosts points at wrong IP).
+-_edge_ns="${HOUSING_NS:-record-platform}"
++_edge_ns="${HOUSING_NS=record-platform:-record-platform}"
+ _edge_host="${OCH_EDGE_HOSTNAME:-record.local}"
+ if [[ "${PREFLIGHT_SKIP_EDGE_ROUTING_GATES:-0}" == "1" ]]; then
+   warn "PREFLIGHT_SKIP_EDGE_ROUTING_GATES=1 — skipping 6b1–6b2 edge ingress + DNS/LB gates"
+ elif [[ -f "$SCRIPT_DIR/verify-preflight-edge-routing.sh" ]]; then
+   say "6b1–6b2. Edge routing gates (ingress /api+/auth→gateway, DNS→LB for $_edge_host)…"
+   chmod +x "$SCRIPT_DIR/verify-preflight-edge-routing.sh" 2>/dev/null || true
+-  VERIFY_PREFLIGHT_EDGE_PHASES=ingress,dns HOUSING_NS="$_edge_ns" OCH_EDGE_HOSTNAME="$_edge_host" \
++  VERIFY_PREFLIGHT_EDGE_PHASES=ingress,dns HOUSING_NS=record-platform="$_edge_ns" OCH_EDGE_HOSTNAME="$_edge_host" \
+     bash "$SCRIPT_DIR/verify-preflight-edge-routing.sh" "$_edge_ns" "$_edge_host" || fail "6b1–6b2 edge routing gates failed — apply infra/k8s/overlays/dev/ingress.yaml, fix /etc/hosts/DNS to caddy-h3 or ingress-nginx-controller LB (see verify-preflight-edge-routing.sh)"
+   ok "6b1–6b2 edge routing gates passed"
+ else
+@@ -3187,7 +3187,7 @@ 
+   local _lab="$PREFLIGHT_RUN_DIR/listings-k6-gateway-lab"
+   mkdir -p "$_lab"
+-  export HOUSING_NS="${HOUSING_NS:-record-platform}"
++  export HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
+   export REPO_ROOT="$REPO_ROOT"
+   # shellcheck source=load/k6-edge-load-diagnostics.sh
+   source "$SCRIPT_DIR/load/k6-edge-load-diagnostics.sh"
+@@ -3326,7 +3326,7 @@   fi
+   say "7a0. Verifying required Deployments (housing + envoy + caddy; listings/trust/analytics must exist for full stack)…"
+   chmod +x "$SCRIPT_DIR/verify-required-housing-pods.sh" 2>/dev/null || true
+-  HOUSING_NS="${HOUSING_NS:-record-platform}" PREFLIGHT_APP_DEPLOYS="${PREFLIGHT_APP_DEPLOYS:-}" \
++  HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}" PREFLIGHT_APP_DEPLOYS="${PREFLIGHT_APP_DEPLOYS:-}" \
+     "$SCRIPT_DIR/verify-required-housing-pods.sh" || return 1
+   _preflight_ci_transport_alignment_gates || return 1
+   say "7a0b. Event-layer verification (outbox / idempotency contract)…"
+
+--- a/scripts/run-suite-with-packet-capture.sh+++ b/scripts/run-suite-with-packet-capture.sh@@ -5,7 +5,7 @@ # Usage:
+ #   ./scripts/run-suite-with-packet-capture.sh ./scripts/test-listings-http2-http3.sh
+ #
+-# Env: HOST, PORT, TARGET_IP, CAPTURE_* , HOUSING_NS (default record-platform), DISABLE_PACKET_CAPTURE=1 to skip capture
++# Env: HOST, PORT, TARGET_IP, CAPTURE_* , HOUSING_NS=record-platform (default record-platform), DISABLE_PACKET_CAPTURE=1 to skip capture
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+@@ -23,9 +23,9 @@   exit 2
+ fi
+ 
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
+-NS="$HOUSING_NS"
+-export NS HOUSING_NS
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
++NS="$HOUSING_NS=record-platform"
++export NS HOUSING_NS=record-platform
+ 
+ _kb() {
+   local ctx
+
+--- a/scripts/run_auth_pgbench_sweep.sh+++ b/scripts/run_auth_pgbench_sweep.sh@@ -18,7 +18,7 @@   cat <<USAGE
+ Usage: ${0##*/} [options]
+   -p, --pod NAME           Postgres pod name (default: autodetect)
+-  -n, --namespace NS       Kubernetes namespace (default: off-campus-housing)
++  -n, --namespace NS       Kubernetes namespace (default: record-platform)
+   -u, --user UUID          User UUID to benchmark (default: 0dc268d0-a86f-4e12-8d10-9db0f1b735e0)
+   -d, --duration SEC       Duration per benchmark run (default: 60)
+   -c, --clients LIST       Comma-separated client counts (default: based on MODE)
+@@ -54,7 +54,7 @@ AUTH_DB_NAME="${AUTH_DB_NAME:-records}"
+ AUTH_DB_PASS="${AUTH_DB_PASS:-postgres}"
+ 
+-NS="off-campus-housing"
++NS="record-platform"
+ POD=""
+ USER_UUID="0dc268d0-a86f-4e12-8d10-9db0f1b735e0"
+ DURATION=60
+
+--- a/scripts/run_pgbench_sweep.sh+++ b/scripts/run_pgbench_sweep.sh@@ -22,7 +22,7 @@ usage() {
+   cat <<USAGE
+ Usage: ${0##*/} [options]
+-  -n, --namespace NS       Kubernetes namespace (default: off-campus-housing, used for config only)
++  -n, --namespace NS       Kubernetes namespace (default: record-platform, used for config only)
+   -u, --user UUID          Tenant UUID to benchmark (default: 0dc268d0-a86f-4e12-8d10-9db0f1b735e0)
+   -q, --query TEXT         Search query string (default: "鄧麗君 album 263 cn-041 polygram")
+   -d, --duration SEC       Duration per benchmark run (default: 60)
+@@ -44,7 +44,7 @@ RECORDS_DB_NAME="${RECORDS_DB_NAME:-records}"
+ RECORDS_DB_PASS="${RECORDS_DB_PASS:-postgres}"
+ 
+-NS="off-campus-housing"
++NS="record-platform"
+ USER_UUID="0dc268d0-a86f-4e12-8d10-9db0f1b735e0"
+ QUERY='鄧麗君 album 263 cn-041 polygram'
+ DURATION=60
+@@ -1911,9 +1911,9 @@         echo "   ✅ Postgres ready after restart (true cold)"
+       fi
+     else
+-      if command -v kubectl >/dev/null 2>&1 && kubectl get deploy -n "${NS:-off-campus-housing}" 2>/dev/null | grep -q postgres; then
++      if command -v kubectl >/dev/null 2>&1 && kubectl get deploy -n "${NS:-record-platform}" 2>/dev/null | grep -q postgres; then
+         echo "   Real cold: restarting Postgres deploy (COLD_POSTGRES_RESTART=1)..."
+-        kubectl rollout restart deploy/postgres -n "${NS:-off-campus-housing}" 2>/dev/null || true
++        kubectl rollout restart deploy/postgres -n "${NS:-record-platform}" 2>/dev/null || true
+         sleep 15
+         wait_for_db_ready || echo "⚠️  Postgres may still be rolling; continuing with DB-level reset" >&2
+       fi
+
+--- a/scripts/service-tls-alias-guard.sh+++ b/scripts/service-tls-alias-guard.sh@@ -1,11 +1,11 @@ #!/usr/bin/env bash
+ # Fail if service-tls and och-service-tls ca.crt fingerprints differ (mTLS drift: api-gateway vs auth, etc.).
+ #
+-# Env: HOUSING_NS — default record-platform
++# Env: HOUSING_NS=record-platform — default record-platform
+ #      SERVICE_TLS_ALIAS_GUARD_SKIP=1 — no-op success
+ set -euo pipefail
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+ ok() { echo "✅ $*"; }
+@@ -44,7 +44,7 @@ echo "   och-service-tls ca.crt SHA-256=$_b"
+ 
+ if [[ "$_a" != "$_b" ]]; then
+-  bad "CA fingerprint mismatch — run: HOUSING_NS=$NS bash scripts/ensure-housing-cluster-secrets.sh"
++  bad "CA fingerprint mismatch — run: HOUSING_NS=record-platform=$NS bash scripts/ensure-housing-cluster-secrets.sh"
+   exit 1
+ fi
+ 
+
+--- a/scripts/setup-full-off-campus-housing-stack.sh+++ b/scripts/setup-full-off-campus-housing-stack.sh@@ -3,13 +3,13 @@ # → DB bootstrap (optional) → Kafka event topics + verification → build/load images → deploy (kustomize) →
+ # housing secret bundle (och-*, Kafka client) → optional event-layer checks → optional full preflight.
+ #
+-# Does not keep generic NS= from your shell; unsets NS and uses HOUSING_NS / NAMESPACE for housing only.
++# Does not keep generic NS= from your shell; unsets NS and uses HOUSING_NS=record-platform / NAMESPACE for housing only.
+ #
+ # Usage:
+-#   ./scripts/setup-full-off-campus-housing-stack.sh
++#   ./scripts/setup-full-record-platform-stack.sh
+ #
+ # Env (all optional):
+-#   HOUSING_NS=record-platform   (default)
++#   HOUSING_NS=record-platform=record-platform   (default)
+ #   SKIP_COLIMA=1           skip setup-new-colima-cluster.sh (use existing cluster)
+ #   SKIP_BRINGUP_INFRA=1    skip bring-up-external-infra.sh
+ #   SKIP_AUTO_DEV_CERTS=1   do not run dev-generate-certs.sh when leaf cert missing
+@@ -34,8 +34,8 @@ export PATH="$SCRIPT_DIR/shims:/opt/homebrew/bin:/usr/local/bin:${PATH:-}"
+ 
+ unset NS 2>/dev/null || true
+-export HOUSING_NS="${HOUSING_NS:-record-platform}"
+-export NAMESPACE="$HOUSING_NS"
++export HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
++export NAMESPACE="$HOUSING_NS=record-platform"
+ 
+ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+ ok() { echo "✅ $*"; }
+@@ -46,7 +46,7 @@ CA="$REPO_ROOT/certs/dev-root.pem"
+ 
+ say "╔══════════════════════════════════════════════════════════════╗"
+-say "║  setup-full-off-campus-housing-stack (HOUSING_NS=$HOUSING_NS)   ║"
++say "║  setup-full-record-platform-stack (HOUSING_NS=record-platform=$HOUSING_NS=record-platform)   ║"
+ say "╚══════════════════════════════════════════════════════════════╝"
+ 
+ if [[ "${SKIP_COLIMA:-0}" != "1" ]]; then
+@@ -112,15 +112,15 @@ fi
+ 
+ if [[ "${SKIP_DEPLOY:-0}" != "1" ]]; then
+-  say "→ deploy-dev.sh (NAMESPACE=$HOUSING_NS)"
+-  NAMESPACE="$HOUSING_NS" "$SCRIPT_DIR/deploy-dev.sh"
++  say "→ deploy-dev.sh (NAMESPACE=$HOUSING_NS=record-platform)"
++  NAMESPACE="$HOUSING_NS=record-platform" "$SCRIPT_DIR/deploy-dev.sh"
+ else
+   warn "SKIP_DEPLOY=1"
+ fi
+ 
+ if [[ "${SKIP_HOUSING_SECRETS:-0}" != "1" ]]; then
+   say "→ ensure-housing-cluster-secrets.sh"
+-  HOUSING_NS="$HOUSING_NS" "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
++  HOUSING_NS=record-platform="$HOUSING_NS=record-platform" "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
+ else
+   warn "SKIP_HOUSING_SECRETS=1"
+ fi
+@@ -134,12 +134,12 @@ 
+ if [[ "${RUN_PREFLIGHT:-0}" == "1" ]]; then
+   say "→ run-preflight-scale-and-all-suites.sh (heavy)"
+-  HOUSING_NS="$HOUSING_NS" "$SCRIPT_DIR/run-preflight-scale-and-all-suites.sh"
++  HOUSING_NS=record-platform="$HOUSING_NS=record-platform" "$SCRIPT_DIR/run-preflight-scale-and-all-suites.sh"
+ else
+   ok "Skipping preflight (set RUN_PREFLIGHT=1 for run-preflight-scale-and-all-suites.sh)"
+ fi
+ 
+ say "══════════════════════════════════════════════════════════════"
+-ok "setup-full-off-campus-housing-stack finished."
+-say "Next: RUN_PREFLIGHT=1 $0  — or  HOUSING_NS=$HOUSING_NS ./scripts/run-preflight-scale-and-all-suites.sh"
++ok "setup-full-record-platform-stack finished."
++say "Next: RUN_PREFLIGHT=1 $0  — or  HOUSING_NS=record-platform=$HOUSING_NS=record-platform ./scripts/run-preflight-scale-and-all-suites.sh"
+ say "Docs: docs/FIRST_TIME_TEAM_SETUP.md · docs/RUN_PIPELINE_ORDER.md"
+
+--- a/scripts/setup-new-colima-cluster.sh+++ b/scripts/setup-new-colima-cluster.sh@@ -135,4 +135,4 @@ step 6 "Cluster bootstrap complete"
+ say "✅ Done (steps 1–${TOTAL_STEPS}/${TOTAL_STEPS}). MetalLB pool: see install-metallb-colima output or: kubectl -n metallb-system get ipaddresspool -o wide"
+ say "Next (manual pieces): ./scripts/bring-up-external-infra.sh → ./scripts/build-housing-images-k3s.sh → ./scripts/deploy-dev.sh"
+-say "One-shot (idiot-proof): ./scripts/setup-full-off-campus-housing-stack.sh — see docs/RUN_PIPELINE_ORDER.md"
++say "One-shot (idiot-proof): ./scripts/setup-full-record-platform-stack.sh — see docs/RUN_PIPELINE_ORDER.md"
+
+--- a/scripts/strict-tls-bootstrap.sh+++ b/scripts/strict-tls-bootstrap.sh@@ -27,8 +27,8 @@   exit 1
+ fi
+ 
+-# Caddy terminates TLS at the edge; off-campus-housing-local-tls is the leaf cert. Secret type is immutable — delete then create if replacing.
+-LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"
++# Caddy terminates TLS at the edge; record-platform-local-tls is the leaf cert. Secret type is immutable — delete then create if replacing.
++LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-record-platform-local-tls}"
+ kubectl create namespace record-platform --dry-run=client -o yaml | kubectl apply -f -
+ for ns in ingress-nginx record-platform; do
+   kubectl -n "$ns" delete secret "$LEAF_TLS_SECRET" --ignore-not-found
+
+--- a/scripts/test-full-chain-with-rotation.sh+++ b/scripts/test-full-chain-with-rotation.sh@@ -42,7 +42,7 @@ fi
+ NS_ING="ingress-nginx"
+ NS_APP="record-platform"
+-LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"
++LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-record-platform-local-tls}"
+ 
+ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+ ok() { echo "✅ $*"; }
+
+--- a/scripts/test-lb-coordinated.sh+++ b/scripts/test-lb-coordinated.sh@@ -94,7 +94,7 @@     consecutive_503=$((consecutive_503 + 1))
+     warn "HAProxy 503 (attempt $attempt/$HAPROXY_ATTEMPTS)"
+     if [[ $consecutive_503 -ge "$HAPROXY_CONSECUTIVE_503_FAIL" ]]; then
+-      info "  Diagnose (HAProxy pod has no curl): kubectl run curl-diagnose --rm -i --restart=Never -n $NS_APP --image=curlimages/curl:latest -- curl -s -o /dev/null -w '%{http_code}' http://api-gateway.${NS_APP}.svc.cluster.local:4020/readyz"
++      info "  Diagnose (HAProxy pod has no curl): kubectl run curl-diagnose --rm -i --restart=Never -n $NS_APP --image=curlimages/curl:latest -- curl -s -o /dev/null -w '%{http_code}' http://api-gateway.${NS_APP}.svc.cluster.localapi-gateway:4000/readyz"
+       info "  If 200 → backend OK; HAProxy needs 'resolvers k8s' + server ... resolvers k8s so health checks resolve FQDN (see haproxy configmap). If 404/000 → path or connectivity."
+       fail "HAProxy backend unhealthy for >30s (${consecutive_503} consecutive 503). Ensure api-gateway has ready pods and HAProxy config option httpchk GET /readyz."
+     fi
+
+--- a/scripts/test-messaging-service-comprehensive.sh+++ b/scripts/test-messaging-service-comprehensive.sh@@ -15,8 +15,8 @@ export PATH="$SCRIPT_DIR/shims:/opt/homebrew/bin:/usr/local/bin:${PATH:-}"
+ [[ -f "$SCRIPT_DIR/lib/ensure-kubectl-shim.sh" ]] && { source "$SCRIPT_DIR/lib/ensure-kubectl-shim.sh" || true; }
+ 
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
+-NS="$HOUSING_NS"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
++NS="$HOUSING_NS=record-platform"
+ HOST="${HOST:-record.local}"
+ PORT="${PORT:-30443}"
+ 
+
+--- a/scripts/test-microservices-http2-http3-enhanced.sh+++ b/scripts/test-microservices-http2-http3-enhanced.sh@@ -1,7 +1,7 @@ #!/usr/bin/env bash
+ # Enhanced Microservices Test: packet capture and explicit HTTP/2 + HTTP/3 (QUIC) verification.
+ # Run after baseline (run-all sets TARGET_IP, PORT, CA_CERT, HTTP3_RESOLVE). Uses same packet-capture lib as baseline.
+-# Namespace: HOUSING_NS (default record-platform). Generic NS= from the shell is not used.
++# Namespace: HOUSING_NS=record-platform (default record-platform). Generic NS= from the shell is not used.
+ # CAPTURE_SKIP_PER_TEST=1 (Colima default): suite-level capture — start once, run all tests, stop once (avoids kubectl exec churn).
+ # Else: per-test capture — start/stop for each test (thorough but heavier on Colima).
+ set -euo pipefail
+@@ -16,8 +16,8 @@ info() { echo "ℹ️  $*"; }
+ 
+ # Housing namespace only — do not inherit stray NS= from other repos.
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
+-NS="$HOUSING_NS"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
++NS="$HOUSING_NS=record-platform"
+ HOST="${HOST:-record.local}"
+ ctx=$(kubectl config current-context 2>/dev/null || echo "")
+ _kb() {
+
+--- a/scripts/test-tls-mtls-comprehensive.sh+++ b/scripts/test-tls-mtls-comprehensive.sh@@ -445,7 +445,7 @@ fi
+ # 2) Fallback: get chain from Kubernetes secret (leaf + CA)
+ if [[ -z "$CERT_FILE" ]] || [[ "${CERT_COUNT:-0}" -lt 2 ]]; then
+-  LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"
++  LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-record-platform-local-tls}"
+   SECRET_LEAF=$(_kb -n "$NS_ING" get secret "$LEAF_TLS_SECRET" -o jsonpath='{.data.tls\.crt}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+   SECRET_CA=$(_kb -n "$NS_ING" get secret dev-root-ca -o jsonpath='{.data.dev-root\.pem}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+   if [[ -n "$SECRET_LEAF" ]]; then
+@@ -465,7 +465,7 @@ if [[ -n "$CERT_COUNT" ]] && [[ "$CERT_COUNT" =~ ^[0-9]+$ ]] && [[ $CERT_COUNT -ge 2 ]]; then
+   test_result 0 "Certificate chain completeness: PASSED ($CERT_COUNT certificates)"
+ elif [[ "${CERT_COUNT:-0}" -eq 1 ]] && [[ -n "${SECRET_CA:-}" ]]; then
+-  # Leaf in off-campus-housing-local-tls + CA in dev-root-ca (separate secrets) is valid
++  # Leaf in record-platform-local-tls + CA in dev-root-ca (separate secrets) is valid
+   test_result 0 "Certificate chain completeness: PASSED (leaf in $LEAF_TLS_SECRET + CA in dev-root-ca)"
+ elif [[ "${CERT_COUNT:-0}" -eq 1 ]]; then
+   test_result 1 "Certificate chain completeness: FAILED (need leaf tls.crt + dev-root-ca; reissue writes leaf-only tls.crt)"
+
+--- a/scripts/tests/kafka-alignment-suite.sh+++ b/scripts/tests/kafka-alignment-suite.sh@@ -7,7 +7,7 @@ # Usage:
+ #   ./scripts/tests/kafka-alignment-suite.sh
+ # Env:
+-#   HOUSING_NS, KAFKA_BROKER_REPLICAS
++#   HOUSING_NS=record-platform, KAFKA_BROKER_REPLICAS
+ #   KAFKA_ALIGNMENT_TEST_MODE=1 — run destructive/mutating tests (2–4, 6–7). Otherwise only safe tests (1 + 5).
+ #   After each mutating test (3–4, 6–7): kafka-runtime-sync --check-only + verify-kafka-cluster (fail fast).
+ #   KAFKA_ALIGNMENT_SKIP_TEST1_VERIFY=1 — test1 runs kafka-runtime-sync --check-only only (skip verify-kafka-cluster).
+@@ -27,7 +27,7 @@ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ REP="${KAFKA_BROKER_REPLICAS:-3}"
+ STAMP="$(date +%Y%m%d-%H%M%S)"
+ LOG="${KAFKA_ALIGNMENT_LOG:-$REPO_ROOT/bench_logs/kafka-alignment-suite-$STAMP.log}"
+@@ -116,7 +116,7 @@   say "Post-destructive verify ($tag): kafka-runtime-sync --check-only + verify-kafka-cluster"
+ 
+   _post_verify_once() {
+-    HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP" \
++    HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP" \
+       && VERIFY_KAFKA_HEALTH_ONLY=0 \
+         VERIFY_KAFKA_SKIP_META_IDENTITY=0 \
+         VERIFY_KAFKA_SKIP_TLS_SANS=0 \
+@@ -125,7 +125,7 @@         VERIFY_KAFKA_SKIP_QUORUM_GATE=0 \
+         VERIFY_KAFKA_SKIP_LEADERSHIP_CHURN_GATE=0 \
+         VERIFY_KAFKA_SKIP_BROKER_API_GATE=0 \
+-        HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \
++        HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" \
+         bash "$REPO_ROOT/scripts/verify-kafka-cluster.sh" "$NS" "$REP"
+   }
+ 
+@@ -140,7 +140,7 @@   fi
+ 
+   warn "Post-destructive ($tag): running kafka-runtime-sync --remediate, then re-verify…"
+-  if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
++  if ! HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
+     bad "Post-destructive: kafka-runtime-sync --remediate failed ($tag)"
+     return 1
+   fi
+@@ -157,7 +157,7 @@ assert_cluster_green_no_remediate() {
+   local tag="$1"
+   say "Cluster green verify ($tag): kafka-runtime-sync --check-only + verify-kafka-cluster"
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP" \
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP" \
+     && VERIFY_KAFKA_HEALTH_ONLY=0 \
+       VERIFY_KAFKA_SKIP_META_IDENTITY=0 \
+       VERIFY_KAFKA_SKIP_TLS_SANS=0 \
+@@ -166,7 +166,7 @@       VERIFY_KAFKA_SKIP_QUORUM_GATE=0 \
+       VERIFY_KAFKA_SKIP_LEADERSHIP_CHURN_GATE=0 \
+       VERIFY_KAFKA_SKIP_BROKER_API_GATE=0 \
+-      HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \
++      HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" \
+       bash "$REPO_ROOT/scripts/verify-kafka-cluster.sh" "$NS" "$REP"
+ }
+ 
+@@ -211,7 +211,7 @@   [[ "${KAFKA_ALIGNMENT_PREFLIGHT_REMEDIATE:-1}" != "1" ]] && return 0
+   say "Pre-suite — kafka-runtime-sync --check-only (advertised.listeners vs LB + TLS SAN vs MetalLB)"
+   set +e
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only --quiet "$NS" "$REP"
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only --quiet "$NS" "$REP"
+   local _pre_rc=$?
+   set -e
+   if [[ "$_pre_rc" -eq 0 ]]; then
+@@ -219,7 +219,7 @@     return 0
+   fi
+   warn "Pre-suite: drift or SAN/LB TLS mismatch — running kafka-runtime-sync --remediate (refresh from LB IPs, rollout, verify)…"
+-  if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
++  if ! HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
+     bad "Pre-suite: kafka-runtime-sync --remediate failed"
+     exit 1
+   fi
+@@ -235,7 +235,7 @@   [[ "${KAFKA_ALIGNMENT_SKIP_TLS_PARITY_GUARD:-0}" == "1" ]] && return 0
+   say "Pre-suite — cross-broker TLS parity (truststore/keystore + PKIX log tail)"
+   chmod +x "$REPO_ROOT/scripts/kafka-after-rollout-verify-brokers.sh" 2>/dev/null || true
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-after-rollout-verify-brokers.sh" || {
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-after-rollout-verify-brokers.sh" || {
+     bad "Cross-broker TLS parity failed — mixed trust anchor after partial restart? Try: kubectl delete pod -n $NS kafka-0 kafka-1 kafka-2"
+     exit 1
+   }
+@@ -244,7 +244,7 @@ # --- TEST 1: baseline ---
+ _test1_run_baseline_checks() {
+   if [[ "${KAFKA_ALIGNMENT_SKIP_TEST1_VERIFY:-0}" == "1" ]]; then
+-    HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
++    HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
+     return $?
+   fi
+   VERIFY_KAFKA_HEALTH_ONLY=0 \
+@@ -255,9 +255,9 @@       VERIFY_KAFKA_SKIP_QUORUM_GATE=0 \
+       VERIFY_KAFKA_SKIP_LEADERSHIP_CHURN_GATE=0 \
+       VERIFY_KAFKA_SKIP_BROKER_API_GATE=0 \
+-      HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \
++      HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" \
+       bash "$REPO_ROOT/scripts/verify-kafka-cluster.sh" "$NS" "$REP" \
+-    && HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
++    && HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
+ }
+ 
+ run_test1_baseline() {
+@@ -271,7 +271,7 @@   fi
+   if [[ "${KAFKA_ALIGNMENT_BASELINE_REMEDIATE_RETRY:-1}" == "1" ]]; then
+     warn "TEST 1 baseline failed — kafka-runtime-sync --remediate, then single retry…"
+-    if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
++    if ! HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
+       emit_result "$name" "FAIL" "$SECONDS"
+       return 1
+     fi
+@@ -312,7 +312,7 @@       return 1
+     }
+   set +e
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
+   rc=$?
+   set -e
+   if [[ "$rc" -eq 0 ]]; then
+@@ -335,7 +335,7 @@   local name="auto_remediate"
+   SECONDS=0
+   say "TEST 3 — Auto-remediation (kafka-runtime-sync --remediate)"
+-  if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
++  if ! HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
+     kubectl exec -n "$NS" kafka-0 -c "$KAFKA_C" --request-timeout=45s -- sh -c \
+       'test -f /etc/kafka/kafka.properties.suite.bak && cp -f /etc/kafka/kafka.properties.suite.bak /etc/kafka/kafka.properties' 2>/dev/null || true
+     emit_result "$name" "FAIL" "$SECONDS"
+@@ -374,13 +374,13 @@     w=$((w + 2))
+   done
+   set +e
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP"
+   _drift_rc=$?
+   set -e
+   if [[ "$_drift_rc" -eq 0 ]]; then
+     warn "Check-only still passed after LB churn — continuing to remediation anyway"
+   fi
+-  if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
++  if ! HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
+     emit_result "$name" "FAIL" "$SECONDS"
+     return 1
+   fi
+@@ -419,7 +419,7 @@     return 1
+   }
+   set +e
+-  KAFKA_TLS_PEM="$bad_pem" HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \
++  KAFKA_TLS_PEM="$bad_pem" HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" \
+     bash "$REPO_ROOT/scripts/verify-kafka-tls-sans.sh" "$NS" "$REP"
+   tls_rc=$?
+   set -e
+@@ -497,7 +497,7 @@ 
+ if [[ "$TESTS_FAILED" -gt 0 ]] && [[ "${KAFKA_ALIGNMENT_SUITE_FAIL_REMEDIATE:-1}" == "1" ]]; then
+   say "Suite had failing test(s); running kafka-runtime-sync --remediate (TLS from LB + rollout + verify)…"
+-  if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
++  if ! HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then
+     bad "Suite-level kafka-runtime-sync --remediate failed"
+     print_summary
+     write_prom_file || true
+
+--- a/scripts/verify-cluster-kafka-three-brokers.sh+++ b/scripts/verify-cluster-kafka-three-brokers.sh@@ -1,19 +1,19 @@ #!/usr/bin/env bash
+ # Fail if ConfigMap app-config KAFKA_BROKER does not list kafka-0..2 headless DNS seeds (three brokers).
+ # Usage: ./scripts/verify-cluster-kafka-three-brokers.sh
+-#   HOUSING_NS=record-platform (default)
++#   HOUSING_NS=record-platform=record-platform (default)
+ set -euo pipefail
+ 
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
+ 
+ if ! command -v kubectl >/dev/null 2>&1; then
+   echo "kubectl not found" >&2
+   exit 1
+ fi
+ 
+-raw="$(kubectl -n "$HOUSING_NS" get configmap app-config -o jsonpath='{.data.KAFKA_BROKER}' 2>/dev/null || true)"
++raw="$(kubectl -n "$HOUSING_NS=record-platform" get configmap app-config -o jsonpath='{.data.KAFKA_BROKER}' 2>/dev/null || true)"
+ if [[ -z "${raw// /}" ]]; then
+-  echo "verify-kafka-three-brokers: missing ConfigMap app-config.data.KAFKA_BROKER in $HOUSING_NS" >&2
++  echo "verify-kafka-three-brokers: missing ConfigMap app-config.data.KAFKA_BROKER in $HOUSING_NS=record-platform" >&2
+   exit 1
+ fi
+ 
+
+--- a/scripts/verify-housing-kafka-bootstrap.sh+++ b/scripts/verify-housing-kafka-bootstrap.sh@@ -4,7 +4,7 @@ set -euo pipefail
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ CM="${APP_CONFIG_NAME:-app-config}"
+ 
+ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+
+--- a/scripts/verify-http3-edge.sh+++ b/scripts/verify-http3-edge.sh@@ -1,6 +1,6 @@ #!/usr/bin/env bash
+ # One-command HTTP/3 diagnostic: Caddy built with h3, UDP 443 exposed, alt-svc, and curl --http3.
+-# Uses: namespace ingress-nginx, deployment caddy-h3 (not off-campus-housing / deploy/caddy).
++# Uses: namespace ingress-nginx, deployment caddy-h3 (not record-platform / deploy/caddy).
+ #
+ # Usage: ./scripts/verify-http3-edge.sh
+ #   TARGET=https://record.local  (default)
+@@ -46,7 +46,7 @@ say "HTTP/3 edge verification (namespace=$NS, deploy=$SVC)"
+ echo "  Target: $TARGET"
+ echo "  curl: $CURL_CMD (script prefers Homebrew curl for --http3 test)"
+-echo "  (Resource names: deploy/$DEPLOY, svc/$SVC in namespace $NS — not off-campus-housing/deploy/caddy)"
++echo "  (Resource names: deploy/$DEPLOY, svc/$SVC in namespace $NS — not record-platform/deploy/caddy)"
+ echo ""
+ 
+ # --- Step 1: Caddy built with HTTP/3 ---
+
+--- a/scripts/verify-kafka-cluster.sh+++ b/scripts/verify-kafka-cluster.sh@@ -13,9 +13,9 @@ # Optional: VERIFY_KAFKA_INCLUDE_GATEWAY_NC=1 — also nc -vz kafka 9093 from first api-gateway pod (stricter path check).
+ #
+ # Phase 6a2c6 — CA / broker trust (fail fast on secret drift):
+-#   Compares SHA-256 fingerprints of ca-cert.pem in kafka-ssl-secret vs och-kafka-ssl-secret.
++#   Compares SHA-256 fingerprints of ca-cert.pem in kafka-ssl-secret vs kafka-ssl-secret.
+ #   Verifies kafka-broker.pem chains to that CA (openssl verify).
+-#   VERIFY_KAFKA_CHECK_CLIENT_DEPLOY_MOUNTS=1 — require listed Deployments to reference och-kafka-ssl-secret (after deploy-dev).
++#   VERIFY_KAFKA_CHECK_CLIENT_DEPLOY_MOUNTS=1 — require listed Deployments to reference kafka-ssl-secret (after deploy-dev).
+ #   VERIFY_KAFKA_CLIENT_MOUNTS_ONLY=1 — run only the deployment mount check and exit (dev-onboard Phase 6b).
+ #   VERIFY_KAFKA_MOUNT_REQUIRED_DEPLOYS — space-separated names (default: Kafka consumer services in base/).
+ #
+@@ -37,11 +37,11 @@ #
+ # Usage:
+ #   ./scripts/verify-kafka-cluster.sh [namespace] [replicas]
+-# Env: HOUSING_NS, KAFKA_BROKER_REPLICAS, KAFKA_CHURN_LOG_SINCE (default 10m for renounce scan)
++# Env: HOUSING_NS=record-platform, KAFKA_BROKER_REPLICAS, KAFKA_CHURN_LOG_SINCE (default 10m for renounce scan)
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+-NS="${1:-${HOUSING_NS:-record-platform}}"
++NS="${1:-${HOUSING_NS=record-platform:-record-platform}}"
+ REPLICAS="${2:-${KAFKA_BROKER_REPLICAS:-3}}"
+ CHURN_SINCE="${KAFKA_CHURN_LOG_SINCE:-10m}"
+ EXEC_TO="${KAFKA_CLUSTER_EXEC_TIMEOUT:-45}"
+@@ -74,11 +74,11 @@       _missing=1
+       continue
+     fi
+-    if ! kubectl get deploy "$_d" -n "$NS" -o yaml --request-timeout=25s | grep -q "secretName: och-kafka-ssl-secret"; then
+-      bad "Deployment $_d does not mount secret och-kafka-ssl-secret"
++    if ! kubectl get deploy "$_d" -n "$NS" -o yaml --request-timeout=25s | grep -q "secretName: kafka-ssl-secret"; then
++      bad "Deployment $_d does not mount secret kafka-ssl-secret"
+       _missing=1
+     else
+-      ok "Deployment $_d references och-kafka-ssl-secret"
++      ok "Deployment $_d references kafka-ssl-secret"
+     fi
+   done < <(tr ' ' '\n' <<<"$(_mount_required_deploys)" | grep -v '^$')
+   [[ "$_missing" -eq 0 ]] || exit 1
+@@ -143,7 +143,7 @@ if [[ "${VERIFY_KAFKA_SKIP_TLS_SANS:-0}" != "1" ]]; then
+   say "Phase 6a2c — TLS SAN verification"
+   chmod +x "$SCRIPT_DIR/verify-kafka-tls-sans.sh" 2>/dev/null || true
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REPLICAS" bash "$SCRIPT_DIR/verify-kafka-tls-sans.sh" "$NS" "$REPLICAS"
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REPLICAS" bash "$SCRIPT_DIR/verify-kafka-tls-sans.sh" "$NS" "$REPLICAS"
+   ok "TLS SAN verification passed"
+ else
+   say "Phase 6a2c — skipped (VERIFY_KAFKA_SKIP_TLS_SANS=1 or VERIFY_KAFKA_HEALTH_ONLY=1)"
+@@ -152,30 +152,30 @@ if [[ "${VERIFY_KAFKA_SKIP_ADVERTISED:-0}" != "1" ]]; then
+   say "Phase 6a2c2 — advertised.listeners verification"
+   chmod +x "$SCRIPT_DIR/verify-kafka-kraft-advertised-listeners.sh" 2>/dev/null || true
+-  HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REPLICAS" bash "$SCRIPT_DIR/verify-kafka-kraft-advertised-listeners.sh" "$NS" "$REPLICAS"
++  HOUSING_NS=record-platform="$NS" KAFKA_BROKER_REPLICAS="$REPLICAS" bash "$SCRIPT_DIR/verify-kafka-kraft-advertised-listeners.sh" "$NS" "$REPLICAS"
+   ok "advertised.listeners verification passed"
+ else
+   say "Phase 6a2c2 — skipped (VERIFY_KAFKA_SKIP_ADVERTISED=1 or VERIFY_KAFKA_HEALTH_ONLY=1)"
+ fi
+ 
+ if [[ "${VERIFY_KAFKA_SKIP_TLS_CONSISTENCY:-0}" != "1" ]]; then
+-  say "Phase 6a2c6 — CA fingerprint consistency (kafka-ssl-secret vs och-kafka-ssl-secret) + broker chain"
++  say "Phase 6a2c6 — CA fingerprint consistency (kafka-ssl-secret vs kafka-ssl-secret) + broker chain"
+   _tmp="$(mktemp -d)"
+   # shellcheck disable=SC2064
+   trap 'rm -rf "$_tmp"' EXIT
+   kubectl get secret kafka-ssl-secret -n "$NS" -o jsonpath='{.data.ca-cert\.pem}' --request-timeout=25s | base64 -d >"$_tmp/broker-ca.pem"
+-  kubectl get secret och-kafka-ssl-secret -n "$NS" -o jsonpath='{.data.ca-cert\.pem}' --request-timeout=25s | base64 -d >"$_tmp/service-ca.pem"
++  kubectl get secret kafka-ssl-secret -n "$NS" -o jsonpath='{.data.ca-cert\.pem}' --request-timeout=25s | base64 -d >"$_tmp/service-ca.pem"
+   kubectl get secret kafka-ssl-secret -n "$NS" -o jsonpath='{.data.kafka-broker\.pem}' --request-timeout=25s | base64 -d >"$_tmp/kafka-broker.pem"
+   if [[ ! -s "$_tmp/broker-ca.pem" || ! -s "$_tmp/service-ca.pem" || ! -s "$_tmp/kafka-broker.pem" ]]; then
+-    bad "Missing ca-cert.pem or kafka-broker.pem in secrets (kafka-ssl-secret / och-kafka-ssl-secret)"
++    bad "Missing ca-cert.pem or kafka-broker.pem in secrets (kafka-ssl-secret / kafka-ssl-secret)"
+     exit 1
+   fi
+   _bfp="$(openssl x509 -in "$_tmp/broker-ca.pem" -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2)"
+   _sfp="$(openssl x509 -in "$_tmp/service-ca.pem" -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2)"
+   if [[ -z "$_bfp" || -z "$_sfp" || "$_bfp" != "$_sfp" ]]; then
+-    bad "CA fingerprint mismatch — broker secret vs och-kafka-ssl-secret (Node clients will reject broker TLS)"
++    bad "CA fingerprint mismatch — broker secret vs kafka-ssl-secret (Node clients will reject broker TLS)"
+     echo "   kafka-ssl-secret ca:     ${_bfp:-?}" >&2
+-    echo "   och-kafka-ssl-secret ca: ${_sfp:-?}" >&2
++    echo "   kafka-ssl-secret ca: ${_sfp:-?}" >&2
+     exit 1
+   fi
+   ok "CA fingerprints match ($_bfp)"
+@@ -209,7 +209,7 @@ fi
+ 
+ if [[ "${VERIFY_KAFKA_CHECK_CLIENT_DEPLOY_MOUNTS:-0}" == "1" ]]; then
+-  say "Phase 6a2c6b — Deployments must reference och-kafka-ssl-secret"
++  say "Phase 6a2c6b — Deployments must reference kafka-ssl-secret"
+   _missing=0
+   while read -r _d; do
+     [[ -z "$_d" ]] && continue
+@@ -218,11 +218,11 @@       _missing=1
+       continue
+     fi
+-    if ! kubectl get deploy "$_d" -n "$NS" -o yaml --request-timeout=25s | grep -q "secretName: och-kafka-ssl-secret"; then
+-      bad "Deployment $_d does not mount secret och-kafka-ssl-secret"
++    if ! kubectl get deploy "$_d" -n "$NS" -o yaml --request-timeout=25s | grep -q "secretName: kafka-ssl-secret"; then
++      bad "Deployment $_d does not mount secret kafka-ssl-secret"
+       _missing=1
+     else
+-      ok "Deployment $_d references och-kafka-ssl-secret"
++      ok "Deployment $_d references kafka-ssl-secret"
+     fi
+   done < <(tr ' ' '\n' <<<"$(_mount_required_deploys)" | grep -v '^$')
+   [[ "$_missing" -eq 0 ]] || exit 1
+
+--- a/scripts/verify-kafka-kraft-advertised-listeners.sh+++ b/scripts/verify-kafka-kraft-advertised-listeners.sh@@ -7,12 +7,12 @@ # Usage:
+ #   ./scripts/verify-kafka-kraft-advertised-listeners.sh [namespace] [replicas]
+ # Env:
+-#   HOUSING_NS / namespace arg
++#   HOUSING_NS=record-platform / namespace arg
+ #   KAFKA_BROKER_REPLICAS / replicas arg
+ #   KAFKA_ADVERTISED_VERIFY_TIMEOUT — kubectl exec timeout seconds (default 25)
+ set -euo pipefail
+ 
+-NS="${1:-${HOUSING_NS:-record-platform}}"
++NS="${1:-${HOUSING_NS=record-platform:-record-platform}}"
+ REPLICAS="${2:-${KAFKA_BROKER_REPLICAS:-3}}"
+ EXEC_TO="${KAFKA_ADVERTISED_VERIFY_TIMEOUT:-25}"
+ 
+
+--- a/scripts/verify-kafka-no-static-advertised-env.sh+++ b/scripts/verify-kafka-no-static-advertised-env.sh@@ -11,7 +11,7 @@ # Usage: ./scripts/verify-kafka-no-static-advertised-env.sh [namespace]
+ set -euo pipefail
+ 
+-NS="${1:-${HOUSING_NS:-record-platform}}"
++NS="${1:-${HOUSING_NS=record-platform:-record-platform}}"
+ 
+ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+ ok() { echo "✅ $*"; }
+
+--- a/scripts/verify-kafka-tls-sans.sh+++ b/scripts/verify-kafka-tls-sans.sh@@ -13,7 +13,7 @@ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+-NS="${1:-${HOUSING_NS:-record-platform}}"
++NS="${1:-${HOUSING_NS=record-platform:-record-platform}}"
+ REPLICAS="${2:-${KAFKA_BROKER_REPLICAS:-3}}"
+ 
+ # shellcheck source=lib/kafka-broker-sans.sh
+
+--- a/scripts/verify-network-coherence.sh+++ b/scripts/verify-network-coherence.sh@@ -4,7 +4,7 @@ #
+ # Usage: ./scripts/verify-network-coherence.sh
+ # Env:
+-#   HOUSING_NS / KAFKA_BROKER_REPLICAS — Kafka checks (default record-platform / 3)
++#   HOUSING_NS=record-platform / KAFKA_BROKER_REPLICAS — Kafka checks (default record-platform / 3)
+ #   VERIFY_NETWORK_COHERENCE_SKIP_KAFKA=1 — skip broker advertised.listeners vs LB check
+ #   VERIFY_NETWORK_COHERENCE_LENIENT=1 — warn only (exit 0); default is strict (exit 1 on mismatch)
+ set -euo pipefail
+@@ -15,7 +15,7 @@ # shellcheck disable=SC1091
+ source "$SCRIPT_DIR/lib/metallb-subnet-guard.sh"
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ REPLICAS="${KAFKA_BROKER_REPLICAS:-3}"
+ LENIENT="${VERIFY_NETWORK_COHERENCE_LENIENT:-0}"
+ 
+
+--- a/scripts/verify-preflight-edge-routing.sh+++ b/scripts/verify-preflight-edge-routing.sh@@ -5,7 +5,7 @@ # Usage:
+ #   ./scripts/verify-preflight-edge-routing.sh [namespace] [edge_hostname]
+ # Env:
+-#   HOUSING_NS, OCH_EDGE_HOSTNAME (default record.local)
++#   HOUSING_NS=record-platform, OCH_EDGE_HOSTNAME (default record.local)
+ #   VERIFY_PREFLIGHT_EDGE_PHASES — comma list: ingress,dns,curl (default: all three)
+ #   PREFLIGHT_SKIP_EDGE_INGRESS_PARITY_GATE=1 — skip ingress
+ #   PREFLIGHT_SKIP_EDGE_DNS_LB_GATE=1 — skip dns
+@@ -22,7 +22,7 @@ # shellcheck disable=SC1091
+ source "$SCRIPT_DIR/lib/edge-test-url.sh"
+ 
+-NS="${1:-${HOUSING_NS:-record-platform}}"
++NS="${1:-${HOUSING_NS=record-platform:-record-platform}}"
+ HOST="${2:-${OCH_EDGE_HOSTNAME:-record.local}}"
+ ING_NAME="${EDGE_INGRESS_NAME:-record-platform}"
+ ING_NS="${EDGE_INGRESS_NAMESPACE:-$NS}"
+@@ -149,7 +149,7 @@ if [[ "$RUN_INGRESS" -eq 1 ]]; then
+   say "Edge 6b1 — Ingress path parity ($ING_NAME/$ING_NS, host $HOST)"
+   _verify_ingress_python || exit 1
+-  ok "Ingress: /api + /auth → api-gateway:4020, / → nginx:8080 (ordered before catch-all /)"
++  ok "Ingress: /api + /auth → api-gateway:4000, / → nginx:8080 (ordered before catch-all /)"
+ fi
+ 
+ if [[ "$RUN_DNS" -eq 1 ]]; then
+
+--- a/scripts/verify-required-housing-pods.sh+++ b/scripts/verify-required-housing-pods.sh@@ -3,7 +3,7 @@ # plus envoy-test and Caddy in ingress-nginx. Use after kustomize apply + image load.
+ #
+ # Usage: ./scripts/verify-required-housing-pods.sh
+-#   HOUSING_NS=record-platform   (default — USE THIS, not NS=)
++#   HOUSING_NS=record-platform=record-platform   (default — USE THIS, not NS=)
+ #   STRICT=1                       exit 1 on any failure (default 1)
+ #   PREFLIGHT_APP_DEPLOYS="..."    space-separated list (default = full housing set + media)
+ #
+@@ -11,8 +11,8 @@ # NS=record-platform (or other repos); that would make this script check the wrong namespace.
+ set -euo pipefail
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+-HOUSING_NS="${HOUSING_NS:-record-platform}"
+-NS="$HOUSING_NS"
++HOUSING_NS=record-platform="${HOUSING_NS=record-platform:-record-platform}"
++NS="$HOUSING_NS=record-platform"
+ STRICT="${STRICT:-1}"
+ 
+ DEFAULT_DEPLOYS="auth-service api-gateway listings-service booking-service messaging-service trust-service analytics-service media-service notification-service"
+@@ -25,7 +25,7 @@ 
+ _k() { kubectl --request-timeout=15s "$@"; }
+ 
+-say "Verifying required Deployments (HOUSING_NS=$HOUSING_NS → namespace $NS, envoy-test, ingress-nginx)…"
++say "Verifying required Deployments (HOUSING_NS=record-platform=$HOUSING_NS=record-platform → namespace $NS, envoy-test, ingress-nginx)…"
+ 
+ bad=0
+ for d in $DEPLOYS; do
+@@ -55,8 +55,8 @@ fi
+ 
+ if [[ "$bad" -ne 0 ]]; then
+-  say "Fix: ./scripts/build-housing-images-k3s.sh && kustomize build infra/k8s/overlays/dev | kubectl apply -f - && kubectl rollout status deploy/listings-service -n $HOUSING_NS --timeout=300s"
+-  say "Tip: if you meant a different cluster namespace, run: HOUSING_NS=your-ns $0"
++  say "Fix: ./scripts/build-housing-images-k3s.sh && kustomize build infra/k8s/overlays/dev | kubectl apply -f - && kubectl rollout status deploy/listings-service -n $HOUSING_NS=record-platform --timeout=300s"
++  say "Tip: if you meant a different cluster namespace, run: HOUSING_NS=record-platform=your-ns $0"
+   [[ "$STRICT" == "1" ]] && fail "Required deployments not ready."
+   exit 0
+ fi
+
+--- a/scripts/wait-for-all-services-ready.sh+++ b/scripts/wait-for-all-services-ready.sh@@ -26,8 +26,8 @@   echo "$msg" >> "${WAIT_LOG:-/dev/stdout}" 2>/dev/null || echo "$msg"
+ }
+ 
+-NS="${HOUSING_NS:-record-platform}"
+-export HOUSING_NS="$NS"
++NS="${HOUSING_NS=record-platform:-record-platform}"
++export HOUSING_NS=record-platform="$NS"
+ # Space-separated deploy names; preflight exports WAIT_APP_SERVICES from PREFLIGHT_APP_DEPLOYS.
+ # WAIT_APP_AUTO_DETECT=1 (default): kubectl list of *-service + api-gateway in namespace (no hardcoded count).
+ WAIT_APP_AUTO_DETECT="${WAIT_APP_AUTO_DETECT:-1}"
+
+--- a/scripts/wait-for-kafka-external-lb-ips.sh+++ b/scripts/wait-for-kafka-external-lb-ips.sh@@ -1,9 +1,9 @@ #!/usr/bin/env bash
+ # Wait until kafka-0..N-1-external each have status.loadBalancer.ingress[0].ip (MetalLB / cloud LB).
+-# Env: HOUSING_NS, KAFKA_BROKER_REPLICAS, KAFKA_LB_WAIT_MAX_ATTEMPTS (default 90), KAFKA_LB_WAIT_SLEEP (default 2)
++# Env: HOUSING_NS=record-platform, KAFKA_BROKER_REPLICAS, KAFKA_LB_WAIT_MAX_ATTEMPTS (default 90), KAFKA_LB_WAIT_SLEEP (default 2)
+ set -euo pipefail
+ 
+-NS="${HOUSING_NS:-record-platform}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ REP="${KAFKA_BROKER_REPLICAS:-3}"
+ MAX="${KAFKA_LB_WAIT_MAX_ATTEMPTS:-90}"
+ SLEEP="${KAFKA_LB_WAIT_SLEEP:-2}"
+
+--- a/scripts/webapp-playwright-strict-edge.sh+++ b/scripts/webapp-playwright-strict-edge.sh@@ -4,7 +4,7 @@ # Usage (from repo root):
+ #   ./scripts/webapp-playwright-strict-edge.sh
+ # Env:
+-#   E2E_API_BASE   — https only (default https://record.local); :4020 / http localhost rejected
++#   E2E_API_BASE   — https only (default https://record.local); api-gateway:4000 / http localhost rejected
+ #   NODE_EXTRA_CA_CERTS — default REPO_ROOT/certs/dev-root.pem
+ set -euo pipefail
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package events.auth;
+
+option go_package = "github.com/TomWang22/record-platform/proto/events/auth";
+
+message UserCreatedV1 {
+  string user_id = 1;
+  string email = 2;
+  string role = 3;
+}
+
+message UserDeletedV1 {
+  string user_id = 1;
+}
+
+// Rich account-deletion signal for cross-service anonymization (envelope.type e.g. user.account.deleted.v1).
+// Prefer this over UserDeletedV1 for new producers; partition key = user_id (envelope.entity_id).
+message UserAccountDeletedV1 {
+  string user_id = 1;
+  string deletion_mode = 2;   // "anonymize" | reserved for future modes
+  bool gdpr_erasure = 3;
+  string requested_by = 4;    // "self" | "admin" | "system"
+  string deleted_at = 5;    // ISO-8601
+  string reason = 6;        // e.g. user_requested
+}
+
+// Optional: consumer completion signal for distributed finalization (topic dev.user.lifecycle.ack.v1).
+message UserDeletionAckV1 {
+  string user_id = 1;
+  string status = 2;              // "completed" | "failed"
+  string consumer_service = 3;    // e.g. messaging-service
+  string source_event_id = 4;     // correlates to envelope.event_id of user.account.deleted.v1
+}
+
+message UserRoleUpdatedV1 {
+  string user_id = 1;
+  string old_role = 2;
+  string new_role = 3;
+}
+
+message UserSuspendedV1 {
+  string user_id = 1;
+  string reason = 2;
+}

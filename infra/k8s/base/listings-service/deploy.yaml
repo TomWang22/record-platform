@@ -14,7 +14,7 @@ spec:
       labels: { app: listings-service }
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "4003"
+        prometheus.io/port: "4012"
         prometheus.io/path: "/metrics"
     spec:
       hostAliases:
@@ -41,9 +41,9 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 4003
+              containerPort: 4012
             - name: grpc
-              containerPort: 50057
+              containerPort: 50062
           envFrom:
             - configMapRef: { name: app-config }
             - secretRef:    { name: app-secrets }
@@ -51,23 +51,50 @@ spec:
             - name: NODE_ENV
               value: "development"
             - name: GRPC_PORT
-              value: "50057"
+              value: "50062"
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_REQUIRE_CLIENT_CERT
               value: "true"  # Strict mTLS: Envoy presents client cert to backends
             - name: TLS_CA_PATH
-              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert
+              value: "/etc/certs/ca.crt"
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
               value: "/certs/dev-root.pem"
             - name: KAFKA_CA_CERT
               value: "/etc/kafka/secrets/ca-cert.pem"
+            - name: KAFKA_CLIENT_CERT
+              value: "/etc/kafka/secrets/client.crt"
+            - name: KAFKA_CLIENT_KEY
+              value: "/etc/kafka/secrets/client.key"
             - name: TLS_KEY_PATH
               value: "/etc/certs/tls.key"
             - name: TLS_CERT_PATH
               value: "/etc/certs/tls.crt"
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+
           resources:
             requests:
               cpu: 200m
@@ -88,64 +115,7 @@ spec:
             - name: kafka-ssl-certs
               mountPath: /etc/kafka/secrets
               readOnly: true
-          # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2/3 only, NOT HTTP/1.1
-          # Uses grpc-health-probe binary for standard gRPC health checking protocol
-          # Protocol: HTTP/2 (h2) with TLS or HTTP/3 (QUIC) - Strict TLS, production-ready
-          # Service name: listings.ListingsService (registered service name)
-          # Uses TLS with CA certificate for strict verification
-          readinessProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50057
-                - -service=listings.ListingsService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=5s
-            initialDelaySeconds: 90
-            periodSeconds: 15
-            timeoutSeconds: 20
-            failureThreshold: 6
-          livenessProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50057
-                - -service=listings.ListingsService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=5s
-            initialDelaySeconds: 180
-            periodSeconds: 20
-            timeoutSeconds: 20
-            failureThreshold: 6
-          startupProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50057
-                - -service=listings.ListingsService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=5s
-            initialDelaySeconds: 45
-            periodSeconds: 15
-            timeoutSeconds: 20
-            failureThreshold: 30
+
       volumes:
         - name: proto-files
           configMap:
@@ -158,7 +128,7 @@ spec:
                 path: dev-root.pem
         - name: service-tls
           secret:
-            secretName: service-tls
+            secretName: service-tls-listings-service
             items:
               - key: tls.key
                 path: tls.key
@@ -173,3 +143,7 @@ spec:
             items:
               - key: ca-cert.pem
                 path: ca-cert.pem
+              - key: client.crt
+                path: client.crt
+              - key: client.key
+                path: client.key

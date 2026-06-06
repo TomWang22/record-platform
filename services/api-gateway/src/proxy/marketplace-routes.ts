@@ -178,21 +178,18 @@ export function registerMarketplaceHttpProxies(deps: MarketplaceProxyDeps): void
     injectIdentityHeadersIfAny,
     createProxyMiddleware(withAgent(proxyOpts(NOTIFICATION_HTTP_TARGET, { "^/api/notification": "" })) as any)
   );
-  app.use(
-    "/notifications",
-    injectIdentityHeadersIfAny,
-    createProxyMiddleware(withAgent(proxyOpts(NOTIFICATION_HTTP_TARGET, { "^/notifications": "/notifications" })) as any)
-  );
   const notificationsProxyOpts = withAgent({
     ...proxyOpts(NOTIFICATION_HTTP_TARGET, {}),
     pathRewrite: (path: string) =>
       `/notifications${path === "/" || path === "" ? "" : path}`,
   });
-  app.use(
-    "/api/notifications",
-    injectIdentityHeadersIfAny,
-    createProxyMiddleware(notificationsProxyOpts as any),
-  );
+  for (const prefix of ["/notifications", "/api/notifications", "/notification", "/api/notification"]) {
+    app.use(
+      prefix,
+      injectIdentityHeadersIfAny,
+      createProxyMiddleware(notificationsProxyOpts as any),
+    );
+  }
   const feedbackProxyOpts = withAgent({
     ...proxyOpts(TRUST_HTTP_TARGET, {}),
     pathRewrite: (path: string) =>

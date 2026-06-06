@@ -1,0 +1,31 @@
+{
+  "bundle_extraction_protocol": "v1",
+  "generated_at": "2026-04-19T00:52:14.255483+00:00",
+  "archive": "/Users/tom/record-platform-kafka-metallb-tls-reference-20260409.tar.gz",
+  "archive_sha256": "467d021cb9ebeca7939aad2b236e1c755f9cd2283ad341d7737f04efdba15f30",
+  "staging_path": "/Users/tom/bundle-staging/record-platform-kafka-metallb-tls-reference-20260409",
+  "archive_root_layout": {
+    "type": "single_top_level",
+    "root": "record-platform-kafka-metallb-tls-reference-20260409"
+  },
+  "pre_extract": {
+    "safe": true,
+    "issues": [],
+    "warnings": [],
+    "file_member_count": 86
+  },
+  "post_extract": {
+    "manifest_tar_equals_find": true,
+    "file_count": 86,
+    "case_collision_free": true,
+    "staging_frozen_read_only": true,
+    "apple_double_neutral_manifest": true
+  },
+  "explicit_non_actions": [
+    "tarball_not_mutated",
+    "no_line_endings_normalized",
+    "no_top_level_strip_rewrite",
+    "no_repo_copy",
+    "no_git_add"
+  ]
+}

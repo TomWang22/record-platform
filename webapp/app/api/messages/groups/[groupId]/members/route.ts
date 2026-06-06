@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8081'
+import { messagingMessagesBaseUrl, messagingProxyHeaders } from '@/lib/messaging-bff'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: { groupId: string } },
 ) {
   try {
     const body = await request.json()
@@ -15,11 +15,11 @@ export async function POST(
       return NextResponse.json({ error: 'user_id is required' }, { status: 400 })
     }
 
-    const response = await fetch(`${API_GATEWAY_URL}/messages/groups/${groupId}/members`, {
+    const response = await fetch(`${messagingMessagesBaseUrl()}/groups/${groupId}/members`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': request.headers.get('Authorization') || '',
+        ...messagingProxyHeaders(request),
       },
       body: JSON.stringify({ user_id }),
     })
@@ -36,4 +36,3 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to add member' }, { status: 500 })
   }
 }
-

@@ -17,12 +17,23 @@ import { assertNoStaleProductUi } from './helpers/stale-ui-guard'
 
 test.describe.configure({ timeout: 120_000 })
 
+function publicShipping(row: Record<string, unknown>): Record<string, unknown> {
+  const sh = row.shipping
+  return sh && typeof sh === 'object' && !Array.isArray(sh) ? (sh as Record<string, unknown>) : {}
+}
+
 function listingDetailApiReady(row: Record<string, unknown>, title: string): boolean {
-  const domestic = Number(row.domestic_shipping_cents ?? row.domesticShippingCents ?? -1)
-  const service = String(row.shipping_service ?? row.shippingService ?? '')
+  const sh = publicShipping(row)
+  const domesticCents =
+    row.domestic_shipping_cents != null
+      ? Number(row.domestic_shipping_cents)
+      : sh.domestic != null
+        ? Math.round(Number(sh.domestic) * 100)
+        : -1
+  const service = String(row.shipping_service ?? row.shippingService ?? sh.service ?? '')
   return (
     String(row.title ?? row.name ?? '') === title &&
-    domestic === FULL_SHIPPING.domestic_shipping_cents &&
+    domesticCents === FULL_SHIPPING.domestic_shipping_cents &&
     service.includes('Media')
   )
 }
@@ -54,13 +65,22 @@ test.describe.serial('Listing detail product contract (7.4)', () => {
     const api = await waitForListingField(request, token, listingId, (row) =>
       listingDetailApiReady(row, listingTitle),
     )
-    expect(api.shipping_service).toBe(FULL_SHIPPING.shipping_service)
-    expect(Number(api.domestic_shipping_cents)).toBe(FULL_SHIPPING.domestic_shipping_cents)
-    expect(Number(api.international_shipping_cents)).toBe(
-      FULL_SHIPPING.international_shipping_cents,
-    )
-    expect(api.package_type).toBe(FULL_SHIPPING.package_type)
-    expect(api.shipping_notes).toBe(FULL_SHIPPING.shipping_notes)
+    const sh = publicShipping(api)
+    const service = String(api.shipping_service ?? sh.service ?? '')
+    const domesticCents =
+      api.domestic_shipping_cents != null
+        ? Number(api.domestic_shipping_cents)
+        : Math.round(Number(sh.domestic ?? 0) * 100)
+    const internationalCents =
+      api.international_shipping_cents != null
+        ? Number(api.international_shipping_cents)
+        : Math.round(Number(sh.international ?? 0) * 100)
+    expect(service).toBe(FULL_SHIPPING.shipping_service)
+    expect(domesticCents).toBe(FULL_SHIPPING.domestic_shipping_cents)
+    expect(internationalCents).toBe(FULL_SHIPPING.international_shipping_cents)
+    expect(String(api.package_type ?? sh.package ?? '')).toBe(FULL_SHIPPING.package_type)
+    expect(String(api.shipping_notes ?? sh.notes ?? '')).toBe(FULL_SHIPPING.shipping_notes)
+    expect(api.priceDisplay).toMatch(/^\$\d+\.\d{2}$/)
 
     await page.goto(`/listings/${listingId}`)
     await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 45_000 })
@@ -81,6 +101,16 @@ test.describe.serial('Listing detail product contract (7.4)', () => {
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-listing-detail-clean-shipping-contact.png'),
+    )
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-listing-detail-product-complete.png'),
+    )
+    await expect(page.getByTestId('listing-listed-at')).toBeVisible()
+    await expect(page.getByTestId('listing-listed-at')).toContainText(/EDT|EST|PDT|PST|UTC/i)
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-listing-detail-shipping-dates.png'),
     )
   })
 })

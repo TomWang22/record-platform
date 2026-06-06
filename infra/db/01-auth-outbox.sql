@@ -1,0 +1,25 @@
+-- Transactional outbox for auth-service. Run against database 'auth' (e.g. port 5441).
+-- Auth DB may be restored from dump; this script is idempotent. Flow: domain change + insert outbox in same transaction; background publisher to dev.auth.events.
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE SCHEMA IF NOT EXISTS auth;
+
+CREATE TABLE IF NOT EXISTS auth.outbox_events (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  aggregate_id  TEXT NOT NULL,
+  type          TEXT NOT NULL,
+  version       INT NOT NULL,
+  payload       BYTEA NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  published     BOOLEAN NOT NULL DEFAULT false
+);
+
+-- Name must differ from Prisma migration index on auth.auth_outbox (idx_auth_outbox_unpublished).
+CREATE INDEX IF NOT EXISTS idx_auth_outbox_events_unpublished
+  ON auth.outbox_events(published, created_at)
+  WHERE published = false;
+
+COMMENT ON COLUMN auth.outbox_events.payload IS 'Serialized domain event (proto bytes); not JSON.';
+COMMENT ON COLUMN auth.outbox_events.id IS 'UUID = envelope.event_id; publisher must set envelope.event_id = this id (no new UUID on publish).';
+COMMENT ON TABLE auth.outbox_events IS 'Transactional outbox: same transaction as domain write; background publisher sends EventEnvelope; Kafka key = aggregate_id.';

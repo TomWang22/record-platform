@@ -9,10 +9,18 @@ export default function ProfileSellingPage() {
   const { authRequired } = useRequireAuth()
   if (authRequired) return <AuthRequiredCard returnTo="/profile/selling" title="Sign in" />
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="selling-page-ready">
       <h1 className="text-2xl font-semibold">Selling</h1>
-      <Card><p className="text-sm text-slate-500">Active and draft listings will appear here after listings API contract (Phase H).</p></Card>
-      <Link href="/sell" className="text-sm text-brand">Create listing →</Link>
+      <div data-testid="selling-empty-state-ready">
+        <Card>
+          <p className="text-sm text-slate-500">
+            No active listings yet. Create a listing to start selling.
+          </p>
+        </Card>
+      </div>
+      <Link href="/sell" className="text-sm text-brand">
+        Create listing →
+      </Link>
     </div>
   )
 }

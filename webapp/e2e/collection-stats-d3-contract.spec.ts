@@ -24,6 +24,10 @@ test.describe('Collection stats D3 contract (7.8)', () => {
     await expect(page.getByTestId('collection-chart-spend')).toBeVisible()
     await capturePageContentScreenshot(
       page,
+      contractScreenshotPath('authenticated-collection-stats-d3-clean.png'),
+    )
+    await capturePageContentScreenshot(
+      page,
       contractScreenshotPath('authenticated-collection-stats-d3-acquisition.png'),
     )
     await page.locator('[data-testid="collection-chart-spend"]').scrollIntoViewIfNeeded()

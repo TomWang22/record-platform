@@ -85,14 +85,28 @@ services:
       retries: 20
       start_period: 10s
 
-  postgres-social:
+  postgres-records:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5433:5432"]
+    volumes: ["pgdata-records:/var/lib/postgresql/data"]
+    shm_size: 1g
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  postgres-messaging:
     image: postgres:16-alpine
     environment: { POSTGRES_PASSWORD: postgres }
     restart: unless-stopped
     ports: ["5434:5432"]
-    volumes: ["pgdata-social:/var/lib/postgresql/data"]
-    shm_size: 1g  # High concurrency: messages, forums, real-time features
-    # Gold tuning: index-first, parallel 12/4, cache-friendly (hot tenants, hashing)
+    volumes: ["pgdata-messaging:/var/lib/postgresql/data"]
+    shm_size: 1g
     command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U postgres"]
@@ -165,8 +179,23 @@ services:
       retries: 20
       start_period: 10s
 
-  postgres-analytics:
+  postgres-auction-monitor-core:
     image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5438:5432"]
+    volumes: ["pgdata-auction-monitor-core:/var/lib/postgresql/data"]
+    shm_size: 1g
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  postgres-analytics:
+    image: pgvector/pgvector:pg16
     environment: { POSTGRES_PASSWORD: postgres }
     restart: unless-stopped
     ports: ["5439:5432"]
@@ -196,6 +225,70 @@ services:
       timeout: 3s
       retries: 20
       start_period: 10s
+
+  postgres-notification:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5441:5432"]
+    volumes: ["pgdata-notification:/var/lib/postgresql/data"]
+    shm_size: 1g
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  postgres-trust:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5442:5432"]
+    volumes: ["pgdata-trust:/var/lib/postgresql/data"]
+    shm_size: 1g
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  postgres-media:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    ports: ["5443:5432"]
+    volumes: ["pgdata-media:/var/lib/postgresql/data"]
+    shm_size: 1g
+    command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=4GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB", "-c", "checkpoint_completion_target=0.9", "-c", "wal_buffers=16MB", "-c", "max_wal_size=2GB", "-c", "default_statistics_target=100", "-c", "random_page_cost=0.8", "-c", "max_parallel_workers=12", "-c", "max_parallel_workers_per_gather=4", "-c", "jit=off", "-c", "enable_seqscan=off", "-c", "track_io_timing=on", "-c", "effective_io_concurrency=200"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  minio:
+    image: minio/minio:RELEASE.2024-08-26T15-33-07Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL","wget -qO- http://127.0.0.1:9000/minio/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
 
   postgres-backup:
     image: prodrigestivill/postgres-backup-local:15
@@ -364,7 +457,6 @@ services:
       listings-service: { condition: service_healthy }
       analytics-service: { condition: service_healthy }
       python-ai-service: { condition: service_healthy }
-      social-service: { condition: service_healthy }
     expose: ["4000"]
     restart: unless-stopped
     healthcheck:
@@ -402,23 +494,6 @@ services:
       start_period: 60s
     environment:
       POSTGRES_URL_PYTHON_AI: postgresql://postgres:postgres@postgres-python-ai:5432/python_ai
-
-  social-service:
-    build: { context: ., dockerfile: services/social-service/Dockerfile }
-    env_file: [.env]
-    depends_on:
-      postgres: { condition: service_healthy }
-      kafka: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    expose: ["4006", "50056"]
-    ports: ["4006:4006", "50056:50056"]
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL","node -e \"require('http').get('http://127.0.0.1:4006/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
-      interval: 5s
-      timeout: 2s
-      retries: 10
-      start_period: 10s
 
   shopping-service:
     build: { context: ., dockerfile: services/shopping-service/Dockerfile }
@@ -527,11 +602,17 @@ services:
 
 volumes:
   pgdata:
-  pgdata-social:
+  pgdata-records:
+  pgdata-messaging:
   pgdata-listings:
   pgdata-shopping:
   pgdata-auth:
   pgdata-auction-monitor:
+  pgdata-auction-monitor-core:
   pgdata-analytics:
   pgdata-python-ai:
+  pgdata-notification:
+  pgdata-trust:
+  pgdata-media:
+  minio_data:
   nginx_cache:

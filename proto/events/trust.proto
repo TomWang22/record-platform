@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package events.trust;
+
+option go_package = "github.com/TomWang22/record-platform/proto/events/trust";
+
+// Versioned event payloads for dev.trust.events. Trust owns trust; listing listens optionally.
+
+message ListingFlaggedV1 {
+  string listing_id = 1;
+  string flagged_by = 2;
+  string reason = 3;
+}
+
+message ListingUnflaggedV1 {
+  string listing_id = 1;
+}
+
+message ReviewCreatedV1 {
+  string review_id = 1;
+  string listing_id = 2;
+  string order_id = 3;
+  string reviewer_id = 4;
+  string reviewee_id = 5;
+  int32 rating = 6;
+  string created_at = 7;
+}
+
+message ReputationUpdatedV1 {
+  string user_id = 1;
+  double new_score = 2;
+  string updated_at = 3;
+}
+
+message SellerVerifiedV1 {
+  string user_id = 1;
+  string verified_at = 2;
+}
+
+message UserReputationUpdatedV1 {
+  string user_id = 1;
+  double new_score = 2;
+}

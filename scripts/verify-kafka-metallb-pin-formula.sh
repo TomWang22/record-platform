@@ -19,7 +19,7 @@ _assert_row() {
   for ((i = 0; i < rep; i++)); do
     want="$1"
     shift
-    got="$(och_kafka_metallb_expected_ip_for_broker "$pool" "$off" "$i")" || {
+    got="$(rp_kafka_metallb_expected_ip_for_broker "$pool" "$off" "$i")" || {
       echo "❌ formula error pool=$pool off=$off i=$i" >&2
       FAIL=1
       return
@@ -53,7 +53,7 @@ REP="${KAFKA_BROKER_REPLICAS:-3}"
 if command -v kubectl >/dev/null 2>&1 && kubectl get svc kafka-0-external -n "$NS" --request-timeout=10s >/dev/null 2>&1; then
   echo "=== verify-kafka-metallb-pin-formula (live annotation vs formula, ns=$NS) ==="
   for ((i = 0; i < REP; i++)); do
-    want="$(och_kafka_metallb_expected_ip_for_broker "$POOL" "$OFF" "$i")"
+    want="$(rp_kafka_metallb_expected_ip_for_broker "$POOL" "$OFF" "$i")"
     got="$(kubectl get svc "kafka-${i}-external" -n "$NS" -o jsonpath="{.metadata.annotations['metallb.universe.tf/loadBalancerIPs']}" --request-timeout=15s 2>/dev/null || true)"
     if [[ -z "$got" ]]; then
       echo "⚠️  kafka-${i}-external: no metallb pin annotation (OK for fresh cluster)" >&2

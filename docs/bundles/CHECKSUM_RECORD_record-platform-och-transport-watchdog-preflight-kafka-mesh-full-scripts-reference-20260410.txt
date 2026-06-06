@@ -1,0 +1,6 @@
+ARCHIVE_SHA256=955d5eec9a6219973e124f33311a0f59c998ed9a68f9d7366982d567502ff5ae
+ARCHIVE_PATH=/Users/tom/record-platform-och-transport-watchdog-preflight-kafka-mesh-full-scripts-reference-20260410.tar.gz
+SIDECAR_PATH=none
+SIDECAR_HASH_EXPECTED=
+RECORDED_AT_UTC=2026-04-19T00:53:24.397446+00:00
+PROTOCOL=bundle_extraction_v1

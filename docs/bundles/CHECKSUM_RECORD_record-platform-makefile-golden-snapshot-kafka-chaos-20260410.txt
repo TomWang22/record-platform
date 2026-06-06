@@ -1,0 +1,6 @@
+ARCHIVE_SHA256=1154eb5fbf17f5f590e9c33118582b192fa268f3d1eb31b62836330579d8d0eb
+ARCHIVE_PATH=/Users/tom/record-platform-makefile-golden-snapshot-kafka-chaos-20260410.tar.gz
+SIDECAR_PATH=none
+SIDECAR_HASH_EXPECTED=
+RECORDED_AT_UTC=2026-04-19T00:52:29.866139+00:00
+PROTOCOL=bundle_extraction_v1

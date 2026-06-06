@@ -56,15 +56,27 @@ test.describe.serial('Listing revisions readable contract (7.6)', () => {
       page,
       contractScreenshotPath('authenticated-listing-revisions-human-readable.png'),
     )
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-listing-revisions-readable-dated.png'),
+    )
 
     await page.goto(`/listings/${listingId}`)
     await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 45_000 })
     await page.getByTestId('listing-revision-panel').getByRole('button').click()
     await expect(page.getByTestId('listing-revision-panel-loaded')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByTestId('listing-revision-panel-loaded')).toContainText(/Title|Price|Sale/i)
+    await expect(page.getByTestId('listing-revision-preview-when')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('listing-revision-preview-when')).toContainText(
+      /Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/i,
+    )
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-listing-detail-revision-panel.png'),
+    )
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-listing-detail-revision-preview-dated.png'),
     )
   })
 })

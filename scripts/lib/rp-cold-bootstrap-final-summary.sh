@@ -45,6 +45,21 @@ _rp_final_summary() {
   echo "  Bootstrap verify: $bootstrap_overall"
   echo "  Cluster doctor:   ${doctor_score} / 100"
   echo "  SLO gates:        $slo_ok  (see bench_logs/rp_slo_sla_report.json)"
+  local grpc_gate="—"
+  local cert_gate="—"
+  local edge_mtls="—"
+  if [[ -f "$bench/security-contract/grpc-mtls-required-gate.json" ]]; then
+    grpc_gate="$(python3 -c "import json; g=json.load(open('$bench/security-contract/grpc-mtls-required-gate.json')); print(f\"{g.get('checked','?')}/{g.get('expected',11)} required={g.get('all_required')} chain={g.get('cert_chain_ok')}\")" 2>/dev/null || echo "?")"
+  fi
+  if [[ -f "$bench/security-contract/service-cert-chain-contract.md" ]]; then
+    cert_gate="$(grep -E '^\*\*RESULT:' "$bench/security-contract/service-cert-chain-contract.md" 2>/dev/null | tail -1 | sed 's/\*\*//g' || echo "see report")"
+  fi
+  if [[ -f "$bench/security-contract/mtls-real-smoke/report.md" ]]; then
+    edge_mtls="$(grep -E 'overall|RESULT' "$bench/security-contract/mtls-real-smoke/report.md" 2>/dev/null | head -1 || echo "see report")"
+  fi
+  echo "  gRPC mTLS gate:   $grpc_gate"
+  echo "  Cert chain:       $cert_gate"
+  echo "  Edge mTLS smoke:  $edge_mtls"
   echo "────────────────────────────────────────────────────────────────"
   echo "  Edge (Caddy MetalLB)"
   if [[ -n "$caddy_ip" && "$caddy_ip" != "—" ]]; then

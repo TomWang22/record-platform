@@ -14,6 +14,8 @@ import {
   USER_ACCOUNT_DELETED_V1,
   userLifecycleV1Topic,
   initOchOutboxSurfaceSupported,
+  mountRpHttpHealth,
+  rpGrpcHealthOptions,
 } from "@common/utils";
 import { inferNetProtoForSpan, mountDebugTraceHeaders, tracingMiddleware } from "@common/utils/otel";
 import {
@@ -167,82 +169,32 @@ app.get("/metrics", async (_req: Request, res: Response) => {
   res.end(await register.metrics());
 });
 
-app.get("/healthz", async (_req: Request, res: Response) => {
-  let dbOk = false;
-  let redisOk = false;
-
-  // Check database (non-blocking, with timeout)
+async function authServiceReadiness(): Promise<boolean> {
   try {
-    // Use Promise.race to add a timeout to the database query
     const dbCheck = prisma.$queryRaw`SELECT 1`;
     const timeout = new Promise((_, reject) =>
       setTimeout(() => reject(new Error("DB check timeout")), 500),
     );
     await Promise.race([dbCheck, timeout]);
-    dbOk = true;
-  } catch (e: any) {
-    // Silently fail - don't log timeout errors to reduce noise
-    if (!e?.message?.includes("timeout")) {
-      console.warn(
-        "auth-service healthz db check failed:",
-        e?.message || "db error",
-      );
-    }
+  } catch {
+    return false;
   }
-
-  // Check Redis (non-blocking, with timeout)
   try {
     const redisCheck = redis.ping();
     const timeout = new Promise((_, reject) =>
       setTimeout(() => reject(new Error("Redis check timeout")), 500),
     );
     await Promise.race([redisCheck, timeout]);
-    redisOk = true;
-  } catch (redisErr: any) {
-    // Silently fail - don't log timeout errors to reduce noise
-    if (!redisErr?.message?.includes("timeout")) {
-      logAuthEvent("healthz_redis_ping_failed", {
-        error: redisErr instanceof Error ? redisErr.message : String(redisErr),
-      });
-    }
+  } catch {
+    return false;
   }
+  return true;
+}
 
-  // Include bcrypt queue status and cache stats in health check
-  const { getCacheStats } = await import("./lib/redis-cache.js");
-  // @ts-ignore - TypeScript incorrectly infers nested type from bcryptjs
-  const queueStatusData: any = getQueueStatus();
-  // @ts-ignore - TypeScript type inference issue (bcryptjs nested type)
-  const queueStatus = {
-    activeOperations: queueStatusData.activeOperations,
-    queueLength: queueStatusData.queueLength,
-    maxConcurrent: queueStatusData.maxConcurrent,
-    rounds: queueStatusData.rounds,
-  } as any;
-  const cacheStatsStale = {
-    connected: false as const,
-    userCacheKeys: 0,
-  };
-  const cacheStats = await Promise.race([
-    getCacheStats(),
-    new Promise<typeof cacheStatsStale>((resolve) =>
-      setTimeout(() => resolve(cacheStatsStale), 800),
-    ),
-  ]);
-
-  // Return 200 immediately - allows service to start and gRPC to be available
-  // The service can still handle requests, they'll just fail if DB is down
-  res.status(200).json({
-    ok: true,
-    db: dbOk ? "connected" : "disconnected",
-    redis: redisOk ? "connected" : "disconnected",
-    bcrypt: {
-      activeOperations: queueStatus.activeOperations,
-      queueLength: queueStatus.queueLength,
-      maxConcurrent: queueStatus.maxConcurrent,
-      rounds: queueStatus.rounds,
-    },
-    cache: cacheStats,
-  });
+mountRpHttpHealth(app, {
+  service: "auth-service",
+  readiness: authServiceReadiness,
+  grpc: rpGrpcHealthOptions("auth-service", "auth.AuthService"),
 });
 
 app.use(
@@ -1195,7 +1147,7 @@ if (!skipAuthListen) {
 if (!skipAuthListen && process.env.ENABLE_GRPC !== "false") {
   import("./grpc-server.js")
     .then(({ startGrpcServer }) => {
-      const grpcPort = parseInt(process.env.GRPC_PORT || "50051", 10);
+      const grpcPort = parseInt(process.env.GRPC_PORT || "50061", 10);
       startGrpcServer(grpcPort);
     })
     .catch((e) => {

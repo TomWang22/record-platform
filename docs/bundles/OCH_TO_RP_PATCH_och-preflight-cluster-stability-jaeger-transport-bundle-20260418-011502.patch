@@ -1,0 +1,627 @@
+# OCH → RP namespace patch (generated; NOT applied)
+# Matrix: /Users/tom/record-platform/docs/bundles/OCH_TO_RP_CONVERSION_MATRIX.md
+# Staging: /Users/tom/bundle-staging/och-preflight-cluster-stability-jaeger-transport-bundle-20260418-011502
+# Review with: git apply --check <this-file>
+
+--- a/Makefile+++ b/Makefile@@ -27,7 +27,7 @@ SKIP_AUTO_RESTORE ?= 0
+ # apply-kafka-kraft: scale brokers to 0 before kafka-ssl-secret refresh (single JKS view). dev-onboard exports 1.
+ KAFKA_TLS_ATOMIC_BEFORE_REFRESH ?= 0
+-HOUSING_NS ?= off-campus-housing-tracker
++HOUSING_NS=record-platform ?= record-platform
+ # Colima+MetalLB lab: one entry point `make preflight-lab` (= preflight-strict). Jaeger default; empty = auto-discover in scripts.
+ #   SKIP_MACOS_DEV_CA_TRUST=1 make preflight-lab     (unattended, no macOS keychain trust)
+ #   make preflight-lab PREFLIGHT_STRICT_JAEGER_QUERY_BASE=     (clear Jaeger URL for script discovery)
+@@ -59,8 +59,8 @@ 	kubectl get pods -A
+ 	kubectl describe pod -n observability -l app=jaeger
+ 	kubectl logs -n observability -l app=jaeger --tail=200
+-	kubectl logs -n off-campus-housing-tracker -l app=api-gateway --tail=200
+-	kubectl logs -n off-campus-housing-tracker -l app=auth-service --tail=200
++	kubectl logs -n record-platform -l app=api-gateway --tail=200
++	kubectl logs -n record-platform -l app=auth-service --tail=200
+ 
+ 
+ # Default orchestration knobs for team "one-command" workflow.
+@@ -99,7 +99,7 @@ HEADLESS ?= 0
+ KUBECONFIG_COLIMA ?= $(HOME)/.colima/default/kubeconfig
+ RESTORE_BACKUP_DIR ?= latest
+-# Default 1: append off-campus-housing.test → MetalLB IP via sudo when needed (set 0 for hints only).
++# Default 1: append record.test → MetalLB IP via sudo when needed (set 0 for hints only).
+ HOSTS_AUTO ?= 1
+ EXTERNAL_IP ?=
+ 
+@@ -157,7 +157,7 @@ 	@echo ""
+ 	@echo "Core:"
+ 	@echo "  make up               Full bootstrap (cluster + infra + TLS + /etc/hosts for edge; no KRaft / no deploy-dev)"
+-	@echo "  make dev-onboard      deps + zero-trust CA + up-fast + Kafka TLS + och-kafka-ssl-secret verify (Phase 10: alignment; SAFE_ONLY=1 → kafka-health); make setup alias"
++	@echo "  make dev-onboard      deps + zero-trust CA + up-fast + Kafka TLS + kafka-ssl-secret verify (Phase 10: alignment; SAFE_ONLY=1 → kafka-health); make setup alias"
+ 	@echo "  make rollout-och-full  After Kafka/TLS secret fixes: ensure cluster secrets + restart all housing apps + Caddy (ordered)"
+ 	@echo "  make kafka-heal-inter-broker-tls  Recreate kafka-0..N-1 if CrashLoop / PKIX JKS drift (see Runbook.md)"
+ 	@echo "  make kafka-diagnose-broker-dns  ENOTFOUND kafka-0.kafka...? (headless svc, pods, EndpointSlices)"
+@@ -357,10 +357,10 @@ 	"$(REPO_ROOT)/scripts/validate-kafka-dns.sh"
+ 
+ # ROLE: DEV/SRE — analytics-service ENOTFOUND kafka-0.kafka...? Headless svc, Ready pods, EndpointSlices, nslookup probe
+-kafka-diagnose-broker-dns: ## Diagnose broker DNS / ENOTFOUND (HOUSING_NS); then: verify-kafka-dns, apply-kafka-kraft
++kafka-diagnose-broker-dns: ## Diagnose broker DNS / ENOTFOUND (HOUSING_NS=record-platform); then: verify-kafka-dns, apply-kafka-kraft
+ 	bash -n "$(REPO_ROOT)/scripts/diagnose-kafka-broker-dns.sh"
+ 	chmod +x "$(REPO_ROOT)/scripts/diagnose-kafka-broker-dns.sh"
+-	HOUSING_NS=$(HOUSING_NS) bash "$(REPO_ROOT)/scripts/diagnose-kafka-broker-dns.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) bash "$(REPO_ROOT)/scripts/diagnose-kafka-broker-dns.sh"
+ 
+ preflight-kafka-k8s: ## Broker props + DNS + ensure event topics (RF=3, min ISR=2); needs kubectl
+ 	bash -n "$(REPO_ROOT)/scripts/preflight-kafka-k8s-rollout.sh"
+@@ -383,7 +383,7 @@ kafka-heal-inter-broker-tls: ## If PKIX/JKS drift or CrashLoopBackOff: delete kafka-0..N-1, wait Ready, re-verify (KAFKA_INTER_BROKER_TLS_HEAL=0 skips)
+ 	bash -n "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+ 	chmod +x "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh" "$(REPO_ROOT)/scripts/kafka-after-rollout-verify-brokers.sh" "$(REPO_ROOT)/scripts/kafka-tls-guard.sh"
+-	HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+ 
+ kafka-runtime-sync: ## Gate: no LB↔advertised drift + TLS SAN vs LB (optional --remediate on script CLI)
+ 	bash -n "$(REPO_ROOT)/scripts/ensure-dev-root-ca.sh"
+@@ -393,7 +393,7 @@ 	bash -n "$(REPO_ROOT)/scripts/kafka-tls-guard.sh"
+ 	bash -n "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+ 	chmod +x "$(REPO_ROOT)/scripts/ensure-dev-root-ca.sh" "$(REPO_ROOT)/scripts/verify-kafka-broker-keystore-jks.sh" "$(REPO_ROOT)/scripts/kafka-runtime-sync.sh" "$(REPO_ROOT)/scripts/kafka-after-rollout-verify-brokers.sh" "$(REPO_ROOT)/scripts/kafka-tls-guard.sh" "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+-	HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+ 	"$(REPO_ROOT)/scripts/kafka-runtime-sync.sh"
+ 
+ kafka-sync-metallb: ## Drift-aware: verify-only if aligned; else refresh TLS from LB + rollout + verify-kafka-cluster
+@@ -411,7 +411,7 @@ 	chmod +x "$(REPO_ROOT)/scripts/kafka-after-rollout-verify-brokers.sh"
+ 	chmod +x "$(REPO_ROOT)/scripts/kafka-tls-guard.sh"
+ 	chmod +x "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+-	HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+ 	"$(REPO_ROOT)/scripts/kafka-sync-metallb.sh"
+ 
+ kafka-alignment-report-venv: ## Venv + matplotlib for generate-kafka-alignment-report.py (PEP 668–safe)
+@@ -427,7 +427,7 @@ 	bash -n "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+ 	bash -n "$(REPO_ROOT)/scripts/tests/kafka-alignment-suite.sh"
+ 	chmod +x "$(REPO_ROOT)/scripts/ensure-dev-root-ca.sh" "$(REPO_ROOT)/scripts/kafka-refresh-tls-from-lb.sh" "$(REPO_ROOT)/scripts/wait-for-kafka-external-lb-ips.sh" "$(REPO_ROOT)/scripts/kafka-after-rollout-verify-brokers.sh" "$(REPO_ROOT)/scripts/kafka-tls-guard.sh" "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh" "$(REPO_ROOT)/scripts/tests/kafka-alignment-suite.sh"
+-	HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+ 	"$(KAFKA_ALIGNMENT_REPORT_VENV)/bin/python" -m py_compile "$(REPO_ROOT)/scripts/generate-kafka-alignment-report.py"
+ 	PATH="$(KAFKA_ALIGNMENT_REPORT_VENV)/bin:$(PATH)" "$(REPO_ROOT)/scripts/tests/kafka-alignment-suite.sh"
+ 
+@@ -445,7 +445,7 @@ 	bash -n "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+ 	bash -n "$(REPO_ROOT)/scripts/tests/kafka-alignment-suite.sh"
+ 	chmod +x "$(REPO_ROOT)/scripts/ensure-dev-root-ca.sh" "$(REPO_ROOT)/scripts/verify-kafka-cluster.sh" "$(REPO_ROOT)/scripts/kafka-runtime-sync.sh" "$(REPO_ROOT)/scripts/kafka-after-rollout-verify-brokers.sh" "$(REPO_ROOT)/scripts/kafka-tls-guard.sh" "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh" "$(REPO_ROOT)/scripts/tests/kafka-alignment-suite.sh"
+-	HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh"
+ 	VERIFY_KAFKA_HEALTH_ONLY=0 \
+ 	  VERIFY_KAFKA_SKIP_META_IDENTITY=0 \
+ 	  VERIFY_KAFKA_SKIP_TLS_SANS=0 \
+@@ -466,7 +466,7 @@ kafka-smoke-with-health: kafka-health kafka-smoke ## kafka-health then gateway smoke (full stack only)
+ 	@true
+ 
+-k8s-diagnose-restarts: ## Pods with restarts: namespace events, per-container describe + logs (HOUSING_NS=…)
++k8s-diagnose-restarts: ## Pods with restarts: namespace events, per-container describe + logs (HOUSING_NS=record-platform=…)
+ 	bash -n "$(REPO_ROOT)/scripts/k8s-diagnose-restarts.sh"
+ 	chmod +x "$(REPO_ROOT)/scripts/k8s-diagnose-restarts.sh"
+ 	"$(REPO_ROOT)/scripts/k8s-diagnose-restarts.sh"
+@@ -487,7 +487,7 @@ 	chmod +x "$(REPO_ROOT)/scripts/verify-preflight-edge-routing.sh"
+ 	"$(REPO_ROOT)/scripts/verify-preflight-edge-routing.sh"
+ 
+-diagnose-k6-edge: ## DNS/TLS/curl checks for off-campus-housing.test (k6 edge timeouts)
++diagnose-k6-edge: ## DNS/TLS/curl checks for record.test (k6 edge timeouts)
+ 	bash -n "$(REPO_ROOT)/scripts/diagnose-k6-edge-connectivity.sh"
+ 	bash "$(REPO_ROOT)/scripts/diagnose-k6-edge-connectivity.sh"
+ 
+@@ -496,16 +496,16 @@ 	"$(REPO_ROOT)/scripts/cleanup-kafka-ops-cronjob-pods.sh"
+ 
+ # ROLE: DEV — reset Kafka LB + headless Services before apply (fresh MetalLB IPs / EndpointSlices)
+-kafka-lb-reset: ## Delete kafka-0/1/2-external LoadBalancers only (namespace off-campus-housing-tracker)
++kafka-lb-reset: ## Delete kafka-0/1/2-external LoadBalancers only (namespace record-platform)
+ 	@for s in kafka-0-external kafka-1-external kafka-2-external; do \
+-	  kubectl delete svc $$s -n off-campus-housing-tracker --ignore-not-found --request-timeout=30s; \
++	  kubectl delete svc $$s -n record-platform --ignore-not-found --request-timeout=30s; \
+ 	done
+ 	@echo "✅ kafka-lb-reset done"
+ 
+ kafka-headless-reset: ## Delete headless kafka Service + EndpointSlices (recreated by apply-kafka-kraft)
+-	@kubectl delete svc kafka -n off-campus-housing-tracker --ignore-not-found --request-timeout=30s
+-	@kubectl delete endpoints kafka -n off-campus-housing-tracker --ignore-not-found --request-timeout=30s 2>/dev/null || true
+-	@kubectl delete endpointslices -n off-campus-housing-tracker -l kubernetes.io/service-name=kafka --ignore-not-found --request-timeout=30s 2>/dev/null || true
++	@kubectl delete svc kafka -n record-platform --ignore-not-found --request-timeout=30s
++	@kubectl delete endpoints kafka -n record-platform --ignore-not-found --request-timeout=30s 2>/dev/null || true
++	@kubectl delete endpointslices -n record-platform -l kubernetes.io/service-name=kafka --ignore-not-found --request-timeout=30s 2>/dev/null || true
+ 	@echo "✅ kafka-headless-reset done"
+ 
+ kafka-onboarding-reset: ## kafka-lb-reset + kafka-headless-reset (dev-onboard runs this before apply-kafka-kraft)
+@@ -518,7 +518,7 @@ # ROLE: DEV — in-cluster KRaft (3 brokers): staged Services/LB → refresh broker TLS SANs → StatefulSet
+ apply-kafka-kraft: ## Staged: headless + external LB svcs → wait IPs → kafka-ssl refresh → PDB + SS (KAFKA_TLS_ATOMIC_BEFORE_REFRESH=1 scales to 0 first)
+ 	chmod +x "$(SCRIPTS)/apply-kafka-kraft-staged.sh" "$(SCRIPTS)/ensure-dev-root-ca.sh" "$(SCRIPTS)/kafka-refresh-tls-from-lb.sh" "$(SCRIPTS)/wait-for-kafka-external-lb-ips.sh"
+-	HOUSING_NS=$(HOUSING_NS) KAFKA_TLS_ATOMIC_BEFORE_REFRESH=$(KAFKA_TLS_ATOMIC_BEFORE_REFRESH) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(SCRIPTS)/apply-kafka-kraft-staged.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) KAFKA_TLS_ATOMIC_BEFORE_REFRESH=$(KAFKA_TLS_ATOMIC_BEFORE_REFRESH) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(SCRIPTS)/apply-kafka-kraft-staged.sh"
+ 
+ kafka-refresh-tls-from-lb: ## Regenerate kafka-ssl-secret after kafka-*-external have LB IPs (requires svcs applied)
+ 	bash -n "$(SCRIPTS)/ensure-dev-root-ca.sh"
+@@ -531,31 +531,31 @@ 
+ kafka-tls-guard: ## Mounted CA + JKS uniformity across brokers, och-kafka CA, logs, verify-kafka-cluster (fail-fast)
+ 	chmod +x "$(SCRIPTS)/kafka-tls-guard.sh"
+-	KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) HOUSING_NS=$(HOUSING_NS) bash "$(SCRIPTS)/kafka-tls-guard.sh"
++	KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) bash "$(SCRIPTS)/kafka-tls-guard.sh"
+ 
+ kafka-tls-rotate-atomic: ## Scale Kafka 0 → kafka-refresh-tls-from-lb → scale back → kafka-tls-guard (JKS atomicity)
+ 	chmod +x "$(SCRIPTS)/kafka-tls-rotate-atomic.sh" "$(SCRIPTS)/ensure-dev-root-ca.sh" "$(SCRIPTS)/kafka-refresh-tls-from-lb.sh" "$(SCRIPTS)/wait-for-kafka-external-lb-ips.sh" "$(SCRIPTS)/kafka-tls-guard.sh"
+-	KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) HOUSING_NS=$(HOUSING_NS) bash "$(SCRIPTS)/kafka-tls-rotate-atomic.sh"
++	KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) bash "$(SCRIPTS)/kafka-tls-rotate-atomic.sh"
+ 
+ kafka-tls-guard-remediate: ## Recovery from PKIX/JKS drift: atomic rotate + full guard
+ 	$(MAKE) kafka-tls-rotate-atomic
+ 
+ kafka-quorum-stable: ## Gate: no QuorumController "leader is (none)" in kafka-0 logs for KAFKA_QUORUM_STABLE_WINDOW_SEC (default 30s)
+ 	chmod +x "$(SCRIPTS)/kafka-quorum-stable.sh"
+-	HOUSING_NS=$(HOUSING_NS) bash "$(SCRIPTS)/kafka-quorum-stable.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) bash "$(SCRIPTS)/kafka-quorum-stable.sh"
+ 
+ service-tls-alias-guard: ## Fail if service-tls vs och-service-tls ca.crt fingerprints differ
+ 	chmod +x "$(SCRIPTS)/service-tls-alias-guard.sh"
+-	HOUSING_NS=$(HOUSING_NS) bash "$(SCRIPTS)/service-tls-alias-guard.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) bash "$(SCRIPTS)/service-tls-alias-guard.sh"
+ 
+ edge-readiness-gate: ## MetalLB IP on caddy-h3 + in-pod Caddy + api-gateway /healthz HTTP 200
+ 	chmod +x "$(SCRIPTS)/edge-readiness-gate.sh"
+-	NS_ING=$(NS_ING) HOUSING_NS=$(HOUSING_NS) bash "$(SCRIPTS)/edge-readiness-gate.sh"
++	NS_ING=$(NS_ING) HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) bash "$(SCRIPTS)/edge-readiness-gate.sh"
+ 
+ # Refresh Kafka TLS alias + ordered restart of every housing Deployment and caddy-h3 (picks up Secret mounts).
+ rollout-och-full: ## ensure-housing-cluster-secrets then rollout-deferred-after-kafka-tls; skip secrets: SKIP_ENSURE_CLUSTER_SECRETS=1
+ 	chmod +x "$(SCRIPTS)/ensure-housing-cluster-secrets.sh" "$(SCRIPTS)/rollout-deferred-after-kafka-tls.sh" "$(SCRIPTS)/rollout-restart-och-full-stack.sh"
+-	NS_ING=$(NS_ING) HOUSING_NS=$(HOUSING_NS) OCH_ROLLOUT_STATUS_TIMEOUT=$(OCH_ROLLOUT_STATUS_TIMEOUT) SKIP_ENSURE_CLUSTER_SECRETS=$(SKIP_ENSURE_CLUSTER_SECRETS) bash "$(SCRIPTS)/rollout-restart-och-full-stack.sh"
++	NS_ING=$(NS_ING) HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) OCH_ROLLOUT_STATUS_TIMEOUT=$(OCH_ROLLOUT_STATUS_TIMEOUT) SKIP_ENSURE_CLUSTER_SECRETS=$(SKIP_ENSURE_CLUSTER_SECRETS) bash "$(SCRIPTS)/rollout-restart-och-full-stack.sh"
+ 
+ # DESTRUCTIVE: wipes Kafka; requires existing cluster + ingress NS. Does not run make up or Docker.
+ dev-onboard-hardened-reset: ## Kafka clean slate → canonical TLS reissue-only → ensure secrets → apply-kafka → guards → housing rollouts
+@@ -563,12 +563,12 @@ 	chmod +x "$(SCRIPTS)/kafka-clean-slate.sh" "$(SCRIPTS)/generate-canonical-dev-tls.sh" "$(SCRIPTS)/ensure-housing-cluster-secrets.sh" "$(SCRIPTS)/kafka-quorum-stable.sh" "$(SCRIPTS)/service-tls-alias-guard.sh" "$(SCRIPTS)/rollout-deferred-after-kafka-tls.sh"
+ 	KAFKA_CLEAN_SLATE_CONFIRM=YES bash "$(SCRIPTS)/kafka-clean-slate.sh"
+ 	CANONICAL_TLS_REISSUE_ONLY=1 KAFKA_SSL=1 RESTART_SERVICES=0 REISSUE_SKIP_CADDY_ROLLOUT=0 "$(SCRIPTS)/generate-canonical-dev-tls.sh"
+-	HOUSING_NS=$(HOUSING_NS) bash "$(SCRIPTS)/ensure-housing-cluster-secrets.sh"
+-	HOUSING_NS=$(HOUSING_NS) KAFKA_TLS_ATOMIC_BEFORE_REFRESH=$(KAFKA_TLS_ATOMIC_BEFORE_REFRESH) $(MAKE) apply-kafka-kraft
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) bash "$(SCRIPTS)/ensure-housing-cluster-secrets.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) KAFKA_TLS_ATOMIC_BEFORE_REFRESH=$(KAFKA_TLS_ATOMIC_BEFORE_REFRESH) $(MAKE) apply-kafka-kraft
+ 	$(MAKE) kafka-tls-guard
+-	HOUSING_NS=$(HOUSING_NS) bash "$(SCRIPTS)/service-tls-alias-guard.sh"
+-	HOUSING_NS=$(HOUSING_NS) bash "$(SCRIPTS)/kafka-quorum-stable.sh"
+-	HOUSING_NS=$(HOUSING_NS) bash "$(SCRIPTS)/rollout-deferred-after-kafka-tls.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) bash "$(SCRIPTS)/service-tls-alias-guard.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) bash "$(SCRIPTS)/kafka-quorum-stable.sh"
++	HOUSING_NS=record-platform=$(HOUSING_NS=record-platform) bash "$(SCRIPTS)/rollout-deferred-after-kafka-tls.sh"
+ 	@echo "✅ dev-onboard-hardened-reset complete"
+ 
+ # ROLE: DEV — after KRaft pods Ready: DNS slice check, topic preflight, bootstrap string vs kafka-0..2
+@@ -590,12 +590,12 @@ 	echo "❌ Timed out waiting for caddy-h3 EXTERNAL-IP (~120s). Check: kubectl -n ingress-nginx get svc caddy-h3"; \
+ 	exit 1
+ 
+-# ROLE: DEV — after deploy-dev (Caddy/ingress up): curl / API health via off-campus-housing.test
++# ROLE: DEV — after deploy-dev (Caddy/ingress up): curl / API health via record.test
+ onboarding-edge: ## verify-preflight-edge-routing (MetalLB + hosts + TLS)
+ 	$(MAKE) verify-preflight-edge-routing
+ 
+ # ROLE: DEV — deterministic local onboard (EKS: dev-onboard-eks). Wrapper: scripts/dev-onboard-local.sh (set -euo pipefail).
+-# Local path: Phase 0.25 deps + 0.5 dev-root CA → up-fast → Kafka apply → och-kafka-ssl-secret sync+verify → … (see script header).
++# Local path: Phase 0.25 deps + 0.5 dev-root CA → up-fast → Kafka apply → kafka-ssl-secret sync+verify → … (see script header).
+ dev-onboard: ## LOCAL: deps + zero-trust CA + up-fast + Kafka/housing TLS gates + alignment (DEV_ONBOARD_KAFKA_ALIGNMENT_SAFE_ONLY=1 → kafka-health); EKS: verify-only
+ 	@cd "$(REPO_ROOT)" && \
+ 	chmod +x scripts/detect-k8s-environment.sh scripts/dev-onboard-local.sh scripts/dev-onboard-zero-trust-preflight.sh scripts/ensure-dev-root-ca.sh scripts/ensure-housing-cluster-secrets.sh && \
+@@ -718,7 +718,7 @@ 	@mkdir -p $(BENCH)
+ 	@export SSLKEYLOGFILE="$(BENCH)/sslkeylog-$$(date +%Y%m%d-%H%M%S).log"; \
+ 	  echo "SSLKEYLOGFILE=$$SSLKEYLOGFILE"; \
+-	  curl --cacert certs/dev-root.pem -sS -I --http3 https://off-campus-housing.test/ >/dev/null || true
++	  curl --cacert certs/dev-root.pem -sS -I --http3 https://record.test/ >/dev/null || true
+ 
+ # ROLE: DEV — optional note only; does not mutate cluster
+ ollama-note: ## Show optional Ollama steps for analytics listing-feel
+@@ -729,7 +729,7 @@ 
+ # ROLE: DEV — optional env set for analytics-service
+ ollama-env: ## Point analytics-service to host Ollama
+-	kubectl set env deployment/analytics-service -n off-campus-housing-tracker OLLAMA_BASE_URL=http://host.docker.internal:11434
++	kubectl set env deployment/analytics-service -n record-platform OLLAMA_BASE_URL=http://host.docker.internal:11434
+ 
+ # ROLE: PERF — current performance suite
+ test-current: ## Current perf model suite: run default service ceiling sweep + auto model derivation
+@@ -1055,24 +1055,24 @@ rollouts: deploy-dev ## Alias: same as deploy-dev
+ 
+ stack: ## Full idempotent stack setup WITHOUT preflight (Colima, infra, certs, DBs, Kafka, build, deploy, secrets, event-layer)
+-	bash "$(SCRIPTS)/setup-full-off-campus-housing-stack.sh"
++	bash "$(SCRIPTS)/setup-full-record-platform-stack.sh"
+ 
+ demo: ## Colima+k3s stack + preflight (MetalLB + k6 LB IP); stops after housing suites+Playwright; no k3d
+ 	REQUIRE_COLIMA=1 METALLB_USE_K3D=0 METALLB_ENABLED=1 K6_USE_METALLB=1 RUN_PGBENCH=0 RUN_FULL_LOAD=0 RUN_PREFLIGHT=1 \
+ 	  PREFLIGHT_EXIT_AFTER_HOUSING_SUITES=1 PREFLIGHT_PHASE_D_TAIL_LAB=0 \
+-	  bash "$(SCRIPTS)/setup-full-off-campus-housing-stack.sh"
++	  bash "$(SCRIPTS)/setup-full-record-platform-stack.sh"
+ 
+ demo-full: ## Colima+k3s + full preflight continuation (transport/pgbench when enabled); no early exit
+ 	REQUIRE_COLIMA=1 METALLB_USE_K3D=0 METALLB_ENABLED=1 K6_USE_METALLB=1 RUN_FULL_LOAD=1 RUN_PREFLIGHT=1 \
+ 	  PREFLIGHT_EXIT_AFTER_HOUSING_SUITES=0 \
+-	  bash "$(SCRIPTS)/setup-full-off-campus-housing-stack.sh"
++	  bash "$(SCRIPTS)/setup-full-record-platform-stack.sh"
+ 
+ demo-network: ## Colima path: preflight + sslkeylog + packet capture (./scripts/run-demo-network-preflight.sh)
+ 	REQUIRE_COLIMA=1 METALLB_USE_K3D=0 bash "$(SCRIPTS)/run-demo-network-preflight.sh"
+ 
+ demo-k3d: ## stack + preflight for k3d (no Colima): set kubectl context to k3d first
+ 	METALLB_ENABLED=1 METALLB_USE_K3D=1 REQUIRE_COLIMA=0 K6_USE_METALLB=1 RUN_PGBENCH=0 RUN_FULL_LOAD=0 RUN_PREFLIGHT=1 \
+-	  PREFLIGHT_PHASE_D_TAIL_LAB=0 SKIP_COLIMA=1 bash "$(SCRIPTS)/setup-full-off-campus-housing-stack.sh"
++	  PREFLIGHT_PHASE_D_TAIL_LAB=0 SKIP_COLIMA=1 bash "$(SCRIPTS)/setup-full-record-platform-stack.sh"
+ 
+ preflight-metallb: ## Run preflight only (MetalLB + k6 LB IP). Example: RUN_PGBENCH=0 RUN_FULL_LOAD=0 make preflight-metallb
+ 	REQUIRE_COLIMA=1 METALLB_USE_K3D=0 METALLB_ENABLED=1 K6_USE_METALLB=1 bash "$(SCRIPTS)/run-preflight-scale-and-all-suites.sh"
+@@ -1118,7 +1118,7 @@ e2e-full-strict: ## All Playwright projects in strict HTTP3 mode (needs JAEGER_QUERY_BASE + TLS edge; set Jaeger if not auto-wired)
+ 	cd "$(REPO_ROOT)" && \
+ 	  export NODE_EXTRA_CA_CERTS="$(REPO_ROOT)/certs/dev-root.pem" && \
+-	  export E2E_API_BASE="https://off-campus-housing.test" && \
++	  export E2E_API_BASE="https://record.test" && \
+ 	  pnpm run test:webapp:e2e:full-strict
+ 
+ test-e2e-integrated: ## Port-forward api-gateway + Playwright (needs running cluster)
+@@ -1136,7 +1136,7 @@ 	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
+ 	  _kl="$(REPO_ROOT)/bench_logs/sslkeys-och-transport-$$(date +%Y%m%d-%H%M%S).log" && \
+ 	  rm -f "$$_kl" && touch "$$_kl" && \
+-	  HOST=off-campus-housing.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
++	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
+ 	    bash "$(SCRIPTS)/test-packet-capture-standalone.sh" && \
+ 	  _dir="$$(ls -dt /tmp/packet-captures-v2-* | head -1)" && \
+ 	  mkdir -p "$(REPO_ROOT)/bench_logs" && echo "$$_dir" > "$(REPO_ROOT)/bench_logs/.last-transport-quic-prove-dir" && \
+@@ -1168,7 +1168,7 @@ 	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
+ 	  _kl="$(REPO_ROOT)/bench_logs/sslkeys-och-transport-$$(date +%Y%m%d-%H%M%S).log" && \
+ 	  rm -f "$$_kl" && touch "$$_kl" && \
+-	  HOST=off-campus-housing.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
++	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
+ 	    bash "$(SCRIPTS)/test-packet-capture-standalone.sh" && \
+ 	  _dir="$$(ls -dt /tmp/packet-captures-v2-* | head -1)" && \
+ 	  echo "$$_dir" > "$(REPO_ROOT)/bench_logs/.last-transport-quic-prove-dir" && \
+@@ -1203,7 +1203,7 @@ 	  test -n "$$_lb" || { echo "No MetalLB IP on ingress-nginx/caddy-h3"; exit 1; } && \
+ 	  _kl="$(REPO_ROOT)/bench_logs/sslkeys-och-transport-$$(date +%Y%m%d-%H%M%S).log" && \
+ 	  rm -f "$$_kl" && touch "$$_kl" && \
+-	  HOST=off-campus-housing.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
++	  HOST=record.test TARGET_IP="$$_lb" PORT=443 STRICT_QUIC_VALIDATION=1 SSLKEYLOGFILE="$$_kl" \
+ 	    bash "$(SCRIPTS)/test-packet-capture-standalone.sh" && \
+ 	  _dir="$$(ls -dt /tmp/packet-captures-v2-* | head -1)" && \
+ 	  echo "$$_dir" > "$(REPO_ROOT)/bench_logs/.last-transport-quic-prove-dir" && \
+
+--- a/infra/k8s/base/observability/prometheus-rule-quic-transport-invariant.example.yaml+++ b/infra/k8s/base/observability/prometheus-rule-quic-transport-invariant.example.yaml@@ -6,7 +6,7 @@   name: och-quic-transport-invariant
+   labels:
+     role: alert-rules
+-    app.kubernetes.io/part-of: off-campus-housing-tracker
++    app.kubernetes.io/part-of: record-platform
+ spec:
+   groups:
+     - name: och-quic-transport
+
+--- a/scripts/capture-quic-pcap.sh+++ b/scripts/capture-quic-pcap.sh@@ -17,7 +17,7 @@ H2LOG="$FO/curl-h2-verbose.log"
+ TCPDUMP_ERR="$FO/tcpdump.stderr.log"
+ CA="${SSL_CERT_FILE:-${NODE_EXTRA_CA_CERTS:-$REPO_ROOT/certs/dev-root.pem}}"
+-HOST="${HOST:-off-campus-housing.test}"
++HOST="${HOST:-record.test}"
+ URL="https://${HOST}/api/healthz"
+ FILTER="${QUIC_PCAP_FILTER:-udp and port 443}"
+ IFACE="${QUIC_CAPTURE_INTERFACE:-any}"
+
+--- a/scripts/ci/verify-quic-hostname-invariant.sh+++ b/scripts/ci/verify-quic-hostname-invariant.sh@@ -1,6 +1,6 @@ #!/usr/bin/env bash
+ # Static gate: k6/load scripts must not default BASE_URL to a raw https://<IP> (breaks TLS SNI for HTTP/3).
+-# OCH edge contract: hostname off-campus-housing.test + --resolve / K6_RESOLVE to LB IP.
++# OCH edge contract: hostname record.test + --resolve / K6_RESOLVE to LB IP.
+ set -euo pipefail
+ 
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+@@ -8,7 +8,7 @@ 
+ hits="$(grep -rE --include='*.js' "BASE_URL.*['\"]https://[0-9]{1,3}\\." scripts/load 2>/dev/null || true)"
+ if [[ -n "$hits" ]]; then
+-  echo "❌ Raw-IP https BASE_URL default in scripts/load (use https://off-campus-housing.test + resolve):"
++  echo "❌ Raw-IP https BASE_URL default in scripts/load (use https://record.test + resolve):"
+   printf '%s\n' "$hits"
+   exit 1
+ fi
+
+--- a/scripts/lib/grpc-http3-health.sh+++ b/scripts/lib/grpc-http3-health.sh@@ -10,8 +10,8 @@   local lib_dir="${BASH_SOURCE[0]%/*}"
+   local script_dir="${SCRIPT_DIR:-$lib_dir/..}"
+   [[ -d "$script_dir" ]] || script_dir="$(cd "$lib_dir/.." && pwd)"
+-  local ns="${NS:-off-campus-housing-tracker}"
+-  local host="${HOST:-off-campus-housing.test}"
++  local ns="${NS:-record-platform}"
++  local host="${HOST:-record.test}"
+   local proto_dir=""
+   [[ -d "$script_dir/../proto" ]] && proto_dir="$(cd "$script_dir/../proto" && pwd)"
+   [[ -z "$proto_dir" ]] && [[ -d "$script_dir/../infra/k8s/base/config/proto" ]] && proto_dir="$(cd "$script_dir/../infra/k8s/base/config/proto" && pwd)"
+@@ -78,7 +78,7 @@   if [[ -z "$ca_file" ]] || [[ ! -f "$ca_file" ]] || [[ ! -s "$ca_file" ]]; then
+     [[ -f "$script_dir/../certs/dev-root.pem" ]] && ca_file="$(cd "$script_dir/.." && pwd)/certs/dev-root.pem"
+   fi
+-  local grpc_authority="${HOST:-off-campus-housing.test}"
++  local grpc_authority="${HOST:-record.test}"
+   local out grpc_ok=0
+   if [[ -n "$ca_file" ]] && [[ -f "$ca_file" ]]; then
+     if [[ $use_mtls -eq 1 ]]; then
+
+--- a/scripts/lib/packet-capture-v2.sh+++ b/scripts/lib/packet-capture-v2.sh@@ -497,11 +497,11 @@     if [[ "$udp443_on_lb_path" -gt 0 ]] && [[ "$udp443_without_lb" -gt 0 ]]; then
+       echo "  [packet-capture-v2] ⚠️  Mixed UDP/443: some rows include $lb_ip and some do not — possible extra QUIC/TLS clients on this interface; narrow BPF or reduce parallel traffic if you need a single-flow pcap."
+     fi
+-    # Optional SNI proof (off-campus-housing.test)
++    # Optional SNI proof (record.test)
+     local sni_count=0
+-    sni_count=$(tshark -r "$dir/node-capture.pcap" -Y "quic && tls.handshake.extensions_server_name contains off-campus-housing.test" 2>/dev/null | wc -l | tr -d '[:space:]')
++    sni_count=$(tshark -r "$dir/node-capture.pcap" -Y "quic && tls.handshake.extensions_server_name contains record.test" 2>/dev/null | wc -l | tr -d '[:space:]')
+     sni_count=${sni_count:-0}
+-    [[ "$sni_count" -gt 0 ]] && echo "  [packet-capture-v2] QUIC SNI off-campus-housing.test: $sni_count packets"
++    [[ "$sni_count" -gt 0 ]] && echo "  [packet-capture-v2] QUIC SNI record.test: $sni_count packets"
+   fi
+ 
+   echo "  === End 3-layer analysis ==="
+
+--- a/scripts/lib/packet-capture.sh+++ b/scripts/lib/packet-capture.sh@@ -27,7 +27,7 @@ # Start capture on a pod. Usage: start_capture <namespace> <pod> [pcap-filter]
+ # Filter default: tcp port 443, tcp port 30443 (NodePort), udp port 443 (QUIC) — BPF limits volume.
+ # In-pod: destination is pod IP (after DNAT), so "dst host TARGET_IP" cannot be used; use port-only.
+-# Host/VM capture (when applicable): use "(tcp or udp) and port 443 and dst host $TARGET_IP" so only traffic to MetalLB IP is captured (gold standard). Post-capture: verify with tshark -Y "udp.port == 443 && ip.dst == $TARGET_IP" and stray -Y "udp.port == 443 && ip.dst != $TARGET_IP" (must be 0); SNI: tshark -Y "quic && tls.handshake.extensions_server_name contains off-campus-housing.test".
++# Host/VM capture (when applicable): use "(tcp or udp) and port 443 and dst host $TARGET_IP" so only traffic to MetalLB IP is captured (gold standard). Post-capture: verify with tshark -Y "udp.port == 443 && ip.dst == $TARGET_IP" and stray -Y "udp.port == 443 && ip.dst != $TARGET_IP" (must be 0); SNI: tshark -Y "quic && tls.handshake.extensions_server_name contains record.test".
+ # CAPTURE_MAX_DURATION: max seconds tcpdump runs in-pod (timeout wrapper); avoids runaway size and OOM. Unset = no limit.
+ # In-pod apk/apt install capped at CAPTURE_INSTALL_TIMEOUT so we never hang. Quick mode (CAPTURE_STOP_TIMEOUT set) uses 55s; else up to 60s.
+ # To avoid install at runtime, bake tcpdump into Caddy/Envoy images (scripts/ensure-caddy-envoy-tcpdump.sh or k3d-registry-push-and-patch.sh).
+@@ -354,7 +354,7 @@       echo "  [packet-capture] Verifying protocols (tshark) in $copy_dir_used"
+       verify_protocol_in_dir "$copy_dir_used" "capture" || true
+     fi
+-    # Per-pod QUIC proof: stray UDP/443 vs pod IP + optional SNI (OCH: CAPTURE_EXPECTED_SNI default off-campus-housing.test)
++    # Per-pod QUIC proof: stray UDP/443 vs pod IP + optional SNI (OCH: CAPTURE_EXPECTED_SNI default record.test)
+     if [[ "${CAPTURE_POST_VERIFY_QUIC:-1}" != "0" ]] && command -v tshark >/dev/null 2>&1 && type verify_caddy_pcap_quic_enforcement &>/dev/null 2>&1; then
+       for (( _ci=0; _ci<${#_CAPTURE_PODS[@]}; _ci++ )); do
+         local _cns="${_CAPTURE_NS[$_ci]}" _cpod="${_CAPTURE_PODS[$_ci]}"
+
+--- a/scripts/lib/protocol-verification.sh+++ b/scripts/lib/protocol-verification.sh@@ -110,20 +110,20 @@   echo "$tcp443 $udp443"
+ }
+ 
+-# Count QUIC packets with SNI off-campus-housing.test (definitive proof traffic is for our domain; no background QUIC noise).
++# Count QUIC packets with SNI record.test (definitive proof traffic is for our domain; no background QUIC noise).
+ count_quic_sni_record_local_in_pcap() {
+   local pcap="${1:?pcap file path}"
+-  local sni="${2:-off-campus-housing.test}"
+-  if [[ ! -f "$pcap" ]] || [[ ! -s "$pcap" ]]; then
+-    echo "0"
+-    return
+-  fi
+-  if ! command -v tshark >/dev/null 2>&1; then
+-    echo "0"
+-    return
+-  fi
+-  local count
+-  # Quote SNI for display filter (OCH: off-campus-housing.test; not record.local / RP)
++  local sni="${2:-record.test}"
++  if [[ ! -f "$pcap" ]] || [[ ! -s "$pcap" ]]; then
++    echo "0"
++    return
++  fi
++  if ! command -v tshark >/dev/null 2>&1; then
++    echo "0"
++    return
++  fi
++  local count
++  # Quote SNI for display filter (OCH: record.test; not record.local / RP)
+   count=$(tshark -r "$pcap" -Y "quic && tls.handshake.extensions_server_name contains \"${sni}\"" 2>/dev/null | wc -l 2>/dev/null | tr -d '[:space:]')
+   [[ "$count" =~ ^[0-9]+$ ]] && echo "$count" || echo "0"
+ }
+@@ -150,7 +150,7 @@ verify_caddy_pcap_quic_enforcement() {
+   local pcap="${1:?pcap}"
+   local pod_ip="${2:?pod IP}"
+-  local sni="${CAPTURE_EXPECTED_SNI:-off-campus-housing.test}"
++  local sni="${CAPTURE_EXPECTED_SNI:-record.test}"
+   [[ ! -f "$pcap" ]] || [[ ! -s "$pcap" ]] && return 0
+   command -v tshark >/dev/null 2>&1 || { echo "  [capture-verify] tshark not installed; skip QUIC/SNI enforcement"; return 0; }
+   local stray udp_all sni_count quic_any
+@@ -339,14 +339,14 @@   else
+     echo "  WARN: $label No QUIC packets (no UDP 443; HTTP/3 may not be in use or traffic hit other Caddy pod)"
+   fi
+-  # SNI validation: QUIC with off-campus-housing.test = definitive proof traffic belongs to our domain (no background noise).
++  # SNI validation: QUIC with record.test = definitive proof traffic belongs to our domain (no background noise).
+   local sni_total=0
+   for pcap in "$dir"/*.pcap; do
+     [[ -f "$pcap" ]] || continue
+     [[ -s "$pcap" ]] || continue
+-    sni_total=$((sni_total + $(count_quic_sni_record_local_in_pcap "$pcap" "${CAPTURE_EXPECTED_SNI:-off-campus-housing.test}")))
+-  done
+-  [[ "$sni_total" -gt 0 ]] && echo "  OK: $label QUIC SNI off-campus-housing.test: $sni_total packets (definitive proof traffic to our domain)"
++    sni_total=$((sni_total + $(count_quic_sni_record_local_in_pcap "$pcap" "${CAPTURE_EXPECTED_SNI:-record.test}")))
++  done
++  [[ "$sni_total" -gt 0 ]] && echo "  OK: $label QUIC SNI record.test: $sni_total packets (definitive proof traffic to our domain)"
+   # When TARGET_IP set: report QUIC to LB IP and stray (for host/VM pcaps; in-pod has dst=pod IP so to_lb may be 0).
+   if [[ -n "${TARGET_IP:-}" ]]; then
+     local to_lb=0 stray=0
+
+--- a/scripts/package-och-preflight-transport-bundle.sh+++ b/scripts/package-och-preflight-transport-bundle.sh@@ -1,13 +1,13 @@ #!/usr/bin/env bash
+ # Two archives from one script:
+ #
+-# 1) OCH upstream (default): off-campus-housing.test / off-campus-housing-tracker unchanged.
+-#    Output: $HOME/och-preflight-cluster-stability-jaeger-transport-bundle-<stamp>.tar.gz
++# 1) OCH upstream (default): record.test / record-platform unchanged.
++#    Output: $HOME/preflight-cluster-stability-jaeger-transport-bundle-<stamp>.tar.gz
+ #
+ # 2) Record Platform porting: same file set + hostname/namespace rewrites (record.test, record-platform)
+ #    across Makefile, scripts, schemas, infra, quic_command_center, quic-forensic, etc.
+-#    RECORD_PLATFORM_PORTING_BUNDLE=1 bash scripts/package-och-preflight-transport-bundle.sh
+-#    Output: $HOME/record-platform-och-preflight-scale-transport-v7b-<stamp>.tar.gz
++#    RECORD_PLATFORM_PORTING_BUNDLE=1 bash scripts/package-preflight-transport-bundle.sh
++#    Output: $HOME/record-platform-preflight-scale-transport-v7b-<stamp>.tar.gz
+ #
+ # Override out dir: OCH_PREFLIGHT_BUNDLE_DIR=/path
+ # Keep older archives: OCH_BUNDLE_KEEP_ALL=1
+@@ -20,12 +20,12 @@ 
+ RECORD_PLATFORM_PORTING_BUNDLE="${RECORD_PLATFORM_PORTING_BUNDLE:-0}"
+ if [[ "$RECORD_PLATFORM_PORTING_BUNDLE" == "1" ]]; then
+-  BUNDLE_TOP="record-platform-och-preflight-scale-transport-v7b"
+-  OUT_GLOB="record-platform-och-preflight-scale-transport-v7b-*.tar.gz"
++  BUNDLE_TOP="record-platform-preflight-scale-transport-v7b"
++  OUT_GLOB="record-platform-preflight-scale-transport-v7b-*.tar.gz"
+   DO_REWRITE=1
+ else
+-  BUNDLE_TOP="och-preflight-cluster-stability-jaeger-transport-bundle"
+-  OUT_GLOB="och-preflight-cluster-stability-jaeger-transport-bundle-*.tar.gz"
++  BUNDLE_TOP="preflight-cluster-stability-jaeger-transport-bundle"
++  OUT_GLOB="preflight-cluster-stability-jaeger-transport-bundle-*.tar.gz"
+   DO_REWRITE=0
+ fi
+ 
+@@ -61,8 +61,8 @@     -name '*.sh' -o -name '*.py' -o -name '*.mjs' -o -name '*.yaml' -o -name '*.yml' \
+     -o -name '*.txt' -o -name '*.fragment' -o -name '*.json' -o -name '*.mts' -o -name '*.md' -o -name 'Makefile' \
+   \) ! -path '*/docs/preflight-transport-phase-grep.txt' -print0 | while IFS= read -r -d '' f; do
+-    perl -pi -e 's/off-campus-housing\.test/record.test/g' "$f"
+-    perl -pi -e 's/off-campus-housing-tracker/record-platform/g' "$f"
++    perl -pi -e 's/record-platform\.test/record.test/g' "$f"
++    perl -pi -e 's/record-platform/record-platform/g' "$f"
+     perl -pi -e 's/och-quic/record-platform-quic/g' "$f"
+     perl -pi -e 's/\(OCH: record\.test/(Record Platform: record.test/g' "$f"
+   done
+@@ -70,7 +70,7 @@ 
+ for rel in \
+   Makefile \
+-  scripts/package-och-preflight-transport-bundle.sh \
++  scripts/package-preflight-transport-bundle.sh \
+   scripts/package-quic-transport-porting-bundle.sh \
+   scripts/test-packet-capture-standalone.sh \
+   scripts/capture-quic-pcap.sh \
+@@ -140,17 +140,17 @@ 
+ Bundled defaults (rewritten from OCH upstream):
+   • Edge hostname / SNI: record.test  (override HOST / CAPTURE_EXPECTED_SNI)
+-  • Kubernetes workload namespace: record-platform  (override NS / HOUSING_NS)
++  • Kubernetes workload namespace: record-platform  (override NS / HOUSING_NS=record-platform)
+ 
+ Same layout as the OCH upstream bundle, including:
+   • scripts/lib/quic_command_center/*.py and scripts/lib/quic-forensic/*.sh (rewritten)
+   • scripts/run-preflight-scale-and-all-suites.sh, transport-study-v7b.mjs, Jaeger helpers, Makefile + fragments
+ 
+ Regenerate:
+-  RECORD_PLATFORM_PORTING_BUNDLE=1 bash scripts/package-och-preflight-transport-bundle.sh
++  RECORD_PLATFORM_PORTING_BUNDLE=1 bash scripts/package-preflight-transport-bundle.sh
+ 
+ Extract:
+-  tar -xzf /path/to/record-platform-och-preflight-scale-transport-v7b-<stamp>.tar.gz -C /path/to/dest
++  tar -xzf /path/to/record-platform-preflight-scale-transport-v7b-<stamp>.tar.gz -C /path/to/dest
+ EOF
+ else
+   cat > "$BUNDLE/README_BUNDLE.txt" <<'EOF'
+@@ -173,17 +173,17 @@   • QUIC + capture: packet-capture-v2.sh, analyzers, verify-quic-jaeger-correlation.mjs, CI hostname script,
+     requirements-transport-forensics.txt, example Prometheus rule
+   • Listings Vitest: services/listings-service/vitest.integration.config.mts
+-  • Meta: README_BUNDLE.txt, MANIFEST.txt, scripts/package-och-preflight-transport-bundle.sh
++  • Meta: README_BUNDLE.txt, MANIFEST.txt, scripts/package-preflight-transport-bundle.sh
+ 
+ Record Platform port (record.test / record-platform everywhere in bundle):
+-  RECORD_PLATFORM_PORTING_BUNDLE=1 bash scripts/package-och-preflight-transport-bundle.sh
++  RECORD_PLATFORM_PORTING_BUNDLE=1 bash scripts/package-preflight-transport-bundle.sh
+ 
+ Regenerate (upstream):
+-  bash scripts/package-och-preflight-transport-bundle.sh
+-  OCH_PREFLIGHT_BUNDLE_DIR=/tmp bash scripts/package-och-preflight-transport-bundle.sh
++  bash scripts/package-preflight-transport-bundle.sh
++  OCH_PREFLIGHT_BUNDLE_DIR=/tmp bash scripts/package-preflight-transport-bundle.sh
+ 
+ Extract:
+-  tar -xzf /path/to/och-preflight-cluster-stability-jaeger-transport-bundle-<stamp>.tar.gz -C /path/to/dest
++  tar -xzf /path/to/preflight-cluster-stability-jaeger-transport-bundle-<stamp>.tar.gz -C /path/to/dest
+ 
+ No secrets. PCAPs and sslkeylog outputs are created at runtime.
+ EOF
+
+--- a/scripts/package-quic-transport-porting-bundle.sh+++ b/scripts/package-quic-transport-porting-bundle.sh@@ -62,7 +62,7 @@ done
+ 
+ mkdir -p "$BUNDLE/make-fragments"
+-# Anchors: SRE packet-capture target + transport-quic prove block (see package-och-preflight-transport-bundle.sh).
++# Anchors: SRE packet-capture target + transport-quic prove block (see package-preflight-transport-bundle.sh).
+ sed -n '959,968p' "$ROOT/Makefile" > "$BUNDLE/make-fragments/Makefile.packet-capture.fragment"
+ sed -n '1127,1233p' "$ROOT/Makefile" > "$BUNDLE/make-fragments/Makefile.transport-quic.fragment"
+ 
+@@ -78,8 +78,8 @@     -name '*.sh' -o -name '*.py' -o -name '*.mjs' -o -name '*.yaml' -o -name '*.yml' \
+     -o -name '*.txt' -o -name '*.fragment' -o -name '*.json' -o -name '*.mts' -o -name '*.md' -o -name 'Makefile' \
+   \) ! -path '*/docs/preflight-quic-step-grep.txt' -print0 | while IFS= read -r -d '' f; do
+-    perl -pi -e 's/off-campus-housing\.test/record.test/g' "$f"
+-    perl -pi -e 's/off-campus-housing-tracker/record-platform/g' "$f"
++    perl -pi -e 's/record-platform\.test/record.test/g' "$f"
++    perl -pi -e 's/record-platform/record-platform/g' "$f"
+     perl -pi -e 's/och-quic/record-platform-quic/g' "$f"
+     perl -pi -e 's/\(OCH: record\.test/(Record Platform: record.test/g' "$f"
+   done
+@@ -92,7 +92,7 @@ 
+ Defaults in this bundle (rewritten from OCH upstream):
+   • Edge hostname / SNI: record.test  (override HOST / CAPTURE_EXPECTED_SNI)
+-  • App / workload Kubernetes namespace: record-platform  (override NS / HOUSING_NS)
++  • App / workload Kubernetes namespace: record-platform  (override NS / HOUSING_NS=record-platform)
+ 
+ Wire-level HTTP/3 / QUIC capture and transport-invariant tooling:
+   Colima L1 node capture in STRICT mode, analyzers v5–v7, quic_command_center, optional Jaeger.
+
+--- a/scripts/phase-barrier.sh+++ b/scripts/phase-barrier.sh@@ -6,7 +6,7 @@ PHASE_NAME="${1:-unknown}"
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+-NS="${HOUSING_NS:-off-campus-housing-tracker}"
++NS="${HOUSING_NS=record-platform:-record-platform}"
+ WATCHDOG_KEY="${PHASE_BARRIER_WATCHDOG_REDIS_KEY:-och:gw:watchdog_throttle}"
+ ROLLOUT_TIMEOUT="${PHASE_BARRIER_GATEWAY_ROLLOUT_TIMEOUT:-180}"
+ POST_GATEWAY_SLEEP="${PHASE_BARRIER_POST_GATEWAY_SLEEP_SEC:-5}"
+
+--- a/scripts/preflight-controlled-transport-otel-prove.sh+++ b/scripts/preflight-controlled-transport-otel-prove.sh@@ -24,7 +24,7 @@ ok() { echo "✅ $*"; }
+ warn() { echo "⚠️  $*"; }
+ 
+-HOST="${HOST:-off-campus-housing.test}"
++HOST="${HOST:-record.test}"
+ export PORT=443
+ export STRICT_QUIC_VALIDATION=1
+ export CAPTURE_NODE_ONLY=1
+
+--- a/scripts/run-transport-study-experiments.sh+++ b/scripts/run-transport-study-experiments.sh@@ -157,7 +157,7 @@     _node_ip=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null | head -1 | awk '{print $1}' || true)
+     _np=$(kubectl -n ingress-nginx get svc caddy-h3 -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || echo "30443")
+     if [[ -n "$_node_ip" ]] && [[ -n "$_np" ]] && [[ "$_node_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+-      _code=$(curl -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 8 --resolve "off-campus-housing.test:${_np}:${_node_ip}" "https://off-campus-housing.test:${_np}/_caddy/healthz" 2>/dev/null || echo "000")
++      _code=$(curl -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 8 --resolve "record.test:${_np}:${_node_ip}" "https://record.test:${_np}/_caddy/healthz" 2>/dev/null || echo "000")
+       if [[ "$_code" == "200" ]]; then
+         ok "  NodePort check: $_node_ip:$_np reachable (HTTP $_code)"
+       else
+@@ -185,7 +185,7 @@       ok "  Caddy installed on host: $_caddy_ver"
+       info "  To run: copy Caddyfile + certs to host dir, then:"
+       info "    cd /tmp/caddy-native && caddy run --config Caddyfile"
+-      info "  Point k6: BASE_URL=https://localhost:443 K6_RESOLVE=off-campus-housing.test:443:127.0.0.1"
++      info "  Point k6: BASE_URL=https://localhost:443 K6_RESOLVE=record.test:443:127.0.0.1"
+       info "  Compare p99/throughput with Colima-in-VM run (rotation-summary.json)"
+     else
+       info "  Caddy not installed on host; install: brew install caddy (macOS) or apt install caddy"
+@@ -235,7 +235,7 @@       (
+         set -euo pipefail
+         cd "$REPO_ROOT"
+-        export HOST="${HOST:-off-campus-housing.test}"
++        export HOST="${HOST:-record.test}"
+         export CAPTURE_NODE_ONLY=1 STRICT_QUIC_VALIDATION=1 CAPTURE_V2_LB_IP="$_lb6"
+         unset CAPTURE_V2_L1_UDP_HOST_MATCH 2>/dev/null || true
+         _fr6="${PREFLIGHT_RUN_DIR:-$REPO_ROOT/bench_logs}/transport-forensics"
+@@ -323,9 +323,9 @@   _h2n=1
+   _h3n=1
+   if [[ -f "$_ca" ]] && command -v curl >/dev/null 2>&1; then
+-    _h2=$(curl -sSI --http2 --max-time 15 --cacert "$_ca" "https://${HOST:-off-campus-housing.test}/api/healthz" 2>>"$_log" | head -n 12 || true)
++    _h2=$(curl -sSI --http2 --max-time 15 --cacert "$_ca" "https://${HOST:-record.test}/api/healthz" 2>>"$_log" | head -n 12 || true)
+     _h2n=$?
+-    _h3=$(curl -sSI --http3 --max-time 15 --cacert "$_ca" "https://${HOST:-off-campus-housing.test}/api/healthz" 2>>"$_log" | head -n 12 || true)
++    _h3=$(curl -sSI --http3 --max-time 15 --cacert "$_ca" "https://${HOST:-record.test}/api/healthz" 2>>"$_log" | head -n 12 || true)
+     _h3n=$?
+   else
+     echo "quic sanity skipped: need curl + certs/dev-root.pem (SSL_CERT_FILE)" >>"$_log"
+@@ -350,7 +350,7 @@   notes: "HTTP/3 probe uses curl --http3; check quic-debug.log for stderr. STRICT_HTTP3 transport tests live in webapp e2e + full-edge-transport-validation.",
+ };
+ fs.writeFileSync(out, JSON.stringify(doc, null, 2) + "\n");
+-' "$_json" "${HOST:-off-campus-housing.test}" "${_h2n:-1}" "${_h3n:-1}" "$_h2_line" "$_h3_line" || true
++' "$_json" "${HOST:-record.test}" "${_h2n:-1}" "${_h3n:-1}" "$_h2_line" "$_h3_line" || true
+   ok "  Wrote $_json (curl h2 exit=${_h2n}, h3 exit=${_h3n}; stderr tail → $_log)"
+   _tv="${_base}/transport-validation-report.json"
+   if [[ -f "$_tv" ]] && command -v node >/dev/null 2>&1; then
+
+--- a/scripts/seed-jaeger-via-edge-health.sh+++ b/scripts/seed-jaeger-via-edge-health.sh@@ -4,7 +4,7 @@ #
+ # Usage (repo root):
+ #   ./scripts/seed-jaeger-via-edge-health.sh
+-# Env: E2E_API_BASE (default https://off-campus-housing.test), NODE_EXTRA_CA_CERTS (default certs/dev-root.pem)
++# Env: E2E_API_BASE (default https://record.test), NODE_EXTRA_CA_CERTS (default certs/dev-root.pem)
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+--- a/scripts/test-packet-capture-standalone.sh+++ b/scripts/test-packet-capture-standalone.sh@@ -21,8 +21,8 @@ warn() { echo "⚠️  $*"; }
+ info() { echo "ℹ️  $*"; }
+ 
+-NS="off-campus-housing-tracker"
+-HOST="${HOST:-off-campus-housing.test}"
++NS="record-platform"
++HOST="${HOST:-record.test}"
+ export PORT="${PORT:-30443}"
+ export HOST
+ export STRICT_QUIC_VALIDATION="${STRICT_QUIC_VALIDATION:-1}"

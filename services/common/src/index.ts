@@ -12,6 +12,7 @@ export * from "./grpc-reflection.js";
 export * from "./grpc-clients.js";
 export * from "./proto.js";
 export * from "./grpc-health.js";
+export * from "./grpc-local-readiness.js";
 export * from "./grpc-server-credentials.js";
 export * from "./user-lifecycle-kafka.js";
 export * from "./user-lifecycle-consumer.js";

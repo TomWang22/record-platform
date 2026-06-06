@@ -18,10 +18,10 @@ describe("listings search route registration order", () => {
     expect(searchIdx).toBeLessThan(catchAllIdx);
   });
 
-  it("search route rewrites to /search upstream path", () => {
+  it("search route rewrites to /listings/search upstream path", () => {
     const start = appSrc.indexOf('["/listings/search", "/api/listings/search"]');
     expect(start).toBeGreaterThan(-1);
     const slice = appSrc.slice(start, start + 900);
-    expect(slice).toContain('pathRewrite: () => "/search"');
+    expect(slice).toContain('pathRewrite: () => "/listings/search"');
   });
 });

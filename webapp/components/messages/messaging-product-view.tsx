@@ -124,14 +124,19 @@ export function MessagingProductView() {
           price_cents?: number
           priceCents?: number
           primary_image_url?: string
+          primaryImageUrl?: string
           seller_id?: string
           user_id?: string
           sellerId?: string
           userId?: string
-          images?: Array<{ url?: string; image_url?: string }>
+          images?: string[] | Array<{ url?: string; image_url?: string }>
         }
         const sellerFromListing = String(
-          data.seller_id ?? data.user_id ?? data.sellerId ?? data.userId ?? '',
+          data.seller_id ??
+            data.user_id ??
+            data.sellerId ??
+            data.userId ??
+            '',
         ).trim()
         setComposeSellerId(composeUserId || sellerFromListing)
         const priceCents =
@@ -142,8 +147,15 @@ export function MessagingProductView() {
               : null
         const thumb =
           data.primary_image_url ??
+          data.primaryImageUrl ??
           (Array.isArray(data.images) && data.images[0]
-            ? String(data.images[0].url ?? data.images[0].image_url ?? '')
+            ? typeof data.images[0] === 'string'
+              ? data.images[0]
+              : String(
+                  (data.images[0] as { url?: string; image_url?: string }).url ??
+                    (data.images[0] as { url?: string; image_url?: string }).image_url ??
+                    '',
+                )
             : null)
         setListingPreview({
           title: String(data.title ?? 'Listing'),
@@ -188,7 +200,11 @@ export function MessagingProductView() {
       }
     : null)
 
-  async function refreshAfterSend(isFirstWithListing: boolean, previewHint?: string) {
+  async function refreshAfterSend(
+    isFirstWithListing: boolean,
+    previewHint?: string,
+    knownThreadId?: string,
+  ) {
     setComposeBody('')
     setReplyTo(null)
     const inbox = await loadInbox()
@@ -198,7 +214,7 @@ export function MessagingProductView() {
         inbox.find((t) => composeListingId && t.listingId === composeListingId) ??
         (hint ? inbox.find((t) => t.lastMessagePreview.includes(hint)) : undefined) ??
         inbox[0]
-      const threadId = match?.id
+      const threadId = knownThreadId || match?.id
       if (threadId) {
         setActiveThreadId(threadId)
         await loadThread(threadId)
@@ -289,16 +305,16 @@ export function MessagingProductView() {
 
       if (!recipientId) return
 
-      const isFirstWithListing = Boolean(composeListingId && composeMode)
+      const isFirstWithListing = Boolean(composeListingId && !activeThreadId && !replyTo)
 
-      await sendMarketplaceMessage({
+      const sent = await sendMarketplaceMessage({
         recipientId,
         body,
         listingId: composeListingId || undefined,
         isFirstWithListing,
       })
 
-      await refreshAfterSend(isFirstWithListing, body)
+      await refreshAfterSend(isFirstWithListing, body, sent.threadId)
     } finally {
       setSending(false)
     }
@@ -344,7 +360,16 @@ export function MessagingProductView() {
   }
 
   return (
-    <div className="space-y-4" data-testid="messages-product-page">
+    <div
+      className="space-y-4"
+      data-testid="messages-product-page"
+      data-ready={loadingInbox ? 'loading' : 'ready'}
+    >
+      <span
+        className="hidden"
+        aria-hidden
+        data-testid={loadingInbox ? 'messages-loading' : 'messages-ready'}
+      />
       <header>
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Messages</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">

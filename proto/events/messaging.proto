@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package events.messaging;
+
+option go_package = "github.com/TomWang22/record-platform/proto/events/messaging";
+
+// DEPRECATED: Prefer immutable versioned contracts in proto/events/messaging/v1/messaging_events.proto
+// (package events.messaging.v1, Kafka topic messaging.events.v1). Do not add new messages here.
+
+// Versioned event payloads for dev.messaging.events. No message content in events.
+
+message ConversationCreatedV1 {
+  string conversation_id = 1;
+  string listing_id = 2;
+}
+
+message MessageSentV1 {
+  string message_id = 1;
+  string conversation_id = 2;
+  string sender_id = 3;
+  string recipient_id = 4;
+  string sent_at = 5;
+  string media_id = 6;  // optional; set when message references an attachment
+}
+
+// Emit for analytics / engagement only. Do NOT use Kafka to drive read receipts or chat sync; keep read logic local (conversation_participants.last_read_at).
+message MessageReadV1 {
+  string message_id = 1;
+  string user_id = 2;
+  string read_at = 3;
+}
+
+message ThreadCreatedV1 {
+  string thread_id = 1;
+  string listing_id = 2;
+  string created_at = 3;
+}
+
+message MessageCreatedV1 {
+  string message_id = 1;
+  string thread_id = 2;
+  string sender_user_id = 3;
+  string created_at = 4;
+}
+
+message AttachmentLinkedV1 {
+  string message_id = 1;
+  string media_id = 2;
+  string linked_at = 3;
+}

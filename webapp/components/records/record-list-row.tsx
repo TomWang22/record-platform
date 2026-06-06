@@ -20,8 +20,23 @@ type Props = {
   compact?: boolean
 }
 
+function displayPaid(record: CollectionRecord): string {
+  if (record.paidDisplay) return record.paidDisplay
+  return formatMoneyCents(record.purchasePriceCents, record.purchaseCurrency ?? 'USD')
+}
+
+function listingStatusLabel(record: CollectionRecord): string {
+  const st = record.listingStatus ?? 'not_listed'
+  if (st === 'published' || st === 'draft') return 'Listed'
+  if (st === 'sold') return 'Sold'
+  return 'Not listed'
+}
+
 export function RecordListRow({ record, compact }: Props) {
   const grades = gradeSummary(record)
+  const purchased = record.purchaseDateDisplay ?? formatDate(record.purchasedAt)
+  const shipped = record.shipDateDisplay ?? formatDate(record.shippedAt)
+  const delivered = record.deliveredDateDisplay ?? formatDate(record.receivedAt)
 
   return (
     <tr
@@ -62,13 +77,19 @@ export function RecordListRow({ record, compact }: Props) {
         )}
       </td>
       <td className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 lg:table-cell">
-        {formatMoneyCents(record.purchasePriceCents, record.purchaseCurrency ?? 'USD')}
+        {displayPaid(record)}
       </td>
       <td className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 xl:table-cell">
-        {formatDate(record.purchasedAt)}
+        {purchased}
       </td>
       <td className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 xl:table-cell">
-        {formatDate(record.receivedAt)}
+        {shipped !== '—' ? shipped : '—'}
+      </td>
+      <td className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 xl:table-cell">
+        {delivered}
+      </td>
+      <td className="hidden px-2 py-3 text-sm text-slate-600 dark:text-slate-300 2xl:table-cell">
+        <span data-testid="record-listing-status">{listingStatusLabel(record)}</span>
       </td>
       <td className="py-3 pr-2 text-right">
         <div className="flex justify-end gap-1 opacity-0 transition group-hover:opacity-100">

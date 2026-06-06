@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { clearSession } from '@/lib/session'
 import type { SessionUser } from '@/lib/use-session'
+import { sessionPrimaryLabel } from '@/lib/session-display'
 import { useSession, isSessionAuthenticated } from '@/lib/use-session'
 
 function UserAvatar({ user }: { user: SessionUser }) {
@@ -114,7 +115,7 @@ export function UserMenu() {
       >
         <UserAvatar user={user} />
         <span className="hidden max-w-[8rem] truncate text-sm font-medium text-slate-900 dark:text-white sm:inline">
-          {user.name ?? user.email ?? 'Account'}
+          {sessionPrimaryLabel(user)}
         </span>
       </button>
 
@@ -125,13 +126,13 @@ export function UserMenu() {
         >
           <div className="border-b border-slate-100 px-4 py-3 dark:border-white/10">
             <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-              {user.name ?? 'User'}
+              {sessionPrimaryLabel(user)}
             </p>
             {user.email && (
               <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
             )}
-            <span className="mt-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              {providerLabel[user.provider]}
+            <span className="mt-2 inline-block text-[10px] text-slate-500 dark:text-slate-400">
+              Signed in with {providerLabel[user.provider] === 'Local' ? 'Email' : providerLabel[user.provider]}
             </span>
           </div>
           <Link

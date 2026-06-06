@@ -1,6 +1,6 @@
 import express, { type Request, type Response, type NextFunction } from 'express'
 import os from 'os'
-import { register, httpCounter } from '@common/utils'
+import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions } from '@common/utils'
 import { requireUser, type AuthedRequest } from './lib/auth.js'
 import { pool, syncOrderNumberSequence } from './lib/db.js'
 import { makeRedis, CacheManager, getCacheStats } from './lib/cache.js'
@@ -38,33 +38,26 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next()
 })
 
-// Health check - optimized for faster response
-app.get('/healthz', async (_req: Request, res: Response) => {
-  try {
-    // Use Promise.race to timeout DB query if it takes too long
-    const dbCheck = Promise.race([
-      pool.query('SELECT 1'),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('DB timeout')), 2000))
-    ])
-    await dbCheck
-    
-    // Redis ping with timeout
-    let r: string = 'skipped'
-    if (redis) {
-      try {
-        const redisCheck = Promise.race([
+mountRpHttpHealth(app, {
+  service: 'shopping-service',
+  readiness: async () => {
+    try {
+      await Promise.race([
+        pool.query('SELECT 1'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('DB timeout')), 2000)),
+      ])
+      if (redis) {
+        await Promise.race([
           redis.ping(),
-          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 1000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 1000)),
         ])
-        r = await redisCheck as string
-      } catch {
-        r = 'error'
       }
+      return true
+    } catch {
+      return false
     }
-    res.json({ ok: true, db: 'connected', redis: r, cpu_cores: CPU_CORES })
-  } catch (err) {
-    res.status(503).json({ ok: false, db: 'disconnected', error: String(err) })
-  }
+  },
+  grpc: rpGrpcHealthOptions('shopping-service', 'shopping.ShoppingService'),
 })
 
 // Metrics endpoint

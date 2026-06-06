@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package events.ai;
+
+option go_package = "github.com/TomWang22/record-platform/proto/events/ai";
+
+// Payloads for ${ENV_PREFIX}.ai.events (python-ai service).
+
+message PricePredictedV1 {
+  string prediction_id = 1;
+  string record_id = 2;
+  string model_id = 3;
+  string predicted_at = 4;
+}
+
+message ModelPublishedV1 {
+  string model_id = 1;
+  string model_name = 2;
+  string model_version = 3;
+  string published_at = 4;
+}

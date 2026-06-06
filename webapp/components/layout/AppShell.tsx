@@ -6,11 +6,12 @@ import { ReactNode } from 'react'
 
 import { UserMenu } from '@/components/auth/user-menu'
 import { CartIndicator } from '@/components/shell/cart-indicator'
-import { NotificationBell } from '@/components/shell/notification-bell'
+import { NotificationDropdown } from '@/components/shell/notification-dropdown'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import config from '@/lib/config'
 import { clearSession } from '@/lib/session'
+import { sessionPrimaryLabel } from '@/lib/session-display'
 import { isSessionAuthenticated, useSession } from '@/lib/use-session'
 
 import { NavLink } from './NavLink'
@@ -66,8 +67,11 @@ function SidebarUserCard() {
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
-            {user.name ?? 'User'}
+          <p
+            className="truncate text-sm font-medium text-slate-900 dark:text-white"
+            data-testid="sidebar-user-display-name"
+          >
+            {sessionPrimaryLabel(user)}
           </p>
           {user.email && (
             <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
@@ -125,13 +129,18 @@ export function AppShell({ children }: AppShellProps) {
               {isSignedIn ? 'Live mode' : 'Guest'}
             </Button>
             <ThemeToggle />
-            <NotificationBell />
+            <NotificationDropdown />
             <CartIndicator />
             <UserMenu />
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10">{children}</main>
+        <main
+          className="flex-1 px-4 py-6 sm:px-6 lg:px-10"
+          data-testid="page-content"
+        >
+          {children}
+        </main>
       </div>
     </div>
   )

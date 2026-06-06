@@ -1,0 +1,6 @@
+ARCHIVE_SHA256=561d76b4f17b813659116772785d7770a6e5dd01a3f486b2fa4ad238a6593690
+ARCHIVE_PATH=/Users/tom/record-platform-monitoring-tests-testd-tools-vitest-scripts-py-20260410.tar.gz
+SIDECAR_PATH=none
+SIDECAR_HASH_EXPECTED=
+RECORDED_AT_UTC=2026-04-19T00:52:42.426198+00:00
+PROTOCOL=bundle_extraction_v1

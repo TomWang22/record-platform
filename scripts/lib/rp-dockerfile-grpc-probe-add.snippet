@@ -1,0 +1,6 @@
+# Paste into build stage after pnpm build (before runtime FROM):
+# grpc-health-probe via ADD (no apt; Colima-friendly)
+ARG TARGETARCH=arm64
+ADD https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.24/grpc_health_probe-linux-${TARGETARCH} /tmp/grpc-health-probe
+RUN chmod +x /tmp/grpc-health-probe
+# Runtime stage: COPY --from=build /tmp/grpc-health-probe /usr/local/bin/grpc-health-probe

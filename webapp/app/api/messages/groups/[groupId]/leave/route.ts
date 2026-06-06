@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8081'
+import { messagingMessagesBaseUrl, messagingProxyHeaders } from '@/lib/messaging-bff'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: { groupId: string } },
 ) {
   try {
     const { groupId } = params
 
-    const response = await fetch(`${API_GATEWAY_URL}/messages/groups/${groupId}/leave`, {
+    const response = await fetch(`${messagingMessagesBaseUrl()}/groups/${groupId}/leave`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': request.headers.get('Authorization') || '',
-      },
+      headers: messagingProxyHeaders(request),
     })
 
     if (!response.ok) {
@@ -27,4 +25,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to leave group' }, { status: 500 })
   }
 }
-

@@ -107,7 +107,17 @@ test.describe.serial('Records collection filter contract (7.8)', () => {
     await expect(page.getByTestId('record-card').filter({ hasText: 'Kenny Dorham' })).toHaveCount(0)
 
     const milesCard = page.getByTestId('record-card').filter({ hasText: 'Miles Davis' }).first()
-    await milesCard.click()
+    const detailResponse = page.waitForResponse(
+      (r) =>
+        r.url().includes(`/api/records/${milesRecordId}`) &&
+        r.request().method() === 'GET' &&
+        r.ok(),
+      { timeout: 45_000 },
+    )
+    await Promise.all([
+      detailResponse,
+      milesCard.getByRole('link', { name: 'View' }).click(),
+    ])
     await expect(page).toHaveURL(new RegExp(`/records/${milesRecordId.replace(/-/g, '\\-')}`))
     await expect(page.getByTestId('record-detail-ready')).toBeVisible({ timeout: 45_000 })
     await capturePageContentScreenshot(

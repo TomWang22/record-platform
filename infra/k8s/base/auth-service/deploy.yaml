@@ -16,7 +16,6 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "4001"
         prometheus.io/path: "/metrics"
-        linkerd.io/inject: enabled  # Enable Linkerd sidecar injection
     spec:
       hostAliases:
         - ip: "192.168.5.2"
@@ -31,7 +30,7 @@ spec:
             - name: http
               containerPort: 4001
             - name: grpc
-              containerPort: 50051
+              containerPort: 50061
           envFrom:
             - configMapRef: { name: app-config }
             - secretRef:    { name: app-secrets }
@@ -39,13 +38,13 @@ spec:
             - name: NODE_ENV
               value: "development"
             - name: GRPC_PORT
-              value: "50051"
+              value: "50061"
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_REQUIRE_CLIENT_CERT
               value: "true"  # Strict mTLS: Envoy presents client cert to backends
             - name: TLS_CA_PATH
-              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert (envoy-client-tls)
+              value: "/etc/certs/ca.crt"
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
@@ -65,6 +64,29 @@ spec:
               value: "all"
             - name: NODE_DEBUG
               value: "http2"
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+
           resources:
             requests:
               cpu: "500m"
@@ -85,67 +107,7 @@ spec:
             - name: kafka-ssl-certs
               mountPath: /etc/kafka/secrets
               readOnly: true
-          # Dual Health Checks: gRPC (for gRPC traffic) + HTTP (for HTTP/3 tests via Caddy)
-          # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2/3 only, NOT HTTP/1.1
-          # Uses grpc-health-probe binary for standard gRPC health checking protocol
-          # Protocol: HTTP/2 cleartext (h2c) for in-cluster communication via Caddy
-          # Service name: auth.AuthService (registered service name)
-          # Note: Service runs in h2c mode (no TLS) for in-cluster, Caddy handles TLS at edge
-          # Use plaintext mode since service runs h2c (no TLS) for in-cluster
-          readinessProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50051
-                - -service=auth.AuthService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=5s
-            initialDelaySeconds: 90
-            periodSeconds: 15
-            timeoutSeconds: 20
-            failureThreshold: 6
-          livenessProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50051
-                - -service=auth.AuthService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=5s
-            initialDelaySeconds: 150
-            periodSeconds: 30
-            timeoutSeconds: 20
-            failureThreshold: 6
-          startupProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50051
-                - -service=auth.AuthService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=5s
-            initialDelaySeconds: 45
-            periodSeconds: 15
-            timeoutSeconds: 20
-            failureThreshold: 30
+
       volumes:
         - name: proto-files
           configMap:
@@ -158,7 +120,7 @@ spec:
                 path: dev-root.pem
         - name: service-tls
           secret:
-            secretName: service-tls
+            secretName: service-tls-auth-service
             items:
               - key: tls.key
                 path: tls.key

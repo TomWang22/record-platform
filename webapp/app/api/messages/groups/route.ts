@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8081'
+import { messagingMessagesBaseUrl, messagingProxyHeaders } from '@/lib/messaging-bff'
+
+const groupsUrl = () => `${messagingMessagesBaseUrl()}/groups`
 
 export async function GET(request: NextRequest) {
   try {
-    const response = await fetch(`${API_GATEWAY_URL}/messages/groups`, {
-      headers: {
-        'Authorization': request.headers.get('Authorization') || '',
-      },
+    const response = await fetch(groupsUrl(), {
+      headers: messagingProxyHeaders(request),
+      cache: 'no-store',
     })
 
     if (!response.ok) {
@@ -31,11 +32,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Group name is required' }, { status: 400 })
     }
 
-    const response = await fetch(`${API_GATEWAY_URL}/messages/groups`, {
+    const response = await fetch(groupsUrl(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': request.headers.get('Authorization') || '',
+        ...messagingProxyHeaders(request),
       },
       body: JSON.stringify({ name, description }),
     })
@@ -52,4 +53,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create group' }, { status: 500 })
   }
 }
-

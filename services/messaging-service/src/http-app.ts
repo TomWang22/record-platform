@@ -4,7 +4,7 @@
  */
 import express, { type Express } from 'express'
 import type Redis from 'ioredis'
-import { createHttpConcurrencyGuard, httpCounter, register, initOchOutboxSurfaceUnsupported } from '@common/utils'
+import { createHttpConcurrencyGuard, httpCounter, register, initOchOutboxSurfaceUnsupported, mountRpHttpHealth, rpGrpcHealthOptions } from '@common/utils'
 import { inferNetProtoForSpan, mountDebugTraceHeaders, tracingMiddleware } from '@common/utils/otel'
 import { requireUser, type AuthedRequest } from './lib/auth.js'
 import { getChatThreadsList, getMessagingUnreadCountHandler } from './routes/chat-threads.js'
@@ -31,8 +31,9 @@ export function createMessagingHttpApp(redis: Redis | null, cpuCores = 1): Expre
   mountDebugTraceHeaders(app)
   app.use(express.json({ limit: '1mb' }))
 
-  app.get(['/healthz', '/health'], (_req, res) => {
-    res.status(200).json({ ok: true })
+  mountRpHttpHealth(app, {
+    service: 'messaging-service',
+    grpc: rpGrpcHealthOptions('messaging-service', 'messaging.v1.MessagingService'),
   })
   app.get('/metrics', async (_req, res) => {
     res.setHeader('Content-Type', register.contentType)

@@ -19,10 +19,14 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 export PATH="${SCRIPT_DIR}/shims:/opt/homebrew/bin:/usr/local/bin:${PATH:-}"
 cd "$REPO_ROOT"
 
+# shellcheck source=lib/rp-dev-ca.sh
+source "$SCRIPT_DIR/lib/rp-dev-ca.sh"
+# shellcheck source=lib/rp-pki-generation.sh
+source "$SCRIPT_DIR/lib/rp-pki-generation.sh"
+
 NS="${KAFKA_SSL_NS:-record-platform}"
 PASS="${KAFKA_SSL_PASS:-changeit}"
 CA_PEM="${REPO_ROOT}/certs/dev-root.pem"
-CA_KEY="${REPO_ROOT}/certs/dev-root.key"
 OUT="${REPO_ROOT}/certs/kafka-ssl"
 TMP="${REPO_ROOT}/.kafka-ssl-tmp.$$"
 
@@ -47,10 +51,11 @@ kctl() {
 # shellcheck source=lib/kafka-broker-sans.sh
 source "$SCRIPT_DIR/lib/kafka-broker-sans.sh"
 
-if [[ ! -f "$CA_PEM" ]] || [[ ! -f "$CA_KEY" ]]; then
+if [[ ! -f "$CA_PEM" ]] || [[ ! -f "$(rp_dev_root_key)" ]]; then
   echo "❌ dev-root CA not found. Run: pnpm run reissue (with KAFKA_SSL=1 to persist CA key), or ensure certs/dev-root.pem and certs/dev-root.key exist."
   exit 1
 fi
+rp_dev_bootstrap_chain
 
 mkdir -p "$OUT" "$TMP"
 trap 'rm -rf "$TMP"' EXIT
@@ -60,7 +65,7 @@ rm -f "$OUT/kafka.keystore.jks" "$OUT/kafka.truststore.jks" "$OUT/kafka.keystore
 REPLICAS="${KAFKA_BROKER_REPLICAS:-3}"
 # Default on: KRaft EXTERNAL://<MetalLB>:9094 requires those IPs in the broker cert. Disable with KAFKA_SSL_AUTO_METALLB_IPS=0.
 if [[ "${KAFKA_SSL_AUTO_METALLB_IPS:-1}" != "0" ]]; then
-  _auto_extra="$(och_kafka_metallb_external_lb_ips_csv "$NS" "$REPLICAS")"
+  _auto_extra="$(rp_kafka_metallb_external_lb_ips_csv "$NS" "$REPLICAS")"
   if [[ -n "$_auto_extra" ]]; then
     if [[ -n "${KAFKA_SSL_EXTRA_IP_SANS:-}" ]]; then
       KAFKA_SSL_EXTRA_IP_SANS="${KAFKA_SSL_EXTRA_IP_SANS},${_auto_extra}"
@@ -72,7 +77,7 @@ if [[ "${KAFKA_SSL_AUTO_METALLB_IPS:-1}" != "0" ]]; then
     warn "KAFKA_SSL_AUTO_METALLB_IPS=1 but no kafka-*-external LoadBalancer IPs in namespace ${NS}"
   fi
 fi
-KAFKA_SANS="$(och_kafka_subject_alt_name_openssl_value "$NS" "$REPLICAS" "${KAFKA_SSL_EXTRA_IP_SANS:-}")"
+KAFKA_SANS="$(rp_kafka_subject_alt_name_openssl_value "$NS" "$REPLICAS" "${KAFKA_SSL_EXTRA_IP_SANS:-}")"
 CN="${KAFKA_SSL_CN:-kafka}"
 say "Broker TLS SANs: replicas 0..$((REPLICAS - 1)), namespace=${NS} (MetalLB IPs auto-merged when discoverable; KAFKA_SSL_AUTO_METALLB_IPS=0 to skip)"
 
@@ -92,9 +97,10 @@ extendedKeyUsage = serverAuth, clientAuth
 subjectAltName = $KAFKA_SANS
 EOF
 
-say "2. Signing broker cert with dev-root-ca..."
-if ! openssl x509 -req -in "$TMP/kafka.csr" -CA "$CA_PEM" -CAkey "$CA_KEY" \
-  -CAcreateserial -out "$TMP/kafka.pem" -days 365 \
+say "2. Signing broker cert with dev intermediate..."
+if ! openssl x509 -req -in "$TMP/kafka.csr" -CA "$(rp_dev_intermediate_pem)" -CAkey "$(rp_dev_intermediate_key)" \
+  -CAserial "$(rp_dev_certs_dir)/dev-intermediate.srl" -CAcreateserial \
+  -out "$TMP/kafka.pem" -days 365 -sha256 \
   -extensions kafka_broker_tls -extfile "$TMP/san.ext"; then
   echo "❌ openssl x509 broker sign failed (see errors above)"
   exit 1
@@ -106,27 +112,42 @@ if ! openssl x509 -in "$TMP/kafka.pem" -text -noout | grep -A2 "Extended Key Usa
 fi
 ok "Broker cert signed (serverAuth + clientAuth in PEM)"
 cp "$TMP/kafka.pem" "$OUT/kafka-broker.pem"
+cp "$TMP/kafka.key" "$OUT/kafka-broker.key"
 
 say "3. Creating JKS keystore and truststore..."
-openssl pkcs12 -export -in "$TMP/kafka.pem" -inkey "$TMP/kafka.key" \
+# Keystore: leaf + issuing intermediate (peers need full chain on the wire).
+# Truststore: intermediate + root (broker leaf is signed by intermediate, not dev-root directly).
+cat "$TMP/kafka.pem" "$(rp_dev_intermediate_pem)" >"$TMP/kafka-chain.pem"
+openssl pkcs12 -export -in "$TMP/kafka-chain.pem" -inkey "$TMP/kafka.key" \
   -out "$TMP/kafka.p12" -passout "pass:$PASS" -name kafka 2>/dev/null
 keytool -importkeystore -srckeystore "$TMP/kafka.p12" -srcstoretype PKCS12 \
   -srcstorepass "$PASS" -destkeystore "$OUT/kafka.keystore.jks" \
   -deststoretype JKS -deststorepass "$PASS" -noprompt 2>/dev/null
 
+rm -f "$OUT/kafka.truststore.jks"
+keytool -importcert -alias dev-intermediate-ca -file "$(rp_dev_intermediate_pem)" \
+  -keystore "$OUT/kafka.truststore.jks" -storepass "$PASS" -noprompt 2>/dev/null
 keytool -importcert -alias dev-root-ca -file "$CA_PEM" \
   -keystore "$OUT/kafka.truststore.jks" -storepass "$PASS" -noprompt 2>/dev/null
 
 echo -n "$PASS" > "$OUT/kafka.keystore-password"
 echo -n "$PASS" > "$OUT/kafka.truststore-password"
 echo -n "$PASS" > "$OUT/kafka.key-password"  # KAFKA_SSL_KEY_CREDENTIALS (in-cluster Kafka deploy)
-cp "$CA_PEM" "$OUT/ca-cert.pem"
+cp "$(rp_dev_chain_pem)" "$OUT/ca-cert.pem"
+cp "$(rp_dev_chain_pem)" "$OUT/ca.crt"
+cp "$(rp_dev_chain_pem)" "$OUT/dev-chain.pem"
 
-chmod +x "$SCRIPT_DIR/verify-kafka-broker-keystore-jks.sh" 2>/dev/null || true
+chmod +x "$SCRIPT_DIR/verify-kafka-broker-keystore-jks.sh" \
+  "$SCRIPT_DIR/verify-kafka-broker-truststore-jks.sh" 2>/dev/null || true
 KAFKA_KEYSTORE_PATH="$OUT/kafka.keystore.jks" \
   KAFKA_KEYSTORE_PASSWORD_FILE="$OUT/kafka.keystore-password" \
   REPO_ROOT="$REPO_ROOT" \
   bash "$SCRIPT_DIR/verify-kafka-broker-keystore-jks.sh" || exit 1
+KAFKA_TRUSTSTORE_PATH="$OUT/kafka.truststore.jks" \
+  KAFKA_TRUSTSTORE_PASSWORD_FILE="$OUT/kafka.truststore-password" \
+  KAFKA_BROKER_PEM_PATH="$OUT/kafka-broker.pem" \
+  REPO_ROOT="$REPO_ROOT" \
+  bash "$SCRIPT_DIR/verify-kafka-broker-truststore-jks.sh" || exit 1
 
 say "3b. Generating Kafka client cert (mTLS: ssl.client.auth=required)..."
 openssl genrsa -out "$TMP/client.key" 2048 2>/dev/null
@@ -138,8 +159,8 @@ basicConstraints = CA:FALSE
 keyUsage = digitalSignature, keyEncipherment
 extendedKeyUsage = clientAuth
 EOF
-openssl x509 -req -in "$TMP/client.csr" -CA "$CA_PEM" -CAkey "$CA_KEY" \
-  -CAcreateserial -out "$TMP/client.crt" -days 365 -sha256 \
+openssl x509 -req -in "$TMP/client.csr" -CA "$(rp_dev_intermediate_pem)" -CAkey "$(rp_dev_intermediate_key)" \
+  -CAserial "$(rp_dev_certs_dir)/dev-intermediate.srl" -CAcreateserial -out "$TMP/client.crt" -days 365 -sha256 \
   -extensions v3_client -extfile "$TMP/client.ext" 2>/dev/null
 cp "$TMP/client.crt" "$OUT/client.crt"
 cp "$TMP/client.key" "$OUT/client.key"
@@ -147,62 +168,12 @@ ok "Kafka client cert (client.crt, client.key) for Node/KafkaJS mTLS"
 
 ok "Keystore/truststore, ca-cert.pem, and client cert in $OUT"
 
-say "4. Creating kafka-ssl-secret in $NS..."
-# Idempotent: avoid "Error from server (AlreadyExists)" when namespace exists
-kubectl create namespace "$NS" --dry-run=client -o yaml 2>/dev/null | kubectl apply -f - 2>/dev/null || true
-# Use a temp file so apply works with host kubectl (pipe to colima ssh often yields "no objects passed to apply")
-_kafka_secret_yaml="${TMP}/kafka-ssl-secret.yaml"
-kubectl create secret generic kafka-ssl-secret -n "$NS" \
-  --from-file=kafka.keystore.jks="$OUT/kafka.keystore.jks" \
-  --from-file=kafka.truststore.jks="$OUT/kafka.truststore.jks" \
-  --from-file=kafka.keystore-password="$OUT/kafka.keystore-password" \
-  --from-file=kafka.truststore-password="$OUT/kafka.truststore-password" \
-  --from-file=kafka.key-password="$OUT/kafka.key-password" \
-  --from-file=kafka-broker.pem="$OUT/kafka-broker.pem" \
-  --from-file=ca-cert.pem="$OUT/ca-cert.pem" \
-  --from-file=ca.crt="$OUT/ca-cert.pem" \
-  --from-file=client.crt="$OUT/client.crt" \
-  --from-file=client.key="$OUT/client.key" \
-  --dry-run=client -o yaml >"$_kafka_secret_yaml"
-if ! kubectl apply -f "$_kafka_secret_yaml" --request-timeout=20s 2>/dev/null; then
-  # After reissue the host tunnel is often down; try in-VM apply (repo path usually same in Colima)
-  if [[ "$ctx" == *"colima"* ]] && command -v colima >/dev/null 2>&1 && [[ -f "$_kafka_secret_yaml" ]]; then
-    if colima ssh -- env KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f "$_kafka_secret_yaml" --request-timeout=20s 2>/dev/null; then
-      ok "kafka-ssl-secret created/updated (via colima ssh)"
-    else
-      warn "kubectl apply failed (host and colima ssh). Check cluster reachable and namespace $NS"
-      exit 1
-    fi
-  else
-    warn "kubectl apply failed (check cluster reachable and namespace $NS)"
-    exit 1
-  fi
+if [[ "${KAFKA_SSL_SKIP_K8S_SECRET:-0}" == "1" ]]; then
+  ok "Skipping k8s secret (KAFKA_SSL_SKIP_K8S_SECRET=1); disk material in $OUT"
 else
-  ok "kafka-ssl-secret created/updated"
-fi
-
-_ca_fp="$(openssl x509 -in "$OUT/ca-cert.pem" -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2 | tr -d '\r')"
-if [[ -n "$_ca_fp" ]]; then
-  if kctl annotate secret kafka-ssl-secret -n "$NS" "och.dev/ca-fingerprint-sha256=${_ca_fp}" --overwrite --request-timeout=20s 2>/dev/null; then
-    ok "Annotated kafka-ssl-secret och.dev/ca-fingerprint-sha256"
-  else
-    warn "Could not annotate kafka-ssl-secret (kubectl/colima); verify-kafka-cluster may warn until fixed"
-  fi
-fi
-
-say "4b. Creating kafka-ssl-secret (same client material; Deployments mount kafka-ssl-secret)…"
-_och_kafka_yaml="${TMP}/kafka-ssl-secret.yaml"
-kubectl create secret generic kafka-ssl-secret -n "$NS" \
-  --from-file=ca-cert.pem="$OUT/ca-cert.pem" \
-  --from-file=client.crt="$OUT/client.crt" \
-  --from-file=client.key="$OUT/client.key" \
-  --dry-run=client -o yaml >"$_och_kafka_yaml"
-if kubectl apply -f "$_och_kafka_yaml" --request-timeout=20s 2>/dev/null; then
-  ok "kafka-ssl-secret created/updated"
-elif [[ "$ctx" == *"colima"* ]] && command -v colima >/dev/null 2>&1 && [[ -f "$_och_kafka_yaml" ]]; then
-  colima ssh -- env KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f "$_och_kafka_yaml" --request-timeout=20s 2>/dev/null && ok "kafka-ssl-secret (via colima ssh)" || warn "kafka-ssl-secret apply failed"
-else
-  warn "kafka-ssl-secret apply failed"
+  say "4. Applying kafka-ssl-secret in $NS (canonical writer: apply-rp-kafka-ssl-secret.sh)..."
+  kubectl create namespace "$NS" --dry-run=client -o yaml 2>/dev/null | kubectl apply -f - 2>/dev/null || true
+  HOUSING_NS="$NS" bash "$SCRIPT_DIR/apply-rp-kafka-ssl-secret.sh"
 fi
 
 say "=== Kafka SSL (dev-root-ca) done ==="

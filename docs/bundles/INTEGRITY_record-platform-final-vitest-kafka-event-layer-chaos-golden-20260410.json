@@ -1,0 +1,33 @@
+{
+  "bundle_extraction_protocol": "v1",
+  "generated_at": "2026-04-19T00:52:06.477031+00:00",
+  "archive": "/Users/tom/record-platform-final-vitest-kafka-event-layer-chaos-golden-20260410.tar.gz",
+  "archive_sha256": "2ae24cbc99afae4b2d3036f5282048127ea5e2ee448113bf3b6cc846e0591765",
+  "staging_path": "/Users/tom/bundle-staging/record-platform-final-vitest-kafka-event-layer-chaos-golden-20260410",
+  "archive_root_layout": {
+    "type": "single_top_level",
+    "root": "record-platform-final-vitest-kafka-event-layer-chaos-golden-20260410"
+  },
+  "pre_extract": {
+    "safe": true,
+    "issues": [],
+    "warnings": [
+      "symlink_allowed:record-platform-final-vitest-kafka-event-layer-chaos-golden-20260410/services/auth-service/prisma/.env->'../../.env'"
+    ],
+    "file_member_count": 1148
+  },
+  "post_extract": {
+    "manifest_tar_equals_find": true,
+    "file_count": 1148,
+    "case_collision_free": true,
+    "staging_frozen_read_only": true,
+    "apple_double_neutral_manifest": true
+  },
+  "explicit_non_actions": [
+    "tarball_not_mutated",
+    "no_line_endings_normalized",
+    "no_top_level_strip_rewrite",
+    "no_repo_copy",
+    "no_git_add"
+  ]
+}

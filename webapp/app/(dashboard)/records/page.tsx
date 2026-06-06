@@ -20,6 +20,7 @@ import type {
   RecordsSortKey,
   RecordsViewMode,
 } from '@/lib/records-types'
+import { normalizeCollectionRecord } from '@/lib/records-types'
 import { RECORDS_PAGE_SIZES } from '@/lib/records-types'
 import { useRequireAuth } from '@/lib/use-require-auth'
 
@@ -108,11 +109,11 @@ function RecordsPageContent() {
         setRecords(
           data.map((r) => {
             const link = links.get(r.id)
-            return {
+            return normalizeCollectionRecord({
               ...r,
               listingId: link?.listingId ?? null,
               listingStatus: link ? link.status : 'not_listed',
-            }
+            })
           }),
         )
         setPage(1)
@@ -350,7 +351,9 @@ function RecordsPageContent() {
                     <th className="hidden px-2 py-3 md:table-cell">Purchase</th>
                     <th className="hidden px-2 py-3 lg:table-cell">Price</th>
                     <th className="hidden px-2 py-3 xl:table-cell">Bought</th>
-                    <th className="hidden px-2 py-3 xl:table-cell">Received</th>
+                    <th className="hidden px-2 py-3 xl:table-cell">Shipped</th>
+                    <th className="hidden px-2 py-3 xl:table-cell">Delivered</th>
+                    <th className="hidden px-2 py-3 2xl:table-cell">Listed</th>
                     <th className="px-2 py-3" />
                   </tr>
                 </thead>

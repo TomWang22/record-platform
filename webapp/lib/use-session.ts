@@ -2,8 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-import { getClientSessionToken, getDevSessionProfile } from './session'
+import {
+  getClientSessionToken,
+  getContractSessionProfile,
+  getDevSessionProfile,
+} from './session'
 import { isDevAuthEnabled } from './dev-auth'
+import { resolveSessionDisplayName } from './session-display'
 
 export type SessionUser = {
   name?: string
@@ -52,8 +57,14 @@ function providerFrom(payload: Record<string, unknown>): SessionUser['provider']
 
 function userFromToken(token: string): SessionUser {
   const payload = parseJwtPayload(token) ?? {}
-  const name = (payload.name ?? payload.display_name ?? payload.sub) as string | undefined
   const email = payload.email as string | undefined
+  const name = resolveSessionDisplayName({
+    name: payload.name as string | undefined,
+    displayName: payload.display_name as string | undefined,
+    username: payload.username as string | undefined,
+    email,
+    sub: payload.sub as string | undefined,
+  })
   const avatarUrl = (payload.picture ?? payload.avatar_url) as string | undefined
   return {
     name,
@@ -75,26 +86,43 @@ export function useSession(): SessionState {
     }
     const baseUser = userFromToken(token)
     const devProfile = isDevAuthEnabled() ? getDevSessionProfile() : null
+    const contractProfile = getContractSessionProfile()
+    const overlay = contractProfile ?? devProfile
+    const merged = overlay
+      ? {
+          ...baseUser,
+          name: overlay.name ?? baseUser.name,
+          email: overlay.email ?? baseUser.email,
+          avatarUrl: overlay.avatarUrl ?? baseUser.avatarUrl,
+          initials: overlay.initials ?? baseUser.initials,
+          provider:
+            (overlay.provider as SessionUser['provider'] | undefined) ?? baseUser.provider,
+        }
+      : baseUser
+    const displayName = resolveSessionDisplayName({
+      name: merged.name,
+      email: merged.email,
+    })
     setState({
       status: 'authenticated',
       token,
-      user: devProfile
-        ? {
-            ...baseUser,
-            name: devProfile.name ?? baseUser.name,
-            email: devProfile.email ?? baseUser.email,
-            avatarUrl: devProfile.avatarUrl ?? baseUser.avatarUrl,
-            initials: devProfile.initials ?? baseUser.initials,
-            provider: devProfile.provider ?? baseUser.provider,
-          }
-        : baseUser,
+      user: {
+        ...merged,
+        name: displayName ?? merged.name,
+        initials: initialsFrom(displayName ?? merged.name, merged.email),
+      },
     })
   }, [])
 
   useEffect(() => {
     refresh()
     const onStorage = (event: StorageEvent) => {
-      if (event.key === 'record-platform.token') refresh()
+      if (
+        event.key === 'record-platform.token' ||
+        event.key === 'record-platform.contract-profile'
+      ) {
+        refresh()
+      }
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)

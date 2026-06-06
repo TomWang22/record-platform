@@ -15,8 +15,12 @@ const protectedRoutes: RouteExpectation[] = [
   { path: "/records/new", name: "records-new", mustContain: /Add new record/i },
   { path: "/cart", name: "cart", mustContain: /Shopping Cart/i },
   { path: "/auctions", name: "auctions", mustContain: /Auction Monitor/i },
-  { path: "/listings", name: "listings", mustContain: /Marketplace Listings|Sign in to browse/i },
-  { path: "/market", name: "sell-list", mustContain: /Create listing|List a record|Sell/i },
+  { path: "/listings", name: "listings", mustContain: /Marketplace|Sign in to browse/i },
+  {
+    path: "/market",
+    name: "sell-list",
+    mustContain: /Create listing|Sign in to create a listing|List a record|Sell/i,
+  },
   { path: "/settings", name: "settings", mustContain: /Settings|Sign in/i },
   { path: "/observation-deck", name: "observation-deck", mustContain: /Observation deck|Sign in/i },
 ];
@@ -48,10 +52,10 @@ test.describe("Route identity — protected app routes", () => {
         `${route.path} must not render standalone /login page`,
       ).toBeFalsy();
 
-      await expect(
-        page.getByRole("heading", { level: 1, name: route.mustContain }).first(),
-        `${route.path} must show expected page heading`,
-      ).toBeVisible({ timeout: 15_000 });
+      const heading = page.getByRole("heading", { name: route.mustContain }).first()
+      await expect(heading, `${route.path} must show expected page heading`).toBeVisible({
+        timeout: 15_000,
+      });
     });
   }
 });

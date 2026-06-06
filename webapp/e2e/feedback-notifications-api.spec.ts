@@ -49,9 +49,12 @@ test.describe('Feedback and notifications API contract', () => {
     const mine = await request.get('/api/listings/mine', {
       headers: { Authorization: `Bearer ${token}` },
     })
+    const mineBody = (await mine.json()) as {
+      items?: { id: string }[]
+      listings?: { id: string }[]
+    }
     const listingId =
-      seed.fixedListingId ??
-      ((await mine.json()) as { items?: { id: string }[] }).items?.[0]?.id
+      seed.fixedListingId ?? mineBody.items?.[0]?.id ?? mineBody.listings?.[0]?.id
     expect(listingId).toBeTruthy()
 
     const { sub: userId } = decodeJwtUsername(token!)

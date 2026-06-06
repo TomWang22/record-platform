@@ -1,0 +1,6 @@
+ARCHIVE_SHA256=a447077cb019ec7e1c2f51a49ae589ad11b376ed96cf1f7f586418b3d1eac150
+ARCHIVE_PATH=/Users/tom/record-platform-kafka-ops-certs-alignment-cron-preflight-20260410.tar.gz
+SIDECAR_PATH=none
+SIDECAR_HASH_EXPECTED=
+RECORDED_AT_UTC=2026-04-19T00:52:18.996714+00:00
+PROTOCOL=bundle_extraction_v1

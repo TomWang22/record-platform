@@ -6,6 +6,8 @@ import { ensureTestCollection } from './helpers/seed-collection'
 import { ensureContractFeedback } from './helpers/seed-feedback'
 import {
   captureScreenshot,
+  contractScreenshotPath,
+  guestContractScreenshotPath,
   waitForFeedbackReady,
   waitForListingsReady,
   waitForRecordsReady,
@@ -34,9 +36,15 @@ test.describe('Marketplace filled screenshots', () => {
       await assertNoStaleProductUi(page)
       await captureScreenshot(
         page,
-        `e2e/screenshots/authenticated/authenticated-records-${view}-filled.png`,
+        contractScreenshotPath(`authenticated-records-${view}-media-filled.png`),
       )
     }
+    await page.goto('/records?view=grid')
+    await waitForRecordsReady(page, 'grid', token)
+    await captureScreenshot(
+      page,
+      contractScreenshotPath('authenticated-records-lifecycle-dates.png'),
+    )
   })
 
   test('marketplace grid list compact filled', async ({ page }) => {
@@ -53,7 +61,7 @@ test.describe('Marketplace filled screenshots', () => {
       await assertNoStaleProductUi(page)
       await captureScreenshot(
         page,
-        `e2e/screenshots/authenticated/authenticated-listings-marketplace-${view}-filled.png`,
+        contractScreenshotPath('authenticated-marketplace-browse-product-cards.png'),
       )
     }
   })
@@ -63,20 +71,30 @@ test.describe('Marketplace filled screenshots', () => {
 
     await page.goto('/profile')
     await assertNoStaleProductUi(page)
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-profile-clickable-stats-filled.png')
+    await captureScreenshot(
+      page,
+      contractScreenshotPath('authenticated-profile-human-readable.png'),
+    )
+    await captureScreenshot(
+      page,
+      contractScreenshotPath('authenticated-profile-clickable-stats-filled.png'),
+    )
 
     await waitForSellingReady(page, 'active')
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-profile-selling-active-filled.png')
+    await captureScreenshot(page, contractScreenshotPath('authenticated-profile-selling-active-filled.png'))
     await waitForSellingReady(page, 'sold')
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-profile-selling-sold-filled.png')
+    await captureScreenshot(page, contractScreenshotPath('authenticated-profile-selling-sold-filled.png'))
 
     await waitForSellingReady(page, 'active')
-    const hrefEarly = await page
-      .locator('[data-testid="selling-listing-row"] a[href^="/listings/"]')
-      .first()
-      .getAttribute('href')
-    const seedListingId =
-      seed.fixedListingId ?? hrefEarly?.match(/\/listings\/([^/?#]+)/)?.[1] ?? null
+    let seedListingId = seed.fixedListingId ?? null
+    if (!seedListingId) {
+      const hrefEarly = await page
+        .locator('[data-testid="selling-listing-row"] a[href^="/listings/"]')
+        .first()
+        .getAttribute('href', { timeout: 15_000 })
+        .catch(() => null)
+      seedListingId = hrefEarly?.match(/\/listings\/([^/?#]+)/)?.[1] ?? null
+    }
     expect(seedListingId).toBeTruthy()
     const jwtPayload = JSON.parse(
       Buffer.from(token!.split('.')[1]!, 'base64').toString(),
@@ -89,7 +107,7 @@ test.describe('Marketplace filled screenshots', () => {
       buyerUserId: userId!,
     })
     await waitForFeedbackReady(page, token!)
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-feedback-d3-filled.png')
+    await captureScreenshot(page, contractScreenshotPath('authenticated-feedback-d3-filled.png'))
 
     const listingId = seedListingId
     if (listingId) {
@@ -98,32 +116,44 @@ test.describe('Marketplace filled screenshots', () => {
         name: /add to watchlist|remove from watchlist/i,
       })
       await expect(watchBtn).toBeVisible({ timeout: 30_000 })
-      await watchBtn.click()
+      const watchLabel = (await watchBtn.getAttribute('aria-label')) ?? ''
+      if (/add to watchlist/i.test(watchLabel)) {
+        await watchBtn.click()
+      }
       await page.goto('/watchlist')
+      await expect(page.getByTestId('watchlist-page-ready')).toBeVisible({ timeout: 30_000 })
       await expect(page.locator('[data-testid="watchlist-item"]').first()).toBeVisible({ timeout: 15_000 })
-      await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-watchlist-filled.png')
+      await captureScreenshot(
+        page,
+        contractScreenshotPath('authenticated-watchlist-filled-product-cards.png'),
+      )
 
       await page.goto(`/listings/${listingId}`)
+      await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 30_000 })
       await page.goto('/recently-viewed')
+      await expect(page.getByTestId('recently-viewed-page-ready')).toBeVisible({ timeout: 30_000 })
       await expect(page.locator('[data-testid="recently-viewed-item"]').first()).toBeVisible({
         timeout: 15_000,
       })
-      await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-recently-viewed-filled.png')
+      await captureScreenshot(
+        page,
+        contractScreenshotPath('authenticated-recently-viewed-filled-product-cards.png'),
+      )
 
       await page.goto(`/listings/${listingId}`)
       await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 30_000 })
       await expect(page.locator('body')).not.toContainText('Loading listing')
-      await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-listing-detail-with-image.png', {
+      await captureScreenshot(page, contractScreenshotPath('authenticated-listing-detail-with-image.png'), {
         fullPage: true,
       })
       await page.goto(`/listings/${listingId}/edit`)
       await expect(page.getByRole('button', { name: /save changes/i })).toBeVisible({
         timeout: 30_000,
       })
-      await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-listing-edit.png')
+      await captureScreenshot(page, contractScreenshotPath('authenticated-listing-edit.png'))
       await page.goto(`/listings/${listingId}/revisions`)
       await expect(page.locator('ol').first()).toBeVisible({ timeout: 30_000 })
-      await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-listing-revisions.png')
+      await captureScreenshot(page, contractScreenshotPath('authenticated-listing-revisions.png'))
     }
 
     const recordId = await page.evaluate(() => {
@@ -138,24 +168,27 @@ test.describe('Marketplace filled screenshots', () => {
     })
     if (recordId) {
       await page.goto(`/records/${recordId}`)
-      await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-record-detail.png')
+      await captureScreenshot(page, contractScreenshotPath('authenticated-record-detail.png'))
     }
 
     await page.goto('/dashboard')
     await page.getByRole('button', { name: /Cart/i }).click()
     await expect(page.getByText(/subtotal|cart/i).first()).toBeVisible({ timeout: 15_000 })
     await page.screenshot({
-      path: 'e2e/screenshots/authenticated/authenticated-cart-popover-filled.png',
+      path: contractScreenshotPath('authenticated-cart-popover-filled.png'),
       fullPage: true,
     })
     await page.goto('/cart')
     await expect(page.getByText(/Loading cart/i)).not.toBeVisible({ timeout: 30_000 })
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-cart-filled.png')
+    await captureScreenshot(page, contractScreenshotPath('authenticated-cart-filled.png'))
   })
 
   test('public profile filled', async ({ page }) => {
     await page.goto('/users/test-collector')
     await assertNoStaleProductUi(page)
-    await captureScreenshot(page, 'e2e/screenshots/guest/authenticated-public-user-profile-filled.png')
+    await captureScreenshot(
+      page,
+      guestContractScreenshotPath('authenticated-public-user-profile-filled.png'),
+    )
   })
 })

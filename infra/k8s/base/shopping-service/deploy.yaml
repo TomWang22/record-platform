@@ -48,7 +48,7 @@ spec:
             - name: GRPC_REQUIRE_CLIENT_CERT
               value: "true"  # Strict mTLS: Envoy presents client cert to backends
             - name: TLS_CA_PATH
-              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert
+              value: "/etc/certs/ca.crt"
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "1"
             - name: NODE_EXTRA_CA_CERTS
@@ -58,7 +58,10 @@ spec:
             - name: TLS_CERT_PATH
               value: "/etc/certs/tls.crt"
             - name: KAFKA_BROKER
-              value: "kafka-external.record-platform.svc.cluster.local:9093"
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: KAFKA_BROKER
             - name: KAFKA_USE_SSL
               value: "true"
             - name: KAFKA_SSL_ENABLED
@@ -78,6 +81,29 @@ spec:
             - name: kafka-ssl-certs
               mountPath: /etc/kafka/secrets
               readOnly: true
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+
           resources:
             requests:
               cpu: 200m
@@ -85,65 +111,7 @@ spec:
             limits:
               cpu: 750m
               memory: 1Gi
-          # gRPC Health Checks (grpc.health.v1.Health/Check) - HTTP/2/3 only, NOT HTTP/1.1
-          # Uses grpc-health-probe binary for standard gRPC health checking protocol
-          # Protocol: HTTP/2 with TLS (strict TLS with client cert verification)
-          # Service name: shopping.ShoppingService (registered service name)
-          # Note: Service uses strict TLS with client certificate verification
-          readinessProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50058
-                - -service=shopping.ShoppingService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=5s
-            initialDelaySeconds: 60
-            periodSeconds: 15
-            timeoutSeconds: 20
-            failureThreshold: 6
-          livenessProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50058
-                - -service=shopping.ShoppingService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=10s
-            initialDelaySeconds: 150
-            periodSeconds: 20
-            timeoutSeconds: 20
-            failureThreshold: 6
-          startupProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50058
-                - -service=shopping.ShoppingService
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=10s
-                - -rpc-timeout=5s
-            initialDelaySeconds: 30
-            periodSeconds: 15
-            timeoutSeconds: 20
-            failureThreshold: 30
+
       volumes:
         - name: proto-files
           configMap:
@@ -156,7 +124,7 @@ spec:
                 path: dev-root.pem
         - name: service-tls
           secret:
-            secretName: service-tls
+            secretName: service-tls-shopping-service
             items:
               - key: tls.key
                 path: tls.key

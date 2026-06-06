@@ -1,0 +1,6 @@
+ARCHIVE_SHA256=a576eba575b1cc40682568ace978f1cf6e35ba009ceca693f4ebbbadc52d5c07
+ARCHIVE_PATH=/Users/tom/och-preflight-cluster-stability-jaeger-transport-bundle-20260418-011502.tar.gz
+SIDECAR_PATH=none
+SIDECAR_HASH_EXPECTED=
+RECORDED_AT_UTC=2026-04-19T00:51:19.574352+00:00
+PROTOCOL=bundle_extraction_v1

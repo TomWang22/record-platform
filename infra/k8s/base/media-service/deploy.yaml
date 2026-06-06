@@ -113,7 +113,7 @@ spec:
             failureThreshold: 60
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /readyz
               port: http
             initialDelaySeconds: 30
             periodSeconds: 10

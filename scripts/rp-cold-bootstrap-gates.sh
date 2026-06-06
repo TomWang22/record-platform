@@ -41,7 +41,7 @@ gate_workspace_forbidden() {
   done
   redis_wrong="$(docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | grep -E ':6380->' || true)"
   [[ -n "$redis_wrong" ]] && fail "Redis on 6380 detected"
-  ok "workspace/forbidden (no booking/social/OCH/5444–5448)"
+  ok "workspace/forbidden (no booking/social/legacy ports 5444–5448)"
 }
 
 gate_workspace_runtime_ports() {
@@ -68,17 +68,17 @@ mat = sys.argv[1]
 with open(os.path.join(mat, "manifest.json"), encoding="utf-8") as f:
     m = json.load(f)
 expected = {
-    5433: ("records", "RP 5433-records"),
-    5434: ("messaging", "OCH 5444-messaging"),
-    5435: ("listings", "OCH 5442-listings + RP overlay hook"),
-    5436: ("shopping", "RP 5436-shopping"),
-    5437: ("auth", "RP 5437-auth"),
-    5438: ("auction_monitor_core", "RP 5438-postgres (auction-monitor/core)"),
-    5439: ("analytics", "OCH 5447-analytics"),
-    5440: ("python_ai", "RP 5440-python_ai"),
-    5441: ("notification", "OCH 5445-notification"),
-    5442: ("trust", "OCH 5446-trust"),
-    5443: ("media", "OCH 5448-media"),
+    5433: ("records", "5433-records"),
+    5434: ("messaging", "5434-messaging"),
+    5435: ("listings", "5435-listings"),
+    5436: ("shopping", "5436-shopping"),
+    5437: ("auth", "5437-auth"),
+    5438: ("auction_monitor_core", "5438-auction-monitor-core"),
+    5439: ("analytics", "5439-analytics"),
+    5440: ("python_ai", "5440-python_ai"),
+    5441: ("notification", "5441-notification"),
+    5442: ("trust", "5442-trust"),
+    5443: ("media", "5443-media"),
 }
 assign = {a["target_port"]: a for a in m.get("assignments", []) if a.get("active")}
 if len(assign) != 11:
@@ -88,23 +88,21 @@ for port, (svc, note) in expected.items():
         sys.exit(f"missing port {port} ({svc})")
     a = assign[port]
     arts = a.get("artifacts") or []
-    bases = {x.get("basename", "") for x in arts}
-    prefix = f"{port}-{a.get('target_database', svc)}"
-    for suf, name in (
-        ("extensions.tsv", f"{prefix}-extensions.tsv"),
-        ("pg_settings.tsv", f"{prefix}-pg_settings.tsv"),
-        (".dump", f"{prefix}.dump"),
-        (".sql.gz", f"{prefix}.sql.gz"),
-    ):
-        if name not in bases:
-            sys.exit(f"port {port}: missing artifact {name}")
+    bases = {x.get("basename", "") for x in arts if x.get("basename")}
+    # Validate by artifact type instead of reconstructing an exact prefix from
+    # target_database. Some backups intentionally keep a legacy basename while
+    # mapping to a normalized runtime DB name (ex: 5438 auction-monitor-core -> postgres).
+    required_suffixes = ("-extensions.tsv", "-pg_settings.tsv", ".dump", ".sql.gz")
+    for suffix in required_suffixes:
+        if not any(name.startswith(f"{port}-") and name.endswith(suffix) for name in bases):
+            sys.exit(f"port {port}: missing artifact with suffix {suffix}")
 ex = set(m.get("excluded_services") or [])
 if "bookings" not in ex or "social" not in ex:
     sys.exit("excluded_services must include bookings and social")
 print("BACKUP_MAP_OK")
 for port in sorted(expected):
-    svc, note = expected[port]
-    print(f"  {port} {svc:<16} ← {note}")
+    svc, artifact = expected[port]
+    print(f"  {port} {svc:<22} {artifact}")
 PY
   ok "backup materialization (11×4 artifacts)"
 }

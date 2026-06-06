@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8081'
+import { messagingMessagesBaseUrl, messagingProxyHeaders } from '@/lib/messaging-bff'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: { groupId: string } },
 ) {
   try {
     const { groupId } = params
 
-    const response = await fetch(`${API_GATEWAY_URL}/messages/groups/${groupId}`, {
-      headers: {
-        'Authorization': request.headers.get('Authorization') || '',
-      },
+    const response = await fetch(`${messagingMessagesBaseUrl()}/groups/${groupId}`, {
+      headers: messagingProxyHeaders(request),
+      cache: 'no-store',
     })
 
     if (!response.ok) {
@@ -26,4 +25,3 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to fetch group' }, { status: 500 })
   }
 }
-

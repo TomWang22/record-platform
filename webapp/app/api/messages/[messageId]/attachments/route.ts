@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8081'
+import { messagingMessagesBaseUrl, messagingProxyHeaders } from '@/lib/messaging-bff'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { messageId: string } }
+  { params }: { params: { messageId: string } },
 ) {
   try {
     const body = await request.json()
     const { messageId } = params
 
-    const response = await fetch(`${API_GATEWAY_URL}/messages/${messageId}/attachments`, {
+    const response = await fetch(`${messagingMessagesBaseUrl()}/${messageId}/attachments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': request.headers.get('Authorization') || '',
+        ...messagingProxyHeaders(request),
       },
       body: JSON.stringify(body),
     })
@@ -34,15 +34,14 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { messageId: string } }
+  { params }: { params: { messageId: string } },
 ) {
   try {
     const { messageId } = params
 
-    const response = await fetch(`${API_GATEWAY_URL}/messages/${messageId}/attachments`, {
-      headers: {
-        'Authorization': request.headers.get('Authorization') || '',
-      },
+    const response = await fetch(`${messagingMessagesBaseUrl()}/${messageId}/attachments`, {
+      headers: messagingProxyHeaders(request),
+      cache: 'no-store',
     })
 
     if (!response.ok) {
@@ -56,4 +55,3 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to fetch attachments' }, { status: 500 })
   }
 }
-

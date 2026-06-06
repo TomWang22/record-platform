@@ -29,7 +29,13 @@ export default function RecordDetailPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const id = params.id as string
-  const { authRequired, onApiError } = useRequireAuth()
+  const { authRequired, onApiError, isReady } = useRequireAuth()
+
+  useEffect(() => {
+    if (id === 'new') {
+      router.replace('/records/new')
+    }
+  }, [id, router])
 
   const tabParam = searchParams.get('tab') as Tab | null
   const [tab, setTab] = useState<Tab>(tabParam ?? 'overview')
@@ -43,26 +49,30 @@ export default function RecordDetailPage() {
   }, [tabParam])
 
   useEffect(() => {
-    if (id && !authRequired) void load()
+    if (!id || !isReady || authRequired) return
+    void load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, authRequired])
+  }, [id, authRequired, isReady])
 
   async function load() {
     setLoading(true)
     setError(null)
+    setRecord(null)
+    setRevisions([])
     try {
-      const [rec, revs] = await Promise.all([
-        apiFetch<CollectionRecord>(`/api/records/${id}`, { auth: true }),
-        apiFetch<RecordRevision[]>(`/api/records/${id}/revisions`, { auth: true }),
-      ])
+      const rec = await apiFetch<CollectionRecord>(`/api/records/${id}`, { auth: true })
       setRecord(rec)
-      setRevisions(revs)
     } catch (err) {
       if (onApiError(err)) return
       setError(err)
+      return
     } finally {
       setLoading(false)
     }
+
+    void apiFetch<RecordRevision[]>(`/api/records/${id}/revisions`, { auth: true })
+      .then(setRevisions)
+      .catch(() => setRevisions([]))
   }
 
   async function deleteRecord() {
@@ -85,8 +95,12 @@ export default function RecordDetailPage() {
     )
   }
 
-  if (loading) {
-    return <p className="text-sm text-slate-500">Loading record…</p>
+  if (!isReady || loading) {
+    return (
+      <p className="text-sm text-slate-500" data-testid="record-detail-loading">
+        Loading record…
+      </p>
+    )
   }
 
   if (error || !record) {
@@ -110,7 +124,7 @@ export default function RecordDetailPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="record-detail-ready">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex gap-4">
           <RecordThumbnail record={record} size="lg" />

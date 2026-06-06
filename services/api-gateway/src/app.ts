@@ -397,6 +397,15 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
     if (originalUrl.startsWith('/api/listings/settings') || originalUrl.startsWith('/api/listings/ratings')) {
       return next();
     }
+    if (
+      originalUrl.startsWith('/api/notifications') ||
+      originalUrl.startsWith('/api/notification') ||
+      originalUrl.startsWith('/api/profile/feedback') ||
+      originalUrl.startsWith('/api/messages') ||
+      originalUrl.startsWith('/api/messaging')
+    ) {
+      return next();
+    }
     // Rewrite URL by removing /api prefix
     const newUrl = originalUrl.replace(/^\/api/, '') || '/';
     // Only set req.url (mutable). Do NOT set req.path or req.originalUrl — they are read-only
@@ -1038,7 +1047,7 @@ app.post(["/listings/ratings", "/api/listings/ratings"], injectIdentityHeadersIf
 app.get(["/listings/search", "/api/listings/search"], injectIdentityHeadersIfAny, createProxyMiddleware({
   target: LISTINGS_HTTP_TARGET,
   changeOrigin: true,
-  pathRewrite: () => "/search",
+  pathRewrite: () => "/listings/search",
   proxyTimeout: 30000,
   agent: keepAliveAgent,
   on: {
@@ -1441,7 +1450,13 @@ app.use(
       }
       // listings-service exposes GET /search at app root (not /listings/search).
       if (withoutListings === "search" || withoutListings.startsWith("search/")) {
-        return "/" + withoutListings;
+        return `/listings/${withoutListings}`;
+      }
+      if (withoutListings === "mine") {
+        return "/mine";
+      }
+      if (withoutListings === "create" || withoutListings.startsWith("create/")) {
+        return "/create";
       }
       const rest = withoutListings || p;
       return rest ? `/listings/${rest}` : "/listings";
@@ -1853,22 +1868,30 @@ app.delete("/shopping/cart", async (req: AuthedRequest, res: Response) => {
   }
 });
 
-// Watchlist routes
-app.get("/shopping/watchlist", async (req: AuthedRequest, res: Response) => {
-  const userId = requireUserIdFromRequest(req, res);
-  if (!userId) return;
-
-  try {
-    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "GetWatchlist", {
-      user_id: userId,
-      limit: req.query.limit ? Number(req.query.limit) : 50,
-      offset: req.query.offset ? Number(req.query.offset) : 0,
-    });
-    res.json(response);
-  } catch (err) {
-    handleGrpcError(res, err);
-  }
-});
+// Watchlist routes — GET via HTTP so shopping-service returns normalized product cards
+app.get(
+  "/shopping/watchlist",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: SHOPPING_HTTP_TARGET,
+    changeOrigin: true,
+    pathRewrite: { "^/shopping": "" },
+    proxyTimeout: 15000,
+    agent: keepAliveAgent,
+    on: {
+      proxyReq: (proxyReq: any, req: AuthedRequest) => {
+        const authHeader = req.headers.authorization;
+        if (authHeader) proxyReq.setHeader("Authorization", authHeader);
+        const userId = req.headers["x-user-id"];
+        if (userId) proxyReq.setHeader("x-user-id", userId as string);
+      },
+      error(err: Error, _req: Request, res: NodeServerResponse | Socket) {
+        console.error("[gw] /shopping/watchlist GET proxy error:", err);
+        sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+      },
+    },
+  }),
+);
 
 app.post("/shopping/watchlist", jsonParser, async (req: AuthedRequest, res: Response) => {
   const userId = requireUserIdFromRequest(req, res);
@@ -1905,22 +1928,30 @@ app.delete("/shopping/watchlist/:itemType/:itemId", async (req: AuthedRequest, r
   }
 });
 
-// Recently Viewed routes
-app.get("/shopping/recently-viewed", async (req: AuthedRequest, res: Response) => {
-  const userId = requireUserIdFromRequest(req, res);
-  if (!userId) return;
-
-  try {
-    const response = await promisifyGrpcCall<any>(shoppingGrpcClient, "GetRecentlyViewed", {
-      user_id: userId,
-      item_type: req.query.item_type as string,
-      limit: req.query.limit ? Number(req.query.limit) : 50,
-    });
-    res.json(response);
-  } catch (err) {
-    handleGrpcError(res, err);
-  }
-});
+// Recently Viewed routes — GET via HTTP for normalized product cards
+app.get(
+  "/shopping/recently-viewed",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: SHOPPING_HTTP_TARGET,
+    changeOrigin: true,
+    pathRewrite: { "^/shopping": "" },
+    proxyTimeout: 15000,
+    agent: keepAliveAgent,
+    on: {
+      proxyReq: (proxyReq: any, req: AuthedRequest) => {
+        const authHeader = req.headers.authorization;
+        if (authHeader) proxyReq.setHeader("Authorization", authHeader);
+        const userId = req.headers["x-user-id"];
+        if (userId) proxyReq.setHeader("x-user-id", userId as string);
+      },
+      error(err: Error, _req: Request, res: NodeServerResponse | Socket) {
+        console.error("[gw] /shopping/recently-viewed GET proxy error:", err);
+        sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+      },
+    },
+  }),
+);
 
 app.post("/shopping/recently-viewed", jsonParser, async (req: AuthedRequest, res: Response) => {
   const userId = requireUserIdFromRequest(req, res);
@@ -1938,6 +1969,34 @@ app.post("/shopping/recently-viewed", jsonParser, async (req: AuthedRequest, res
     handleGrpcError(res, err);
   }
 });
+
+app.delete(
+  "/shopping/recently-viewed",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: SHOPPING_HTTP_TARGET,
+    changeOrigin: true,
+    pathRewrite: { "^/shopping": "" },
+    proxyTimeout: 15000,
+    agent: keepAliveAgent,
+    on: {
+      proxyReq: (proxyReq: any, req: AuthedRequest) => {
+        const authHeader = req.headers.authorization;
+        if (authHeader) {
+          proxyReq.setHeader("Authorization", authHeader);
+        }
+        const userId = req.headers["x-user-id"];
+        if (userId) {
+          proxyReq.setHeader("x-user-id", userId as string);
+        }
+      },
+      error(err: Error, _req: Request, res: NodeServerResponse | Socket) {
+        console.error("[gw] /shopping/recently-viewed DELETE proxy error:", err);
+        sendJson502(res as NodeServerResponse | Socket, "shopping upstream error");
+      },
+    },
+  }),
+);
 
 // Wishlist routes
 app.get("/shopping/wishlist", async (req: AuthedRequest, res: Response) => {

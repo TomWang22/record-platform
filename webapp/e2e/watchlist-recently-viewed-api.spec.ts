@@ -1,15 +1,19 @@
 import { test, expect } from '@playwright/test'
 
-import { signInAsTestCollector, signInAsTestCollectorWithSeed } from './helpers/auth'
+import {
+  obtainAuthToken,
+  signInAsTestCollector,
+  signInAsTestCollectorWithSeed,
+} from './helpers/auth'
 import { getJsonWith429Retry, with429Retry } from './helpers/http-retry'
+import { pollRecentlyViewedIds } from './helpers/seed-lean'
 
 test.describe('Watchlist and recently viewed API persistence', () => {
   test.describe.configure({ timeout: 120_000 })
 
   test('watchlist survives reload', async ({ page, request }) => {
     await signInAsTestCollector(page)
-    const token = await page.evaluate(() => localStorage.getItem('record-platform.token'))
-    expect(token).toBeTruthy()
+    const token = await obtainAuthToken(request)
 
     const headers = { Authorization: `Bearer ${token!}` }
     const mine = await getJsonWith429Retry<{ items?: { id: string }[] }>(
@@ -18,7 +22,7 @@ test.describe('Watchlist and recently viewed API persistence', () => {
       headers,
       'watchlist mine listings',
     )
-    const listingId = mine.items?.[0]?.id
+    const listingId = mine.listings?.[0]?.id ?? mine.items?.[0]?.id
     expect(listingId).toBeTruthy()
 
     await with429Retry('watchlist delete', () =>
@@ -38,13 +42,14 @@ test.describe('Watchlist and recently viewed API persistence', () => {
     )
     expect(add.ok()).toBeTruthy()
 
-    const body1 = await getJsonWith429Retry<{ items?: { item_id: string }[] }>(
-      request,
-      '/api/shopping/watchlist',
-      headers,
-      'watchlist list1',
-    )
-    expect(body1.items?.some((i) => i.item_id === listingId)).toBeTruthy()
+    const body1 = await getJsonWith429Retry<{
+      items?: { listingId: string; title?: string; priceDisplay?: string }[]
+    }>(request, '/api/shopping/watchlist', headers, 'watchlist list1')
+    const hit = body1.items?.find((i) => i.listingId === listingId)
+    expect(hit).toBeTruthy()
+    expect(hit?.title).toBeTruthy()
+    expect(hit?.priceDisplay).toBeTruthy()
+    expect(JSON.stringify(body1)).not.toMatch(/item_type|price_cents/)
 
     await page.goto('/watchlist')
     await expect(page.getByRole('heading', { name: 'Watchlist' })).toBeVisible({
@@ -64,13 +69,13 @@ test.describe('Watchlist and recently viewed API persistence', () => {
     await with429Retry('watchlist delete final', () =>
       request.delete(`/api/shopping/watchlist/listing/${listingId}`, { headers }),
     )
-    const body2 = await getJsonWith429Retry<{ items?: { item_id: string }[] }>(
+    const body2 = await getJsonWith429Retry<{ items?: { listingId: string }[] }>(
       request,
       '/api/shopping/watchlist',
       headers,
       'watchlist list2',
     )
-    expect(body2.items?.some((i) => i.item_id === listingId)).toBeFalsy()
+    expect(body2.items?.some((i) => i.listingId === listingId)).toBeFalsy()
   })
 
   test('recently viewed from listing detail only', async ({ page, request }) => {
@@ -79,15 +84,25 @@ test.describe('Watchlist and recently viewed API persistence', () => {
     expect(listingId).toBeTruthy()
 
     await page.goto(`/listings/${listingId}`)
+    await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 45_000 })
     await expect(
       page.getByRole('button', { name: /add to watchlist|remove from watchlist/i }),
     ).toBeVisible({ timeout: 30_000 })
 
-    const rv = await request.get('/api/shopping/recently-viewed?item_type=listing', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const items = ((await rv.json()) as { items?: { item_id: string }[] }).items ?? []
-    expect(items.some((i) => i.item_id === listingId)).toBeTruthy()
+    await pollRecentlyViewedIds(request, token, [listingId], { timeoutMs: 45_000 })
+
+    const rvBody = await getJsonWith429Retry<{
+      items?: { listingId: string; primaryImageUrl?: string; priceDisplay?: string }[]
+    }>(
+      request,
+      '/api/shopping/recently-viewed?item_type=listing',
+      { Authorization: `Bearer ${token}` },
+      'recently viewed after detail',
+    )
+    const hit = rvBody.items?.find((i) => i.listingId === listingId)
+    expect(hit).toBeTruthy()
+    expect(hit?.priceDisplay).toBeTruthy()
+    expect(JSON.stringify(rvBody)).not.toMatch(/item_type|price_cents/)
 
     await page.goto('/recently-viewed')
     await expect(page.locator('[data-testid="recently-viewed-item"]').first()).toBeVisible({

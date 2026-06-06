@@ -4,6 +4,7 @@
 import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { publicListingResponseLeaksInternalPricing } from "../src/listing-public-contract.js";
 import { publicListingResponseLeaksPrivateData } from "../src/listing-public-privacy.js";
 
 const { poolQuery, publishCreate, syncAnalytics } = vi.hoisted(() => ({
@@ -419,8 +420,11 @@ describe("createListingsHttpApp", () => {
     expect(res.body.address_line1).toBeUndefined();
     expect(res.body.latitude).toBeUndefined();
     expect(res.body.price).toBe(1200);
+    expect(res.body.priceDisplay).toBe("$1200.00");
+    expect(res.body.price_cents).toBeUndefined();
     expect(res.body.images).toEqual(["https://cdn.example/a.jpg"]);
     expect(publicListingResponseLeaksPrivateData(res.body)).toBeNull();
+    expect(publicListingResponseLeaksInternalPricing(res.body)).toBeNull();
   });
 
   it("GET /listings/:id/meta — returns active booking count", async () => {

@@ -1,0 +1,13 @@
+# Minimal Caddy config for rp-caddy toolcheck / local QUIC smoke.
+# Production edge uses repo-root Caddyfile via ConfigMap.
+{
+	admin 0.0.0.0:2019
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+:443 {
+	tls internal
+	respond "rp-caddy ok" 200
+}

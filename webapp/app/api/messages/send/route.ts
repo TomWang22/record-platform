@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8081'
+import { messagingMessagesBaseUrl, messagingProxyHeaders } from '@/lib/messaging-bff'
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,22 +10,22 @@ export async function POST(request: NextRequest) {
     if ((!recipient_id && !group_id) || (recipient_id && group_id)) {
       return NextResponse.json(
         { error: 'Either recipient_id (direct message) or group_id (group message) required, but not both' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
-    if (!message_type || !subject || !content) {
+    if (!message_type || !content) {
       return NextResponse.json(
-        { error: 'message_type, subject, and content are required' },
-        { status: 400 }
+        { error: 'message_type and content are required' },
+        { status: 400 },
       )
     }
 
-    const response = await fetch(`${API_GATEWAY_URL}/messages`, {
+    const response = await fetch(messagingMessagesBaseUrl(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': request.headers.get('Authorization') || '',
+        ...messagingProxyHeaders(request),
       },
       body: JSON.stringify({
         recipient_id: recipient_id || null,

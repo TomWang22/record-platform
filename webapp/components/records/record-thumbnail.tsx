@@ -15,14 +15,24 @@ const sizeClass = {
   lg: 'h-32 w-32 text-4xl',
 }
 
+function resolveImageUrl(record: CollectionRecord): string | null {
+  return (
+    record.imageUrl ??
+    record.coverUrl ??
+    record.mediaPieces?.find((m) => m.urlOrPath)?.urlOrPath ??
+    null
+  )
+}
+
 export function RecordThumbnail({ record, size = 'md', className }: Props) {
-  const mediaUrl = record.mediaPieces?.find((m) => m.urlOrPath)?.urlOrPath
+  const mediaUrl = resolveImageUrl(record)
   if (mediaUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={mediaUrl}
         alt=""
+        data-testid="record-image"
         className={cn(
           'shrink-0 rounded-lg border border-slate-200/80 object-cover dark:border-white/10',
           sizeClass[size],

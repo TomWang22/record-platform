@@ -10,7 +10,7 @@ test.describe('Message filters contract (8.9D)', () => {
   test.beforeAll(async ({ request }) => {
     test.setTimeout(120_000)
     const seed = await ensureInboxThreadForFilters(request)
-    searchNeedle = seed.listingTitle.split(/\s+/).find((w) => w.length > 4) ?? 'Filter'
+    searchNeedle = seed.listingTitle.split(/\s+/).find((w) => w.length > 4 && !/^\d+$/.test(w)) ?? 'Filter'
   })
 
   test.beforeEach(async ({ page }) => {

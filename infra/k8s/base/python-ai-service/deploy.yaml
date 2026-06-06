@@ -56,7 +56,7 @@ spec:
             - name: GRPC_REQUIRE_CLIENT_CERT
               value: "true"  # Strict mTLS: Envoy presents client cert to backends
             - name: TLS_CA_PATH
-              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert
+              value: "/etc/certs/ca.crt"
             - name: TLS_KEY_PATH
               value: "/etc/certs/tls.key"
             - name: TLS_CERT_PATH
@@ -70,7 +70,10 @@ spec:
             - name: KAFKA_SSL_CA_CERT
               value: "/etc/kafka/secrets/ca-cert.pem"
             - name: KAFKA_BROKER
-              value: "kafka-external.record-platform.svc.cluster.local:9093"
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: KAFKA_BROKER
             - name: KAFKA_USE_SSL
               value: "true"
             - name: KAFKA_SSL_ENABLED
@@ -92,62 +95,29 @@ spec:
             - name: kafka-ssl-certs
               mountPath: /etc/kafka/secrets
               readOnly: true
-          # gRPC Health (grpc.health.v1.Health) with TLS — keep; memory and long timeouts for slow TLS/startup.
-          # Start probing at 90s so we can become ready sooner when service is up; failureThreshold 60 still allows long startup.
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 60
           readinessProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50060
-                - -service=grpc.health.v1.Health
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=30s
-                - -rpc-timeout=15s
-            initialDelaySeconds: 90
-            periodSeconds: 15
-            timeoutSeconds: 90
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 12
           livenessProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50060
-                - -service=grpc.health.v1.Health
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=30s
-                - -rpc-timeout=15s
-            initialDelaySeconds: 300
-            periodSeconds: 45
-            timeoutSeconds: 90
-            failureThreshold: 10
-          startupProbe:
-            exec:
-              command:
-                - /usr/local/bin/grpc-health-probe
-                - -addr=localhost:50060
-                - -service=grpc.health.v1.Health
-                - -tls
-                - -tls-no-verify=false
-                - -tls-ca-cert=/etc/certs/ca.crt
-                - -tls-client-cert=/etc/certs/tls.crt
-                - -tls-client-key=/etc/certs/tls.key
-                - -tls-server-name=record.local
-                - -connect-timeout=30s
-                - -rpc-timeout=15s
-            initialDelaySeconds: 90
-            periodSeconds: 15
-            timeoutSeconds: 90
-            failureThreshold: 60
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+
           resources:
             requests:
               cpu: "500m"
@@ -167,7 +137,7 @@ spec:
                 path: dev-root.pem
         - name: service-tls
           secret:
-            secretName: service-tls
+            secretName: service-tls-python-ai-service
             items:
               - key: tls.key
                 path: tls.key

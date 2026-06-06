@@ -1,0 +1,6 @@
+ARCHIVE_SHA256=362e531762ea6d44c723d7f01bad9a688a3c2096bd9999a333f0f2bfbc50a6a4
+ARCHIVE_PATH=/Users/tom/record-platform-och-vitest-playwright-event-layer-analytics-reference-20260409.tar.gz
+SIDECAR_PATH=none
+SIDECAR_HASH_EXPECTED=
+RECORDED_AT_UTC=2026-04-19T00:53:38.393950+00:00
+PROTOCOL=bundle_extraction_v1

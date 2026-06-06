@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test'
 
 import { signInAsTestCollector } from './helpers/auth'
+import {
+  contractScreenshotPath,
+  guestContractScreenshotPath,
+} from './helpers/screenshot-readiness'
 
 const guestRoutes = [
   { name: 'dashboard', path: '/dashboard' },
@@ -28,7 +32,7 @@ test.describe('Guest screenshots', () => {
       expect(body).not.toContain('Application error')
       expect(body).not.toContain('client-side exception')
       await page.screenshot({
-        path: `e2e/screenshots/guest/${route.name}.png`,
+        path: guestContractScreenshotPath(`${route.name}.png`),
         fullPage: true,
       })
     })
@@ -50,7 +54,7 @@ test.describe('Authenticated screenshots', () => {
       expect(body).not.toContain('listing_id must be a valid UUID')
       await expect(page.getByText('Test Collector').first()).toBeVisible({ timeout: 10_000 })
       await page.screenshot({
-        path: `e2e/screenshots/authenticated/${route.name}.png`,
+        path: contractScreenshotPath(`${route.name}.png`),
         fullPage: true,
       })
     })

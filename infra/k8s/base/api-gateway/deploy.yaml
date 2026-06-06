@@ -125,7 +125,7 @@ spec:
                 path: dev-root.pem
         - name: service-tls
           secret:
-            secretName: service-tls
+            secretName: service-tls-api-gateway
             items:
               - key: tls.key
                 path: tls.key

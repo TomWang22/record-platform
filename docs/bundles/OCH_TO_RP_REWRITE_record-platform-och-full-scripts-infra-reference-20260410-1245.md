@@ -1,0 +1,1816 @@
+# OCH → RP rewrite scan: `record-platform-och-full-scripts-infra-reference-20260410-1245`
+
+**Staging (read-only scan):** `/Users/tom/bundle-staging/record-platform-och-full-scripts-infra-reference-20260410-1245`
+
+This report lists **detected** OCH-era strings. It does **not** apply edits.
+
+---
+
+## Namespace references
+
+*Kubernetes / config namespace strings*
+
+**Hits:** 720 (capped per file in scanner)
+
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/.github/workflows/kafka-alignment.yml`
+  - L134: `if kubectl get statefulset kafka -n off-campus-housing-tracker --request-timeout=15s >/dev/null 2>&1; then`
+  - L137: `echo "No statefulset/kafka in off-campus-housing-tracker — alignment suite not exercised (expected on fresh k3s)."`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/Makefile`
+  - L2: `# Off-Campus-Housing-Tracker — Unified Orchestration Makefile`
+  - L30: `HOUSING_NS ?= off-campus-housing-tracker`
+  - L86: `# Default 1: append off-campus-housing.test → MetalLB IP via sudo when needed (set 0 for hints only).`
+  - L138: `@echo "Off-Campus-Housing-Tracker — common make targets"`
+  - L190: `@echo " Off-Campus-Housing-Tracker Make Menu"`
+  - L467: `diagnose-k6-edge: ## DNS/TLS/curl checks for off-campus-housing.test (k6 edge timeouts)`
+  - L476: `kafka-lb-reset: ## Delete kafka-0/1/2-external LoadBalancers only (namespace off-campus-housing-tracker)`
+  - L478: `kubectl delete svc $$s -n off-campus-housing-tracker --ignore-not-found --request-timeout=30s; \`
+  - L483: `@kubectl delete svc kafka -n off-campus-housing-tracker --ignore-not-found --request-timeout=30s`
+  - L484: `@kubectl delete endpoints kafka -n off-campus-housing-tracker --ignore-not-found --request-timeout=30s 2>/dev/null || true`
+  - L485: `@kubectl delete endpointslices -n off-campus-housing-tracker -l kubernetes.io/service-name=kafka --ignore-not-found --request-timeout=30s 2>/dev/null || true`
+  - L570: `# ROLE: DEV — after deploy-dev (Caddy/ingress up): curl / API health via off-campus-housing.test`
+  - L697: `curl --cacert certs/dev-root.pem -sS -I --http3 https://off-campus-housing.test/ >/dev/null || true`
+  - L708: `kubectl set env deployment/analytics-service -n off-campus-housing-tracker OLLAMA_BASE_URL=http://host.docker.internal:11434`
+  - L1034: `bash $(SCRIPTS)/setup-full-off-campus-housing-stack.sh`
+  - … *3 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/README-BUNDLE.md`
+  - L3: `This archive is a **full export** of **`scripts/`** from **Off-Campus-Housing-Tracker**, plus **Kafka / MetalLB / observability** Kubernetes manifests, **Prometheus & Grafana** rule/dashboard packs…`
+  - L29: `Follow the license of the upstream **Off-Campus-Housing-Tracker** repository.`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/RECORD_PLATFORM_ALIGNMENT.md`
+  - L14: `**Option B — merge into Record Platform:** Copy `scripts/`, `infra/`, `proto/`, and merge **Makefile** targets (or run `make -C /path/to/bundle …`). Update every path that still says `off-campus-ho…`
+  - L22: `| `off-campus-housing-tracker` | Your K8s namespace (e.g. `record-platform`) |`
+  - L24: `| `off-campus-housing.test` | Your edge DNS / TLS SANs |`
+  - L31: `rg -l 'off-campus-housing-tracker' scripts infra .github Makefile | xargs sed -i '' 's/off-campus-housing-tracker/record-platform/g'`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka-ca-exporter/configmap.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+  - L19: `NS = os.environ.get("HOUSING_NS", "off-campus-housing-tracker")`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka-ca-exporter/deployment.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+  - L34: `value: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka-ca-exporter/rbac.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+  - L13: `namespace: off-campus-housing-tracker`
+  - L24: `namespace: off-campus-housing-tracker`
+  - L32: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka-ca-exporter/service.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka-external/external-service.yaml`
+  - L12: `namespace: off-campus-housing-tracker`
+  - L25: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka/deploy.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+  - L50: `- { name: KAFKA_CLUSTER_ID, value: "off-campus-housing-tracker-kafka-cluster" }`
+  - L53: `- { name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka.off-campus-housing-tracker.svc.cluster.local:9092,SSL://kafka.off-campus-housing-tracker.svc.cluster.local:9093,PLAINTEXT_HOST://kafk…`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka/external-service.yaml`
+  - L7: `namespace: off-campus-housing-tracker`
+  - L20: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka/service.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/grafana-deploy.yaml`
+  - L44: `value: https://off-campus-housing.test/grafana/`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/podmonitors.yaml`
+  - L4: `name: off-campus-housing-tracker-services`
+  - L7: `app: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/prometheus-deploy.yaml`
+  - L26: `- off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/prometheus-rules-kafka-health.yaml`
+  - L50: `# Emitted by kafka-ca-exporter (off-campus-housing-tracker) — scraped via housing-pods job when pod has prometheus.io/* annotations.`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/README.md`
+  - L24: `HOUSING_NS=off-campus-housing-tracker bash scripts/verify-kafka-tls-sans.sh`
+  - L51: `kubectl -n off-campus-housing-tracker wait --for=condition=complete job/kafka-tls-preflight --timeout=120s`
+  - L52: `kubectl -n off-campus-housing-tracker logs job/kafka-tls-preflight`
+  - L55: `Delete the job before re-running: `kubectl -n off-campus-housing-tracker delete job kafka-tls-preflight`.`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/certificates/kafka-0-cert.yaml`
+  - L6: `namespace: off-campus-housing-tracker`
+  - L15: `- kafka-0.kafka.off-campus-housing-tracker.svc`
+  - L16: `- kafka-0.kafka.off-campus-housing-tracker.svc.cluster.local`
+  - L17: `- kafka-0-external.off-campus-housing-tracker.svc.cluster.local`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/certificates/kafka-1-cert.yaml`
+  - L6: `namespace: off-campus-housing-tracker`
+  - L15: `- kafka-1.kafka.off-campus-housing-tracker.svc`
+  - L16: `- kafka-1.kafka.off-campus-housing-tracker.svc.cluster.local`
+  - L17: `- kafka-1-external.off-campus-housing-tracker.svc.cluster.local`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/certificates/kafka-2-cert.yaml`
+  - L6: `namespace: off-campus-housing-tracker`
+  - L15: `- kafka-2.kafka.off-campus-housing-tracker.svc`
+  - L16: `- kafka-2.kafka.off-campus-housing-tracker.svc.cluster.local`
+  - L17: `- kafka-2-external.off-campus-housing-tracker.svc.cluster.local`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/kafka-tls-preflight-job.yaml`
+  - L4: `#   kubectl -n off-campus-housing-tracker wait --for=condition=complete job/kafka-tls-preflight --timeout=120s`
+  - L9: `namespace: off-campus-housing-tracker`
+  - L25: `NS="off-campus-housing-tracker"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/external-services.yaml`
+  - L8: `namespace: off-campus-housing-tracker`
+  - L23: `namespace: off-campus-housing-tracker`
+  - L38: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/headless-service.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/kafka-metallb-alignment-exporter.yaml`
+  - L7: `namespace: off-campus-housing-tracker`
+  - L13: `namespace: off-campus-housing-tracker`
+  - L29: `namespace: off-campus-housing-tracker`
+  - L37: `namespace: off-campus-housing-tracker`
+  - L43: `namespace: off-campus-housing-tracker`
+  - L77: `- { name: HOUSING_NS, value: off-campus-housing-tracker }`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/kafka-pdb.yaml`
+  - L7: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/kustomization.yaml`
+  - L5: `#   - Namespace off-campus-housing-tracker`
+  - L33: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/rbac-kafka-svc-reader.yaml`
+  - L7: `namespace: off-campus-housing-tracker`
+  - L14: `namespace: off-campus-housing-tracker`
+  - L26: `namespace: off-campus-housing-tracker`
+  - L35: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/statefulset.yaml`
+  - L12: `namespace: off-campus-housing-tracker`
+  - L188: `value: "0@kafka-0.kafka.off-campus-housing-tracker.svc.cluster.local:9095,1@kafka-1.kafka.off-campus-housing-tracker.svc.cluster.local:9095,2@kafka-2.kafka.off-campus-housing-tracker.svc.cluster.lo…`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/metallb/bgpadvertisement.example.yaml`
+  - L1: `# BGPAdvertisement: advertise off-campus-housing-tracker-pool via BGP. Apply after BGPPeer.`
+  - L5: `name: off-campus-housing-tracker-pool`
+  - L9: `- off-campus-housing-tracker-pool`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/metallb/bgpadvertisement.yaml`
+  - L1: `# BGPAdvertisement: advertise off-campus-housing-tracker-pool to BGP peer (FRR).`
+  - L5: `name: off-campus-housing-tracker-pool`
+  - L9: `- off-campus-housing-tracker-pool`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/metallb/bgppeer-frr.yaml`
+  - L5: `name: off-campus-housing-tracker-frr`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/metallb/bgppeer.example.yaml`
+  - L7: `name: off-campus-housing-tracker-frr`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/metallb/bgppeer.yaml`
+  - L5: `name: off-campus-housing-tracker-frr`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/metallb/ipaddresspool.yaml`
+  - L6: `name: off-campus-housing-tracker-pool`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/metallb/l2advertisement.yaml`
+  - L1: `# L2 advertisement for off-campus-housing-tracker-pool. Optional: set nodeSelector for multi-node priority (see docs/METALLB_TRAFFIC_POLICY_AND_SCALE.md).`
+  - L5: `name: off-campus-housing-tracker-l2`
+  - L9: `- off-campus-housing-tracker-pool`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/proto/common.proto`
+  - L7: `option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/common";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/proto/events/analytics.proto`
+  - L5: `option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/events/analytics";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/proto/events/auth.proto`
+  - L5: `option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/events/auth";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/proto/events/booking.proto`
+  - L5: `option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/events/booking";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/proto/events/envelope.proto`
+  - L5: `option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/events";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/proto/events/listing.proto`
+  - L5: `option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/events/listing";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/proto/events/media.proto`
+  - L5: `option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/events/media";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/proto/events/messaging.proto`
+  - L5: `option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/events/messaging";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/proto/events/messaging/v1/messaging_events.proto`
+  - L5: `option go_package = "github.com/yourorg/off-campus-housing/proto/events/messaging/v1";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/proto/events/notification.proto`
+  - L5: `option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/events/notification";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/proto/events/trust.proto`
+  - L5: `option go_package = "github.com/yourorg/off-campus-housing-tracker/proto/events/trust";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/aggressive-cleanup-replicasets.sh`
+  - L25: `NS="off-campus-housing-tracker"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/apply-kafka-kraft-staged.sh`
+  - L11: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/apply-metallb-pool-colima.sh`
+  - L48: `echo "Then: curl -k --http3 https://$ext_ip/_caddy/healthz  (or add $ext_ip off-campus-housing.test to /etc/hosts)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/apply-och-messaging-and-restart.sh`
+  - L8: `NS="${NAMESPACE:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/auth-outbox-replay.sh`
+  - L7: `# Env: HOUSING_NS (default off-campus-housing-tracker), AUTH_DEPLOY (default auth-service)`
+  - L11: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/bring-up-external-infra.sh`
+  - L19: `#   WAIT_K8S_KAFKA=1         — after compose up, wait for kafka-0..2 Ready in off-campus-housing-tracker (optional)`
+  - L38: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/build-and-load-auth-service.sh`
+  - L44: `say "Done. Deploy with: kubectl apply -k infra/k8s/base/auth-service (ensure namespace off-campus-housing exists)."`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/build-housing-images-k3s.sh`
+  - L68: `ok "Colima docker load complete. Restart pods if needed: kubectl rollout restart deploy/<name> -n off-campus-housing-tracker"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/build-k6-http3.sh`
+  - L92: `say "  $INSTALL_DIR/k6-http3 run -e BASE_URL=https://off-campus-housing.test scripts/load/k6-http3-complete.js"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/chaos-kafka-alignment-stochastic.sh`
+  - L10: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/chaos-kafka-broker.sh`
+  - L8: `#   HOUSING_NS — default off-campus-housing-tracker`
+  - L16: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/chaos-kafka-partition.sh`
+  - L10: `NS="${CHAOS_KAFKA_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/chaos-latency.sh`
+  - L9: `NS="${CHAOS_LATENCY_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/chaos-metallb-kafka-lb.sh`
+  - L6: `# Env: HOUSING_NS (default off-campus-housing-tracker)`
+  - L13: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/check-all-pods-and-tls.sh`
+  - L81: `_KNS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L124: `say "5. Checking app pods (off-campus-housing-tracker, should be 1/1 Ready)..."`
+  - L125: `HOUSING_CHECK_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L154: `R=$(_kubectl get deploy -n off-campus-housing-tracker "$svc" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")`
+  - L155: `S=$(_kubectl get deploy -n off-campus-housing-tracker "$svc" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")`
+  - L180: `R=$(_kubectl get deploy -n off-campus-housing-tracker "$svc" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")`
+  - L181: `S=$(_kubectl get deploy -n off-campus-housing-tracker "$svc" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")`
+  - L217: `POD=$(_kubectl get pods -n off-campus-housing-tracker -l app="$svc" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")`
+  - L228: `PHASE=$(_kubectl get pod "$POD" -n off-campus-housing-tracker -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")`
+  - L229: `READY_STATUS=$(_kubectl get pod "$POD" -n off-campus-housing-tracker -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || echo "false")`
+  - L230: `RESTARTS=$(_kubectl get pod "$POD" -n off-campus-housing-tracker -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>/dev/null || echo "0")`
+  - L239: `_kubectl describe pod "$POD" -n off-campus-housing-tracker 2>&1 | tee -a "$DIAG_LOG" | grep -A 20 "Events:" | head -25 || true`
+  - L244: `_kubectl logs "$POD" -n off-campus-housing-tracker --tail=50 2>&1 | tee -a "$DIAG_LOG" | tail -30 || true`
+  - L254: `AGE=$(_kubectl get pod "$POD" -n off-campus-housing-tracker -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || echo "")`
+  - L262: `_kubectl delete pod "$POD" -n off-campus-housing-tracker --force --grace-period=0 2>&1 | tee -a "$DIAG_LOG" || true`
+  - … *10 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/check-kafka-config-drift.sh`
+  - L12: `NS="${1:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/canary-pod-stability.sh`
+  - L3: `# Usage: HOUSING_NS=off-campus-housing-tracker CANARY_MAX_TOTAL_RESTARTS=50 ./scripts/ci/canary-pod-stability.sh`
+  - L6: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/ephemeral-k3s-converge.sh`
+  - L16: `POOL_NAME="${POOL_NAME:-off-campus-housing-tracker-pool}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/generate-kafka-ci-tls.sh`
+  - L28: `-subj "/CN=och-kafka-ci-ca/O=off-campus-housing-ci" \`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/hydrate-certs-for-ci.sh`
+  - L14: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/k6-smoke-incluster.sh`
+  - L6: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/post-deploy-verify.sh`
+  - L7: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/smoke-api-gateway.sh`
+  - L3: `# Usage: HOUSING_NS=off-campus-housing-tracker ./scripts/ci/smoke-api-gateway.sh`
+  - L6: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/verify-k8s-images.sh`
+  - L8: `#   HOUSING_NS — default off-campus-housing-tracker`
+  - L18: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/verify-quic-hostname-invariant.sh`
+  - L3: `# OCH edge contract: hostname off-campus-housing.test + --resolve / K6_RESOLVE to LB IP.`
+  - L11: `echo "❌ Raw-IP https BASE_URL default in scripts/load (use https://off-campus-housing.test + resolve):"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/cleanup-kafka-ops-cronjob-pods.sh`
+  - L11: `#   HOUSING_NS=off-campus-housing-tracker (default)`
+  - L14: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/cluster-log-sweep.sh`
+  - L7: `#   SWEEP_NAMESPACES="off-campus-housing-tracker ingress-nginx" ./scripts/cluster-log-sweep.sh`
+  - L26: `NS_FILTER="off-campus-housing-tracker ingress-nginx kube-system"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/colima-apply-host-aliases.sh`
+  - L13: `NS="off-campus-housing-tracker"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/colima-metallb-bring-up.sh`
+  - L24: `say "Step 2/3: Namespaces (ingress-nginx, envoy-test, off-campus-housing-tracker)"`
+  - L25: `for ns in ingress-nginx envoy-test off-campus-housing-tracker; do`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/colima-patch-app-config-db-host-to-gateway.sh`
+  - L12: `#   DB_HOST_GATEWAY_IP=192.168.5.2 HOUSING_NS=off-campus-housing-tracker ./scripts/colima-patch-app-config-db-host-to-gateway.sh`
+  - L18: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/compare-h2-h3-headers.sh`
+  - L45: `URL="https://off-campus-housing.test:443${TEST_PATH}"`
+  - L46: `RESOLVE="off-campus-housing.test:443:${TARGET_IP}"`
+  - L48: `echo "=== Compare H2 vs H3 for path: $TEST_PATH (resolve off-campus-housing.test → $TARGET_IP) ==="`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/create-kafka-event-topics-k8s.sh`
+  - L10: `#   KAFKA_K8S_NS=off-campus-housing-tracker`
+  - L21: `NS="${KAFKA_K8S_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/deep-dive-pod-diagnostics.sh`
+  - L18: `NS="off-campus-housing-tracker"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/deploy-dev.sh`
+  - L30: `NS="${NAMESPACE:-off-campus-housing-tracker}"`
+  - L40: `LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/dev-generate-certs.sh`
+  - L3: `# Output: certs/dev-root.pem, certs/dev-root.key; certs/off-campus-housing.test.{crt,key} (Caddy/ingress);`
+  - L38: `-out "$CERTS/dev-root.pem" -subj "/CN=dev-root-ca/O=off-campus-housing-dev" 2>/dev/null`
+  - L47: `# 2. Caddy/ingress leaf (off-campus-housing.test) — required for strict-tls-bootstrap.sh and rollout-caddy.sh`
+  - L48: `say "2. Creating Caddy leaf (off-campus-housing.test)..."`
+  - L49: `HOST="${HOST:-off-campus-housing.test}"`
+  - L50: `if [[ ! -f "$CERTS/off-campus-housing.test.crt" ]] || [[ ! -f "$CERTS/off-campus-housing.test.key" ]]; then`
+  - L51: `openssl genrsa -out "$CERTS/off-campus-housing.test.key" 2048 2>/dev/null`
+  - L52: `openssl req -new -key "$CERTS/off-campus-housing.test.key" -out "$TMP/leaf.csr" \`
+  - L53: `-subj "/CN=${HOST}/O=off-campus-housing-tracker" 2>/dev/null`
+  - L58: `-CAcreateserial -out "$CERTS/off-campus-housing.test.crt" -days "$DAYS" \`
+  - L60: `ok "off-campus-housing.test.crt, .key (for Caddy TLS)"`
+  - L62: `ok "off-campus-housing.test.crt|.key already exist"`
+  - L69: `-subj "/CN=messaging-service/O=off-campus-housing-dev" 2>/dev/null`
+  - L78: `-subj "/CN=media-service/O=off-campus-housing-dev" 2>/dev/null`
+  - L88: `-subj "/CN=kafka-client/O=off-campus-housing-dev" 2>/dev/null`
+  - … *2 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/dev-onboard-local.sh`
+  - L125: `_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L150: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"`
+  - L153: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}" bash "$SCRIPT_DIR/service-tls-alias-guard.sh"`
+  - L156: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}" bash "$SCRIPT_DIR/kafka-quorum-stable.sh"`
+  - L176: `NS_ING="${NS_ING:-ingress-nginx}" HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}" bash "$SCRIPT_DIR/edge-readiness-gate.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/diagnose-k6-edge-connectivity.sh`
+  - L8: `#   HOUSING_NS=off-campus-housing-tracker CA=certs/dev-root.pem ./scripts/diagnose-k6-edge-connectivity.sh`
+  - L13: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L14: `HOST="${EDGE_HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/diagnose-och-deployment.sh`
+  - L2: `# Quick readiness diagnostics for a Deployment in off-campus-housing-tracker.`
+  - L7: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/edge-readiness-gate.sh`
+  - L6: `#   HOUSING_NS — default off-campus-housing-tracker`
+  - L12: `NS_APP="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/enhanced-adversarial-tests.sh`
+  - L21: `NS="off-campus-housing-tracker"`
+  - L22: `HOST="${HOST:-off-campus-housing.test}"`
+  - L50: `# Get CA certificate for strict TLS (k6 and curl need this for off-campus-housing.test:30443; use absolute path for SSL_CERT_FILE)`
+  - L61: `[[ -z "$CA_CERT" ]] && [[ -n "$K8S_CA" ]] && CA_CERT="/tmp/test-ca-adversarial-$$.pem" && echo "$K8S_CA" > "$CA_CERT" && ok "Using Kubernetes CA (off-campus-housing-tracker) for strict TLS"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-caddy-envoy-strict-tls.sh`
+  - L5: `# Prerequisites: certs in ./certs/ (dev-root.pem, off-campus-housing.test.crt/key, envoy-client.crt/key).`
+  - L33: `# 2. TLS secrets (off-campus-housing-local-tls, dev-root-ca in ingress-nginx; dev-root-ca, envoy-client-tls in envoy-test)`
+  - L34: `TLS_SECRET="${TLS_SECRET:-off-campus-housing-local-tls}"`
+  - L35: `if [[ -f "$REPO_ROOT/certs/dev-root.pem" ]] && [[ -f "$REPO_ROOT/certs/off-campus-housing.test.crt" ]] && [[ -f "$REPO_ROOT/certs/off-campus-housing.test.key" ]]; then`
+  - L55: `warn "certs/dev-root.pem or off-campus-housing.test.crt/key missing. Run: KAFKA_SSL=1 ./scripts/reissue-ca-and-leaf-load-all-services.sh then ./scripts/strict-tls-bootstrap.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-caddy-envoy-tcpdump.sh`
+  - L19: `REG_NAME="${K3D_REGISTRY_NAME:-k3d-off-campus-housing-tracker-registry}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-colima-metallb-for-l2.sh`
+  - L51: `#    Deploy Caddy (same as k3d) so verify-metallb-and-traffic-policy.sh and advanced script work (off-campus-housing.test /_caddy/healthz).`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-edge-hosts.sh`
+  - L2: `# Idempotent /etc/hosts line for the edge hostname (default off-campus-housing.test) → MetalLB IP`
+  - L6: `#   OCH_EDGE_HOSTNAME   — hostname (default off-campus-housing.test)`
+  - L19: `HOST="${OCH_EDGE_HOSTNAME:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-housing-cluster-secrets.sh`
+  - L17: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-kafka-ready.sh`
+  - L15: `NS="${KAFKA_K8S_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-readiness-before-suites.sh`
+  - L10: `NS_APP="${NS_APP:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-ready-for-preflight.sh`
+  - L73: `_pods_not_ready=$(kubectl get pods -n off-campus-housing-tracker --no-headers 2>/dev/null | grep -v "Running\|Completed" | wc -l | tr -d ' ' || echo "?")`
+  - L74: `_pods_total=$(kubectl get pods -n off-campus-housing-tracker --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")`
+  - L75: `[[ "$_pods_total" -gt 0 ]] && echo "  off-campus-housing-tracker pods: $_pods_total total ($_pods_not_ready not Running/Completed)"`
+  - L131: `_KNS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L158: `REG="${K3D_REGISTRY:-k3d-off-campus-housing-tracker-registry:5000}"`
+  - L172: `echo "  Then: kubectl rollout restart deploy -n off-campus-housing-tracker"`
+  - L188: `echo "  (Requires: 127.0.0.1 k3d-off-campus-housing-tracker-registry in /etc/hosts and registry in Docker insecure-registries)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-strict-tls-mtls-preflight.sh`
+  - L14: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L82: `if [[ -f "$CERTS_DIR/dev-root.pem" ]] && [[ -f "$CERTS_DIR/off-campus-housing.test.crt" ]] && [[ -f "$CERTS_DIR/off-campus-housing.test.key" ]]; then`
+  - L86: `--from-file=tls.crt="$CERTS_DIR/off-campus-housing.test.crt" \`
+  - L87: `--from-file=tls.key="$CERTS_DIR/off-campus-housing.test.key" \`
+  - L106: `off-campus-housing.test "*.off-campus-housing.test" localhost 127.0.0.1 \`
+  - L107: `"auth-service.off-campus-housing-tracker.svc.cluster.local" \`
+  - L108: `"api-gateway.off-campus-housing-tracker.svc.cluster.local" \`
+  - L109: `"listings-service.off-campus-housing-tracker.svc.cluster.local" \`
+  - L110: `"booking-service.off-campus-housing-tracker.svc.cluster.local" \`
+  - L111: `"messaging-service.off-campus-housing-tracker.svc.cluster.local" \`
+  - L112: `"trust-service.off-campus-housing-tracker.svc.cluster.local" \`
+  - L113: `"analytics-service.off-campus-housing-tracker.svc.cluster.local" \`
+  - L114: `"*.off-campus-housing-tracker.svc.cluster.local" \`
+  - L130: `cp -f "$tmpd/tls.crt" "$CERTS_DIR/off-campus-housing.test.crt"`
+  - L131: `cp -f "$tmpd/tls.key" "$CERTS_DIR/off-campus-housing.test.key"`
+  - … *1 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/export-kafka-ca-metric.sh`
+  - L6: `# Env: HOUSING_NS (default off-campus-housing-tracker)`
+  - L9: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/force-deployments-to-working-replicasets.sh`
+  - L17: `NS="off-campus-housing-tracker"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/forensic-log-sweep.sh`
+  - L7: `#   FORENSIC_NAMESPACES — space-separated (default: off-campus-housing-tracker ingress-nginx)`
+  - L19: `NS_LIST="${FORENSIC_NAMESPACES:-off-campus-housing-tracker ingress-nginx}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/gen-kafka-cert-crds.sh`
+  - L14: `NS="${NAMESPACE:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/generate-envoy-client-cert.sh`
+  - L3: `# Backends expect a client identity; the edge leaf (off-campus-housing.test) is not a service identity.`
+  - L36: `-subj "/CN=envoy/O=off-campus-housing-tracker" 2>/dev/null`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/get-pods-to-ready.sh`
+  - L2: `# Get all off-campus-housing-tracker app pods to 1/1 Ready.`
+  - L9: `# After running: wait for rollout (e.g. kubectl -n off-campus-housing-tracker rollout status deploy -l app -t 120s)`
+  - L25: `say "=== Get off-campus-housing-tracker pods to 1/1 Ready ==="`
+  - L45: `if kubectl get deployment "$d" -n off-campus-housing-tracker --request-timeout=5s >/dev/null 2>&1; then`
+  - L46: `if kubectl -n off-campus-housing-tracker rollout status "deploy/$d" --timeout=120s 2>/dev/null; then`
+  - L49: `warn "$d: rollout not complete (check: kubectl -n off-campus-housing-tracker get pods -l app=$d)"`
+  - L63: `kubectl -n off-campus-housing-tracker get pods 2>/dev/null | head -30`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/golden-snapshot-verify.sh`
+  - L19: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k3d-registry-push-and-patch.sh`
+  - L11: `REGISTRY_NAME="${K3D_REGISTRY_NAME:-k3d-off-campus-housing-tracker-registry}"`
+  - L79: `# Patch deployments to use registry (inside k3d, nodes resolve k3d-off-campus-housing-tracker-registry:5000)`
+  - L85: `if kubectl get deployment "$app" -n off-campus-housing-tracker --request-timeout=5s >/dev/null 2>&1; then`
+  - L86: `kubectl set image "deployment/$app" -n off-campus-housing-tracker "app=${REGISTRY_ADDR}/${app}:dev" --request-timeout=15s 2>/dev/null && info "Patched $app" || warn "Patch $app failed"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k6-chaos-test.js`
+  - L115: `const HOST = __ENV.HOST || "off-campus-housing.test";`
+  - L171: `// HTTP/3 test — resolver-proof: connect via LB IP, validate TLS against off-campus-housing.test`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k6-exec-strict-edge.sh`
+  - L2: `# Run `k6 run …` with correct trust for https://off-campus-housing.test (rotated dev-root CA).`
+  - L10: `#   export BASE_URL=https://off-campus-housing.test`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k6/k6-smoke-gateway.js`
+  - L15: `"http://api-gateway.off-campus-housing-tracker.svc.cluster.local:4020";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k8s-diagnose-restarts.sh`
+  - L6: `#   HOUSING_NS — used when namespace arg omitted (default: off-campus-housing-tracker)`
+  - L10: `NS="${1:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k8s-rollout-och-ordered.sh`
+  - L4: `#   HOUSING_NS=off-campus-housing-tracker  (default)`
+  - L12: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-after-rollout-verify-brokers.sh`
+  - L7: `#   HOUSING_NS=off-campus-housing-tracker KAFKA_BROKER_REPLICAS=3 ./scripts/kafka-after-rollout-verify-brokers.sh`
+  - L13: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-auto-heal-inter-broker-tls.sh`
+  - L6: `#   HOUSING_NS=off-campus-housing-tracker KAFKA_BROKER_REPLICAS=3 ./scripts/kafka-auto-heal-inter-broker-tls.sh`
+  - L13: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-clean-slate.sh`
+  - L5: `# Env: HOUSING_NS (default off-campus-housing-tracker)`
+  - L9: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-onboarding-reset.sh`
+  - L5: `# Env: HOUSING_NS (default off-campus-housing-tracker)`
+  - L8: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-quorum-stable.sh`
+  - L6: `#   HOUSING_NS — default off-campus-housing-tracker`
+  - L13: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-refresh-tls-from-lb.sh`
+  - L15: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-rolling-restart.sh`
+  - L12: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-runtime-sync.sh`
+  - L44: `NS="${POS_NS:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-ssl-from-dev-root.sh`
+  - L4: `# Output: certs/kafka-ssl/*.jks, *.p12, passwords; creates kafka-ssl-secret in off-campus-housing-tracker`
+  - L8: `#   KAFKA_SSL_NS=off-campus-housing-tracker  — namespace for kafka-ssl-secret`
+  - L22: `NS="${KAFKA_SSL_NS:-off-campus-housing-tracker}"`
+  - L82: `-subj "/CN=${CN}/O=off-campus-housing-tracker" 2>/dev/null`
+  - L134: `-subj "/CN=kafka-client/O=off-campus-housing-tracker" 2>/dev/null`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-sync-metallb.sh`
+  - L12: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-tls-guard.sh`
+  - L8: `#   HOUSING_NS — default off-campus-housing-tracker`
+  - L18: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-tls-rotate-atomic.sh`
+  - L10: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- … *115 more paths*
+
+## SNI / hostnames
+
+*Hosts, URLs, and dotted domains*
+
+**Hits:** 261 (capped per file in scanner)
+
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/Makefile`
+  - L86: `# Default 1: append off-campus-housing.test → MetalLB IP via sudo when needed (set 0 for hints only).`
+  - L467: `diagnose-k6-edge: ## DNS/TLS/curl checks for off-campus-housing.test (k6 edge timeouts)`
+  - L570: `# ROLE: DEV — after deploy-dev (Caddy/ingress up): curl / API health via off-campus-housing.test`
+  - L697: `curl --cacert certs/dev-root.pem -sS -I --http3 https://off-campus-housing.test/ >/dev/null || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/RECORD_PLATFORM_ALIGNMENT.md`
+  - L24: `| `off-campus-housing.test` | Your edge DNS / TLS SANs |`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/grafana-deploy.yaml`
+  - L44: `value: https://off-campus-housing.test/grafana/`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/apply-metallb-pool-colima.sh`
+  - L48: `echo "Then: curl -k --http3 https://$ext_ip/_caddy/healthz  (or add $ext_ip off-campus-housing.test to /etc/hosts)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/build-k6-http3.sh`
+  - L92: `say "  $INSTALL_DIR/k6-http3 run -e BASE_URL=https://off-campus-housing.test scripts/load/k6-http3-complete.js"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/verify-quic-hostname-invariant.sh`
+  - L3: `# OCH edge contract: hostname off-campus-housing.test + --resolve / K6_RESOLVE to LB IP.`
+  - L11: `echo "❌ Raw-IP https BASE_URL default in scripts/load (use https://off-campus-housing.test + resolve):"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/compare-h2-h3-headers.sh`
+  - L45: `URL="https://off-campus-housing.test:443${TEST_PATH}"`
+  - L46: `RESOLVE="off-campus-housing.test:443:${TARGET_IP}"`
+  - L48: `echo "=== Compare H2 vs H3 for path: $TEST_PATH (resolve off-campus-housing.test → $TARGET_IP) ==="`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/dev-generate-certs.sh`
+  - L3: `# Output: certs/dev-root.pem, certs/dev-root.key; certs/off-campus-housing.test.{crt,key} (Caddy/ingress);`
+  - L47: `# 2. Caddy/ingress leaf (off-campus-housing.test) — required for strict-tls-bootstrap.sh and rollout-caddy.sh`
+  - L48: `say "2. Creating Caddy leaf (off-campus-housing.test)..."`
+  - L49: `HOST="${HOST:-off-campus-housing.test}"`
+  - L50: `if [[ ! -f "$CERTS/off-campus-housing.test.crt" ]] || [[ ! -f "$CERTS/off-campus-housing.test.key" ]]; then`
+  - L51: `openssl genrsa -out "$CERTS/off-campus-housing.test.key" 2048 2>/dev/null`
+  - L52: `openssl req -new -key "$CERTS/off-campus-housing.test.key" -out "$TMP/leaf.csr" \`
+  - L58: `-CAcreateserial -out "$CERTS/off-campus-housing.test.crt" -days "$DAYS" \`
+  - L60: `ok "off-campus-housing.test.crt, .key (for Caddy TLS)"`
+  - L62: `ok "off-campus-housing.test.crt|.key already exist"`
+  - L151: `echo "  Caddy/ingress: certs/off-campus-housing.test.crt, certs/off-campus-housing.test.key"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/diagnose-k6-edge-connectivity.sh`
+  - L14: `HOST="${EDGE_HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/enhanced-adversarial-tests.sh`
+  - L22: `HOST="${HOST:-off-campus-housing.test}"`
+  - L50: `# Get CA certificate for strict TLS (k6 and curl need this for off-campus-housing.test:30443; use absolute path for SSL_CERT_FILE)`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-caddy-envoy-strict-tls.sh`
+  - L5: `# Prerequisites: certs in ./certs/ (dev-root.pem, off-campus-housing.test.crt/key, envoy-client.crt/key).`
+  - L35: `if [[ -f "$REPO_ROOT/certs/dev-root.pem" ]] && [[ -f "$REPO_ROOT/certs/off-campus-housing.test.crt" ]] && [[ -f "$REPO_ROOT/certs/off-campus-housing.test.key" ]]; then`
+  - L55: `warn "certs/dev-root.pem or off-campus-housing.test.crt/key missing. Run: KAFKA_SSL=1 ./scripts/reissue-ca-and-leaf-load-all-services.sh then ./scripts/strict-tls-bootstrap.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-colima-metallb-for-l2.sh`
+  - L51: `#    Deploy Caddy (same as k3d) so verify-metallb-and-traffic-policy.sh and advanced script work (off-campus-housing.test /_caddy/healthz).`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-edge-hosts.sh`
+  - L2: `# Idempotent /etc/hosts line for the edge hostname (default off-campus-housing.test) → MetalLB IP`
+  - L6: `#   OCH_EDGE_HOSTNAME   — hostname (default off-campus-housing.test)`
+  - L19: `HOST="${OCH_EDGE_HOSTNAME:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-strict-tls-mtls-preflight.sh`
+  - L82: `if [[ -f "$CERTS_DIR/dev-root.pem" ]] && [[ -f "$CERTS_DIR/off-campus-housing.test.crt" ]] && [[ -f "$CERTS_DIR/off-campus-housing.test.key" ]]; then`
+  - L86: `--from-file=tls.crt="$CERTS_DIR/off-campus-housing.test.crt" \`
+  - L87: `--from-file=tls.key="$CERTS_DIR/off-campus-housing.test.key" \`
+  - L106: `off-campus-housing.test "*.off-campus-housing.test" localhost 127.0.0.1 \`
+  - L130: `cp -f "$tmpd/tls.crt" "$CERTS_DIR/off-campus-housing.test.crt"`
+  - L131: `cp -f "$tmpd/tls.key" "$CERTS_DIR/off-campus-housing.test.key"`
+  - L160: `fail "Cannot provision: ensure certs/dev-root.pem, certs/off-campus-housing.test.crt, certs/off-campus-housing.test.key exist, or install mkcert (brew install mkcert && mkcert -install). Then re-ru…`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/generate-envoy-client-cert.sh`
+  - L3: `# Backends expect a client identity; the edge leaf (off-campus-housing.test) is not a service identity.`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k6-chaos-test.js`
+  - L115: `const HOST = __ENV.HOST || "off-campus-housing.test";`
+  - L171: `// HTTP/3 test — resolver-proof: connect via LB IP, validate TLS against off-campus-housing.test`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k6-exec-strict-edge.sh`
+  - L2: `# Run `k6 run …` with correct trust for https://off-campus-housing.test (rotated dev-root CA).`
+  - L10: `#   export BASE_URL=https://off-campus-housing.test`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k6/k6-smoke-gateway.js`
+  - L15: `"http://api-gateway.off-campus-housing-tracker.svc.cluster.local:4020";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/COHERENT_ANALYSIS.md`
+  - L29: `1. Prove **TLS + SNI** (`off-campus-housing.test`) and **HTTP/2** to Caddy.`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/edge-test-url.sh`
+  - L2: `# Shared helpers: edge-only E2E / k6 (https://off-campus-housing.test), no port-forward / :4020.`
+  - L5: `EDGE_TEST_DEFAULT_BASE="https://off-campus-housing.test"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/ensure-och-grpc-certs.sh`
+  - L4: `# Fallback: repo certs/off-campus-housing.test.{crt,key} + certs/dev-root.pem → ca.crt.`
+  - L34: `if [[ -f "$_repo/certs/off-campus-housing.test.crt" ]] && [[ -f "$_repo/certs/off-campus-housing.test.key" ]]; then`
+  - L35: `cp -f "$_repo/certs/off-campus-housing.test.crt" "$dest/tls.crt"`
+  - L36: `cp -f "$_repo/certs/off-campus-housing.test.key" "$dest/tls.key"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/grpc-http3-health.sh`
+  - L14: `local host="${HOST:-off-campus-housing.test}"`
+  - L73: `local grpc_authority="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/http3.sh`
+  - L14: `#   3. NodePort fallback (HTTP3_USE_LB_IP=0): resolve off-campus-housing.test to 127.0.0.1:30443.`
+  - L278: `local expected_host="${HTTP3_EXPECTED_HOST:-off-campus-housing.test}"`
+  - L430: `# Auto-inject --resolve so hostname/SNI is correct (avoid accidental IP QUIC; Caddy serves off-campus-housing.test so SNI must match).`
+  - L470: `: # MetalLB: keep off-campus-housing.test:443:LB_IP; do not rewrite to 127.0.0.1:30443`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/packet-capture-v2.sh`
+  - L404: `# Optional SNI proof (off-campus-housing.test)`
+  - L406: `sni_count=$(tshark -r "$dir/node-capture.pcap" -Y "quic && tls.handshake.extensions_server_name contains off-campus-housing.test" 2>/dev/null | wc -l | tr -d '[:space:]')`
+  - L408: `[[ "$sni_count" -gt 0 ]] && echo "  [packet-capture-v2] QUIC SNI off-campus-housing.test: $sni_count packets"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/packet-capture.sh`
+  - L30: `# Host/VM capture (when applicable): use "(tcp or udp) and port 443 and dst host $TARGET_IP" so only traffic to MetalLB IP is captured (gold standard). Post-capture: verify with tshark -Y "udp.port…`
+  - L357: `# Per-pod QUIC proof: stray UDP/443 vs pod IP + optional SNI (OCH: CAPTURE_EXPECTED_SNI default off-campus-housing.test)`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/protocol-verification.sh`
+  - L113: `# Count QUIC packets with SNI off-campus-housing.test (definitive proof traffic is for our domain; no background QUIC noise).`
+  - L116: `local sni="${2:-off-campus-housing.test}"`
+  - L126: `# Quote SNI for display filter (OCH: off-campus-housing.test; not record.local / RP)`
+  - L153: `local sni="${CAPTURE_EXPECTED_SNI:-off-campus-housing.test}"`
+  - L342: `# SNI validation: QUIC with off-campus-housing.test = definitive proof traffic belongs to our domain (no background noise).`
+  - L347: `sni_total=$((sni_total + $(count_quic_sni_record_local_in_pcap "$pcap" "${CAPTURE_EXPECTED_SNI:-off-campus-housing.test}")))`
+  - L349: `[[ "$sni_total" -gt 0 ]] && echo "  OK: $label QUIC SNI off-campus-housing.test: $sni_total packets (definitive proof traffic to our domain)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/trust-dev-root-ca-macos.sh`
+  - L2: `# Add the dev-root CA to macOS keychain so k6, curl, and browsers trust https://off-campus-housing.test (avoids x509 and manual Keychain Access).`
+  - L3: `# Call after rotation syncs certs/dev-root.pem, or before any step that hits off-campus-housing.test with TLS.`
+  - L46: `ok "Dev CA added to macOS login keychain (Always Trust for SSL). k6/curl/browser will trust off-campus-housing.test."`
+  - L50: `ok "Dev CA added to macOS login keychain (trustAsRoot). k6/curl/browser will trust off-campus-housing.test."`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-analytics-daily-smoke.js`
+  - L4: `*   BASE_URL=https://off-campus-housing.test k6 run scripts/load/k6-analytics-daily-smoke.js`
+  - L9: `const base = (__ENV.BASE_URL || "https://off-campus-housing.test").replace(/\/$/, "");`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-analytics-listing-feel-smoke.js`
+  - L3: `*   BASE_URL=https://off-campus-housing.test k6 run scripts/load/k6-analytics-listing-feel-smoke.js`
+  - L8: `const base = (__ENV.BASE_URL || "https://off-campus-housing.test").replace(/\/$/, "");`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-find-max-rps-http3.js`
+  - L17: `const HOST = __ENV.HOST || 'off-campus-housing.test';`
+  - L18: `const BASE = (__ENV.BASE_URL || 'https://off-campus-housing.test').replace(/\/$/, '');`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-http3-complete.js`
+  - L60: `const HOST = __ENV.HOST || 'off-campus-housing.test';`
+  - L62: `const BASE_URL = (__ENV.BASE_URL || 'https://off-campus-housing.test').replace(/\/$/, '');`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-http3-toolchain.js`
+  - L58: `const BASE_URL = (__ENV.BASE_URL || 'https://off-campus-housing.test').replace(/\/$/, '');`
+  - L60: `const HOST = __ENV.HOST || 'off-campus-housing.test';`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-limit-test-comprehensive.js`
+  - L38: `const HOST = __ENV.HOST || 'off-campus-housing.test';`
+  - L39: `const BASE_URL = __ENV.BASE_URL || 'https://off-campus-housing.test';`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-listings-health.js`
+  - L20: `: "https://off-campus-housing.test";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-listings.js`
+  - L9: `const rawBase = (__ENV.BASE_URL || "https://off-campus-housing.test").replace(/\/$/, "");`
+  - L22: `const host = __ENV.HOST || "off-campus-housing.test";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-media-upload.js`
+  - L13: `const RAW_BASE = (__ENV.BASE_URL || 'https://off-campus-housing.test').replace(/\/$/, '');`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-messaging-direct-message.js`
+  - L6: `*   BASE_URL          — https://off-campus-housing.test (default)`
+  - L25: `const RAW_BASE = (__ENV.BASE_URL || 'https://off-campus-housing.test').replace(/\/$/, '');`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-messaging-e2e.js`
+  - L6: `*   BASE_URL=https://off-campus-housing.test K6_RESOLVE=host:443:ip SSL_CERT_FILE=./certs/dev-root.pem \`
+  - L14: `const RAW_BASE = (__ENV.BASE_URL || 'https://off-campus-housing.test').replace(/\/$/, '');`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-messaging-flow.js`
+  - L7: `*   BASE_URL=https://off-campus-housing.test K6_RESOLVE=... SSL_CERT_FILE=./certs/dev-root.pem \`
+  - L16: `const RAW_BASE = (__ENV.BASE_URL || 'https://off-campus-housing.test').replace(/\/$/, '');`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-messaging-limit-finder.js`
+  - L12: `const RAW_BASE = (__ENV.BASE_URL || 'https://off-campus-housing.test').replace(/\/$/, '');`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-messaging.js`
+  - L5: `* SNI must be off-campus-housing.test (--resolve off-campus-housing.test:443:<LB_IP>).`
+  - L8: `*   BASE_URL=https://off-campus-housing.test K6_RESOLVE=off-campus-housing.test:443:<LB_IP> \`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-reads.js`
+  - L7: `const RAW_BASE = (__ENV.BASE_URL || 'https://off-campus-housing.test').replace(/\/$/, '');`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-spam-test.js`
+  - L15: `const RAW_BASE = (__ENV.BASE_URL || 'https://off-campus-housing.test').replace(/\/$/, '');`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-strict-edge-tls.js`
+  - L9: `* https://off-campus-housing.test so `k6 run scripts/load/k6-*.js` works from repo root.`
+  - L15: `: "https://off-campus-housing.test";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/run-k6-all-services.sh`
+  - L8: `#   BASE_URL              default https://off-campus-housing.test:443 or :30443`
+  - L9: `#   HOST                  SNI host (default off-campus-housing.test)`
+  - L21: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/run-k6-phases.sh`
+  - L26: `HOST="${HOST:-off-campus-housing.test}"`
+  - L27: `# Worst-case / cert alignment: use https://off-campus-housing.test (SNI + SAN). Override PORT only if you must hit NodePort (e.g. 30443).`
+  - L29: `# BASE_URL: always use hostname for strict TLS (cert SAN has DNS:off-campus-housing.test, not IP).`
+  - L30: `# From host: use off-campus-housing.test + K6_RESOLVE so k6 connects to MetalLB IP but TLS SNI matches cert.`
+  - L31: `# Never use raw IP — causes x509 SAN mismatch (cert valid for off-campus-housing.test, not 192.168.64.240).`
+  - L35: `echo "  ❌ Do not use raw IP for strict TLS. Use hostname (e.g. https://off-campus-housing.test:443) and K6_RESOLVE."`
+  - L44: `# From host: use hostname + --resolve so TLS SAN matches (off-campus-housing.test in cert)`
+  - L55: `# Default: https://off-campus-housing.test (implicit :443). Set PORT=30443 only for raw NodePort without MetalLB.`
+  - L86: `# k6 (Go) requires a valid CA for https://off-campus-housing.test; without it we get "x509: certificate signed by unknown authority". Do not run phases without a CA.`
+  - L108: `# k6 has no --resolve flag (that's curl). Ensure off-campus-housing.test resolves: add to /etc/hosts or use route (e.g. Colima).`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/perf/run-all-k6-load-report.sh`
+  - L10: `#   BASE_URL              default https://off-campus-housing.test`
+  - L25: `export BASE_URL="${BASE_URL:-https://off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/perf/run-k6-cross-service-isolation.sh`
+  - L36: `export BASE_URL="${BASE_URL:-https://off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/perf/run-preflight-phase-d-tail-lab.sh`
+  - L60: `export BASE_URL="${BASE_URL:-https://off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/protocol/full-edge-transport-validation.sh`
+  - L23: `export HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/protocol/test-service-protocol.sh`
+  - L26: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/reissue-ca-and-leaf-load-all-services.sh`
+  - L18: `#   HOST=off-campus-housing.test      — leaf CN and SANs (default off-campus-housing.test)`
+  - L43: `HOST="${HOST:-off-campus-housing.test}"`
+  - L608: `cp "$LEAF_CRT" "$REPO_ROOT/certs/off-campus-housing.test.crt"`
+  - L609: `cp "$LEAF_KEY" "$REPO_ROOT/certs/off-campus-housing.test.key"`
+  - L613: `ok "certs/dev-root.pem|.key, off-campus-housing.test.crt|.key (KAFKA_SSL=1: CA key persisted for kafka-ssl-from-dev-root)"`
+  - L615: `ok "certs/dev-root.pem, certs/off-campus-housing.test.crt|.key updated"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rollout-caddy.sh`
+  - L8: `CADDY_PUBLIC_HOSTNAME="${CADDY_PUBLIC_HOSTNAME:-off-campus-housing.test}"`
+  - L36: `echo "    --cert=certs/off-campus-housing.test.crt \\"`
+  - L37: `echo "    --key=certs/off-campus-housing.test.key \\"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rotation-suite.sh`
+  - L15: `HOST="${HOST:-off-campus-housing.test}"`
+  - L667: `say "Warmup: 8s + one HTTP/3 health to off-campus-housing.test (clear stale QUIC sessions)…"`
+  - L1000: `_sni_enf="${CAPTURE_EXPECTED_SNI:-off-campus-housing.test}"`
+  - L1692: `log_info "Certificate verified above: issuer = dev CA (CN=dev-root-ca, O=off-campus-housing-tracker); subject = CN=off-campus-housing.test."`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-all-test-suites.sh`
+  - L204: `export HOST="${HOST:-off-campus-housing.test}"`
+  - L407: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" -H "Host: off-campus-housing.test" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || echo "000")`
+  - L419: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" -H "Host: off-campus-housing.test" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || echo "000")`
+  - L433: `-H "Host: off-campus-housing.test" "https://127.0.0.1:$_caddy_np/_caddy/healthz" 2>/dev/null || echo "000")`
+  - L464: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null) || true`
+  - L470: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null) || true`
+  - L487: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null) || true`
+  - L493: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null) || true`
+  - L527: `-H "Host: off-campus-housing.test" "https://127.0.0.1:30443/_caddy/healthz" 2>/dev/null || echo "000")`
+  - L541: `-H "Host: off-campus-housing.test" "https://127.0.0.1:30443/_caddy/healthz" 2>/dev/null) || true`
+  - L672: `HOST="${HOST:-off-campus-housing.test}"`
+  - L674: `# From host: use hostname + K6_RESOLVE (never raw IP — cert SAN is off-campus-housing.test, not MetalLB IP)`
+  - L686: `# macOS: add dev CA to keychain (replaces manual Keychain Access → Import → Always Trust). Do this so k6/curl/browser trust off-campus-housing.test and we avoid x509.`
+  - L734: `export HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-demo-network-preflight.sh`
+  - L42: `export HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-housing-k6-edge-smoke.sh`
+  - L2: `# k6 → https://off-campus-housing.test → Caddy → HAProxy → api-gateway (strict TLS, hostname only).`
+  - L6: `#   - BASE_URL must be https (default https://off-campus-housing.test)`
+  - L9: `#   - Hostname must resolve (e.g. /etc/hosts: <MetalLB IP> off-campus-housing.test) — see scripts/lib/edge-test-url.sh, OCH_AUTO_EDGE_HOSTS=1`
+  - L52: `export BASE_URL="${BASE_URL:-https://off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-k6-chaos.sh`
+  - L174: `value: "${HOST:-off-campus-housing.test}"`
+  - L283: `echo "ERROR: On macOS, k6 cannot verify off-campus-housing.test without the CA in the keychain (Go ignores SSL_CERT_FILE)." >&2`
+  - L303: `K6_TARGET="${K6_TARGET_URL:-https://off-campus-housing.test:30443/_caddy/healthz}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-playwright-e2e-preflight.sh`
+  - L10: `#   E2E_API_BASE           — must be https (default https://off-campus-housing.test)`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-preflight-scale-and-all-suites.sh`
+  - L49: `#   https://off-campus-housing.test. Step 7a runs ./scripts/lib/trust-dev-root-ca-macos.sh automatically`
+  - L95: `#   Edge hostname / headless DNS (Playwright + Node fetch require off-campus-housing.test → IP):`
+  - L231: `#   Preconditions: PR1 merged; off-campus-housing.test + certs/dev-root.pem; kubectl get pods -n off-campus-housing-tracker.`
+  - L310: `#   In-pod Caddy: CAPTURE_STRICT_ENDPOINT_BPF=1 (default) → BPF (tcp|udp) dst podIP:443; post-verify stray UDP/443 (dst != pod) must be 0. CAPTURE_EXPECTED_SNI=off-campus-housing.test (OCH edge; no…`
+  - L454: `"$certs_dir/off-campus-housing.test.crt"`
+  - L455: `"$certs_dir/off-campus-housing.test.key"`
+  - L2600: `# 4e. k3d: verify HTTP/3 (QUIC) on NodePort from host (off-campus-housing.test + --resolve; host UDP often broken on macOS).`
+  - L2608: `# QUIC invariant: use off-campus-housing.test URL + --resolve (no raw IP); PORT/HTTP3_RESOLVE_PORT for NodePort.`
+  - L2610: `"https://off-campus-housing.test:30443/_caddy/healthz" 2>/dev/null) || true`
+  - L2613: `ok "HTTP/3 (NodePort 30443) OK — QUIC reachable from host via off-campus-housing.test:30443"`
+  - L2629: `if TARGET_IP="$_lb_ip" HOST="off-campus-housing.test" "$SCRIPT_DIR/verify-caddy-http3-in-cluster.sh" 2>/dev/null; then`
+  - L2911: `_edge_host="${OCH_EDGE_HOSTNAME:-off-campus-housing.test}"`
+  - L3037: `# Packet capture standard: (1) Host/VM: BPF (tcp|udp) dst TARGET_IP:443 if capturing before DNAT. (2) In-pod Caddy: BPF (tcp|udp) dst podIP:443, tcpdump -i eth0 (fallback any). (3) tshark: in-pod s…`
+  - L3123: `say "Preflight stopped: macOS keychain trust is required for host k6 → https://off-campus-housing.test"`
+  - L3197: `export BASE_URL="${BASE_URL:-https://off-campus-housing.test}"`
+  - … *3 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-transport-study-experiments.sh`
+  - L151: `_code=$(curl -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 8 --resolve "off-campus-housing.test:${_np}:${_node_ip}" "https://off-campus-housing.test:${_np}/_caddy/healthz" 2>…`
+  - L179: `info "  Point k6: BASE_URL=https://localhost:443 K6_RESOLVE=off-campus-housing.test:443:127.0.0.1"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/setup-full-off-campus-housing-stack.sh`
+  - L45: `LEAF="$REPO_ROOT/certs/off-campus-housing.test.crt"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/setup-lb-ip-host-access.sh`
+  - L100: `_h2=$(curl -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 8 --resolve "off-campus-housing.test:443:$LB_IP" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || echo…`
+  - L104: `_h3=$(NGTCP2_ENABLE_GSO=0 "$CURL_HTTP3" --http3-only -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 --resolve "off-campus-housing.test:443:$LB_IP" "https://off-campus-housi…`
+  - L335: `VERIFY_H2=$(curl -k --http2 -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --resolve "off-campus-housing.test:443:$LB_IP" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || ech…`
+  - L338: `VERIFY_H3=$(NGTCP2_ENABLE_GSO=0 "$CURL_HTTP3" --http3-only -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --resolve "off-campus-housing.test:443:$LB_IP" "https://off-campus-housing.test/…`
+  - L370: `echo "  curl -k --http2 -sS -o /dev/null -w '%{http_code}' --resolve off-campus-housing.test:443:$LB_IP https://off-campus-housing.test/_caddy/healthz"`
+  - L372: `echo "  NGTCP2_ENABLE_GSO=0 $CURL_HTTP3 --http3-only -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --resolve off-campus-housing.test:443:$LB_IP https://off-campus-housing.test/_caddy/he…`
+  - L379: `echo "  NGTCP2_ENABLE_GSO=0 /opt/homebrew/opt/curl/bin/curl --http3-only -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --resolve off-campus-housing.test:443:$LB_IP https://off-campus-ho…`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/setup-tls-and-edge.sh`
+  - L41: `say "Step 2/7: Generate certs (CA, off-campus-housing.test, envoy-client, services)"`
+  - L43: `if [[ ! -f "$REPO_ROOT/certs/off-campus-housing.test.crt" ]] || [[ ! -f "$REPO_ROOT/certs/dev-root.pem" ]]; then`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/smoke-services.sh`
+  - L7: `HOST="${HOST:-off-campus-housing.test}"`
+  - L45: `# Ensure host resolves (optional: add off-campus-housing.test to /etc/hosts if needed)`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/smoke-test-dev.sh`
+  - L4: `#   BASE_URL=https://off-campus-housing.test  (default from PORT/LB)`
+  - L11: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/strict-tls-bootstrap.sh`
+  - L4: `# Run from repo root. dev-root.pem, off-campus-housing.test.crt, off-campus-housing.test.key must be in ./certs/`
+  - L15: `LEAF_CRT="$ROOT/certs/off-campus-housing.test.crt"`
+  - L16: `LEAF_KEY="$ROOT/certs/off-campus-housing.test.key"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-auth-service.sh`
+  - L6: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-booking-http2-http3.sh`
+  - L11: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-full-chain-with-rotation.sh`
+  - L5: `HOST="${HOST:-off-campus-housing.test}"`
+  - L454: `ROTATION_HOST="$HOST"  # off-campus-housing.test`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-grpc-http2-http3.sh`
+  - L6: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-http2-http3-strict-tls.sh`
+  - L6: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-lb-coordinated.sh`
+  - L46: `# Host: off-campus-housing.test required so Caddy matches https://off-campus-housing.test vhost (otherwise :443 catch-all; -k = no CA in pod)`
+  - L48: `curl -sS -o /dev/null -w "%{http_code}" -k --connect-timeout 5 --max-time 10 --resolve "off-campus-housing.test:443:${CLUSTER_IP}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-listings-http2-http3.sh`
+  - L17: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-messaging-service-comprehensive.sh`
+  - L20: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-microservices-http2-http3-enhanced.sh`
+  - L21: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-microservices-http2-http3-housing.sh`
+  - L39: `HOST="${HOST:-off-campus-housing.test}"`
+  - L1544: `HOST="${HOST:-off-campus-housing.test}" "$SCRIPT_DIR/test-booking-http2-http3.sh" || fail "Booking protocol suite failed"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-packet-capture-standalone.sh`
+  - L25: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-tls-mtls-comprehensive.sh`
+  - L19: `HOST="${HOST:-off-campus-housing.test}"`
+  - L142: `grpc_authority="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/transport/http3-concurrent-curl-stress.sh`
+  - L5: `#   OCH_H3_URL=https://off-campus-housing.test/api/healthz \`
+  - L14: `URL="${OCH_H3_URL:-https://off-campus-housing.test/api/healthz}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-caddy-grpc-routing.sh`
+  - L3: `# Uses grpcurl to Caddy :443 with authority off-campus-housing.test; expects grpc.health.v1.Health/Check SERVING.`
+  - L12: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-caddy-http3-in-cluster.sh`
+  - L9: `#   HOST=off-campus-housing.test  (required when TARGET_IP set for SNI)`
+  - L22: `HOST="${HOST:-off-campus-housing.test}"`
+  - L49: `_code=$(NGTCP2_ENABLE_GSO=0 "$_curl_host" -sS -w '%{http_code}' -o /dev/null --max-time 15 --http3-only --cacert "$_ca" --resolve "off-campus-housing.test:443:$_lb_ip" "https://off-campus-housing.t…`
+  - L51: `ok "Caddy HTTP/3 OK via host Homebrew curl (off-campus-housing.test:443 -> $_lb_ip)"`
+  - L72: `# Caddy serves off-campus-housing.test (cert SAN). --resolve requires an IP; get ClusterIP or use TARGET_IP.`
+  - L74: `CURL_RESOLVE="off-campus-housing.test:443:${TARGET_IP}"`
+  - L78: `CURL_RESOLVE="off-campus-housing.test:443:${_cluster_ip}"`
+  - L80: `CURL_URL="https://off-campus-housing.test/_caddy/healthz"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-caddy-strict-tls-in-cluster.sh`
+  - L8: `#   2. Creates a temporary Pod with curl image and CA mounted; runs curl with --cacert and Host: off-campus-housing.test.`
+  - L22: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-caddy-strict-tls.sh`
+  - L18: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-db-and-cache-comprehensive.sh`
+  - L112: `HOST="${HOST:-off-campus-housing.test}"`
+  - L158: `HOST="${HOST:-off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-http3-edge.sh`
+  - L6: `#   TARGET=https://off-campus-housing.test  (default)`
+  - L29: `TARGET="${TARGET:-https://off-campus-housing.test}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-metallb-and-traffic-policy.sh`
+  - L245: `out1=\$(curl -k -sS -w '%{http_code}' -o /tmp/b1 --max-time 10 -H "Host: off-campus-housing.test" "https://\$LB_IP/_caddy/healthz" 2>&1) || true`
+  - L249: `out2=\$(curl -k -sS -w '%{http_code}' -o /tmp/b2 --max-time 10 --http2 -H "Host: off-campus-housing.test" "https://\$LB_IP/_caddy/healthz" 2>&1) || true`
+  - L296: `code=\$(curl -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 3 --max-time 5 --resolve "off-campus-housing.test:443:$lb_ip" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null) || c…`
+  - L338: `# Helper: curl to LB IP using off-campus-housing.test for TLS (cert SAN). Returns 200 or 000.`
+  - L340: `curl -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 --resolve "off-campus-housing.test:443:${1}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || echo "000"`
+  - L345: `curl -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 --resolve "off-campus-housing.test:${host_https_port}:${host_https_host}" "https://off-campus-housing.test:${host_https_p…`
+  - L495: `_h3_resolve="off-campus-housing.test:${_h3_port}:${_h3_host}"`
+  - L496: `_h3_url="https://off-campus-housing.test:${_h3_port}/_caddy/healthz"`
+  - L497: `[[ "$_h3_port" == "443" ]] && _h3_url="https://off-campus-housing.test/_caddy/healthz"`
+  - L513: `curl -k -sS -o /dev/null -w "%{http_code}\n" --connect-timeout 8 --max-time 20 --http3 --resolve "off-campus-housing.test:443:${lb_ip}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null …`
+  - L528: `_vm_h3=$(colima ssh -- curl -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 --http3-only --resolve "off-campus-housing.test:443:${lb_ip}" "https://off-campus-housing.test/_c…`
+  - L541: `_colima_h3=$(_normalize_http_code "$("$CURL_BIN" --http3-only -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 15 --resolve "off-campus-housing.test:8443:127.0.0.1" "https://off…`
+  - L559: `--resolve "off-campus-housing.test:${_h3_port}:127.0.0.1" "https://off-campus-housing.test:${_h3_port}/_caddy/healthz" 2>/dev/null || echo "000")`
+  - L567: `--resolve "off-campus-housing.test:${_h3_port}:127.0.0.1" "https://off-campus-housing.test:${_h3_port}/_caddy/healthz" 2>/dev/null || echo "000")`
+  - L592: `[[ -n "$_docker_ip" ]] && _h3_resolve="off-campus-housing.test:${_docker_port}:$_docker_ip" && _h3_url="https://off-campus-housing.test:${_docker_port}/_caddy/healthz"`
+  - … *10 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-preflight-edge-routing.sh`
+  - L8: `#   HOUSING_NS, OCH_EDGE_HOSTNAME (default off-campus-housing.test)`
+  - L26: `HOST="${2:-${OCH_EDGE_HOSTNAME:-off-campus-housing.test}}"`
+  - L69: `want_host = os.environ.get("_EDGE_VERIFY_HOST", "off-campus-housing.test")`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/webapp-playwright-strict-edge.sh`
+  - L7: `#   E2E_API_BASE   — https only (default https://off-campus-housing.test); :4020 / http localhost rejected`
+
+## OCH-prefixed identifiers
+
+*Secrets, services, env keys with och- / och_*
+
+**Hits:** 501 (capped per file in scanner)
+
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/.github/workflows/protocol-validation.yml`
+  - L22: `- "scripts/recycle-och-postgres-compose.sh"`
+  - L61: `run: shellcheck -S error -x -e SC2015,SC2016,SC2012,SC1091,SC2002 scripts/ci/verify-docker-ports.sh scripts/ci/verify-quic-hostname-invariant.sh scripts/ci/verify-housing-grpc-matrix.sh scripts/ci/…`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/Makefile`
+  - L42: `metallb-fix hosts-sanity ensure-edge-hosts wait-for-caddy-ip preflight-gate sslkeylog-seed ollama-note ollama-env verify-network-coherence verify-kafka-bootstrap verify-kafka-cluster check-kafka-co…`
+  - L144: `@echo "  make dev-onboard      deps + zero-trust CA + up-fast + Kafka TLS + och-kafka-ssl-secret verify (Phase 10: alignment; SAFE_ONLY=1 → kafka-health); make setup alias"`
+  - L145: `@echo "  make rollout-och-full  After Kafka/TLS secret fixes: ensure cluster secrets + restart all housing apps + Caddy (ordered)"`
+  - L509: `kafka-tls-guard: ## Mounted CA + JKS uniformity across brokers, och-kafka CA, logs, verify-kafka-cluster (fail-fast)`
+  - L524: `service-tls-alias-guard: ## Fail if service-tls vs och-service-tls ca.crt fingerprints differ`
+  - L533: `rollout-och-full: ## ensure-housing-cluster-secrets then rollout-deferred-after-kafka-tls; skip secrets: SKIP_ENSURE_CLUSTER_SECRETS=1`
+  - L534: `chmod +x $(SCRIPTS)/ensure-housing-cluster-secrets.sh $(SCRIPTS)/rollout-deferred-after-kafka-tls.sh $(SCRIPTS)/rollout-restart-och-full-stack.sh`
+  - L535: `NS_ING=$(NS_ING) HOUSING_NS=$(HOUSING_NS) OCH_ROLLOUT_STATUS_TIMEOUT=$(OCH_ROLLOUT_STATUS_TIMEOUT) SKIP_ENSURE_CLUSTER_SECRETS=$(SKIP_ENSURE_CLUSTER_SECRETS) bash $(SCRIPTS)/rollout-restart-och-ful…`
+  - L575: `# Local path: Phase 0.25 deps + 0.5 dev-root CA → up-fast → Kafka apply → och-kafka-ssl-secret sync+verify → … (see script header).`
+  - L851: `bash $(SCRIPTS)/recycle-och-postgres-compose.sh`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/OUTBOX_AND_OBSERVABILITY.md`
+  - L52: `| **`prometheus-rules-och-slo.yaml`** | OCH SLO-style recording/alert rules. |`
+  - L53: `| **`och-slo-prometheusrule.yaml`** | Prometheus Operator **PrometheusRule** CRD variant. |`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/RECORD_PLATFORM_ALIGNMENT.md`
+  - L36: `Event topics are derived from **`proto/events/*.proto`** and **`scripts/lib/och-kafka-event-topics-from-proto.sh`**. Defaults use `ENV_PREFIX=dev` (or service-specific prefixes). For Record Platform:`
+  - L38: `- Set **`ENV_PREFIX`** (and **`OCH_KAFKA_TOPIC_SUFFIX`** for CI isolation) consistently in **services** and **scripts**.`
+  - L65: `- **`verify-preflight-edge-routing.sh`** and **`make verify-curl-http3`** are OCH-edge-specific; disable or rewrite for your edge.`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/alertmanager-slo-route-example.yaml`
+  - L12: `name: alertmanager-och-slo-example`
+  - L34: `channel: "#och-slo-warning"`
+  - L42: `channel: "#och-slo-critical"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/grafana-dashboard-auth-outbox.yaml`
+  - L13: `"uid": "och-auth-outbox",`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/grafana-dashboard-providers.yaml`
+  - L11: `- name: och-file`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/grafana-dashboards-transport.yaml`
+  - L10: `och-transport-edge.json: |`
+  - L108: `"uid": "och-transport-edge",`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/grafana-dashboards.yaml`
+  - L107: `"uid": "och-microservices-overview",`
+  - L176: `"uid": "och-distributed-tracing",`
+  - L269: `"uid": "och-housing-uptime",`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/kustomization.yaml`
+  - L10: `- prometheus-rules-och-slo.yaml`
+  - L27: `#   och-slo-prometheusrule.yaml     — Prometheus Operator PrometheusRule`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/och-slo-prometheusrule.yaml`
+  - L2: `# This repo's default stack uses vanilla Prometheus + prometheus-rules-och-slo ConfigMap.`
+  - L3: `# Install into a cluster that has PrometheusRule CRD and a Prometheus selecting `role: och-slo`.`
+  - L5: `#   kubectl apply -f infra/k8s/base/observability/och-slo-prometheusrule.yaml`
+  - L11: `name: och-slo-rules`
+  - L14: `role: och-slo`
+  - L18: `- name: och-slo-recording`
+  - L51: `- name: och-slo-burn-alerts`
+  - L78: `- name: och-slo-violation-alerts`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/prometheus-deploy.yaml`
+  - L12: `- /etc/prometheus/rules/och-slo.yml`
+  - L125: `name: prometheus-rules-och-slo`
+  - L127: `- key: och-slo.yml`
+  - L128: `path: rules/och-slo.yml`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/observability/prometheus-rules-och-slo.yaml`
+  - L12: `name: prometheus-rules-och-slo`
+  - L18: `och-slo.yml: |`
+  - L21: `- name: och-slo-recording`
+  - L64: `- name: och-slo-burn-alerts`
+  - L94: `- name: och-slo-violation-alerts`
+  - L121: `- name: och-transport-edge`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/README.md`
+  - L47: `After Kafka and `och-kafka-ssl-secret` exist:`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/kafka-tls-preflight-job.yaml`
+  - L2: `# Apply after Kafka + och-kafka-ssl-secret exist:`
+  - L52: `secretName: och-kafka-ssl-secret`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/monitoring/grafana/dashboards/auth-outbox.json`
+  - L3: `"uid": "och-auth-outbox",`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/monitoring/grafana/dashboards/cluster-stability.json`
+  - L3: `"uid": "och-cluster-stability",`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/monitoring/grafana/dashboards/forensic-mode.json`
+  - L3: `"uid": "och-forensic-mode",`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/monitoring/grafana/dashboards/kafka-health.json`
+  - L3: `"uid": "och-kafka-health",`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/monitoring/grafana/dashboards/tls-health.json`
+  - L3: `"uid": "och-tls-health",`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/monitoring/prometheus/rules/kafka-election.yaml`
+  - L7: `#   - name: och-kafka-election`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/monitoring/prometheus/rules/restart-anomaly.yaml`
+  - L8: `- name: och-restart-anomaly`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/monitoring/prometheus/rules/tls-cert-expiry.yaml`
+  - L6: `#   - name: och-tls-expiry`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/aggressive-cleanup-replicasets.sh`
+  - L6: `# kubectl rollout restart deploy/NAME, and ./scripts/k8s-rollout-och-ordered.sh for dependency order.`
+  - L8: `# Set OCH_AGGRESSIVE_RS_CLEANUP=1 only for interactive emergency debugging.`
+  - L27: `if [[ "${OCH_AGGRESSIVE_RS_CLEANUP:-0}" != "1" ]]; then`
+  - L29: `log "OCH_AGGRESSIVE_RS_CLEANUP is not 1 — not scaling or deleting ReplicaSets."`
+  - L31: `log "Ordered rollout: $SCRIPT_DIR/k8s-rollout-och-ordered.sh"`
+  - L37: `warn "OCH_AGGRESSIVE_RS_CLEANUP=1 — running legacy RS manipulation (debug only)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/apply-och-messaging-and-restart.sh`
+  - L3: `# Prereq: OCH secrets exist (och-service-tls, och-kafka-ssl-secret).`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/assert-kafka-integration-cluster.mjs`
+  - L5: `* Discovers MetalLB brokers when OCH_INTEGRATION_KAFKA_FROM_K8S_LB=1 (same as @common/utils/kafka-vitest-cluster).`
+  - L7: `* Skip (e.g. CI without cluster): OCH_SKIP_KAFKA_INTEGRATION_ASSERT=1`
+  - L18: `if (process.env.OCH_SKIP_KAFKA_INTEGRATION_ASSERT === "1" || process.env.OCH_SKIP_KAFKA_INTEGRATION_ASSERT === "true") {`
+  - L19: `console.warn("[och-it] assert-kafka-integration-cluster: skipped (OCH_SKIP_KAFKA_INTEGRATION_ASSERT=1)");`
+  - L25: `console.error("[och-it] Missing services/common/dist/kafka-vitest-cluster.js — run: pnpm -C services/common run build");`
+  - L29: `process.env.OCH_INTEGRATION_KAFKA_FROM_K8S_LB ??= "1";`
+  - L35: `console.log("[och-it] Kafka cluster integration policy OK (≥3 TLS seeds, PEM material, no plaintext shortcuts).");`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/bring-up-external-infra.sh`
+  - L10: `#   ./scripts/recycle-och-postgres-compose.sh`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/build-housing-images-k3s.sh`
+  - L4: `# Build + rollout helper: ./scripts/rebuild-och-images-and-rollout.sh (or pnpm run rebuild:och:rollout).`
+  - L17: `# shellcheck source=lib/och-housing-docker-services-default.sh`
+  - L18: `source "$SCRIPT_DIR/lib/och-housing-docker-services-default.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/check-all-pods-and-tls.sh`
+  - L6: `# Set OCH_DIAGNOSTIC_ALLOW_POD_DELETE=1 to allow stuck-Pending, FailedMount-retry, and probe-TLS pod deletion.`
+  - L126: `if type och_list_app_deployments &>/dev/null; then`
+  - L127: `_listed=$(och_list_app_deployments "$HOUSING_CHECK_NS" | tr '\n' ' ')`
+  - L142: `# Optional settle time: OCH_APP_READY_WAIT_SEC (default 180), poll OCH_APP_READY_POLL_STEP (default 12)`
+  - L143: `APP_WAIT_SEC="${OCH_APP_READY_WAIT_SEC:-180}"`
+  - L144: `APP_POLL_STEP="${OCH_APP_READY_POLL_STEP:-12}"`
+  - L259: `if [[ "${OCH_DIAGNOSTIC_ALLOW_POD_DELETE:-0}" == "1" ]]; then`
+  - L265: `warn "  Pod $POD stuck in $PHASE for ${AGE_SEC}s (set OCH_DIAGNOSTIC_ALLOW_POD_DELETE=1 to delete)"`
+  - L290: `if [[ "${OCH_DIAGNOSTIC_ALLOW_POD_DELETE:-0}" == "1" ]]; then`
+  - L296: `warn "  Mount failed but pod delete disabled (OCH_DIAGNOSTIC_ALLOW_POD_DELETE=1 to retry via delete)"`
+  - L344: `if [[ "${OCH_DIAGNOSTIC_ALLOW_POD_DELETE:-0}" == "1" ]]; then`
+  - L350: `warn "  TLS/probe issue logged; not deleting pod (OCH_DIAGNOSTIC_ALLOW_POD_DELETE=1 to enable)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/delete-kafka-event-topics.sh`
+  - L3: `# Uses identical env: ENV_PREFIX, OCH_KAFKA_TOPIC_SUFFIX, KAFKA_DOCKER_CONTAINER or KAFKA_DOCKER_COMPOSE_SERVICE.`
+  - L5: `# Example (CI container): KAFKA_DOCKER_CONTAINER=kafka-ci OCH_KAFKA_TOPIC_SUFFIX=... bash scripts/ci/delete-kafka-event-topics.sh`
+  - L8: `export OCH_KAFKA_TOPICS_DELETE=1`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/generate-kafka-ci-tls.sh`
+  - L28: `-subj "/CN=och-kafka-ci-ca/O=off-campus-housing-ci" \`
+  - L36: `-subj "/CN=${CN}/O=och-kafka-ci"`
+  - L59: `-subj "/CN=kafka-client/O=och-kafka-ci"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/start-kafka-tls-ci.sh`
+  - L11: `NET="${KAFKA_CI_DOCKER_NETWORK:-och-kafka-ci-net}"`
+  - L101: `} > /tmp/och-kafka-event-topics.props'`
+  - L109: `--command-config /tmp/och-kafka-event-topics.props 2>/dev/null)"; then`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/verify-housing-grpc-matrix.sh`
+  - L32: `bad_bind="$(grep -R --include='*.ts' -l 'OCH_GRPC_INSECURE_TEST_BIND' services/*-service/src 2>/dev/null || true)"`
+  - L34: `printf 'verify-housing-grpc-matrix: OCH_GRPC_INSECURE_TEST_BIND must not appear under services/*-service/src:\n%s\n' "$bad_bind" >&2`
+  - L39: `bad_kafka="$(grep -R --include='*.ts' -E 'OCH_KAFKA_DISABLED|createNoopKafka|ochKafkaDisabled' services scripts 2>/dev/null || true)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/colima-edge-sysctl-tuning.sh`
+  - L6: `# Persist: create /etc/sysctl.d/99-och-edge.conf with the same keys (distribution-specific).`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/colima-patch-app-config-db-host-to-gateway.sh`
+  - L14: `# After apply, restart app pods if needed: ./scripts/rebuild-och-images-and-rollout.sh with ROLLOUT only, or kubectl rollout restart.`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/create-kafka-event-topics-k8s.sh`
+  - L13: `#   ENV_PREFIX, PARTITIONS, OCH_KAFKA_TOPIC_SUFFIX — same as create-kafka-event-topics.sh`
+  - L39: `och_topic_suffix() {`
+  - L40: `local raw="${OCH_KAFKA_TOPIC_SUFFIX:-}"`
+  - L46: `SUF="$(och_topic_suffix)"`
+  - L48: `# shellcheck source=lib/och-kafka-event-topics-from-proto.sh`
+  - L49: `source "$SCRIPT_DIR/lib/och-kafka-event-topics-from-proto.sh"`
+  - L50: `och_kafka_event_topics_fill || die "Could not build topic list from proto/events"`
+  - L51: `TOPICS=("${OCH_KAFKA_EVENT_TOPICS[@]}")`
+  - L66: `} > /tmp/och-k8s-topics.props'`
+  - L73: `kubectl exec -n "$NS" "$KPOD" -- kafka-topics --bootstrap-server "$BS" --command-config /tmp/och-k8s-topics.props "$@"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/create-kafka-event-topics.sh`
+  - L5: `# Isolation: when OCH_KAFKA_TOPIC_SUFFIX is set (e.g. GITHUB_RUN_ID), the same rules as`
+  - L20: `#   OCH_KAFKA_TOPIC_SUFFIX=...       — optional CI/test isolation (matches services)`
+  - L23: `#   OCH_KAFKA_TOPICS_DELETE=1         — delete the same topic set (--if-exists), then exit (optional CI/teardown)`
+  - L37: `och_topic_suffix() {`
+  - L38: `local raw="${OCH_KAFKA_TOPIC_SUFFIX:-}"`
+  - L47: `SUF="$(och_topic_suffix)"`
+  - L53: `# Topic names derived from proto/events/*.proto (+ explicit booking.events.v1 + messaging.dlq). See scripts/lib/och-kafka-event-topics-from-proto.sh`
+  - L54: `# shellcheck source=lib/och-kafka-event-topics-from-proto.sh`
+  - L55: `source "$SCRIPT_DIR/lib/och-kafka-event-topics-from-proto.sh"`
+  - L56: `och_kafka_event_topics_fill || die "Could not build topic list from proto/events"`
+  - L57: `TOPICS=("${OCH_KAFKA_EVENT_TOPICS[@]}")`
+  - L71: `} > /tmp/och-kafka-event-topics.props'`
+  - L108: `CONFIG_ARGS=(--command-config /tmp/och-kafka-event-topics.props)`
+  - L115: `if [[ "${OCH_KAFKA_TOPICS_DELETE:-}" == "1" ]]; then`
+  - L116: `say "OCH_KAFKA_TOPICS_DELETE=1 — deleting listed topics (best-effort, --if-exists)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/dev-onboard-local.sh`
+  - L4: `# Prevents app CrashLoop when Secret/och-kafka-ssl-secret is missing or incomplete (auth-service,`
+  - L10: `#        defer Kafka JKS until LB (TLS_FIRST_TIME_DEFER_KAFKA_JKS); reissue syncs och-service-tls (reissue step 2c);`
+  - L11: `#        Phase 3.5 ensure-housing-cluster-secrets + verify och-kafka-ssl-secret PEM keys right after apply-kafka-kraft;`
+  - L57: `export OCH_ROLLOUT_STATUS_TIMEOUT="${OCH_ROLLOUT_STATUS_TIMEOUT:-300}"`
+  - L77: `# Exit 0 iff Secret/och-kafka-ssl-secret has non-empty data for ca-cert.pem, client.crt, client.key.`
+  - L84: `['kubectl', '-n', ns, 'get', 'secret', 'och-kafka-ssl-secret', '-o', 'json', '--request-timeout=25s'],`
+  - L94: `print('  ✅ och-kafka-ssl-secret verified (ca-cert.pem, client.crt, client.key)')`
+  - L123: `echo "▶ Phase 3.5: Housing secrets — sync och-kafka-ssl-secret (app Kafka mTLS PEMs) + verify keys"`
+  - L128: `echo "▶ Phase 3.5 remediate: kafka-ssl-from-dev-root.sh + re-sync (broker PEM material → och-kafka-ssl-secret)"`
+  - L138: `echo "❌ och-kafka-ssl-secret still incomplete — check kubectl context, namespace $_NS, and certs/dev-root.{pem,key}" >&2`
+  - L149: `echo "▶ Phase 5a: Re-sync och-service-tls / och-kafka aliases (idempotent; after TLS guard churn)"`
+  - L152: `echo "▶ Phase 5a1: service-tls ↔ och-service-tls CA fingerprint gate (alias drift fail-fast)"`
+  - L164: `echo "▶ Phase 6b: Verify app Deployments mount och-kafka-ssl-secret (KafkaJS CA trust)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/dev-onboard-zero-trust-preflight.sh`
+  - L4: `# tls-first-time / kafka-refresh cannot produce kafka-ssl-secret or och-kafka-ssl-secret.`
+  - L17: `echo "  After Kafka TLS refresh, dev-onboard syncs Secret/och-kafka-ssl-secret (keys: ca-cert.pem, client.crt, client.key) for app pods."`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/diagnose-k6-edge-connectivity.sh`
+  - L81: `echo "  # If DNS missing: add \"$LB_IP $HOST\" to /etc/hosts or: OCH_AUTO_EDGE_HOSTS=1 with sudo"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/diagnose-och-deployment.sh`
+  - L3: `# Usage: ./scripts/diagnose-och-deployment.sh media-service`
+  - L4: `#        ./scripts/diagnose-och-deployment.sh auth-service`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-all-services-tls.sh`
+  - L3: `# CA may be: dev-root-ca volume and/or ca.crt inside service-tls / och-service-tls secret items.`
+  - L33: `grep -qE 'secretName:\s*(service-tls|och-service-tls)\b' "$f"`
+  - L54: `if grep -qE 'secretName:\s*och-kafka-ssl-secret\b' "$DEPLOY_FILE"; then`
+  - L55: `ok "$svc: Kafka client mTLS (och-kafka-ssl-secret); gRPC health via TCP (no och-service-tls mount in this Deployment)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-edge-hosts.sh`
+  - L6: `#   OCH_EDGE_HOSTNAME   — hostname (default off-campus-housing.test)`
+  - L19: `HOST="${OCH_EDGE_HOSTNAME:-off-campus-housing.test}"`
+  - L110: `sudo env OCH_HOSTS_NAME="$h" OCH_HOSTS_LINE="$line" bash -c '`
+  - L111: `grep -vF "$OCH_HOSTS_NAME" /etc/hosts > /tmp/och.hosts.new 2>/dev/null || true`
+  - L112: `printf "%s\n" "$OCH_HOSTS_LINE" >> /tmp/och.hosts.new`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-housing-cluster-secrets.sh`
+  - L4: `#   - och-service-tls — alias of service-tls (same ca.crt / tls.crt / tls.key)`
+  - L5: `#   - och-kafka-ssl-secret — from kafka-ssl-secret or by running kafka-ssl-from-dev-root.sh when CA key exists`
+  - L32: `warn "Cannot sync och-service-tls: service-tls missing"`
+  - L40: `kubectl -n "$NS" create secret generic och-service-tls \`
+  - L46: `ok "och-service-tls synced from service-tls"`
+  - L72: `kubectl -n "$NS" create secret generic och-kafka-ssl-secret \`
+  - L78: `ok "och-kafka-ssl-secret synced from kafka-ssl-secret"`
+  - L82: `warn "kafka-ssl-secret missing ca-cert.pem / client.crt / client.key; cannot sync och-kafka-ssl-secret"`
+  - L87: `warn "No kafka-ssl-secret / och-kafka-ssl-secret and no certs/dev-root.{pem,key} — run reissue (KAFKA_SSL=1) then: ./scripts/kafka-ssl-from-dev-root.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-strict-tls-mtls-preflight.sh`
+  - L235: `say "Rollout restart (FORCE_TLS_RESTART=$FORCE_TLS_RESTART, SECRET_UPDATED=$SECRET_UPDATED; OCH_ROLLOUT_SEQUENTIAL=${OCH_ROLLOUT_SEQUENTIAL:-1})"`
+  - L236: `# shellcheck source=scripts/lib/och-sequential-rollout.sh`
+  - L237: `source "$SCRIPT_DIR/lib/och-sequential-rollout.sh"`
+  - L238: `if [[ "${OCH_ROLLOUT_SEQUENTIAL:-1}" == "1" ]]; then`
+  - L239: `OCH_ROLLOUT_NS="$NS" NS_ING="$NS_ING" och_rollout_ordered_housing_apps`
+  - L240: `OCH_ROLLOUT_NS="$NS" och_rollout_caddy_last`
+  - L241: `ok "Sequential app + Caddy rollouts triggered (OCH_ROLLOUT_STATUS_TIMEOUT=${OCH_ROLLOUT_STATUS_TIMEOUT:-180}s each)"`
+  - L250: `# Deployments mount och-service-tls; reissue updates service-tls — always refresh alias so mounts never go stale.`
+  - L253: `warn "och-service-tls skipped: service-tls missing"`
+  - L257: `d=$(mktemp -d 2>/dev/null || echo "/tmp/och-tls-$$")`
+  - L261: `kubectl -n "$NS" create secret generic och-service-tls \`
+  - L267: `ok "och-service-tls synced from service-tls"`
+  - L272: `if [[ -f "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh" ]]; then`
+  - L273: `# shellcheck source=scripts/lib/ensure-och-grpc-certs.sh`
+  - L274: `source "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh"`
+  - … *2 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/install-metallb-colima.sh`
+  - L124: `if ! och_assert_metallb_pool_coherent "$METALLB_POOL"; then`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k8s-rollout-och-ordered.sh`
+  - L3: `# Usage: ./scripts/k8s-rollout-och-ordered.sh`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-refresh-tls-from-lb.sh`
+  - L2: `# Regenerate kafka-ssl-secret (and och-kafka-ssl-secret) with SANs that include current`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-rolling-restart.sh`
+  - L36: `if ! och_kafka_kraft_quorum_ok "$NS"; then`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-ssl-from-dev-root.sh`
+  - L63: `_auto_extra="$(och_kafka_metallb_external_lb_ips_csv "$NS" "$REPLICAS")"`
+  - L75: `KAFKA_SANS="$(och_kafka_subject_alt_name_openssl_value "$NS" "$REPLICAS" "${KAFKA_SSL_EXTRA_IP_SANS:-}")"`
+  - L193: `say "4b. Creating och-kafka-ssl-secret (same client material; Deployments mount och-kafka-ssl-secret)…"`
+  - L194: `_och_kafka_yaml="${TMP}/och-kafka-ssl-secret.yaml"`
+  - L195: `kubectl create secret generic och-kafka-ssl-secret -n "$NS" \`
+  - L201: `ok "och-kafka-ssl-secret created/updated"`
+  - L203: `colima ssh -- env KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f "$_och_kafka_yaml" --request-timeout=20s 2>/dev/null && ok "och-kafka-ssl-secret (via colima ssh)" || warn "och-kafka-ssl-sec…`
+  - L205: `warn "och-kafka-ssl-secret apply failed"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-tls-guard.sh`
+  - L3: `# och-kafka secret, logs, verify-kafka-cluster.`
+  - L13: `#     skip 5b–6 (service-tls / och-kafka / annotation) and step 8 (verify-cluster)`
+  - L165: `say "POST_ROLLOUT_ONLY=1 — skipping service-tls / och-kafka / annotation gates (use full kafka-tls-guard for those)"`
+  - L216: `say "6) och-kafka-ssl-secret CA vs kafka-ssl-secret"`
+  - L217: `if kubectl get secret och-kafka-ssl-secret -n "$NS" --request-timeout=15s >/dev/null 2>&1; then`
+  - L218: `kubectl get secret och-kafka-ssl-secret -n "$NS" -o jsonpath='{.data.ca-cert\.pem}' --request-timeout=25s | base64 -d >"$TMP/service-ca.pem"`
+  - L221: `bad "CA fingerprint mismatch kafka-ssl-secret vs och-kafka-ssl-secret (run: make kafka-refresh-tls-from-lb)"`
+  - L226: `echo "   ℹ️  och-kafka-ssl-secret absent — skipped"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-tls-rotate-atomic.sh`
+  - L30: `echo "▶ Regenerate kafka-ssl-secret + och-kafka-ssl-secret (full JKS + PEM)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/edge-test-url.sh`
+  - L68: `echo "  (Could not discover LB IP — set OCH_EDGE_IP=... from: kubectl get svc -A | grep LoadBalancer)" >&2`
+  - L72: `echo "    export OCH_EDGE_IP=$ip" >&2`
+  - L76: `echo "  Or: OCH_AUTO_EDGE_HOSTS=1 (uses OCH_EDGE_IP or discovered LB IP; requires sudo on non-root)" >&2`
+  - L83: `[[ "${OCH_AUTO_EDGE_HOSTS:-0}" != "1" ]] && return 0`
+  - L85: `echo "⚠️  OCH_AUTO_EDGE_HOSTS=1 but IP invalid: $ip" >&2`
+  - L101: `echo "❌ OCH_AUTO_EDGE_HOSTS=1 but cannot write /etc/hosts (need root or sudo)" >&2`
+  - L124: `local lb="${OCH_EDGE_IP:-}"`
+  - L140: `echo "❌ DNS: cannot resolve $host — set OCH_EDGE_IP=<LoadBalancer_IP> and add hosts line, or use OCH_AUTO_EDGE_HOSTS=1 with sudo" >&2`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/ensure-colima-docker-context.sh`
+  - L7: `#   export OCH_KUBE_CONTEXT="$(kubectl config current-context 2>/dev/null)"`
+  - L8: `#   och_ensure_colima_docker_context || exit 1`
+  - L11: `#   OCH_KUBE_CONTEXT — if unset, uses kubectl current-context (if *colima*, enforce socket)`
+  - L12: `#   OCH_FORCE_COLIMA_DOCKER — 1: apply Colima docker context even if kube context name lacks "colima"`
+  - L14: `och_ensure_colima_docker_context() {`
+  - L15: `local kube_ctx="${OCH_KUBE_CONTEXT:-$(kubectl config current-context 2>/dev/null || true)}"`
+  - L16: `if [[ "${OCH_FORCE_COLIMA_DOCKER:-0}" != "1" ]] && [[ "$kube_ctx" != *colima* ]]; then`
+  - L57: `och_ensure_colima_docker_context || exit 1`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/ensure-och-grpc-certs.sh`
+  - L3: `# Primary: kubectl secret och-service-tls or service-tls in off-campus-housing-tracker (same as pod mounts).`
+  - L7: `#   och_sync_grpc_certs_to_dir [DEST_DIR] [NAMESPACE]`
+  - L11: `och_sync_grpc_certs_to_dir() {`
+  - L13: `local ns="${2:-${OCH_GRPC_CERT_NS:-off-campus-housing-tracker}}"`
+  - L21: `if kubectl -n "$ns" get secret och-service-tls -o name &>/dev/null; then`
+  - L22: `secret="och-service-tls"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/grpc-http3-health.sh`
+  - L60: `if [[ -f "$lib_dir/ensure-och-grpc-certs.sh" ]]; then`
+  - L61: `# shellcheck source=scripts/lib/ensure-och-grpc-certs.sh`
+  - L62: `source "$lib_dir/ensure-och-grpc-certs.sh"`
+  - L63: `och_sync_grpc_certs_to_dir "$grpc_certs_dir" "$ns" || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/grpc-utils.sh`
+  - L7: `och_housing_ns() {`
+  - L12: `och_list_app_deployments() {`
+  - L13: `local ns="${1:-$(och_housing_ns)}"`
+  - L21: `och_app_deployment_count() {`
+  - L22: `och_list_app_deployments "${1:-}" | wc -w | tr -d ' '`
+  - L27: `och_deploy_grpc_uses_tls() {`
+  - L29: `local ns="${2:-$(och_housing_ns)}"`
+  - L33: `# Alias for harness readability (same as och_deploy_grpc_uses_tls).`
+  - L35: `och_deploy_grpc_uses_tls "$@"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/kafka-broker-sans.sh`
+  - L9: `och_kafka_kubectl() {`
+  - L18: `och_kafka_metallb_external_lb_ips_lines() {`
+  - L21: `_ip="$(och_kafka_kubectl get svc "kafka-${i}-external" -n "$ns" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"`
+  - L29: `och_kafka_metallb_external_lb_ips_csv() {`
+  - L38: `done < <(och_kafka_metallb_external_lb_ips_lines "$1" "$2")`
+  - L44: `och_kafka_subject_alt_name_openssl_value() {`
+  - L75: `och_kafka_emit_san_verify_dns_specs() {`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/kafka-kraft-quorum-ok.sh`
+  - L3: `# Usage: source this file and call och_kafka_kraft_quorum_ok [namespace]`
+  - L7: `och_kafka_kraft_quorum_ok() {`
+  - L20: `PROP=/tmp/och-kafka-quorum-gate.props`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/metallb-subnet-guard.sh`
+  - L5: `#   och_metallb_pool_first_ip "$METALLB_POOL"  → first IP in range string`
+  - L6: `#   och_ipv4_prefix "a.b.c.d" → a.b.c`
+  - L7: `#   och_colima_eth0_ipv4`
+  - L8: `#   och_k8s_node_internal_ipv4`
+  - L9: `#   och_assert_metallb_pool_coherent "$METALLB_POOL"  → exit 0 or 1 (stderr on failure)`
+  - L11: `och_ipv4_prefix() {`
+  - L22: `och_metallb_pool_first_ip() {`
+  - L31: `och_colima_eth0_ipv4() {`
+  - L37: `och_k8s_node_internal_ipv4() {`
+  - L43: `och_assert_metallb_pool_coherent() {`
+  - L50: `pool_ip="$(och_metallb_pool_first_ip "$pool")" || {`
+  - L54: `pool_p="$(och_ipv4_prefix "$pool_ip")" || return 1`
+  - L57: `vm_ip="$(och_colima_eth0_ipv4 || true)"`
+  - L59: `vm_p="$(och_ipv4_prefix "$vm_ip" || true)"`
+  - L64: `node_ip="$(och_k8s_node_internal_ipv4 || true)"`
+  - … *1 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/och-housing-docker-services-default.sh`
+  - L2: `# transport-watchdog: image only; rollouts map to deploy/api-gateway (see rebuild-och-images-and-rollout.sh).`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/och-kafka-event-topics-from-proto.sh`
+  - L2: `# Shared: derive OCH_KAFKA_EVENT_TOPICS from proto/events/*.proto (single source of truth with explicit exceptions).`
+  - L9: `#   OCH_KAFKA_EVENT_TOPICS — bash array of topic names (sorted unique)`
+  - L17: `och_kafka_event_topics_fill() {`
+  - L18: `OCH_KAFKA_EVENT_TOPICS=()`
+  - L56: `OCH_KAFKA_EVENT_TOPICS+=("$line")`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/och-sequential-rollout.sh`
+  - L8: `#     och_kubectl() { kctl "$@"; }`
+  - L11: `#   OCH_ROLLOUT_NS — app namespace (default off-campus-housing-tracker)`
+  - L13: `#   OCH_ROLLOUT_STATUS_TIMEOUT — seconds for each kubectl rollout status (default 180)`
+  - L15: `if ! declare -F och_kubectl >/dev/null 2>&1; then`
+  - L16: `och_kubectl() {`
+  - L21: `och_rollout_ordered_housing_apps() {`
+  - L22: `local ns="${OCH_ROLLOUT_NS:-off-campus-housing-tracker}"`
+  - L23: `local timeout="${OCH_ROLLOUT_STATUS_TIMEOUT:-180}"`
+  - L37: `if och_kubectl -n "$ns" get deploy "$d" >/dev/null 2>&1; then`
+  - L38: `och_kubectl -n "$ns" rollout restart "deploy/$d" >/dev/null 2>&1 \`
+  - L41: `och_kubectl -n "$ns" rollout status "deploy/$d" --timeout="${timeout}s" >/dev/null 2>&1 \`
+  - L48: `och_rollout_caddy_last() {`
+  - L50: `local timeout="${OCH_ROLLOUT_STATUS_TIMEOUT:-180}"`
+  - L51: `if och_kubectl -n "$ns_ing" get deploy caddy-h3 >/dev/null 2>&1; then`
+  - L52: `och_kubectl -n "$ns_ing" rollout restart deploy/caddy-h3 >/dev/null 2>&1 \`
+  - … *1 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/patch-kafka-external-host.sh`
+  - L44: `RAW=$(kubectl run och-resolve-kafka-host --rm -i --restart=Never --image=busybox:1.36 -n off-campus-housing-tracker -- \`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/perf/build-canonical-bundle.sh`
+  - L10: `#   SKIP_ZIP=1        — only create och-perf-canonical-10-v2 + summary.json`
+  - L18: `#   och-perf-canonical-10-v2/ — exactly 10 named files`
+  - L20: `#   perf-bundle-<STAMP>.zip   — och-perf-canonical-10-v2/ + summary.json`
+  - L38: `OUT="$RUN_DIR/och-perf-canonical-10-v2"`
+  - L154: `out_dir = run_dir / "och-perf-canonical-10-v2"`
+  - L184: `"schema": "och-perf-canonical-10-v2",`
+  - L225: `(cd "$RUN_DIR" && zip -q -r "perf-bundle-${STAMP}.zip" "och-perf-canonical-10-v2" summary.json)`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/preflight-kafka-k8s-rollout.sh`
+  - L39: `} > /tmp/och-pf.props'`
+  - L43: `kafka-topics --bootstrap-server $BS --command-config /tmp/och-pf.props --list | head -25`
+  - L44: `echo --- total: \$(kafka-topics --bootstrap-server $BS --command-config /tmp/och-pf.props --list | wc -l | tr -d \" \") topics ---`
+  - L50: `kafka-topics --bootstrap-server $BS --command-config /tmp/och-pf.props --describe --topic $SAMPLE_TOPIC" 2>/dev/null; then`
+  - L55: `kafka-topics --bootstrap-server $BS --command-config /tmp/och-pf.props --list | head -1")"`
+  - L58: `kafka-topics --bootstrap-server $BS --command-config /tmp/och-pf.props --describe --topic \"$ft\""`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/protocol/test-service-protocol.sh`
+  - L200: `# shellcheck source=scripts/lib/ensure-och-grpc-certs.sh`
+  - L201: `[[ -f "$SCRIPT_DIR/../lib/ensure-och-grpc-certs.sh" ]] && source "$SCRIPT_DIR/../lib/ensure-och-grpc-certs.sh" && och_sync_grpc_certs_to_dir "$grpc_certs_dir" "$NS" 2>/dev/null || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rebuild-all-housing-images-k3s.sh`
+  - L12: `# Same env as rebuild-och-images-and-rollout.sh / build-housing-images-k3s.sh (IMAGE_TAG, DOCKER_DEFAULT_PLATFORM, …).`
+  - L18: `# shellcheck source=lib/och-housing-docker-services-default.sh`
+  - L19: `source "$SCRIPT_DIR/lib/och-housing-docker-services-default.sh"`
+  - L24: `exec "$SCRIPT_DIR/rebuild-och-images-and-rollout.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rebuild-och-images-and-rollout.sh`
+  - L6: `#   ./scripts/rebuild-och-images-and-rollout.sh`
+  - L7: `#   SERVICES=api-gateway ./scripts/rebuild-och-images-and-rollout.sh   # gateway only`
+  - L8: `#   SERVICES=listings-service ./scripts/rebuild-och-images-and-rollout.sh`
+  - L9: `#   SERVICES=trust-service ./scripts/rebuild-och-images-and-rollout.sh`
+  - L10: `#   SERVICES="auth-service analytics-service" ./scripts/rebuild-och-images-and-rollout.sh`
+  - L11: `#   SERVICES="media-service listings-service" SKIP_LOAD=1 ./scripts/rebuild-och-images-and-rollout.sh   # build only`
+  - L12: `#   SERVICES="api-gateway,listings-service" ./scripts/rebuild-och-images-and-rollout.sh   # commas OK too`
+  - L14: `#   ROLLOUT=0 ./scripts/rebuild-och-images-and-rollout.sh   # build/load only, no kubectl restart`
+  - L15: `#   WAIT_ROLLOUT=0 ./scripts/rebuild-och-images-and-rollout.sh   # skip rollout status wait`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rebuild-traffic-control-stack.sh`
+  - L11: `exec "$ROOT/scripts/rebuild-och-images-and-rollout.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/recycle-och-postgres-compose.sh`
+  - L9: `#   ./scripts/recycle-och-postgres-compose.sh`
+  - L121: `echo "  ./scripts/rollout-restart-och-after-pool-tuning.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/reissue-ca-and-leaf-load-all-services.sh`
+  - L8: `# och-service-tls (alias of service-tls for Deployments that mount och-service-tls — auth, listings, …; keeps mTLS trust aligned with api-gateway),`
+  - L29: `#   OCH_ROLLOUT_STATUS_TIMEOUT — seconds for each kubectl rollout status during step 7 (default 180; dev-onboard strict sets 300).`
+  - L573: `# api-gateway mounts service-tls; auth and most services mount och-service-tls — must match or gRPC mTLS /readyz fails (wrong CA).`
+  - L574: `log_progress "step 2c: syncing och-service-tls from service-tls…"`
+  - L579: `_kubectl_step2 -n "$NS_APP" create secret generic och-service-tls \`
+  - L584: `ok "och-service-tls synced from service-tls (alias)"`
+  - L586: `warn "Could not read service-tls to sync och-service-tls"`
+  - L753: `och_kubectl() { kctl "$@"; }`
+  - L754: `# shellcheck source=scripts/lib/och-sequential-rollout.sh`
+  - L755: `source "$SCRIPT_DIR/lib/och-sequential-rollout.sh"`
+  - L756: `OCH_ROLLOUT_NS="$NS_APP" NS_ING="$NS_ING" och_rollout_ordered_housing_apps`
+  - L757: `unset -f och_kubectl 2>/dev/null || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/restore-external-postgres-from-backup.sh`
+  - L44: `och_terminate_db_sessions() {`
+  - L58: `och_terminate_db_sessions "$port" "$db"`
+  - L66: `och_terminate_db_sessions "$port" "$db"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rollout-deferred-after-kafka-tls.sh`
+  - L5: `# Env: HOUSING_NS, NS_ING (default ingress-nginx), OCH_ROLLOUT_STATUS_TIMEOUT`
+  - L9: `# shellcheck source=scripts/lib/och-sequential-rollout.sh`
+  - L10: `source "$SCRIPT_DIR/lib/och-sequential-rollout.sh"`
+  - L12: `och_kubectl() {`
+  - L16: `export OCH_ROLLOUT_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L19: `echo "=== rollout-deferred-after-kafka-tls (ns=$OCH_ROLLOUT_NS) ==="`
+  - L20: `och_rollout_ordered_housing_apps`
+  - L21: `och_rollout_caddy_last`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rollout-restart-och-after-pool-tuning.sh`
+  - L6: `#   ./scripts/rollout-restart-och-after-pool-tuning.sh`
+  - L10: `#   OCH_NS   — default off-campus-housing-tracker`
+  - L16: `OCH_NS="${OCH_NS:-off-campus-housing-tracker}"`
+  - L20: `OCH_DEPLOYMENTS=(`
+  - L46: `echo "Rollout restart: ${OCH_DEPLOYMENTS[*]} -n $OCH_NS"`
+  - L47: `"$KUBECTL" rollout restart deployment "${OCH_DEPLOYMENTS[@]}" -n "$OCH_NS"`
+  - L48: `for d in "${OCH_DEPLOYMENTS[@]}"; do`
+  - L49: `"$KUBECTL" rollout status "deployment/$d" -n "$OCH_NS" --timeout=300s`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rollout-restart-och-full-stack.sh`
+  - L11: `#   api-gateway → caddy-h3 (see scripts/lib/och-sequential-rollout.sh).`
+  - L17: `#   OCH_ROLLOUT_STATUS_TIMEOUT — seconds per rollout status (default 180)`
+  - L28: `echo "=== rollout-restart-och-full-stack (ns=$HOUSING_NS, ingress=$NS_ING) ==="`
+  - L31: `echo "▶ ensure-housing-cluster-secrets (och-kafka-ssl-secret + och-service-tls aliases)"`
+  - L40: `echo "✅ rollout-restart-och-full-stack complete"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-all-test-suites.sh`
+  - L189: `if [[ -f "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh" ]]; then`
+  - L190: `# shellcheck source=scripts/lib/ensure-och-grpc-certs.sh`
+  - L191: `source "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh"`
+  - L192: `och_sync_grpc_certs_to_dir "${GRPC_CERTS_DIR:-/tmp/grpc-certs}" "${HOUSING_NS:-off-campus-housing-tracker}" || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-housing-k6-edge-smoke.sh`
+  - L9: `#   - Hostname must resolve (e.g. /etc/hosts: <MetalLB IP> off-campus-housing.test) — see scripts/lib/edge-test-url.sh, OCH_AUTO_EDGE_HOSTS=1`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-preflight-scale-and-all-suites.sh`
+  - L78: `#   - PREFLIGHT_KAFKA_TLS_PREFLIGHT_JOB=1 — after 6a2c, run infra/k8s/kafka-certs/kafka-tls-preflight-job.yaml (in-cluster mTLS to headless :9093). Default 0 (opt-in: slower, needs brokers + och-ka…`
+  - L96: `#     OCH_EDGE_IP=<MetalLB-or-NodeIP> — when DNS fails, scripts/lib/edge-test-url.sh prints curl --resolve hints.`
+  - L97: `#     OCH_AUTO_EDGE_HOSTS=1 — if DNS fails, append "$OCH_EDGE_IP hostname" to /etc/hosts (needs sudo on non-root).`
+  - L98: `#       Discovers IP from kubectl LoadBalancer services when OCH_EDGE_IP unset.`
+  - L104: `#     smoke (matches GitHub och-ci `transport-validation` job: py_compile + exit 2 / "no pcap provided").`
+  - L223: `#     rebuild-och-images-and-rollout.sh; cert/JKS preflight bootstrap (step 1c).`
+  - L226: `#   Rebuild after code: one backend SERVICES=<n> ./scripts/rebuild-och-images-and-rollout.sh or pnpm rebuild:service:*;`
+  - L227: `#     several backends SERVICES="a b" .../rebuild-och-images-and-rollout.sh; webapp + default listings`
+  - L330: `#   3a0   Auto housing secrets: ensure-housing-cluster-secrets.sh (service-tls/dev-root-ca, och-service-tls alias,`
+  - L331: `#         och-kafka-ssl-secret). On by default; PREFLIGHT_AUTO_ENSURE_CLUSTER_SECRETS=0 or SKIP_AUTO_CLUSTER_SECRETS=1 to skip.`
+  - L442: `OCH_PREFLIGHT_DEPLOY_ARR=()`
+  - L444: `IFS=' ' read -r -a OCH_PREFLIGHT_DEPLOY_ARR <<< "$PREFLIGHT_APP_DEPLOYS"`
+  - L701: `for _svc in "${OCH_PREFLIGHT_DEPLOY_ARR[@]}"; do`
+  - L839: `say "9b. Canonical perf bundle (och-perf-canonical-10-v2 + summary.json + zip) → $PREFLIGHT_RUN_DIR"`
+  - L880: `canon = os.path.join(run_dir, "och-perf-canonical-10-v2")`
+  - … *10 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/service-tls-alias-guard.sh`
+  - L2: `# Fail if service-tls and och-service-tls ca.crt fingerprints differ (mTLS drift: api-gateway vs auth, etc.).`
+  - L28: `for s in service-tls och-service-tls; do`
+  - L36: `_b="$(kubectl get secret och-service-tls -n "$NS" -o jsonpath='{.data.ca\.crt}' --request-timeout=20s | base64 -d | _fp)"`
+  - L39: `bad "Could not read ca.crt from service-tls and/or och-service-tls"`
+  - L44: `echo "   och-service-tls ca.crt SHA-256=$_b"`
+  - L51: `ok "service-tls and och-service-tls ca.crt match"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/setup-new-colima-cluster.sh`
+  - L82: `if ! och_assert_metallb_pool_coherent "$METALLB_POOL"; then`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/slo/check-error-budget.js`
+  - L11: `*   OCH_SLO_TARGET      — decimal availability target (default: 0.995)`
+  - L21: `const SLO_TARGET = Number(process.env.OCH_SLO_TARGET || "0.995");`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-booking-http2-http3.sh`
+  - L24: `for _sec in och-service-tls service-tls; do`
+  - L115: `for _sec in och-service-tls service-tls; do`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-microservices-http2-http3-housing.sh`
+  - L194: `if [[ -f "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh" ]]; then`
+  - L195: `# shellcheck source=scripts/lib/ensure-och-grpc-certs.sh`
+  - L196: `source "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh"`
+  - L197: `och_sync_grpc_certs_to_dir "$grpc_cert_dir" "$NS" 2>/dev/null || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-packet-capture-standalone.sh`
+  - L90: `if [[ -f "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh" ]]; then`
+  - L91: `# shellcheck source=scripts/lib/ensure-och-grpc-certs.sh`
+  - L92: `source "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh"`
+  - L93: `och_sync_grpc_certs_to_dir "$GRPC_CERTS_DIR" "$NS" 2>/dev/null || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-tls-mtls-comprehensive.sh`
+  - L82: `# mTLS client certs: sync from cluster och-service-tls (or repo leaf) — never rely on missing certs/tls.crt in repo root.`
+  - L84: `if [[ -f "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh" ]]; then`
+  - L85: `# shellcheck source=scripts/lib/ensure-och-grpc-certs.sh`
+  - L86: `source "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh"`
+  - L87: `och_sync_grpc_certs_to_dir "$GRPC_CERTS_DIR" "$NS" || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/tls-k8s-secrets-expiry.sh`
+  - L17: `echo "och_tls_cert_days_remaining{namespace=\"$ns\",secret=\"$sec\"} $days"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/transport/http3-concurrent-curl-stress.sh`
+  - L5: `#   OCH_H3_URL=https://off-campus-housing.test/api/healthz \`
+  - L6: `#   OCH_H3_CA=certs/dev-root.pem \`
+  - L14: `URL="${OCH_H3_URL:-https://off-campus-housing.test/api/healthz}"`
+  - L15: `CA="${OCH_H3_CA:-certs/dev-root.pem}"`
+  - L19: `echo "Missing CA file: $CA (set OCH_H3_CA)" >&2`
+  - L33: `tmp="$(mktemp -d "${TMPDIR:-/tmp}/och-h3-stress.XXXXXX")"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/validate-kafka-stack-contract.sh`
+  - L6: `#   REPO_ROOT, ENV_PREFIX (default dev), OCH_KAFKA_TOPIC_SUFFIX (optional)`
+  - L10: `#   OCH_KAFKA_REQUIRE_QUORUM_3=1 — same as KAFKA_CONTRACT_MIN_BROKERS=3 (k8s KRaft / production gate)`
+  - L32: `[[ "${OCH_KAFKA_REQUIRE_QUORUM_3:-0}" == "1" ]] && _req_brokers=3`
+  - L67: `# --- Static: no OCH_KAFKA_DISABLED in TS sources`
+  - L69: `fail "OCH_KAFKA_DISABLED must not appear in services/scripts TypeScript"`
+  - L71: `pass "No OCH_KAFKA_DISABLED in TS sources"`
+  - L149: `[[ "${OCH_KAFKA_REQUIRE_QUORUM_3:-0}" == "1" ]] && [[ "$_k8s_min_brokers" -eq 0 ]] && _k8s_min_brokers=3`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-caddy-grpc-routing.sh`
+  - L58: `if [[ -f "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh" ]]; then`
+  - L59: `# shellcheck source=scripts/lib/ensure-och-grpc-certs.sh`
+  - L60: `source "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh"`
+  - L61: `och_sync_grpc_certs_to_dir "$GRPC_SYNC_DIR" off-campus-housing-tracker || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-deletion-flow.sh`
+  - L88: `HTTP_CODE="$(curl -sS -o /tmp/och_del_account.json -w "%{http_code}" -X DELETE "${AUTH_BASE}/account" \`
+  - L90: `BODY="$(cat /tmp/och_del_account.json)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-kafka-cluster.sh`
+  - L16: `#   Compares SHA-256 fingerprints of ca-cert.pem in kafka-ssl-secret vs och-kafka-ssl-secret.`
+  - L18: `#   VERIFY_KAFKA_CHECK_CLIENT_DEPLOY_MOUNTS=1 — require listed Deployments to reference och-kafka-ssl-secret (after deploy-dev).`
+  - L77: `if ! kubectl get deploy "$_d" -n "$NS" -o yaml --request-timeout=25s | grep -q "secretName: och-kafka-ssl-secret"; then`
+  - L78: `bad "Deployment $_d does not mount secret och-kafka-ssl-secret"`
+  - L81: `ok "Deployment $_d references och-kafka-ssl-secret"`
+  - L162: `say "Phase 6a2c6 — CA fingerprint consistency (kafka-ssl-secret vs och-kafka-ssl-secret) + broker chain"`
+  - L167: `kubectl get secret och-kafka-ssl-secret -n "$NS" -o jsonpath='{.data.ca-cert\.pem}' --request-timeout=25s | base64 -d >"$_tmp/service-ca.pem"`
+  - L170: `bad "Missing ca-cert.pem or kafka-broker.pem in secrets (kafka-ssl-secret / och-kafka-ssl-secret)"`
+  - L176: `bad "CA fingerprint mismatch — broker secret vs och-kafka-ssl-secret (Node clients will reject broker TLS)"`
+  - L178: `echo "   och-kafka-ssl-secret ca: ${_sfp:-?}" >&2`
+  - L212: `say "Phase 6a2c6b — Deployments must reference och-kafka-ssl-secret"`
+  - L221: `if ! kubectl get deploy "$_d" -n "$NS" -o yaml --request-timeout=25s | grep -q "secretName: och-kafka-ssl-secret"; then`
+  - L222: `bad "Deployment $_d does not mount secret och-kafka-ssl-secret"`
+  - L225: `ok "Deployment $_d references och-kafka-ssl-secret"`
+  - L249: `PROP=/tmp/och-kafka-ritual-quorum.props`
+  - … *1 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-kafka-event-topic-partitions.sh`
+  - L24: `# shellcheck source=lib/och-kafka-event-topics-from-proto.sh`
+  - L25: `source "$SCRIPT_DIR/lib/och-kafka-event-topics-from-proto.sh"`
+  - L26: `och_kafka_event_topics_fill || fail "Could not build topic list from proto/events"`
+  - L27: `TOPICS=("${OCH_KAFKA_EVENT_TOPICS[@]}")`
+  - L50: `} > /tmp/och-kafka-verify.props'`
+  - L54: `out="$(kubectl exec -n "$_ns" "$_pod" -- kafka-topics --bootstrap-server "$_bs" --command-config /tmp/och-kafka-verify.props --describe --topic "$t" 2>/dev/null | head -8 || true)"`
+  - L97: `} > /tmp/och-kafka-verify.props`
+  - L104: `kafka-topics --bootstrap-server localhost:9093 --command-config /tmp/och-kafka-verify.props --describe --topic "$KAFKA_TOPIC" 2>/dev/null | head -8`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-kafka-kraft-e2e.sh`
+  - L87: `OCH_KAFKA_TOPIC_SUFFIX="${OCH_KAFKA_TOPIC_SUFFIX:-}" \`
+  - L216: `} > /tmp/och-kraft-describe.props`
+  - L217: `kafka-topics --bootstrap-server kafka-0.kafka:9093 --command-config /tmp/och-kraft-describe.props --describe`
+  - L253: `OCH_KAFKA_REQUIRE_QUORUM_3=1 \`
+  - L260: `bash "$SCRIPT_DIR/validate-kafka-stack-contract.sh" >/tmp/och-kraft-preflight-fail.out 2>/tmp/och-kraft-preflight-fail.err`
+  - L264: `grep -q 'ERROR: Kafka quorum' /tmp/och-kraft-preflight-fail.err 2>/dev/null || grep -q 'ERROR: Kafka quorum' /tmp/och-kraft-preflight-fail.out 2>/dev/null || \`
+  - L265: `warn "Gate failed (exit $_pe) but exact ERROR line not found in captured output (check /tmp/och-kraft-preflight-fail.err)"`
+  - L296: `_topic="${KRAFT_E2E_SMOKE_TOPIC:-och-kraft-e2e-smoke}"`
+  - L309: `} > /tmp/och-smoke.props`
+  - L310: `kafka-topics --bootstrap-server kafka-0.kafka:9093 --command-config /tmp/och-smoke.props --create --if-not-exists --topic ${_topic} --replication-factor 3 --partitions 1`
+  - L325: `} > /tmp/och-smoke.props`
+  - L326: `echo '${_msg}' | kafka-console-producer --bootstrap-server kafka-0.kafka:9093 --producer.config /tmp/och-smoke.props --topic ${_topic}`
+  - L340: `} > /tmp/och-smoke.props`
+  - L341: `timeout 25 kafka-console-consumer --bootstrap-server kafka-1.kafka:9093 --consumer.config /tmp/och-smoke.props --topic ${_topic} --from-beginning --max-messages 1 2>/dev/null | tail -1`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-kafka-tls-sans.sh`
+  - L104: `done < <(och_kafka_emit_san_verify_dns_specs "$NS" "$REPLICAS")`
+  - L120: `done < <(och_kafka_metallb_external_lb_ips_lines "$NS" "$REPLICAS")`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-network-coherence.sh`
+  - L61: `_vm="$(och_colima_eth0_ipv4 || true)"`
+  - L62: `_node="$(och_k8s_node_internal_ipv4 || true)"`
+  - L66: `_vp="$(och_ipv4_prefix "$_vm" || true)"`
+  - L67: `_np="$(och_ipv4_prefix "$_node" || true)"`
+  - L86: `if ! och_assert_metallb_pool_coherent "$_pool_raw"; then`
+  - L119: `_kp="$(och_ipv4_prefix "$_bpfx" || true)"`
+  - L121: `_first="$(och_metallb_pool_first_ip "${_pool_raw// /}" || true)"`
+  - L122: `_poolpfx="$(och_ipv4_prefix "$_first" || true)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-preflight-edge-routing.sh`
+  - L8: `#   HOUSING_NS, OCH_EDGE_HOSTNAME (default off-campus-housing.test)`
+  - L13: `#   OCH_EDGE_IP — if set to an IPv4, use for 6b2 LB alignment instead of resolving HOST (optional override)`
+  - L26: `HOST="${2:-${OCH_EDGE_HOSTNAME:-off-campus-housing.test}}"`
+  - L62: `_jf="$(mktemp "${TMPDIR:-/tmp}/och-edge-ing.XXXXXX.json")"`
+  - L157: `if [[ -n "${OCH_EDGE_IP:-}" ]] && [[ "${OCH_EDGE_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then`
+  - L158: `EDGE_IP="${OCH_EDGE_IP}"`
+  - L159: `ok "Using OCH_EDGE_IP=$EDGE_IP for alignment check"`
+  - L164: `bad "Could not resolve IPv4 for $HOST (tried Python socket, getent, ping, dig). Fix /etc/hosts or DNS (see OCH_EDGE_IP)."`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-proto-events-topics.sh`
+  - L30: `grep -q 'och-kafka-event-topics-from-proto.sh' "$TOPIC_SCRIPT" || fail "$TOPIC_SCRIPT must source scripts/lib/och-kafka-event-topics-from-proto.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-proto-topic-alignment.sh`
+  - L3: `# implemented in scripts/lib/och-kafka-event-topics-from-proto.sh. Fails on drift (new proto without wiring).`
+  - L6: `#   ENV_PREFIX=dev  OCH_KAFKA_TOPIC_SUFFIX=   PROTO_EVENTS_ROOT=... (optional)`
+  - L19: `raw="${OCH_KAFKA_TOPIC_SUFFIX:-}"`
+  - L25: `# shellcheck source=lib/och-kafka-event-topics-from-proto.sh`
+  - L26: `source "$SCRIPT_DIR/lib/och-kafka-event-topics-from-proto.sh"`
+  - L27: `och_kafka_event_topics_fill || fail "Could not build topic list from proto/events"`
+  - L29: `och_topic_list_contains() {`
+  - L31: `for t in "${OCH_KAFKA_EVENT_TOPICS[@]}"; do`
+  - L45: `och_topic_list_contains "messaging.events.v1" || fail "messaging.proto must map to topic messaging.events.v1"`
+  - L48: `och_topic_list_contains "$exp" || fail "Proto $base.proto expects Kafka topic '$exp' in derived topic set (got ${#OCH_KAFKA_EVENT_TOPICS[@]} topics)"`
+  - L52: `och_topic_list_contains "${ENV_PREFIX}.booking.events.v1${SUF}" || fail "Missing ${ENV_PREFIX}.booking.events.v1${SUF}"`
+  - L53: `och_topic_list_contains "${ENV_PREFIX}.messaging.dlq${SUF}" || fail "Missing ${ENV_PREFIX}.messaging.dlq${SUF}"`
+  - L55: `ok "proto/events ↔ Kafka topic naming contract OK (${#OCH_KAFKA_EVENT_TOPICS[@]} topics, ENV_PREFIX=$ENV_PREFIX)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/wait-for-all-services-ready.sh`
+  - L5: `# Self-heal path can delete stuck Pending pods; default OFF (set OCH_WAIT_ALLOW_STUCK_POD_DELETE=1 to enable).`
+  - L41: `_och_apps=$(och_list_app_deployments "$NS" | tr '\n' ' ')`
+  - L208: `if [[ "${OCH_WAIT_ALLOW_STUCK_POD_DELETE:-0}" == "1" ]]; then`
+  - L212: `log "    ⚠️  Pod stuck in $phase (OCH_WAIT_ALLOW_STUCK_POD_DELETE=1 to delete)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/wait-for-docker-compose-kafka-strict-ready.sh`
+  - L6: `#   REPO_ROOT, ENV_PREFIX (default dev), OCH_KAFKA_TOPIC_SUFFIX (optional)`
+
+## K8s `namespace:` lines (YAML)
+
+*Raw namespace: declarations*
+
+**Hits:** 33 (capped per file in scanner)
+
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka-ca-exporter/configmap.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka-ca-exporter/deployment.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka-ca-exporter/rbac.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+  - L13: `namespace: off-campus-housing-tracker`
+  - L24: `namespace: off-campus-housing-tracker`
+  - L32: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka-ca-exporter/service.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka-external/external-service.yaml`
+  - L12: `namespace: off-campus-housing-tracker`
+  - L25: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka/deploy.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka/external-service.yaml`
+  - L7: `namespace: off-campus-housing-tracker`
+  - L20: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/base/kafka/service.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/certificates/kafka-0-cert.yaml`
+  - L6: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/certificates/kafka-1-cert.yaml`
+  - L6: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/certificates/kafka-2-cert.yaml`
+  - L6: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/kafka-tls-preflight-job.yaml`
+  - L9: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/external-services.yaml`
+  - L8: `namespace: off-campus-housing-tracker`
+  - L23: `namespace: off-campus-housing-tracker`
+  - L38: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/headless-service.yaml`
+  - L5: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/kafka-metallb-alignment-exporter.yaml`
+  - L7: `namespace: off-campus-housing-tracker`
+  - L13: `namespace: off-campus-housing-tracker`
+  - L29: `namespace: off-campus-housing-tracker`
+  - L37: `namespace: off-campus-housing-tracker`
+  - L43: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/kafka-pdb.yaml`
+  - L7: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/kustomization.yaml`
+  - L33: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/rbac-kafka-svc-reader.yaml`
+  - L7: `namespace: off-campus-housing-tracker`
+  - L14: `namespace: off-campus-housing-tracker`
+  - L26: `namespace: off-campus-housing-tracker`
+  - L35: `namespace: off-campus-housing-tracker`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-kraft-metallb/statefulset.yaml`
+  - L12: `namespace: off-campus-housing-tracker`
+
+## Cert / SAN hints
+
+*x509-ish strings mentioning OCH hosts*
+
+**Hits:** 19 (capped per file in scanner)
+
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/generate-kafka-ci-tls.sh`
+  - L28: `-subj "/CN=och-kafka-ci-ca/O=off-campus-housing-ci" \`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/dev-generate-certs.sh`
+  - L38: `-out "$CERTS/dev-root.pem" -subj "/CN=dev-root-ca/O=off-campus-housing-dev" 2>/dev/null`
+  - L53: `-subj "/CN=${HOST}/O=off-campus-housing-tracker" 2>/dev/null`
+  - L69: `-subj "/CN=messaging-service/O=off-campus-housing-dev" 2>/dev/null`
+  - L78: `-subj "/CN=media-service/O=off-campus-housing-dev" 2>/dev/null`
+  - L88: `-subj "/CN=kafka-client/O=off-campus-housing-dev" 2>/dev/null`
+  - L105: `-subj "/CN=kafka/O=off-campus-housing-dev" 2>/dev/null`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/generate-envoy-client-cert.sh`
+  - L36: `-subj "/CN=envoy/O=off-campus-housing-tracker" 2>/dev/null`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-ssl-from-dev-root.sh`
+  - L82: `-subj "/CN=${CN}/O=off-campus-housing-tracker" 2>/dev/null`
+  - L134: `-subj "/CN=kafka-client/O=off-campus-housing-tracker" 2>/dev/null`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/run-k6-phases.sh`
+  - L29: `# BASE_URL: always use hostname for strict TLS (cert SAN has DNS:off-campus-housing.test, not IP).`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/reissue-ca-and-leaf-load-all-services.sh`
+  - L202: `-subj "/CN=dev-root-ca/O=off-campus-housing-tracker" 2>/dev/null`
+  - L207: `-subj "/CN=${HOST}/O=off-campus-housing-tracker" 2>/dev/null`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rotation-suite.sh`
+  - L187: `-subj "/CN=dev-root-ca/O=off-campus-housing-tracker" >/dev/null 2>&1 || fail "Failed to generate CA certificate"`
+  - L232: `-subj "/CN=$HOST/O=off-campus-housing-tracker" >/dev/null 2>&1 || fail "Failed to create CSR"`
+  - L527: `openssl req -new -key "$ENVOY_CLIENT_KEY" -out "$TMP/envoy.csr" -subj "/CN=envoy/O=off-campus-housing-tracker" 2>/dev/null && \`
+  - L1692: `log_info "Certificate verified above: issuer = dev CA (CN=dev-root-ca, O=off-campus-housing-tracker); subject = CN=off-campus-housing.test."`
+  - L2157: `ok "✅ Certificate is from dev CA (CN=dev-root-ca, O=off-campus-housing-tracker)"`
+  - L2190: `ok "  ✅ CA certificate confirmed (CN=dev-root-ca, O=off-campus-housing-tracker)"`
+
+## Hardcoded gateway / legacy ports
+
+*4020-style ports (RP api-gateway default is :4000)*
+
+**Hits:** 21 (capped per file in scanner)
+
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/smoke-api-gateway.sh`
+  - L2: `# In-cluster HTTP smoke: api-gateway /healthz (port 4020). Requires kubectl + reachable api-gateway Service.`
+  - L8: `PORT="${API_GATEWAY_PORT:-4020}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/diagnose-k6-edge-connectivity.sh`
+  - L3: `# Caddy (ingress-nginx ns) routes /api/* and /auth/* to api-gateway:4020 (see infra/k8s/caddy-h3-configmap.yaml).`
+  - L74: `echo "  kubectl -n $HOUSING_NS port-forward svc/api-gateway 4020:4020"`
+  - L75: `echo "  curl -sS http://127.0.0.1:4020/healthz   # gateway liveness (no TLS)"`
+  - L76: `echo "  curl -sS http://127.0.0.1:4020/api/healthz"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/edge-readiness-gate.sh`
+  - L53: `sh -c 'if command -v curl >/dev/null 2>&1; then curl -gfsS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 15 http://127.0.0.1:4020/healthz; elif command -v wget >/dev/null 2>&1; then…`
+  - L62: `sh -c 'if command -v curl >/dev/null 2>&1; then curl -gfsS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 25 http://127.0.0.1:4020/readyz; elif command -v wget >/dev/null 2>&1; then …`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k6/k6-smoke-gateway.js`
+  - L15: `"http://api-gateway.off-campus-housing-tracker.svc.cluster.local:4020";`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/edge-test-url.sh`
+  - L2: `# Shared helpers: edge-only E2E / k6 (https://off-campus-housing.test), no port-forward / :4020.`
+  - L15: `if [[ "$raw" =~ ^http://127\.0\.0\.1:4020 ]] || [[ "$raw" =~ ^http://localhost:4020 ]]; then`
+  - L16: `echo "⚠️  Ignoring legacy E2E_API_BASE=$raw (port-forward / :4020 removed). Using $EDGE_TEST_DEFAULT_BASE" >&2`
+  - L35: `if [[ "$raw" =~ ^http://127\.0\.0\.1:4020 ]] || [[ "$raw" =~ ^http://localhost:4020 ]]; then`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rollout-caddy.sh`
+  - L49: `# Apply Caddy ConfigMap from repo root Caddyfile (api-gateway:4020, auth:4011 per README; gRPC h2c://envoy-test:10000)`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-playwright-e2e-preflight.sh`
+  - L5: `# No kubectl port-forward; no http://127.0.0.1:4020 — legacy E2E_API_BASE values are ignored.`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-preflight-scale-and-all-suites.sh`
+  - L76: `#   - PREFLIGHT_SKIP_EDGE_ROUTING_GATES=1 — skip 6b1–6b2 (Ingress /api+/auth→api-gateway:4020 order, DNS→caddy-h3 or ingress-nginx-controller LB). Fixes silent k6 0-byte runs from edge drift.`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-lb-coordinated.sh`
+  - L97: `info "  Diagnose (HAProxy pod has no curl): kubectl run curl-diagnose --rm -i --restart=Never -n $NS_APP --image=curlimages/curl:latest -- curl -s -o /dev/null -w '%{http_code}' http://api-gateway.…`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-preflight-edge-routing.sh`
+  - L80: `("/api", "Prefix", "api-gateway", 4020),`
+  - L81: `("/auth", "Prefix", "api-gateway", 4020),`
+  - L152: `ok "Ingress: /api + /auth → api-gateway:4020, / → nginx:8080 (ordered before catch-all /)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/webapp-playwright-strict-edge.sh`
+  - L7: `#   E2E_API_BASE   — https only (default https://off-campus-housing.test); :4020 / http localhost rejected`
+
+## HOUSING / legacy env
+
+*Environment variables and assignments*
+
+**Hits:** 236 (capped per file in scanner)
+
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/Makefile`
+  - L363: `HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash $(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh`
+  - L373: `HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash $(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh`
+  - L391: `HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash $(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh`
+  - L407: `HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash $(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh`
+  - L425: `HOUSING_NS=$(HOUSING_NS) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash $(REPO_ROOT)/scripts/kafka-auto-heal-inter-broker-tls.sh`
+  - L446: `k8s-diagnose-restarts: ## Pods with restarts: namespace events, per-container describe + logs (HOUSING_NS=…)`
+  - L498: `HOUSING_NS=$(HOUSING_NS) KAFKA_TLS_ATOMIC_BEFORE_REFRESH=$(KAFKA_TLS_ATOMIC_BEFORE_REFRESH) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash $(SCRIPTS)/apply-kafka-kraft-staged.sh`
+  - L511: `KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) HOUSING_NS=$(HOUSING_NS) bash $(SCRIPTS)/kafka-tls-guard.sh`
+  - L515: `KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) HOUSING_NS=$(HOUSING_NS) bash $(SCRIPTS)/kafka-tls-rotate-atomic.sh`
+  - L522: `HOUSING_NS=$(HOUSING_NS) bash $(SCRIPTS)/kafka-quorum-stable.sh`
+  - L526: `HOUSING_NS=$(HOUSING_NS) bash $(SCRIPTS)/service-tls-alias-guard.sh`
+  - L530: `NS_ING=$(NS_ING) HOUSING_NS=$(HOUSING_NS) bash $(SCRIPTS)/edge-readiness-gate.sh`
+  - L535: `NS_ING=$(NS_ING) HOUSING_NS=$(HOUSING_NS) OCH_ROLLOUT_STATUS_TIMEOUT=$(OCH_ROLLOUT_STATUS_TIMEOUT) SKIP_ENSURE_CLUSTER_SECRETS=$(SKIP_ENSURE_CLUSTER_SECRETS) bash $(SCRIPTS)/rollout-restart-och-ful…`
+  - L543: `HOUSING_NS=$(HOUSING_NS) bash $(SCRIPTS)/ensure-housing-cluster-secrets.sh`
+  - L544: `HOUSING_NS=$(HOUSING_NS) KAFKA_TLS_ATOMIC_BEFORE_REFRESH=$(KAFKA_TLS_ATOMIC_BEFORE_REFRESH) $(MAKE) apply-kafka-kraft`
+  - … *3 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/infra/k8s/kafka-certs/README.md`
+  - L24: `HOUSING_NS=off-campus-housing-tracker bash scripts/verify-kafka-tls-sans.sh`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/apply-kafka-kraft-staged.sh`
+  - L11: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/auth-outbox-replay.sh`
+  - L11: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/bring-up-external-infra.sh`
+  - L38: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/chaos-kafka-alignment-stochastic.sh`
+  - L10: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L50: `HOUSING_NS="$NS" bash "$SCRIPT_DIR/kafka-refresh-tls-from-lb.sh"`
+  - L58: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only "$NS" "$REP"`
+  - L63: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --remediate "$NS" "$REP"`
+  - L66: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only "$NS" "$REP"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/chaos-kafka-broker.sh`
+  - L16: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/chaos-metallb-kafka-lb.sh`
+  - L13: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/check-all-pods-and-tls.sh`
+  - L81: `_KNS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L125: `HOUSING_CHECK_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/check-kafka-config-drift.sh`
+  - L12: `NS="${1:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/canary-pod-stability.sh`
+  - L3: `# Usage: HOUSING_NS=off-campus-housing-tracker CANARY_MAX_TOTAL_RESTARTS=50 ./scripts/ci/canary-pod-stability.sh`
+  - L6: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/hydrate-certs-for-ci.sh`
+  - L14: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/k6-smoke-incluster.sh`
+  - L6: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/post-deploy-verify.sh`
+  - L7: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L8: `export HOUSING_NS="$NS"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/smoke-api-gateway.sh`
+  - L3: `# Usage: HOUSING_NS=off-campus-housing-tracker ./scripts/ci/smoke-api-gateway.sh`
+  - L6: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ci/verify-k8s-images.sh`
+  - L18: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/cleanup-kafka-ops-cronjob-pods.sh`
+  - L11: `#   HOUSING_NS=off-campus-housing-tracker (default)`
+  - L14: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/colima-patch-app-config-db-host-to-gateway.sh`
+  - L12: `#   DB_HOST_GATEWAY_IP=192.168.5.2 HOUSING_NS=off-campus-housing-tracker ./scripts/colima-patch-app-config-db-host-to-gateway.sh`
+  - L18: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/compare-h2-h3-headers.sh`
+  - L45: `URL="https://off-campus-housing.test:443${TEST_PATH}"`
+  - L46: `RESOLVE="off-campus-housing.test:443:${TARGET_IP}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/dev-onboard-local.sh`
+  - L125: `_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L126: `HOUSING_NS="$_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"`
+  - L136: `HOUSING_NS="$_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"`
+  - L150: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"`
+  - L153: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}" bash "$SCRIPT_DIR/service-tls-alias-guard.sh"`
+  - L156: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}" bash "$SCRIPT_DIR/kafka-quorum-stable.sh"`
+  - L176: `NS_ING="${NS_ING:-ingress-nginx}" HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}" bash "$SCRIPT_DIR/edge-readiness-gate.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/diagnose-k6-edge-connectivity.sh`
+  - L8: `#   HOUSING_NS=off-campus-housing-tracker CA=certs/dev-root.pem ./scripts/diagnose-k6-edge-connectivity.sh`
+  - L13: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/diagnose-och-deployment.sh`
+  - L7: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/edge-readiness-gate.sh`
+  - L12: `NS_APP="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/enhanced-adversarial-tests.sh`
+  - L50: `# Get CA certificate for strict TLS (k6 and curl need this for off-campus-housing.test:30443; use absolute path for SSL_CERT_FILE)`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-housing-cluster-secrets.sh`
+  - L17: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L102: `if FORCE_TLS_RESTART="${FORCE_TLS_RESTART:-0}" HOUSING_NS="$HOUSING_NS" "$SCRIPT_DIR/ensure-strict-tls-mtls-preflight.sh"; then`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-ready-for-preflight.sh`
+  - L131: `_KNS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/ensure-strict-tls-mtls-preflight.sh`
+  - L14: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/export-kafka-ca-metric.sh`
+  - L9: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/golden-snapshot-verify.sh`
+  - L19: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k8s-diagnose-restarts.sh`
+  - L10: `NS="${1:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/k8s-rollout-och-ordered.sh`
+  - L4: `#   HOUSING_NS=off-campus-housing-tracker  (default)`
+  - L12: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-after-rollout-verify-brokers.sh`
+  - L7: `#   HOUSING_NS=off-campus-housing-tracker KAFKA_BROKER_REPLICAS=3 ./scripts/kafka-after-rollout-verify-brokers.sh`
+  - L13: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L36: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-auto-heal-inter-broker-tls.sh`
+  - L6: `#   HOUSING_NS=off-campus-housing-tracker KAFKA_BROKER_REPLICAS=3 ./scripts/kafka-auto-heal-inter-broker-tls.sh`
+  - L13: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L29: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-clean-slate.sh`
+  - L9: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-onboarding-reset.sh`
+  - L8: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-quorum-stable.sh`
+  - L13: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-refresh-tls-from-lb.sh`
+  - L15: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L17: `export HOUSING_NS="$NS"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-rolling-restart.sh`
+  - L12: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L45: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$R" bash "$SCRIPT_DIR/verify-kafka-cluster.sh" "$NS" "$R"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-runtime-sync.sh`
+  - L44: `NS="${POS_NS:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+  - L48: `export HOUSING_NS="$NS"`
+  - L58: `export HOUSING_NS="$NS"`
+  - L103: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-refresh-tls-from-lb.sh"`
+  - L121: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" || {`
+  - L127: `if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only "$NS" "$REP"; then`
+  - L141: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-sync-metallb.sh`
+  - L12: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L24: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-auto-heal-inter-broker-tls.sh" || exit 1`
+  - L27: `if HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-runtime-sync.sh" --check-only --quiet "$NS" "$REP"; then`
+  - L37: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \`
+  - L49: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-refresh-tls-from-lb.sh"`
+  - L63: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" || exit 1`
+  - L73: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-tls-guard.sh`
+  - L18: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/kafka-tls-rotate-atomic.sh`
+  - L10: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/edge-test-url.sh`
+  - L53: `local ns="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/grpc-utils.sh`
+  - L8: `echo "${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/http3.sh`
+  - L470: `: # MetalLB: keep off-campus-housing.test:443:LB_IP; do not rewrite to 127.0.0.1:30443`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/kafka-kraft-quorum-ok.sh`
+  - L8: `local NS="${1:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/packet-capture-v2.sh`
+  - L408: `[[ "$sni_count" -gt 0 ]] && echo "  [packet-capture-v2] QUIC SNI off-campus-housing.test: $sni_count packets"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/lib/protocol-verification.sh`
+  - L342: `# SNI validation: QUIC with off-campus-housing.test = definitive proof traffic belongs to our domain (no background noise).`
+  - L349: `[[ "$sni_total" -gt 0 ]] && echo "  OK: $label QUIC SNI off-campus-housing.test: $sni_total packets (definitive proof traffic to our domain)"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-edge-load-diagnostics.sh`
+  - L16: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L45: `echo "=== $tag @ $(date -u +%Y-%m-%dT%H:%M:%SZ) ns=$HOUSING_NS ==="`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/k6-messaging.js`
+  - L5: `* SNI must be off-campus-housing.test (--resolve off-campus-housing.test:443:<LB_IP>).`
+  - L8: `*   BASE_URL=https://off-campus-housing.test K6_RESOLVE=off-campus-housing.test:443:<LB_IP> \`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/run-k6-all-services.sh`
+  - L8: `#   BASE_URL              default https://off-campus-housing.test:443 or :30443`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/run-k6-listings-concurrency-instrumented.sh`
+  - L15: `export HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/load/run-k6-phases.sh`
+  - L35: `echo "  ❌ Do not use raw IP for strict TLS. Use hostname (e.g. https://off-campus-housing.test:443) and K6_RESOLVE."`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/probe-kafka-kraft-listeners.sh`
+  - L3: `# Usage: HOUSING_NS=off-campus-housing-tracker ./scripts/probe-kafka-kraft-listeners.sh [kafka-0|kafka-1|kafka-2]`
+  - L5: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rebuild-housing-colima.sh`
+  - L30: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rebuild-och-images-and-rollout.sh`
+  - L34: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rollout-deferred-after-kafka-tls.sh`
+  - L16: `export OCH_ROLLOUT_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/rollout-restart-och-full-stack.sh`
+  - L25: `export HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L32: `HOUSING_NS="$HOUSING_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-all-test-suites.sh`
+  - L192: `och_sync_grpc_certs_to_dir "${GRPC_CERTS_DIR:-/tmp/grpc-certs}" "${HOUSING_NS:-off-campus-housing-tracker}" || true`
+  - L407: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" -H "Host: off-campus-housing.test" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || echo "000")`
+  - L419: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" -H "Host: off-campus-housing.test" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || echo "000")`
+  - L464: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null) || true`
+  - L470: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null) || true`
+  - L487: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null) || true`
+  - L493: `--resolve "off-campus-housing.test:443:${REACHABLE_LB_IP}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null) || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-demo-network-preflight.sh`
+  - L65: `if ! HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}" "$SCRIPT_DIR/run-preflight-scale-and-all-suites.sh"; then`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-k6-chaos.sh`
+  - L303: `K6_TARGET="${K6_TARGET_URL:-https://off-campus-housing.test:30443/_caddy/healthz}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-preflight-scale-and-all-suites.sh`
+  - L427: `local _ns="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L435: `VERIFY_K8S_SERVICES="$PREFLIGHT_APP_DEPLOYS" HOUSING_NS="$_ns" \`
+  - L509: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}" \`
+  - L1438: `if HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}" FORCE_TLS_RESTART=0 "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"; then`
+  - L1707: `_housing_ns="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L1869: `_kraft_ns="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L2610: `"https://off-campus-housing.test:30443/_caddy/healthz" 2>/dev/null) || true`
+  - L2613: `ok "HTTP/3 (NodePort 30443) OK — QUIC reachable from host via off-campus-housing.test:30443"`
+  - L2711: `_k8s_ns="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L2737: `_k8s_ns_b="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L2771: `_sk_ns="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L2779: `(cd "$REPO_ROOT" && HOUSING_NS="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" pnpm verify:kafka-tls-sans) || fail "6a2c verify:kafka-tls-sans failed — broker cert missing headless SANs (re-run: KAFKA_S…`
+  - L2781: `HOUSING_NS="$_sk_ns" bash "$SCRIPT_DIR/verify-housing-kafka-bootstrap.sh" || fail "6a2c verify-housing-kafka-bootstrap failed"`
+  - L2782: `HOUSING_NS="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" bash "$SCRIPT_DIR/verify-kafka-tls-sans.sh" || fail "6a2c verify-kafka-tls-sans failed"`
+  - L2792: `HOUSING_NS="$_sk_ns" KAFKA_BROKER_REPLICAS="$_sk_rep" bash "$SCRIPT_DIR/verify-kafka-kraft-advertised-listeners.sh" || fail "6a2c2 verify-kafka-kraft-advertised-listeners failed (fix StatefulSet ad…`
+  - … *7 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-suite-with-packet-capture.sh`
+  - L26: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/run-transport-study-experiments.sh`
+  - L151: `_code=$(curl -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 8 --resolve "off-campus-housing.test:${_np}:${_node_ip}" "https://off-campus-housing.test:${_np}/_caddy/healthz" 2>…`
+  - L179: `info "  Point k6: BASE_URL=https://localhost:443 K6_RESOLVE=off-campus-housing.test:443:127.0.0.1"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/service-tls-alias-guard.sh`
+  - L8: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L47: `bad "CA fingerprint mismatch — run: HOUSING_NS=$NS bash scripts/ensure-housing-cluster-secrets.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/setup-full-off-campus-housing-stack.sh`
+  - L12: `#   HOUSING_NS=off-campus-housing-tracker   (default)`
+  - L37: `export HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L49: `say "║  setup-full-off-campus-housing-stack (HOUSING_NS=$HOUSING_NS)   ║"`
+  - L123: `HOUSING_NS="$HOUSING_NS" "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"`
+  - L137: `HOUSING_NS="$HOUSING_NS" "$SCRIPT_DIR/run-preflight-scale-and-all-suites.sh"`
+  - L144: `say "Next: RUN_PREFLIGHT=1 $0  — or  HOUSING_NS=$HOUSING_NS ./scripts/run-preflight-scale-and-all-suites.sh"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/setup-lb-ip-host-access.sh`
+  - L100: `_h2=$(curl -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 8 --resolve "off-campus-housing.test:443:$LB_IP" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || echo…`
+  - L104: `_h3=$(NGTCP2_ENABLE_GSO=0 "$CURL_HTTP3" --http3-only -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 --resolve "off-campus-housing.test:443:$LB_IP" "https://off-campus-housi…`
+  - L335: `VERIFY_H2=$(curl -k --http2 -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --resolve "off-campus-housing.test:443:$LB_IP" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || ech…`
+  - L338: `VERIFY_H3=$(NGTCP2_ENABLE_GSO=0 "$CURL_HTTP3" --http3-only -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --resolve "off-campus-housing.test:443:$LB_IP" "https://off-campus-housing.test/…`
+  - L370: `echo "  curl -k --http2 -sS -o /dev/null -w '%{http_code}' --resolve off-campus-housing.test:443:$LB_IP https://off-campus-housing.test/_caddy/healthz"`
+  - L372: `echo "  NGTCP2_ENABLE_GSO=0 $CURL_HTTP3 --http3-only -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --resolve off-campus-housing.test:443:$LB_IP https://off-campus-housing.test/_caddy/he…`
+  - L379: `echo "  NGTCP2_ENABLE_GSO=0 /opt/homebrew/opt/curl/bin/curl --http3-only -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --resolve off-campus-housing.test:443:$LB_IP https://off-campus-ho…`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-lb-coordinated.sh`
+  - L48: `curl -sS -o /dev/null -w "%{http_code}" -k --connect-timeout 5 --max-time 10 --resolve "off-campus-housing.test:443:${CLUSTER_IP}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || true`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-messaging-service-comprehensive.sh`
+  - L18: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/test-microservices-http2-http3-enhanced.sh`
+  - L19: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/tests/kafka-alignment-suite.sh`
+  - L30: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L119: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP" \`
+  - L128: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \`
+  - L143: `if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then`
+  - L160: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP" \`
+  - L169: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \`
+  - L214: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only --quiet "$NS" "$REP"`
+  - L222: `if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then`
+  - L238: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-after-rollout-verify-brokers.sh" || {`
+  - L247: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP"`
+  - L258: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" \`
+  - L260: `&& HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP"`
+  - L274: `if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then`
+  - L315: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --check-only "$NS" "$REP"`
+  - L338: `if ! HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$REPO_ROOT/scripts/kafka-runtime-sync.sh" --remediate "$NS" "$REP"; then`
+  - … *4 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-caddy-http3-in-cluster.sh`
+  - L49: `_code=$(NGTCP2_ENABLE_GSO=0 "$_curl_host" -sS -w '%{http_code}' -o /dev/null --max-time 15 --http3-only --cacert "$_ca" --resolve "off-campus-housing.test:443:$_lb_ip" "https://off-campus-housing.t…`
+  - L51: `ok "Caddy HTTP/3 OK via host Homebrew curl (off-campus-housing.test:443 -> $_lb_ip)"`
+  - L74: `CURL_RESOLVE="off-campus-housing.test:443:${TARGET_IP}"`
+  - L78: `CURL_RESOLVE="off-campus-housing.test:443:${_cluster_ip}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-cluster-kafka-three-brokers.sh`
+  - L4: `#   HOUSING_NS=off-campus-housing-tracker (default)`
+  - L7: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-housing-kafka-bootstrap.sh`
+  - L7: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-kafka-cluster.sh`
+  - L44: `NS="${1:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+  - L146: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REPLICAS" bash "$SCRIPT_DIR/verify-kafka-tls-sans.sh" "$NS" "$REPLICAS"`
+  - L155: `HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REPLICAS" bash "$SCRIPT_DIR/verify-kafka-kraft-advertised-listeners.sh" "$NS" "$REPLICAS"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-kafka-kraft-advertised-listeners.sh`
+  - L15: `NS="${1:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-kafka-no-static-advertised-env.sh`
+  - L14: `NS="${1:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-kafka-tls-sans.sh`
+  - L16: `NS="${1:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-metallb-and-traffic-policy.sh`
+  - L296: `code=\$(curl -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 3 --max-time 5 --resolve "off-campus-housing.test:443:$lb_ip" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null) || c…`
+  - L340: `curl -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 --resolve "off-campus-housing.test:443:${1}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null || echo "000"`
+  - L345: `curl -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 --resolve "off-campus-housing.test:${host_https_port}:${host_https_host}" "https://off-campus-housing.test:${host_https_p…`
+  - L495: `_h3_resolve="off-campus-housing.test:${_h3_port}:${_h3_host}"`
+  - L496: `_h3_url="https://off-campus-housing.test:${_h3_port}/_caddy/healthz"`
+  - L513: `curl -k -sS -o /dev/null -w "%{http_code}\n" --connect-timeout 8 --max-time 20 --http3 --resolve "off-campus-housing.test:443:${lb_ip}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null …`
+  - L528: `_vm_h3=$(colima ssh -- curl -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 --http3-only --resolve "off-campus-housing.test:443:${lb_ip}" "https://off-campus-housing.test/_c…`
+  - L541: `_colima_h3=$(_normalize_http_code "$("$CURL_BIN" --http3-only -k -sS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 15 --resolve "off-campus-housing.test:8443:127.0.0.1" "https://off…`
+  - L559: `--resolve "off-campus-housing.test:${_h3_port}:127.0.0.1" "https://off-campus-housing.test:${_h3_port}/_caddy/healthz" 2>/dev/null || echo "000")`
+  - L567: `--resolve "off-campus-housing.test:${_h3_port}:127.0.0.1" "https://off-campus-housing.test:${_h3_port}/_caddy/healthz" 2>/dev/null || echo "000")`
+  - L592: `[[ -n "$_docker_ip" ]] && _h3_resolve="off-campus-housing.test:${_docker_port}:$_docker_ip" && _h3_url="https://off-campus-housing.test:${_docker_port}/_caddy/healthz"`
+  - L618: `curl -k -sS -o /dev/null -w "%{http_code}\n" --connect-timeout 8 --max-time 20 --http3 --resolve "off-campus-housing.test:443:${lb_ip}" "https://off-campus-housing.test/_caddy/healthz" 2>/dev/null …`
+  - L632: `info "Manual in-cluster check: kubectl -n $NS_ING run verify-h3-manual --rm -i --restart=Never --image=rmarx/curl-http3:latest --overrides='{\"spec\":{\"hostNetwork\":true}}' -- curl -k -v --http3 …`
+  - L653: `info "On Colima, NodePort is on VM; 127.0.0.1:$caddy_nodeport is not valid from Mac. Verify QUIC in-VM: colima ssh -- curl -k --http3-only --resolve off-campus-housing.test:443:$lb_ip https://off-c…`
+  - L668: `--resolve "off-campus-housing.test:${caddy_nodeport}:127.0.0.1" "${_np_args[@]}" "https://off-campus-housing.test:${caddy_nodeport}/_caddy/healthz" 2>/dev/null || echo "000")")`
+  - … *10 more in this file*
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-network-coherence.sh`
+  - L18: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-preflight-edge-routing.sh`
+  - L25: `NS="${1:-${HOUSING_NS:-off-campus-housing-tracker}}"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/verify-required-housing-pods.sh`
+  - L6: `#   HOUSING_NS=off-campus-housing-tracker   (default — USE THIS, not NS=)`
+  - L14: `HOUSING_NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L28: `say "Verifying required Deployments (HOUSING_NS=$HOUSING_NS → namespace $NS, envoy-test, ingress-nginx)…"`
+  - L59: `say "Tip: if you meant a different cluster namespace, run: HOUSING_NS=your-ns $0"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/wait-for-all-services-ready.sh`
+  - L29: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+  - L30: `export HOUSING_NS="$NS"`
+- `record-platform-och-full-scripts-infra-reference-20260410-1245/scripts/wait-for-kafka-external-lb-ips.sh`
+  - L6: `NS="${HOUSING_NS:-off-campus-housing-tracker}"`
+
+---
+
+## Summary
+
+Apply **`docs/bundles/OCH_TO_RP_CONVERSION_MATRIX.md`** when porting; prefer surgical patches over bulk replace.

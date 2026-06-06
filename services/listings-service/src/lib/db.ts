@@ -89,7 +89,7 @@ export { pool, withRetry };
 export async function getListingsByUser(userId: string, limit = 50, offset = 0) {
   const result = await pool.query(
     `SELECT * FROM listings.listings 
-     WHERE user_id = $1 AND is_active = true 
+     WHERE user_id = $1::uuid AND deleted_at IS NULL
      ORDER BY created_at DESC 
      LIMIT $2 OFFSET $3`,
     [userId, limit, offset]

@@ -12,8 +12,14 @@ import {
   addToWatchlist,
   removeFromWatchlist,
   getUserWatchlist,
-  searchListings,
 } from '../lib/db.js';
+import { handleListingsSearchHttp } from '../listings-search-http.js';
+import { handleListingRevisionsHttp } from '../listings-revisions-http.js';
+import { handleListingPatchHttp } from '../listings-patch-http.js';
+import { createListingsHttpApp } from '../http-server.js';
+
+/** Housing-schema GET /listings/:id (gateway + E2E contract). */
+const listingsDetailHttp = createListingsHttpApp();
 
 const router: Router = Router();
 
@@ -31,38 +37,8 @@ function requireAuth(req: any, res: any, next: () => void) {
   }
 }
 
-// Public routes (no auth required)
-// Search is public - moved before auth middleware
-router.get('/search', async (req, res) => {
-  try {
-    const query = req.query.q as string || '';
-    const filters = {
-      listing_type: req.query.listing_type as string,
-      category: req.query.category as string,
-      min_price: req.query.min_price ? parseFloat(req.query.min_price as string) : undefined,
-      max_price: req.query.max_price ? parseFloat(req.query.max_price as string) : undefined,
-      condition: req.query.condition as string,
-      media_type: req.query.media_type as string,
-      has_obi: req.query.has_obi === 'true' ? true : req.query.has_obi === 'false' ? false : undefined,
-      label_type: req.query.label_type as string,
-      sort_by: req.query.sort_by as 'created_at' | 'price' | 'popularity' | 'label_type' | undefined,
-      sort_order: (req.query.sort_order as 'asc' | 'desc') || 'desc',
-      limit: parseInt(req.query.limit as string) || 50,
-      offset: parseInt(req.query.offset as string) || 0,
-    };
-    const result = await searchListings(query, filters);
-    res.json({ 
-      listings: result.listings, 
-      total: result.total,
-      limit: result.limit,
-      offset: result.offset,
-      hasMore: result.hasMore
-    });
-  } catch (err) {
-    console.error('[listings] search error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// Public browse/search (RP restored DB contract via search-listings-query.ts)
+router.get('/search', (req, res) => void handleListingsSearchHttp(req, res));
 
 // Protected routes below require authentication
 router.use(requireAuth);
@@ -81,30 +57,23 @@ router.get('/my-listings', async (req, res) => {
   }
 });
 
-// Get listing by ID (public - no auth required, but must be after /my-listings)
-router.get('/:id', async (req, res) => {
-  try {
-    const listing = await getListingById(req.params.id);
-    if (!listing) {
-      return res.status(404).json({ error: 'Listing not found' });
-    }
-    const L = listing as Record<string, unknown>;
-    const soldAt = L.sold_at ? new Date(L.sold_at as string) : null;
-    const endedAt = L.ended_at ? new Date(L.ended_at as string) : null;
-    const visibleUntil = L.visible_until ? new Date(L.visible_until as string) : null;
-    const now = new Date();
-    let lifecycle_status: 'active' | 'sold' | 'ended' | 'did_not_sell' = 'active';
-    if (soldAt) lifecycle_status = 'sold';
-    else if (endedAt) lifecycle_status = 'ended';
-    else if (visibleUntil && visibleUntil < now) lifecycle_status = 'did_not_sell';
-    if (L.id) L.item_id = L.id;
-    L.stock_quantity = L.stock_quantity != null ? Number(L.stock_quantity) : 1;
-    L.lifecycle_status = lifecycle_status;
-    res.json(L);
-  } catch (err) {
-    console.error('[listings] get by id error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+// Owner revision history (gateway: GET /api/listings/:id/revisions → /listings/:id/revisions)
+router.get('/:id/revisions', (req, res) =>
+  void handleListingRevisionsHttp(req as Parameters<typeof handleListingRevisionsHttp>[0], res),
+);
+
+router.patch('/:id', (req, res) =>
+  void handleListingPatchHttp(req as Parameters<typeof handleListingPatchHttp>[0], res),
+);
+
+// Get listing by ID (housing schema; must be after /my-listings and /:id/revisions)
+router.get('/:id', (req, res, next) => {
+  const savedUrl = req.url;
+  req.url = `/listings/${req.params.id}`;
+  listingsDetailHttp(req, res, () => {
+    req.url = savedUrl;
+    next();
+  });
 });
 
 // Create listing

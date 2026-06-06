@@ -20,8 +20,39 @@ type Props = {
   compact?: boolean
 }
 
+function listingStatusBadge(record: CollectionRecord) {
+  const st = record.listingStatus ?? 'not_listed'
+  if (st === 'published' || st === 'draft') {
+    return (
+      <Badge variant="outline" data-testid="record-listing-status">
+        Listed
+      </Badge>
+    )
+  }
+  if (st === 'sold') {
+    return (
+      <Badge variant="outline" data-testid="record-listing-status">
+        Sold
+      </Badge>
+    )
+  }
+  return (
+    <Badge variant="outline" data-testid="record-listing-status">
+      Not listed
+    </Badge>
+  )
+}
+
+function displayPaid(record: CollectionRecord): string {
+  if (record.paidDisplay) return record.paidDisplay
+  return formatMoneyCents(record.purchasePriceCents, record.purchaseCurrency ?? 'USD')
+}
+
 export function RecordCard({ record, compact }: Props) {
   const grades = gradeSummary(record)
+  const purchased = record.purchaseDateDisplay ?? formatDate(record.purchasedAt)
+  const shipped = record.shipDateDisplay ?? formatDate(record.shippedAt)
+  const delivered = record.deliveredDateDisplay ?? formatDate(record.receivedAt)
 
   return (
     <article
@@ -44,30 +75,36 @@ export function RecordCard({ record, compact }: Props) {
           </div>
         </div>
 
-        {!compact && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {record.purchaseType && (
-              <Badge variant="primary">{purchaseTypeLabel(record.purchaseType)}</Badge>
-            )}
-            {grades && <Badge variant="outline">{grades}</Badge>}
-            {record.isPromo && <Badge variant="warning">Promo</Badge>}
-            <Badge variant="outline">Not listed</Badge>
-          </div>
-        )}
+        <div className={`flex flex-wrap gap-1.5 ${compact ? 'mt-2' : 'mt-3'}`}>
+          {!compact && record.purchaseType && (
+            <Badge variant="primary">{purchaseTypeLabel(record.purchaseType)}</Badge>
+          )}
+          {!compact && grades && <Badge variant="outline">{grades}</Badge>}
+          {!compact && record.isPromo && <Badge variant="warning">Promo</Badge>}
+          {listingStatusBadge(record)}
+        </div>
 
         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
           <div>
             <dt className="text-slate-400">Purchased</dt>
-            <dd className="font-medium text-slate-800 dark:text-slate-200">
-              {formatDate(record.purchasedAt)}
-            </dd>
+            <dd className="font-medium text-slate-800 dark:text-slate-200">{purchased}</dd>
           </div>
           <div>
             <dt className="text-slate-400">Paid</dt>
-            <dd className="font-medium text-slate-800 dark:text-slate-200">
-              {formatMoneyCents(record.purchasePriceCents, record.purchaseCurrency ?? 'USD')}
-            </dd>
+            <dd className="font-medium text-slate-800 dark:text-slate-200">{displayPaid(record)}</dd>
           </div>
+          {(record.shippedAt || record.shipDateDisplay) && (
+            <div>
+              <dt className="text-slate-400">Shipped</dt>
+              <dd className="font-medium text-slate-800 dark:text-slate-200">{shipped}</dd>
+            </div>
+          )}
+          {(record.receivedAt || record.deliveredDateDisplay) && (
+            <div>
+              <dt className="text-slate-400">Delivered</dt>
+              <dd className="font-medium text-slate-800 dark:text-slate-200">{delivered}</dd>
+            </div>
+          )}
         </dl>
       </Link>
 

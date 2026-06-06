@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 
-import { signInAsTestCollector } from './helpers/auth'
+import { obtainAuthToken, signInAsTestCollector } from './helpers/auth'
+import { ensureTestCollection } from './helpers/seed-collection'
 
 test.describe('Records UI contract', () => {
   test.beforeEach(async ({ page }) => {
@@ -34,13 +35,12 @@ test.describe('Records UI contract', () => {
     await page.screenshot({ path: 'e2e/screenshots/authenticated/authenticated-records-list.png', fullPage: true })
   })
 
-  test('record detail and revisions routes load', async ({ page }) => {
-    await page.goto('/records', { waitUntil: 'domcontentloaded' })
+  test('record detail and revisions routes load', async ({ page, request }) => {
+    const token = await obtainAuthToken(request)
+    await ensureTestCollection(request, token)
+    await page.goto('/records?view=grid', { waitUntil: 'domcontentloaded' })
     const viewLink = page.getByRole('link', { name: 'View' }).first()
-    if ((await viewLink.count()) === 0) {
-      test.skip()
-      return
-    }
+    await expect(viewLink).toBeVisible({ timeout: 60_000 })
     await viewLink.click()
     await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible({ timeout: 15_000 })
     await page.screenshot({ path: 'e2e/screenshots/authenticated/record-detail.png', fullPage: true })

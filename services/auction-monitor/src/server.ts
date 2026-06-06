@@ -1,6 +1,6 @@
 import express from 'express';
 import { Pool } from 'pg';
-import { register, httpCounter } from '@common/utils';
+import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions } from '@common/utils';
 
 // Dual-DB setup: listings DB for reading watchlist, auction-monitor DB for writing results
 const POSTGRES_URL_LISTINGS = process.env.POSTGRES_URL_LISTINGS || process.env.POSTGRES_URL!;
@@ -57,7 +57,21 @@ app.get('/metrics', async (_req, res) => {
   res.end(await register.metrics());
 });
 
-app.get('/healthz', async (_req, res) => {
+mountRpHttpHealth(app, {
+  service: 'auction-monitor',
+  readiness: async () => {
+    try {
+      await listingsPool.query('SELECT 1');
+      await auctionPool.query('SELECT 1');
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  grpc: rpGrpcHealthOptions('auction-monitor', 'auction_monitor.AuctionMonitorService'),
+});
+
+app.get('/healthz/details', async (_req, res) => {
   const status = {
     ok: true,
     listings: 'unknown',
@@ -65,7 +79,6 @@ app.get('/healthz', async (_req, res) => {
     timestamp: new Date().toISOString()
   };
   
-  // Check listings DB (REQUIRED - service needs this to read watchlist)
   try {
     await listingsPool.query('SELECT 1');
     status.listings = 'ok';
@@ -75,7 +88,6 @@ app.get('/healthz', async (_req, res) => {
     console.error('[auction-monitor] listings DB check failed:', err);
   }
   
-  // Check auction-monitor DB (REQUIRED - service needs this to write results)
   try {
     await auctionPool.query('SELECT 1');
     status.auction_monitor = 'ok';
@@ -85,8 +97,6 @@ app.get('/healthz', async (_req, res) => {
     console.error('[auction-monitor] auction-monitor DB check failed:', err);
   }
   
-  // BOTH databases are REQUIRED - return 503 if either fails
-  // Service cannot function properly without both databases
   const httpStatus = status.ok ? 200 : 503;
   res.status(httpStatus).json(status);
 });

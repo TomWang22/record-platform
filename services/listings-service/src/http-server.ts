@@ -10,6 +10,8 @@ import {
   register,
   createHttpConcurrencyGuard,
   initOchOutboxSurfaceUnsupported,
+  mountRpHttpHealth,
+  rpGrpcHealthOptions,
 } from "@common/utils";
 import { inferNetProtoForSpan, mountDebugTraceHeaders, tracingMiddleware } from "@common/utils/otel";
 import { pool } from "./db.js";
@@ -58,7 +60,7 @@ import {
   formatListingPublicLocation,
   normalizeResidenceType,
 } from "./location-display.js";
-import { toPublicListingShape } from "./listing-public-privacy.js";
+import { buildPublicListingFromRow } from "./listing-public-contract.js";
 import { applyRpListingFields, parseRpListingFields } from "./rp-listing-fields.js";
 import { geocodeStructuredAddress } from "./geocode-address.js";
 import settingsRouter from "./settings.js";
@@ -238,11 +240,10 @@ FROM listings.listings l
 WHERE l.id = $1::uuid AND (l.deleted_at IS NULL)
 `;
 
-function landlordDisplayLabel(row: Record<string, unknown>): string {
-  const raw = String(row.username_display ?? "").trim();
+function sellerDisplayLabel(row: Record<string, unknown>): string {
+  const raw = String(row.username_display ?? row.seller ?? "").trim();
   if (raw) return raw.slice(0, 120);
-  /** Never show UUID fragments as the host label — prefer trust/username_display backfill. */
-  return "Host";
+  return "Seller";
 }
 
 function milesToCampus(lat: number | null, lng: number | null): number | null {
@@ -262,149 +263,28 @@ function milesToCampus(lat: number | null, lng: number | null): number | null {
 }
 
 /** Compact marketplace detail for GET /listings/:id and GET /:uuid (gateway alias). */
-function parseMediaItemsJson(raw: unknown): Array<{
-  id: string;
-  url_or_path: string;
-  media_type: string;
-  sort_order: number;
-}> {
-  if (!raw) return [];
-  let arr: unknown[] = [];
-  if (Array.isArray(raw)) arr = raw;
-  else if (typeof raw === "string") {
-    try {
-      const p = JSON.parse(raw) as unknown;
-      if (Array.isArray(p)) arr = p;
-    } catch {
-      return [];
-    }
-  }
-  const out: Array<{ id: string; url_or_path: string; media_type: string; sort_order: number }> = [];
-  for (const x of arr) {
-    if (!x || typeof x !== "object") continue;
-    const o = x as Record<string, unknown>;
-    const id = String(o.id ?? "");
-    const url_or_path = String(o.url_or_path ?? "");
-    if (!id || !url_or_path) continue;
-    const media_type = String(o.media_type ?? "image").toLowerCase();
-    const so = Number(o.sort_order);
-    out.push({
-      id,
-      url_or_path,
-      media_type,
-      sort_order: Number.isFinite(so) ? Math.floor(so) : 0,
-    });
-  }
-  return out;
-}
-
 function listingDetailMarketplace(
   row: Record<string, unknown>,
   opts?: { includePrivateAddress?: boolean },
 ) {
-  const amenities = amenitiesToStrings(row.amenities);
-  const media_items = parseMediaItemsJson(row.media_items_json);
-  let images: string[] = [];
-  const ij = row.images_json;
-  if (Array.isArray(ij)) images = ij.map(String);
-  else if (typeof ij === "string") {
-    try {
-      const p = JSON.parse(ij) as unknown;
-      if (Array.isArray(p)) images = p.map(String);
-    } catch {
-      images = [];
-    }
-  }
-  /** If images_json empty but media rows exist (e.g. legacy), derive image URLs from media_items. */
-  if (!images.length && media_items.length) {
-    images = media_items.filter((m) => m.media_type === "image").map((m) => m.url_or_path);
-  }
-  images = images.map((u) => refreshCommunityImageUrlIfPublicInline(String(u)));
-  for (let i = 0; i < media_items.length; i++) {
-    const m = media_items[i];
-    if (!m) continue;
-    media_items[i] = {
-      ...m,
-      url_or_path: refreshCommunityImageUrlIfPublicInline(m.url_or_path),
-    };
-  }
-  const price_cents = Number(row.price_cents);
-  const price = Number.isFinite(price_cents) ? Math.round(price_cents) / 100 : null;
+  const owner = opts?.includePrivateAddress === true;
+  const built = buildPublicListingFromRow(row, {
+    includePrivateAddress: owner,
+    includeOwnerIds: owner,
+  });
+  if (!owner) return built;
   const lat =
     row.latitude != null && Number.isFinite(Number(row.latitude)) ? Number(row.latitude) : null;
   const lng =
     row.longitude != null && Number.isFinite(Number(row.longitude)) ? Number(row.longitude) : null;
-  const sq = row.size_sqft;
-  const square_feet =
-    sq != null && Number.isFinite(Number(sq)) ? Math.max(0, Math.floor(Number(sq))) : null;
-  const br = row.bedrooms;
-  const bedrooms =
-    br != null && Number.isFinite(Number(br)) ? Math.max(0, Math.floor(Number(br))) : null;
-  const ba = row.bathrooms;
-  const bathrooms =
-    ba != null && Number.isFinite(Number(ba)) ? Math.round(Number(ba) * 10) / 10 : null;
-  const pricingRaw = String(row.pricing_mode ?? "fixed").trim().toLowerCase();
-  const rpEarly = parseRpListingFields(row);
-  const pricing_mode =
-    rpEarly.saleType === "auction" ? "auction" : pricingRaw === "obo" ? "obo" : "fixed";
-  let soft_hold_until: string | null = null;
-  const sh = row.soft_hold_until;
-  if (sh instanceof Date) soft_hold_until = sh.toISOString();
-  else if (sh != null && String(sh).trim()) soft_hold_until = String(sh).trim();
-  const holdMs = soft_hold_until ? Date.parse(soft_hold_until) : NaN;
-  const listing_on_hold = Number.isFinite(holdMs) && holdMs > Date.now();
-  const base: Record<string, unknown> = {
-    id: row.id,
-    user_id: row.user_id,
-    landlord_id: row.user_id,
-    landlord_display: landlordDisplayLabel(row),
-    title: row.title,
-    description: row.description ?? "",
-    price_cents: row.price_cents,
-    price,
-    residence_type: row.residence_type ?? null,
-    square_feet,
-    bedrooms,
-    bathrooms,
-    city: row.city ?? null,
-    state_or_province: row.state_or_province ?? null,
-    country: row.country ?? null,
-    neighborhood: row.neighborhood ?? null,
-    location: formatListingPublicLocation(row),
-    amenities,
-    images,
-    primaryImageUrl: images[0] ?? null,
-    distance_miles_to_campus: milesToCampus(lat, lng),
-    watch_count: 0,
-    lease_terms: {
-      effective_from: row.effective_from ?? null,
-      effective_until: row.effective_until ?? null,
-      lease_length_months: row.lease_length_months ?? null,
-    },
-    availability_status: String(row.status ?? "unknown"),
-    pricing_mode,
-    soft_hold_until,
-    listing_on_hold,
-    media_items,
+  return {
+    ...built,
+    address_line1: row.address_line1 ?? null,
+    address_line2: row.address_line2 ?? null,
+    postal_code: row.postal_code ?? null,
+    ...(lat != null && lng != null ? { latitude: lat, longitude: lng } : {}),
+    user_id: row.user_id != null ? String(row.user_id) : undefined,
   };
-  const rpPayload = applyRpListingFields(base, row);
-  if (opts?.includePrivateAddress) {
-    rpPayload.address_line1 = row.address_line1 ?? null;
-    rpPayload.address_line2 = row.address_line2 ?? null;
-    rpPayload.postal_code = row.postal_code ?? null;
-    if (lat != null && lng != null) {
-      rpPayload.latitude = lat;
-      rpPayload.longitude = lng;
-    }
-    return toPublicListingShape(rpPayload, {
-      includePrivateAddress: true,
-      includeOwnerIds: true,
-    });
-  }
-  return toPublicListingShape(rpPayload, {
-    includePrivateAddress: false,
-    includeOwnerIds: false,
-  });
 }
 
 function requesterUserId(req: Request): string | null {
@@ -479,98 +359,15 @@ async function proxyBookingWatchlist(
   return { ok: upstream.ok, status: upstream.status, body };
 }
 
-/** Marketplace-oriented JSON (additive fields; keeps existing keys). */
+/** Marketplace-oriented JSON for search, mine, and list cards. */
 function rowToJson(row: Record<string, unknown>) {
-  const price_cents = Number(row.price_cents);
-  const price_usd =
-    Number.isFinite(price_cents) ? Math.round(price_cents) / 100 : null;
-  const title = String(row.title || "");
-  const description = String(row.description || "");
-  const text = `${title} ${description}`;
-  const bedMatch = text.match(/(\d+)\s*(?:bed|br)\b/i);
-  const bathMatch = text.match(/(\d+)\s*(?:bath|ba)\b/i);
-  const brCol =
-    row.bedrooms != null && Number.isFinite(Number(row.bedrooms))
-      ? Math.max(0, Math.floor(Number(row.bedrooms)))
-      : null;
-  const baCol =
-    row.bathrooms != null && Number.isFinite(Number(row.bathrooms))
-      ? Math.round(Number(row.bathrooms) * 10) / 10
-      : null;
-  const primaryImageUrlRaw =
-    typeof row.primary_image_url === "string" && row.primary_image_url.trim().length > 0
-      ? row.primary_image_url.trim()
-      : null;
-  const primaryImageUrl = primaryImageUrlRaw
-    ? refreshCommunityImageUrlIfPublicInline(primaryImageUrlRaw)
-    : null;
-  const sq = row.size_sqft;
-  const square_feet =
-    sq != null && Number.isFinite(Number(sq)) ? Math.max(0, Math.floor(Number(sq))) : null;
-  const pmRaw = String(row.pricing_mode ?? "fixed").trim().toLowerCase();
-  const pricing_mode = pmRaw === "obo" ? "obo" : "fixed";
-  let soft_hold_until: string | null = null;
-  const sh = row.soft_hold_until;
-  if (sh instanceof Date) soft_hold_until = sh.toISOString();
-  else if (sh != null && String(sh).trim()) soft_hold_until = String(sh).trim();
-  const holdMs = soft_hold_until ? Date.parse(soft_hold_until) : NaN;
-  const listing_on_hold = Number.isFinite(holdMs) && holdMs > Date.now();
-  const out = {
-    id: row.id,
-    user_id: row.user_id,
-    landlord_id: row.user_id,
-    title: row.title,
-    description: row.description,
-    price_cents: row.price_cents,
-    /** Monthly rent in USD (derived from price_cents). */
-    price: price_usd,
-    price_usd_monthly: price_usd,
-    amenities: amenitiesToStrings(row.amenities),
-    smoke_free: row.smoke_free,
-    pet_friendly: row.pet_friendly,
-    furnished: row.furnished,
-    status: row.status,
-    created_at: row.created_at,
-    updated_at: row.updated_at ?? null,
-    listed_at: formatListedAt(row),
-    effective_from: row.effective_from ?? null,
-    effective_until: row.effective_until ?? null,
-    lease_length_months: row.lease_length_months ?? null,
-    size_sqft: row.size_sqft ?? null,
-    square_feet,
-    residence_type: row.residence_type ?? null,
-    city: row.city ?? null,
-    state_or_province: row.state_or_province ?? null,
-    country: row.country ?? null,
-    neighborhood: row.neighborhood ?? null,
-    bedrooms: brCol ?? (bedMatch ? Math.max(1, Number(bedMatch[1])) : null),
-    bathrooms: baCol ?? (bathMatch ? Math.max(1, Number(bathMatch[1])) : null),
-    username_display: row.username_display ?? null,
-    landlord_display: landlordDisplayLabel(row),
-    watch_count:
+  return buildPublicListingFromRow(row, {
+    includePrivateAddress: false,
+    includeOwnerIds: false,
+    watchCount:
       row.watch_count != null && Number.isFinite(Number(row.watch_count))
         ? Math.max(0, Math.floor(Number(row.watch_count)))
         : 0,
-    location: formatListingPublicLocation(row),
-    distance_miles_to_campus: milesToCampus(
-      row.latitude != null && Number.isFinite(Number(row.latitude)) ? Number(row.latitude) : null,
-      row.longitude != null && Number.isFinite(Number(row.longitude)) ? Number(row.longitude) : null,
-    ),
-    lease_terms: {
-      effective_from: row.effective_from ?? null,
-      effective_until: row.effective_until ?? null,
-      lease_length_months: row.lease_length_months ?? null,
-    },
-    images: primaryImageUrl ? [primaryImageUrl] : ([] as string[]),
-    primaryImageUrl,
-    availability_status: String(row.status || "unknown"),
-    pricing_mode,
-    soft_hold_until,
-    listing_on_hold,
-  };
-  return toPublicListingShape(applyRpListingFields(out, row), {
-    includePrivateAddress: false,
-    includeOwnerIds: false,
   });
 }
 
@@ -608,17 +405,17 @@ export function createListingsHttpApp(): Application {
     next();
   });
 
-  app.get(["/healthz", "/health"], async (_req, res) => {
-    try {
-      await pool.query("SELECT 1");
-      res.status(200).json({ ok: true, db: "connected" });
-    } catch {
-      res.status(200).json({
-        ok: true,
-        db: "disconnected",
-        warning: "database unavailable",
-      });
-    }
+  mountRpHttpHealth(app, {
+    service: "listings-service",
+    readiness: async () => {
+      try {
+        await pool.query("SELECT 1");
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    grpc: rpGrpcHealthOptions("listings-service", "listings.ListingsService"),
   });
 
   app.get("/metrics", async (_req, res) => {
@@ -699,10 +496,11 @@ export function createListingsHttpApp(): Application {
         return;
       }
       const d = listingDetailMarketplace(row);
-      const priceCentsRaw = Number(d.price_cents);
+      const priceCentsRaw = Number(row.price_cents);
       const priceCents =
         Number.isFinite(priceCentsRaw) && priceCentsRaw >= 0 ? Math.floor(priceCentsRaw) : 0;
-      const ownerId = d.landlord_id != null ? String(d.landlord_id) : d.user_id != null ? String(d.user_id) : "";
+      const ownerId =
+        row.user_id != null ? String(row.user_id) : d.seller_id != null ? String(d.seller_id) : "";
       res.json({
         id: String(d.id),
         title: String(d.title ?? ""),

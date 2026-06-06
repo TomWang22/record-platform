@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8081'
+/** Server-side BFF: in-cluster gateway, not public edge URL (avoids /messages without /api prefix). */
+const API_GATEWAY_URL =
+  process.env.API_GATEWAY_URL ||
+  process.env.NEXT_PUBLIC_API_GATEWAY_URL ||
+  'http://api-gateway.record-platform.svc.cluster.local:4000'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +13,8 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit') || '20'
     const type = searchParams.get('type')
 
-    const url = new URL(`${API_GATEWAY_URL}/messages`)
+    const base = API_GATEWAY_URL.replace(/\/$/, '')
+    const url = new URL(`${base}/api/messaging/threads`)
     url.searchParams.set('page', page)
     url.searchParams.set('limit', limit)
     if (type) url.searchParams.set('type', type)

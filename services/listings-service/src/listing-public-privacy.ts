@@ -56,6 +56,24 @@ export type PublicListingShapeOptions = {
   includeOwnerIds?: boolean;
 };
 
+/** Human seller label for marketplace JSON (never a UUID fragment). */
+export function marketplaceSellerDisplay(row: Record<string, unknown>): string {
+  const raw = String(
+    row.seller ??
+      row.username_display ??
+      row.landlord_display ??
+      row.seller_display ??
+      "",
+  ).trim();
+  if (raw) return raw.slice(0, 120);
+  return "Seller";
+}
+
+/** Seller account id for contact-seller / messaging (not shown as primary UI label). */
+export function marketplaceSellerUserId(row: Record<string, unknown>): string {
+  return String(row.seller_id ?? row.user_id ?? row.landlord_id ?? "").trim();
+}
+
 /**
  * Strip forbidden keys and normalize seller location fields for public JSON.
  */
@@ -106,6 +124,11 @@ export function toPublicListingShape(
   const cityRegionCountry = [city, region, country].filter(Boolean).join(", ");
   const label = approx || cityRegionCountry;
   if (label) out.approximate_location_label = String(label).slice(0, 240);
+
+  out.seller = marketplaceSellerDisplay(row);
+  const sellerId = marketplaceSellerUserId(row);
+  if (sellerId) out.seller_id = sellerId;
+  if (opts.includeOwnerIds && sellerId) out.user_id = sellerId;
 
   return out;
 }

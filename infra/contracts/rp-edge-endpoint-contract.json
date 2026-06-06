@@ -25,9 +25,12 @@
     {"path": "/api/trust/healthz", "methods": ["GET"], "codes": [200], "attempts": {"h2": 1, "h3": 1}}
   ],
   "observability": [
-    {"path": "/grafana/", "methods": ["GET"], "codes": [200, 302, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false},
-    {"path": "/jaeger/", "methods": ["GET"], "codes": [200, 302, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false},
-    {"path": "/prometheus/", "methods": ["GET"], "codes": [200, 302, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false}
+    {"path": "/grafana/", "methods": ["GET"], "codes": [200, 301, 302, 308, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false},
+    {"path": "/grafana", "methods": ["GET"], "codes": [200, 301, 302, 308, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false},
+    {"path": "/jaeger/", "methods": ["GET"], "codes": [200, 301, 302, 308, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false},
+    {"path": "/jaeger", "methods": ["GET"], "codes": [200, 301, 302, 308, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false},
+    {"path": "/prometheus/", "methods": ["GET"], "codes": [200, 301, 302, 308, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false},
+    {"path": "/prometheus", "methods": ["GET"], "codes": [200, 301, 302, 308, 401], "attempts": {"h2": 1, "h3": 1}, "critical": false}
   ],
   "negative": [
     {"host": "wrong-record-platform.test", "path": "/", "codes": [421], "verdicts": ["CERT_FAIL", "EDGE_MISROUTE"], "critical": false, "protocols": ["h2", "h3"]},

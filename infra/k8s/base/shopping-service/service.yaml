@@ -9,8 +9,7 @@ spec:
   ports:
     - name: http
       port: 4007
-      targetPort: http
+      targetPort: 4007
     - name: grpc
       port: 50058
-      targetPort: grpc
-
+      targetPort: 50058

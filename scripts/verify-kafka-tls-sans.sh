@@ -101,7 +101,7 @@ while IFS='|' read -r kind name || [[ -n "$kind" ]]; do
       fi
     fi
   fi
-done < <(och_kafka_emit_san_verify_dns_specs "$NS" "$REPLICAS")
+done < <(rp_kafka_emit_san_verify_dns_specs "$NS" "$REPLICAS")
 
 # MetalLB EXTERNAL listener uses raw IPv4; broker JKS must include each kafka-N-external LB IP as IP SAN.
 if [[ "${KAFKA_VERIFY_METALLB_IP_SANS:-1}" == "1" ]] && command -v kubectl >/dev/null 2>&1; then
@@ -117,7 +117,7 @@ if [[ "${KAFKA_VERIFY_METALLB_IP_SANS:-1}" == "1" ]] && command -v kubectl >/dev
     else
       ok "SAN includes IP ${_lb_ip} (kafka-*-external)"
     fi
-  done < <(och_kafka_metallb_external_lb_ips_lines "$NS" "$REPLICAS")
+  done < <(rp_kafka_metallb_external_lb_ips_lines "$NS" "$REPLICAS")
 fi
 
 if [[ "$missing" -ne 0 ]]; then

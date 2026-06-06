@@ -9,3 +9,5 @@ patches:
   - path: patches/replicas-auth-service.yaml
   - path: patches/replicas-rest.yaml
   - path: patches/disk-pressure-tolerations.yaml
+  - path: patches/ollama-hpa-dev-colima.yaml
+  - path: patches/ollama-colima-memory.yaml

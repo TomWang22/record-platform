@@ -3,44 +3,36 @@
 import { useEffect, useState } from 'react'
 
 import { AuthRequiredCard } from '@/components/auth/auth-required-card'
-import { Card } from '@/components/ui/card'
+import { CollectionStatsCharts } from '@/components/collection/collection-stats-charts'
 import { apiFetch } from '@/lib/api-client'
 import type { CollectionRecord } from '@/lib/records-types'
 import { useRequireAuth } from '@/lib/use-require-auth'
 
 export default function ProfileCollectionStatsPage() {
   const { authRequired } = useRequireAuth()
-  const [byType, setByType] = useState<Record<string, number>>({})
+  const [records, setRecords] = useState<CollectionRecord[]>([])
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    if (!authRequired) {
-      void apiFetch<CollectionRecord[]>('/api/records', { auth: true }).then((rows) => {
-        const map: Record<string, number> = {}
-        for (const r of rows) {
-          const t = r.purchaseType ?? 'unknown'
-          map[t] = (map[t] ?? 0) + 1
-        }
-        setByType(map)
-      })
-    }
+    if (authRequired) return
+    void apiFetch<CollectionRecord[]>('/api/records', { auth: true })
+      .then((rows) => setRecords(rows))
+      .catch(() => setRecords([]))
+      .finally(() => setLoaded(true))
   }, [authRequired])
 
-  if (authRequired) return <AuthRequiredCard returnTo="/profile/collection-stats" title="Sign in" />
+  if (authRequired) {
+    return <AuthRequiredCard returnTo="/profile/collection-stats" title="Sign in" />
+  }
+
+  if (!loaded) {
+    return <p className="text-sm text-slate-500">Loading collection stats…</p>
+  }
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Collection stats</h1>
-      <Card title="Acquisition type breakdown">
-        <ul className="space-y-2 text-sm">
-          {Object.entries(byType).map(([k, v]) => (
-            <li key={k} className="flex justify-between"><span>{k}</span><span className="font-medium">{v}</span></li>
-          ))}
-          {Object.keys(byType).length === 0 && <li className="text-slate-500">No records yet.</li>}
-        </ul>
-      </Card>
-      <Card title="Charts">
-        <p className="text-sm text-slate-500">Weekly/monthly acquisition charts — adapter in Phase H.</p>
-      </Card>
+      <CollectionStatsCharts records={records} />
     </div>
   )
 }

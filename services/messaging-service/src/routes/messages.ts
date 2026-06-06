@@ -80,7 +80,7 @@ async function fetchListingForMessagingStart(
   if (upstream.status === 404) return null
   if (!upstream.ok) throw new Error(`listings_${upstream.status}`)
   const j = (await upstream.json()) as Record<string, unknown>
-  const landlord_id = String(j.landlord_id ?? j.seller_id ?? j.user_id ?? '').trim()
+  const landlord_id = String(j.seller_id ?? j.user_id ?? j.landlord_id ?? '').trim()
   const title = String(j.title ?? 'Listing')
   if (!THREAD_LISTING_UUID_RE.test(landlord_id)) return null
   return { landlord_id, title }

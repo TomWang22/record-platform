@@ -7,7 +7,13 @@ export type StoredListingRef = {
   title: string
   artist?: string
   priceCents?: number
+  priceDisplay?: string
   imageUrl?: string
+  saleType?: string
+  saleTypeDisplay?: string
+  sellerDisplay?: string
+  format?: string
+  mediaCondition?: string
   viewedAt?: string
 }
 

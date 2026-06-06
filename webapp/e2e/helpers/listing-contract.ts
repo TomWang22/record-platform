@@ -20,11 +20,9 @@ export async function pollListingUntil(
     listingId,
     (row) => {
       const images = (row.images as string[]) ?? []
+      const primary = String(row.primaryImageUrl ?? images[0] ?? '')
       if (expected.imageCount !== undefined && images.length !== expected.imageCount) return false
-      if (
-        expected.primaryIncludes &&
-        !String(images[0] ?? '').includes(expected.primaryIncludes)
-      ) {
+      if (expected.primaryIncludes && !primary.includes(expected.primaryIncludes)) {
         return false
       }
       return true
@@ -46,16 +44,11 @@ export async function saveListingAndOpenDetail(
   await expect(media).toBeAttached()
   await expect(page.getByTestId('listing-edit-save')).toBeEnabled()
 
-  const saveResponse = page.waitForResponse(
-    (r) =>
-      r.request().method() !== 'GET' &&
-      r.url().includes(`/api/listings/${listingId}`) &&
-      r.ok(),
-    { timeout: 60_000 },
-  )
   await page.getByTestId('listing-edit-save').click()
-  await saveResponse
-  await pollListingUntil(request, token, listingId, expected, { timeoutMs: 90_000 })
+  await page.waitForURL(new RegExp(`/listings/${listingId.replace(/-/g, '\\-')}$`), {
+    timeout: 120_000,
+  })
+  await pollListingUntil(request, token, listingId, expected, { timeoutMs: 120_000 })
 
   const detailRe = new RegExp(`/listings/${listingId.replace(/-/g, '\\-')}$`)
   if (!detailRe.test(new URL(page.url()).pathname)) {

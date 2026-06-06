@@ -1,6 +1,6 @@
 import express, { type Application, type NextFunction, type Request, type Response } from "express";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
-import { httpCounter, register, createHttpConcurrencyGuard, initOchOutboxSurfaceUnsupported } from "@common/utils";
+import { httpCounter, register, createHttpConcurrencyGuard, initOchOutboxSurfaceUnsupported, rpCheckLocalGrpcMtlsHealth, rpGrpcHealthOptions } from "@common/utils";
 import { checkKafkaConnectivity } from "@common/utils/kafka";
 import { inferNetProtoForSpan, mountDebugTraceHeaders, tracingMiddleware } from "@common/utils/otel";
 import { withCircuitBreaker } from "./circuitBreaker.js";
@@ -288,12 +288,29 @@ export function createAnalyticsHttpApp(): Application {
   });
 
   app.get("/readyz", async (_req, res) => {
+    let dbOk = false;
     try {
       await pool.query("SELECT 1");
-      res.json({ ok: true, ready: true });
+      dbOk = true;
     } catch {
-      res.status(503).json({ ok: false, ready: false });
+      dbOk = false;
     }
+    const grpcOpts = rpGrpcHealthOptions("analytics-service", "analytics.AnalyticsService");
+    let grpcOk = true;
+    if (grpcOpts) {
+      grpcOk = await rpCheckLocalGrpcMtlsHealth({
+        port: grpcOpts.port,
+        grpcService: grpcOpts.grpcService,
+        serverName: grpcOpts.serverName ?? "analytics-service",
+      });
+    }
+    const ready = dbOk && grpcOk;
+    res.status(ready ? 200 : 503).json({
+      ok: ready,
+      ready,
+      db: dbOk ? "connected" : "disconnected",
+      grpc: grpcOk ? "SERVING" : grpcOpts ? "fail" : "skip",
+    });
   });
 
   app.get("/metrics", async (_req, res) => {

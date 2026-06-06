@@ -9,6 +9,10 @@ import { Card } from '@/components/ui/card'
 import { ApiError, apiFetch } from '@/lib/api-client'
 import { isDevAuthEnabled } from '@/lib/dev-auth'
 import { persistDevSessionProfile, persistSessionToken } from '@/lib/session'
+import {
+  contractProfileFromJwtPayload,
+  persistContractSessionProfile,
+} from '@/lib/session-profile'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -53,6 +57,16 @@ export default function LoginPage() {
         data: { email, password },
       })
       persistSessionToken(data.token)
+      try {
+        const parts = data.token.split('.')
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]!)) as Record<string, unknown>
+          const profile = contractProfileFromJwtPayload({ ...payload, email: payload.email ?? email })
+          if (profile) persistContractSessionProfile(profile)
+        }
+      } catch {
+        /* non-fatal */
+      }
       router.replace('/dashboard')
     } catch (error) {
       if (error instanceof ApiError) {

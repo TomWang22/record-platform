@@ -33,7 +33,7 @@ fi
 
 for ((i = R - 1; i >= 0; i--)); do
   echo "▶ Quorum gate before restarting kafka-$i"
-  if ! och_kafka_kraft_quorum_ok "$NS"; then
+  if ! rp_kafka_kraft_quorum_ok "$NS"; then
     echo "❌ KRaft quorum not healthy (no LeaderId in describe --status) — aborting rolling restart"
     exit 1
   fi

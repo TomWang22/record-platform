@@ -59,9 +59,38 @@ class PredictReq(BaseModel):
 
 @app.get("/healthz")
 async def healthz():
-    """Fast health check endpoint - must respond quickly even under load"""
-    # Don't block on any operations - just return immediately
-    return {"ok": True, "status": "healthy"}
+    """Liveness: process up only."""
+    return {"ok": True, "status": "healthy", "service": "python-ai-service"}
+
+@app.get("/readyz")
+async def readyz():
+    """Readiness: local mTLS gRPC health SERVING."""
+    import subprocess
+    grpc_port = os.getenv("GRPC_PORT", "50060")
+    grpc_svc = "python_ai.PythonAIService"
+    cmd = [
+        "/usr/local/bin/grpc-health-probe",
+        f"-addr=127.0.0.1:{grpc_port}",
+        f"-service={grpc_svc}",
+        "-tls",
+        "-tls-no-verify=false",
+        "-tls-ca-cert=/etc/certs/ca.crt",
+        "-tls-client-cert=/etc/certs/tls.crt",
+        "-tls-client-key=/etc/certs/tls.key",
+        "-tls-server-name=python-ai-service",
+        "-connect-timeout=3s",
+        "-rpc-timeout=5s",
+    ]
+    try:
+        r = subprocess.run(cmd, capture_output=True, timeout=8, check=False)
+        if r.returncode != 0:
+            return JSONResponse(
+                {"ok": False, "ready": False, "grpc": "fail", "stderr": (r.stderr or b"").decode()[:200]},
+                status_code=503,
+            )
+        return {"ok": True, "ready": True, "grpc": "SERVING", "service": "python-ai-service"}
+    except Exception as e:
+        return JSONResponse({"ok": False, "ready": False, "grpc": "error", "error": str(e)}, status_code=503)
 
 @app.get("/metrics")
 def metrics():

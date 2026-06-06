@@ -21,6 +21,8 @@ service ShoppingService {
   // Recently Viewed operations
   rpc AddRecentlyViewed(AddRecentlyViewedRequest) returns (AddRecentlyViewedResponse);
   rpc GetRecentlyViewed(GetRecentlyViewedRequest) returns (GetRecentlyViewedResponse);
+  rpc RemoveRecentlyViewed(RemoveRecentlyViewedRequest) returns (RemoveRecentlyViewedResponse);
+  rpc ClearRecentlyViewed(ClearRecentlyViewedRequest) returns (ClearRecentlyViewedResponse);
   
   // Wishlist operations
   rpc AddToWishlist(AddToWishlistRequest) returns (AddToWishlistResponse);
@@ -190,6 +192,26 @@ message RecentlyViewedItem {
   string item_id = 3;
   string viewed_at = 4;
   string metadata = 5; // JSON string
+}
+
+message RemoveRecentlyViewedRequest {
+  string user_id = 1;
+  string item_type = 2;
+  string item_id = 3;
+}
+
+message RemoveRecentlyViewedResponse {
+  bool success = 1;
+}
+
+message ClearRecentlyViewedRequest {
+  string user_id = 1;
+  optional string item_type = 2;
+}
+
+message ClearRecentlyViewedResponse {
+  bool success = 1;
+  int32 removed = 2;
 }
 
 // Wishlist messages

@@ -3,6 +3,8 @@
 import { Button } from '@/components/ui/button'
 import {
   RECORDS_PAGE_SIZES,
+  type ListedStatusFilter,
+  type PurchaseTypeFilter,
   type RecordsSortKey,
   type RecordsViewMode,
 } from '@/lib/records-types'
@@ -23,6 +25,18 @@ type Props = {
   page: number
   pageCount: number
   onPageChange: (page: number) => void
+  purchaseTypeFilter?: PurchaseTypeFilter
+  onPurchaseTypeFilterChange?: (v: PurchaseTypeFilter) => void
+  purchasedFrom?: string
+  purchasedTo?: string
+  onPurchasedFromChange?: (v: string) => void
+  onPurchasedToChange?: (v: string) => void
+  receivedFrom?: string
+  receivedTo?: string
+  onReceivedFromChange?: (v: string) => void
+  onReceivedToChange?: (v: string) => void
+  listedFilter?: ListedStatusFilter
+  onListedFilterChange?: (v: ListedStatusFilter) => void
 }
 
 export function RecordsToolbar({
@@ -41,6 +55,18 @@ export function RecordsToolbar({
   page,
   pageCount,
   onPageChange,
+  purchaseTypeFilter = '',
+  onPurchaseTypeFilterChange,
+  purchasedFrom = '',
+  purchasedTo = '',
+  onPurchasedFromChange,
+  onPurchasedToChange,
+  receivedFrom = '',
+  receivedTo = '',
+  onReceivedFromChange,
+  onReceivedToChange,
+  listedFilter = '',
+  onListedFilterChange,
 }: Props) {
   return (
     <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-slate-950">
@@ -60,6 +86,87 @@ export function RecordsToolbar({
         <Button variant="ghost" onClick={() => onClear?.()} disabled={loading || !query}>
           Clear
         </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 dark:border-white/5">
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          Purchase type
+          <select
+            data-testid="records-filter-purchase-type"
+            value={purchaseTypeFilter}
+            onChange={(e) =>
+              onPurchaseTypeFilterChange?.(e.target.value as PurchaseTypeFilter)
+            }
+            className="rounded-lg border border-slate-200/80 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-slate-900"
+          >
+            <option value="">All types</option>
+            <option value="fixed_price">Fixed price</option>
+            <option value="auction_win">Auction win</option>
+            <option value="retail">Retail</option>
+            <option value="trade">Trade</option>
+            <option value="gift">Gift</option>
+            <option value="obo">OBO</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          Purchased from
+          <input
+            type="date"
+            data-testid="records-filter-purchased-from"
+            value={purchasedFrom}
+            onChange={(e) => onPurchasedFromChange?.(e.target.value)}
+            className="rounded-lg border border-slate-200/80 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-slate-900"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          Purchased to
+          <input
+            type="date"
+            data-testid="records-filter-purchased-to"
+            value={purchasedTo}
+            onChange={(e) => onPurchasedToChange?.(e.target.value)}
+            className="rounded-lg border border-slate-200/80 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-slate-900"
+          />
+        </label>
+
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          Received from
+          <input
+            type="date"
+            data-testid="records-filter-received-from"
+            value={receivedFrom}
+            onChange={(e) => onReceivedFromChange?.(e.target.value)}
+            className="rounded-lg border border-slate-200/80 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-slate-900"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          Received to
+          <input
+            type="date"
+            data-testid="records-filter-received-to"
+            value={receivedTo}
+            onChange={(e) => onReceivedToChange?.(e.target.value)}
+            className="rounded-lg border border-slate-200/80 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-slate-900"
+          />
+        </label>
+
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          Listed
+          <select
+            data-testid="records-filter-listed"
+            value={listedFilter}
+            onChange={(e) =>
+              onListedFilterChange?.(e.target.value as ListedStatusFilter)
+            }
+            className="rounded-lg border border-slate-200/80 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-slate-900"
+          >
+            <option value="">All</option>
+            <option value="listed">Listed</option>
+            <option value="not_listed">Not listed</option>
+          </select>
+        </label>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

@@ -1,7 +1,7 @@
 # file: scripts/strict-tls-bootstrap.sh  (re-run to ensure secrets exist in BOTH namespaces)
 #!/usr/bin/env bash
 set -euo pipefail
-# Run from repo root. dev-root.pem, record.local.crt, record.local.key must be in ./certs/
+# Run from repo root. dev-root.pem, record-platform.test.crt, record-platform.test.key must be in ./certs/
 # For Envoy→backend mTLS we also need a dedicated Envoy client cert (CN=envoy). Generate with:
 #   KAFKA_SSL=1 ./scripts/reissue-ca-and-leaf-load-all-services.sh   # persists certs/dev-root.key
 #   ./scripts/generate-envoy-client-cert.sh                         # creates certs/envoy-client.crt|.key
@@ -11,34 +11,40 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"
-# Caddy terminates TLS at the edge; record-local-tls is the leaf cert. Secret type is immutable — delete then create if replacing.
+# shellcheck source=lib/rp-pki-generation.sh
+source "$SCRIPT_DIR/lib/rp-pki-generation.sh"
+# shellcheck source=lib/rp-apply-service-mtls-secrets.sh
+source "$SCRIPT_DIR/lib/rp-apply-service-mtls-secrets.sh"
+
+# Caddy terminates TLS at the edge; record-platform-local-tls is the leaf cert.
 for ns in ingress-nginx record-platform; do
-  kubectl -n "$ns" delete secret record-local-tls --ignore-not-found
-  kubectl -n "$ns" create secret tls record-local-tls \
-    --cert=certs/record.local.crt --key=certs/record.local.key
+  kubectl -n "$ns" delete secret record-platform-local-tls --ignore-not-found
+  kubectl -n "$ns" create secret tls record-platform-local-tls \
+    --cert=certs/record-platform.test.crt --key=certs/record-platform.test.key
+  rp_annotate_secret_pki_generation "$ns" record-platform-local-tls
 done
 kubectl -n ingress-nginx create secret generic dev-root-ca \
   --from-file=dev-root.pem=certs/dev-root.pem \
   -o yaml --dry-run=client | kubectl apply -f -
+rp_annotate_secret_pki_generation ingress-nginx dev-root-ca
 kubectl -n record-platform create secret generic dev-root-ca \
   --from-file=dev-root.pem=certs/dev-root.pem \
   -o yaml --dry-run=client | kubectl apply -f -
-# Backends (auth-service, etc.) use secret "service-tls" with tls.crt, tls.key, ca.crt for TLS server + client cert verification (real mTLS).
-kubectl -n record-platform delete secret service-tls --ignore-not-found
-kubectl -n record-platform create secret generic service-tls \
-  --from-file=tls.crt=certs/record.local.crt \
-  --from-file=tls.key=certs/record.local.key \
-  --from-file=ca.crt=certs/dev-root.pem
+rp_annotate_secret_pki_generation record-platform dev-root-ca
+# Contract-driven per-service mTLS + bundle + edge aliases.
+rp_apply_service_mtls_secrets record-platform
 kubectl create namespace envoy-test --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n envoy-test create secret generic dev-root-ca \
   --from-file=dev-root.pem=certs/dev-root.pem \
   -o yaml --dry-run=client | kubectl apply -f -
+rp_annotate_secret_pki_generation envoy-test dev-root-ca
 # Envoy uses a dedicated client cert (CN=envoy), not the edge leaf, so backends see a proper client identity.
 if [[ -f certs/envoy-client.crt ]] && [[ -f certs/envoy-client.key ]]; then
   kubectl -n envoy-test delete secret envoy-client-tls --ignore-not-found
   kubectl -n envoy-test create secret generic envoy-client-tls \
     --from-file=envoy.crt=certs/envoy-client.crt \
     --from-file=envoy.key=certs/envoy-client.key
+  rp_annotate_secret_pki_generation envoy-test envoy-client-tls
   echo "Envoy client secret envoy-client-tls created (CN=envoy)."
 else
   echo "⚠️  certs/envoy-client.crt or certs/envoy-client.key missing. Run: KAFKA_SSL=1 ./scripts/reissue-ca-and-leaf-load-all-services.sh then ./scripts/generate-envoy-client-cert.sh"

@@ -1,0 +1,6 @@
+ARCHIVE_SHA256=e61be4de4d984816cb37d41d8247a9e951d6edaadd2d1a54f8bdc29ca19a7149
+ARCHIVE_PATH=/Users/tom/record-platform-och-preflight-cert-kafka-bundle-20260418-025117.tar.gz
+SIDECAR_PATH=none
+SIDECAR_HASH_EXPECTED=
+RECORDED_AT_UTC=2026-04-19T00:52:57.272447+00:00
+PROTOCOL=bundle_extraction_v1

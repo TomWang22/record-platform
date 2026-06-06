@@ -4,7 +4,7 @@ import helmet from "helmet";
 import compression from "compression";
 import cors from "cors";
 import { PrismaClient } from '../generated/records-client';
-import { register, httpCounter } from "@common/utils";
+import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions } from "@common/utils";
 import { recordsRouter } from "./routes/records.js";
 import { exportRouter } from "./routes/export.js";
 import { makeRedis, attachPgInvalidationListener } from "./lib/cache.js";
@@ -72,21 +72,18 @@ app.get("/metrics", async (_req: Request, res: Response) => {
   res.end(await register.metrics());
 });
 
-// /healthz — cheap DB + optional Redis ping
-app.get("/healthz", async (_req: Request, res: Response) => {
-  try {
-    const row = await prisma.$queryRaw<{ current_user: string }[]>`SELECT current_user`;
-    const user = row?.[0]?.current_user ?? "unknown";
-    let r = "skipped";
+mountRpHttpHealth(app, {
+  service: "records-service",
+  readiness: async () => {
     try {
-      r = redis ? await redis.ping() : "disabled";
+      await prisma.$queryRaw`SELECT 1`;
+      if (redis) await redis.ping();
+      return true;
     } catch {
-      r = "error";
+      return false;
     }
-    res.json({ ok: true, db_user: user, redis: r });
-  } catch (e: any) {
-    res.status(500).json({ ok: false, error: e?.message || "db error" });
-  }
+  },
+  grpc: rpGrpcHealthOptions("records-service", "records.RecordsService"),
 });
 
 /** Identity guard */

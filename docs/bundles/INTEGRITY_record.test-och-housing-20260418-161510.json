@@ -1,0 +1,41 @@
+{
+  "bundle_extraction_protocol": "v1",
+  "generated_at": "2026-04-19T00:53:56.673137+00:00",
+  "archive": "/Users/tom/record.test-och-housing-20260418-161510.tar.gz",
+  "archive_sha256": "5a087585d20a8937a39f72a67fbc43a87f7298175a85b09a41cf082c5622161e",
+  "staging_path": "/Users/tom/bundle-staging/record.test-och-housing-20260418-161510",
+  "archive_root_layout": {
+    "type": "mixed_top_level",
+    "roots_sample": [
+      ".nvmrc",
+      "Makefile",
+      "RECORD.test",
+      "Runbook.md",
+      "docs",
+      "infra",
+      "package.json",
+      "scripts",
+      "vitest.system.config.mts"
+    ]
+  },
+  "pre_extract": {
+    "safe": true,
+    "issues": [],
+    "warnings": [],
+    "file_member_count": 22
+  },
+  "post_extract": {
+    "manifest_tar_equals_find": true,
+    "file_count": 22,
+    "case_collision_free": true,
+    "staging_frozen_read_only": true,
+    "apple_double_neutral_manifest": true
+  },
+  "explicit_non_actions": [
+    "tarball_not_mutated",
+    "no_line_endings_normalized",
+    "no_top_level_strip_rewrite",
+    "no_repo_copy",
+    "no_git_add"
+  ]
+}

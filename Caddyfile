@@ -42,6 +42,18 @@
 https://record-platform.test {
 	tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key {
 		protocols tls1.2 tls1.3
+		client_auth {
+			mode verify_if_given
+			trust_pool file /etc/caddy/mtls-test/mtls-test-ca.pem
+		}
+	}
+
+	# REST API paths (contract): /api/* /auth/* /shopping/* /messaging/* /community/*
+	# /media/* /trust/* /notification/* /analytics/* /insights/* /ai/* /python-ai/*
+	# /auctions/* /auction-monitor/*
+	header {
+		# alt-svc advertisement for HTTP/3 (QUIC on :443)
+		Alt-Svc `h3=":443"; ma=86400`
 	}
 
 	# Request access log: host, uri, proto for H2 vs H3 comparison (kubectl logs deploy/caddy-h3 -n ingress-nginx)
@@ -75,6 +87,27 @@ https://record-platform.test {
 		respond "ok" 200
 	}
 
+	# Edge health (no client cert) — api-gateway /healthz
+	handle /healthz {
+		reverse_proxy http://api-gateway.record-platform.svc.cluster.local:4000 {
+			header_up Host {http.request.host}
+			transport http {
+				versions h1
+			}
+		}
+	}
+
+	# Dev mTLS edge probe — mtls-test CA (secret rp-mtls-test-ca → /etc/caddy/mtls-test/)
+	map {http.request.tls.client.subject} {mtls_client_tier} {
+		~rp-mtls-test-client ok
+		default deny
+	}
+	handle /mtls-healthz {
+		@mtls_ok expression {mtls_client_tier} == "ok"
+		respond @mtls_ok "ok" 200
+		respond "Forbidden" 403
+	}
+
 	# Auction Monitor & Python AI health ( /auctions/healthz, /ai/healthz ) -> api-gateway
 	# These are NOT under /api/ so we route them explicitly; api-gateway serves /auctions/healthz and /ai/healthz
 	handle /auctions/healthz {
@@ -94,13 +127,16 @@ https://record-platform.test {
 		}
 	}
 
-	# gRPC: route to Envoy via h2c only. TLS terminated at Caddy; do NOT use https:// upstream for Envoy.
-	# CRITICAL: Explicit transport versions h2c — without it Caddy may downgrade to HTTP/1.1 and Envoy gRPC listener rejects.
-	# See docs/CADDY_GRPC_REVERSE_PROXY_SETUP.md
-	@grpc path_regexp \.
+	# gRPC: route to Envoy via h2c only (Content-Type: application/grpc).
+	# TODO: remove X-OCH-Edge-Proto once all RP interceptors use X-RP-Edge-Proto only.
+	@grpc {
+		header Content-Type application/grpc*
+	}
 	handle @grpc {
 		reverse_proxy envoy-test.envoy-test.svc.cluster.local:10000 {
 			header_up Host {http.request.host}
+			header_up X-RP-Edge-Proto {http.request.proto}
+			header_up X-OCH-Edge-Proto {http.request.proto}
 			transport http {
 				versions h2c
 			}
@@ -121,46 +157,16 @@ https://record-platform.test {
 				dial_timeout 10s
 				response_header_timeout 30s
 			}
-			health_uri /healthz
-			health_interval 10s
-			health_timeout 5s
 		}
 	}
 
-	# REST API requests: route DIRECTLY to api-gateway (NOT through ingress-nginx)
-	# Direct routing: Caddy → api-gateway (single-hop, faster, more reliable)
-	# CRITICAL: Exclude gRPC paths (service.Service/Method format with dots) - only match REST paths (with slashes)
-	@api {
-		path_regexp ^/(api/|auth/|records/|listings/|social/|shopping/|analytics/|python-ai/|auction-monitor/)
-		not path_regexp ^/?[a-z_]+\. # Exclude gRPC paths (service.Service format)
+	# Next.js BFF routes (must hit webapp, not api-gateway)
+	@webapp_bff {
+		path /api/webapp-version
+		path /api/messages/*
 	}
-	handle @api {
-		reverse_proxy http://api-gateway.record-platform.svc.cluster.local:4000 {
-			header_up Host {http.request.host}
-			# Use HTTP/1.1 to match backend
-			transport http {
-				versions h1
-				# Connection pool settings for high load
-				dial_timeout 10s
-				response_header_timeout 30s
-				expect_continue_timeout 5s
-				# Connection reuse is enabled by default in Caddy
-			}
-			# Load balancing and health checks
-			lb_policy round_robin
-			health_uri /healthz
-			health_interval 10s
-			health_timeout 5s
-			# Retry on connection errors
-			fail_duration 30s
-			max_fails 3
-		}
-	}
-
-	# Catch-all for non-API paths (webapp externalized - route to api-gateway fallback)
-	# Webapp was excluded from kustomization; use api-gateway so Caddy doesn't poison on missing DNS
-	handle {
-		reverse_proxy http://api-gateway.record-platform.svc.cluster.local:4000 {
+	handle @webapp_bff {
+		reverse_proxy http://webapp.record-platform.svc.cluster.local:3001 {
 			header_up Host {http.request.host}
 			header_up X-Forwarded-Proto https
 			transport http {
@@ -168,9 +174,46 @@ https://record-platform.test {
 				dial_timeout 10s
 				response_header_timeout 30s
 			}
-			health_uri /healthz
-			health_interval 10s
-			health_timeout 5s
+		}
+	}
+
+	# REST API requests: route DIRECTLY to api-gateway (NOT through ingress-nginx)
+	# Direct routing: Caddy → api-gateway (single-hop, faster, more reliable)
+	# CRITICAL: Exclude gRPC paths (service.Service/Method format with dots) - only match REST paths (with slashes)
+	@api {
+		path_regexp ^/(api/|auth/|shopping/|messaging/|community/|media/|trust/|notification/|analytics/|insights/|ai/|python-ai/|auctions/|auction-monitor/)
+		not path_regexp ^/?[a-z_]+\. # Exclude gRPC paths (service.Service format)
+	}
+	# Browser UI lives under /records/* and /listings/* (Next.js); REST uses /api/records and /api/listings only.
+	handle @api {
+		reverse_proxy http://api-gateway.record-platform.svc.cluster.local:4000 {
+			header_up Host {http.request.host}
+			header_up X-RP-Edge-Proto {http.request.proto}
+			header_up X-OCH-Edge-Proto {http.request.proto}
+			transport http {
+				versions h1
+				dial_timeout 10s
+				response_header_timeout 30s
+				expect_continue_timeout 5s
+			}
+			lb_policy round_robin
+			fail_duration 30s
+			max_fails 3
+		}
+	}
+
+	# Catch-all for non-API paths → in-cluster webapp (Next.js on :3001)
+	handle {
+		reverse_proxy http://webapp.record-platform.svc.cluster.local:3001 {
+			header_up Host {http.request.host}
+			header_up X-Forwarded-Proto https
+			header_up X-RP-Edge-Proto {http.request.proto}
+			header_up X-OCH-Edge-Proto {http.request.proto}
+			transport http {
+				versions h1
+				dial_timeout 10s
+				response_header_timeout 30s
+			}
 		}
 	}
 }
@@ -208,20 +251,6 @@ https://record-platform.test {
 	# Catch-all for non-record-platform.test hosts (ingress-nginx-controller not deployed; use api-gateway)
 	# Fixes "no such host" DNS failures that poisoned Caddy readiness
 	handle {
-		reverse_proxy http://api-gateway.record-platform.svc.cluster.local:4000 {
-			header_up Host {http.request.host}
-			transport http {
-				versions h1
-				dial_timeout 10s
-				response_header_timeout 30s
-				expect_continue_timeout 5s
-			}
-			lb_policy round_robin
-			health_uri /healthz
-			health_interval 10s
-			health_timeout 5s
-			fail_duration 30s
-			max_fails 3
-		}
+		respond "Misdirected Request" 421
 	}
 }

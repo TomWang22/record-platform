@@ -70,7 +70,7 @@ spec:
             - name: GRPC_REQUIRE_CLIENT_CERT
               value: "true"  # Strict mTLS: Envoy presents client cert to backends
             - name: TLS_CA_PATH
-              value: "/certs/dev-root.pem"  # Must match CA that signs Envoy client cert
+              value: "/etc/certs/ca.crt"
             - name: TLS_KEY_PATH
               value: "/etc/certs/tls.key"
             - name: TLS_CERT_PATH
@@ -146,7 +146,7 @@ spec:
                 path: dev-root.pem
         - name: service-tls
           secret:
-            secretName: service-tls
+            secretName: service-tls-analytics-service
             items:
               - key: tls.key
                 path: tls.key

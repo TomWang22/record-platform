@@ -3,7 +3,7 @@
  * Used by `http-server.ts` and unit tests; does not listen or touch Kafka bootstrap.
  */
 import express, { type Express, type NextFunction, type Request, type Response } from 'express'
-import { createHttpConcurrencyGuard, httpCounter, register, initOchOutboxSurfaceSupported, setOchOutboxUnpublishedCount, setOchOutboxOldestUnpublishedAgeSeconds } from '@common/utils'
+import { createHttpConcurrencyGuard, httpCounter, register, initOchOutboxSurfaceSupported, setOchOutboxUnpublishedCount, setOchOutboxOldestUnpublishedAgeSeconds, rpCheckLocalGrpcMtlsHealth, rpGrpcHealthOptions } from '@common/utils'
 import { inferNetProtoForSpan, mountDebugTraceHeaders, tracingMiddleware, writeDebugTraceHeadersJson } from '@common/utils/otel'
 import { checkConnection, getById, loadInlineBytes, pool, saveInlineBytes } from './db/mediaRepo.js'
 import { completeUpload } from './handlers/completeUpload.js'
@@ -141,12 +141,23 @@ export function createMediaHttpApp(): Express {
   app.get(['/readyz', '/ready', '/ready/'], async (_req, res) => {
     try {
       const dbOk = await checkConnection()
-      const body = {
-        ok: dbOk,
-        db: dbOk ? 'connected' : 'disconnected',
-        service: 'media-service',
+      const grpcOpts = rpGrpcHealthOptions('media-service', 'media.MediaService')
+      let grpcOk = true
+      if (grpcOpts) {
+        grpcOk = await rpCheckLocalGrpcMtlsHealth({
+          port: grpcOpts.port,
+          grpcService: grpcOpts.grpcService,
+          serverName: grpcOpts.serverName ?? 'media-service',
+        })
       }
-      res.status(dbOk ? 200 : 503).json(body)
+      const ready = dbOk && grpcOk
+      res.status(ready ? 200 : 503).json({
+        ok: ready,
+        ready,
+        db: dbOk ? 'connected' : 'disconnected',
+        grpc: grpcOk ? 'SERVING' : grpcOpts ? 'fail' : 'skip',
+        service: 'media-service',
+      })
     } catch {
       res.status(503).json({ ok: false, db: 'error', service: 'media-service' })
     }

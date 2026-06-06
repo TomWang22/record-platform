@@ -3,6 +3,7 @@ import type Redis from 'ioredis'
 import type { AuthedRequest } from '../lib/auth.js'
 import { pool, withRetry } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
+import { normalizeRecentlyViewedItems } from '../lib/shopping-product-contract.js'
 
 export default function recentlyViewedRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
   const router: Router = Router()
@@ -40,7 +41,8 @@ export default function recentlyViewedRouter(redis: Redis | null, cacheManager: 
         'get recently viewed'
       )
 
-      res.json({ items: result.rows })
+      const items = await normalizeRecentlyViewedItems(result.rows)
+      res.json({ items })
     } catch (err) {
       console.error('[shopping] Get recently viewed error:', err)
       res.status(500).json({ error: 'Failed to get recently viewed' })
@@ -82,6 +84,53 @@ export default function recentlyViewedRouter(redis: Redis | null, cacheManager: 
     } catch (err) {
       console.error('[shopping] Add recently viewed error:', err)
       res.status(500).json({ error: 'Failed to add recently viewed' })
+    }
+  })
+
+  // DELETE /recently-viewed?item_type=listing — clear all, or ?item_type=&item_id= — remove one
+  router.delete('/', async (req: AuthedRequest, res: Response) => {
+    const userId = req.user?.sub
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
+    const itemType = req.query.item_type as string | undefined
+    const itemId = req.query.item_id as string | undefined
+
+    try {
+      if (itemId) {
+        if (!itemType) {
+          return res.status(400).json({ error: 'item_type required when item_id is set' })
+        }
+        const result = await withRetry(
+          () =>
+            pool.query(
+              `DELETE FROM shopping.recently_viewed
+               WHERE user_id = $1 AND item_type = $2 AND item_id = $3
+               RETURNING item_id`,
+              [userId, itemType, itemId],
+            ),
+          3,
+          'remove recently viewed',
+        )
+        if (result.rowCount === 0) {
+          return res.status(404).json({ error: 'not found' })
+        }
+        return res.json({ success: true })
+      }
+
+      let query = `DELETE FROM shopping.recently_viewed WHERE user_id = $1`
+      const params: string[] = [userId]
+      if (itemType) {
+        query += ` AND item_type = $2`
+        params.push(itemType)
+      }
+      query += ` RETURNING item_id`
+      const result = await withRetry(() => pool.query(query, params), 3, 'clear recently viewed')
+      res.json({ success: true, removed: result.rowCount ?? 0 })
+    } catch (err) {
+      console.error('[shopping] Delete recently viewed error:', err)
+      res.status(500).json({ error: 'Failed to delete recently viewed' })
     }
   })
 

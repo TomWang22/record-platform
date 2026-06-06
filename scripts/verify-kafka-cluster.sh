@@ -25,7 +25,7 @@
 #   VERIFY_KAFKA_SKIP_STATIC_ADVERTISED_ENV=1 — skip guard: workload env must not set KAFKA_ADVERTISED_LISTENERS (KRaft)
 #   VERIFY_KAFKA_SKIP_QUORUM_GATE=1, VERIFY_KAFKA_SKIP_LEADERSHIP_CHURN_GATE=1, VERIFY_KAFKA_SKIP_BROKER_API_GATE=1,
 #   VERIFY_KAFKA_SKIP_TLS_CONSISTENCY=1
-#   VERIFY_KAFKA_REQUIRE_SECRET_CA_ANNOTATION=1 — fail if kafka-ssl-secret lacks och.dev/ca-fingerprint-sha256
+#   VERIFY_KAFKA_REQUIRE_SECRET_CA_ANNOTATION=1 — fail if kafka-ssl-secret lacks rp.dev/ca-fingerprint-sha256
 #
 # What would break this cluster (operational checklist):
 #   - MetalLB IP changes without cert regen → external TLS fails (mitigation: KAFKA_SSL_AUTO_METALLB_IPS=1).
@@ -41,6 +41,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="${REPO_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# shellcheck source=lib/rp-kafka-ssl-fingerprint.sh
+source "$SCRIPT_DIR/lib/rp-kafka-ssl-fingerprint.sh"
+# shellcheck source=lib/rp-dev-ca.sh
+source "$SCRIPT_DIR/lib/rp-dev-ca.sh"
 NS="${1:-${HOUSING_NS:-record-platform}}"
 REPLICAS="${2:-${KAFKA_BROKER_REPLICAS:-3}}"
 CHURN_SINCE="${KAFKA_CHURN_LOG_SINCE:-10m}"
@@ -179,29 +184,23 @@ if [[ "${VERIFY_KAFKA_SKIP_TLS_CONSISTENCY:-0}" != "1" ]]; then
     exit 1
   fi
   ok "CA fingerprints match ($_bfp)"
-  _ann="$(kubectl get secret kafka-ssl-secret -n "$NS" -o go-template='{{index .metadata.annotations "och.dev/ca-fingerprint-sha256"}}' 2>/dev/null | tr -d '\r' || true)"
-  if [[ -n "$_ann" && "$_ann" != "$_bfp" ]]; then
-    bad "kafka-ssl-secret annotation och.dev/ca-fingerprint-sha256 does not match live ca-cert.pem (partial edit? annotation=$_ann computed=$_bfp)"
-    exit 1
+  if ! rp_kafka_ssl_verify_secret_ca_annotation "$NS" "$_tmp/broker-ca.pem"; then
+    if [[ "${VERIFY_KAFKA_REQUIRE_SECRET_CA_ANNOTATION:-1}" == "1" ]]; then
+      bad "kafka-ssl-secret rp.dev/ca-fingerprint-sha256 drift (re-run: HOUSING_NS=$NS bash scripts/apply-rp-kafka-ssl-secret.sh)"
+      exit 1
+    fi
+    say "ℹ️  rp.dev/ca-fingerprint-sha256 check failed (non-fatal: VERIFY_KAFKA_REQUIRE_SECRET_CA_ANNOTATION=0)"
+  else
+    ok "Secret CA annotation (rp.dev) matches live ca-cert.pem ($_bfp)"
   fi
-  if [[ -z "$_ann" && "${VERIFY_KAFKA_REQUIRE_SECRET_CA_ANNOTATION:-0}" == "1" ]]; then
-    bad "kafka-ssl-secret missing annotation och.dev/ca-fingerprint-sha256 (re-run: make kafka-refresh-tls-from-lb or pnpm kafka-ssl)"
-    exit 1
-  fi
-  [[ -n "$_ann" ]] && ok "Secret CA annotation matches computed fingerprint" || say "ℹ️  No och.dev/ca-fingerprint-sha256 annotation yet (non-fatal unless VERIFY_KAFKA_REQUIRE_SECRET_CA_ANNOTATION=1)"
   awk '/BEGIN CERTIFICATE/,/END CERTIFICATE/{print; if (/END CERTIFICATE/) exit}' "$_tmp/kafka-broker.pem" >"$_tmp/broker-leaf.pem"
-  if ! openssl verify -CAfile "$_tmp/broker-ca.pem" "$_tmp/broker-leaf.pem" >/dev/null 2>&1; then
-    bad "Broker leaf in kafka-broker.pem does not verify against ca-cert.pem from kafka-ssl-secret"
-    openssl verify -CAfile "$_tmp/broker-ca.pem" "$_tmp/broker-leaf.pem" >&2 || true
+  rp_dev_bootstrap_chain
+  if ! openssl verify -CAfile "$(rp_dev_root_pem)" -untrusted "$(rp_dev_intermediate_pem)" "$_tmp/broker-leaf.pem" >/dev/null 2>&1; then
+    bad "Broker leaf in kafka-broker.pem does not chain to dev-root via dev-intermediate (3-stage PKI)"
+    openssl verify -CAfile "$(rp_dev_root_pem)" -untrusted "$(rp_dev_intermediate_pem)" "$_tmp/broker-leaf.pem" >&2 || true
     exit 1
   fi
-  _iss="$(openssl x509 -in "$_tmp/broker-leaf.pem" -noout -issuer -nameopt RFC2253 2>/dev/null | sed 's/^issuer=//')"
-  _sub="$(openssl x509 -in "$_tmp/broker-ca.pem" -noout -subject -nameopt RFC2253 2>/dev/null | sed 's/^subject=//')"
-  if [[ "$_iss" != "$_sub" ]]; then
-    bad "Broker cert issuer does not match CA subject (issuer=$_iss subject=$_sub)"
-    exit 1
-  fi
-  ok "Broker leaf verifies; issuer matches CA subject"
+  ok "Broker leaf chains to dev-root (serverAuth + clientAuth EKU on leaf)"
   trap - EXIT
   rm -rf "$_tmp"
 else

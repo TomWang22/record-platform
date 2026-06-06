@@ -1,0 +1,6 @@
+ARCHIVE_SHA256=2ae24cbc99afae4b2d3036f5282048127ea5e2ee448113bf3b6cc846e0591765
+ARCHIVE_PATH=/Users/tom/record-platform-final-vitest-kafka-event-layer-chaos-golden-20260410.tar.gz
+SIDECAR_PATH=none
+SIDECAR_HASH_EXPECTED=
+RECORDED_AT_UTC=2026-04-19T00:51:41.581762+00:00
+PROTOCOL=bundle_extraction_v1

@@ -516,6 +516,86 @@ function verifyKafkaAlignment() {
   });
 }
 
+function verifyGrpcMtlsRequired() {
+  const skip =
+    process.env.RP_SKIP_GRPC_MTLS_REQUIRED === "1" ||
+    process.env.RP_SKIP_GRPC_MTLS_REQUIRED === "true";
+  const gateJson = join(repoRoot, "bench_logs/security-contract/grpc-mtls-required-gate.json");
+  const covPath = join(repoRoot, "bench_logs/grpc-mtls-rca/coverage.json");
+  const matPath = join(repoRoot, "bench_logs/grpc-mtls-rca/full-matrix.json");
+
+  if (skip) {
+    return {
+      ok: false,
+      skipped: true,
+      checked: 0,
+      expected: 11,
+      all_required: false,
+      plaintext_denied: false,
+      strict_integrity: false,
+      reason: "RP_SKIP_GRPC_MTLS_REQUIRED=1 (local dev only; fails strict bootstrap)",
+    };
+  }
+
+  const errors = [];
+  let checked = 0;
+  let expected = 11;
+  let allRequired = false;
+  let plaintextDenied = false;
+  let strictIntegrity = false;
+
+  if (existsSync(covPath)) {
+    try {
+      const cov = JSON.parse(readFileSync(covPath, "utf8"));
+      checked = Number(cov.checked ?? 0);
+      expected = Number(cov.expected ?? 11);
+      allRequired = cov.all_services_required === true;
+      plaintextDenied = cov.plaintext_denied_all === true;
+      strictIntegrity = cov.strict_integrity === true;
+      if (cov.runtime_ok === false) errors.push("grpcRca.runtime_ok=false");
+      if (cov.grpc_integrity_ok === false && cov.strict_integrity === true) {
+        errors.push("grpcRca.grpc_integrity_ok=false");
+      }
+      if (checked < expected) errors.push(`grpcRca coverage ${checked}/${expected}`);
+      if (!allRequired) errors.push("not all 11 gRPC services have required=true");
+      if (!plaintextDenied) errors.push("plaintext not denied on all mTLS gRPC services");
+    } catch (e) {
+      errors.push(`invalid ${relative(repoRoot, covPath)}: ${e.message}`);
+    }
+  } else {
+    errors.push(
+      "missing bench_logs/grpc-mtls-rca/coverage.json (run bash scripts/lib/rp-bootstrap-grpc-mtls-gate.sh)",
+    );
+  }
+
+  if (existsSync(matPath)) {
+    try {
+      const mat = JSON.parse(readFileSync(matPath, "utf8"));
+      const svcs = mat.services || [];
+      const bad = svcs.filter((s) => s.required !== true && !s.skip_reason);
+      if (bad.length) {
+        errors.push(
+          `full-matrix required=false: ${bad.map((s) => s.service).join(", ")}`,
+        );
+      }
+    } catch (e) {
+      errors.push(`invalid ${relative(repoRoot, matPath)}: ${e.message}`);
+    }
+  }
+
+  const detail = {
+    checked,
+    expected,
+    all_required: allRequired,
+    plaintext_denied: plaintextDenied,
+    strict_integrity: strictIntegrity,
+    gate_json: existsSync(gateJson) ? relative(repoRoot, gateJson) : null,
+  };
+
+  if (errors.length) return phaseFail(errors, detail);
+  return phaseOk(false, detail);
+}
+
 function verifyAppRuntime(ns) {
   if (process.env.VERIFY_BOOTSTRAP_SKIP_APP_RUNTIME === "1" || process.env.VERIFY_BOOTSTRAP_SKIP_APP_RUNTIME === "true") {
     return phaseOk(true, { reason: "VERIFY_BOOTSTRAP_SKIP_APP_RUNTIME=1" });
@@ -773,6 +853,12 @@ function verifyFinalContract(repoRootPath) {
       if (cov.runtime_ok === false) {
         errors.push("grpcRca.runtime_ok=false (required service gRPC in-pod probe failed)");
       }
+      if (cov.all_services_required === false) {
+        errors.push("grpcRca.all_services_required=false (expected 11/11 required=true)");
+      }
+      if (cov.plaintext_denied_all === false) {
+        errors.push("grpcRca.plaintext_denied_all=false");
+      }
     } catch (e) {
       errors.push(`invalid grpc-mtls-rca/coverage.json: ${e.message}`);
     }
@@ -820,6 +906,7 @@ function overallRequired(context, phases) {
       "observability",
       "secret_sync",
       "app_runtime",
+      "grpc_mtls_required",
     ];
     const base = keys.every((k) => phases[k]?.ok);
     const strict = phases.rp_strict;
@@ -880,6 +967,7 @@ function main() {
   phase_results.observability = { ok: true, skipped: true };
   phase_results.secret_sync = { ok: true, skipped: true };
   phase_results.app_runtime = { ok: true, skipped: true };
+  phase_results.grpc_mtls_required = { ok: true, skipped: true };
   phase_results.transport = { ok: true, skipped: true };
   phase_results.kafka_alignment = { ok: true, skipped: true };
   phase_results.final_contract = { ok: true, skipped: true };
@@ -931,6 +1019,11 @@ function main() {
       phase_results.app_runtime = verifyAppRuntime(ns);
     } catch (e) {
       phase_results.app_runtime = phaseFail([e.message]);
+    }
+    try {
+      phase_results.grpc_mtls_required = verifyGrpcMtlsRequired();
+    } catch (e) {
+      phase_results.grpc_mtls_required = phaseFail([e.message]);
     }
     if (context === "preflight-end") {
       phase_results.transport = verifyTransportStrict();

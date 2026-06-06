@@ -55,10 +55,10 @@ data:
   POSTGRES_URL_ANALYTICS: postgresql://postgres:postgres@host.docker.internal:5439/analytics?connect_timeout=10
   # NOTE: asyncpg doesn't support connect_timeout parameter - removed for Python AI service
   POSTGRES_URL_PYTHON_AI: postgresql://postgres:postgres@host.docker.internal:5440/python_ai
-  POSTGRES_URL_MESSAGING: postgresql://postgres:postgres@host.docker.internal:5434/postgres?connect_timeout=5
-  POSTGRES_URL_NOTIFICATION: postgresql://postgres:postgres@host.docker.internal:5441/postgres?connect_timeout=5
-  POSTGRES_URL_TRUST: postgresql://postgres:postgres@host.docker.internal:5442/postgres?connect_timeout=5
-  POSTGRES_URL_MEDIA: postgresql://postgres:postgres@host.docker.internal:5443/postgres?connect_timeout=5
+  POSTGRES_URL_MESSAGING: postgresql://postgres:postgres@host.docker.internal:5434/messaging?connect_timeout=5
+  POSTGRES_URL_NOTIFICATION: postgresql://postgres:postgres@host.docker.internal:5441/notification?connect_timeout=5
+  POSTGRES_URL_TRUST: postgresql://postgres:postgres@host.docker.internal:5442/trust?connect_timeout=5
+  POSTGRES_URL_MEDIA: postgresql://postgres:postgres@host.docker.internal:5443/media?connect_timeout=5
 
   # In-cluster Ollama (analytics listing-feel). Override in dev overlay for host Metal.
   OLLAMA_BASE_URL: http://ollama.record-platform.svc.cluster.local:11434

@@ -155,24 +155,22 @@ test.describe.serial('Listing revision diff correctness (7.6R)', () => {
     await waitForListingRevisions(request, token, listingId, { minCount: 1 })
     await page.goto(`/listings/${listingId}`, { waitUntil: 'domcontentloaded' })
     await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 90_000 })
-    const revRes = page.waitForResponse(
-      (res) =>
-        res.request().method() === 'GET' &&
-        res.url().includes(`/api/listings/${listingId}/revisions`) &&
-        res.status() < 400,
-      { timeout: 60_000 },
-    )
+    await expect(page.getByTestId('listing-revision-preview')).toBeVisible({ timeout: 60_000 })
     await page.getByTestId('listing-revision-panel').getByRole('button').click()
-    await revRes
     await expect(page.getByTestId('listing-revision-panel-loaded')).toBeVisible({
       timeout: 60_000,
     })
     const panel = await page.getByTestId('listing-revision-panel-loaded').innerText()
     expect(panel).not.toMatch(/ → —/)
     expect(panel).not.toMatch(/"to"/)
+    await expect(page.getByTestId('listing-revision-preview-when')).toBeVisible()
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-listing-detail-revision-panel-clean.png'),
+    )
+    await capturePageContentScreenshot(
+      page,
+      contractScreenshotPath('authenticated-listing-detail-revision-preview-dated.png'),
     )
   })
 })

@@ -8,7 +8,7 @@ import {
   ensureWatchlistEntry,
   timed,
 } from './helpers/seed-lean'
-import { captureScreenshot } from './helpers/screenshot-readiness'
+import { captureScreenshot, contractScreenshotPath } from './helpers/screenshot-readiness'
 import { assertNoStaleProductUi } from './helpers/stale-ui-guard'
 import { ensureTestCollection } from './helpers/seed-collection'
 
@@ -53,10 +53,16 @@ test.describe.serial('Product contract A–D', () => {
     const body = await page.locator('body').innerText()
     expect(body).not.toMatch(/localStorage/i)
     expect(body).not.toMatch(/until API is wired/i)
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-recently-viewed-api-filled.png')
+    await captureScreenshot(
+      page,
+      contractScreenshotPath('authenticated-recently-viewed-filled-product-cards.png'),
+    )
     await page.getByTestId('recently-viewed-clear').click()
     await expect(page.getByTestId('recently-viewed-item')).toHaveCount(0, { timeout: 15_000 })
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-recently-viewed-api-cleared.png')
+    await captureScreenshot(
+      page,
+      contractScreenshotPath('authenticated-recently-viewed-cleared.png'),
+    )
   })
 
   test('B — watchlist API', async ({ page, request }) => {
@@ -68,13 +74,16 @@ test.describe.serial('Product contract A–D', () => {
     const body = await page.locator('body').innerText()
     expect(body).not.toMatch(/local until/i)
     expect(body).not.toMatch(/localStorage/i)
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-watchlist-api-filled.png')
+    await captureScreenshot(
+      page,
+      contractScreenshotPath('authenticated-watchlist-filled-product-cards.png'),
+    )
     await timed('watchlist/clear', () => clearWatchlist(request, token))
     await page.goto('/watchlist')
     await expect(page.getByTestId('watchlist-empty-state-ready')).toBeVisible({ timeout: 15_000 })
     await captureScreenshot(
       page,
-      'e2e/screenshots/authenticated/authenticated-watchlist-api-empty-after-remove.png',
+      contractScreenshotPath('authenticated-watchlist-empty-after-remove.png'),
     )
   })
 
@@ -85,15 +94,25 @@ test.describe.serial('Product contract A–D', () => {
     })
     await expect(page.locator('[data-testid="record-image"]').first()).toBeVisible()
     await assertNoStaleProductUi(page)
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-records-grid-media-filled.png')
+    await captureScreenshot(
+      page,
+      contractScreenshotPath('authenticated-records-grid-media-filled.png'),
+    )
     await page.goto('/records?view=list')
     await expect(page.locator('[data-testid="record-row"]').first()).toBeVisible({ timeout: 30_000 })
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-records-list-media-filled.png')
+    await captureScreenshot(
+      page,
+      contractScreenshotPath('authenticated-records-list-media-filled.png'),
+    )
     await page.goto('/records?view=compact')
     await expect(page.locator('[data-testid="record-card"]').first()).toBeVisible({ timeout: 30_000 })
     await captureScreenshot(
       page,
-      'e2e/screenshots/authenticated/authenticated-records-compact-media-filled.png',
+      contractScreenshotPath('authenticated-records-compact-media-filled.png'),
+    )
+    await captureScreenshot(
+      page,
+      contractScreenshotPath('authenticated-records-lifecycle-dates.png'),
     )
   })
 
@@ -102,12 +121,12 @@ test.describe.serial('Product contract A–D', () => {
     await page.goto(`/records/${recordId}`)
     await expect(page.getByTestId('record-detail-ready')).toBeVisible({ timeout: 45_000 })
     await expect(page.getByTestId('record-detail-loading')).toHaveCount(0)
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-record-detail-filled.png')
+    await captureScreenshot(page, contractScreenshotPath('authenticated-record-detail-filled.png'))
     await page.getByRole('link', { name: 'Edit' }).click()
     await expect(page).toHaveURL(new RegExp(`/records/${recordId}/edit`))
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-record-edit-filled.png')
+    await captureScreenshot(page, contractScreenshotPath('authenticated-record-edit-filled.png'))
     await page.goto(`/records/${recordId}?tab=revisions`)
     await expect(page.getByText(/Revision/i).first()).toBeVisible({ timeout: 30_000 })
-    await captureScreenshot(page, 'e2e/screenshots/authenticated/authenticated-record-revisions-filled.png')
+    await captureScreenshot(page, contractScreenshotPath('authenticated-record-revisions-filled.png'))
   })
 })

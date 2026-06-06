@@ -43,6 +43,7 @@ model Record {
   notes              String?  @db.Text
 
   purchasedAt        DateTime?                            @map("purchased_at")
+  shippedAt          DateTime?                            @map("shipped_at")
   receivedAt         DateTime?                            @map("received_at")
   purchaseType       PurchaseType?                        @map("purchase_type")
   purchaseSource     String?   @db.VarChar(256)           @map("purchase_source")
@@ -125,6 +126,7 @@ model RecordMedium {
   discGrade  String?  @db.VarChar(16) @map("disc_grade")
   sides      Json?
   notes      String?  @db.Text
+  urlOrPath  String?  @db.Text @map("url_or_path")
 
   createdAt  DateTime @default(now())  @map("created_at")
   updatedAt  DateTime @updatedAt       @map("updated_at")

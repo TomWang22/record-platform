@@ -137,8 +137,9 @@ app.get('/healthz', async (_req, res) => {
   }
 })
 
-// Kubelet readiness (infra/contracts: readyPath /readyz) — ephemeral probe avoids stale min-pool connections.
+// Kubelet readiness (infra/contracts: readyPath /readyz) — DB + local mTLS gRPC.
 app.get('/readyz', async (_req, res) => {
+  const { rpCheckLocalGrpcMtlsHealth, rpGrpcHealthOptions } = await import('@common/utils')
   const url =
     process.env.POSTGRES_URL_ANALYTICS || process.env.DATABASE_URL || ''
   if (!url) {
@@ -146,15 +147,32 @@ app.get('/readyz', async (_req, res) => {
   }
   const { Client } = await import('pg')
   const client = new Client({ connectionString: url })
+  let dbOk = false
   try {
     await client.connect()
     await client.query('SELECT 1')
-    res.json({ ok: true, ready: true })
+    dbOk = true
   } catch (err) {
-    res.status(503).json({ ok: false, ready: false, error: String(err) })
+    await client.end().catch(() => {})
+    return res.status(503).json({ ok: false, ready: false, error: String(err) })
   } finally {
     await client.end().catch(() => {})
   }
+  const grpcOpts = rpGrpcHealthOptions('analytics-service', 'analytics.AnalyticsService')
+  let grpcOk = true
+  if (grpcOpts) {
+    grpcOk = await rpCheckLocalGrpcMtlsHealth({
+      port: grpcOpts.port,
+      grpcService: grpcOpts.grpcService,
+      serverName: grpcOpts.serverName ?? 'analytics-service',
+    })
+  }
+  const ready = dbOk && grpcOk
+  res.status(ready ? 200 : 503).json({
+    ok: ready,
+    ready,
+    grpc: grpcOk ? 'SERVING' : grpcOpts ? 'fail' : 'skip',
+  })
 })
 
 // Enhanced predict-price: uses historical data + worker threads + Redis caching
@@ -506,15 +524,14 @@ async function main() {
   await waitForAnalyticsPools()
 
   const PORT = process.env.ANALYTICS_PORT || process.env.HTTP_PORT || 4004
-  server = app.listen(PORT, () => {
-    console.log(`[analytics] service listening on port ${PORT}`)
-  })
-
   if (process.env.ENABLE_GRPC === 'true') {
     const { startGrpcServer } = require('./grpc-server')
     const grpcPort = parseInt(process.env.GRPC_PORT || '50067', 10)
     grpcServer = startGrpcServer(grpcPort)
   }
+  server = app.listen(PORT, () => {
+    console.log(`[analytics] service listening on port ${PORT}`)
+  })
 }
 
 main().catch((err) => {

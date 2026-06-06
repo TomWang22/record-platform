@@ -212,7 +212,11 @@ _run_grpc() {
       grpc_status=0
     else
       grpc_status=$?
-      grpc_err="grpc-health-probe exit $grpc_status (see $REPORT_DIR/grpc.stderr.txt)"
+      local stderr_snip=""
+      if [[ -s "$REPORT_DIR/grpc.stderr.txt" ]]; then
+        stderr_snip="$(head -c 500 "$REPORT_DIR/grpc.stderr.txt" | tr '\n' ' ')"
+      fi
+      grpc_err="grpc-health-probe exit $grpc_status target=${GRPC_ADDR} authority=${sname} service=${GRPC_SVC} ${stderr_snip:-no stderr}"
     fi
   else
     printf '%s -addr=%s -service=%s -connect-timeout=3s -rpc-timeout=12s\n' \
@@ -253,18 +257,11 @@ case "$MODE" in
     [[ "$grpc_ok" -eq 1 ]] && overall_ok=1
     ;;
   both|*)
-    if [[ "$http_ok" -eq 1 ]]; then
-      overall_ok=1
-      if [[ "$grpc_ok" -ne 1 && "$GRPC_PORT" != "null" && -n "$GRPC_PORT" ]]; then
-        _log "⚠️  gRPC diagnostic failed (HTTP passed; not blocking unless grpcRequiredForRuntime=true)"
-        if [[ "$VERBOSE" -eq 1 ]]; then
-          echo "⚠️  gRPC diagnostic failed: ${grpc_err:-non-zero} (HTTP is primary for mode=both)"
-        fi
-        if [[ "$GRPC_REQUIRED" == "true" ]]; then
-          overall_ok=0
-        fi
-      fi
-    elif [[ "$grpc_ok" -eq 1 ]]; then
+    if [[ "$http_ok" -ne 1 ]]; then
+      overall_ok=0
+    elif [[ -n "$GRPC_PORT" && "$GRPC_PORT" != "null" && "$GRPC_REQUIRED" == "true" ]]; then
+      [[ "$grpc_ok" -eq 1 ]] && overall_ok=1 || overall_ok=0
+    else
       overall_ok=1
     fi
     ;;

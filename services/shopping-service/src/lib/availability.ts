@@ -5,8 +5,8 @@ import { withRetry } from './db.js';
 // Listings database is on port 5435 (record-platform-postgres-listings-1)
 // Connection string format: postgresql://user:password@host:port/database
 export const listingsPool = new Pool({
-  connectionString: process.env.POSTGRES_URL_LISTINGS || 
-    'postgresql://postgres:postgres@host.docker.internal:5435/records',
+  connectionString: process.env.POSTGRES_URL_LISTINGS ||
+    'postgresql://postgres:postgres@host.docker.internal:5435/listings',
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,

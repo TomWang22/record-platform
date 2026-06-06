@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+# k6 → https://record-platform.test → Caddy → HAProxy → api-gateway (strict TLS, hostname only).
+# Tests only through the edge domain. No port-forward, no localhost gateway, no insecure skip.
+#
+# Requirements:
+#   - BASE_URL must be https (default https://record-platform.test)
+#   - SSL_CERT_FILE must be a non-empty file (default REPO_ROOT/certs/dev-root.pem)
+#   - K6_INSECURE_SKIP_TLS is forced to 0
+#   - Hostname must resolve (e.g. /etc/hosts: <MetalLB IP> record-platform.test) — see scripts/lib/edge-test-url.sh, OCH_AUTO_EDGE_HOSTS=1
+# Edge paths: gateway health is /api/healthz; auth via gateway is /auth/healthz (k6-auth-service-health.js). Caddy routes both to api-gateway.
+#   If traffic goes through nginx Ingress in housing ns, apply infra/k8s/overlays/dev/ingress.yaml (includes Prefix /auth → api-gateway).
+# Troubleshooting: ./scripts/diagnose-k6-edge-connectivity.sh
+#
+# Env:
+#   SKIP_K6_GRID=1           — no-op
+#   K6_SMOKE_DURATION        — default 22s per script (health grid)
+#   K6_SMOKE_VUS             — default 5
+#   SKIP_K6_BOOKING_SEARCH=1 — skip k6-booking.js + k6-search-watchlist.js
+#   SKIP_K6_ANALYTICS_LISTING_FEEL=1 — skip Ollama-backed POST listing-feel
+#   K6_ORCHESTRATION_VU_SCENARIO=1 (default here) — messaging + media use ramping-vus in suite (not CAR); set 0 for stress-style CAR.
+#   K6_SUITE_GATEWAY_DRAIN=1 (default here) — after each k6 block, wait until api-gateway CPU < ~150m (needs metrics-server).
+#   K6_SUITE_POST_DRAIN_SLEEP_SEC=10 (default here) — fixed settle after drain, before killing stray k6 / cooldown.
+#   K6_SUITE_KILL_K6_AFTER_BLOCK=1 (default here) — SIGKILL stray k6 (kills all k6 on host; set 0 if you run other k6 in parallel).
+#   K6_SUITE_POST_KILL_K6_SLEEP_SEC=0 (default) — optional extra sleep after kill; set 10 for harsher lab settle.
+#   SKIP_K6_EDGE_CURL_GATE=1 — skip strict curl to /api/healthz and /auth/healthz before k6 (not recommended).
+#   PREFLIGHT_LAB=1 — after the standard grid + JWT flows, run k6-preflight-lab-randomized-all-endpoints.js (set by make preflight-lab).
+#   PREFLIGHT_LAB_K6_RANDOM_DURATION / PREFLIGHT_LAB_K6_RANDOM_VUS — tune lab randomized script (defaults 120s / 10).
+#   SKIP_K6_BOOKING_HEALTH=1 — skip k6-booking-health.js (RP has no booking-service; default in make preflight-lab).
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+LOAD="$SCRIPT_DIR/load"
+
+# shellcheck source=lib/edge-test-url.sh
+source "$SCRIPT_DIR/lib/edge-test-url.sh"
+
+if [[ -f "$SCRIPT_DIR/lib/k6-suite-resource-hooks.sh" ]]; then
+  # shellcheck source=lib/k6-suite-resource-hooks.sh
+  source "$SCRIPT_DIR/lib/k6-suite-resource-hooks.sh"
+else
+  k6_suite_after_k6_block() { return 0; }
+fi
+
+# Defaults tuned for back-to-back orchestration (concurrency bleed through api-gateway); override per env.
+export K6_ORCHESTRATION_VU_SCENARIO="${K6_ORCHESTRATION_VU_SCENARIO:-1}"
+export K6_SUITE_GATEWAY_DRAIN="${K6_SUITE_GATEWAY_DRAIN:-1}"
+export K6_SUITE_POST_DRAIN_SLEEP_SEC="${K6_SUITE_POST_DRAIN_SLEEP_SEC:-10}"
+export K6_SUITE_KILL_K6_AFTER_BLOCK="${K6_SUITE_KILL_K6_AFTER_BLOCK:-1}"
+export K6_SUITE_POST_KILL_K6_SLEEP_SEC="${K6_SUITE_POST_KILL_K6_SLEEP_SEC:-0}"
+
+[[ "${SKIP_K6_GRID:-0}" == "1" ]] && { echo "SKIP_K6_GRID=1 — skipping"; exit 0; }
+
+command -v k6 >/dev/null 2>&1 || { echo "k6 not installed"; exit 1; }
+
+export BASE_URL="${BASE_URL:-https://record-platform.test}"
+export K6_INSECURE_SKIP_TLS=0
+
+BASE_URL="$(edge_normalize_k6_base_url)" || exit 1
+export BASE_URL
+edge_require_host_resolves "$BASE_URL" || exit 1
+
+CA="${SSL_CERT_FILE:-$REPO_ROOT/certs/dev-root.pem}"
+export SSL_CERT_FILE="$CA"
+export K6_TLS_CA_CERT="${K6_TLS_CA_CERT:-$CA}"
+export K6_CA_ABSOLUTE="${K6_CA_ABSOLUTE:-$CA}"
+
+if [[ ! -s "$SSL_CERT_FILE" ]]; then
+  echo "SSL_CERT_FILE missing or empty: $SSL_CERT_FILE"
+  exit 1
+fi
+
+# Fail before k6 iterations if edge returns 0 B (wrong LB, missing /auth on Ingress, or TLS/DNS drift).
+edge_strict_curl_edge_health "$BASE_URL" "$SSL_CERT_FILE" || exit 1
+
+DUR="${K6_SMOKE_DURATION:-22s}"
+VUS="${K6_SMOKE_VUS:-5}"
+
+_k6_run() {
+  k6 run \
+    -e "BASE_URL=${BASE_URL}" \
+    -e "K6_TLS_CA_CERT=${K6_TLS_CA_CERT}" \
+    -e "K6_CA_ABSOLUTE=${K6_CA_ABSOLUTE}" \
+    -e "K6_INSECURE_SKIP_TLS=0" \
+    -e "DURATION=${DURATION:-}" \
+    -e "VUS=${VUS:-}" \
+    -e "K6_ORCHESTRATION_VU_SCENARIO=${K6_ORCHESTRATION_VU_SCENARIO:-}" \
+    "$@"
+}
+
+# $3: 1 = constant-arrival-rate script (extra cooldown + optional envoy restart); 0 = default VU/duration
+_run() {
+  local name="$1"
+  local file="$2"
+  local is_car="${3:-0}"
+  if [[ "${K6_ORCHESTRATION_VU_SCENARIO:-1}" == "1" ]]; then
+    case "$file" in
+      k6-messaging.js | k6-media-health.js) is_car=0 ;;
+    esac
+  fi
+  shift 3
+  echo ""
+  echo "━━ k6 smoke: $name ━━"
+  k6_suite_before_k6_block "smoke-${name}"
+  export DURATION="$DUR" VUS="$VUS"
+  local _k6_rc=0
+  _k6_run "$LOAD/$file" || _k6_rc=$?
+  k6_suite_after_k6_block "k6-smoke-${name}" "$is_car" || return $?
+  [[ "$_k6_rc" -ne 0 ]] && return "$_k6_rc"
+  return 0
+}
+
+say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
+
+say "run-housing-k6-edge-smoke (BASE_URL=$BASE_URL, SSL_CERT_FILE=$SSL_CERT_FILE)"
+
+# Preflight-lab: analytics + randomized grid hit strict Kafka-adjacent paths under load; relax k6 thresholds unless overridden.
+if [[ "${PREFLIGHT_LAB:-0}" == "1" ]] || [[ "${PREFLIGHT_LAB:-0}" == "yes" ]] || [[ "${PREFLIGHT_LAB:-0}" == "true" ]]; then
+  export K6_ANALYTICS_PUBLIC_MAX_FAIL_RATE="${K6_ANALYTICS_PUBLIC_MAX_FAIL_RATE:-0.20}"
+  export K6_PREFLIGHT_LAB_HTTP_REQ_FAILED_MAX="${K6_PREFLIGHT_LAB_HTTP_REQ_FAILED_MAX:-0.92}"
+  export K6_PREFLIGHT_LAB_ERRORS_MAX="${K6_PREFLIGHT_LAB_ERRORS_MAX:-0.88}"
+fi
+
+# Third field: 1 after k6 constant-arrival-rate scripts (see scripts/load/*.js)
+for triple in \
+  "gateway-health:k6-gateway-health.js:0" \
+  "auth-health:k6-auth-service-health.js:0" \
+  "listings-health:k6-listings-health.js:0" \
+  "booking-health:k6-booking-health.js:0" \
+  "trust-public:k6-trust-public.js:0" \
+  "analytics-public:k6-analytics-public.js:0" \
+  "messaging:k6-messaging.js:1" \
+  "media-health:k6-media-health.js:1" \
+  "event-layer-adversarial:k6-event-layer-adversarial.js:0"; do
+  name="${triple%%:*}"
+  rest="${triple#*:}"
+  is_car="${rest##*:}"
+  file="${rest%:*}"
+  if [[ "$file" == "k6-booking-health.js" ]] && [[ "${SKIP_K6_BOOKING_HEALTH:-${SKIP_K6_BOOKING_SEARCH:-0}}" == "1" ]]; then
+    echo "ℹ️  Skip $name (SKIP_K6_BOOKING_HEALTH=1 — no booking-service in RP)"
+    continue
+  fi
+  _run "$name" "$file" "$is_car" || {
+    echo "⚠️  $name failed"
+    [[ "${K6_GRID_STRICT:-0}" == "1" ]] && exit 1
+    true
+  }
+done
+
+if [[ "${SKIP_K6_ANALYTICS_LISTING_FEEL:-0}" != "1" ]]; then
+  export DURATION="${K6_ANALYTICS_FEEL_DURATION:-45s}" VUS="${K6_ANALYTICS_FEEL_VUS:-2}"
+  _run "analytics-listing-feel" "k6-analytics-listing-feel.js" 0 || {
+    echo "⚠️  analytics-listing-feel failed (Ollama cold/down? SKIP_K6_ANALYTICS_LISTING_FEEL=1 to skip)"
+    [[ "${K6_GRID_STRICT:-0}" == "1" ]] && exit 1
+    true
+  }
+fi
+
+if [[ "${SKIP_K6_BOOKING_SEARCH:-0}" != "1" ]]; then
+  say "k6 JWT flows (booking + search/watchlist) via edge $BASE_URL"
+  export DURATION="${K6_BOOKING_DURATION:-25s}" VUS="${K6_BOOKING_VUS:-3}"
+  k6_suite_before_k6_block "smoke-booking-jwt"
+  _k6_run "$LOAD/k6-booking.js" || {
+    echo "⚠️  k6-booking failed"
+    [[ "${K6_GRID_STRICT:-0}" == "1" ]] && exit 1
+    true
+  }
+  k6_suite_after_k6_block "k6-smoke-booking-jwt" 0 || {
+    echo "⚠️  k6 suite hook failed after booking"
+    [[ "${K6_GRID_STRICT:-0}" == "1" ]] && exit 1
+    true
+  }
+  export DURATION="${K6_SEARCH_DURATION:-25s}" VUS="${K6_SEARCH_VUS:-6}"
+  k6_suite_before_k6_block "smoke-search-watchlist"
+  _k6_run "$LOAD/k6-search-watchlist.js" || {
+    echo "⚠️  k6-search-watchlist failed"
+    [[ "${K6_GRID_STRICT:-0}" == "1" ]] && exit 1
+    true
+  }
+  k6_suite_after_k6_block "k6-smoke-search-watchlist" 0 || {
+    echo "⚠️  k6 suite hook failed after search-watchlist"
+    [[ "${K6_GRID_STRICT:-0}" == "1" ]] && exit 1
+    true
+  }
+else
+  echo "ℹ️  Skip k6-booking/search (SKIP_K6_BOOKING_SEARCH=1)"
+fi
+
+if [[ "${PREFLIGHT_LAB:-0}" == "1" ]] || [[ "${PREFLIGHT_LAB:-0}" == "yes" ]] || [[ "${PREFLIGHT_LAB:-0}" == "true" ]]; then
+  say "k6 preflight-lab: randomized all-service endpoints (k6-preflight-lab-randomized-all-endpoints.js)"
+  export DURATION="${PREFLIGHT_LAB_K6_RANDOM_DURATION:-120s}" VUS="${PREFLIGHT_LAB_K6_RANDOM_VUS:-10}"
+  k6_suite_before_k6_block "smoke-preflight-lab-randomized"
+  _lab_rc=0
+  _k6_run "$LOAD/k6-preflight-lab-randomized-all-endpoints.js" || _lab_rc=$?
+  k6_suite_after_k6_block "k6-smoke-preflight-lab-randomized" 0 || {
+    echo "⚠️  suite hook failed after preflight-lab randomized k6"
+    [[ "${K6_GRID_STRICT:-0}" == "1" ]] && exit 1
+    true
+  }
+  if [[ "$_lab_rc" -ne 0 ]]; then
+    echo "⚠️  preflight-lab randomized k6 exited ${_lab_rc}"
+    [[ "${K6_GRID_STRICT:-0}" == "1" ]] && exit "$_lab_rc"
+  fi
+fi
+
+say "run-housing-k6-edge-smoke done"

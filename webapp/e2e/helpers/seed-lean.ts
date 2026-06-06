@@ -66,14 +66,11 @@ export async function clearWatchlist(
   token: string,
 ): Promise<void> {
   const headers = { Authorization: `Bearer ${token}` }
-  const data = await getJsonWith429Retry<{ items?: { item_id?: string; item_type?: string }[] }>(
-    request,
-    '/api/shopping/watchlist',
-    headers,
-    'watchlist list',
-  )
+  const data = await getJsonWith429Retry<{
+    items?: { listingId?: string; item_id?: string; item_type?: string }[]
+  }>(request, '/api/shopping/watchlist', headers, 'watchlist list')
   for (const row of data.items ?? []) {
-    const id = row.item_id
+    const id = row.listingId ?? row.item_id
     const type = row.item_type ?? 'listing'
     if (!id) continue
     const del = await with429Retry('watchlist delete', () =>
@@ -161,8 +158,10 @@ export async function fetchRecentlyViewedIds(
   if (!res.ok()) {
     throw new Error(`recently-viewed fetch failed ${res.status()}: ${(await res.text()).slice(0, 200)}`)
   }
-  const data = (await res.json()) as { items?: { item_id?: string }[] }
-  return (data.items ?? []).map((row) => row.item_id).filter((id): id is string => Boolean(id))
+  const data = (await res.json()) as { items?: { listingId?: string; item_id?: string }[] }
+  return (data.items ?? [])
+    .map((row) => row.listingId ?? row.item_id)
+    .filter((id): id is string => Boolean(id))
 }
 
 /** Poll shopping-service until recently-viewed matches expected listing ids (API truth, not UI cache). */

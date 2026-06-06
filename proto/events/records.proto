@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package events.records;
+
+option go_package = "github.com/TomWang22/record-platform/proto/events/records";
+
+// Payloads for ${ENV_PREFIX}.records.events (EventEnvelope.payload).
+
+message RecordCreatedV1 {
+  string record_id = 1;
+  string user_id = 2;
+  string created_at = 3;
+}
+
+message RecordUpdatedV1 {
+  string record_id = 1;
+  string user_id = 2;
+  string updated_at = 3;
+}
+
+message RecordDeletedV1 {
+  string record_id = 1;
+  string user_id = 2;
+  string deleted_at = 3;
+}

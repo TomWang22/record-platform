@@ -11,9 +11,9 @@ const HTTP_PORT = Number(process.env.HTTP_PORT || "4016");
 const GRPC_PORT = Number(process.env.GRPC_PORT || "50066");
 
 async function main() {
-  // Bind HTTP/gRPC before Kafka/DB so kubelet startup/readiness can reach /healthz quickly.
-  startTrustHttpServer(HTTP_PORT);
+  // gRPC before HTTP so /readyz local mTLS health check can reach a listening server.
   startGrpcServer(GRPC_PORT);
+  startTrustHttpServer(HTTP_PORT);
 
   void (async () => {
     try {

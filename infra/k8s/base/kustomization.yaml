@@ -1,6 +1,6 @@
 # Before first apply: ./scripts/install-prometheus-operator-crds.sh (ServiceMonitor/PodMonitor CRDs).
 # On k3d after apply: patch app images to registry, e.g. ./scripts/push-dev-images-to-registry.sh then
-#   for d in api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service auction-monitor; do kubectl set image deploy/$d -n record-platform app=k3d-record-platform-registry:5000/$d:dev; done
+#   for d in api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service trust-service media-service notification-service shopping-service auction-monitor webapp ollama; do kubectl set image deploy/$d -n record-platform app=k3d-record-platform-registry:5000/$d:dev; done
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -25,9 +25,13 @@ resources:
   - listings-service
   - analytics-service
   - python-ai-service
-  - social-service
+  - messaging-service
+  - trust-service
+  - media-service
+  - notification-service
   - shopping-service
   - auction-monitor
+  - ollama
+  - webapp
   - envoy-test                # Envoy gRPC proxy (port 10000)
   # - cron-jobs              # Temporarily disabled - k6 files missing
-  # - webapp                 # Webapp frontend (port 3001) - excluded as requested (externalized)

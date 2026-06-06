@@ -108,6 +108,15 @@ elif [[ "${VERIFY_APP_RUNTIME_SKIP_KAFKA_GATE:-0}" == "1" ]]; then
   echo "verify-app-runtime: VERIFY_APP_RUNTIME_SKIP_KAFKA_GATE=1 — skipping verify-kafka-ready" >&2
 fi
 
+if [[ "${VERIFY_APP_RUNTIME_SKIP_GRPC_READINESS:-0}" != "1" ]]; then
+  chmod +x "$SCRIPT_DIR/wait-grpc-mtls-readiness.sh" 2>/dev/null || true
+  echo "verify-app-runtime: gRPC/mTLS readiness wait (wait-grpc-mtls-readiness.sh)…" >&2
+  HOUSING_NS="$NS" bash "$SCRIPT_DIR/wait-grpc-mtls-readiness.sh" || {
+    echo "verify-app-runtime: wait-grpc-mtls-readiness failed" >&2
+    exit 1
+  }
+fi
+
 DEF_RETRIES="$(jq -r '.defaults.retries // 10' "$CONFIG")"
 DEF_BO_INIT="$(jq -r '.defaults.backoff_initial_seconds // 2' "$CONFIG")"
 DEF_BO_MAX="$(jq -r '.defaults.backoff_max_seconds // 60' "$CONFIG")"
@@ -352,7 +361,16 @@ _check_service_worker() {
       local fail_target fail_status fail_detail
       fail_target="$(jq -r '.http_url // "?"' "$probe_report/summary.json" 2>/dev/null || echo "$http_url")"
       fail_status="$(jq -r '.http_status // "?"' "$probe_report/summary.json" 2>/dev/null || echo "?")"
-      fail_detail="$(jq -r '[.http_error,.grpc_error]|map(select(length>0))|join("; ")' "$probe_report/summary.json" 2>/dev/null || echo "probe failed")"
+      fail_detail="$(jq -r '[.http_error,.grpc_error]|map(select(length>0))|join("; ")' "$probe_report/summary.json" 2>/dev/null || true)"
+      if [[ -z "${fail_detail:-}" ]]; then
+        if [[ -s "$probe_report/grpc.stderr.txt" ]]; then
+          fail_detail="grpc: $(head -c 400 "$probe_report/grpc.stderr.txt" | tr '\n' ' ')"
+        elif [[ -s "$probe_report/http.stderr.txt" ]]; then
+          fail_detail="http: $(head -c 400 "$probe_report/http.stderr.txt" | tr '\n' ' ')"
+        else
+          fail_detail="probe failed (see ${probe_report}/summary.json and grpc.stderr.txt)"
+        fi
+      fi
       fail_line="$(jq -r '"\(.service // "'"$name"'") http=\(.http_label // .http_status) grpc=\(.grpc_label // "?") runtime=\(.runtime_verdict // "fail")"' "$probe_report/summary.json" 2>/dev/null || echo "")"
       if [[ "$i" -ge "$retries" ]]; then
         break

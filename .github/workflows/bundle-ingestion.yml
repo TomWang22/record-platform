@@ -1,0 +1,48 @@
+name: Bundle ingestion (protocol v1)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "tools/bundle-audit/**"
+      - "docs/bundles/BUNDLE_INGESTION_POLICY.md"
+      - "docs/bundles/OCH_RP_ARTIFACT_CONTRACT.md"
+      - ".github/workflows/bundle-ingestion.yml"
+
+jobs:
+  bundle-audit-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python syntax check (bundle-audit)
+        run: |
+          python3 -m py_compile tools/bundle-audit/validate_bundle_v1.py
+          python3 -m py_compile tools/bundle-audit/bundle_ingestion_analyze.py
+          python3 -m py_compile tools/bundle-audit/mechanical_parity_tar_vs_repo.py
+          python3 -m py_compile tools/bundle-audit/bundle_audit_lib.py
+
+      - name: Minimal safe tar — protocol v1 smoke
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/bundle-protocol-fixture /tmp/minimal-safe-bundle.tar.gz
+          mkdir -p /tmp/bundle-protocol-fixture/scripts
+          echo "fixture" > /tmp/bundle-protocol-fixture/scripts/hello.txt
+          tar -czf /tmp/minimal-safe-bundle.tar.gz -C /tmp bundle-protocol-fixture
+          python3 tools/bundle-audit/validate_bundle_v1.py /tmp/minimal-safe-bundle.tar.gz
+          RP_REPO_ROOT="${GITHUB_WORKSPACE}" BUNDLE_STAGING_ROOT="/tmp/bundle-staging-ci" \
+            bash tools/bundle-audit/extract_bundle_v1.sh /tmp/minimal-safe-bundle.tar.gz
+
+      - name: Validate bundles/bundles/*.tar.gz when present
+        run: |
+          set -euo pipefail
+          if compgen -G "bundles/*.tar.gz" > /dev/null 2>&1; then
+            for f in bundles/*.tar.gz; do
+              echo "Validating $f"
+              python3 tools/bundle-audit/validate_bundle_v1.py "$f"
+              RP_REPO_ROOT="${GITHUB_WORKSPACE}" BUNDLE_STAGING_ROOT="/tmp/bundle-staging-ci" \
+                bash tools/bundle-audit/extract_bundle_v1.sh "$f"
+            done
+          else
+            echo "No bundles/*.tar.gz in this checkout; skipping."
+          fi

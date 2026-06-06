@@ -3,6 +3,7 @@ import type Redis from 'ioredis'
 import type { AuthedRequest } from '../lib/auth.js'
 import { pool, withRetry } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
+import { normalizeWatchlistItems } from '../lib/shopping-product-contract.js'
 
 export default function watchlistRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
   const router: Router = Router()
@@ -20,18 +21,7 @@ export default function watchlistRouter(redis: Redis | null, cacheManager: Cache
     try {
       const result = await withRetry(
         () => pool.query(
-          `SELECT w.id, w.listing_id, w.item_type, w.item_id, w.notify_on, w.metadata, w.created_at,
-                  CASE 
-                    WHEN w.item_type = 'listing' AND w.listing_id IS NOT NULL THEN
-                      (SELECT json_build_object(
-                        'is_active', l.is_active,
-                        'sold_at', l.sold_at,
-                        'stock_quantity', l.stock_quantity,
-                        'title', l.title,
-                        'price', l.price
-                      ) FROM listings.listings l WHERE l.id = w.listing_id)
-                    ELSE NULL
-                  END as listing_info
+          `SELECT w.id, w.listing_id, w.item_type, w.item_id, w.metadata, w.created_at
            FROM shopping.watchlist w
            WHERE w.user_id = $1
            ORDER BY w.created_at DESC
@@ -42,16 +32,7 @@ export default function watchlistRouter(redis: Redis | null, cacheManager: Cache
         'get watchlist'
       )
 
-      // Enrich with sold-out status from metadata
-      const enrichedItems = result.rows.map((item: any) => {
-        const soldOut = item.metadata?.sold_out === true || 
-                       (item.listing_info && (!item.listing_info.is_active || item.listing_info.sold_at || item.listing_info.stock_quantity <= 0))
-        return {
-          ...item,
-          sold_out: soldOut,
-          sold_out_at: item.metadata?.sold_out_at || (item.listing_info?.sold_at || null),
-        }
-      })
+      const items = await normalizeWatchlistItems(result.rows)
 
       const countResult = await withRetry(
         () => pool.query(
@@ -63,7 +44,7 @@ export default function watchlistRouter(redis: Redis | null, cacheManager: Cache
       )
 
       res.json({
-        items: enrichedItems,
+        items,
         total: parseInt(countResult.rows[0].total),
       })
     } catch (err) {

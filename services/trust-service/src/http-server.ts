@@ -9,6 +9,7 @@ import {
   createHttpConcurrencyGuard,
   initOchOutboxSurfaceUnsupported,
   mountRpHttpHealth,
+  rpGrpcHealthOptions,
 } from "@common/utils";
 import { inferNetProtoForSpan, mountDebugTraceHeaders, tracingMiddleware } from "@common/utils/otel";
 import { pool } from "./db.js";
@@ -118,6 +119,7 @@ export function createTrustHttpApp() {
         return false;
       }
     },
+    grpc: rpGrpcHealthOptions("trust-service", "trust.TrustService"),
   });
 
   app.get("/metrics", async (_req, res) => {

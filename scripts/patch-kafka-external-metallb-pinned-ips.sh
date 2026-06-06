@@ -60,7 +60,7 @@ if [[ -n "${KAFKA_METALLB_PIN_IPS:-}" ]]; then
   fi
 else
   for ((i = 0; i < REP; i++)); do
-    IPS[i]="$(och_kafka_metallb_expected_ip_for_broker "$POOL" "$OFFSET" "$i")" || exit 1
+    IPS[i]="$(rp_kafka_metallb_expected_ip_for_broker "$POOL" "$OFFSET" "$i")" || exit 1
   done
 fi
 

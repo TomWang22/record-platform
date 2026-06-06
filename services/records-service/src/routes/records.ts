@@ -89,21 +89,53 @@ function debigint<T>(v: T): T {
   return walk(v);
 }
 
+const toIso = (d: any) => (d ? new Date(d).toISOString() : null);
+const toNum = (v: any) =>
+  v == null
+    ? null
+    : v instanceof Decimal
+    ? v.toNumber()
+    : typeof v === "string"
+    ? Number(v)
+    : Number(v);
+
+function formatRecordDateDisplay(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatPaidDisplay(
+  cents: number | null | undefined,
+  currency = "USD"
+): string | null {
+  if (cents == null || !Number.isFinite(Number(cents))) return null;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: String(currency || "USD").toUpperCase(),
+  }).format(Number(cents) / 100);
+}
+
+function resolveRecordImageUrl(r: any): string | null {
+  for (const m of r.mediaPieces ?? []) {
+    const u = m.urlOrPath ?? m.url_or_path;
+    if (u && String(u).trim()) return String(u).trim();
+  }
+  return null;
+}
+
 // Decimal/date → plain JSON (records + mediaPieces)
 function toPlainRecord(r: any) {
-  const toIso = (d: any) => (d ? new Date(d).toISOString() : null);
-  const toNum = (v: any) =>
-    v == null
-      ? null
-      : v instanceof Decimal
-      ? v.toNumber()
-      : typeof v === "string"
-      ? Number(v)
-      : Number(v);
   return {
     ...r,
     pricePaid: r.pricePaid == null ? null : toNum(r.pricePaid),
     purchasedAt: toIso(r.purchasedAt),
+    shippedAt: toIso(r.shippedAt),
     receivedAt: toIso(r.receivedAt),
     purchasePriceCents: r.purchasePriceCents ?? null,
     shippingPaidCents: r.shippingPaidCents ?? null,
@@ -113,11 +145,30 @@ function toPlainRecord(r: any) {
     updatedAt: toIso(r.updatedAt),
     mediaPieces: (r.mediaPieces ?? []).map((m: any) => ({
       ...m,
+      urlOrPath: m.urlOrPath ?? m.url_or_path ?? null,
       sizeInch: m.sizeInch ?? null,
       speedRpm: m.speedRpm ?? null,
       createdAt: toIso(m.createdAt),
       updatedAt: toIso(m.updatedAt),
     })),
+  };
+}
+
+/** Public API contract: human display fields + cover image URL. */
+function toPublicRecord(r: any) {
+  const plain = toPlainRecord(r);
+  const imageUrl = resolveRecordImageUrl(plain);
+  return {
+    ...plain,
+    imageUrl,
+    coverUrl: imageUrl,
+    purchaseDateDisplay: formatRecordDateDisplay(plain.purchasedAt),
+    shipDateDisplay: formatRecordDateDisplay(plain.shippedAt),
+    deliveredDateDisplay: formatRecordDateDisplay(plain.receivedAt),
+    paidDisplay: formatPaidDisplay(
+      plain.purchasePriceCents,
+      plain.purchaseCurrency
+    ),
   };
 }
 
@@ -147,6 +198,7 @@ function pickUpdate(body: any) {
     "catalogNumber",
     "notes",
     "purchasedAt",
+    "shippedAt",
     "receivedAt",
     "purchaseType",
     "purchaseSource",
@@ -204,8 +256,22 @@ function pickUpdate(body: any) {
   if (out.purchaseType != null && !PURCHASE_TYPES.has(String(out.purchaseType))) {
     throw Object.assign(new Error("invalid purchaseType"), { status: 400 });
   }
+  if (typeof out.shippedAt === "string") {
+    const d = new Date(out.shippedAt);
+    out.shippedAt = Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (out.shippedAt && out.purchasedAt && out.shippedAt < out.purchasedAt) {
+    throw Object.assign(new Error("shippedAt cannot be before purchasedAt"), {
+      status: 400,
+    });
+  }
   if (out.receivedAt && out.purchasedAt && out.receivedAt < out.purchasedAt) {
     throw Object.assign(new Error("receivedAt cannot be before purchasedAt"), {
+      status: 400,
+    });
+  }
+  if (out.receivedAt && out.shippedAt && out.receivedAt < out.shippedAt) {
+    throw Object.assign(new Error("receivedAt cannot be before shippedAt"), {
       status: 400,
     });
   }
@@ -256,6 +322,13 @@ function pickUpdate(body: any) {
       const speedRpm =
         p.speedRpm != null ? Number(p.speedRpm) : info.speedRpmHint ?? null;
 
+      const urlOrPath =
+        p.urlOrPath != null
+          ? String(p.urlOrPath).trim() || null
+          : p.url_or_path != null
+          ? String(p.url_or_path).trim() || null
+          : null;
+
       return {
         index: idx,
         kind,
@@ -264,6 +337,7 @@ function pickUpdate(body: any) {
         discGrade: normalized.discGrade ?? null,
         sides: normalized.sides ?? null,
         notes: p.notes ?? null,
+        urlOrPath,
         __formatHint: info.formatHint ?? undefined,
       };
     });
@@ -385,7 +459,7 @@ export function recordsRouter(
         take: 100,
         include: { mediaPieces: { orderBy: { index: "asc" } } },
       });
-      res.json(items.map(toPlainRecord));
+      res.json(items.map(toPublicRecord));
     })
   );
 
@@ -484,7 +558,7 @@ export function recordsRouter(
           });
         }
       );
-      res.json((items as any[]).map(toPlainRecord));
+      res.json((items as any[]).map(toPublicRecord));
     })
   );
 
@@ -622,7 +696,7 @@ export function recordsRouter(
       const items = await (prisma as any).$queryRaw<any[]>`
         SELECT * FROM public.records_recent(CAST(${userId} AS uuid), CAST(${limit} AS int))
       `;
-      res.json(items.map(toPlainRecord));
+      res.json(items.map(toPublicRecord));
     })
   );
 
@@ -695,7 +769,7 @@ export function recordsRouter(
         include: { mediaPieces: { orderBy: { index: "asc" } } },
       });
       if (!rec) return res.status(404).json({ error: "not found" });
-      res.json(toPlainRecord(rec));
+      res.json(toPublicRecord(rec));
     })
   );
 
@@ -738,6 +812,7 @@ export function recordsRouter(
           catalogNumber: patch.catalogNumber ?? null,
           notes: patch.notes ?? null,
           purchasedAt: patch.purchasedAt ?? null,
+          shippedAt: patch.shippedAt ?? null,
           receivedAt: patch.receivedAt ?? null,
           purchaseType: patch.purchaseType ?? null,
           purchaseSource: patch.purchaseSource ?? null,
@@ -770,7 +845,7 @@ export function recordsRouter(
                 mediaPieces: {
                   create: patch.mediaPieces.map((p: any) => {
                     const { __formatHint, ...rest } = p;
-                    return rest;
+                    return { ...rest, userId };
                   }),
                 },
               }
@@ -806,7 +881,7 @@ export function recordsRouter(
       if (redis) await redis.incr(verKey(userId));
       await invalidateSearchKeysForUser(redis ?? null, userId);
 
-      res.status(201).json(toPlainRecord(created));
+      res.status(201).json(toPublicRecord(created));
     })
   );
 
@@ -859,7 +934,7 @@ export function recordsRouter(
                   deleteMany: {},
                   create: mediaPieces.map((p: any) => {
                     const { __formatHint, ...rest } = p;
-                    return rest;
+                    return { ...rest, userId };
                   }),
                 },
               }
@@ -902,7 +977,7 @@ export function recordsRouter(
       if (redis) await redis.incr(verKey(userId));
       await invalidateSearchKeysForUser(redis ?? null, userId);
 
-      res.json(toPlainRecord(updated));
+      res.json(toPublicRecord(updated));
     })
   );
 

@@ -990,14 +990,16 @@ for ((_rz_i = 1; _rz_i <= _rz_max; _rz_i++)); do
   fi
 done
 if [[ "$_readyz_ok" != "1" ]]; then
-  bad "edge /api/readyz never returned 200 after ${_rz_max} attempts (last HTTP=${_http:-?} caddy_lb=${CADDY_LB_IP:-?}). Try: curl -vk --resolve ${EDGE_HOST}:443:${CADDY_LB_IP:-LB_IP} --cacert \"$EDGE_CA_PEM\" -H \"x-traffic-class: infra\" \"https://${EDGE_HOST}/api/readyz\""
+  bad "edge /api/readyz never returned 200 after ${_rz_max} attempts (last HTTP=${_http:-?} caddy_lb=${CADDY_LB_IP:-?}). Try: curl --cacert \"$EDGE_CA_PEM\" --resolve ${EDGE_HOST}:443:${CADDY_LB_IP:-LB_IP} -H \"x-traffic-class: infra\" \"https://${EDGE_HOST}/api/readyz\""
   exit 1
 fi
 
 if [[ "${BOOTSTRAP_SKIP_EDGE_LATENCY_SLA:-0}" != "1" ]]; then
   say "[P8a] edge route latency SLA (probe-edge-route-latency.sh)"
-  export HOST="$EDGE_HOST"
-  export CA_CERT="$EDGE_CA_PEM"
+  # shellcheck source=lib/rp-edge-url.sh
+  source "$SCRIPT_DIR/lib/rp-edge-url.sh" 2>/dev/null || true
+  export HOST="${EDGE_HOST:-record-platform.test}"
+  export CA_CERT="${EDGE_CACERT:-$EDGE_CA_PEM}"
   bash "$SCRIPT_DIR/probe-edge-route-latency.sh"
   ok "edge latency SLA"
 fi
@@ -1011,8 +1013,18 @@ if [[ "${BOOTSTRAP_SKIP_PHASE_GUARD:-0}" != "1" ]]; then
   _och_bootstrap_phase_guard --complete F.cluster_deploy 2>/dev/null || true
 fi
 
+if [[ "${BOOTSTRAP_SKIP_GRPC_MTLS_GATE:-0}" != "1" ]] && [[ "${RP_SKIP_GRPC_MTLS_REQUIRED:-0}" != "1" ]]; then
+  say "[P8a-mtls] gRPC mTLS required gate (audit + rca + smoke)"
+  chmod +x "$SCRIPT_DIR/lib/rp-bootstrap-grpc-mtls-gate.sh" 2>/dev/null || true
+  HOUSING_NS="$NS" bash "$SCRIPT_DIR/lib/rp-bootstrap-grpc-mtls-gate.sh" || {
+    bad "gRPC mTLS required gate failed — fix contract/deploy TLS before app runtime (see bench_logs/grpc-mtls-rca)"
+    exit 1
+  }
+  ok "gRPC mTLS required gate"
+fi
+
 say "[P8b] Application runtime readiness (scripts/verify-app-runtime.sh — DAG G.app_runtime)"
-chmod +x "$SCRIPT_DIR/verify-app-runtime.sh" 2>/dev/null || true
+chmod +x "$SCRIPT_DIR/verify-app-runtime.sh" "$SCRIPT_DIR/wait-grpc-mtls-readiness.sh" 2>/dev/null || true
 if ! _och_node_is_complete G.app_runtime; then
   _och_bootstrap_phase_guard --enter G.app_runtime || {
     bad "phase guard: cannot enter G.app_runtime (complete F.cluster_deploy first — cluster deploy phase incomplete)"

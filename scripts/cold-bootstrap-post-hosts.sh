@@ -42,10 +42,17 @@ rp_cb_ensure_kube_api "before J.final_contract" || \
 chmod +x "$SCRIPT_DIR/audit-rp-metallb-only-edge.sh" \
   "$SCRIPT_DIR/smoke-rp-edge-http2-strict.sh" \
   "$SCRIPT_DIR/smoke-rp-edge-http3-strict.sh" \
+  "$SCRIPT_DIR/smoke-rp-edge-h2-h3-strict-tls.sh" \
   "$SCRIPT_DIR/smoke-rp-edge-contract.sh" \
+  "$SCRIPT_DIR/audit-rp-edge-host-contract.sh" \
+  "$SCRIPT_DIR/probe-edge-route-latency.sh" \
   "$SCRIPT_DIR/verify-app-runtime.sh" \
   "$SCRIPT_DIR/audit-rp-grpc-health-source.sh" \
   "$SCRIPT_DIR/rca-rp-grpc-mtls.sh" \
+  "$SCRIPT_DIR/audit-rp-service-mtls-required.sh" \
+  "$SCRIPT_DIR/smoke-rp-mtls-real.sh" \
+  "$SCRIPT_DIR/lib/rp-bootstrap-grpc-mtls-gate.sh" \
+  "$SCRIPT_DIR/lib/rp-bootstrap-post-runtime-gates.sh" \
   "$SCRIPT_DIR/audit-rp-ollama-stack.sh" \
   "$SCRIPT_DIR/smoke-rp-ollama.sh" 2>/dev/null || true
 
@@ -65,19 +72,35 @@ export RP_CB_RUN_LABEL="smoke-rp-edge-contract"
 rp_cb_run bash "$SCRIPT_DIR/smoke-rp-edge-contract.sh" || \
   rp_cb_phase_fail J.final_contract "edge endpoint contract smoke failed" "bash scripts/smoke-rp-edge-contract.sh"
 
+export RP_CB_RUN_LABEL="audit-rp-edge-host-contract"
+rp_cb_run bash "$SCRIPT_DIR/audit-rp-edge-host-contract.sh" || \
+  rp_cb_phase_fail J.final_contract "edge host contract audit failed" "bash scripts/audit-rp-edge-host-contract.sh"
+
+export RP_CB_RUN_LABEL="probe-edge-route-latency"
+rp_cb_run bash "$SCRIPT_DIR/probe-edge-route-latency.sh" || \
+  rp_cb_phase_fail J.final_contract "edge route latency SLA failed" "bash scripts/probe-edge-route-latency.sh"
+
+export RP_CB_RUN_LABEL="smoke-rp-edge-h2-h3-strict-tls"
+rp_cb_run bash "$SCRIPT_DIR/smoke-rp-edge-h2-h3-strict-tls.sh" || \
+  rp_cb_phase_fail J.final_contract "H2/H3 strict TLS smoke failed" "bash scripts/smoke-rp-edge-h2-h3-strict-tls.sh"
+
+export RP_CB_RUN_LABEL="rp-bootstrap-grpc-mtls-gate"
+# shellcheck source=lib/rp-bootstrap-grpc-mtls-gate.sh
+rp_cb_run bash "$SCRIPT_DIR/lib/rp-bootstrap-grpc-mtls-gate.sh" || \
+  rp_cb_phase_fail J.final_contract "gRPC mTLS required gate failed" "bash scripts/lib/rp-bootstrap-grpc-mtls-gate.sh"
+
 export RP_CB_RUN_LABEL="verify-app-runtime (post-hosts)"
 rp_cb_run env VERIFY_APP_RUNTIME_PHASE=cold HOUSING_NS="$HOUSING_NS" \
   bash "$SCRIPT_DIR/verify-app-runtime.sh" || \
   rp_cb_phase_fail J.final_contract "verify-app-runtime failed" "VERIFY_APP_RUNTIME_PHASE=cold bash scripts/verify-app-runtime.sh"
 
+export RP_CB_RUN_LABEL="rp-bootstrap-post-runtime-gates (kafka/redis/outbox)"
+rp_cb_run bash "$SCRIPT_DIR/lib/rp-bootstrap-post-runtime-gates.sh" || \
+  rp_cb_phase_fail J.final_contract "post-runtime kafka/redis gates failed" "bash scripts/lib/rp-bootstrap-post-runtime-gates.sh"
+
 export RP_CB_RUN_LABEL="audit-rp-grpc-health-source"
 rp_cb_run bash "$SCRIPT_DIR/audit-rp-grpc-health-source.sh" || \
   rp_cb_phase_fail J.final_contract "audit-rp-grpc-health-source failed" "bash scripts/audit-rp-grpc-health-source.sh"
-
-export RP_CB_RUN_LABEL="rca-rp-grpc-mtls --all --required --strict-integrity"
-RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES="${RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES:-0}" \
-  rp_cb_run bash "$SCRIPT_DIR/rca-rp-grpc-mtls.sh" --all --required --strict-integrity || \
-  rp_cb_phase_fail J.final_contract "rca-rp-grpc-mtls failed (grpc_integrity)" "RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES=1 bash scripts/rca-rp-grpc-mtls.sh --all --required --strict-integrity"
 
 if [[ "${RP_ENABLE_OLLAMA_EFFECTIVE:-1}" == "1" ]]; then
   export RP_CB_RUN_LABEL="apply-ollama-metallb-lb"

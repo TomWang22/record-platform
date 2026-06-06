@@ -358,6 +358,53 @@ const shoppingService = {
     }
   },
 
+  async RemoveRecentlyViewed(call: any, callback: any) {
+    const { user_id, item_type, item_id } = call.request
+    try {
+      const result = await withRetry(
+        () =>
+          pool.query(
+            `DELETE FROM shopping.recently_viewed
+             WHERE user_id = $1 AND item_type = $2 AND item_id = $3
+             RETURNING item_id`,
+            [user_id, item_type, item_id],
+          ),
+        3,
+        'gRPC RemoveRecentlyViewed',
+      )
+      if (result.rows.length === 0) {
+        return callback({
+          code: grpc.status.NOT_FOUND,
+          message: 'Item not found in recently viewed',
+        })
+      }
+      callback(null, { success: true })
+    } catch (err: any) {
+      callback({ code: grpc.status.INTERNAL, message: err.message })
+    }
+  },
+
+  async ClearRecentlyViewed(call: any, callback: any) {
+    const { user_id, item_type } = call.request
+    try {
+      let query = `DELETE FROM shopping.recently_viewed WHERE user_id = $1`
+      const params: string[] = [user_id]
+      if (item_type) {
+        query += ` AND item_type = $2`
+        params.push(item_type)
+      }
+      query += ` RETURNING item_id`
+      const result = await withRetry(
+        () => pool.query(query, params),
+        3,
+        'gRPC ClearRecentlyViewed',
+      )
+      callback(null, { success: true, removed: result.rowCount ?? 0 })
+    } catch (err: any) {
+      callback({ code: grpc.status.INTERNAL, message: err.message })
+    }
+  },
+
   // Wishlist methods
   async AddToWishlist(call: any, callback: any) {
     const { user_id, item_type, item_id, listing_id, priority = 0, notes, metadata } = call.request

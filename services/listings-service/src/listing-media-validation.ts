@@ -7,6 +7,16 @@ export type ListingImageUrlValidation =
   | { ok: true }
   | { ok: false; message: string };
 
+/** Playwright contract placeholders (picsum does not support HEAD). */
+function isRpContractPlaceholderUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw.trim());
+    return u.protocol === "https:" && u.hostname === "picsum.photos" && /^\/seed\/rp-/i.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
 /** Same-origin paths proxied to media-service (inline signed URLs, etc.). */
 function isOchMediaGatewayPath(raw: string): boolean {
   const s = String(raw).trim();
@@ -51,7 +61,7 @@ export async function validateListingImageUrlHead(
   const shape = validateListingImageUrlShape(url);
   if (!shape.ok) return shape;
   const raw = String(url).trim();
-  if (isOchMediaGatewayPath(raw)) {
+  if (isOchMediaGatewayPath(raw) || isRpContractPlaceholderUrl(raw)) {
     return { ok: true };
   }
   if (

@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package events.notification;
+
+option go_package = "github.com/TomWang22/record-platform/proto/events/notification";
+
+// Optional emit: notification service can publish after delivery for analytics/audit.
+
+message NotificationCreatedV1 {
+  string notification_id = 1;
+  string user_id = 2;
+  string type = 3;
+  string created_at = 4;
+}
+
+message NotificationReadV1 {
+  string notification_id = 1;
+  string user_id = 2;
+  string read_at = 3;
+}
+
+message NotificationContextReadV1 {
+  string notification_id = 1;
+  string user_id = 2;
+  string context_key = 3;
+  string read_at = 4;
+}
+
+message NotificationSentV1 {
+  string notification_id = 1;
+  string user_id = 2;
+  string type = 3;
+}

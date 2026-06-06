@@ -29,7 +29,16 @@ export type CollectionRecord = {
   isPromo?: boolean
   notes?: string | null
   purchasedAt?: string | null
+  shippedAt?: string | null
   receivedAt?: string | null
+  imageUrl?: string | null
+  coverUrl?: string | null
+  purchaseDateDisplay?: string | null
+  shipDateDisplay?: string | null
+  deliveredDateDisplay?: string | null
+  paidDisplay?: string | null
+  listingId?: string | null
+  listingStatus?: ListingLinkStatus
   purchaseType?: string | null
   purchaseSource?: string | null
   sellerName?: string | null
@@ -73,3 +82,29 @@ export type RecordsSortKey =
 export const RECORDS_PAGE_SIZES = [24, 48, 72, 120] as const
 
 export type ListingLinkStatus = 'not_listed' | 'draft' | 'published' | 'sold'
+
+export type PurchaseTypeFilter =
+  | ''
+  | 'fixed_price'
+  | 'auction_win'
+  | 'retail'
+  | 'trade'
+  | 'gift'
+  | 'obo'
+  | 'negotiated_obo'
+  | 'other'
+
+export type ListedStatusFilter = '' | 'listed' | 'not_listed'
+
+export function normalizeCollectionRecord(raw: CollectionRecord): CollectionRecord {
+  const imageUrl =
+    raw.imageUrl ??
+    raw.coverUrl ??
+    raw.mediaPieces?.find((m) => m.urlOrPath)?.urlOrPath ??
+    null
+  return {
+    ...raw,
+    imageUrl: imageUrl ?? null,
+    coverUrl: imageUrl ?? null,
+  }
+}

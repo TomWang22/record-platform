@@ -1,4 +1,28 @@
 packages:
   - "services/*"
+  - "!services/social-service"
+  - "!services/booking-service"
   - "webapp"
   - "tools/kafka-contract"
+
+allowBuilds:
+  "@prisma/client": true
+  "@prisma/engines": true
+  esbuild: true
+  prisma: true
+  protobufjs: true
+  puppeteer: false
+
+pnpm:
+  dangerouslyAllowAllBuilds: true
+  forceLegacyDeploy: true
+  overrides:
+    "@smithy/types": "^4.13.1"
+    rollup: "npm:@rollup/wasm-node@4.9.6"
+  supportedArchitectures:
+    os:
+      - darwin
+      - linux
+    cpu:
+      - arm64
+      - x64

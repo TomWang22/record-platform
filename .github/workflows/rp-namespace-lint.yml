@@ -1,0 +1,46 @@
+name: RP Namespace Lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python compile check (bundle-audit tools)
+        run: python3 -m py_compile tools/bundle-audit/*.py
+
+      - name: RP namespace lint
+        run: python3 tools/bundle-audit/rp_namespace_linter_v1.py --repo-root "$GITHUB_WORKSPACE"
+
+      - name: Secret name alignment audit
+        run: python3 tools/bundle-audit/secret_name_alignment_audit.py --repo-root "$GITHUB_WORKSPACE"
+
+      - name: Phase barrier equivalence (static)
+        run: python3 tools/bundle-audit/phase_barrier_equivalence_check.py --repo-root "$GITHUB_WORKSPACE"
+
+      - name: Preflight static contract check
+        run: python3 tools/bundle-audit/preflight_static_contract_check.py --repo-root "$GITHUB_WORKSPACE"
+
+      # Set Actions variable `OCH_PREFLIGHT_SCRIPT` to an absolute path on the runner (e.g. checked-out staging)
+      # to compare OCH vs RP preflight; otherwise this step is a no-op.
+      - name: Preflight behavioral diff (optional)
+        env:
+          OCH_PREFLIGHT_SCRIPT: ${{ vars.OCH_PREFLIGHT_SCRIPT }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${OCH_PREFLIGHT_SCRIPT:-}" ]]; then
+            echo "Skip preflight behavioral diff: unset Actions variable OCH_PREFLIGHT_SCRIPT"
+            exit 0
+          fi
+          if [[ ! -f "${OCH_PREFLIGHT_SCRIPT}" ]]; then
+            echo "OCH_PREFLIGHT_SCRIPT is not a readable file: ${OCH_PREFLIGHT_SCRIPT}" >&2
+            exit 1
+          fi
+          python3 tools/bundle-audit/preflight_behavioral_diff.py \
+            --och-script "${OCH_PREFLIGHT_SCRIPT}" \
+            --rp-script "${GITHUB_WORKSPACE}/scripts/run-preflight-scale-and-all-suites.sh" \
+            --stem ci

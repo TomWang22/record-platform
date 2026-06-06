@@ -1,25 +1,36 @@
 # syntax=docker/dockerfile:1
 
 # ---------- deps ----------
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 
 # Copy package manifests (changes rarely, good for caching)
 # Only copy what's needed for dependency installation
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
+COPY .npmrc ./
 COPY webapp/package.json ./webapp/package.json
 
 # Use BuildKit cache mounts for pnpm store (persists between builds)
 # Parallel install with ignore-scripts for faster install
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm -w --filter webapp... install --frozen-lockfile --ignore-scripts
+    rp-pnpm -w --filter webapp... install --frozen-lockfile --ignore-scripts
 
 # ---------- build ----------
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.11.0 --activate
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV NPM_CONFIG_CONFIRM_MODULES_PURGE=false
+ENV PNPM_CONFIG_CONFIRM_MODULES_PURGE=false
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
 
 # Copy installed dependencies from deps stage
 COPY --from=deps /app /app
@@ -46,24 +57,30 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 # Build with progress output (so it doesn't look stuck)
 # Use unbuffered output so progress shows immediately
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    echo "=== Starting Next.js build (this takes 2-5 minutes) ===" && \
-    echo "Compiling TypeScript and bundling React..." && \
-    echo "Note: Type checking is skipped during build (ignoreBuildErrors: true)" && \
-    echo "Starting build at $(date)" && \
-    echo "Clearing Next.js cache to prevent corruption..." && \
+    set -eu && \
     rm -rf /app/webapp/.next && \
-    echo "Running build..." && \
-    NODE_OPTIONS="--max-old-space-size=4096" NEXT_TELEMETRY_DISABLED=1 pnpm build 2>&1 | tee /tmp/next-build.log && \
-    echo "Build completed at $(date)" && \
-    echo "=== Next.js build complete ==="
+    NODE_OPTIONS="--max-old-space-size=4096" NEXT_TELEMETRY_DISABLED=1 rp-pnpm build && \
+    test -d /app/webapp/.next/standalone
 
-# Prune production dependencies after build
+# Prune production dependencies after build (standalone gate required)
 WORKDIR /app
-RUN cd webapp && pnpm prune --prod
+RUN test -d /app/webapp/.next/standalone && cd webapp && rp-pnpm prune --prod
 
 # ---------- runtime ----------
-FROM node:20-alpine
+FROM node:22-alpine
+ARG RP_SOURCE_SHA=unknown
+ARG GIT_COMMIT=unknown
+ARG RP_WEBAPP_BUILD_AT=unknown
+LABEL rp.dev.service="webapp"
+LABEL rp.dev.source-sha="${RP_SOURCE_SHA}"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 WORKDIR /app
+ENV RP_WEBAPP_BUILD_SHA="${GIT_COMMIT}"
+ENV RP_WEBAPP_BUILD_AT="${RP_WEBAPP_BUILD_AT}"
+ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
+RUN chmod +x /usr/local/bin/rp-pnpm
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 

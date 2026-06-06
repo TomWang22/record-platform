@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Return 0 if kafka-metadata-quorum describe --status shows a leader (cluster can serve metadata).
-# Usage: source this file and call och_kafka_kraft_quorum_ok [namespace]
+# Usage: source this file and call rp_kafka_kraft_quorum_ok [namespace]
 # Env: KAFKA_CLUSTER_EXEC_TIMEOUT (default 45)
 # Intentionally no set -euo: this file is sourced by other scripts.
 
-och_kafka_kraft_quorum_ok() {
+rp_kafka_kraft_quorum_ok() {
   local NS="${1:-${HOUSING_NS:-record-platform}}"
   local EXEC_TO="${KAFKA_CLUSTER_EXEC_TIMEOUT:-45}"
   local _qout

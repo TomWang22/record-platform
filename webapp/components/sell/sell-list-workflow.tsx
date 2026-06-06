@@ -142,35 +142,57 @@ export function SellListWorkflow({ returnTo = '/sell' }: { returnTo?: string }) 
     setCreatingListing(true)
     setMessage('')
     try {
-      await apiFetch('/api/listings', {
+      const today = new Date().toISOString().slice(0, 10)
+      const nextYear = new Date(Date.now() + 365 * 86_400_000).toISOString().slice(0, 10)
+      const imageUrls = listingMedia.map((m) => m.url).filter(Boolean)
+      const images =
+        imageUrls.length > 0
+          ? imageUrls
+          : ['https://picsum.photos/seed/rp-sell-list-flow/400/400']
+      const pricing_mode =
+        form.listingType === 'auction' ? 'auction' : form.listingType === 'obo' ? 'obo' : 'fixed'
+      const amenities: string[] = [
+        `sale_type:${pricing_mode === 'auction' ? 'auction' : pricing_mode === 'obo' ? 'obo' : 'fixed'}`,
+        `ships_from_country:${form.shipsFromCountry}`,
+        `ships_from_region:${form.shipsFromRegion}`,
+        `ships_from_postal:${form.shipsFromPostal}`,
+      ]
+      if (form.conditionNotes.trim()) {
+        amenities.push(`condition_notes:${form.conditionNotes.trim()}`)
+      }
+      if (selectedRecordId) amenities.push(`source_record_id:${selectedRecordId}`)
+      if (form.shippingNotes.trim()) amenities.push(`shipping_notes:${form.shippingNotes.trim()}`)
+      if (form.shippingService) amenities.push(`shipping_service:${form.shippingService}`)
+      if (form.packageType) amenities.push(`package_type:${form.packageType}`)
+      await apiFetch('/api/listings/create', {
         method: 'POST',
         auth: true,
         data: {
-          record_id: selectedRecordId || undefined,
           title: form.title,
           description: form.description,
-          condition_notes: form.conditionNotes,
-          status: mode === 'publish' ? 'published' : form.status,
-          listing_type: form.listingType,
           price_cents: Math.round(Number(form.price || form.startingBid || 0) * 100),
-          minimum_offer_cents: Math.round(Number(form.minimumOffer || 0) * 100) || null,
-          currency: form.currency,
-          quantity: Number(form.quantity || 1),
-          ships_from_country: form.shipsFromCountry,
-          ships_from_region: form.shipsFromRegion,
-          ships_from_postal_code: form.shipsFromPostal,
-          domestic_shipping_cents: Math.round(Number(form.domesticShipping || 0) * 100) || null,
-          international_shipping_cents: Math.round(Number(form.internationalShipping || 0) * 100) || null,
-          handling_days: Number(form.handlingDays || 0) || null,
+          effective_from: today,
+          effective_until: nextYear,
+          pricing_mode,
+          initial_status: mode === 'publish' ? 'active' : 'draft',
+          format: selectedRecord?.format,
+          media_condition: form.conditionNotes.trim() || undefined,
+          images,
+          amenities,
+          domestic_shipping_cents:
+            Math.round(Number(form.domesticShipping || 0) * 100) || undefined,
+          international_shipping_cents:
+            Math.round(Number(form.internationalShipping || 0) * 100) || undefined,
+          domestic_shipping: Boolean(form.domesticShipping),
+          international_shipping: Boolean(form.internationalShipping),
           local_pickup: form.localPickup,
           combined_shipping: form.combinedShipping,
-          shipping_notes: form.shippingNotes,
-          auction_start_at: form.auctionStart || null,
-          auction_end_at: form.auctionEnd || null,
-          starting_bid_cents: Math.round(Number(form.startingBid || 0) * 100) || null,
-          reserve_price_cents: Math.round(Number(form.reservePrice || 0) * 100) || null,
-          bid_increment_cents: Math.round(Number(form.bidIncrement || 0) * 100) || null,
-          media_asset_ids: mediaAssetIds,
+          country: form.shipsFromCountry,
+          state_or_province: form.shipsFromRegion,
+          postal_code: form.shipsFromPostal,
+          shipping_notes: form.shippingNotes.trim() || undefined,
+          shipping_service: form.shippingService,
+          package_type: form.packageType,
         },
       })
       setRevisionSummary((prev) => [`${mode === 'publish' ? 'Published' : 'Draft saved'} at ${new Date().toLocaleString()}`, ...prev])
@@ -202,7 +224,7 @@ export function SellListWorkflow({ returnTo = '/sell' }: { returnTo?: string }) 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="sell-list-ready">
       <header>
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Create listing</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">

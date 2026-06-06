@@ -22,7 +22,7 @@
       "httpPort": 4001,
       "grpcPort": 50061,
       "healthPath": "/healthz",
-      "readyPath": "/healthz",
+      "readyPath": "/readyz",
       "httpEnv": [
         "AUTH_PORT"
       ],
@@ -43,7 +43,7 @@
       "httpPort": 4002,
       "grpcPort": 50051,
       "healthPath": "/healthz",
-      "readyPath": "/healthz",
+      "readyPath": "/readyz",
       "httpEnv": [
         "RECORDS_PORT"
       ],
@@ -64,7 +64,7 @@
       "httpPort": 4007,
       "grpcPort": 50058,
       "healthPath": "/healthz",
-      "readyPath": "/healthz",
+      "readyPath": "/readyz",
       "httpEnv": [
         "SHOPPING_PORT"
       ],
@@ -85,7 +85,7 @@
       "httpPort": 4008,
       "grpcPort": 50059,
       "healthPath": "/healthz",
-      "readyPath": "/healthz",
+      "readyPath": "/readyz",
       "httpEnv": [
         "HTTP_PORT"
       ],
@@ -106,7 +106,7 @@
       "httpPort": 4012,
       "grpcPort": 50062,
       "healthPath": "/healthz",
-      "readyPath": "/healthz",
+      "readyPath": "/readyz",
       "httpEnv": [
         "HTTP_PORT"
       ],
@@ -127,7 +127,7 @@
       "httpPort": 4014,
       "grpcPort": 50064,
       "healthPath": "/healthz",
-      "readyPath": "/healthz",
+      "readyPath": "/readyz",
       "httpEnv": [
         "HTTP_PORT"
       ],
@@ -149,7 +149,7 @@
       "httpPort": 4015,
       "grpcPort": 50065,
       "healthPath": "/healthz",
-      "readyPath": "/healthz",
+      "readyPath": "/readyz",
       "httpEnv": [
         "HTTP_PORT"
       ],
@@ -212,7 +212,7 @@
       "httpPort": 4018,
       "grpcPort": 50068,
       "healthPath": "/healthz",
-      "readyPath": "/healthz",
+      "readyPath": "/readyz",
       "httpEnv": [
         "HTTP_PORT",
         "MEDIA_HTTP_PORT"
@@ -234,7 +234,7 @@
       "httpPort": 5005,
       "grpcPort": 50060,
       "healthPath": "/healthz",
-      "readyPath": "/healthz",
+      "readyPath": "/readyz",
       "httpEnv": [
         "HTTP_PORT",
         "AI_PORT"

@@ -8,8 +8,8 @@ spec:
   selector: { app: listings-service }
   ports:
     - name: http
-      port: 4003
-      targetPort: http
+      port: 4012
+      targetPort: 4012
     - name: grpc
-      port: 50057
-      targetPort: grpc
+      port: 50062
+      targetPort: 50062

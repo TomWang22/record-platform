@@ -11,6 +11,18 @@ PASS="${RP_COMB_PASSWORD:-ContractPass123!}"
 REPORT="${REPORT:-$ROOT/bench_logs/frontend-contract/api-path-probe-report.md}"
 mkdir -p "$(dirname "$REPORT")"
 
+# Redact JWTs and password fields before writing reports or stdout.
+redact_probe_note() {
+  python3 -c '
+import re, sys
+s = sys.stdin.read()
+s = re.sub(r"\"token\"\s*:\s*\"[^\"]+\"", "\"token\":\"[REDACTED]\"", s)
+s = re.sub(r"\"password\"\s*:\s*\"[^\"]+\"", "\"password\":\"[REDACTED]\"", s)
+s = re.sub(r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "[REDACTED_JWT]", s)
+print(s[:80])
+' <<<"${1:-}"
+}
+
 token=""
 token="$(curl -sfS --max-time 15 --cacert "$CA" -X POST "$BASE/api/auth/login" \
   -H 'Content-Type: application/json' -H 'X-RP-E2E-Contract: 1' \
@@ -54,7 +66,10 @@ for p in "${paths[@]}"; do
   code=$(curl -sS -o /tmp/rp-probe-body.json -w '%{http_code}' --max-time 15 --cacert "$CA" "${extra[@]}" "${auth[@]}" "$BASE$p" 2>/dev/null || echo "000")
   note=""
   if [[ -f /tmp/rp-probe-body.json ]]; then
-    note=$(head -c 80 /tmp/rp-probe-body.json | tr '\n' ' ')
+    note="$(tr '\n' ' ' </tmp/rp-probe-body.json | redact_probe_note)"
+  fi
+  if [[ "$p" == "/api/auth/login" ]]; then
+    note='{"token":"[REDACTED]"}'
   fi
   echo "| \`$p\` | $meth | $code | ${note:-—} |" >>"$REPORT"
   printf '%-45s %s %s\n' "$p" "$code" "${note:0:60}"

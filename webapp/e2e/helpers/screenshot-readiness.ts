@@ -226,3 +226,22 @@ export async function waitForSellingReady(page: Page, tab = 'active'): Promise<v
   await expect(row.first().or(empty)).toBeVisible({ timeout: 15_000 })
   await waitForNoLoadingStates(page, `/profile/selling?status=${tab}`)
 }
+
+/** Wait for a specific watchlist product card after API persistence is confirmed. */
+export async function waitForWatchlistCard(
+  page: Page,
+  listingIdOrTitle: string,
+  timeoutMs = 60_000,
+): Promise<void> {
+  await expect(page.getByTestId('watchlist-page-ready')).toBeVisible({ timeout: timeoutMs })
+  const isListingId = /^[0-9a-f-]{36}$/i.test(listingIdOrTitle)
+  const card = isListingId
+    ? page
+        .locator(`[data-testid="watchlist-item"] a[href="/listings/${listingIdOrTitle}"]`)
+        .first()
+    : page.locator('[data-testid="watchlist-item"]').filter({ hasText: listingIdOrTitle }).first()
+  await expect(card).toBeVisible({ timeout: timeoutMs })
+  await expect(page.locator('[data-testid="watchlist-item"]').first()).toBeVisible({
+    timeout: timeoutMs,
+  })
+}

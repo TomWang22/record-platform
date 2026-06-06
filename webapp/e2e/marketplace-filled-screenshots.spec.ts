@@ -4,6 +4,7 @@ import { obtainAuthToken, signInAsTestCollector, signInAsTestCollectorWithSeed }
 import { getJsonWith429Retry } from './helpers/http-retry'
 import { ensureTestCollection } from './helpers/seed-collection'
 import { ensureContractFeedback } from './helpers/seed-feedback'
+import { ensureWatchlistContains, pollRecentlyViewedIds } from './helpers/seed-lean'
 import {
   captureScreenshot,
   contractScreenshotPath,
@@ -12,6 +13,7 @@ import {
   waitForListingsReady,
   waitForRecordsReady,
   waitForSellingReady,
+  waitForWatchlistCard,
 } from './helpers/screenshot-readiness'
 import { assertNoStaleProductUi } from './helpers/stale-ui-guard'
 
@@ -112,17 +114,10 @@ test.describe('Marketplace filled screenshots', () => {
     const listingId = seedListingId
     if (listingId) {
       await page.goto(`/listings/${listingId}`)
-      const watchBtn = page.getByRole('button', {
-        name: /add to watchlist|remove from watchlist/i,
-      })
-      await expect(watchBtn).toBeVisible({ timeout: 30_000 })
-      const watchLabel = (await watchBtn.getAttribute('aria-label')) ?? ''
-      if (/add to watchlist/i.test(watchLabel)) {
-        await watchBtn.click()
-      }
+      await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 30_000 })
+      await ensureWatchlistContains(page.request, token!, listingId)
       await page.goto('/watchlist')
-      await expect(page.getByTestId('watchlist-page-ready')).toBeVisible({ timeout: 30_000 })
-      await expect(page.locator('[data-testid="watchlist-item"]').first()).toBeVisible({ timeout: 15_000 })
+      await waitForWatchlistCard(page, listingId)
       await captureScreenshot(
         page,
         contractScreenshotPath('authenticated-watchlist-filled-product-cards.png'),
@@ -130,6 +125,7 @@ test.describe('Marketplace filled screenshots', () => {
 
       await page.goto(`/listings/${listingId}`)
       await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 30_000 })
+      await pollRecentlyViewedIds(page.request, token!, [listingId], { timeoutMs: 45_000 })
       await page.goto('/recently-viewed')
       await expect(page.getByTestId('recently-viewed-page-ready')).toBeVisible({ timeout: 30_000 })
       await expect(page.locator('[data-testid="recently-viewed-item"]').first()).toBeVisible({

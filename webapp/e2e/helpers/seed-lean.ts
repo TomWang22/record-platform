@@ -82,27 +82,79 @@ export async function clearWatchlist(
   }
 }
 
+export async function fetchWatchlistListingIds(
+  request: APIRequestContext,
+  token: string,
+): Promise<string[]> {
+  const headers = { Authorization: `Bearer ${token}` }
+  const data = await getJsonWith429Retry<{
+    items?: { listingId?: string; item_id?: string }[]
+  }>(request, '/api/shopping/watchlist', headers, 'watchlist fetch')
+  return (data.items ?? [])
+    .map((row) => row.listingId ?? row.item_id)
+    .filter((id): id is string => Boolean(id))
+}
+
+/** Poll shopping-service until watchlist contains expected listing ids (API truth, not UI cache). */
+export async function pollWatchlistListingIds(
+  request: APIRequestContext,
+  token: string,
+  expectedIds: string[],
+  opts?: { timeoutMs?: number },
+): Promise<void> {
+  const timeoutMs = opts?.timeoutMs ?? 45_000
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const ids = await fetchWatchlistListingIds(request, token)
+    const have = new Set(ids)
+    if (expectedIds.every((id) => have.has(id))) {
+      return
+    }
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  const finalIds = await fetchWatchlistListingIds(request, token)
+  throw new Error(
+    `watchlist poll timeout: expected [${expectedIds.join(', ')}], got [${finalIds.join(', ')}]`,
+  )
+}
+
 export async function ensureWatchlistEntry(
   request: APIRequestContext,
   token: string,
   listingId: string,
 ): Promise<void> {
+  await ensureWatchlistContains(request, token, listingId)
+}
+
+/** Add listing to API-backed watchlist and poll until shopping-service reflects it. */
+export async function ensureWatchlistContains(
+  request: APIRequestContext,
+  token: string,
+  listingId: string,
+  opts?: { title?: string },
+): Promise<void> {
   const headers = {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
   }
-  const res = await request.post('/api/shopping/watchlist', {
-    headers,
-    data: {
-      item_type: 'listing',
-      item_id: listingId,
-      listing_id: listingId,
-      metadata: { title: 'Lean listing', imageUrl: PLACEHOLDER },
-    },
-  })
-  if (!res.ok() && res.status() !== 409) {
-    throw new Error(`watchlist add failed ${res.status()}: ${(await res.text()).slice(0, 200)}`)
+  const existing = await fetchWatchlistListingIds(request, token)
+  if (!existing.includes(listingId)) {
+    const res = await with429Retry('watchlist add', () =>
+      request.post('/api/shopping/watchlist', {
+        headers,
+        data: {
+          item_type: 'listing',
+          item_id: listingId,
+          listing_id: listingId,
+          metadata: { title: opts?.title ?? 'Lean listing', imageUrl: PLACEHOLDER },
+        },
+      }),
+    )
+    if (!res.ok() && res.status() !== 409) {
+      throw new Error(`watchlist add failed ${res.status()}: ${(await res.text()).slice(0, 200)}`)
+    }
   }
+  await pollWatchlistListingIds(request, token, [listingId])
 }
 
 export async function ensureRecentlyViewedEntry(

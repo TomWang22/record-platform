@@ -148,7 +148,11 @@ export async function ensureMarketplaceSeed(
   if (result.watchedListingId) {
     await request.post('/api/shopping/watchlist', {
       headers,
-      data: { itemType: 'listing', itemId: result.watchedListingId },
+      data: {
+        item_type: 'listing',
+        item_id: result.watchedListingId,
+        listing_id: result.watchedListingId,
+      },
     }).catch(() => {})
   }
 

@@ -20,7 +20,7 @@ s = re.sub(r"\"token\"\s*:\s*\"[^\"]+\"", "\"token\":\"[REDACTED]\"", s)
 s = re.sub(r"\"password\"\s*:\s*\"[^\"]+\"", "\"password\":\"[REDACTED]\"", s)
 s = re.sub(r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "[REDACTED_JWT]", s)
 print(s[:80])
-' <<<"${1:-}"
+'
 }
 
 token=""

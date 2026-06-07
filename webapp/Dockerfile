@@ -23,11 +23,17 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 
 # ---------- build ----------
 FROM node:22-alpine AS build
+ARG GIT_COMMIT=unknown
+ARG RP_WEBAPP_BUILD_AT=unknown
 WORKDIR /app
 ENV CI=true
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 ENV NPM_CONFIG_CONFIRM_MODULES_PURGE=false
 ENV PNPM_CONFIG_CONFIRM_MODULES_PURGE=false
+ENV RP_WEBAPP_BUILD_SHA="${GIT_COMMIT}"
+ENV RP_WEBAPP_BUILD_AT="${RP_WEBAPP_BUILD_AT}"
+ENV NEXT_PUBLIC_RP_WEBAPP_BUILD_SHA="${GIT_COMMIT}"
+ENV NEXT_PUBLIC_RP_WEBAPP_BUILD_AT="${RP_WEBAPP_BUILD_AT}"
 COPY scripts/docker/rp-pnpm-ci-install.sh /usr/local/bin/rp-pnpm
 RUN chmod +x /usr/local/bin/rp-pnpm
 RUN corepack enable && corepack prepare pnpm@11.1.3 --activate

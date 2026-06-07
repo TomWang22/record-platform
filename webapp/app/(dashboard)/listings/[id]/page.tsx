@@ -125,13 +125,18 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)] lg:items-start">
+      <div
+        className="grid gap-6 lg:grid-cols-[minmax(420px,1.15fr)_minmax(300px,400px)] lg:items-start"
+        data-testid="listing-detail-product-area"
+      >
         <ListingImageGallery images={images} />
-        <ListingShippingCard listing={listing} />
+        <div className="space-y-4">
+          <ListingShippingCard listing={listing} />
+          <ListingSellerCard listing={listing} listingId={id} />
+        </div>
       </div>
 
       <div className="space-y-4">
-        <ListingSellerCard listing={listing} listingId={id} />
         <Card className="p-4" data-testid="listing-description-card">
           <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Description</p>
           <p

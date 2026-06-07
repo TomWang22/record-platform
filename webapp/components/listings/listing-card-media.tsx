@@ -19,8 +19,8 @@ export function ListingCardMedia({ listing, compact, ended, href }: Props) {
   const active = images[index] ?? images[0]
   const hasMany = images.length > 1
   const frameClass = compact
-    ? 'aspect-square max-h-[132px] w-full'
-    : 'aspect-square w-full'
+    ? 'aspect-square min-h-[160px] max-h-[200px] w-full'
+    : 'aspect-square min-h-[220px] w-full'
 
   const show = useCallback(
     (next: number) => {

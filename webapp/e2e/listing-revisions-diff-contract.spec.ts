@@ -155,7 +155,7 @@ test.describe.serial('Listing revision diff correctness (7.6R)', () => {
     await waitForListingRevisions(request, token, listingId, { minCount: 1 })
     await page.goto(`/listings/${listingId}`, { waitUntil: 'domcontentloaded' })
     await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 90_000 })
-    await expect(page.getByTestId('listing-revision-preview')).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByTestId('listing-detail-revision-preview')).toBeVisible({ timeout: 60_000 })
     await page.getByTestId('listing-revision-panel').getByRole('button').click()
     await expect(page.getByTestId('listing-revision-panel-loaded')).toBeVisible({
       timeout: 60_000,

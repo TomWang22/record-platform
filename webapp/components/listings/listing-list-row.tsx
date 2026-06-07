@@ -32,11 +32,11 @@ export function ListingListRow({ listing }: Props) {
     <div
       data-testid="listing-row"
       data-sale-mode={mode}
-      className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5 dark:border-white/10 dark:bg-slate-950"
+      className="flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-950"
     >
       <Link
         href={`/listings/${listing.id}`}
-        className="relative h-[96px] w-[96px] shrink-0 overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800"
+        className="relative h-[140px] w-[140px] shrink-0 overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800"
       >
         {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -58,7 +58,7 @@ export function ListingListRow({ listing }: Props) {
       <div className="min-w-0 flex-1">
         <Link
           href={`/listings/${listing.id}`}
-          className="line-clamp-2 text-sm font-medium text-slate-900 hover:text-brand dark:text-white"
+          className="line-clamp-2 text-base font-medium text-slate-900 hover:text-brand dark:text-white"
         >
           {listing.release ?? listing.title}
         </Link>
@@ -71,7 +71,7 @@ export function ListingListRow({ listing }: Props) {
       </div>
       <div className="shrink-0 text-right">
         <p className="text-[10px] uppercase text-slate-500">{price.label}</p>
-        <p className="text-base font-bold">{price.amount}</p>
+        <p className="text-lg font-bold">{price.amount}</p>
         {price.meta && <p className="text-[11px] text-rose-600">{price.meta}</p>}
       </div>
       <div className="flex shrink-0 flex-col gap-1">

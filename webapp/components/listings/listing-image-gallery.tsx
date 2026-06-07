@@ -13,8 +13,8 @@ export function ListingImageGallery({ images }: Props) {
   if (!primary) {
     return (
       <div
-        className="flex aspect-[4/3] max-h-72 items-center justify-center rounded-2xl bg-slate-100 text-sm text-slate-500 dark:bg-slate-800"
-        data-testid="listing-gallery"
+        className="flex min-h-[320px] w-full items-center justify-center rounded-xl border border-slate-200/80 bg-slate-100 text-sm text-slate-500 dark:border-white/10 dark:bg-slate-800"
+        data-testid="listing-detail-gallery"
       >
         No media
       </div>
@@ -22,14 +22,17 @@ export function ListingImageGallery({ images }: Props) {
   }
 
   return (
-    <div className="space-y-3" data-testid="listing-gallery">
-      <div className="flex h-[min(280px,36vh)] max-h-72 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50 p-2 dark:border-white/10 dark:bg-slate-900/40">
+    <div className="w-full space-y-3" data-testid="listing-detail-gallery">
+      <div
+        className="flex aspect-square w-full min-h-[320px] max-h-[min(560px,72vh)] items-center justify-center overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-900/40"
+        data-testid="listing-detail-main-image"
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={primary}
           alt=""
           data-testid="listing-primary-image"
-          className="max-h-full max-w-full rounded-lg object-contain shadow-sm"
+          className="h-full w-full max-h-full max-w-full rounded-lg object-contain shadow-sm"
         />
       </div>
       {images.length > 1 && (
@@ -39,7 +42,7 @@ export function ListingImageGallery({ images }: Props) {
               key={`${src}-${i}`}
               type="button"
               onClick={() => setSelected(i)}
-              className={`h-14 w-14 overflow-hidden rounded-lg border-2 transition ${
+              className={`h-16 w-16 overflow-hidden rounded-lg border-2 transition ${
                 i === selected
                   ? 'border-brand'
                   : 'border-transparent opacity-80 hover:opacity-100'

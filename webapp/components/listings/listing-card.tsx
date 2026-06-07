@@ -53,7 +53,7 @@ export function ListingCard({ listing, compact }: Props) {
         {ribbon && (
           <span
             data-testid="listing-card-sale-ribbon"
-            className={`absolute left-0 top-0 z-10 px-2 py-0.5 text-[10px] font-bold tracking-wide ${RIBBON_CLASS[ribbon.tone]}`}
+            className={`absolute left-0 top-0 z-10 px-2.5 py-1 text-[11px] font-bold tracking-wide ${RIBBON_CLASS[ribbon.tone]}`}
           >
             {ribbon.text}
           </span>
@@ -63,26 +63,26 @@ export function ListingCard({ listing, compact }: Props) {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 p-2.5">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
         <Link href={detailHref} className="min-w-0 flex-1">
           <h3
             data-testid="listing-card-title"
-            className="line-clamp-2 text-[13px] font-medium leading-snug text-slate-900 dark:text-white"
+            className="line-clamp-2 text-sm font-medium leading-snug text-slate-900 dark:text-white"
           >
             {listing.release ?? listing.title}
           </h3>
           {!compact && listing.artist && (
-            <p className="mt-0.5 truncate text-[11px] text-slate-500">{listing.artist}</p>
+            <p className="mt-0.5 truncate text-xs text-slate-500">{listing.artist}</p>
           )}
-          <p className="mt-1 text-[11px] text-slate-500" data-testid="listing-card-condition">
+          <p className="mt-1 text-xs text-slate-500" data-testid="listing-card-condition">
             {browseConditionLine(listing)}
           </p>
-          <div className="mt-1.5" data-testid="listing-card-price">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+          <div className="mt-2" data-testid="listing-card-price">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
               {price.label}
             </p>
             <p
-              className={`text-lg font-bold leading-tight ${
+              className={`text-xl font-bold leading-tight ${
                 price.accent === 'ended'
                   ? 'text-slate-500'
                   : price.accent === 'urgent'
@@ -94,7 +94,7 @@ export function ListingCard({ listing, compact }: Props) {
             </p>
             {price.meta && (
               <p
-                className={`text-[11px] ${
+                className={`text-xs ${
                   price.accent === 'ended' || price.accent === 'urgent'
                     ? 'font-medium text-rose-600 dark:text-rose-400'
                     : 'text-slate-600 dark:text-slate-400'
@@ -106,11 +106,11 @@ export function ListingCard({ listing, compact }: Props) {
             )}
           </div>
           {!compact && (
-            <p className="mt-1 text-[11px] text-slate-500" data-testid="listing-card-shipping">
+            <p className="mt-1 text-xs text-slate-500" data-testid="listing-card-shipping">
               {browseShippingLine(listing)}
             </p>
           )}
-          <p className="mt-0.5 truncate text-[11px] text-slate-500" data-testid="listing-card-seller">
+          <p className="mt-0.5 truncate text-xs text-slate-500" data-testid="listing-card-seller">
             {listing.seller ?? 'Seller'}
             {listing.seller_feedback_score != null
               ? ` (${listing.seller_feedback_score}% positive)`
@@ -124,7 +124,7 @@ export function ListingCard({ listing, compact }: Props) {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 flex-1 rounded-full text-xs"
+                className="h-8 flex-1 rounded-full text-xs"
                 asChild
                 data-testid="listing-card-make-offer"
               >
@@ -134,7 +134,7 @@ export function ListingCard({ listing, compact }: Props) {
             {mode === 'auction' && (
               <Button
                 size="sm"
-                className="h-7 flex-1 rounded-full text-xs"
+                className="h-8 flex-1 rounded-full text-xs"
                 asChild
                 data-testid="listing-card-place-bid"
               >
@@ -144,7 +144,7 @@ export function ListingCard({ listing, compact }: Props) {
             {mode === 'fixed' && (
               <Button
                 size="sm"
-                className="h-7 flex-1 rounded-full text-xs"
+                className="h-8 flex-1 rounded-full text-xs"
                 asChild
                 data-testid="listing-card-buy-now"
               >

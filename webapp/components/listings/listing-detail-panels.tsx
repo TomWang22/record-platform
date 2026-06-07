@@ -62,12 +62,12 @@ export function ListingShippingCard({ listing }: { listing: MarketplaceListing }
   )
   return (
     <div data-testid="listing-shipping-card">
-    <Card className="space-y-3 p-4" data-testid="listing-price-sale-card">
+    <Card className="space-y-3 p-4" data-testid="listing-detail-price-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Price &amp; sale</p>
         <Badge>{sale}</Badge>
       </div>
-      <p className="text-3xl font-bold tracking-tight" data-testid="listing-price-card">
+      <p className="text-3xl font-bold tracking-tight" data-testid="listing-detail-price-amount">
         {formatListingPrice(listing)}
       </p>
       {listing.listing_type === 'auction' && listing.auction && (
@@ -180,7 +180,7 @@ export function ListingSellerCard({ listing, listingId }: Props) {
     : `/messages?listing=${encodeURIComponent(listingId)}`
 
   return (
-    <div data-testid="listing-seller-card">
+    <div data-testid="listing-detail-seller-card">
     <Card className="flex flex-wrap items-center justify-between gap-4 p-4">
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Seller</p>
@@ -252,7 +252,7 @@ export function ListingRevisionPanel({ listingId }: { listingId: string }) {
     <Card className="space-y-3 p-4">
       {loaded && (
         <div
-          data-testid="listing-revision-preview"
+          data-testid="listing-detail-revision-preview"
           className="min-h-[4.5rem] rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-3 text-sm dark:border-white/10 dark:bg-slate-900/50"
         >
           {lines.length > 0 && previewWhen ? (

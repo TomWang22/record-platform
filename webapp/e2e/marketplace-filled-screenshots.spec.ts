@@ -15,7 +15,8 @@ import {
   contractScreenshotPath,
   guestContractScreenshotPath,
   capturePageContentScreenshot,
-  captureBrowseResultsScreenshot,
+  captureBrowseFocusedScreenshot,
+  captureTestIdScreenshot,
   captureToolbarScreenshot,
   waitForFeedbackReady,
   waitForListingsReady,
@@ -92,12 +93,16 @@ test.describe('Marketplace filled screenshots', () => {
     for (const view of ['grid', 'list', 'compact'] as const) {
       await waitForListingsReady(page, view)
       await assertNoStaleProductUi(page)
-      await captureBrowseResultsScreenshot(
+      await captureBrowseFocusedScreenshot(
+        page,
+        contractScreenshotPath(`authenticated-marketplace-browse-${view}-focused.png`),
+      )
+      await captureBrowseFocusedScreenshot(
         page,
         contractScreenshotPath(`authenticated-marketplace-browse-${view}-polished.png`),
       )
       if (view === 'grid') {
-        await captureBrowseResultsScreenshot(
+        await captureBrowseFocusedScreenshot(
           page,
           contractScreenshotPath('authenticated-marketplace-browse-product-cards.png'),
         )
@@ -205,18 +210,40 @@ test.describe('Marketplace filled screenshots', () => {
       await page.goto(`/listings/${listingId}`)
       await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 30_000 })
       await expect(page.locator('body')).not.toContainText('Loading listing')
-      await capturePageContentScreenshot(
+      await captureTestIdScreenshot(
         page,
+        'listing-detail-product-area',
+        contractScreenshotPath('authenticated-listing-detail-product-sized.png'),
+      )
+      await captureTestIdScreenshot(
+        page,
+        'listing-detail-product-area',
         contractScreenshotPath('authenticated-listing-detail-with-image.png'),
       )
       await page.goto(`/listings/${listingId}/edit`)
-      await expect(page.getByRole('button', { name: /save changes/i })).toBeVisible({
-        timeout: 30_000,
-      })
-      await captureScreenshot(page, contractScreenshotPath('authenticated-listing-edit.png'))
+      await expect(page.getByTestId('listing-edit-form')).toBeVisible({ timeout: 30_000 })
+      await captureTestIdScreenshot(
+        page,
+        'listing-edit-form',
+        contractScreenshotPath('authenticated-listing-edit-focused.png'),
+      )
+      await captureTestIdScreenshot(
+        page,
+        'listing-edit-form',
+        contractScreenshotPath('authenticated-listing-edit.png'),
+      )
       await page.goto(`/listings/${listingId}/revisions`)
-      await expect(page.locator('ol').first()).toBeVisible({ timeout: 30_000 })
-      await captureScreenshot(page, contractScreenshotPath('authenticated-listing-revisions.png'))
+      await expect(page.getByTestId('listing-revisions-timeline')).toBeVisible({ timeout: 30_000 })
+      await captureTestIdScreenshot(
+        page,
+        'listing-revisions-timeline',
+        contractScreenshotPath('authenticated-listing-revisions-focused.png'),
+      )
+      await captureTestIdScreenshot(
+        page,
+        'listing-revisions-timeline',
+        contractScreenshotPath('authenticated-listing-revisions.png'),
+      )
     }
 
     const recordId = await page.evaluate(() => {

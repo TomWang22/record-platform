@@ -85,7 +85,7 @@ test.describe.serial('Listing detail product contract (7.4)', () => {
     await page.goto(`/listings/${listingId}`)
     await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 45_000 })
     await expect(page.getByTestId('listing-shipping-card')).toBeVisible()
-    await expect(page.getByTestId('listing-seller-card')).toBeVisible()
+    await expect(page.getByTestId('listing-detail-seller-card')).toBeVisible()
     await expect(page.getByTestId('contact-seller-button')).toBeVisible()
     const contact = page.getByTestId('contact-seller-button')
     await expect(contact).toHaveAttribute('href', new RegExp(`/messages\\?.*listing=${listingId}`))
@@ -114,13 +114,13 @@ test.describe.serial('Listing detail product contract (7.4)', () => {
     )
     await expect(page.getByTestId('listing-primary-image')).toBeVisible()
     const imgBox = await page.getByTestId('listing-primary-image').boundingBox()
-    expect(imgBox?.width ?? 0).toBeGreaterThan(80)
-    expect(imgBox?.width ?? 0).toBeLessThan(500)
-    expect(imgBox?.height ?? 0).toBeGreaterThan(80)
-    expect(imgBox?.height ?? 0).toBeLessThan(500)
+    expect(imgBox?.width ?? 0).toBeGreaterThan(280)
+    expect(imgBox?.width ?? 0).toBeLessThan(600)
+    expect(imgBox?.height ?? 0).toBeGreaterThan(280)
+    expect(imgBox?.height ?? 0).toBeLessThan(600)
     await expect(page.getByTestId('listing-description-text')).toBeVisible()
     await expect(page.getByTestId('listing-revision-loading')).toHaveCount(0, { timeout: 30_000 })
-    await expect(page.getByTestId('listing-revision-preview')).toBeVisible()
+    await expect(page.getByTestId('listing-detail-revision-preview')).toBeVisible()
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-listing-detail-gallery-sized.png'),

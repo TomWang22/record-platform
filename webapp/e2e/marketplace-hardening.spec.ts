@@ -57,7 +57,7 @@ test.describe('Marketplace hardening', () => {
     await page.goto(`/listings/${listingId}`)
     await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 45_000 })
     await expect(page.getByTestId('listing-revision-loading')).toHaveCount(0, { timeout: 30_000 })
-    await expect(page.getByTestId('listing-revision-preview')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('listing-detail-revision-preview')).toBeVisible({ timeout: 30_000 })
     await assertNoStaleProductUi(page)
     await capturePageContentScreenshot(page, contractScreenshotPath('authenticated-listing-detail.png'))
     await page.goto(`/listings/${listingId}/edit`)

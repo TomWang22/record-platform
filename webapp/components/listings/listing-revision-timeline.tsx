@@ -19,11 +19,17 @@ type Props = {
 export function ListingRevisionTimeline({ revisions, publicItems }: Props) {
   if (publicItems?.length) {
     return (
-      <ol className="relative space-y-6 border-l border-slate-200 pl-6 dark:border-white/10">
+      <ol
+        className="relative space-y-6 border-l border-slate-200 pl-6 dark:border-white/10"
+        data-testid="listing-revisions-timeline"
+      >
         {publicItems.map((item, idx) => (
           <li key={item.id} className="relative">
             <span className="absolute -left-[1.55rem] top-1 flex h-3 w-3 rounded-full border-2 border-brand bg-white dark:bg-slate-950" />
-            <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-slate-900/50">
+            <div
+              className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-slate-900/50"
+              data-testid="listing-revision-card"
+            >
               <div className="flex flex-wrap justify-between gap-2">
                 <p className="font-semibold text-slate-900 dark:text-white">
                   Revision {publicItems.length - idx}
@@ -63,14 +69,20 @@ export function ListingRevisionTimeline({ revisions, publicItems }: Props) {
   )
 
   return (
-    <ol className="relative space-y-6 border-l border-slate-200 pl-6 dark:border-white/10">
+    <ol
+      className="relative space-y-6 border-l border-slate-200 pl-6 dark:border-white/10"
+      data-testid="listing-revisions-timeline"
+    >
       {sorted.map((rev, idx) => {
         const rawLines = humanReadableRevisionLines(rev)
         const lines = rawLines.length ? rawLines : ['Listing updated']
         return (
           <li key={rev.id} className="relative">
             <span className="absolute -left-[1.55rem] top-1 flex h-3 w-3 rounded-full border-2 border-brand bg-white dark:bg-slate-950" />
-            <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-slate-900/50">
+            <div
+              className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-slate-900/50"
+              data-testid="listing-revision-card"
+            >
               <div className="flex flex-wrap justify-between gap-2">
                 <p className="font-semibold text-slate-900 dark:text-white">
                   Revision {sorted.length - idx}

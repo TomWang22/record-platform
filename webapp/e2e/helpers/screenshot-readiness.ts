@@ -96,12 +96,34 @@ export async function capturePageContentScreenshot(page: Page, filePath: string)
   await captureScreenshot(page, filePath, { scope: 'page-content' })
 }
 
+const FOCUSED_BROWSE_MAX_HEIGHT = 1100
+
 export async function captureBrowseResultsScreenshot(page: Page, filePath: string): Promise<void> {
+  await captureBrowseFocusedScreenshot(page, filePath)
+}
+
+export async function captureBrowseFocusedScreenshot(page: Page, filePath: string): Promise<void> {
   await waitForNoLoadingStates(page, filePath)
   await assertNoForbiddenContractStrings(page, filePath)
   fs.mkdirSync(path.dirname(filePath), { recursive: true })
-  await expect(page.getByTestId('marketplace-browse-results')).toBeVisible({ timeout: 30_000 })
-  await page.getByTestId('marketplace-browse-results').screenshot({ path: filePath })
+  const results = page.getByTestId('marketplace-browse-results')
+  await expect(results).toBeVisible({ timeout: 30_000 })
+  const box = await results.boundingBox()
+  expect(box, `${filePath}: marketplace-browse-results bounding box`).toBeTruthy()
+  const height = Math.min(box!.height, FOCUSED_BROWSE_MAX_HEIGHT)
+  await page.screenshot({
+    path: filePath,
+    clip: { x: box!.x, y: box!.y, width: box!.width, height },
+  })
+}
+
+export async function captureTestIdScreenshot(page: Page, testId: string, filePath: string): Promise<void> {
+  await waitForNoLoadingStates(page, filePath)
+  await assertNoForbiddenContractStrings(page, filePath)
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  const target = page.getByTestId(testId)
+  await expect(target).toBeVisible({ timeout: 30_000 })
+  await target.screenshot({ path: filePath })
 }
 
 export async function captureToolbarScreenshot(page: Page, filePath: string): Promise<void> {

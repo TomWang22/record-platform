@@ -126,7 +126,7 @@ export function ListingEditForm({ values, onChange }: Props) {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" data-testid="listing-edit-form">
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Basics</h2>
         <label className="block text-sm">

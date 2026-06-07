@@ -336,10 +336,10 @@ export function ListingsBrowse() {
               data-testid="marketplace-browse-results"
               className={
                 view === 'grid'
-                  ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
+                  ? 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3'
                   : view === 'compact'
-                    ? 'grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
-                    : 'space-y-2'
+                    ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
+                    : 'space-y-3'
               }
             >
               {listings.map((listing) =>

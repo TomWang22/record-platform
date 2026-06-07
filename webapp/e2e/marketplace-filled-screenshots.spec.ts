@@ -9,6 +9,7 @@ import {
   clearWatchlist,
   ensureWatchlistContains,
 } from './helpers/seed-lean'
+import { ensureMarketplaceBrowseSaleMix } from './helpers/seed-marketplace-browse'
 import {
   captureScreenshot,
   contractScreenshotPath,
@@ -70,6 +71,7 @@ test.describe('Marketplace filled screenshots', () => {
 
   test('marketplace grid list compact filled', async ({ page }) => {
     const token = await obtainAuthToken(page.request)
+    await ensureMarketplaceBrowseSaleMix(page.request, token)
     const search = await getJsonWith429Retry<{ items?: unknown[] }>(
       page.request,
       '/api/listings/search?limit=5',
@@ -77,6 +79,16 @@ test.describe('Marketplace filled screenshots', () => {
       'listings filled gate',
     )
     expect((search.items ?? []).length).toBeGreaterThan(0)
+    await page.goto('/listings')
+    await expect(
+      page.locator('[data-testid="listing-card"][data-sale-mode="obo"]').first(),
+    ).toBeVisible({ timeout: 45_000 })
+    await expect(
+      page.locator('[data-testid="listing-card"][data-sale-mode="auction"]').first(),
+    ).toBeVisible({ timeout: 45_000 })
+    await expect(page.getByTestId('listing-card-make-offer').first()).toBeVisible({
+      timeout: 30_000,
+    })
     for (const view of ['grid', 'list', 'compact'] as const) {
       await waitForListingsReady(page, view)
       await assertNoStaleProductUi(page)

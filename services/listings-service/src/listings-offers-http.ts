@@ -8,9 +8,12 @@ import {
   counterOffer,
   createOffer,
   getOfferById,
+  getOfferSettingsForListing,
   listOffersForListing,
+  listOffersInbox,
   listOffersMine,
   listOffersMineForListing,
+  listOffersSent,
   OfferServiceError,
   rejectOffer,
   withdrawOffer,
@@ -65,6 +68,24 @@ export function mountListingsOffersHttp(app: import("express").Application): voi
     }
   });
 
+  app.get("/offers/inbox", async (req: AuthedOfferRequest, res) => {
+    try {
+      const data = await listOffersInbox(String(req.userId));
+      res.json(data);
+    } catch (e) {
+      handleOfferError(res, e);
+    }
+  });
+
+  app.get("/offers/sent", async (req: AuthedOfferRequest, res) => {
+    try {
+      const data = await listOffersSent(String(req.userId));
+      res.json(data);
+    } catch (e) {
+      handleOfferError(res, e);
+    }
+  });
+
   app.get("/offers/:offerId", async (req: AuthedOfferRequest, res) => {
     try {
       const data = await getOfferById(req.params.offerId, String(req.userId));
@@ -94,6 +115,20 @@ export function mountListingsOffersHttp(app: import("express").Application): voi
         message: body.message != null ? String(body.message) : undefined,
       });
       res.status(201).json(data);
+    } catch (e) {
+      handleOfferError(res, e);
+    }
+  });
+
+  app.get("/listings/:id/offers/settings", requireUser, async (req: AuthedOfferRequest, res) => {
+    const validation = validateListingId(req.params.id);
+    if (!validation.ok) {
+      res.status(400).json({ error: validation.message });
+      return;
+    }
+    try {
+      const data = await getOfferSettingsForListing(validation.value, String(req.userId));
+      res.json(data);
     } catch (e) {
       handleOfferError(res, e);
     }
@@ -155,6 +190,19 @@ export function mountListingsOffersHttp(app: import("express").Application): voi
 
   app.post(
     "/listings/:id/offers/:offerId/reject",
+    requireUser,
+    async (req: AuthedOfferRequest, res) => {
+      try {
+        const data = await rejectOffer(req.params.offerId, String(req.userId));
+        res.json(data);
+      } catch (e) {
+        handleOfferError(res, e);
+      }
+    },
+  );
+
+  app.post(
+    "/listings/:id/offers/:offerId/decline",
     requireUser,
     async (req: AuthedOfferRequest, res) => {
       try {

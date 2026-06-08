@@ -164,6 +164,29 @@ export async function buildPublicOffer(
   };
 }
 
+export function buildPublicOfferSettings(input: {
+  oboEnabled: boolean;
+  maxAttempts: number;
+  attemptsRemaining: number | null;
+  minOfferCents: number | null;
+  offerTtlHours: number;
+  allowCounteroffers: boolean;
+  listingTitle?: string | null;
+}): Record<string, unknown> {
+  return {
+    oboEnabled: input.oboEnabled,
+    maxAttempts: input.maxAttempts,
+    attemptsRemaining: input.attemptsRemaining,
+    minOfferDisplay:
+      input.minOfferCents != null && Number.isFinite(input.minOfferCents)
+        ? formatMoneyFromCents(input.minOfferCents)
+        : null,
+    offerTtlHours: input.offerTtlHours,
+    allowCounteroffers: input.allowCounteroffers,
+    listingTitle: input.listingTitle ?? null,
+  };
+}
+
 /** Reject internal cents keys leaking into public offer JSON. */
 export function publicOfferResponseLeaksInternal(payload: unknown, depth = 0): string | null {
   if (payload == null || depth > 6) return null;

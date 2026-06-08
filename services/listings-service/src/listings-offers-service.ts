@@ -6,9 +6,13 @@ import { pool } from "./lib/db.js";
 import { parseRpListingFields } from "./rp-listing-fields.js";
 import {
   buildPublicOffer,
+  buildPublicOfferSettings,
+  resolveMarketplaceUserDisplay,
   type OfferEventRow,
   type OfferRow,
 } from "./listings-offers-contract.js";
+import { formatMoneyFromCents } from "./listing-public-contract.js";
+import { reserveAcceptedOfferInCart } from "./shopping-cart-client.js";
 import {
   insertOfferOutboxRow,
   markOfferOutboxPublished,
@@ -21,6 +25,7 @@ export type OfferSettings = {
   listing_id: string;
   obo_enabled: boolean;
   max_offer_attempts: number;
+  min_offer_cents: number | null;
   min_auto_accept_cents: number | null;
   min_auto_reject_cents: number | null;
   offer_expiration_hours: number;
@@ -78,6 +83,7 @@ export async function loadOfferSettings(
   return {
     listing_id: listing.id,
     obo_enabled: obo,
+    min_offer_cents: rp.minOfferCents ? Number(rp.minOfferCents) : null,
     max_offer_attempts: amenityInt(
       { max_offer_attempts: rp.maxOfferAttempts ?? "" },
       "max_offer_attempts",
@@ -138,6 +144,71 @@ async function insertOfferEvent(
   );
 }
 
+async function buildOfferKafkaPayload(input: {
+  offerId: string;
+  listingId: string;
+  buyerUserId: string;
+  sellerUserId: string;
+  amountCents: number;
+  status: string;
+  listingTitle?: string | null;
+  message?: string | null;
+  sellerDisplay?: string | null;
+  eventType: OfferKafkaEventType;
+}): Promise<Record<string, unknown>> {
+  const buyerDisplay = await resolveMarketplaceUserDisplay(input.buyerUserId);
+  const sellerDisplay =
+    input.sellerDisplay?.trim() ||
+    (await resolveMarketplaceUserDisplay(input.sellerUserId));
+  const amountDisplay = formatMoneyFromCents(input.amountCents);
+  const listingTitle = input.listingTitle ?? "your listing";
+  let notificationTitle: string = input.eventType;
+  let notificationBody: string = `${amountDisplay} on ${listingTitle}`;
+  switch (input.eventType) {
+    case "OfferCreated":
+      notificationTitle = "New offer received";
+      notificationBody = `${buyerDisplay} offered ${amountDisplay} on ${listingTitle}`;
+      break;
+    case "OfferCountered":
+      notificationTitle = "Counteroffer received";
+      notificationBody = `${sellerDisplay} countered at ${amountDisplay} on ${listingTitle}`;
+      break;
+    case "OfferAccepted":
+      notificationTitle = "Offer accepted";
+      notificationBody = `Your ${amountDisplay} offer on ${listingTitle} was accepted`;
+      break;
+    case "OfferRejected":
+      notificationTitle = "Offer declined";
+      notificationBody = `Your ${amountDisplay} offer on ${listingTitle} was declined`;
+      break;
+    case "OfferWithdrawn":
+      notificationTitle = "Offer withdrawn";
+      notificationBody = `${buyerDisplay} withdrew their offer on ${listingTitle}`;
+      break;
+    case "OfferExpired":
+      notificationTitle = "Offer expired";
+      notificationBody = `The ${amountDisplay} offer on ${listingTitle} expired`;
+      break;
+    default:
+      break;
+  }
+  return {
+    offer_id: input.offerId,
+    listing_id: input.listingId,
+    buyer_user_id: input.buyerUserId,
+    seller_user_id: input.sellerUserId,
+    buyer_display: buyerDisplay,
+    seller_display: sellerDisplay,
+    amount_cents: input.amountCents,
+    amount_display: amountDisplay,
+    status: input.status,
+    listing_title: input.listingTitle ?? null,
+    message: input.message ?? null,
+    title: notificationTitle,
+    body: notificationBody,
+  };
+}
+
 async function queueOfferOutbox(
   client: PoolClient,
   input: {
@@ -149,18 +220,12 @@ async function queueOfferOutbox(
     amountCents: number;
     status: string;
     listingTitle?: string | null;
+    message?: string | null;
+    sellerDisplay?: string | null;
   },
 ): Promise<{ eventId: string; payload: Record<string, unknown> }> {
   const eventId = newOfferEventId();
-  const payload = {
-    offer_id: input.offerId,
-    listing_id: input.listingId,
-    buyer_user_id: input.buyerUserId,
-    seller_user_id: input.sellerUserId,
-    amount_cents: input.amountCents,
-    status: input.status,
-    listing_title: input.listingTitle ?? null,
-  };
+  const payload = await buildOfferKafkaPayload(input);
   await insertOfferOutboxRow(client, {
     eventId,
     aggregateId: input.offerId,
@@ -168,6 +233,38 @@ async function queueOfferOutbox(
     payload,
   });
   return { eventId, payload };
+}
+
+async function reserveCartForAcceptedOffer(row: OfferRow): Promise<void> {
+  const reserved = await reserveAcceptedOfferInCart({
+    buyerUserId: row.buyer_user_id,
+    listingId: row.listing_id,
+    offerId: row.id,
+    amountCents: row.amount_cents,
+    listingTitle: row.listing_title,
+    sellerDisplay: row.seller_display,
+  });
+  if (!reserved) {
+    console.warn("[listings-offers] accepted offer without cart reservation", {
+      offerId: row.id,
+      listingId: row.listing_id,
+    });
+  }
+}
+
+async function assertListingAcceptsOffers(
+  client: PoolClient,
+  listingId: string,
+): Promise<void> {
+  const accepted = await client.query(
+    `SELECT id FROM listings.offers
+     WHERE listing_id = $1::uuid AND status = 'accepted'
+     LIMIT 1`,
+    [listingId],
+  );
+  if (accepted.rows[0]) {
+    throw new OfferServiceError("listing already has an accepted offer", 409);
+  }
 }
 
 async function flushOfferOutboxEvent(input: {
@@ -279,6 +376,13 @@ export async function createOffer(input: {
     if (!settings.obo_enabled) {
       throw new OfferServiceError("listing does not accept offers", 400);
     }
+    await assertListingAcceptsOffers(client, input.listingId);
+    if (
+      settings.min_offer_cents != null &&
+      input.amountCents < settings.min_offer_cents
+    ) {
+      throw new OfferServiceError("offer below minimum", 400);
+    }
     const attempts = await countBuyerAttempts(client, input.listingId, input.buyerUserId);
     if (attempts >= settings.max_offer_attempts) {
       throw new OfferServiceError("max offer attempts exceeded", 400);
@@ -367,6 +471,8 @@ export async function createOffer(input: {
       amountCents: input.amountCents,
       status,
       listingTitle: listing.title,
+      message: input.message ?? null,
+      sellerDisplay: listing.username_display,
     });
     const events = await fetchOfferEvents(client, offer.id);
     const publicOffer = await buildPublicOffer(
@@ -381,6 +487,13 @@ export async function createOffer(input: {
       eventType: kafkaType,
       payload: queued.payload,
     });
+    if (status === "accepted") {
+      await reserveCartForAcceptedOffer({
+        ...offer,
+        listing_title: listing.title,
+        seller_display: listing.username_display,
+      });
+    }
     return publicOffer;
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
@@ -415,6 +528,13 @@ async function transitionOffer(
     if (terminal.has(String(row.status))) {
       throw new OfferServiceError(`offer is ${row.status}`, 400);
     }
+    if (row.expires_at && new Date(row.expires_at) < new Date()) {
+      await client.query(
+        `UPDATE listings.offers SET status = 'expired', updated_at = now() WHERE id = $1::uuid`,
+        [offerId],
+      );
+      throw new OfferServiceError("offer expired", 409);
+    }
     const prev = String(row.status);
     await client.query(
       `UPDATE listings.offers SET status = $1, decided_at = now(), updated_at = now() WHERE id = $2::uuid`,
@@ -441,6 +561,8 @@ async function transitionOffer(
       amountCents: row.amount_cents,
       status: input.newStatus,
       listingTitle: row.listing_title,
+      message: row.message,
+      sellerDisplay: row.seller_display,
     });
     const updatedRow = (await fetchOfferRow(client, offerId)) ?? row;
     const events = await fetchOfferEvents(client, offerId);
@@ -453,6 +575,9 @@ async function transitionOffer(
       eventType: input.eventType,
       payload: queued.payload,
     });
+    if (input.newStatus === "accepted") {
+      await reserveCartForAcceptedOffer(updatedRow);
+    }
     return publicOffer;
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
@@ -562,6 +687,8 @@ export async function counterOffer(input: {
       amountCents: input.amountCents,
       status: "pending",
       listingTitle: listing.title,
+      message: input.message ?? null,
+      sellerDisplay: listing.username_display,
     });
     const events = await fetchOfferEvents(client, offer.id);
     const publicOffer = await buildPublicOffer(
@@ -651,6 +778,79 @@ export async function listOffersMineForListing(
   }
 }
 
+export async function getOfferSettingsForListing(
+  listingId: string,
+  viewerUserId: string,
+): Promise<Record<string, unknown>> {
+  const client = await pool.connect();
+  try {
+    const listing = await loadListing(client, listingId);
+    const settings = await loadOfferSettings(client, listing);
+    let attemptsRemaining: number | null = null;
+    if (viewerUserId) {
+      const used = await countBuyerAttempts(client, listingId, viewerUserId);
+      attemptsRemaining = Math.max(0, settings.max_offer_attempts - used);
+    }
+    return buildPublicOfferSettings({
+      oboEnabled: settings.obo_enabled,
+      maxAttempts: settings.max_offer_attempts,
+      attemptsRemaining,
+      minOfferCents: settings.min_offer_cents,
+      offerTtlHours: settings.offer_expiration_hours,
+      allowCounteroffers: settings.allow_counteroffers,
+      listingTitle: listing.title,
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function listOffersInbox(sellerUserId: string) {
+  const client = await pool.connect();
+  try {
+    const r = await client.query(
+      `SELECT o.*, l.title AS listing_title, l.username_display AS seller_display
+       FROM listings.offers o
+       JOIN listings.listings l ON l.id = o.listing_id
+       WHERE o.seller_user_id = $1::uuid AND o.status IN ('pending', 'countered')
+       ORDER BY o.updated_at DESC
+       LIMIT 100`,
+      [sellerUserId],
+    );
+    const out: Record<string, unknown>[] = [];
+    for (const row of r.rows as OfferRow[]) {
+      const events = await fetchOfferEvents(client, row.id);
+      out.push(await buildPublicOffer(row, events));
+    }
+    return { items: out, total: out.length };
+  } finally {
+    client.release();
+  }
+}
+
+export async function listOffersSent(buyerUserId: string) {
+  const client = await pool.connect();
+  try {
+    const r = await client.query(
+      `SELECT o.*, l.title AS listing_title, l.username_display AS seller_display
+       FROM listings.offers o
+       JOIN listings.listings l ON l.id = o.listing_id
+       WHERE o.buyer_user_id = $1::uuid
+       ORDER BY o.updated_at DESC
+       LIMIT 100`,
+      [buyerUserId],
+    );
+    const out: Record<string, unknown>[] = [];
+    for (const row of r.rows as OfferRow[]) {
+      const events = await fetchOfferEvents(client, row.id);
+      out.push(await buildPublicOffer(row, events));
+    }
+    return { items: out, total: out.length };
+  } finally {
+    client.release();
+  }
+}
+
 export async function listOffersMine(userId: string) {
   const client = await pool.connect();
   try {
@@ -705,12 +905,13 @@ export async function upsertOfferSettingsFromListing(
   const settings = await loadOfferSettings(client, listing);
   await client.query(
     `INSERT INTO listings.offer_settings
-       (listing_id, obo_enabled, max_offer_attempts, min_auto_accept_cents, min_auto_reject_cents,
-        offer_expiration_hours, allow_counteroffers)
-     VALUES ($1::uuid, $2, $3, $4, $5, $6, $7)
+       (listing_id, obo_enabled, max_offer_attempts, min_offer_cents, min_auto_accept_cents,
+        min_auto_reject_cents, offer_expiration_hours, allow_counteroffers)
+     VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (listing_id) DO UPDATE SET
        obo_enabled = EXCLUDED.obo_enabled,
        max_offer_attempts = EXCLUDED.max_offer_attempts,
+       min_offer_cents = EXCLUDED.min_offer_cents,
        min_auto_accept_cents = EXCLUDED.min_auto_accept_cents,
        min_auto_reject_cents = EXCLUDED.min_auto_reject_cents,
        offer_expiration_hours = EXCLUDED.offer_expiration_hours,
@@ -720,6 +921,7 @@ export async function upsertOfferSettingsFromListing(
       listingId,
       settings.obo_enabled,
       settings.max_offer_attempts,
+      settings.min_offer_cents,
       settings.min_auto_accept_cents,
       settings.min_auto_reject_cents,
       settings.offer_expiration_hours,

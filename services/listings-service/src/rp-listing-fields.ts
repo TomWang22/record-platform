@@ -37,6 +37,7 @@ export type RpListingFields = {
   offerExpirationHours?: string;
   autoAcceptCents?: string;
   autoDeclineCents?: string;
+  minOfferCents?: string;
   startingBidCents?: string;
   reservePriceCents?: string;
   buyItNowCents?: string;
@@ -138,6 +139,7 @@ export function parseRpListingFields(row: Record<string, unknown>): RpListingFie
     offerExpirationHours: map.offer_expiration_hours,
     autoAcceptCents: map.auto_accept_cents,
     autoDeclineCents: map.auto_decline_cents,
+    minOfferCents: map.min_offer_cents,
     startingBidCents: map.starting_bid_cents,
     reservePriceCents: map.reserve_price_cents,
     buyItNowCents: map.buy_it_now_cents,
@@ -185,6 +187,7 @@ export function applyRpListingFields(
     offer_expiration_hours: rp.offerExpirationHours ?? null,
     auto_accept_cents: rp.autoAcceptCents ?? null,
     auto_decline_cents: rp.autoDeclineCents ?? null,
+    min_offer_cents: rp.minOfferCents ?? null,
     starting_bid_cents: rp.startingBidCents ?? null,
     reserve_price_cents: rp.reservePriceCents ?? null,
     buy_it_now_cents: rp.buyItNowCents ?? null,

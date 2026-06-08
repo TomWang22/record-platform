@@ -21,6 +21,7 @@ export const PUBLIC_LISTING_INTERNAL_KEYS = [
   "international_shipping_cents",
   "auto_accept_cents",
   "auto_decline_cents",
+  "min_offer_cents",
   "starting_bid_cents",
   "reserve_price_cents",
   "buy_it_now_cents",

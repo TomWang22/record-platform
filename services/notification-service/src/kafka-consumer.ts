@@ -408,6 +408,12 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
                     const p = j.payload && typeof j.payload === "object" ? j.payload : {};
                     const listingId = String(p.listing_id || p.listingId || "").trim();
                     const offerId = String(p.offer_id || p.offerId || meta.eventId).trim();
+                    const deepLink =
+                      meta.eventType === "OfferAccepted"
+                        ? "/cart"
+                        : listingId
+                          ? `/listings/${encodeURIComponent(listingId)}`
+                          : "/listings";
                     payloadObj = {
                       notification_category: "marketplace_offer",
                       category: "marketplace",
@@ -416,10 +422,14 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
                       offer_id: offerId,
                       listing_id: listingId,
                       listing_title: p.listing_title ?? null,
+                      buyer_display: p.buyer_display ?? null,
+                      seller_display: p.seller_display ?? null,
+                      amount_display: p.amount_display ?? null,
+                      message: p.message ?? null,
+                      title: p.title ?? meta.eventType,
+                      body: p.body ?? null,
                       event_type: meta.eventType,
-                      deep_link: listingId
-                        ? `/listings/${encodeURIComponent(listingId)}`
-                        : "/listings",
+                      deep_link: deepLink,
                       source: "kafka.listing.offer",
                     };
                   } catch {

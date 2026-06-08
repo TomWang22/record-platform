@@ -208,7 +208,7 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
                   item.quantity,
                   item.price,
                   'USD',
-                  'buy_now',
+                  (item.metadata as { purchase_type?: string } | null)?.purchase_type ?? 'buy_now',
                   'completed',
                   JSON.stringify({
                     ...item.metadata,
@@ -254,7 +254,7 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
                 item.quantity,
                 item.price,
                 'USD',
-                'buy_now',
+                (item.metadata as { purchase_type?: string } | null)?.purchase_type ?? 'buy_now',
                 'completed',
                 JSON.stringify({
                   ...item.metadata,

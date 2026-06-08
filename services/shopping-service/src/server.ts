@@ -13,6 +13,7 @@ import recommendationsRouter from './routes/recommendations.js'
 import resellRouter from './routes/resell.js'
 import ordersRouter from './routes/orders.js'
 import returnsRouter from './routes/returns.js'
+import internalCartRouter from './routes/internal-cart.js'
 
 const app = express()
 app.use(express.json())
@@ -78,6 +79,9 @@ app.get('/cache/stats', async (_req: Request, res: Response) => {
     res.status(500).json({ error: 'failed to get cache stats', message: err.message })
   }
 })
+
+// Internal service-to-service routes (no JWT)
+app.use('/internal', internalCartRouter())
 
 // Routes (require auth) - pass redis and cacheManager
 app.use('/cart', requireUser, cartRouter(redis, cacheManager))

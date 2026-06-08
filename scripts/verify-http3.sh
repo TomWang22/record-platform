@@ -5,13 +5,21 @@
 # Env:
 #   OCH_EDGE_HOSTNAME — default record-platform.test
 #   VERIFY_HTTP3_URL — full URL override (default https://$HOST/)
-#   VERIFY_HTTP3_CACERT — PEM path (default $REPO_ROOT/certs/dev-root.pem); if missing, uses -k
+#   VERIFY_HTTP3_CACERT — PEM path (default dev-chain.pem, else dev-root.pem); if missing, uses -k
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 HOST="${OCH_EDGE_HOSTNAME:-record-platform.test}"
 URL="${VERIFY_HTTP3_URL:-https://${HOST}/}"
-CA="${VERIFY_HTTP3_CACERT:-$REPO_ROOT/certs/dev-root.pem}"
+if [[ -z "${VERIFY_HTTP3_CACERT:-}" ]]; then
+  if [[ -f "$REPO_ROOT/certs/dev-chain.pem" ]]; then
+    CA="$REPO_ROOT/certs/dev-chain.pem"
+  else
+    CA="$REPO_ROOT/certs/dev-root.pem"
+  fi
+else
+  CA="$VERIFY_HTTP3_CACERT"
+fi
 CURL=(curl -sS --connect-timeout 8 --max-time 35)
 if [[ -f "$CA" ]]; then
   CURL+=(--cacert "$CA")

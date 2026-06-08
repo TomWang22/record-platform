@@ -177,6 +177,40 @@ https://record-platform.test {
 		}
 	}
 
+	# Observability UIs (subpath on edge TLS — before webapp catch-all)
+	@obs_grafana_root path /grafana
+	handle @obs_grafana_root {
+		redir /grafana/ 308
+	}
+	handle_path /grafana/* {
+		reverse_proxy grafana.observability.svc.cluster.local:3000 {
+			header_up Host {http.request.host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	@obs_jaeger_root path /jaeger
+	handle @obs_jaeger_root {
+		redir /jaeger/ 308
+	}
+	handle_path /jaeger/* {
+		reverse_proxy jaeger.observability.svc.cluster.local:16686 {
+			header_up Host {http.request.host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	@obs_prometheus_root path /prometheus
+	handle @obs_prometheus_root {
+		redir /prometheus/ 308
+	}
+	handle_path /prometheus/* {
+		reverse_proxy prometheus.observability.svc.cluster.local:9090 {
+			header_up Host {http.request.host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
 	# REST API requests: route DIRECTLY to api-gateway (NOT through ingress-nginx)
 	# Direct routing: Caddy → api-gateway (single-hop, faster, more reliable)
 	# CRITICAL: Exclude gRPC paths (service.Service/Method format with dots) - only match REST paths (with slashes)

@@ -12,6 +12,9 @@ ok() { echo "✅ $*"; }
 warn() { echo "  ⚠️  $*"; }
 
 [[ -f "$CF" ]] || { bad "missing Caddyfile"; exit 1; }
+if [[ -x "$SCRIPT_DIR/sync-caddy-h3-configmap.sh" ]]; then
+  bash "$SCRIPT_DIR/sync-caddy-h3-configmap.sh" >/dev/null
+fi
 echo "audit-rp-caddyfile ($CF)"
 
 for mf in "$REPO_ROOT/infra/k8s/loadbalancer.yaml" "$REPO_ROOT/infra/k8s/caddy-h3-service-loadbalancer.yaml"; do

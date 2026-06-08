@@ -40,6 +40,10 @@ spec:
           value: admin
         - name: GF_INSTALL_PLUGINS
           value: ""
+        - name: GF_SERVER_ROOT_URL
+          value: https://record-platform.test/grafana/
+        - name: GF_SERVER_SERVE_FROM_SUB_PATH
+          value: "true"
         volumeMounts:
         - name: datasources
           mountPath: /etc/grafana/provisioning/datasources

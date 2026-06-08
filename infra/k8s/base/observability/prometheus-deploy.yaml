@@ -87,6 +87,8 @@ spec:
         args:
           - '--config.file=/etc/prometheus/prometheus.yml'
           - '--storage.tsdb.path=/prometheus'
+          - '--web.external-url=https://record-platform.test/prometheus/'
+          - '--web.route-prefix=/prometheus'
         volumeMounts:
         - name: config
           mountPath: /etc/prometheus

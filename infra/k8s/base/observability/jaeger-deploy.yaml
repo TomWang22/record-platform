@@ -37,6 +37,8 @@ spec:
           value: "20000"
         - name: COLLECTOR_NUM_WORKERS
           value: "50"
+        - name: QUERY_BASE_PATH
+          value: /jaeger
         resources:
           requests:
             memory: "512Mi"

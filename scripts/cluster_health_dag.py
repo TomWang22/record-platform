@@ -123,6 +123,15 @@ def _edge_leaf_cert(repo: Path) -> Path | None:
     return None
 
 
+def _edge_trust_ca(repo: Path) -> Path | None:
+    """Trust bundle for edge curl — leaf is intermediate-signed; dev-chain.pem required when Caddy sends leaf only."""
+    for name in ("dev-chain.pem", "dev-root.pem"):
+        p = repo / "certs" / name
+        if p.is_file():
+            return p
+    return None
+
+
 def _required_cluster_secrets() -> tuple[str, ...]:
     return ("app-secrets", "service-tls", "kafka-ssl-secret")
 
@@ -380,9 +389,9 @@ def score_endpoints(ns: str, warnings: list[str]) -> float:
 def score_edge(repo: Path, warnings: list[str]) -> float:
     mx = float(WEIGHTS["edge"])
     host = os.environ.get("RP_PUBLIC_HOST") or os.environ.get("OCH_EDGE_HOSTNAME", "record-platform.test")
-    ca = repo / "certs" / "dev-root.pem"
-    if not ca.is_file():
-        warnings.append("edge: missing CA for curl")
+    ca = _edge_trust_ca(repo)
+    if ca is None:
+        warnings.append("edge: missing CA for curl (certs/dev-chain.pem or dev-root.pem)")
         return 0.0
     attempts = int(os.environ.get("BOOTSTRAP_HEALTH_EDGE_CURL_ATTEMPTS", "12"))
     sleep_s = float(os.environ.get("BOOTSTRAP_HEALTH_EDGE_CURL_SLEEP", "2"))
@@ -946,8 +955,8 @@ def cmd_bootstrap(ns: str, repo: Path) -> int:
 def _curl_edge(repo: Path, extra_args: list[str]) -> bool:
     host = os.environ.get("RP_PUBLIC_HOST") or os.environ.get("OCH_EDGE_HOSTNAME", "record-platform.test")
     suite = os.environ.get("OCH_X_SUITE", "bash")
-    ca = repo / "certs" / "dev-root.pem"
-    if not ca.is_file():
+    ca = _edge_trust_ca(repo)
+    if ca is None:
         return False
     r = subprocess.run(
         [

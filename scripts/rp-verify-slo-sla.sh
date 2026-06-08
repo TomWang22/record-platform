@@ -172,5 +172,6 @@ if [[ -f "$SCRIPT_DIR/lib/rp-cold-bootstrap-final-summary.sh" ]] && [[ "${RP_CB_
   export RP_CB_REPO_ROOT="$REPO_ROOT"
   # shellcheck source=scripts/lib/rp-cold-bootstrap-final-summary.sh
   source "$SCRIPT_DIR/lib/rp-cold-bootstrap-final-summary.sh" 2>/dev/null || true
+  rp_cb_final_summary_print 2>/dev/null || true
 fi
 exit 0

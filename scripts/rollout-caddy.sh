@@ -29,8 +29,17 @@ if [ "${CADDY_USE_HOSTPORT:-0}" = "1" ] || [ "${CADDY_USE_LOADBALANCER:-0}" = "1
   fi
 fi
 
+# Keep infra/k8s/caddy-h3-configmap.yaml aligned with repo-root Caddyfile (audit-rp-caddyfile parity).
+if [[ -x "$ROOT/scripts/sync-caddy-h3-configmap.sh" ]]; then
+  bash "$ROOT/scripts/sync-caddy-h3-configmap.sh"
+fi
+
 # Apply Caddy ConfigMap (gRPC must use h2c://envoy-test...:10000; do not use https:// for Envoy)
 kubectl -n "$NS" create configmap caddy-h3 --from-file=Caddyfile=./Caddyfile -o yaml --dry-run=client | kubectl apply -f -
+# ConfigMap edits do not remount until pods restart.
+if kubectl -n "$NS" get deployment caddy-h3 &>/dev/null; then
+  kubectl -n "$NS" rollout restart deployment/caddy-h3
+fi
 
 # Apply Caddy Deployment (LoadBalancer path: no hostPort so 2 replicas can run on one node for zero-downtime).
 # If you previously had the hostPort deploy applied, delete the deployment first so apply is clean:

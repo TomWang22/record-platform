@@ -152,3 +152,5 @@ rp_cb_ok "cold-bootstrap post-hosts contract complete (h2+h3 strict TLS + edge c
 
 # shellcheck source=scripts/lib/rp-cold-bootstrap-final-summary.sh
 source "$SCRIPT_DIR/lib/rp-cold-bootstrap-final-summary.sh"
+rp_cb_final_summary_print
+rp_cb_final_success_line

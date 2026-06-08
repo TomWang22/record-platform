@@ -50,6 +50,20 @@ function parseArgs(argv) {
   return { jsonOut, context };
 }
 
+/** Wall-clock ms → hours/minutes/seconds for bootstrap JSON consumers. */
+function formatDurationParts(ms) {
+  const n = Math.max(0, Math.round(Number(ms) || 0));
+  const totalSeconds = Math.floor(n / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || hours > 0) parts.push(`${minutes}m`);
+  parts.push(`${seconds}s`);
+  return { hours, minutes, seconds, human: parts.join(" ") };
+}
+
 function sh(cmd, args, opts = {}) {
   try {
     return execFileSync(cmd, args, {
@@ -1050,6 +1064,7 @@ function main() {
 
   const overall = overallRequired(context, phase_results);
   const durationMs = Math.round(performance.now() - wallStart);
+  const duration = formatDurationParts(durationMs);
   const payload = {
     contract_version: "v1.0",
     context,
@@ -1057,6 +1072,12 @@ function main() {
     phase_results,
     overall,
     durationMs,
+    duration: {
+      hours: duration.hours,
+      minutes: duration.minutes,
+      seconds: duration.seconds,
+    },
+    durationHuman: duration.human,
     timestamp: new Date().toISOString(),
   };
 

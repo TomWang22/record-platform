@@ -218,7 +218,7 @@ export function MessagingProductView() {
       if (threadId) {
         setActiveThreadId(threadId)
         await loadThread(threadId)
-        router.replace(`/messages?thread=${encodeURIComponent(threadId)}`)
+        router.push(`/messages?thread=${encodeURIComponent(threadId)}`)
       }
     } else if (activeThreadId) {
       await loadThread(activeThreadId)

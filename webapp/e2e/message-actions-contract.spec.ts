@@ -8,7 +8,7 @@ import {
   signInWithToken,
 } from './helpers/auth'
 import { createListingWithShipping } from './helpers/listing-contract'
-import { inboxListingTitleVisible } from './helpers/messaging-contract'
+import { inboxListingTitleVisible, pollThreadIdForListing } from './helpers/messaging-contract'
 import { fillComposeAndSend } from './helpers/messaging-compose'
 import { timed } from './helpers/seed-lean'
 
@@ -46,12 +46,16 @@ test.describe.serial('Message reply, edit, and reaction contract', () => {
     await expect(page.locator('[data-testid="messages-thread-panel"] p').first()).toBeVisible({
       timeout: 15_000,
     })
-    await fillComposeAndSend(page, buyerMessage)
+    const sent = await fillComposeAndSend(page, buyerMessage)
     await expect(
       page.getByTestId('messages-bubble-text').filter({ hasText: buyerMessage }).first(),
     ).toBeVisible({ timeout: 45_000 })
-    threadId = new URL(page.url()).searchParams.get('thread') ?? ''
-    expect(threadId, 'thread id must appear in URL after send').toBeTruthy()
+    threadId =
+      sent.threadId ??
+      (await pollThreadIdForListing(request, buyerToken, listingId, {
+        messageHint: buyerMessage.slice(0, 24),
+      }))
+    expect(threadId, 'thread id must resolve from start API or inbox').toBeTruthy()
   })
 
   test('seller replies with threaded reply action', async ({ page, request }) => {

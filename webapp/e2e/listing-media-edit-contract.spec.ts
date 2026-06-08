@@ -6,7 +6,6 @@ import {
   createTwoImageListing,
   fetchListingApi,
   pollListingUntil,
-  saveListingAndOpenDetail,
   waitForListingRevisions,
 } from './helpers/listing-contract'
 import {
@@ -18,15 +17,6 @@ import { timed } from './helpers/seed-lean'
 test.describe.configure({ timeout: 180_000 })
 
 test.describe.serial('Listing media edit persistence (7.5R)', () => {
-  let listingId = ''
-
-  test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext()
-    const token = await timed('auth', () => obtainAuthToken(ctx.request))
-    listingId = await timed('listing/2img', () => createTwoImageListing(ctx.request, token))
-    await ctx.close()
-  })
-
   test.beforeEach(async ({ page }) => {
     await signInWithContractApiToken(page)
   })
@@ -36,34 +26,61 @@ test.describe.serial('Listing media edit persistence (7.5R)', () => {
     request,
   }) => {
     const token = await obtainAuthToken(request)
+    const listingId = await timed('listing/2img', () => createTwoImageListing(request, token))
+
     await page.goto(`/listings/${listingId}/edit`)
     await expect(page.getByTestId('listing-edit-ready')).toBeVisible({ timeout: 60_000 })
-    await expect(page.locator('[data-testid="listing-edit-media"]')).toBeAttached()
+    const media = page.locator('[data-testid="listing-edit-media"]')
+    await expect(media).toBeAttached()
 
     await page.locator('#listing-edit-new-image').fill(PLACEHOLDER_C)
-    await page.locator('[data-testid="listing-edit-media"] button', { hasText: /^Add$/ }).click()
-    const thirdRadio = page.locator('[data-testid="listing-edit-media"] input[type="radio"]').nth(2)
-    await thirdRadio.check()
-    await page
-      .locator('[data-testid="listing-edit-media"] button', { hasText: /remove/i })
-      .first()
-      .click()
+    await media.getByRole('button', { name: /^Add$/ }).click()
+    await expect(media.locator('input[type="radio"]')).toHaveCount(3)
 
-    await saveListingAndOpenDetail(page, request, token, listingId, {
+    await media.locator('input[type="radio"]').nth(2).check()
+    await media
+      .locator('div.flex.gap-2.rounded-xl', {
+        has: page.locator('img[src*="rp-contract-a"]'),
+      })
+      .getByRole('button', { name: 'Remove' })
+      .click()
+    await expect(media.locator('input[type="radio"]')).toHaveCount(2)
+
+    const savePatch = page.waitForResponse(
+      (res) => {
+        const u = res.url()
+        return (
+          res.request().method() === 'PATCH' &&
+          u.includes(`/api/listings/${listingId}`) &&
+          !u.includes('/status') &&
+          res.status() < 400
+        )
+      },
+      { timeout: 120_000 },
+    )
+    await page.getByTestId('listing-edit-save').click()
+    const patchRes = await savePatch
+    expect(patchRes.ok(), `media PATCH failed: ${patchRes.status()}`).toBeTruthy()
+
+    await pollListingUntil(request, token, listingId, {
       imageCount: 2,
       primaryIncludes: 'rp-contract-c',
     })
 
     const api = await fetchListingApi(request, token, listingId)
     const images = (api.images as string[]) ?? []
-    expect(images[0]).toContain('rp-contract-c')
-    expect(images.length).toBe(2)
+    expect(images).toHaveLength(2)
+    expect(String(api.primaryImageUrl ?? images[0])).toContain('rp-contract-c')
+    expect(images.some((u) => u.includes('rp-contract-b'))).toBeTruthy()
+    expect(images.some((u) => u.includes('rp-contract-c'))).toBeTruthy()
+    expect(images.some((u) => u.includes('rp-contract-a'))).toBeFalsy()
 
-    const primarySrc = await page
-      .locator('[data-testid="listing-detail-ready"] img.aspect-square')
-      .first()
-      .getAttribute('src')
+    await page.goto(`/listings/${listingId}`, { waitUntil: 'domcontentloaded' })
+    await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByTestId('listing-primary-image')).toBeVisible({ timeout: 30_000 })
+    const primarySrc = await page.getByTestId('listing-primary-image').getAttribute('src')
     expect(primarySrc ?? '').toContain('rp-contract-c')
+    await expect(page.getByTestId('listing-gallery-thumbnails').locator('button')).toHaveCount(2)
 
     await capturePageContentScreenshot(
       page,

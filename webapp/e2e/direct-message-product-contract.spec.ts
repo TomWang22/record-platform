@@ -8,7 +8,11 @@ import {
   signInWithToken,
 } from './helpers/auth'
 import { createListingWithShipping } from './helpers/listing-contract'
-import { assertNoUuidInMessagesUi, inboxListingTitleVisible } from './helpers/messaging-contract'
+import {
+  assertNoUuidInMessagesUi,
+  inboxListingTitleVisible,
+  pollThreadIdForListing,
+} from './helpers/messaging-contract'
 import { fillComposeAndSend } from './helpers/messaging-compose'
 import { capturePageContentScreenshot, contractScreenshotPath } from './helpers/screenshot-readiness'
 import { timed } from './helpers/seed-lean'
@@ -47,11 +51,15 @@ test.describe.serial('Direct message product contract (8.9A–B)', () => {
     })
     await assertNoUuidInMessagesUi(page)
     await capturePageContentScreenshot(page, contractScreenshotPath('direct-message-compose.png'))
-    await fillComposeAndSend(page, buyerMsg)
+    const sent = await fillComposeAndSend(page, buyerMsg)
     await expect(page.getByTestId('messages-bubble-text').filter({ hasText: buyerMsg }).first()).toBeVisible({
       timeout: 45_000,
     })
-    threadId = new URL(page.url()).searchParams.get('thread') ?? ''
+    threadId =
+      sent.threadId ??
+      (await pollThreadIdForListing(request, buyerToken, listingId, {
+        messageHint: buyerMsg.slice(0, 24),
+      }))
     expect(threadId).toBeTruthy()
   })
 

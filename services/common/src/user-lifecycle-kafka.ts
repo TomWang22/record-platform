@@ -1,22 +1,31 @@
 /**
  * ${ENV_PREFIX}.user.lifecycle.v1 — EventEnvelope + UserAccountDeletedV1 (proto/events).
  */
-import protobuf from "protobufjs";
+import { createRequire } from "node:module";
 import { ochKafkaTopicIsolationSuffix } from "./kafka.js";
 import { resolveProtoPath } from "./proto.js";
 
+const nodeRequire = createRequire(__filename);
+// protobufjs is provided transitively by @grpc/proto-loader (not a direct @common/utils dep).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const protobuf: any = nodeRequire(
+  nodeRequire.resolve("protobufjs", {
+    paths: [nodeRequire.resolve("@grpc/proto-loader/package.json")],
+  }),
+);
+
 export const USER_ACCOUNT_DELETED_V1 = "user.account.deleted.v1";
 
-let rootSingleton: protobuf.Root | null = null;
+let rootSingleton: { lookupType: (name: string) => { encode: (v: unknown) => { finish: () => Uint8Array }; decode: (b: Uint8Array) => unknown } } | null = null;
 
-function getProtoRoot(): protobuf.Root {
+function getProtoRoot(): NonNullable<typeof rootSingleton> {
   if (!rootSingleton) {
     rootSingleton = protobuf.loadSync([
       resolveProtoPath("events/envelope.proto"),
       resolveProtoPath("events/auth.proto"),
-    ]) as protobuf.Root;
+    ]);
   }
-  return rootSingleton;
+  return rootSingleton!;
 }
 
 export function userLifecycleV1Topic(): string {
@@ -82,7 +91,7 @@ export function tryDecodeUserAccountDeletedEnvelope(buf: Buffer): DecodedUserAcc
     const root = getProtoRoot();
     const EventEnvelope = root.lookupType("events.EventEnvelope");
     const UserAccountDeletedV1 = root.lookupType("events.auth.UserAccountDeletedV1");
-    const decoded = EventEnvelope.decode(buf) as protobuf.Message & {
+    const decoded = EventEnvelope.decode(buf) as {
       event_id: string;
       type: string;
       entity_id: string;
@@ -90,7 +99,7 @@ export function tryDecodeUserAccountDeletedEnvelope(buf: Buffer): DecodedUserAcc
       payload: Uint8Array;
     };
     if (decoded.type !== USER_ACCOUNT_DELETED_V1) return null;
-    const inner = UserAccountDeletedV1.decode(decoded.payload) as protobuf.Message & {
+    const inner = UserAccountDeletedV1.decode(decoded.payload) as {
       user_id: string;
       deletion_mode: string;
       gdpr_erasure: boolean;

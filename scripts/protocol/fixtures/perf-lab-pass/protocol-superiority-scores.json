@@ -1,0 +1,31 @@
+{
+  "services": [
+    {
+      "service": "fixture-service",
+      "winner_protocol": "http3",
+      "protocols": [
+        {
+          "protocol": "http3",
+          "p95_ms": 95,
+          "fail_rate": 0,
+          "tail_penalty": 0.08,
+          "scores": { "composite": 0.92, "stability": 1 }
+        },
+        {
+          "protocol": "http2",
+          "p95_ms": 110,
+          "fail_rate": 0,
+          "tail_penalty": 0.1,
+          "scores": { "composite": 0.74, "stability": 1 }
+        },
+        {
+          "protocol": "http1",
+          "p95_ms": 140,
+          "fail_rate": 0,
+          "tail_penalty": 0.12,
+          "scores": { "composite": 0.58, "stability": 1 }
+        }
+      ]
+    }
+  ]
+}

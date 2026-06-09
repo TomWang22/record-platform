@@ -22,6 +22,7 @@ tmp/
 !tsconfig*.json
 !infra/observability/*.json
 !docs/bundles/INTEGRITY_*.json
+!scripts/protocol/fixtures/**/*.json
 *.ndjson
 *.csv
 

@@ -1,0 +1,23 @@
+{
+  "global": {
+    "transport_validation_all_ok": true,
+    "collapse_smoke_ok": true,
+    "production_ready": true,
+    "endpoint_coverage_untested_heuristic": 0
+  },
+  "protocol_integrity": {
+    "any_http2_collapse_anomaly": false
+  },
+  "quic_pipeline": "integrated",
+  "quic": {
+    "mean_dominance_score": 0.82
+  },
+  "per_service": {
+    "fixture-service": {
+      "transport": {
+        "downgrade_detected": false,
+        "overall_ok": true
+      }
+    }
+  }
+}

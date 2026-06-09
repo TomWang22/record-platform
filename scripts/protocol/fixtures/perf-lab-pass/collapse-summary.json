@@ -1,0 +1,10 @@
+[
+  {
+    "service": "fixture-service",
+    "protocols": {
+      "http3": { "max_rps_pre_collapse": 500 },
+      "http2": { "max_rps_pre_collapse": 420 },
+      "http1": { "max_rps_pre_collapse": 360 }
+    }
+  }
+]

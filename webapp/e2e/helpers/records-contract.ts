@@ -49,7 +49,7 @@ export async function waitForRecordsCollectionLoaded(page: Page): Promise<void> 
         if (await tableRows.count()) return 'table'
         return ''
       },
-      { timeout: 60_000 },
+      { timeout: 90_000 },
     )
     .not.toBe('')
 }

@@ -87,6 +87,12 @@ jobs:
           bash -n scripts/chaos-latency.sh
       - name: Outbox ↔ proto ↔ topic alignment
         run: ./scripts/verify-outbox-infra-alignment.sh
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - name: Outbox library tests (@common/utils)
         run: pnpm install --frozen-lockfile && pnpm -C services/common run build && pnpm -C services/common run test
       - name: Kustomize build kafka-kraft-metallb

@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { ListingMakeOfferPanel } from '@/components/listings/listing-make-offer-panel'
 import {
   ListingRevisionPanel,
   ListingSellerCard,
@@ -18,6 +19,7 @@ import { Card } from '@/components/ui/card'
 import { apiFetch } from '@/lib/api-client'
 import { listingStatusLabel, saleTypeLabel } from '@/lib/listing-format'
 import { fetchListing } from '@/lib/listings-api'
+import { listingAcceptsOffers } from '@/lib/offers-api'
 import { listingToStoredRef, type MarketplaceListing } from '@/lib/listings-types'
 import { addRecentlyViewedOnApi } from '@/lib/marketplace-shopping-api'
 import { getClientSessionToken } from '@/lib/session'
@@ -26,7 +28,9 @@ import { isSessionAuthenticated, useSession } from '@/lib/use-session'
 
 export default function ListingDetailPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const id = params.id as string
+  const makeOfferOpen = searchParams.get('makeOffer') === '1'
   const session = useSession()
   const { authRequired, onApiError } = useRequireAuth()
   const signedIn = isSessionAuthenticated(session)
@@ -132,6 +136,13 @@ export default function ListingDetailPage() {
         <ListingImageGallery images={images} />
         <div className="space-y-4">
           <ListingShippingCard listing={listing} />
+          {signedIn && !canEdit && listingAcceptsOffers(listing) && (
+            <ListingMakeOfferPanel
+              listingId={id}
+              listingTitle={listing.title}
+              autoOpen={makeOfferOpen}
+            />
+          )}
           <ListingSellerCard listing={listing} listingId={id} />
         </div>
       </div>

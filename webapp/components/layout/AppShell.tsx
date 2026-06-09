@@ -24,6 +24,8 @@ const navItems = [
   { href: '/dashboard', label: 'My Collection' },
   { href: '/records', label: 'Records' },
   { href: '/market', label: 'Sell / List' },
+  { href: '/offers/inbox', label: 'Offer inbox' },
+  { href: '/offers/sent', label: 'Sent offers' },
   { href: '/auctions', label: 'Auction Monitor' },
   { href: '/forum', label: 'Forum' },
   { href: '/insights', label: 'Insights & AI' },

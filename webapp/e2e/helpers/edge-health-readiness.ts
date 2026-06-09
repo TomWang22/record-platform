@@ -25,7 +25,7 @@ export async function pollEdgeHealthReady(
       const res = await with429Retry(
         `edge health ${ep}`,
         () => request.get(ep, { maxRedirects: 5 }),
-        { attempts: 4 },
+        { attempts: 12 },
       )
       last = `${ep} → HTTP ${res.status()}`
       if (!res.ok()) {

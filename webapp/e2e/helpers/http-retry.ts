@@ -10,11 +10,11 @@ export async function with429Retry(
   fn: () => Promise<APIResponse>,
   opts?: { attempts?: number },
 ): Promise<APIResponse> {
-  const attempts = opts?.attempts ?? 8
+  const attempts = opts?.attempts ?? 10
   for (let attempt = 0; attempt < attempts; attempt++) {
     const res = await fn()
     if (res.status() !== 429) return res
-    await sleep(1500 * (attempt + 1))
+    await sleep(Math.min(12_000, 2000 * (attempt + 1)))
   }
   throw new Error(`${label} failed after ${attempts} attempts: 429 Too many requests`)
 }

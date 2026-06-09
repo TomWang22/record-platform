@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { formatMoneyFromCents } from '@/lib/listing-format'
+import { formatMoneyFromCents, saleTypeLabel } from '@/lib/listing-format'
 import { getUserIdFromToken } from '@/lib/jwt-user'
 import {
   addMessageReaction,
@@ -15,9 +15,12 @@ import {
   fetchArchivedThreads,
   fetchMessagingInbox,
   fetchMessagingThread,
+  fetchMessagingUser,
   replyToMessage,
+  searchMessagingUsers,
   sendGroupMessage,
   sendMarketplaceMessage,
+  type MessagingUserSearchHit,
   type InboxFilter,
   type MessagingInboxThread,
   type MessagingThreadContract,
@@ -63,8 +66,15 @@ export function MessagingProductView() {
     title: string
     priceCents: number | null
     thumbnailUrl: string | null
+    saleMode: string | null
+    sellerName: string | null
   } | null>(null)
   const [composeSellerId, setComposeSellerId] = useState('')
+  const [composeRecipientLabel, setComposeRecipientLabel] = useState('')
+  const [newMessageOpen, setNewMessageOpen] = useState(false)
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [userSearchResults, setUserSearchResults] = useState<MessagingUserSearchHit[]>([])
+  const [userSearchLoading, setUserSearchLoading] = useState(false)
   const [replyTo, setReplyTo] = useState<{ id: string; snippet: string } | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState('')
@@ -110,7 +120,7 @@ export function MessagingProductView() {
   useEffect(() => {
     if (!composeListingId) {
       setListingPreview(null)
-      setComposeSellerId('')
+      if (!composeUserId) setComposeSellerId('')
       return
     }
     void (async () => {
@@ -129,6 +139,10 @@ export function MessagingProductView() {
           user_id?: string
           sellerId?: string
           userId?: string
+          seller?: string
+          seller_display?: string
+          pricing_mode?: string
+          pricingMode?: string
           images?: string[] | Array<{ url?: string; image_url?: string }>
         }
         const sellerFromListing = String(
@@ -139,6 +153,8 @@ export function MessagingProductView() {
             '',
         ).trim()
         setComposeSellerId(composeUserId || sellerFromListing)
+        const sellerLabel = String(data.seller_display ?? data.seller ?? '').trim()
+        if (sellerLabel) setComposeRecipientLabel(sellerLabel)
         const priceCents =
           typeof data.price_cents === 'number'
             ? data.price_cents
@@ -157,10 +173,13 @@ export function MessagingProductView() {
                     '',
                 )
             : null)
+        const saleMode = String(data.pricing_mode ?? data.pricingMode ?? '').trim() || null
         setListingPreview({
           title: String(data.title ?? 'Listing'),
           priceCents,
           thumbnailUrl: thumb,
+          saleMode,
+          sellerName: sellerLabel || null,
         })
       } catch {
         setListingPreview(null)
@@ -169,8 +188,35 @@ export function MessagingProductView() {
   }, [composeListingId, composeUserId, token])
 
   useEffect(() => {
-    if (composeUserId) setComposeSellerId(composeUserId)
+    if (!composeUserId) return
+    setComposeSellerId(composeUserId)
+    void (async () => {
+      try {
+        const user = await fetchMessagingUser(composeUserId)
+        if (user?.displayName) setComposeRecipientLabel(user.displayName)
+        else if (user?.username) setComposeRecipientLabel(user.username.replace(/^@+/, ''))
+      } catch {
+        /* non-fatal */
+      }
+    })()
   }, [composeUserId])
+
+  useEffect(() => {
+    if (!newMessageOpen) return
+    const q = userSearchQuery.trim()
+    if (q.length < 2) {
+      setUserSearchResults([])
+      return
+    }
+    const handle = setTimeout(() => {
+      setUserSearchLoading(true)
+      void searchMessagingUsers(q)
+        .then(setUserSearchResults)
+        .catch(() => setUserSearchResults([]))
+        .finally(() => setUserSearchLoading(false))
+    }, 250)
+    return () => clearTimeout(handle)
+  }, [newMessageOpen, userSearchQuery])
 
   useEffect(() => {
     if (threadParam) {
@@ -188,8 +234,18 @@ export function MessagingProductView() {
     }
     const row = threads.find((t) => t.id === activeThreadId)
     if (row?.participantDisplay) return row.participantDisplay
-    return 'Seller'
-  }, [threadDetail, threads, activeThreadId, currentUserId])
+    if (composeRecipientLabel) return composeRecipientLabel
+    if (listingPreview?.sellerName) return listingPreview.sellerName
+    return composeMode ? 'New conversation' : 'Messages'
+  }, [
+    threadDetail,
+    threads,
+    activeThreadId,
+    currentUserId,
+    composeRecipientLabel,
+    listingPreview,
+    composeMode,
+  ])
 
   const listingCard = threadDetail?.listing ?? (composeListingId && listingPreview
     ? {
@@ -197,6 +253,7 @@ export function MessagingProductView() {
         title: listingPreview.title,
         priceCents: listingPreview.priceCents,
         thumbnailUrl: listingPreview.thumbnailUrl,
+        saleMode: listingPreview.saleMode,
       }
     : null)
 
@@ -305,16 +362,16 @@ export function MessagingProductView() {
 
       if (!recipientId) return
 
-      const isFirstWithListing = Boolean(composeListingId && !activeThreadId && !replyTo)
+      const isFirstMessage = Boolean(!activeThreadId && !replyTo)
 
       const sent = await sendMarketplaceMessage({
         recipientId,
         body,
         listingId: composeListingId || undefined,
-        isFirstWithListing,
+        isFirstMessage,
       })
 
-      await refreshAfterSend(isFirstWithListing, body, sent.threadId)
+      await refreshAfterSend(isFirstMessage, body, sent.threadId)
     } finally {
       setSending(false)
     }
@@ -419,9 +476,62 @@ export function MessagingProductView() {
           className="flex flex-col border-b border-slate-200/80 dark:border-white/10 lg:border-b-0 lg:border-r"
           data-testid="messages-inbox-list"
         >
-          <div className="border-b border-slate-200/80 px-4 py-3 dark:border-white/10">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 px-4 py-3 dark:border-white/10">
             <p className="text-sm font-semibold text-slate-900 dark:text-white">Inbox</p>
+            <button
+              type="button"
+              data-testid="messages-new-message"
+              onClick={() => {
+                setNewMessageOpen((v) => !v)
+                setUserSearchQuery('')
+                setUserSearchResults([])
+              }}
+              className="rounded-full bg-brand px-2.5 py-1 text-[11px] font-medium text-white hover:opacity-90"
+            >
+              New message
+            </button>
           </div>
+          {newMessageOpen && (
+            <div
+              className="border-b border-slate-200/80 px-4 py-3 dark:border-white/10"
+              data-testid="messages-user-search-panel"
+            >
+              <input
+                data-testid="messages-user-search-input"
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                placeholder="Search by name or email…"
+                className="w-full rounded-lg border border-slate-200/80 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950"
+              />
+              {userSearchLoading && (
+                <p className="mt-2 text-xs text-slate-500">Searching…</p>
+              )}
+              <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto">
+                {userSearchResults.map((user) => {
+                  const label = user.displayName || user.username || 'User'
+                  return (
+                    <li key={user.id}>
+                      <button
+                        type="button"
+                        data-testid="messages-user-search-result"
+                        onClick={() => {
+                          setNewMessageOpen(false)
+                          setComposeRecipientLabel(label)
+                          router.push(`/messages?user=${encodeURIComponent(user.id)}`)
+                        }}
+                        className="w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-white/5"
+                      >
+                        <span className="font-medium text-slate-900 dark:text-white">{label}</span>
+                        {user.username && user.displayName && (
+                          <span className="ml-2 text-xs text-slate-500">@{user.username}</span>
+                        )}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
           <ul className="flex-1 overflow-y-auto">
             {loadingInbox && threads.length === 0 && (
               <li className="px-4 py-6 text-sm text-slate-500">Loading conversations…</li>
@@ -500,9 +610,27 @@ export function MessagingProductView() {
                 <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                   {listingCard.title}
                 </p>
-                {listingCard.priceCents != null && (
-                  <p className="text-sm text-slate-600 dark:text-slate-300">
-                    {formatMoneyFromCents(listingCard.priceCents)}
+                <div className="flex flex-wrap items-center gap-2">
+                  {listingCard.priceCents != null && (
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                      {formatMoneyFromCents(listingCard.priceCents)}
+                    </p>
+                  )}
+                  {listingCard.saleMode && (
+                    <p
+                      className="text-xs font-medium uppercase tracking-wide text-slate-500"
+                      data-testid="messages-compose-listing-sale-mode"
+                    >
+                      {saleTypeLabel(listingCard.saleMode)}
+                    </p>
+                  )}
+                </div>
+                {listingPreview?.sellerName && (
+                  <p
+                    className="text-xs text-slate-500"
+                    data-testid="messages-compose-seller-name"
+                  >
+                    Seller: {listingPreview.sellerName}
                   </p>
                 )}
                 <Link
@@ -560,8 +688,10 @@ export function MessagingProductView() {
               <p className="text-sm text-slate-500">Loading conversation…</p>
             )}
             {!loadingThread && composeMode && threadDetail == null && (
-              <p className="text-sm text-slate-500">
-                Send a message to start the conversation about this listing.
+              <p className="text-sm text-slate-500" data-testid="messages-compose-hint">
+                {composeListingId
+                  ? 'Write your first message when you are ready — listing context is attached.'
+                  : 'Write your first message to start this conversation.'}
               </p>
             )}
             {(threadDetail?.messages ?? []).map((msg) => (

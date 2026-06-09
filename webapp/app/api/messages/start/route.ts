@@ -5,32 +5,40 @@ import {
   messagingProxyHeaders,
   userIdFromAuthHeader,
 } from '@/lib/messaging-bff'
+import { normalizeMessagingStartBody } from '@/lib/messaging-start-body'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { listing_id, initial_message } = body as { listing_id?: string; initial_message?: string }
+    const body = (await request.json()) as Record<string, unknown>
+    const { listingId, recipientId, initialMessage } = normalizeMessagingStartBody(body)
 
-    if (!listing_id || !String(initial_message ?? '').trim()) {
+    if (!listingId && !recipientId) {
       return NextResponse.json(
-        { error: 'listing_id and initial_message are required' },
+        { error: 'recipient_id or listing_id is required' },
         { status: 400 },
       )
     }
 
     const auth = request.headers.get('Authorization') || ''
     const renterId = userIdFromAuthHeader(auth)
+    if (!renterId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const upstreamBody: Record<string, unknown> = {
+      renter_id: renterId,
+    }
+    if (listingId) upstreamBody.listing_id = listingId
+    if (recipientId) upstreamBody.recipient_id = recipientId
+    if (initialMessage) upstreamBody.initial_message = initialMessage
+
     const response = await fetch(`${messagingMessagesBaseUrl()}/start`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...messagingProxyHeaders(request),
       },
-      body: JSON.stringify({
-        listing_id,
-        renter_id: renterId,
-        initial_message: String(initial_message).trim(),
-      }),
+      body: JSON.stringify(upstreamBody),
     })
 
     if (!response.ok) {

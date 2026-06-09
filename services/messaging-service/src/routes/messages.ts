@@ -64,9 +64,31 @@ function listingMetaFromSubject(subject: string): { listingId: string | null; li
   return { listingId: match[1], listingTitle: match[2]?.trim() || 'Listing' }
 }
 
-async function fetchListingForMessagingStart(
-  listingId: string,
-): Promise<{ landlord_id: string; title: string } | null> {
+type ListingStartMeta = {
+  seller_id: string
+  title: string
+  price_cents: number | null
+  thumbnail_url: string | null
+  pricing_mode: string | null
+}
+
+function resolveListingPriceCents(j: Record<string, unknown>): number | null {
+  const priceRaw = j.price_cents ?? j.priceCents
+  if (typeof priceRaw === 'number' && Number.isFinite(priceRaw)) {
+    return Math.floor(priceRaw)
+  }
+  const priceDollars = j.price
+  if (typeof priceDollars === 'number' && Number.isFinite(priceDollars)) {
+    return Math.round(priceDollars * 100)
+  }
+  if (typeof priceDollars === 'string' && priceDollars.trim()) {
+    const n = Number(priceDollars)
+    if (Number.isFinite(n)) return Math.round(n * 100)
+  }
+  return null
+}
+
+async function fetchListingForMessagingStart(listingId: string): Promise<ListingStartMeta | null> {
   const base = (process.env.LISTINGS_HTTP || 'http://127.0.0.1:4012').replace(/\/$/, '')
   const url = `${base}/listings/${listingId}`
   let upstream: globalThis.Response
@@ -80,10 +102,55 @@ async function fetchListingForMessagingStart(
   if (upstream.status === 404) return null
   if (!upstream.ok) throw new Error(`listings_${upstream.status}`)
   const j = (await upstream.json()) as Record<string, unknown>
-  const landlord_id = String(j.seller_id ?? j.user_id ?? j.landlord_id ?? '').trim()
+  const seller_id = String(j.seller_id ?? j.user_id ?? '').trim()
   const title = String(j.title ?? 'Listing')
-  if (!THREAD_LISTING_UUID_RE.test(landlord_id)) return null
-  return { landlord_id, title }
+  if (!THREAD_LISTING_UUID_RE.test(seller_id)) return null
+  const price_cents = resolveListingPriceCents(j)
+  const thumb = String(
+    j.primary_image_url ??
+      j.primaryImageUrl ??
+      (Array.isArray(j.images) && j.images[0]
+        ? typeof j.images[0] === 'string'
+          ? j.images[0]
+          : String(
+              (j.images[0] as { url?: string; image_url?: string }).url ??
+                (j.images[0] as { url?: string; image_url?: string }).image_url ??
+                '',
+            )
+        : '') ??
+      '',
+  ).trim()
+  let pricing_mode = String(j.pricing_mode ?? j.pricingMode ?? '').trim() || null
+  if (!pricing_mode) {
+    const saleType = String(j.saleType ?? j.sale_type ?? j.listing_type ?? '')
+      .trim()
+      .toLowerCase()
+    if (saleType === 'obo') pricing_mode = 'obo'
+    else if (saleType === 'auction') pricing_mode = 'auction'
+    else pricing_mode = 'fixed'
+  }
+  return {
+    seller_id,
+    title,
+    price_cents,
+    thumbnail_url: thumb || null,
+    pricing_mode,
+  }
+}
+
+function pickStartBodyField(body: Record<string, unknown>, snake: string, camel: string): string {
+  const v = body[snake] ?? body[camel]
+  return v != null ? String(v).trim() : ''
+}
+
+function listingContextPayload(listingId: string, lj: ListingStartMeta) {
+  return {
+    id: listingId,
+    title: lj.title,
+    price_cents: lj.price_cents,
+    thumbnail_url: lj.thumbnail_url,
+    pricing_mode: lj.pricing_mode,
+  }
 }
 
 export default function messagesRouter(redis: Redis | null, cpuCores: number) {
@@ -377,37 +444,76 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     res.json(result)
   })
 
-  // POST /messages/start — begin landlord DM from a listing (renter → lister's user_id)
+  // POST /messages/start — open or begin a DM (recipient and/or listing; initial message optional)
   router.post('/start', async (req: AuthedRequest, res: Response) => {
-    const { listing_id, renter_id: renterIdBody, initial_message } = req.body as {
-      listing_id?: string
-      renter_id?: string
-      initial_message?: string
+    const body = (req.body ?? {}) as Record<string, unknown>
+    const listing_id = pickStartBodyField(body, 'listing_id', 'listingId')
+    const recipient_id = pickStartBodyField(body, 'recipient_id', 'recipientId')
+    const initial_message = pickStartBodyField(body, 'initial_message', 'initialMessage')
+    const renter_id = pickStartBodyField(body, 'renter_id', 'renterId') || String(req.userId || '').trim()
+
+    if (!listing_id && !recipient_id) {
+      return res.status(400).json({ error: 'recipient_id or listing_id is required' })
     }
-    const renter_id = String(renterIdBody || req.userId || '').trim()
-    if (!listing_id || !renter_id || !(initial_message && String(initial_message).trim())) {
-      return res.status(400).json({
-        error: 'listing_id, renter_id, initial_message required',
-      })
-    }
-    if (!THREAD_LISTING_UUID_RE.test(listing_id)) {
-      return res.status(400).json({ error: 'invalid listing_id' })
+    if (!renter_id) {
+      return res.status(400).json({ error: 'renter_id required' })
     }
     if (renter_id !== req.userId) {
       return res.status(403).json({ error: 'renter_id must match authenticated user' })
     }
-    let lj: { landlord_id: string; title: string } | null
-    try {
-      lj = await fetchListingForMessagingStart(listing_id)
-    } catch {
-      return res.status(502).json({ error: 'listing fetch failed' })
+    if (listing_id && !THREAD_LISTING_UUID_RE.test(listing_id)) {
+      return res.status(400).json({ error: 'invalid listing_id' })
     }
-    if (!lj) {
-      return res.status(404).json({ error: 'listing not found' })
+    if (recipient_id && !ROUTE_UUID_RE.test(recipient_id)) {
+      return res.status(400).json({ error: 'invalid recipient_id' })
     }
 
-    const subject = `[listing:${listing_id}] ${lj.title}`.slice(0, 500)
-    const dmThreadId = stableHumanDmThreadId(String(renter_id), String(lj.landlord_id))
+    let lj: ListingStartMeta | null = null
+    if (listing_id) {
+      try {
+        lj = await fetchListingForMessagingStart(listing_id)
+      } catch {
+        return res.status(502).json({ error: 'listing fetch failed' })
+      }
+      if (!lj) {
+        return res.status(404).json({ error: 'listing not found' })
+      }
+      if (lj.seller_id === renter_id) {
+        return res.status(403).json({ error: 'cannot contact yourself as seller' })
+      }
+      if (recipient_id && recipient_id !== lj.seller_id) {
+        return res.status(400).json({ error: 'recipient_id does not match listing seller' })
+      }
+    }
+
+    const resolvedRecipient = lj?.seller_id || recipient_id
+    if (!resolvedRecipient || !ROUTE_UUID_RE.test(resolvedRecipient)) {
+      return res.status(404).json({ error: 'seller not found' })
+    }
+    if (resolvedRecipient === renter_id) {
+      return res.status(403).json({ error: 'cannot message yourself' })
+    }
+
+    const dmThreadId = stableHumanDmThreadId(String(renter_id), String(resolvedRecipient))
+    const listingPayload = listing_id && lj ? listingContextPayload(listing_id, lj) : null
+    const openOnly = !initial_message
+
+    if (openOnly) {
+      return res.status(201).json({
+        thread_id: dmThreadId,
+        recipient_id: resolvedRecipient,
+        ...(listing_id ? { listing_id } : {}),
+        seller_id: lj?.seller_id ?? resolvedRecipient,
+        ...(listingPayload ? { listing: listingPayload } : {}),
+      })
+    }
+
+    const hasListing = Boolean(listing_id && lj)
+    const subject = hasListing
+      ? `[listing:${listing_id}] ${lj!.title}`.slice(0, 500)
+      : ''
+    const messageType = hasListing ? 'ListingInquiry' : 'direct'
+    const content = String(initial_message).slice(0, 8000)
 
     try {
       const insertQuery = `
@@ -420,21 +526,20 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       `
       const { rows } = await pool.query(insertQuery, [
         renter_id,
-        lj.landlord_id,
+        resolvedRecipient,
         dmThreadId,
-        'ListingInquiry',
+        messageType,
         subject,
-        String(initial_message).slice(0, 8000),
+        content,
       ])
       const message = rows[0]
 
       const producer = await getKafkaProducer()
-      const kafkaKey = lj.landlord_id
       const createdAt =
         message.created_at instanceof Date
           ? message.created_at.toISOString()
           : String(message.created_at)
-      await sendMessagingEvent(producer, kafkaKey, {
+      await sendMessagingEvent(producer, resolvedRecipient, {
         metadata: buildMetadata({
           event_type: 'MessageSent',
           aggregate_id: message.id,
@@ -442,12 +547,12 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
         }),
         message_id: message.id,
         sender_id: renter_id,
-        recipient_id: lj.landlord_id,
+        recipient_id: resolvedRecipient,
         thread_id: message.thread_id || '',
-        message_type: 'ListingInquiry',
+        message_type: messageType,
         subject,
-        content: String(initial_message),
-        listing_id,
+        content,
+        listing_id: listing_id || undefined,
         created_at: createdAt,
       })
 
@@ -457,33 +562,39 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
           `DELETE FROM messages.user_archived_threads
            WHERE user_id = ANY($1::uuid[])
              AND thread_id::text = ANY($2::text[])`,
-          [[renter_id, lj.landlord_id], [dmThreadId, String(message.thread_id ?? ''), String(message.id ?? '')]],
+          [
+            [renter_id, resolvedRecipient],
+            [dmThreadId, String(message.thread_id ?? ''), String(message.id ?? '')],
+          ],
         )
       } catch (archErr: unknown) {
         const code = (archErr as { code?: string })?.code
         if (code !== '42P01') {
-          console.error('[messaging] unarchive listing thread failed', archErr)
+          console.error('[messaging] unarchive thread failed', archErr)
         }
       }
 
       void pushMessageReceivedNotification({
-        recipientId: String(lj.landlord_id),
+        recipientId: String(resolvedRecipient),
         senderId: String(renter_id),
         messageId: String(message.id ?? ''),
         threadId: String(message.thread_id ?? dmThreadId),
-        content: String(initial_message),
-        listingId: listing_id,
-        listingTitle: lj.title,
+        content,
+        listingId: listing_id || undefined,
+        listingTitle: lj?.title,
       })
 
       return res.status(201).json({
-        listing_id,
-        landlord_id: lj.landlord_id,
         thread_id: dmThreadId,
+        message_id: message.id,
+        recipient_id: resolvedRecipient,
+        ...(listing_id ? { listing_id } : {}),
+        seller_id: lj?.seller_id ?? resolvedRecipient,
+        ...(listingPayload ? { listing: listingPayload } : {}),
         message: { ...message, thread_id: dmThreadId },
       })
     } catch (err: unknown) {
-      console.error('[messaging] Error starting listing thread:', err)
+      console.error('[messaging] Error starting thread:', err)
       return res.status(500).json({ error: 'Failed to start conversation' })
     }
   })
@@ -682,6 +793,52 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       }
       console.error('[messaging] users/search', e)
       return res.status(500).json({ error: 'Failed to search users' })
+    }
+  })
+
+  /**
+   * GET /messages/users/:userId — recipient profile for compose (display name / email fallback).
+   */
+  router.get('/users/:userId', async (req: AuthedRequest, res: Response) => {
+    const userId = req.userId!
+    const targetId = String(req.params.userId ?? '').trim()
+    if (!ROUTE_UUID_RE.test(targetId)) {
+      return res.status(400).json({ error: 'invalid user id' })
+    }
+    if (targetId === userId) {
+      return res.status(400).json({ error: 'cannot message yourself' })
+    }
+    try {
+      const { rows } = await pool.query(
+        `SELECT u.id::text AS id,
+                COALESCE(
+                  NULLIF(TRIM(u.username::text), ''),
+                  NULLIF(TRIM(u.display_username::text), ''),
+                  NULLIF(SPLIT_PART(COALESCE(u.email::text, ''), '@', 1), '')
+                ) AS username,
+                COALESCE(
+                  NULLIF(TRIM(u.display_username::text), ''),
+                  NULLIF(TRIM(u.display_name::text), ''),
+                  NULLIF(TRIM(u.username::text), '')
+                ) AS display_name,
+                NULLIF(TRIM(u.email::text), '') AS email
+         FROM auth.users u
+         WHERE u.id = $1::uuid
+           AND COALESCE(u.is_deleted, false) = false
+         LIMIT 1`,
+        [targetId],
+      )
+      if (!rows[0]) {
+        return res.status(404).json({ error: 'user not found' })
+      }
+      return res.json({ user: rows[0] })
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code
+      if (code === '42P01' || code === '42703') {
+        return res.status(404).json({ error: 'user not found' })
+      }
+      console.error('[messaging] users/:userId', e)
+      return res.status(500).json({ error: 'Failed to load user' })
     }
   })
 

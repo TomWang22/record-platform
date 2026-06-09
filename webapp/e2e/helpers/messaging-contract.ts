@@ -17,6 +17,12 @@ export async function assertNoUuidInMessagesUi(page: Page, context = 'messages U
   expect(text, `${context} must not show raw UUIDs`).not.toMatch(UUID_VISIBLE_RE)
 }
 
+export function assertMessagingStartContract(body: Record<string, unknown>): void {
+  expect(body['landlord_id']).toBeUndefined()
+  expect(body['landlordId']).toBeUndefined()
+  expect(body.seller_id ?? body.sellerId).toBeTruthy()
+}
+
 /** Resolve thread id from inbox after compose send (API-first; do not rely on client router URL). */
 export async function pollThreadIdForListing(
   request: APIRequestContext,

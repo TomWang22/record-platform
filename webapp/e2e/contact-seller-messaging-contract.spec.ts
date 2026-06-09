@@ -12,6 +12,8 @@ import {
 } from './helpers/screenshot-readiness'
 import { assertNoHeaderOverlayInPageContent } from './helpers/page-content-guard'
 import { fillComposeAndSend } from './helpers/messaging-compose'
+import { assertMessagingStartContract } from './helpers/messaging-contract'
+import { assertNoStaleProductUi } from './helpers/stale-ui-guard'
 import { timed } from './helpers/seed-lean'
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
@@ -39,6 +41,31 @@ test.describe.serial('Contact seller messaging contract (7.4M)', () => {
     sellerId = String(listingBody.seller_id ?? listingBody.user_id ?? '')
     await ctx.close()
     expect(sellerId).toBeTruthy()
+  })
+
+  test('buyer opens compose with listing only (no initial message required)', async ({ page, request }) => {
+    const buyerToken = await obtainBuyerContractToken(request)
+    const startRes = await request.post('/api/messages/start', {
+      headers: { Authorization: `Bearer ${buyerToken}` },
+      data: { listing_id: listingId },
+    })
+    expect(startRes.status(), await startRes.text()).toBeLessThan(400)
+    const started = (await startRes.json()) as Record<string, unknown> & {
+      thread_id?: string
+      listing?: { title?: string; price_cents?: number }
+    }
+    assertMessagingStartContract(started)
+    expect(started.thread_id).toBeTruthy()
+    expect(started.listing?.price_cents).toBeGreaterThan(0)
+
+    await signInWithToken(page, buyerToken)
+    await page.goto(`/messages?listing=${listingId}`)
+    await expect(page.getByTestId('messages-compose-panel')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('messages-compose-listing-context')).toBeVisible()
+    await expect(page.getByTestId('messages-compose-ready')).toBeAttached({ timeout: 30_000 })
+    const visible = await page.getByTestId('page-content').innerText()
+    expect(visible).not.toMatch(UUID_RE)
+    await assertNoStaleProductUi(page, 'messages UI')
   })
 
   test('buyer composes and sends message with listing context', async ({ page, request }) => {

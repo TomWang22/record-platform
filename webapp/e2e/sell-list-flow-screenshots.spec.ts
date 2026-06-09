@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 import { obtainAuthToken, signInAsTestCollector } from './helpers/auth'
+import { waitForListingField } from './helpers/listing-contract'
 import { getJsonWith429Retry } from './helpers/http-retry'
 import { ensureTestCollection } from './helpers/seed-collection'
 import {
@@ -86,7 +87,16 @@ test.describe('Sell/list UI flow screenshots', () => {
     }
     expect(createdListingId).toBeTruthy()
 
+    await waitForListingField(
+      request,
+      token!,
+      createdListingId,
+      (row) => String(row.title ?? row.name ?? '') === UNIQUE_TITLE,
+      { timeoutMs: 120_000 },
+    )
+
     await page.goto(`/listings/${createdListingId}`)
+    await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 60_000 })
     await expect(page.getByRole('heading', { level: 1 })).toContainText(UNIQUE_TITLE, {
       timeout: 30_000,
     })

@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { messagingMessagesBaseUrl, messagingProxyHeaders } from '@/lib/messaging-bff'
+import { pickMessagingField } from '@/lib/messaging-start-body'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { recipient_id, group_id, message_type, subject, content, parent_message_id } = body
+    const body = (await request.json()) as Record<string, unknown>
+    const recipient_id = pickMessagingField(body, 'recipient_id', 'recipientId')
+    const group_id = pickMessagingField(body, 'group_id', 'groupId')
+    const message_type = pickMessagingField(body, 'message_type', 'messageType')
+    const subject = pickMessagingField(body, 'subject', 'subject')
+    const content = pickMessagingField(body, 'content', 'content')
+    const parent_message_id = pickMessagingField(body, 'parent_message_id', 'parentMessageId')
+    const thread_id = pickMessagingField(body, 'thread_id', 'threadId')
 
     if ((!recipient_id && !group_id) || (recipient_id && group_id)) {
       return NextResponse.json(
@@ -34,6 +41,7 @@ export async function POST(request: NextRequest) {
         subject,
         content,
         parent_message_id: parent_message_id || null,
+        thread_id: thread_id || null,
       }),
     })
 

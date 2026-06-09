@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ALLOWLIST="${RP_OCH_ALLOWLIST:-$REPO_ROOT/config/rp-och-allowlist.txt}"
 REPORT_DIR="${REPORT_DIR:-$REPO_ROOT/bench_logs/domain-comb}"
 REPORT="${REPORT:-$REPORT_DIR/rp-och-code-comb.md}"
-SCAN_BENCH_LOGS="${SCAN_BENCH_LOGS:-0}"
+SCAN_BENCH_LOGS="${SCAN_BENCH_LOGS:-1}"
 
 mkdir -p "$REPORT_DIR"
 
@@ -17,6 +17,8 @@ RG_PATTERNS=(
   'off[- ]campus'
   '\bhousing\b'
   '\blandlord\b'
+  'landlord_id'
+  '\btenant\b'
   '\bbooking\b'
   '\bbookings\b'
   '\bapartment\b'
@@ -26,6 +28,7 @@ RG_PATTERNS=(
   '\bfurnished\b'
   'housing-media'
   'off-campus-housing'
+  'record\.local'
 )
 
 SCAN_DIRS=()
@@ -42,7 +45,11 @@ for base in "$REPO_ROOT/webapp/e2e/screenshots/authenticated" "$REPO_ROOT/webapp
     [[ -d "$dir" ]] && SCAN_DIRS+=("$dir")
   done
 done
-[[ "$SCAN_BENCH_LOGS" == "1" && -d "$REPO_ROOT/bench_logs" ]] && SCAN_DIRS+=("$REPO_ROOT/bench_logs")
+if [[ "$SCAN_BENCH_LOGS" == "1" && -d "$REPO_ROOT/bench_logs" ]]; then
+  for bl in messaging-contract domain-comb security-contract; do
+    [[ -d "$REPO_ROOT/bench_logs/$bl" ]] && SCAN_DIRS+=("$REPO_ROOT/bench_logs/$bl")
+  done
+fi
 
 RG_GLOBS=(
   -g '!**/node_modules/**'

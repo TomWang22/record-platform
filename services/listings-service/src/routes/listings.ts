@@ -76,39 +76,11 @@ router.get('/:id', (req, res, next) => {
   });
 });
 
-// Create listing
-router.post('/', async (req, res) => {
-  try {
-    const userId = (req as any).user.sub;
-    const listing = await createListing({
-      user_id: userId,
-      title: req.body.title,
-      description: req.body.description,
-      price: parseFloat(req.body.price),
-      currency: req.body.currency || 'USD',
-      listing_type: req.body.listing_type || 'fixed_price',
-      condition: req.body.condition,
-      catalog_id: req.body.catalog_id,
-      category: req.body.category,
-      location: req.body.location,
-      shipping_cost: req.body.shipping_cost ? parseFloat(req.body.shipping_cost) : 0,
-      shipping_method: req.body.shipping_method,
-      expires_at: req.body.expires_at ? new Date(req.body.expires_at) : undefined,
-      media_type: req.body.media_type,
-      has_obi: req.body.has_obi || false,
-      label_type: req.body.label_type,
-      stock_quantity: req.body.stock_quantity || 1,
-      duration_days: req.body.duration_days || 30,
-      visible_from: req.body.visible_from ? new Date(req.body.visible_from) : undefined,
-    });
-    // eBay-style: each listing has an id; expose as item_id for cart/order flows
-    const payload = listing as Record<string, unknown>;
-    if (payload.id) payload.item_id = payload.id;
-    res.status(201).json(payload);
-  } catch (err) {
-    console.error('[listings] create error:', err);
-    res.status(500).json({ error: 'Internal server error', details: String(err) });
-  }
+// Legacy housing-era create removed — use POST /listings/create (price_cents contract).
+router.post('/', (_req, res) => {
+  res.status(410).json({
+    error: 'Use POST /listings/create with price_cents (legacy price column removed)',
+  });
 });
 
 // Update listing

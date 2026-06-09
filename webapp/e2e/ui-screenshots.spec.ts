@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 import path from "path";
 
+import { pollEdgeHealthReady } from "./helpers/edge-health-readiness";
+
 const SCREENSHOT_DIR = path.join(__dirname, "screenshots");
 
 const pages: { name: string; path: string; waitFor?: string }[] = [
@@ -26,6 +28,10 @@ const pages: { name: string; path: string; waitFor?: string }[] = [
 ];
 
 test.describe("UI screenshots — all RP pages", () => {
+  test.beforeAll(async ({ request }) => {
+    await pollEdgeHealthReady(request);
+  });
+
   for (const pg of pages) {
     test(`screenshot: ${pg.name} (${pg.path})`, async ({ page }) => {
       const isInsights = pg.path === "/insights";
@@ -56,6 +62,10 @@ test.describe("UI screenshots — all RP pages", () => {
 });
 
 test.describe("API health endpoints", () => {
+  test.beforeAll(async ({ request }) => {
+    await pollEdgeHealthReady(request);
+  });
+
   const healthEndpoints = [
     "/api/readyz",
     "/api/healthz",

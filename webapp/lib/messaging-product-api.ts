@@ -5,6 +5,7 @@ export type MessagingListingContext = {
   title: string
   priceCents: number | null
   thumbnailUrl: string | null
+  saleMode?: string | null
 }
 
 export type MessagingParticipant = {
@@ -89,34 +90,126 @@ export async function fetchMessagingThread(threadId: string): Promise<MessagingT
   )
 }
 
+export type StartMessagingThreadResult = {
+  threadId: string
+  recipientId?: string
+  listingId?: string
+  messageId?: string
+  listing?: MessagingListingContext | null
+}
+
+export async function startMessagingThread(input: {
+  listingId?: string
+  recipientId?: string
+  initialMessage?: string
+}): Promise<StartMessagingThreadResult> {
+  if (!input.listingId && !input.recipientId) {
+    throw new Error('listingId or recipientId required')
+  }
+  const data = await apiFetch<{
+    thread_id?: string
+    threadId?: string
+    message_id?: string
+    messageId?: string
+    recipient_id?: string
+    recipientId?: string
+    listing_id?: string
+    listingId?: string
+    listing?: {
+      id?: string
+      title?: string
+      price_cents?: number | null
+      thumbnail_url?: string | null
+      pricing_mode?: string | null
+    }
+  }>('/api/messages/start', {
+    method: 'POST',
+    auth: true,
+    data: {
+      ...(input.listingId ? { listing_id: input.listingId } : {}),
+      ...(input.recipientId ? { recipient_id: input.recipientId } : {}),
+      ...(input.initialMessage ? { initial_message: input.initialMessage } : {}),
+    },
+  })
+  const threadId = String(data.thread_id ?? data.threadId ?? '').trim()
+  if (!threadId) throw new Error('start did not return thread_id')
+  const listing = data.listing
+  return {
+    threadId,
+    recipientId: String(data.recipient_id ?? data.recipientId ?? input.recipientId ?? '').trim() || undefined,
+    listingId: String(data.listing_id ?? data.listingId ?? input.listingId ?? '').trim() || undefined,
+    messageId: String(data.message_id ?? data.messageId ?? '').trim() || undefined,
+    listing: listing
+      ? {
+          id: String(listing.id ?? input.listingId ?? ''),
+          title: String(listing.title ?? 'Listing'),
+          priceCents:
+            typeof listing.price_cents === 'number' ? listing.price_cents : null,
+          thumbnailUrl: listing.thumbnail_url ? String(listing.thumbnail_url) : null,
+          saleMode: listing.pricing_mode ? String(listing.pricing_mode) : null,
+        }
+      : null,
+  }
+}
+
+export type MessagingUserSearchHit = {
+  id: string
+  username: string | null
+  displayName: string | null
+}
+
+export async function searchMessagingUsers(query: string): Promise<MessagingUserSearchHit[]> {
+  const q = query.trim()
+  if (q.length < 2) return []
+  const data = await apiFetch<{
+    users?: Array<{ id: string; username?: string | null; display_name?: string | null }>
+  }>(`/api/messages/users/search?q=${encodeURIComponent(q)}`, { auth: true })
+  return (data.users ?? []).map((row) => ({
+    id: String(row.id),
+    username: row.username ? String(row.username) : null,
+    displayName: row.display_name ? String(row.display_name) : null,
+  }))
+}
+
+export async function fetchMessagingUser(userId: string): Promise<MessagingUserSearchHit | null> {
+  const data = await apiFetch<{
+    user?: { id: string; username?: string | null; display_name?: string | null; email?: string | null }
+  }>(`/api/messages/users/${encodeURIComponent(userId)}`, { auth: true })
+  const row = data.user
+  if (!row?.id) return null
+  return {
+    id: String(row.id),
+    username: row.username ? String(row.username) : null,
+    displayName: row.display_name
+      ? String(row.display_name)
+      : row.email
+        ? String(row.email)
+        : null,
+  }
+}
+
 export type SendMarketplaceMessageResult = {
   threadId?: string
+  messageId?: string
 }
 
 export async function sendMarketplaceMessage(input: {
   recipientId: string
   body: string
   listingId?: string
-  isFirstWithListing?: boolean
+  isFirstMessage?: boolean
   parentMessageId?: string
 }): Promise<SendMarketplaceMessageResult> {
   const content = input.body.trim()
   if (!content) throw new Error('Message body required')
 
-  if (input.isFirstWithListing && input.listingId) {
-    const started = await apiFetch<{ thread_id?: string; threadId?: string }>(
-      '/api/messages/start',
-      {
-        method: 'POST',
-        auth: true,
-        data: {
-          listing_id: input.listingId,
-          initial_message: content,
-        },
-      },
-    )
-    const threadId = String(started.thread_id ?? started.threadId ?? '').trim()
-    return threadId ? { threadId } : {}
+  if (input.isFirstMessage) {
+    const started = await startMessagingThread({
+      listingId: input.listingId,
+      recipientId: input.recipientId,
+      initialMessage: content,
+    })
+    return { threadId: started.threadId, messageId: started.messageId }
   }
 
   await apiFetch('/api/messages/send', {

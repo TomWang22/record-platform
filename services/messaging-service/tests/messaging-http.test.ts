@@ -1027,6 +1027,48 @@ describe('createMessagingHttpApp (mocked pool + kafka)', () => {
   it('POST /messages/start — 400 missing fields', async () => {
     const res = await request(app).post('/messages/start').set('x-user-id', userId).send({})
     expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/recipient_id or listing_id/i)
+  })
+
+  it('POST /messages/start — 201 recipient only without message', async () => {
+    const res = await request(app)
+      .post('/messages/start')
+      .set('x-user-id', userId)
+      .send({ recipient_id: recipientId, renter_id: userId })
+    expect(res.status).toBe(201)
+    expect(res.body.thread_id).toBeTruthy()
+    expect(res.body.recipient_id).toBe(recipientId)
+    expect(res.body.message_id).toBeUndefined()
+    expect(kafkaSend).not.toHaveBeenCalled()
+  })
+
+  it('POST /messages/start — 201 listing only without message', async () => {
+    const listingUuid = randomUUID()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ seller_id: recipientId, title: 'Nice unit', price: 19.99, saleType: 'fixed_price' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    )
+    try {
+      const res = await request(app)
+        .post('/messages/start')
+        .set('x-user-id', userId)
+        .send({ listing_id: listingUuid, renter_id: userId })
+      expect(res.status).toBe(201)
+      expect(res.body.thread_id).toBeTruthy()
+      expect(res.body.listing_id).toBe(listingUuid)
+      expect(res.body.seller_id).toBe(recipientId)
+      expect(res.body.landlord_id).toBeUndefined()
+      expect(res.body.listing?.title).toBe('Nice unit')
+      expect(res.body.listing?.price_cents).toBe(1999)
+      expect(kafkaSend).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('POST /messages/start — 403 renter mismatch', async () => {
@@ -1041,13 +1083,13 @@ describe('createMessagingHttpApp (mocked pool + kafka)', () => {
     expect(res.status).toBe(403)
   })
 
-  it('POST /messages/start — 201 opens landlord thread', async () => {
+  it('POST /messages/start — 201 opens seller thread with message', async () => {
     const listingUuid = randomUUID()
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
         new Response(
-          JSON.stringify({ landlord_id: recipientId, title: 'Nice unit' }),
+          JSON.stringify({ seller_id: recipientId, title: 'Nice unit', price: 19.99 }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
       ),
@@ -1062,7 +1104,8 @@ describe('createMessagingHttpApp (mocked pool + kafka)', () => {
           initial_message: 'Tour request',
         })
       expect(res.status).toBe(201)
-      expect(res.body.landlord_id).toBe(recipientId)
+      expect(res.body.seller_id).toBe(recipientId)
+      expect(res.body.landlord_id).toBeUndefined()
       expect(res.body.listing_id).toBe(listingUuid)
       expect(kafkaSend).toHaveBeenCalled()
     } finally {

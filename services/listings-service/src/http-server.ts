@@ -504,9 +504,9 @@ export function createListingsHttpApp(): Application {
       res.json({
         id: String(d.id),
         title: String(d.title ?? ""),
-        landlord_id: ownerId || null,
+        seller_id: ownerId || null,
         user_id: d.user_id != null ? String(d.user_id) : null,
-        landlord_display: d.landlord_display != null ? String(d.landlord_display) : null,
+        seller_display: d.seller != null ? String(d.seller) : null,
         price_cents: priceCents,
         price_usd_monthly: d.price,
         location: d.location,

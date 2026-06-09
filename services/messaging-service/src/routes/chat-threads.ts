@@ -131,7 +131,6 @@ function mapThreadRow(
     lastMessagePreview,
     unreadCount: Number(r.unread_count || 0),
     lastAt: r.last_at,
-    listingTitle: participantDisplay,
   };
 }
 

@@ -26,11 +26,13 @@ test.describe.serial('Product contract A–D', () => {
     listingId = await timed('listing/create', () => ensureLeanListing(request, token))
     const seeded = await timed('records/seed', () => ensureTestCollection(request, token))
     const recs = await timed('records/list', async () => {
-      const res = await request.get('/api/records', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok()) throw new Error(`records list ${res.status()}: ${await res.text()}`)
-      return (await res.json()) as { id: string }[]
+      const { getJsonWith429Retry } = await import('./helpers/http-retry')
+      return getJsonWith429Retry<{ id: string }[]>(
+        request,
+        '/api/records',
+        { Authorization: `Bearer ${token}`, 'X-RP-E2E-Contract': '1' },
+        'records list beforeAll',
+      )
     })
     recordId = recs[0]?.id ?? ''
     if (!recordId) {

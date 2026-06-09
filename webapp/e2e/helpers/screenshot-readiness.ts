@@ -3,7 +3,20 @@ import path from 'node:path'
 
 import { expect, type Page } from '@playwright/test'
 
+import { with429Retry } from './http-retry'
 import { assertNoHeaderOverlayInPageContent } from './page-content-guard'
+
+async function fetchRecordsJson(page: Page, token: string): Promise<unknown[]> {
+  const res = await with429Retry('records API readiness', () =>
+    page.request.get('/api/records', {
+      headers: { Authorization: `Bearer ${token}`, 'X-RP-E2E-Contract': '1' },
+    }),
+  )
+  if (!res.ok()) {
+    throw new Error(`records API ${res.status()}: ${(await res.text()).slice(0, 300)}`)
+  }
+  return (await res.json()) as unknown[]
+}
 
 const LOADING_PATTERNS = [
   /Loading marketplace/i,
@@ -181,12 +194,11 @@ export async function waitForRecordsReady(
   if (token) {
     await expect
       .poll(async () => {
-        const res = await page.request.get('/api/records', {
-          headers: { Authorization: `Bearer ${token}`, 'X-RP-E2E-Contract': '1' },
-        })
-        if (!res.ok()) return 0
-        const rows = (await res.json()) as unknown[]
-        return rows.length
+        try {
+          return (await fetchRecordsJson(page, token)).length
+        } catch {
+          return 0
+        }
       }, { timeout: 60_000 })
       .toBeGreaterThan(0)
 
@@ -196,11 +208,7 @@ export async function waitForRecordsReady(
     if (view === 'list') {
       await page.locator('select').filter({ has: page.locator('option[value="24"]') }).last().selectOption('24')
     }
-    const apiRows = (await (
-      await page.request.get('/api/records', {
-        headers: { Authorization: `Bearer ${token}`, 'X-RP-E2E-Contract': '1' },
-      })
-    ).json()) as { artist?: string }[]
+    const apiRows = (await fetchRecordsJson(page, token)) as { artist?: string }[]
     const searchTerm = apiRows.some((r) => r.artist === 'Kenny Dorham')
       ? 'Kenny Dorham'
       : (apiRows[0]?.artist ?? '')
@@ -312,11 +320,11 @@ export async function waitForProfileReady(page: Page, token?: string): Promise<v
   if (token) {
     await expect
       .poll(async () => {
-        const res = await page.request.get('/api/records', {
-          headers: { Authorization: `Bearer ${token}`, 'X-RP-E2E-Contract': '1' },
-        })
-        if (!res.ok()) return 0
-        return ((await res.json()) as unknown[]).length
+        try {
+          return (await fetchRecordsJson(page, token)).length
+        } catch {
+          return 0
+        }
       }, { timeout: 60_000 })
       .toBeGreaterThan(0)
   }

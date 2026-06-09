@@ -116,6 +116,36 @@ export function extractNotificationEnvelopeMeta(buf: Buffer): {
           eventType,
         };
       }
+      if (
+        eventType === "BidPlaced" ||
+        eventType === "AuctionOutbid" ||
+        eventType === "AuctionEnded" ||
+        eventType === "AuctionWon" ||
+        eventType === "AuctionLost" ||
+        eventType === "AuctionSold"
+      ) {
+        let recipient = "";
+        if (eventType === "BidPlaced" || eventType === "AuctionEnded") {
+          recipient = String(payload.seller_user_id || payload.sellerUserId || "").trim();
+        } else if (eventType === "AuctionSold") {
+          recipient = String(payload.seller_user_id || payload.sellerUserId || "").trim();
+        } else if (eventType === "AuctionWon") {
+          recipient = String(payload.winner_user_id || payload.winnerUserId || "").trim();
+        } else if (eventType === "AuctionOutbid" || eventType === "AuctionLost") {
+          recipient = String(
+            payload.outbid_user_id ||
+              payload.outbidUserId ||
+              payload.loser_user_id ||
+              payload.loserUserId ||
+              "",
+          ).trim();
+        }
+        return {
+          eventId,
+          userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
+          eventType,
+        };
+      }
       if (eventType === "booking.thread.ensure") {
         return { eventId, userId: null, eventType };
       }
@@ -431,6 +461,58 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
                       event_type: meta.eventType,
                       deep_link: deepLink,
                       source: "kafka.listing.offer",
+                    };
+                  } catch {
+                    /* minimal */
+                  }
+                  if (meta.userId) {
+                    await pool.query(
+                      `INSERT INTO notification.notifications (user_id, event_type, channel, status, payload)
+                       VALUES ($1::uuid, $2, 'push'::notification.notification_channel, 'pending', $3::jsonb)`,
+                      [meta.userId, meta.eventType, JSON.stringify(payloadObj)],
+                    );
+                    await invalidateNotificationListCacheForUser(meta.userId);
+                    await publishRealtimeNotification(meta.userId, {
+                      ...payloadObj,
+                      event: meta.eventType,
+                    });
+                  }
+                  return;
+                }
+                if (
+                  meta.eventType === "BidPlaced" ||
+                  meta.eventType === "AuctionOutbid" ||
+                  meta.eventType === "AuctionEnded" ||
+                  meta.eventType === "AuctionWon" ||
+                  meta.eventType === "AuctionLost" ||
+                  meta.eventType === "AuctionSold"
+                ) {
+                  let payloadObj: Record<string, unknown> = { source: "kafka.listing.auction" };
+                  try {
+                    const j = JSON.parse(v.toString("utf8")) as {
+                      payload?: Record<string, unknown>;
+                    };
+                    const p = j.payload && typeof j.payload === "object" ? j.payload : {};
+                    const listingId = String(p.listing_id || p.listingId || "").trim();
+                    const deepLink =
+                      meta.eventType === "AuctionWon"
+                        ? "/cart"
+                        : listingId
+                          ? `/listings/${encodeURIComponent(listingId)}`
+                          : "/listings";
+                    payloadObj = {
+                      notification_category: "marketplace_auction",
+                      category: "marketplace",
+                      context_type: "auction",
+                      context_id: listingId,
+                      listing_id: listingId,
+                      listing_title: p.listing_title ?? null,
+                      amount_display: p.amount_display ?? null,
+                      title: p.title ?? meta.eventType,
+                      body: p.body ?? null,
+                      event_type: meta.eventType,
+                      deep_link: deepLink,
+                      source: "kafka.listing.auction",
                     };
                   } catch {
                     /* minimal */

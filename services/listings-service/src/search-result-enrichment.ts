@@ -1,3 +1,5 @@
+import { fetchAuctionStatsByListingId } from "./listings-auction-service.js";
+
 /** Batch watch counts from booking HTTP (best-effort; failures yield zeros). */
 export async function fetchWatchCountsByListingId(
   ids: string[],
@@ -27,21 +29,35 @@ export async function fetchWatchCountsByListingId(
   return out;
 }
 
-/** Populate derived search fields (watch counts) before rowToJson. */
+/** Populate derived search fields (watch counts + auction stats) before rowToJson. */
 export async function enrichSearchRows(
   rows: Record<string, unknown>[],
   _opts: { sort: string },
 ): Promise<void> {
   const ids = rows.map((r) => String(r.id ?? "")).filter(Boolean);
   let wc: Record<string, number> = {};
+  let auctionStats: Awaited<ReturnType<typeof fetchAuctionStatsByListingId>> = {};
   try {
     wc = await fetchWatchCountsByListingId(ids);
   } catch {
     wc = {};
   }
+  try {
+    auctionStats = await fetchAuctionStatsByListingId(ids);
+  } catch {
+    auctionStats = {};
+  }
   for (const row of rows) {
     const id = String(row.id ?? "");
     if (id && wc[id] != null) row.watch_count = wc[id];
     else if (row.watch_count == null) row.watch_count = 0;
+    const stats = id ? auctionStats[id] : undefined;
+    if (stats) {
+      row.auction_current_bid_cents =
+        stats.current_bid_cents > 0 ? stats.current_bid_cents : stats.starting_bid_cents;
+      row.auction_bid_count = stats.bid_count;
+      row.auction_ends_at = stats.ends_at;
+      row.auction_status = stats.status;
+    }
   }
 }

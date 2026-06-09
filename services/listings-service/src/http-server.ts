@@ -289,18 +289,34 @@ function listingDetailMarketplace(
 
 function requesterUserId(req: Request): string | null {
   const raw = (req.get("x-user-id") || "").trim();
-  return raw.length > 0 ? raw : null;
+  return raw.length > 0 ? raw.toLowerCase() : null;
 }
 
-/** Non-active listings are only visible to the landlord (x-user-id). */
-function listingMarketplaceVisibleToRequester(
+/** Non-active listings: owner always; closed auction participants (bidders/winner) may view ended detail. */
+async function listingMarketplaceVisibleToRequester(
   row: Record<string, unknown>,
   viewer: string | null,
-): boolean {
+  listingId: string,
+): Promise<boolean> {
   const st = String(row.status ?? "").toLowerCase();
   if (st === "active") return true;
   if (!viewer) return false;
-  return String(row.user_id ?? "") === viewer;
+  if (String(row.user_id ?? "").toLowerCase() === viewer) return true;
+  if (st === "closed") {
+    const r = await pool.query(
+      `SELECT 1 AS ok FROM listings.auction_settings
+       WHERE listing_id = $1::uuid
+         AND (winner_user_id = $2::uuid OR high_bidder_user_id = $2::uuid)
+       UNION ALL
+       SELECT 1 FROM listings.bids WHERE listing_id = $1::uuid AND bidder_user_id = $2::uuid
+       UNION ALL
+       SELECT 1 FROM listings.proxy_bids WHERE listing_id = $1::uuid AND bidder_user_id = $2::uuid
+       LIMIT 1`,
+      [listingId, viewer],
+    );
+    return Boolean(r.rows[0]);
+  }
+  return false;
 }
 
 async function listingDetailResponsePayload(
@@ -319,7 +335,26 @@ async function listingDetailResponsePayload(
     viewerUserId != null &&
     viewerUserId.length > 0 &&
     String(row.user_id ?? "") === String(viewerUserId);
-  const detail = listingDetailMarketplace(rowForDetail, { includePrivateAddress: owner });
+  let rowWithAuction = rowForDetail;
+  try {
+    const { fetchAuctionStatsByListingId } = await import("./listings-auction-service.js");
+    const stats = await fetchAuctionStatsByListingId([listingId]);
+    const s = stats[listingId];
+    if (s) {
+      rowWithAuction = {
+        ...rowForDetail,
+        auction_current_bid_cents:
+          s.current_bid_cents > 0 ? s.current_bid_cents : s.starting_bid_cents,
+        auction_bid_count: s.bid_count,
+        auction_ends_at: s.ends_at,
+        auction_status: s.status,
+        auction_reserve_met: s.current_bid_cents >= (Number(rowForDetail.reserve_price_cents) || 0),
+      };
+    }
+  } catch {
+    /* best-effort */
+  }
+  const detail = listingDetailMarketplace(rowWithAuction, { includePrivateAddress: owner });
   try {
     const wc = await fetchWatchCountsByListingId([listingId]);
     detail.watch_count = wc[listingId] ?? 0;
@@ -1576,7 +1611,7 @@ export function createListingsHttpApp(): Application {
         return;
       }
       const row = result.rows[0] as Record<string, unknown>;
-      if (!listingMarketplaceVisibleToRequester(row, requesterUserId(req))) {
+      if (!(await listingMarketplaceVisibleToRequester(row, requesterUserId(req), validation.value))) {
         res.status(404).json({ error: "not found" });
         return;
       }
@@ -1643,7 +1678,7 @@ export function createListingsHttpApp(): Application {
       }
       const row = result.rows[0] as Record<string, unknown>;
       const viewer = requesterUserId(req);
-      if (!listingMarketplaceVisibleToRequester(row, viewer)) {
+      if (!(await listingMarketplaceVisibleToRequester(row, viewer, validation.value))) {
         res.status(404).json({ error: "not found" });
         return;
       }
@@ -2949,7 +2984,7 @@ $24::int, $25::numeric, $26::listings.listing_status
         return;
       }
       const row = result.rows[0] as Record<string, unknown>;
-      if (!listingMarketplaceVisibleToRequester(row, requesterUserId(req))) {
+      if (!(await listingMarketplaceVisibleToRequester(row, requesterUserId(req), validation.value))) {
         res.status(404).json({ error: "not found" });
         return;
       }

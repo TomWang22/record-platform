@@ -317,6 +317,23 @@ export function buildPublicListingFromRow(
       ? Math.max(1, Math.floor(Number(rp.maxOfferAttempts)))
       : 3;
 
+  const auctionBidCount =
+    row.auction_bid_count != null && Number.isFinite(Number(row.auction_bid_count))
+      ? Math.max(0, Math.floor(Number(row.auction_bid_count)))
+      : null;
+  const auctionCurrentBidCents =
+    row.auction_current_bid_cents != null && Number.isFinite(Number(row.auction_current_bid_cents))
+      ? Math.max(0, Math.floor(Number(row.auction_current_bid_cents)))
+      : null;
+  const auctionEndsAt =
+    row.auction_ends_at != null ? String(row.auction_ends_at) : rp.auctionEndsAt ?? null;
+  const auctionStartingCents =
+    rp.startingBidCents != null && Number.isFinite(Number(rp.startingBidCents))
+      ? Math.floor(Number(rp.startingBidCents))
+      : Number.isFinite(priceCents)
+        ? priceCents
+        : null;
+
   const merged: Record<string, unknown> = {
     ...stripInternalKeys(rpBase),
     id: row.id != null ? String(row.id) : null,
@@ -350,6 +367,34 @@ export function buildPublicListingFromRow(
     label: rpBase.label ?? null,
     subtitle: rpBase.subtitle ?? null,
   };
+
+  if (saleType === "auction") {
+    const currentCents =
+      auctionCurrentBidCents != null && auctionCurrentBidCents > 0
+        ? auctionCurrentBidCents
+        : auctionStartingCents ?? 0;
+    merged.bidCount = auctionBidCount ?? 0;
+    merged.currentBidCents = currentCents;
+    merged.currentBidDisplay = formatMoneyFromCents(currentCents);
+    merged.endsAt = auctionEndsAt;
+    merged.reserveMet =
+      row.auction_reserve_met === true ||
+      (rp.reservePriceCents != null &&
+        currentCents >= Math.floor(Number(rp.reservePriceCents)));
+    if (auctionEndsAt) {
+      const left = Math.max(0, Date.parse(auctionEndsAt) - Date.now());
+      merged.timeLeftMs = left;
+      merged.timeLeft =
+        left <= 0 ? "Ended" : left < 3_600_000 ? "<1h left" : `${Math.floor(left / 3_600_000)}h left`;
+    }
+    merged.auction = {
+      bidCount: auctionBidCount ?? 0,
+      currentBidCents: currentCents,
+      currentBidDisplay: formatMoneyFromCents(currentCents),
+      endsAt: auctionEndsAt,
+      status: row.auction_status != null ? String(row.auction_status) : "active",
+    };
+  }
 
   if (opts.includeOwnerIds) {
     if (opts.offerCount != null) merged.offerCount = opts.offerCount;

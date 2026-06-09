@@ -177,7 +177,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="cart-page-ready">
       <header>
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Shopping Cart</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -224,12 +224,24 @@ export default function CartPage() {
             </Card>
             
             {cart.items.map((item) => {
-              const itemTitle: string = typeof item.title === 'string' ? item.title : (typeof item.metadata?.title === 'string' ? item.metadata.title : `Item ${item.item_id.substring(0, 8)}`)
+              const itemIdLabel =
+                typeof item.item_id === 'string'
+                  ? item.item_id.slice(0, 8)
+                  : typeof item.listing_id === 'string'
+                    ? item.listing_id.slice(0, 8)
+                    : 'item'
+              const itemTitle: string =
+                typeof item.title === 'string'
+                  ? item.title
+                  : typeof item.metadata?.title === 'string'
+                    ? item.metadata.title
+                    : `Item ${itemIdLabel}`
               const itemImage: string | undefined = typeof item.image_url === 'string' ? item.image_url : (typeof item.metadata?.image_url === 'string' ? item.metadata.image_url : undefined)
               const itemCondition: string | undefined = typeof item.condition === 'string' ? item.condition : (typeof item.metadata?.condition === 'string' ? item.metadata.condition : undefined)
               const itemCatalogId: string | undefined = typeof item.catalog_id === 'string' ? item.catalog_id : (typeof item.metadata?.catalog_id === 'string' ? item.metadata.catalog_id : undefined)
-              const itemPrice = item.price || 0
-              const itemTotal = itemPrice * item.quantity
+              const itemPrice = Number(item.price) || 0
+              const itemQty = Number(item.quantity) || 1
+              const itemTotal = itemPrice * itemQty
               
               return (
                 <Card key={item.id} className="p-4">
@@ -292,7 +304,7 @@ export default function CartPage() {
                             <input
                               type="number"
                               min="1"
-                              value={item.quantity}
+                              value={itemQty}
                               onChange={(e) => void updateQuantity(item.id, parseInt(e.target.value) || 1)}
                               className="w-16 rounded border border-slate-200/80 bg-white px-2 py-1 text-sm text-slate-900 focus:border-brand focus:outline-none dark:border-white/10 dark:bg-slate-950 dark:text-white"
                             />
@@ -336,7 +348,7 @@ export default function CartPage() {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600 dark:text-slate-400">Items ({cart.total_items})</span>
-                  <span className="text-slate-900 dark:text-white">${cart.total_price.toFixed(2)}</span>
+                  <span className="text-slate-900 dark:text-white">${(Number(cart.total_price) || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600 dark:text-slate-400">Shipping</span>
@@ -345,7 +357,7 @@ export default function CartPage() {
                 <div className="border-t border-slate-200 dark:border-white/10 pt-3 flex justify-between">
                   <span className="font-semibold text-slate-900 dark:text-white">Total</span>
                   <span className="font-bold text-lg text-slate-900 dark:text-white">
-                    ${cart.total_price.toFixed(2)}
+                    ${(Number(cart.total_price) || 0).toFixed(2)}
                   </span>
                 </div>
               </div>

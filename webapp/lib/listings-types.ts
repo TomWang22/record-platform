@@ -65,6 +65,13 @@ export type MarketplaceListing = {
     sort_order: number
   }>
   watch_count?: number
+  bidCount?: number
+  currentBidCents?: number
+  currentBidDisplay?: string
+  endsAt?: string
+  timeLeft?: string
+  reserveMet?: boolean
+  highBidderMasked?: string | null
   user_id?: string
   saleType?: string
   allowOffers?: boolean

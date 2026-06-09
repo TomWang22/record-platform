@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { ListingAuctionPanel } from '@/components/listings/listing-auction-panel'
 import { ListingMakeOfferPanel } from '@/components/listings/listing-make-offer-panel'
 import {
   ListingRevisionPanel,
@@ -19,6 +20,7 @@ import { Card } from '@/components/ui/card'
 import { apiFetch } from '@/lib/api-client'
 import { listingStatusLabel, saleTypeLabel } from '@/lib/listing-format'
 import { fetchListing } from '@/lib/listings-api'
+import { listingIsAuction } from '@/lib/auctions-api'
 import { listingAcceptsOffers } from '@/lib/offers-api'
 import { listingToStoredRef, type MarketplaceListing } from '@/lib/listings-types'
 import { addRecentlyViewedOnApi } from '@/lib/marketplace-shopping-api'
@@ -136,6 +138,9 @@ export default function ListingDetailPage() {
         <ListingImageGallery images={images} />
         <div className="space-y-4">
           <ListingShippingCard listing={listing} />
+          {signedIn && listingIsAuction(listing) && (
+            <ListingAuctionPanel listingId={id} canClose={canEdit} />
+          )}
           {signedIn && !canEdit && listingAcceptsOffers(listing) && (
             <ListingMakeOfferPanel
               listingId={id}

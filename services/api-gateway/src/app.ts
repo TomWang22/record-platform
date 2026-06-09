@@ -442,6 +442,8 @@ const limiter = rateLimit({
     if (req.path === "/healthz" || req.path === "/readyz" || req.path === "/metrics") return true;
     // Skip rate limiting when X-Loadtest header is present (for load testing)
     if (req.get("x-loadtest") === "1" || req.get("X-Loadtest") === "1") return true;
+    // E2E contract suite: bypass gateway throttle (records/listings/auth polling during Playwright)
+    if (req.get("x-rp-e2e-contract") === "1") return true;
     return false;
   },
 });
@@ -973,37 +975,55 @@ app.post("/api/auth/refresh", jsonParser, refreshTokenHandler);
 // gRPC uses HTTP/2 with proper connection management, avoiding HTTP proxy connection reset issues
 
 /* ----------------------- AUTH GUARD ----------------------- */
-app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
-  if (isOpenRoute(req)) return next();
-
+async function attachUserFromBearerIfPresent(
+  req: AuthedRequest,
+  res: Response,
+  opts: { required: boolean },
+): Promise<boolean> {
   delete (req.headers as any)["x-user-id"];
   delete (req.headers as any)["x-user-email"];
   delete (req.headers as any)["x-user-jti"];
 
   const token = extractBearer(req);
-  if (!token) return res.status(401).json({ error: "auth required" });
+  if (!token) {
+    if (opts.required) {
+      res.status(401).json({ error: "auth required" });
+      return false;
+    }
+    return true;
+  }
 
   try {
     const payload = verifyJwt(token) as TokenPayload & { jti?: string };
     if (payload?.jti) {
       try {
-        // Add timeout to Redis check to prevent hanging
-        const revoked = await Promise.race([
+        const revoked = (await Promise.race([
           redis.get(`revoked:${payload.jti}`),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Redis check timeout')), 500))
-        ]) as string | null;
-        if (revoked) return res.status(401).json({ error: "token revoked" });
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Redis check timeout")), 500),
+          ),
+        ])) as string | null;
+        if (revoked) {
+          res.status(401).json({ error: "token revoked" });
+          return false;
+        }
       } catch (e) {
-        // If Redis check fails, log but proceed (non-blocking)
-        // This allows the service to continue working even if Redis is temporarily unavailable
         console.warn("revocation check failed, proceeding:", (e as Error)?.message);
       }
     }
     req.user = payload;
-    return next();
+    return true;
   } catch {
-    return res.status(401).json({ error: "invalid token" });
+    res.status(401).json({ error: "invalid token" });
+    return false;
   }
+}
+
+app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
+  const ok = await attachUserFromBearerIfPresent(req, res, {
+    required: !isOpenRoute(req),
+  });
+  if (ok) next();
 });
 
 /* ----------------------- Listings settings/ratings (first after auth so path /api/listings/* matches) ----------------------- */

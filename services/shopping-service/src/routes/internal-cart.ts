@@ -112,6 +112,68 @@ export function internalCartRouter(): Router {
     }
   });
 
+  router.post("/cart/reserve-auction-win", async (req: Request, res: Response) => {
+    if (!requireInternalSecret(req, res)) return;
+
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const buyerUserId = String(body.buyer_user_id || "").trim();
+    const listingId = String(body.listing_id || "").trim();
+    const amountCents = Number(body.amount_cents);
+    const listingTitle = body.listing_title != null ? String(body.listing_title) : null;
+    const sellerDisplay = body.seller_display != null ? String(body.seller_display) : null;
+
+    if (!buyerUserId || !listingId) {
+      res.status(400).json({ error: "buyer_user_id, listing_id required" });
+      return;
+    }
+    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+      res.status(400).json({ error: "invalid amount_cents" });
+      return;
+    }
+
+    try {
+      const existing = await pool.query(
+        `SELECT id FROM shopping.shopping_cart
+         WHERE user_id = $1::uuid AND item_type = 'listing' AND item_id = $2::uuid
+           AND metadata->>'purchase_type' = 'auction_win'
+         LIMIT 1`,
+        [buyerUserId, listingId],
+      );
+      if (existing.rows[0]) {
+        res.status(200).json({
+          cart_item_id: (existing.rows[0] as { id: string }).id,
+          reserved: true,
+          duplicate: true,
+        });
+        return;
+      }
+
+      const priceDollars = Math.round(amountCents) / 100;
+      const metadata = {
+        purchase_type: "auction_win",
+        title: listingTitle,
+        seller_display: sellerDisplay,
+        reserved_at: new Date().toISOString(),
+        amount_cents: Math.round(amountCents),
+      };
+
+      const ins = await pool.query(
+        `INSERT INTO shopping.shopping_cart
+           (user_id, item_type, item_id, listing_id, quantity, price, metadata)
+         VALUES ($1::uuid, 'listing', $2::uuid, $2::uuid, 1, $3, $4::jsonb)
+         RETURNING id`,
+        [buyerUserId, listingId, priceDollars, JSON.stringify(metadata)],
+      );
+      res.status(201).json({
+        cart_item_id: (ins.rows[0] as { id: string }).id,
+        reserved: true,
+      });
+    } catch (err) {
+      console.error("[shopping] reserve-auction-win error:", err);
+      res.status(500).json({ error: "failed to reserve auction win in cart" });
+    }
+  });
+
   return router;
 }
 

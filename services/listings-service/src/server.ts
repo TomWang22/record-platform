@@ -61,6 +61,7 @@ app.get("/cache/stats", async (_req, res) => {
 import ratingsRouter from './routes/ratings.js';
 import { createListingsHttpApp } from "./http-server.js";
 import { mountListingsOffersHttp } from "./listings-offers-http.js";
+import { mountListingsAuctionHttp } from "./listings-auction-http.js";
 
 /** Gateway rewrites POST /api/listings/create → POST /create (housing-schema contract). */
 const listingsContractHttp = createListingsHttpApp();
@@ -126,6 +127,7 @@ app.patch("/listings/:id/media-order", (req, res, next) => {
 });
 
 mountListingsOffersHttp(app);
+mountListingsAuctionHttp(app);
 
 app.use("/oauth", oauthRouter);
 app.use("/settings", settingsRouter);

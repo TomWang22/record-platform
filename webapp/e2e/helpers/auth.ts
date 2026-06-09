@@ -12,14 +12,20 @@ const TEST_PASSWORD = 'ContractPass123!'
 export const AUTH_EMAIL = 'e2e-contract@record-platform.local'
 export const SELLER_CONTRACT_EMAIL = 'seller-contract@record-platform.local'
 export const BUYER_CONTRACT_EMAIL = 'buyer-contract@record-platform.local'
+export const BIDDER2_CONTRACT_EMAIL = 'bidder2-contract@record-platform.local'
+export const BIDDER3_CONTRACT_EMAIL = 'bidder3-contract@record-platform.local'
 const TEST_NAME = 'Test Collector'
 const SELLER_NAME = 'Seller Contract'
 const BUYER_NAME = 'Buyer Contract'
+const BIDDER2_NAME = 'Bidder Two'
+const BIDDER3_NAME = 'Bidder Three'
 
 const PROFILE_BY_EMAIL: Record<string, { name: string; initials: string }> = {
   [AUTH_EMAIL]: { name: TEST_NAME, initials: 'TC' },
   [SELLER_CONTRACT_EMAIL]: { name: SELLER_NAME, initials: 'SC' },
   [BUYER_CONTRACT_EMAIL]: { name: BUYER_NAME, initials: 'BC' },
+  [BIDDER2_CONTRACT_EMAIL]: { name: BIDDER2_NAME, initials: 'B2' },
+  [BIDDER3_CONTRACT_EMAIL]: { name: BIDDER3_NAME, initials: 'B3' },
 }
 
 const memoryTokens = new Map<string, string>()
@@ -160,6 +166,8 @@ export async function warmContractAuthCache(
     [AUTH_EMAIL]: TEST_NAME,
     [SELLER_CONTRACT_EMAIL]: SELLER_NAME,
     [BUYER_CONTRACT_EMAIL]: BUYER_NAME,
+    [BIDDER2_CONTRACT_EMAIL]: BIDDER2_NAME,
+    [BIDDER3_CONTRACT_EMAIL]: BIDDER3_NAME,
   }
   for (const email of emails) {
     await ensureAccountToken(request, email, names[email] ?? email)
@@ -176,6 +184,14 @@ export async function obtainSellerContractToken(request: APIRequestContext): Pro
 
 export async function obtainBuyerContractToken(request: APIRequestContext): Promise<string> {
   return ensureAccountToken(request, BUYER_CONTRACT_EMAIL, BUYER_NAME)
+}
+
+export async function obtainBidder2ContractToken(request: APIRequestContext): Promise<string> {
+  return ensureAccountToken(request, BIDDER2_CONTRACT_EMAIL, BIDDER2_NAME)
+}
+
+export async function obtainBidder3ContractToken(request: APIRequestContext): Promise<string> {
+  return ensureAccountToken(request, BIDDER3_CONTRACT_EMAIL, BIDDER3_NAME)
 }
 
 export async function signInWithToken(

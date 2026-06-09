@@ -49,10 +49,22 @@ export function browsePriceDisplay(listing: MarketplaceListing): BrowsePriceDisp
 
   if (mode === 'auction') {
     const ended = auctionEnded(listing) || sold
-    const timeLeft = formatAuctionTimeLeft(listing.auction?.endsAt)
-    const bids = listing.watch_count != null ? `${listing.watch_count} watching` : '0 bids'
+    const timeLeft = formatAuctionTimeLeft(listing.endsAt ?? listing.auction?.endsAt)
+    const auctionAmount =
+      listing.currentBidDisplay ??
+      (listing.currentBidCents != null
+        ? formatMoneyFromCents(listing.currentBidCents)
+        : listing.auction?.currentBidDisplay ?? amount)
+    const bidN =
+      listing.bidCount ??
+      listing.auction?.bidCount ??
+      (listing as { bid_count?: number }).bid_count
+    const bids =
+      bidN != null && Number.isFinite(Number(bidN))
+        ? `${Math.max(0, Math.floor(Number(bidN)))} bids`
+        : '0 bids'
     return {
-      amount,
+      amount: auctionAmount,
       label: ended ? 'Ended' : 'Current bid',
       meta: ended ? `${bids} · Ended` : `${bids} · ${timeLeft ?? 'Active'}`,
       accent: ended ? 'ended' : 'urgent',

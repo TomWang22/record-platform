@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { pool } from "../lib/db.js";
+import { pushCartReservedNotification } from "../pushShoppingNotification.js";
 
 const INTERNAL_SECRET = (
   process.env.LISTINGS_BOOKING_INTERNAL_SECRET ||
@@ -105,6 +106,13 @@ export function internalCartRouter(): Router {
         cartItemId = (ins.rows[0] as { id: string }).id;
       }
 
+      void pushCartReservedNotification({
+        buyerUserId,
+        listingId,
+        listingTitle,
+        purchaseType: "best_offer",
+        amountCents: Math.round(amountCents),
+      });
       res.status(201).json({ cart_item_id: cartItemId, reserved: true });
     } catch (err) {
       console.error("[shopping] reserve-offer error:", err);
@@ -164,6 +172,13 @@ export function internalCartRouter(): Router {
          RETURNING id`,
         [buyerUserId, listingId, priceDollars, JSON.stringify(metadata)],
       );
+      void pushCartReservedNotification({
+        buyerUserId,
+        listingId,
+        listingTitle,
+        purchaseType: "auction_win",
+        amountCents: Math.round(amountCents),
+      });
       res.status(201).json({
         cart_item_id: (ins.rows[0] as { id: string }).id,
         reserved: true,

@@ -23,7 +23,7 @@ import { startOllamaKeepWarmScheduler } from "./ollamaKeepWarm.js";
 import { getAiControlPlaneState, getPromptVersion, patchAiControlPlaneState } from "./intelligence/aiControlPlaneRuntime.js";
 import { buildListingFeelTimingTransport } from "./listing-feel-timing-transport.js";
 
-const aiTracer = trace.getTracer("och-analytics-ai");
+const aiTracer = trace.getTracer("rp-analytics-ai");
 
 type Authed = Request & { userId?: string };
 

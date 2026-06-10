@@ -309,9 +309,11 @@ export async function waitForFeedbackReady(page: Page, token?: string): Promise<
 export async function waitForSellingReady(page: Page, tab = 'active'): Promise<void> {
   await page.goto(`/profile/selling?status=${tab}`)
   await expect(page.locator('[data-testid="selling-page-ready"]')).toBeVisible({ timeout: 30_000 })
-  const row = page.locator('[data-testid="selling-listing-row"]')
-  const empty = page.locator('[data-testid="selling-empty-state-ready"]')
-  await expect(row.first().or(empty)).toBeVisible({ timeout: 15_000 })
+  await expect(
+    page
+      .getByTestId('seller-analytics-ready')
+      .or(page.getByTestId('seller-analytics-empty-state')),
+  ).toBeVisible({ timeout: 45_000 })
   await waitForNoLoadingStates(page, `/profile/selling?status=${tab}`)
 }
 

@@ -28,10 +28,10 @@ export async function fetchProfileDashboardStats(): Promise<ProfileDashboardStat
   const records = await apiFetch<{ purchaseType?: string; purchasedAt?: string }[]>('/api/records', {
     auth: true,
   })
-  const feedback = await apiFetch<{ positivePercent?: number; totalReviews?: number }>(
+  const feedback = await apiFetch<{ score?: number; totalReviews?: number }>(
     '/api/feedback/me',
     { auth: true },
-  ).catch(() => ({ positivePercent: undefined, totalReviews: 0 }))
+  ).catch(() => ({ score: undefined, totalReviews: 0 }))
   const mine = await apiFetch<{ items?: { status?: string }[]; listings?: { status?: string }[] }>(
     '/api/listings/mine',
     { auth: true },
@@ -57,8 +57,8 @@ export async function fetchProfileDashboardStats(): Promise<ProfileDashboardStat
       : '—'
 
   const feedbackScore =
-    feedback.positivePercent != null
-      ? `${Math.round(feedback.positivePercent)}%`
+    feedback.score != null
+      ? `${Math.round(feedback.score)}%`
       : (feedback.totalReviews ?? 0) > 0
         ? String(feedback.totalReviews)
         : '—'

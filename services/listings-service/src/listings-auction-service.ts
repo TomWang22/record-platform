@@ -188,6 +188,58 @@ function assertAuctionActive(settings: AuctionSettingsRow): void {
   }
 }
 
+async function maybeEmitAuctionEndingSoon(
+  client: PoolClient,
+  listing: ListingContext,
+  settings: AuctionSettingsRow,
+): Promise<void> {
+  if (String(settings.status) !== "active") return;
+  const endsMs = Date.parse(
+    settings.ends_at instanceof Date ? settings.ends_at.toISOString() : String(settings.ends_at),
+  );
+  if (!Number.isFinite(endsMs)) return;
+  const remainingMs = endsMs - Date.now();
+  if (remainingMs <= 0 || remainingMs > 60 * 60 * 1000) return;
+
+  const prior = await client.query(
+    `SELECT 1 FROM listings.outbox_events
+     WHERE aggregate_id = $1 AND type = 'AuctionEndingSoon' LIMIT 1`,
+    [listing.id],
+  );
+  if (prior.rows.length > 0) return;
+
+  const listingTitle = listing.title ?? "listing";
+  const mins = Math.max(1, Math.ceil(remainingMs / 60_000));
+  const body = `${listingTitle} ends in about ${mins} minute${mins === 1 ? "" : "s"}`;
+  const basePayload = {
+    listing_id: listing.id,
+    listing_title: listingTitle,
+    seller_user_id: listing.user_id,
+    ends_at:
+      settings.ends_at instanceof Date ? settings.ends_at.toISOString() : String(settings.ends_at),
+    title: "Auction ending soon",
+    body,
+  };
+
+  await queueAuctionOutbox(client, {
+    eventType: "AuctionEndingSoon",
+    listingId: listing.id,
+    payload: { ...basePayload, recipient_role: "seller" },
+  });
+
+  if (settings.high_bidder_user_id) {
+    await queueAuctionOutbox(client, {
+      eventType: "AuctionEndingSoon",
+      listingId: listing.id,
+      payload: {
+        ...basePayload,
+        high_bidder_user_id: settings.high_bidder_user_id,
+        recipient_role: "bidder",
+      },
+    });
+  }
+}
+
 export async function getAuctionStateForListing(
   listingId: string,
   viewerUserId?: string | null,
@@ -196,6 +248,11 @@ export async function getAuctionStateForListing(
   try {
     const listing = await loadListing(client, listingId);
     const settings = await ensureAuctionSettings(client, listing);
+    try {
+      await maybeEmitAuctionEndingSoon(client, listing, settings);
+    } catch (e) {
+      console.warn("[listings-auction] ending-soon notification skipped", e);
+    }
     return buildPublicAuctionState(settings, {
       viewerUserId,
       listingTitle: listing.title,

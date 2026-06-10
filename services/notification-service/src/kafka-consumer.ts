@@ -119,14 +119,26 @@ export function extractNotificationEnvelopeMeta(buf: Buffer): {
       if (
         eventType === "BidPlaced" ||
         eventType === "AuctionOutbid" ||
+        eventType === "AuctionEndingSoon" ||
         eventType === "AuctionEnded" ||
         eventType === "AuctionWon" ||
         eventType === "AuctionLost" ||
         eventType === "AuctionSold"
       ) {
         let recipient = "";
-        if (eventType === "BidPlaced" || eventType === "AuctionEnded") {
-          recipient = String(payload.seller_user_id || payload.sellerUserId || "").trim();
+        if (
+          eventType === "BidPlaced" ||
+          eventType === "AuctionEnded" ||
+          eventType === "AuctionEndingSoon"
+        ) {
+          const role = String(payload.recipient_role || "").trim().toLowerCase();
+          if (role === "bidder") {
+            recipient = String(
+              payload.high_bidder_user_id || payload.highBidderUserId || "",
+            ).trim();
+          } else {
+            recipient = String(payload.seller_user_id || payload.sellerUserId || "").trim();
+          }
         } else if (eventType === "AuctionSold") {
           recipient = String(payload.seller_user_id || payload.sellerUserId || "").trim();
         } else if (eventType === "AuctionWon") {
@@ -482,6 +494,7 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
                 if (
                   meta.eventType === "BidPlaced" ||
                   meta.eventType === "AuctionOutbid" ||
+                  meta.eventType === "AuctionEndingSoon" ||
                   meta.eventType === "AuctionEnded" ||
                   meta.eventType === "AuctionWon" ||
                   meta.eventType === "AuctionLost" ||

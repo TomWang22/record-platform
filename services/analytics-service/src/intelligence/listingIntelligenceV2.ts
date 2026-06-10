@@ -44,7 +44,7 @@ import type {
   ListingIntelligenceOutput,
 } from "./types.js";
 
-const aiTracer = trace.getTracer("och-analytics-ai");
+const aiTracer = trace.getTracer("rp-analytics-ai");
 
 function parseModelCosts(): Record<string, number> {
   const raw = String(process.env.ANALYTICS_MODEL_COSTS || "").trim();

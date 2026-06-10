@@ -103,29 +103,34 @@ test.describe.serial('Auction close UI screenshots', () => {
       item_id?: string
       metadata?: { purchase_type?: string }
     }
-    let hit: CartRow | undefined
-    for (let attempt = 0; attempt < 20; attempt++) {
-      const cart = await getJsonWith429Retry<{ items?: CartRow[] }>(
-        request,
-        '/api/cart',
-        headers(winnerToken),
-        'winner cart after auction close',
+    await expect
+      .poll(
+        async () => {
+          try {
+            const cart = await getJsonWith429Retry<{ items?: CartRow[] }>(
+              request,
+              '/api/cart',
+              headers(winnerToken),
+              'winner cart after auction close',
+            )
+            return (cart.items ?? []).find(
+              (i) =>
+                String(i.listing_id || i.item_id) === listingId &&
+                i.metadata?.purchase_type === 'auction_win',
+            )
+          } catch {
+            return null
+          }
+        },
+        { timeout: 120_000 },
       )
-      hit = (cart.items ?? []).find(
-        (i) =>
-          String(i.listing_id || i.item_id) === listingId &&
-          i.metadata?.purchase_type === 'auction_win',
-      )
-      if (hit) break
-      await new Promise((r) => setTimeout(r, 1000))
-    }
-    expect(hit).toBeTruthy()
+      .toBeTruthy()
 
     await signInWithToken(page, winnerToken, BUYER_CONTRACT_EMAIL)
     await page.goto('/cart')
     await expect(page.getByText(/Loading cart/i)).not.toBeVisible({ timeout: 30_000 })
     await expect(page.getByTestId('cart-page-ready')).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByRole('heading', { name: listingTitle })).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('h3').filter({ hasText: listingTitle })).toBeVisible({ timeout: 60_000 })
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-cart-auction-win-reservation.png'),

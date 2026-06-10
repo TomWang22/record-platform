@@ -23,7 +23,7 @@ function normalizeSubject(raw: string): string {
 function cleanListingContextTitle(raw: string): string {
   const s = normalizeSubject(raw);
   if (!s) return "";
-  if (/^(booking request created for listing|och-page-\d+-)/i.test(s)) return "";
+  if (/^(booking request created for listing|rp-page-\d+-)/i.test(s)) return "";
   return s.slice(0, 160);
 }
 

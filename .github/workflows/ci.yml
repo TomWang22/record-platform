@@ -74,7 +74,16 @@ jobs:
           test -f services/common/dist/index.d.ts
 
       - name: Build service
-        run: pnpm -C services/${{ matrix.service }} build
+        shell: bash
+        run: |
+          set -euo pipefail
+          svc="${{ matrix.service }}"
+          if [[ "$svc" == "python-ai-service" ]]; then
+            python3 -m compileall -q "services/$svc"
+            echo "python-ai-service: Python compile check OK"
+          else
+            pnpm -C "services/$svc" build
+          fi
 
   test:
     name: Test (${{ matrix.service }})

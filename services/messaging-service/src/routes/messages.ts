@@ -5,7 +5,11 @@ import { cached, makeMessagesKey, makeThreadKey } from '../lib/cache.js'
 import { pool } from '../lib/db.js'
 import { kafka } from '@common/utils/kafka'
 import { buildMetadata, sendMessagingEvent } from '../kafkaMessagingEvents.js'
-import { pushMessageReceivedNotification } from '../pushMessageNotification.js'
+import {
+  pushMessageEditedNotification,
+  pushMessageReactionNotification,
+  pushMessageReceivedNotification,
+} from '../pushMessageNotification.js'
 import {
   isBookingOrSystemDirectMessage,
   sqlBookingOrSystemDmRow,
@@ -1976,6 +1980,29 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
          ON CONFLICT (message_id, user_id, emoji) DO NOTHING`,
         [messageId, userId, emoji],
       );
+      const msgRow = await pool.query(
+        `SELECT sender_id::text, recipient_id::text, thread_id::text
+         FROM messages.messages WHERE id = $1::uuid LIMIT 1`,
+        [messageId],
+      );
+      const msg = msgRow.rows[0] as
+        | { sender_id: string; recipient_id: string | null; thread_id: string | null }
+        | undefined;
+      if (msg) {
+        const notifyId =
+          String(userId) === String(msg.sender_id)
+            ? String(msg.recipient_id || "").trim()
+            : String(msg.sender_id || "").trim();
+        if (notifyId && notifyId !== String(userId)) {
+          void pushMessageReactionNotification({
+            recipientId: notifyId,
+            reactorId: String(userId),
+            messageId,
+            threadId: String(msg.thread_id || ""),
+            emoji,
+          });
+        }
+      }
       const keys = await threadCacheKeysForMessageId(messageId);
       await bustThreadCachesAfterWrite(keys);
       return res.status(201).json({ ok: true, message_id: messageId, emoji });
@@ -2300,9 +2327,41 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       if (rows.length === 0) {
         return res.status(404).json({ error: 'Message not found' })
       }
+      const updated = rows[0] as Record<string, unknown>
+      if (contentChanged) {
+        const producer = await getKafkaProducer()
+        const recipientId = String(updated.recipient_id || '').trim()
+        const threadId = String(updated.thread_id || '').trim()
+        const createdAt =
+          updated.updated_at instanceof Date
+            ? updated.updated_at.toISOString()
+            : String(updated.updated_at || new Date().toISOString())
+        await sendMessagingEvent(producer, recipientId || messageId, {
+          metadata: buildMetadata({
+            event_type: 'MessageUpdated',
+            aggregate_id: messageId,
+            aggregate_type: 'message',
+          }),
+          message_id: messageId,
+          sender_id: userId,
+          recipient_id: recipientId,
+          thread_id: threadId,
+          content: nextContent,
+          created_at: createdAt,
+        })
+        if (recipientId && recipientId !== userId) {
+          void pushMessageEditedNotification({
+            recipientId,
+            editorId: String(userId),
+            messageId,
+            threadId,
+            preview: String(nextContent).trim().slice(0, 160),
+          })
+        }
+      }
       const keys = await threadCacheKeysForMessageId(messageId)
       await bustThreadCachesAfterWrite(keys)
-      res.json(rows[0])
+      res.json(updated)
     } catch (err) {
       console.error('[messaging] Error updating message:', err)
       res.status(500).json({ error: 'Failed to update message' })

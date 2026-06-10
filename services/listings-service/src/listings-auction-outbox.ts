@@ -8,6 +8,7 @@ import { LISTING_EVENTS_TOPIC, publishListingEvent } from "./listing-kafka.js";
 export type AuctionKafkaEventType =
   | "BidPlaced"
   | "AuctionOutbid"
+  | "AuctionEndingSoon"
   | "AuctionEnded"
   | "AuctionWon"
   | "AuctionLost"

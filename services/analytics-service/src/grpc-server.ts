@@ -11,7 +11,7 @@ import { analyzeListingFeelText } from "./ollama.js";
 import { recordAnalyzeTelemetry } from "./intelligence/analyticsUnifiedObservabilityMetrics.js";
 import { getPromptVersion } from "./intelligence/aiControlPlaneRuntime.js";
 
-const aiTracer = trace.getTracer("och-analytics-ai");
+const aiTracer = trace.getTracer("rp-analytics-ai");
 
 const PROTO = resolveProtoPath("analytics.proto");
 const pd = protoLoader.loadSync(PROTO, {

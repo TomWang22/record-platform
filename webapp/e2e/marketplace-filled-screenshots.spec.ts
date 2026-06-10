@@ -141,7 +141,7 @@ test.describe('Marketplace filled screenshots', () => {
     let seedListingId = seed.fixedListingId ?? null
     if (!seedListingId) {
       const hrefEarly = await page
-        .locator('[data-testid="selling-listing-row"] a[href^="/listings/"]')
+        .locator('[data-testid="seller-listings-table"] a[href^="/listings/"]')
         .first()
         .getAttribute('href', { timeout: 15_000 })
         .catch(() => null)

@@ -8,7 +8,7 @@ const UUID_IN_PUBLIC_PATH =
   /\/api\/media\/public\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i;
 
 function mediaPublicSecret(): string {
-  return String(process.env.MEDIA_PUBLIC_URL_SECRET || process.env.JWT_SECRET || "och-media-public-dev").trim();
+  return String(process.env.MEDIA_PUBLIC_URL_SECRET || process.env.JWT_SECRET || "rp-media-public-dev").trim();
 }
 
 export function signInlineMediaDownload(mediaId: string, expSec: number): string {

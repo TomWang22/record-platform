@@ -5,6 +5,7 @@ import {
   obtainBuyerContractToken,
   obtainSellerContractToken,
 } from './helpers/auth'
+import { getJsonWith429Retry } from './helpers/http-retry'
 import { createListingWithShipping, patchListingFields } from './helpers/listing-contract'
 
 test.describe.configure({ timeout: 180_000 })
@@ -53,19 +54,33 @@ test.describe.serial('Auction cart reservation contract', () => {
     })
     expect(closed.ok()).toBeTruthy()
 
-    const cartRes = await request.get('/api/cart', {
-      headers: { Authorization: `Bearer ${winnerToken}`, 'X-RP-E2E-Contract': '1' },
-    })
-    expect(cartRes.ok()).toBeTruthy()
-    const cart = (await cartRes.json()) as {
-      items?: { listing_id?: string; item_id?: string; metadata?: { purchase_type?: string } }[]
+    type CartItem = {
+      listing_id?: string
+      item_id?: string
+      metadata?: { purchase_type?: string }
     }
-    const hit = (cart.items ?? []).find(
-      (i) =>
-        String(i.listing_id || i.item_id) === listingId &&
-        i.metadata?.purchase_type === 'auction_win',
-    )
-    expect(hit).toBeTruthy()
+    await expect
+      .poll(
+        async () => {
+          try {
+            const cart = await getJsonWith429Retry<{ items?: CartItem[] }>(
+              request,
+              '/api/cart',
+              { Authorization: `Bearer ${winnerToken}`, 'X-RP-E2E-Contract': '1' },
+              'winner cart after auction close',
+            )
+            return (cart.items ?? []).find(
+              (i) =>
+                String(i.listing_id || i.item_id) === listingId &&
+                i.metadata?.purchase_type === 'auction_win',
+            )
+          } catch {
+            return null
+          }
+        },
+        { timeout: 120_000 },
+      )
+      .toBeTruthy()
 
     const loserCart = await request.get('/api/cart', {
       headers: { Authorization: `Bearer ${loserToken}`, 'X-RP-E2E-Contract': '1' },

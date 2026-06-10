@@ -1,0 +1,15 @@
+# Path prefixes relative to repo root; any file whose path starts with one of these is skipped.
+docs/
+tools/bundle-audit/
+staging/
+bench_logs/
+toolkit-reference/
+config/
+infra/k8s/base/observability/
+scripts/
+Makefile
+webapp/e2e/frontend-contract.spec.ts
+services/common/src/och-outbox-surface-metrics.ts
+services/common/src/index.ts
+services/common/src/otel/
+services/media-service/src/handlers/getDownloadUrl.ts

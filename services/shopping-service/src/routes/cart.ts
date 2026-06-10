@@ -143,7 +143,17 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
           3,
           'create shipment with tracking'
         )
-        if (shipResult.rows[0]) trackingNumber = shipResult.rows[0].tracking_number
+        if (shipResult.rows[0]) {
+          trackingNumber = shipResult.rows[0].tracking_number
+          const { pushShipmentStatusNotification } = await import('../pushShoppingNotification.js')
+          void pushShipmentStatusNotification({
+            buyerUserId: userId,
+            orderId,
+            orderNumber,
+            trackingNumber,
+            status: String(shipResult.rows[0].status || 'shipped'),
+          })
+        }
       } catch (shipErr: any) {
         console.warn('[shopping] Could not create shipment (table may not exist yet):', shipErr.message)
       }

@@ -805,7 +805,87 @@ export async function getOfferSettingsForListing(
   }
 }
 
+async function expireDueOffer(offerId: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const row = await fetchOfferRow(client, offerId);
+    if (!row || !["pending", "countered"].includes(String(row.status))) {
+      await client.query("ROLLBACK");
+      return;
+    }
+    if (!row.expires_at || new Date(row.expires_at) >= new Date()) {
+      await client.query("ROLLBACK");
+      return;
+    }
+
+    await client.query(
+      `UPDATE listings.offers SET status = 'expired', updated_at = now() WHERE id = $1::uuid`,
+      [offerId],
+    );
+    await insertOfferEvent(client, {
+      offerId,
+      listingId: row.listing_id,
+      actorUserId: row.seller_user_id,
+      eventType: "expired",
+      previousStatus: String(row.status),
+      newStatus: "expired",
+      amountCents: row.amount_cents,
+    });
+    const queued = await queueOfferOutbox(client, {
+      eventType: "OfferExpired",
+      offerId,
+      listingId: row.listing_id,
+      buyerUserId: row.buyer_user_id,
+      sellerUserId: row.seller_user_id,
+      amountCents: row.amount_cents,
+      status: "expired",
+      listingTitle: row.listing_title,
+      message: row.message,
+      sellerDisplay: row.seller_display,
+    });
+    await client.query("COMMIT");
+    await flushOfferOutboxEvent({
+      eventId: queued.eventId,
+      offerId,
+      listingId: row.listing_id,
+      eventType: "OfferExpired",
+      payload: queued.payload,
+    });
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function expireDueOffersForSeller(sellerUserId: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    const due = await client.query(
+      `SELECT id::text FROM listings.offers
+       WHERE seller_user_id = $1::uuid
+         AND status IN ('pending', 'countered')
+         AND expires_at IS NOT NULL
+         AND expires_at < now()
+       LIMIT 25`,
+      [sellerUserId],
+    );
+    for (const row of due.rows as { id: string }[]) {
+      try {
+        await expireDueOffer(row.id);
+      } catch (e) {
+        console.warn("[listings-offers] expire due offer failed", row.id, e);
+      }
+    }
+  } finally {
+    client.release();
+  }
+}
+
 export async function listOffersInbox(sellerUserId: string) {
+  await expireDueOffersForSeller(sellerUserId);
   const client = await pool.connect();
   try {
     const r = await client.query(

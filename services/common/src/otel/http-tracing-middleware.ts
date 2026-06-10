@@ -102,7 +102,7 @@ export function tracingMiddleware(req: Request, res: Response, next: NextFunctio
       x_trace_id: xTrace,
     });
 
-    httpRequestDurationSeconds.observe(
+    httpRequestDurationSeconds?.observe(
       {
         service: process.env.OTEL_SERVICE_NAME?.trim() || "http",
         route: req.path,
@@ -162,7 +162,7 @@ export async function traceIncomingHttpRequest(
       span,
     });
 
-    httpRequestDurationSeconds.observe(
+    httpRequestDurationSeconds?.observe(
       {
         service: process.env.OTEL_SERVICE_NAME?.trim() || "http",
         route: routePath,

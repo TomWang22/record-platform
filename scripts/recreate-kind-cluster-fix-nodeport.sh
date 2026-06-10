@@ -32,7 +32,7 @@ kind delete cluster --name "$CLUSTER_NAME" || fail "Failed to delete cluster"
 ok "Cluster deleted"
 
 say "Step 3: Creating new cluster with fixed configuration..."
-kind create cluster --config kind-h3.yaml --name "$CLUSTER_NAME" || fail "Failed to create cluster"
+kind create cluster --config infra/kind/kind-h3.yaml --name "$CLUSTER_NAME" || fail "Failed to create cluster"
 ok "Cluster created"
 
 say "Step 4: Waiting for cluster to be ready..."

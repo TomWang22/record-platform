@@ -65,8 +65,8 @@ _cluster_note="**Cluster-only focus:** This copy is for Kubernetes cluster opera
 if [[ -f ENGINEERING.md ]]; then
   { echo "$_cluster_note"; echo ""; cat ENGINEERING.md; } > "$BUNDLE_ABS/ENGINEERING.md"
 fi
-if [[ -f Runbook.md ]]; then
-  { echo "$_cluster_note"; echo ""; cat Runbook.md; } > "$BUNDLE_ABS/Runbook.md"
+if [[ -f docs/Runbook.md ]]; then
+  { echo "$_cluster_note"; echo ""; cat docs/Runbook.md; } > "$BUNDLE_ABS/Runbook.md"
 fi
 
 # infra/ — copy full infra except db and ansible; include haproxy, kafka, nginx, k8s (and docs)

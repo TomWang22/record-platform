@@ -1,0 +1,30 @@
+# Transport validation / QUIC benchmarking — central config.
+# Env overrides: TRANSPORT_VALIDATION_OUT, K6_LB_IP, K6_BIN, SKIP_HEALTH_GATE, etc.
+
+k6:
+  lb_ip: "192.168.64.240"
+  h2_rate: 0
+  strict_h3: true
+  # Path relative to repo root, or absolute
+  bin: ".k6-build/bin/k6-http3"
+
+ramp:
+  start_vus: 10
+  step: 10
+  max_vus: 200
+
+gate:
+  quic_probe_repeat: 10
+  transport_gate_duration_sec: 5
+
+capture:
+  vm_pcap_path: "/tmp/vm-capture-validation.pcap"
+  interface_override: ""
+  min_pcap_bytes: 1024
+  # Limit pcap size so kubectl exec cat doesn't stream GBs (snaplen + packet cap)
+  snaplen: 256      # bytes per packet; enough for QUIC header + ALPN
+  max_packets: 10000
+
+output:
+  # Default out dir; override with TRANSPORT_VALIDATION_OUT
+  out_dir: "."

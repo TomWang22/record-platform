@@ -106,7 +106,7 @@ def collect(
         "experiment_uuid": experiment_uuid,
         "reproducibility_hash": reproducibility_hash,
     }
-    cfg = repo / "transport-config.yaml"
+    cfg = repo / "infra" / "transport" / "transport-config.yaml"
     if cfg.exists():
         meta["config_file"] = str(cfg)
     if k6_bin:

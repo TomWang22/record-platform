@@ -1,5 +1,11 @@
 node_modules/
 dist/
+webapp/.next/
+.k6-build/
+.xk6-build/
+xk6-http3/
+istio-1.*/
+.venv*/
 
 # Local reference toolkits (not part of RP product repo)
 toolkit-reference/
@@ -35,14 +41,21 @@ webapp/generated/
 .env
 vscode/
 
-# TLS certificates and private keys
+# TLS certificates and private keys (runtime material under certs/; see certs/README.md)
 certs/
+!certs/README.md
+!certs/README.txt
+certs/_archive/
+certs/legacy/
 *.crt
 *.key
 *.pem
 *.csr
 *.cnf
 *.srl
+*.p12
+*.pcap
+*.pcapng
 
 # Database dumps, backups, and bundles
 *.sql
@@ -119,13 +132,15 @@ infra/docs/EIGHT-DATABASES_ARCHITECTURE.md
 !tools/bundle-audit/*.sh
 !tools/bundle-audit/rp_namespace_linter_allowlist.txt
 !infra/**/*.sh
-!deploy.sh
+!scripts/deploy.sh
 !webapp/*.sh
 !services/**/*.sh
 *.yaml
 !docker-compose.yml
 !pnpm-workspace.yaml
 !tsconfig.base.json
+!infra/kind/*.yaml
+!infra/transport/*.yaml
 *.conf
 *.ini
 *.ini.bak
@@ -165,6 +180,7 @@ pgbasebackup.tar.gz
 warm-records-cache.yaml
 caddy-*.yaml
 kind-*.yaml
+!infra/kind/*.yaml
 apply.sh
 fill-config.sh
 fix-kustomize.sh
@@ -185,6 +201,7 @@ Makefile*
 # Dockerfiles in root (pgbouncer, etc. - not used)
 Dockerfile*
 !Dockerfile
+!docker/**/Dockerfile
 # Backup environment files
 **/.env.bak
 

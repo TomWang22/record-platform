@@ -61,7 +61,7 @@ for f in \
   "docs/COLIMA_K3S_TUNING.md" \
   "PREFLIGHT_WHY_IT_WORKED_AND_WHATS_BROKEN.md" \
   "METALLB_AND_API_503_REPORT.md" \
-  "Runbook.md" \
+  "docs/Runbook.md" \
   "scripts/CONNECTION-RESET-PLAYBOOK.md" \
   "infra/k8s/caddy-h3-service.yaml" \
   "infra/k8s/caddy-h3-service-nodeport.yaml" \

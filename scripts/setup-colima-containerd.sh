@@ -311,7 +311,7 @@ Next steps:
 
 1. Create Kind cluster:
    cd $REPO_ROOT
-   kind create cluster --name h3 --config kind-h3.yaml
+   kind create cluster --name h3 --config infra/kind/kind-h3.yaml
 
 2. Build and load images:
    ./scripts/build-and-load-images.sh

@@ -60,7 +60,7 @@ def resolve_tshark() -> str | None:
 
 def load_config(root: Path) -> dict:
     """Load transport-config.yaml; env overrides. No PyYAML required: fallback to defaults."""
-    cfg_path = root / "transport-config.yaml"
+    cfg_path = root / "infra" / "transport" / "transport-config.yaml"
     cfg: dict = {
         "k6": {"lb_ip": "192.168.64.240", "h2_rate": 0, "strict_h3": True, "bin": ".k6-build/bin/k6-http3"},
         "ramp": {"start_vus": 10, "step": 10, "max_vus": 200},

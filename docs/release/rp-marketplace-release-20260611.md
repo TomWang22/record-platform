@@ -1,13 +1,13 @@
 # Record Platform marketplace release 20260611
 
-Generated: 2026-06-11T20:33:28Z
+Generated: 2026-06-11T21:04:59Z
 
 ## Release identity
 
 | Field | Value |
 |-------|-------|
-| Main SHA | `71663dfb07386339cdd1eff1d60674aa68c0bc7e` |
-| Short SHA | `71663dfb0738` |
+| Main SHA | `2fd3029a814547dc3d541af068468874153bab42` |
+| Short SHA | `2fd3029a8145` |
 | Edge hostname | `record-platform.test` |
 | Caddy LB IP | `192.168.64.244` |
 | Tag | `rp-marketplace-release-20260611` |
@@ -51,7 +51,7 @@ Generated: 2026-06-11T20:33:28Z
 
 ```bash
 # Git revert release commit
-git revert 71663dfb07386339cdd1eff1d60674aa68c0bc7e
+git revert 2fd3029a814547dc3d541af068468874153bab42
 
 # Kubernetes image rollback (per deployment)
 kubectl -n record-platform rollout undo deployment/api-gateway

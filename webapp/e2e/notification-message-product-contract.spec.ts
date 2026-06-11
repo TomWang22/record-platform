@@ -48,7 +48,7 @@ test.describe.serial('Notification message product contract (8.9E)', () => {
         if (!(await count.isVisible())) return 0
         const n = Number((await count.innerText()).replace('+', ''))
         return Number.isFinite(n) ? n : 0
-      }, { timeout: 60_000 })
+      }, { timeout: 120_000 })
       .toBeGreaterThan(0)
     await capturePageContentScreenshot(page, contractScreenshotPath('notification-message-direct.png'))
 

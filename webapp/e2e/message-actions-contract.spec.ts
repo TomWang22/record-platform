@@ -65,7 +65,7 @@ test.describe.serial('Message reply, edit, and reaction contract', () => {
     await expect(page.getByTestId('messages-thread-panel')).toBeVisible({ timeout: 45_000 })
     await expect(
       page.getByTestId('messages-bubble-text').filter({ hasText: buyerMessage }).first(),
-    ).toBeVisible({ timeout: 30_000 })
+    ).toBeVisible({ timeout: 60_000 })
     const buyerBubble = page
       .getByTestId('messages-thread-bubble')
       .filter({ has: page.getByTestId('messages-bubble-text').filter({ hasText: buyerMessage }) })

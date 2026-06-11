@@ -75,6 +75,34 @@ This isn't a tutorial project—it's a production-grade system solving real prob
 - **Operational tooling** - `scripts/` covers smoke tests, TLS helpers, QUIC tuning, backup/restore, load tests, and rollout automation. **307+ scripts** organized by purpose (testing, load testing, service management, database management, infrastructure, debugging, utilities) to support constant debugging and iterative development. **CI** (`.github/workflows/ci.yml`): each matrix job builds the common package then the service; transport-validation skips tshark when no pcap is present.
 - **Webapp** - Next.js 14 frontend with landing pages, dashboard, authentication, and comprehensive documentation. See `webapp/README.md` for frontend architecture and connection guide.
 
+## Release lock operations (Phase 12/13)
+
+Canonical edge: **`record-platform.test`** with strict TLS (`certs/dev-root.pem`). Full command reference: [`docs/release-lock-operations.md`](docs/release-lock-operations.md).
+
+```bash
+# Host + edge
+make rp-bootstrap-host-deps && make ensure-edge-hosts
+
+# Cold bootstrap (Colima k3s)
+COLD_BOOTSTRAP_CONFIRM=yes make cold-bootstrap
+
+# Release lock gates
+bash scripts/rp-repo-hygiene-contract.sh
+bash scripts/rp-bootstrap-grpc-mtls-gate.sh
+bash scripts/smoke-rp-edge-h2-h3-strict-tls.sh
+bash scripts/smoke-rp-mtls-real.sh
+CLUSTER_DOCTOR_STRICT=1 make cluster-doctor
+
+# Full product proof
+cd webapp && CONTRACT_SCREENSHOT_DATE="$(date -u +%F)" \
+  E2E_API_BASE=https://record-platform.test \
+  NODE_EXTRA_CA_CERTS=../certs/dev-root.pem \
+  pnpm exec playwright test --workers=1 --retries=0 --timeout=180000
+CONTRACT_ONLY=1 make rp-frontend-screenshot-strict-contract
+```
+
+**Do not use:** `record.local`, `curl -k`, OCH/housing terms in product paths. **Rollback:** `git revert <release-lock-sha>`.
+
 ## 🎉 Recent Breakthroughs
 
 ### Zero-Downtime CA Rotation ✅

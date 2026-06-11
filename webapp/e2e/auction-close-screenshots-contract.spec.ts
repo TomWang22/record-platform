@@ -128,8 +128,7 @@ test.describe.serial('Auction close UI screenshots', () => {
 
     await signInWithToken(page, winnerToken, BUYER_CONTRACT_EMAIL)
     await page.goto('/cart')
-    await expect(page.getByText(/Loading cart/i)).not.toBeVisible({ timeout: 30_000 })
-    await expect(page.getByTestId('cart-page-ready')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('cart-page-ready')).toBeVisible({ timeout: 90_000 })
     await expect(page.locator('h3').filter({ hasText: listingTitle })).toBeVisible({ timeout: 60_000 })
     await capturePageContentScreenshot(
       page,

@@ -9,6 +9,28 @@
 
 This document catalogs all bugs, issues, and solutions encountered during the stabilization of the record-platform stack on **Colima + k3s** with MetalLB (control plane, MetalLB webhook, k3s crash-loop, Envoy CA drift, packet capture, rotation, HTTP/3 route, and 80+ items). It serves as a reference for troubleshooting and for understanding the decisions that shaped the current setup.
 
+## Release lock operations (canonical — Phase 12/13)
+
+**Current edge:** `record-platform.test` with strict TLS (`certs/dev-root.pem`). Historical items below may reference `record.local` — treat those as legacy debugging notes, not current contract paths.
+
+**Canonical operator doc:** [`docs/release-lock-operations.md`](release-lock-operations.md)
+
+| Workflow | Command |
+|----------|---------|
+| Host deps + edge hosts | `make rp-bootstrap-host-deps` · `make ensure-edge-hosts` |
+| MetalLB Caddy IP | `kubectl -n ingress-nginx get svc caddy-h3` |
+| Cold bootstrap | `COLD_BOOTSTRAP_CONFIRM=yes make cold-bootstrap` |
+| gRPC mTLS gate | `bash scripts/rp-bootstrap-grpc-mtls-gate.sh` |
+| H2/H3 strict TLS | `bash scripts/smoke-rp-edge-h2-h3-strict-tls.sh` |
+| Real mTLS edge | `bash scripts/smoke-rp-mtls-real.sh` |
+| Kafka / Redis / outbox | `bash scripts/verify-kafka-ready.sh` · `bash scripts/audit-rp-redis-lua-runtime-contract.sh` · `bash scripts/audit-rp-event-outbox-contract.sh` |
+| Backup (11 DBs) | `PGPASSWORD=postgres bash scripts/backup-rp-postgres-dbs.sh` |
+| Ollama (optional) | `make ollama-note` · `make ollama-env` |
+| Full Playwright | see `docs/release-lock-operations.md` |
+| Repo hygiene | `bash scripts/rp-repo-hygiene-contract.sh` |
+
+**Do not use:** `record.local`, `curl -k`, OCH/housing terminology in product paths, Cursor/Co-authored commit trailers.
+
 ## Bugs and decisions index (explicit)
 
 | # | Area | Issue / decision | Section |

@@ -69,7 +69,13 @@ for dir in "${scan_dirs[@]}"; do
     scanned=$((scanned + 1))
     text="$(strings -n 6 "$f" 2>/dev/null | LC_ALL=C grep -E '^[A-Za-z0-9][A-Za-z0-9 ,.;:()$\/\-]{4,}$' || true)"
     for pat in "${FORBIDDEN[@]}"; do
-      if printf '%s' "$text" | grep -qiE "$pat"; then
+      # PNG `strings` can embed coincidental tokens (e.g. j-OCH:R); require space-delimited OCH/Housing.
+      case "$pat" in
+        '\bOCH\b') scan_pat='(^|[[:space:]])OCH([[:space:]]|$)' ;;
+        '\bHousing\b') scan_pat='(^|[[:space:]])Housing([[:space:]]|$)' ;;
+        *) scan_pat="$pat" ;;
+      esac
+      if printf '%s' "$text" | grep -qiE "$scan_pat"; then
         hits+=("$f: matched /$pat/i")
         fail=1
       fi

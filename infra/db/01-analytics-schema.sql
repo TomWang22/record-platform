@@ -1,6 +1,6 @@
 -- Analytics service DB: immutable event log + precomputed aggregates. Consumer-only: no source-of-truth writes to other services.
--- Run against database 'analytics' on port 5447:
---   PGPASSWORD=postgres psql -h 127.0.0.1 -p 5447 -U postgres -d analytics -f infra/db/01-analytics-schema.sql
+-- Run against database 'analytics' on port 5439:
+--   PGPASSWORD=postgres psql -h 127.0.0.1 -p 5439 -U postgres -d analytics -f infra/db/01-analytics-schema.sql
 --
 -- Analytics: consumes all domain events → appends to events → projects into daily_metrics / user_activity.
 -- Does NOT serve transactional queries, modify other services, or block any flows. Store payload as JSONB; schema evolves.

@@ -88,7 +88,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 if ! grep -q "^POSTGRES_URL_AUCTION_MONITOR=" "$ENV_FILE"; then
-  echo "POSTGRES_URL_AUCTION_MONITOR=postgresql://postgres:postgres@localhost:5438/auction_monitor" >> "$ENV_FILE"
+  echo "POSTGRES_URL_AUCTION_MONITOR=postgresql://postgres:postgres@localhost:5438/postgres" >> "$ENV_FILE"
   echo "✅ Added default POSTGRES_URL_AUCTION_MONITOR"
 fi
 

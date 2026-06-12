@@ -47,16 +47,20 @@ def _get_kafka_ssl_context() -> Optional[ssl.SSLContext]:
         if os.path.exists(KAFKA_SSL_CA_CERT):
             ssl_context.load_verify_locations(KAFKA_SSL_CA_CERT)
             logger.info(f"[data-pipeline] Loaded Kafka CA certificate from {KAFKA_SSL_CA_CERT}")
-            # Verify hostname (strict TLS)
             ssl_context.check_hostname = True
             ssl_context.verify_mode = ssl.CERT_REQUIRED
         else:
-            # Strict TLS: no cleartext fallback. Refuse to connect without valid CA.
             logger.error(f"[data-pipeline] Kafka CA certificate not found at {KAFKA_SSL_CA_CERT}")
             raise FileNotFoundError(
                 f"KAFKA_USE_SSL=true but CA cert missing at {KAFKA_SSL_CA_CERT}. "
                 "Mount kafka-ssl-secret and set KAFKA_SSL_CA_CERT. No plaintext fallback."
             )
+
+        client_cert = os.getenv("KAFKA_CLIENT_CERT", "/etc/kafka/secrets/client.crt")
+        client_key = os.getenv("KAFKA_CLIENT_KEY", "/etc/kafka/secrets/client.key")
+        if os.path.exists(client_cert) and os.path.exists(client_key):
+            ssl_context.load_cert_chain(client_cert, client_key)
+            logger.info("[data-pipeline] Loaded Kafka client mTLS certificate")
 
         return ssl_context
     except FileNotFoundError:

@@ -5,6 +5,7 @@ import json
 from typing import Any, Dict, List, Optional
 
 from app.ai.envelope import build_envelope, chunk_to_citation, source_ref
+from app.ai.outbox import insert_pricing_recommendation_outbox, publish_python_ai_outbox_tick
 from app.ai.providers.registry import get_provider, resolve_model_used
 from app.ai.providers.rule_engine import (
     auction_risk_signals,
@@ -458,7 +459,7 @@ async def offer_insights(*, user_id: Optional[str], listing_id: str) -> Dict[str
     }
     if model_deg:
         details["model_degraded_reason"] = model_deg
-    return build_envelope(
+    envelope = build_envelope(
         "pricing_recommendation",
         source_status=status,
         model_used=model_used,
@@ -468,3 +469,14 @@ async def offer_insights(*, user_id: Optional[str], listing_id: str) -> Dict[str
         confidence=0.6 if obo_count else 0.35,
         degraded_reason=None if status == "live" else "no_obo_corpus",
     )
+    if user_id and status == "live":
+        async def persist(conn):
+            await insert_pricing_recommendation_outbox(
+                conn,
+                user_id=user_id,
+                listing_id=listing_id,
+                envelope=envelope,
+            )
+            await publish_python_ai_outbox_tick(conn)
+        await _with_conn(persist)
+    return envelope

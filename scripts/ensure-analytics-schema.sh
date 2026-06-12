@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Apply analytics schema to database 'analytics' on port 5447.
-# Requires postgres-analytics up: docker compose up -d postgres-analytics
+# Apply analytics schema to database 'analytics' on port 5439 (canonical RP backup target).
+# Requires postgres-analytics up: record-platform-postgres-analytics-1 on host port 5439
 # Usage: PGPASSWORD=postgres ./scripts/ensure-analytics-schema.sh
 
 set -euo pipefail
@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SQL="$REPO_ROOT/infra/db/01-analytics-schema.sql"
 PGHOST="${PGHOST:-127.0.0.1}"
-PGPORT="${PGPORT:-5447}"
+PGPORT="${PGPORT:-5439}"
 export PGPASSWORD="${PGPASSWORD:-postgres}"
 
 if [[ ! -f "$SQL" ]]; then

@@ -19,3 +19,27 @@ message ModelPublishedV1 {
   string model_version = 3;
   string published_at = 4;
 }
+
+message SourceRefV1 {
+  string source_type = 1;
+  string source_id = 2;
+  string freshness = 3;
+}
+
+message AIInsightCreatedV1 {
+  string insight_id = 1;
+  string contract_id = 2;
+  string user_id = 3;
+  string source_status = 4;
+  repeated SourceRefV1 source_refs = 5;
+  string generated_at = 6;
+}
+
+message PricingRecommendationCreatedV1 {
+  string insight_id = 1;
+  string listing_id = 2;
+  string user_id = 3;
+  string source_status = 4;
+  repeated SourceRefV1 source_refs = 5;
+  string generated_at = 6;
+}

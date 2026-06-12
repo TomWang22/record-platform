@@ -517,6 +517,60 @@ app.get('/analytics/fuzzy-search', async (req, res) => {
   })
 })
 
+// T15.4A — owner-scoped AI feature projections
+app.get('/analytics/ai/features/:userId', async (req, res) => {
+  try {
+    const callerId = (req.headers['x-user-id'] as string | undefined)?.trim()
+    const { userId } = req.params
+    if (callerId && callerId !== userId) {
+      return res.status(403).json({ error: 'forbidden', error_code: 'OWNER_SCOPE' })
+    }
+    const {
+      computeUserAiFeatures,
+      upsertUserAiFeatures,
+      getUserAiFeatures,
+    } = await import('./lib/ai-feature-pipeline.js')
+    const { insertAiInsightOutbox, publishAnalyticsOutboxTick } = await import('./lib/analytics-ai-outbox.js')
+    const computed = await computeUserAiFeatures(userId, {
+      listings: listingsPool,
+      records: recordsPool,
+      analytics: analyticsPool,
+    })
+    await upsertUserAiFeatures(analyticsPool, userId, computed)
+    const features = await getUserAiFeatures(analyticsPool, userId)
+    const allRefs = features.flatMap((f) => f.source_refs || [])
+    if (allRefs.length > 0) {
+      const client = await analyticsPool.connect()
+      try {
+        await client.query('BEGIN')
+        await insertAiInsightOutbox(client, {
+          userId,
+          contractId: 'buyer_collection_summary',
+          sourceRefs: allRefs,
+          metrics: { feature_groups: features.map((f) => f.feature_group) },
+        })
+        await client.query('COMMIT')
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => undefined)
+        console.warn('[analytics] ai insight outbox insert failed:', (e as Error).message)
+      } finally {
+        client.release()
+      }
+      await publishAnalyticsOutboxTick(analyticsPool).catch(() => 0)
+    }
+    return res.json({
+      user_id: userId,
+      feature_count: features.length,
+      features,
+      source_refs: allRefs,
+      source_status: allRefs.length > 0 ? 'live' : 'degraded',
+    })
+  } catch (err: any) {
+    console.error('[analytics] ai features error:', err)
+    return res.status(500).json({ error: 'ai_features_failed', message: err?.message ?? String(err) })
+  }
+})
+
 let server: ReturnType<typeof app.listen> | null = null
 let grpcServer: any = null
 

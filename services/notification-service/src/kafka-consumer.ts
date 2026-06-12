@@ -31,6 +31,8 @@ const DEFAULT_TOPIC_CSV = [
   `${PREFIX}.listing.events`,
   `${PREFIX}.community.events.v1`,
   `${PREFIX}.notification.events`,
+  `${PREFIX}.ai.events`,
+  `${PREFIX}.auction_monitor.events`,
   "messaging.events.v1",
 ].join(",");
 
@@ -92,6 +94,23 @@ export function extractNotificationEnvelopeMeta(buf: Buffer): {
       }
       if (eventType === "MessageSent") {
         const recipient = String(j.recipient_id || "").trim();
+        return {
+          eventId,
+          userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
+          eventType,
+        };
+      }
+      if (
+        eventType === "AIInsightCreatedV1" ||
+        eventType === "PricingRecommendationCreatedV1" ||
+        eventType === "AuctionRiskDetectedV1"
+      ) {
+        const recipient = String(
+          payload.user_id ||
+            payload.seller_user_id ||
+            payload.sellerUserId ||
+            "",
+        ).trim();
         return {
           eventId,
           userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
@@ -473,6 +492,54 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
                       event_type: meta.eventType,
                       deep_link: deepLink,
                       source: "kafka.listing.offer",
+                    };
+                  } catch {
+                    /* minimal */
+                  }
+                  if (meta.userId) {
+                    await pool.query(
+                      `INSERT INTO notification.notifications (user_id, event_type, channel, status, payload)
+                       VALUES ($1::uuid, $2, 'push'::notification.notification_channel, 'pending', $3::jsonb)`,
+                      [meta.userId, meta.eventType, JSON.stringify(payloadObj)],
+                    );
+                    await invalidateNotificationListCacheForUser(meta.userId);
+                    await publishRealtimeNotification(meta.userId, {
+                      ...payloadObj,
+                      event: meta.eventType,
+                    });
+                  }
+                  return;
+                }
+                if (
+                  meta.eventType === "AIInsightCreatedV1" ||
+                  meta.eventType === "PricingRecommendationCreatedV1" ||
+                  meta.eventType === "AuctionRiskDetectedV1"
+                ) {
+                  let payloadObj: Record<string, unknown> = { source: "kafka.ai.platform" };
+                  try {
+                    const j = JSON.parse(v.toString("utf8")) as { payload?: Record<string, unknown> };
+                    const p = j.payload && typeof j.payload === "object" ? j.payload : {};
+                    const listingId = String(p.listing_id || p.listingId || "").trim();
+                    const deepLink = listingId
+                      ? `/listings/${encodeURIComponent(listingId)}`
+                      : "/profile";
+                    payloadObj = {
+                      notification_category: "marketplace_ai",
+                      category: "marketplace",
+                      context_type: "ai_insight",
+                      context_id: String(p.insight_id || meta.eventId),
+                      listing_id: listingId || null,
+                      contract_id: p.contract_id ?? null,
+                      signal_code: p.signal_code ?? null,
+                      title:
+                        meta.eventType === "AuctionRiskDetectedV1"
+                          ? `Auction signal: ${String(p.signal_code || "risk")}`
+                          : "AI insight ready",
+                      body: String(p.detail || p.summary || "Grounded platform insight available"),
+                      event_type: meta.eventType,
+                      deep_link: deepLink,
+                      source_refs: p.source_refs ?? [],
+                      source: "kafka.ai.platform",
                     };
                   } catch {
                     /* minimal */

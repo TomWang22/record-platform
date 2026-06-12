@@ -19,3 +19,20 @@ message UserSavedAuctionV1 {
   string auction_result_id = 2;
   string saved_at = 3;
 }
+
+message AuctionRiskSourceRefV1 {
+  string source_type = 1;
+  string source_id = 2;
+  string freshness = 3;
+}
+
+message AuctionRiskDetectedV1 {
+  string listing_id = 1;
+  string signal_code = 2;
+  string severity = 3;
+  double confidence = 4;
+  string detail = 5;
+  repeated AuctionRiskSourceRefV1 source_refs = 6;
+  string detected_at = 7;
+  string seller_user_id = 8;
+}

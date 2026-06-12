@@ -235,6 +235,37 @@ app.post('/monitor', async (req, res) => {
   }
 });
 
+let aiSignalsRefreshInFlight = false;
+
+// T15.4B — persisted auction AI risk signals
+app.get('/ai-signals', async (req, res) => {
+  try {
+    const { ensureAiSignalsSchema, scanAndPersistAuctionSignals, listAiSignals } = await import('./ai-signals.js');
+    await ensureAiSignalsSchema(auctionPool);
+    const listingId = (req.query.listing_id as string | undefined)?.trim();
+    const refresh = req.query.refresh === '1' || req.query.refresh === 'true';
+    // Refresh runs in background: full scan + Kafka publish exceed Caddy's 30s upstream timeout.
+    if (refresh && !aiSignalsRefreshInFlight) {
+      aiSignalsRefreshInFlight = true;
+      void scanAndPersistAuctionSignals(listingsPool, auctionPool)
+        .catch((e) => console.warn('[auction-monitor] ai-signals refresh failed:', (e as Error).message))
+        .finally(() => {
+          aiSignalsRefreshInFlight = false;
+        });
+    }
+    const signals = await listAiSignals(auctionPool, { listingId, limit: 100 });
+    res.json({
+      listing_id: listingId ?? null,
+      signal_count: signals.length,
+      signals,
+      source_status: signals.length > 0 ? 'live' : 'degraded',
+    });
+  } catch (err) {
+    console.error('[auction-monitor] GET /ai-signals error:', err);
+    res.status(500).json({ error: 'ai_signals_failed', details: String(err) });
+  }
+});
+
 // Get recent auction results (all users, or filtered by user)
 app.get('/results', async (req, res) => {
   try {
@@ -298,8 +329,18 @@ app.get('/results', async (req, res) => {
 
 // Use port 4008 for HTTP server (matches K8s service port)
 const HTTP_PORT = 4008;
-const server = app.listen(HTTP_PORT, '0.0.0.0', () => {
+const server = app.listen(HTTP_PORT, '0.0.0.0', async () => {
   console.log(`[auction-monitor] HTTP server listening on port ${HTTP_PORT}`);
+  try {
+    const { ensureAiSignalsSchema, scanAndPersistAuctionSignals, publishAuctionMonitorOutbox } = await import('./ai-signals.js');
+    await ensureAiSignalsSchema(auctionPool);
+    setInterval(async () => {
+      await scanAndPersistAuctionSignals(listingsPool, auctionPool).catch(() => undefined);
+      await publishAuctionMonitorOutbox(auctionPool).catch(() => undefined);
+    }, 120_000);
+  } catch (e) {
+    console.warn('[auction-monitor] ai-signals bootstrap:', (e as Error).message);
+  }
 });
 
 // Start gRPC server if enabled

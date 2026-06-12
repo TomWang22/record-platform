@@ -1,6 +1,8 @@
 -- Python AI Service Database Schema
 -- Database: python_ai
 -- Purpose: Store AI model data, predictions, inference results, and analytics cache
+--
+-- T15.2 RAG corpus tables: apply infra/db/10-ai-rag-corpus.sql (idempotent) after this file.
 
 -- Extensions
 CREATE EXTENSION IF NOT EXISTS pg_trgm;

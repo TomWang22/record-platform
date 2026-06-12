@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Header, Query
 from pydantic import BaseModel, Field
 
 from app.ai import insights
@@ -98,3 +98,11 @@ async def post_buyer_collection_summary(
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
 ):
     return await insights.buyer_collection_summary(user_id=_user_id(x_user_id, body.user_id))
+
+
+@router.get("/offer-insights")
+async def get_offer_insights(
+    listing_id: str = Query(..., min_length=8),
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.offer_insights(user_id=_user_id(x_user_id, None), listing_id=listing_id)

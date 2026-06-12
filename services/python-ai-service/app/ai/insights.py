@@ -387,3 +387,84 @@ async def buyer_collection_summary(*, user_id: Optional[str]) -> Dict[str, Any]:
         confidence=0.55 if records else 0.0,
         degraded_reason=None if status == "live" else "no_record_corpus",
     )
+
+
+async def offer_insights(*, user_id: Optional[str], listing_id: str) -> Dict[str, Any]:
+    """T15.4C — OBO negotiation helper signals (summaries only, no raw negotiation text)."""
+    async def run(conn):
+        listing = await fetch_document_chunks_for_user(
+            conn, user_id=user_id, source_type="listing", source_id=listing_id
+        )
+        obo = await retrieve_chunks(
+            conn,
+            query=listing_id,
+            user_id=user_id,
+            source_types=["obo_offer_summary"],
+            max_chunks=8,
+        )
+        trends = await retrieve_chunks(
+            conn,
+            query=_join_content(listing["chunks"]),
+            user_id=user_id,
+            source_types=["listing", "listing_revision"],
+            max_chunks=5,
+        )
+        return listing, obo, trends
+
+    data, err = await _with_conn(run)
+    model_used, model_deg = await resolve_model_used()
+    if err:
+        return build_envelope(
+            "pricing_recommendation",
+            source_status="degraded",
+            model_used="none",
+            summary="Offer insights unavailable",
+            degraded_reason=err,
+        )
+    listing, obo, trends = data
+    refs = listing["source_refs"] + obo["source_refs"] + trends["source_refs"]
+    seen = set()
+    unique_refs: List[Dict[str, Any]] = []
+    for r in refs:
+        k = (r["source_type"], r["source_id"])
+        if k in seen:
+            continue
+        seen.add(k)
+        unique_refs.append(r)
+    band = pricing_band_from_chunks(listing["chunks"] + obo["chunks"] + trends["chunks"])
+    obo_count = len(obo["chunks"])
+    signals: List[Dict[str, Any]] = []
+    if band.get("mid") is not None:
+        signals.append({
+            "code": "fair_offer_band",
+            "low": band.get("low"),
+            "high": band.get("high"),
+            "mid": band.get("mid"),
+        })
+    if obo_count > 0:
+        signals.append({"code": "counter_suggestion", "action": "review_latest_offer_summary"})
+        signals.append({"code": "buyer_pressure", "offer_summaries": obo_count})
+    else:
+        signals.append({"code": "stale_offer", "detail": "No OBO summaries in corpus for listing"})
+    if band.get("low") is not None and band.get("mid") is not None:
+        spread = float(band["mid"]) - float(band["low"])
+        if spread > float(band["mid"]) * 0.25:
+            signals.append({"code": "accept_risk", "detail": "Wide offer band vs listing trend"})
+    status = "live" if unique_refs else "degraded"
+    summary = f"{len(signals)} OBO helper signal(s) from offer summaries and listing trends."
+    details = {
+        "signals": signals,
+        "privacy": "offer_summaries_only_no_message_bodies",
+    }
+    if model_deg:
+        details["model_degraded_reason"] = model_deg
+    return build_envelope(
+        "pricing_recommendation",
+        source_status=status,
+        model_used=model_used,
+        summary=summary,
+        details=details,
+        source_refs=unique_refs,
+        confidence=0.6 if obo_count else 0.35,
+        degraded_reason=None if status == "live" else "no_obo_corpus",
+    )

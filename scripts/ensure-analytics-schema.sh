@@ -30,4 +30,14 @@ if [[ -f "$SQL3" ]]; then
   psql -h "$PGHOST" -p "$PGPORT" -U postgres -d analytics -v ON_ERROR_STOP=1 -f "$SQL3"
   echo "✅ Analytics recommendation (03) applied."
 fi
+SQL4="$REPO_ROOT/infra/db/03-analytics-outbox.sql"
+if [[ -f "$SQL4" ]]; then
+  psql -h "$PGHOST" -p "$PGPORT" -U postgres -d analytics -v ON_ERROR_STOP=1 -f "$SQL4"
+  echo "✅ Analytics outbox (03) applied."
+fi
+SQL11="$REPO_ROOT/infra/db/11-analytics-ai-features.sql"
+if [[ -f "$SQL11" ]]; then
+  psql -h "$PGHOST" -p "$PGPORT" -U postgres -d analytics -v ON_ERROR_STOP=1 -f "$SQL11"
+  echo "✅ Analytics AI features (11) applied."
+fi
 echo "✅ Analytics schema applied (port $PGPORT, database analytics)."

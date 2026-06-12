@@ -343,41 +343,6 @@ app.use(
   })
 );
 
-/* ----------------------- API Python AI Routes (BEFORE URL Rewrite) ----------------------- */
-// Handle /api/ai/* routes BEFORE URL rewrite middleware
-// This ensures the route matches before the URL is rewritten
-app.use(
-  "/api/ai",
-  injectIdentityHeadersIfAny,
-  createProxyMiddleware({
-    target: PYTHON_AI_HTTP_TARGET,
-    changeOrigin: true,
-    pathRewrite: (path, req) => {
-      // Health check endpoint is at root level, not under /ai
-      if (path === '/healthz') {
-        console.log(`[gw] pathRewrite python-ai health: ${req.originalUrl || req.url} -> ${path} -> /healthz`);
-        return '/healthz';
-      }
-      // Other paths need /ai prefix removed (e.g., /selling-advice -> /ai/selling-advice)
-      // Python AI service expects /ai/* paths
-      const newPath = `/ai${path}`;
-      console.log(`[gw] pathRewrite python-ai: ${req.originalUrl || req.url} -> ${path} -> ${newPath}`);
-      return newPath;
-    },
-    proxyTimeout: 30000,
-    agent: keepAliveAgent,
-    on: {
-      proxyReq(proxyReq, req, res) {
-        console.log(`[gw] Proxying ${req.method} ${req.originalUrl || req.url} to python-ai-service${proxyReq.path}`);
-      },
-      error(err: Error, _req: Request, res: NodeServerResponse | Socket) {
-        console.error("[gw] api/python-ai proxy error:", err);
-        sendJson502(res as NodeServerResponse | Socket, "python-ai upstream error");
-      },
-    },
-  })
-);
-
 /* ----------------------- API Prefix Middleware ----------------------- */
 // Rewrite /api/* paths to /* so existing routes work with both /api/ and non-/api/ prefixes
 // This must be early in the middleware chain, before route matching
@@ -1025,6 +990,34 @@ app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
   });
   if (ok) next();
 });
+
+/* ----------------------- API Python AI Routes (after auth — owner-scoped RAG) ----------------------- */
+app.use(
+  "/api/ai",
+  injectIdentityHeadersIfAny,
+  createProxyMiddleware({
+    target: PYTHON_AI_HTTP_TARGET,
+    changeOrigin: true,
+    pathRewrite: (path, req) => {
+      if (path === '/healthz') {
+        return '/healthz';
+      }
+      return `/ai${path}`;
+    },
+    proxyTimeout: 30000,
+    agent: keepAliveAgent,
+    on: {
+      proxyReq(proxyReq, req: AuthedRequest) {
+        if (req.user?.sub) proxyReq.setHeader("x-user-id", req.user.sub);
+        console.log(`[gw] Proxying ${req.method} ${req.originalUrl || req.url} to python-ai-service${proxyReq.path}`);
+      },
+      error(err: Error, _req: Request, res: NodeServerResponse | Socket) {
+        console.error("[gw] api/python-ai proxy error:", err);
+        sendJson502(res as NodeServerResponse | Socket, "python-ai upstream error");
+      },
+    },
+  })
+);
 
 /* ----------------------- Listings settings/ratings (first after auth so path /api/listings/* matches) ----------------------- */
 // Note: Don't use jsonParser for proxy routes - http-proxy-middleware needs the raw body stream

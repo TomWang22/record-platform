@@ -1,0 +1,100 @@
+"""T15.3C — Canonical AI HTTP routes."""
+from __future__ import annotations
+
+from typing import List, Optional
+
+from fastapi import APIRouter, Header, Request
+from pydantic import BaseModel, Field
+
+from app.ai import insights
+
+router = APIRouter(prefix="/ai", tags=["ai-platform"])
+
+
+def _user_id(header: Optional[str], body_user: Optional[str]) -> Optional[str]:
+    uid = (header or body_user or "").strip()
+    if uid in ("", "null", "None"):
+        return None
+    return uid
+
+
+class RagQueryBody(BaseModel):
+    question: str = Field(..., min_length=2)
+    user_id: Optional[str] = None
+    source_types: Optional[List[str]] = None
+
+
+class RecordValuationBody(BaseModel):
+    record_id: str
+    user_id: Optional[str] = None
+    include_comps: bool = True
+
+
+class ListingIdBody(BaseModel):
+    listing_id: str
+    user_id: Optional[str] = None
+
+
+class UserBody(BaseModel):
+    user_id: Optional[str] = None
+
+
+@router.post("/rag/query")
+async def post_rag_query(
+    body: RagQueryBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.rag_query(
+        user_id=_user_id(x_user_id, body.user_id),
+        question=body.question,
+        source_types=body.source_types,
+    )
+
+
+@router.post("/records/valuation")
+async def post_record_valuation(
+    body: RecordValuationBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.record_valuation(
+        user_id=_user_id(x_user_id, body.user_id),
+        record_id=body.record_id,
+    )
+
+
+@router.post("/listings/pricing-advice")
+async def post_pricing_advice(
+    body: ListingIdBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.listing_pricing_advice(
+        user_id=_user_id(x_user_id, body.user_id),
+        listing_id=body.listing_id,
+    )
+
+
+@router.post("/auctions/risk")
+async def post_auction_risk(
+    body: ListingIdBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.auction_risk(
+        user_id=_user_id(x_user_id, body.user_id),
+        listing_id=body.listing_id,
+    )
+
+
+@router.post("/seller/summary")
+async def post_seller_summary(
+    body: UserBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.seller_summary(user_id=_user_id(x_user_id, body.user_id))
+
+
+@router.post("/buyer/collection-summary")
+async def post_buyer_collection_summary(
+    body: UserBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.buyer_collection_summary(user_id=_user_id(x_user_id, body.user_id))

@@ -1,0 +1,389 @@
+"""T15.3C — Canonical insight builders (rules + optional Ollama explanation)."""
+from __future__ import annotations
+
+import json
+from typing import Any, Dict, List, Optional
+
+from app.ai.envelope import build_envelope, chunk_to_citation, source_ref
+from app.ai.providers.registry import get_provider, resolve_model_used
+from app.ai.providers.rule_engine import (
+    auction_risk_signals,
+    listing_quality_checklist,
+    pricing_band_from_chunks,
+)
+from app.ai.rag_retrieval import fetch_document_chunks_for_user, retrieve_chunks
+from app.db import get_pool
+
+
+def _coerce_metadata(meta: Any) -> Dict[str, Any]:
+    if meta is None:
+        return {}
+    if isinstance(meta, dict):
+        return meta
+    if isinstance(meta, str):
+        try:
+            parsed = json.loads(meta)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+async def _with_conn(fn):
+    pool = await get_pool()
+    if not pool:
+        return None, "python_ai_db_unavailable"
+    async with pool.acquire() as conn:
+        return await fn(conn), None
+
+
+def _join_content(chunks: List[Dict[str, Any]]) -> str:
+    return "\n\n".join(c.get("content") or "" for c in chunks)
+
+
+async def rag_query(
+    *,
+    user_id: Optional[str],
+    question: str,
+    source_types: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    async def run(conn):
+        return await retrieve_chunks(conn, query=question, user_id=user_id, source_types=source_types)
+
+    result, err = await _with_conn(run)
+    model_used, model_deg = await resolve_model_used()
+    if err:
+        return build_envelope(
+            "rag_query",
+            source_status="degraded",
+            model_used="none",
+            summary="RAG corpus unavailable",
+            details={},
+            source_refs=[],
+            degraded_reason=err,
+        )
+    chunks = result["chunks"]
+    refs = result["source_refs"]
+    citations = [chunk_to_citation(c) for c in chunks[:5]]
+    status = "live" if refs else "degraded"
+    summary = f"Retrieved {len(chunks)} grounded excerpts for your question."
+    if not chunks:
+        summary = "No matching corpus excerpts for this question."
+    details = {
+        "retrieval_mode": result["retrieval_mode"],
+        "chunk_count": len(chunks),
+        "excerpts": [c.get("content", "")[:300] for c in chunks[:3]],
+    }
+    provider = get_provider()
+    if provider.name == "ollama" and chunks:
+        expl = await provider.explain(
+            f"Summarize only from these sources:\n{_join_content(chunks[:3])}\n\nQuestion: {question}",
+            system="Cite only provided excerpts. No fabrication.",
+        )
+        if expl.get("ok") and expl.get("text"):
+            details["explanation"] = expl["text"][:800]
+            model_used = expl.get("model_used") or model_used
+        elif model_deg:
+            details["model_degraded_reason"] = model_deg
+    elif model_deg:
+        details["model_degraded_reason"] = model_deg
+    return build_envelope(
+        "rag_query",
+        source_status=status,
+        model_used=model_used,
+        summary=summary,
+        details=details,
+        source_refs=refs,
+        citations=citations,
+        confidence=0.7 if refs else 0.0,
+        degraded_reason=None if status == "live" else "no_matching_chunks",
+    )
+
+
+async def record_valuation(*, user_id: Optional[str], record_id: str) -> Dict[str, Any]:
+    async def run(conn):
+        rec = await fetch_document_chunks_for_user(
+            conn, user_id=user_id, source_type="record", source_id=record_id
+        )
+        comps = await retrieve_chunks(
+            conn,
+            query=_join_content(rec["chunks"]),
+            user_id=user_id,
+            source_types=["listing", "obo_offer_summary"],
+            max_chunks=5,
+        )
+        return rec, comps
+
+    data, err = await _with_conn(run)
+    model_used, model_deg = await resolve_model_used()
+    if err:
+        return build_envelope(
+            "record_valuation",
+            source_status="degraded",
+            model_used="none",
+            summary="Record valuation unavailable",
+            degraded_reason=err,
+        )
+    rec, comps = data
+    refs = rec["source_refs"] + comps["source_refs"]
+    band = pricing_band_from_chunks(rec["chunks"] + comps["chunks"])
+    status = "live" if rec["source_refs"] else "degraded"
+    summary = (
+        f"Estimated band ${band['low']}-${band['high']} from collection record and comparables."
+        if band["low"] is not None
+        else "Record located; insufficient comparable pricing in corpus."
+    )
+    details = {"valuation_band": band, "comparable_chunks": len(comps["chunks"])}
+    if model_deg:
+        details["model_degraded_reason"] = model_deg
+    return build_envelope(
+        "record_valuation",
+        source_status=status,
+        model_used=model_used,
+        summary=summary,
+        details=details,
+        source_refs=refs,
+        confidence=0.65 if band["low"] is not None else 0.3,
+        degraded_reason=None if status == "live" else "record_not_in_corpus",
+    )
+
+
+async def listing_pricing_advice(*, user_id: Optional[str], listing_id: str) -> Dict[str, Any]:
+    async def run(conn):
+        listing = await fetch_document_chunks_for_user(
+            conn, user_id=user_id, source_type="listing", source_id=listing_id
+        )
+        revs = await retrieve_chunks(
+            conn,
+            query="",
+            user_id=user_id,
+            source_types=["listing_revision"],
+            metadata_listing_id=listing_id,
+            max_chunks=3,
+        )
+        obo = await retrieve_chunks(
+            conn, query=listing_id, user_id=user_id, source_types=["obo_offer_summary"], max_chunks=5
+        )
+        auction = await retrieve_chunks(
+            conn, query=listing_id, user_id=user_id, source_types=["auction_bid_summary"], max_chunks=3
+        )
+        comps = await retrieve_chunks(
+            conn, query=_join_content(listing["chunks"]), user_id=user_id, source_types=["listing"], max_chunks=5
+        )
+        return listing, revs, obo, auction, comps
+
+    data, err = await _with_conn(run)
+    model_used, model_deg = await resolve_model_used()
+    if err:
+        return build_envelope(
+            "pricing_recommendation",
+            source_status="degraded",
+            model_used="none",
+            summary="Pricing advice unavailable",
+            degraded_reason=err,
+        )
+    listing, revs, obo, auction, comps = data
+    all_chunks = listing["chunks"] + revs["chunks"] + obo["chunks"] + auction["chunks"] + comps["chunks"]
+    refs: List[Dict[str, Any]] = []
+    for part in (listing, revs, obo, auction, comps):
+        refs.extend(part["source_refs"])
+    # dedupe
+    seen = set()
+    unique_refs = []
+    for r in refs:
+        k = (r["source_type"], r["source_id"])
+        if k in seen:
+            continue
+        seen.add(k)
+        unique_refs.append(r)
+    band = pricing_band_from_chunks(all_chunks)
+    quality = listing_quality_checklist(_join_content(listing["chunks"]))
+    status = "live" if unique_refs else "degraded"
+    summary = (
+        f"Suggested price near ${band['mid']} based on listing, revisions, and offer/auction summaries."
+        if band["mid"] is not None
+        else "Listing corpus found; expand pricing signals with active comparables."
+    )
+    details = {
+        "suggested_fixed_price": band.get("mid"),
+        "obo_floor": band.get("low"),
+        "auction_starting_bid": band.get("low"),
+        "auction_reserve_hint": band.get("mid"),
+        "quality_signals": quality,
+        "negotiation_guidance": {
+            "recommendation": "review_offer_summaries",
+            "note": "Offer summaries only; private message bodies are not ingested.",
+        },
+    }
+    if model_deg:
+        details["model_degraded_reason"] = model_deg
+    return build_envelope(
+        "pricing_recommendation",
+        source_status=status,
+        model_used=model_used,
+        summary=summary,
+        details=details,
+        source_refs=unique_refs,
+        confidence=0.6 if band["mid"] is not None else 0.25,
+        degraded_reason=None if status == "live" else "listing_not_in_corpus",
+    )
+
+
+async def auction_risk(*, user_id: Optional[str], listing_id: str) -> Dict[str, Any]:
+    async def run(conn):
+        found = await retrieve_chunks(
+            conn,
+            query=listing_id,
+            user_id=user_id,
+            source_types=["auction_bid_summary"],
+            source_id=listing_id,
+            max_chunks=6,
+        )
+        if found["chunks"]:
+            return found
+        return await retrieve_chunks(
+            conn,
+            query=listing_id,
+            user_id=user_id,
+            source_types=["auction_bid_summary"],
+            metadata_listing_id=listing_id,
+            max_chunks=6,
+        )
+
+    result, err = await _with_conn(run)
+    model_used, model_deg = await resolve_model_used()
+    if err:
+        return build_envelope(
+            "auction_risk",
+            source_status="degraded",
+            model_used="none",
+            summary="Auction risk unavailable",
+            degraded_reason=err,
+        )
+    chunks = result["chunks"]
+    refs = result["source_refs"]
+    text = _join_content(chunks)
+    meta = _coerce_metadata(chunks[0].get("metadata") if chunks else None)
+    signals = auction_risk_signals(text, meta)
+    status = "live" if refs else "degraded"
+    summary = f"{len(signals)} auction risk signal(s) from bid summaries."
+    details = {"signals": signals, "bidder_masking": "bidder hashes only in corpus"}
+    if model_deg:
+        details["model_degraded_reason"] = model_deg
+    return build_envelope(
+        "auction_risk",
+        source_status=status,
+        model_used=model_used,
+        summary=summary,
+        details=details,
+        source_refs=refs,
+        confidence=0.55 if signals else 0.2,
+        degraded_reason=None if status == "live" else "auction_summary_missing",
+    )
+
+
+async def seller_summary(*, user_id: Optional[str]) -> Dict[str, Any]:
+    async def run(conn):
+        return await retrieve_chunks(
+            conn,
+            query="seller listing offer auction",
+            user_id=user_id,
+            source_types=["listing", "obo_offer_summary", "auction_bid_summary", "notification"],
+            max_chunks=10,
+        )
+
+    result, err = await _with_conn(run)
+    model_used, model_deg = await resolve_model_used()
+    if err:
+        return build_envelope(
+            "seller_sales_summary",
+            source_status="degraded",
+            model_used="none",
+            summary="Seller summary unavailable",
+            degraded_reason=err,
+        )
+    refs = result["source_refs"]
+    by_type: Dict[str, int] = {}
+    for r in refs:
+        by_type[r["source_type"]] = by_type.get(r["source_type"], 0) + 1
+    status = "live" if refs else "degraded"
+    summary = f"Seller activity across {len(refs)} grounded sources."
+    details = {"counts_by_source_type": by_type, "metrics": {"source_documents": len(refs)}}
+    if model_deg:
+        details["model_degraded_reason"] = model_deg
+    return build_envelope(
+        "seller_sales_summary",
+        source_status=status,
+        model_used=model_used,
+        summary=summary,
+        details=details,
+        source_refs=refs,
+        confidence=0.5 if refs else 0.0,
+        degraded_reason=None if status == "live" else "no_seller_corpus",
+    )
+
+
+async def buyer_collection_summary(*, user_id: Optional[str]) -> Dict[str, Any]:
+    async def run(conn):
+        records = await retrieve_chunks(
+            conn,
+            query="",
+            user_id=user_id,
+            source_types=["record"],
+            max_chunks=12,
+        )
+        notes = await retrieve_chunks(
+            conn,
+            query="purchase acquisition",
+            user_id=user_id,
+            source_types=["notification"],
+            max_chunks=6,
+        )
+        merged_chunks = records["chunks"] + notes["chunks"]
+        merged_refs = records["source_refs"] + notes["source_refs"]
+        seen = set()
+        unique_refs = []
+        for r in merged_refs:
+            k = (r["source_type"], r["source_id"])
+            if k in seen:
+                continue
+            seen.add(k)
+            unique_refs.append(r)
+        return {
+            "chunks": merged_chunks,
+            "source_refs": unique_refs,
+            "retrieval_mode": "keyword",
+            "token_count": records.get("token_count", 0) + notes.get("token_count", 0),
+            "embedding_available": False,
+        }
+
+    result, err = await _with_conn(run)
+    model_used, model_deg = await resolve_model_used()
+    if err:
+        return build_envelope(
+            "buyer_collection_summary",
+            source_status="degraded",
+            model_used="none",
+            summary="Collection summary unavailable",
+            degraded_reason=err,
+        )
+    refs = result["source_refs"]
+    records = [r for r in refs if r["source_type"] == "record"]
+    status = "live" if records else "degraded"
+    summary = f"Collection spans {len(records)} catalogued records."
+    details = {
+        "record_count": len(records),
+        "acquisition_patterns": {"grounded_records": len(records)},
+    }
+    if model_deg:
+        details["model_degraded_reason"] = model_deg
+    return build_envelope(
+        "buyer_collection_summary",
+        source_status=status,
+        model_used=model_used,
+        summary=summary,
+        details=details,
+        source_refs=refs,
+        confidence=0.55 if records else 0.0,
+        degraded_reason=None if status == "live" else "no_record_corpus",
+    )

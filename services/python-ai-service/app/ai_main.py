@@ -11,6 +11,7 @@ import logging
 
 # Import new modules
 from app.data_pipeline import ingest_analytics_data, start_kafka_consumer, shutdown as pipeline_shutdown
+from app.ai.routes import router as ai_platform_router
 from app.ai_advisor import SellingAdvisor, BuyingAdvisor, NegotiationAdvisor, BiddingAdvisor
 from app.db import close_pool as close_db_pool, get_last_pool_error, get_pool, log_inference
 from app.redis_cache import close_redis
@@ -20,6 +21,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="python-ai-service", version="0.4.0")
+app.include_router(ai_platform_router)
 REQS = Counter("ai_http_requests_total","AI HTTP",[ "route","code" ])
 
 GRADES = { "M":0.35, "NM":0.25, "EX":0.18, "VG+":0.10, "VG":0.0, "G+":-0.15, "G":-0.25, "P":-0.5 }
@@ -95,6 +97,12 @@ async def readyz():
 @app.get("/metrics")
 def metrics():
     return PlainTextResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+@app.get("/ai/rag/status")
+async def ai_rag_status():
+    """T15.2E: corpus readiness — counts, ingestion run, Ollama/embedding availability (no LLM prose)."""
+    from app.rag_status import get_rag_status
+    return await get_rag_status()
 
 async def ebay_prices(query: str) -> List[float]:
     """

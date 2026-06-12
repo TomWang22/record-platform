@@ -64,6 +64,19 @@ SQL
 
 ok "Python AI schema applied successfully"
 
+RAG_SCHEMA_FILE="infra/db/10-ai-rag-corpus.sql"
+if [[ -f "$RAG_SCHEMA_FILE" ]]; then
+  say "Applying AI RAG corpus schema (T15.2A)..."
+  kubectl -n "$NS" run dbschema-python-ai-rag --image=postgres:16-alpine --restart=Never --rm -i \
+    --env="POSTGRES_URL=$POSTGRES_URL" \
+    -- sh -lc "
+      psql \"\$POSTGRES_URL\" -v ON_ERROR_STOP=1 -f - <<'SQL'
+$(cat "$RAG_SCHEMA_FILE")
+SQL
+    "
+  ok "AI RAG corpus schema applied"
+fi
+
 say "=== Python AI Database Initialization Complete ==="
 say "Database: $DB_NAME"
 say "Host: $DB_HOST:$DB_PORT"
@@ -75,4 +88,5 @@ echo "  - ai.inference_log (inference tracking)"
 echo "  - ai.analytics_cache (analytics data cache)"
 echo "  - ai.events (event log)"
 echo "  - ai.model_metrics (model performance)"
+echo "  - ai.ai_documents / ai.ai_document_chunks / ai.ai_ingestion_runs / ai.ai_rag_queries (RAG corpus)"
 

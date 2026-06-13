@@ -37,7 +37,7 @@ test.describe("Frontend contract — no generic errors", () => {
       const timeout = pg.path === "/insights" ? 60_000 : 30_000;
       await page.goto(pg.path, { waitUntil, timeout });
       if (pg.path === "/insights") {
-        await expect(page.getByRole("heading", { name: /Insights & AI/i })).toBeVisible({
+        await expect(page.getByRole("heading", { name: /AI Insights/i })).toBeVisible({
           timeout: 45_000,
         });
       }
@@ -59,7 +59,7 @@ test.describe("Frontend contract — no generic errors", () => {
       const timeout = pg.path === "/insights" ? 60_000 : 30_000;
       await page.goto(pg.path, { waitUntil, timeout });
       if (pg.path === "/insights") {
-        await expect(page.getByRole("heading", { name: /Insights & AI/i })).toBeVisible({
+        await expect(page.getByRole("heading", { name: /AI Insights/i })).toBeVisible({
           timeout: 45_000,
         });
       }
@@ -85,7 +85,7 @@ test.describe("Frontend contract — branding", () => {
       const timeout = pg.path === "/insights" ? 60_000 : 30_000;
       await page.goto(pg.path, { waitUntil, timeout });
       if (pg.path === "/insights") {
-        await expect(page.getByRole("heading", { name: /Insights & AI/i })).toBeVisible({
+        await expect(page.getByRole("heading", { name: /AI Insights/i })).toBeVisible({
           timeout: 45_000,
         });
       }

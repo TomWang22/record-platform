@@ -28,21 +28,48 @@ function parsePayload(payload: NotificationRow['payload']): Record<string, unkno
   }
 }
 
+function aiInsightDeepLink(
+  eventType: string,
+  payload: Record<string, unknown>,
+): string | null {
+  const listingId = String(payload.listing_id ?? payload.listingId ?? '').trim()
+  const contractId = String(payload.contract_id ?? '').trim()
+  if (eventType === 'AuctionRiskDetectedV1') {
+    return listingId ? `/insights?panel=auction&listing=${listingId}` : '/insights?panel=auction'
+  }
+  if (eventType === 'PricingRecommendationCreatedV1') {
+    return listingId ? `/insights?panel=pricing&listing=${listingId}` : '/insights?panel=pricing'
+  }
+  if (eventType === 'AIInsightCreatedV1') {
+    if (contractId === 'buyer_collection_summary') return '/insights?panel=buyer'
+    if (contractId === 'seller_sales_summary') return '/insights?panel=seller'
+    if (contractId === 'record_valuation') return '/insights?panel=valuation'
+    if (contractId === 'rag_query') return '/insights?panel=rag'
+    return '/insights'
+  }
+  if (payload.notification_category === 'marketplace_ai') {
+    return '/insights'
+  }
+  return null
+}
+
 function rowToAppNotification(row: NotificationRow): AppNotification {
   const payload = parsePayload(row.payload)
   const title = String(payload.title ?? row.event_type ?? 'Notification')
   const body = String(payload.body ?? payload.message ?? '')
+  const eventType = String(row.event_type ?? '').trim()
+  const aiLink = aiInsightDeepLink(eventType, payload)
   const href = String(
     payload.href ??
       payload.deep_link ??
+      aiLink ??
       (payload.listing_id ? `/listings/${payload.listing_id}` : '/listings'),
   )
-  const eventType = String(row.event_type ?? '').trim()
   const payloadType = String(payload.type ?? '').trim()
   const normalizedType =
     payloadType ||
     (eventType === 'message_received' ? 'message_received' : eventType) ||
-    'system'
+    (payload.notification_category === 'marketplace_ai' ? 'marketplace_ai' : 'system')
 
   return {
     id: row.id,

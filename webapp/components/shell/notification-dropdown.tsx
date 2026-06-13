@@ -11,13 +11,23 @@ import {
   type AppNotification,
 } from '@/lib/marketplace-notifications-api'
 
-const GROUP_ORDER = ['Messages', 'Offers', 'Auctions', 'Orders / Shipping', 'System'] as const
+const GROUP_ORDER = [
+  'Messages',
+  'Offers',
+  'Auctions',
+  'AI Insights',
+  'Orders / Shipping',
+  'System',
+] as const
 
 function notificationGroup(type: string): (typeof GROUP_ORDER)[number] {
   const t = type.toLowerCase()
   if (t.includes('message')) return 'Messages'
   if (t.includes('offer')) return 'Offers'
   if (t.includes('auction')) return 'Auctions'
+  if (t.includes('marketplace_ai') || t.includes('aiinsight') || t.includes('pricingrecommendation')) {
+    return 'AI Insights'
+  }
   if (t.includes('sold') || t.includes('shipping') || t.includes('order')) return 'Orders / Shipping'
   return 'System'
 }

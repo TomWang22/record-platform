@@ -40,7 +40,7 @@ test.describe("UI screenshots — all RP pages", () => {
         timeout: isInsights ? 60_000 : 30_000,
       });
       if (isInsights) {
-        await expect(page.getByRole("heading", { name: /Insights & AI/i })).toBeVisible({
+        await expect(page.getByRole("heading", { name: /AI Insights/i })).toBeVisible({
           timeout: 45_000,
         });
       }

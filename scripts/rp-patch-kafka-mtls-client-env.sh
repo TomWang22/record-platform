@@ -35,8 +35,20 @@ for d in "${DEPLOYS[@]}"; do
   fi
   kubectl set env deployment/"$d" -n "$NS" \
     KAFKA_CLIENT_CERT="$CLIENT_CERT" \
-    KAFKA_CLIENT_KEY="$CLIENT_KEY" >/dev/null
-  ok "patched $d KAFKA_CLIENT_CERT/KEY"
+    KAFKA_CLIENT_KEY="$CLIENT_KEY" \
+    KAFKA_USE_SSL=true \
+    KAFKA_SSL_ENABLED=true >/dev/null
+  # Ensure full kafka-ssl-secret mount (not CA-only items list)
+  kubectl patch deployment "$d" -n "$NS" --type=json -p='[{"op":"replace","path":"/spec/template/spec/volumes","value":'"$(kubectl get deployment "$d" -n "$NS" -o json | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+vols=d['spec']['template']['spec'].get('volumes',[])
+for v in vols:
+  if v.get('name')=='kafka-ssl-certs':
+    v['secret']={'secretName':'kafka-ssl-secret','defaultMode':420}
+print(json.dumps(vols))
+")"'}]' >/dev/null 2>&1 || true
+  ok "patched $d KAFKA_CLIENT_CERT/KEY + kafka volume"
 done
 
 say "Done. Rollout affected deployments if images already running."

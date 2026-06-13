@@ -14,7 +14,7 @@ ENV CADDY_VERSION=v2.8.4
 RUN xcaddy build "${CADDY_VERSION}" --output /usr/bin/caddy
 
 FROM ${ALPINE_IMAGE}
-RUN apk add --no-cache ca-certificates curl tcpdump tshark strace htop libcap
+RUN apk add --no-cache ca-certificates curl tcpdump tshark strace htop jq openssl libcap
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 RUN setcap cap_net_bind_service=+ep /usr/bin/caddy 2>/dev/null || true \
   && command -v /usr/bin/caddy \
@@ -22,7 +22,9 @@ RUN setcap cap_net_bind_service=+ep /usr/bin/caddy 2>/dev/null || true \
   && command -v tshark \
   && command -v strace \
   && command -v htop \
-  && command -v curl
+  && command -v curl \
+  && command -v jq \
+  && command -v openssl
 
 EXPOSE 443 443/udp 2019 5000
 VOLUME ["/config/caddy", "/data/caddy"]

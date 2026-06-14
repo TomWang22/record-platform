@@ -1,6 +1,13 @@
 # Record Platform AI soak observability (Phase 16)
 
-Phase 16 adds soak monitors and documents existing Prometheus metrics. No new product features.
+Phase 16 is **observe/soak/proof only**. No new product UI, AI endpoints, business logic, RAG sources, provider behavior, marketplace behavior, or schema changes unless absolutely required for monitoring (documented in the soak report).
+
+## Allowed changes
+
+- Soak scripts (`rp-ai-soak-monitor.sh`)
+- Lag monitor scripts (`rp-event-lag-monitor.sh`)
+- Observability docs and dashboard/metric documentation
+- Tiny instrumentation only when a required metric is missing (with explicit report)
 
 ## Soak scripts
 
@@ -15,8 +22,8 @@ Phase 16 adds soak monitors and documents existing Prometheus metrics. No new pr
 - `SOAK_DURATION_SECONDS` — AI soak window (default `900`)
 - `SOAK_INTERVAL_SECONDS` — sample interval (default `60`)
 - `LAG_WINDOW_SECONDS` — event lag window (defaults to `SOAK_DURATION_SECONDS`)
-- `AI_SOAK_API_BASE` / `RP_PUBLIC_ORIGIN` — `https://record-platform.test`
-- `NODE_EXTRA_CA_CERTS` — `certs/dev-chain.pem`
+- `AI_SOAK_API_BASE` — `https://record-platform.test`
+- Strict TLS (required): `--cacert certs/dev-chain.pem` + `--resolve record-platform.test:443:<LB>` (no `-k` / `--insecure`)
 
 ## Prometheus metrics (current RP names)
 

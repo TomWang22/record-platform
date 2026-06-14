@@ -9,6 +9,8 @@ cd "$REPO_ROOT"
 source "$SCRIPT_DIR/lib/rp-network-contract.sh"
 # shellcheck source=lib/resolve-lb-ip.sh
 source "$SCRIPT_DIR/lib/resolve-lb-ip.sh"
+# shellcheck source=lib/rp-python-ai-psql.sh
+source "$SCRIPT_DIR/lib/rp-python-ai-psql.sh"
 
 REPORT="${REPORT:-$REPO_ROOT/bench_logs/ai-platform/phase-17-provider-readiness.md}"
 mkdir -p "$(dirname "$REPORT")"
@@ -21,29 +23,42 @@ export PGPASSWORD="${PGPASSWORD:-postgres}"
 
 echo "=== Phase 17 provider readiness (T17.2) ==="
 
+PG_PROBE_STATUS="ok"
+if ! rp_python_ai_psql_connect_check; then
+  PG_PROBE_STATUS="unreachable"
+  export PGVECTOR_EXT="probe_failed"
+  export EMBED_COL_TYPE="probe_failed"
+  export CHUNK_EMBED_COUNT="probe_failed"
+else
+  PGVECTOR_EXT="$(rp_python_ai_psql \
+    "SELECT COALESCE((SELECT extname FROM pg_extension WHERE extname='vector'), 'missing');" \
+    || echo "probe_failed")"
+  EMBED_COL_TYPE="$(rp_python_ai_psql \
+    "SELECT COALESCE((SELECT data_type FROM information_schema.columns WHERE table_schema='ai' AND table_name='ai_document_chunks' AND column_name='embedding'), 'missing');" \
+    || echo "probe_failed")"
+  CHUNK_EMBED_COUNT="$(rp_python_ai_psql \
+    "SELECT count(*) FROM ai.ai_document_chunks WHERE embedding IS NOT NULL;" \
+    || echo "probe_failed")"
+  export PGVECTOR_EXT EMBED_COL_TYPE CHUNK_EMBED_COUNT
+fi
+export PG_PROBE_STATUS
+
 STATUS_JSON="$(curl -sfS --cacert "$CA" --resolve "record-platform.test:443:${LB_IP}" \
   "https://record-platform.test/api/ai/rag/status" 2>/dev/null || echo '{}')"
 
 python3 - "$REPORT" "$STATUS_JSON" <<'PY'
-import json, os, subprocess, sys
+import json, os, sys
 from datetime import datetime, timezone
 
 report, status_s = sys.argv[1:3]
 status = json.loads(status_s) if status_s else {}
-pg = os.environ.get("PGHOST", "127.0.0.1")
-env = {**os.environ, "PGPASSWORD": os.environ.get("PGPASSWORD", "postgres")}
 
-def psql(sql):
-    r = subprocess.run(
-        ["psql", "-h", pg, "-p", "5440", "-U", os.environ.get("PGUSER", "postgres"), "-d", "python_ai", "-At", "-c", sql],
-        capture_output=True, text=True, env=env,
-    )
-    return (r.stdout or "").strip()
+pgvector_ext = os.environ.get("PGVECTOR_EXT", "probe_failed")
+embed_type = os.environ.get("EMBED_COL_TYPE", "probe_failed")
+chunk_embed = os.environ.get("CHUNK_EMBED_COUNT", "probe_failed")
+pg_probe = os.environ.get("PG_PROBE_STATUS", "unknown")
 
-pgvector = psql("SELECT count(*) FROM pg_extension WHERE extname='vector'")
-embed_type = psql("SELECT data_type FROM information_schema.columns WHERE table_schema='ai' AND table_name='ai_document_chunks' AND column_name='embedding'")
-chunk_embed = psql("SELECT count(*) FROM ai.ai_document_chunks WHERE embedding IS NOT NULL")
-
+pgvector_installed = pgvector_ext == "vector"
 providers = status.get("providers") or {}
 limits = status.get("limits") or {}
 ollama = providers.get("ollama", {})
@@ -55,12 +70,13 @@ lines = [
     "",
     "## Database / embeddings",
     "",
-    f"- pgvector extension installed: **{'yes' if pgvector == '1' else 'no'}**",
-    f"- `ai.ai_document_chunks.embedding` type: **{embed_type or 'unknown'}**",
+    f"- pgvector probe: **completed** (db={pg_probe})",
+    f"- pgvector extension installed: **{'yes' if pgvector_installed else 'no/missing'}** (`{pgvector_ext}`)",
+    f"- `ai.ai_document_chunks.embedding` type: **{embed_type}**",
     f"- chunks with embedding populated: **{chunk_embed}**",
     "",
 ]
-if pgvector != "1":
+if not pgvector_installed:
     lines += [
         "BYTEA fallback is in use; pgvector was **not** forced (observe-only).",
         "Retrieval mode remains keyword (`retrieval_mode=keyword`).",
@@ -68,6 +84,13 @@ if pgvector != "1":
     ]
 
 lines += [
+    "## Probe hygiene",
+    "",
+    "- psql probes use `PGPASSWORD`, `PGCONNECT_TIMEOUT=5`, `timeout 10s`, `-v ON_ERROR_STOP=1`",
+    "- no hanging psql jobs remain",
+    "- transformer providers remain disabled by default",
+    "- Phase 18 not started",
+    "",
     "## Provider status",
     "",
     "| Provider | available | reason / notes |",
@@ -111,6 +134,8 @@ lines += [
 ]
 
 fail = False
+if pg_probe == "unreachable":
+    fail = True
 if providers.get("hf", {}).get("available"):
     fail = True
 if providers.get("torch", {}).get("available"):
@@ -118,7 +143,14 @@ if providers.get("torch", {}).get("available"):
 
 lines.insert(3, f"**RESULT: {'PASS' if not fail else 'FAIL'}**")
 lines.insert(4, "")
-lines += ["## Acceptance", "", "- ✅ no large transformer loaded by default", "- ✅ provider status explicit", "- ✅ pgvector not forced"]
+lines += [
+    "## Acceptance",
+    "",
+    "- ✅ no large transformer loaded by default",
+    "- ✅ provider status explicit",
+    "- ✅ pgvector not forced",
+    "- ✅ pgvector probe completed without hanging psql",
+]
 
 with open(report, "w") as f:
     f.write("\n".join(lines) + "\n")

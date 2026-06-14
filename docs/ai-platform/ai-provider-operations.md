@@ -121,10 +121,21 @@ bash scripts/audit-rp-ai-rag-contract.sh
 Check extension (do not force in dev):
 
 ```bash
-psql -h 127.0.0.1 -p 5440 -U postgres -d python_ai -c \
-  "SELECT extname FROM pg_extension WHERE extname='vector';"
-psql -h 127.0.0.1 -p 5440 -U postgres -d python_ai -c \
-  "SELECT data_type FROM information_schema.columns WHERE table_schema='ai' AND table_name='ai_document_chunks' AND column_name='embedding';"
+# Non-interactive probes — always set PGPASSWORD and PGCONNECT_TIMEOUT
+PGPASSWORD=postgres PGCONNECT_TIMEOUT=5 \
+psql -h 127.0.0.1 -p 5440 -U postgres -d python_ai -v ON_ERROR_STOP=1 -At -c \
+  "SELECT COALESCE((SELECT extname FROM pg_extension WHERE extname='vector'), 'missing');"
+PGPASSWORD=postgres PGCONNECT_TIMEOUT=5 \
+psql -h 127.0.0.1 -p 5440 -U postgres -d python_ai -v ON_ERROR_STOP=1 -At -c \
+  "SELECT COALESCE((SELECT data_type FROM information_schema.columns WHERE table_schema='ai' AND table_name='ai_document_chunks' AND column_name='embedding'), 'missing');"
+```
+
+Or use the shared helper from scripts:
+
+```bash
+source scripts/lib/rp-python-ai-psql.sh
+rp_python_ai_psql_connect_check
+rp_python_ai_psql "SELECT COALESCE((SELECT extname FROM pg_extension WHERE extname='vector'), 'missing');"
 ```
 
 BYTEA fallback is valid; retrieval stays `keyword`.

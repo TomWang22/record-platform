@@ -9,6 +9,8 @@ cd "$REPO_ROOT"
 source "$SCRIPT_DIR/lib/rp-network-contract.sh"
 # shellcheck source=lib/resolve-lb-ip.sh
 source "$SCRIPT_DIR/lib/resolve-lb-ip.sh"
+# shellcheck source=lib/rp-python-ai-psql.sh
+source "$SCRIPT_DIR/lib/rp-python-ai-psql.sh"
 
 REPORT_DIR="${REPORT_DIR:-$REPO_ROOT/bench_logs/ai-platform}"
 JSON_REPORT="$REPORT_DIR/phase-16-ai-soak-monitor.json"
@@ -54,8 +56,12 @@ LISTING_ID="$(curl -sfS "${CURL_TLS[@]}" --max-time 20 -H "Authorization: Bearer
 RECORD_ID="$(curl -sfS "${CURL_TLS[@]}" --max-time 20 -H "Authorization: Bearer $TOKEN" \
   "$API_BASE/api/records" 2>/dev/null \
   | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[0]["id"] if isinstance(d,list) and d else "")' 2>/dev/null || true)"
-AUCTION_LISTING_ID="$(psql -h "$PGHOST" -p 5440 -U "$PGUSER" -d python_ai -At -c \
-  "SELECT source_id FROM ai.ai_documents WHERE source_type='auction_bid_summary' LIMIT 1" 2>/dev/null || true)"
+AUCTION_LISTING_ID=""
+if rp_python_ai_psql_connect_check; then
+  AUCTION_LISTING_ID="$(rp_python_ai_psql \
+    "SELECT COALESCE((SELECT source_id::text FROM ai.ai_documents WHERE source_type='auction_bid_summary' LIMIT 1), '');" \
+    || echo "")"
+fi
 
 END_TS=$(( $(date +%s) + SOAK_DURATION_SECONDS ))
 ITER=0

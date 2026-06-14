@@ -10,6 +10,9 @@ source "$SCRIPT_DIR/lib/rp-network-contract.sh"
 # shellcheck source=lib/resolve-lb-ip.sh
 source "$SCRIPT_DIR/lib/resolve-lb-ip.sh"
 
+# shellcheck source=lib/rp-python-ai-psql.sh
+source "$SCRIPT_DIR/lib/rp-python-ai-psql.sh"
+
 REPORT_MD="${REPORT_MD:-$REPO_ROOT/bench_logs/ai-platform/phase-17-rag-quality-smoke.md}"
 REPORT_JSON="${REPORT_JSON:-$REPO_ROOT/bench_logs/ai-platform/phase-17-rag-quality-smoke.json}"
 mkdir -p "$(dirname "$REPORT_MD")"
@@ -39,8 +42,14 @@ LISTING_ID="$(curl -sfS "${CURL_TLS[@]}" --max-time 20 -H "Authorization: Bearer
 RECORD_ID="$(curl -sfS "${CURL_TLS[@]}" --max-time 20 -H "Authorization: Bearer $TOKEN" \
   "$API_BASE/api/records" \
   | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[0]["id"] if isinstance(d,list) and d else "")')"
-AUCTION_ID="$(psql -h "$PGHOST" -p 5440 -U "$PGUSER" -d python_ai -At -c \
-  "SELECT source_id FROM ai.ai_documents WHERE source_type='auction_bid_summary' LIMIT 1" 2>/dev/null || true)"
+AUCTION_ID=""
+if rp_python_ai_psql_connect_check; then
+  AUCTION_ID="$(rp_python_ai_psql \
+    "SELECT COALESCE((SELECT source_id::text FROM ai.ai_documents WHERE source_type='auction_bid_summary' LIMIT 1), '');" \
+    || echo "")"
+else
+  echo "⚠️ python_ai DB unreachable — auction_risk prompt may use empty listing context"
+fi
 
 export TOKEN API_BASE CA LB_IP REPORT_MD REPORT_JSON LISTING_ID RECORD_ID AUCTION_ID CURL_RESOLVE="record-platform.test:443:${LB_IP}"
 python3 <<'PY'

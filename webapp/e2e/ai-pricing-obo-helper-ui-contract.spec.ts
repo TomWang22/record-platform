@@ -6,6 +6,7 @@ import {
   assertNoForbiddenContractStrings,
   captureTestIdScreenshot,
   contractScreenshotPath,
+  waitForAiInsightsDashboardSettled,
   waitForNoLoadingStates,
 } from './helpers/screenshot-readiness'
 
@@ -36,6 +37,7 @@ test.describe('AI pricing / OBO helper UI contract (T15.5B)', () => {
     expect(body).not.toMatch(/private message body|negotiation thread/i)
     expect(body).not.toMatch(/demo|mock|sample fallback/i)
 
+    await waitForAiInsightsDashboardSettled(page)
     await waitForNoLoadingStates(page, 'pricing obo')
     await assertNoForbiddenContractStrings(page, 'pricing obo')
     await captureTestIdScreenshot(

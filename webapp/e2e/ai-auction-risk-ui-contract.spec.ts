@@ -6,6 +6,7 @@ import {
   assertNoForbiddenContractStrings,
   captureTestIdScreenshot,
   contractScreenshotPath,
+  waitForAiInsightsDashboardSettled,
   waitForNoLoadingStates,
 } from './helpers/screenshot-readiness'
 
@@ -33,7 +34,8 @@ test.describe('AI auction risk UI contract (T15.5C)', () => {
     expect(body).not.toMatch(/max_bid_cents|proxy max/i)
     expect(body).not.toMatch(/demo|mock|sample fallback/i)
 
-    await waitForNoLoadingStates(page, 'auction risk').catch(() => undefined)
+    await waitForAiInsightsDashboardSettled(page)
+    await waitForNoLoadingStates(page, 'auction risk')
     await assertNoForbiddenContractStrings(page, 'auction risk')
     await captureTestIdScreenshot(
       page,

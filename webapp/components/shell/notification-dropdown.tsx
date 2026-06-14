@@ -24,10 +24,15 @@ function notificationGroup(type: string): (typeof GROUP_ORDER)[number] {
   const t = type.toLowerCase()
   if (t.includes('message')) return 'Messages'
   if (t.includes('offer')) return 'Offers'
-  if (t.includes('auction')) return 'Auctions'
-  if (t.includes('marketplace_ai') || t.includes('aiinsight') || t.includes('pricingrecommendation')) {
+  if (
+    t.includes('marketplace_ai') ||
+    t.includes('aiinsight') ||
+    t.includes('pricingrecommendation') ||
+    t.includes('auctionriskdetected')
+  ) {
     return 'AI Insights'
   }
+  if (t.includes('auction')) return 'Auctions'
   if (t.includes('sold') || t.includes('shipping') || t.includes('order')) return 'Orders / Shipping'
   return 'System'
 }

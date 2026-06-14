@@ -6,6 +6,7 @@ import {
   assertNoForbiddenContractStrings,
   captureTestIdScreenshot,
   contractScreenshotPath,
+  waitForAiInsightsDashboardSettled,
   waitForNoLoadingStates,
 } from './helpers/screenshot-readiness'
 
@@ -32,6 +33,7 @@ test.describe('AI record valuation UI contract (T15.5B)', () => {
     const body = await panel.innerText()
     expect(body).not.toMatch(/demo|mock|sample fallback/i)
 
+    await waitForAiInsightsDashboardSettled(page)
     await waitForNoLoadingStates(page, 'record valuation')
     await assertNoForbiddenContractStrings(page, 'record valuation')
     await captureTestIdScreenshot(

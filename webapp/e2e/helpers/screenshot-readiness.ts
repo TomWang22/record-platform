@@ -50,6 +50,23 @@ const FORBIDDEN_CONTRACT_STRINGS = [
   /Loading listing/i,
 ]
 
+const AI_INSIGHTS_READY_TEST_IDS = [
+  'ai-insight-rag-ready',
+  'ai-insight-record-valuation-ready',
+  'ai-insight-pricing-ready',
+  'ai-insight-pricing-obo-ready',
+  'ai-insight-auction-risk-ready',
+  'ai-insight-seller-summary-ready',
+  'ai-insight-buyer-summary-ready',
+] as const
+
+/** Wait until all /insights panels finish loading (avoids cross-panel loading text in screenshots). */
+export async function waitForAiInsightsDashboardSettled(page: Page): Promise<void> {
+  for (const testId of AI_INSIGHTS_READY_TEST_IDS) {
+    await expect(page.getByTestId(testId)).toBeVisible({ timeout: 90_000 })
+  }
+}
+
 export async function waitForNoLoadingStates(page: Page, context = 'page'): Promise<void> {
   const body = await page.locator('body').innerText()
   for (const re of LOADING_PATTERNS) {

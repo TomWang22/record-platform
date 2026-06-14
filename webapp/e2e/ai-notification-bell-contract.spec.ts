@@ -31,7 +31,13 @@ test.describe('AI notification bell contract (T15.5D)', () => {
     )
 
     await signInWithContractApiToken(page)
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+    await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes('/api/notifications') && res.status() === 200,
+        { timeout: 90_000 },
+      ),
+      page.goto('/dashboard', { waitUntil: 'domcontentloaded' }),
+    ])
     await expect(page.getByTestId('notification-dropdown')).toBeVisible({ timeout: 30_000 })
 
     const notes = await getJsonWith429Retry<{ items?: Array<{ event_type?: string; payload?: Record<string, unknown> }> }>(
@@ -48,18 +54,21 @@ test.describe('AI notification bell contract (T15.5D)', () => {
         n.payload?.notification_category === 'marketplace_ai',
     )
 
+    await page.getByTestId('notification-dropdown').click()
+    await expect(page.getByTestId('notification-dropdown-panel')).toBeVisible()
+    await expect(page.getByTestId('notification-dropdown-panel').getByText(/^Loading/)).toHaveCount(0, {
+      timeout: 60_000,
+    })
+
     if (aiItems.length > 0) {
-      await page.getByTestId('notification-dropdown').click()
-      await expect(page.getByTestId('notification-dropdown-panel')).toBeVisible()
-      const first = page.getByTestId('notification-item').first()
-      await expect(first).toBeVisible()
-      const href = await first.locator('a').getAttribute('href')
-      expect(href).toMatch(/\/insights|\/listings\//)
+      const aiLink = page.locator('[data-testid="notification-item"] a[href*="/insights"]')
+      await expect(aiLink.first()).toBeVisible({ timeout: 30_000 })
+      const href = await aiLink.first().getAttribute('href')
+      expect(href).toMatch(/\/insights/)
     }
 
     await waitForNoLoadingStates(page, 'notification bell')
     await assertNoForbiddenContractStrings(page, 'notification bell')
-    await page.getByTestId('notification-dropdown').click().catch(() => undefined)
     await capturePageContentScreenshot(
       page,
       contractScreenshotPath('authenticated-ai-notification-bell.png'),

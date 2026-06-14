@@ -20,7 +20,7 @@ export async function fillComposeAndSend(
       res.request().method() === 'POST' &&
       (res.url().includes('/api/messages/send') || res.url().includes('/api/messages/start')) &&
       res.status() < 400,
-    { timeout: 60_000 },
+    { timeout: 90_000 },
   )
   await send.click()
   const res = await sendRes

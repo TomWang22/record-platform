@@ -11,6 +11,7 @@ import {
   assertNoForbiddenContractStrings,
   captureTestIdScreenshot,
   contractScreenshotPath,
+  waitForAiInsightsDashboardSettled,
   waitForNoLoadingStates,
 } from './helpers/screenshot-readiness'
 
@@ -34,6 +35,7 @@ test.describe('AI profile summaries UI contract (T15.5D)', () => {
     await expect(panel.getByTestId('ai-insight-meta-seller_sales_summary')).toBeVisible()
     await expect(panel.getByTestId('ai-insight-source-status')).toHaveText(/live|degraded/)
 
+    await waitForAiInsightsDashboardSettled(page)
     await waitForNoLoadingStates(page, 'seller summary')
     await assertNoForbiddenContractStrings(page, 'seller summary')
     await captureTestIdScreenshot(

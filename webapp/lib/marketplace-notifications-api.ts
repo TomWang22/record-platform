@@ -60,9 +60,9 @@ function rowToAppNotification(row: NotificationRow): AppNotification {
   const eventType = String(row.event_type ?? '').trim()
   const aiLink = aiInsightDeepLink(eventType, payload)
   const href = String(
-    payload.href ??
+    aiLink ??
+      payload.href ??
       payload.deep_link ??
-      aiLink ??
       (payload.listing_id ? `/listings/${payload.listing_id}` : '/listings'),
   )
   const payloadType = String(payload.type ?? '').trim()

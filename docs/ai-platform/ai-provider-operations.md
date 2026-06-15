@@ -138,13 +138,17 @@ rp_python_ai_psql_connect_check
 rp_python_ai_psql "SELECT COALESCE((SELECT extname FROM pg_extension WHERE extname='vector'), 'missing');"
 ```
 
-BYTEA fallback is valid when pgvector is absent; with T18.3 image swap (`pgvector/pgvector:pg16` on port 5440), extension + `embedding_vec` are enabled; retrieval stays `keyword` until hybrid flip approval.
-
-Phase 18 pgvector (T18.3 — image swap only; no model pull, no backfill):
+BYTEA fallback applies when pgvector is absent; with T18.3+T18.4, pgvector and `nomic-embed-text` are enabled; retrieval stays `keyword` until hybrid flip approval.
 
 ```bash
 bash scripts/rp-ai-pgvector-readiness.sh
 bash scripts/rp-ai-embedding-model-readiness.sh
+```
+
+Pull embedding model (T18.4 — requires explicit approval; already executed in cluster):
+
+```bash
+kubectl -n record-platform exec deploy/ollama -c ollama -- ollama pull nomic-embed-text
 ```
 
 Provider readiness:

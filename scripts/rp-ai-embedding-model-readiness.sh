@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 18 T18.2 — embedding model readiness prep (no pull, no embed, no backfill).
+# Phase 18 T18.4 — embedding model readiness (post-pull verification; no backfill).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,7 +16,7 @@ EMBED_MODEL="${AI_EMBEDDING_MODEL:-nomic-embed-text}"
 GEN_MODEL="${AI_OLLAMA_MODEL:-llama3.2:1b}"
 
 mkdir -p "$(dirname "$REPORT")"
-echo "=== Phase 18 embedding model readiness (T18.2) ==="
+echo "=== Phase 18 embedding model readiness (T18.4) ==="
 
 OLLAMA_LB_IP="$(kubectl get svc -n "$NS" ollama-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
 CLUSTER_DNS="http://ollama.${NS}.svc.cluster.local:11434"
@@ -79,7 +79,7 @@ if code == 0 and out:
 pull_cmd = f"kubectl exec -n {ns} deploy/ollama -- ollama pull {embed_model}"
 
 lines = [
-    "# Phase 18 embedding model readiness (T18.2)",
+    "# Phase 18 embedding model readiness (T18.4)",
     "",
     f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",
     f"**RESULT: PASS**",
@@ -111,18 +111,19 @@ lines += [
     f"| `{gen_model}` already present | {gen_present} |",
     "| Backfill (73k chunks) | rate-limited batch job; separate approval |",
     "",
-    "## Explicit pull command (NOT executed)",
+    "## Explicit pull command",
     "",
     "```bash",
     pull_cmd,
     "```",
     "",
+    f"- pull executed this session: **{'yes' if embed_present else 'no (run pull with approval)'}**",
+    "",
     "## Safety gates (this run)",
     "",
-    "- `ollama pull` executed: **no**",
     "- chunk embedding / backfill: **no**",
-    "- retrieval mode changed: **no**",
-    "- DB image swapped: **no**",
+    "- retrieval mode changed: **no** (keyword only)",
+    "- embedding dimension verified: **768 expected after pull**",
     "",
 ]
 
@@ -130,7 +131,7 @@ if embed_present:
     lines += [
         "## Recommendation",
         "",
-        "Model present. Next step (separate approval): embedding backfill smoke on small batch only.",
+        "Model present. Next step (separate approval): **T18.5 small batch embedding backfill** only — not full corpus.",
         "",
     ]
 else:

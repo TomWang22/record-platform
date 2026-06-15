@@ -77,6 +77,19 @@ SQL
   ok "AI RAG corpus schema applied"
 fi
 
+EMBED_VEC_FILE="infra/db/11-ai-rag-embedding-vec.sql"
+if [[ -f "$EMBED_VEC_FILE" ]]; then
+  say "Applying AI RAG embedding_vec prep (T18.1 — no-op if pgvector unavailable)..."
+  kubectl -n "$NS" run dbschema-python-ai-embed-vec --image=postgres:16-alpine --restart=Never --rm -i \
+    --env="POSTGRES_URL=$POSTGRES_URL" \
+    -- sh -lc "
+      psql \"\$POSTGRES_URL\" -v ON_ERROR_STOP=0 -f - <<'SQL'
+$(cat "$EMBED_VEC_FILE")
+SQL
+    "
+  ok "AI RAG embedding_vec migration attempted (safe no-op on alpine)"
+fi
+
 say "=== Python AI Database Initialization Complete ==="
 say "Database: $DB_NAME"
 say "Host: $DB_HOST:$DB_PORT"

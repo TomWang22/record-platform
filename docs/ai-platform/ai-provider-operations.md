@@ -140,6 +140,13 @@ rp_python_ai_psql "SELECT COALESCE((SELECT extname FROM pg_extension WHERE extna
 
 BYTEA fallback is valid; retrieval stays `keyword`.
 
+Phase 18 prep (no image swap, no model pull):
+
+```bash
+bash scripts/rp-ai-pgvector-readiness.sh
+bash scripts/rp-ai-embedding-model-readiness.sh
+```
+
 Provider readiness:
 
 ```bash

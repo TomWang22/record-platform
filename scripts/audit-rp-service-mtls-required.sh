@@ -158,17 +158,34 @@ _log ""
 _log "## RCA required column (live)"
 if [[ -x "$SCRIPT_DIR/rca-rp-grpc-mtls.sh" ]]; then
   rca_log="$OUT/service-mtls-rca-audit.log"
+  _rca_audit_ok() {
+    grep -q 'all_services_required=true' "$rca_log" 2>/dev/null || \
+      { grep -q '✅ rca-rp-grpc-mtls passed' "$rca_log" 2>/dev/null && \
+        grep -qE 'Coverage: checked=11 expected=11' "$rca_log" 2>/dev/null && \
+        grep -q 'grpc_integrity_ok=true' "$rca_log" 2>/dev/null; }
+  }
   if bash "$SCRIPT_DIR/rca-rp-grpc-mtls.sh" --all --required --strict-integrity 2>&1 | tee "$rca_log"; then
-    if grep -q 'all_services_required=true' "$rca_log" 2>/dev/null || \
-       { grep -q '✅ rca-rp-grpc-mtls passed' "$rca_log" 2>/dev/null && \
-         grep -qE 'Coverage: checked=11 expected=11' "$rca_log" 2>/dev/null && \
-         grep -q 'grpc_integrity_ok=true' "$rca_log" 2>/dev/null; }; then
+    if _rca_audit_ok; then
       _pass "rca-rp-grpc-mtls --all --required --strict-integrity (11/11 coverage, integrity ok)"
     else
       _fail "rca summary missing 11/11 coverage or integrity (see $rca_log)"
     fi
   else
-    _fail "rca-rp-grpc-mtls exited nonzero (see $rca_log)"
+    if grep -qE 'exit_code=139|failure_class: probe_crash|fail_probe_crash|Segmentation fault|probe_crash_retries=' "$rca_log" 2>/dev/null && \
+       ! grep -qE 'cluster_dns.*fail' "$rca_log" 2>/dev/null; then
+      _log "⚠️  rca first pass failed with probe_crash — retrying once"
+      if bash "$SCRIPT_DIR/rca-rp-grpc-mtls.sh" --all --required --strict-integrity 2>&1 | tee "$rca_log"; then
+        if _rca_audit_ok; then
+          _pass "rca-rp-grpc-mtls --all --required --strict-integrity (probe_crash retry ok)"
+        else
+          _fail "rca retry summary missing 11/11 coverage or integrity (see $rca_log)"
+        fi
+      else
+        _fail "rca-rp-grpc-mtls retry exited nonzero (see $rca_log)"
+      fi
+    else
+      _fail "rca-rp-grpc-mtls exited nonzero (see $rca_log)"
+    fi
   fi
 else
   _fail "rca-rp-grpc-mtls.sh not executable"

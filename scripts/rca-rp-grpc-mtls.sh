@@ -103,10 +103,21 @@ print('/etc/certs')
 
 _classify_failure() {
   local stderr_file="$1"
+  local meta_file="${2:-}"
+  if [[ -n "$meta_file" && -f "$meta_file" ]]; then
+    local ec
+    ec="$(grep '^exit_code=' "$meta_file" 2>/dev/null | cut -d= -f2)"
+    if [[ "$ec" == "139" || "$ec" == "134" || "$ec" == "11" ]]; then
+      echo "probe_crash"
+      return
+    fi
+  fi
   [[ -f "$stderr_file" ]] || { echo "unknown"; return; }
   local txt
   txt="$(head -c 4000 "$stderr_file" 2>/dev/null || true)"
-  if echo "$txt" | grep -qi 'NOT_SERVING\|not.*serving\|service unhealthy'; then
+  if echo "$txt" | grep -qi 'segmentation fault\|segfault\|signal: killed\|SIGSEGV'; then
+    echo "probe_crash"
+  elif echo "$txt" | grep -qi 'NOT_SERVING\|not.*serving\|service unhealthy'; then
     echo "grpc_not_serving"
   elif echo "$txt" | grep -qi 'connection refused\|ECONNREFUSED'; then
     echo "connection_refused"
@@ -147,6 +158,7 @@ mkdir -p "$OUT"
 FAIL=0
 INTEGRITY_FAIL=0
 CERT_CHAIN_FAIL=0
+PROBE_CRASH_RETRIES=0
 CHECKED=0
 EXPECTED=0
 SKIPPED_NAMES=()
@@ -220,6 +232,39 @@ _run_probe() {
   } >"$meta_file"
 
   [[ "$ec" -eq 0 ]] && { echo "ok"; return 0; }
+  return 1
+}
+
+_is_probe_crash() {
+  local meta_file="$1" stderr_file="$2"
+  [[ -f "$meta_file" ]] || return 1
+  local ec
+  ec="$(grep '^exit_code=' "$meta_file" 2>/dev/null | cut -d= -f2)"
+  [[ "$ec" == "139" || "$ec" == "134" || "$ec" == "11" ]] && return 0
+  [[ -f "$stderr_file" ]] && grep -qi 'segmentation fault\|segfault\|SIGSEGV' "$stderr_file" 2>/dev/null
+}
+
+_run_probe_with_retry() {
+  local svc_name="$1" scope="$2" ns_exec="$3" addr="$4" tls_mode="$5" sname="$6" gsvc="$7" ca="$8" cc="$9" ck="${10}"
+  local stderr_file="$OUT/${svc_name}-${scope}-${tls_mode}.stderr"
+  local meta_file="$OUT/${svc_name}-${scope}-${tls_mode}.meta"
+  if _run_probe "$svc_name" "$scope" "$ns_exec" "$addr" "$tls_mode" "$sname" "$gsvc" "$ca" "$cc" "$ck" >/dev/null; then
+    echo "ok"
+    return 0
+  fi
+  if _is_probe_crash "$meta_file" "$stderr_file"; then
+    PROBE_CRASH_RETRIES=$((PROBE_CRASH_RETRIES + 1))
+    echo "    probe_crash: exit 139 (grpc-health-probe segfault) — retrying once" >&2
+    if _run_probe "$svc_name" "$scope" "$ns_exec" "$addr" "$tls_mode" "$sname" "$gsvc" "$ca" "$cc" "$ck" >/dev/null; then
+      echo "ok_after_probe_retry"
+      return 0
+    fi
+    if _is_probe_crash "$meta_file" "$stderr_file"; then
+      echo "fail_probe_crash"
+      return 1
+    fi
+  fi
+  echo "fail"
   return 1
 }
 
@@ -389,12 +434,13 @@ for svc in "${ALL_SVCS[@]}"; do
     else
       ca_use="$ca_inpod" cc_use="$cc_inpod" ck_use="$ck_inpod"
     fi
-    if _run_probe "$svc" "$scope" "$who" "$addr" "mtls" "$sname" "$gsvc" "$ca_use" "$cc_use" "$ck_use"; then
-      st="ok"
+    if st="$(_run_probe_with_retry "$svc" "$scope" "$who" "$addr" "mtls" "$sname" "$gsvc" "$ca_use" "$cc_use" "$ck_use")"; then
+      :
     else
+      st="${st:-fail}"
       # Check if failure is NOT_SERVING (gRPC TLS works, health reports unhealthy)
       stderr_file="$OUT/${svc}-${scope}-mtls.stderr"
-      if [[ -f "$stderr_file" ]] && grep -qi 'NOT_SERVING\|service unhealthy' "$stderr_file" 2>/dev/null; then
+      if [[ "$st" == "fail" && -f "$stderr_file" ]] && grep -qi 'NOT_SERVING\|service unhealthy' "$stderr_file" 2>/dev/null; then
         st="not_serving"
       fi
     fi
@@ -408,10 +454,10 @@ for svc in "${ALL_SVCS[@]}"; do
       pod_ip)          r_podip="$st" ;;
     esac
 
-    if [[ "$st" == "fail" ]]; then
+    if [[ "$st" == "fail" || "$st" == "fail_probe_crash" ]]; then
       stderr_file="$OUT/${svc}-${scope}-mtls.stderr"
       meta_file="$OUT/${svc}-${scope}-mtls.meta"
-      fc="$(_classify_failure "$stderr_file")"
+      fc="$(_classify_failure "$stderr_file" "$meta_file")"
       if [[ "$svc_failure_class" == "none" ]]; then
         svc_failure_class="$fc"
       fi
@@ -440,6 +486,9 @@ for svc in "${ALL_SVCS[@]}"; do
       if [[ "$scope" == "cluster_dns" ]]; then
         INTEGRITY_FAIL=1
       fi
+      if [[ "$fc" == "probe_crash" && "$scope" == inpod_localhost ]]; then
+        echo "    note: probe_crash on inpod_localhost is grpc-health-probe binary crash, not mTLS failure"
+      fi
       if [[ "$scope" == "pod_ip" ]]; then
         echo "    diagnostic: pod_ip failure may be due to bind address, NetworkPolicy, SAN mismatch, or client path"
       fi
@@ -464,10 +513,12 @@ for svc in "${ALL_SVCS[@]}"; do
   # For runtime_verdict: NOT_SERVING with grpcRequiredForRuntime=false is still "pass".
   # For grpc_integrity_verdict: NOT_SERVING proves TLS chain works, so it counts as "pass".
   runtime_verdict="pass"
-  if [[ "$r_localhost" == "fail" || "$r_anyaddr" == "fail" ]]; then
-    # not_serving is a health issue, not a connectivity issue
+  if [[ "$r_localhost" == "fail" || "$r_localhost" == "fail_probe_crash" || "$r_anyaddr" == "fail" || "$r_anyaddr" == "fail_probe_crash" ]]; then
+    # not_serving is a health issue, not a connectivity issue; ok_after_probe_retry recovered probe crash
     if [[ "$r_localhost" == "fail" && "$r_localhost" != "not_serving" ]] || \
-       [[ "$r_anyaddr" == "fail" && "$r_anyaddr" != "not_serving" ]]; then
+       [[ "$r_localhost" == "fail_probe_crash" ]] || \
+       [[ "$r_anyaddr" == "fail" && "$r_anyaddr" != "not_serving" ]] || \
+       [[ "$r_anyaddr" == "fail_probe_crash" ]]; then
       runtime_verdict="fail"
     fi
   fi
@@ -478,9 +529,11 @@ for svc in "${ALL_SVCS[@]}"; do
   r_localhost_effective="$r_localhost"
   r_anyaddr_effective="$r_anyaddr"
   [[ "$r_dns" == "not_serving" ]] && r_dns_effective="ok"
-  [[ "$r_localhost" == "not_serving" ]] && r_localhost_effective="ok"
-  [[ "$r_anyaddr" == "not_serving" ]] && r_anyaddr_effective="ok"
-  if [[ "$r_localhost_effective" == "fail" || "$r_anyaddr_effective" == "fail" || "$r_dns_effective" == "fail" ]]; then
+  [[ "$r_localhost" == "not_serving" || "$r_localhost" == "ok_after_probe_retry" ]] && r_localhost_effective="ok"
+  [[ "$r_anyaddr" == "not_serving" || "$r_anyaddr" == "ok_after_probe_retry" ]] && r_anyaddr_effective="ok"
+  if [[ "$r_localhost_effective" == "fail" || "$r_localhost_effective" == "fail_probe_crash" || \
+        "$r_anyaddr_effective" == "fail" || "$r_anyaddr_effective" == "fail_probe_crash" || \
+        "$r_dns_effective" == "fail" ]]; then
     grpc_integrity_verdict="fail"
   elif [[ "$r_podip" == "fail" ]]; then
     grpc_integrity_verdict="pass-diagnostic"
@@ -608,7 +661,8 @@ jq -cn \
   --argjson require_all_policy "$REQUIRE_ALL_POLICY" \
   --argjson all_services_required "$([ "$all_services_required" = true ] && echo true || echo false)" \
   --argjson plaintext_denied_all "$([ "$plaintext_denied_all" = true ] && echo true || echo false)" \
-  '{checked:$checked,expected:$expected,skipped:$skipped,skipped_names:($skipped_names|split(",")),coverage_pct:$coverage_pct,require_all:$require_all,require_cross_pod:$require_cross_pod,runtime_ok:$runtime_ok,grpc_integrity_ok:$grpc_integrity_ok,cert_chain_ok:$cert_chain_ok,strict_integrity:$strict_integrity,require_all_policy:$require_all_policy,all_services_required:$all_services_required,plaintext_denied_all:$plaintext_denied_all}' \
+  --argjson probe_crash_retries "$PROBE_CRASH_RETRIES" \
+  '{checked:$checked,expected:$expected,skipped:$skipped,skipped_names:($skipped_names|split(",")),coverage_pct:$coverage_pct,require_all:$require_all,require_cross_pod:$require_cross_pod,runtime_ok:$runtime_ok,grpc_integrity_ok:$grpc_integrity_ok,cert_chain_ok:$cert_chain_ok,strict_integrity:$strict_integrity,require_all_policy:$require_all_policy,all_services_required:$all_services_required,plaintext_denied_all:$plaintext_denied_all,probe_crash_retries:$probe_crash_retries}' \
   >"$OUT/coverage.json"
 
 {
@@ -632,6 +686,7 @@ echo "  grpc_integrity_ok=$integrity_ok"
 echo "  cert_chain_ok=$cert_chain_ok_all"
 echo "  strict_integrity=$STRICT_INTEGRITY"
 echo "  RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES=${RP_ALLOW_GRPC_DIAGNOSTIC_FAILURES:-0}"
+echo "  probe_crash_retries=$PROBE_CRASH_RETRIES"
 
 if [[ "$STRICT_INTEGRITY" -eq 1 && "$cert_chain_ok_all" != "true" ]]; then
   echo "❌ rca-rp-grpc-mtls: cert_chain_ok=false in --strict-integrity mode" >&2

@@ -151,6 +151,18 @@ Pull embedding model (T18.4 — requires explicit approval; already executed in 
 kubectl -n record-platform exec deploy/ollama -c ollama -- ollama pull nomic-embed-text
 ```
 
+Small batch embedding backfill (T18.5 — <=100 chunks; no full corpus; keyword retrieval unchanged):
+
+```bash
+# Dry run first
+EMBEDDING_BACKFILL_DRY_RUN=1 EMBEDDING_BACKFILL_LIMIT=25 \
+  bash scripts/rp-ai-embedding-backfill-small.sh
+
+# Actual small batch (default limit 100)
+EMBEDDING_BACKFILL_LIMIT=100 EMBEDDING_BACKFILL_BATCH_SIZE=10 \
+  bash scripts/rp-ai-embedding-backfill-small.sh
+```
+
 Provider readiness:
 
 ```bash

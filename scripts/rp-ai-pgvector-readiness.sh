@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 18 T18.1 — pgvector DB readiness prep (no image swap, no retrieval flip).
+# Phase 18 T18.3 — pgvector DB readiness (image swap + extension + additive migration).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,13 +22,14 @@ _reapply_psql_migration() {
 }
 
 REPORT="${REPORT:-$REPO_ROOT/bench_logs/ai-platform/phase-18-pgvector-readiness.md}"
+IMAGE_SWAPPED="${IMAGE_SWAPPED:-auto}"
 MIGRATION="${REPO_ROOT}/infra/db/11-ai-rag-embedding-vec.sql"
 APPLY_MIGRATION="${APPLY_MIGRATION:-1}"
 PGPORT="${PYTHON_AI_PGPORT:-5440}"
 PGDB="${PYTHON_AI_DB:-python_ai}"
 
 mkdir -p "$(dirname "$REPORT")"
-echo "=== Phase 18 pgvector readiness (T18.1) ==="
+echo "=== Phase 18 pgvector readiness (T18.3) ==="
 
 export PGHOST="${PGHOST:-127.0.0.1}"
 export PGUSER="${PGUSER:-postgres}"
@@ -105,8 +106,16 @@ if command -v docker >/dev/null 2>&1; then
   [[ -n "$CONTAINER_NAME" ]] || CONTAINER_NAME="n/a"
 fi
 
+if [[ "$IMAGE_SWAPPED" == "auto" ]]; then
+  if echo "$PG_IMAGE" | grep -qi 'pgvector'; then
+    IMAGE_SWAPPED="yes"
+  else
+    IMAGE_SWAPPED="no"
+  fi
+fi
+
 export REPORT_PATH="$REPORT" DB_OK PG_VERSION PG_IMAGE CONTAINER_NAME EXT_STATUS EMBED_TYPE \
-  VEC_STATUS MIGRATION_RESULT EXT_AVAILABLE RECOMMENDATION FAIL PGHOST PGPORT PGDB
+  VEC_STATUS MIGRATION_RESULT EXT_AVAILABLE RECOMMENDATION FAIL PGHOST PGPORT PGDB IMAGE_SWAPPED
 
 python3 <<'PY'
 import os
@@ -115,7 +124,7 @@ from datetime import datetime, timezone
 report = os.environ["REPORT_PATH"]
 fail = int(os.environ.get("FAIL", "0"))
 lines = [
-    "# Phase 18 pgvector readiness (T18.1)",
+    "# Phase 18 pgvector readiness (T18.3)",
     "",
     f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",
     f"**RESULT: {'PASS' if not fail else 'FAIL'}**",
@@ -132,6 +141,7 @@ lines = [
     "",
     f"- container: `{os.environ.get('CONTAINER_NAME', 'n/a')}`",
     f"- image: `{os.environ.get('PG_IMAGE', 'unknown')}`",
+    f"- DB image swapped (pgvector): **{os.environ.get('IMAGE_SWAPPED', 'unknown')}**",
     f"- pgvector in pg_available_extensions: **{os.environ.get('EXT_AVAILABLE', 'unknown')}**",
     "",
     "## pgvector / embeddings schema",
@@ -143,7 +153,7 @@ lines = [
     "",
     "## Safety gates (this run)",
     "",
-    "- DB image swapped: **no**",
+    f"- DB image swapped: **{os.environ.get('IMAGE_SWAPPED', 'unknown')}**",
     "- retrieval mode changed: **no** (keyword only)",
     "- model pull: **no**",
     "- embedding backfill: **no**",
@@ -154,7 +164,7 @@ lines = [
     "",
     "## Safe next step",
     "",
-    "Request **separate explicit approval** for DB image swap / pgvector enablement before HNSW index or hybrid retrieval.",
+    "Request **separate explicit approval** for embedding model pull and backfill before hybrid retrieval.",
     "",
 ]
 open(report, "w").write("\n".join(lines) + "\n")

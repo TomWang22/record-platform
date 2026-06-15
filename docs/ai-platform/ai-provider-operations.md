@@ -138,9 +138,9 @@ rp_python_ai_psql_connect_check
 rp_python_ai_psql "SELECT COALESCE((SELECT extname FROM pg_extension WHERE extname='vector'), 'missing');"
 ```
 
-BYTEA fallback is valid; retrieval stays `keyword`.
+BYTEA fallback is valid when pgvector is absent; with T18.3 image swap (`pgvector/pgvector:pg16` on port 5440), extension + `embedding_vec` are enabled; retrieval stays `keyword` until hybrid flip approval.
 
-Phase 18 prep (no image swap, no model pull):
+Phase 18 pgvector (T18.3 — image swap only; no model pull, no backfill):
 
 ```bash
 bash scripts/rp-ai-pgvector-readiness.sh

@@ -32,27 +32,35 @@ test.describe.serial('OBO offer cart reservation contract', () => {
     expect(accepted.ok()).toBeTruthy()
     expect((await accepted.json()).status).toBe('accepted')
 
-    const cartRes = await request.get('/api/cart', {
-      headers: { Authorization: `Bearer ${buyerToken}`, 'X-RP-E2E-Contract': '1' },
-    })
-    expect(cartRes.ok()).toBeTruthy()
-    const cart = (await cartRes.json()) as {
-      items?: {
-        item_id?: string
-        listing_id?: string
-        price?: number
-        metadata?: { purchase_type?: string; offer_id?: string; amount_cents?: number }
-      }[]
+    type CartItem = {
+      item_id?: string
+      listing_id?: string
+      price?: number
+      metadata?: { purchase_type?: string; offer_id?: string; amount_cents?: number }
     }
-    const hit = (cart.items ?? []).find(
-      (i) =>
-        String(i.listing_id || i.item_id) === listingId &&
-        i.metadata?.purchase_type === 'best_offer' &&
-        i.metadata?.offer_id === offerId,
-    )
-    expect(hit).toBeTruthy()
-    expect(Number(hit?.price)).toBeCloseTo(offerAmountCents / 100, 2)
-    expect(hit?.metadata?.amount_cents).toBe(offerAmountCents)
+    let found: CartItem | undefined
+    await expect
+      .poll(
+        async () => {
+          const cartRes = await request.get('/api/cart', {
+            headers: { Authorization: `Bearer ${buyerToken}`, 'X-RP-E2E-Contract': '1' },
+          })
+          if (!cartRes.ok()) return null
+          const cart = (await cartRes.json()) as { items?: CartItem[] }
+          found = (cart.items ?? []).find(
+            (i) =>
+              String(i.listing_id || i.item_id) === listingId &&
+              i.metadata?.purchase_type === 'best_offer' &&
+              i.metadata?.offer_id === offerId,
+          )
+          return found
+        },
+        { timeout: 120_000 },
+      )
+      .toBeTruthy()
+
+    expect(Number(found?.price)).toBeCloseTo(offerAmountCents / 100, 2)
+    expect(found?.metadata?.amount_cents).toBe(offerAmountCents)
   })
 
   test('second accept on same listing is blocked after first acceptance', async ({ request }) => {

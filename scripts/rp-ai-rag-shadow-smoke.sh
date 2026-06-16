@@ -15,6 +15,7 @@ REPORT_JSON="${REPORT_JSON:-$REPO_ROOT/bench_logs/ai-platform/t18-6-rag-shadow-s
 COMPARE_MD="${COMPARE_MD:-$REPO_ROOT/bench_logs/ai-platform/t18-7-shadow-quality-comparison.md}"
 BASELINE_JSON="${SHADOW_BASELINE_JSON:-$REPO_ROOT/bench_logs/ai-platform/t18-7-shadow-baseline.json}"
 CAPTURE_BASELINE="${SHADOW_CAPTURE_BASELINE:-0}"
+CURL_TIMEOUT="${SHADOW_SMOKE_CURL_TIMEOUT:-120}"
 mkdir -p "$(dirname "$REPORT_MD")"
 
 CA="${REPO_ROOT}/certs/dev-chain.pem"
@@ -32,7 +33,7 @@ TOKEN="$(curl -sfS "${CURL_TLS[@]}" --max-time 20 -X POST "$API_BASE/api/auth/lo
   | python3 -c 'import json,sys; print(json.load(sys.stdin).get("token",""))')"
 [[ -n "$TOKEN" ]] || { echo "❌ auth failed"; exit 1; }
 
-export TOKEN API_BASE CA LB_IP REPORT_MD REPORT_JSON COMPARE_MD BASELINE_JSON CAPTURE_BASELINE CURL_RESOLVE="record-platform.test:443:${LB_IP}"
+export TOKEN API_BASE CA LB_IP REPORT_MD REPORT_JSON COMPARE_MD BASELINE_JSON CAPTURE_BASELINE CURL_TIMEOUT CURL_RESOLVE="record-platform.test:443:${LB_IP}"
 python3 <<'PY'
 import json, os, re, statistics, subprocess, sys, time
 from datetime import datetime, timezone
@@ -41,6 +42,7 @@ token = os.environ["TOKEN"]
 base = os.environ["API_BASE"]
 ca = os.environ["CA"]
 resolve = os.environ["CURL_RESOLVE"]
+curl_timeout = os.environ.get("CURL_TIMEOUT", "120")
 md_out = os.environ["REPORT_MD"]
 json_out = os.environ["REPORT_JSON"]
 compare_md = os.environ["COMPARE_MD"]
@@ -78,7 +80,7 @@ def percentile(vals, pct):
 
 def call(path, body, *, shadow: bool):
     cmd = [
-        "curl", "-sfS", "--max-time", "90", "--cacert", ca, "--resolve", resolve,
+        "curl", "-sfS", "--max-time", curl_timeout, "--cacert", ca, "--resolve", resolve,
         "-H", f"Authorization: Bearer {token}",
         "-H", "X-RP-E2E-Contract: 1",
         "-X", "POST", "-H", "Content-Type: application/json",

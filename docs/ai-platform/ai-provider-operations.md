@@ -176,6 +176,26 @@ bash scripts/rp-ai-rag-shadow-smoke.sh
 
 Shadow mode never changes `summary`, `source_refs`, or card ranking. Vector retrieval remains off by default.
 
+Controlled per-type embedding backfill (T18.7 — <=1000 new chunks; balanced source types; keyword unchanged):
+
+```bash
+# Plan / dry run
+EMBEDDING_BACKFILL_DRY_RUN=1 EMBEDDING_BACKFILL_TOTAL_LIMIT=1000 \
+  bash scripts/rp-ai-embedding-backfill-controlled.sh
+
+# Actual controlled backfill
+EMBEDDING_BACKFILL_TOTAL_LIMIT=1000 EMBEDDING_BACKFILL_BATCH_SIZE=10 \
+  bash scripts/rp-ai-embedding-backfill-controlled.sh
+
+# Shadow baseline before backfill, then compare after
+SHADOW_CAPTURE_BASELINE=1 bash scripts/rp-ai-rag-shadow-smoke.sh
+# ... run backfill ...
+bash scripts/rp-ai-rag-shadow-smoke.sh   # writes t18-7-shadow-quality-comparison.md
+
+# Analytics → python-ai output validation
+bash scripts/rp-ai-analytics-output-validation.sh
+```
+
 Provider readiness:
 
 ```bash

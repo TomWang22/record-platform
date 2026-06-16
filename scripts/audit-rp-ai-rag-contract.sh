@@ -103,6 +103,53 @@ if [[ "${DUP_CHECKSUM:-0}" -eq 0 ]]; then pass "checksum_unique_per_document"; e
 if [[ "${ORPHAN_CHUNKS:-0}" -eq 0 ]]; then pass "chunk_document_fk_consistent"; else fail "chunk_document_fk_consistent" "orphans=$ORPHAN_CHUNKS"; fi
 if [[ "${EMPTY_DOCS:-0}" -eq 0 ]]; then pass "every_document_has_chunks"; else fail "every_document_has_chunks" "empty=$EMPTY_DOCS"; fi
 
+# 11 — T18.6 shadow vector diagnostics (code contract + privacy parity)
+RAG_PY="$REPO_ROOT/services/python-ai-service/app/ai/rag_retrieval.py"
+INSIGHTS_PY="$REPO_ROOT/services/python-ai-service/app/ai/insights.py"
+ROUTES_PY="$REPO_ROOT/services/python-ai-service/app/ai/routes.py"
+CONFIG_PY="$REPO_ROOT/services/python-ai-service/app/ai/config.py"
+
+if grep -q 'retrieve_chunks_vector_shadow' "$RAG_PY"; then
+  pass "shadow_vector_retrieval_fn"
+else
+  fail "shadow_vector_retrieval_fn" "missing retrieve_chunks_vector_shadow"
+fi
+if grep -q 'build_shadow_vector_diagnostic' "$RAG_PY"; then
+  pass "shadow_vector_diagnostic_fn"
+else
+  fail "shadow_vector_diagnostic_fn" "missing build_shadow_vector_diagnostic"
+fi
+if grep -q 'FORBIDDEN_CHUNK_RE' "$RAG_PY" && grep -q '_chunk_passes_privacy' "$RAG_PY"; then
+  pass "shadow_applies_forbidden_chunk_filter"
+else
+  fail "shadow_applies_forbidden_chunk_filter" "privacy post-filter not shared"
+fi
+if grep -q "source_type <> 'message'" "$RAG_PY" && grep -q 'opt_in' "$RAG_PY"; then
+  pass "shadow_message_opt_in_filter"
+else
+  fail "shadow_message_opt_in_filter" "message opt-in filter missing"
+fi
+if grep -q '_visibility_clause' "$RAG_PY" && grep -q '_build_scope_filters' "$RAG_PY"; then
+  pass "shadow_owner_visibility_scope"
+else
+  fail "shadow_owner_visibility_scope" "owner/public visibility scope missing"
+fi
+if grep -q '"retrieval_mode": "keyword"' "$RAG_PY"; then
+  pass "keyword_retrieval_default_mode"
+else
+  fail "keyword_retrieval_default_mode" "keyword mode not default"
+fi
+if grep -q 'shadow_vector' "$INSIGHTS_PY" && grep -q 'details\["shadow_vector"\]' "$INSIGHTS_PY"; then
+  pass "shadow_diagnostics_details_only"
+else
+  fail "shadow_diagnostics_details_only" "shadow not wired to details"
+fi
+if grep -q 'AI_RAG_SHADOW_VECTOR' "$CONFIG_PY" && grep -q 'shadow_vector' "$ROUTES_PY"; then
+  pass "shadow_flag_env_and_query_param"
+else
+  fail "shadow_flag_env_and_query_param" "AI_RAG_SHADOW_VECTOR or query param missing"
+fi
+
 DOC_COUNT=$("${PSQL[@]}" -c "SELECT COUNT(*) FROM ai.ai_documents" 2>/dev/null || echo 0)
 CHUNK_COUNT=$("${PSQL[@]}" -c "SELECT COUNT(*) FROM ai.ai_document_chunks" 2>/dev/null || echo 0)
 SOURCE_COUNTS_JSON=$("${PSQL[@]}" -c "

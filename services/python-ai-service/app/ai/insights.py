@@ -12,7 +12,12 @@ from app.ai.providers.rule_engine import (
     listing_quality_checklist,
     pricing_band_from_chunks,
 )
-from app.ai.rag_retrieval import fetch_document_chunks_for_user, retrieve_chunks
+from app.ai.rag_retrieval import (
+    build_shadow_vector_diagnostic,
+    fetch_document_chunks_for_user,
+    retrieve_chunks,
+    retrieve_chunks_vector_shadow,
+)
 from app.db import get_pool
 
 
@@ -47,9 +52,17 @@ async def rag_query(
     user_id: Optional[str],
     question: str,
     source_types: Optional[List[str]] = None,
+    shadow_vector: bool = False,
 ) -> Dict[str, Any]:
     async def run(conn):
-        return await retrieve_chunks(conn, query=question, user_id=user_id, source_types=source_types)
+        keyword = await retrieve_chunks(conn, query=question, user_id=user_id, source_types=source_types)
+        shadow_diag = None
+        if shadow_vector:
+            shadow = await retrieve_chunks_vector_shadow(
+                conn, query=question, user_id=user_id, source_types=source_types
+            )
+            shadow_diag = build_shadow_vector_diagnostic(keyword["chunks"], shadow)
+        return keyword, shadow_diag
 
     result, err = await _with_conn(run)
     model_used, model_deg = await resolve_model_used()
@@ -63,18 +76,21 @@ async def rag_query(
             source_refs=[],
             degraded_reason=err,
         )
-    chunks = result["chunks"]
-    refs = result["source_refs"]
+    keyword_result, shadow_diag = result
+    chunks = keyword_result["chunks"]
+    refs = keyword_result["source_refs"]
     citations = [chunk_to_citation(c) for c in chunks[:5]]
     status = "live" if refs else "degraded"
     summary = f"Retrieved {len(chunks)} grounded excerpts for your question."
     if not chunks:
         summary = "No matching corpus excerpts for this question."
     details = {
-        "retrieval_mode": result["retrieval_mode"],
+        "retrieval_mode": keyword_result["retrieval_mode"],
         "chunk_count": len(chunks),
         "excerpts": [c.get("content", "")[:300] for c in chunks[:3]],
     }
+    if shadow_diag is not None:
+        details["shadow_vector"] = shadow_diag
     provider = get_provider()
     if provider.name == "ollama" and chunks:
         expl = await provider.explain(

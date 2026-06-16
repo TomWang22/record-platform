@@ -14,6 +14,11 @@ AI_HF_MODEL = os.getenv("AI_HF_MODEL", "")
 AI_TORCH_MODEL = os.getenv("AI_TORCH_MODEL", "")
 AI_TF_MODEL = os.getenv("AI_TF_MODEL", "")
 
+# T18.6 — shadow vector diagnostics only; keyword remains default retrieval.
+AI_RAG_SHADOW_VECTOR = os.getenv("AI_RAG_SHADOW_VECTOR", "0") == "1"
+AI_RAG_SHADOW_MIN_EMBEDDED = int(os.getenv("AI_RAG_SHADOW_MIN_EMBEDDED", "1"))
+AI_RAG_VECTOR_DIM = int(os.getenv("AI_RAG_VECTOR_DIM", "768"))
+
 FORBIDDEN_RESPONSE_RE = (
     "demo",
     "mock",

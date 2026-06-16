@@ -163,6 +163,19 @@ EMBEDDING_BACKFILL_LIMIT=100 EMBEDDING_BACKFILL_BATCH_SIZE=10 \
   bash scripts/rp-ai-embedding-backfill-small.sh
 ```
 
+Hybrid retrieval shadow diagnostics (T18.6 — keyword default; shadow opt-in only):
+
+```bash
+# Query param (diagnostic fields in details.shadow_vector only)
+curl -sfS ... -X POST 'https://record-platform.test/api/ai/rag/query?shadow_vector=1' \
+  -H 'Authorization: Bearer $TOKEN' -d '{"question":"Why is this auction risky?"}'
+
+# Or pod env AI_RAG_SHADOW_VECTOR=1 (same behavior)
+bash scripts/rp-ai-rag-shadow-smoke.sh
+```
+
+Shadow mode never changes `summary`, `source_refs`, or card ranking. Vector retrieval remains off by default.
+
 Provider readiness:
 
 ```bash

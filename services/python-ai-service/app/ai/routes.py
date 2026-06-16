@@ -7,6 +7,7 @@ from fastapi import APIRouter, Header, Query
 from pydantic import BaseModel, Field
 
 from app.ai import insights
+from app.ai.config import AI_RAG_SHADOW_VECTOR
 
 router = APIRouter(prefix="/ai", tags=["ai-platform"])
 
@@ -43,11 +44,13 @@ class UserBody(BaseModel):
 async def post_rag_query(
     body: RagQueryBody,
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+    shadow_vector: bool = Query(False),
 ):
     return await insights.rag_query(
         user_id=_user_id(x_user_id, body.user_id),
         question=body.question,
         source_types=body.source_types,
+        shadow_vector=shadow_vector or AI_RAG_SHADOW_VECTOR,
     )
 
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# T18.7 — Controlled per-source-type embedding backfill (<=1000 new; no full corpus; keyword default).
+# T18.7 / T19.3 — Controlled per-source-type embedding backfill (bounded new rows; keyword default).
+# One actual write pass per tranche lock — see EMBEDDING_BACKFILL_TRANCHE_ID / EMBEDDING_BACKFILL_FORCE.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,11 +19,21 @@ EXPECTED_DIM="${EMBEDDING_EXPECTED_DIM:-768}"
 OLLAMA_URL="${OLLAMA_BASE_URL:-http://ollama.${NS}.svc.cluster.local:11434}"
 REPORT_JSON="${REPORT_JSON:-$REPO_ROOT/bench_logs/ai-platform/t18-7-controlled-backfill.json}"
 REPORT_MD="${REPORT_MD:-$REPO_ROOT/bench_logs/ai-platform/t18-7-controlled-backfill-plan.md}"
+TRANCHE_ID="${EMBEDDING_BACKFILL_TRANCHE_ID:-}"
+TRANCHE_LOCK="${EMBEDDING_BACKFILL_TRANCHE_LOCK:-}"
+EMBEDDING_BACKFILL_FORCE="${EMBEDDING_BACKFILL_FORCE:-0}"
+MAX_NEW="${EMBEDDING_BACKFILL_MAX_NEW:-$TOTAL_LIMIT}"
+TICKET="${EMBEDDING_BACKFILL_TICKET:-T18.7}"
+
+if [[ -z "$TRANCHE_LOCK" ]] && [[ -n "$TRANCHE_ID" ]]; then
+  TRANCHE_LOCK="$REPO_ROOT/bench_logs/ai-platform/${TRANCHE_ID}-actual-run.json"
+fi
 
 mkdir -p "$(dirname "$REPORT_JSON")"
 
-echo "=== T18.7 controlled embedding backfill ==="
-echo "total_limit=$TOTAL_LIMIT per_type=$PER_TYPE_LIMITS batch_size=$BATCH_SIZE dry_run=$DRY_RUN"
+echo "=== Controlled embedding backfill ($TICKET) ==="
+echo "total_limit=$TOTAL_LIMIT max_new=$MAX_NEW per_type=$PER_TYPE_LIMITS batch_size=$BATCH_SIZE dry_run=$DRY_RUN"
+[[ -n "$TRANCHE_ID" ]] && echo "tranche_id=$TRANCHE_ID tranche_lock=$TRANCHE_LOCK force=$EMBEDDING_BACKFILL_FORCE"
 
 if ! rp_python_ai_psql_connect_check; then
   echo "❌ python_ai DB unreachable on port ${PYTHON_AI_PGPORT:-5440}" >&2
@@ -36,6 +47,19 @@ fi
 
 rp_python_ai_psql "ALTER TABLE ai.ai_document_chunks ADD COLUMN IF NOT EXISTS embedding_status TEXT;" >/dev/null
 rp_python_ai_psql "ALTER TABLE ai.ai_document_chunks ADD COLUMN IF NOT EXISTS embedding_updated_at TIMESTAMPTZ;" >/dev/null
+
+PRE_EMBEDDED_COUNT="$(PGPASSWORD="${PGPASSWORD:-postgres}" PGCONNECT_TIMEOUT=5 \
+  psql -h "${PYTHON_AI_PGHOST:-127.0.0.1}" -p "${PYTHON_AI_PGPORT:-5440}" -U "${PGUSER:-postgres}" -d python_ai \
+  -v ON_ERROR_STOP=1 -At -c "SELECT count(*) FROM ai.ai_document_chunks WHERE embedding_vec IS NOT NULL;")"
+echo "pre_embedded_count=$PRE_EMBEDDED_COUNT"
+
+if [[ "$DRY_RUN" == "0" ]]; then
+  if [[ -n "$TRANCHE_LOCK" ]] && [[ -f "$TRANCHE_LOCK" ]] && [[ "$EMBEDDING_BACKFILL_FORCE" != "1" ]]; then
+    echo "❌ tranche actual-run lock exists: $TRANCHE_LOCK" >&2
+    echo "   One write pass per tranche. Set EMBEDDING_BACKFILL_FORCE=1 only after explicit ops approval." >&2
+    exit 1
+  fi
+fi
 
 export TOTAL_LIMIT PER_TYPE_LIMITS BATCH_SIZE DRY_RUN EMBED_MODEL EXPECTED_DIM OLLAMA_URL NS
 
@@ -242,7 +266,9 @@ async def main() -> dict:
                     errors.append({"chunk_id": chunk_id, "error": str(e)[:200]})
 
         distinct_types = len(by_type)
-        ok = len(errors) == 0 and (updated == 0 or distinct_types >= 2)
+        ok = len(errors) == 0 and (
+            updated == 0 or distinct_types >= 2 or TOTAL_LIMIT <= 200
+        )
         return {
             "ok": ok,
             "dry_run": False,
@@ -280,7 +306,8 @@ fi
 
 python3 -m json.tool "$SUMMARY_FILE" >/dev/null 2>&1 || { cat "$SUMMARY_FILE"; exit 1; }
 
-export REPORT_JSON REPORT_MD SUMMARY_FILE TOTAL_LIMIT PER_TYPE_LIMITS BATCH_SIZE DRY_RUN EMBED_MODEL EXPECTED_DIM
+export REPORT_JSON REPORT_MD SUMMARY_FILE TOTAL_LIMIT PER_TYPE_LIMITS BATCH_SIZE DRY_RUN EMBED_MODEL EXPECTED_DIM \
+  PRE_EMBEDDED_COUNT MAX_NEW TRANCHE_ID TRANCHE_LOCK TICKET
 python3 <<'PY'
 import json, os
 from datetime import datetime, timezone
@@ -290,12 +317,17 @@ with open(os.environ["SUMMARY_FILE"], encoding="utf-8") as f:
 report_json = os.environ["REPORT_JSON"]
 report_md = os.environ["REPORT_MD"]
 now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+pre_embedded = int(os.environ.get("PRE_EMBEDDED_COUNT", "0"))
+max_new = int(os.environ.get("MAX_NEW", "0"))
+ticket = os.environ.get("TICKET", "T18.7")
 
 payload = {
     "generated": now,
-    "ticket": "T18.7",
+    "ticket": ticket,
     "dry_run": summary.get("dry_run", False),
+    "pre_embedded_count": pre_embedded,
     "total_limit": int(os.environ["TOTAL_LIMIT"]),
+    "max_new_embeddings": max_new,
     "per_type_limits": os.environ["PER_TYPE_LIMITS"],
     "batch_size": int(os.environ["BATCH_SIZE"]),
     "embedding_model": os.environ["EMBED_MODEL"],
@@ -314,7 +346,7 @@ payload = {
 open(report_json, "w").write(json.dumps(payload, indent=2) + "\n")
 
 lines = [
-    "# T18.7 controlled embedding backfill plan",
+    f"# {ticket} controlled embedding backfill plan",
     "",
     f"**Generated:** {now}",
     f"**RESULT: {'PASS' if payload['ok'] else 'FAIL'}**",
@@ -322,6 +354,8 @@ lines = [
     "## Config",
     "",
     f"- dry_run: **{payload['dry_run']}**",
+    f"- pre_embedded_count: {pre_embedded}",
+    f"- max_new_embeddings: {max_new}",
     f"- total_limit: {payload['total_limit']}",
     f"- per_type_limits: `{payload['per_type_limits']}`",
     f"- batch_size: {payload['batch_size']}",
@@ -403,6 +437,55 @@ echo "proxy_leaks=$PROXY_LEAKS"
 [[ "$PROXY_LEAKS" == "0" ]] || { echo "❌ proxy max in embedded chunks"; exit 1; }
 
 UPDATED="$(python3 -c 'import json; print(json.load(open("'"$SUMMARY_FILE"'")).get("updated_count",0))')"
+WORKER_OK="$(python3 -c 'import json; print("1" if json.load(open("'"$SUMMARY_FILE"'")).get("ok") else "0")')"
+ERROR_COUNT="$(python3 -c 'import json; print(len(json.load(open("'"$SUMMARY_FILE"'")).get("errors",[])))')"
+
+POST_EMBEDDED_COUNT="$(PGPASSWORD="${PGPASSWORD:-postgres}" PGCONNECT_TIMEOUT=5 \
+  psql -h "${PYTHON_AI_PGHOST:-127.0.0.1}" -p "${PYTHON_AI_PGPORT:-5440}" -U "${PGUSER:-postgres}" -d python_ai \
+  -v ON_ERROR_STOP=1 -At -c "SELECT count(*) FROM ai.ai_document_chunks WHERE embedding_vec IS NOT NULL;")"
+echo "post_embedded_count=$POST_EMBEDDED_COUNT"
+NEW_EMBEDDED=$((POST_EMBEDDED_COUNT - PRE_EMBEDDED_COUNT))
+echo "new_embeddings_added=$NEW_EMBEDDED"
+
+if [[ "$DRY_RUN" == "0" ]]; then
+  if [[ "$NEW_EMBEDDED" -gt "$MAX_NEW" ]]; then
+    echo "❌ added $NEW_EMBEDDED embeddings; max_new=$MAX_NEW (pre=$PRE_EMBEDDED_COUNT post=$POST_EMBEDDED_COUNT)" >&2
+    exit 1
+  fi
+  if [[ -n "$TRANCHE_LOCK" ]]; then
+  python3 - "$TRANCHE_LOCK" "$TRANCHE_ID" "$PRE_EMBEDDED_COUNT" "$POST_EMBEDDED_COUNT" "$NEW_EMBEDDED" \
+    "$UPDATED" "$WORKER_OK" "$ERROR_COUNT" "$TICKET" <<'PY'
+import json, sys
+from datetime import datetime, timezone
+
+lock_path, tranche_id, pre, post, new_added, updated, worker_ok, error_count, ticket = sys.argv[1:10]
+payload = {
+    "tranche_id": tranche_id or None,
+    "ticket": ticket,
+    "completed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "pre_embedded_count": int(pre),
+    "post_embedded_count": int(post),
+    "new_embeddings_added": int(new_added),
+    "worker_updated_count": int(updated),
+    "worker_ok": worker_ok == "1",
+    "error_count": int(error_count),
+    "status": "complete" if worker_ok == "1" and int(error_count) == 0 else "partial_failure",
+    "rerun_requires": "EMBEDDING_BACKFILL_FORCE=1",
+}
+with open(lock_path, "w", encoding="utf-8") as f:
+    json.dump(payload, f, indent=2)
+    f.write("\n")
+print(f"tranche_lock_written={lock_path}")
+PY
+  fi
+  if [[ "$WORKER_OK" != "1" ]] || [[ "$ERROR_COUNT" -gt 0 ]]; then
+    echo "❌ partial backfill failure (updated=$UPDATED errors=$ERROR_COUNT)" >&2
+    echo "   STOP — do not rerun actual backfill. Report partial count; rerun gates only if needed." >&2
+    echo "   Further writes require EMBEDDING_BACKFILL_FORCE=1 after ops review." >&2
+    exit 1
+  fi
+fi
+
 if [[ "$DRY_RUN" == "0" ]] && [[ "$UPDATED" -gt 0 ]]; then
   DISTINCT="$(python3 -c 'import json; print(json.load(open("'"$SUMMARY_FILE"'")).get("distinct_source_types_updated",0))')"
   TOTAL_LIMIT_INT="$(python3 -c 'import json; print(json.load(open("'"$SUMMARY_FILE"'")).get("total_limit",0))')"
@@ -412,4 +495,4 @@ if [[ "$DRY_RUN" == "0" ]] && [[ "$UPDATED" -gt 0 ]]; then
   fi
 fi
 
-echo "✅ T18.7 controlled backfill complete (updated=$UPDATED dry_run=$DRY_RUN)"
+echo "✅ controlled backfill complete (updated=$UPDATED new=$NEW_EMBEDDED dry_run=$DRY_RUN)"

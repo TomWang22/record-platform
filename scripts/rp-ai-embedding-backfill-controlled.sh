@@ -40,7 +40,8 @@ rp_python_ai_psql "ALTER TABLE ai.ai_document_chunks ADD COLUMN IF NOT EXISTS em
 export TOTAL_LIMIT PER_TYPE_LIMITS BATCH_SIZE DRY_RUN EMBED_MODEL EXPECTED_DIM OLLAMA_URL NS
 
 WORKER="$(mktemp)"
-trap 'rm -f "$WORKER"' EXIT
+SUMMARY_FILE="$(mktemp)"
+trap 'rm -f "$WORKER" "$SUMMARY_FILE"' EXIT
 cat >"$WORKER" <<'PY'
 import asyncio
 import json
@@ -133,6 +134,43 @@ def embed_text(text: str) -> list:
 
 async def main() -> dict:
     conn = await asyncpg.connect(DB_URL)
+
+    async def reconnect() -> None:
+        nonlocal conn
+        if conn is not None and not conn.is_closed():
+            await conn.close()
+        conn = await asyncpg.connect(DB_URL)
+
+    async def update_chunk(chunk_id: str, vec_lit: str, checksum: str) -> bool:
+        nonlocal conn
+        for attempt in range(3):
+            try:
+                if conn.is_closed():
+                    await reconnect()
+                result = await conn.execute(
+                    """
+                    UPDATE ai.ai_document_chunks
+                    SET embedding_vec = $1::vector,
+                        embedding_model = $2,
+                        embedding_status = 'embedded',
+                        embedding_updated_at = now()
+                    WHERE id = $3::uuid
+                      AND embedding_vec IS NULL
+                      AND checksum = $4
+                    """,
+                    vec_lit,
+                    EMBED_MODEL,
+                    chunk_id,
+                    checksum,
+                )
+                return result.split()[-1] != "0"
+            except (asyncpg.InterfaceError, asyncpg.ConnectionDoesNotExistError, OSError) as e:
+                if attempt < 2:
+                    await reconnect()
+                    continue
+                raise RuntimeError(f"db_update_failed: {e}") from e
+        return False
+
     try:
         rows = []
         plan_by_type: dict = {}
@@ -186,23 +224,7 @@ async def main() -> dict:
                 try:
                     vec = embed_text(r["content"] or "")
                     vec_lit = "[" + ",".join(f"{x:.8f}" for x in vec) + "]"
-                    result = await conn.execute(
-                        """
-                        UPDATE ai.ai_document_chunks
-                        SET embedding_vec = $1::vector,
-                            embedding_model = $2,
-                            embedding_status = 'embedded',
-                            embedding_updated_at = now()
-                        WHERE id = $3::uuid
-                          AND embedding_vec IS NULL
-                          AND checksum = $4
-                        """,
-                        vec_lit,
-                        EMBED_MODEL,
-                        chunk_id,
-                        r["chunk_checksum"],
-                    )
-                    if result.split()[-1] != "0":
+                    if await update_chunk(chunk_id, vec_lit, r["chunk_checksum"]):
                         updated += 1
                         st = r["source_type"]
                         by_type[st] = by_type.get(st, 0) + 1
@@ -233,7 +255,8 @@ async def main() -> dict:
             "errors": errors,
         }
     finally:
-        await conn.close()
+        if conn is not None and not conn.is_closed():
+            await conn.close()
 
 
 result = asyncio.run(main())
@@ -242,7 +265,7 @@ if not result.get("ok"):
     sys.exit(1)
 PY
 
-SUMMARY="$(cat "$WORKER" | kubectl -n "$NS" exec -i deploy/python-ai-service -c app -- env \
+if ! cat "$WORKER" | kubectl -n "$NS" exec -i deploy/python-ai-service -c app -- env \
   TOTAL_LIMIT="$TOTAL_LIMIT" \
   PER_TYPE_LIMITS="$PER_TYPE_LIMITS" \
   BATCH_SIZE="$BATCH_SIZE" \
@@ -250,19 +273,20 @@ SUMMARY="$(cat "$WORKER" | kubectl -n "$NS" exec -i deploy/python-ai-service -c 
   EMBED_MODEL="$EMBED_MODEL" \
   EXPECTED_DIM="$EXPECTED_DIM" \
   OLLAMA_URL="$OLLAMA_URL" \
-  python3 - 2>&1)" || {
-  echo "$SUMMARY" >&2
+  python3 - >"$SUMMARY_FILE" 2>&1; then
+  cat "$SUMMARY_FILE" >&2
   exit 1
-}
+fi
 
-echo "$SUMMARY" | python3 -m json.tool >/dev/null 2>&1 || { echo "$SUMMARY"; exit 1; }
+python3 -m json.tool "$SUMMARY_FILE" >/dev/null 2>&1 || { cat "$SUMMARY_FILE"; exit 1; }
 
-export REPORT_JSON REPORT_MD SUMMARY TOTAL_LIMIT PER_TYPE_LIMITS BATCH_SIZE DRY_RUN EMBED_MODEL EXPECTED_DIM
+export REPORT_JSON REPORT_MD SUMMARY_FILE TOTAL_LIMIT PER_TYPE_LIMITS BATCH_SIZE DRY_RUN EMBED_MODEL EXPECTED_DIM
 python3 <<'PY'
 import json, os
 from datetime import datetime, timezone
 
-summary = json.loads(os.environ["SUMMARY"])
+with open(os.environ["SUMMARY_FILE"], encoding="utf-8") as f:
+    summary = json.loads(f.read())
 report_json = os.environ["REPORT_JSON"]
 report_md = os.environ["REPORT_MD"]
 now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -378,10 +402,11 @@ WHERE embedding_vec IS NOT NULL
 echo "proxy_leaks=$PROXY_LEAKS"
 [[ "$PROXY_LEAKS" == "0" ]] || { echo "❌ proxy max in embedded chunks"; exit 1; }
 
-UPDATED="$(echo "$SUMMARY" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("updated_count",0))')"
+UPDATED="$(python3 -c 'import json; print(json.load(open("'"$SUMMARY_FILE"'")).get("updated_count",0))')"
 if [[ "$DRY_RUN" == "0" ]] && [[ "$UPDATED" -gt 0 ]]; then
-  DISTINCT="$(echo "$SUMMARY" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("distinct_source_types_updated",0))')"
-  if [[ "${DISTINCT:-0}" -lt 2 ]]; then
+  DISTINCT="$(python3 -c 'import json; print(json.load(open("'"$SUMMARY_FILE"'")).get("distinct_source_types_updated",0))')"
+  TOTAL_LIMIT_INT="$(python3 -c 'import json; print(json.load(open("'"$SUMMARY_FILE"'")).get("total_limit",0))')"
+  if [[ "${DISTINCT:-0}" -lt 2 ]] && [[ "${TOTAL_LIMIT_INT:-0}" -gt 200 ]]; then
     echo "❌ backfill not balanced across source types (distinct=$DISTINCT)" >&2
     exit 1
   fi

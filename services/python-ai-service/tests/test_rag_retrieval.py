@@ -61,7 +61,27 @@ class TestEnvelope(unittest.TestCase):
             )
 
 
-class TestForbiddenPatterns(unittest.TestCase):
+class TestShadowProfiles(unittest.TestCase):
+    def test_unknown_profile_falls_back_to_generic(self):
+        from app.ai.shadow_profiles import resolve_shadow_profile
+
+        self.assertEqual(resolve_shadow_profile(None), "generic_rag")
+        self.assertEqual(resolve_shadow_profile(""), "generic_rag")
+        self.assertEqual(resolve_shadow_profile("not_a_real_profile"), "generic_rag")
+
+    def test_auction_risk_prefers_auction_type(self):
+        from app.ai.shadow_profiles import source_type_weights
+
+        weights = source_type_weights("auction_risk")
+        self.assertGreater(
+            weights.get("auction_bid_summary", 0),
+            weights.get("listing", 0),
+        )
+
+    def test_pricing_recommendation_alias(self):
+        from app.ai.shadow_profiles import resolve_shadow_profile
+
+        self.assertEqual(resolve_shadow_profile("pricing_recommendation"), "obo_helper")
     def test_proxy_max_pattern(self):
         self.assertTrue(FORBIDDEN_CHUNK_RE.search("max_bid_cents exposed"))
         self.assertFalse(FORBIDDEN_CHUNK_RE.search("current bid 1200 cents"))

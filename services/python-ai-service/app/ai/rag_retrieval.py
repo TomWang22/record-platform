@@ -14,6 +14,12 @@ from app.ai.config import (
     OLLAMA_BASE_URL,
 )
 from app.ai.envelope import source_ref
+from app.ai.shadow_profiles import (
+    profile_diagnostic_meta,
+    preferred_source_types,
+    resolve_shadow_profile,
+    source_type_weights,
+)
 
 FORBIDDEN_CHUNK_RE = re.compile(r"max_bid_cents|proxy_bids|proxy max", re.I)
 
@@ -175,6 +181,178 @@ async def count_embedded_chunks_for_scope(
     return int(await conn.fetchval(sql, *params) or 0)
 
 
+def _select_route_weighted_chunks(
+    rows: Sequence[Any],
+    *,
+    preferred: Sequence[str],
+    weights: Dict[str, float],
+    words: List[str],
+    pin_source: bool,
+    query: str,
+    max_chunks: int,
+    max_tokens: int,
+    scope_by_type: Dict[str, int],
+) -> List[Dict[str, Any]]:
+    """Shadow-only: reserve slots for owner-visible preferred types, then fill by weighted score."""
+    privacy_rows: List[Any] = []
+    for row in rows:
+        if _chunk_passes_privacy(row, words=words, pin_source=pin_source, query=query):
+            privacy_rows.append(row)
+
+    by_type: Dict[str, List[Any]] = {}
+    for row in privacy_rows:
+        by_type.setdefault(row["source_type"], []).append(row)
+    for st in by_type:
+        by_type[st].sort(key=lambda r: (-float(r.get("score") or 0), str(r["id"])))
+
+    selected_rows: List[Any] = []
+    seen_ids = set()
+    per_type_quota = max(1, min(3, max_chunks // max(len(preferred), 1)))
+
+    for st in preferred:
+        if scope_by_type.get(st, 0) <= 0:
+            continue
+        for row in by_type.get(st, [])[:per_type_quota]:
+            if str(row["id"]) in seen_ids:
+                continue
+            selected_rows.append(row)
+            seen_ids.add(str(row["id"]))
+            if len(selected_rows) >= max_chunks:
+                break
+        if len(selected_rows) >= max_chunks:
+            break
+
+    weighted_rest = _apply_route_weights(
+        [r for r in privacy_rows if str(r["id"]) not in seen_ids],
+        weights,
+    )
+    for row in weighted_rest:
+        if str(row["id"]) in seen_ids:
+            continue
+        selected_rows.append(row)
+        seen_ids.add(str(row["id"]))
+        if len(selected_rows) >= max_chunks * 3:
+            break
+
+    return _rows_to_chunks(
+        selected_rows,
+        words=words,
+        pin_source=pin_source,
+        query=query,
+        max_chunks=max_chunks,
+        max_tokens=max_tokens,
+    )
+
+
+def _apply_route_weights(rows: Sequence[Any], weights: Dict[str, float]) -> List[Any]:
+    """Re-rank vector rows by cosine score * route weight (after SQL fetch, before privacy select)."""
+    weighted = []
+    for row in rows:
+        base = float(row.get("score") or 0)
+        st = row["source_type"]
+        w = weights.get(st, 0.35)
+        weighted.append((base * w, row))
+    weighted.sort(key=lambda x: (-x[0], str(x[1]["id"])))
+    return [row for _, row in weighted]
+
+
+async def count_embedded_by_source_type_for_scope(
+    conn,
+    *,
+    user_id: Optional[str],
+    source_types: Optional[Sequence[str]] = None,
+) -> Dict[str, int]:
+    filters, params, _idx = _build_scope_filters(
+        user_id,
+        source_types=source_types,
+        require_embedding_vec=True,
+    )
+    sql = f"""
+        SELECT d.source_type, COUNT(*)::int AS cnt
+        FROM ai.ai_document_chunks c
+        JOIN ai.ai_documents d ON d.id = c.document_id
+        WHERE {' AND '.join(filters)}
+        GROUP BY d.source_type
+    """
+    rows = await conn.fetch(sql, *params)
+    return {str(r["source_type"]): int(r["cnt"]) for r in rows}
+
+
+def _merge_vector_rows(*groups: Sequence[Any]) -> List[Any]:
+    by_id: Dict[Any, Any] = {}
+    for group in groups:
+        for row in group:
+            by_id[row["id"]] = row
+    return list(by_id.values())
+
+
+async def _fetch_vector_rows(
+    conn,
+    *,
+    filters: List[str],
+    params: List[Any],
+    vec_param: int,
+    limit: int,
+    extra_source_type: Optional[str] = None,
+) -> List[Any]:
+    local_filters = list(filters)
+    local_params = list(params)
+    idx = len(local_params) + 1
+    if extra_source_type:
+        local_filters.append(f"d.source_type = ${idx}")
+        local_params.append(extra_source_type)
+        idx += 1
+    local_params.append(limit)
+    limit_param = idx
+    sql = f"""
+        SELECT c.id, c.document_id, c.chunk_index, c.content, c.checksum, c.source_refs,
+               d.source_type, d.source_id, d.owner_user_id, d.visibility,
+               d.source_updated_at, d.title, d.metadata,
+               (1 - (c.embedding_vec <=> ${vec_param}::vector))::float AS score
+        FROM ai.ai_document_chunks c
+        JOIN ai.ai_documents d ON d.id = c.document_id
+        WHERE {' AND '.join(local_filters)}
+        ORDER BY c.embedding_vec <=> ${vec_param}::vector ASC
+        LIMIT ${limit_param}
+    """
+    return list(await conn.fetch(sql, *local_params))
+
+
+async def _fetch_diversified_vector_rows(
+    conn,
+    *,
+    filters: List[str],
+    params: List[Any],
+    vec_param: int,
+    preferred: Sequence[str],
+    scope_by_type: Dict[str, int],
+    global_limit: int,
+    per_type_limit: int,
+) -> List[Any]:
+    global_rows = await _fetch_vector_rows(
+        conn,
+        filters=filters,
+        params=params,
+        vec_param=vec_param,
+        limit=global_limit,
+    )
+    pool_groups: List[List[Any]] = [global_rows]
+    for st in preferred:
+        if scope_by_type.get(st, 0) <= 0:
+            continue
+        type_rows = await _fetch_vector_rows(
+            conn,
+            filters=filters,
+            params=params,
+            vec_param=vec_param,
+            limit=per_type_limit,
+            extra_source_type=st,
+        )
+        if type_rows:
+            pool_groups.append(type_rows)
+    return _merge_vector_rows(*pool_groups)
+
+
 async def retrieve_chunks_vector_shadow(
     conn,
     *,
@@ -185,6 +363,7 @@ async def retrieve_chunks_vector_shadow(
     metadata_listing_id: Optional[str] = None,
     max_chunks: int = AI_RAG_MAX_CHUNKS,
     max_tokens: int = AI_RAG_MAX_CONTEXT_TOKENS,
+    route_shadow_profile: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Diagnostic-only vector retrieval; same privacy scope as keyword path."""
     pin_source = bool(source_id or metadata_listing_id)
@@ -233,45 +412,110 @@ async def retrieve_chunks_vector_shadow(
     vec_lit = "[" + ",".join(f"{x:.8f}" for x in query_vec) + "]"
     params.append(vec_lit)
     vec_param = idx
-    idx += 1
-    params.append(max_chunks * 3)
-    limit_param = idx
 
-    sql = f"""
-        SELECT c.id, c.document_id, c.chunk_index, c.content, c.checksum, c.source_refs,
-               d.source_type, d.source_id, d.owner_user_id, d.visibility,
-               d.source_updated_at, d.title, d.metadata,
-               (1 - (c.embedding_vec <=> ${vec_param}::vector))::float AS score
-        FROM ai.ai_document_chunks c
-        JOIN ai.ai_documents d ON d.id = c.document_id
-        WHERE {' AND '.join(filters)}
-        ORDER BY c.embedding_vec <=> ${vec_param}::vector ASC
-        LIMIT ${limit_param}
-    """
-    rows = await conn.fetch(sql, *params)
-    selected = _rows_to_chunks(
-        rows,
-        words=words,
-        pin_source=pin_source,
-        query=query,
-        max_chunks=max_chunks,
-        max_tokens=max_tokens,
-    )
+    resolved_profile = resolve_shadow_profile(route_shadow_profile) if route_shadow_profile else None
+    route_mode = route_shadow_profile is not None
+    preferred_zero_visible: List[str] = []
+    scope_by_type: Dict[str, int] = {}
+
+    if route_mode:
+        preferred = preferred_source_types(resolved_profile)
+        weights = source_type_weights(resolved_profile)
+        scope_by_type = await count_embedded_by_source_type_for_scope(conn, user_id=user_id)
+        preferred_zero_visible = [st for st in preferred if scope_by_type.get(st, 0) == 0]
+        global_rows = await _fetch_vector_rows(
+            conn,
+            filters=filters,
+            params=params,
+            vec_param=vec_param,
+            limit=max_chunks * 3,
+        )
+        unweighted_selected = _rows_to_chunks(
+            global_rows,
+            words=words,
+            pin_source=pin_source,
+            query=query,
+            max_chunks=max_chunks,
+            max_tokens=max_tokens,
+        )
+        pool_rows = list(global_rows)
+        for st in preferred:
+            if scope_by_type.get(st, 0) <= 0:
+                continue
+            type_rows = await _fetch_vector_rows(
+                conn,
+                filters=filters,
+                params=params,
+                vec_param=vec_param,
+                limit=max(6, max_chunks),
+                extra_source_type=st,
+            )
+            pool_rows = _merge_vector_rows(pool_rows, type_rows)
+        weighted_selected = _select_route_weighted_chunks(
+            pool_rows,
+            preferred=preferred,
+            weights=weights,
+            words=words,
+            pin_source=pin_source,
+            query=query,
+            max_chunks=max_chunks,
+            max_tokens=max_tokens,
+            scope_by_type=scope_by_type,
+        )
+    else:
+        global_rows = await _fetch_vector_rows(
+            conn,
+            filters=filters,
+            params=params,
+            vec_param=vec_param,
+            limit=max_chunks * 3,
+        )
+        unweighted_selected = _rows_to_chunks(
+            global_rows,
+            words=words,
+            pin_source=pin_source,
+            query=query,
+            max_chunks=max_chunks,
+            max_tokens=max_tokens,
+        )
+        weighted_selected = unweighted_selected
+
     latency_ms = round((time.perf_counter() - t0) * 1000, 1)
-    return {
+    result: Dict[str, Any] = {
         "enabled": True,
         "status": "ok",
         "embedded_chunks": embedded_count,
-        "candidate_count": len(selected),
-        "chunks": selected,
-        "chunk_ids": [c["id"] for c in selected],
+        "candidate_count": len(unweighted_selected),
+        "chunks": unweighted_selected,
+        "chunk_ids": [c["id"] for c in unweighted_selected],
         "latency_ms": latency_ms,
     }
+    if route_mode:
+        meta = profile_diagnostic_meta(resolved_profile)
+        result.update({
+            "profile": meta["profile"],
+            "preferred_source_types": meta["preferred_source_types"],
+            "source_type_weights": meta["source_type_weights"],
+            "unweighted_candidate_count": len(unweighted_selected),
+            "unweighted_chunks": unweighted_selected,
+            "unweighted_chunk_ids": [c["id"] for c in unweighted_selected],
+            "weighted_candidate_count": len(weighted_selected),
+            "weighted_chunks": weighted_selected,
+            "weighted_chunk_ids": [c["id"] for c in weighted_selected],
+            "preferred_zero_owner_visible": preferred_zero_visible,
+            "embedded_by_source_type": scope_by_type,
+            "chunks": weighted_selected,
+            "chunk_ids": [c["id"] for c in weighted_selected],
+            "candidate_count": len(weighted_selected),
+        })
+    return result
 
 
 def build_shadow_vector_diagnostic(
     keyword_chunks: Sequence[Dict[str, Any]],
     shadow_result: Dict[str, Any],
+    *,
+    unweighted_result: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     keyword_ids = {str(c.get("id")) for c in keyword_chunks if c.get("id")}
     shadow_ids = set(shadow_result.get("chunk_ids") or [])
@@ -286,9 +530,34 @@ def build_shadow_vector_diagnostic(
         "candidate_count": shadow_result.get("candidate_count", 0),
         "overlap_with_keyword": overlap,
         "top_source_types": [{"source_type": k, "count": v} for k, v in top_source_types],
+        "source_type_distribution": dict(source_types),
         "latency_ms": shadow_result.get("latency_ms", 0),
         "embedded_chunks": shadow_result.get("embedded_chunks", 0),
     }
+    if unweighted_result is not None:
+        unweighted_types: Dict[str, int] = {}
+        for ch in unweighted_result.get("chunks") or []:
+            st = ch.get("source_type") or "unknown"
+            unweighted_types[st] = unweighted_types.get(st, 0) + 1
+        unweighted_ids = set(unweighted_result.get("chunk_ids") or [])
+        diag["unweighted"] = {
+            "candidate_count": unweighted_result.get("candidate_count", 0),
+            "overlap_with_keyword": len(keyword_ids & unweighted_ids),
+            "source_type_distribution": unweighted_types,
+            "top_source_types": [
+                {"source_type": k, "count": v}
+                for k, v in sorted(unweighted_types.items(), key=lambda x: (-x[1], x[0]))[:5]
+            ],
+            "latency_ms": unweighted_result.get("latency_ms"),
+        }
+    if shadow_result.get("profile"):
+        diag["profile"] = shadow_result["profile"]
+        diag["preferred_source_types"] = shadow_result.get("preferred_source_types") or []
+        diag["source_type_weights"] = shadow_result.get("source_type_weights") or {}
+        diag["weighted_candidate_count"] = shadow_result.get("weighted_candidate_count")
+        diag["unweighted_candidate_count"] = shadow_result.get("unweighted_candidate_count")
+        if shadow_result.get("preferred_zero_owner_visible"):
+            diag["preferred_zero_owner_visible"] = shadow_result["preferred_zero_owner_visible"]
     status = shadow_result.get("status")
     if status and status != "ok":
         diag["status"] = status

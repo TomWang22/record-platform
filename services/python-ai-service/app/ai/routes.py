@@ -45,12 +45,14 @@ async def post_rag_query(
     body: RagQueryBody,
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
     shadow_vector: bool = Query(False),
+    shadow_profile: Optional[str] = Query(None),
 ):
     return await insights.rag_query(
         user_id=_user_id(x_user_id, body.user_id),
         question=body.question,
         source_types=body.source_types,
         shadow_vector=shadow_vector or AI_RAG_SHADOW_VECTOR,
+        shadow_profile=shadow_profile,
     )
 
 

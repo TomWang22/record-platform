@@ -150,6 +150,39 @@ else
   fail "shadow_flag_env_and_query_param" "AI_RAG_SHADOW_VECTOR or query param missing"
 fi
 
+# 12 — T19.5 route-specific shadow profiles (opt-in diagnostic only)
+SHADOW_PROFILES_PY="$REPO_ROOT/services/python-ai-service/app/ai/shadow_profiles.py"
+if grep -q 'resolve_shadow_profile' "$SHADOW_PROFILES_PY" && grep -q 'generic_rag' "$SHADOW_PROFILES_PY"; then
+  pass "shadow_route_profile_map"
+else
+  fail "shadow_route_profile_map" "shadow_profiles.py missing resolve_shadow_profile/generic_rag"
+fi
+if grep -q 'shadow_profile' "$ROUTES_PY" && grep -q 'route_shadow_profile' "$RAG_PY"; then
+  pass "shadow_route_profile_opt_in_only"
+else
+  fail "shadow_route_profile_opt_in_only" "shadow_profile query param or route_shadow_profile missing"
+fi
+if grep -q 'retrieve_chunks(' "$INSIGHTS_PY" && grep -q '"retrieval_mode": "keyword"' "$RAG_PY"; then
+  pass "shadow_route_no_keyword_rank_change"
+else
+  fail "shadow_route_no_keyword_rank_change" "keyword path must remain default"
+fi
+if grep -q '_chunk_passes_privacy' "$RAG_PY" && grep -q '_select_route_weighted_chunks' "$RAG_PY"; then
+  pass "shadow_privacy_before_route_weights"
+else
+  fail "shadow_privacy_before_route_weights" "privacy must precede route weighting"
+fi
+if grep -q "source_type <> 'message'" "$RAG_PY" && grep -q 'FORBIDDEN_CHUNK_RE' "$RAG_PY"; then
+  pass "shadow_route_message_and_proxy_filters"
+else
+  fail "shadow_route_message_and_proxy_filters" "message/proxy filters missing"
+fi
+if grep -q 'return "generic_rag"' "$SHADOW_PROFILES_PY"; then
+  pass "shadow_unknown_profile_fallback"
+else
+  fail "shadow_unknown_profile_fallback" "unknown profile must fall back to generic_rag"
+fi
+
 DOC_COUNT=$("${PSQL[@]}" -c "SELECT COUNT(*) FROM ai.ai_documents" 2>/dev/null || echo 0)
 CHUNK_COUNT=$("${PSQL[@]}" -c "SELECT COUNT(*) FROM ai.ai_document_chunks" 2>/dev/null || echo 0)
 SOURCE_COUNTS_JSON=$("${PSQL[@]}" -c "

@@ -124,13 +124,13 @@ def obo_owner_visible_diagnostic(user_id: str | None) -> dict:
             JOIN ai.ai_documents d ON d.id = c.document_id
             WHERE c.embedding_vec IS NOT NULL AND d.source_type = 'obo_offer_summary'
               AND (d.visibility = 'public'
-                   OR (d.visibility = 'owner' AND d.owner_user_id = '{uid}'::uuid))
+                   OR (d.visibility = 'owner' AND d.owner_user_id = '{uid}'))
             """
         )
         user_obo_docs = psql_scalar(
             f"""
             SELECT COUNT(*) FROM ai.ai_documents
-            WHERE source_type = 'obo_offer_summary' AND owner_user_id = '{uid}'::uuid
+            WHERE source_type = 'obo_offer_summary' AND owner_user_id = '{uid}'
             """
         )
     recommended_fix = None

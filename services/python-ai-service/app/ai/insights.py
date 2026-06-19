@@ -54,18 +54,19 @@ async def rag_query(
     source_types: Optional[List[str]] = None,
     shadow_vector: bool = False,
     shadow_profile: Optional[str] = None,
+    shadow_query_hints: bool = False,
 ) -> Dict[str, Any]:
     async def run(conn):
         keyword = await retrieve_chunks(conn, query=question, user_id=user_id, source_types=source_types)
         shadow_diag = None
         if shadow_vector:
-            profile = shadow_profile or "generic_rag"
             shadow = await retrieve_chunks_vector_shadow(
                 conn,
                 query=question,
                 user_id=user_id,
                 source_types=source_types,
-                route_shadow_profile=profile,
+                route_shadow_profile=shadow_profile,
+                shadow_query_hints=shadow_query_hints,
             )
             unweighted_result = {
                 "candidate_count": shadow.get("unweighted_candidate_count", shadow.get("candidate_count", 0)),

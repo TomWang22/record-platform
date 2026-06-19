@@ -15,6 +15,7 @@ from app.ai.config import (
 )
 from app.ai.envelope import source_ref
 from app.ai.shadow_profiles import (
+    expand_query_with_hints,
     profile_diagnostic_meta,
     preferred_source_types,
     resolve_shadow_profile,
@@ -364,6 +365,7 @@ async def retrieve_chunks_vector_shadow(
     max_chunks: int = AI_RAG_MAX_CHUNKS,
     max_tokens: int = AI_RAG_MAX_CONTEXT_TOKENS,
     route_shadow_profile: Optional[str] = None,
+    shadow_query_hints: bool = False,
 ) -> Dict[str, Any]:
     """Diagnostic-only vector retrieval; same privacy scope as keyword path."""
     pin_source = bool(source_id or metadata_listing_id)
@@ -387,9 +389,18 @@ async def retrieve_chunks_vector_shadow(
             "latency_ms": 0,
         }
 
+    resolved_profile = resolve_shadow_profile(route_shadow_profile) if route_shadow_profile else None
+    route_mode = route_shadow_profile is not None
+    hint_profile = resolved_profile if route_mode else "generic_rag"
+    embed_query, expanded_query_terms, query_hint_applied = expand_query_with_hints(
+        query,
+        hint_profile,
+        apply_hints=shadow_query_hints,
+    )
+
     t0 = time.perf_counter()
     try:
-        query_vec = await _embed_query_vector(query)
+        query_vec = await _embed_query_vector(embed_query)
     except Exception as exc:
         return {
             "enabled": True,
@@ -400,6 +411,8 @@ async def retrieve_chunks_vector_shadow(
             "chunk_ids": [],
             "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
             "error": str(exc)[:120],
+            "query_hint_applied": query_hint_applied,
+            "expanded_query_terms": expanded_query_terms,
         }
 
     filters, params, idx = _build_scope_filters(
@@ -413,8 +426,6 @@ async def retrieve_chunks_vector_shadow(
     params.append(vec_lit)
     vec_param = idx
 
-    resolved_profile = resolve_shadow_profile(route_shadow_profile) if route_shadow_profile else None
-    route_mode = route_shadow_profile is not None
     preferred_zero_visible: List[str] = []
     scope_by_type: Dict[str, int] = {}
 
@@ -489,6 +500,8 @@ async def retrieve_chunks_vector_shadow(
         "chunks": unweighted_selected,
         "chunk_ids": [c["id"] for c in unweighted_selected],
         "latency_ms": latency_ms,
+        "query_hint_applied": query_hint_applied,
+        "expanded_query_terms": expanded_query_terms,
     }
     if route_mode:
         meta = profile_diagnostic_meta(resolved_profile)
@@ -509,6 +522,18 @@ async def retrieve_chunks_vector_shadow(
             "candidate_count": len(weighted_selected),
         })
     return result
+
+
+def _top_results_from_chunks(chunks: Sequence[Dict[str, Any]], *, limit: int = 5) -> List[Dict[str, Any]]:
+    """Diagnostic labels only — no chunk body text."""
+    out: List[Dict[str, Any]] = []
+    for ch in chunks[:limit]:
+        out.append({
+            "source_type": ch.get("source_type"),
+            "source_id": ch.get("source_id"),
+            "label": ch.get("title") or ch.get("source_id"),
+        })
+    return out
 
 
 def build_shadow_vector_diagnostic(
@@ -558,6 +583,11 @@ def build_shadow_vector_diagnostic(
         diag["unweighted_candidate_count"] = shadow_result.get("unweighted_candidate_count")
         if shadow_result.get("preferred_zero_owner_visible"):
             diag["preferred_zero_owner_visible"] = shadow_result["preferred_zero_owner_visible"]
+    if shadow_result.get("query_hint_applied") is not None:
+        diag["query_hint_applied"] = shadow_result.get("query_hint_applied")
+        diag["expanded_query_terms"] = shadow_result.get("expanded_query_terms") or []
+    if shadow_result.get("chunks"):
+        diag["top_results"] = _top_results_from_chunks(shadow_result["chunks"])
     status = shadow_result.get("status")
     if status and status != "ok":
         diag["status"] = status

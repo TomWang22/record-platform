@@ -82,6 +82,27 @@ class TestShadowProfiles(unittest.TestCase):
         from app.ai.shadow_profiles import resolve_shadow_profile
 
         self.assertEqual(resolve_shadow_profile("pricing_recommendation"), "obo_helper")
+
+    def test_shadow_query_hints_expand_auction_risk(self):
+        from app.ai.shadow_profiles import expand_query_with_hints
+
+        expanded, terms, applied = expand_query_with_hints(
+            "Why risky?", "auction_risk", apply_hints=True
+        )
+        self.assertTrue(applied)
+        self.assertIn("bid history", terms)
+        self.assertIn("bid history", expanded)
+
+    def test_shadow_query_hints_off_when_disabled(self):
+        from app.ai.shadow_profiles import expand_query_with_hints
+
+        expanded, terms, applied = expand_query_with_hints(
+            "Why risky?", "auction_risk", apply_hints=False
+        )
+        self.assertFalse(applied)
+        self.assertEqual(expanded, "Why risky?")
+        self.assertEqual(terms, [])
+
     def test_proxy_max_pattern(self):
         self.assertTrue(FORBIDDEN_CHUNK_RE.search("max_bid_cents exposed"))
         self.assertFalse(FORBIDDEN_CHUNK_RE.search("current bid 1200 cents"))

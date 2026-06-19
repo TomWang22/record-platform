@@ -1,4 +1,4 @@
-"""T19.5 — Route-specific shadow vector profiles (diagnostic only; keyword unchanged)."""
+"""T19.5/T19.6 — Route-specific shadow vector profiles (diagnostic only; keyword unchanged)."""
 from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
@@ -45,6 +45,49 @@ _PROFILE_PREFERRED: Dict[str, List[str]] = {
     "generic_rag": list(ALLOWED_SHADOW_SOURCE_TYPES),
 }
 
+_PROFILE_QUERY_HINTS: Dict[str, List[str]] = {
+    "auction_risk": [
+        "bid history",
+        "current bid",
+        "reserve",
+        "ending soon",
+        "proxy pressure",
+        "listing revision",
+    ],
+    "obo_helper": [
+        "offer",
+        "counter",
+        "accepted",
+        "rejected",
+        "withdrawn",
+        "fair price",
+        "listing price",
+        "buyer",
+        "seller",
+    ],
+    "record_valuation": [
+        "record",
+        "artist",
+        "title",
+        "condition",
+        "format",
+        "purchase",
+        "collection",
+        "valuation",
+    ],
+    "seller_sales_summary": [
+        "seller",
+        "listing",
+        "sold",
+        "offer",
+        "auction",
+        "revenue",
+        "notification",
+        "performance",
+    ],
+    "generic_rag": ["marketplace", "listing"],
+}
+
 
 def resolve_shadow_profile(profile: str | None) -> str:
     """Unknown profiles fall back to generic_rag."""
@@ -81,3 +124,21 @@ def profile_diagnostic_meta(profile: str | None) -> Dict[str, Any]:
         "preferred_source_types": preferred_source_types(resolved),
         "source_type_weights": source_type_weights(resolved),
     }
+
+
+def expand_query_with_hints(
+    query: str,
+    profile: str | None,
+    *,
+    apply_hints: bool,
+) -> Tuple[str, List[str], bool]:
+    """Shadow-only query expansion; keyword path must not call this."""
+    if not apply_hints:
+        return query, [], False
+    resolved = resolve_shadow_profile(profile)
+    hints = _PROFILE_QUERY_HINTS.get(resolved, [])
+    if not hints:
+        return query, [], False
+    hint_terms = list(hints)
+    expanded = f"{query.strip()} {' '.join(hints)}"
+    return expanded, hint_terms, True

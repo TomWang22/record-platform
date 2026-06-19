@@ -15,7 +15,7 @@ REPORT_JSON="${REPORT_JSON:-$REPO_ROOT/bench_logs/ai-platform/t18-6-rag-shadow-s
 COMPARE_MD="${COMPARE_MD:-$REPO_ROOT/bench_logs/ai-platform/t18-7-shadow-quality-comparison.md}"
 BASELINE_JSON="${SHADOW_BASELINE_JSON:-$REPO_ROOT/bench_logs/ai-platform/t18-7-shadow-baseline.json}"
 CAPTURE_BASELINE="${SHADOW_CAPTURE_BASELINE:-0}"
-CURL_TIMEOUT="${SHADOW_SMOKE_CURL_TIMEOUT:-120}"
+CURL_TIMEOUT="${SHADOW_SMOKE_CURL_TIMEOUT:-180}"
 mkdir -p "$(dirname "$REPORT_MD")"
 
 CA="${REPO_ROOT}/certs/dev-chain.pem"

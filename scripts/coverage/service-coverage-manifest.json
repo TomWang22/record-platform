@@ -1,0 +1,163 @@
+{
+  "version": "1",
+  "description": "RP service coverage manifest — strict gates only when strict_enabled=true",
+  "services": [
+    {
+      "name": "auth-service",
+      "path": "services/auth-service",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/auth-service/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "test:coverage not wired"
+    },
+    {
+      "name": "records-service",
+      "path": "services/records-service",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/records-service/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "test:coverage not wired"
+    },
+    {
+      "name": "listings-service",
+      "path": "services/listings-service",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/listings-service/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "test:coverage not wired"
+    },
+    {
+      "name": "shopping-service",
+      "path": "services/shopping-service",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/shopping-service/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "test:coverage not wired"
+    },
+    {
+      "name": "messaging-service",
+      "path": "services/messaging-service",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/messaging-service/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": "pnpm -C services/messaging-service run test:coverage",
+      "skip_reason": null
+    },
+    {
+      "name": "notification-service",
+      "path": "services/notification-service",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/notification-service/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": "pnpm -C services/notification-service run test:coverage",
+      "skip_reason": null
+    },
+    {
+      "name": "trust-service",
+      "path": "services/trust-service",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/trust-service/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": "pnpm -C services/trust-service run test:coverage",
+      "skip_reason": null
+    },
+    {
+      "name": "analytics-service",
+      "path": "services/analytics-service",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/analytics-service/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "test:coverage not wired"
+    },
+    {
+      "name": "media-service",
+      "path": "services/media-service",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/media-service/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": "pnpm -C services/media-service run test:coverage",
+      "skip_reason": null
+    },
+    {
+      "name": "auction-monitor",
+      "path": "services/auction-monitor",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/auction-monitor/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "test:coverage not wired"
+    },
+    {
+      "name": "api-gateway",
+      "path": "services/api-gateway",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/api-gateway/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "test:coverage not wired"
+    },
+    {
+      "name": "common",
+      "path": "services/common",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/common/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "test:coverage not wired"
+    },
+    {
+      "name": "python-ai-service",
+      "path": "services/python-ai-service",
+      "language": "python",
+      "runtime": "python3.11",
+      "coverage_tool": "pytest-cov",
+      "coverage_include": "app/ai",
+      "coverage_summary_path": "services/python-ai-service/coverage/coverage-summary.json",
+      "threshold": { "lines": 90 },
+      "strict_enabled": true,
+      "run_command": "bash scripts/coverage/run-python-ai-coverage.sh",
+      "skip_reason": null
+    }
+  ]
+}

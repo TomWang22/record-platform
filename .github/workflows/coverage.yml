@@ -1,0 +1,66 @@
+# Service coverage gates (T20.6) — separate from product CI gates.
+name: coverage
+
+on:
+  push:
+    paths:
+      - "services/**"
+      - "scripts/coverage/**"
+      - ".github/workflows/coverage.yml"
+  pull_request:
+    paths:
+      - "services/**"
+      - "scripts/coverage/**"
+      - ".github/workflows/coverage.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22.13"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  service-coverage:
+    name: Service coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run python-ai coverage
+        run: bash scripts/coverage/run-service-coverage.sh python-ai-service
+
+      - name: Enforce strict coverage gates
+        run: node scripts/coverage/enforce-service-coverage.mjs
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: service-coverage-summaries
+          path: |
+            services/python-ai-service/coverage/coverage-summary.json
+            services/python-ai-service/coverage/coverage.json
+          if-no-files-found: ignore

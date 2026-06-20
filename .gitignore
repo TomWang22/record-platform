@@ -14,6 +14,8 @@ toolkit-reference/
 webapp/.env.local
 .DS_Store
 coverage/
+!scripts/coverage/
+!scripts/coverage/**
 .reissue-tmp.*
 .reissue-ssh-*
 *.log
@@ -29,6 +31,7 @@ tmp/
 !infra/observability/*.json
 !docs/bundles/INTEGRITY_*.json
 !scripts/protocol/fixtures/**/*.json
+!scripts/coverage/*.json
 *.ndjson
 *.csv
 
@@ -89,6 +92,7 @@ bench_export_*.csv
 !LICENSE
 !CHANGELOG.md
 !**/requirements.txt
+!services/python-ai-service/requirements-test.txt
 
 # Prisma generated files
 **/prisma/generated/
@@ -123,6 +127,7 @@ infra/docs/EIGHT-DATABASES_ARCHITECTURE.md
 *.txt
 !certs/README.txt
 !docs/bundles/*.txt
+!services/python-ai-service/requirements-test.txt
 *.csv
 *.tsv
 *.html
@@ -143,6 +148,7 @@ infra/docs/EIGHT-DATABASES_ARCHITECTURE.md
 !infra/transport/*.yaml
 *.conf
 *.ini
+!services/python-ai-service/pytest.ini
 *.ini.bak
 *.tmpl
 *.tmpl.bak

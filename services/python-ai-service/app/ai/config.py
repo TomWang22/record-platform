@@ -18,6 +18,10 @@ AI_TF_MODEL = os.getenv("AI_TF_MODEL", "")
 AI_RAG_SHADOW_VECTOR = os.getenv("AI_RAG_SHADOW_VECTOR", "0") == "1"
 AI_RAG_SHADOW_MIN_EMBEDDED = int(os.getenv("AI_RAG_SHADOW_MIN_EMBEDDED", "1"))
 AI_RAG_VECTOR_DIM = int(os.getenv("AI_RAG_VECTOR_DIM", "768"))
+# T20.10E — shadow-only embed latency bounds (keyword path unaffected).
+AI_RAG_SHADOW_EMBED_TIMEOUT_MS = int(os.getenv("AI_RAG_SHADOW_EMBED_TIMEOUT_MS", "5000"))
+AI_RAG_SHADOW_EMBED_HINT_MAX_CHARS = int(os.getenv("AI_RAG_SHADOW_EMBED_HINT_MAX_CHARS", "512"))
+AI_RAG_SHADOW_EMBED_CACHE_MAX = int(os.getenv("AI_RAG_SHADOW_EMBED_CACHE_MAX", "64"))
 
 FORBIDDEN_RESPONSE_RE = (
     "demo",

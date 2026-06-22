@@ -136,20 +136,22 @@ class TestShadowProfiles(unittest.TestCase):
     def test_shadow_query_hints_expand_auction_risk(self):
         from app.ai.shadow_profiles import expand_query_with_hints
 
-        expanded, terms, applied = expand_query_with_hints(
+        expanded, terms, applied, truncated = expand_query_with_hints(
             "Why risky?", "auction_risk", apply_profile_hints=True
         )
         self.assertTrue(applied)
+        self.assertFalse(truncated)
         self.assertIn("bid history", terms)
         self.assertIn("bid history", expanded)
 
     def test_shadow_query_hints_off_when_disabled(self):
         from app.ai.shadow_profiles import expand_query_with_hints
 
-        expanded, terms, applied = expand_query_with_hints(
+        expanded, terms, applied, truncated = expand_query_with_hints(
             "Why risky?", "auction_risk", apply_profile_hints=False
         )
         self.assertFalse(applied)
+        self.assertFalse(truncated)
         self.assertEqual(expanded, "Why risky?")
         self.assertEqual(terms, [])
 

@@ -203,7 +203,7 @@ class TestVectorShadowRouteMode(unittest.TestCase):
         async def fake_fetch_vector(*args, **kwargs):
             return [_chunk_row()]
 
-        with patch("app.ai.rag_retrieval._embed_query_vector", AsyncMock(return_value=[0.1] * 768)):
+        with patch("app.ai.rag_retrieval._call_ollama_embed", AsyncMock(return_value=[0.1] * 768)):
             with patch("app.ai.rag_retrieval._fetch_vector_rows", AsyncMock(side_effect=fake_fetch_vector)):
                 result = _run(
                     retrieve_chunks_vector_shadow(
@@ -485,7 +485,7 @@ class TestVectorShadowNonRoute(unittest.TestCase):
     def test_non_route_vector_ok(self):
         conn = FakeConn(fetchval=10, fetch_rows=[_chunk_row()])
 
-        with patch("app.ai.rag_retrieval._embed_query_vector", AsyncMock(return_value=[0.1] * 768)):
+        with patch("app.ai.rag_retrieval._call_ollama_embed", AsyncMock(return_value=[0.1] * 768)):
             with patch(
                 "app.ai.rag_retrieval._fetch_vector_rows",
                 AsyncMock(return_value=[_chunk_row()]),
@@ -543,7 +543,7 @@ class TestShadowProfilesEdge(unittest.TestCase):
     def test_generic_rag_hints_empty_profile(self):
         from app.ai.shadow_profiles import expand_query_with_hints
 
-        expanded, terms, applied = expand_query_with_hints("q", "generic_rag", apply_profile_hints=True)
+        expanded, terms, applied, truncated = expand_query_with_hints("q", "generic_rag", apply_profile_hints=True)
         self.assertTrue(applied)
         self.assertIn("marketplace", expanded)
 

@@ -238,13 +238,39 @@ def resolved_profile_for_diagnostics(profile: str | None) -> Dict[str, Any]:
     }
 
 
+def _cap_hint_expansion(
+    base: str,
+    hint_terms: List[str],
+    max_expanded_chars: int | None,
+) -> Tuple[str, List[str], bool]:
+    """Shadow-only: keep embed input bounded when profile hints inflate query length."""
+    base = base.strip()
+    if not hint_terms:
+        return base, [], False
+    if not max_expanded_chars or max_expanded_chars <= 0:
+        return f"{base} {' '.join(hint_terms)}", hint_terms, False
+    used: List[str] = []
+    truncated = False
+    for term in hint_terms:
+        candidate = f"{base} {' '.join([*used, term])}"
+        if len(candidate) <= max_expanded_chars:
+            used.append(term)
+            continue
+        truncated = True
+        break
+    if not used:
+        return base, [], truncated
+    return f"{base} {' '.join(used)}", used, truncated
+
+
 def expand_query_with_hints(
     query: str,
     profile: str | None,
     *,
     apply_profile_hints: bool = False,
     custom_hints: List[str] | None = None,
-) -> Tuple[str, List[str], bool]:
+    max_expanded_chars: int | None = None,
+) -> Tuple[str, List[str], bool, bool]:
     """Shadow-only query expansion; keyword path must not call this."""
     hint_terms: List[str] = []
     if custom_hints:
@@ -253,6 +279,10 @@ def expand_query_with_hints(
         resolved = resolve_shadow_profile(profile)
         hint_terms.extend(_PROFILE_QUERY_HINTS.get(resolved, []))
     if not hint_terms:
-        return query, [], False
-    expanded = f"{query.strip()} {' '.join(hint_terms)}"
-    return expanded, hint_terms, True
+        return query, [], False, False
+    expanded, used_terms, truncated = _cap_hint_expansion(
+        query,
+        hint_terms,
+        max_expanded_chars,
+    )
+    return expanded, used_terms, bool(used_terms), truncated

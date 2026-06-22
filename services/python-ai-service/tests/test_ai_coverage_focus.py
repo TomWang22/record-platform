@@ -211,7 +211,7 @@ class TestEmbeddingDimension(unittest.TestCase):
                 return FakeResp()
 
         with patch("httpx.AsyncClient", return_value=FakeClient()):
-            with self.assertRaises(ValueError) as ctx:
+            with self.assertRaises(RuntimeError) as ctx:
                 self._run(_embed_query_vector("test query"))
             self.assertIn("dimension_mismatch", str(ctx.exception))
 
@@ -266,7 +266,7 @@ class TestVectorShadowDegraded(unittest.TestCase):
         conn.fetchval = AsyncMock(return_value=5)
 
         with patch(
-            "app.ai.rag_retrieval._embed_query_vector",
+            "app.ai.rag_retrieval._call_ollama_embed",
             AsyncMock(side_effect=RuntimeError("ollama down")),
         ):
             result = self._run(

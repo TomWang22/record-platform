@@ -1,9 +1,10 @@
 """T15.3B — Owner-scoped keyword retrieval over RAG corpus."""
 from __future__ import annotations
 
+import hashlib
 import re
 import time
-from collections import Counter
+from collections import Counter, OrderedDict
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -11,6 +12,9 @@ from app.ai.config import (
     AI_EMBEDDING_MODEL,
     AI_RAG_MAX_CHUNKS,
     AI_RAG_MAX_CONTEXT_TOKENS,
+    AI_RAG_SHADOW_EMBED_CACHE_MAX,
+    AI_RAG_SHADOW_EMBED_HINT_MAX_CHARS,
+    AI_RAG_SHADOW_EMBED_TIMEOUT_MS,
     AI_RAG_SHADOW_MIN_EMBEDDED,
     AI_RAG_VECTOR_DIM,
     OLLAMA_BASE_URL,
@@ -77,6 +81,24 @@ class ShadowTimingDiagnostics:
 
 
 @dataclass(slots=True)
+class ShadowEmbedDiagnostics:
+    provider: str = "ollama"
+    model: str = ""
+    query_length: int = 0
+    expanded_query_length: int = 0
+    profile_hints_enabled: bool = False
+    hint_terms_count: int = 0
+    hint_expansion_truncated: bool = False
+    timeout_ms: int = 0
+    retry_count: int = 0
+    cache_hit: bool = False
+    latency_ms: int = 0
+    timed_out: bool = False
+    error: Optional[str] = None
+    fallback_reason: Optional[str] = None
+
+
+@dataclass(slots=True)
 class ShadowCountDiagnostics:
     candidate_count_raw: int = 0
     candidate_count_after_source_filters: int = 0
@@ -116,6 +138,7 @@ class ShadowRetrievalDiagnostics:
     profile: Optional[str] = None
     query_hints: List[str] = field(default_factory=list)
     timings_ms: ShadowTimingDiagnostics = field(default_factory=ShadowTimingDiagnostics)
+    embed: ShadowEmbedDiagnostics = field(default_factory=ShadowEmbedDiagnostics)
     counts: ShadowCountDiagnostics = field(default_factory=ShadowCountDiagnostics)
     by_source_type: ShadowBySourceTypeDiagnostics = field(default_factory=ShadowBySourceTypeDiagnostics)
     privacy: ShadowPrivacyDiagnostics = field(default_factory=ShadowPrivacyDiagnostics)
@@ -327,15 +350,38 @@ def _rows_to_chunks(
     return selected
 
 
-async def _embed_query_vector(query: str) -> List[float]:
+_shadow_embed_cache: OrderedDict[str, List[float]] = OrderedDict()
+
+
+def _shadow_embed_cache_key(model: str, query: str) -> str:
+    digest = hashlib.sha256(f"{model}:{query}".encode("utf-8")).hexdigest()
+    return digest[:40]
+
+
+def _shadow_embed_cache_get(key: str) -> Optional[List[float]]:
+    vec = _shadow_embed_cache.get(key)
+    if vec is None:
+        return None
+    _shadow_embed_cache.move_to_end(key)
+    return list(vec)
+
+
+def _shadow_embed_cache_put(key: str, vec: Sequence[float]) -> None:
+    _shadow_embed_cache[key] = list(vec)
+    _shadow_embed_cache.move_to_end(key)
+    while len(_shadow_embed_cache) > max(0, AI_RAG_SHADOW_EMBED_CACHE_MAX):
+        _shadow_embed_cache.popitem(last=False)
+
+
+async def _call_ollama_embed(query: str, *, timeout_ms: int) -> List[float]:
     import httpx
 
     payload = {
         "model": AI_EMBEDDING_MODEL,
         "input": f"search_query: {(query or '')[:8000]}",
     }
-    timeout = max(5.0, 30.0)
-    async with httpx.AsyncClient(timeout=timeout) as client:
+    timeout_sec = max(1.0, timeout_ms / 1000.0)
+    async with httpx.AsyncClient(timeout=timeout_sec) as client:
         r = await client.post(f"{OLLAMA_BASE_URL}/api/embed", json=payload)
         r.raise_for_status()
         body = r.json()
@@ -347,6 +393,70 @@ async def _embed_query_vector(query: str) -> List[float]:
     if len(vec) != AI_RAG_VECTOR_DIM:
         raise ValueError(f"dimension_mismatch: got {len(vec)} expected {AI_RAG_VECTOR_DIM}")
     return vec
+
+
+async def _embed_query_vector(query: str) -> List[float]:
+    vec, _meta = await _shadow_embed_query(
+        query,
+        original_query_length=len(query or ""),
+        profile_hints_enabled=False,
+        hint_terms_count=0,
+        hint_expansion_truncated=False,
+        use_cache=False,
+    )
+    if vec is None:
+        raise RuntimeError(_meta.error or "embed_failed")
+    return vec
+
+
+async def _shadow_embed_query(
+    query: str,
+    *,
+    original_query_length: int,
+    profile_hints_enabled: bool,
+    hint_terms_count: int,
+    hint_expansion_truncated: bool,
+    use_cache: bool = True,
+) -> Tuple[Optional[List[float]], ShadowEmbedDiagnostics]:
+    """Shadow-only embedding with timeout, cache, and diagnostics."""
+    meta = ShadowEmbedDiagnostics(
+        provider="ollama",
+        model=AI_EMBEDDING_MODEL,
+        query_length=original_query_length,
+        expanded_query_length=len(query or ""),
+        profile_hints_enabled=profile_hints_enabled,
+        hint_terms_count=hint_terms_count,
+        hint_expansion_truncated=hint_expansion_truncated,
+        timeout_ms=AI_RAG_SHADOW_EMBED_TIMEOUT_MS,
+    )
+    cache_key = _shadow_embed_cache_key(AI_EMBEDDING_MODEL, query)
+    if use_cache and AI_RAG_SHADOW_EMBED_CACHE_MAX > 0:
+        cached = _shadow_embed_cache_get(cache_key)
+        if cached is not None:
+            meta.cache_hit = True
+            meta.latency_ms = 0
+            return cached, meta
+
+    embed_start = _now_ms()
+    try:
+        vec = await _call_ollama_embed(query, timeout_ms=AI_RAG_SHADOW_EMBED_TIMEOUT_MS)
+    except Exception as exc:
+        meta.latency_ms = _elapsed_ms(embed_start)
+        err = str(exc)
+        meta.error = err[:120]
+        import httpx
+
+        if isinstance(exc, httpx.TimeoutException) or "timed out" in err.lower():
+            meta.timed_out = True
+            meta.fallback_reason = "embed_timeout"
+        else:
+            meta.fallback_reason = "embed_error"
+        return None, meta
+
+    meta.latency_ms = _elapsed_ms(embed_start)
+    if use_cache and AI_RAG_SHADOW_EMBED_CACHE_MAX > 0:
+        _shadow_embed_cache_put(cache_key, vec)
+    return vec, meta
 
 
 async def count_embedded_chunks_for_scope(
@@ -612,39 +722,49 @@ async def retrieve_chunks_vector_shadow(
     resolved_profile = resolve_shadow_profile(route_shadow_profile) if route_shadow_profile else None
     route_mode = route_shadow_profile is not None
     hint_profile = resolved_profile if route_mode else "generic_rag"
-    embed_query, expanded_query_terms, query_hint_applied = expand_query_with_hints(
+    embed_query, expanded_query_terms, query_hint_applied, hint_truncated = expand_query_with_hints(
         query,
         hint_profile,
         apply_profile_hints=shadow_profile_hints,
         custom_hints=list(shadow_custom_query_hints or []),
+        max_expanded_chars=AI_RAG_SHADOW_EMBED_HINT_MAX_CHARS,
     )
     if include_diagnostics:
         diagnostics.query_hints = list(expanded_query_terms)
         diagnostics.debug["profile_details"] = resolved_profile_for_diagnostics(route_shadow_profile)
         diagnostics.debug["query_hint_applied"] = query_hint_applied
+        diagnostics.debug["hint_expansion_truncated"] = hint_truncated
 
     embed_start = _now_ms()
-    try:
-        query_vec = await _embed_query_vector(embed_query)
-    except Exception as exc:
-        diagnostics.timings_ms.embed = _elapsed_ms(embed_start)
+    query_vec, embed_meta = await _shadow_embed_query(
+        embed_query,
+        original_query_length=len(query or ""),
+        profile_hints_enabled=shadow_profile_hints,
+        hint_terms_count=len(expanded_query_terms),
+        hint_expansion_truncated=hint_truncated,
+        use_cache=True,
+    )
+    diagnostics.embed = embed_meta
+    diagnostics.timings_ms.embed = embed_meta.latency_ms or _elapsed_ms(embed_start)
+    if query_vec is None:
         diagnostics.timings_ms.total = _elapsed_ms(total_start)
+        status = "embed_timed_out" if embed_meta.timed_out else "embed_failed"
         result = {
             "enabled": True,
-            "status": "embed_failed",
+            "status": status,
             "embedded_chunks": embedded_count,
             "candidate_count": 0,
             "chunks": [],
             "chunk_ids": [],
             "latency_ms": diagnostics.timings_ms.total,
-            "error": str(exc)[:120],
+            "error": (embed_meta.error or embed_meta.fallback_reason or "embed_failed")[:120],
             "query_hint_applied": query_hint_applied,
             "expanded_query_terms": expanded_query_terms,
+            "embed_timed_out": embed_meta.timed_out,
         }
         if include_diagnostics:
             result["shadow_diagnostics"] = diagnostics.to_dict()
         return result
-    diagnostics.timings_ms.embed = _elapsed_ms(embed_start)
 
     filters, params, idx = _build_scope_filters(
         user_id,

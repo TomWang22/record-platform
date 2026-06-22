@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# T18.7 / T19.3 — Controlled per-source-type embedding backfill (bounded new rows; keyword default).
+# T18.7 / T19.3 / T20.7R — Controlled per-source-type embedding backfill (bounded new rows; keyword default).
 # One actual write pass per tranche lock — see EMBEDDING_BACKFILL_TRANCHE_ID / EMBEDDING_BACKFILL_FORCE.
+#
+# Exit codes:
+#   0 — success (dry-run, selected=0 no-op, or completed actual write)
+#   1 — partial failure, validation failure, or infrastructure error
+#   2 — tranche actual-run lock blocks rerun (no EMBEDDING_BACKFILL_FORCE=1)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,6 +13,50 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 # shellcheck source=lib/rp-python-ai-psql.sh
 source "$SCRIPT_DIR/lib/rp-python-ai-psql.sh"
+
+EXIT_OK=0
+EXIT_FAIL=1
+EXIT_LOCK_BLOCKED=2
+
+usage() {
+  cat <<'EOF'
+Usage:
+  rp-ai-embedding-backfill-controlled.sh
+  rp-ai-embedding-backfill-controlled.sh --check-lock <tranche_id>
+
+Env:
+  EMBEDDING_BACKFILL_TRANCHE_ID       tranche identifier (writes lock file when set)
+  EMBEDDING_BACKFILL_DRY_RUN=1        plan only, no writes
+  EMBEDDING_BACKFILL_FORCE=1          bypass tranche lock (ops approval only)
+
+Exit codes:
+  0 success | 1 failure | 2 tranche lock blocks rerun
+EOF
+}
+
+check_tranche_lock() {
+  local tranche_id="$1"
+  local lock_path="${EMBEDDING_BACKFILL_TRANCHE_LOCK:-$REPO_ROOT/bench_logs/ai-platform/${tranche_id}-actual-run.json}"
+  local force="${EMBEDDING_BACKFILL_FORCE:-0}"
+  if [[ -f "$lock_path" ]] && [[ "$force" != "1" ]]; then
+    echo "❌ tranche actual-run lock exists: $lock_path" >&2
+    echo "   Rerun blocked — one write pass per tranche." >&2
+    echo "   Set EMBEDDING_BACKFILL_FORCE=1 only after explicit ops approval." >&2
+    return "$EXIT_LOCK_BLOCKED"
+  fi
+  echo "✅ tranche lock check OK (tranche_id=$tranche_id lock=$lock_path force=$force)"
+  return "$EXIT_OK"
+}
+
+if [[ "${1:-}" == "--check-lock" ]]; then
+  [[ -n "${2:-}" ]] || { usage >&2; exit "$EXIT_FAIL"; }
+  check_tranche_lock "$2"
+  exit $?
+fi
+if [[ "${1:-}" == "-h" ]] || [[ "${1:-}" == "--help" ]]; then
+  usage
+  exit "$EXIT_OK"
+fi
 
 NS="${K8S_NAMESPACE:-record-platform}"
 TOTAL_LIMIT="${EMBEDDING_BACKFILL_TOTAL_LIMIT:-1000}"
@@ -56,8 +105,9 @@ echo "pre_embedded_count=$PRE_EMBEDDED_COUNT"
 if [[ "$DRY_RUN" == "0" ]]; then
   if [[ -n "$TRANCHE_LOCK" ]] && [[ -f "$TRANCHE_LOCK" ]] && [[ "$EMBEDDING_BACKFILL_FORCE" != "1" ]]; then
     echo "❌ tranche actual-run lock exists: $TRANCHE_LOCK" >&2
-    echo "   One write pass per tranche. Set EMBEDDING_BACKFILL_FORCE=1 only after explicit ops approval." >&2
-    exit 1
+    echo "   Rerun blocked — one write pass per tranche." >&2
+    echo "   Set EMBEDDING_BACKFILL_FORCE=1 only after explicit ops approval." >&2
+    exit "$EXIT_LOCK_BLOCKED"
   fi
 fi
 

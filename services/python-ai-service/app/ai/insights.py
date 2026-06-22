@@ -54,11 +54,14 @@ async def rag_query(
     source_types: Optional[List[str]] = None,
     shadow_vector: bool = False,
     shadow_profile: Optional[str] = None,
-    shadow_query_hints: bool = False,
+    shadow_profile_hints: bool = False,
+    shadow_custom_query_hints: Optional[List[str]] = None,
+    shadow_debug: bool = False,
 ) -> Dict[str, Any]:
     async def run(conn):
         keyword = await retrieve_chunks(conn, query=question, user_id=user_id, source_types=source_types)
         shadow_diag = None
+        shadow_diagnostics = None
         if shadow_vector:
             shadow = await retrieve_chunks_vector_shadow(
                 conn,
@@ -66,7 +69,10 @@ async def rag_query(
                 user_id=user_id,
                 source_types=source_types,
                 route_shadow_profile=shadow_profile,
-                shadow_query_hints=shadow_query_hints,
+                shadow_profile_hints=shadow_profile_hints,
+                shadow_custom_query_hints=shadow_custom_query_hints,
+                include_diagnostics=shadow_debug,
+                keyword_chunks_for_overlap=keyword["chunks"] if shadow_debug else None,
             )
             unweighted_result = {
                 "candidate_count": shadow.get("unweighted_candidate_count", shadow.get("candidate_count", 0)),
@@ -77,7 +83,9 @@ async def rag_query(
             shadow_diag = build_shadow_vector_diagnostic(
                 keyword["chunks"], shadow, unweighted_result=unweighted_result
             )
-        return keyword, shadow_diag
+            if shadow_debug and shadow.get("shadow_diagnostics"):
+                shadow_diagnostics = shadow["shadow_diagnostics"]
+        return keyword, shadow_diag, shadow_diagnostics
 
     result, err = await _with_conn(run)
     model_used, model_deg = await resolve_model_used()
@@ -91,7 +99,7 @@ async def rag_query(
             source_refs=[],
             degraded_reason=err,
         )
-    keyword_result, shadow_diag = result
+    keyword_result, shadow_diag, shadow_diagnostics = result
     chunks = keyword_result["chunks"]
     refs = keyword_result["source_refs"]
     citations = [chunk_to_citation(c) for c in chunks[:5]]
@@ -106,6 +114,8 @@ async def rag_query(
     }
     if shadow_diag is not None:
         details["shadow_vector"] = shadow_diag
+    if shadow_diagnostics is not None:
+        details["shadow_diagnostics"] = shadow_diagnostics
     provider = get_provider()
     if provider.name == "ollama" and chunks:
         expl = await provider.explain(

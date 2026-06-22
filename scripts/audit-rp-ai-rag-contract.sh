@@ -184,17 +184,17 @@ else
 fi
 
 # 13 — T19.6 shadow query hints (opt-in diagnostic only)
-if grep -q 'expand_query_with_hints' "$SHADOW_PROFILES_PY" && grep -q 'shadow_query_hints' "$ROUTES_PY"; then
+if grep -q 'expand_query_with_hints' "$SHADOW_PROFILES_PY" && grep -q 'shadow_profile_hints' "$ROUTES_PY"; then
   pass "shadow_query_hints_opt_in_only"
 else
-  fail "shadow_query_hints_opt_in_only" "shadow_query_hints query param or expand_query_with_hints missing"
+  fail "shadow_query_hints_opt_in_only" "shadow_profile_hints query param or expand_query_with_hints missing"
 fi
 if grep -q 'query_hint_applied' "$RAG_PY" && grep -q 'expanded_query_terms' "$RAG_PY"; then
   pass "shadow_query_hints_in_diagnostics"
 else
   fail "shadow_query_hints_in_diagnostics" "query hint diagnostics missing from shadow path"
 fi
-if grep -q 'shadow_query_hints' "$INSIGHTS_PY" && grep -q 'retrieve_chunks(' "$INSIGHTS_PY"; then
+if grep -q 'shadow_profile_hints' "$INSIGHTS_PY" && grep -q 'retrieve_chunks(' "$INSIGHTS_PY"; then
   pass "shadow_query_hints_no_keyword_change"
 else
   fail "shadow_query_hints_no_keyword_change" "keyword path must not use shadow query hints"

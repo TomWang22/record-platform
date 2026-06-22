@@ -87,7 +87,7 @@ class TestShadowProfiles(unittest.TestCase):
         from app.ai.shadow_profiles import expand_query_with_hints
 
         expanded, terms, applied = expand_query_with_hints(
-            "Why risky?", "auction_risk", apply_hints=True
+            "Why risky?", "auction_risk", apply_profile_hints=True
         )
         self.assertTrue(applied)
         self.assertIn("bid history", terms)
@@ -97,7 +97,7 @@ class TestShadowProfiles(unittest.TestCase):
         from app.ai.shadow_profiles import expand_query_with_hints
 
         expanded, terms, applied = expand_query_with_hints(
-            "Why risky?", "auction_risk", apply_hints=False
+            "Why risky?", "auction_risk", apply_profile_hints=False
         )
         self.assertFalse(applied)
         self.assertEqual(expanded, "Why risky?")

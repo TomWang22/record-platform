@@ -183,36 +183,48 @@ def types_from_dist(dist):
 
 def parse_shadow_response(data):
     sv = (data.get("details") or {}).get("shadow_vector") or {}
+    sd = (data.get("details") or {}).get("shadow_diagnostics") or {}
     uw = sv.get("unweighted") or {}
     weighted_dist = dist_from_sv(sv)
     unweighted_dist = dist_from_sv(uw) if uw else weighted_dist
+    timings = sd.get("timings_ms") or {}
+    counts = sd.get("counts") or {}
+    overlap_detail = sd.get("overlap") or {}
     return {
         "shadow_vector": sv,
+        "shadow_diagnostics": sd,
         "source_types": types_from_dist(weighted_dist),
         "unweighted_types": types_from_dist(unweighted_dist),
         "candidate_count": sv.get("weighted_candidate_count", sv.get("candidate_count")),
         "unweighted_candidates": uw.get("candidate_count") if uw else sv.get("unweighted_candidate_count"),
-        "overlap": sv.get("overlap_with_keyword"),
+        "overlap": sv.get("overlap_with_keyword", overlap_detail.get("count")),
+        "overlap_ratio_vs_keyword": overlap_detail.get("ratio_vs_keyword") or sv.get("overlap_ratio_vs_keyword"),
         "unweighted_overlap": uw.get("overlap_with_keyword"),
-        "profile": sv.get("profile"),
+        "profile": sv.get("profile") or sd.get("profile"),
         "preferred_zero_owner_visible": sv.get("preferred_zero_owner_visible") or [],
         "query_hint_applied": sv.get("query_hint_applied"),
         "expanded_query_terms": sv.get("expanded_query_terms") or [],
-        "latency_ms": sv.get("latency_ms"),
+        "latency_ms": sv.get("latency_ms") or timings.get("total"),
+        "timings_ms": timings,
+        "counts": counts,
+        "privacy": sd.get("privacy") or {},
         "top_results": sv.get("top_results") or [],
     }
 
 
-def call_rag(question, *, shadow: bool, profile: str | None = None, query_hints: bool = False, retries: int = 2):
+def call_rag(question, *, shadow: bool, profile: str | None = None, profile_hints: bool = False, custom_hints: str | None = None, retries: int = 2):
     last = {}
     for attempt in range(retries + 1):
         params = []
         if shadow:
             params.append("shadow_vector=1")
+            params.append("shadow_debug=1")
         if profile:
             params.append(f"shadow_profile={profile}")
-        if query_hints:
-            params.append("shadow_query_hints=1")
+        if profile_hints:
+            params.append("shadow_profile_hints=1")
+        if custom_hints:
+            params.append(f"shadow_query_hints={custom_hints}")
         qs = ("?" + "&".join(params)) if params else ""
         cmd = [
             "curl", "-sfS", "--max-time", curl_timeout, "--cacert", ca, "--resolve", resolve,
@@ -286,12 +298,15 @@ unweighted_types_union = set()
 weighted_types_union = set()
 hinted_types_union = set()
 hinted_lats = []
+hinted_phase_embed = []
+hinted_phase_fetch = []
+hinted_phase_privacy = []
 
 for pid, question, profile in PROMPTS:
     keyword = call_rag(question, shadow=False)
     unweighted = call_rag(question, shadow=True)
     weighted = call_rag(question, shadow=True, profile=profile)
-    hinted = call_rag(question, shadow=True, profile=profile, query_hints=True)
+    hinted = call_rag(question, shadow=True, profile=profile, profile_hints=True)
 
     row = {
         "prompt_id": pid,
@@ -312,6 +327,13 @@ for pid, question, profile in PROMPTS:
         hinted_types_union.add(st)
     if hinted.get("latency_ms") is not None:
         hinted_lats.append(float(hinted["latency_ms"]))
+    timings = hinted.get("timings_ms") or {}
+    if timings.get("embed") is not None:
+        hinted_phase_embed.append(float(timings["embed"]))
+    if timings.get("candidate_fetch") is not None:
+        hinted_phase_fetch.append(float(timings["candidate_fetch"]))
+    if timings.get("privacy_filter") is not None:
+        hinted_phase_privacy.append(float(timings["privacy_filter"]))
 
     issues.extend(check_keyword_stable(
         pid, keyword,
@@ -373,6 +395,9 @@ summary = {
     "obo_zero_owner_visible_prompts": obo_zero_reason,
     "shadow_latency_p50_ms": percentile(hinted_lats, 50),
     "shadow_latency_p95_ms": percentile(hinted_lats, 95),
+    "shadow_embed_p95_ms": percentile(hinted_phase_embed, 95),
+    "shadow_fetch_p95_ms": percentile(hinted_phase_fetch, 95),
+    "shadow_privacy_p95_ms": percentile(hinted_phase_privacy, 95),
     "results": rows,
 }
 
@@ -390,6 +415,7 @@ lines = [
     f"- Types (route weighted): {', '.join(summary['source_types_route_weighted_union']) or '(none)'}",
     f"- Types (weighted + hints): {', '.join(summary['source_types_route_weighted_hints_union']) or '(none)'}",
     f"- Latency p50/p95 ms (hinted): {summary['shadow_latency_p50_ms']} / {summary['shadow_latency_p95_ms']}",
+    f"- Phase p95 ms embed/fetch/privacy: {summary['shadow_embed_p95_ms']} / {summary['shadow_fetch_p95_ms']} / {summary['shadow_privacy_p95_ms']}",
     "",
     "## OBO owner-visible diagnostic (T19.6B)",
     "",
@@ -399,16 +425,18 @@ lines = [
     f"- Contract user OBO documents: {obo_diag['contract_user_obo_documents']}",
     f"- Recommended fix: {obo_diag.get('recommended_fix') or 'none'}",
     "",
-    "| prompt | profile | uw types | w types | w+h types | uw cand | w cand | h cand | h overlap | h latency | hints |",
-    "|--------|---------|----------|---------|-----------|--------:|-------:|-------:|----------:|----------:|-------|",
+    "| prompt | profile | uw types | w types | w+h types | uw cand | w cand | h cand | h overlap | h latency | embed | fetch | privacy | hints |",
+    "|--------|---------|----------|---------|-----------|--------:|-------:|-------:|----------:|----------:|------:|------:|--------:|-------|",
 ]
 for r in rows:
     uw, w, h = r["unweighted_global"], r["route_weighted"], r["route_weighted_hints"]
+    ht = h.get("timings_ms") or {}
     lines.append(
         f"| {r['prompt_id']} | {r['profile']} | {', '.join(uw.get('source_types') or [])} | "
         f"{', '.join(w.get('source_types') or [])} | {', '.join(h.get('source_types') or [])} | "
         f"{uw.get('candidate_count', '')} | {w.get('candidate_count', '')} | {h.get('candidate_count', '')} | "
-        f"{h.get('overlap', '')} | {h.get('latency_ms', '')} | {h.get('query_hint_applied', '')} |"
+        f"{h.get('overlap', '')} | {h.get('latency_ms', '')} | {ht.get('embed', '')} | "
+        f"{ht.get('candidate_fetch', '')} | {ht.get('privacy_filter', '')} | {h.get('query_hint_applied', '')} |"
     )
 
 lines += [

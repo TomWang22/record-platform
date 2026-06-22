@@ -126,19 +126,32 @@ def profile_diagnostic_meta(profile: str | None) -> Dict[str, Any]:
     }
 
 
+def resolved_profile_for_diagnostics(profile: str | None) -> Dict[str, Any]:
+    """Shadow-only serialization for diagnostics; does not affect keyword retrieval."""
+    resolved = resolve_shadow_profile(profile)
+    meta = profile_diagnostic_meta(resolved)
+    return {
+        **meta,
+        "query_hints_available": list(_PROFILE_QUERY_HINTS.get(resolved, [])),
+        "notes": [f"shadow-only profile {resolved}"],
+    }
+
+
 def expand_query_with_hints(
     query: str,
     profile: str | None,
     *,
-    apply_hints: bool,
+    apply_profile_hints: bool = False,
+    custom_hints: List[str] | None = None,
 ) -> Tuple[str, List[str], bool]:
     """Shadow-only query expansion; keyword path must not call this."""
-    if not apply_hints:
+    hint_terms: List[str] = []
+    if custom_hints:
+        hint_terms.extend(h.strip() for h in custom_hints if h and h.strip())
+    if apply_profile_hints:
+        resolved = resolve_shadow_profile(profile)
+        hint_terms.extend(_PROFILE_QUERY_HINTS.get(resolved, []))
+    if not hint_terms:
         return query, [], False
-    resolved = resolve_shadow_profile(profile)
-    hints = _PROFILE_QUERY_HINTS.get(resolved, [])
-    if not hints:
-        return query, [], False
-    hint_terms = list(hints)
-    expanded = f"{query.strip()} {' '.join(hints)}"
+    expanded = f"{query.strip()} {' '.join(hint_terms)}"
     return expanded, hint_terms, True

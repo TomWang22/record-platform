@@ -210,7 +210,7 @@ class TestVectorShadowRouteMode(unittest.TestCase):
                         query="auction risk",
                         user_id="u1",
                         route_shadow_profile="auction_risk",
-                        shadow_query_hints=True,
+                        shadow_profile_hints=True,
                     )
                 )
         self.assertEqual(result["status"], "ok")
@@ -355,6 +355,64 @@ class TestInsightsWithMockPool(unittest.TestCase):
                     )
         self.assertIn("shadow_vector", env.get("details", {}))
 
+    def test_rag_query_shadow_debug_diagnostics(self):
+        conn = FakeConn(fetch_rows=[_chunk_row()])
+        shadow_payload = {
+            "status": "ok",
+            "candidate_count": 1,
+            "chunks": [_chunk_row()],
+            "chunk_ids": ["c1"],
+            "latency_ms": 5.0,
+            "embedded_chunks": 10,
+            "shadow_diagnostics": {
+                "enabled": True,
+                "timings_ms": {"total": 5},
+                "counts": {"selected_count": 1},
+                "overlap": {"count": 0},
+            },
+        }
+        with patch.object(insights, "get_pool", AsyncMock(return_value=self._mock_pool(conn))):
+            with patch.object(insights, "resolve_model_used", AsyncMock(return_value=("rule-engine", None))):
+                with patch.object(
+                    insights,
+                    "retrieve_chunks_vector_shadow",
+                    AsyncMock(return_value=shadow_payload),
+                ):
+                    env = _run(
+                        insights.rag_query(
+                            user_id="u1",
+                            question="listing price",
+                            shadow_vector=True,
+                            shadow_debug=True,
+                        )
+                    )
+        details = env.get("details", {})
+        self.assertIn("shadow_diagnostics", details)
+        self.assertEqual(details["shadow_diagnostics"]["counts"]["selected_count"], 1)
+
+    def test_rag_query_without_shadow_debug_omits_diagnostics(self):
+        conn = FakeConn(fetch_rows=[_chunk_row()])
+        with patch.object(insights, "get_pool", AsyncMock(return_value=self._mock_pool(conn))):
+            with patch.object(insights, "resolve_model_used", AsyncMock(return_value=("rule-engine", None))):
+                with patch.object(
+                    insights,
+                    "retrieve_chunks_vector_shadow",
+                    AsyncMock(
+                        return_value={
+                            "status": "ok",
+                            "candidate_count": 1,
+                            "chunks": [_chunk_row()],
+                            "chunk_ids": ["c1"],
+                            "latency_ms": 5.0,
+                            "embedded_chunks": 10,
+                        }
+                    ),
+                ):
+                    env = _run(
+                        insights.rag_query(user_id="u1", question="listing price", shadow_vector=True)
+                    )
+        self.assertNotIn("shadow_diagnostics", env.get("details", {}))
+
     def test_rag_query_ollama_explanation(self):
         conn = FakeConn(fetch_rows=[_chunk_row()])
         fake_provider = MagicMock()
@@ -484,7 +542,7 @@ class TestShadowProfilesEdge(unittest.TestCase):
     def test_generic_rag_hints_empty_profile(self):
         from app.ai.shadow_profiles import expand_query_with_hints
 
-        expanded, terms, applied = expand_query_with_hints("q", "generic_rag", apply_hints=True)
+        expanded, terms, applied = expand_query_with_hints("q", "generic_rag", apply_profile_hints=True)
         self.assertTrue(applied)
         self.assertIn("marketplace", expanded)
 

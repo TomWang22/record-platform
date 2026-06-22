@@ -12,6 +12,15 @@ from app.ai.config import AI_RAG_SHADOW_VECTOR
 router = APIRouter(prefix="/ai", tags=["ai-platform"])
 
 
+def _parse_custom_query_hints(value: Optional[str]) -> Optional[List[str]]:
+    if value is None:
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
 def _user_id(header: Optional[str], body_user: Optional[str]) -> Optional[str]:
     uid = (header or body_user or "").strip()
     if uid in ("", "null", "None"):
@@ -46,7 +55,12 @@ async def post_rag_query(
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
     shadow_vector: bool = Query(False),
     shadow_profile: Optional[str] = Query(None),
-    shadow_query_hints: bool = Query(False),
+    shadow_profile_hints: bool = Query(False),
+    shadow_query_hints: Optional[str] = Query(
+        None,
+        description="Comma-separated shadow-only query hint terms, e.g. obo,owner_visible",
+    ),
+    shadow_debug: bool = Query(False),
 ):
     return await insights.rag_query(
         user_id=_user_id(x_user_id, body.user_id),
@@ -54,7 +68,9 @@ async def post_rag_query(
         source_types=body.source_types,
         shadow_vector=shadow_vector or AI_RAG_SHADOW_VECTOR,
         shadow_profile=shadow_profile,
-        shadow_query_hints=shadow_query_hints,
+        shadow_profile_hints=shadow_profile_hints,
+        shadow_custom_query_hints=_parse_custom_query_hints(shadow_query_hints),
+        shadow_debug=shadow_debug,
     )
 
 

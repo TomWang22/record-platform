@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import re
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from collections import Counter
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from app.ai.config import (
     AI_EMBEDDING_MODEL,
@@ -19,10 +21,195 @@ from app.ai.shadow_profiles import (
     profile_diagnostic_meta,
     preferred_source_types,
     resolve_shadow_profile,
+    resolved_profile_for_diagnostics,
     source_type_weights,
 )
 
 FORBIDDEN_CHUNK_RE = re.compile(r"max_bid_cents|proxy_bids|proxy max", re.I)
+
+
+def _now_ms() -> int:
+    return int(time.perf_counter() * 1000)
+
+
+def _elapsed_ms(start_ms: int) -> int:
+    return max(0, _now_ms() - start_ms)
+
+
+def _safe_chunk_id(chunk: Mapping[str, Any]) -> str:
+    value = chunk.get("id") or chunk.get("chunk_id") or ""
+    return str(value)
+
+
+def _safe_source_type(chunk: Mapping[str, Any]) -> str:
+    value = chunk.get("source_type") or "unknown"
+    return str(value)
+
+
+def _count_by_source_type(chunks: Iterable[Mapping[str, Any]]) -> Dict[str, int]:
+    counter: Counter[str] = Counter()
+    for chunk in chunks:
+        counter[_safe_source_type(chunk)] += 1
+    return dict(sorted(counter.items(), key=lambda item: item[0]))
+
+
+def _collect_chunk_ids(chunks: Iterable[Mapping[str, Any]]) -> List[str]:
+    ids: List[str] = []
+    for chunk in chunks:
+        chunk_id = _safe_chunk_id(chunk)
+        if chunk_id:
+            ids.append(chunk_id)
+    return ids
+
+
+@dataclass(slots=True)
+class ShadowTimingDiagnostics:
+    embed: int = 0
+    candidate_fetch: int = 0
+    source_filter: int = 0
+    privacy_filter: int = 0
+    rerank_select: int = 0
+    total: int = 0
+
+
+@dataclass(slots=True)
+class ShadowCountDiagnostics:
+    candidate_count_raw: int = 0
+    candidate_count_after_source_filters: int = 0
+    candidate_count_after_privacy_filters: int = 0
+    selected_count: int = 0
+
+
+@dataclass(slots=True)
+class ShadowBySourceTypeDiagnostics:
+    raw: Dict[str, int] = field(default_factory=dict)
+    post_source_filter: Dict[str, int] = field(default_factory=dict)
+    post_privacy_filter: Dict[str, int] = field(default_factory=dict)
+    selected: Dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class ShadowPrivacyDiagnostics:
+    blocked_message_count: int = 0
+    blocked_proxy_count: int = 0
+    blocked_owner_scope_count: int = 0
+    blocked_other_count: int = 0
+
+
+@dataclass(slots=True)
+class ShadowOverlapDiagnostics:
+    count: int = 0
+    ratio_vs_keyword: float = 0.0
+    ratio_vs_shadow: float = 0.0
+    overlap_ids: List[str] = field(default_factory=list)
+    keyword_ids: List[str] = field(default_factory=list)
+    shadow_ids: List[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class ShadowRetrievalDiagnostics:
+    enabled: bool
+    profile: Optional[str] = None
+    query_hints: List[str] = field(default_factory=list)
+    timings_ms: ShadowTimingDiagnostics = field(default_factory=ShadowTimingDiagnostics)
+    counts: ShadowCountDiagnostics = field(default_factory=ShadowCountDiagnostics)
+    by_source_type: ShadowBySourceTypeDiagnostics = field(default_factory=ShadowBySourceTypeDiagnostics)
+    privacy: ShadowPrivacyDiagnostics = field(default_factory=ShadowPrivacyDiagnostics)
+    overlap: ShadowOverlapDiagnostics = field(default_factory=ShadowOverlapDiagnostics)
+    debug: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+def _privacy_block_reason(
+    row: Any,
+    *,
+    words: List[str],
+    pin_source: bool,
+    query: str,
+) -> Optional[str]:
+    content = row["content"] or ""
+    if FORBIDDEN_CHUNK_RE.search(content):
+        return "proxy"
+    if row["source_type"] == "message":
+        meta = _coerce_metadata(row["metadata"])
+        if meta.get("opt_in") is not True:
+            return "message"
+    if words and row.get("score", 1) <= 0 and query and not pin_source:
+        return "other"
+    return None
+
+
+def _partition_privacy_rows(
+    rows: Sequence[Any],
+    *,
+    words: List[str],
+    pin_source: bool,
+    query: str,
+) -> Tuple[List[Any], ShadowPrivacyDiagnostics]:
+    allowed: List[Any] = []
+    privacy = ShadowPrivacyDiagnostics()
+    for row in rows:
+        reason = _privacy_block_reason(row, words=words, pin_source=pin_source, query=query)
+        if reason == "proxy":
+            privacy.blocked_proxy_count += 1
+            continue
+        if reason == "message":
+            privacy.blocked_message_count += 1
+            continue
+        if reason == "other":
+            privacy.blocked_other_count += 1
+            continue
+        allowed.append(row)
+    return allowed, privacy
+
+
+def _build_overlap_diagnostics(
+    *,
+    keyword_chunks: Sequence[Mapping[str, Any]],
+    shadow_chunks: Sequence[Mapping[str, Any]],
+) -> ShadowOverlapDiagnostics:
+    keyword_ids = _collect_chunk_ids(keyword_chunks)
+    shadow_ids = _collect_chunk_ids(shadow_chunks)
+    keyword_set = set(keyword_ids)
+    shadow_set = set(shadow_ids)
+    overlap_ids = sorted(keyword_set.intersection(shadow_set))
+    overlap_count = len(overlap_ids)
+    ratio_vs_keyword = (overlap_count / len(keyword_set)) if keyword_set else 0.0
+    ratio_vs_shadow = (overlap_count / len(shadow_set)) if shadow_set else 0.0
+    return ShadowOverlapDiagnostics(
+        count=overlap_count,
+        ratio_vs_keyword=round(ratio_vs_keyword, 4),
+        ratio_vs_shadow=round(ratio_vs_shadow, 4),
+        overlap_ids=overlap_ids,
+        keyword_ids=keyword_ids,
+        shadow_ids=shadow_ids,
+    )
+
+
+def _finalize_shadow_diagnostics(
+    diagnostics: ShadowRetrievalDiagnostics,
+    *,
+    raw_rows: Sequence[Any],
+    source_filtered_rows: Sequence[Any],
+    privacy_filtered_rows: Sequence[Any],
+    selected_chunks: Sequence[Mapping[str, Any]],
+    keyword_chunks: Optional[Sequence[Mapping[str, Any]]] = None,
+) -> None:
+    diagnostics.counts.candidate_count_raw = len(raw_rows)
+    diagnostics.counts.candidate_count_after_source_filters = len(source_filtered_rows)
+    diagnostics.counts.candidate_count_after_privacy_filters = len(privacy_filtered_rows)
+    diagnostics.counts.selected_count = len(selected_chunks)
+    diagnostics.by_source_type.raw = _count_by_source_type(raw_rows)
+    diagnostics.by_source_type.post_source_filter = _count_by_source_type(source_filtered_rows)
+    diagnostics.by_source_type.post_privacy_filter = _count_by_source_type(privacy_filtered_rows)
+    diagnostics.by_source_type.selected = _count_by_source_type(selected_chunks)
+    if keyword_chunks is not None:
+        diagnostics.overlap = _build_overlap_diagnostics(
+            keyword_chunks=keyword_chunks,
+            shadow_chunks=selected_chunks,
+        )
 
 
 def _coerce_metadata(meta: Any) -> Dict[str, Any]:
@@ -365,9 +552,18 @@ async def retrieve_chunks_vector_shadow(
     max_chunks: int = AI_RAG_MAX_CHUNKS,
     max_tokens: int = AI_RAG_MAX_CONTEXT_TOKENS,
     route_shadow_profile: Optional[str] = None,
-    shadow_query_hints: bool = False,
+    shadow_profile_hints: bool = False,
+    shadow_custom_query_hints: Optional[Sequence[str]] = None,
+    include_diagnostics: bool = False,
+    keyword_chunks_for_overlap: Optional[Sequence[Mapping[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Diagnostic-only vector retrieval; same privacy scope as keyword path."""
+    total_start = _now_ms()
+    diagnostics = ShadowRetrievalDiagnostics(
+        enabled=include_diagnostics,
+        profile=resolve_shadow_profile(route_shadow_profile) if route_shadow_profile else None,
+        query_hints=[],
+    )
     pin_source = bool(source_id or metadata_listing_id)
     words: List[str] = []
 
@@ -379,15 +575,19 @@ async def retrieve_chunks_vector_shadow(
         metadata_listing_id=metadata_listing_id,
     )
     if embedded_count < AI_RAG_SHADOW_MIN_EMBEDDED:
-        return {
+        diagnostics.timings_ms.total = _elapsed_ms(total_start)
+        result: Dict[str, Any] = {
             "enabled": True,
             "status": "insufficient_embeddings",
             "embedded_chunks": embedded_count,
             "candidate_count": 0,
             "chunks": [],
             "chunk_ids": [],
-            "latency_ms": 0,
+            "latency_ms": diagnostics.timings_ms.total,
         }
+        if include_diagnostics:
+            result["shadow_diagnostics"] = diagnostics.to_dict()
+        return result
 
     resolved_profile = resolve_shadow_profile(route_shadow_profile) if route_shadow_profile else None
     route_mode = route_shadow_profile is not None
@@ -395,25 +595,36 @@ async def retrieve_chunks_vector_shadow(
     embed_query, expanded_query_terms, query_hint_applied = expand_query_with_hints(
         query,
         hint_profile,
-        apply_hints=shadow_query_hints,
+        apply_profile_hints=shadow_profile_hints,
+        custom_hints=list(shadow_custom_query_hints or []),
     )
+    if include_diagnostics:
+        diagnostics.query_hints = list(expanded_query_terms)
+        diagnostics.debug["profile_details"] = resolved_profile_for_diagnostics(route_shadow_profile)
+        diagnostics.debug["query_hint_applied"] = query_hint_applied
 
-    t0 = time.perf_counter()
+    embed_start = _now_ms()
     try:
         query_vec = await _embed_query_vector(embed_query)
     except Exception as exc:
-        return {
+        diagnostics.timings_ms.embed = _elapsed_ms(embed_start)
+        diagnostics.timings_ms.total = _elapsed_ms(total_start)
+        result = {
             "enabled": True,
             "status": "embed_failed",
             "embedded_chunks": embedded_count,
             "candidate_count": 0,
             "chunks": [],
             "chunk_ids": [],
-            "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+            "latency_ms": diagnostics.timings_ms.total,
             "error": str(exc)[:120],
             "query_hint_applied": query_hint_applied,
             "expanded_query_terms": expanded_query_terms,
         }
+        if include_diagnostics:
+            result["shadow_diagnostics"] = diagnostics.to_dict()
+        return result
+    diagnostics.timings_ms.embed = _elapsed_ms(embed_start)
 
     filters, params, idx = _build_scope_filters(
         user_id,
@@ -428,7 +639,12 @@ async def retrieve_chunks_vector_shadow(
 
     preferred_zero_visible: List[str] = []
     scope_by_type: Dict[str, int] = {}
+    raw_rows: List[Any] = []
+    source_filtered_rows: List[Any] = []
+    privacy_filtered_rows: List[Any] = []
+    privacy_stats = ShadowPrivacyDiagnostics()
 
+    fetch_start = _now_ms()
     if route_mode:
         preferred = preferred_source_types(resolved_profile)
         weights = source_type_weights(resolved_profile)
@@ -440,14 +656,6 @@ async def retrieve_chunks_vector_shadow(
             params=params,
             vec_param=vec_param,
             limit=max_chunks * 3,
-        )
-        unweighted_selected = _rows_to_chunks(
-            global_rows,
-            words=words,
-            pin_source=pin_source,
-            query=query,
-            max_chunks=max_chunks,
-            max_tokens=max_tokens,
         )
         pool_rows = list(global_rows)
         for st in preferred:
@@ -462,8 +670,51 @@ async def retrieve_chunks_vector_shadow(
                 extra_source_type=st,
             )
             pool_rows = _merge_vector_rows(pool_rows, type_rows)
+        raw_rows = list(pool_rows)
+    else:
+        global_rows = await _fetch_vector_rows(
+            conn,
+            filters=filters,
+            params=params,
+            vec_param=vec_param,
+            limit=max_chunks * 3,
+        )
+        raw_rows = list(global_rows)
+    diagnostics.timings_ms.candidate_fetch = _elapsed_ms(fetch_start)
+
+    source_filter_start = _now_ms()
+    if route_mode:
+        preferred = preferred_source_types(resolved_profile)
+        weights = source_type_weights(resolved_profile)
+        source_filtered_rows = _apply_route_weights(raw_rows, weights)
+    else:
+        source_filtered_rows = list(raw_rows)
+    diagnostics.timings_ms.source_filter = _elapsed_ms(source_filter_start)
+
+    privacy_filter_start = _now_ms()
+    privacy_filtered_rows, privacy_stats = _partition_privacy_rows(
+        source_filtered_rows,
+        words=words,
+        pin_source=pin_source,
+        query=query,
+    )
+    diagnostics.timings_ms.privacy_filter = _elapsed_ms(privacy_filter_start)
+    diagnostics.privacy = privacy_stats
+
+    select_start = _now_ms()
+    if route_mode:
+        preferred = preferred_source_types(resolved_profile)
+        weights = source_type_weights(resolved_profile)
+        unweighted_selected = _rows_to_chunks(
+            raw_rows,
+            words=words,
+            pin_source=pin_source,
+            query=query,
+            max_chunks=max_chunks,
+            max_tokens=max_tokens,
+        )
         weighted_selected = _select_route_weighted_chunks(
-            pool_rows,
+            raw_rows,
             preferred=preferred,
             weights=weights,
             words=words,
@@ -474,15 +725,8 @@ async def retrieve_chunks_vector_shadow(
             scope_by_type=scope_by_type,
         )
     else:
-        global_rows = await _fetch_vector_rows(
-            conn,
-            filters=filters,
-            params=params,
-            vec_param=vec_param,
-            limit=max_chunks * 3,
-        )
         unweighted_selected = _rows_to_chunks(
-            global_rows,
+            raw_rows,
             words=words,
             pin_source=pin_source,
             query=query,
@@ -490,9 +734,11 @@ async def retrieve_chunks_vector_shadow(
             max_tokens=max_tokens,
         )
         weighted_selected = unweighted_selected
+    diagnostics.timings_ms.rerank_select = _elapsed_ms(select_start)
+    diagnostics.timings_ms.total = _elapsed_ms(total_start)
 
-    latency_ms = round((time.perf_counter() - t0) * 1000, 1)
-    result: Dict[str, Any] = {
+    latency_ms = float(diagnostics.timings_ms.total)
+    result = {
         "enabled": True,
         "status": "ok",
         "embedded_chunks": embedded_count,
@@ -521,6 +767,22 @@ async def retrieve_chunks_vector_shadow(
             "chunk_ids": [c["id"] for c in weighted_selected],
             "candidate_count": len(weighted_selected),
         })
+    if include_diagnostics:
+        selected_for_diag = weighted_selected if route_mode else unweighted_selected
+        _finalize_shadow_diagnostics(
+            diagnostics,
+            raw_rows=raw_rows,
+            source_filtered_rows=source_filtered_rows,
+            privacy_filtered_rows=privacy_filtered_rows,
+            selected_chunks=selected_for_diag,
+            keyword_chunks=keyword_chunks_for_overlap,
+        )
+        diagnostics.debug.update({
+            "top_k": max_chunks,
+            "raw_chunk_ids": _collect_chunk_ids(raw_rows)[:25],
+            "selected_chunk_ids": _collect_chunk_ids(selected_for_diag)[:25],
+        })
+        result["shadow_diagnostics"] = diagnostics.to_dict()
     return result
 
 
@@ -588,6 +850,18 @@ def build_shadow_vector_diagnostic(
         diag["expanded_query_terms"] = shadow_result.get("expanded_query_terms") or []
     if shadow_result.get("chunks"):
         diag["top_results"] = _top_results_from_chunks(shadow_result["chunks"])
+    shadow_diag = shadow_result.get("shadow_diagnostics")
+    if shadow_diag:
+        diag["timings_ms"] = shadow_diag.get("timings_ms")
+        diag["counts"] = shadow_diag.get("counts")
+        diag["by_source_type"] = shadow_diag.get("by_source_type")
+        diag["privacy"] = shadow_diag.get("privacy")
+        overlap = shadow_diag.get("overlap") or {}
+        if overlap:
+            diag["overlap_count"] = overlap.get("count", diag.get("overlap_with_keyword", 0))
+            diag["overlap_ratio_vs_keyword"] = overlap.get("ratio_vs_keyword")
+            diag["overlap_ratio_vs_shadow"] = overlap.get("ratio_vs_shadow")
+            diag["overlap_ids"] = overlap.get("overlap_ids")
     status = shadow_result.get("status")
     if status and status != "ok":
         diag["status"] = status

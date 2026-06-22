@@ -125,8 +125,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build common package
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @common/utils run build
+          test -f services/common/dist/index.d.ts
+
       - name: Test service
-        run: pnpm -C services/${{ matrix.service }} test --if-present
+        shell: bash
+        run: |
+          set -euo pipefail
+          svc="${{ matrix.service }}"
+          if [[ "$svc" == "python-ai-service" ]]; then
+            echo "python-ai-service: unit tests run in coverage workflow"
+            exit 0
+          fi
+          if [[ ! -f "services/$svc/package.json" ]]; then
+            echo "No package.json for $svc — skip"
+            exit 0
+          fi
+          pnpm -C "services/$svc" run --if-present test
 
   docker-build:
     name: Docker build (${{ matrix.service }})

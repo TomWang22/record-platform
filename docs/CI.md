@@ -13,7 +13,7 @@ The main workflow is defined in [.github/workflows/ci.yml](../.github/workflows/
 | Job | Purpose | Depends on |
 |-----|---------|------------|
 | **build** | Compile `@common/utils` and each service (matrix) | — |
-| **test** | Run service tests (`pnpm test --if-present`) per service | build |
+| **test** | Run service tests (`pnpm run --if-present test`) per service | build |
 | **docker-build** | Build Docker image per service with layer cache | build |
 | **quic-invariants** | Enforce no IP-based HTTP/3 (hostname-only QUIC) | — |
 | **transport-validation** | Validate transport tooling; optional pcap gate if `vm.pcap` exists | — |
@@ -23,7 +23,7 @@ The main workflow is defined in [.github/workflows/ci.yml](../.github/workflows/
 ## Build and test matrix
 
 - **Build:** 9 services — api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, auction-monitor, cron-jobs.
-- **Test:** 8 services (same list without cron-jobs); each job runs `pnpm -C services/<service> test --if-present`.
+- **Test:** matrix matches build (minus python-ai-service pytest, which runs in coverage workflow); each job builds `@common/utils` then runs `pnpm -C services/<service> run --if-present test` (skips services with no `test` script).
 - **Docker build:** 9 images — same 8 as test plus python-ai-service; build context is repo root, Dockerfile path `services/<service>/Dockerfile`.
 
 Strategy is `fail-fast: false` so one failing service doesn’t cancel others; you see full matrix results.

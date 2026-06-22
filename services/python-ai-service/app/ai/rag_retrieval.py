@@ -122,6 +122,78 @@ class ShadowPrivacyDiagnostics:
     blocked_other_count: int = 0
 
 
+def _collect_document_ids(chunks: Iterable[Mapping[str, Any]]) -> List[str]:
+    ids: List[str] = []
+    for chunk in chunks:
+        doc_id = chunk.get("document_id")
+        if doc_id:
+            ids.append(str(doc_id))
+    return ids
+
+
+def _entity_keys_for_chunk(chunk: Mapping[str, Any]) -> set[str]:
+    """Shadow-only overlap keys from source_id and safe metadata fields (no body text)."""
+    keys: set[str] = set()
+    source_type = chunk.get("source_type")
+    source_id = chunk.get("source_id")
+    if source_type and source_id:
+        keys.add(f"{source_type}:{source_id}")
+    meta = _coerce_metadata(chunk.get("metadata"))
+    for field in ("listing_id", "offer_id", "record_id"):
+        value = meta.get(field)
+        if value:
+            keys.add(f"{field}:{value}")
+    return keys
+
+
+def _collect_entity_keys(chunks: Iterable[Mapping[str, Any]]) -> set[str]:
+    keys: set[str] = set()
+    for chunk in chunks:
+        keys.update(_entity_keys_for_chunk(chunk))
+    return keys
+
+
+def _classify_zero_overlap_reason(
+    *,
+    chunk_overlap: int,
+    document_overlap: int,
+    entity_overlap: int,
+    keyword_source_types: Dict[str, int],
+    shadow_source_types: Dict[str, int],
+    keyword_count: int,
+    shadow_count: int,
+) -> Optional[str]:
+    if chunk_overlap > 0:
+        return None
+    if keyword_count == 0 or shadow_count == 0:
+        return "one_path_empty"
+    if entity_overlap > 0:
+        return "shared_entity_different_chunks"
+    if document_overlap > 0:
+        return "same_document_different_chunks"
+    kw_types = set(keyword_source_types)
+    sh_types = set(shadow_source_types)
+    shared_types = kw_types.intersection(sh_types)
+    if not shared_types:
+        return "source_type_mismatch"
+    if shared_types and not entity_overlap and not document_overlap:
+        return "same_source_type_different_chunks"
+    return "different_retrieval_paths"
+
+
+@dataclass(slots=True)
+class ShadowOverlapExplanation:
+    keyword_source_types: Dict[str, int] = field(default_factory=dict)
+    shadow_source_types: Dict[str, int] = field(default_factory=dict)
+    chunk_overlap_count: int = 0
+    document_overlap_count: int = 0
+    shared_source_type_count: int = 0
+    entity_overlap_count: int = 0
+    keyword_document_count: int = 0
+    shadow_document_count: int = 0
+    zero_overlap_reason: Optional[str] = None
+
+
 @dataclass(slots=True)
 class ShadowOverlapDiagnostics:
     count: int = 0
@@ -130,6 +202,11 @@ class ShadowOverlapDiagnostics:
     overlap_ids: List[str] = field(default_factory=list)
     keyword_ids: List[str] = field(default_factory=list)
     shadow_ids: List[str] = field(default_factory=list)
+    document_overlap_count: int = 0
+    document_overlap_ids: List[str] = field(default_factory=list)
+    entity_overlap_count: int = 0
+    entity_overlap_keys: List[str] = field(default_factory=list)
+    explanation: ShadowOverlapExplanation = field(default_factory=ShadowOverlapExplanation)
 
 
 @dataclass(slots=True)
@@ -205,6 +282,44 @@ def _build_overlap_diagnostics(
     overlap_count = len(overlap_ids)
     ratio_vs_keyword = (overlap_count / len(keyword_set)) if keyword_set else 0.0
     ratio_vs_shadow = (overlap_count / len(shadow_set)) if shadow_set else 0.0
+
+    keyword_doc_ids = _collect_document_ids(keyword_chunks)
+    shadow_doc_ids = _collect_document_ids(shadow_chunks)
+    keyword_doc_set = set(keyword_doc_ids)
+    shadow_doc_set = set(shadow_doc_ids)
+    document_overlap_ids = sorted(keyword_doc_set.intersection(shadow_doc_set))
+    document_overlap_count = len(document_overlap_ids)
+
+    keyword_entities = _collect_entity_keys(keyword_chunks)
+    shadow_entities = _collect_entity_keys(shadow_chunks)
+    entity_overlap_keys = sorted(keyword_entities.intersection(shadow_entities))
+    entity_overlap_count = len(entity_overlap_keys)
+
+    keyword_source_types = _count_by_source_type(keyword_chunks)
+    shadow_source_types = _count_by_source_type(shadow_chunks)
+    shared_source_type_count = len(set(keyword_source_types).intersection(shadow_source_types))
+    zero_overlap_reason = _classify_zero_overlap_reason(
+        chunk_overlap=overlap_count,
+        document_overlap=document_overlap_count,
+        entity_overlap=entity_overlap_count,
+        keyword_source_types=keyword_source_types,
+        shadow_source_types=shadow_source_types,
+        keyword_count=len(keyword_chunks),
+        shadow_count=len(shadow_chunks),
+    )
+
+    explanation = ShadowOverlapExplanation(
+        keyword_source_types=keyword_source_types,
+        shadow_source_types=shadow_source_types,
+        chunk_overlap_count=overlap_count,
+        document_overlap_count=document_overlap_count,
+        shared_source_type_count=shared_source_type_count,
+        entity_overlap_count=entity_overlap_count,
+        keyword_document_count=len(keyword_doc_set),
+        shadow_document_count=len(shadow_doc_set),
+        zero_overlap_reason=zero_overlap_reason,
+    )
+
     return ShadowOverlapDiagnostics(
         count=overlap_count,
         ratio_vs_keyword=round(ratio_vs_keyword, 4),
@@ -212,6 +327,11 @@ def _build_overlap_diagnostics(
         overlap_ids=overlap_ids,
         keyword_ids=keyword_ids,
         shadow_ids=shadow_ids,
+        document_overlap_count=document_overlap_count,
+        document_overlap_ids=document_overlap_ids,
+        entity_overlap_count=entity_overlap_count,
+        entity_overlap_keys=entity_overlap_keys,
+        explanation=explanation,
     )
 
 
@@ -1007,6 +1127,11 @@ def build_shadow_vector_diagnostic(
             diag["overlap_ratio_vs_keyword"] = overlap.get("ratio_vs_keyword")
             diag["overlap_ratio_vs_shadow"] = overlap.get("ratio_vs_shadow")
             diag["overlap_ids"] = overlap.get("overlap_ids")
+            diag["document_overlap_count"] = overlap.get("document_overlap_count")
+            diag["entity_overlap_count"] = overlap.get("entity_overlap_count")
+            explanation = overlap.get("explanation")
+            if explanation:
+                diag["overlap_explanation"] = explanation
     status = shadow_result.get("status")
     if status and status != "ok":
         diag["status"] = status

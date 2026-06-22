@@ -42,6 +42,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from datetime import datetime, timezone
 
 token = os.environ["TOKEN"]
@@ -164,6 +165,9 @@ with open(jsonl_out, "w") as out:
 shadow_totals = []
 embed_latencies = []
 overlaps = []
+doc_overlaps = []
+entity_overlaps = []
+overlap_reasons = []
 selected_counts = []
 embed_outliers = []
 for r in rows:
@@ -172,6 +176,8 @@ for r in rows:
     if not r["mode"].startswith("shadow"):
         continue
     sd = (r.get("response") or {}).get("details", {}).get("shadow_diagnostics") or {}
+    ov = sd.get("overlap") or {}
+    expl = ov.get("explanation") or {}
     if sd:
         shadow_totals.append(float(sd.get("timings_ms", {}).get("total") or 0))
         embed = sd.get("embed") or {}
@@ -188,11 +194,19 @@ for r in rows:
                 "cache_hit": embed.get("cache_hit"),
                 "query_prefix": (r.get("query") or "")[:72],
             })
-    overlaps.append(int(sd.get("overlap", {}).get("count") or 0))
+    chunk_ov = int(ov.get("count") or 0)
+    overlaps.append(chunk_ov)
+    doc_overlaps.append(int(ov.get("document_overlap_count") or expl.get("document_overlap_count") or 0))
+    entity_overlaps.append(int(ov.get("entity_overlap_count") or expl.get("entity_overlap_count") or 0))
+    if chunk_ov == 0:
+        reason = expl.get("zero_overlap_reason") or "unknown"
+        overlap_reasons.append(reason)
     selected_counts.append(int(sd.get("counts", {}).get("selected_count") or 0))
 
+reason_counts = Counter(overlap_reasons)
+
 summary = {
-    "ticket": "T20.10E",
+    "ticket": "T20.10G",
     "generated_at": datetime.now(timezone.utc).isoformat(),
     "warmup_runs": bench_warmup_runs,
     "total_runs": len([r for r in rows if not r.get("warmup")]),
@@ -202,8 +216,11 @@ summary = {
     "embed_ms_p50": percentile(embed_latencies, 50),
     "embed_ms_p95": percentile(embed_latencies, 95),
     "shadow_overlap_zero_runs": sum(1 for o in overlaps if o == 0),
+    "shadow_doc_overlap_gt0_runs": sum(1 for o in doc_overlaps if o > 0),
+    "shadow_entity_overlap_gt0_runs": sum(1 for o in entity_overlaps if o > 0),
     "shadow_empty_runs": sum(1 for c in selected_counts if c == 0),
     "embed_outlier_count": len(embed_outliers),
+    "zero_overlap_reason_counts": dict(sorted(reason_counts.items())),
 }
 
 lines = [
@@ -221,9 +238,19 @@ lines = [
     f"- embed p95 ms: {summary['embed_ms_p95']}",
     f"- embed outliers (>=5s or timeout): {summary['embed_outlier_count']}",
     f"- zero-overlap shadow runs: {summary['shadow_overlap_zero_runs']}/{summary['shadow_runs']}",
+    f"- document-overlap >0 runs: {summary['shadow_doc_overlap_gt0_runs']}/{summary['shadow_runs']}",
+    f"- entity-overlap >0 runs: {summary['shadow_entity_overlap_gt0_runs']}/{summary['shadow_runs']}",
     f"- zero-result shadow runs: {summary['shadow_empty_runs']}/{summary['shadow_runs']}",
     "",
 ]
+if summary.get("zero_overlap_reason_counts"):
+    lines.extend([
+        "## Zero-overlap reasons (chunk overlap=0)",
+        "",
+    ])
+    for reason, cnt in summary["zero_overlap_reason_counts"].items():
+        lines.append(f"- {reason}: {cnt}")
+    lines.append("")
 if embed_outliers:
     lines.extend([
         "## Embed outliers",
@@ -242,20 +269,22 @@ if embed_outliers:
 lines.extend([
     "## Per-run summary",
     "",
-    "| mode | profile | warmup | http_time_s | selected_count | overlap_count | embed_ms | total_ms | query |",
-    "|---|---:|:---:|:---:|:---:|:---:|:---:|:---:|---|",
+    "| mode | profile | warmup | http_time_s | selected_count | chunk_ov | doc_ov | entity_ov | reason | total_ms | query |",
+    "|---|---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---:|---|",
 ])
 for r in rows:
     sd = (r.get("response") or {}).get("details", {}).get("shadow_diagnostics") or {}
     counts = sd.get("counts") or {}
     overlap = sd.get("overlap") or {}
+    expl = overlap.get("explanation") or {}
     timings = sd.get("timings_ms") or {}
-    embed = sd.get("embed") or {}
     q = r["query"][:72] + ("…" if len(r["query"]) > 72 else "")
+    reason = expl.get("zero_overlap_reason") or ("" if overlap.get("count") else "")
     lines.append(
         f"| {r['mode']} | {r.get('profile') or ''} | {r.get('warmup', False)} | {r.get('http_time_s', 0):.3f} | "
         f"{counts.get('selected_count', '')} | {overlap.get('count', '')} | "
-        f"{embed.get('latency_ms', timings.get('embed', ''))} | {timings.get('total', '')} | {q} |"
+        f"{overlap.get('document_overlap_count', '')} | {overlap.get('entity_overlap_count', '')} | "
+        f"{reason} | {timings.get('total', '')} | {q} |"
     )
 
 with open(md_out, "w") as f:
@@ -269,4 +298,4 @@ print(
 sys.exit(0)
 PY
 
-echo "✅ T20.10E complete"
+echo "✅ T20.10G benchmark summary written"

@@ -29,13 +29,13 @@ class TestShadowDiagnosticsHelpers(unittest.TestCase):
 
     def test_overlap_diagnostics_computes_ratios(self) -> None:
         keyword_chunks = [
-            {"id": "a", "source_type": "listing"},
-            {"id": "b", "source_type": "listing_revision"},
-            {"id": "c", "source_type": "obo_offer_summary"},
+            {"id": "a", "document_id": "doc1", "source_type": "listing", "source_id": "L1"},
+            {"id": "b", "document_id": "doc2", "source_type": "listing_revision", "source_id": "R1"},
+            {"id": "c", "document_id": "doc3", "source_type": "obo_offer_summary", "source_id": "O1"},
         ]
         shadow_chunks = [
-            {"id": "b", "source_type": "listing_revision"},
-            {"id": "d", "source_type": "listing"},
+            {"id": "b", "document_id": "doc2", "source_type": "listing_revision", "source_id": "R1"},
+            {"id": "d", "document_id": "doc4", "source_type": "listing", "source_id": "L2"},
         ]
 
         result = _build_overlap_diagnostics(
@@ -45,8 +45,45 @@ class TestShadowDiagnosticsHelpers(unittest.TestCase):
 
         self.assertEqual(result.count, 1)
         self.assertEqual(result.overlap_ids, ["b"])
+        self.assertEqual(result.document_overlap_count, 1)
+        self.assertEqual(result.document_overlap_ids, ["doc2"])
         self.assertAlmostEqual(result.ratio_vs_keyword, 1 / 3, places=4)
         self.assertAlmostEqual(result.ratio_vs_shadow, 0.5, places=4)
+        self.assertEqual(result.explanation.zero_overlap_reason, None)
+        self.assertEqual(result.explanation.shared_source_type_count, 2)
+
+    def test_overlap_explanation_entity_and_reason(self) -> None:
+        keyword_chunks = [
+            {
+                "id": "k1",
+                "document_id": "doc-k",
+                "source_type": "listing",
+                "source_id": "L1",
+                "metadata": {"listing_id": "L1"},
+            },
+        ]
+        shadow_chunks = [
+            {
+                "id": "s1",
+                "document_id": "doc-s",
+                "source_type": "obo_offer_summary",
+                "source_id": "O1",
+                "metadata": {"listing_id": "L1"},
+            },
+        ]
+        result = _build_overlap_diagnostics(
+            keyword_chunks=keyword_chunks,
+            shadow_chunks=shadow_chunks,
+        )
+        self.assertEqual(result.count, 0)
+        self.assertEqual(result.entity_overlap_count, 1)
+        self.assertEqual(result.explanation.zero_overlap_reason, "shared_entity_different_chunks")
+
+    def test_overlap_source_type_mismatch_reason(self) -> None:
+        keyword_chunks = [{"id": "k1", "document_id": "d1", "source_type": "listing", "source_id": "L1"}]
+        shadow_chunks = [{"id": "s1", "document_id": "d2", "source_type": "notification", "source_id": "N1"}]
+        result = _build_overlap_diagnostics(keyword_chunks=keyword_chunks, shadow_chunks=shadow_chunks)
+        self.assertEqual(result.explanation.zero_overlap_reason, "source_type_mismatch")
 
     def test_shadow_diagnostics_to_dict_shape(self) -> None:
         diagnostics = ShadowRetrievalDiagnostics(enabled=True, profile="obo_helper", query_hints=["obo"])

@@ -1,1 +1,2 @@
-services/python-ai-service/.coverage
+.coverage
+coverage/

@@ -187,6 +187,8 @@ jobs:
             ${{ runner.os }}-${{ matrix.service }}-
 
       - name: Build image
+        env:
+          DOCKER_DEFAULT_PLATFORM: linux/amd64
         run: |
           if [ "${{ matrix.service }}" = "webapp" ]; then
             df="webapp/Dockerfile"

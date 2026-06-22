@@ -67,13 +67,8 @@ describe("notificationGrpcHandlers", () => {
     expect((err as { code: number }).code).toBe(grpc.status.INTERNAL);
   });
 
-  it("notificationGrpcHealthCheck — true when SELECT 1 succeeds", async () => {
-    poolQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }], rowCount: 1 });
-    await expect(notificationGrpcHealthCheck()).resolves.toBe(true);
-  });
-
-  it("notificationGrpcHealthCheck — false when SELECT 1 fails", async () => {
+  it("notificationGrpcHealthCheck — gRPC liveness only (DB readiness is HTTP /readyz)", async () => {
     poolQuery.mockRejectedValueOnce(new Error("down"));
-    await expect(notificationGrpcHealthCheck()).resolves.toBe(false);
+    await expect(notificationGrpcHealthCheck()).resolves.toBe(true);
   });
 });

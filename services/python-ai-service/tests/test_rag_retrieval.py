@@ -163,6 +163,9 @@ class TestRetrievalPrivacyIntegration(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        if os.getenv("CI") == "true":
+            cls.skip_reason = "CI runner has no python_ai DB"
+            return
         cls.db_url = os.getenv(
             "POSTGRES_URL_PYTHON_AI",
             "postgresql://postgres:postgres@127.0.0.1:5440/python_ai",

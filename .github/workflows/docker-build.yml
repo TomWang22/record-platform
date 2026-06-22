@@ -43,6 +43,7 @@ jobs:
           file: ${{ matrix.service == 'webapp' && 'webapp/Dockerfile' || 'services/' + matrix.service + '/Dockerfile' }}
           push: false
           tags: ${{ matrix.service }}:test
+          platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |

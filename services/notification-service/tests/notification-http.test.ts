@@ -124,17 +124,23 @@ describe("createNotificationHttpApp (mocked pool)", () => {
     publishRealtime.mockClear();
   });
 
-  it("GET /healthz — connected", async () => {
+  it("GET /healthz — liveness", async () => {
     const res = await request(app).get("/healthz");
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ ok: true, db: "connected" });
+    expect(res.body).toEqual({ ok: true, service: "notification-service" });
   });
 
-  it("GET /healthz — disconnected on DB error", async () => {
-    poolQuery.mockRejectedValueOnce(new Error("econnrefused"));
-    const res = await request(app).get("/healthz");
+  it("GET /readyz — connected", async () => {
+    const res = await request(app).get("/readyz");
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ ok: true, db: "disconnected" });
+    expect(res.body).toMatchObject({ ok: true, ready: true, service: "notification-service" });
+  });
+
+  it("GET /readyz — disconnected on DB error", async () => {
+    poolQuery.mockRejectedValueOnce(new Error("econnrefused"));
+    const res = await request(app).get("/readyz");
+    expect(res.status).toBe(503);
+    expect(res.body).toMatchObject({ ok: false, ready: false, deps: false });
   });
 
   it("GET /metrics — exposition", async () => {

@@ -888,7 +888,7 @@ describe('createMessagingHttpApp (mocked pool + kafka)', () => {
   it('GET /healthz returns 200', async () => {
     const res = await request(app).get('/healthz')
     expect(res.status).toBe(200)
-    expect(res.body).toEqual({ ok: true })
+    expect(res.body).toEqual({ ok: true, service: 'messaging-service' })
   })
 
   it('GET /threads — missing x-user-id → 401', async () => {
@@ -1908,14 +1908,14 @@ describe('createMessagingHttpApp (mocked pool + kafka)', () => {
   it('POST /messages/thread/:threadId/archive — 403 when thread exists but user not participant', async () => {
     poolQuery.mockImplementation(async (sql: string, params: unknown[] = []) => {
       const norm = sql.replace(/\s+/g, ' ').trim()
-      if (
-        norm.includes('SELECT 1 WHERE') &&
-        norm.includes('FROM messages.messages m') &&
-        norm.includes('m.thread_id::text = $1 OR m.group_id::text = $1')
-      ) {
+      if (norm.includes('SELECT 1 WHERE') && norm.includes('EXISTS')) {
         return { rows: [] }
       }
-      if (norm.includes('SELECT 1 FROM messages.messages WHERE thread_id::text = $1 OR group_id::text = $1 LIMIT 1')) {
+      if (
+        norm.includes('SELECT 1 FROM messages.messages m') &&
+        norm.includes('LIMIT 1') &&
+        !norm.includes('group_members')
+      ) {
         return { rows: [{ '?column?': 1 }] }
       }
       return defaultPoolHandler(sql, params)

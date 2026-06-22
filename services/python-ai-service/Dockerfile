@@ -80,7 +80,7 @@ COPY --from=build --chown=python:python /usr/local/lib/python3.11/site-packages 
 COPY --from=build --chown=python:python /usr/local/bin /usr/local/bin
 COPY --from=build --chown=python:python /app /app
 # Repo-pinned grpc-health-probe (same source as other RP services; no runtime download)
-ARG TARGETARCH=arm64
+ARG TARGETARCH
 COPY scripts/vendor/grpc_health_probe-linux-${TARGETARCH} /usr/local/bin/grpc-health-probe
 RUN chmod 755 /usr/local/bin/grpc-health-probe \
  && /usr/local/bin/grpc-health-probe -version >/dev/null 2>&1 \

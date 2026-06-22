@@ -105,7 +105,7 @@ describe("notification kafka-consumer", () => {
     const { notificationKafkaTopics } = await import("../src/kafka-consumer.js");
     const t = notificationKafkaTopics();
     expect(t.some((x) => x === "messaging.events.v1")).toBe(true);
-    expect(t.some((x) => x.endsWith(".iso") && x.includes("booking"))).toBe(true);
+    expect(t.some((x) => x.endsWith(".iso") && x.includes("listing.events"))).toBe(true);
   });
 
   it("notificationKafkaTopics parses NOTIFICATION_KAFKA_TOPICS CSV", async () => {

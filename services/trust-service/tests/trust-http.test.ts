@@ -78,18 +78,25 @@ describe("createTrustHttpApp", () => {
     delete process.env.TRUST_HTTP_TIMING;
   });
 
-  it("GET /healthz — DB connected", async () => {
+  it("GET /healthz — liveness", async () => {
     const app = createTrustHttpApp();
     const res = await request(app).get("/healthz").expect(200);
-    expect(res.body).toEqual({ ok: true, db: "connected" });
+    expect(res.body).toEqual({ ok: true, service: "trust-service" });
   });
 
-  it("GET /health — DB disconnected still 200 with warning", async () => {
+  it("GET /readyz — DB connected", async () => {
+    const app = createTrustHttpApp();
+    const res = await request(app).get("/readyz").expect(200);
+    expect(res.body).toMatchObject({ ok: true, ready: true, service: "trust-service" });
+  });
+
+  it("GET /readyz — DB disconnected returns 503", async () => {
     poolQuery.mockRejectedValueOnce(new Error("econnrefused"));
     const app = createTrustHttpApp();
-    const res = await request(app).get("/health").expect(200);
-    expect(res.body.ok).toBe(true);
-    expect(res.body.db).toBe("disconnected");
+    const res = await request(app).get("/readyz").expect(503);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.ready).toBe(false);
+    expect(res.body.deps).toBe(false);
   });
 
   it("enables slow-request diagnostics when TRUST_HTTP_TIMING=1", async () => {

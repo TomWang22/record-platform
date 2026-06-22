@@ -1,0 +1,8 @@
+# Host Compose Kafka: point app-config at kafka-external Service (Endpoints patched via scripts/patch-kafka-external-host.sh).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: record-platform
+resources:
+  - ../../base/config
+patches:
+  - path: patches/app-config-kafka-external.yaml

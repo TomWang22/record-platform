@@ -15,7 +15,7 @@
 ## Deployment / volume secret refs vs static `kind: Secret`
 
 - **Declared Secret names:** 8
-- **Referenced secret names:** 15
+- **Referenced secret names:** 29
 
 ### Referenced but not defined (and not on dynamic allowlist)
 - _(none)_

@@ -46,7 +46,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     chmod +x /usr/local/bin/prisma-generate-retry \
  && prisma-generate-retry services/messaging-service \
  && rp-pnpm -C services/messaging-service exec tsc -p tsconfig.json
-ARG TARGETARCH=arm64
+ARG TARGETARCH
 COPY scripts/vendor/grpc_health_probe-linux-${TARGETARCH} /tmp/grpc-health-probe
 RUN chmod +x /tmp/grpc-health-probe
 

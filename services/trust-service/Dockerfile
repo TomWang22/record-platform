@@ -35,7 +35,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     rp-pnpm -C services/common build
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     rp-pnpm -C services/trust-service build
-ARG TARGETARCH=arm64
+ARG TARGETARCH
 COPY scripts/vendor/grpc_health_probe-linux-${TARGETARCH} /tmp/grpc-health-probe
 RUN chmod +x /tmp/grpc-health-probe
 

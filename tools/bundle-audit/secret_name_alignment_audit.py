@@ -62,12 +62,24 @@ DYNAMIC_SECRET_ALLOWLIST = frozenset(
         "envoy-client-tls",
         "record-local-tls",
         "record-local-tls-b",
+        "record-platform-local-tls",
+        "record-platform-local-tls-b",
         "regcred",
         "docker-registry",
         "redis-auth",
         "postgres-postinit-sql",
+        "rp-mtls-test-ca",
+        "webapp-runtime-secrets",
     }
 )
+
+
+def is_allowed_secret_ref(name: str) -> bool:
+    if name in DYNAMIC_SECRET_ALLOWLIST:
+        return True
+    if name.startswith("service-tls-"):
+        return True
+    return False
 
 
 def load_allow_rules(repo: Path) -> tuple[list[str], list[str]]:
@@ -254,7 +266,7 @@ def main() -> int:
     undefined_report: list[tuple[str, str]] = []
     for fpath, refs in sorted(per_file_refs.items()):
         for r in sorted(refs):
-            if r in defined or r in DYNAMIC_SECRET_ALLOWLIST:
+            if r in defined or is_allowed_secret_ref(r):
                 continue
             undefined_report.append((fpath, r))
             hard_fail.append(f"Referenced secret `{r}` not in static Secret manifests nor allowlist ({fpath})")

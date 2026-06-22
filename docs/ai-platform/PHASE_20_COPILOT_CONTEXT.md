@@ -1,7 +1,7 @@
 # Phase 20 — Copilot / agent context (Record Platform AI)
 
 **Last updated:** 2026-06-22  
-**Current main SHA:** `3aba1701bed3783c724a632b9756c65deff131ed`  
+**Current main SHA:** `80e754522c1d12fecbde68af204e8701abd143ff`  
 **Audience:** GitHub Copilot, Cursor, and other coding agents working on `record-platform`
 
 Use this document when continuing Phase 20 work. It replaces any deleted handoff notes.

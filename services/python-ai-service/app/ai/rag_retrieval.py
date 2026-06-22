@@ -18,11 +18,15 @@ from app.ai.config import (
 from app.ai.envelope import source_ref
 from app.ai.shadow_profiles import (
     expand_query_with_hints,
+    is_obo_focused,
+    non_primary_source_caps,
+    preferred_type_quotas,
     profile_diagnostic_meta,
     preferred_source_types,
     resolve_shadow_profile,
     resolved_profile_for_diagnostics,
     source_type_weights,
+    vector_fetch_extra_types,
 )
 
 FORBIDDEN_CHUNK_RE = re.compile(r"max_bid_cents|proxy_bids|proxy max", re.I)
@@ -372,6 +376,7 @@ async def count_embedded_chunks_for_scope(
 def _select_route_weighted_chunks(
     rows: Sequence[Any],
     *,
+    profile: str,
     preferred: Sequence[str],
     weights: Dict[str, float],
     words: List[str],
@@ -380,6 +385,7 @@ def _select_route_weighted_chunks(
     max_chunks: int,
     max_tokens: int,
     scope_by_type: Dict[str, int],
+    custom_hints: Optional[Sequence[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Shadow-only: reserve slots for owner-visible preferred types, then fill by weighted score."""
     privacy_rows: List[Any] = []
@@ -395,21 +401,30 @@ def _select_route_weighted_chunks(
 
     selected_rows: List[Any] = []
     seen_ids = set()
-    per_type_quota = max(1, min(3, max_chunks // max(len(preferred), 1)))
+    type_counts: Counter[str] = Counter()
+    quotas = preferred_type_quotas(
+        profile,
+        max_chunks,
+        scope_by_type,
+        custom_hints=custom_hints,
+    )
 
     for st in preferred:
-        if scope_by_type.get(st, 0) <= 0:
+        cap = quotas.get(st, 0)
+        if cap <= 0:
             continue
-        for row in by_type.get(st, [])[:per_type_quota]:
+        for row in by_type.get(st, [])[:cap]:
             if str(row["id"]) in seen_ids:
                 continue
             selected_rows.append(row)
             seen_ids.add(str(row["id"]))
+            type_counts[st] += 1
             if len(selected_rows) >= max_chunks:
                 break
         if len(selected_rows) >= max_chunks:
             break
 
+    slot_caps = non_primary_source_caps(profile, max_chunks, custom_hints=custom_hints)
     weighted_rest = _apply_route_weights(
         [r for r in privacy_rows if str(r["id"]) not in seen_ids],
         weights,
@@ -417,8 +432,13 @@ def _select_route_weighted_chunks(
     for row in weighted_rest:
         if str(row["id"]) in seen_ids:
             continue
+        st = str(row["source_type"])
+        cap = slot_caps.get(st)
+        if cap is not None and type_counts[st] >= cap:
+            continue
         selected_rows.append(row)
         seen_ids.add(str(row["id"]))
+        type_counts[st] += 1
         if len(selected_rows) >= max_chunks * 3:
             break
 
@@ -650,23 +670,26 @@ async def retrieve_chunks_vector_shadow(
         weights = source_type_weights(resolved_profile)
         scope_by_type = await count_embedded_by_source_type_for_scope(conn, user_id=user_id)
         preferred_zero_visible = [st for st in preferred if scope_by_type.get(st, 0) == 0]
+        obo_focused = is_obo_focused(resolved_profile, shadow_custom_query_hints)
+        global_limit = max_chunks * 2 if obo_focused else max_chunks * 3
         global_rows = await _fetch_vector_rows(
             conn,
             filters=filters,
             params=params,
             vec_param=vec_param,
-            limit=max_chunks * 3,
+            limit=global_limit,
         )
         pool_rows = list(global_rows)
-        for st in preferred:
+        for st in vector_fetch_extra_types(resolved_profile, shadow_custom_query_hints):
             if scope_by_type.get(st, 0) <= 0:
                 continue
+            type_limit = max(8, max_chunks) if st == "obo_offer_summary" and obo_focused else max(6, max_chunks)
             type_rows = await _fetch_vector_rows(
                 conn,
                 filters=filters,
                 params=params,
                 vec_param=vec_param,
-                limit=max(6, max_chunks),
+                limit=type_limit,
                 extra_source_type=st,
             )
             pool_rows = _merge_vector_rows(pool_rows, type_rows)
@@ -715,6 +738,7 @@ async def retrieve_chunks_vector_shadow(
         )
         weighted_selected = _select_route_weighted_chunks(
             raw_rows,
+            profile=resolved_profile or "generic_rag",
             preferred=preferred,
             weights=weights,
             words=words,
@@ -723,6 +747,7 @@ async def retrieve_chunks_vector_shadow(
             max_chunks=max_chunks,
             max_tokens=max_tokens,
             scope_by_type=scope_by_type,
+            custom_hints=list(shadow_custom_query_hints or []),
         )
     else:
         unweighted_selected = _rows_to_chunks(

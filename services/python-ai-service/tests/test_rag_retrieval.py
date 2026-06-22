@@ -78,6 +78,56 @@ class TestShadowProfiles(unittest.TestCase):
             weights.get("listing", 0),
         )
 
+    def test_obo_helper_prefers_obo_type(self):
+        from app.ai.shadow_profiles import source_type_weights
+
+        weights = source_type_weights("obo_helper")
+        self.assertGreater(
+            weights.get("obo_offer_summary", 0),
+            weights.get("listing", 0),
+        )
+
+    def test_obo_focused_selection_reserves_more_obo_slots(self):
+        from app.ai.rag_retrieval import _select_route_weighted_chunks
+        from app.ai.shadow_profiles import source_type_weights
+
+        rows = [
+            {"id": f"obo-{i}", "source_type": "obo_offer_summary", "content": f"offer {i}", "score": 0.9 - i * 0.01}
+            for i in range(8)
+        ] + [
+            {"id": f"lst-{i}", "source_type": "listing", "content": f"listing {i}", "score": 0.95 - i * 0.01}
+            for i in range(8)
+        ]
+        for row in rows:
+            row.update({
+                "document_id": row["id"],
+                "chunk_index": 0,
+                "checksum": "x",
+                "source_refs": [],
+                "source_id": "s",
+                "owner_user_id": "u",
+                "visibility": "owner",
+                "source_updated_at": None,
+                "title": "t",
+                "metadata": {},
+            })
+        weights = source_type_weights("obo_helper")
+        selected = _select_route_weighted_chunks(
+            rows,
+            profile="obo_helper",
+            preferred=["obo_offer_summary", "listing", "listing_revision", "record"],
+            weights=weights,
+            words=[],
+            pin_source=False,
+            query="",
+            max_chunks=8,
+            max_tokens=5000,
+            scope_by_type={"obo_offer_summary": 18, "listing": 20, "listing_revision": 5},
+            custom_hints=["obo", "owner_visible"],
+        )
+        obo_selected = sum(1 for c in selected if c["source_type"] == "obo_offer_summary")
+        self.assertGreater(obo_selected, 2)
+
     def test_pricing_recommendation_alias(self):
         from app.ai.shadow_profiles import resolve_shadow_profile
 

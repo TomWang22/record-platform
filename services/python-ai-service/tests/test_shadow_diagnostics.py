@@ -109,6 +109,24 @@ class TestShadowDiagnosticsHelpers(unittest.TestCase):
         self.assertEqual(terms, ["obo", "owner_visible"])
         self.assertIn("owner_visible", expanded)
 
+    def test_obo_focused_quotas_and_fetch_plan(self) -> None:
+        from app.ai.shadow_profiles import (
+            is_obo_focused,
+            preferred_type_quotas,
+            vector_fetch_extra_types,
+        )
+
+        self.assertTrue(is_obo_focused("obo_helper", None))
+        quotas = preferred_type_quotas(
+            "obo_helper",
+            8,
+            {"obo_offer_summary": 18, "listing": 10, "listing_revision": 4},
+            custom_hints=["owner_visible"],
+        )
+        self.assertGreaterEqual(quotas.get("obo_offer_summary", 0), 3)
+        self.assertLessEqual(quotas.get("listing", 0), 2)
+        self.assertEqual(vector_fetch_extra_types("obo_helper"), ["obo_offer_summary", "listing"])
+
 
 if __name__ == "__main__":
     unittest.main()

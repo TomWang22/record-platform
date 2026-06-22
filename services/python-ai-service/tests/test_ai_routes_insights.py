@@ -178,6 +178,7 @@ class TestRouteWeightedSelection(unittest.TestCase):
         weights = source_type_weights("auction_risk")
         selected = _select_route_weighted_chunks(
             rows,
+            profile="auction_risk",
             preferred=["auction_bid_summary", "listing"],
             weights=weights,
             words=[],

@@ -1,7 +1,7 @@
 """T19.5/T19.6 — Route-specific shadow vector profiles (diagnostic only; keyword unchanged)."""
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 ALLOWED_SHADOW_SOURCE_TYPES: Tuple[str, ...] = (
     "record",
@@ -88,6 +88,34 @@ _PROFILE_QUERY_HINTS: Dict[str, List[str]] = {
     "generic_rag": ["marketplace", "listing"],
 }
 
+_OBO_FOCUS_HINTS = frozenset({"obo", "owner_visible", "owner-visible", "offer", "offers"})
+
+_PROFILE_FIXED_WEIGHTS: Dict[str, Dict[str, float]] = {
+    "obo_helper": {
+        "obo_offer_summary": 3.5,
+        "listing": 1.35,
+        "listing_revision": 1.1,
+        "record": 0.85,
+        "auction_bid_summary": 0.35,
+        "notification": 0.35,
+    },
+}
+
+
+def _normalize_hints(custom_hints: Optional[Sequence[str]]) -> List[str]:
+    if not custom_hints:
+        return []
+    return [str(h).strip().lower() for h in custom_hints if h and str(h).strip()]
+
+
+def is_obo_focused(profile: str | None, custom_hints: Optional[Sequence[str]] = None) -> bool:
+    """Shadow-only: OBO owner/seller prompts need stronger OBO selection."""
+    resolved = resolve_shadow_profile(profile)
+    if resolved == "obo_helper":
+        return True
+    hints = _normalize_hints(custom_hints)
+    return any(h in _OBO_FOCUS_HINTS for h in hints)
+
 
 def resolve_shadow_profile(profile: str | None) -> str:
     """Unknown profiles fall back to generic_rag."""
@@ -107,7 +135,14 @@ def preferred_source_types(profile: str | None) -> List[str]:
 
 def source_type_weights(profile: str | None) -> Dict[str, float]:
     """Higher weight for earlier preferred types; non-preferred types rank lower."""
-    preferred = preferred_source_types(profile)
+    resolved = resolve_shadow_profile(profile)
+    if resolved in _PROFILE_FIXED_WEIGHTS:
+        weights = dict(_PROFILE_FIXED_WEIGHTS[resolved])
+        for st in ALLOWED_SHADOW_SOURCE_TYPES:
+            if st not in weights:
+                weights[st] = 0.35
+        return weights
+    preferred = preferred_source_types(resolved)
     weights: Dict[str, float] = {}
     for i, st in enumerate(preferred):
         weights[st] = round(2.5 - (i * 0.35), 2)
@@ -117,12 +152,78 @@ def source_type_weights(profile: str | None) -> Dict[str, float]:
     return weights
 
 
+def preferred_type_quotas(
+    profile: str | None,
+    max_chunks: int,
+    scope_by_type: Mapping[str, int],
+    *,
+    custom_hints: Optional[Sequence[str]] = None,
+) -> Dict[str, int]:
+    """Shadow-only reserved slots per source type before weighted fill."""
+    resolved = resolve_shadow_profile(profile)
+    preferred = preferred_source_types(resolved)
+    quotas: Dict[str, int] = {}
+
+    if is_obo_focused(resolved, custom_hints):
+        obo_available = int(scope_by_type.get("obo_offer_summary", 0))
+        if obo_available > 0:
+            quotas["obo_offer_summary"] = min(
+                obo_available,
+                max(3, max_chunks // 2),
+                max_chunks,
+            )
+        listing_available = int(scope_by_type.get("listing", 0))
+        if listing_available > 0:
+            quotas["listing"] = min(listing_available, 2)
+        revision_available = int(scope_by_type.get("listing_revision", 0))
+        if revision_available > 0:
+            quotas["listing_revision"] = min(revision_available, 1)
+        return quotas
+
+    uniform = max(1, min(3, max_chunks // max(len(preferred), 1)))
+    for st in preferred:
+        if int(scope_by_type.get(st, 0)) > 0:
+            quotas[st] = uniform
+    return quotas
+
+
+def non_primary_source_caps(
+    profile: str | None,
+    max_chunks: int,
+    *,
+    custom_hints: Optional[Sequence[str]] = None,
+) -> Dict[str, int]:
+    """Shadow-only hard caps for non-primary types during weighted fill."""
+    if not is_obo_focused(profile, custom_hints):
+        return {}
+    return {
+        "listing": min(3, max_chunks),
+        "listing_revision": min(2, max_chunks),
+        "record": 1,
+        "notification": 1,
+        "auction_bid_summary": 1,
+    }
+
+
+def vector_fetch_extra_types(
+    profile: str | None,
+    custom_hints: Optional[Sequence[str]] = None,
+) -> List[str]:
+    """Shadow-only: narrow per-type vector fetches to cut latency on focused routes."""
+    resolved = resolve_shadow_profile(profile)
+    if is_obo_focused(resolved, custom_hints):
+        return ["obo_offer_summary", "listing"]
+    return preferred_source_types(resolved)[:3]
+
+
 def profile_diagnostic_meta(profile: str | None) -> Dict[str, Any]:
     resolved = resolve_shadow_profile(profile)
     return {
         "profile": resolved,
         "preferred_source_types": preferred_source_types(resolved),
         "source_type_weights": source_type_weights(resolved),
+        "obo_focused": is_obo_focused(resolved),
+        "vector_fetch_extra_types": vector_fetch_extra_types(resolved),
     }
 
 

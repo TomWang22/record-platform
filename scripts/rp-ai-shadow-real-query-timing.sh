@@ -62,7 +62,7 @@ QUERIES = [
 ]
 
 CASES = [
-    ("keyword", None, False, None),
+    ("keyword", None, False, False, None),
     ("shadow_default", None, True, False, None),
     ("shadow_obo_owner", "obo_helper", True, True, "obo,owner_visible"),
 ]

@@ -1,10 +1,49 @@
 # Phase 20 — Copilot / agent context (Record Platform AI)
 
 **Last updated:** 2026-06-22  
-**Current main SHA:** `8633149c6f8f74e351a19d82d92c08806902fce8`  
+**Current main SHA:** `3aba1701bed3783c724a632b9756c65deff131ed`  
 **Audience:** GitHub Copilot, Cursor, and other coding agents working on `record-platform`
 
 Use this document when continuing Phase 20 work. It replaces any deleted handoff notes.
+
+---
+
+## Locked takeaway (active Phase 20 state)
+
+```text
+T20.8 verdict: vector rollout NOT READY
+
+Keep:
+- keyword retrieval as production default
+- AI_RAG_SHADOW_VECTOR=0
+- vector retrieval shadow-only
+- no EMBEDDING_BACKFILL_FORCE=1
+- no broad/full embedding backfill
+- no Phase 21
+```
+
+### Copilot-safe instruction
+
+```md
+Use @docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md as the source of truth.
+
+Do not enable vector retrieval as production default. Do not start Phase 21.
+Do not rerun Tranche 2. Do not use EMBEDDING_BACKFILL_FORCE=1.
+Do not change keyword retrieval behavior.
+
+Current T20.8 verdict is NOT READY:
+- embedded coverage: 6.9% / 5,049 FAIL
+- e2e OBO owner-visible embedded: 2 FAIL
+- shadow p95: ~7.1s FAIL
+- shadow-keyword overlap: 0 FAIL
+- leakage: PASS
+- keyword stability: PASS
+
+Allowed work only with explicit approval:
+- bounded new embedding tranche with fresh backup and dry-run
+- shadow-only diagnostics/refinement
+- coverage hardening without product behavior changes
+```
 
 ---
 
@@ -30,12 +69,17 @@ Use this document when continuing Phase 20 work. It replaces any deleted handoff
 | **T20.6** | `655ffee` | CI/coverage hardening: `scripts/coverage/service-coverage-manifest.json`, runner/enforcer, python-ai pytest-cov ≥90% on `app/ai/*`, `.github/workflows/coverage.yml` |
 | **T20.7** | `655ffee` (DB only) | Bounded **Tranche 2**: +500 embeddings (4,549 → 5,049). Caps: obo 150, listing 200, listing_revision 100, notification 50. Backup: `backups/rp-all-11-t20-tranche2-preflight` |
 | **T20.7R** | `8633149` | Rerun guard hardening: lock blocks with **exit 2**; `--check-lock`; `scripts/rp-ai-backfill-rerun-guard-smoke.sh` |
-| **T20.8** | `8633149` | **Read-only** vector rollout readiness eval → **NOT READY** (see `bench_logs/ai-platform/t20-8-vector-rollout-readiness.md`) |
+| **T20.8** | `3aba170` | **Read-only** vector rollout readiness eval → **NOT READY** — `docs/ai-platform/T20-8-vector-rollout-readiness.md` |
 
-### Phase 20 tickets NOT started
+### Phase 20 tickets NOT started (require explicit approval)
 
-- **T20.9+** Production vector default / hybrid rollout
-- **Phase 21** — not started; do not begin without explicit approval
+| Ticket | Scope |
+|--------|-------|
+| **T20.9** | Bounded Tranche 3 embeddings (dry-run plan only until approved) — `docs/ai-platform/T20-9-tranche3-dry-run-plan.md` |
+| **T20.10+** | Shadow-only refinement (profiles/hints/diagnostics; no keyword changes) |
+| **T20.11+** | Coverage manifest extension for Node services (`strict_enabled=false` until wired) |
+| **T20.12+** | Production vector default / hybrid rollout — only after T20.3 thresholds pass |
+| **Phase 21** | Not started; do not begin without explicit approval |
 
 ---
 
@@ -206,11 +250,17 @@ Production vector default requires **all** of:
 
 ## Recommended sequencing (what to do next)
 
-1. **If asked to "enable vector"** → refuse until thresholds pass; cite T20.8 report.
-2. **If more embeddings needed** → new tranche id, fresh backup, dry-run first, caps, no FORCE; never rerun `t20-tranche-2`.
-3. **If improving shadow** → shadow-only code (`shadow_profiles.py`, diagnostic scripts); no keyword behavior change.
-4. **If hardening** → extend coverage manifest for Node services (`strict_enabled=false` until wired).
-5. **Before any push** → OCH scan, strip Co-authored trailers if needed, no bench_logs in commit.
+Best next **safe** workstreams — **only with explicit approval**:
+
+1. **New bounded embedding tranche (T20.9)** — new tranche id, fresh backup, dry-run first, caps only; never rerun `t20-tranche-2`; no `EMBEDDING_BACKFILL_FORCE=1`. See `docs/ai-platform/T20-9-tranche3-dry-run-plan.md`.
+2. **Shadow-only refinement (T20.10)** — improve `shadow_profiles.py` / query hints / diagnostics; no keyword or API contract changes.
+3. **Coverage hardening (T20.11)** — extend manifest for more services; keep `strict_enabled=false` until wired; preserve python-ai strict 90% gate.
+
+Refusal rules:
+
+1. **If asked to "enable vector"** → refuse until T20.3 thresholds pass; cite `docs/ai-platform/T20-8-vector-rollout-readiness.md`.
+2. **If rerunning Tranche 2** → refuse; lock exists (exit **2**).
+3. **Before any push** → OCH scan, strip Co-authored trailers if needed, no `bench_logs/` in commit.
 
 ---
 
@@ -218,8 +268,11 @@ Production vector default requires **all** of:
 
 | Document | Path |
 |----------|------|
+| **This handoff (source of truth)** | `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md` |
+| T20.8 rollout eval (committed) | `docs/ai-platform/T20-8-vector-rollout-readiness.md` |
+| T20.8 rollout eval (local run artifact) | `bench_logs/ai-platform/t20-8-vector-rollout-readiness.md` |
+| T20.9 Tranche 3 dry-run plan | `docs/ai-platform/T20-9-tranche3-dry-run-plan.md` |
 | Phase 20 planning | `bench_logs/ai-platform/phase-20-next-step-planning.md` |
-| T20.8 rollout eval | `bench_logs/ai-platform/t20-8-vector-rollout-readiness.md` |
 | Phase 19 release | `docs/release/rp-ai-vector-shadow-routing-readiness-20260616.md` |
 | AI contracts | `docs/ai-platform/rp-ai-contracts.md` |
 | Coverage manifest | `scripts/coverage/service-coverage-manifest.json` |
@@ -234,5 +287,6 @@ Recent Phase 20 commits:
 
 - `chore(ci): add service coverage hardening gates` (T20.6)
 - `chore(ai): harden embedding tranche rerun guard` (T20.7R)
+- `docs(ai): add Phase 20 copilot context and T20.8 rollout eval` (T20.8)
 
 Do not commit DB-only embedding changes. Docs like this file **should** be committed when updated.

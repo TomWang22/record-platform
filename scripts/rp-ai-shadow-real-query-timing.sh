@@ -191,6 +191,8 @@ overlap_reasons = []
 selected_counts = []
 embed_outliers = []
 embed_timeouts = []
+candidate_fetch_latencies = []
+rerank_latencies = []
 for r in rows:
     if r.get("warmup"):
         continue
@@ -200,9 +202,12 @@ for r in rows:
     ov = sd.get("overlap") or {}
     expl = ov.get("explanation") or {}
     if sd:
-        shadow_totals.append(float(sd.get("timings_ms", {}).get("total") or 0))
+        timings = sd.get("timings_ms") or {}
+        shadow_totals.append(float(timings.get("total") or 0))
+        candidate_fetch_latencies.append(float(timings.get("candidate_fetch") or 0))
+        rerank_latencies.append(float(timings.get("rerank_select") or 0))
         embed = sd.get("embed") or {}
-        embed_ms = float(embed.get("latency_ms") or sd.get("timings_ms", {}).get("embed") or 0)
+        embed_ms = float(embed.get("latency_ms") or timings.get("embed") or 0)
         embed_latencies.append(embed_ms)
         if embed.get("timed_out") or embed_ms >= 5000:
             embed_outliers.append({
@@ -239,6 +244,10 @@ summary = {
     "shadow_total_ms_p95": percentile(shadow_totals, 95),
     "embed_ms_p50": percentile(embed_latencies, 50),
     "embed_ms_p95": percentile(embed_latencies, 95),
+    "candidate_fetch_ms_p50": percentile(candidate_fetch_latencies, 50),
+    "candidate_fetch_ms_p95": percentile(candidate_fetch_latencies, 95),
+    "rerank_select_ms_p50": percentile(rerank_latencies, 50),
+    "rerank_select_ms_p95": percentile(rerank_latencies, 95),
     "shadow_overlap_zero_runs": sum(1 for o in overlaps if o == 0),
     "shadow_doc_overlap_gt0_runs": sum(1 for o in doc_overlaps if o > 0),
     "shadow_entity_overlap_gt0_runs": sum(1 for o in entity_overlaps if o > 0),
@@ -261,6 +270,10 @@ lines = [
     f"- shadow p95 total ms: {summary['shadow_total_ms_p95']}",
     f"- embed p50 ms: {summary['embed_ms_p50']}",
     f"- embed p95 ms: {summary['embed_ms_p95']}",
+    f"- candidate_fetch p50 ms: {summary['candidate_fetch_ms_p50']}",
+    f"- candidate_fetch p95 ms: {summary['candidate_fetch_ms_p95']}",
+    f"- rerank_select p50 ms: {summary['rerank_select_ms_p50']}",
+    f"- rerank_select p95 ms: {summary['rerank_select_ms_p95']}",
     f"- embed outliers (>=5s or timeout): {summary['embed_outlier_count']}",
     f"- embed timeouts: {summary['embed_timeout_count']}",
     f"- zero-overlap shadow runs: {summary['shadow_overlap_zero_runs']}/{summary['shadow_runs']}",
@@ -316,11 +329,19 @@ for r in rows:
 with open(md_out, "w") as f:
     f.write("\n".join(lines) + "\n")
 
-print(f"Wrote:\n  {jsonl_out}\n  {md_out}")
-print(
-    f"shadow p50/p95 ms: {summary['shadow_total_ms_p50']} / {summary['shadow_total_ms_p95']} | "
-    f"embed p50/p95 ms: {summary['embed_ms_p50']} / {summary['embed_ms_p95']}"
+console_summary = (
+    f"shadow p50/p95 ms: {summary['shadow_total_ms_p50']} / "
+    f"{summary['shadow_total_ms_p95']} | "
+    f"embed p50/p95 ms: {summary['embed_ms_p50']} / "
+    f"{summary['embed_ms_p95']} | "
+    f"candidate_fetch p50/p95 ms: {summary['candidate_fetch_ms_p50']} / "
+    f"{summary['candidate_fetch_ms_p95']} | "
+    f"rerank_select p50/p95 ms: {summary['rerank_select_ms_p50']} / "
+    f"{summary['rerank_select_ms_p95']}"
 )
+
+print(f"Wrote:\n  {jsonl_out}\n  {md_out}")
+print(console_summary)
 sys.exit(0)
 PY
 

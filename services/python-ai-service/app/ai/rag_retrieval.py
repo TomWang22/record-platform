@@ -132,6 +132,14 @@ def _collect_document_ids(chunks: Iterable[Mapping[str, Any]]) -> List[str]:
     return ids
 
 
+# T20.10K — map source_type to canonical entity-id field for parity diagnostics.
+_SOURCE_TYPE_ENTITY_ID_FIELD: dict[str, str] = {
+    "listing": "listing_id",
+    "record": "record_id",
+    "obo_offer_summary": "offer_id",
+}
+
+
 def _entity_keys_for_chunk(chunk: Mapping[str, Any]) -> set[str]:
     """Shadow-only overlap keys from source_id and safe metadata fields (no body text)."""
     keys: set[str] = set()
@@ -139,6 +147,9 @@ def _entity_keys_for_chunk(chunk: Mapping[str, Any]) -> set[str]:
     source_id = chunk.get("source_id")
     if source_type and source_id:
         keys.add(f"{source_type}:{source_id}")
+        alias_field = _SOURCE_TYPE_ENTITY_ID_FIELD.get(str(source_type))
+        if alias_field:
+            keys.add(f"{alias_field}:{source_id}")
     meta = _coerce_metadata(chunk.get("metadata"))
     for field in ("listing_id", "offer_id", "record_id"):
         value = meta.get(field)
@@ -160,6 +171,9 @@ def _entity_keys_for_row(row: Mapping[str, Any]) -> set[str]:
     source_id = row.get("source_id")
     if source_type and source_id:
         keys.add(f"{source_type}:{source_id}")
+        alias_field = _SOURCE_TYPE_ENTITY_ID_FIELD.get(str(source_type))
+        if alias_field:
+            keys.add(f"{alias_field}:{source_id}")
     meta = _coerce_metadata(row.get("metadata"))
     for field in ("listing_id", "offer_id", "record_id"):
         value = meta.get(field)

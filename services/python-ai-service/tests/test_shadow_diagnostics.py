@@ -86,6 +86,33 @@ class TestShadowDiagnosticsHelpers(unittest.TestCase):
         self.assertEqual(result.entity_overlap_count, 1)
         self.assertEqual(result.explanation.zero_overlap_reason, "shared_entity_different_chunks")
 
+    def test_overlap_entity_alias_listing_source_id_without_metadata(self) -> None:
+        """T20.10K — listing source_id aliases to listing_id for OBO parity."""
+        keyword_chunks = [
+            {
+                "id": "k1",
+                "document_id": "doc-k",
+                "source_type": "listing",
+                "source_id": "L1",
+                "metadata": {},
+            },
+        ]
+        shadow_chunks = [
+            {
+                "id": "s1",
+                "document_id": "doc-s",
+                "source_type": "obo_offer_summary",
+                "source_id": "O1",
+                "metadata": {"listing_id": "L1"},
+            },
+        ]
+        result = _build_overlap_diagnostics(
+            keyword_chunks=keyword_chunks,
+            shadow_chunks=shadow_chunks,
+        )
+        self.assertEqual(result.entity_overlap_count, 1)
+        self.assertEqual(result.explanation.zero_overlap_reason, "shared_entity_different_chunks")
+
     def test_overlap_source_type_mismatch_reason(self) -> None:
         keyword_chunks = [{"id": "k1", "document_id": "d1", "source_type": "listing", "source_id": "L1"}]
         shadow_chunks = [{"id": "s1", "document_id": "d2", "source_type": "notification", "source_id": "N1"}]

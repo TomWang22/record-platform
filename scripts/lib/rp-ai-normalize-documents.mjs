@@ -80,6 +80,66 @@ export function assertNoForbiddenExport(text) {
   }
 }
 
+const NOTIFICATION_ENTITY_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Safe entity id token for notification metadata (no body text). */
+export function isSafeNotificationEntityId(value) {
+  const s = String(value ?? '').trim();
+  if (!s || s.length > 64) return false;
+  if (/\s/.test(s)) return false;
+  return NOTIFICATION_ENTITY_ID_PATTERN.test(s);
+}
+
+function pickNotificationEntityId(payload, ...keys) {
+  for (const key of keys) {
+    const raw = payload?.[key];
+    if (raw == null) continue;
+    const s = String(raw).trim();
+    if (isSafeNotificationEntityId(s)) return s;
+  }
+  return null;
+}
+
+/**
+ * T20.10L — extract safe entity IDs from notification payload for parity diagnostics.
+ * Never copies body/message/title or other prose fields.
+ */
+export function extractNotificationEntityMetadata(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const out = {};
+
+  const listingId = pickNotificationEntityId(p, 'listing_id', 'listingId');
+  if (listingId) out.listing_id = listingId;
+
+  const recordId = pickNotificationEntityId(p, 'record_id', 'recordId');
+  if (recordId) out.record_id = recordId;
+
+  const offerId = pickNotificationEntityId(p, 'offer_id', 'offerId', 'obo_offer_id');
+  if (offerId) out.offer_id = offerId;
+
+  let auctionId = pickNotificationEntityId(p, 'auction_id', 'auctionId');
+  const bidId = pickNotificationEntityId(p, 'bid_id', 'bidId');
+
+  const contextType = String(p.context_type ?? '').trim().toLowerCase();
+  const contextId = pickNotificationEntityId(p, 'context_id', 'contextId');
+
+  if (contextType === 'offer' && !out.offer_id && contextId) {
+    out.offer_id = contextId;
+  }
+  if (contextType === 'listing' && !out.listing_id && contextId) {
+    out.listing_id = contextId;
+  }
+  if (contextType === 'auction') {
+    if (!auctionId && contextId) auctionId = contextId;
+    if (!auctionId && listingId) auctionId = listingId;
+  }
+  if (auctionId) out.auction_id = auctionId;
+  if (bidId) out.bid_id = bidId;
+
+  return out;
+}
+
 function baseDoc(partial) {
   const doc = {
     source_type: partial.source_type,
@@ -292,13 +352,14 @@ export function normalizeAuctionBidSummary(listing, settings, bids) {
 
 export function normalizeNotification(row) {
   const payload = row.payload ?? {};
+  const entityMeta = extractNotificationEntityMetadata(payload);
   const title = `Notification: ${row.event_type}`;
   const lines = [
     `Notification ${row.event_type}`,
     `Channel: ${row.channel}`,
     `Status: ${row.status}`,
-    payload.listing_id ? `Listing: ${payload.listing_id}` : null,
-    payload.record_id ? `Record: ${payload.record_id}` : null,
+    entityMeta.listing_id ? `Listing: ${entityMeta.listing_id}` : null,
+    entityMeta.record_id ? `Record: ${entityMeta.record_id}` : null,
   ].filter(Boolean);
   return baseDoc({
     source_type: SOURCE_TYPES.NOTIFICATION,
@@ -309,7 +370,12 @@ export function normalizeNotification(row) {
     summary: `${row.event_type} via ${row.channel}`,
     normalized_text: lines.join('\n'),
     source_updated_at: row.created_at,
-    metadata: { event_type: row.event_type, channel: row.channel, status: row.status },
+    metadata: {
+      event_type: row.event_type,
+      channel: row.channel,
+      status: row.status,
+      ...entityMeta,
+    },
     source_refs: [{ schema: 'notification', table: 'notifications', id: String(row.id) }],
   });
 }

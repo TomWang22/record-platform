@@ -7,7 +7,9 @@ import {
   normalizeListingRevision,
   normalizeOboOfferSummary,
   normalizeAuctionBidSummary,
+  normalizeNotification,
   normalizeMessage,
+  extractNotificationEntityMetadata,
   documentChecksum,
   maskBidderId,
   sanitizeListingTitle,
@@ -145,5 +147,73 @@ describe('rp-ai-normalize-documents', () => {
     const a = documentChecksum({ source_type: 'record', source_id: '1', visibility: 'owner', title: 't', summary: 's', normalized_text: 'n', source_updated_at: now });
     const b = documentChecksum({ source_type: 'record', source_id: '1', visibility: 'owner', title: 't', summary: 's', normalized_text: 'n', source_updated_at: now });
     assert.equal(a, b);
+  });
+
+  const listingUuid = '11111111-1111-4111-8111-111111111111';
+  const recordUuid = '22222222-2222-4222-8222-222222222222';
+  const offerUuid = '33333333-3333-4333-8333-333333333333';
+  const auctionUuid = '44444444-4444-4444-8444-444444444444';
+  const bidUuid = '55555555-5555-4555-8555-555555555555';
+
+  it('notification entity metadata — listing_id snake_case', () => {
+    const meta = extractNotificationEntityMetadata({ listing_id: listingUuid });
+    assert.equal(meta.listing_id, listingUuid);
+    assert.equal(meta.record_id, undefined);
+  });
+
+  it('notification entity metadata — listingId camelCase', () => {
+    const meta = extractNotificationEntityMetadata({ listingId: listingUuid });
+    assert.equal(meta.listing_id, listingUuid);
+  });
+
+  it('notification entity metadata — record_id', () => {
+    const meta = extractNotificationEntityMetadata({ record_id: recordUuid });
+    assert.equal(meta.record_id, recordUuid);
+  });
+
+  it('notification entity metadata — offer id variants', () => {
+    assert.equal(extractNotificationEntityMetadata({ offer_id: offerUuid }).offer_id, offerUuid);
+    assert.equal(extractNotificationEntityMetadata({ offerId: offerUuid }).offer_id, offerUuid);
+    assert.equal(extractNotificationEntityMetadata({ obo_offer_id: offerUuid }).offer_id, offerUuid);
+  });
+
+  it('notification entity metadata — auction and bid ids', () => {
+    const meta = extractNotificationEntityMetadata({
+      context_type: 'auction',
+      listing_id: auctionUuid,
+      bid_id: bidUuid,
+    });
+    assert.equal(meta.listing_id, auctionUuid);
+    assert.equal(meta.auction_id, auctionUuid);
+    assert.equal(meta.bid_id, bidUuid);
+  });
+
+  it('notification entity metadata — no entity ids', () => {
+    assert.deepEqual(extractNotificationEntityMetadata({ source: 'kafka.test' }), {});
+  });
+
+  it('notification normalize preserves existing metadata and excludes body text', () => {
+    const doc = normalizeNotification({
+      id: 'n1',
+      user_id: 'u1',
+      event_type: 'OfferReceived',
+      channel: 'push',
+      status: 'sent',
+      payload: {
+        listing_id: listingUuid,
+        offer_id: offerUuid,
+        body: 'SECRET BODY TEXT',
+        message: 'SECRET MESSAGE',
+        title: 'Offer title',
+      },
+      created_at: now,
+    });
+    assert.equal(doc.metadata.event_type, 'OfferReceived');
+    assert.equal(doc.metadata.channel, 'push');
+    assert.equal(doc.metadata.status, 'sent');
+    assert.equal(doc.metadata.listing_id, listingUuid);
+    assert.equal(doc.metadata.offer_id, offerUuid);
+    assert.ok(!JSON.stringify(doc.metadata).includes('SECRET'));
+    assert.ok(doc.normalized_text.includes(listingUuid));
   });
 });

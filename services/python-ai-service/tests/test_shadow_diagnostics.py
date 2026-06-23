@@ -113,6 +113,32 @@ class TestShadowDiagnosticsHelpers(unittest.TestCase):
         self.assertEqual(result.entity_overlap_count, 1)
         self.assertEqual(result.explanation.zero_overlap_reason, "shared_entity_different_chunks")
 
+    def test_overlap_entity_notification_listing_id_bridge(self) -> None:
+        """T20.10L — notification listing_id bridges to listing source_id alias."""
+        keyword_chunks = [
+            {
+                "id": "k1",
+                "document_id": "doc-k",
+                "source_type": "listing",
+                "source_id": "L1",
+                "metadata": {},
+            },
+        ]
+        shadow_chunks = [
+            {
+                "id": "s1",
+                "document_id": "doc-s",
+                "source_type": "notification",
+                "source_id": "N1",
+                "metadata": {"listing_id": "L1", "event_type": "OfferReceived"},
+            },
+        ]
+        result = _build_overlap_diagnostics(
+            keyword_chunks=keyword_chunks,
+            shadow_chunks=shadow_chunks,
+        )
+        self.assertGreaterEqual(result.entity_overlap_count, 1)
+
     def test_overlap_source_type_mismatch_reason(self) -> None:
         keyword_chunks = [{"id": "k1", "document_id": "d1", "source_type": "listing", "source_id": "L1"}]
         shadow_chunks = [{"id": "s1", "document_id": "d2", "source_type": "notification", "source_id": "N1"}]

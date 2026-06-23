@@ -151,7 +151,7 @@ def _entity_keys_for_chunk(chunk: Mapping[str, Any]) -> set[str]:
         if alias_field:
             keys.add(f"{alias_field}:{source_id}")
     meta = _coerce_metadata(chunk.get("metadata"))
-    for field in ("listing_id", "offer_id", "record_id"):
+    for field in ("listing_id", "offer_id", "record_id", "auction_id", "bid_id"):
         value = meta.get(field)
         if value:
             keys.add(f"{field}:{value}")
@@ -175,7 +175,7 @@ def _entity_keys_for_row(row: Mapping[str, Any]) -> set[str]:
         if alias_field:
             keys.add(f"{alias_field}:{source_id}")
     meta = _coerce_metadata(row.get("metadata"))
-    for field in ("listing_id", "offer_id", "record_id"):
+    for field in ("listing_id", "offer_id", "record_id", "auction_id", "bid_id"):
         value = meta.get(field)
         if value:
             keys.add(f"{field}:{value}")

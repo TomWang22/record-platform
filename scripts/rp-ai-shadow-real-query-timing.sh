@@ -16,7 +16,17 @@ RAW_JSONL="${RAW_JSONL:-$OUTPUT_DIR/t20-10-shadow-real-query-${STAMP}.jsonl}"
 SUMMARY_MD="${SUMMARY_MD:-$OUTPUT_DIR/t20-10-shadow-real-query-${STAMP}.md}"
 CURL_TIMEOUT="${SHADOW_DIAG_CURL_TIMEOUT:-180}"
 BENCH_WARMUP_RUNS="${BENCH_WARMUP_RUNS:-1}"
+BENCH_WORKER_WARMUP_RUNS="${BENCH_WORKER_WARMUP_RUNS:-${WEB_CONCURRENCY:-4}}"
+BENCH_REQUIRE_OLLAMA_WARM="${BENCH_REQUIRE_OLLAMA_WARM:-0}"
 mkdir -p "$OUTPUT_DIR"
+
+if [[ "$BENCH_REQUIRE_OLLAMA_WARM" == "1" ]]; then
+  echo "=== Ollama embed warmup gate (required) ==="
+  bash "$SCRIPT_DIR/rp-ai-ollama-embed-warmup.sh" || {
+    echo "❌ Ollama embed warmup gate failed — benchmark aborted"
+    exit 1
+  }
+fi
 
 CA="${REPO_ROOT}/certs/dev-chain.pem"
 LB_IP="$(rp_discover_metallb_ip || echo "${TARGET_IP:-}")"
@@ -35,6 +45,7 @@ TOKEN="$(printf '%s' "$LOGIN_JSON" | python3 -c 'import json,sys; print(json.loa
 
 export TOKEN API_BASE CA LB_IP RAW_JSONL SUMMARY_MD CURL_TIMEOUT CURL_RESOLVE="record-platform.test:443:${LB_IP}"
 export BENCH_WARMUP_RUNS
+export BENCH_WORKER_WARMUP_RUNS
 
 python3 <<'PY'
 import json
@@ -51,6 +62,7 @@ ca = os.environ["CA"]
 resolve = os.environ["CURL_RESOLVE"]
 curl_timeout = os.environ.get("CURL_TIMEOUT", "180")
 bench_warmup_runs = int(os.environ.get("BENCH_WARMUP_RUNS", "1") or "0")
+bench_worker_warmup_runs = int(os.environ.get("BENCH_WORKER_WARMUP_RUNS", "4") or "0")
 jsonl_out = os.environ["RAW_JSONL"]
 md_out = os.environ["SUMMARY_MD"]
 
@@ -69,6 +81,13 @@ CASES = [
     ("keyword", None, False, False, None),
     ("shadow_default", None, True, False, None),
     ("shadow_obo_owner", "obo_helper", True, True, "obo,owner_visible"),
+]
+
+WARMUP_CASES = [
+    (QUERIES[1], "obo_helper", True, "obo,owner_visible"),
+    (QUERIES[0], None, False, None),
+    (QUERIES[2], None, False, None),
+    (QUERIES[4], None, False, None),
 ]
 
 
@@ -123,20 +142,21 @@ def call_rag(question, *, shadow: bool, profile: str | None, profile_hints: bool
 
 
 rows = []
+warmup_total = max(bench_warmup_runs, bench_worker_warmup_runs)
 with open(jsonl_out, "w") as out:
-    warmup_query = QUERIES[1]
-    for i in range(bench_warmup_runs):
+    for i in range(warmup_total):
+        query, profile, profile_hints, custom_hints = WARMUP_CASES[i % len(WARMUP_CASES)]
         result = call_rag(
-            warmup_query,
+            query,
             shadow=True,
-            profile="obo_helper",
-            profile_hints=True,
-            custom_hints="obo,owner_visible",
+            profile=profile,
+            profile_hints=profile_hints,
+            custom_hints=custom_hints,
         )
         row = {
-            "mode": "warmup_shadow_obo_owner",
-            "profile": "obo_helper",
-            "query": warmup_query,
+            "mode": "warmup_shadow",
+            "profile": profile or "inferred",
+            "query": query,
             "warmup": True,
             **result,
         }
@@ -170,6 +190,7 @@ entity_overlaps = []
 overlap_reasons = []
 selected_counts = []
 embed_outliers = []
+embed_timeouts = []
 for r in rows:
     if r.get("warmup"):
         continue
@@ -194,6 +215,8 @@ for r in rows:
                 "cache_hit": embed.get("cache_hit"),
                 "query_prefix": (r.get("query") or "")[:72],
             })
+        if embed.get("timed_out"):
+            embed_timeouts.append(r["mode"])
     chunk_ov = int(ov.get("count") or 0)
     overlaps.append(chunk_ov)
     doc_overlaps.append(int(ov.get("document_overlap_count") or expl.get("document_overlap_count") or 0))
@@ -206,9 +229,10 @@ for r in rows:
 reason_counts = Counter(overlap_reasons)
 
 summary = {
-    "ticket": "T20.10G",
+    "ticket": "T20.10I",
     "generated_at": datetime.now(timezone.utc).isoformat(),
-    "warmup_runs": bench_warmup_runs,
+    "warmup_runs": warmup_total,
+    "worker_warmup_runs": bench_worker_warmup_runs,
     "total_runs": len([r for r in rows if not r.get("warmup")]),
     "shadow_runs": sum(1 for r in rows if r["mode"].startswith("shadow") and not r.get("warmup")),
     "shadow_total_ms_p50": percentile(shadow_totals, 50),
@@ -220,6 +244,7 @@ summary = {
     "shadow_entity_overlap_gt0_runs": sum(1 for o in entity_overlaps if o > 0),
     "shadow_empty_runs": sum(1 for c in selected_counts if c == 0),
     "embed_outlier_count": len(embed_outliers),
+    "embed_timeout_count": len(embed_timeouts),
     "zero_overlap_reason_counts": dict(sorted(reason_counts.items())),
 }
 
@@ -228,7 +253,7 @@ lines = [
     "",
     f"- Raw: `{jsonl_out}`",
     f"- Generated: {summary['generated_at']}",
-    f"- Warmup runs (excluded from aggregates): {summary['warmup_runs']}",
+    f"- Warmup runs (excluded from aggregates): {summary['warmup_runs']} (worker target={summary['worker_warmup_runs']})",
     "",
     "## Aggregate",
     "",
@@ -237,6 +262,7 @@ lines = [
     f"- embed p50 ms: {summary['embed_ms_p50']}",
     f"- embed p95 ms: {summary['embed_ms_p95']}",
     f"- embed outliers (>=5s or timeout): {summary['embed_outlier_count']}",
+    f"- embed timeouts: {summary['embed_timeout_count']}",
     f"- zero-overlap shadow runs: {summary['shadow_overlap_zero_runs']}/{summary['shadow_runs']}",
     f"- document-overlap >0 runs: {summary['shadow_doc_overlap_gt0_runs']}/{summary['shadow_runs']}",
     f"- entity-overlap >0 runs: {summary['shadow_entity_overlap_gt0_runs']}/{summary['shadow_runs']}",
@@ -298,4 +324,4 @@ print(
 sys.exit(0)
 PY
 
-echo "✅ T20.10H benchmark summary written"
+echo "✅ T20.10I benchmark summary written"

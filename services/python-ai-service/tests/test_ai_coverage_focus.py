@@ -341,7 +341,13 @@ class TestShadowProfilesExtended(unittest.TestCase):
     def test_seller_sales_summary_profile(self):
         self.assertEqual(resolve_shadow_profile("seller_sales_summary"), "seller_sales_summary")
         weights = source_type_weights("seller_sales_summary")
-        self.assertGreater(weights.get("listing", 0), weights.get("record", 0))
+        self.assertGreater(weights.get("obo_offer_summary", 0), weights.get("record", 0))
+        self.assertGreater(weights.get("listing_revision", 0), weights.get("record", 0))
+
+    def test_infer_shadow_profile_generic_empty(self):
+        from app.ai.shadow_profiles import infer_shadow_profile_from_query
+
+        self.assertEqual(infer_shadow_profile_from_query(""), "generic_rag")
 
 
 class TestInsightsDegraded(unittest.TestCase):

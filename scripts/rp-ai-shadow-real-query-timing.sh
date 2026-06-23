@@ -298,4 +298,4 @@ print(
 sys.exit(0)
 PY
 
-echo "✅ T20.10G benchmark summary written"
+echo "✅ T20.10H benchmark summary written"

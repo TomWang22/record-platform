@@ -1,12 +1,14 @@
-import multiprocessing, os
+import multiprocessing
+import os
+
 bind = f"0.0.0.0:{os.getenv('AI_PORT','5005')}"
-# Cap workers based on memory limits to prevent OOM
-# With 4Gi memory limit, estimate ~100MB per worker + 200MB overhead = ~38 workers max
-# But be conservative: use CPU-based calculation with a hard cap
-cpu_count = multiprocessing.cpu_count()
-# Formula: workers = CPU cores * 2 (for I/O-bound async work), but cap at 20 to prevent memory issues
-# This prevents spawning too many workers under load
-workers = min(max(4, cpu_count * 2), 30)  # Increased cap to 30 workers for higher concurrency
+# WEB_CONCURRENCY caps gunicorn workers to avoid OOM on dev clusters (Colima/k8s reports host CPU count).
+_cpu_count = multiprocessing.cpu_count()
+_web_concurrency = os.getenv("WEB_CONCURRENCY")
+if _web_concurrency:
+    workers = max(1, min(int(_web_concurrency), 8))
+else:
+    workers = min(max(2, _cpu_count), 4)
 worker_class = "uvicorn.workers.UvicornWorker"
 threads = 1
 preload_app = True

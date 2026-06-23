@@ -9,12 +9,19 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.ai.rag_retrieval import (  # noqa: E402
     ShadowRetrievalDiagnostics,
+    _apply_keyword_alignment_boost,
     _build_overlap_diagnostics,
     _count_by_source_type,
     _finalize_shadow_diagnostics,
+    _keyword_alignment_multiplier,
+    _keyword_alignment_targets,
     _partition_privacy_rows,
 )
-from app.ai.shadow_profiles import resolved_profile_for_diagnostics  # noqa: E402
+from app.ai.shadow_profiles import (  # noqa: E402
+    infer_shadow_profile_from_query,
+    resolved_profile_for_diagnostics,
+    vector_fetch_extra_types,
+)
 
 
 class TestShadowDiagnosticsHelpers(unittest.TestCase):
@@ -160,10 +167,125 @@ class TestShadowDiagnosticsHelpers(unittest.TestCase):
             8,
             {"obo_offer_summary": 18, "listing": 10, "listing_revision": 4},
             custom_hints=["owner_visible"],
+            query="owner OBO summary",
         )
         self.assertGreaterEqual(quotas.get("obo_offer_summary", 0), 3)
         self.assertLessEqual(quotas.get("listing", 0), 2)
         self.assertEqual(vector_fetch_extra_types("obo_helper"), ["obo_offer_summary", "listing"])
+
+    def test_infer_shadow_profile_from_query(self) -> None:
+        from app.ai.shadow_profiles import infer_shadow_profile_from_query
+
+        self.assertEqual(
+            infer_shadow_profile_from_query(
+                "Give me an owner-visible summary of OBO activity for my active listings."
+            ),
+            "obo_helper",
+        )
+        self.assertEqual(
+            infer_shadow_profile_from_query(
+                "What notifications matter most for my selling activity right now?"
+            ),
+            "seller_sales_summary",
+        )
+        self.assertEqual(
+            infer_shadow_profile_from_query(
+                "What are the most recent pricing or revision changes across my listings?"
+            ),
+            "seller_sales_summary",
+        )
+
+    def test_seller_sales_summary_quotas_include_obo_for_offer_prompt(self) -> None:
+        from app.ai.shadow_profiles import preferred_type_quotas
+
+        quotas = preferred_type_quotas(
+            "seller_sales_summary",
+            8,
+            {
+                "obo_offer_summary": 18,
+                "listing": 10,
+                "listing_revision": 8,
+                "notification": 6,
+            },
+            query="Summarize the latest offers I have received on my listings.",
+        )
+        self.assertGreaterEqual(quotas.get("obo_offer_summary", 0), 2)
+        self.assertGreaterEqual(quotas.get("listing", 0), 2)
+
+    def test_shared_source_alignment_diagnostics(self) -> None:
+        keyword_chunks = [
+            {
+                "id": "k1",
+                "document_id": "doc-k",
+                "source_type": "listing",
+                "source_id": "L1",
+                "metadata": {"listing_id": "L1"},
+            },
+        ]
+        shadow_chunks = [
+            {
+                "id": "s1",
+                "document_id": "doc-s",
+                "source_type": "listing",
+                "source_id": "L2",
+                "metadata": {"listing_id": "L1"},
+            },
+        ]
+        result = _build_overlap_diagnostics(
+            keyword_chunks=keyword_chunks,
+            shadow_chunks=shadow_chunks,
+        )
+        self.assertEqual(result.explanation.zero_overlap_reason, "shared_entity_different_chunks")
+        self.assertIn("listing", result.explanation.shared_source_alignment)
+        self.assertEqual(
+            result.explanation.shared_source_alignment["listing"]["shared_entity_count"],
+            1,
+        )
+
+    def test_keyword_alignment_targets_and_boost(self) -> None:
+        keyword_chunks = [
+            {
+                "id": "k1",
+                "document_id": "doc-k",
+                "source_type": "listing",
+                "metadata": {"listing_id": "L1"},
+            },
+        ]
+        chunk_ids, doc_ids, entity_keys = _keyword_alignment_targets(keyword_chunks)
+        self.assertEqual(chunk_ids, {"k1"})
+        self.assertEqual(doc_ids, {"doc-k"})
+        self.assertIn("listing_id:L1", entity_keys)
+
+        rows = [
+            {"id": "k1", "source_type": "listing", "score": 0.5, "metadata": {}},
+            {"id": "s2", "source_type": "listing", "score": 0.9, "metadata": {"listing_id": "L1"}},
+        ]
+        boosted = _apply_keyword_alignment_boost(rows, keyword_chunks)
+        self.assertEqual(boosted[0]["id"], "s2")
+        self.assertEqual(boosted[1]["id"], "k1")
+        self.assertEqual(
+            _keyword_alignment_multiplier(
+                rows[1],
+                keyword_chunk_ids=chunk_ids,
+                keyword_document_ids=doc_ids,
+                keyword_entity_keys=entity_keys,
+            ),
+            1.25,
+        )
+
+    def test_vector_fetch_extra_types_for_seller_prompt(self) -> None:
+        extra = vector_fetch_extra_types(
+            "seller_sales_summary",
+            query="What notifications matter most for my selling activity right now?",
+        )
+        self.assertIn("notification", extra)
+        self.assertIn("obo_offer_summary", extra)
+
+    def test_infer_shadow_profile_auction_route(self) -> None:
+        self.assertEqual(
+            infer_shadow_profile_from_query("Show auction proxy pressure on my listings."),
+            "auction_risk",
+        )
 
     def test_hint_expansion_cap_truncates_profile_hints(self) -> None:
         from app.ai.shadow_profiles import expand_query_with_hints

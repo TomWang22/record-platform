@@ -82,9 +82,7 @@ spec:
             - name: POSTGRES_URL_PYTHON_AI
               valueFrom:
                 configMapKeyRef: { name: app-config, key: POSTGRES_URL_PYTHON_AI }
-            # T15.2E — RAG readiness (small defaults; Ollama HTTP only, no in-process transformers)
-            - name: OLLAMA_BASE_URL
-              value: "http://ollama.ollama.svc.cluster.local:11434"
+            # T15.2E — RAG readiness (OLLAMA_BASE_URL from app-config via envFrom)
             - name: AI_RAG_MAX_CHUNKS
               value: "8"
             - name: AI_RAG_MAX_CONTEXT_TOKENS
@@ -101,6 +99,9 @@ spec:
               value: "512"
             - name: AI_TRANSFORMER_ENABLED
               value: "0"
+            # T20.10H — cap gunicorn workers (preload_app + grpc/kafka per worker is memory-heavy)
+            - name: WEB_CONCURRENCY
+              value: "4"
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto

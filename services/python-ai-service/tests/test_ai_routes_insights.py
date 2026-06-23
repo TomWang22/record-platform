@@ -490,9 +490,23 @@ class TestVectorShadowNonRoute(unittest.TestCase):
                 "app.ai.rag_retrieval._fetch_vector_rows",
                 AsyncMock(return_value=[_chunk_row()]),
             ):
-                result = _run(retrieve_chunks_vector_shadow(conn, query="marketplace", user_id=None))
+                result = _run(retrieve_chunks_vector_shadow(conn, query="", user_id=None))
         self.assertEqual(result["status"], "ok")
         self.assertNotIn("profile", result)
+
+    def test_inferred_profile_vector_ok(self):
+        conn = FakeConn(fetchval=10, fetch_rows=[_chunk_row()])
+
+        with patch("app.ai.rag_retrieval._call_ollama_embed", AsyncMock(return_value=[0.1] * 768)):
+            with patch(
+                "app.ai.rag_retrieval._fetch_vector_rows",
+                AsyncMock(return_value=[_chunk_row()]),
+            ):
+                result = _run(
+                    retrieve_chunks_vector_shadow(conn, query="marketplace listings", user_id=None)
+                )
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["profile"], "seller_sales_summary")
 
 
 class TestRegistryProviders(unittest.TestCase):

@@ -22,6 +22,7 @@ from app.ai.config import (
 from app.ai.envelope import source_ref
 from app.ai.shadow_profiles import (
     expand_query_with_hints,
+    infer_shadow_profile_from_query,
     is_obo_focused,
     non_primary_source_caps,
     preferred_type_quotas,
@@ -153,6 +154,67 @@ def _collect_entity_keys(chunks: Iterable[Mapping[str, Any]]) -> set[str]:
     return keys
 
 
+def _entity_keys_for_row(row: Mapping[str, Any]) -> set[str]:
+    keys: set[str] = set()
+    source_type = row.get("source_type")
+    source_id = row.get("source_id")
+    if source_type and source_id:
+        keys.add(f"{source_type}:{source_id}")
+    meta = _coerce_metadata(row.get("metadata"))
+    for field in ("listing_id", "offer_id", "record_id"):
+        value = meta.get(field)
+        if value:
+            keys.add(f"{field}:{value}")
+    return keys
+
+
+def _keyword_alignment_targets(
+    keyword_chunks: Optional[Sequence[Mapping[str, Any]]],
+) -> Tuple[set[str], set[str], set[str]]:
+    chunk_ids: set[str] = set()
+    document_ids: set[str] = set()
+    entity_keys: set[str] = set()
+    for chunk in keyword_chunks or []:
+        chunk_id = chunk.get("id")
+        if chunk_id:
+            chunk_ids.add(str(chunk_id))
+        doc_id = chunk.get("document_id")
+        if doc_id:
+            document_ids.add(str(doc_id))
+        entity_keys.update(_entity_keys_for_chunk(chunk))
+    return chunk_ids, document_ids, entity_keys
+
+
+def _shared_source_type_alignment(
+    keyword_chunks: Sequence[Mapping[str, Any]],
+    shadow_chunks: Sequence[Mapping[str, Any]],
+) -> Dict[str, Dict[str, int]]:
+    kw_by_type: Dict[str, List[Mapping[str, Any]]] = {}
+    sh_by_type: Dict[str, List[Mapping[str, Any]]] = {}
+    for chunk in keyword_chunks:
+        st = str(chunk.get("source_type") or "")
+        if st:
+            kw_by_type.setdefault(st, []).append(chunk)
+    for chunk in shadow_chunks:
+        st = str(chunk.get("source_type") or "")
+        if st:
+            sh_by_type.setdefault(st, []).append(chunk)
+    shared_types = set(kw_by_type).intersection(sh_by_type)
+    alignment: Dict[str, Dict[str, int]] = {}
+    for st in sorted(shared_types):
+        kw_entities = _collect_entity_keys(kw_by_type[st])
+        sh_entities = _collect_entity_keys(sh_by_type[st])
+        kw_docs = set(_collect_document_ids(kw_by_type[st]))
+        sh_docs = set(_collect_document_ids(sh_by_type[st]))
+        alignment[st] = {
+            "keyword_count": len(kw_by_type[st]),
+            "shadow_count": len(sh_by_type[st]),
+            "shared_entity_count": len(kw_entities.intersection(sh_entities)),
+            "shared_document_count": len(kw_docs.intersection(sh_docs)),
+        }
+    return alignment
+
+
 def _classify_zero_overlap_reason(
     *,
     chunk_overlap: int,
@@ -192,6 +254,7 @@ class ShadowOverlapExplanation:
     keyword_document_count: int = 0
     shadow_document_count: int = 0
     zero_overlap_reason: Optional[str] = None
+    shared_source_alignment: Dict[str, Dict[str, int]] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -298,6 +361,7 @@ def _build_overlap_diagnostics(
     keyword_source_types = _count_by_source_type(keyword_chunks)
     shadow_source_types = _count_by_source_type(shadow_chunks)
     shared_source_type_count = len(set(keyword_source_types).intersection(shadow_source_types))
+    shared_source_alignment = _shared_source_type_alignment(keyword_chunks, shadow_chunks)
     zero_overlap_reason = _classify_zero_overlap_reason(
         chunk_overlap=overlap_count,
         document_overlap=document_overlap_count,
@@ -318,6 +382,7 @@ def _build_overlap_diagnostics(
         keyword_document_count=len(keyword_doc_set),
         shadow_document_count=len(shadow_doc_set),
         zero_overlap_reason=zero_overlap_reason,
+        shared_source_alignment=shared_source_alignment,
     )
 
     return ShadowOverlapDiagnostics(
@@ -616,6 +681,7 @@ def _select_route_weighted_chunks(
     max_tokens: int,
     scope_by_type: Dict[str, int],
     custom_hints: Optional[Sequence[str]] = None,
+    keyword_chunks: Optional[Sequence[Mapping[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Shadow-only: reserve slots for owner-visible preferred types, then fill by weighted score."""
     privacy_rows: List[Any] = []
@@ -637,6 +703,7 @@ def _select_route_weighted_chunks(
         max_chunks,
         scope_by_type,
         custom_hints=custom_hints,
+        query=query,
     )
 
     for st in preferred:
@@ -655,8 +722,10 @@ def _select_route_weighted_chunks(
             break
 
     slot_caps = non_primary_source_caps(profile, max_chunks, custom_hints=custom_hints)
+    remaining_rows = [r for r in privacy_rows if str(r["id"]) not in seen_ids]
+    remaining_rows = _apply_keyword_alignment_boost(remaining_rows, keyword_chunks)
     weighted_rest = _apply_route_weights(
-        [r for r in privacy_rows if str(r["id"]) not in seen_ids],
+        remaining_rows,
         weights,
     )
     for row in weighted_rest:
@@ -692,6 +761,47 @@ def _apply_route_weights(rows: Sequence[Any], weights: Dict[str, float]) -> List
         weighted.append((base * w, row))
     weighted.sort(key=lambda x: (-x[0], str(x[1]["id"])))
     return [row for _, row in weighted]
+
+
+def _keyword_alignment_multiplier(
+    row: Mapping[str, Any],
+    *,
+    keyword_chunk_ids: set[str],
+    keyword_document_ids: set[str],
+    keyword_entity_keys: set[str],
+) -> float:
+    row_id = str(row.get("id") or "")
+    if row_id and row_id in keyword_chunk_ids:
+        return 2.0
+    doc_id = row.get("document_id")
+    if doc_id and str(doc_id) in keyword_document_ids:
+        return 1.35
+    if _entity_keys_for_row(row).intersection(keyword_entity_keys):
+        return 1.25
+    return 1.0
+
+
+def _apply_keyword_alignment_boost(
+    rows: Sequence[Any],
+    keyword_chunks: Optional[Sequence[Mapping[str, Any]]],
+) -> List[Any]:
+    if not keyword_chunks:
+        return list(rows)
+    chunk_ids, document_ids, entity_keys = _keyword_alignment_targets(keyword_chunks)
+    if not chunk_ids and not document_ids and not entity_keys:
+        return list(rows)
+    boosted: List[Tuple[float, Any]] = []
+    for row in rows:
+        base = float(row.get("score") or 0)
+        multiplier = _keyword_alignment_multiplier(
+            row,
+            keyword_chunk_ids=chunk_ids,
+            keyword_document_ids=document_ids,
+            keyword_entity_keys=entity_keys,
+        )
+        boosted.append((base * multiplier, row))
+    boosted.sort(key=lambda x: (-x[0], str(x[1]["id"])))
+    return [row for _, row in boosted]
 
 
 async def count_embedded_by_source_type_for_scope(
@@ -811,7 +921,7 @@ async def retrieve_chunks_vector_shadow(
     total_start = _now_ms()
     diagnostics = ShadowRetrievalDiagnostics(
         enabled=include_diagnostics,
-        profile=resolve_shadow_profile(route_shadow_profile) if route_shadow_profile else None,
+        profile=None,
         query_hints=[],
     )
     pin_source = bool(source_id or metadata_listing_id)
@@ -839,8 +949,15 @@ async def retrieve_chunks_vector_shadow(
             result["shadow_diagnostics"] = diagnostics.to_dict()
         return result
 
-    resolved_profile = resolve_shadow_profile(route_shadow_profile) if route_shadow_profile else None
-    route_mode = route_shadow_profile is not None
+    explicit_profile = route_shadow_profile
+    if explicit_profile:
+        resolved_profile = resolve_shadow_profile(explicit_profile)
+        profile_source = "explicit"
+    else:
+        resolved_profile = infer_shadow_profile_from_query(query)
+        profile_source = "inferred" if resolved_profile != "generic_rag" else "default"
+    route_mode = explicit_profile is not None or resolved_profile != "generic_rag"
+    diagnostics.profile = resolved_profile if route_mode else None
     hint_profile = resolved_profile if route_mode else "generic_rag"
     embed_query, expanded_query_terms, query_hint_applied, hint_truncated = expand_query_with_hints(
         query,
@@ -851,7 +968,11 @@ async def retrieve_chunks_vector_shadow(
     )
     if include_diagnostics:
         diagnostics.query_hints = list(expanded_query_terms)
-        diagnostics.debug["profile_details"] = resolved_profile_for_diagnostics(route_shadow_profile)
+        diagnostics.debug["profile_details"] = resolved_profile_for_diagnostics(
+            explicit_profile or resolved_profile,
+        )
+        diagnostics.debug["profile_source"] = profile_source
+        diagnostics.debug["inferred_profile"] = resolved_profile if not explicit_profile else None
         diagnostics.debug["query_hint_applied"] = query_hint_applied
         diagnostics.debug["hint_expansion_truncated"] = hint_truncated
 
@@ -920,7 +1041,11 @@ async def retrieve_chunks_vector_shadow(
             limit=global_limit,
         )
         pool_rows = list(global_rows)
-        for st in vector_fetch_extra_types(resolved_profile, shadow_custom_query_hints):
+        for st in vector_fetch_extra_types(
+            resolved_profile,
+            shadow_custom_query_hints,
+            query=query,
+        ):
             if scope_by_type.get(st, 0) <= 0:
                 continue
             type_limit = max(8, max_chunks) if st == "obo_offer_summary" and obo_focused else max(6, max_chunks)
@@ -988,6 +1113,7 @@ async def retrieve_chunks_vector_shadow(
             max_tokens=max_tokens,
             scope_by_type=scope_by_type,
             custom_hints=list(shadow_custom_query_hints or []),
+            keyword_chunks=keyword_chunks_for_overlap,
         )
     else:
         unweighted_selected = _rows_to_chunks(

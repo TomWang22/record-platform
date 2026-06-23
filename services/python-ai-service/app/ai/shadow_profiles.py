@@ -1,6 +1,7 @@
 """T19.5/T19.6 — Route-specific shadow vector profiles (diagnostic only; keyword unchanged)."""
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 ALLOWED_SHADOW_SOURCE_TYPES: Tuple[str, ...] = (
@@ -90,6 +91,16 @@ _PROFILE_QUERY_HINTS: Dict[str, List[str]] = {
 
 _OBO_FOCUS_HINTS = frozenset({"obo", "owner_visible", "owner-visible", "offer", "offers"})
 
+_LISTING_REVISION_TERMS = frozenset(
+    {"revision", "revisions", "pricing", "price", "priced", "reprice"}
+)
+_NOTIFICATION_TERMS = frozenset({"notification", "notifications", "notify"})
+_OBO_QUERY_TERMS = frozenset(
+    {"offer", "offers", "obo", "counter", "negotiation", "negotiate", "bid", "bidding"}
+)
+_AUCTION_QUERY_TERMS = frozenset({"auction", "proxy", "reserve"})
+_LISTING_QUERY_TERMS = frozenset({"listing", "listings", "catalog", "seller", "selling"})
+
 _PROFILE_FIXED_WEIGHTS: Dict[str, Dict[str, float]] = {
     "obo_helper": {
         "obo_offer_summary": 3.5,
@@ -99,6 +110,14 @@ _PROFILE_FIXED_WEIGHTS: Dict[str, Dict[str, float]] = {
         "auction_bid_summary": 0.35,
         "notification": 0.35,
     },
+    "seller_sales_summary": {
+        "obo_offer_summary": 2.8,
+        "listing": 2.2,
+        "listing_revision": 2.4,
+        "notification": 2.0,
+        "auction_bid_summary": 1.6,
+        "record": 1.0,
+    },
 }
 
 
@@ -106,6 +125,36 @@ def _normalize_hints(custom_hints: Optional[Sequence[str]]) -> List[str]:
     if not custom_hints:
         return []
     return [str(h).strip().lower() for h in custom_hints if h and str(h).strip()]
+
+
+def _query_tokens(query: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9'-]+", (query or "").lower()))
+
+
+def _query_has_terms(query: str, terms: frozenset[str]) -> bool:
+    tokens = _query_tokens(query)
+    return bool(tokens & terms) or any(term in (query or "").lower() for term in terms)
+
+
+def infer_shadow_profile_from_query(query: str) -> str:
+    """Shadow-only: pick a route profile when none is supplied explicitly."""
+    q = (query or "").lower()
+    tokens = _query_tokens(query)
+    if "owner-visible" in q or "owner visible" in q:
+        return "obo_helper"
+    if _query_has_terms(query, _NOTIFICATION_TERMS) and not _query_has_terms(query, _OBO_QUERY_TERMS):
+        return "seller_sales_summary"
+    if _query_has_terms(query, _AUCTION_QUERY_TERMS) and not _query_has_terms(query, _OBO_QUERY_TERMS):
+        return "auction_risk"
+    if _query_has_terms(query, _LISTING_REVISION_TERMS):
+        return "seller_sales_summary"
+    if _query_has_terms(query, _OBO_QUERY_TERMS):
+        return "seller_sales_summary"
+    if _query_has_terms(query, _LISTING_QUERY_TERMS):
+        return "seller_sales_summary"
+    if tokens:
+        return "seller_sales_summary"
+    return "generic_rag"
 
 
 def is_obo_focused(profile: str | None, custom_hints: Optional[Sequence[str]] = None) -> bool:
@@ -158,6 +207,7 @@ def preferred_type_quotas(
     scope_by_type: Mapping[str, int],
     *,
     custom_hints: Optional[Sequence[str]] = None,
+    query: str = "",
 ) -> Dict[str, int]:
     """Shadow-only reserved slots per source type before weighted fill."""
     resolved = resolve_shadow_profile(profile)
@@ -180,6 +230,32 @@ def preferred_type_quotas(
             quotas["listing_revision"] = min(revision_available, 1)
         return quotas
 
+    if resolved == "seller_sales_summary":
+        remaining = max_chunks
+        if _query_has_terms(query, _OBO_QUERY_TERMS):
+            obo_available = int(scope_by_type.get("obo_offer_summary", 0))
+            if obo_available > 0:
+                slot = min(obo_available, 3, remaining)
+                quotas["obo_offer_summary"] = slot
+                remaining -= slot
+        if _query_has_terms(query, _LISTING_REVISION_TERMS):
+            revision_available = int(scope_by_type.get("listing_revision", 0))
+            if revision_available > 0 and remaining > 0:
+                slot = min(revision_available, 3, remaining)
+                quotas["listing_revision"] = slot
+                remaining -= slot
+        if _query_has_terms(query, _NOTIFICATION_TERMS):
+            notification_available = int(scope_by_type.get("notification", 0))
+            if notification_available > 0 and remaining > 0:
+                slot = min(notification_available, 2, remaining)
+                quotas["notification"] = slot
+                remaining -= slot
+        listing_available = int(scope_by_type.get("listing", 0))
+        if listing_available > 0 and remaining > 0:
+            quotas["listing"] = min(listing_available, max(2, remaining))
+        if quotas:
+            return quotas
+
     uniform = max(1, min(3, max_chunks // max(len(preferred), 1)))
     for st in preferred:
         if int(scope_by_type.get(st, 0)) > 0:
@@ -194,25 +270,49 @@ def non_primary_source_caps(
     custom_hints: Optional[Sequence[str]] = None,
 ) -> Dict[str, int]:
     """Shadow-only hard caps for non-primary types during weighted fill."""
-    if not is_obo_focused(profile, custom_hints):
-        return {}
-    return {
-        "listing": min(3, max_chunks),
-        "listing_revision": min(2, max_chunks),
-        "record": 1,
-        "notification": 1,
-        "auction_bid_summary": 1,
-    }
+    if is_obo_focused(profile, custom_hints):
+        return {
+            "listing": min(3, max_chunks),
+            "listing_revision": min(2, max_chunks),
+            "record": 1,
+            "notification": 1,
+            "auction_bid_summary": 1,
+        }
+    resolved = resolve_shadow_profile(profile)
+    if resolved == "seller_sales_summary":
+        return {
+            "notification": min(2, max_chunks),
+            "auction_bid_summary": min(2, max_chunks),
+            "record": 1,
+        }
+    return {}
 
 
 def vector_fetch_extra_types(
     profile: str | None,
     custom_hints: Optional[Sequence[str]] = None,
+    *,
+    query: str = "",
 ) -> List[str]:
     """Shadow-only: narrow per-type vector fetches to cut latency on focused routes."""
     resolved = resolve_shadow_profile(profile)
     if is_obo_focused(resolved, custom_hints):
         return ["obo_offer_summary", "listing"]
+    if resolved == "seller_sales_summary":
+        extra: List[str] = ["listing", "obo_offer_summary"]
+        if _query_has_terms(query, _LISTING_REVISION_TERMS):
+            extra.append("listing_revision")
+        if _query_has_terms(query, _NOTIFICATION_TERMS):
+            extra.append("notification")
+        if _query_has_terms(query, _AUCTION_QUERY_TERMS):
+            extra.append("auction_bid_summary")
+        seen: set[str] = set()
+        ordered: List[str] = []
+        for st in extra:
+            if st not in seen:
+                seen.add(st)
+                ordered.append(st)
+        return ordered[:4]
     return preferred_source_types(resolved)[:3]
 
 

@@ -21,17 +21,20 @@ from app.ai.config import (
 )
 from app.ai.envelope import source_ref
 from app.ai.shadow_profiles import (
+    candidate_pool_is_sufficient,
     expand_query_with_hints,
     infer_shadow_profile_from_query,
     is_obo_focused,
+    needs_global_fallback,
     non_primary_source_caps,
     preferred_type_quotas,
     profile_diagnostic_meta,
     preferred_source_types,
+    resolve_shadow_fetch_strategy,
     resolve_shadow_profile,
     resolved_profile_for_diagnostics,
+    source_type_quota_satisfied,
     source_type_weights,
-    vector_fetch_extra_types,
 )
 
 FORBIDDEN_CHUNK_RE = re.compile(r"max_bid_cents|proxy_bids|proxy max", re.I)
@@ -848,6 +851,160 @@ def _merge_vector_rows(*groups: Sequence[Any]) -> List[Any]:
     return list(by_id.values())
 
 
+def _pool_rows_by_source_type(rows: Sequence[Any]) -> Dict[str, int]:
+    counts: Counter[str] = Counter()
+    for row in rows:
+        counts[str(row["source_type"])] += 1
+    return dict(counts)
+
+
+def _shadow_type_fetch_limit(
+    source_type: str,
+    *,
+    max_chunks: int,
+    obo_focused: bool,
+) -> int:
+    if source_type == "obo_offer_summary" and obo_focused:
+        return max(8, max_chunks)
+    return max(6, max_chunks)
+
+
+async def _collect_route_mode_shadow_rows(
+    conn,
+    *,
+    filters: List[str],
+    params: List[Any],
+    vec_param: int,
+    resolved_profile: str,
+    shadow_custom_query_hints: Optional[Sequence[str]],
+    query: str,
+    max_chunks: int,
+    scope_by_type: Dict[str, int],
+) -> Tuple[List[Any], Dict[str, Any]]:
+    """T20.10W — shadow-only Option A+B candidate fetch strategy."""
+    obo_focused = is_obo_focused(resolved_profile, shadow_custom_query_hints)
+    global_limit = max_chunks * 2 if obo_focused else max_chunks * 3
+    strategy = resolve_shadow_fetch_strategy(
+        resolved_profile,
+        shadow_custom_query_hints,
+        query=query,
+        scope_by_type=scope_by_type,
+    )
+    fetch_diag: Dict[str, Any] = {
+        "fetch_strategy": strategy.fetch_strategy,
+        "primary_source_type": strategy.primary_source_type,
+        "global_fetch_skipped": False,
+        "typed_fetches_skipped": [],
+        "typed_fetches_run": [],
+        "candidate_pool_before_rerank": 0,
+    }
+    pool_rows: List[Any] = []
+    fetched_source_types: set[str] = set()
+
+    async def _typed_fetch(source_type: str) -> None:
+        if scope_by_type.get(source_type, 0) <= 0:
+            return
+        type_rows = await _fetch_vector_rows(
+            conn,
+            filters=filters,
+            params=params,
+            vec_param=vec_param,
+            limit=_shadow_type_fetch_limit(
+                source_type,
+                max_chunks=max_chunks,
+                obo_focused=obo_focused,
+            ),
+            extra_source_type=source_type,
+        )
+        pool_rows.extend(type_rows)
+        fetched_source_types.add(source_type)
+        fetch_diag["typed_fetches_run"].append(source_type)
+
+    def _pool_snapshot() -> Tuple[int, Dict[str, int]]:
+        merged = _merge_vector_rows(pool_rows)
+        return len(merged), _pool_rows_by_source_type(merged)
+
+    def _pool_is_sufficient(
+        pool_size: int,
+        pool_by_type: Mapping[str, int],
+        *,
+        primary_source_type: Optional[str] = None,
+    ) -> bool:
+        return candidate_pool_is_sufficient(
+            pool_size,
+            max_chunks,
+            pool_by_type=pool_by_type,
+            profile=resolved_profile,
+            scope_by_type=scope_by_type,
+            custom_hints=shadow_custom_query_hints,
+            query=query,
+            primary_source_type=primary_source_type,
+        )
+
+    primary = strategy.primary_source_type
+    if strategy.fetch_strategy == "scoped_first" and primary:
+        await _typed_fetch(primary)
+        pool_size, pool_by_type = _pool_snapshot()
+        if _pool_is_sufficient(pool_size, pool_by_type, primary_source_type=primary):
+            fetch_diag["global_fetch_skipped"] = True
+            fetch_diag["typed_fetches_skipped"] = list(strategy.extra_source_types)
+            fetch_diag["candidate_pool_before_rerank"] = pool_size
+            return _merge_vector_rows(pool_rows), fetch_diag
+
+    pool_size, pool_by_type = _pool_snapshot()
+    if needs_global_fallback(
+        pool_size,
+        max_chunks,
+        pool_by_type=pool_by_type,
+        profile=resolved_profile,
+        scope_by_type=scope_by_type,
+        custom_hints=shadow_custom_query_hints,
+        query=query,
+        primary_source_type=primary,
+    ):
+        global_rows = await _fetch_vector_rows(
+            conn,
+            filters=filters,
+            params=params,
+            vec_param=vec_param,
+            limit=global_limit,
+        )
+        pool_rows = _merge_vector_rows(pool_rows, global_rows)
+    else:
+        fetch_diag["global_fetch_skipped"] = True
+
+    pool_size, pool_by_type = _pool_snapshot()
+    for source_type in strategy.extra_source_types:
+        if source_type in fetched_source_types:
+            fetch_diag["typed_fetches_skipped"].append(source_type)
+            continue
+        if _pool_is_sufficient(pool_size, pool_by_type):
+            fetch_diag["typed_fetches_skipped"].append(source_type)
+            continue
+        if source_type_quota_satisfied(
+            source_type,
+            pool_by_type,
+            resolved_profile,
+            max_chunks,
+            scope_by_type,
+            custom_hints=shadow_custom_query_hints,
+            query=query,
+        ):
+            fetch_diag["typed_fetches_skipped"].append(source_type)
+            continue
+        await _typed_fetch(source_type)
+        pool_size, pool_by_type = _pool_snapshot()
+        if _pool_is_sufficient(pool_size, pool_by_type):
+            for remaining in strategy.extra_source_types:
+                if remaining not in fetched_source_types and remaining not in fetch_diag["typed_fetches_skipped"]:
+                    fetch_diag["typed_fetches_skipped"].append(remaining)
+            break
+
+    merged_rows = _merge_vector_rows(pool_rows)
+    fetch_diag["candidate_pool_before_rerank"] = len(merged_rows)
+    return merged_rows, fetch_diag
+
+
 async def _fetch_vector_rows(
     conn,
     *,
@@ -1040,39 +1197,23 @@ async def retrieve_chunks_vector_shadow(
     privacy_stats = ShadowPrivacyDiagnostics()
 
     fetch_start = _now_ms()
+    fetch_diag: Dict[str, Any] = {}
     if route_mode:
         preferred = preferred_source_types(resolved_profile)
         weights = source_type_weights(resolved_profile)
         scope_by_type = await count_embedded_by_source_type_for_scope(conn, user_id=user_id)
         preferred_zero_visible = [st for st in preferred if scope_by_type.get(st, 0) == 0]
-        obo_focused = is_obo_focused(resolved_profile, shadow_custom_query_hints)
-        global_limit = max_chunks * 2 if obo_focused else max_chunks * 3
-        global_rows = await _fetch_vector_rows(
+        raw_rows, fetch_diag = await _collect_route_mode_shadow_rows(
             conn,
             filters=filters,
             params=params,
             vec_param=vec_param,
-            limit=global_limit,
-        )
-        pool_rows = list(global_rows)
-        for st in vector_fetch_extra_types(
-            resolved_profile,
-            shadow_custom_query_hints,
+            resolved_profile=resolved_profile,
+            shadow_custom_query_hints=shadow_custom_query_hints,
             query=query,
-        ):
-            if scope_by_type.get(st, 0) <= 0:
-                continue
-            type_limit = max(8, max_chunks) if st == "obo_offer_summary" and obo_focused else max(6, max_chunks)
-            type_rows = await _fetch_vector_rows(
-                conn,
-                filters=filters,
-                params=params,
-                vec_param=vec_param,
-                limit=type_limit,
-                extra_source_type=st,
-            )
-            pool_rows = _merge_vector_rows(pool_rows, type_rows)
-        raw_rows = list(pool_rows)
+            max_chunks=max_chunks,
+            scope_by_type=scope_by_type,
+        )
     else:
         global_rows = await _fetch_vector_rows(
             conn,
@@ -1187,6 +1328,9 @@ async def retrieve_chunks_vector_shadow(
             "raw_chunk_ids": _collect_chunk_ids(raw_rows)[:25],
             "selected_chunk_ids": _collect_chunk_ids(selected_for_diag)[:25],
         })
+        if fetch_diag:
+            diagnostics.debug.update(fetch_diag)
+            diagnostics.debug["candidate_fetch_ms"] = diagnostics.timings_ms.candidate_fetch
         result["shadow_diagnostics"] = diagnostics.to_dict()
     return result
 

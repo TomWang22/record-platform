@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 ALLOWED_SHADOW_SOURCE_TYPES: Tuple[str, ...] = (
@@ -286,6 +287,185 @@ def non_primary_source_caps(
             "record": 1,
         }
     return {}
+
+
+@dataclass(frozen=True, slots=True)
+class ShadowFetchStrategy:
+    """Shadow-only candidate fetch plan (T20.10W); keyword path must not use this."""
+
+    fetch_strategy: str  # scoped_first | global_first
+    primary_source_type: Optional[str]
+    extra_source_types: List[str]
+
+
+def resolve_primary_source_type(
+    profile: str | None,
+    custom_hints: Optional[Sequence[str]] = None,
+    *,
+    query: str = "",
+    scope_by_type: Mapping[str, int],
+) -> Optional[str]:
+    """Shadow-only: primary typed fetch for strongly classified route profiles."""
+    resolved = resolve_shadow_profile(profile)
+    if resolved == "generic_rag":
+        return None
+
+    if is_obo_focused(resolved, custom_hints):
+        if int(scope_by_type.get("obo_offer_summary", 0)) > 0:
+            return "obo_offer_summary"
+        return None
+
+    if resolved == "record_valuation":
+        if int(scope_by_type.get("record", 0)) > 0:
+            return "record"
+        return None
+
+    if resolved == "auction_risk":
+        if int(scope_by_type.get("auction_bid_summary", 0)) > 0:
+            return "auction_bid_summary"
+        return None
+
+    if resolved == "seller_sales_summary":
+        if _query_has_terms(query, _NOTIFICATION_TERMS) and not _query_has_terms(query, _OBO_QUERY_TERMS):
+            if int(scope_by_type.get("notification", 0)) > 0:
+                return "notification"
+        if _query_has_terms(query, _LISTING_REVISION_TERMS):
+            if int(scope_by_type.get("listing_revision", 0)) > 0:
+                return "listing_revision"
+        if _query_has_terms(query, _OBO_QUERY_TERMS):
+            if int(scope_by_type.get("obo_offer_summary", 0)) > 0:
+                return "obo_offer_summary"
+        if int(scope_by_type.get("listing", 0)) > 0:
+            return "listing"
+        return None
+
+    return None
+
+
+def _extra_source_types_excluding_primary(
+    profile: str | None,
+    custom_hints: Optional[Sequence[str]] = None,
+    *,
+    query: str = "",
+    primary_source_type: Optional[str] = None,
+) -> List[str]:
+    extras = vector_fetch_extra_types(profile, custom_hints, query=query)
+    seen: set[str] = set()
+    ordered: List[str] = []
+    for st in extras:
+        if st == primary_source_type or st in seen:
+            continue
+        seen.add(st)
+        ordered.append(st)
+    return ordered
+
+
+def resolve_shadow_fetch_strategy(
+    profile: str | None,
+    custom_hints: Optional[Sequence[str]] = None,
+    *,
+    query: str = "",
+    scope_by_type: Mapping[str, int],
+) -> ShadowFetchStrategy:
+    """Shadow-only fetch ordering for route-mode vector retrieval."""
+    primary = resolve_primary_source_type(
+        profile,
+        custom_hints,
+        query=query,
+        scope_by_type=scope_by_type,
+    )
+    extras = _extra_source_types_excluding_primary(
+        profile,
+        custom_hints,
+        query=query,
+        primary_source_type=primary,
+    )
+    fetch_strategy = "scoped_first" if primary else "global_first"
+    return ShadowFetchStrategy(
+        fetch_strategy=fetch_strategy,
+        primary_source_type=primary,
+        extra_source_types=extras,
+    )
+
+
+def candidate_pool_is_sufficient(
+    pool_size: int,
+    max_chunks: int,
+    *,
+    pool_by_type: Mapping[str, int],
+    profile: str | None,
+    scope_by_type: Mapping[str, int],
+    custom_hints: Optional[Sequence[str]] = None,
+    query: str = "",
+    primary_source_type: Optional[str] = None,
+) -> bool:
+    """Shadow-only: enough candidates to skip further fetches."""
+    if pool_size >= max_chunks:
+        return True
+    if primary_source_type:
+        available = int(scope_by_type.get(primary_source_type, 0))
+        fetched = int(pool_by_type.get(primary_source_type, 0))
+        if available > 0 and fetched >= min(available, max_chunks):
+            return True
+    quotas = preferred_type_quotas(
+        profile,
+        max_chunks,
+        scope_by_type,
+        custom_hints=custom_hints,
+        query=query,
+    )
+    if quotas and pool_size >= sum(min(q, int(scope_by_type.get(st, 0))) for st, q in quotas.items()):
+        return True
+    return False
+
+
+def source_type_quota_satisfied(
+    source_type: str,
+    pool_by_type: Mapping[str, int],
+    profile: str | None,
+    max_chunks: int,
+    scope_by_type: Mapping[str, int],
+    custom_hints: Optional[Sequence[str]] = None,
+    query: str = "",
+) -> bool:
+    """Shadow-only: per-type quota already met in the current candidate pool."""
+    quotas = preferred_type_quotas(
+        profile,
+        max_chunks,
+        scope_by_type,
+        custom_hints=custom_hints,
+        query=query,
+    )
+    quota = quotas.get(source_type, 0)
+    if quota <= 0:
+        return False
+    return int(pool_by_type.get(source_type, 0)) >= quota
+
+
+def needs_global_fallback(
+    pool_size: int,
+    max_chunks: int,
+    *,
+    pool_by_type: Mapping[str, int],
+    profile: str | None,
+    scope_by_type: Mapping[str, int],
+    custom_hints: Optional[Sequence[str]] = None,
+    query: str = "",
+    primary_source_type: Optional[str] = None,
+) -> bool:
+    """Shadow-only: global fetch required after a primary typed fetch underfills."""
+    if primary_source_type is None:
+        return True
+    return not candidate_pool_is_sufficient(
+        pool_size,
+        max_chunks,
+        pool_by_type=pool_by_type,
+        profile=profile,
+        scope_by_type=scope_by_type,
+        custom_hints=custom_hints,
+        query=query,
+        primary_source_type=primary_source_type,
+    )
 
 
 def vector_fetch_extra_types(

@@ -46,6 +46,8 @@ TOKEN="$(printf '%s' "$LOGIN_JSON" | python3 -c 'import json,sys; print(json.loa
 export TOKEN API_BASE CA LB_IP RAW_JSONL SUMMARY_MD CURL_TIMEOUT CURL_RESOLVE="record-platform.test:443:${LB_IP}"
 export BENCH_WARMUP_RUNS
 export BENCH_WORKER_WARMUP_RUNS
+export BENCH_REQUIRE_OLLAMA_WARM
+export REPO_ROOT
 
 python3 <<'PY'
 import json
@@ -65,6 +67,37 @@ bench_warmup_runs = int(os.environ.get("BENCH_WARMUP_RUNS", "1") or "0")
 bench_worker_warmup_runs = int(os.environ.get("BENCH_WORKER_WARMUP_RUNS", "4") or "0")
 jsonl_out = os.environ["RAW_JSONL"]
 md_out = os.environ["SUMMARY_MD"]
+bench_require_ollama_warm = os.environ.get("BENCH_REQUIRE_OLLAMA_WARM", "0")
+repo_root = os.environ.get("REPO_ROOT", ".")
+
+REQUIRED_SUMMARY_KEYS = [
+    "shadow_total_ms_p50",
+    "shadow_total_ms_p95",
+    "embed_ms_p50",
+    "embed_ms_p95",
+    "candidate_fetch_ms_p50",
+    "candidate_fetch_ms_p95",
+    "rerank_select_ms_p50",
+    "rerank_select_ms_p95",
+]
+
+
+def fmt_ms(value):
+    if value is None:
+        return "n/a"
+    return str(value)
+
+
+def git_head_sha():
+    try:
+        out = subprocess.check_output(
+            ["git", "-C", repo_root, "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        return out[:12] if out else "unknown"
+    except (subprocess.CalledProcessError, OSError):
+        return "unknown"
 
 QUERIES = [
     "Summarize the latest offers I have received on my listings and what changed most recently.",
@@ -193,6 +226,8 @@ embed_outliers = []
 embed_timeouts = []
 candidate_fetch_latencies = []
 rerank_latencies = []
+shadow_run_records = []
+shadow_diagnostics_missing = 0
 for r in rows:
     if r.get("warmup"):
         continue
@@ -201,14 +236,31 @@ for r in rows:
     sd = (r.get("response") or {}).get("details", {}).get("shadow_diagnostics") or {}
     ov = sd.get("overlap") or {}
     expl = ov.get("explanation") or {}
+    timings = sd.get("timings_ms") or {}
+    embed = sd.get("embed") or {}
+    if not sd:
+        shadow_diagnostics_missing += 1
     if sd:
-        timings = sd.get("timings_ms") or {}
-        shadow_totals.append(float(timings.get("total") or 0))
-        candidate_fetch_latencies.append(float(timings.get("candidate_fetch") or 0))
-        rerank_latencies.append(float(timings.get("rerank_select") or 0))
-        embed = sd.get("embed") or {}
+        total_ms = float(timings.get("total") or 0)
+        cf_ms = float(timings.get("candidate_fetch") or 0)
+        rerank_ms = float(timings.get("rerank_select") or 0)
         embed_ms = float(embed.get("latency_ms") or timings.get("embed") or 0)
+        shadow_totals.append(total_ms)
+        candidate_fetch_latencies.append(cf_ms)
+        rerank_latencies.append(rerank_ms)
         embed_latencies.append(embed_ms)
+        shadow_run_records.append({
+            "mode": r["mode"],
+            "profile": r.get("profile") or "",
+            "query_prefix": (r.get("query") or "")[:72],
+            "total_ms": total_ms,
+            "embed_ms": embed_ms,
+            "candidate_fetch_ms": cf_ms,
+            "rerank_select_ms": rerank_ms,
+            "timed_out": bool(embed.get("timed_out")),
+            "cache_hit": embed.get("cache_hit"),
+            "selected_count": int(sd.get("counts", {}).get("selected_count") or 0),
+        })
         if embed.get("timed_out") or embed_ms >= 5000:
             embed_outliers.append({
                 "mode": r["mode"],
@@ -234,12 +286,16 @@ for r in rows:
 reason_counts = Counter(overlap_reasons)
 
 summary = {
-    "ticket": "T20.10I",
+    "ticket": "T20.10T",
+    "baseline_sha": git_head_sha(),
     "generated_at": datetime.now(timezone.utc).isoformat(),
     "warmup_runs": warmup_total,
     "worker_warmup_runs": bench_worker_warmup_runs,
+    "bench_require_ollama_warm": bench_require_ollama_warm,
+    "query_count": len(QUERIES),
     "total_runs": len([r for r in rows if not r.get("warmup")]),
     "shadow_runs": sum(1 for r in rows if r["mode"].startswith("shadow") and not r.get("warmup")),
+    "shadow_diagnostics_missing": shadow_diagnostics_missing,
     "shadow_total_ms_p50": percentile(shadow_totals, 50),
     "shadow_total_ms_p95": percentile(shadow_totals, 95),
     "embed_ms_p50": percentile(embed_latencies, 50),
@@ -257,23 +313,48 @@ summary = {
     "zero_overlap_reason_counts": dict(sorted(reason_counts.items())),
 }
 
+if summary["shadow_runs"] > 0:
+    missing_keys = [k for k in REQUIRED_SUMMARY_KEYS if summary.get(k) is None]
+    if missing_keys:
+        print(
+            f"ERROR: missing benchmark summary keys (shadow_runs={summary['shadow_runs']}): "
+            + ", ".join(missing_keys),
+            file=sys.stderr,
+        )
+        if summary["shadow_diagnostics_missing"]:
+            print(
+                f"ERROR: {summary['shadow_diagnostics_missing']} shadow run(s) lacked shadow_diagnostics",
+                file=sys.stderr,
+            )
+        sys.exit(1)
+
 lines = [
     "# T20.10 real-query timing",
     "",
-    f"- Raw: `{jsonl_out}`",
+    "## Benchmark metadata",
+    "",
+    f"- Ticket: {summary['ticket']}",
+    f"- Baseline SHA: `{summary['baseline_sha']}`",
     f"- Generated: {summary['generated_at']}",
-    f"- Warmup runs (excluded from aggregates): {summary['warmup_runs']} (worker target={summary['worker_warmup_runs']})",
+    f"- Raw JSONL: `{jsonl_out}`",
+    f"- Summary MD: `{md_out}`",
+    f"- Query count: {summary['query_count']}",
+    f"- Shadow runs (non-warmup): {summary['shadow_runs']}",
+    f"- BENCH_WARMUP_RUNS: {summary['warmup_runs']}",
+    f"- BENCH_WORKER_WARMUP_RUNS: {summary['worker_warmup_runs']}",
+    f"- BENCH_REQUIRE_OLLAMA_WARM: {summary['bench_require_ollama_warm']}",
+    f"- Shadow diagnostics missing: {summary['shadow_diagnostics_missing']}",
     "",
     "## Aggregate",
     "",
-    f"- shadow p50 total ms: {summary['shadow_total_ms_p50']}",
-    f"- shadow p95 total ms: {summary['shadow_total_ms_p95']}",
-    f"- embed p50 ms: {summary['embed_ms_p50']}",
-    f"- embed p95 ms: {summary['embed_ms_p95']}",
-    f"- candidate_fetch p50 ms: {summary['candidate_fetch_ms_p50']}",
-    f"- candidate_fetch p95 ms: {summary['candidate_fetch_ms_p95']}",
-    f"- rerank_select p50 ms: {summary['rerank_select_ms_p50']}",
-    f"- rerank_select p95 ms: {summary['rerank_select_ms_p95']}",
+    f"- shadow p50 total ms: {fmt_ms(summary['shadow_total_ms_p50'])}",
+    f"- shadow p95 total ms: {fmt_ms(summary['shadow_total_ms_p95'])}",
+    f"- embed p50 ms: {fmt_ms(summary['embed_ms_p50'])}",
+    f"- embed p95 ms: {fmt_ms(summary['embed_ms_p95'])}",
+    f"- candidate_fetch p50 ms: {fmt_ms(summary['candidate_fetch_ms_p50'])}",
+    f"- candidate_fetch p95 ms: {fmt_ms(summary['candidate_fetch_ms_p95'])}",
+    f"- rerank_select p50 ms: {fmt_ms(summary['rerank_select_ms_p50'])}",
+    f"- rerank_select p95 ms: {fmt_ms(summary['rerank_select_ms_p95'])}",
     f"- embed outliers (>=5s or timeout): {summary['embed_outlier_count']}",
     f"- embed timeouts: {summary['embed_timeout_count']}",
     f"- zero-overlap shadow runs: {summary['shadow_overlap_zero_runs']}/{summary['shadow_runs']}",
@@ -305,11 +386,45 @@ if embed_outliers:
         )
     lines.append("")
 
+    lines.append("")
+
+def top_runs(records, key, n=5):
+    return sorted(records, key=lambda r: r.get(key) or 0, reverse=True)[:n]
+
+if shadow_run_records:
+    lines.extend([
+        "## Latency contributors (shadow runs)",
+        "",
+        "### Top total_ms",
+        "",
+        "| mode | profile | total_ms | embed_ms | candidate_fetch_ms | rerank_ms | selected | query |",
+        "|---|---:|---:|---:|---:|---:|---:|---|",
+    ])
+    for rec in top_runs(shadow_run_records, "total_ms"):
+        lines.append(
+            f"| {rec['mode']} | {rec['profile']} | {rec['total_ms']} | {rec['embed_ms']} | "
+            f"{rec['candidate_fetch_ms']} | {rec['rerank_select_ms']} | {rec['selected_count']} | "
+            f"{rec['query_prefix']} |"
+        )
+    lines.append("")
+    lines.extend([
+        "### Top candidate_fetch_ms",
+        "",
+        "| mode | profile | candidate_fetch_ms | total_ms | embed_ms | cache_hit | query |",
+        "|---|---:|---:|---:|---:|:---:|---|",
+    ])
+    for rec in top_runs(shadow_run_records, "candidate_fetch_ms"):
+        lines.append(
+            f"| {rec['mode']} | {rec['profile']} | {rec['candidate_fetch_ms']} | {rec['total_ms']} | "
+            f"{rec['embed_ms']} | {rec['cache_hit']} | {rec['query_prefix']} |"
+        )
+    lines.append("")
+
 lines.extend([
     "## Per-run summary",
     "",
-    "| mode | profile | warmup | http_time_s | selected_count | chunk_ov | doc_ov | entity_ov | reason | total_ms | query |",
-    "|---|---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---:|---|",
+    "| mode | profile | warmup | http_time_s | selected | chunk_ov | doc_ov | entity_ov | total_ms | embed_ms | cf_ms | reason | query |",
+    "|---|---:|:---:|:---:|:---:|:---:|:---:|:---:|---:|---:|---:|:---:|---|",
 ])
 for r in rows:
     sd = (r.get("response") or {}).get("details", {}).get("shadow_diagnostics") or {}
@@ -317,27 +432,29 @@ for r in rows:
     overlap = sd.get("overlap") or {}
     expl = overlap.get("explanation") or {}
     timings = sd.get("timings_ms") or {}
+    embed = sd.get("embed") or {}
     q = r["query"][:72] + ("…" if len(r["query"]) > 72 else "")
     reason = expl.get("zero_overlap_reason") or ("" if overlap.get("count") else "")
     lines.append(
         f"| {r['mode']} | {r.get('profile') or ''} | {r.get('warmup', False)} | {r.get('http_time_s', 0):.3f} | "
         f"{counts.get('selected_count', '')} | {overlap.get('count', '')} | "
         f"{overlap.get('document_overlap_count', '')} | {overlap.get('entity_overlap_count', '')} | "
-        f"{reason} | {timings.get('total', '')} | {q} |"
+        f"{fmt_ms(timings.get('total'))} | {fmt_ms(embed.get('latency_ms', timings.get('embed')))} | "
+        f"{fmt_ms(timings.get('candidate_fetch'))} | {reason} | {q} |"
     )
 
 with open(md_out, "w") as f:
     f.write("\n".join(lines) + "\n")
 
 console_summary = (
-    f"shadow p50/p95 ms: {summary['shadow_total_ms_p50']} / "
-    f"{summary['shadow_total_ms_p95']} | "
-    f"embed p50/p95 ms: {summary['embed_ms_p50']} / "
-    f"{summary['embed_ms_p95']} | "
-    f"candidate_fetch p50/p95 ms: {summary['candidate_fetch_ms_p50']} / "
-    f"{summary['candidate_fetch_ms_p95']} | "
-    f"rerank_select p50/p95 ms: {summary['rerank_select_ms_p50']} / "
-    f"{summary['rerank_select_ms_p95']}"
+    f"shadow p50/p95 ms: {fmt_ms(summary['shadow_total_ms_p50'])} / "
+    f"{fmt_ms(summary['shadow_total_ms_p95'])} | "
+    f"embed p50/p95 ms: {fmt_ms(summary['embed_ms_p50'])} / "
+    f"{fmt_ms(summary['embed_ms_p95'])} | "
+    f"candidate_fetch p50/p95 ms: {fmt_ms(summary['candidate_fetch_ms_p50'])} / "
+    f"{fmt_ms(summary['candidate_fetch_ms_p95'])} | "
+    f"rerank_select p50/p95 ms: {fmt_ms(summary['rerank_select_ms_p50'])} / "
+    f"{fmt_ms(summary['rerank_select_ms_p95'])}"
 )
 
 print(f"Wrote:\n  {jsonl_out}\n  {md_out}")
@@ -345,4 +462,4 @@ print(console_summary)
 sys.exit(0)
 PY
 
-echo "✅ T20.10I benchmark summary written"
+echo "✅ T20.10T benchmark summary written"

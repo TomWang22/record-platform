@@ -1,6 +1,6 @@
 {
-  "version": "1",
-  "description": "RP service coverage manifest — strict gates only when strict_enabled=true",
+  "version": "1.1",
+  "description": "RP service coverage manifest — strict gates only when strict_enabled=true (T20.11A: enumerate Node services; python-ai only strict)",
   "services": [
     {
       "name": "auth-service",
@@ -27,6 +27,30 @@
       "skip_reason": "test:coverage not wired"
     },
     {
+      "name": "cron-jobs",
+      "path": "services/cron-jobs",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/cron-jobs/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "no vitest coverage runner"
+    },
+    {
+      "name": "event-layer-verification",
+      "path": "services/event-layer-verification",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/event-layer-verification/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "test:coverage not wired"
+    },
+    {
       "name": "listings-service",
       "path": "services/listings-service",
       "language": "typescript",
@@ -45,6 +69,18 @@
       "runtime": "node",
       "coverage_tool": "vitest",
       "coverage_summary_path": "services/shopping-service/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "test:coverage not wired"
+    },
+    {
+      "name": "transport-watchdog",
+      "path": "services/transport-watchdog",
+      "language": "typescript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/transport-watchdog/coverage/coverage-summary.json",
       "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
       "strict_enabled": false,
       "run_command": null,
@@ -145,6 +181,30 @@
       "strict_enabled": false,
       "run_command": null,
       "skip_reason": "test:coverage not wired"
+    },
+    {
+      "name": "ollama-gateway",
+      "path": "services/ollama-gateway",
+      "language": "javascript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/ollama-gateway/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "no test suite"
+    },
+    {
+      "name": "ollama-worker",
+      "path": "services/ollama-worker",
+      "language": "javascript",
+      "runtime": "node",
+      "coverage_tool": "vitest",
+      "coverage_summary_path": "services/ollama-worker/coverage/coverage-summary.json",
+      "threshold": { "lines": 98, "branches": 98, "functions": 98, "statements": 98 },
+      "strict_enabled": false,
+      "run_command": null,
+      "skip_reason": "no test suite"
     },
     {
       "name": "python-ai-service",

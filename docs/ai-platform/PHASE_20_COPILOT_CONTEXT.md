@@ -1,7 +1,7 @@
 # Phase 20 — Copilot / agent context (Record Platform AI)
 
 **Last updated:** 2026-06-25 (T20.16B final reconciliation)  
-**Current main SHA:** `38f9030`  
+**Current main SHA:** `69709c1`  
 **Phase 20 status:** **HARDENING CLOSED** — no further work unless T20.12 dry-run explicitly approved  
 **Audience:** GitHub Copilot, Cursor, and other coding agents working on `record-platform`
 
@@ -136,7 +136,7 @@ Allowed work only with explicit approval:
 |--------|-----|---------|
 | **T20.16** | `967d877` | Phase 20 copilot context refresh (post T20.10AG) |
 | **T20.17** | `f3bc531` | Phase 20 release note draft — `docs/release/rp-ai-phase-20-hardening-20260625.md` |
-| **T20.16B** | _(this reconciliation)_ | Final context reconciliation after T20.11C + T20.17 |
+| **T20.16B** | `69709c1` | Final context reconciliation after T20.11C + T20.17 |
 
 ### Phase 20 tickets NOT started (require explicit approval)
 
@@ -151,7 +151,7 @@ Allowed work only with explicit approval:
 ## Current system snapshot (2026-06-25)
 
 ```text
-Current main SHA: 38f9030
+Current main SHA: 69709c1
 Embedded chunks: 5,565
 Non-message chunks: 73,043
 Embedded coverage: 7.62%

@@ -1,7 +1,7 @@
 # Phase 20 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-25 (T20.12G tranche 5 actual recorded)  
-**Current main SHA:** `6504bc8` (verify at commit time)  
+**Last updated:** 2026-06-25 (T20.12L tranche 6 actual recorded)  
+**Current main SHA:** `77c82ba` (verify at commit time)  
 **Phase 20 status:** **HARDENING CLOSED** — embedding tranche ops allowed only with explicit approval per tranche  
 **Audience:** GitHub Copilot, Cursor, and other coding agents working on `record-platform`
 
@@ -37,9 +37,9 @@ Do not change keyword retrieval behavior.
 Do not enable overlap refinement flags by default.
 
 Vector rollout: NOT APPROVED / NOT READY:
-- embedded coverage: 9.0% / 6,565 FAIL (was 8.3% / 6,065 pre–Tranche 5)
+- embedded coverage: 9.7% / 7,065 FAIL (was 9.0% / 6,565 pre–Tranche 6)
 - source diversity: 6 PASS
-- owner-visible OBO embedded: 18 PASS (total embedded OBO: 1,418)
+- owner-visible OBO embedded: 18 PASS (total embedded OBO: 1,544; OBO eligible pool exhausted)
 - shadow p95: passes on some warm runs; unstable historically CONDITIONAL
 - embed p95 / timeouts: unstable historically; T20.10AG flagged 0 timeouts CONDITIONAL
 - leakage: 0 PASS
@@ -55,7 +55,7 @@ Phase 20 hardening branches are closed (T20.10AG, T20.11C, T20.17). Do not reope
 overlap or coverage work without explicit approval.
 
 Allowed work only with explicit approval:
-- T20.12K next embedding tranche actual write (requires new tranche id, fresh backup, dry-run, no FORCE)
+- T20.12O next embedding tranche actual write (requires new tranche id, fresh backup, dry-run — see `docs/ai-platform/T20-12N-tranche7-dry-run-plan.md`)
 - T20.14/T20.15 rollout only after all gates pass
 ```
 
@@ -137,13 +137,13 @@ Allowed work only with explicit approval:
 | **T20.16** | `967d877` | Phase 20 copilot context refresh (post T20.10AG) |
 | **T20.17** | `f3bc531` | Phase 20 release note draft — `docs/release/rp-ai-phase-20-hardening-20260625.md` |
 | **T20.16B** | `69709c1` | Final context reconciliation after T20.11C + T20.17 |
-| **T20.12** | `t20-tranche-5` (ops) | Tranche 5 actual: +500 embeddings (6,065 → 6,565); FORCE not used; validation PASS; rollout still NOT APPROVED |
+| **T20.12** | `t20-tranche-6` (ops) | Tranche 6 actual: +500 embeddings (6,565 → 7,065); T20.12J-S adjusted caps; OBO pool exhausted; FORCE not used; validation PASS; rollout still NOT APPROVED |
 
 ### Phase 20 tickets NOT started (require explicit approval)
 
 | Ticket | Scope |
 |--------|-------|
-| **T20.12K** | Next bounded embedding tranche actual write (`t20-tranche-6` dry-run planned — see `docs/ai-platform/T20-12J-tranche6-dry-run-plan.md`) |
+| **T20.12O** | Next bounded embedding tranche actual write (`t20-tranche-7` dry-run planned — see `docs/ai-platform/T20-12N-tranche7-dry-run-plan.md`) |
 | **T20.14 / T20.15** | Production vector default / hybrid rollout — only after all gates pass |
 | **Phase 21** | Not started; do not begin without explicit approval |
 
@@ -157,7 +157,12 @@ Allowed work only with explicit approval:
 | **T20.12G** | Docs-only source-of-truth update for Tranche 5 |
 | **T20.12H** | Live inference transcript harness — `scripts/rp-ai-live-inference-transcript.sh` |
 | **T20.12I** | Post–Tranche 5 readiness + live inference eval — `docs/ai-platform/T20-12I-post-tranche5-readiness-eval.md` |
-| **T20.12J** | Tranche 6 dry-run plan only — `docs/ai-platform/T20-12J-tranche6-dry-run-plan.md` |
+| **T20.12J** | Tranche 6 dry-run plan — `docs/ai-platform/T20-12J-tranche6-dry-run-plan.md` |
+| **T20.12J-R/S** | Tranche 6 capacity adjustment + adjusted dry-run (500/500) |
+| **T20.12K** (actual) | **`t20-tranche-6`** completed 2026-06-25: +500 → 7,065; backup `backups/rp-all-11-t20-12-tranche6-preflight/` (local only) |
+| **T20.12L** | Docs-only source-of-truth update for Tranche 6 |
+| **T20.12M** | Post–Tranche 6 readiness + live inference eval — `docs/ai-platform/T20-12M-post-tranche6-readiness-eval.md` |
+| **T20.12N** | Tranche 7 dry-run plan only — `docs/ai-platform/T20-12N-tranche7-dry-run-plan.md` |
 
 ---
 
@@ -165,16 +170,16 @@ Allowed work only with explicit approval:
 
 ```text
 Current main SHA: 51ffa8a (verify at commit time)
-Embedded chunks: 6,565
+Embedded chunks: 7,065
 Non-message chunks: 73,043
-Embedded coverage: 9.0%
+Embedded coverage: 9.7%
 Production retrieval: keyword
 Vector default: off
 AI_RAG_SHADOW_VECTOR=0
 AI_RAG_SHADOW_ENTITY_HINTS=0
 AI_RAG_SHADOW_NEIGHBOR_EXPANSION=0
 Source diversity: 6 PASS
-Owner-visible OBO embedded: 18 / 1,418 total embedded OBO
+Owner-visible OBO embedded: 18 / 1,544 total embedded OBO (eligible pool exhausted)
 Leakage: 0 PASS
 Keyword stability: PASS
 Default/off zero chunk-overlap: 11/16 FAIL (T20.12D warm benchmark)
@@ -184,17 +189,17 @@ Service coverage manifest: v1.2, 18 services, 1 strict (python-ai)
 Vector rollout: NOT APPROVED
 Phase 21: not started
 Phase 20 hardening: CLOSED
-Last tranche: t20-tranche-5 (+500, 2026-06-25)
+Last tranche: t20-tranche-6 (+500, 2026-06-25; T20.12J-S adjusted caps)
 ```
 
-### Embedded by source_type (post–Tranche 5; verify before next tranche)
+### Embedded by source_type (post–Tranche 6; verify before next tranche)
 
 | source_type | embedded |
 |-------------|--------:|
-| obo_offer_summary | 1,418 |
-| listing | 2,300 |
-| listing_revision | 1,100 |
-| notification | 900 |
+| obo_offer_summary | 1,544 |
+| listing | 2,524 |
+| listing_revision | 1,200 |
+| notification | 950 |
 | record | 594 |
 | auction_bid_summary | 253 |
 
@@ -204,7 +209,7 @@ Last tranche: t20-tranche-5 (+500, 2026-06-25)
 
 | Gate | Target | Current | Status |
 |------|--------|---------|--------|
-| Embedded coverage | ≥15% or ≥10k embedded | 9.0% / 6,565 | **FAIL** |
+| Embedded coverage | ≥15% or ≥10k embedded | 9.7% / 7,065 | **FAIL** |
 | Source diversity | ≥5 types | 6 | **PASS** |
 | Owner-visible OBO | ≥10 | 18 | **PASS** |
 | Shadow p95 latency | ≤3,000 ms | passes on some warm runs; unstable historically | **CONDITIONAL** / not enough for rollout |
@@ -237,7 +242,7 @@ Key implementation: `_apply_shadow_overlap_refinements()` in `rag_retrieval.py`.
 2. **Do NOT** enable `AI_RAG_SHADOW_ENTITY_HINTS` or `AI_RAG_SHADOW_NEIGHBOR_EXPANSION` by default.
 3. **Do NOT** run broad/full corpus embedding backfill.
 4. **Do NOT** set `EMBEDDING_BACKFILL_FORCE=1` unless ops explicitly approves (bypasses tranche lock).
-5. **Do NOT** rerun actual Tranche 2, 3, 4, or 5 writes — locks exist; blocked exit **2**.
+5. **Do NOT** rerun actual Tranche 2–6 writes — locks exist; blocked exit **2**.
 6. **Do NOT** change product behavior (keyword path, API contracts, default env) as part of Phase 20 hardening/eval tickets.
 7. **Do NOT** start Phase 21.
 8. **Do NOT** commit: `bench_logs/`, `backups/`, screenshots, DB dumps, coverage output artifacts.
@@ -360,17 +365,17 @@ Embedding tranche loop (with explicit approval per tranche):
 1. dry-run → 2. warmup pre-write gate → 3. backup → 4. actual write → 5. readiness eval (T20.12I) → 6. live inference transcript (`scripts/rp-ai-live-inference-transcript.sh`) → 7. docs push → 8. next dry-run
 
 Only with explicit approval:
-1. T20.12K next tranche actual write (`t20-tranche-6` dry-run planned — see T20-12J)
+1. T20.12O next tranche actual write (`t20-tranche-7` dry-run planned — see T20-12N)
 2. No T20.14/T20.15 rollout work until all gates pass
 ```
 
-Do **not** start T20.12K actual write without explicit approval (`Approved: start T20.12K actual t20-tranche-6 write`).
+Do **not** start T20.12O actual write without explicit approval (`Approved: start T20.12O actual t20-tranche-7 write`).
 
 Refusal rules:
 
 1. **If asked to "enable vector"** → refuse until all rollout gates pass; cite this doc and `docs/ai-platform/T20-8-vector-rollout-readiness.md`.
 2. **If asked to default-on overlap flags** → refuse; T20.10AG closed branch as diagnostic-only.
-3. **If rerunning Tranche 2–5** → refuse; locks exist (exit **2**).
+3. **If rerunning Tranche 2–6** → refuse; locks exist (exit **2**).
 4. **Before any push** → OCH scan, strip Co-authored trailers if needed, no `bench_logs/` in commit.
 
 ---
@@ -390,7 +395,9 @@ Refusal rules:
 | T20.17 Phase 20 release note | `docs/release/rp-ai-phase-20-hardening-20260625.md` |
 | T20.9 Tranche 3 dry-run plan | `docs/ai-platform/T20-9-tranche3-dry-run-plan.md` |
 | T20.12I post–Tranche 5 eval | `docs/ai-platform/T20-12I-post-tranche5-readiness-eval.md` |
-| T20.12J Tranche 6 dry-run plan | `docs/ai-platform/T20-12J-tranche6-dry-run-plan.md` |
+| T20.12M post–Tranche 6 eval | `docs/ai-platform/T20-12M-post-tranche6-readiness-eval.md` |
+| T20.12N Tranche 7 dry-run plan | `docs/ai-platform/T20-12N-tranche7-dry-run-plan.md` |
+| T20.12J-S adjusted Tranche 6 dry-run | `docs/ai-platform/T20-12J-S-tranche6-adjusted-dry-run.md` |
 | T20.12H live inference harness | `scripts/rp-ai-live-inference-transcript.sh` |
 | Phase 19 release | `docs/release/rp-ai-vector-shadow-routing-readiness-20260616.md` |
 | AI contracts | `docs/ai-platform/rp-ai-contracts.md` |

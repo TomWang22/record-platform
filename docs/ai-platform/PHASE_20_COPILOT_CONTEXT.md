@@ -1,7 +1,7 @@
 # Phase 20 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-22  
-**Current main SHA:** `108088653d0d0363440c58c969a4e01e1f2e53ef`  
+**Last updated:** 2026-06-25  
+**Current main SHA:** `40fabfc`  
 **Audience:** GitHub Copilot, Cursor, and other coding agents working on `record-platform`
 
 Use this document when continuing Phase 20 work. It replaces any deleted handoff notes.
@@ -11,12 +11,15 @@ Use this document when continuing Phase 20 work. It replaces any deleted handoff
 ## Locked takeaway (active Phase 20 state)
 
 ```text
-T20.8 verdict: vector rollout NOT READY
+Vector rollout: NOT APPROVED / NOT READY
 
 Keep:
 - keyword retrieval as production default
 - AI_RAG_SHADOW_VECTOR=0
 - vector retrieval shadow-only
+- overlap refinement flags default off:
+  - AI_RAG_SHADOW_ENTITY_HINTS=0
+  - AI_RAG_SHADOW_NEIGHBOR_EXPANSION=0
 - no EMBEDDING_BACKFILL_FORCE=1
 - no broad/full embedding backfill
 - no Phase 21
@@ -30,19 +33,28 @@ Use @docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md as the source of truth.
 Do not enable vector retrieval as production default. Do not start Phase 21.
 Do not rerun Tranche 2. Do not use EMBEDDING_BACKFILL_FORCE=1.
 Do not change keyword retrieval behavior.
+Do not enable overlap refinement flags by default.
 
-Current T20.8 verdict is NOT READY:
-- embedded coverage: 6.9% / 5,049 FAIL
-- e2e OBO owner-visible embedded: 2 FAIL
-- shadow p95: ~7.1s FAIL
-- shadow-keyword overlap: 0 FAIL
-- leakage: PASS
+Vector rollout: NOT APPROVED / NOT READY:
+- embedded coverage: 7.62% / 5,565 FAIL
+- source diversity: 6 PASS
+- owner-visible OBO embedded: 18 PASS
+- shadow p95: passes on some warm runs; unstable historically CONDITIONAL
+- embed p95 / timeouts: unstable historically; T20.10AG flagged 0 timeouts CONDITIONAL
+- leakage: 0 PASS
 - keyword stability: PASS
+- shadow-keyword overlap: default/off 11/16 zero; flagged/on 8/16 diagnostic-only FAIL
+- tranche rerun guard: PASS
+
+T20.10AC–AG flagged overlap improvements are diagnostic-only. They improve overlap
+from 11/16 zero-overlap to 8/16 under default-off flags, but they are not production
+rollout approval and must not be enabled by default.
 
 Allowed work only with explicit approval:
-- bounded new embedding tranche with fresh backup and dry-run
-- shadow-only diagnostics/refinement
-- coverage hardening without product behavior changes
+- bounded new embedding tranche with fresh backup and dry-run (T20.12+)
+- shadow-only diagnostics/refinement (overlap branch closed — see T20.10AG)
+- coverage hardening without product behavior changes (T20.11)
+- docs-only release notes (T20.17)
 ```
 
 ---
@@ -60,67 +72,131 @@ Allowed work only with explicit approval:
 | Phase | Status | Summary |
 |-------|--------|---------|
 | **Phase 19** | **LOCKED** | Vector shadow routing: route profiles, weights, query hints, OBO corpus repair. Keyword default unchanged. Release: `docs/release/rp-ai-vector-shadow-routing-readiness-20260616.md` |
-| **Phase 20** | **IN PROGRESS** | Hardening + bounded embedding growth + rollout readiness evaluation — **not** production vector flip |
+| **Phase 20** | **IN PROGRESS** | Hardening + bounded embedding growth + shadow diagnostics + rollout readiness — **not** production vector flip |
 
-### Phase 20 tickets completed
+### Phase 20 tickets completed (core)
 
-| Ticket | SHA era | What it did |
-|--------|---------|-------------|
-| **T20.6** | `655ffee` | CI/coverage hardening: `scripts/coverage/service-coverage-manifest.json`, runner/enforcer, python-ai pytest-cov ≥90% on `app/ai/*`, `.github/workflows/coverage.yml` |
-| **T20.7** | `655ffee` (DB only) | Bounded **Tranche 2**: +500 embeddings (4,549 → 5,049). Caps: obo 150, listing 200, listing_revision 100, notification 50. Backup: `backups/rp-all-11-t20-tranche2-preflight` |
-| **T20.7R** | `8633149` | Rerun guard hardening: lock blocks with **exit 2**; `--check-lock`; `scripts/rp-ai-backfill-rerun-guard-smoke.sh` |
-| **T20.8** | `3aba170` | **Read-only** vector rollout readiness eval → **NOT READY** — `docs/ai-platform/T20-8-vector-rollout-readiness.md` |
+| Ticket | SHA | What it did |
+|--------|-----|-------------|
+| **T20.6** | `655ffee` | CI/coverage hardening: manifest, runner/enforcer, python-ai pytest-cov ≥90% on `app/ai/*` |
+| **T20.7** | `655ffee` (DB) | Bounded Tranche 2: +500 embeddings (4,549 → 5,049) |
+| **T20.7R** | `8633149` | Rerun guard hardening: lock blocks exit **2** |
+| **T20.8** | `3aba170` | Read-only vector rollout readiness eval → **NOT READY** |
+
+### T20.10 shadow overlap / latency branch (closed)
+
+| Ticket | SHA | Summary |
+|--------|-----|---------|
+| **T20.10O** | `16d4d43` | Post notification-metadata refresh readiness eval; rollout NOT APPROVED |
+| **T20.10P** | `8ecfb94` | Shadow latency diagnostics |
+| **T20.10T** | `02e80cb` | Shadow benchmark timing hardening |
+| **T20.10U** | `3ec10eb` | pgvector candidate-fetch EXPLAIN diagnostics |
+| **T20.10V** | `ad0cd22` | Shadow profile refinement proposal |
+| **T20.10W** | `b7e17b6` / `c838cda` | Scoped-first + dedupe shadow fetch strategy |
+| **T20.10X** | `8e5513d` | Source diversity regression diagnostics |
+| **T20.10Y** | `3e2a80f` / `31d300f` | Typed diversity top-ups restored 6 types |
+| **T20.10Z** | `26eb884` | Post-refinement readiness eval; rollout still NOT APPROVED |
+| **T20.10AA** | `37071f8` / `b44f27a` | Overlap deep dive + count correction |
+| **T20.10AB** | `2d7b3af` | Overlap refinement proposal |
+| **T20.10AC** | `4bcbf51` | Default-off flagged overlap refinements |
+| **T20.10AD** | `0f42c06` | Flagged overlap eval |
+| **T20.10AE** | `8468921` | Flagged latency-trim proposal |
+| **T20.10AF** | `dc8cff4` / `0a4634c` | Flagged latency trims (AF1–AF4) |
+| **T20.10AG** | `40fabfc` | Flagged overlap stability eval — **branch closed** |
+
+**T20.10 branch outcome:** Flagged diagnostic mode improves overlap **11/16 → 8/16** zero chunk-overlap (stable across 3 warm runs per T20.10AG). Latency acceptable on warm runs; embed variance remains conditional. **Not rollout approval.** Flags stay default off.
 
 ### Phase 20 tickets NOT started (require explicit approval)
 
 | Ticket | Scope |
 |--------|-------|
-| **T20.9** | Bounded Tranche 3 embeddings (dry-run plan only until approved) — `docs/ai-platform/T20-9-tranche3-dry-run-plan.md` |
-| **T20.10+** | Shadow-only refinement (profiles/hints/diagnostics; no keyword changes) |
-| **T20.11+** | Coverage manifest extension for Node services (`strict_enabled=false` until wired) |
-| **T20.12+** | Production vector default / hybrid rollout — only after T20.3 thresholds pass |
+| **T20.9 / T20.12** | Bounded embedding tranche (dry-run only until approved) — see `docs/ai-platform/T20-9-tranche3-dry-run-plan.md` |
+| **T20.11** | Coverage manifest extension for Node services (`strict_enabled=false` until wired) |
+| **T20.14 / T20.15** | Production vector default / hybrid rollout — only after all gates pass |
+| **T20.17** | Phase 20 release note draft (docs-only) — recommended next |
 | **Phase 21** | Not started; do not begin without explicit approval |
 
 ---
 
-## Current system snapshot (2026-06-22)
+## Current system snapshot (2026-06-25)
 
-| Metric | Value |
-|--------|------:|
-| Embedded chunks | **5,049** |
-| Non-message chunks | 73,011 |
-| Embedded coverage | **~6.9%** |
-| Retrieval default | **keyword** |
-| Vector default | **off** (`AI_RAG_SHADOW_VECTOR=0`) |
-| python-ai coverage (strict) | **90.39%** lines on `app/ai/*` |
-| Tranche 2 lock | `bench_logs/ai-platform/t20-tranche-2-actual-run.json` |
-| Shadow latency p95 (hinted) | **~7.1s** (target for rollout ≤3s) |
-| e2e-contract owner-visible OBO embedded | **2** (rollout target ≥10) |
+```text
+Current main SHA: 40fabfc
+Embedded chunks: 5,565
+Non-message chunks: 73,043
+Embedded coverage: 7.62%
+Production retrieval: keyword
+Vector default: off
+AI_RAG_SHADOW_VECTOR=0
+AI_RAG_SHADOW_ENTITY_HINTS=0
+AI_RAG_SHADOW_NEIGHBOR_EXPANSION=0
+Source diversity: 6 PASS
+Owner-visible OBO embedded: 18 PASS
+Leakage: 0 PASS
+Keyword stability: PASS
+Default/off zero chunk-overlap: 11/16 FAIL
+Flagged/on zero chunk-overlap: 8/16 diagnostic-only, still not rollout approval
+Coverage (app/ai strict): PASS (~90%+)
+Vector rollout: NOT APPROVED
+Phase 21: not started
+```
 
-### Embedded by source_type
+### Embedded by source_type (approximate; verify before tranche work)
 
-| source_type | embedded |
-|-------------|--------:|
-| listing | 1,700 |
-| obo_offer_summary | 952 |
-| notification | 750 |
-| listing_revision | 800 |
-| record | 594 |
-| auction_bid_summary | 253 |
+| source_type | embedded (era) |
+|-------------|---------------:|
+| listing | ~1,700+ |
+| obo_offer_summary | ~950+ |
+| notification | ~750+ |
+| listing_revision | ~800+ |
+| record | ~590+ |
+| auction_bid_summary | ~250+ |
+
+---
+
+## Vector rollout gate table (T20.3 / T20.8 / T20.10AG)
+
+| Gate | Target | Current | Status |
+|------|--------|---------|--------|
+| Embedded coverage | ≥15% or ≥10k embedded | 7.62% / 5,565 | **FAIL** |
+| Source diversity | ≥5 types | 6 | **PASS** |
+| Owner-visible OBO | ≥10 | 18 | **PASS** |
+| Shadow p95 latency | ≤3,000 ms | passes on some warm runs; unstable historically | **CONDITIONAL** / not enough for rollout |
+| Embed p95 / timeouts | stable, no timeouts | unstable historically; T20.10AG flagged 0 timeouts | **CONDITIONAL** |
+| Leakage | 0 | 0 | **PASS** |
+| Keyword stability | unchanged | PASS | **PASS** |
+| Shadow-keyword overlap | meaningful | default/off 11/16 zero; flagged/on 8/16 diagnostic-only | **FAIL** |
+| Tranche rerun guard | exit 2 on lock | PASS | **PASS** |
+
+**Verdict:** hold keyword default; vector rollout **NOT APPROVED**.
+
+---
+
+## Overlap refinement flags (T20.10AC–AF)
+
+| Flag | Default | When on (diagnostic only) |
+|------|---------|---------------------------|
+| `AI_RAG_SHADOW_ENTITY_HINTS` | `0` | Entity key extraction, score boost, conditional listing_id typed fetch |
+| `AI_RAG_SHADOW_NEIGHBOR_EXPANSION` | `0` | Entity-gated neighbor expansion (AF1 caps: 1/doc, 3 global, 3 docs) |
+
+Read at process start in `app/ai/config.py`. Deployment must match for live benchmarks. **Never default on.**
+
+Key implementation: `_apply_shadow_overlap_refinements()` in `rag_retrieval.py`.
 
 ---
 
 ## Hard rules for agents (do not violate)
 
-1. **Do NOT** enable vector retrieval as production default without explicit approval and T20.3 thresholds passing.
-2. **Do NOT** run broad/full corpus embedding backfill.
-3. **Do NOT** set `EMBEDDING_BACKFILL_FORCE=1` unless ops explicitly approves (bypasses tranche lock).
-4. **Do NOT** rerun actual Tranche 2 write — lock exists; blocked exit **2**.
-5. **Do NOT** change product behavior (keyword path, API contracts, default env) as part of Phase 20 hardening/eval tickets.
-6. **Do NOT** start Phase 21.
-7. **Do NOT** commit: `bench_logs/`, `backups/`, screenshots, DB dumps, coverage output artifacts.
-8. **Do** run `bash scripts/rp-och-decontaminate-scan.sh` before push; no OCH/housing/landlord/tenant contamination in committed text.
-9. **Pipefail trap:** When testing script exit codes, run **directly** — never pipe to `tail` without `set -o pipefail` (T20.7R lesson).
+1. **Do NOT** enable vector retrieval as production default without explicit approval and all rollout gates passing.
+2. **Do NOT** enable `AI_RAG_SHADOW_ENTITY_HINTS` or `AI_RAG_SHADOW_NEIGHBOR_EXPANSION` by default.
+3. **Do NOT** run broad/full corpus embedding backfill.
+4. **Do NOT** set `EMBEDDING_BACKFILL_FORCE=1` unless ops explicitly approves (bypasses tranche lock).
+5. **Do NOT** rerun actual Tranche 2 write — lock exists; blocked exit **2**.
+6. **Do NOT** change product behavior (keyword path, API contracts, default env) as part of Phase 20 hardening/eval tickets.
+7. **Do NOT** start Phase 21.
+8. **Do NOT** commit: `bench_logs/`, `backups/`, screenshots, DB dumps, coverage output artifacts.
+9. **Do** run `bash scripts/rp-och-decontaminate-scan.sh` before push; no OCH/housing/landlord/tenant contamination in committed text.
+10. **Pipefail trap:** When testing script exit codes, run **directly** — never pipe to `tail` without `set -o pipefail` (T20.7R lesson).
 
 ---
 
@@ -131,17 +207,18 @@ POST /api/ai/rag/query
   └─> insights.rag_query()  [keyword default]
         └─> retrieve_chunks()           ← PRODUCTION
         └─> retrieve_chunks_vector_shadow()  ← ONLY if shadow_vector=true (diagnostic)
+              └─> _apply_shadow_overlap_refinements()  ← ONLY if overlap flags on
 ```
 
 **Key files:**
 
 | File | Role |
 |------|------|
-| `services/python-ai-service/app/ai/rag_retrieval.py` | Keyword + shadow vector retrieval, privacy filters |
-| `services/python-ai-service/app/ai/shadow_profiles.py` | Route profiles, weights, query hints |
+| `services/python-ai-service/app/ai/rag_retrieval.py` | Keyword + shadow vector retrieval, overlap refinements, privacy filters |
+| `services/python-ai-service/app/ai/shadow_profiles.py` | Route profiles, weights, query hints, neighbor caps |
 | `services/python-ai-service/app/ai/insights.py` | Insight builders; keyword path unchanged |
 | `services/python-ai-service/app/ai/routes.py` | HTTP routes; `shadow_vector`, `shadow_profile`, `shadow_query_hints` query params |
-| `services/python-ai-service/app/ai/config.py` | `AI_RAG_SHADOW_VECTOR` default `0` |
+| `services/python-ai-service/app/ai/config.py` | `AI_RAG_SHADOW_VECTOR`, overlap flags — all default `0` |
 
 **Privacy:** Owner-scoped docs, no message bodies without opt-in, `FORBIDDEN_CHUNK_RE` blocks proxy max leakage.
 
@@ -161,11 +238,6 @@ POST /api/ai/rag/query
 
 **Exit codes:** `0` success · `1` failure · `2` tranche lock blocked
 
-**Helpers:**
-
-- `bash scripts/rp-ai-embedding-backfill-controlled.sh --check-lock t20-tranche-2`
-- `bash scripts/rp-ai-backfill-rerun-guard-smoke.sh`
-
 **Backup before any new tranche:**
 
 ```bash
@@ -182,7 +254,6 @@ PGPASSWORD=postgres PG_DUMP_JOBS=4 BACKUP_TIMESTAMP=<label> \
 | `scripts/coverage/service-coverage-manifest.json` | Per-service thresholds; only `python-ai-service` has `strict_enabled=true` (90% lines, `app/ai/*`) |
 | `scripts/coverage/run-service-coverage.sh` | Run one or all services |
 | `scripts/coverage/enforce-service-coverage.mjs` | Fail only strict services; others print `SKIP` |
-| `.github/workflows/coverage.yml` | Separate from product `ci.yml` |
 
 ```bash
 bash scripts/coverage/run-service-coverage.sh python-ai-service
@@ -197,6 +268,7 @@ node scripts/coverage/enforce-service-coverage.mjs
 
 ```bash
 bash scripts/rp-ai-shadow-source-diagnostic.sh      # shadow quality (read-only)
+bash scripts/rp-ai-shadow-real-query-timing.sh      # T20.10T timing harness
 bash scripts/audit-rp-ai-rag-contract.sh
 bash scripts/rp-ai-rag-quality-smoke.sh
 bash scripts/audit-rp-ai-runtime-contract.sh
@@ -230,37 +302,22 @@ Edge: `https://record-platform.test` with strict TLS (`certs/dev-chain.pem`).
 
 ---
 
-## Vector rollout thresholds (T20.3 / T20.8)
+## Recommended next work
 
-Production vector default requires **all** of:
-
-| Requirement | Target | Current (2026-06-22) |
-|-------------|--------|------------------------|
-| Embedded coverage | ≥15% **or** ≥10k chunks | 6.9% / 5,049 — **FAIL** |
-| Shadow source diversity | ≥5 types | 6 — **PASS** |
-| Owner-visible OBO (e2e) | ≥10 | 2 — **FAIL** |
-| Shadow p95 latency | ≤3s | ~7.1s — **FAIL** |
-| Leakage | 0 | 0 — **PASS** |
-| Keyword stability | unchanged | stable — **PASS** |
-| Quality parity | meaningful shadow/keyword overlap | 0 overlap — **FAIL** |
-
-**Verdict:** hold keyword default; T20.8 evaluation complete.
-
----
-
-## Recommended sequencing (what to do next)
-
-Best next **safe** workstreams — **only with explicit approval**:
-
-1. **New bounded embedding tranche (T20.9)** — new tranche id, fresh backup, dry-run first, caps only; never rerun `t20-tranche-2`; no `EMBEDDING_BACKFILL_FORCE=1`. See `docs/ai-platform/T20-9-tranche3-dry-run-plan.md`.
-2. **Shadow-only refinement (T20.10)** — improve `shadow_profiles.py` / query hints / diagnostics; no keyword or API contract changes.
-3. **Coverage hardening (T20.11)** — extend manifest for more services; keep `strict_enabled=false` until wired; preserve python-ai strict 90% gate.
+```text
+Recommended next:
+1. T20.17 Phase 20 release note draft, docs-only.
+2. T20.11 coverage track if desired.
+3. T20.12 embedding tranche dry-run only with explicit approval.
+4. No T20.14/T20.15 rollout work until all gates pass.
+```
 
 Refusal rules:
 
-1. **If asked to "enable vector"** → refuse until T20.3 thresholds pass; cite `docs/ai-platform/T20-8-vector-rollout-readiness.md`.
-2. **If rerunning Tranche 2** → refuse; lock exists (exit **2**).
-3. **Before any push** → OCH scan, strip Co-authored trailers if needed, no `bench_logs/` in commit.
+1. **If asked to "enable vector"** → refuse until all rollout gates pass; cite this doc and `docs/ai-platform/T20-8-vector-rollout-readiness.md`.
+2. **If asked to default-on overlap flags** → refuse; T20.10AG closed branch as diagnostic-only.
+3. **If rerunning Tranche 2** → refuse; lock exists (exit **2**).
+4. **Before any push** → OCH scan, strip Co-authored trailers if needed, no `bench_logs/` in commit.
 
 ---
 
@@ -269,15 +326,16 @@ Refusal rules:
 | Document | Path |
 |----------|------|
 | **This handoff (source of truth)** | `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md` |
-| T20.8 rollout eval (committed) | `docs/ai-platform/T20-8-vector-rollout-readiness.md` |
-| T20.8 rollout eval (local run artifact) | `bench_logs/ai-platform/t20-8-vector-rollout-readiness.md` |
+| T20.8 rollout eval | `docs/ai-platform/T20-8-vector-rollout-readiness.md` |
+| T20.10Z post-refinement readiness | `docs/ai-platform/T20-10Z-post-shadow-refinement-readiness.md` |
+| T20.10AA overlap deep dive | `docs/ai-platform/T20-10AA-shadow-keyword-overlap-deep-dive.md` |
+| T20.10AD flagged overlap eval | `docs/ai-platform/T20-10AD-flagged-overlap-refinement-eval.md` |
+| T20.10AF latency trims | `docs/ai-platform/T20-10AF-flagged-overlap-latency-trim.md` |
+| T20.10AG stability eval | `docs/ai-platform/T20-10AG-flagged-overlap-stability-eval.md` |
 | T20.9 Tranche 3 dry-run plan | `docs/ai-platform/T20-9-tranche3-dry-run-plan.md` |
-| Phase 20 planning | `bench_logs/ai-platform/phase-20-next-step-planning.md` |
 | Phase 19 release | `docs/release/rp-ai-vector-shadow-routing-readiness-20260616.md` |
 | AI contracts | `docs/ai-platform/rp-ai-contracts.md` |
 | Coverage manifest | `scripts/coverage/service-coverage-manifest.json` |
-| Tranche 2 proof | `bench_logs/ai-platform/t20-7-tranche2-embedding-proof.md` |
-| Rerun guard smoke | `bench_logs/ai-platform/t20-7r-backfill-rerun-guard-smoke.md` |
 
 ---
 
@@ -285,8 +343,8 @@ Refusal rules:
 
 Recent Phase 20 commits:
 
-- `chore(ci): add service coverage hardening gates` (T20.6)
-- `chore(ai): harden embedding tranche rerun guard` (T20.7R)
-- `docs(ai): add Phase 20 copilot context and T20.8 rollout eval` (T20.8)
+- `chore(ai): trim flagged shadow overlap latency` (T20.10AF)
+- `docs(ai): evaluate T20.10AG flagged overlap stability` (T20.10AG)
+- `docs(ai): refresh Phase 20 copilot context` (T20.16)
 
 Do not commit DB-only embedding changes. Docs like this file **should** be committed when updated.

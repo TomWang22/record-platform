@@ -53,8 +53,8 @@ rollout approval and must not be enabled by default.
 Allowed work only with explicit approval:
 - bounded new embedding tranche with fresh backup and dry-run (T20.12+)
 - shadow-only diagnostics/refinement (overlap branch closed — see T20.10AG)
-- coverage hardening without product behavior changes (T20.11)
-- docs-only release notes (T20.17)
+- coverage hardening without product behavior changes (T20.11 — **closed**)
+- docs-only release notes (T20.17 — done)
 ```
 
 ---
@@ -106,14 +106,22 @@ Allowed work only with explicit approval:
 
 **T20.10 branch outcome:** Flagged diagnostic mode improves overlap **11/16 → 8/16** zero chunk-overlap (stable across 3 warm runs per T20.10AG). Latency acceptable on warm runs; embed variance remains conditional. **Not rollout approval.** Flags stay default off.
 
+### T20.11 coverage hardening (closed)
+
+| Ticket | SHA | Summary |
+|--------|-----|---------|
+| **T20.11A** | `4f52a46` | Manifest v1.1 — enumerate 18 services; 5 new Node entries; all Node non-strict |
+| **T20.11B** | `b39a5d3` | Manifest v1.2 — dry-wire runners for messaging/notification/trust/media |
+| **T20.11C** | _(closeout doc)_ | Audit — python-ai only strict gate; 4 dry-wired Node, 13 skipped |
+
+**T20.11 outcome:** `python-ai-service` remains the **only strict** coverage gate (≥90% `app/ai/*`). Node dry-wire runs are **non-blocking**. See `docs/ai-platform/T20-11C-service-coverage-hardening.md`.
+
 ### Phase 20 tickets NOT started (require explicit approval)
 
 | Ticket | Scope |
 |--------|-------|
 | **T20.9 / T20.12** | Bounded embedding tranche (dry-run only until approved) — see `docs/ai-platform/T20-9-tranche3-dry-run-plan.md` |
-| **T20.11** | Coverage manifest extension for Node services (`strict_enabled=false` until wired) |
 | **T20.14 / T20.15** | Production vector default / hybrid rollout — only after all gates pass |
-| **T20.17** | Phase 20 release note draft (docs-only) — recommended next |
 | **Phase 21** | Not started; do not begin without explicit approval |
 
 ---
@@ -247,18 +255,21 @@ PGPASSWORD=postgres PG_DUMP_JOBS=4 BACKUP_TIMESTAMP=<label> \
 
 ---
 
-## Coverage system (T20.6)
+## Coverage system (T20.6 / T20.11)
 
 | Path | Role |
 |------|------|
-| `scripts/coverage/service-coverage-manifest.json` | Per-service thresholds; only `python-ai-service` has `strict_enabled=true` (90% lines, `app/ai/*`) |
-| `scripts/coverage/run-service-coverage.sh` | Run one or all services |
-| `scripts/coverage/enforce-service-coverage.mjs` | Fail only strict services; others print `SKIP` |
+| `scripts/coverage/service-coverage-manifest.json` | **v1.2** — 18 services; only `python-ai-service` has `strict_enabled=true` (90% lines, `app/ai/*`); 4 Node dry-wired |
+| `scripts/coverage/run-service-coverage.sh` | Run one service, or `all` (18 services); Node dry-wire non-blocking |
+| `scripts/coverage/enforce-service-coverage.mjs` | Fail only strict services; Node SKIP with optional dry-wire line % |
 
 ```bash
 bash scripts/coverage/run-service-coverage.sh python-ai-service
+bash scripts/coverage/run-service-coverage.sh all
 node scripts/coverage/enforce-service-coverage.mjs
 ```
+
+Closeout: `docs/ai-platform/T20-11C-service-coverage-hardening.md`
 
 ---
 
@@ -306,10 +317,9 @@ Edge: `https://record-platform.test` with strict TLS (`certs/dev-chain.pem`).
 
 ```text
 Recommended next:
-1. T20.17 Phase 20 release note draft, docs-only.
-2. T20.11 coverage track if desired.
-3. T20.12 embedding tranche dry-run only with explicit approval.
-4. No T20.14/T20.15 rollout work until all gates pass.
+1. T20.12 embedding tranche dry-run only with explicit approval.
+2. More readiness evaluation only after coverage/overlap/latency gates improve.
+3. No T20.14/T20.15 rollout work until all gates pass.
 ```
 
 Refusal rules:

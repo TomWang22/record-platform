@@ -50,7 +50,15 @@ function enforceService(svc) {
 
   if (!strict) {
     const reason = skipReason || "strict_enabled=false";
-    console.log(`SKIP ${name} — ${reason}`);
+    const { path, data } = readSummary(svc);
+    if (data?.total?.lines?.pct != null) {
+      const linePct = pct(data.total, "lines");
+      console.log(
+        `SKIP ${name} — ${reason} (dry-wire summary: lines ${linePct?.toFixed(2)}%)`,
+      );
+    } else {
+      console.log(`SKIP ${name} — ${reason}`);
+    }
     return { name, status: "skip", reason };
   }
 

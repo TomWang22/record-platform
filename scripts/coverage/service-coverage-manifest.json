@@ -1,6 +1,6 @@
 {
-  "version": "1.1",
-  "description": "RP service coverage manifest — strict gates only when strict_enabled=true (T20.11A: enumerate Node services; python-ai only strict)",
+  "version": "1.2",
+  "description": "RP service coverage manifest — strict gates only when strict_enabled=true (T20.11B: dry-wired Node runners; python-ai only strict)",
   "services": [
     {
       "name": "auth-service",

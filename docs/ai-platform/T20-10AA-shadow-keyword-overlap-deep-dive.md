@@ -116,7 +116,7 @@ Keyword types from paired keyword rows in run `215017`. Shadow types from `shado
 | Classification | Count | Meaning |
 |----------------|------:|---------|
 | `topup_diversity_not_overlap` | 4 | T20.10Y added types; chunk IDs still differ |
-| `shadow_summary_vs_keyword_event_chunk` | 4 | OBO-profile or cross-type mix vs keyword narrow chunks |
+| `shadow_summary_vs_keyword_event_chunk` | 3 | OBO-profile or cross-type mix vs keyword narrow chunks |
 | `source_type_mismatch` | 2 | No shared primary source types (rows 3, 5) |
 | `keyword_exact_match_vs_shadow_semantic` | 1 | Lexical keyword hits ≠ vector neighbors (row 7) |
 | `same_source_type_different_chunks` | 1 | Pure listing listing-ID divergence (row 15) |

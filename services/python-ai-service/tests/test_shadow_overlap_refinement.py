@@ -10,6 +10,11 @@ from unittest.mock import AsyncMock, patch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.ai import config as ai_config  # noqa: E402
+from app.ai.shadow_profiles import (  # noqa: E402
+    SHADOW_NEIGHBOR_DOCS_CONSIDERED,
+    SHADOW_NEIGHBOR_GLOBAL_CAP,
+    SHADOW_NEIGHBOR_PER_DOC,
+)
 from app.ai.rag_retrieval import (  # noqa: E402
     _apply_entity_hint_score_boost,
     _apply_shadow_overlap_refinements,
@@ -167,15 +172,14 @@ class TestNeighborExpansion(unittest.TestCase):
                     words=[],
                     pin_source=False,
                     query="listing",
-                    per_doc_limit=2,
-                    global_cap=6,
-                    docs_considered=4,
+                    per_doc_limit=1,
+                    global_cap=3,
+                    docs_considered=3,
                 )
             merged_ids = [str(r["id"]) for r in merged]
             self.assertIn("n-a1", merged_ids)
-            self.assertIn("n-a2", merged_ids)
             self.assertEqual(merged_ids.count("top-1"), 1)
-            self.assertLessEqual(diag["neighbor_rows_added"], 6)
+            self.assertLessEqual(diag["neighbor_rows_added"], 3)
 
         asyncio.run(run())
 
@@ -263,7 +267,7 @@ class TestShadowOverlapRefinementIntegration(unittest.TestCase):
         keyword_chunks = [
             {"id": "k1", "metadata": {"listing_id": "L1"}, "source_type": "listing", "source_id": "L1"},
         ]
-        raw_rows = [_row("s1", metadata={"listing_id": "L9"})]
+        raw_rows = [_row("s1", source_id="L9", metadata={"listing_id": "L9"})]
         hint_row = _row("hint-1", metadata={"listing_id": "L1"})
 
         async def run() -> None:
@@ -292,14 +296,17 @@ class TestShadowOverlapRefinementIntegration(unittest.TestCase):
 
         asyncio.run(run())
 
-    def test_neighbor_expansion_adds_rows_when_flag_on(self) -> None:
+    def test_neighbor_expansion_adds_rows_when_entity_confidence_present(self) -> None:
         keyword_chunks = [{"id": "k1", "metadata": {"listing_id": "L1"}, "source_type": "listing", "source_id": "L1"}]
-        raw_rows = [_row("top-1", document_id="doc-a", chunk_index=1)]
+        raw_rows = [_row("top-1", document_id="doc-a", chunk_index=1, metadata={"listing_id": "L1"})]
         neighbor = _row("neighbor-1", document_id="doc-a", chunk_index=2, score=0.0)
 
         async def run() -> None:
-            with patch("app.ai.rag_retrieval.AI_RAG_SHADOW_ENTITY_HINTS", False), patch(
+            with patch("app.ai.rag_retrieval.AI_RAG_SHADOW_ENTITY_HINTS", True), patch(
                 "app.ai.rag_retrieval.AI_RAG_SHADOW_NEIGHBOR_EXPANSION", True
+            ), patch(
+                "app.ai.rag_retrieval._fetch_listing_entity_hint_rows",
+                new=AsyncMock(return_value=[]),
             ), patch(
                 "app.ai.rag_retrieval._fetch_document_neighbor_rows",
                 new=AsyncMock(return_value=[neighbor]),
@@ -317,7 +324,31 @@ class TestShadowOverlapRefinementIntegration(unittest.TestCase):
                     query="listing",
                 )
             self.assertEqual(diag["neighbor_rows_added"], 1)
+            self.assertFalse(diag["neighbor_expansion_skipped"])
             self.assertEqual(len(merged), 2)
+
+        asyncio.run(run())
+
+    def test_neighbor_expansion_skips_without_entity_confidence(self) -> None:
+        async def run() -> None:
+            with patch("app.ai.rag_retrieval.AI_RAG_SHADOW_ENTITY_HINTS", False), patch(
+                "app.ai.rag_retrieval.AI_RAG_SHADOW_NEIGHBOR_EXPANSION", True
+            ):
+                merged, diag = await _apply_shadow_overlap_refinements(
+                    conn=AsyncMock(),
+                    raw_rows=[_row("top-1", metadata={"listing_id": "L9"})],
+                    keyword_chunks=None,
+                    filters=["1=1"],
+                    params=[],
+                    vec_param=1,
+                    query_vec=None,
+                    words=[],
+                    pin_source=False,
+                    query="listing",
+                )
+            self.assertTrue(diag["neighbor_expansion_skipped"])
+            self.assertEqual(diag["neighbor_expansion_skip_reason"], "low_entity_confidence")
+            self.assertEqual(len(merged), 1)
 
         asyncio.run(run())
 
@@ -383,10 +414,10 @@ class TestShadowOverlapRefinementVectorShadow(unittest.TestCase):
         result = asyncio.run(run())
         debug = result["shadow_diagnostics"]["debug"]
         self.assertTrue(debug.get("entity_hints_enabled"))
-        self.assertTrue(debug.get("neighbor_expansion_enabled"))
-        self.assertTrue(debug.get("entity_listing_fetch_run"))
+        self.assertTrue(debug.get("entity_listing_fetch_skipped"))
+        self.assertFalse(debug.get("entity_listing_fetch_run"))
 
-    def test_generic_shadow_path_applies_neighbor_flag(self) -> None:
+    def test_generic_shadow_path_skips_neighbor_without_entity_confidence(self) -> None:
         conn = AsyncMock()
         conn.fetchval = AsyncMock(return_value=10)
         conn.fetch = AsyncMock(return_value=[])
@@ -410,7 +441,77 @@ class TestShadowOverlapRefinementVectorShadow(unittest.TestCase):
 
         result = asyncio.run(run())
         debug = result["shadow_diagnostics"]["debug"]
-        self.assertTrue(debug.get("neighbor_expansion_enabled"))
+        self.assertTrue(debug.get("neighbor_expansion_skipped"))
+        self.assertEqual(debug.get("neighbor_expansion_skip_reason"), "low_entity_confidence")
+
+
+class TestShadowOverlapLatencyTrim(unittest.TestCase):
+    def test_af2_neighbor_cap_constants(self) -> None:
+        self.assertEqual(SHADOW_NEIGHBOR_PER_DOC, 1)
+        self.assertEqual(SHADOW_NEIGHBOR_GLOBAL_CAP, 3)
+        self.assertEqual(SHADOW_NEIGHBOR_DOCS_CONSIDERED, 3)
+
+    def test_listing_fetch_skips_when_overlap_before_positive(self) -> None:
+        keyword_chunks = [
+            {"id": "k1", "metadata": {"listing_id": "L1"}, "source_type": "listing", "source_id": "L1"},
+        ]
+        raw_rows = [_row("s1", metadata={"listing_id": "L1"})]
+
+        async def run() -> None:
+            with patch("app.ai.rag_retrieval.AI_RAG_SHADOW_ENTITY_HINTS", True), patch(
+                "app.ai.rag_retrieval.AI_RAG_SHADOW_NEIGHBOR_EXPANSION", False
+            ), patch(
+                "app.ai.rag_retrieval._fetch_listing_entity_hint_rows",
+                new=AsyncMock(return_value=[_row("hint-1")]),
+            ) as listing_fetch:
+                _, diag = await _apply_shadow_overlap_refinements(
+                    conn=AsyncMock(),
+                    raw_rows=list(raw_rows),
+                    keyword_chunks=keyword_chunks,
+                    filters=["1=1"],
+                    params=["[0.1]"],
+                    vec_param=1,
+                    query_vec="[0.1]",
+                    words=[],
+                    pin_source=False,
+                    query="listing",
+                )
+            listing_fetch.assert_not_awaited()
+            self.assertTrue(diag["entity_listing_fetch_skipped"])
+            self.assertEqual(diag["entity_listing_fetch_skip_reason"], "sufficient_entity_boost")
+
+        asyncio.run(run())
+
+    def test_listing_fetch_skips_when_pre_boost_matches_two(self) -> None:
+        keyword_chunks = [
+            {"id": "k1", "metadata": {"listing_id": "L1"}, "source_type": "listing", "source_id": "L1"},
+        ]
+        raw_rows = [
+            _row("s1", source_id="L1", metadata={"listing_id": "L1"}),
+            _row("s2", source_id="L1", metadata={"listing_id": "L1"}),
+        ]
+
+        async def run() -> None:
+            with patch("app.ai.rag_retrieval.AI_RAG_SHADOW_ENTITY_HINTS", True), patch(
+                "app.ai.rag_retrieval._fetch_listing_entity_hint_rows",
+                new=AsyncMock(return_value=[]),
+            ) as listing_fetch:
+                _, diag = await _apply_shadow_overlap_refinements(
+                    conn=AsyncMock(),
+                    raw_rows=list(raw_rows),
+                    keyword_chunks=keyword_chunks,
+                    filters=["1=1"],
+                    params=["[0.1]"],
+                    vec_param=1,
+                    query_vec="[0.1]",
+                    words=[],
+                    pin_source=False,
+                    query="listing",
+                )
+            listing_fetch.assert_not_awaited()
+            self.assertTrue(diag["entity_listing_fetch_skipped"])
+
+        asyncio.run(run())
 
 
 if __name__ == "__main__":

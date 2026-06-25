@@ -221,6 +221,18 @@ def listing_ids_from_entity_keys(entity_keys: set[str]) -> List[str]:
     return listing_ids[:SHADOW_ENTITY_LISTING_ID_CAP]
 
 
+def _entity_boost_match_count(
+    rows: Sequence[Mapping[str, Any]],
+    entity_keys: set[str],
+) -> int:
+    """Count pool rows sharing keyword entity keys (no score mutation)."""
+    if not entity_keys:
+        return 0
+    return sum(
+        1 for row in rows if _entity_keys_for_row(row).intersection(entity_keys)
+    )
+
+
 def _entity_overlap_count_in_rows(
     entity_keys: set[str],
     rows: Sequence[Mapping[str, Any]],
@@ -1101,13 +1113,17 @@ async def _apply_shadow_overlap_refinements(
         "entity_boosted_rows": 0,
         "entity_overlap_before": 0,
         "entity_overlap_after": 0,
+        "entity_listing_fetch_run": False,
+        "entity_listing_fetch_rows": 0,
+        "entity_listing_fetch_skipped": False,
+        "entity_listing_fetch_skip_reason": None,
         "neighbor_expansion_enabled": False,
+        "neighbor_expansion_skipped": False,
+        "neighbor_expansion_skip_reason": None,
         "neighbor_docs_considered": 0,
         "neighbor_rows_added": 0,
         "candidate_pool_before_neighbors": len(raw_rows),
         "candidate_pool_after_neighbors": len(raw_rows),
-        "entity_listing_fetch_run": False,
-        "entity_listing_fetch_rows": 0,
     }
     if not AI_RAG_SHADOW_ENTITY_HINTS and not AI_RAG_SHADOW_NEIGHBOR_EXPANSION:
         return raw_rows, refine_diag
@@ -1119,9 +1135,16 @@ async def _apply_shadow_overlap_refinements(
         refine_diag["entity_hints_enabled"] = True
         refine_diag["entity_hint_keys_count"] = len(entity_keys)
         refine_diag["entity_overlap_before"] = _entity_overlap_count_in_rows(entity_keys, merged_rows)
+        pre_boost_matches = _entity_boost_match_count(merged_rows, entity_keys)
 
         listing_ids = listing_ids_from_entity_keys(entity_keys)
-        if listing_ids and len(listing_ids) <= SHADOW_ENTITY_LISTING_ID_CAP and query_vec:
+        skip_listing_fetch = (
+            pre_boost_matches >= 2 or refine_diag["entity_overlap_before"] >= 1
+        )
+        if skip_listing_fetch:
+            refine_diag["entity_listing_fetch_skipped"] = True
+            refine_diag["entity_listing_fetch_skip_reason"] = "sufficient_entity_boost"
+        elif listing_ids and len(listing_ids) <= SHADOW_ENTITY_LISTING_ID_CAP and query_vec:
             hint_rows = await _fetch_listing_entity_hint_rows(
                 conn,
                 filters=filters,
@@ -1138,17 +1161,27 @@ async def _apply_shadow_overlap_refinements(
         merged_rows, boosted_count = _apply_entity_hint_score_boost(merged_rows, entity_keys)
         refine_diag["entity_boosted_rows"] = boosted_count
 
+    entity_overlap_before = int(refine_diag["entity_overlap_before"])
+    entity_boosted_rows = int(refine_diag["entity_boosted_rows"])
     if AI_RAG_SHADOW_NEIGHBOR_EXPANSION:
-        merged_rows, neighbor_diag = await _expand_shadow_neighbor_rows(
-            conn,
-            filters=filters,
-            params=scope_params,
-            raw_rows=merged_rows,
-            words=words,
-            pin_source=pin_source,
-            query=query,
-        )
-        refine_diag.update(neighbor_diag)
+        if entity_overlap_before >= 1 or entity_boosted_rows >= 1:
+            merged_rows, neighbor_diag = await _expand_shadow_neighbor_rows(
+                conn,
+                filters=filters,
+                params=scope_params,
+                raw_rows=merged_rows,
+                words=words,
+                pin_source=pin_source,
+                query=query,
+            )
+            refine_diag.update(neighbor_diag)
+            refine_diag["neighbor_expansion_skipped"] = False
+            refine_diag["neighbor_expansion_skip_reason"] = None
+        else:
+            refine_diag["neighbor_expansion_skipped"] = True
+            refine_diag["neighbor_expansion_skip_reason"] = "low_entity_confidence"
+            refine_diag["candidate_pool_before_neighbors"] = len(merged_rows)
+            refine_diag["candidate_pool_after_neighbors"] = len(merged_rows)
 
     if entity_keys:
         refine_diag["entity_overlap_after"] = _entity_overlap_count_in_rows(entity_keys, merged_rows)

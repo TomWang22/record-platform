@@ -163,12 +163,12 @@ Phase 20 improved shadow observability, fetch strategy, diversity, and diagnosti
 
 ## Next possible work (guarded)
 
-1. **T20.11** — coverage track: extend manifest to Node services; keep `strict_enabled=false` until wired.
-2. **T20.12** — embedding tranche **dry-run only** with explicit approval (fresh backup, new tranche id, caps only).
-3. More readiness evaluation **only after** coverage, overlap, and latency gates improve materially.
+1. **T20.12** — Tranche 4 actual completed (`t20-tranche-4`, +500 → 6,065 embedded). Tranche 5 dry-run planned — see `docs/ai-platform/T20-12E-tranche5-dry-run-plan.md`.
+2. **T20.12F** — next tranche actual write only with explicit approval (fresh backup, new tranche id, no FORCE).
+3. More readiness evaluation after each tranche (T20.12D pattern).
 4. **No T20.14/T20.15** rollout work until **all** gates pass and explicit approval is granted.
 
-Do not start T20.12 actual write or T20.14/T20.15 rollout without explicit approval.
+Do not start T20.12F actual write or T20.14/T20.15 rollout without explicit approval.
 
 ---
 

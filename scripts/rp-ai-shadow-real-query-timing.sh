@@ -36,6 +36,10 @@ AUTH_PASS="${RP_COMB_PASSWORD:-ContractPass123!}"
 CURL_TLS=(--cacert "$CA" --resolve "record-platform.test:443:${LB_IP}")
 
 echo "=== T20.10B real-query shadow timing (read-only) ==="
+if [[ "${AI_RAG_SHADOW_ENTITY_HINTS:-0}" == "1" || "${AI_RAG_SHADOW_NEIGHBOR_EXPANSION:-0}" == "1" ]]; then
+  echo "T20.10AC overlap refinement flags: ENTITY_HINTS=${AI_RAG_SHADOW_ENTITY_HINTS:-0} NEIGHBOR_EXPANSION=${AI_RAG_SHADOW_NEIGHBOR_EXPANSION:-0}"
+  echo "Note: python-ai-service deployment must have matching env vars for flagged behavior."
+fi
 
 LOGIN_JSON="$(curl -sfS "${CURL_TLS[@]}" --max-time 20 -X POST "$API_BASE/api/auth/login" \
   -H 'Content-Type: application/json' -H 'X-RP-E2E-Contract: 1' \

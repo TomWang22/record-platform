@@ -14,6 +14,14 @@ ALLOWED_SHADOW_SOURCE_TYPES: Tuple[str, ...] = (
     "notification",
 )
 
+# T20.10AC — diagnostic overlap refinement caps (flags default off in config).
+SHADOW_NEIGHBOR_PER_DOC = 2
+SHADOW_NEIGHBOR_GLOBAL_CAP = 6
+SHADOW_NEIGHBOR_DOCS_CONSIDERED = 4
+SHADOW_ENTITY_LISTING_FETCH_LIMIT = 8
+SHADOW_ENTITY_LISTING_ID_CAP = 5
+SHADOW_ENTITY_HINT_SCORE_MULTIPLIER = 1.5
+
 _PROFILE_ALIASES: Dict[str, str] = {
     "pricing_recommendation": "obo_helper",
     "buyer_collection_summary": "record_valuation",

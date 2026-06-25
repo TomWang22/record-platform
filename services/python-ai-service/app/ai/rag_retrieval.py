@@ -15,12 +15,20 @@ from app.ai.config import (
     AI_RAG_SHADOW_EMBED_CACHE_MAX,
     AI_RAG_SHADOW_EMBED_HINT_MAX_CHARS,
     AI_RAG_SHADOW_EMBED_TIMEOUT_MS,
+    AI_RAG_SHADOW_ENTITY_HINTS,
     AI_RAG_SHADOW_MIN_EMBEDDED,
+    AI_RAG_SHADOW_NEIGHBOR_EXPANSION,
     AI_RAG_VECTOR_DIM,
     OLLAMA_BASE_URL,
 )
 from app.ai.envelope import source_ref
 from app.ai.shadow_profiles import (
+    SHADOW_ENTITY_LISTING_FETCH_LIMIT,
+    SHADOW_ENTITY_LISTING_ID_CAP,
+    SHADOW_ENTITY_HINT_SCORE_MULTIPLIER,
+    SHADOW_NEIGHBOR_DOCS_CONSIDERED,
+    SHADOW_NEIGHBOR_GLOBAL_CAP,
+    SHADOW_NEIGHBOR_PER_DOC,
     candidate_pool_is_sufficient,
     expand_query_with_hints,
     infer_shadow_profile_from_query,
@@ -144,6 +152,17 @@ _SOURCE_TYPE_ENTITY_ID_FIELD: dict[str, str] = {
 }
 
 
+# T20.10K / T20.10AC — safe metadata entity fields for shadow overlap hints (no body text).
+_SAFE_ENTITY_METADATA_FIELDS: Tuple[str, ...] = (
+    "listing_id",
+    "record_id",
+    "offer_id",
+    "obo_offer_id",
+    "auction_id",
+    "bid_id",
+)
+
+
 def _entity_keys_for_chunk(chunk: Mapping[str, Any]) -> set[str]:
     """Shadow-only overlap keys from source_id and safe metadata fields (no body text)."""
     keys: set[str] = set()
@@ -155,7 +174,7 @@ def _entity_keys_for_chunk(chunk: Mapping[str, Any]) -> set[str]:
         if alias_field:
             keys.add(f"{alias_field}:{source_id}")
     meta = _coerce_metadata(chunk.get("metadata"))
-    for field in ("listing_id", "offer_id", "record_id", "auction_id", "bid_id"):
+    for field in _SAFE_ENTITY_METADATA_FIELDS:
         value = meta.get(field)
         if value:
             keys.add(f"{field}:{value}")
@@ -179,11 +198,60 @@ def _entity_keys_for_row(row: Mapping[str, Any]) -> set[str]:
         if alias_field:
             keys.add(f"{alias_field}:{source_id}")
     meta = _coerce_metadata(row.get("metadata"))
-    for field in ("listing_id", "offer_id", "record_id", "auction_id", "bid_id"):
+    for field in _SAFE_ENTITY_METADATA_FIELDS:
         value = meta.get(field)
         if value:
             keys.add(f"{field}:{value}")
     return keys
+
+
+def extract_keyword_entity_hint_keys(
+    keyword_chunks: Optional[Sequence[Mapping[str, Any]]],
+) -> set[str]:
+    """T20.10AC A1 — entity keys from keyword-selected chunks (metadata only)."""
+    return _collect_entity_keys(keyword_chunks or [])
+
+
+def listing_ids_from_entity_keys(entity_keys: set[str]) -> List[str]:
+    """Bounded listing_id values for optional typed entity fetch."""
+    listing_ids: List[str] = []
+    for key in sorted(entity_keys):
+        if key.startswith("listing_id:"):
+            listing_ids.append(key.split(":", 1)[1])
+    return listing_ids[:SHADOW_ENTITY_LISTING_ID_CAP]
+
+
+def _entity_overlap_count_in_rows(
+    entity_keys: set[str],
+    rows: Sequence[Mapping[str, Any]],
+) -> int:
+    if not entity_keys:
+        return 0
+    pool_keys = set()
+    for row in rows:
+        pool_keys.update(_entity_keys_for_row(row))
+    return len(entity_keys.intersection(pool_keys))
+
+
+def _apply_entity_hint_score_boost(
+    rows: Sequence[Any],
+    entity_keys: set[str],
+    *,
+    multiplier: float = SHADOW_ENTITY_HINT_SCORE_MULTIPLIER,
+) -> Tuple[List[Any], int]:
+    """T20.10AC A2 — bounded score boost for rows sharing keyword entity keys."""
+    if not entity_keys:
+        return list(rows), 0
+    boosted_rows: List[Any] = []
+    boosted_count = 0
+    for row in rows:
+        row_copy = dict(row)
+        if _entity_keys_for_row(row_copy).intersection(entity_keys):
+            base = float(row_copy.get("score") or 0)
+            row_copy["score"] = base * multiplier
+            boosted_count += 1
+        boosted_rows.append(row_copy)
+    return boosted_rows, boosted_count
 
 
 def _keyword_alignment_targets(
@@ -870,6 +938,224 @@ def _shadow_type_fetch_limit(
     return max(6, max_chunks)
 
 
+async def _fetch_listing_entity_hint_rows(
+    conn,
+    *,
+    filters: List[str],
+    scope_params: List[Any],
+    query_vec: str,
+    listing_ids: Sequence[str],
+    limit: int,
+) -> List[Any]:
+    """T20.10AC A3 — one bounded typed fetch filtered by listing_id metadata."""
+    if not listing_ids:
+        return []
+    local_filters = list(filters)
+    local_params = list(scope_params)
+    idx = len(local_params) + 1
+    local_filters.append(f"d.metadata->>'listing_id' = ANY(${idx}::text[])")
+    local_params.append(list(listing_ids))
+    idx += 1
+    local_params.append(query_vec)
+    vec_param = idx
+    idx += 1
+    local_params.append(limit)
+    limit_param = idx
+    sql = f"""
+        SELECT c.id, c.document_id, c.chunk_index, c.content, c.checksum, c.source_refs,
+               d.source_type, d.source_id, d.owner_user_id, d.visibility,
+               d.source_updated_at, d.title, d.metadata,
+               (1 - (c.embedding_vec <=> ${vec_param}::vector))::float AS score
+        FROM ai.ai_document_chunks c
+        JOIN ai.ai_documents d ON d.id = c.document_id
+        WHERE {' AND '.join(local_filters)}
+        ORDER BY c.embedding_vec <=> ${vec_param}::vector ASC
+        LIMIT ${limit_param}::int
+    """
+    return list(await conn.fetch(sql, *local_params))
+
+
+async def _fetch_document_neighbor_rows(
+    conn,
+    *,
+    filters: List[str],
+    params: List[Any],
+    document_id: str,
+    anchor_chunk_index: int,
+    per_doc_limit: int,
+) -> List[Any]:
+    """T20.10AC C1 — same-document neighbor chunks ordered by index distance."""
+    local_filters = list(filters)
+    local_params = list(params)
+    idx = len(local_params) + 1
+    local_filters.append(f"c.document_id = ${idx}::uuid")
+    local_params.append(document_id)
+    idx += 1
+    local_params.append(anchor_chunk_index)
+    anchor_param = idx
+    idx += 1
+    local_params.append(per_doc_limit)
+    limit_param = idx
+    sql = f"""
+        SELECT c.id, c.document_id, c.chunk_index, c.content, c.checksum, c.source_refs,
+               d.source_type, d.source_id, d.owner_user_id, d.visibility,
+               d.source_updated_at, d.title, d.metadata,
+               0.0::float AS score
+        FROM ai.ai_document_chunks c
+        JOIN ai.ai_documents d ON d.id = c.document_id
+        WHERE {' AND '.join(local_filters)}
+        ORDER BY ABS(c.chunk_index - ${anchor_param}::int) ASC, c.chunk_index ASC, c.id ASC
+        LIMIT ${limit_param}::int
+    """
+    return list(await conn.fetch(sql, *local_params))
+
+
+async def _expand_shadow_neighbor_rows(
+    conn,
+    *,
+    filters: List[str],
+    params: List[Any],
+    raw_rows: Sequence[Any],
+    words: List[str],
+    pin_source: bool,
+    query: str,
+    per_doc_limit: int = SHADOW_NEIGHBOR_PER_DOC,
+    global_cap: int = SHADOW_NEIGHBOR_GLOBAL_CAP,
+    docs_considered: int = SHADOW_NEIGHBOR_DOCS_CONSIDERED,
+) -> Tuple[List[Any], Dict[str, Any]]:
+    """T20.10AC C1 — add bounded neighbor chunks for top matched documents."""
+    diag: Dict[str, Any] = {
+        "neighbor_expansion_enabled": True,
+        "neighbor_docs_considered": 0,
+        "neighbor_rows_added": 0,
+        "candidate_pool_before_neighbors": len(raw_rows),
+        "candidate_pool_after_neighbors": len(raw_rows),
+    }
+    if not raw_rows:
+        return list(raw_rows), diag
+
+    existing_ids = {str(row["id"]) for row in raw_rows}
+    merged_rows = list(raw_rows)
+    neighbors_added = 0
+    docs_seen: set[str] = set()
+
+    ranked = sorted(
+        raw_rows,
+        key=lambda row: (-float(row.get("score") or 0), str(row["id"])),
+    )
+    for row in ranked:
+        if len(docs_seen) >= docs_considered or neighbors_added >= global_cap:
+            break
+        doc_id = row.get("document_id")
+        if not doc_id:
+            continue
+        doc_key = str(doc_id)
+        if doc_key in docs_seen:
+            continue
+        docs_seen.add(doc_key)
+        anchor_index = int(row.get("chunk_index") or 0)
+        neighbor_rows = await _fetch_document_neighbor_rows(
+            conn,
+            filters=filters,
+            params=params,
+            document_id=doc_key,
+            anchor_chunk_index=anchor_index,
+            per_doc_limit=per_doc_limit + 1,
+        )
+        for neighbor in neighbor_rows:
+            if neighbors_added >= global_cap:
+                break
+            neighbor_id = str(neighbor["id"])
+            if neighbor_id in existing_ids:
+                continue
+            if not _chunk_passes_privacy(neighbor, words=words, pin_source=pin_source, query=query):
+                continue
+            merged_rows.append(neighbor)
+            existing_ids.add(neighbor_id)
+            neighbors_added += 1
+
+    diag["neighbor_docs_considered"] = len(docs_seen)
+    diag["neighbor_rows_added"] = neighbors_added
+    diag["candidate_pool_after_neighbors"] = len(merged_rows)
+    return merged_rows, diag
+
+
+async def _apply_shadow_overlap_refinements(
+    conn,
+    *,
+    raw_rows: List[Any],
+    keyword_chunks: Optional[Sequence[Mapping[str, Any]]],
+    filters: List[str],
+    params: List[Any],
+    vec_param: int,
+    query_vec: Optional[str],
+    words: List[str],
+    pin_source: bool,
+    query: str,
+) -> Tuple[List[Any], Dict[str, Any]]:
+    """T20.10AC — diagnostic-only overlap refinements (flags default off)."""
+    scope_params = params[: max(0, vec_param - 1)]
+    refine_diag: Dict[str, Any] = {
+        "entity_hints_enabled": False,
+        "entity_hint_keys_count": 0,
+        "entity_boosted_rows": 0,
+        "entity_overlap_before": 0,
+        "entity_overlap_after": 0,
+        "neighbor_expansion_enabled": False,
+        "neighbor_docs_considered": 0,
+        "neighbor_rows_added": 0,
+        "candidate_pool_before_neighbors": len(raw_rows),
+        "candidate_pool_after_neighbors": len(raw_rows),
+        "entity_listing_fetch_run": False,
+        "entity_listing_fetch_rows": 0,
+    }
+    if not AI_RAG_SHADOW_ENTITY_HINTS and not AI_RAG_SHADOW_NEIGHBOR_EXPANSION:
+        return raw_rows, refine_diag
+
+    merged_rows = list(raw_rows)
+    entity_keys: set[str] = set()
+    if AI_RAG_SHADOW_ENTITY_HINTS and keyword_chunks:
+        entity_keys = extract_keyword_entity_hint_keys(keyword_chunks)
+        refine_diag["entity_hints_enabled"] = True
+        refine_diag["entity_hint_keys_count"] = len(entity_keys)
+        refine_diag["entity_overlap_before"] = _entity_overlap_count_in_rows(entity_keys, merged_rows)
+
+        listing_ids = listing_ids_from_entity_keys(entity_keys)
+        if listing_ids and len(listing_ids) <= SHADOW_ENTITY_LISTING_ID_CAP and query_vec:
+            hint_rows = await _fetch_listing_entity_hint_rows(
+                conn,
+                filters=filters,
+                scope_params=scope_params,
+                query_vec=query_vec,
+                listing_ids=listing_ids,
+                limit=SHADOW_ENTITY_LISTING_FETCH_LIMIT,
+            )
+            if hint_rows:
+                refine_diag["entity_listing_fetch_run"] = True
+                refine_diag["entity_listing_fetch_rows"] = len(hint_rows)
+                merged_rows = _merge_vector_rows(merged_rows, hint_rows)
+
+        merged_rows, boosted_count = _apply_entity_hint_score_boost(merged_rows, entity_keys)
+        refine_diag["entity_boosted_rows"] = boosted_count
+
+    if AI_RAG_SHADOW_NEIGHBOR_EXPANSION:
+        merged_rows, neighbor_diag = await _expand_shadow_neighbor_rows(
+            conn,
+            filters=filters,
+            params=scope_params,
+            raw_rows=merged_rows,
+            words=words,
+            pin_source=pin_source,
+            query=query,
+        )
+        refine_diag.update(neighbor_diag)
+
+    if entity_keys:
+        refine_diag["entity_overlap_after"] = _entity_overlap_count_in_rows(entity_keys, merged_rows)
+
+    return merged_rows, refine_diag
+
+
 async def _collect_route_mode_shadow_rows(
     conn,
     *,
@@ -1237,6 +1523,22 @@ async def retrieve_chunks_vector_shadow(
             limit=max_chunks * 3,
         )
         raw_rows = list(global_rows)
+        fetch_diag = {}
+
+    overlap_refine_diag: Dict[str, Any] = {}
+    if AI_RAG_SHADOW_ENTITY_HINTS or AI_RAG_SHADOW_NEIGHBOR_EXPANSION:
+        raw_rows, overlap_refine_diag = await _apply_shadow_overlap_refinements(
+            conn,
+            raw_rows=raw_rows,
+            keyword_chunks=keyword_chunks_for_overlap,
+            filters=filters,
+            params=params,
+            vec_param=vec_param,
+            query_vec=str(params[vec_param - 1]) if len(params) >= vec_param else None,
+            words=words,
+            pin_source=pin_source,
+            query=query,
+        )
     diagnostics.timings_ms.candidate_fetch = _elapsed_ms(fetch_start)
 
     source_filter_start = _now_ms()
@@ -1349,6 +1651,8 @@ async def retrieve_chunks_vector_shadow(
                 diagnostics.debug["source_types_after_rerank"] = sorted(
                     _count_by_source_type(selected_for_diag).keys()
                 )
+        if overlap_refine_diag:
+            diagnostics.debug.update(overlap_refine_diag)
         result["shadow_diagnostics"] = diagnostics.to_dict()
     return result
 

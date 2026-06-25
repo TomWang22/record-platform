@@ -2,7 +2,7 @@
 
 **Generated:** 2026-06-25  
 **Baseline SHA:** `8468921` (T20.10AE flagged overlap latency-trim proposal)  
-**Implementation SHA:** `ebda2ae` (`chore(ai): trim flagged shadow overlap latency`)  
+**Implementation SHA:** `dc8cff4` (`chore(ai): trim flagged shadow overlap latency`)  
 **Mode:** flagged-path-only latency trims — flags remain default off  
 **Vector rollout:** NOT APPROVED
 

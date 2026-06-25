@@ -27,6 +27,7 @@ from app.ai.shadow_profiles import (
     is_obo_focused,
     needs_global_fallback,
     non_primary_source_caps,
+    pool_diversity_satisfied,
     preferred_type_quotas,
     profile_diagnostic_meta,
     preferred_source_types,
@@ -881,7 +882,7 @@ async def _collect_route_mode_shadow_rows(
     max_chunks: int,
     scope_by_type: Dict[str, int],
 ) -> Tuple[List[Any], Dict[str, Any]]:
-    """T20.10W — shadow-only Option A+B candidate fetch strategy."""
+    """T20.10W/T20.10Y — shadow-only scoped-first fetch + diversity top-ups."""
     obo_focused = is_obo_focused(resolved_profile, shadow_custom_query_hints)
     global_limit = max_chunks * 2 if obo_focused else max_chunks * 3
     strategy = resolve_shadow_fetch_strategy(
@@ -896,29 +897,37 @@ async def _collect_route_mode_shadow_rows(
         "global_fetch_skipped": False,
         "typed_fetches_skipped": [],
         "typed_fetches_run": [],
+        "diversity_topups_run": [],
+        "diversity_topups_skipped": [],
         "candidate_pool_before_rerank": 0,
+        "source_types_before_rerank": [],
     }
     pool_rows: List[Any] = []
     fetched_source_types: set[str] = set()
 
-    async def _typed_fetch(source_type: str) -> None:
+    async def _typed_fetch(source_type: str, *, limit: Optional[int] = None) -> None:
         if scope_by_type.get(source_type, 0) <= 0:
             return
+        type_limit = limit if limit is not None else _shadow_type_fetch_limit(
+            source_type,
+            max_chunks=max_chunks,
+            obo_focused=obo_focused,
+        )
         type_rows = await _fetch_vector_rows(
             conn,
             filters=filters,
             params=params,
             vec_param=vec_param,
-            limit=_shadow_type_fetch_limit(
-                source_type,
-                max_chunks=max_chunks,
-                obo_focused=obo_focused,
-            ),
+            limit=type_limit,
             extra_source_type=source_type,
         )
         pool_rows.extend(type_rows)
         fetched_source_types.add(source_type)
         fetch_diag["typed_fetches_run"].append(source_type)
+
+    async def _diversity_topup_fetch(source_type: str) -> None:
+        await _typed_fetch(source_type, limit=strategy.diversity_topup_limit)
+        fetch_diag["diversity_topups_run"].append(source_type)
 
     def _pool_snapshot() -> Tuple[int, Dict[str, int]]:
         merged = _merge_vector_rows(pool_rows)
@@ -944,12 +953,16 @@ async def _collect_route_mode_shadow_rows(
     primary = strategy.primary_source_type
     if strategy.fetch_strategy == "scoped_first" and primary:
         await _typed_fetch(primary)
-        pool_size, pool_by_type = _pool_snapshot()
-        if _pool_is_sufficient(pool_size, pool_by_type, primary_source_type=primary):
-            fetch_diag["global_fetch_skipped"] = True
-            fetch_diag["typed_fetches_skipped"] = list(strategy.extra_source_types)
-            fetch_diag["candidate_pool_before_rerank"] = pool_size
-            return _merge_vector_rows(pool_rows), fetch_diag
+
+    for source_type in strategy.diversity_topup_source_types:
+        if source_type in fetched_source_types:
+            fetch_diag["diversity_topups_skipped"].append(source_type)
+            continue
+        _, pool_by_type = _pool_snapshot()
+        if pool_diversity_satisfied(pool_by_type, strategy.min_source_diversity):
+            fetch_diag["diversity_topups_skipped"].append(source_type)
+            continue
+        await _diversity_topup_fetch(source_type)
 
     pool_size, pool_by_type = _pool_snapshot()
     if needs_global_fallback(
@@ -1002,6 +1015,7 @@ async def _collect_route_mode_shadow_rows(
 
     merged_rows = _merge_vector_rows(pool_rows)
     fetch_diag["candidate_pool_before_rerank"] = len(merged_rows)
+    fetch_diag["source_types_before_rerank"] = sorted(_pool_rows_by_source_type(merged_rows).keys())
     return merged_rows, fetch_diag
 
 
@@ -1331,6 +1345,10 @@ async def retrieve_chunks_vector_shadow(
         if fetch_diag:
             diagnostics.debug.update(fetch_diag)
             diagnostics.debug["candidate_fetch_ms"] = diagnostics.timings_ms.candidate_fetch
+            if route_mode:
+                diagnostics.debug["source_types_after_rerank"] = sorted(
+                    _count_by_source_type(selected_for_diag).keys()
+                )
         result["shadow_diagnostics"] = diagnostics.to_dict()
     return result
 

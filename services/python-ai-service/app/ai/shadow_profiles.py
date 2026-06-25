@@ -289,13 +289,20 @@ def non_primary_source_caps(
     return {}
 
 
+SHADOW_MIN_SOURCE_DIVERSITY = 5
+SHADOW_DIVERSITY_TOPUP_LIMIT = 3
+
+
 @dataclass(frozen=True, slots=True)
 class ShadowFetchStrategy:
-    """Shadow-only candidate fetch plan (T20.10W); keyword path must not use this."""
+    """Shadow-only candidate fetch plan (T20.10W/T20.10Y); keyword path must not use this."""
 
     fetch_strategy: str  # scoped_first | global_first
     primary_source_type: Optional[str]
     extra_source_types: List[str]
+    diversity_topup_source_types: List[str]
+    diversity_topup_limit: int = SHADOW_DIVERSITY_TOPUP_LIMIT
+    min_source_diversity: int = SHADOW_MIN_SOURCE_DIVERSITY
 
 
 def resolve_primary_source_type(
@@ -360,6 +367,55 @@ def _extra_source_types_excluding_primary(
     return ordered
 
 
+def diversity_topup_source_types(
+    profile: str | None,
+    custom_hints: Optional[Sequence[str]] = None,
+    *,
+    query: str = "",
+    primary_source_type: Optional[str] = None,
+    scope_by_type: Mapping[str, int],
+) -> List[str]:
+    """Shadow-only: small typed fetches to restore rollout source-diversity gate."""
+    resolved = resolve_shadow_profile(profile)
+    candidates: List[str]
+
+    if is_obo_focused(resolved, custom_hints) or resolved == "obo_helper":
+        candidates = ["listing", "listing_revision", "notification"]
+    elif resolved == "record_valuation":
+        candidates = ["listing", "listing_revision", "notification", "obo_offer_summary"]
+    elif resolved == "seller_sales_summary":
+        candidates = ["listing_revision", "notification", "obo_offer_summary", "listing"]
+    elif resolved == "auction_risk":
+        candidates = ["listing", "listing_revision"]
+    elif resolved == "generic_rag":
+        if _query_has_terms(query, _NOTIFICATION_TERMS):
+            candidates = ["notification", "listing", "listing_revision", "obo_offer_summary"]
+        else:
+            candidates = ["listing_revision", "notification", "listing"]
+    else:
+        candidates = ["listing_revision", "notification"]
+
+    seen: set[str] = set()
+    ordered: List[str] = []
+    for st in candidates:
+        if st == primary_source_type or st in seen:
+            continue
+        if int(scope_by_type.get(st, 0)) <= 0:
+            continue
+        seen.add(st)
+        ordered.append(st)
+    return ordered
+
+
+def pool_diversity_satisfied(
+    pool_by_type: Mapping[str, int],
+    min_distinct: int = SHADOW_MIN_SOURCE_DIVERSITY,
+) -> bool:
+    """Shadow-only: distinct source types present in candidate pool."""
+    distinct = sum(1 for count in pool_by_type.values() if int(count) > 0)
+    return distinct >= min_distinct
+
+
 def resolve_shadow_fetch_strategy(
     profile: str | None,
     custom_hints: Optional[Sequence[str]] = None,
@@ -380,11 +436,21 @@ def resolve_shadow_fetch_strategy(
         query=query,
         primary_source_type=primary,
     )
+    topups = diversity_topup_source_types(
+        profile,
+        custom_hints,
+        query=query,
+        primary_source_type=primary,
+        scope_by_type=scope_by_type,
+    )
     fetch_strategy = "scoped_first" if primary else "global_first"
     return ShadowFetchStrategy(
         fetch_strategy=fetch_strategy,
         primary_source_type=primary,
         extra_source_types=extras,
+        diversity_topup_source_types=topups,
+        diversity_topup_limit=SHADOW_DIVERSITY_TOPUP_LIMIT,
+        min_source_diversity=SHADOW_MIN_SOURCE_DIVERSITY,
     )
 
 
@@ -453,9 +519,7 @@ def needs_global_fallback(
     query: str = "",
     primary_source_type: Optional[str] = None,
 ) -> bool:
-    """Shadow-only: global fetch required after a primary typed fetch underfills."""
-    if primary_source_type is None:
-        return True
+    """Shadow-only: global fetch required after primary typed fetch underfills."""
     return not candidate_pool_is_sufficient(
         pool_size,
         max_chunks,

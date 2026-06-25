@@ -247,7 +247,9 @@ Approved: start T20.12S actual t20-tranche-8 write
 | Tranche 9 (U) | 8,565 | ~11.7% | +1,435 |
 | Tranche 10 (X) | 9,065 | ~12.4% | +935 |
 | Tranche 11 | 9,565 | ~13.1% | +435 |
-| Tranche 12 | 10,065 | ~13.8% | coverage gate may still FAIL (need ≥15% or ≥10k — 10k passes at ~10,065) |
+| Tranche 12 | 10,065 | ~13.8% | **≥10k embedded gate clears** (see note below) |
+
+Tranche 12 projected: **10,065 embedded**. This clears the **≥10k embedded** gate, even though percentage coverage is only **~13.8%** and still below **15%**. Vector rollout remains NOT APPROVED until all gates pass (overlap, latency, etc.) — not coverage count alone.
 
 Rollout remains NOT APPROVED until **all** gates pass (overlap, latency, etc.) — not coverage alone.
 

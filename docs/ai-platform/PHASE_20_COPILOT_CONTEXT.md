@@ -1,7 +1,8 @@
 # Phase 20 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-25  
-**Current main SHA:** `40fabfc`  
+**Last updated:** 2026-06-25 (T20.16B final reconciliation)  
+**Current main SHA:** `38f9030`  
+**Phase 20 status:** **HARDENING CLOSED** — no further work unless T20.12 dry-run explicitly approved  
 **Audience:** GitHub Copilot, Cursor, and other coding agents working on `record-platform`
 
 Use this document when continuing Phase 20 work. It replaces any deleted handoff notes.
@@ -50,12 +51,25 @@ T20.10AC–AG flagged overlap improvements are diagnostic-only. They improve ove
 from 11/16 zero-overlap to 8/16 under default-off flags, but they are not production
 rollout approval and must not be enabled by default.
 
+Phase 20 hardening branches are closed (T20.10AG, T20.11C, T20.17). Do not reopen
+overlap or coverage work without explicit approval.
+
 Allowed work only with explicit approval:
-- bounded new embedding tranche with fresh backup and dry-run (T20.12+)
-- shadow-only diagnostics/refinement (overlap branch closed — see T20.10AG)
-- coverage hardening without product behavior changes (T20.11 — **closed**)
-- docs-only release notes (T20.17 — done)
+- T20.12 embedding tranche dry-run only (no actual write without separate approval)
+- T20.14/T20.15 rollout only after all gates pass
 ```
+
+---
+
+## Phase 20 closeout (T20.16B)
+
+| Branch | Closed at | Doc |
+|--------|-----------|-----|
+| T20.10 shadow overlap / latency | **T20.10AG** (`40fabfc`) | `docs/ai-platform/T20-10AG-flagged-overlap-stability-eval.md` |
+| T20.11 coverage hardening | **T20.11C** (`38f9030`) | `docs/ai-platform/T20-11C-service-coverage-hardening.md` |
+| T20.17 release note | **T20.17** (`f3bc531`) | `docs/release/rp-ai-phase-20-hardening-20260625.md` |
+
+**Active verdict unchanged:** Vector rollout **NOT APPROVED / NOT READY**. Production keyword retrieval. Phase 21 not started.
 
 ---
 
@@ -72,7 +86,7 @@ Allowed work only with explicit approval:
 | Phase | Status | Summary |
 |-------|--------|---------|
 | **Phase 19** | **LOCKED** | Vector shadow routing: route profiles, weights, query hints, OBO corpus repair. Keyword default unchanged. Release: `docs/release/rp-ai-vector-shadow-routing-readiness-20260616.md` |
-| **Phase 20** | **IN PROGRESS** | Hardening + bounded embedding growth + shadow diagnostics + rollout readiness — **not** production vector flip |
+| **Phase 20** | **CLOSED (hardening)** | Coverage, shadow diagnostics, rollout evals, release note — **not** production vector flip |
 
 ### Phase 20 tickets completed (core)
 
@@ -112,9 +126,17 @@ Allowed work only with explicit approval:
 |--------|-----|---------|
 | **T20.11A** | `4f52a46` | Manifest v1.1 — enumerate 18 services; 5 new Node entries; all Node non-strict |
 | **T20.11B** | `b39a5d3` | Manifest v1.2 — dry-wire runners for messaging/notification/trust/media |
-| **T20.11C** | _(closeout doc)_ | Audit — python-ai only strict gate; 4 dry-wired Node, 13 skipped |
+| **T20.11C** | `38f9030` | Audit — python-ai only strict gate; 4 dry-wired Node, 13 skipped — **branch closed** |
 
 **T20.11 outcome:** `python-ai-service` remains the **only strict** coverage gate (≥90% `app/ai/*`). Node dry-wire runs are **non-blocking**. See `docs/ai-platform/T20-11C-service-coverage-hardening.md`.
+
+### Phase 20 docs and release (closed)
+
+| Ticket | SHA | Summary |
+|--------|-----|---------|
+| **T20.16** | `967d877` | Phase 20 copilot context refresh (post T20.10AG) |
+| **T20.17** | `f3bc531` | Phase 20 release note draft — `docs/release/rp-ai-phase-20-hardening-20260625.md` |
+| **T20.16B** | _(this reconciliation)_ | Final context reconciliation after T20.11C + T20.17 |
 
 ### Phase 20 tickets NOT started (require explicit approval)
 
@@ -129,7 +151,7 @@ Allowed work only with explicit approval:
 ## Current system snapshot (2026-06-25)
 
 ```text
-Current main SHA: 40fabfc
+Current main SHA: 38f9030
 Embedded chunks: 5,565
 Non-message chunks: 73,043
 Embedded coverage: 7.62%
@@ -145,8 +167,10 @@ Keyword stability: PASS
 Default/off zero chunk-overlap: 11/16 FAIL
 Flagged/on zero chunk-overlap: 8/16 diagnostic-only, still not rollout approval
 Coverage (app/ai strict): PASS (~90%+)
+Service coverage manifest: v1.2, 18 services, 1 strict (python-ai)
 Vector rollout: NOT APPROVED
 Phase 21: not started
+Phase 20 hardening: CLOSED
 ```
 
 ### Embedded by source_type (approximate; verify before tranche work)
@@ -316,11 +340,14 @@ Edge: `https://record-platform.test` with strict TLS (`certs/dev-chain.pem`).
 ## Recommended next work
 
 ```text
-Recommended next:
-1. T20.12 embedding tranche dry-run only with explicit approval.
-2. More readiness evaluation only after coverage/overlap/latency gates improve.
-3. No T20.14/T20.15 rollout work until all gates pass.
+Phase 20 hardening is closed. Default: stop Phase 20 work here.
+
+Only with explicit approval:
+1. T20.12 embedding tranche dry-run only (see docs/ai-platform/T20-9-tranche3-dry-run-plan.md)
+2. No T20.14/T20.15 rollout work until all gates pass
 ```
+
+Do **not** start T20.12 actual write, overlap tuning, or Node strict coverage promotion without explicit approval.
 
 Refusal rules:
 
@@ -342,6 +369,8 @@ Refusal rules:
 | T20.10AD flagged overlap eval | `docs/ai-platform/T20-10AD-flagged-overlap-refinement-eval.md` |
 | T20.10AF latency trims | `docs/ai-platform/T20-10AF-flagged-overlap-latency-trim.md` |
 | T20.10AG stability eval | `docs/ai-platform/T20-10AG-flagged-overlap-stability-eval.md` |
+| T20.11C coverage closeout | `docs/ai-platform/T20-11C-service-coverage-hardening.md` |
+| T20.17 Phase 20 release note | `docs/release/rp-ai-phase-20-hardening-20260625.md` |
 | T20.9 Tranche 3 dry-run plan | `docs/ai-platform/T20-9-tranche3-dry-run-plan.md` |
 | Phase 19 release | `docs/release/rp-ai-vector-shadow-routing-readiness-20260616.md` |
 | AI contracts | `docs/ai-platform/rp-ai-contracts.md` |
@@ -353,8 +382,8 @@ Refusal rules:
 
 Recent Phase 20 commits:
 
-- `chore(ai): trim flagged shadow overlap latency` (T20.10AF)
-- `docs(ai): evaluate T20.10AG flagged overlap stability` (T20.10AG)
-- `docs(ai): refresh Phase 20 copilot context` (T20.16)
+- `docs(ci): document Phase 20 service coverage hardening` (T20.11C)
+- `docs(release): draft Phase 20 AI hardening notes` (T20.17)
+- `docs(ai): reconcile final Phase 20 context` (T20.16B)
 
 Do not commit DB-only embedding changes. Docs like this file **should** be committed when updated.

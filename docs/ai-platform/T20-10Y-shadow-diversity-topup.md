@@ -2,7 +2,7 @@
 
 **Generated:** 2026-06-25  
 **Baseline SHA:** `8e5513d` (T20.10X shadow source diversity diagnostics)  
-**Implementation SHA:** _(filled at commit)_  
+**Implementation SHA:** `3e2a80f`  
 **Mode:** shadow-only — keyword retrieval unchanged  
 **Vector rollout:** NOT APPROVED
 

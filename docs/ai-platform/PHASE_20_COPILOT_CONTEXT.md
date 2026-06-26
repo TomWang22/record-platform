@@ -367,7 +367,7 @@ Phase 20 hardening is closed. Default: stop rollout work.
 
 Embedding tranche loop (with explicit approval per tranche):
 1. dry-run → 2. warmup pre-write gate → 3. backup → 4. actual write → 5. readiness eval + live inference → 6. docs push → 7. next dry-run
-8. Full bundle spec: `docs/ai-platform/T20-12O-tranche7-bundle-flight-plan.md` (O→P→Q→R pattern)
+8. Full bundle specs: `docs/ai-platform/T20-12S-tranche8-bundle-flight-plan.md` (S→T→U→V); completed O→R: `docs/ai-platform/T20-12O-tranche7-bundle-flight-plan.md`
 
 Only with explicit approval:
 1. T20.12S next tranche actual write (`t20-tranche-8` dry-run planned — see T20-12R)
@@ -403,7 +403,8 @@ Refusal rules:
 | T20.12M post–Tranche 6 eval | `docs/ai-platform/T20-12M-post-tranche6-readiness-eval.md` |
 | T20.12Q post–Tranche 7 eval | `docs/ai-platform/T20-12Q-post-tranche7-readiness-eval.md` |
 | T20.12R Tranche 8 dry-run plan | `docs/ai-platform/T20-12R-tranche8-dry-run-plan.md` |
-| T20.12O→R bundle flight plan | `docs/ai-platform/T20-12O-tranche7-bundle-flight-plan.md` |
+| T20.12S→V Tranche 8 bundle flight plan | `docs/ai-platform/T20-12S-tranche8-bundle-flight-plan.md` |
+| T20.12O→R bundle flight plan (completed) | `docs/ai-platform/T20-12O-tranche7-bundle-flight-plan.md` |
 | T20.12J-S adjusted Tranche 6 dry-run | `docs/ai-platform/T20-12J-S-tranche6-adjusted-dry-run.md` |
 | T20.12H live inference harness | `scripts/rp-ai-live-inference-transcript.sh` |
 | Phase 19 release | `docs/release/rp-ai-vector-shadow-routing-readiness-20260616.md` |

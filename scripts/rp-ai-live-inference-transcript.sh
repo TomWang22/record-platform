@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T20.12H — Live inference transcript harness (read-only; local bench_logs output).
+# T20.13C — Live inference telemetry harness (read-only; local bench_logs output).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,8 +15,13 @@ usage() {
   cat <<'EOF'
 Usage: rp-ai-live-inference-transcript.sh [options]
 
-Read-only live inference transcript harness. Writes local output under
+Read-only live inference telemetry harness. Writes local output under
 bench_logs/ai-platform/live-inference/ (not committed).
+
+Produces:
+  <timestamp>.md
+  <timestamp>.summary.json
+  raw-<timestamp>/*.json
 
 Options:
   --help              Show this help
@@ -40,5 +45,5 @@ fi
 export TARGET_IP="${TARGET_IP:-$(rp_discover_metallb_ip || true)}"
 export K8S_NS="${K8S_NS:-record-platform}"
 
-echo "=== T20.12H live inference transcript harness ==="
+echo "=== T20.13C live inference telemetry harness ==="
 exec python3 "$SCRIPT_DIR/rp-ai-live-inference-transcript.py" "$@"

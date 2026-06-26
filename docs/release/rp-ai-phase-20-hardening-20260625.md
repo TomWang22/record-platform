@@ -163,12 +163,12 @@ Phase 20 improved shadow observability, fetch strategy, diversity, and diagnosti
 
 ## Next possible work (guarded)
 
-1. **T20.12** — Tranche 7 actual completed (`t20-tranche-7`, +500 → 7,565 embedded). Tranche 8 dry-run planned — see `docs/ai-platform/T20-12R-tranche8-dry-run-plan.md`.
-2. **T20.12S** — next tranche actual write only with explicit approval (fresh backup, new tranche id, no FORCE).
-3. Post-tranche evidence: `scripts/rp-ai-live-inference-transcript.sh` + T20.12Q eval doc.
+1. **T20.12** — Tranche 8 actual completed (`t20-tranche-8`, +500 → 8,065 embedded). Tranche 9 dry-run planned — see `docs/ai-platform/T20-12V-tranche9-dry-run-plan.md`.
+2. **T20.12W** — next tranche actual write only with explicit approval (fresh backup, new tranche id, no FORCE).
+3. Post-tranche evidence: `scripts/rp-ai-live-inference-transcript.sh` + T20.12U eval doc.
 4. **No T20.14/T20.15** rollout work until **all** gates pass and explicit approval is granted.
 
-Do not start T20.12S actual write or T20.14/T20.15 rollout without explicit approval.
+Do not start T20.12W actual write or T20.14/T20.15 rollout without explicit approval.
 
 ---
 

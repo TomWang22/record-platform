@@ -163,12 +163,12 @@ Phase 20 improved shadow observability, fetch strategy, diversity, and diagnosti
 
 ## Next possible work (guarded)
 
-1. **T20.12** — Tranche 11 actual completed (`t20-tranche-11`, +500 → 9,565 embedded). Tranche 12 dry-run planned — see `docs/ai-platform/T20-12AH-tranche12-dry-run-plan.md`.
-2. **T20.12AI** — next tranche actual write only with explicit approval (projected 10,065).
-3. Finish-to-10k: AI (+500) clears count gate; then **T20.13** before Phase 21 or T20.14/T20.15.
-4. **No T20.14/T20.15** rollout until all gates pass.
+1. **T20.12** — Tranche 12 actual completed (`t20-tranche-12`, +500 → 10,065 embedded). **≥10k count gate clears.**
+2. **T20.13** — comprehensive rollout re-eval complete — rollout **NOT APPROVED**.
+3. **No T20.14/T20.15** rollout until all gates pass.
+4. **Phase 21** — not started.
 
-Do not start T20.12AI actual write, T20.13, or Phase 21 without explicit approval.
+Do not start T20.14/T20.15 rollout or Phase 21 without explicit approval and all gates passing.
 
 ---
 

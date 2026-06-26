@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T20.13C — Live inference telemetry harness (read-only; local bench_logs output).
+# T20.13E — Live inference telemetry harness with diagnostic embed warmup/retry.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,6 +27,11 @@ Options:
   --help              Show this help
   --skip-flagged      Skip flagged overlap diagnostic mode
   --skip-endpoints    Skip structured insight endpoints
+  --embed-warmup-runs N          (default 3)
+  --embed-warmup-threshold-ms M  (default 2000)
+  --embed-retry-on-timeout N     (default 1)
+  --embed-timeout-ms M           (default 5000, classification only)
+  --no-embed-warmup              Skip pre-shadow embed warmup gate
 
 Env:
   RP_COMB_EMAIL / RP_COMB_PASSWORD — contract auth (default e2e-contract)
@@ -45,5 +50,5 @@ fi
 export TARGET_IP="${TARGET_IP:-$(rp_discover_metallb_ip || true)}"
 export K8S_NS="${K8S_NS:-record-platform}"
 
-echo "=== T20.13C live inference telemetry harness ==="
+echo "=== T20.13E live inference telemetry harness ==="
 exec python3 "$SCRIPT_DIR/rp-ai-live-inference-transcript.py" "$@"

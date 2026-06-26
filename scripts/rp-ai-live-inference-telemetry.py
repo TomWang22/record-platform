@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""T20.13C — Live inference telemetry parser and aggregator (read-only)."""
+"""T20.13E — Live inference telemetry parser and aggregator (read-only)."""
 from __future__ import annotations
 
 import json
@@ -66,10 +66,13 @@ def leakage_check(text: str, source_types: list[str]) -> str:
 
 
 def classify_failure(row: dict[str, Any]) -> str:
+    if row.get("failure_class") == "embed_warmup_failed":
+        return "embed_warmup_failed"
     if row.get("request_error"):
         return "request_error"
     if row.get("malformed_response"):
         return "malformed_response"
+    embed_limit = _as_int(row.get("embed_timeout_ms")) or 5000
     if row.get("timed_out") or row.get("timeout_status") == "embed_timeout":
         sel = _as_int(row.get("shadow_selected_count"))
         if sel == 0:
@@ -78,7 +81,7 @@ def classify_failure(row: dict[str, Any]) -> str:
     if sel == 0 and row.get("mode", "").startswith("shadow"):
         cf = _as_int(row.get("candidate_fetch_ms"))
         embed = _as_int(row.get("embed_ms"))
-        if embed is not None and embed >= 5000:
+        if embed is not None and embed >= embed_limit:
             return "embed_timeout_before_fetch"
         if cf == 0 and (embed is None or embed > 0):
             return "embed_timeout_before_fetch"
@@ -173,6 +176,10 @@ def parse_case(raw_json_path: str | Path) -> dict[str, Any]:
         return row
 
     if resp.get("error") or resp.get("parse_error"):
+        if resp.get("error") == "embed_warmup_failed" or req.get("embed_warmup_failed"):
+            row["failure_class"] = "embed_warmup_failed"
+            row["mode"] = row["mode"] if row["mode"] != "unknown" else "shadow_off"
+            return row
         row["request_error"] = True
 
     details = resp.get("details") if isinstance(resp.get("details"), dict) else {}
@@ -241,6 +248,18 @@ def parse_case(raw_json_path: str | Path) -> dict[str, Any]:
         row["request_error"] = True
 
     row["failure_class"] = classify_failure(row)
+
+    cf = _as_int(row.get("candidate_fetch_ms"))
+    sel = _as_int(row.get("shadow_selected_count"))
+    row["shadow_fetch_attempted"] = bool(
+        (cf is not None and cf > 0) or (sel is not None and sel > 0)
+    )
+    row["embed_retry_attempted"] = bool(req.get("embed_retry_attempted"))
+    row["embed_retry_succeeded"] = bool(req.get("embed_retry_succeeded"))
+    harness_timeout = _as_int(req.get("embed_timeout_ms"))
+    row["embed_timeout_ms"] = harness_timeout if harness_timeout is not None else safe_get(
+        embed_diag, "timeout_ms", default="not_exposed",
+    )
     return row
 
 
@@ -294,8 +313,9 @@ def overlap_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
 def mode_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
     request_errors = sum(1 for r in rows if r.get("failure_class") == "request_error")
     embed_timeouts = sum(
-        1 for r in rows if r.get("failure_class") == "embed_timeout_before_fetch" or r.get("timed_out")
+        1 for r in rows if r.get("failure_class") == "embed_timeout_before_fetch"
     )
+    warmup_failed = sum(1 for r in rows if r.get("failure_class") == "embed_warmup_failed")
     true_zero = sum(
         1 for r in rows
         if r.get("failure_class") in ("candidate_fetch_returned_zero", "privacy_filter_removed_all", "rerank_filtered_all")
@@ -311,11 +331,15 @@ def mode_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
     neighbor_added = sum(
         1 for r in rows if isinstance(r.get("neighbor_rows_added"), int) and r["neighbor_rows_added"] > 0
     )
+    fetch_attempted = sum(1 for r in rows if r.get("shadow_fetch_attempted"))
     return {
         **ov,
         "request_errors": request_errors,
         "embed_timeouts": embed_timeouts,
+        "embed_timeout_before_fetch": embed_timeouts,
+        "embed_warmup_failed": warmup_failed,
         "true_zero_results": true_zero,
+        "shadow_fetch_attempted": fetch_attempted,
         "shadow_p50_ms": percentile(shadow_ms, 50),
         "shadow_p95_ms": percentile(shadow_ms, 95),
         "candidate_fetch_p50_ms": percentile(cf_ms, 50),
@@ -337,6 +361,7 @@ def build_summary(
     endpoint_rows: list[dict[str, Any]],
     flags_after: dict[str, str],
     leakage_fail: bool,
+    warmup_stats: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     kw_lat = [float(r["latency_ms"]) for r in keyword_rows if isinstance(r.get("latency_ms"), (int, float))]
     all_types: set[str] = set()
@@ -351,11 +376,12 @@ def build_summary(
     )
 
     summary = {
-        "ticket": "T20.13C",
+        "ticket": "T20.13E",
         "baseline_sha": sha,
         "report_md": str(report_md),
         "summary_json": str(summary_json),
         "raw_dir": str(raw_dir),
+        "embed_warmup": warmup_stats or {},
         "production_keyword": {
             "cases": len(keyword_rows),
             "non_empty": sum(1 for r in keyword_rows if r.get("summary")),
@@ -390,6 +416,17 @@ def print_console_summary(summary: dict[str, Any], excerpts: list[tuple[str, str
     print(f"Summary JSON:\n  {summary['summary_json']}")
     print(f"Raw JSON dir:\n  {summary['raw_dir']}")
     print()
+    wu = summary.get("embed_warmup") or {}
+    if wu:
+        print("Embed warmup:")
+        print(f"- enabled: {wu.get('embed_warmup_enabled')}")
+        print(f"- passed: {wu.get('embed_warmup_passed')}")
+        print(f"- runs requested/passed: {wu.get('embed_warmup_runs_requested')} / {wu.get('embed_warmup_runs_passed')}")
+        print(f"- threshold_ms: {wu.get('embed_warmup_threshold_ms')}")
+        print(f"- p50/p95 ms: {wu.get('embed_warmup_p50_ms')} / {wu.get('embed_warmup_p95_ms')}")
+        print(f"- retry on timeout: {wu.get('embed_retry_on_timeout')}")
+        print(f"- retry attempted/succeeded: {wu.get('embed_retry_attempted')} / {wu.get('embed_retry_succeeded')}")
+        print()
     pk = summary["production_keyword"]
     print("Production keyword:")
     print(f"- cases: {pk['cases']}")
@@ -404,7 +441,9 @@ def print_console_summary(summary: dict[str, Any], excerpts: list[tuple[str, str
     print(f"- cases: {so['cases']}")
     print(f"- request_errors: {so['request_errors']}")
     print(f"- embed_timeouts: {so['embed_timeouts']}")
+    print(f"- embed_timeout_before_fetch: {so.get('embed_timeout_before_fetch', so['embed_timeouts'])}")
     print(f"- true zero-results: {so['true_zero_results']}")
+    print(f"- shadow_fetch_attempted: {so.get('shadow_fetch_attempted', 0)}")
     print(f"- chunk/doc/entity overlap: {so['chunk_overlap_gt0']}/{so['document_overlap_gt0']}/{so['entity_overlap_gt0']}")
     print(f"- shadow p50/p95: {so['shadow_p50_ms']} / {so['shadow_p95_ms']} ms")
     print(f"- candidate_fetch p50/p95: {so['candidate_fetch_p50_ms']} / {so['candidate_fetch_p95_ms']} ms")
@@ -414,7 +453,9 @@ def print_console_summary(summary: dict[str, Any], excerpts: list[tuple[str, str
     print(f"- cases: {sn['cases']}")
     print(f"- request_errors: {sn['request_errors']}")
     print(f"- embed_timeouts: {sn['embed_timeouts']}")
+    print(f"- embed_timeout_before_fetch: {sn.get('embed_timeout_before_fetch', sn['embed_timeouts'])}")
     print(f"- true zero-results: {sn['true_zero_results']}")
+    print(f"- shadow_fetch_attempted: {sn.get('shadow_fetch_attempted', 0)}")
     print(f"- chunk/doc/entity overlap: {sn['chunk_overlap_gt0']}/{sn['document_overlap_gt0']}/{sn['entity_overlap_gt0']}")
     print(f"- shadow p50/p95: {sn['shadow_p50_ms']} / {sn['shadow_p95_ms']} ms")
     print(f"- candidate_fetch p50/p95: {sn['candidate_fetch_p50_ms']} / {sn['candidate_fetch_p95_ms']} ms")
@@ -531,11 +572,21 @@ def _self_test() -> int:
         row7 = analyze(flagged)
         check("flagged overlap extract", _as_int(row7["chunk_overlap"]) == 2)
         check("leakage pass", row7["leakage"] == "PASS")
+        check("shadow_fetch_attempted", row7.get("shadow_fetch_attempted") is True)
+
+        warmup_fail = tmp_path / "shadow-off-warmup-fail.json"
+        warmup_fail.write_text(json.dumps({
+            "request": {"label": "warmup_fail", "embed_warmup_failed": True},
+            "http_status": 0,
+            "response": {"error": "embed_warmup_failed"},
+        }))
+        row8 = analyze(warmup_fail)
+        check("embed warmup failed class", row8["failure_class"] == "embed_warmup_failed")
 
     if failures:
         print("SELF-TEST FAIL:", ", ".join(failures), file=sys.stderr)
         return 1
-    print("SELF-TEST PASS (8 checks)")
+    print("SELF-TEST PASS (10 checks)")
     return 0
 
 

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""T20.13C — Live inference transcript harness with telemetry (read-only, local bench_logs)."""
+"""T20.13E — Live inference transcript harness with embed warmup/retry telemetry."""
 from __future__ import annotations
 
 import argparse
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import time
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,7 @@ _spec.loader.exec_module(_telemetry)
 build_summary = _telemetry.build_summary
 parse_case = _telemetry.parse_case
 print_console_summary = _telemetry.print_console_summary
+percentile = _telemetry.percentile
 
 RAG_PROMPTS = [
     ("01", "catalog_activity", "Summarize listing activity and buyer interest for my catalog."),
@@ -36,6 +39,75 @@ RAG_PROMPTS = [
     ("06", "seller_attention_today", "What should I pay attention to as a seller today?"),
     ("07", "marketplace_activity_summary", "Give me a grounded summary of recent marketplace activity relevant to me."),
 ]
+
+
+@dataclass
+class EmbedHarnessConfig:
+    warmup_enabled: bool = True
+    warmup_runs: int = 3
+    warmup_threshold_ms: int = 2000
+    retry_on_timeout: int = 1
+    embed_timeout_ms: int = 5000
+    warmup_passed: bool = False
+    warmup_latencies_ms: list[int] = field(default_factory=list)
+    retry_attempted: int = 0
+    retry_succeeded: int = 0
+
+
+def response_embed_timed_out(resp: dict) -> bool:
+    if not isinstance(resp, dict):
+        return False
+    details = resp.get("details") if isinstance(resp.get("details"), dict) else {}
+    sd = details.get("shadow_diagnostics") if isinstance(details.get("shadow_diagnostics"), dict) else {}
+    sv = details.get("shadow_vector") if isinstance(details.get("shadow_vector"), dict) else {}
+    embed = sd.get("embed") if isinstance(sd.get("embed"), dict) else {}
+    return bool(sv.get("status") == "embed_timed_out" or embed.get("timed_out"))
+
+
+def run_embed_warmup_gate(cfg: EmbedHarnessConfig, *, consecutive: int | None = None) -> bool:
+    if not cfg.warmup_enabled:
+        cfg.warmup_passed = True
+        return True
+    need = consecutive if consecutive is not None else cfg.warmup_runs
+    env = os.environ.copy()
+    env["OLLAMA_WARMUP_CONSECUTIVE"] = str(need)
+    env["OLLAMA_WARMUP_TARGET_MS"] = str(cfg.warmup_threshold_ms)
+    env["OLLAMA_WARMUP_MAX_ATTEMPTS"] = str(max(12, need * 4))
+    proc = subprocess.run(
+        ["bash", str(SCRIPT_DIR / "rp-ai-ollama-embed-warmup.sh")],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+        env=env,
+    )
+    latencies: list[int] = []
+    for line in (proc.stdout or "").splitlines():
+        m = re.search(r"elapsed_ms=(\d+)", line)
+        if m:
+            latencies.append(int(m.group(1)))
+    cfg.warmup_latencies_ms.extend(latencies)
+    passed = proc.returncode == 0 and "WARMUP_PASS" in (proc.stdout or "")
+    if consecutive is None:
+        cfg.warmup_passed = passed
+    return passed
+
+
+def warmup_stats_dict(cfg: EmbedHarnessConfig) -> dict[str, Any]:
+    lats = cfg.warmup_latencies_ms
+    return {
+        "embed_warmup_enabled": cfg.warmup_enabled,
+        "embed_warmup_passed": cfg.warmup_passed,
+        "embed_warmup_runs_requested": cfg.warmup_runs,
+        "embed_warmup_runs_passed": cfg.warmup_runs if cfg.warmup_passed else 0,
+        "embed_warmup_threshold_ms": cfg.warmup_threshold_ms,
+        "embed_warmup_p50_ms": percentile([float(x) for x in lats], 50) if lats else None,
+        "embed_warmup_p95_ms": percentile([float(x) for x in lats], 95) if lats else None,
+        "embed_retry_on_timeout": cfg.retry_on_timeout,
+        "embed_retry_attempted": cfg.retry_attempted,
+        "embed_retry_succeeded": cfg.retry_succeeded,
+        "embed_timeout_ms": cfg.embed_timeout_ms,
+    }
 
 
 def sh(cmd: list[str], *, timeout: int = 300) -> subprocess.CompletedProcess[str]:
@@ -179,20 +251,65 @@ def run_rag_cases(
     prefix: str,
     shadow: bool,
     flags_label: str | None = None,
+    embed_cfg: EmbedHarnessConfig | None = None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    cfg = embed_cfg or EmbedHarnessConfig(warmup_enabled=False, warmup_passed=True)
+
+    if shadow and cfg.warmup_enabled and not cfg.warmup_passed:
+        for cid, label, _question in RAG_PROMPTS:
+            path = write_raw(raw_dir, f"{prefix}-{cid}.json", {
+                "request": {"label": label, "shadow": True, "embed_warmup_failed": True},
+                "http_status": 0,
+                "latency_ms": 0,
+                "response": {"error": "embed_warmup_failed"},
+            })
+            row = parse_case(path)
+            row["case_id"] = f"{prefix}-{label}"
+            row["failure_class"] = "embed_warmup_failed"
+            rows.append(row)
+        return rows
+
     for cid, label, question in RAG_PROMPTS:
-        resp, http_status, lat = api_call(
-            token, lb_ip, "POST", "/api/ai/rag/query", {"question": question}, shadow=shadow,
-        )
+        embed_retry_attempted = False
+        embed_retry_succeeded = False
+        resp: dict = {}
+        http_status = 0
+        lat = 0.0
+        attempts = 0
+        max_attempts = 1 + (cfg.retry_on_timeout if shadow else 0)
+
+        while attempts < max_attempts:
+            attempts += 1
+            if shadow and attempts > 1:
+                embed_retry_attempted = True
+                cfg.retry_attempted += 1
+                run_embed_warmup_gate(cfg, consecutive=1)
+                time.sleep(0.5)
+            resp, http_status, lat = api_call(
+                token, lb_ip, "POST", "/api/ai/rag/query", {"question": question}, shadow=shadow,
+            )
+            if not shadow or not response_embed_timed_out(resp):
+                if shadow and embed_retry_attempted:
+                    embed_retry_succeeded = True
+                    cfg.retry_succeeded += 1
+                break
+
         req: dict[str, Any] = {"question": question, "label": label, "shadow": shadow}
         if flags_label:
             req["flags"] = flags_label
+        if shadow:
+            req["embed_timeout_ms"] = cfg.embed_timeout_ms
+        if embed_retry_attempted:
+            req["embed_retry_attempted"] = True
+        if embed_retry_succeeded:
+            req["embed_retry_succeeded"] = True
         path = write_raw(raw_dir, f"{prefix}-{cid}.json", {
             "request": req,
             "http_status": http_status,
             "latency_ms": round(lat, 1),
             "response": resp,
+            "attempts": attempts,
         })
         row = parse_case(path)
         row["case_id"] = f"{prefix}-{label}" if prefix != "keyword" else label
@@ -344,7 +461,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Live AI inference telemetry harness (read-only)")
     parser.add_argument("--skip-flagged", action="store_true", help="Skip flagged diagnostic mode")
     parser.add_argument("--skip-endpoints", action="store_true", help="Skip structured insight endpoints")
+    parser.add_argument("--embed-warmup-runs", type=int, default=3, help="Consecutive embed probes under threshold")
+    parser.add_argument("--embed-warmup-threshold-ms", type=int, default=2000, help="Warmup latency target ms")
+    parser.add_argument("--embed-retry-on-timeout", type=int, default=1, help="Shadow embed retries after warmup probe")
+    parser.add_argument("--embed-timeout-ms", type=int, default=5000, help="Observed app embed timeout for classification")
+    parser.add_argument("--no-embed-warmup", action="store_true", help="Skip pre-shadow embed warmup gate")
     args = parser.parse_args()
+
+    embed_cfg = EmbedHarnessConfig(
+        warmup_enabled=not args.no_embed_warmup,
+        warmup_runs=args.embed_warmup_runs,
+        warmup_threshold_ms=args.embed_warmup_threshold_ms,
+        retry_on_timeout=max(0, args.embed_retry_on_timeout),
+        embed_timeout_ms=args.embed_timeout_ms,
+    )
 
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     raw_dir = OUT_DIR / f"raw-{ts}"
@@ -361,15 +491,27 @@ def main() -> int:
     ctx = discover_context_ids(token, lb_ip)
 
     keyword_rows = run_rag_cases(token, lb_ip, raw_dir, prefix="keyword", shadow=False)
-    shadow_off_rows = run_rag_cases(token, lb_ip, raw_dir, prefix="shadow-off", shadow=True)
+
+    if embed_cfg.warmup_enabled:
+        print("Running embed warmup gate before shadow diagnostics...", file=sys.stderr)
+        run_embed_warmup_gate(embed_cfg)
+        if not embed_cfg.warmup_passed:
+            print("Embed warmup gate failed — shadow cases will be marked embed_warmup_failed", file=sys.stderr)
+
+    shadow_off_rows = run_rag_cases(
+        token, lb_ip, raw_dir, prefix="shadow-off", shadow=True, embed_cfg=embed_cfg,
+    )
 
     flagged_rows: list[dict[str, Any]] = []
     if not args.skip_flagged:
+        if embed_cfg.warmup_enabled and embed_cfg.warmup_passed:
+            run_embed_warmup_gate(embed_cfg, consecutive=1)
         print("Enabling flagged deployment env...", file=sys.stderr)
         kubectl_set_flags("1", "1")
         time.sleep(3)
         flagged_rows = run_rag_cases(
-            token, lb_ip, raw_dir, prefix="flagged", shadow=True, flags_label="1/1",
+            token, lb_ip, raw_dir, prefix="flagged", shadow=True,
+            flags_label="1/1", embed_cfg=embed_cfg,
         )
         print("Resetting deployment flags...", file=sys.stderr)
         kubectl_set_flags("0", "0")
@@ -392,6 +534,7 @@ def main() -> int:
         endpoint_rows=endpoint_rows,
         flags_after=flags_after,
         leakage_fail=leakage_fail,
+        warmup_stats=warmup_stats_dict(embed_cfg),
     )
     out_json.write_text(json.dumps(summary, indent=2))
     out_md.write_text(render_markdown(

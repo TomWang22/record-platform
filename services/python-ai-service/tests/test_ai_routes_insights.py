@@ -355,6 +355,21 @@ class TestInsightsWithMockPool(unittest.TestCase):
                         insights.rag_query(user_id="u1", question="listing price", shadow_vector=True)
                     )
         self.assertIn("shadow_vector", env.get("details", {}))
+        self.assertIn("synthesis", env.get("details", {}))
+
+    def test_rag_query_synthesis_not_shallow_boilerplate(self):
+        conn = FakeConn(fetch_rows=[_chunk_row(content="Seller listing: Test Status: active Price: 42.50")])
+        with patch.object(insights, "get_pool", AsyncMock(return_value=self._mock_pool(conn))):
+            with patch.object(insights, "resolve_model_used", AsyncMock(return_value=("rule-engine", None))):
+                env = _run(
+                    insights.rag_query(
+                        user_id="u1",
+                        question="Summarize listing activity and buyer interest for my catalog.",
+                    )
+                )
+        self.assertNotIn("Retrieved 1 grounded excerpts", env.get("summary", ""))
+        self.assertIn("synthesis", env.get("details", {}))
+        self.assertEqual(env["details"]["retrieval_mode"], "keyword")
 
     def test_rag_query_shadow_debug_diagnostics(self):
         conn = FakeConn(fetch_rows=[_chunk_row()])

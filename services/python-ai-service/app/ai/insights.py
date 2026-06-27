@@ -18,6 +18,7 @@ from app.ai.rag_retrieval import (
     retrieve_chunks,
     retrieve_chunks_vector_shadow,
 )
+from app.ai.rag_synthesis import synthesize_rag_summary
 from app.db import get_pool
 
 
@@ -104,13 +105,17 @@ async def rag_query(
     refs = keyword_result["source_refs"]
     citations = [chunk_to_citation(c) for c in chunks[:5]]
     status = "live" if refs else "degraded"
-    summary = f"Retrieved {len(chunks)} grounded excerpts for your question."
-    if not chunks:
-        summary = "No matching corpus excerpts for this question."
+    synthesis = synthesize_rag_summary(question=question, chunks=chunks, refs=refs)
+    summary = synthesis["summary"]
     details = {
         "retrieval_mode": keyword_result["retrieval_mode"],
         "chunk_count": len(chunks),
         "excerpts": [c.get("content", "")[:300] for c in chunks[:3]],
+        "synthesis": {
+            "template": synthesis["template"],
+            "caveats": synthesis["caveats"],
+            "parsed_signals": synthesis["parsed_signals"],
+        },
     }
     if shadow_diag is not None:
         details["shadow_vector"] = shadow_diag

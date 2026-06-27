@@ -580,15 +580,25 @@ def _build_scope_filters(
     return filters, params, idx
 
 
+def _row_get(row: Any, key: str, default: Any = None) -> Any:
+    """Read a SQL row field; missing optional keys return default (no KeyError)."""
+    if isinstance(row, dict):
+        return row.get(key, default)
+    try:
+        return row[key]
+    except (KeyError, TypeError):
+        return default
+
+
 def _chunk_passes_privacy(row: Any, *, words: List[str], pin_source: bool, query: str) -> bool:
-    content = row["content"] or ""
+    content = _row_get(row, "content") or ""
     if FORBIDDEN_CHUNK_RE.search(content):
         return False
-    if row["source_type"] == "message":
-        meta = _coerce_metadata(row["metadata"])
+    if _row_get(row, "source_type") == "message":
+        meta = _coerce_metadata(_row_get(row, "metadata"))
         if meta.get("opt_in") is not True:
             return False
-    if words and row.get("score", 1) <= 0 and query and not pin_source:
+    if words and _row_get(row, "score", 1) <= 0 and query and not pin_source:
         return False
     return True
 
@@ -607,27 +617,28 @@ def _rows_to_chunks(
     for row in rows:
         if not _chunk_passes_privacy(row, words=words, pin_source=pin_source, query=query):
             continue
-        content = row["content"] or ""
+        content = _row_get(row, "content") or ""
         tok = _estimate_tokens(content)
         if selected and token_budget + tok > max_tokens:
             break
         if len(selected) >= max_chunks:
             break
+        source_updated_at = _row_get(row, "source_updated_at")
         selected.append({
-            "id": str(row["id"]),
-            "document_id": str(row["document_id"]),
-            "chunk_index": row["chunk_index"],
+            "id": str(_row_get(row, "id")),
+            "document_id": str(_row_get(row, "document_id")),
+            "chunk_index": _row_get(row, "chunk_index"),
             "content": content,
-            "checksum": row["checksum"],
-            "source_refs": row["source_refs"],
-            "source_type": row["source_type"],
-            "source_id": row["source_id"],
-            "owner_user_id": row["owner_user_id"],
-            "visibility": row["visibility"],
-            "source_updated_at": row["source_updated_at"].isoformat() if row["source_updated_at"] else None,
-            "title": row["title"],
-            "metadata": row["metadata"],
-            "score": row.get("score", 0),
+            "checksum": _row_get(row, "checksum"),
+            "source_refs": _row_get(row, "source_refs") or [],
+            "source_type": _row_get(row, "source_type"),
+            "source_id": _row_get(row, "source_id"),
+            "owner_user_id": _row_get(row, "owner_user_id"),
+            "visibility": _row_get(row, "visibility"),
+            "source_updated_at": source_updated_at.isoformat() if source_updated_at else None,
+            "title": _row_get(row, "title"),
+            "metadata": _row_get(row, "metadata") or {},
+            "score": _row_get(row, "score", 0),
         })
         token_budget += tok
     return selected

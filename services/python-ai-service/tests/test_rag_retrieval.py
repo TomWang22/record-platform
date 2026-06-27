@@ -61,6 +61,45 @@ class TestEnvelope(unittest.TestCase):
             )
 
 
+class TestRowsToChunks(unittest.TestCase):
+    def _minimal_row(self, **overrides: Any) -> Dict[str, Any]:
+        row: Dict[str, Any] = {
+            "id": "c1",
+            "document_id": "d1",
+            "chunk_index": 0,
+            "content": "Seller listing: Jazz LP Status: active Price: 45.00",
+            "source_type": "listing",
+            "source_id": "L1",
+        }
+        row.update(overrides)
+        return row
+
+    def test_row_with_checksum(self):
+        from app.ai.rag_retrieval import _rows_to_chunks
+
+        row = self._minimal_row(checksum="abc123", source_refs=[], title="Jazz LP", metadata={})
+        chunks = _rows_to_chunks([row], words=[], pin_source=False, query="listing", max_chunks=5, max_tokens=8000)
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(chunks[0]["checksum"], "abc123")
+
+    def test_row_without_checksum_does_not_crash(self):
+        from app.ai.rag_retrieval import _rows_to_chunks
+
+        row = self._minimal_row()
+        chunks = _rows_to_chunks([row], words=[], pin_source=False, query="listing", max_chunks=5, max_tokens=8000)
+        self.assertEqual(len(chunks), 1)
+        self.assertIsNone(chunks[0]["checksum"])
+
+    def test_row_without_freshness_metadata_optional(self):
+        from app.ai.rag_retrieval import _rows_to_chunks
+
+        row = self._minimal_row(source_updated_at=None, metadata=None, title=None)
+        chunks = _rows_to_chunks([row], words=[], pin_source=False, query="listing", max_chunks=5, max_tokens=8000)
+        self.assertEqual(len(chunks), 1)
+        self.assertIsNone(chunks[0]["source_updated_at"])
+        self.assertEqual(chunks[0]["metadata"], {})
+
+
 class TestShadowProfiles(unittest.TestCase):
     def test_unknown_profile_falls_back_to_generic(self):
         from app.ai.shadow_profiles import resolve_shadow_profile

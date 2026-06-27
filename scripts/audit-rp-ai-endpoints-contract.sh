@@ -87,6 +87,34 @@ post_ai() {
   curl "${CURL_OPTS[@]}" -X POST "$API_BASE$path" "${AUTH_H[@]}" -d "$body" 2>/dev/null || echo '{}'
 }
 
+get_ai() {
+  local path="$1"
+  curl "${CURL_OPTS[@]}" -X GET "$API_BASE$path" "${AUTH_H[@]}" 2>/dev/null || echo '{}'
+}
+
+assert_session_envelope() {
+  local id="$1" json="$2"
+  printf '%s' "$json" | python3 -c '
+import json,sys
+d = json.loads(sys.stdin.read())
+required = ("insight_id","contract_id","source_status","model_used","summary","source_refs","details")
+for k in required:
+    if k not in d:
+        raise SystemExit(f"missing {k}")
+cid = d.get("contract_id")
+if cid in ("session_start","session_get","session_query"):
+    if "session_memory" not in (d.get("details") or {}):
+        raise SystemExit("missing session_memory in details")
+if cid == "session_reset":
+    if not (d.get("details") or {}).get("reset"):
+        raise SystemExit("missing reset flag")
+blob = json.dumps(d).lower()
+for term in ("message_body","thread_text","demo","mock","sample fallback"):
+    if term in blob:
+        raise SystemExit(f"forbidden term {term}")
+' >/dev/null
+}
+
 ENDPOINTS=(
   "rag_query|/api/ai/rag/query|{\"question\":\"listing price auction\"}"
   "record_valuation|/api/ai/records/valuation|{\"record_id\":\"$RECORD_ID\"}"
@@ -125,6 +153,47 @@ for spec in "${ENDPOINTS[@]}"; do
   fi
 done
 SAMPLES_JSON+="}"
+
+SESSION_ID=""
+if [[ -n "$TOKEN" ]]; then
+  SESSION_START_RESP="$(post_ai "/api/ai/session/start" "{}")"
+  if assert_session_envelope "session_start" "$SESSION_START_RESP" 2>/dev/null; then
+    pass "endpoint_session_start"
+    SESSION_ID="$(echo "$SESSION_START_RESP" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("details",{}).get("session_memory",{}).get("session_id",""))' 2>/dev/null || true)"
+    SAMPLES_JSON="${SAMPLES_JSON%\}}"
+    SAMPLES_JSON+=",\"session_start\":$(echo "$SESSION_START_RESP" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)))' 2>/dev/null || echo '{}')"
+    SAMPLES_JSON+="}"
+  else
+    fail "endpoint_session_start" "$(echo "$SESSION_START_RESP" | head -c 200)"
+  fi
+
+  if [[ -n "$SESSION_ID" ]]; then
+    SESSION_QUERY_RESP="$(post_ai "/api/ai/session/query" "{\"session_id\":\"$SESSION_ID\",\"question\":\"listing activity and offer summaries\"}")"
+    if assert_session_envelope "session_query" "$SESSION_QUERY_RESP" 2>/dev/null; then
+      pass "endpoint_session_query"
+    else
+      fail "endpoint_session_query" "$(echo "$SESSION_QUERY_RESP" | head -c 200)"
+    fi
+
+    SESSION_GET_RESP="$(get_ai "/api/ai/session/$SESSION_ID")"
+    if assert_session_envelope "session_get" "$SESSION_GET_RESP" 2>/dev/null; then
+      pass "endpoint_session_get"
+    else
+      fail "endpoint_session_get" "$(echo "$SESSION_GET_RESP" | head -c 200)"
+    fi
+
+    SESSION_RESET_RESP="$(post_ai "/api/ai/session/reset" "{\"session_id\":\"$SESSION_ID\"}")"
+    if assert_session_envelope "session_reset" "$SESSION_RESET_RESP" 2>/dev/null; then
+      pass "endpoint_session_reset"
+    else
+      fail "endpoint_session_reset" "$(echo "$SESSION_RESET_RESP" | head -c 200)"
+    fi
+  else
+    fail "endpoint_session_query" "no session_id from start"
+    fail "endpoint_session_get" "no session_id from start"
+    fail "endpoint_session_reset" "no session_id from start"
+  fi
+fi
 
 # Retrieval section (T15.3B) — privacy via DB
 PROXY_HITS="$("${PSQL[@]}" -c "SELECT COUNT(*) FROM ai.ai_document_chunks WHERE content ~* 'max_bid_cents|proxy_bids|proxy max'" 2>/dev/null || echo 0)"

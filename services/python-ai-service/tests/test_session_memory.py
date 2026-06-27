@@ -116,8 +116,20 @@ class TestSessionMemoryFourTurn(unittest.TestCase):
         self._orig_store = insights.session_store
         insights.session_store = SessionMemoryStore(ttl_seconds=3600)
         self._store = insights.session_store
+        self._resolve_patcher = patch.object(
+            insights,
+            "resolve_model_used",
+            AsyncMock(return_value=("rule-engine", None)),
+        )
+        self._resolve_patcher.start()
+        provider = MagicMock()
+        provider.name = "rule-engine"
+        self._provider_patcher = patch.object(insights, "get_provider", return_value=provider)
+        self._provider_patcher.start()
 
     def tearDown(self):
+        self._provider_patcher.stop()
+        self._resolve_patcher.stop()
         insights.session_store = self._orig_store
 
     def _mock_pool(self, conn):
@@ -147,25 +159,24 @@ class TestSessionMemoryFourTurn(unittest.TestCase):
         turn_counts = []
 
         with patch.object(insights, "get_pool", AsyncMock(return_value=self._mock_pool(conn))):
-            with patch.object(insights, "resolve_model_used", AsyncMock(return_value=("rule-engine", None))):
-                for prompt in TURN_PROMPTS:
-                    env = _run(
-                        insights.session_query(
-                            user_id="u1",
-                            session_id=session_id,
-                            question=prompt,
-                        )
+            for prompt in TURN_PROMPTS:
+                env = _run(
+                    insights.session_query(
+                        user_id="u1",
+                        session_id=session_id,
+                        question=prompt,
                     )
-                    self.assertEqual(env["contract_id"], "session_query")
-                    self.assertEqual(env["model_used"], "rule-engine")
-                    self.assertEqual(env["details"]["retrieval_mode"], "keyword")
-                    mem = env["details"]["session_memory"]
-                    turn_counts.append(mem["turn_count"])
-                    templates.append(env["details"]["synthesis"]["template"])
-                    summaries.append(env["summary"])
-                    blob = (env["summary"] + str(mem)).lower()
-                    for term in FORBIDDEN:
-                        self.assertNotIn(term, blob)
+                )
+                self.assertEqual(env["contract_id"], "session_query")
+                self.assertEqual(env["model_used"], "rule-engine")
+                self.assertEqual(env["details"]["retrieval_mode"], "keyword")
+                mem = env["details"]["session_memory"]
+                turn_counts.append(mem["turn_count"])
+                templates.append(env["details"]["synthesis"]["template"])
+                summaries.append(env["summary"])
+                blob = (env["summary"] + str(mem)).lower()
+                for term in FORBIDDEN:
+                    self.assertNotIn(term, blob)
 
         self.assertEqual(turn_counts, [1, 2, 3, 4])
         prefs_blob = " ".join(
@@ -201,6 +212,45 @@ class TestSessionMemoryFourTurn(unittest.TestCase):
         self.assertIn("ACCUMULATED SESSION CONTEXT", augmented)
         self.assertIn("stale inventory", augmented.lower())
         self.assertIn("rare jazz", augmented.lower())
+
+
+    def test_session_query_row_without_checksum(self):
+        """Regression: sparse SQL rows must not KeyError in _rows_to_chunks."""
+        sparse_row = {
+            "id": "c-sparse",
+            "document_id": "d-sparse",
+            "chunk_index": 0,
+            "content": "Seller listing: Test LP Status: active Price: 12.00",
+            "source_type": "listing",
+            "source_id": "L-sparse",
+        }
+
+        class SparseConn:
+            async def fetch(self, sql, *params):
+                return [sparse_row]
+
+            async def fetchval(self, sql, *params):
+                return 0
+
+            async def execute(self, sql, *params):
+                return None
+
+        start = _run(insights.session_start(user_id="u-sparse"))
+        session_id = start["details"]["session_memory"]["session_id"]
+
+        with patch.object(insights, "get_pool", AsyncMock(return_value=self._mock_pool(SparseConn()))):
+            env = _run(
+                insights.session_query(
+                    user_id="u-sparse",
+                    session_id=session_id,
+                    question="Summarize my listing activity.",
+                )
+            )
+        self.assertEqual(env["contract_id"], "session_query")
+        self.assertEqual(env["model_used"], "rule-engine")
+        blob = (env.get("summary") or "").lower()
+        for term in FORBIDDEN:
+            self.assertNotIn(term, blob)
 
 
 class TestSessionRoutes(unittest.TestCase):

@@ -278,7 +278,13 @@ export function evaluateLongformTurn(
       score = hasGrounding && (hasCaveat || /auction|bid/i.test(answer)) ? 3.5 : 2.5
       break
     case 'collector_metadata':
-      score = /pressing|condition|scarcity|collector|metadata|missing|weak/i.test(answer) ? 3 : 2
+      if (/present:|missing or unclear|highest-impact|completeness score/i.test(answer)) {
+        score = 4
+      } else if (/pressing|condition|scarcity|collector|metadata|missing|weak/i.test(answer)) {
+        score = 3.5
+      } else {
+        score = 2
+      }
       break
     case 'listing_rewrite':
       score = /title|description|listing/i.test(answer) && !/lorem/i.test(answer) ? 3.5 : 2

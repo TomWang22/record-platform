@@ -336,8 +336,9 @@ class TestT2013XLongformSynthesis(unittest.TestCase):
         out = synthesize_rag_summary(question=prompt, chunks=self._chunks(), refs=self._refs())
         self.assertEqual(out["template"], "collector_metadata_gaps")
         self.assertIn("Collector metadata check:", out["summary"])
-        self.assertIn("Title:", out["summary"])
-        self.assertIn("Pressing:", out["summary"])
+        self.assertIn("Present:", out["summary"])
+        self.assertIn("Missing or unclear:", out["summary"])
+        self.assertIn("Highest-impact edits:", out["summary"])
 
     def test_final_action_plan_longform(self):
         prompt = (

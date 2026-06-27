@@ -189,6 +189,363 @@ def _obo_status_counts(chunks: Sequence[Dict[str, Any]]) -> Dict[str, int]:
     return counts
 
 
+COLLECTOR_METADATA_FIELD_NAMES: Tuple[str, ...] = (
+    "title",
+    "artist",
+    "album",
+    "label",
+    "catalog_number",
+    "pressing",
+    "country",
+    "year",
+    "format",
+    "condition_media",
+    "condition_sleeve",
+    "grade",
+    "variant",
+    "edition",
+    "provenance",
+    "scarcity_signal",
+    "price",
+    "seller_notes",
+    "photos_or_visuals",
+    "defects_or_wear",
+)
+
+_COLLECTOR_HIGH_PRIORITY: Tuple[str, ...] = (
+    "pressing",
+    "condition_media",
+    "condition_sleeve",
+    "grade",
+    "label",
+    "catalog_number",
+    "photos_or_visuals",
+    "title",
+    "price",
+)
+
+_COLLECTOR_FIELD_DETECTORS: Dict[str, Tuple[Tuple[str, Optional[str]], ...]] = {
+    "title": (
+        (r"(?:seller listing:|listing:)\s*(.+?)\s+status:", "group"),
+        (r"title:\s*(.+?)(?:\s+description:|\s+status:|$)", "group"),
+        (r"title:|listing:|seller listing:", None),
+    ),
+    "artist": (
+        (r"artist:\s*(.+?)(?:\s+album:|\s+title:|\s+label:|$)", "group"),
+        (r"artist:\s*", None),
+    ),
+    "album": (
+        (r"album:\s*(.+?)(?:\s+artist:|\s+label:|\s+title:|$)", "group"),
+        (r"album:\s*", None),
+    ),
+    "label": (
+        (r"label:\s*(.+?)(?:\s+cat(?:alog)?:|\s+catalog|\s+pressing:|$)", "group"),
+        (r"label:\s*", None),
+    ),
+    "catalog_number": (
+        (r"(?:cat(?:alog)?(?:\s+number)?|catalog(?:\s+number)?|cat#):\s*([A-Za-z0-9\-./]+)", "group"),
+        (r"catalog number:\s*([A-Za-z0-9\-./]+)", "group"),
+    ),
+    "pressing": (
+        (r"pressing:\s*(.+?)(?:\s+country:|\s+year:|\s+format:|$)", "group"),
+        (r"pressing|first press|mono|stereo|repress|reissue pressing", None),
+    ),
+    "country": (
+        (r"country:\s*(.+?)(?:\s+year:|\s+format:|$)", "group"),
+        (r"country of origin:\s*(.+?)(?:\s+year:|$)", "group"),
+        (r"made in\s+([A-Za-z ]{2,24})", "group"),
+    ),
+    "year": (
+        (r"year:\s*(\d{4})", "group"),
+        (r"(?:released|release year)[:\s]+(\d{4})", "group"),
+    ),
+    "format": (
+        (r"format:\s*(.+?)(?:\s+condition|$)", "group"),
+        (r"\b(?:lp|12\"|7\"|10\"|vinyl|single|ep)\b", None),
+    ),
+    "condition_media": (
+        (r"condition media:\s*(.+?)(?:\s+sleeve:|$)", "group"),
+        (r"media condition:\s*(.+?)(?:\s+sleeve:|$)", "group"),
+        (r"plays clean|vinyl condition:\s*(.+?)(?:\s+sleeve:|$)", "group"),
+    ),
+    "condition_sleeve": (
+        (r"(?:condition )?sleeve:\s*(.+?)(?:\s+grade:|$)", "group"),
+        (r"sleeve condition:\s*(.+?)(?:\s+grade:|$)", "group"),
+    ),
+    "grade": (
+        (r"grade:\s*(.+?)(?:\s+description:|$)", "group"),
+        (r"\b(?:nm|mint|m-|vg\+|vg\+\+|vg|g\+|g|p|f)\b/\s*(?:nm|mint|m-|vg\+|vg|g\+|g|p|f)\b", "group"),
+        (r"\b(?:near mint|very good plus|very good|good plus|poor|fair)\b", None),
+    ),
+    "variant": (
+        (r"variant:\s*(.+?)(?:\s+edition:|$)", "group"),
+        (r"color vinyl|colored vinyl|picture disc|promo copy", None),
+    ),
+    "edition": (
+        (r"edition:\s*(.+?)(?:\s+variant:|$)", "group"),
+        (r"limited edition|first edition|reissue|remaster|original pressing", None),
+    ),
+    "provenance": (
+        (r"provenance:\s*(.+?)(?:\s+scarcity:|$)", "group"),
+        (r"purchased from|owned since|acquired from|from the collection of", None),
+    ),
+    "scarcity_signal": (
+        (r"scarcity:\s*(.+?)(?:\s+provenance:|$)", "group"),
+        (r"\b(?:rare|limited|out of print|scarce|hard to find)\b", None),
+    ),
+    "price": (
+        (r"price:\s*([0-9.]+)", "group"),
+        (r"amount:\s*([0-9.]+)", "group"),
+        (r"(\d+)\s*cents", "group"),
+    ),
+    "seller_notes": (
+        (r"description:\s*(.+?)(?:\s+pressing:|\s+condition|$)", "group"),
+        (r"seller notes:\s*(.+?)(?:\s+pressing:|$)", "group"),
+        (r"notes:\s*(.+?)(?:\s+pressing:|$)", "group"),
+    ),
+    "photos_or_visuals": (
+        (r"photos included|photo included|with photos|gallery|images attached", None),
+        (r"\b(?:photo|photos|image|images|picture)\b", None),
+    ),
+    "defects_or_wear": (
+        (r"defects:\s*(.+?)(?:\s+photos:|$)", "group"),
+        (r"ring wear|surface noise|light scratch|skip|warp|writing on label| seam split", None),
+    ),
+}
+
+
+def _collector_corpus(chunks: Sequence[Dict[str, Any]]) -> str:
+    preferred = ("listing", "record", "listing_revision")
+    ordered: List[str] = []
+    for st in preferred:
+        for ch in chunks:
+            if ch.get("source_type") == st:
+                ordered.append(ch.get("content") or "")
+    for ch in chunks:
+        if ch.get("source_type") not in preferred:
+            ordered.append(ch.get("content") or "")
+    return "\n".join(ordered)
+
+
+def _detect_collector_field(field: str, text: str) -> Dict[str, Any]:
+    detectors = _COLLECTOR_FIELD_DETECTORS.get(field, ())
+    combined = text or ""
+    if not combined.strip():
+        return {"field": field, "status": "unknown", "confidence": "low"}
+
+    for pattern, mode in detectors:
+        m = re.search(pattern, combined, re.I)
+        if not m:
+            continue
+        if mode == "group" and m.lastindex:
+            raw_val = m.group(1).strip()
+            value = _sanitize_line(raw_val, max_len=80)
+            evidence = _sanitize_line(m.group(0), max_len=120)
+            if value:
+                return {
+                    "field": field,
+                    "status": "present",
+                    "value": value,
+                    "evidence": evidence,
+                    "confidence": "high" if len(value) > 2 else "medium",
+                }
+        evidence = _sanitize_line(m.group(0), max_len=120)
+        return {
+            "field": field,
+            "status": "present",
+            "evidence": evidence,
+            "confidence": "medium",
+        }
+
+    if field == "seller_notes" and len(combined) > 200:
+        return {
+            "field": field,
+            "status": "present",
+            "evidence": _sanitize_line(combined[:120]),
+            "confidence": "low",
+        }
+
+    if field == "title" and re.search(r"listing:|seller listing:", combined, re.I):
+        return {
+            "field": field,
+            "status": "present",
+            "confidence": "medium",
+            "evidence": "listing title marker in excerpt",
+        }
+
+    if field == "condition_media" and re.search(
+        r"condition|plays clean|\bnm\b|\bmint\b|\bvg\b|near mint", combined, re.I
+    ):
+        return {
+            "field": field,
+            "status": "present",
+            "confidence": "low",
+            "evidence": "generic condition language in excerpt",
+        }
+
+    return {"field": field, "status": "missing", "confidence": "high"}
+
+
+def _collector_completeness_score(field_map: Sequence[Dict[str, Any]]) -> int:
+    if not field_map:
+        return 0
+    weight = 0
+    scored = 0
+    for entry in field_map:
+        w = 2 if entry["field"] in _COLLECTOR_HIGH_PRIORITY else 1
+        weight += w
+        if entry.get("status") == "present":
+            scored += w
+    return round(100 * scored / weight) if weight else 0
+
+
+def _collector_recommended_edits(field_map: Sequence[Dict[str, Any]]) -> List[str]:
+    missing = {e["field"] for e in field_map if e.get("status") == "missing"}
+    edits: List[str] = []
+    if {"condition_media", "condition_sleeve", "grade"} & missing:
+        edits.append("add media/sleeve condition and a clear grade (e.g. VG+/VG)")
+    if "pressing" in missing:
+        edits.append("add pressing/version (mono/stereo, first press/reissue)")
+    if {"label", "catalog_number"} & missing:
+        edits.append("add label and catalog number")
+    if "photos_or_visuals" in missing:
+        edits.append("add photos of labels, sleeve, and vinyl surface")
+    if "provenance" in missing:
+        edits.append("document provenance only when verifiable")
+    if "scarcity_signal" in missing:
+        edits.append("do not invent scarcity — only cite rarity language present in records")
+    if "defects_or_wear" in missing and (
+        "condition_media" not in missing or "grade" not in missing
+    ):
+        edits.append("note visible defects/wear so buyers can trust the grade")
+    if not edits:
+        edits.append("metadata looks adequate in retrieved excerpts; still verify pressing/condition manually")
+    return edits
+
+
+def _collector_risk_notes(field_map: Sequence[Dict[str, Any]]) -> List[str]:
+    by_field = {e["field"]: e for e in field_map}
+    notes: List[str] = []
+    if by_field.get("scarcity_signal", {}).get("status") != "present":
+        notes.append("Do not claim rarity or scarcity without explicit excerpt evidence.")
+    if by_field.get("grade", {}).get("status") != "present" and by_field.get("condition_media", {}).get(
+        "status"
+    ) != "present":
+        notes.append("Condition grade absent — buyer trust risk until media/sleeve grades are stated.")
+    if by_field.get("pressing", {}).get("status") != "present":
+        notes.append("Pressing/version unclear — collector pricing may be unreliable.")
+    if by_field.get("photos_or_visuals", {}).get("status") != "present":
+        notes.append("No photo/visual evidence in excerpts — add label/sleeve photos.")
+    if not notes:
+        notes.append("Review excerpts manually before changing price or accepting low offers.")
+    return notes
+
+
+def extract_collector_metadata(chunks: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """Deterministic field-level collector metadata from listing/record excerpts."""
+    corpus = _collector_corpus(chunks)
+    if not corpus.strip():
+        field_map = [
+            {"field": name, "status": "unknown", "confidence": "low"}
+            for name in COLLECTOR_METADATA_FIELD_NAMES
+        ]
+        return {
+            "field_map": field_map,
+            "fields": {name: "unknown" for name in COLLECTOR_METADATA_FIELD_NAMES},
+            "completeness_score": 0,
+            "high_priority_missing": list(_COLLECTOR_HIGH_PRIORITY),
+            "recommended_listing_edits": ["no listing/record excerpts retrieved"],
+            "collector_risk_notes": ["Cannot assess collector metadata without grounded excerpts."],
+            "present_fields": [],
+            "missing_fields": list(COLLECTOR_METADATA_FIELD_NAMES),
+        }
+
+    field_map: List[Dict[str, Any]] = []
+    for name in COLLECTOR_METADATA_FIELD_NAMES:
+        entry = _detect_collector_field(name, corpus)
+        if FORBIDDEN_EMIT.search(entry.get("value") or "") or FORBIDDEN_EMIT.search(
+            entry.get("evidence") or ""
+        ):
+            entry = {"field": name, "status": "missing", "confidence": "high"}
+        field_map.append(entry)
+
+    legacy: Dict[str, str] = {}
+    for entry in field_map:
+        st = entry["status"]
+        if st == "present":
+            legacy[entry["field"]] = "present"
+        elif st == "unknown":
+            legacy[entry["field"]] = "unknown"
+        else:
+            legacy[entry["field"]] = "missing"
+
+    present_fields = [e["field"] for e in field_map if e["status"] == "present"]
+    missing_fields = [e["field"] for e in field_map if e["status"] == "missing"]
+    high_priority_missing = [f for f in _COLLECTOR_HIGH_PRIORITY if f in missing_fields]
+
+    return {
+        "field_map": field_map,
+        "fields": legacy,
+        "completeness_score": _collector_completeness_score(field_map),
+        "high_priority_missing": high_priority_missing,
+        "recommended_listing_edits": _collector_recommended_edits(field_map),
+        "collector_risk_notes": _collector_risk_notes(field_map),
+        "present_fields": present_fields,
+        "missing_fields": missing_fields,
+    }
+
+
+def _scan_collector_metadata(chunks: Sequence[Dict[str, Any]]) -> Dict[str, str]:
+    """Legacy present/missing map — derived from extract_collector_metadata."""
+    report = extract_collector_metadata(chunks)
+    legacy = report["fields"]
+    return {
+        "title": legacy.get("title", "missing"),
+        "price": legacy.get("price", "missing"),
+        "condition": (
+            "present"
+            if any(
+                legacy.get(k) == "present"
+                for k in ("condition_media", "condition_sleeve", "grade")
+            )
+            else "missing from retrieved excerpts"
+        ),
+        "pressing": legacy.get("pressing", "missing"),
+        "scarcity": legacy.get("scarcity_signal", "missing"),
+        "seller_notes": legacy.get("seller_notes", "missing"),
+        "provenance": legacy.get("provenance", "missing"),
+    }
+
+
+def _format_collector_metadata_block(report: Dict[str, Any]) -> List[str]:
+    present = report.get("present_fields") or []
+    missing = report.get("missing_fields") or []
+    unclear = [e["field"] for e in report.get("field_map") or [] if e.get("status") == "unknown"]
+    missing_or_unclear = missing + unclear
+    edits = report.get("recommended_listing_edits") or []
+    lines = ["Collector metadata check:"]
+    lines.append(
+        "- Present: "
+        + (", ".join(present) if present else "none detected in retrieved excerpts")
+    )
+    lines.append(
+        "- Missing or unclear: "
+        + (", ".join(missing_or_unclear) if missing_or_unclear else "none flagged")
+    )
+    lines.append(
+        "- Highest-impact edits: "
+        + (edits[0] if edits else "review excerpts manually")
+    )
+    if len(edits) > 1:
+        for extra in edits[1:3]:
+            lines.append(f"  · {extra}")
+    risks = report.get("collector_risk_notes") or []
+    if risks:
+        lines.append(f"- Collector risk: {risks[0]}")
+    lines.append(f"- Completeness score: {report.get('completeness_score', 0)}/100")
+    return lines
+
+
 def _format_obo_line(fact: Dict[str, Any]) -> str:
     amt = f"${fact['amount']:.0f}" if fact.get("amount") is not None else "amount n/a"
     listing = fact.get("listing_ref") or "listing"
@@ -504,25 +861,11 @@ def _synthesize_generic(chunks: Sequence[Dict[str, Any]], refs: Sequence[Dict[st
     return "\n".join(lines)
 
 
-def _scan_collector_metadata(chunks: Sequence[Dict[str, Any]]) -> Dict[str, str]:
-    combined = "\n".join(c.get("content") or "" for c in chunks).lower()
-    return {
-        "title": "present" if re.search(r"title:|listing:|seller listing:", combined, re.I) else "missing",
-        "price": "present" if re.search(r"price:|amount:|cents", combined, re.I) else "missing",
-        "condition": (
-            "present"
-            if re.search(r"condition|plays clean|\bnm\b|\bmint\b|\bvg\b|near mint", combined, re.I)
-            else "missing from retrieved excerpts"
-        ),
-        "pressing": "present" if re.search(r"pressing|mono|stereo|blue note|first press", combined, re.I) else "missing",
-        "scarcity": "present" if re.search(r"scarcity|rare|limited|first press|out of print", combined, re.I) else "missing",
-        "seller_notes": (
-            "present"
-            if re.search(r"description:|seller notes|notes:", combined, re.I) or len(combined) > 200
-            else "missing"
-        ),
-        "provenance": "present" if re.search(r"provenance|purchased from|owned since|acquired", combined, re.I) else "missing",
-    }
+def _synthesize_collector_metadata_gaps(chunks: Sequence[Dict[str, Any]], refs: Sequence[Dict[str, Any]]) -> str:
+    report = extract_collector_metadata(chunks)
+    lines = _format_collector_metadata_block(report)
+    lines.extend(["", _grounding_footer(len(chunks), _refs_source_types(refs))])
+    return "\n".join(lines)
 
 
 def _extract_seller_tradeoffs(question: str) -> Dict[str, bool]:
@@ -566,32 +909,6 @@ def _auction_evidence(chunks: Sequence[Dict[str, Any]]) -> Tuple[List[str], List
     return signals, gaps
 
 
-def _format_collector_metadata_block(fields: Dict[str, str]) -> List[str]:
-    missing = [k for k, v in fields.items() if v.startswith("missing")]
-    rec: List[str] = []
-    if "condition" in missing or "pressing" in missing:
-        rec.append("add condition, pressing/version, and provenance notes before relying on collector demand")
-    if "scarcity" in missing or "provenance" in missing:
-        rec.append("document scarcity/provenance only when you can verify — do not invent rarity")
-    if not rec:
-        rec.append("metadata looks adequate in retrieved excerpts; still verify pressing/condition manually")
-    lines = ["Collector metadata check:"]
-    for key in ("title", "price", "condition", "pressing", "scarcity", "seller_notes", "provenance"):
-        label = key.replace("_", " ").title()
-        if key == "seller_notes":
-            label = "Seller notes"
-        lines.append(f"- {label}: {fields[key]}")
-    lines.append(f"Recommended next step: {rec[0]}.")
-    return lines
-
-
-def _synthesize_collector_metadata_gaps(chunks: Sequence[Dict[str, Any]], refs: Sequence[Dict[str, Any]]) -> str:
-    fields = _scan_collector_metadata(chunks)
-    lines = _format_collector_metadata_block(fields)
-    lines.extend(["", _grounding_footer(len(chunks), _refs_source_types(refs))])
-    return "\n".join(lines)
-
-
 def _synthesize_listing_advice(chunks: Sequence[Dict[str, Any]], refs: Sequence[Dict[str, Any]]) -> str:
     by_type = _chunks_by_type(chunks)
     listings = by_type.get("listing", [])
@@ -599,8 +916,9 @@ def _synthesize_listing_advice(chunks: Sequence[Dict[str, Any]], refs: Sequence[
     obo = by_type.get("obo_offer_summary", [])
     listing_facts = [_parse_listing_facts(c.get("content") or "") for c in listings[:4]]
     obo_counts = _obo_status_counts(chunks)
-    meta = _scan_collector_metadata(chunks)
-    missing_meta = [k for k, v in meta.items() if v.startswith("missing")]
+    meta_report = extract_collector_metadata(chunks)
+    missing_meta = meta_report.get("high_priority_missing") or meta_report.get("missing_fields") or []
+    recommended = meta_report.get("recommended_listing_edits") or []
 
     weak: List[str] = []
     for f in listing_facts:
@@ -627,11 +945,17 @@ def _synthesize_listing_advice(chunks: Sequence[Dict[str, Any]], refs: Sequence[
         + (f"{len(revisions)} revision excerpt(s)" if revisions else "none in set"),
         "4. Recommended listing edits: "
         + (
-            f"strengthen {', '.join(missing_meta[:3])} on active listings"
-            if missing_meta
-            else "review titles/prices against recent revisions"
+            recommended[0]
+            if recommended
+            else (
+                f"strengthen {', '.join(missing_meta[:3])} on active listings"
+                if missing_meta
+                else "review titles/prices against recent revisions"
+            )
         ),
-        "5. Missing metadata: " + (", ".join(missing_meta) if missing_meta else "none detected in excerpts"),
+        "5. Collector metadata gaps: "
+        + (", ".join(missing_meta[:6]) if missing_meta else "none detected in excerpts"),
+        f"6. Completeness score: {meta_report.get('completeness_score', 0)}/100",
         "",
         "Recommended next step: Revise listings with missing collector fields before discounting.",
         "",
@@ -1078,19 +1402,21 @@ def build_auction_pressure(
 def build_collector_metadata_gaps(
     chunks: Sequence[Dict[str, Any]], refs: Sequence[Dict[str, Any]]
 ) -> Dict[str, Any]:
-    fields = _scan_collector_metadata(chunks)
-    missing = [k for k, v in fields.items() if v.startswith("missing")]
+    report = extract_collector_metadata(chunks)
+    legacy = _scan_collector_metadata(chunks)
+    missing = [k for k, v in legacy.items() if v.startswith("missing")]
     summary = _synthesize_collector_metadata_gaps(chunks, refs)
     return {
         "summary": summary,
-        "fields": fields,
-        "missing_fields": missing,
-        "recommended_edits": [
-            "add condition and pressing/version notes",
-            "document provenance only when verifiable",
-        ]
-        if missing
-        else ["metadata adequate in excerpts"],
+        "fields": legacy,
+        "field_map": report["field_map"],
+        "completeness_score": report["completeness_score"],
+        "high_priority_missing": report["high_priority_missing"],
+        "recommended_listing_edits": report["recommended_listing_edits"],
+        "collector_risk_notes": report["collector_risk_notes"],
+        "present_fields": report["present_fields"],
+        "missing_fields": report["missing_fields"],
+        "recommended_edits": report["recommended_listing_edits"],
         "evidence_basis": _refs_source_types(refs),
     }
 

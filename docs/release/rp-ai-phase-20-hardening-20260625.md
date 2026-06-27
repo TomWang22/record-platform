@@ -189,6 +189,7 @@ Do not start T20.14/T20.15 rollout or Phase 21 without explicit approval and all
 ## Verification commands (reference)
 
 ```bash
+bash scripts/rp-ai-live-inference-transcript.sh   # T20.13C+ harness; optional embed warmup flags
 bash scripts/rp-ai-shadow-source-diagnostic.sh
 bash scripts/audit-rp-ai-rag-contract.sh
 bash scripts/rp-ai-rag-quality-smoke.sh
@@ -203,3 +204,18 @@ Benchmark harness (read-only; artifacts stay local):
 ```bash
 BENCH_REQUIRE_OLLAMA_WARM=1 BENCH_WARMUP_RUNS=1 bash scripts/rp-ai-shadow-real-query-timing.sh
 ```
+
+---
+
+## Post-closeout addendum (T20.13K, 2026-06-26)
+
+| Item | State |
+|------|-------|
+| Embedded | **10,065** — ≥10k **PASS** |
+| Keyword RAG quality | **2.6 → 3.6/5** via `rag_synthesis.py` |
+| Production | keyword / rule-engine |
+| Vector rollout | **NOT APPROVED** — shadow p95 8–10s, overlap weak |
+| Phase 21 | **not started** |
+| Further tranches | Not required for 10k gate; 15% coverage only with explicit approval |
+
+See `docs/ai-platform/T20-13K-post-synthesis-readiness-closeout.md` and updated `PHASE_20_COPILOT_CONTEXT.md`.

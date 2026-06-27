@@ -1,8 +1,8 @@
 # Phase 20 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-26 (T20.12AJ tranche 12 actual recorded; T20.13 re-eval complete)  
-**Current main SHA:** `4ad6fd0` (verify at commit time)  
-**Phase 20 status:** **HARDENING CLOSED** — embedding tranche ops allowed only with explicit approval per tranche  
+**Last updated:** 2026-06-26 (T20.13K post-synthesis closeout)  
+**Current main SHA:** `9e26955` (verify at commit time)  
+**Phase 20 status:** **HARDENING CLOSED** — embedding tranche ops allowed only with explicit approval per tranche; **≥10k count gate complete**  
 **Audience:** GitHub Copilot, Cursor, and other coding agents working on `record-platform`
 
 Use this document when continuing Phase 20 work. It replaces any deleted handoff notes.
@@ -24,6 +24,7 @@ Keep:
 - no EMBEDDING_BACKFILL_FORCE=1
 - no broad/full embedding backfill
 - no Phase 21
+- keyword RAG synthesis via rag_synthesis.py (T20.13I) — rule-engine templates, not generative default
 ```
 
 ### Copilot-safe instruction
@@ -37,27 +38,26 @@ Do not change keyword retrieval behavior.
 Do not enable overlap refinement flags by default.
 
 Vector rollout: NOT APPROVED / NOT READY:
-- embedded coverage: 13.8% / 10,065 — **≥10k count PASS**; **≥15% FAIL** (was 13.1% / 9,565 pre–Tranche 12)
+- embedded coverage: 13.8% / 10,065 — **≥10k count PASS**; **≥15% FAIL**
+- keyword answer quality: **3.6/5** (T20.13J) — **PASS** target ≥3.5
 - source diversity: 6 PASS
-- owner-visible OBO embedded: 18 PASS (total embedded OBO: 1,544; OBO eligible pool exhausted)
-- shadow p95: **6,457 ms** eval / **2,925 ms** pre-write — FAIL / CONDITIONAL (rollout-blocking)
-- embed p95 / timeouts: p95 **3,297 ms**; 1 live-inference embed timeout — CONDITIONAL
-- shadow-keyword overlap: default/off **15/16** zero (timing); **1/7** live inference — FAIL
+- owner-visible OBO embedded: 18 PASS (total embedded OBO: 1,544)
+- shadow p95: **8–10s** recent warmed runs — **FAIL** (rollout-blocking)
+- embed warmup (T20.13E): 7/7 → 0/7 embed_timeout_before_fetch in harness
+- shadow-keyword overlap: default/off **1/7** chunk >0; flagged/on **3/7** — **FAIL**
 - leakage: 0 PASS
 - keyword stability: PASS
-- shadow-keyword overlap: flagged/on **3/7** live inference — diagnostic-only FAIL
 - tranche rerun guard: PASS
 
-T20.10AC–AG flagged overlap improvements are diagnostic-only. They improve overlap
-from 11/16 zero-overlap to 8/16 under default-off flags, but they are not production
-rollout approval and must not be enabled by default.
+T20.13I keyword synthesis improved user-visible RAG answers without vector rollout.
+Shadow latency/overlap remain blockers. See T20-13K-post-synthesis-readiness-closeout.md.
 
-Phase 20 hardening branches are closed (T20.10AG, T20.11C, T20.17). Do not reopen
-overlap or coverage work without explicit approval.
+No further embedding tranches needed for ≥10k count gate unless explicitly approved for 15% coverage.
 
 Allowed work only with explicit approval:
-- T20.14/T20.15 production vector rollout — only after **all** T20.13 gates pass (currently **NOT APPROVED**)
+- T20.14/T20.15 production vector rollout — only after **all** gates pass (currently **NOT APPROVED**)
 - Phase 21 — not started; blocked until rollout approved
+- T20.13L/M shadow latency/overlap design proposals — read-only, explicit approval
 - Optional shadow-only refinement (read-only diagnostics) — explicit approval only
 ```
 
@@ -141,11 +141,18 @@ Allowed work only with explicit approval:
 | **T20.16B** | `69709c1` | Final context reconciliation after T20.11C + T20.17 |
 | **T20.12** | `t20-tranche-12` (ops) | Tranche 12 actual: +500 embeddings (9,565 → 10,065); ≥10k count gate clears; T20.13 rollout **NOT APPROVED** |
 | **T20.13** | (eval) | Comprehensive vector rollout readiness re-eval — `docs/ai-platform/T20-13-comprehensive-vector-rollout-readiness.md` |
+| **T20.13A–B** | (docs) | Shadow zero-result/latency triage + stability fix proposal |
+| **T20.13C–D** | `bd2b607` | Live inference telemetry harness + real inference report |
+| **T20.13E–F** | `cbb4bdd` | Diagnostic embed warmup/retry; shadow fetch unblocked |
+| **T20.13G–G-S** | `a579121` | Shadow fetch/latency/overlap triage + prompt/answer quality eval (RAG 2.6/5) |
+| **T20.13H–J** | `9e26955` | Keyword synthesis proposal + implementation + eval (RAG **3.6/5**) |
+| **T20.13K** | (docs) | Post-synthesis readiness closeout — `docs/ai-platform/T20-13K-post-synthesis-readiness-closeout.md` |
 
 ### Phase 20 tickets NOT started (require explicit approval)
 
 | Ticket | Scope |
 |--------|-------|
+| **T20.13L / T20.13M** | Shadow latency / overlap design proposals (read-only) |
 | **T20.14 / T20.15** | Production vector default / hybrid rollout — only after all gates pass |
 | **Phase 21** | Not started; do not begin without explicit approval |
 
@@ -192,33 +199,37 @@ Allowed work only with explicit approval:
 
 ---
 
-## Current system snapshot (2026-06-26)
+## Current system snapshot (2026-06-26, T20.13K)
 
 ```text
-Current main SHA: 4ad6fd0 (verify at commit time)
+Current main SHA: 9e26955 (verify at commit time)
 Embedded chunks: 10,065
 Non-message chunks: 73,043
 Embedded coverage: 13.8%
 ≥10k count gate: PASS
 ≥15% coverage gate: FAIL
 Production retrieval: keyword
+Production model_used: rule-engine
+Keyword RAG synthesis: rag_synthesis.py (T20.13I) — 7 templates
+Keyword answer quality: 3.6/5 (T20.13J) — target ≥3.5 PASS
 Vector default: off
 AI_RAG_SHADOW_VECTOR=0
 AI_RAG_SHADOW_ENTITY_HINTS=0
 AI_RAG_SHADOW_NEIGHBOR_EXPANSION=0
 Source diversity: 6 PASS
-Owner-visible OBO embedded: 18 / 1,544 total embedded OBO (eligible pool exhausted)
+Owner-visible OBO embedded: 18 / 1,544 total embedded OBO
 Leakage: 0 PASS
 Keyword stability: PASS
-Default/off zero chunk-overlap: 15/16 FAIL (T20.12AK warm benchmark)
-Flagged/on overlap: 3/7 live inference (diagnostic-only)
+Shadow embed timeouts (warmed harness): 0/7
+Shadow p95 (recent warmed): 8–10s FAIL vs 3s SLO
+Default/off overlap: 1/7 chunk >0 FAIL
+Flagged/on overlap: 3/7 diagnostic-only
 Coverage (app/ai strict): PASS (~90%+)
-Service coverage manifest: v1.2, 18 services, 1 strict (python-ai)
-Vector rollout: NOT APPROVED (T20.13)
+Vector rollout: NOT APPROVED
 Phase 21: not started
 Phase 20 hardening: CLOSED
-Embedding ladder to 10k: COMPLETE
-Last tranche: t20-tranche-12 (+500, 2026-06-26; post-OBO caps)
+Embedding ladder to 10k: COMPLETE — no further tranches required for count gate
+Last tranche: t20-tranche-12 (+500, 2026-06-26)
 ```
 
 ### Embedded by source_type (post–Tranche 12)
@@ -234,21 +245,25 @@ Last tranche: t20-tranche-12 (+500, 2026-06-26; post-OBO caps)
 
 ---
 
-## Vector rollout gate table (T20.3 / T20.8 / T20.10AG)
+## Vector rollout gate table (T20.13K closeout)
 
 | Gate | Target | Current | Status |
 |------|--------|---------|--------|
-| Embedded coverage | ≥15% or ≥10k embedded | 13.8% / 10,065 — count **PASS**, % **FAIL** | **PARTIAL** |
+| Embedded count | ≥10,000 | **10,065** | **PASS** |
+| Percent coverage | ≥15% | **~13.8%** | **FAIL** (count gate passes alternate) |
+| Keyword answer quality | ≥3.5/5 | **3.6/5** (T20.13J) | **PASS** |
+| Production retrieval | keyword | keyword | **PASS** |
 | Source diversity | ≥5 types | 6 | **PASS** |
 | Owner-visible OBO | ≥10 | 18 | **PASS** |
-| Shadow p95 latency | ≤3,000 ms | passes on some warm runs; unstable historically | **CONDITIONAL** / not enough for rollout |
-| Embed p95 / timeouts | stable, no timeouts | unstable historically; T20.10AG flagged 0 timeouts | **CONDITIONAL** |
 | Leakage | 0 | 0 | **PASS** |
 | Keyword stability | unchanged | PASS | **PASS** |
-| Shadow-keyword overlap | meaningful | default/off 11/16 zero; flagged/on 8/16 diagnostic-only | **FAIL** |
+| Shadow p95 latency | ≤3,000 ms | **8–10s** recent warmed | **FAIL** |
+| Shadow overlap | meaningful | 1/7 off; 3/7 flagged | **FAIL** |
+| Vector default | off | off | **PASS** |
+| Phase 21 | not started | not started | **PASS** |
 | Tranche rerun guard | exit 2 on lock | PASS | **PASS** |
 
-**Verdict:** hold keyword default; vector rollout **NOT APPROVED**.
+**Verdict:** hold keyword default; vector rollout **NOT APPROVED**. Product RAG quality improved via synthesis; shadow latency/overlap remain blockers.
 
 ---
 
@@ -285,7 +300,8 @@ Key implementation: `_apply_shadow_overlap_refinements()` in `rag_retrieval.py`.
 ```
 POST /api/ai/rag/query
   └─> insights.rag_query()  [keyword default]
-        └─> retrieve_chunks()           ← PRODUCTION
+        └─> retrieve_chunks()           ← PRODUCTION (unchanged)
+        └─> synthesize_rag_summary()  ← T20.13I keyword answer templates
         └─> retrieve_chunks_vector_shadow()  ← ONLY if shadow_vector=true (diagnostic)
               └─> _apply_shadow_overlap_refinements()  ← ONLY if overlap flags on
 ```
@@ -295,8 +311,9 @@ POST /api/ai/rag/query
 | File | Role |
 |------|------|
 | `services/python-ai-service/app/ai/rag_retrieval.py` | Keyword + shadow vector retrieval, overlap refinements, privacy filters |
+| `services/python-ai-service/app/ai/rag_synthesis.py` | Deterministic keyword RAG summary templates (T20.13I) |
 | `services/python-ai-service/app/ai/shadow_profiles.py` | Route profiles, weights, query hints, neighbor caps |
-| `services/python-ai-service/app/ai/insights.py` | Insight builders; keyword path unchanged |
+| `services/python-ai-service/app/ai/insights.py` | Insight builders; rag_query wires synthesis |
 | `services/python-ai-service/app/ai/routes.py` | HTTP routes; `shadow_vector`, `shadow_profile`, `shadow_query_hints` query params |
 | `services/python-ai-service/app/ai/config.py` | `AI_RAG_SHADOW_VECTOR`, overlap flags — all default `0` |
 
@@ -388,18 +405,19 @@ Edge: `https://record-platform.test` with strict TLS (`certs/dev-chain.pem`).
 ## Recommended next work
 
 ```text
-Phase 20 hardening is closed. Default: stop rollout work.
+Phase 20 hardening is closed. T20.13K closeout recorded.
 
-Embedding tranche loop (with explicit approval per tranche):
-1. dry-run → 2. warmup pre-write gate → 3. backup → 4. actual write → 5. readiness eval + live inference → 6. docs push → 7. next dry-run
-8. Full bundle specs: `docs/ai-platform/T20-12AA-tranche10-bundle-flight-plan.md` (AA→AB→AC→AD); completed W→Z: `docs/ai-platform/T20-12W-tranche9-bundle-flight-plan.md`
+Embedding ladder to 10k count gate: COMPLETE (10,065 embedded).
+No further embedding tranches required for ≥10k unless explicitly approved for ≥15% coverage.
 
-Embedding ladder to 10k count gate: **COMPLETE** (10,065 embedded).
+Default: stop rollout work. Keyword synthesis (T20.13I) improved product value without vector.
 
 Only with explicit approval:
-1. T20.14/T20.15 production vector rollout — **blocked** until all T20.13 gates pass
-2. Phase 21 — not started
-3. Optional shadow-only refinement (read-only) — explicit approval only
+1. T20.13L — shadow latency design proposal (read-only)
+2. T20.13M — shadow overlap design proposal (read-only)
+3. T20.14/T20.15 production vector rollout — blocked until latency/overlap pass
+4. Phase 21 — not started
+5. Optional additional embedding tranches toward 15% coverage — explicit approval only
 ```
 
 Do **not** start T20.14/T20.15 rollout or Phase 21 without explicit approval and all gates passing.
@@ -441,6 +459,11 @@ Refusal rules:
 | T20.12AH Tranche 12 dry-run plan | `docs/ai-platform/T20-12AH-tranche12-dry-run-plan.md` |
 | T20.12AK post–Tranche 12 eval | `docs/ai-platform/T20-12AK-post-tranche12-readiness-eval.md` |
 | T20.13 comprehensive rollout re-eval | `docs/ai-platform/T20-13-comprehensive-vector-rollout-readiness.md` |
+| T20.13K post-synthesis closeout | `docs/ai-platform/T20-13K-post-synthesis-readiness-closeout.md` |
+| T20.13J synthesis quality eval | `docs/ai-platform/T20-13J-keyword-synthesis-quality-eval.md` |
+| T20.13I keyword synthesis | `docs/ai-platform/T20-13I-keyword-answer-synthesis.md` |
+| T20.13G-S answer quality report | `docs/ai-platform/T20-13G-S-real-use-case-answer-quality-report.md` |
+| T20.13E/F embed warmup | `docs/ai-platform/T20-13E-diagnostic-embed-warmup-retry.md`, `T20-13F-post-warmup-inference-telemetry.md` |
 | T20.12AA→AD bundle flight plan (completed) | `docs/ai-platform/T20-12AA-tranche10-bundle-flight-plan.md` |
 | T20.12W→Z bundle flight plan (completed) | `docs/ai-platform/T20-12W-tranche9-bundle-flight-plan.md` |
 | T20.12S→V bundle flight plan (completed) | `docs/ai-platform/T20-12S-tranche8-bundle-flight-plan.md` |

@@ -47,10 +47,16 @@ _INTENT_RULES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
 def classify_rag_intent(question: str) -> str:
     q = (question or "").lower()
     # T20.13X — longform / domain intents (higher priority than generic negotiation)
+    if "10-bullet" in q and (
+        "tagged" in q or "[grounded]" in q or "missing evidence" in q or "seller plan" in q
+    ):
+        return "tagged_executive_summary"
     if "accumulated session context" in q or len(question or "") > 1500:
         if "tagged as" in q and ("10-bullet" in q or "[grounded]" in q or "missing evidence" in q):
             return "tagged_executive_summary"
-        if "review your own advice" in q or "overclaim" in q:
+        if "review your own advice" in q or (
+            "overclaim" in q and "10-bullet" not in q and "[grounded]" not in q
+        ):
             return "self_review_overclaim"
         if "using everything above" in q or "final seller action plan" in q:
             return "final_action_plan"

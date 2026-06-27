@@ -49,6 +49,62 @@ class UserBody(BaseModel):
     user_id: Optional[str] = None
 
 
+class SessionStartBody(BaseModel):
+    user_id: Optional[str] = None
+
+
+class SessionQueryBody(BaseModel):
+    session_id: str = Field(..., min_length=8)
+    question: str = Field(..., min_length=2)
+    user_id: Optional[str] = None
+    source_types: Optional[List[str]] = None
+
+
+class SessionResetBody(BaseModel):
+    session_id: str = Field(..., min_length=8)
+    user_id: Optional[str] = None
+
+
+@router.post("/session/start")
+async def post_session_start(
+    body: SessionStartBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.session_start(user_id=_user_id(x_user_id, body.user_id))
+
+
+@router.post("/session/query")
+async def post_session_query(
+    body: SessionQueryBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.session_query(
+        user_id=_user_id(x_user_id, body.user_id),
+        session_id=body.session_id,
+        question=body.question,
+        source_types=body.source_types,
+    )
+
+
+@router.get("/session/{session_id}")
+async def get_session(
+    session_id: str,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.session_get(user_id=_user_id(x_user_id, None), session_id=session_id)
+
+
+@router.post("/session/reset")
+async def post_session_reset(
+    body: SessionResetBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.session_reset(
+        user_id=_user_id(x_user_id, body.user_id),
+        session_id=body.session_id,
+    )
+
+
 @router.post("/rag/query")
 async def post_rag_query(
     body: RagQueryBody,

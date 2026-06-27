@@ -26,6 +26,11 @@ from app.ai.rag_synthesis import (
     build_negotiation_strategy,
     synthesize_rag_summary,
 )
+from app.ai.session_memory import (
+    augment_question_with_memory,
+    store as session_store,
+    update_session_from_turn,
+)
 from app.db import get_pool
 
 
@@ -76,6 +81,7 @@ async def rag_query(
     user_id: Optional[str],
     question: str,
     source_types: Optional[List[str]] = None,
+    synthesis_question: Optional[str] = None,
     shadow_vector: bool = False,
     shadow_profile: Optional[str] = None,
     shadow_profile_hints: bool = False,
@@ -128,7 +134,8 @@ async def rag_query(
     refs = keyword_result["source_refs"]
     citations = [chunk_to_citation(c) for c in chunks[:5]]
     status = "live" if refs else "degraded"
-    synthesis = synthesize_rag_summary(question=question, chunks=chunks, refs=refs)
+    synth_q = synthesis_question if synthesis_question is not None else question
+    synthesis = synthesize_rag_summary(question=synth_q, chunks=chunks, refs=refs)
     summary = synthesis["summary"]
     details = {
         "retrieval_mode": keyword_result["retrieval_mode"],
@@ -168,6 +175,126 @@ async def rag_query(
         confidence=0.7 if refs else 0.0,
         degraded_reason=None if status == "live" else "no_matching_chunks",
     )
+
+
+async def session_start(*, user_id: Optional[str]) -> Dict[str, Any]:
+    uid = (user_id or "").strip()
+    if not uid:
+        return build_envelope(
+            "session_start",
+            source_status="degraded",
+            model_used="none",
+            summary="user_id required to start session",
+            details={},
+            source_refs=[],
+            degraded_reason="missing_user_id",
+        )
+    state = session_store.start(uid)
+    return build_envelope(
+        "session_start",
+        source_status="live",
+        model_used="rule-engine",
+        summary="Session started",
+        details={"session_memory": state.to_public_dict()},
+        source_refs=[],
+        confidence=1.0,
+    )
+
+
+async def session_get(*, user_id: Optional[str], session_id: str) -> Dict[str, Any]:
+    uid = (user_id or "").strip()
+    sid = (session_id or "").strip()
+    state = session_store.get(sid, uid) if uid and sid else None
+    if not state:
+        return build_envelope(
+            "session_get",
+            source_status="degraded",
+            model_used="none",
+            summary="Session not found",
+            details={},
+            source_refs=[],
+            degraded_reason="session_not_found",
+        )
+    return build_envelope(
+        "session_get",
+        source_status="live",
+        model_used="rule-engine",
+        summary="Session state",
+        details={"session_memory": state.to_public_dict()},
+        source_refs=[],
+        confidence=1.0,
+    )
+
+
+async def session_reset(*, user_id: Optional[str], session_id: str) -> Dict[str, Any]:
+    uid = (user_id or "").strip()
+    sid = (session_id or "").strip()
+    ok = session_store.reset(sid, uid) if uid and sid else False
+    if not ok:
+        return build_envelope(
+            "session_reset",
+            source_status="degraded",
+            model_used="none",
+            summary="Session not found",
+            details={},
+            source_refs=[],
+            degraded_reason="session_not_found",
+        )
+    return build_envelope(
+        "session_reset",
+        source_status="live",
+        model_used="rule-engine",
+        summary="Session reset",
+        details={"session_id": sid, "reset": True},
+        source_refs=[],
+        confidence=1.0,
+    )
+
+
+async def session_query(
+    *,
+    user_id: Optional[str],
+    session_id: str,
+    question: str,
+    source_types: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    uid = (user_id or "").strip()
+    sid = (session_id or "").strip()
+    state = session_store.get(sid, uid) if uid and sid else None
+    if not state:
+        return build_envelope(
+            "session_query",
+            source_status="degraded",
+            model_used="none",
+            summary="Session not found",
+            details={},
+            source_refs=[],
+            degraded_reason="session_not_found",
+        )
+
+    synthesis_question = augment_question_with_memory(question, state)
+    envelope = await rag_query(
+        user_id=uid,
+        question=question,
+        source_types=source_types,
+        synthesis_question=synthesis_question,
+        shadow_vector=False,
+    )
+    synthesis_meta = (envelope.get("details") or {}).get("synthesis") or {}
+    update_session_from_turn(
+        state,
+        prompt=question,
+        summary=envelope.get("summary") or "",
+        source_refs=envelope.get("source_refs") or [],
+        synthesis=synthesis_meta,
+    )
+    refreshed = session_store.get(sid, uid)
+    details = dict(envelope.get("details") or {})
+    details["session_memory"] = refreshed.to_public_dict() if refreshed else {}
+    details["session_id"] = sid
+    envelope["details"] = details
+    envelope["contract_id"] = "session_query"
+    return envelope
 
 
 async def record_valuation(*, user_id: Optional[str], record_id: str) -> Dict[str, Any]:

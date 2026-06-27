@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
+import { AiSourceEvidenceList } from '@/components/ai/ai-source-evidence-list'
 import { AiInsightMeta } from '@/components/ai/ai-insight-meta'
 import { AiSourceRefsList } from '@/components/ai/ai-source-refs'
 import { SellerIntelligencePanels } from '@/components/ai/seller-intelligence-panels'
@@ -300,7 +301,14 @@ export function AiInsightsDashboard() {
               <p className="text-sm text-slate-700 dark:text-slate-200" data-testid="ai-rag-summary">
                 {rag.envelope.summary}
               </p>
-              <AiSourceRefsList refs={rag.envelope.source_refs} />
+              <AiSourceEvidenceList
+                refs={rag.envelope.source_refs}
+                excerpts={
+                  Array.isArray(rag.envelope.details?.excerpts)
+                    ? rag.envelope.details.excerpts
+                    : undefined
+                }
+              />
             </>
           )}
           {!rag.loading && (

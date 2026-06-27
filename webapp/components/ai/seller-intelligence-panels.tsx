@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { AiInsightMeta } from '@/components/ai/ai-insight-meta'
+import { AiSourceEvidenceList } from '@/components/ai/ai-source-evidence-list'
 import { Card } from '@/components/ui/card'
 import { ApiError } from '@/lib/api-client'
 import {
@@ -11,7 +12,7 @@ import {
   fetchSellerListingAdvice,
   fetchSellerNegotiationStrategy,
 } from '@/lib/ai-insights-client'
-import type { AiEnvelope, AiSourceRef } from '@/lib/ai-insights-types'
+import type { AiEnvelope } from '@/lib/ai-insights-types'
 
 type PanelState = {
   envelope: AiEnvelope | null
@@ -61,27 +62,9 @@ function extractCaveats(envelope: AiEnvelope): string[] {
   return [...new Set(caveats)]
 }
 
-function SellerSourceRefs({ refs }: { refs: AiSourceRef[] }) {
-  if (!refs.length) {
-    return <p className="text-xs text-slate-400">No source references.</p>
-  }
-
-  return (
-    <ul className="space-y-1">
-      {refs.slice(0, 8).map((ref, idx) => (
-        <li
-          key={`${ref.source_type}-${ref.source_id}-${idx}`}
-          className="font-mono text-[11px] text-slate-600 dark:text-slate-300"
-          data-testid="seller-intelligence-source-ref"
-        >
-          {ref.source_type}:{ref.source_id.slice(0, 8)}…
-        </li>
-      ))}
-      {refs.length > 8 && (
-        <li className="text-[11px] text-slate-400">+{refs.length - 8} more sources</li>
-      )}
-    </ul>
-  )
+function excerptsFromEnvelope(envelope: AiEnvelope): unknown[] | undefined {
+  const raw = envelope.details?.excerpts
+  return Array.isArray(raw) ? raw : undefined
 }
 
 type SellerCardProps = {
@@ -136,7 +119,12 @@ function SellerIntelligenceCard({
                   ))}
                 </ul>
               )}
-              <SellerSourceRefs refs={state.envelope.source_refs ?? []} />
+              <AiSourceEvidenceList
+                refs={state.envelope.source_refs ?? []}
+                excerpts={excerptsFromEnvelope(state.envelope)}
+                excerptTestId="seller-intelligence-source-excerpt"
+                showPrivacyLabel
+              />
             </>
           )}
           {!state.loading && (

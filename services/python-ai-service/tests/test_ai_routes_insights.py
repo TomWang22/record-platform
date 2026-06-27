@@ -678,6 +678,8 @@ class TestInsightsDegradedPaths(unittest.TestCase):
                 env = _run(insights.seller_listing_advice(user_id="u1"))
         self.assertEqual(env["contract_id"], "listing_advice")
         self.assertIn("weak_listings", env.get("details", {}))
+        self.assertIn("excerpts", env.get("details", {}))
+        self.assertTrue(env["details"]["excerpts"])
 
     def test_seller_negotiation_strategy_no_leakage(self):
         obo = _chunk_row(source_type="obo_offer_summary", content="Status: countered Amount: 4136 USD")

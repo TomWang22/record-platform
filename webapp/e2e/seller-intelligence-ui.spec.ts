@@ -6,6 +6,9 @@ import { ensureTestCollection } from './helpers/seed-collection'
 
 test.describe.configure({ timeout: 180_000 })
 
+const FORBIDDEN_UI =
+  /message_body|thread_text|private obo message|proxy_bids|max_bid_cents/i
+
 const SELLER_ENDPOINTS = [
   {
     panel: 'Listing Advice',
@@ -47,7 +50,7 @@ async function signInFreshContract(page: import('@playwright/test').Page): Promi
   await signInWithToken(page, token, AUTH_EMAIL)
 }
 
-test.describe('Seller intelligence UI (P21.1A)', () => {
+test.describe('Seller intelligence UI (P21.1A / P21.2A)', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext()
     const token = await obtainAuthToken(ctx.request)
@@ -93,22 +96,53 @@ test.describe('Seller intelligence UI (P21.1A)', () => {
 
       const leakage = leakageCheck(text, [])
       expect(leakage).toBe('PASS')
+
+      const card = page.getByTestId(spec.cardTestId)
+      const evidenceItems = card.getByTestId('ai-source-evidence-item')
+      await expect(evidenceItems.first()).toBeVisible({ timeout: 30_000 })
+      expect(await evidenceItems.count()).toBeGreaterThan(0)
+
+      const toggle = evidenceItems.first().getByTestId('ai-source-evidence-toggle')
+      await toggle.click()
+
+      const excerpt = evidenceItems.first().getByTestId('seller-intelligence-source-excerpt')
+      const unavailable = evidenceItems.first().getByTestId('ai-source-evidence-unavailable')
+      const excerptVisible = await excerpt.isVisible().catch(() => false)
+      const unavailableVisible = await unavailable.isVisible().catch(() => false)
+      expect(excerptVisible || unavailableVisible).toBe(true)
+
+      const expandedText =
+        (await excerpt.textContent().catch(() => '')) ||
+        (await unavailable.textContent().catch(() => '')) ||
+        ''
+      expect(expandedText).not.toMatch(FORBIDDEN_UI)
     }
 
     const panel = page.getByTestId('seller-intelligence-panel')
-    const refCount = await panel.getByTestId('seller-intelligence-source-ref').count()
-    expect(refCount).toBeGreaterThan(0)
+    expect(await panel.getByTestId('ai-source-evidence-item').count()).toBeGreaterThan(0)
 
     await expect(page.getByTestId('ai-insights-dashboard-ready')).toBeVisible({ timeout: 120_000 })
     await expect(page.getByTestId('ai-rag-summary')).toBeVisible()
     await expect(page.getByTestId('ai-insight-rag-ready')).toBeVisible()
 
+    const ragCard = page.getByTestId('ai-insight-rag')
+    const ragToggle = ragCard.getByTestId('ai-source-evidence-toggle').first()
+    await expect(ragToggle).toBeVisible({ timeout: 30_000 })
+    await ragToggle.click()
+    const ragExcerpt = ragCard.getByTestId('ai-source-evidence-excerpt')
+    const ragUnavailable = ragCard.getByTestId('ai-source-evidence-unavailable')
+    const ragExcerptOk = await ragExcerpt.isVisible().catch(() => false)
+    const ragUnavailableOk = await ragUnavailable.isVisible().catch(() => false)
+    expect(ragExcerptOk || ragUnavailableOk).toBe(true)
+
     const ragText = (await page.getByTestId('ai-rag-summary').textContent()) ?? ''
     expect(leakageCheck(ragText, [])).toBe('PASS')
     expect(ragText.length).toBeGreaterThan(20)
+    const bodyText = await page.locator('body').innerText()
+    expect(bodyText).not.toMatch(FORBIDDEN_UI)
 
     const elapsed = Date.now() - t0
-    console.log(`\nSeller intelligence UI (P21.1A) — ${SELLER_ENDPOINTS.length}/4 panels · ${elapsed}ms total`)
+    console.log(`\nSeller intelligence UI — ${SELLER_ENDPOINTS.length}/4 panels · ${elapsed}ms total`)
     for (const spec of SELLER_ENDPOINTS) {
       const r = responses[spec.path]
       const summaryEl = page.getByTestId(spec.summaryTestId)

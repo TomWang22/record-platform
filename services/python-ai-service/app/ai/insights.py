@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.ai.envelope import build_envelope, chunk_to_citation, source_ref
@@ -52,6 +53,22 @@ async def _with_conn(fn):
 
 def _join_content(chunks: List[Dict[str, Any]]) -> str:
     return "\n\n".join(c.get("content") or "" for c in chunks)
+
+
+_FORBIDDEN_EXCERPT = re.compile(
+    r"message_body|thread_text|private obo message|proxy_bids|max_bid_cents",
+    re.I,
+)
+
+
+def _sanitized_excerpts(chunks: List[Dict[str, Any]], limit: int = 8) -> List[str]:
+    out: List[str] = []
+    for ch in chunks[:limit]:
+        text = (ch.get("content") or "")[:300]
+        if _FORBIDDEN_EXCERPT.search(text):
+            text = "[redacted — private message content excluded]"
+        out.append(text)
+    return out
 
 
 async def rag_query(
@@ -563,6 +580,7 @@ async def seller_listing_advice(*, user_id: Optional[str]) -> Dict[str, Any]:
     built = build_listing_advice(chunks, refs)
     status = "live" if refs else "degraded"
     details = {k: v for k, v in built.items() if k != "summary"}
+    details["excerpts"] = _sanitized_excerpts(chunks)
     if model_deg:
         details["model_degraded_reason"] = model_deg
     return build_envelope(
@@ -594,6 +612,7 @@ async def seller_negotiation_strategy(*, user_id: Optional[str]) -> Dict[str, An
     status = "live" if refs else "degraded"
     details = {k: v for k, v in built.items() if k != "summary"}
     details["privacy"] = "offer_summaries_only_no_message_bodies"
+    details["excerpts"] = _sanitized_excerpts(chunks)
     if model_deg:
         details["model_degraded_reason"] = model_deg
     return build_envelope(
@@ -624,6 +643,7 @@ async def seller_auction_pressure(*, user_id: Optional[str]) -> Dict[str, Any]:
     built = build_auction_pressure(chunks, refs)
     status = "live" if refs else "degraded"
     details = {k: v for k, v in built.items() if k != "summary"}
+    details["excerpts"] = _sanitized_excerpts(chunks)
     if model_deg:
         details["model_degraded_reason"] = model_deg
     return build_envelope(
@@ -654,6 +674,7 @@ async def seller_collector_metadata_gaps(*, user_id: Optional[str]) -> Dict[str,
     built = build_collector_metadata_gaps(chunks, refs)
     status = "live" if refs else "degraded"
     details = {k: v for k, v in built.items() if k != "summary"}
+    details["excerpts"] = _sanitized_excerpts(chunks)
     if model_deg:
         details["model_degraded_reason"] = model_deg
     return build_envelope(

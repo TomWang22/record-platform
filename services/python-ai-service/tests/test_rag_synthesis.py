@@ -8,6 +8,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.ai.rag_synthesis import (
+    _coerce_chunk_metadata,
     classify_rag_intent,
     synthesize_rag_summary,
 )
@@ -212,6 +213,71 @@ class TestSynthesisTemplates(unittest.TestCase):
         self.assertIn("caveats", out)
         self.assertIn("parsed_signals", out)
         self.assertIsInstance(out["parsed_signals"]["source_types"], list)
+
+
+class TestAuctionMetadataCoercion(unittest.TestCase):
+    """T20.13T — auction_bid_summary metadata must not crash synthesis."""
+
+    def test_coerce_metadata_dict(self):
+        self.assertEqual(_coerce_chunk_metadata({"bid_count": 3})["bid_count"], 3)
+
+    def test_coerce_metadata_json_string(self):
+        self.assertEqual(_coerce_chunk_metadata('{"bid_count": 5, "reserve_met": false}')["bid_count"], 5)
+
+    def test_coerce_metadata_invalid_string(self):
+        self.assertEqual(_coerce_chunk_metadata("{bad json"), {})
+
+    def test_coerce_metadata_missing(self):
+        self.assertEqual(_coerce_chunk_metadata(None), {})
+        self.assertEqual(_coerce_chunk_metadata([]), {})
+
+    def test_auction_bid_summary_metadata_json_string_no_crash(self):
+        chunks = [
+            _chunk("obo_offer_summary", OBO_PENDING),
+            _chunk(
+                "auction_bid_summary",
+                AUCTION,
+                id="c2",
+                metadata='{"bid_count": 6, "reserve_met": false}',
+            ),
+        ]
+        out = synthesize_rag_summary(
+            question="Show bidding and offer activity tied to my recent listings.",
+            chunks=chunks,
+            refs=[_ref("obo_offer_summary"), _ref("auction_bid_summary", "a1")],
+        )
+        self.assertIn("Offer and bidding activity", out["summary"])
+        self.assertIn("bid_spike", out["summary"].lower())
+
+    def test_auction_psychology_prompt_does_not_crash(self):
+        prompt = (
+            "What auction or bidding signals should I watch right now? "
+            "Look for bid activity, urgency, risk, and whether I should adjust listing strategy. "
+            "If there is not enough auction evidence, say so."
+        )
+        chunks = [
+            _chunk(
+                "auction_bid_summary",
+                AUCTION,
+                metadata='{"bid_count": 0}',
+            ),
+        ]
+        out = synthesize_rag_summary(question=prompt, chunks=chunks, refs=[_ref("auction_bid_summary")])
+        self.assertTrue(out["summary"])
+        self.assertNotIn("message_body", out["summary"].lower())
+        self.assertNotIn("thread_text", out["summary"].lower())
+
+    def test_auction_invalid_metadata_still_synthesizes(self):
+        chunks = [
+            _chunk("auction_bid_summary", AUCTION, metadata="not-valid-json"),
+        ]
+        out = synthesize_rag_summary(
+            question="What auction or bidding signals should I watch?",
+            chunks=chunks,
+            refs=[_ref("auction_bid_summary")],
+        )
+        self.assertIn("Offer and bidding activity", out["summary"])
+        self.assertIn("Auction/bid signals", out["summary"])
 
 
 if __name__ == "__main__":

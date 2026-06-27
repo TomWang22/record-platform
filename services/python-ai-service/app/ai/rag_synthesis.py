@@ -1,6 +1,7 @@
 """T20.13I — Deterministic keyword RAG answer synthesis (rule-engine, no LLM)."""
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -49,6 +50,21 @@ def classify_rag_intent(question: str) -> str:
         if any(p in q for p in phrases):
             return intent
     return "generic_grounded"
+
+
+def _coerce_chunk_metadata(meta: Any) -> Dict[str, Any]:
+    """Normalize chunk metadata — dict, JSON string, or invalid → safe dict."""
+    if meta is None:
+        return {}
+    if isinstance(meta, dict):
+        return meta
+    if isinstance(meta, str):
+        try:
+            parsed = json.loads(meta)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
 
 
 def _chunks_by_type(chunks: Sequence[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
@@ -235,7 +251,8 @@ def _synthesize_offer_bidding(chunks: Sequence[Dict[str, Any]], refs: Sequence[D
     auction_chunks = [c for c in chunks if c.get("source_type") == "auction_bid_summary"]
     auction_notes: List[str] = []
     for ch in auction_chunks[:2]:
-        for sig in auction_risk_signals(ch.get("content") or "", ch.get("metadata")):
+        meta = _coerce_chunk_metadata(ch.get("metadata"))
+        for sig in auction_risk_signals(ch.get("content") or "", meta):
             auction_notes.append(f"{sig['code']} ({sig['severity']})")
 
     price_band = (
@@ -354,7 +371,8 @@ def _rank_seller_actions(chunks: Sequence[Dict[str, Any]]) -> List[str]:
                 priority = 1
                 actions.append((priority, f"Review pending offer {_format_obo_line(fact)}"))
         elif st == "auction_bid_summary":
-            for sig in auction_risk_signals(content, ch.get("metadata")):
+            meta = _coerce_chunk_metadata(ch.get("metadata"))
+            for sig in auction_risk_signals(content, meta):
                 if sig["code"] == "ending_soon":
                     actions.append((1, f"Auction ending soon — {sig['detail']}"))
         elif st == "listing_revision":

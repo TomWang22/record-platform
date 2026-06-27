@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 
 import { AiInsightMeta } from '@/components/ai/ai-insight-meta'
 import { AiSourceRefsList } from '@/components/ai/ai-source-refs'
+import { SellerIntelligencePanels } from '@/components/ai/seller-intelligence-panels'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ApiError } from '@/lib/api-client'
@@ -309,6 +310,8 @@ export function AiInsightsDashboard() {
           )}
         </div>
       </Card>
+
+      <SellerIntelligencePanels />
 
       <section className="grid gap-5 lg:grid-cols-2">
         <Card

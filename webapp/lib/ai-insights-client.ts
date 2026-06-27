@@ -78,3 +78,35 @@ export async function fetchBuyerCollectionSummary(): Promise<AiEnvelope> {
     data: {},
   })
 }
+
+export async function fetchSellerListingAdvice(): Promise<AiEnvelope> {
+  return apiFetch<AiEnvelope>('/api/ai/seller/listing-advice', {
+    method: 'POST',
+    auth: true,
+    data: {},
+  })
+}
+
+export async function fetchSellerNegotiationStrategy(): Promise<AiEnvelope> {
+  return apiFetch<AiEnvelope>('/api/ai/seller/negotiation-strategy', {
+    method: 'POST',
+    auth: true,
+    data: {},
+  })
+}
+
+export async function fetchSellerAuctionPressure(): Promise<AiEnvelope> {
+  return apiFetch<AiEnvelope>('/api/ai/seller/auction-pressure', {
+    method: 'POST',
+    auth: true,
+    data: {},
+  })
+}
+
+export async function fetchSellerCollectorMetadataGaps(): Promise<AiEnvelope> {
+  return apiFetch<AiEnvelope>('/api/ai/seller/collector-metadata-gaps', {
+    method: 'POST',
+    auth: true,
+    data: {},
+  })
+}

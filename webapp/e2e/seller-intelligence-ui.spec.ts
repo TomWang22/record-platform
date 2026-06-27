@@ -1,0 +1,121 @@
+import { test, expect } from '@playwright/test'
+
+import { obtainAuthToken, signInWithToken, AUTH_EMAIL } from './helpers/auth'
+import { leakageCheck } from './helpers/ai-rag'
+import { ensureTestCollection } from './helpers/seed-collection'
+
+test.describe.configure({ timeout: 180_000 })
+
+const SELLER_ENDPOINTS = [
+  {
+    panel: 'Listing Advice',
+    path: '/api/ai/seller/listing-advice',
+    cardTestId: 'seller-listing-advice-card',
+    readyTestId: 'seller-listing-advice-ready',
+    summaryTestId: 'seller-listing-advice-summary',
+  },
+  {
+    panel: 'Negotiation Strategy',
+    path: '/api/ai/seller/negotiation-strategy',
+    cardTestId: 'seller-negotiation-strategy-card',
+    readyTestId: 'seller-negotiation-strategy-ready',
+    summaryTestId: 'seller-negotiation-strategy-summary',
+  },
+  {
+    panel: 'Auction Pressure',
+    path: '/api/ai/seller/auction-pressure',
+    cardTestId: 'seller-auction-pressure-card',
+    readyTestId: 'seller-auction-pressure-ready',
+    summaryTestId: 'seller-auction-pressure-summary',
+  },
+  {
+    panel: 'Collector Metadata Gaps',
+    path: '/api/ai/seller/collector-metadata-gaps',
+    cardTestId: 'seller-collector-metadata-card',
+    readyTestId: 'seller-collector-metadata-ready',
+    summaryTestId: 'seller-collector-metadata-summary',
+  },
+] as const
+
+async function signInFreshContract(page: import('@playwright/test').Page): Promise<void> {
+  const res = await page.request.post('/api/auth/login', {
+    data: { email: AUTH_EMAIL, password: 'ContractPass123!' },
+    headers: { 'X-RP-E2E-Contract': '1' },
+  })
+  expect(res.ok(), `fresh login: ${await res.text()}`).toBeTruthy()
+  const { token } = (await res.json()) as { token: string }
+  await signInWithToken(page, token, AUTH_EMAIL)
+}
+
+test.describe('Seller intelligence UI (P21.1A)', () => {
+  test.beforeAll(async ({ browser }) => {
+    const ctx = await browser.newContext()
+    const token = await obtainAuthToken(ctx.request)
+    await ensureTestCollection(ctx.request, token)
+    await ctx.close()
+  })
+
+  test('Seller intelligence UI — four structured panels on /insights', async ({ page }) => {
+    const responses: Record<
+      string,
+      { status: number; ms: number; body: Record<string, unknown> }
+    > = {}
+
+    page.on('response', async (res) => {
+      const path = SELLER_ENDPOINTS.find((s) => res.url().includes(s.path))?.path
+      if (!path || res.request().method() !== 'POST') return
+      const timing = res.request().timing()
+      const ms = timing.responseEnd > 0 ? timing.responseEnd : 0
+      try {
+        const body = (await res.json()) as Record<string, unknown>
+        responses[path] = { status: res.status(), ms, body }
+      } catch {
+        responses[path] = { status: res.status(), ms, body: {} }
+      }
+    })
+
+    await signInFreshContract(page)
+    const t0 = Date.now()
+    await page.goto('/insights', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.getByTestId('seller-intelligence-panel')).toBeVisible({ timeout: 120_000 })
+
+    for (const spec of SELLER_ENDPOINTS) {
+      await expect(page.getByTestId(spec.cardTestId)).toBeVisible({ timeout: 120_000 })
+      await expect(page.getByTestId(spec.readyTestId)).toBeVisible({ timeout: 120_000 })
+      const summary = page.getByTestId(spec.summaryTestId)
+      await expect(summary).toBeVisible({ timeout: 120_000 })
+      const text = (await summary.textContent()) ?? ''
+      expect(text.length).toBeGreaterThan(20)
+
+      const resp = responses[spec.path]
+      expect(resp, `missing response for ${spec.path}`).toBeTruthy()
+      expect(resp.status).toBe(200)
+
+      const leakage = leakageCheck(text, [])
+      expect(leakage).toBe('PASS')
+    }
+
+    const panel = page.getByTestId('seller-intelligence-panel')
+    const refCount = await panel.getByTestId('seller-intelligence-source-ref').count()
+    expect(refCount).toBeGreaterThan(0)
+
+    await expect(page.getByTestId('ai-insights-dashboard-ready')).toBeVisible({ timeout: 120_000 })
+    await expect(page.getByTestId('ai-rag-summary')).toBeVisible()
+    await expect(page.getByTestId('ai-insight-rag-ready')).toBeVisible()
+
+    const ragText = (await page.getByTestId('ai-rag-summary').textContent()) ?? ''
+    expect(leakageCheck(ragText, [])).toBe('PASS')
+    expect(ragText.length).toBeGreaterThan(20)
+
+    const elapsed = Date.now() - t0
+    console.log(`\nSeller intelligence UI (P21.1A) — ${SELLER_ENDPOINTS.length}/4 panels · ${elapsed}ms total`)
+    for (const spec of SELLER_ENDPOINTS) {
+      const r = responses[spec.path]
+      const summaryEl = page.getByTestId(spec.summaryTestId)
+      const chars = ((await summaryEl.textContent()) ?? '').length
+      console.log(
+        `${spec.panel}: http=${r?.status ?? '?'} ms=${Math.round(r?.ms ?? 0)} summary=${chars}chars`,
+      )
+    }
+  })
+})

@@ -123,6 +123,38 @@ async def post_buyer_collection_summary(
     return await insights.buyer_collection_summary(user_id=_user_id(x_user_id, body.user_id))
 
 
+@router.post("/seller/listing-advice")
+async def post_seller_listing_advice(
+    body: UserBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.seller_listing_advice(user_id=_user_id(x_user_id, body.user_id))
+
+
+@router.post("/seller/negotiation-strategy")
+async def post_seller_negotiation_strategy(
+    body: UserBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.seller_negotiation_strategy(user_id=_user_id(x_user_id, body.user_id))
+
+
+@router.post("/seller/auction-pressure")
+async def post_seller_auction_pressure(
+    body: UserBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.seller_auction_pressure(user_id=_user_id(x_user_id, body.user_id))
+
+
+@router.post("/seller/collector-metadata-gaps")
+async def post_seller_collector_metadata_gaps(
+    body: UserBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.seller_collector_metadata_gaps(user_id=_user_id(x_user_id, body.user_id))
+
+
 @router.get("/offer-insights")
 async def get_offer_insights(
     listing_id: str = Query(..., min_length=8),

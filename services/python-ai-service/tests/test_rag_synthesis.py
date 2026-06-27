@@ -280,5 +280,113 @@ class TestAuctionMetadataCoercion(unittest.TestCase):
         self.assertIn("Auction/bid signals", out["summary"])
 
 
+class TestT2013XLongformSynthesis(unittest.TestCase):
+    """T20.13X — longform seller strategist synthesis."""
+
+    def _chunks(self):
+        return [
+            _chunk("listing", LISTING),
+            _chunk("obo_offer_summary", OBO_COUNTERED, id="c2"),
+            _chunk("obo_offer_summary", OBO_PENDING, id="c3"),
+        ]
+
+    def _refs(self):
+        return [_ref("listing"), _ref("obo_offer_summary", "o1")]
+
+    def test_tagged_executive_summary(self):
+        prompt = (
+            "ACCUMULATED SESSION CONTEXT:\nTurn 1: prior advice\n\n"
+            "Give me a final 10-bullet seller plan I can act on today, with each bullet tagged as "
+            "[grounded], [missing evidence], or [needs manual review]."
+        )
+        out = synthesize_rag_summary(question=prompt, chunks=self._chunks(), refs=self._refs())
+        self.assertEqual(out["template"], "tagged_executive_summary")
+        self.assertIn("[grounded]", out["summary"])
+        self.assertIn("[missing evidence]", out["summary"])
+        self.assertIn("[needs manual review]", out["summary"])
+        self.assertNotIn("Private negotiation context", out["summary"])
+
+    def test_self_review_overclaiming(self):
+        prompt = (
+            "ACCUMULATED SESSION CONTEXT:\n...\n\n"
+            "Review your own advice. Identify any place where you may have overclaimed "
+            "buyer psychology, rarity, auction urgency, or condition."
+        )
+        out = synthesize_rag_summary(question=prompt, chunks=self._chunks(), refs=self._refs())
+        self.assertEqual(out["template"], "self_review_overclaim")
+        self.assertIn("overclaim", out["summary"].lower())
+        self.assertIn("cannot be inferred", out["summary"].lower())
+
+    def test_seller_tradeoff_stale_jazz(self):
+        prompt = (
+            "Additional seller context: I care more about moving stale inventory than maximizing top dollar. "
+            "I also want to avoid underselling rare jazz records. Re-rank your advice with that tradeoff."
+        )
+        out = synthesize_rag_summary(question=prompt, chunks=self._chunks(), refs=self._refs())
+        self.assertEqual(out["template"], "seller_tradeoff")
+        self.assertIn("Seller tradeoff:", out["summary"])
+        self.assertIn("stale inventory", out["summary"].lower())
+        self.assertIn("rare jazz", out["summary"].lower())
+
+    def test_collector_metadata_gaps(self):
+        prompt = (
+            "Think like a serious vinyl collector. Which listing details are missing or weak: "
+            "pressing, condition, title, price, scarcity, seller notes, or provenance?"
+        )
+        out = synthesize_rag_summary(question=prompt, chunks=self._chunks(), refs=self._refs())
+        self.assertEqual(out["template"], "collector_metadata_gaps")
+        self.assertIn("Collector metadata check:", out["summary"])
+        self.assertIn("Title:", out["summary"])
+        self.assertIn("Pressing:", out["summary"])
+
+    def test_final_action_plan_longform(self):
+        prompt = (
+            "ACCUMULATED SESSION CONTEXT:\nTurn 9 tradeoff\n\n"
+            "Using everything above, produce a final seller action plan for today."
+        )
+        out = synthesize_rag_summary(question=prompt, chunks=self._chunks(), refs=self._refs())
+        self.assertEqual(out["template"], "final_action_plan")
+        self.assertIn("Urgent offer actions", out["summary"])
+        self.assertIn("Not allowed to infer", out["summary"])
+        self.assertGreater(len(out["summary"]), 200)
+
+    def test_negotiation_strategy_conservative(self):
+        out = synthesize_rag_summary(
+            question="For active OBO or offer activity, what should I accept, counter, or review?",
+            chunks=self._chunks(),
+            refs=self._refs(),
+        )
+        self.assertEqual(out["template"], "negotiation_strategy")
+        self.assertIn("review", out["summary"].lower())
+        self.assertNotIn("message_body", out["summary"].lower())
+
+    def test_auction_pressure_no_hallucination(self):
+        out = synthesize_rag_summary(
+            question="Now focus on auction or bidding signals. Is there urgency, thin demand, bid risk?",
+            chunks=self._chunks(),
+            refs=self._refs(),
+        )
+        self.assertEqual(out["template"], "auction_pressure")
+        self.assertIn("Not enough auction evidence", out["summary"])
+
+    def test_no_hallucinated_rarity(self):
+        out = synthesize_rag_summary(
+            question="Re-rank with rare jazz tradeoff",
+            chunks=[_chunk("listing", LISTING)],
+            refs=[_ref("listing")],
+        )
+        self.assertNotIn("definitely rare", out["summary"].lower())
+        self.assertIn("manual review", out["summary"].lower())
+
+    def test_no_old_boilerplate(self):
+        out = synthesize_rag_summary(
+            question="ACCUMULATED SESSION CONTEXT:\n\nUsing everything above, final seller action plan",
+            chunks=self._chunks(),
+            refs=self._refs(),
+        )
+        self.assertNotIn("Retrieved 8 grounded excerpts", out["summary"])
+        self.assertNotIn("Private negotiation context (offer summaries only", out["summary"])
+
+
 if __name__ == "__main__":
     unittest.main()

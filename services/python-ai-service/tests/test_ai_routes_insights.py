@@ -115,6 +115,30 @@ class TestRoutes(unittest.TestCase):
         r = self.client.post("/ai/seller/summary", json={"user_id": "u1"})
         self.assertEqual(r.status_code, 200)
 
+    @patch.object(insights, "seller_listing_advice", new_callable=AsyncMock)
+    def test_post_seller_listing_advice(self, mock_fn):
+        mock_fn.return_value = {"contract_id": "listing_advice"}
+        r = self.client.post("/ai/seller/listing-advice", json={"user_id": "u1"})
+        self.assertEqual(r.status_code, 200)
+
+    @patch.object(insights, "seller_negotiation_strategy", new_callable=AsyncMock)
+    def test_post_seller_negotiation_strategy(self, mock_fn):
+        mock_fn.return_value = {"contract_id": "negotiation_strategy"}
+        r = self.client.post("/ai/seller/negotiation-strategy", json={"user_id": "u1"})
+        self.assertEqual(r.status_code, 200)
+
+    @patch.object(insights, "seller_auction_pressure", new_callable=AsyncMock)
+    def test_post_seller_auction_pressure(self, mock_fn):
+        mock_fn.return_value = {"contract_id": "auction_pressure"}
+        r = self.client.post("/ai/seller/auction-pressure", json={"user_id": "u1"})
+        self.assertEqual(r.status_code, 200)
+
+    @patch.object(insights, "seller_collector_metadata_gaps", new_callable=AsyncMock)
+    def test_post_seller_collector_metadata_gaps(self, mock_fn):
+        mock_fn.return_value = {"contract_id": "collector_metadata_gaps"}
+        r = self.client.post("/ai/seller/collector-metadata-gaps", json={"user_id": "u1"})
+        self.assertEqual(r.status_code, 200)
+
     @patch.object(insights, "buyer_collection_summary", new_callable=AsyncMock)
     def test_post_buyer_collection(self, mock_fn):
         mock_fn.return_value = {"contract_id": "buyer_collection_summary"}
@@ -646,6 +670,40 @@ class TestInsightsDegradedPaths(unittest.TestCase):
                 env = _run(insights.offer_insights(user_id=None, listing_id="L1"))
         codes = [s["code"] for s in env.get("details", {}).get("signals", [])]
         self.assertIn("stale_offer", codes)
+
+    def test_seller_listing_advice_live(self):
+        conn = FakeConn(fetch_rows=[_chunk_row(source_type="listing")])
+        with patch.object(insights, "get_pool", AsyncMock(return_value=self._mock_pool(conn))):
+            with patch.object(insights, "resolve_model_used", AsyncMock(return_value=("rule-engine", None))):
+                env = _run(insights.seller_listing_advice(user_id="u1"))
+        self.assertEqual(env["contract_id"], "listing_advice")
+        self.assertIn("weak_listings", env.get("details", {}))
+
+    def test_seller_negotiation_strategy_no_leakage(self):
+        obo = _chunk_row(source_type="obo_offer_summary", content="Status: countered Amount: 4136 USD")
+        conn = FakeConn(fetch_rows=[obo])
+        with patch.object(insights, "get_pool", AsyncMock(return_value=self._mock_pool(conn))):
+            with patch.object(insights, "resolve_model_used", AsyncMock(return_value=("rule-engine", None))):
+                env = _run(insights.seller_negotiation_strategy(user_id="u1"))
+        self.assertEqual(env["contract_id"], "negotiation_strategy")
+        self.assertNotIn("message_body", env.get("summary", "").lower())
+        self.assertTrue(env["details"].get("private_messages_excluded"))
+
+    def test_seller_auction_pressure_missing_evidence(self):
+        conn = FakeConn(fetch_rows=[_chunk_row(source_type="listing")])
+        with patch.object(insights, "get_pool", AsyncMock(return_value=self._mock_pool(conn))):
+            with patch.object(insights, "resolve_model_used", AsyncMock(return_value=("rule-engine", None))):
+                env = _run(insights.seller_auction_pressure(user_id="u1"))
+        self.assertEqual(env["contract_id"], "auction_pressure")
+        self.assertIn("Not enough auction evidence", env.get("summary", ""))
+
+    def test_seller_collector_metadata_gaps(self):
+        conn = FakeConn(fetch_rows=[_chunk_row(source_type="listing", content="Seller listing: Jazz LP Status: active Price: 45")])
+        with patch.object(insights, "get_pool", AsyncMock(return_value=self._mock_pool(conn))):
+            with patch.object(insights, "resolve_model_used", AsyncMock(return_value=("rule-engine", None))):
+                env = _run(insights.seller_collector_metadata_gaps(user_id="u1"))
+        self.assertEqual(env["contract_id"], "collector_metadata_gaps")
+        self.assertIn("fields", env.get("details", {}))
 
 
 class TestRagRetrievalExtras(unittest.TestCase):

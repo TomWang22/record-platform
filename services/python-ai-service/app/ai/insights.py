@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.ai.envelope import build_envelope, chunk_to_citation, source_ref
 from app.ai.outbox import insert_pricing_recommendation_outbox, publish_python_ai_outbox_tick
@@ -18,7 +18,13 @@ from app.ai.rag_retrieval import (
     retrieve_chunks,
     retrieve_chunks_vector_shadow,
 )
-from app.ai.rag_synthesis import synthesize_rag_summary
+from app.ai.rag_synthesis import (
+    build_auction_pressure,
+    build_collector_metadata_gaps,
+    build_listing_advice,
+    build_negotiation_strategy,
+    synthesize_rag_summary,
+)
 from app.db import get_pool
 
 
@@ -526,3 +532,137 @@ async def offer_insights(*, user_id: Optional[str], listing_id: str) -> Dict[str
             await publish_python_ai_outbox_tick(conn)
         await _with_conn(persist)
     return envelope
+
+
+async def _seller_scoped_chunks(*, user_id: Optional[str], query: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    async def run(conn):
+        return await retrieve_chunks(
+            conn,
+            query=query,
+            user_id=user_id,
+            source_types=["listing", "obo_offer_summary", "auction_bid_summary", "listing_revision"],
+            max_chunks=10,
+        )
+
+    return await _with_conn(run)
+
+
+async def seller_listing_advice(*, user_id: Optional[str]) -> Dict[str, Any]:
+    result, err = await _seller_scoped_chunks(user_id=user_id, query="listing health weak buyer interest revision")
+    model_used, model_deg = await resolve_model_used()
+    if err:
+        return build_envelope(
+            "listing_advice",
+            source_status="degraded",
+            model_used="none",
+            summary="Listing advice unavailable",
+            degraded_reason=err,
+        )
+    chunks = result["chunks"]
+    refs = result["source_refs"]
+    built = build_listing_advice(chunks, refs)
+    status = "live" if refs else "degraded"
+    details = {k: v for k, v in built.items() if k != "summary"}
+    if model_deg:
+        details["model_degraded_reason"] = model_deg
+    return build_envelope(
+        "listing_advice",
+        source_status=status,
+        model_used=model_used,
+        summary=built["summary"],
+        details=details,
+        source_refs=refs,
+        confidence=0.55 if refs else 0.0,
+        degraded_reason=None if status == "live" else "no_seller_corpus",
+    )
+
+
+async def seller_negotiation_strategy(*, user_id: Optional[str]) -> Dict[str, Any]:
+    result, err = await _seller_scoped_chunks(user_id=user_id, query="obo offer counter pending negotiation")
+    model_used, model_deg = await resolve_model_used()
+    if err:
+        return build_envelope(
+            "negotiation_strategy",
+            source_status="degraded",
+            model_used="none",
+            summary="Negotiation strategy unavailable",
+            degraded_reason=err,
+        )
+    chunks = result["chunks"]
+    refs = result["source_refs"]
+    built = build_negotiation_strategy(chunks, refs)
+    status = "live" if refs else "degraded"
+    details = {k: v for k, v in built.items() if k != "summary"}
+    details["privacy"] = "offer_summaries_only_no_message_bodies"
+    if model_deg:
+        details["model_degraded_reason"] = model_deg
+    return build_envelope(
+        "negotiation_strategy",
+        source_status=status,
+        model_used=model_used,
+        summary=built["summary"],
+        details=details,
+        source_refs=refs,
+        confidence=0.5 if built.get("offers") else 0.25,
+        degraded_reason=None if status == "live" else "no_obo_corpus",
+    )
+
+
+async def seller_auction_pressure(*, user_id: Optional[str]) -> Dict[str, Any]:
+    result, err = await _seller_scoped_chunks(user_id=user_id, query="auction bid urgency ending soon")
+    model_used, model_deg = await resolve_model_used()
+    if err:
+        return build_envelope(
+            "auction_pressure",
+            source_status="degraded",
+            model_used="none",
+            summary="Auction pressure unavailable",
+            degraded_reason=err,
+        )
+    chunks = result["chunks"]
+    refs = result["source_refs"]
+    built = build_auction_pressure(chunks, refs)
+    status = "live" if refs else "degraded"
+    details = {k: v for k, v in built.items() if k != "summary"}
+    if model_deg:
+        details["model_degraded_reason"] = model_deg
+    return build_envelope(
+        "auction_pressure",
+        source_status=status,
+        model_used=model_used,
+        summary=built["summary"],
+        details=details,
+        source_refs=refs,
+        confidence=0.45 if built.get("signals") else 0.2,
+        degraded_reason=None if status == "live" else "no_auction_corpus",
+    )
+
+
+async def seller_collector_metadata_gaps(*, user_id: Optional[str]) -> Dict[str, Any]:
+    result, err = await _seller_scoped_chunks(user_id=user_id, query="listing pressing condition provenance scarcity")
+    model_used, model_deg = await resolve_model_used()
+    if err:
+        return build_envelope(
+            "collector_metadata_gaps",
+            source_status="degraded",
+            model_used="none",
+            summary="Collector metadata gaps unavailable",
+            degraded_reason=err,
+        )
+    chunks = result["chunks"]
+    refs = result["source_refs"]
+    built = build_collector_metadata_gaps(chunks, refs)
+    status = "live" if refs else "degraded"
+    details = {k: v for k, v in built.items() if k != "summary"}
+    if model_deg:
+        details["model_degraded_reason"] = model_deg
+    return build_envelope(
+        "collector_metadata_gaps",
+        source_status=status,
+        model_used=model_used,
+        summary=built["summary"],
+        details=details,
+        source_refs=refs,
+        confidence=0.5 if refs else 0.0,
+        degraded_reason=None if status == "live" else "no_listing_corpus",
+    )

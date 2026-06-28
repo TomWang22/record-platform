@@ -213,6 +213,28 @@ export function buildTurnPrompt(
   return { prompt, accumulated_context_chars: accumulated.length + prefs.length }
 }
 
+/** Match RAG POST body to a specific longform turn (avoids accumulated-context collisions). */
+export function ragQueryMatchesTurn(turnId: string, question: string, fullPrompt: string): boolean {
+  const q = question ?? ''
+  if (!q) return false
+
+  switch (turnId) {
+    case 'executive_summary':
+      return /Give me a final 10-bullet seller plan/i.test(q) && /\[grounded\]/i.test(q)
+    case 'red_team_overclaim':
+      return (
+        /Review your own advice/i.test(q) &&
+        /overclaimed buyer psychology|rarity, auction urgency, or condition/i.test(q)
+      )
+    case 'final_action_plan_long':
+      return /Using everything above, produce a final seller action plan for today/i.test(q)
+    case 'user_tradeoff_rerank':
+      return /Additional seller context: I care more about moving stale inventory/i.test(q)
+    default:
+      return q === fullPrompt || q.endsWith(fullPrompt)
+  }
+}
+
 export function evaluateLongformTurn(
   turnId: string,
   turnIndex: number,

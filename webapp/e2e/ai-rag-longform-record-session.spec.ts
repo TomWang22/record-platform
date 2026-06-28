@@ -14,6 +14,7 @@ import {
   extractApiExcerpts,
   extractShadowTelemetry,
   printLongformConsoleSummary,
+  ragQueryMatchesTurn,
   writeLongformArtifacts,
   type LongformSessionResult,
   type LongformTurnResult,
@@ -87,11 +88,7 @@ test.describe('AI longform record collector RAG session (T20.13V)', () => {
           }
           try {
             const data = res.request().postDataJSON() as { question?: string }
-            const q = data?.question ?? ''
-            if (prompt_chars > 2000) {
-              return q.startsWith('ACCUMULATED SESSION CONTEXT')
-            }
-            return q === prompt
+            return ragQueryMatchesTurn(id, data?.question ?? '', prompt)
           } catch {
             return false
           }
@@ -153,8 +150,21 @@ test.describe('AI longform record collector RAG session (T20.13V)', () => {
 
       let answerText = ''
       const summary = page.getByTestId('ai-rag-summary')
-      if (envelope?.summary) {
-        await expect(summary).toContainText(envelope.summary.slice(0, 40).trim(), { timeout: 120_000 })
+      if (id === 'executive_summary') {
+        await expect(summary).toContainText('[grounded]', { timeout: 120_000 })
+        await expect(summary).toContainText('[missing evidence]', { timeout: 120_000 })
+        await expect(summary).toContainText('[needs manual review]', { timeout: 120_000 })
+        answerText = (await summary.innerText()).trim()
+        expect(envelope?.summary ?? '').toMatch(/\[grounded\]/i)
+        expect(envelope?.summary ?? '').toMatch(/\[missing evidence\]/i)
+        expect(envelope?.summary ?? '').toMatch(/\[needs manual review\]/i)
+      } else if (envelope?.summary) {
+        const marker =
+          envelope.summary
+            .split('\n')
+            .map((line) => line.trim())
+            .find((line) => line.length > 12)?.slice(0, 48) ?? envelope.summary.slice(0, 40).trim()
+        await expect(summary).toContainText(marker, { timeout: 120_000 })
         answerText = (await summary.innerText()).trim()
       } else {
         const errorEl = ragPanel.locator('p.text-rose-600')
@@ -260,7 +270,9 @@ test.describe('AI longform record collector RAG session (T20.13V)', () => {
     expect(session.aggregate.http_500_count).toBe(0)
     expect(session.aggregate.leakage).toBe('PASS')
     expect(session.aggregate.old_boilerplate_regression).toBe(false)
-    expect.soft(session.turns[11].answer_text).toMatch(/\[(grounded|missing evidence|needs manual review)\]/i)
-    expect.soft(session.aggregate.avg_score).toBeGreaterThanOrEqual(3.5)
+    expect(session.turns[11].answer_text).toMatch(/\[grounded\]/i)
+    expect(session.turns[11].answer_text).toMatch(/\[missing evidence\]/i)
+    expect(session.turns[11].answer_text).toMatch(/\[needs manual review\]/i)
+    expect(session.aggregate.avg_score).toBeGreaterThanOrEqual(3.5)
   })
 })

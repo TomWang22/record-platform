@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 import { AiInsightMeta } from '@/components/ai/ai-insight-meta'
 import { AiSourceEvidenceList } from '@/components/ai/ai-source-evidence-list'
+import { CollectorMetadataFieldMap } from '@/components/ai/collector-metadata-field-map'
 import { Card } from '@/components/ui/card'
 import { ApiError } from '@/lib/api-client'
 import {
@@ -75,6 +76,7 @@ type SellerCardProps = {
   readyTestId: string
   state: PanelState
   showPrivacyNote?: boolean
+  renderDetails?: (envelope: AiEnvelope) => ReactNode
 }
 
 function SellerIntelligenceCard({
@@ -85,6 +87,7 @@ function SellerIntelligenceCard({
   readyTestId,
   state,
   showPrivacyNote,
+  renderDetails,
 }: SellerCardProps) {
   const caveats = state.envelope ? extractCaveats(state.envelope) : []
 
@@ -107,6 +110,7 @@ function SellerIntelligenceCard({
               >
                 {state.envelope.summary}
               </p>
+              {renderDetails?.(state.envelope)}
               {showPrivacyNote && (
                 <p className="text-xs text-slate-500">
                   Private message bodies were not used.
@@ -213,6 +217,9 @@ export function SellerIntelligencePanels() {
           summaryTestId="seller-collector-metadata-summary"
           readyTestId="seller-collector-metadata-ready"
           state={collectorMetadata}
+          renderDetails={(envelope) => (
+            <CollectorMetadataFieldMap details={envelope.details ?? {}} />
+          )}
         />
       </div>
     </section>

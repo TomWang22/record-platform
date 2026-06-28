@@ -116,6 +116,16 @@ test.describe('Seller intelligence UI (P21.1A / P21.2A)', () => {
         (await unavailable.textContent().catch(() => '')) ||
         ''
       expect(expandedText).not.toMatch(FORBIDDEN_UI)
+
+      if (spec.path === '/api/ai/seller/collector-metadata-gaps') {
+        await expect(card.getByTestId('collector-metadata-field-map')).toBeVisible({
+          timeout: 30_000,
+        })
+        await expect(card.getByTestId('collector-metadata-completeness-score')).toBeVisible()
+        await expect(card.getByTestId('collector-metadata-high-priority-missing')).toBeVisible()
+        await expect(card.getByTestId('collector-metadata-recommended-edits')).toBeVisible()
+        expect(await card.getByTestId('collector-metadata-field-row').count()).toBeGreaterThan(0)
+      }
     }
 
     const panel = page.getByTestId('seller-intelligence-panel')

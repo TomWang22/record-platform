@@ -1,7 +1,8 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-28 (P21.8 release closeout)  
-**Current main SHA:** `13bc0ad` (verify at commit time)  
+**Last updated:** 2026-06-28 (P21.8R SHA reconciliation)  
+**Current main SHA:** `4eb1fc3` (verify at commit time)  
+**Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **READY FOR RELEASE** — non-vector seller intelligence product track **CLOSED**  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
@@ -12,7 +13,7 @@ Use this document as the **source of truth** for Phase 21 state. For Phase 20 ve
 ## Locked takeaway
 
 ```text
-Phase 21 non-vector seller intelligence: READY FOR RELEASE (closeout @ 13bc0ad)
+Phase 21 non-vector seller intelligence: READY FOR RELEASE (closeout @ 4eb1fc3; validation @ 13bc0ad)
 
 Production path:
 - retrieval: keyword
@@ -118,7 +119,7 @@ Key files:
 
 ---
 
-## Validation metrics (P21.7B final)
+## Validation metrics (P21.7B final @ `13bc0ad`)
 
 | Metric | Value | Gate |
 | ------ | ----: | ---- |

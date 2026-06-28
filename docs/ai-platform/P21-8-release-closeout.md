@@ -1,7 +1,8 @@
 # P21.8 — Phase 21 non-vector seller intelligence release closeout
 
 **Generated:** 2026-06-28  
-**Final main SHA:** `13bc0ad`  
+**Final main SHA:** `4eb1fc3`  
+**Final validation SHA (P21.7B):** `13bc0ad`  
 **Release note:** `docs/release/rp-ai-phase-21-non-vector-seller-intelligence.md`  
 **Agent context:** `docs/ai-platform/PHASE_21_COPILOT_CONTEXT.md`
 
@@ -99,7 +100,7 @@ rp-ai-phase-21-non-vector-seller-intelligence-20260628
 Suggested commands (do not run without approval):
 
 ```bash
-git tag -a rp-ai-phase-21-non-vector-seller-intelligence-20260628 13bc0ad \
+git tag -a rp-ai-phase-21-non-vector-seller-intelligence-20260628 4eb1fc3 \
   -m "Phase 21 non-vector seller intelligence — keyword/rule-engine product release"
 git push origin rp-ai-phase-21-non-vector-seller-intelligence-20260628
 ```
@@ -119,6 +120,7 @@ git push origin rp-ai-phase-21-non-vector-seller-intelligence-20260628
 | P21.6 | Latency burn-down | CLOSED |
 | P21.7 | RC + final validation | CLOSED |
 | P21.8 | Release closeout | CLOSED |
+| P21.8R | Closeout SHA reconciliation | CLOSED |
 
 ---
 

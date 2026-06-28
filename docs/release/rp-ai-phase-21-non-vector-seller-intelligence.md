@@ -7,7 +7,8 @@ Edge: `https://record-platform.test` (strict TLS only)
 
 | Field | Value |
 | ----- | ----- |
-| Closeout SHA | `13bc0ad` (P21.7B validation + P21.8 closeout) |
+| Closeout SHA | `4eb1fc3` (P21.8 + P21.8R closeout) |
+| Final validation SHA | `13bc0ad` (P21.7B) |
 | Phase | **21 — Non-vector seller intelligence product track** |
 | Phase 20 | **LOCKED** — `docs/release/rp-ai-phase-20-hardening-20260625.md` |
 | Vector rollout | **NOT APPROVED** |

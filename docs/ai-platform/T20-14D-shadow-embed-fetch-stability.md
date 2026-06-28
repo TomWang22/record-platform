@@ -78,10 +78,13 @@ bash scripts/rp-och-decontaminate-scan.sh
 Deploy required before cluster shadow timing reflects D changes:
 
 ```bash
-docker build -f services/python-ai-service/Dockerfile -t python-ai-service:dev .
+docker build -f services/python-ai-service/Dockerfile -t python-ai-service:t20-p214 .
+kubectl -n record-platform set image deployment/python-ai-service app=python-ai-service:t20-p214
 kubectl -n record-platform rollout restart deployment/python-ai-service
 kubectl -n record-platform rollout status deployment/python-ai-service --timeout=180s
 ```
+
+**Note:** Cluster dev overlay uses tag `t20-p214`, not `:dev`.
 
 ---
 

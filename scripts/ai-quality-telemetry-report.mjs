@@ -237,7 +237,24 @@ export function aggregateTelemetry(repoRoot, opts = {}) {
   let longformSession = null;
   /** @type {Record<string, unknown>|null} */
   let inferenceSession = null;
+  /** @type {Record<string, unknown>|null} */
+  let sellerSession = null;
 
+  if (roots.sellerIntel) {
+    try {
+      sellerSession = JSON.parse(readFileSync(roots.sellerIntel, 'utf8'));
+      const panels = /** @type {Record<string, unknown>[]} */ (sellerSession.panels ?? []);
+      for (const p of panels) {
+        const apiMs = Number(p.api_ms ?? 0);
+        if (apiMs > 0) apiLatencies.push(apiMs);
+        httpTotal += 1;
+        if (Number(p.http_status) === 200) http200 += 1;
+        if (p.leakage_result !== 'PASS') leakagePass = false;
+      }
+    } catch {
+      sellerSession = null;
+    }
+  }
   if (roots.recordIntel) {
     recordSession = JSON.parse(readFileSync(roots.recordIntel, 'utf8'));
     const cases = /** @type {Record<string, unknown>[]} */ (recordSession.cases ?? []);
@@ -303,13 +320,10 @@ export function aggregateTelemetry(repoRoot, opts = {}) {
 
   const stamps = { ...loadStamps(repoRoot), ...(opts.stamps ?? {}) };
   let sellerPanelsPassed = stamps['seller-intelligence'] ?? null;
-  if (roots.sellerIntel) {
-    try {
-      const sellerSession = JSON.parse(readFileSync(roots.sellerIntel, 'utf8'));
-      sellerPanelsPassed = Number(sellerSession.aggregate?.panels_pass ?? sellerPanelsPassed);
-    } catch {
-      /* ignore */
-    }
+  if (sellerSession) {
+    sellerPanelsPassed = Number(
+      sellerSession.aggregate?.panels_passed ?? sellerSession.aggregate?.panels_pass ?? sellerPanelsPassed,
+    );
   }
 
   const contract = loadContractAudit(repoRoot);
@@ -339,6 +353,9 @@ export function aggregateTelemetry(repoRoot, opts = {}) {
     final_turn_score: longformAgg.final_turn_score ?? null,
     seller_panels_count: EXPECTED_SELLER_PANELS,
     seller_panels_passed: sellerPanelsPassed,
+    seller_dashboard_ready_ms: sellerSession?.seller_dashboard_ready_ms ?? null,
+    seller_panel_api_p95_ms: sellerSession?.aggregate?.p95_api_ms ?? null,
+    rag_ready_ms: sellerSession?.rag_ready_ms ?? null,
     endpoint_http_200_count: http200,
     endpoint_http_total: httpTotal,
     endpoint_latency_p50_ms: percentile(apiLatencies, 50),
@@ -422,6 +439,9 @@ export function buildMarkdownReport(summary) {
     `- Structured contract checks: **${m.structured_endpoint_pass_count}/${m.structured_endpoint_total}** pass`,
     `- Contract audit exit: **${m.contract_audit_exit_code ?? 'n/a'}**`,
     `- Seller panels passed: **${m.seller_panels_passed ?? 'unknown'}/${m.seller_panels_count}**`,
+    `- Seller dashboard ready: **${fmt(m.seller_dashboard_ready_ms)} ms**`,
+    `- Seller panel API p95: **${fmt(m.seller_panel_api_p95_ms)} ms**`,
+    `- RAG ready (seller run): **${fmt(m.rag_ready_ms)} ms**`,
     '',
     '## 5. Source evidence coverage',
     '',

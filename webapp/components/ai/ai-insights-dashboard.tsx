@@ -68,7 +68,7 @@ export function AiInsightsDashboard() {
   const [auctionListingId, setAuctionListingId] = useState('')
   const [ragQuestion, setRagQuestion] = useState('listing price condition shipping')
 
-  const [rag, setRag] = useState<PanelState>({ ...EMPTY_PANEL, loading: true })
+  const [rag, setRag] = useState<PanelState>(EMPTY_PANEL)
   const [valuation, setValuation] = useState<PanelState>({ ...EMPTY_PANEL, loading: true })
   const [pricing, setPricing] = useState<PanelState>({ ...EMPTY_PANEL, loading: true })
   const [obo, setObo] = useState<PanelState>(EMPTY_PANEL)
@@ -218,33 +218,74 @@ export function AiInsightsDashboard() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const ids = await loadContextIds()
+      await loadContextIds()
       if (cancelled) return
-      await Promise.all([
-        loadRag(ragQuestion),
-        loadValuation(ids.recId),
-        loadPricing(ids.listId),
-        loadObo(ids.listId),
-        loadAuction(ids.auctionId),
-        loadSeller(),
-        loadBuyer(),
-      ])
-      if (!cancelled) setDashboardReady(true)
+      setDashboardReady(true)
     })()
     return () => {
       cancelled = true
     }
-  }, [
-    loadContextIds,
-    loadRag,
-    loadValuation,
-    loadPricing,
-    loadObo,
-    loadAuction,
-    loadSeller,
-    loadBuyer,
-    ragQuestion,
-  ])
+  }, [loadContextIds])
+
+  useEffect(() => {
+    let cancelled = false
+    let idleId: number | undefined
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    const loadSecondaryPanels = () => {
+      if (cancelled) return
+      void (async () => {
+        const ids = await loadContextIds()
+        if (cancelled) return
+        await Promise.all([
+          loadValuation(ids.recId),
+          loadPricing(ids.listId),
+          loadObo(ids.listId),
+          loadAuction(ids.auctionId),
+          loadSeller(),
+          loadBuyer(),
+        ])
+      })()
+    }
+
+    if (typeof requestIdleCallback !== 'undefined') {
+      idleId = requestIdleCallback(loadSecondaryPanels, { timeout: 2500 })
+    } else {
+      timeoutId = setTimeout(loadSecondaryPanels, 100)
+    }
+
+    return () => {
+      cancelled = true
+      if (idleId != null && typeof cancelIdleCallback !== 'undefined') {
+        cancelIdleCallback(idleId)
+      }
+      if (timeoutId != null) clearTimeout(timeoutId)
+    }
+  }, [loadContextIds, loadValuation, loadPricing, loadObo, loadAuction, loadSeller, loadBuyer])
+
+  useEffect(() => {
+    let cancelled = false
+    let idleId: number | undefined
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    const prefetchRag = () => {
+      if (!cancelled) void loadRag(ragQuestion)
+    }
+
+    if (typeof requestIdleCallback !== 'undefined') {
+      idleId = requestIdleCallback(prefetchRag, { timeout: 4000 })
+    } else {
+      timeoutId = setTimeout(prefetchRag, 1500)
+    }
+
+    return () => {
+      cancelled = true
+      if (idleId != null && typeof cancelIdleCallback !== 'undefined') {
+        cancelIdleCallback(idleId)
+      }
+      if (timeoutId != null) clearTimeout(timeoutId)
+    }
+  }, [loadRag, ragQuestion])
 
   const auctionSignalCodes = useMemo(() => {
     const codes = new Set([
@@ -271,6 +312,8 @@ export function AiInsightsDashboard() {
           ready
         </p>
       )}
+
+      <SellerIntelligencePanels />
 
       <Card
         title="RAG query"
@@ -318,8 +361,6 @@ export function AiInsightsDashboard() {
           )}
         </div>
       </Card>
-
-      <SellerIntelligencePanels />
 
       <section className="grid gap-5 lg:grid-cols-2">
         <Card

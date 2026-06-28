@@ -90,6 +90,43 @@ const SAMPLE_LONGFORM = {
   },
 };
 
+const SAMPLE_SELLER = {
+  seller_dashboard_ready_ms: 8200,
+  rag_ready_ms: 14500,
+  panels: [
+    {
+      panel_id: 'listing_advice',
+      api_ms: 3200,
+      ui_ready_ms: 3500,
+      http_status: 200,
+      leakage_result: 'PASS',
+      refs_count: 5,
+      synthesis_template: 'listing_advice',
+    },
+    {
+      panel_id: 'negotiation_strategy',
+      api_ms: 5100,
+      ui_ready_ms: 7800,
+      http_status: 200,
+      leakage_result: 'PASS',
+      refs_count: 8,
+      synthesis_template: 'negotiation_strategy',
+    },
+  ],
+  aggregate: {
+    panels_passed: 2,
+    p95_api_ms: 5100,
+    p95_ui_ready_ms: 7800,
+    leakage: 'PASS',
+  },
+};
+
+function writeSellerArtifact(repoRoot, timestamp, data) {
+  const dir = join(repoRoot, 'bench_logs', 'ai-platform', 'seller-intelligence-ui', timestamp);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${timestamp}.json`), JSON.stringify(data, null, 2));
+}
+
 function writeArtifact(repoRoot, subdir, timestamp, data) {
   const dir = join(repoRoot, 'bench_logs', 'ai-platform', subdir, timestamp);
   mkdirSync(dir, { recursive: true });
@@ -129,6 +166,19 @@ describe('ai-quality-telemetry-report', () => {
       assert.equal(summary.metrics.session_memory_context_retention, 'good');
       assert.equal(summary.metrics.collector_completeness_score, 48);
       assert.ok(summary.metrics.synthesis_template_counts.listing_advice >= 1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('aggregateTelemetry reads seller intelligence artifact metrics', () => {
+    const root = mkdtempSync(join(tmpdir(), 'aqt-'));
+    try {
+      writeSellerArtifact(root, '20260628-120000', SAMPLE_SELLER);
+      const summary = aggregateTelemetry(root);
+      assert.equal(summary.metrics.seller_dashboard_ready_ms, 8200);
+      assert.equal(summary.metrics.seller_panel_api_p95_ms, 5100);
+      assert.equal(summary.metrics.seller_panels_passed, 2);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

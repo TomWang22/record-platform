@@ -165,13 +165,39 @@ export function SellerIntelligencePanels() {
   )
 
   useEffect(() => {
-    void Promise.all([
-      loadPanel(fetchSellerListingAdvice, setListingAdvice),
-      loadPanel(fetchSellerNegotiationStrategy, setNegotiation),
-      loadPanel(fetchSellerAuctionPressure, setAuctionPressure),
-      loadPanel(fetchSellerCollectorMetadataGaps, setCollectorMetadata),
-    ])
+    let cancelled = false
+    let idleId: number | undefined
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    void loadPanel(fetchSellerListingAdvice, setListingAdvice)
+    void loadPanel(fetchSellerAuctionPressure, setAuctionPressure)
+
+    const loadSecondaryPanels = () => {
+      if (cancelled) return
+      void loadPanel(fetchSellerNegotiationStrategy, setNegotiation)
+      void loadPanel(fetchSellerCollectorMetadataGaps, setCollectorMetadata)
+    }
+
+    if (typeof requestIdleCallback !== 'undefined') {
+      idleId = requestIdleCallback(loadSecondaryPanels, { timeout: 750 })
+    } else {
+      timeoutId = setTimeout(loadSecondaryPanels, 0)
+    }
+
+    return () => {
+      cancelled = true
+      if (idleId != null && typeof cancelIdleCallback !== 'undefined') {
+        cancelIdleCallback(idleId)
+      }
+      if (timeoutId != null) clearTimeout(timeoutId)
+    }
   }, [loadPanel])
+
+  const sellerDashboardReady =
+    !listingAdvice.loading &&
+    !negotiation.loading &&
+    !auctionPressure.loading &&
+    !collectorMetadata.loading
 
   return (
     <section className="space-y-4" data-testid="seller-intelligence-panel">
@@ -183,6 +209,12 @@ export function SellerIntelligencePanels() {
           Structured advice from keyword retrieval and rule-engine synthesis — no vector rollout.
         </p>
       </div>
+
+      {sellerDashboardReady && (
+        <span className="sr-only" data-testid="seller-dashboard-ready">
+          ready
+        </span>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <SellerIntelligenceCard

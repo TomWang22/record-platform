@@ -299,6 +299,13 @@ def non_primary_source_caps(
 
 SHADOW_MIN_SOURCE_DIVERSITY = 5
 SHADOW_DIVERSITY_TOPUP_LIMIT = 3
+# T20.14D — shadow diagnostic global fetch cap (was max_chunks*3 for non-OBO).
+SHADOW_GLOBAL_FETCH_CHUNK_MULTIPLIER = 2
+
+
+def shadow_global_fetch_limit(max_chunks: int) -> int:
+    """Shadow-only: cap global vector pool size for latency (keyword path unaffected)."""
+    return max(max_chunks * SHADOW_GLOBAL_FETCH_CHUNK_MULTIPLIER, max_chunks)
 
 
 @dataclass(frozen=True, slots=True)

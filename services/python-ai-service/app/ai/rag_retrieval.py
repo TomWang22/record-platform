@@ -14,6 +14,7 @@ from app.ai.config import (
     AI_RAG_MAX_CONTEXT_TOKENS,
     AI_RAG_SHADOW_EMBED_CACHE_MAX,
     AI_RAG_SHADOW_EMBED_HINT_MAX_CHARS,
+    AI_RAG_SHADOW_EMBED_RETRY_ON_TIMEOUT,
     AI_RAG_SHADOW_EMBED_TIMEOUT_MS,
     AI_RAG_SHADOW_ENTITY_HINTS,
     AI_RAG_SHADOW_MIN_EMBEDDED,
@@ -41,6 +42,7 @@ from app.ai.shadow_profiles import (
     preferred_source_types,
     resolve_shadow_fetch_strategy,
     resolve_shadow_profile,
+    shadow_global_fetch_limit,
     resolved_profile_for_diagnostics,
     source_type_quota_satisfied,
     source_type_weights,
@@ -104,6 +106,9 @@ class ShadowEmbedDiagnostics:
     hint_expansion_truncated: bool = False
     timeout_ms: int = 0
     retry_count: int = 0
+    embed_retry_attempted: bool = False
+    embed_retry_succeeded: bool = False
+    embed_timeout_before_fetch: bool = False
     cache_hit: bool = False
     latency_ms: int = 0
     timed_out: bool = False
@@ -743,6 +748,29 @@ async def _shadow_embed_query(
         if isinstance(exc, httpx.TimeoutException) or "timed out" in err.lower():
             meta.timed_out = True
             meta.fallback_reason = "embed_timeout"
+            if AI_RAG_SHADOW_EMBED_RETRY_ON_TIMEOUT:
+                meta.embed_retry_attempted = True
+                meta.retry_count = 1
+                retry_start = _now_ms()
+                try:
+                    vec = await _call_ollama_embed(
+                        query,
+                        timeout_ms=AI_RAG_SHADOW_EMBED_TIMEOUT_MS,
+                    )
+                except Exception as retry_exc:
+                    meta.latency_ms = _elapsed_ms(embed_start)
+                    retry_err = str(retry_exc)
+                    meta.error = retry_err[:120]
+                    meta.embed_timeout_before_fetch = True
+                    return None, meta
+                meta.embed_retry_succeeded = True
+                meta.timed_out = False
+                meta.fallback_reason = None
+                meta.error = None
+                meta.latency_ms = _elapsed_ms(embed_start)
+                if use_cache and AI_RAG_SHADOW_EMBED_CACHE_MAX > 0:
+                    _shadow_embed_cache_put(cache_key, vec)
+                return vec, meta
         else:
             meta.fallback_reason = "embed_error"
         return None, meta
@@ -1214,7 +1242,7 @@ async def _collect_route_mode_shadow_rows(
 ) -> Tuple[List[Any], Dict[str, Any]]:
     """T20.10W/T20.10Y — shadow-only scoped-first fetch + diversity top-ups."""
     obo_focused = is_obo_focused(resolved_profile, shadow_custom_query_hints)
-    global_limit = max_chunks * 2 if obo_focused else max_chunks * 3
+    global_limit = shadow_global_fetch_limit(max_chunks)
     strategy = resolve_shadow_fetch_strategy(
         resolved_profile,
         shadow_custom_query_hints,
@@ -1321,6 +1349,18 @@ async def _collect_route_mode_shadow_rows(
         if source_type in fetched_source_types:
             fetch_diag["typed_fetches_skipped"].append(source_type)
             continue
+        if source_type == "listing" and int(pool_by_type.get("listing", 0)) > 0:
+            if source_type_quota_satisfied(
+                "listing",
+                pool_by_type,
+                resolved_profile,
+                max_chunks,
+                scope_by_type,
+                custom_hints=shadow_custom_query_hints,
+                query=query,
+            ):
+                fetch_diag["typed_fetches_skipped"].append(source_type)
+                continue
         if _pool_is_sufficient(pool_size, pool_by_type):
             fetch_diag["typed_fetches_skipped"].append(source_type)
             continue
@@ -1505,6 +1545,14 @@ async def retrieve_chunks_vector_shadow(
     if query_vec is None:
         diagnostics.timings_ms.total = _elapsed_ms(total_start)
         status = "embed_timed_out" if embed_meta.timed_out else "embed_failed"
+        diagnostics.debug["shadow_fetch_attempted"] = False
+        if embed_meta.embed_timeout_before_fetch or embed_meta.timed_out:
+            diagnostics.debug["embed_timeout_before_fetch"] = True
+            diagnostics.debug["zero_result_reason"] = "embed_timeout_before_fetch"
+        elif embed_meta.fallback_reason == "embed_error":
+            diagnostics.debug["zero_result_reason"] = "embed_error"
+        else:
+            diagnostics.debug["zero_result_reason"] = "embed_failed"
         result = {
             "enabled": True,
             "status": status,
@@ -1517,10 +1565,13 @@ async def retrieve_chunks_vector_shadow(
             "query_hint_applied": query_hint_applied,
             "expanded_query_terms": expanded_query_terms,
             "embed_timed_out": embed_meta.timed_out,
+            "embed_timeout_before_fetch": embed_meta.embed_timeout_before_fetch,
         }
         if include_diagnostics:
             result["shadow_diagnostics"] = diagnostics.to_dict()
         return result
+
+    diagnostics.debug["shadow_fetch_attempted"] = True
 
     filters, params, idx = _build_scope_filters(
         user_id,
@@ -1564,7 +1615,7 @@ async def retrieve_chunks_vector_shadow(
             filters=filters,
             params=params,
             vec_param=vec_param,
-            limit=max_chunks * 3,
+            limit=shadow_global_fetch_limit(max_chunks),
         )
         raw_rows = list(global_rows)
         fetch_diag = {}
@@ -1697,6 +1748,9 @@ async def retrieve_chunks_vector_shadow(
                 )
         if overlap_refine_diag:
             diagnostics.debug.update(overlap_refine_diag)
+        selected_count = len(selected_for_diag)
+        if selected_count == 0 and diagnostics.debug.get("shadow_fetch_attempted"):
+            diagnostics.debug["zero_result_reason"] = "zero_result_after_fetch"
         result["shadow_diagnostics"] = diagnostics.to_dict()
     return result
 

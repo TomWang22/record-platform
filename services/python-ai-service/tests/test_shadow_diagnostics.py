@@ -406,6 +406,7 @@ class TestShadowDiagnosticsHelpers(unittest.TestCase):
         self.assertTrue(result.get("embed_timed_out"))
         sd = result["shadow_diagnostics"]
         self.assertTrue(sd["embed"]["timed_out"])
+        self.assertTrue(sd["embed"]["embed_retry_attempted"])
         self.assertEqual(result["chunks"], [])
 
     def test_shadow_embed_cache_hit(self) -> None:

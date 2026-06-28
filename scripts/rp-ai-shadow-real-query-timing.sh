@@ -228,6 +228,13 @@ overlap_reasons = []
 selected_counts = []
 embed_outliers = []
 embed_timeouts = []
+embed_timeout_before_fetch_runs = []
+true_zero_result_runs = []
+zero_result_after_fetch_runs = []
+embed_retry_attempted_runs = []
+embed_retry_succeeded_runs = []
+shadow_fetch_attempted_runs = []
+request_error_runs = []
 candidate_fetch_latencies = []
 rerank_latencies = []
 shadow_run_records = []
@@ -238,6 +245,9 @@ for r in rows:
     if not r["mode"].startswith("shadow"):
         continue
     sd = (r.get("response") or {}).get("details", {}).get("shadow_diagnostics") or {}
+    resp = r.get("response") or {}
+    if resp.get("error") and not sd:
+        request_error_runs.append(r["mode"])
     ov = sd.get("overlap") or {}
     expl = ov.get("explanation") or {}
     timings = sd.get("timings_ms") or {}
@@ -249,6 +259,27 @@ for r in rows:
         cf_ms = float(timings.get("candidate_fetch") or 0)
         rerank_ms = float(timings.get("rerank_select") or 0)
         embed_ms = float(embed.get("latency_ms") or timings.get("embed") or 0)
+        debug = sd.get("debug") or {}
+        counts = sd.get("counts") or {}
+        selected_count = int(counts.get("selected_count") or 0)
+        zero_reason = debug.get("zero_result_reason") or ""
+        if embed.get("embed_retry_attempted"):
+            embed_retry_attempted_runs.append(r["mode"])
+        if embed.get("embed_retry_succeeded"):
+            embed_retry_succeeded_runs.append(r["mode"])
+        if debug.get("shadow_fetch_attempted"):
+            shadow_fetch_attempted_runs.append(r["mode"])
+        if (
+            zero_reason == "embed_timeout_before_fetch"
+            or embed.get("embed_timeout_before_fetch")
+            or (embed.get("timed_out") and not debug.get("shadow_fetch_attempted"))
+        ):
+            embed_timeout_before_fetch_runs.append(r["mode"])
+        elif zero_reason == "zero_result_after_fetch" or (
+            selected_count == 0 and debug.get("shadow_fetch_attempted")
+        ):
+            zero_result_after_fetch_runs.append(r["mode"])
+            true_zero_result_runs.append(r["mode"])
         shadow_totals.append(total_ms)
         candidate_fetch_latencies.append(cf_ms)
         rerank_latencies.append(rerank_ms)
@@ -314,6 +345,13 @@ summary = {
     "shadow_empty_runs": sum(1 for c in selected_counts if c == 0),
     "embed_outlier_count": len(embed_outliers),
     "embed_timeout_count": len(embed_timeouts),
+    "embed_timeout_before_fetch_count": len(embed_timeout_before_fetch_runs),
+    "true_zero_result_count": len(true_zero_result_runs),
+    "zero_result_after_fetch_count": len(zero_result_after_fetch_runs),
+    "shadow_fetch_attempted_count": len(shadow_fetch_attempted_runs),
+    "embed_retry_attempted_count": len(embed_retry_attempted_runs),
+    "embed_retry_succeeded_count": len(embed_retry_succeeded_runs),
+    "request_error_count": len(request_error_runs),
     "zero_overlap_reason_counts": dict(sorted(reason_counts.items())),
 }
 
@@ -360,7 +398,13 @@ lines = [
     f"- rerank_select p50 ms: {fmt_ms(summary['rerank_select_ms_p50'])}",
     f"- rerank_select p95 ms: {fmt_ms(summary['rerank_select_ms_p95'])}",
     f"- embed outliers (>=5s or timeout): {summary['embed_outlier_count']}",
-    f"- embed timeouts: {summary['embed_timeout_count']}",
+    f"- embed timeouts (timed_out flag): {summary['embed_timeout_count']}",
+    f"- embed_timeout_before_fetch: {summary['embed_timeout_before_fetch_count']}",
+    f"- true zero-result (after fetch): {summary['true_zero_result_count']}/{summary['shadow_runs']}",
+    f"- zero_result_after_fetch: {summary['zero_result_after_fetch_count']}",
+    f"- shadow_fetch_attempted: {summary['shadow_fetch_attempted_count']}/{summary['shadow_runs']}",
+    f"- embed_retry attempted/succeeded: {summary['embed_retry_attempted_count']}/{summary['embed_retry_succeeded_count']}",
+    f"- request_error: {summary['request_error_count']}",
     f"- zero-overlap shadow runs: {summary['shadow_overlap_zero_runs']}/{summary['shadow_runs']}",
     f"- document-overlap >0 runs: {summary['shadow_doc_overlap_gt0_runs']}/{summary['shadow_runs']}",
     f"- entity-overlap >0 runs: {summary['shadow_entity_overlap_gt0_runs']}/{summary['shadow_runs']}",

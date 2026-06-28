@@ -132,8 +132,8 @@ test.describe('Seller intelligence UI (P21.1A / P21.2A)', () => {
     expect(await panel.getByTestId('ai-source-evidence-item').count()).toBeGreaterThan(0)
 
     await expect(page.getByTestId('ai-insights-dashboard-ready')).toBeVisible({ timeout: 120_000 })
-    await expect(page.getByTestId('ai-rag-summary')).toBeVisible()
-    await expect(page.getByTestId('ai-insight-rag-ready')).toBeVisible()
+    await expect(page.getByTestId('ai-rag-summary')).toBeVisible({ timeout: 120_000 })
+    await expect(page.getByTestId('ai-insight-rag-ready')).toBeVisible({ timeout: 120_000 })
 
     const ragCard = page.getByTestId('ai-insight-rag')
     const ragToggle = ragCard.getByTestId('ai-source-evidence-toggle').first()

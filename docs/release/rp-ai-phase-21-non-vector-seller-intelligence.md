@@ -7,7 +7,7 @@ Edge: `https://record-platform.test` (strict TLS only)
 
 | Field | Value |
 | ----- | ----- |
-| Closeout SHA | `aa9e566` (P21.7A RC) + P21.7B validation |
+| Closeout SHA | `13bc0ad` (P21.7B validation + P21.8 closeout) |
 | Phase | **21 — Non-vector seller intelligence product track** |
 | Phase 20 | **LOCKED** — `docs/release/rp-ai-phase-20-hardening-20260625.md` |
 | Vector rollout | **NOT APPROVED** |
@@ -115,6 +115,8 @@ Full validation: `docs/ai-platform/P21-7B-non-vector-seller-intelligence-final-v
 | `docs/ai-platform/P21-0-non-vector-seller-intelligence-charter.md` | Phase charter |
 | `docs/ai-platform/P21-7A-non-vector-seller-intelligence-rc.md` | Release candidate |
 | `docs/ai-platform/P21-7B-non-vector-seller-intelligence-final-validation.md` | Final validation |
+| `docs/ai-platform/P21-8-release-closeout.md` | Release closeout |
+| `docs/ai-platform/PHASE_21_COPILOT_CONTEXT.md` | Agent source of truth |
 | `scripts/ai-quality-telemetry-report.mjs` | Ongoing quality/latency reporter |
 
 ---

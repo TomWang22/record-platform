@@ -1,9 +1,10 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-28 (P21.8R SHA reconciliation)  
-**Current main SHA:** `4eb1fc3` (verify at commit time)  
+**Last updated:** 2026-06-28 (P21.10A / T20.14A–B vector runway)  
+**Current main SHA:** verify with `git rev-parse --short HEAD`  
+**Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
-**Phase 21 status:** **READY FOR RELEASE** — non-vector seller intelligence product track **CLOSED**  
+**Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -13,7 +14,7 @@ Use this document as the **source of truth** for Phase 21 state. For Phase 20 ve
 ## Locked takeaway
 
 ```text
-Phase 21 non-vector seller intelligence: READY FOR RELEASE (closeout @ 4eb1fc3; validation @ 13bc0ad)
+Phase 21 non-vector seller intelligence: RELEASE TAGGED @ d0e4c58
 
 Production path:
 - retrieval: keyword
@@ -37,8 +38,8 @@ Do NOT enable hybrid rollout or default-on overlap flags.
 Do NOT use generative Ollama as production RAG default.
 Do NOT expose message bodies in UI or API responses.
 
-Phase 21 product track is CLOSED at P21.8. No new feature work unless a new charter is approved.
-Tag rp-ai-phase-21-non-vector-seller-intelligence-20260628 is PREPARED, NOT CREATED — P21.9 only with explicit approval.
+Phase 21 product track is CLOSED and tagged. P21.10+ product follow-ups require explicit approval (keyword/rule-engine only).
+T20.14 vector blocker burn-down is the only path toward rollout; T20.15 blocked until T20.14H passes all gates.
 ```
 
 ---
@@ -197,23 +198,36 @@ Release note: `docs/release/rp-ai-phase-21-non-vector-seller-intelligence.md`
 
 ---
 
-## Next optional tracks (not started — require explicit approval)
+## Post-release roadmap (two lanes)
+
+| Lane | Doc | Status |
+| ---- | --- | ------ |
+| **Product** (optional) | `P21-10-post-release-product-roadmap.md` | P21.10+ require approval; keyword/rule-engine only |
+| **Vector** (blocker burn-down) | `T20-14A-current-vector-readiness-baseline.md`, `T20-14B-vector-rollout-gate-template.md` | T20.14C next (design only); T20.15 blocked |
+
+Product work may continue on keyword/rule-engine. **No product ticket may silently enable vector.**
+
+---
+
+## Next optional tracks (require explicit approval)
 
 | Track | Scope |
 | ----- | ----- |
-| **P21.9** | Git tag creation — `rp-ai-phase-21-non-vector-seller-intelligence-20260628` — **explicit approval only** |
 | **P21.10** | Batch seller endpoint design — reduce four parallel retrievals |
 | **P21.11** | Persistent session memory design — Redis/DB, multi-pod |
 | **P21.12** | Observation-deck integration — feed telemetry JSON into `/observation-deck` |
+| **P21.13** | Seller intelligence polish |
+| **P21.14** | Dedicated session-memory UI |
+| **T20.14C** | Shadow latency implementation plan — read-only; **next vector candidate** |
 
-Do not start P21.9–P21.12 without user approval. Vector rollout remains a **separate** decision track (T20.14/T20.15).
+Do not start implementation tickets without approval. Vector rollout remains **NOT APPROVED**.
 
 ---
 
 ## Final verdict
 
 ```text
-Phase 21 non-vector seller intelligence: READY FOR RELEASE
+Phase 21 non-vector seller intelligence: RELEASE TAGGED
 Vector rollout: NOT APPROVED
 T20.14/T20.15: BLOCKED
 ```

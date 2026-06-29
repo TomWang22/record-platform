@@ -27,6 +27,7 @@ from app.ai.shadow_profiles import (
     SHADOW_ENTITY_LISTING_FETCH_LIMIT,
     SHADOW_ENTITY_LISTING_ID_CAP,
     SHADOW_ENTITY_HINT_SCORE_MULTIPLIER,
+    SHADOW_KEYWORD_ANCHOR_MAX,
     SHADOW_NEIGHBOR_DOCS_CONSIDERED,
     SHADOW_NEIGHBOR_GLOBAL_CAP,
     SHADOW_NEIGHBOR_PER_DOC,
@@ -42,6 +43,7 @@ from app.ai.shadow_profiles import (
     preferred_source_types,
     resolve_shadow_fetch_strategy,
     resolve_shadow_profile,
+    resolve_source_type_floor_plan,
     shadow_global_fetch_limit,
     resolved_profile_for_diagnostics,
     source_type_quota_satisfied,
@@ -1384,6 +1386,49 @@ async def _collect_route_mode_shadow_rows(
             break
 
     merged_rows = _merge_vector_rows(pool_rows)
+    pool_size, pool_by_type = len(merged_rows), _pool_rows_by_source_type(merged_rows)
+    floor_plan = resolve_source_type_floor_plan(
+        resolved_profile,
+        query=query,
+        scope_by_type=scope_by_type,
+        pool_by_type=pool_by_type,
+        primary_source_type=primary,
+    )
+    fetch_diag["typed_pool_empty"] = floor_plan.typed_pool_empty
+    if floor_plan.typed_pool_empty and pool_size == 0:
+        global_rows = await _fetch_vector_rows(
+            conn,
+            filters=filters,
+            params=params,
+            vec_param=vec_param,
+            limit=global_limit,
+        )
+        pool_rows = _merge_vector_rows(pool_rows, global_rows)
+        fetch_diag["global_fetch_skipped"] = False
+        fetch_diag["source_type_floor_forced_global"] = True
+        merged_rows = _merge_vector_rows(pool_rows)
+        pool_size, pool_by_type = len(merged_rows), _pool_rows_by_source_type(merged_rows)
+
+    if floor_plan.applied:
+        fetch_diag["source_type_floor_applied"] = True
+        fetch_diag["source_type_floor_types"] = list(floor_plan.floor_types)
+        fetch_diag["obo_as_notification_evidence"] = floor_plan.obo_as_notification_evidence
+        for source_type in floor_plan.floor_types:
+            if int(pool_by_type.get(source_type, 0)) == 0:
+                await _typed_fetch(source_type)
+        merged_rows = _merge_vector_rows(pool_rows)
+        pool_by_type = _pool_rows_by_source_type(merged_rows)
+        fetch_diag["source_type_floor_satisfied"] = all(
+            int(pool_by_type.get(source_type, 0)) > 0
+            or int(scope_by_type.get(source_type, 0)) == 0
+            for source_type in floor_plan.floor_types
+        )
+    elif floor_plan.floor_types:
+        fetch_diag["source_type_floor_applied"] = False
+        fetch_diag["source_type_floor_types"] = list(floor_plan.floor_types)
+        fetch_diag["source_type_floor_satisfied"] = floor_plan.satisfied
+        fetch_diag["obo_as_notification_evidence"] = floor_plan.obo_as_notification_evidence
+
     fetch_diag["candidate_pool_before_rerank"] = len(merged_rows)
     fetch_diag["source_types_before_rerank"] = sorted(_pool_rows_by_source_type(merged_rows).keys())
     return merged_rows, fetch_diag
@@ -1454,6 +1499,126 @@ async def _fetch_diversified_vector_rows(
         if type_rows:
             pool_groups.append(type_rows)
     return _merge_vector_rows(*pool_groups)
+
+
+def _keyword_chunk_passes_anchor_privacy(chunk: Mapping[str, Any]) -> bool:
+    """T20.14G2 — keyword anchors must pass the same privacy rules as vector chunks."""
+    if _safe_source_type(chunk) == "message":
+        return False
+    content = chunk.get("content") or ""
+    if FORBIDDEN_CHUNK_RE.search(content):
+        return False
+    return bool(content.strip())
+
+
+def _select_keyword_anchor_chunks(
+    keyword_chunks: Sequence[Mapping[str, Any]],
+    *,
+    existing_ids: Iterable[str],
+    max_anchors: int = SHADOW_KEYWORD_ANCHOR_MAX,
+) -> List[Dict[str, Any]]:
+    """T20.14G2 — shadow-only top-up from keyword refs (diagnostic path)."""
+    seen = {str(chunk_id) for chunk_id in existing_ids}
+    anchors: List[Dict[str, Any]] = []
+    for chunk in keyword_chunks:
+        if len(anchors) >= max_anchors:
+            break
+        chunk_id = _safe_chunk_id(chunk)
+        if not chunk_id or chunk_id in seen:
+            continue
+        if not _keyword_chunk_passes_anchor_privacy(chunk):
+            continue
+        anchor = {
+            "id": chunk_id,
+            "document_id": str(chunk.get("document_id") or chunk_id),
+            "chunk_index": chunk.get("chunk_index", 0),
+            "content": chunk.get("content") or "",
+            "checksum": chunk.get("checksum"),
+            "source_refs": chunk.get("source_refs") or [],
+            "source_type": _safe_source_type(chunk),
+            "source_id": chunk.get("source_id"),
+            "owner_user_id": chunk.get("owner_user_id"),
+            "visibility": chunk.get("visibility"),
+            "source_updated_at": chunk.get("source_updated_at"),
+            "title": chunk.get("title"),
+            "metadata": chunk.get("metadata") or {},
+            "score": float(chunk.get("score") or 0.0),
+            "keyword_anchor_added": True,
+        }
+        anchors.append(anchor)
+        seen.add(chunk_id)
+    return anchors
+
+
+def _merge_selected_with_keyword_anchors(
+    vector_selected: Sequence[Dict[str, Any]],
+    anchor_chunks: Sequence[Dict[str, Any]],
+    *,
+    max_chunks: int,
+) -> List[Dict[str, Any]]:
+    """Preserve vector-selected refs; append tagged keyword anchors up to max_chunks."""
+    merged: List[Dict[str, Any]] = list(vector_selected)
+    seen = {_safe_chunk_id(chunk) for chunk in merged}
+    for anchor in anchor_chunks:
+        if len(merged) >= max_chunks:
+            break
+        anchor_id = _safe_chunk_id(anchor)
+        if anchor_id in seen:
+            continue
+        merged.append(anchor)
+        seen.add(anchor_id)
+    return merged
+
+
+def _rerun_shadow_selection(
+    raw_rows: Sequence[Any],
+    *,
+    route_mode: bool,
+    resolved_profile: str,
+    scope_by_type: Dict[str, int],
+    shadow_custom_query_hints: Optional[Sequence[str]],
+    query: str,
+    max_chunks: int,
+    max_tokens: int,
+    words: List[str],
+    pin_source: bool,
+    keyword_chunks_for_overlap: Optional[Sequence[Mapping[str, Any]]],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    if route_mode:
+        preferred = preferred_source_types(resolved_profile)
+        weights = source_type_weights(resolved_profile)
+        unweighted_selected = _rows_to_chunks(
+            raw_rows,
+            words=words,
+            pin_source=pin_source,
+            query=query,
+            max_chunks=max_chunks,
+            max_tokens=max_tokens,
+        )
+        weighted_selected = _select_route_weighted_chunks(
+            raw_rows,
+            profile=resolved_profile or "generic_rag",
+            preferred=preferred,
+            weights=weights,
+            words=words,
+            pin_source=pin_source,
+            query=query,
+            max_chunks=max_chunks,
+            max_tokens=max_tokens,
+            scope_by_type=scope_by_type,
+            custom_hints=list(shadow_custom_query_hints or []),
+            keyword_chunks=keyword_chunks_for_overlap,
+        )
+        return unweighted_selected, weighted_selected
+    selected = _rows_to_chunks(
+        raw_rows,
+        words=words,
+        pin_source=pin_source,
+        query=query,
+        max_chunks=max_chunks,
+        max_tokens=max_tokens,
+    )
+    return selected, selected
 
 
 async def retrieve_chunks_vector_shadow(
@@ -1692,6 +1857,113 @@ async def retrieve_chunks_vector_shadow(
         )
         weighted_selected = unweighted_selected
     diagnostics.timings_ms.rerank_select = _elapsed_ms(select_start)
+
+    pool_before_rerank = int(
+        fetch_diag.get("candidate_pool_before_rerank", len(raw_rows)) if fetch_diag else len(raw_rows)
+    )
+    selected_for_output = weighted_selected if route_mode else unweighted_selected
+    vector_selected_for_output = list(selected_for_output)
+    selected_count_before_fallback = len(selected_for_output)
+
+    fallback_diag: Dict[str, Any] = {
+        "zero_result_fallback_attempted": False,
+        "zero_result_fallback_stage": None,
+        "zero_result_fallback_succeeded": False,
+        "keyword_anchor_added": False,
+        "keyword_anchor_count": 0,
+        "keyword_anchor_ids": [],
+        "vector_selected_chunk_ids": [_safe_chunk_id(chunk) for chunk in vector_selected_for_output],
+        "shadow_selected_count_before_fallback": selected_count_before_fallback,
+        "shadow_selected_count_after_fallback": selected_count_before_fallback,
+        "true_zero_result_after_fallback": False,
+        "fallback_reason": None,
+    }
+
+    embed_timeout_before_fetch = bool(
+        embed_meta.embed_timeout_before_fetch or embed_meta.timed_out
+    )
+    needs_fallback = bool(
+        diagnostics.debug.get("shadow_fetch_attempted")
+        and not embed_timeout_before_fetch
+        and (pool_before_rerank == 0 or selected_count_before_fallback == 0)
+    )
+
+    if needs_fallback:
+        fallback_diag["zero_result_fallback_attempted"] = True
+        if selected_count_before_fallback == 0:
+            fallback_diag["zero_result_reason_before_fallback"] = "zero_result_after_fetch"
+
+        fallback_start = _now_ms()
+        if pool_before_rerank == 0 or not raw_rows:
+            fallback_diag["zero_result_fallback_stage"] = "global_untyped_retry"
+            global_rows = await _fetch_vector_rows(
+                conn,
+                filters=filters,
+                params=params,
+                vec_param=vec_param,
+                limit=shadow_global_fetch_limit(max_chunks),
+            )
+            raw_rows = _merge_vector_rows(raw_rows, global_rows)
+            unweighted_selected, weighted_selected = _rerun_shadow_selection(
+                raw_rows,
+                route_mode=route_mode,
+                resolved_profile=resolved_profile,
+                scope_by_type=scope_by_type,
+                shadow_custom_query_hints=shadow_custom_query_hints,
+                query=query,
+                max_chunks=max_chunks,
+                max_tokens=max_tokens,
+                words=words,
+                pin_source=pin_source,
+                keyword_chunks_for_overlap=keyword_chunks_for_overlap,
+            )
+            selected_for_output = weighted_selected if route_mode else unweighted_selected
+            vector_selected_for_output = list(selected_for_output)
+            fallback_diag["shadow_selected_count_after_fallback"] = len(selected_for_output)
+
+        if len(selected_for_output) == 0:
+            if keyword_chunks_for_overlap:
+                fallback_diag["zero_result_fallback_stage"] = (
+                    fallback_diag.get("zero_result_fallback_stage") or "keyword_anchor_topup"
+                )
+                anchor_chunks = _select_keyword_anchor_chunks(
+                    keyword_chunks_for_overlap,
+                    existing_ids=_collect_chunk_ids(vector_selected_for_output),
+                )
+                if anchor_chunks:
+                    fallback_diag["keyword_anchor_added"] = True
+                    fallback_diag["keyword_anchor_count"] = len(anchor_chunks)
+                    fallback_diag["keyword_anchor_ids"] = [_safe_chunk_id(chunk) for chunk in anchor_chunks]
+                    selected_for_output = _merge_selected_with_keyword_anchors(
+                        vector_selected_for_output,
+                        anchor_chunks,
+                        max_chunks=max_chunks,
+                    )
+                    if route_mode:
+                        weighted_selected = selected_for_output
+                        unweighted_selected = _merge_selected_with_keyword_anchors(
+                            unweighted_selected,
+                            anchor_chunks,
+                            max_chunks=max_chunks,
+                        )
+                    else:
+                        unweighted_selected = selected_for_output
+                        weighted_selected = selected_for_output
+                    fallback_diag["shadow_selected_count_after_fallback"] = len(selected_for_output)
+                else:
+                    fallback_diag["fallback_reason"] = "keyword_anchor_filtered_empty"
+            else:
+                fallback_diag["fallback_reason"] = "not_exposed"
+
+        diagnostics.timings_ms.candidate_fetch += _elapsed_ms(fallback_start)
+
+        if len(selected_for_output) > 0:
+            fallback_diag["zero_result_fallback_succeeded"] = True
+            fallback_diag["fallback_reason"] = fallback_diag.get("fallback_reason") or "zero_result_fallback_applied"
+        else:
+            fallback_diag["true_zero_result_after_fallback"] = True
+            fallback_diag["fallback_reason"] = fallback_diag.get("fallback_reason") or "zero_result_after_fallback"
+
     diagnostics.timings_ms.total = _elapsed_ms(total_start)
 
     latency_ms = float(diagnostics.timings_ms.total)
@@ -1748,8 +2020,13 @@ async def retrieve_chunks_vector_shadow(
                 )
         if overlap_refine_diag:
             diagnostics.debug.update(overlap_refine_diag)
+        diagnostics.debug.update(fallback_diag)
         selected_count = len(selected_for_diag)
-        if selected_count == 0 and diagnostics.debug.get("shadow_fetch_attempted"):
+        if fallback_diag.get("zero_result_fallback_succeeded"):
+            diagnostics.debug["zero_result_reason"] = "zero_result_fallback_applied"
+        elif fallback_diag.get("true_zero_result_after_fallback"):
+            diagnostics.debug["zero_result_reason"] = "zero_result_after_fallback"
+        elif selected_count == 0 and diagnostics.debug.get("shadow_fetch_attempted"):
             diagnostics.debug["zero_result_reason"] = "zero_result_after_fetch"
         result["shadow_diagnostics"] = diagnostics.to_dict()
     return result

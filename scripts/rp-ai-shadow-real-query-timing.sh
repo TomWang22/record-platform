@@ -230,7 +230,10 @@ embed_outliers = []
 embed_timeouts = []
 embed_timeout_before_fetch_runs = []
 true_zero_result_runs = []
+true_zero_after_fallback_runs = []
 zero_result_after_fetch_runs = []
+fallback_applied_runs = []
+keyword_anchor_added_runs = []
 embed_retry_attempted_runs = []
 embed_retry_succeeded_runs = []
 shadow_fetch_attempted_runs = []
@@ -269,17 +272,30 @@ for r in rows:
             embed_retry_succeeded_runs.append(r["mode"])
         if debug.get("shadow_fetch_attempted"):
             shadow_fetch_attempted_runs.append(r["mode"])
+        if debug.get("zero_result_fallback_attempted"):
+            fallback_applied_runs.append(r["mode"])
+        if debug.get("keyword_anchor_added"):
+            keyword_anchor_added_runs.append(r["mode"])
         if (
             zero_reason == "embed_timeout_before_fetch"
             or embed.get("embed_timeout_before_fetch")
             or (embed.get("timed_out") and not debug.get("shadow_fetch_attempted"))
         ):
             embed_timeout_before_fetch_runs.append(r["mode"])
+        elif debug.get("true_zero_result_after_fallback") or (
+            zero_reason == "zero_result_after_fallback"
+            and debug.get("zero_result_fallback_attempted")
+        ):
+            true_zero_after_fallback_runs.append(r["mode"])
+            true_zero_result_runs.append(r["mode"])
         elif zero_reason == "zero_result_after_fetch" or (
-            selected_count == 0 and debug.get("shadow_fetch_attempted")
+            selected_count == 0
+            and debug.get("shadow_fetch_attempted")
+            and not debug.get("zero_result_fallback_succeeded")
         ):
             zero_result_after_fetch_runs.append(r["mode"])
-            true_zero_result_runs.append(r["mode"])
+            if not debug.get("zero_result_fallback_attempted"):
+                true_zero_result_runs.append(r["mode"])
         shadow_totals.append(total_ms)
         candidate_fetch_latencies.append(cf_ms)
         rerank_latencies.append(rerank_ms)
@@ -311,8 +327,10 @@ for r in rows:
             embed_timeouts.append(r["mode"])
     chunk_ov = int(ov.get("count") or 0)
     overlaps.append(chunk_ov)
-    doc_overlaps.append(int(ov.get("document_overlap_count") or expl.get("document_overlap_count") or 0))
-    entity_overlaps.append(int(ov.get("entity_overlap_count") or expl.get("entity_overlap_count") or 0))
+    doc_ov = int(ov.get("document_overlap_count") or expl.get("document_overlap_count") or 0)
+    ent_ov = int(ov.get("entity_overlap_count") or expl.get("entity_overlap_count") or 0)
+    doc_overlaps.append(doc_ov)
+    entity_overlaps.append(ent_ov)
     if chunk_ov == 0:
         reason = expl.get("zero_overlap_reason") or "unknown"
         overlap_reasons.append(reason)
@@ -347,7 +365,10 @@ summary = {
     "embed_timeout_count": len(embed_timeouts),
     "embed_timeout_before_fetch_count": len(embed_timeout_before_fetch_runs),
     "true_zero_result_count": len(true_zero_result_runs),
+    "true_zero_after_fallback_count": len(true_zero_after_fallback_runs),
     "zero_result_after_fetch_count": len(zero_result_after_fetch_runs),
+    "fallback_applied_count": len(fallback_applied_runs),
+    "keyword_anchor_added_count": len(keyword_anchor_added_runs),
     "shadow_fetch_attempted_count": len(shadow_fetch_attempted_runs),
     "embed_retry_attempted_count": len(embed_retry_attempted_runs),
     "embed_retry_succeeded_count": len(embed_retry_succeeded_runs),
@@ -400,8 +421,11 @@ lines = [
     f"- embed outliers (>=5s or timeout): {summary['embed_outlier_count']}",
     f"- embed timeouts (timed_out flag): {summary['embed_timeout_count']}",
     f"- embed_timeout_before_fetch: {summary['embed_timeout_before_fetch_count']}",
-    f"- true zero-result (after fetch): {summary['true_zero_result_count']}/{summary['shadow_runs']}",
+    f"- true zero-result (after fetch): {summary['zero_result_after_fetch_count']}/{summary['shadow_runs']}",
+    f"- true zero-result (after fallback): {summary['true_zero_after_fallback_count']}/{summary['shadow_runs']}",
     f"- zero_result_after_fetch: {summary['zero_result_after_fetch_count']}",
+    f"- fallback applied: {summary['fallback_applied_count']}/{summary['shadow_runs']}",
+    f"- keyword anchors added: {summary['keyword_anchor_added_count']}/{summary['shadow_runs']}",
     f"- shadow_fetch_attempted: {summary['shadow_fetch_attempted_count']}/{summary['shadow_runs']}",
     f"- embed_retry attempted/succeeded: {summary['embed_retry_attempted_count']}/{summary['embed_retry_succeeded_count']}",
     f"- request_error: {summary['request_error_count']}",

@@ -109,6 +109,7 @@ _OBO_QUERY_TERMS = frozenset(
 )
 _AUCTION_QUERY_TERMS = frozenset({"auction", "proxy", "reserve"})
 _LISTING_QUERY_TERMS = frozenset({"listing", "listings", "catalog", "seller", "selling"})
+_CATALOG_ACTIVITY_TERMS = frozenset({"catalog", "buyer", "interest", "activity", "week"})
 
 _PROFILE_FIXED_WEIGHTS: Dict[str, Dict[str, float]] = {
     "obo_helper": {
@@ -299,6 +300,8 @@ def non_primary_source_caps(
 
 SHADOW_MIN_SOURCE_DIVERSITY = 5
 SHADOW_DIVERSITY_TOPUP_LIMIT = 3
+# T20.14G2 — shadow-only keyword anchor cap for zero-result fallback.
+SHADOW_KEYWORD_ANCHOR_MAX = 2
 # T20.14D — shadow diagnostic global fetch cap (was max_chunks*3 for non-OBO).
 SHADOW_GLOBAL_FETCH_CHUNK_MULTIPLIER = 2
 
@@ -429,6 +432,77 @@ def pool_diversity_satisfied(
     """Shadow-only: distinct source types present in candidate pool."""
     distinct = sum(1 for count in pool_by_type.values() if int(count) > 0)
     return distinct >= min_distinct
+
+
+@dataclass(frozen=True, slots=True)
+class SourceTypeFloorPlan:
+    """T20.14G2 — shadow-only source-type floor for seller_sales_summary."""
+
+    applied: bool
+    floor_types: Tuple[str, ...]
+    satisfied: bool
+    typed_pool_empty: bool
+    obo_as_notification_evidence: bool = False
+
+
+def resolve_source_type_floor_plan(
+    profile: str | None,
+    *,
+    query: str,
+    scope_by_type: Mapping[str, int],
+    pool_by_type: Mapping[str, int],
+    primary_source_type: Optional[str],
+) -> SourceTypeFloorPlan:
+    """Shadow-only: typed floor when primary pool is empty or intent-specific types missing."""
+    resolved = resolve_shadow_profile(profile)
+    pool_size = sum(int(count) for count in pool_by_type.values())
+    typed_pool_empty = pool_size == 0
+
+    if resolved != "seller_sales_summary":
+        return SourceTypeFloorPlan(
+            applied=False,
+            floor_types=(),
+            satisfied=pool_size > 0,
+            typed_pool_empty=typed_pool_empty,
+        )
+
+    floor_types: List[str] = []
+    obo_as_notification_evidence = False
+
+    if _query_has_terms(query, _NOTIFICATION_TERMS) and not _query_has_terms(query, _OBO_QUERY_TERMS):
+        if int(pool_by_type.get("notification", 0)) == 0:
+            if int(scope_by_type.get("notification", 0)) > 0:
+                floor_types.append("notification")
+            if int(scope_by_type.get("obo_offer_summary", 0)) > 0:
+                floor_types.append("obo_offer_summary")
+                obo_as_notification_evidence = True
+    elif _query_has_terms(query, _CATALOG_ACTIVITY_TERMS) or _query_has_terms(query, _LISTING_QUERY_TERMS):
+        if int(pool_by_type.get("listing", 0)) == 0 and int(scope_by_type.get("listing", 0)) > 0:
+            floor_types.append("listing")
+        if int(pool_by_type.get("listing_revision", 0)) == 0 and int(scope_by_type.get("listing_revision", 0)) > 0:
+            floor_types.append("listing_revision")
+    elif typed_pool_empty and primary_source_type and int(scope_by_type.get(primary_source_type, 0)) > 0:
+        floor_types.append(primary_source_type)
+
+    seen: set[str] = set()
+    ordered: List[str] = []
+    for source_type in floor_types:
+        if source_type not in seen:
+            seen.add(source_type)
+            ordered.append(source_type)
+
+    needs_fetch = any(
+        int(pool_by_type.get(source_type, 0)) == 0 and int(scope_by_type.get(source_type, 0)) > 0
+        for source_type in ordered
+    )
+    satisfied = not needs_fetch
+    return SourceTypeFloorPlan(
+        applied=bool(ordered) and needs_fetch,
+        floor_types=tuple(ordered),
+        satisfied=satisfied,
+        typed_pool_empty=typed_pool_empty,
+        obo_as_notification_evidence=obo_as_notification_evidence,
+    )
 
 
 def resolve_shadow_fetch_strategy(

@@ -36,7 +36,7 @@ T20.15A hybrid canary design: READY FOR OWNER APPROVAL (H1/H2 passed; not starte
 | B — Hybrid anchored overlap | **16/16 PASS** |
 | C — Keyword production | **PASS** (default) |
 
-Deploy: `python-ai-service:t20-p214g3r` @ `cbe764a`. Docs: `T20-14H0-hybrid-vector-gate-design.md`, `T20-14H1-hybrid-vector-5run-stability-eval.md`, `T20-14H2-vector-rollout-decision-package.md`.
+Deploy: `python-ai-service:t20-p215b2` @ `cd12a85`.
 
 ### Copilot-safe instruction
 
@@ -50,7 +50,7 @@ Do NOT use generative Ollama as production RAG default.
 Do NOT expose message bodies in UI or API responses.
 
 Phase 21 product track is CLOSED and tagged. P21.10+ product follow-ups require explicit approval (keyword/rule-engine only).
-T20.14H hybrid gate complete: pure vector NOT APPROVED; T20.15A hybrid canary design ready for owner approval only.
+T20.15A–D complete: allowlist hybrid canary KEEP (`AI_RAG_HYBRID_CANARY=1`, percent=0). T20.15E blocked.
 ```
 
 ---
@@ -172,8 +172,9 @@ Design: `docs/ai-platform/P21-5A-ai-quality-telemetry-design.md`
 | ---- | ------ |
 | No vector default rollout | **BLOCKED** |
 | No hybrid rollout (production) | **BLOCKED** |
-| No T20.15A implementation | **BLOCKED** until owner approves design |
-| T20.15A hybrid canary design | **READY FOR OWNER APPROVAL** (H2) |
+| T20.15 execution | **BLOCKED** (allowlist canary active for evidence only) |
+| T20.15E percentage design | **NOT STARTED** |
+| Hybrid allowlist canary | **KEEP** (`t20-p215b2`, contract user allowlist) |
 | No embedding tranches without separate approval | **BLOCKED** |
 | No default-on overlap flags | **BLOCKED** |
 | No generative Ollama as production RAG default | **BLOCKED** |
@@ -230,7 +231,7 @@ Product work may continue on keyword/rule-engine. **No product ticket may silent
 | **P21.12** | Observation-deck integration — feed telemetry JSON into `/observation-deck` |
 | **P21.13** | Seller intelligence polish |
 | **P21.14** | Dedicated session-memory UI |
-| **T20.15A** | Hybrid canary design — owner approval required before implementation |
+| **T20.15A–D** | Hybrid canary design → impl → eval → decision | **KEEP allowlist canary**; vector default NOT APPROVED |
 
 Do not start T20.15A implementation without owner approval. Vector rollout remains **NOT APPROVED** for production default.
 
@@ -241,7 +242,7 @@ Do not start T20.15A implementation without owner approval. Vector rollout remai
 ```text
 Phase 21 non-vector seller intelligence: RELEASE TAGGED
 Vector rollout: NOT APPROVED
-T20.15 execution: BLOCKED
-T20.15A hybrid canary design: READY FOR OWNER APPROVAL
 Production default: keyword
+Hybrid allowlist canary: KEEP
+T20.15E: NOT STARTED
 ```

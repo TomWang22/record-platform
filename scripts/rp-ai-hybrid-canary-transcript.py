@@ -18,7 +18,7 @@ import urllib.request
 
 REPO = Path(__file__).resolve().parents[1]
 OUT_DIR = REPO / "bench_logs/ai-platform/hybrid-canary-transcript"
-CA_FILE = REPO / "certs" / "dev-root.pem"
+CA_FILE = REPO / "certs" / "dev-chain.pem"
 
 
 def _ssl_context() -> ssl.SSLContext:

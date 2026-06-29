@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **SHA:** (see commit)  
-**Image:** `python-ai-service:t20-p215b`
+**Image:** `python-ai-service:t20-p215b2`
 
 ## Summary
 

@@ -116,15 +116,14 @@ class TestShadowZeroResultFallback(unittest.TestCase):
 
     def test_global_retry_success(self) -> None:
         conn = self._conn()
-        global_calls = 0
+        global_untyped_calls = 0
 
         async def fake_fetch(*args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
-            nonlocal global_calls
+            nonlocal global_untyped_calls
             source_type = kwargs.get("extra_source_type")
             if source_type is None:
-                global_calls += 1
-                if global_calls >= 3:
-                    return [_row("global-1", "listing")]
+                global_untyped_calls += 1
+                return [_row("global-1", "listing")]
             return []
 
         async def run() -> Dict[str, Any]:
@@ -141,8 +140,11 @@ class TestShadowZeroResultFallback(unittest.TestCase):
         debug = result["shadow_diagnostics"]["debug"]
         self.assertTrue(debug.get("zero_result_fallback_attempted"))
         self.assertTrue(debug.get("zero_result_fallback_succeeded"))
+        self.assertEqual(debug.get("zero_result_fallback_stage"), "global_untyped_retry")
+        self.assertEqual(debug.get("global_retry_limit"), 4)
         self.assertEqual(debug.get("zero_result_reason"), "zero_result_fallback_applied")
         self.assertGreater(result["candidate_count"], 0)
+        self.assertGreaterEqual(global_untyped_calls, 1)
 
     def test_keyword_anchor_fallback_success(self) -> None:
         conn = self._conn()
@@ -166,6 +168,8 @@ class TestShadowZeroResultFallback(unittest.TestCase):
         debug = result["shadow_diagnostics"]["debug"]
         self.assertTrue(debug.get("keyword_anchor_added"))
         self.assertEqual(debug.get("keyword_anchor_count"), 2)
+        self.assertEqual(debug.get("zero_result_fallback_stage"), "keyword_anchor_first")
+        self.assertTrue(debug.get("global_retry_skipped"))
         self.assertEqual(debug.get("zero_result_reason"), "zero_result_fallback_applied")
         self.assertEqual(result["candidate_count"], 2)
         self.assertTrue(all(chunk.get("keyword_anchor_added") for chunk in result["chunks"]))

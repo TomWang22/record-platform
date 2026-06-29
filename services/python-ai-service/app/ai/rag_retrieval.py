@@ -44,6 +44,7 @@ from app.ai.shadow_profiles import (
     resolve_shadow_fetch_strategy,
     resolve_shadow_profile,
     resolve_source_type_floor_plan,
+    shadow_fallback_global_retry_limit,
     shadow_global_fetch_limit,
     resolved_profile_for_diagnostics,
     source_type_quota_satisfied,
@@ -1325,7 +1326,18 @@ async def _collect_route_mode_shadow_rows(
         await _diversity_topup_fetch(source_type)
 
     pool_size, pool_by_type = _pool_snapshot()
-    if needs_global_fallback(
+    early_floor_plan = resolve_source_type_floor_plan(
+        resolved_profile,
+        query=query,
+        scope_by_type=scope_by_type,
+        pool_by_type=pool_by_type,
+        primary_source_type=primary,
+    )
+    if early_floor_plan.skip_broad_global_retry:
+        fetch_diag["global_fetch_skipped"] = True
+        fetch_diag["global_retry_skipped"] = True
+        fetch_diag["global_retry_skip_reason"] = early_floor_plan.global_retry_skip_reason
+    elif needs_global_fallback(
         pool_size,
         max_chunks,
         pool_by_type=pool_by_type,
@@ -1396,23 +1408,35 @@ async def _collect_route_mode_shadow_rows(
     )
     fetch_diag["typed_pool_empty"] = floor_plan.typed_pool_empty
     if floor_plan.typed_pool_empty and pool_size == 0:
-        global_rows = await _fetch_vector_rows(
-            conn,
-            filters=filters,
-            params=params,
-            vec_param=vec_param,
-            limit=global_limit,
-        )
-        pool_rows = _merge_vector_rows(pool_rows, global_rows)
-        fetch_diag["global_fetch_skipped"] = False
-        fetch_diag["source_type_floor_forced_global"] = True
-        merged_rows = _merge_vector_rows(pool_rows)
-        pool_size, pool_by_type = len(merged_rows), _pool_rows_by_source_type(merged_rows)
+        if floor_plan.skip_broad_global_retry:
+            fetch_diag["global_retry_skipped"] = True
+            fetch_diag["global_retry_skip_reason"] = (
+                floor_plan.global_retry_skip_reason or "source_type_floor_pending"
+            )
+        else:
+            fallback_global_limit = shadow_fallback_global_retry_limit(max_chunks)
+            global_rows = await _fetch_vector_rows(
+                conn,
+                filters=filters,
+                params=params,
+                vec_param=vec_param,
+                limit=fallback_global_limit,
+            )
+            pool_rows = _merge_vector_rows(pool_rows, global_rows)
+            fetch_diag["global_fetch_skipped"] = False
+            fetch_diag["source_type_floor_forced_global"] = True
+            fetch_diag["global_retry_limit"] = fallback_global_limit
+            fetch_diag["global_retry_candidate_count"] = len(global_rows)
+            merged_rows = _merge_vector_rows(pool_rows)
+            pool_size, pool_by_type = len(merged_rows), _pool_rows_by_source_type(merged_rows)
 
     if floor_plan.applied:
         fetch_diag["source_type_floor_applied"] = True
         fetch_diag["source_type_floor_types"] = list(floor_plan.floor_types)
         fetch_diag["obo_as_notification_evidence"] = floor_plan.obo_as_notification_evidence
+        if floor_plan.skip_broad_global_retry:
+            fetch_diag["global_retry_skipped"] = True
+            fetch_diag["global_retry_skip_reason"] = floor_plan.global_retry_skip_reason
         for source_type in floor_plan.floor_types:
             if int(pool_by_type.get(source_type, 0)) == 0:
                 await _typed_fetch(source_type)
@@ -1869,14 +1893,20 @@ async def retrieve_chunks_vector_shadow(
         "zero_result_fallback_attempted": False,
         "zero_result_fallback_stage": None,
         "zero_result_fallback_succeeded": False,
+        "zero_result_fallback_applied": False,
         "keyword_anchor_added": False,
         "keyword_anchor_count": 0,
         "keyword_anchor_ids": [],
         "vector_selected_chunk_ids": [_safe_chunk_id(chunk) for chunk in vector_selected_for_output],
         "shadow_selected_count_before_fallback": selected_count_before_fallback,
         "shadow_selected_count_after_fallback": selected_count_before_fallback,
+        "vector_only_zero_result": selected_count_before_fallback == 0,
         "true_zero_result_after_fallback": False,
         "fallback_reason": None,
+        "global_retry_skipped": False,
+        "global_retry_skip_reason": None,
+        "global_retry_limit": None,
+        "global_retry_candidate_count": None,
     }
 
     embed_timeout_before_fetch = bool(
@@ -1888,21 +1918,58 @@ async def retrieve_chunks_vector_shadow(
         and (pool_before_rerank == 0 or selected_count_before_fallback == 0)
     )
 
+    def _apply_keyword_anchors(anchor_chunks: List[Dict[str, Any]]) -> None:
+        nonlocal selected_for_output, weighted_selected, unweighted_selected
+        fallback_diag["keyword_anchor_added"] = True
+        fallback_diag["keyword_anchor_count"] = len(anchor_chunks)
+        fallback_diag["keyword_anchor_ids"] = [_safe_chunk_id(chunk) for chunk in anchor_chunks]
+        selected_for_output = _merge_selected_with_keyword_anchors(
+            vector_selected_for_output,
+            anchor_chunks,
+            max_chunks=max_chunks,
+        )
+        if route_mode:
+            weighted_selected = selected_for_output
+            unweighted_selected = _merge_selected_with_keyword_anchors(
+                unweighted_selected,
+                anchor_chunks,
+                max_chunks=max_chunks,
+            )
+        else:
+            unweighted_selected = selected_for_output
+            weighted_selected = selected_for_output
+        fallback_diag["shadow_selected_count_after_fallback"] = len(selected_for_output)
+
     if needs_fallback:
         fallback_diag["zero_result_fallback_attempted"] = True
         if selected_count_before_fallback == 0:
             fallback_diag["zero_result_reason_before_fallback"] = "zero_result_after_fetch"
 
         fallback_start = _now_ms()
-        if pool_before_rerank == 0 or not raw_rows:
+        safe_anchors: List[Dict[str, Any]] = []
+        if keyword_chunks_for_overlap:
+            safe_anchors = _select_keyword_anchor_chunks(
+                keyword_chunks_for_overlap,
+                existing_ids=_collect_chunk_ids(vector_selected_for_output),
+            )
+
+        if safe_anchors:
+            fallback_diag["zero_result_fallback_stage"] = "keyword_anchor_first"
+            fallback_diag["global_retry_skipped"] = True
+            fallback_diag["global_retry_skip_reason"] = "safe_keyword_anchors_available"
+            _apply_keyword_anchors(safe_anchors)
+        elif pool_before_rerank == 0 or not raw_rows or len(selected_for_output) == 0:
+            global_limit = shadow_fallback_global_retry_limit(max_chunks)
             fallback_diag["zero_result_fallback_stage"] = "global_untyped_retry"
+            fallback_diag["global_retry_limit"] = global_limit
             global_rows = await _fetch_vector_rows(
                 conn,
                 filters=filters,
                 params=params,
                 vec_param=vec_param,
-                limit=shadow_global_fetch_limit(max_chunks),
+                limit=global_limit,
             )
+            fallback_diag["global_retry_candidate_count"] = len(global_rows)
             raw_rows = _merge_vector_rows(raw_rows, global_rows)
             unweighted_selected, weighted_selected = _rerun_shadow_selection(
                 raw_rows,
@@ -1921,44 +1988,26 @@ async def retrieve_chunks_vector_shadow(
             vector_selected_for_output = list(selected_for_output)
             fallback_diag["shadow_selected_count_after_fallback"] = len(selected_for_output)
 
-        if len(selected_for_output) == 0:
-            if keyword_chunks_for_overlap:
-                fallback_diag["zero_result_fallback_stage"] = (
-                    fallback_diag.get("zero_result_fallback_stage") or "keyword_anchor_topup"
-                )
-                anchor_chunks = _select_keyword_anchor_chunks(
-                    keyword_chunks_for_overlap,
-                    existing_ids=_collect_chunk_ids(vector_selected_for_output),
-                )
-                if anchor_chunks:
-                    fallback_diag["keyword_anchor_added"] = True
-                    fallback_diag["keyword_anchor_count"] = len(anchor_chunks)
-                    fallback_diag["keyword_anchor_ids"] = [_safe_chunk_id(chunk) for chunk in anchor_chunks]
-                    selected_for_output = _merge_selected_with_keyword_anchors(
-                        vector_selected_for_output,
-                        anchor_chunks,
-                        max_chunks=max_chunks,
-                    )
-                    if route_mode:
-                        weighted_selected = selected_for_output
-                        unweighted_selected = _merge_selected_with_keyword_anchors(
-                            unweighted_selected,
-                            anchor_chunks,
-                            max_chunks=max_chunks,
-                        )
-                    else:
-                        unweighted_selected = selected_for_output
-                        weighted_selected = selected_for_output
-                    fallback_diag["shadow_selected_count_after_fallback"] = len(selected_for_output)
-                else:
-                    fallback_diag["fallback_reason"] = "keyword_anchor_filtered_empty"
+        if len(selected_for_output) == 0 and keyword_chunks_for_overlap and not fallback_diag.get("keyword_anchor_added"):
+            fallback_diag["zero_result_fallback_stage"] = (
+                fallback_diag.get("zero_result_fallback_stage") or "keyword_anchor_topup"
+            )
+            anchor_chunks = _select_keyword_anchor_chunks(
+                keyword_chunks_for_overlap,
+                existing_ids=_collect_chunk_ids(vector_selected_for_output),
+            )
+            if anchor_chunks:
+                _apply_keyword_anchors(anchor_chunks)
             else:
-                fallback_diag["fallback_reason"] = "not_exposed"
+                fallback_diag["fallback_reason"] = "keyword_anchor_filtered_empty"
+        elif len(selected_for_output) == 0 and not keyword_chunks_for_overlap:
+            fallback_diag["fallback_reason"] = "not_exposed"
 
         diagnostics.timings_ms.candidate_fetch += _elapsed_ms(fallback_start)
 
         if len(selected_for_output) > 0:
             fallback_diag["zero_result_fallback_succeeded"] = True
+            fallback_diag["zero_result_fallback_applied"] = True
             fallback_diag["fallback_reason"] = fallback_diag.get("fallback_reason") or "zero_result_fallback_applied"
         else:
             fallback_diag["true_zero_result_after_fallback"] = True

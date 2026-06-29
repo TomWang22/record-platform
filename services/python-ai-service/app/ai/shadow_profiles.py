@@ -302,6 +302,8 @@ SHADOW_MIN_SOURCE_DIVERSITY = 5
 SHADOW_DIVERSITY_TOPUP_LIMIT = 3
 # T20.14G2 — shadow-only keyword anchor cap for zero-result fallback.
 SHADOW_KEYWORD_ANCHOR_MAX = 2
+# T20.14G2R — emergency fallback global retry cap (not full shadow global pool).
+SHADOW_FALLBACK_GLOBAL_RETRY_CAP = 4
 # T20.14D — shadow diagnostic global fetch cap (was max_chunks*3 for non-OBO).
 SHADOW_GLOBAL_FETCH_CHUNK_MULTIPLIER = 2
 
@@ -309,6 +311,11 @@ SHADOW_GLOBAL_FETCH_CHUNK_MULTIPLIER = 2
 def shadow_global_fetch_limit(max_chunks: int) -> int:
     """Shadow-only: cap global vector pool size for latency (keyword path unaffected)."""
     return max(max_chunks * SHADOW_GLOBAL_FETCH_CHUNK_MULTIPLIER, max_chunks)
+
+
+def shadow_fallback_global_retry_limit(max_chunks: int) -> int:
+    """T20.14G2R — capped global retry for zero-result fallback only."""
+    return min(SHADOW_FALLBACK_GLOBAL_RETRY_CAP, max_chunks)
 
 
 @dataclass(frozen=True, slots=True)
@@ -443,6 +450,8 @@ class SourceTypeFloorPlan:
     satisfied: bool
     typed_pool_empty: bool
     obo_as_notification_evidence: bool = False
+    skip_broad_global_retry: bool = False
+    global_retry_skip_reason: Optional[str] = None
 
 
 def resolve_source_type_floor_plan(
@@ -496,12 +505,22 @@ def resolve_source_type_floor_plan(
         for source_type in ordered
     )
     satisfied = not needs_fetch
+    skip_broad_global_retry = False
+    global_retry_skip_reason: Optional[str] = None
+    if obo_as_notification_evidence and typed_pool_empty:
+        skip_broad_global_retry = True
+        global_retry_skip_reason = "obo_floor_satisfied"
+    elif ordered and typed_pool_empty:
+        skip_broad_global_retry = True
+        global_retry_skip_reason = "source_type_floor_pending"
     return SourceTypeFloorPlan(
         applied=bool(ordered) and needs_fetch,
         floor_types=tuple(ordered),
         satisfied=satisfied,
         typed_pool_empty=typed_pool_empty,
         obo_as_notification_evidence=obo_as_notification_evidence,
+        skip_broad_global_retry=skip_broad_global_retry,
+        global_retry_skip_reason=global_retry_skip_reason,
     )
 
 

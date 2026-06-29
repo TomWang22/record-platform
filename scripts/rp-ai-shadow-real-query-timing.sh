@@ -234,6 +234,7 @@ true_zero_after_fallback_runs = []
 zero_result_after_fetch_runs = []
 fallback_applied_runs = []
 keyword_anchor_added_runs = []
+global_retry_skipped_runs = []
 embed_retry_attempted_runs = []
 embed_retry_succeeded_runs = []
 shadow_fetch_attempted_runs = []
@@ -276,6 +277,8 @@ for r in rows:
             fallback_applied_runs.append(r["mode"])
         if debug.get("keyword_anchor_added"):
             keyword_anchor_added_runs.append(r["mode"])
+        if debug.get("global_retry_skipped"):
+            global_retry_skipped_runs.append(r["mode"])
         if (
             zero_reason == "embed_timeout_before_fetch"
             or embed.get("embed_timeout_before_fetch")
@@ -369,6 +372,7 @@ summary = {
     "zero_result_after_fetch_count": len(zero_result_after_fetch_runs),
     "fallback_applied_count": len(fallback_applied_runs),
     "keyword_anchor_added_count": len(keyword_anchor_added_runs),
+    "global_retry_skipped_count": len(global_retry_skipped_runs),
     "shadow_fetch_attempted_count": len(shadow_fetch_attempted_runs),
     "embed_retry_attempted_count": len(embed_retry_attempted_runs),
     "embed_retry_succeeded_count": len(embed_retry_succeeded_runs),
@@ -426,6 +430,7 @@ lines = [
     f"- zero_result_after_fetch: {summary['zero_result_after_fetch_count']}",
     f"- fallback applied: {summary['fallback_applied_count']}/{summary['shadow_runs']}",
     f"- keyword anchors added: {summary['keyword_anchor_added_count']}/{summary['shadow_runs']}",
+    f"- global retry skipped: {summary['global_retry_skipped_count']}/{summary['shadow_runs']}",
     f"- shadow_fetch_attempted: {summary['shadow_fetch_attempted_count']}/{summary['shadow_runs']}",
     f"- embed_retry attempted/succeeded: {summary['embed_retry_attempted_count']}/{summary['embed_retry_succeeded_count']}",
     f"- request_error: {summary['request_error_count']}",

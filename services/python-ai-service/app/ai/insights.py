@@ -3,9 +3,18 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.ai.envelope import build_envelope, chunk_to_citation, source_ref
+from app.ai.hybrid_canary import (
+    build_hybrid_canary_diagnostics,
+    chunks_to_source_refs,
+    evaluate_hybrid_canary_gate,
+    hybrid_chunks_from_shadow,
+    hybrid_failure_reason,
+    hybrid_succeeded,
+)
 from app.ai.outbox import insert_pricing_recommendation_outbox, publish_python_ai_outbox_tick
 from app.ai.providers.registry import get_provider, resolve_model_used
 from app.ai.providers.rule_engine import (
@@ -89,10 +98,36 @@ async def rag_query(
     shadow_debug: bool = False,
 ) -> Dict[str, Any]:
     async def run(conn):
+        kw_start = time.perf_counter()
         keyword = await retrieve_chunks(conn, query=question, user_id=user_id, source_types=source_types)
+        keyword_latency_ms = (time.perf_counter() - kw_start) * 1000.0
+
+        gate = evaluate_hybrid_canary_gate(user_id)
         shadow_diag = None
         shadow_diagnostics = None
-        if shadow_vector:
+        hybrid_shadow: Optional[Dict[str, Any]] = None
+        hybrid_error: Optional[str] = None
+        hybrid_latency_ms: Optional[float] = None
+
+        if gate.canary_allowed:
+            h_start = time.perf_counter()
+            try:
+                hybrid_shadow = await retrieve_chunks_vector_shadow(
+                    conn,
+                    query=question,
+                    user_id=user_id,
+                    source_types=source_types,
+                    route_shadow_profile=shadow_profile,
+                    shadow_profile_hints=shadow_profile_hints,
+                    shadow_custom_query_hints=shadow_custom_query_hints,
+                    include_diagnostics=True,
+                    keyword_chunks_for_overlap=keyword["chunks"],
+                )
+            except Exception as exc:  # pragma: no cover - defensive fallback
+                hybrid_error = str(exc)[:200]
+                hybrid_shadow = {"status": "error", "error": hybrid_error, "chunks": []}
+            hybrid_latency_ms = (time.perf_counter() - h_start) * 1000.0
+        elif shadow_vector:
             shadow = await retrieve_chunks_vector_shadow(
                 conn,
                 query=question,
@@ -115,7 +150,16 @@ async def rag_query(
             )
             if shadow_debug and shadow.get("shadow_diagnostics"):
                 shadow_diagnostics = shadow["shadow_diagnostics"]
-        return keyword, shadow_diag, shadow_diagnostics
+        return (
+            keyword,
+            shadow_diag,
+            shadow_diagnostics,
+            gate,
+            hybrid_shadow,
+            keyword_latency_ms,
+            hybrid_latency_ms,
+            hybrid_error,
+        )
 
     result, err = await _with_conn(run)
     model_used, model_deg = await resolve_model_used()
@@ -129,24 +173,51 @@ async def rag_query(
             source_refs=[],
             degraded_reason=err,
         )
-    keyword_result, shadow_diag, shadow_diagnostics = result
-    chunks = keyword_result["chunks"]
-    refs = keyword_result["source_refs"]
+    keyword_result, shadow_diag, shadow_diagnostics, gate, hybrid_shadow, keyword_latency_ms, hybrid_latency_ms, hybrid_error = result
+
+    use_hybrid = hybrid_succeeded(gate=gate, shadow=hybrid_shadow, hybrid_error=hybrid_error)
+    fallback_reason = hybrid_failure_reason(gate=gate, shadow=hybrid_shadow, hybrid_error=hybrid_error)
+    hybrid_fallback = gate.canary_allowed and not use_hybrid
+
+    if use_hybrid:
+        chunks = hybrid_chunks_from_shadow(hybrid_shadow or {})
+        refs = chunks_to_source_refs(chunks)
+        retrieval_mode = "hybrid_canary"
+    else:
+        chunks = keyword_result["chunks"]
+        refs = keyword_result["source_refs"]
+        if gate.canary_allowed and hybrid_fallback and gate.require_keyword_fallback:
+            retrieval_mode = "keyword_fallback_from_hybrid"
+        else:
+            retrieval_mode = keyword_result["retrieval_mode"]
+
     citations = [chunk_to_citation(c) for c in chunks[:5]]
     status = "live" if refs else "degraded"
     synth_q = synthesis_question if synthesis_question is not None else question
     synthesis = synthesize_rag_summary(question=synth_q, chunks=chunks, refs=refs)
     summary = synthesis["summary"]
-    details = {
-        "retrieval_mode": keyword_result["retrieval_mode"],
+    details: Dict[str, Any] = {
+        "retrieval_mode": retrieval_mode,
         "chunk_count": len(chunks),
-        "excerpts": [c.get("content", "")[:300] for c in chunks[:3]],
+        "excerpts": _sanitized_excerpts(chunks, limit=3),
         "synthesis": {
             "template": synthesis["template"],
             "caveats": synthesis["caveats"],
             "parsed_signals": synthesis["parsed_signals"],
         },
     }
+    if gate.canary_enabled and gate.user_allowlisted:
+        details["hybrid_canary"] = build_hybrid_canary_diagnostics(
+            gate=gate,
+            keyword_result=keyword_result,
+            shadow=hybrid_shadow,
+            keyword_latency_ms=keyword_latency_ms,
+            hybrid_latency_ms=hybrid_latency_ms,
+            hybrid_fallback=hybrid_fallback,
+            hybrid_fallback_reason=fallback_reason if hybrid_fallback else None,
+            hybrid_error=hybrid_error,
+            retrieval_mode=retrieval_mode,
+        )
     if shadow_diag is not None:
         details["shadow_vector"] = shadow_diag
     if shadow_diagnostics is not None:

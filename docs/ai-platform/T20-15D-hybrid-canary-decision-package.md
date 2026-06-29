@@ -58,6 +58,29 @@ Image rollback: `python-ai-service:t20-p214g3r`
 
 ---
 
+## Locked operational state (T20.15D)
+
+```text
+T20.15A–D complete.
+Hybrid allowlist canary: KEEP for evidence collection only.
+AI_RAG_HYBRID_CANARY=1 for allowlisted contract user.
+AI_RAG_HYBRID_CANARY_PERCENT=0.
+Production default remains keyword.
+Vector production default: NOT APPROVED.
+T20.15E limited percentage design: NOT STARTED — explicit approval required.
+```
+
+| Metric | T20.15C baseline |
+| ------ | ---------------- |
+| Image | `python-ai-service:t20-p215b2` |
+| Allowlisted user | `2ed75568-7deb-4c29-91b0-6919f24a0c9f` |
+| API fallback | 1/9 (`final_tagged_plan`) |
+| Pure / anchored overlap | 8/16 / 16/16 |
+| Avg quality | 3.78 |
+| Hybrid p95 | 269 ms API / 427 ms shadow |
+
+---
+
 ## Required verdict
 
 ```text

@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-29 (T20.14H0–H2 hybrid gate complete)  
+**Last updated:** 2026-06-29 (T20.15A–D complete; D-R/S/T evidence bundle)  
 **Current main SHA:** verify with `git rev-parse --short HEAD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
@@ -17,16 +17,32 @@ Use this document as the **source of truth** for Phase 21 state. For Phase 20 ve
 Phase 21 non-vector seller intelligence: RELEASE TAGGED @ d0e4c58
 
 Production path:
-- retrieval: keyword
+- retrieval: keyword (default for all non-allowlisted users)
 - synthesis: rule-engine (rag_synthesis.py templates)
 - model_used: rule-engine
 - vector default: OFF
 - AI_RAG_SHADOW_VECTOR: 0 (must remain off unless explicitly approved)
 
-Vector rollout: NOT APPROVED
-T20.15 execution: BLOCKED
-T20.15A hybrid canary design: READY FOR OWNER APPROVAL (H1/H2 passed; not started)
+T20.15A–D complete.
+Hybrid allowlist canary: KEEP for evidence collection only.
+AI_RAG_HYBRID_CANARY=1 for allowlisted contract user.
+AI_RAG_HYBRID_CANARY_PERCENT=0.
+Production default remains keyword.
+Vector production default: NOT APPROVED.
+T20.15E limited percentage design: NOT STARTED — explicit approval required.
 ```
+
+### T20.15 hybrid canary (implemented)
+
+| Item | Value |
+| ---- | ----- |
+| Image | `python-ai-service:t20-p215b2` |
+| Allowlisted user | `2ed75568-7deb-4c29-91b0-6919f24a0c9f` |
+| API fallback | 1/9 on `final_tagged_plan` |
+| Pure overlap | 8/16 |
+| Anchored overlap | 16/16 |
+| Avg quality (T20.15C API) | 3.78 |
+| Hybrid p95 | 269 ms API / 427 ms shadow |
 
 ### T20.14H hybrid gate (2026-06-29)
 
@@ -44,8 +60,9 @@ Deploy: `python-ai-service:t20-p215b2` @ `cd12a85`.
 Use @docs/ai-platform/PHASE_21_COPILOT_CONTEXT.md as the source of truth for Phase 21.
 
 Do NOT enable vector retrieval as production default.
-Do NOT start T20.15A implementation without explicit owner approval (design is ready per H2).
-Do NOT enable hybrid rollout or default-on overlap flags.
+Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without T20.15E owner approval.
+Do NOT start T20.15E percentage design without explicit approval.
+Do NOT enable hybrid rollout beyond allowlisted contract user.
 Do NOT use generative Ollama as production RAG default.
 Do NOT expose message bodies in UI or API responses.
 

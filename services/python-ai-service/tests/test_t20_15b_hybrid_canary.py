@@ -115,7 +115,7 @@ class TestHybridCanaryGates(unittest.TestCase):
             gate = hc.evaluate_hybrid_canary_gate("u-allow")
             self.assertFalse(gate.canary_allowed)
 
-    def test_percent_gt_zero_blocks_canary(self) -> None:
+    def test_percent_gt_zero_still_allows_allowlist(self) -> None:
         with patch.dict(
             os.environ,
             {
@@ -132,13 +132,27 @@ class TestHybridCanaryGates(unittest.TestCase):
             reload(cfg)
             reload(hc)
             gate = hc.evaluate_hybrid_canary_gate("u-allow")
-            self.assertFalse(gate.canary_allowed)
-            self.assertTrue(gate.percent_blocked)
+            self.assertTrue(gate.canary_allowed)
+            self.assertEqual(gate.gate_reason, "allowlist")
 
 
 class TestHybridCanaryDiagnostics(unittest.TestCase):
     def test_pure_vs_anchored_not_conflated(self) -> None:
-        gate = evaluate_hybrid_canary_gate(None)
+        with patch.dict(
+            os.environ,
+            {
+                "AI_RAG_HYBRID_CANARY": "1",
+                "AI_RAG_HYBRID_CANARY_USER_ALLOWLIST": "u-allow",
+            },
+            clear=False,
+        ):
+            from importlib import reload
+            import app.ai.config as cfg
+            import app.ai.hybrid_canary as hc
+
+            reload(cfg)
+            reload(hc)
+            gate = hc.evaluate_hybrid_canary_gate("u-allow")
         diag = build_hybrid_canary_diagnostics(
             gate=gate,
             keyword_result=_keyword_result(),
@@ -172,7 +186,7 @@ class TestHybridCanaryDiagnostics(unittest.TestCase):
             reload(hc)
             gate = hc.evaluate_hybrid_canary_gate("x")
             reason = hc.hybrid_failure_reason(gate=gate, shadow=None, hybrid_error="boom")
-            self.assertEqual(reason, "user_not_allowlisted")
+            self.assertEqual(reason, "user_not_in_cohort")
 
 
 class TestRagQueryHybridIntegration(unittest.TestCase):

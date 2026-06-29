@@ -221,7 +221,7 @@ async def rag_query(
             "parsed_signals": synthesis["parsed_signals"],
         },
     }
-    if gate.canary_enabled and gate.user_allowlisted:
+    if gate.canary_enabled:
         details["hybrid_canary"] = build_hybrid_canary_diagnostics(
             gate=gate,
             keyword_result=keyword_result,

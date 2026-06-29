@@ -1,12 +1,16 @@
-"""T20.15B — Allowlist-only hybrid canary gates (keyword default preserved)."""
+"""T20.15B/F — Hybrid canary gates (keyword default preserved; percentage cohort optional)."""
 from __future__ import annotations
 
+import hashlib
+import os
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from app.ai.config import (
     AI_RAG_HYBRID_ANCHOR_MAX,
     AI_RAG_HYBRID_CANARY,
+    AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT,
     AI_RAG_HYBRID_CANARY_PERCENT,
     AI_RAG_HYBRID_CANARY_USER_ALLOWLIST,
     AI_RAG_HYBRID_LOG_PURE_VECTOR,
@@ -14,13 +18,23 @@ from app.ai.config import (
 )
 from app.ai.envelope import source_ref
 
+_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+_PRODUCTION_NAMESPACES = frozenset({"record-platform"})
+
+GateReason = str  # allowlist | percentage | keyword_default | prod_percent_blocked
+
 
 @dataclass(frozen=True)
 class HybridCanaryGate:
     canary_enabled: bool
     canary_allowed: bool
-    percent_blocked: bool
+    gate_reason: GateReason
     user_allowlisted: bool
+    percentage: int
+    percentage_bucket: Optional[int]
+    percentage_cohort: bool
     require_keyword_fallback: bool
     log_pure_vector: bool
     anchor_max: int
@@ -30,29 +44,131 @@ class HybridCanaryGate:
         return self.canary_allowed
 
 
+def normalize_user_id(user_id: Optional[str]) -> Optional[str]:
+    if user_id is None:
+        return None
+    s = str(user_id).strip()
+    if not s or s.lower() in ("null", "none"):
+        return None
+    if not _UUID_RE.match(s):
+        return None
+    return s.lower()
+
+
+def _clamp_percent(percent: int) -> int:
+    if percent <= 0:
+        return 0
+    if percent > 100:
+        return 100
+    return percent
+
+
+def percentage_bucket(user_id: str) -> int:
+    normalized = normalize_user_id(user_id) or str(user_id).strip().lower()
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    return int(digest[:8], 16) % 100
+
+
+def in_percentage_cohort(user_id: str, percent: int) -> bool:
+    clamped = _clamp_percent(percent)
+    if clamped <= 0:
+        return False
+    return percentage_bucket(user_id) < clamped
+
+
 def _parse_allowlist(raw: str) -> set[str]:
-    return {part.strip() for part in (raw or "").split(",") if part.strip()}
+    return {part.strip().lower() for part in (raw or "").split(",") if part.strip()}
+
+
+def _is_production_namespace() -> bool:
+    ns = os.getenv("KUBERNETES_NAMESPACE", "").strip()
+    return ns in _PRODUCTION_NAMESPACES
+
+
+def _has_owner_scope(user_id: Optional[str]) -> bool:
+    return normalize_user_id(user_id) is not None
 
 
 def evaluate_hybrid_canary_gate(user_id: Optional[str]) -> HybridCanaryGate:
-    uid = (user_id or "").strip()
+    raw_uid = (user_id or "").strip()
+    uid = normalize_user_id(user_id)
     allowlist = _parse_allowlist(AI_RAG_HYBRID_CANARY_USER_ALLOWLIST)
-    percent_blocked = AI_RAG_HYBRID_CANARY_PERCENT > 0
-    user_allowlisted = bool(uid and uid in allowlist)
+    percent = _clamp_percent(AI_RAG_HYBRID_CANARY_PERCENT)
     canary_enabled = AI_RAG_HYBRID_CANARY
-    canary_allowed = (
-        canary_enabled
-        and user_allowlisted
-        and not percent_blocked
-    )
-    return HybridCanaryGate(
+    user_allowlisted = bool(raw_uid and raw_uid.lower() in allowlist)
+    bucket: Optional[int] = percentage_bucket(uid) if uid else None
+
+    base = dict(
         canary_enabled=canary_enabled,
-        canary_allowed=canary_allowed,
-        percent_blocked=percent_blocked,
         user_allowlisted=user_allowlisted,
+        percentage=percent,
+        percentage_bucket=bucket,
         require_keyword_fallback=AI_RAG_HYBRID_REQUIRE_KEYWORD_FALLBACK,
         log_pure_vector=AI_RAG_HYBRID_LOG_PURE_VECTOR,
         anchor_max=AI_RAG_HYBRID_ANCHOR_MAX,
+    )
+
+    if not canary_enabled:
+        return HybridCanaryGate(
+            canary_allowed=False,
+            gate_reason="keyword_default",
+            percentage_cohort=False,
+            **base,
+        )
+
+    if user_allowlisted:
+        return HybridCanaryGate(
+            canary_allowed=True,
+            gate_reason="allowlist",
+            percentage_cohort=False,
+            **base,
+        )
+
+    if percent <= 0:
+        return HybridCanaryGate(
+            canary_allowed=False,
+            gate_reason="keyword_default",
+            percentage_cohort=False,
+            **base,
+        )
+
+    if not uid:
+        return HybridCanaryGate(
+            canary_allowed=False,
+            gate_reason="keyword_default",
+            percentage_cohort=False,
+            **base,
+        )
+
+    if not _has_owner_scope(uid):
+        return HybridCanaryGate(
+            canary_allowed=False,
+            gate_reason="keyword_default",
+            percentage_cohort=False,
+            **base,
+        )
+
+    if _is_production_namespace() and not AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT:
+        return HybridCanaryGate(
+            canary_allowed=False,
+            gate_reason="prod_percent_blocked",
+            percentage_cohort=False,
+            **base,
+        )
+
+    if in_percentage_cohort(uid, percent):
+        return HybridCanaryGate(
+            canary_allowed=True,
+            gate_reason="percentage",
+            percentage_cohort=True,
+            **base,
+        )
+
+    return HybridCanaryGate(
+        canary_allowed=False,
+        gate_reason="keyword_default",
+        percentage_cohort=False,
+        **base,
     )
 
 
@@ -96,10 +212,10 @@ def hybrid_failure_reason(
 ) -> Optional[str]:
     if not gate.canary_enabled:
         return "canary_disabled"
-    if gate.percent_blocked:
-        return "percent_rollout_blocked"
-    if not gate.user_allowlisted:
-        return "user_not_allowlisted"
+    if not gate.canary_allowed:
+        if gate.gate_reason == "prod_percent_blocked":
+            return "prod_percent_blocked"
+        return "user_not_in_cohort"
     if hybrid_error:
         return "hybrid_exception"
     if shadow is None:
@@ -132,6 +248,22 @@ def hybrid_succeeded(
     return hybrid_failure_reason(gate=gate, shadow=shadow, hybrid_error=hybrid_error) is None
 
 
+def _gate_metadata(gate: HybridCanaryGate, retrieval_mode: str) -> Dict[str, Any]:
+    return {
+        "enabled": gate.canary_enabled,
+        "eligible": gate.canary_allowed,
+        "gate_reason": gate.gate_reason,
+        "percentage": gate.percentage,
+        "percentage_bucket": gate.percentage_bucket,
+        "percentage_cohort": gate.percentage_cohort,
+        "allowlisted": gate.user_allowlisted,
+        "require_keyword_fallback": gate.require_keyword_fallback,
+        "pure_vector_logged": gate.log_pure_vector,
+        "anchor_max": gate.anchor_max,
+        "retrieval_mode": retrieval_mode,
+    }
+
+
 def build_hybrid_canary_diagnostics(
     *,
     gate: HybridCanaryGate,
@@ -144,6 +276,15 @@ def build_hybrid_canary_diagnostics(
     hybrid_error: Optional[str],
     retrieval_mode: str,
 ) -> Dict[str, Any]:
+    meta = _gate_metadata(gate, retrieval_mode)
+    if not gate.canary_allowed:
+        return {
+            **meta,
+            "canary_enabled": gate.canary_enabled,
+            "canary_allowed": False,
+            "canary_lane": "lane_c_keyword",
+        }
+
     keyword_chunks = list(keyword_result.get("chunks") or [])
     hybrid_chunk_list = hybrid_chunks_from_shadow(shadow) if shadow else []
     sd = (shadow or {}).get("shadow_diagnostics") or {}
@@ -171,18 +312,16 @@ def build_hybrid_canary_diagnostics(
         pure_doc_out = 0
         pure_ent_out = 0
 
-    if gate.canary_allowed and hybrid_succeeded(gate=gate, shadow=shadow, hybrid_error=hybrid_error):
+    if hybrid_succeeded(gate=gate, shadow=shadow, hybrid_error=hybrid_error):
         canary_lane = "lane_b_hybrid_anchored"
-    elif gate.canary_allowed:
-        canary_lane = "lane_b_hybrid_attempted"
     else:
-        canary_lane = "lane_c_keyword"
+        canary_lane = "lane_b_hybrid_attempted"
 
     return {
+        **meta,
         "canary_enabled": gate.canary_enabled,
         "canary_allowed": gate.canary_allowed,
         "canary_lane": canary_lane,
-        "retrieval_mode": retrieval_mode,
         "keyword_latency_ms": round(keyword_latency_ms, 2),
         "hybrid_latency_ms": round(hybrid_latency_ms, 2) if hybrid_latency_ms is not None else None,
         "pure_vector_doc_overlap": pure_doc_out,
@@ -202,7 +341,4 @@ def build_hybrid_canary_diagnostics(
         "source_types_hybrid": _source_types(hybrid_chunk_list),
         "source_refs_keyword_count": len(keyword_result.get("source_refs") or []),
         "source_refs_hybrid_count": len(chunks_to_source_refs(hybrid_chunk_list)),
-        "percent_rollout_blocked": gate.percent_blocked,
-        "require_keyword_fallback": gate.require_keyword_fallback,
-        "anchor_max": gate.anchor_max,
     }

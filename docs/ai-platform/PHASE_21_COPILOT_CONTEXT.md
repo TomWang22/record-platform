@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-28 (P21.10A / T20.14A–B vector runway)  
+**Last updated:** 2026-06-29 (T20.14H0–H2 hybrid gate complete)  
 **Current main SHA:** verify with `git rev-parse --short HEAD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
@@ -24,8 +24,19 @@ Production path:
 - AI_RAG_SHADOW_VECTOR: 0 (must remain off unless explicitly approved)
 
 Vector rollout: NOT APPROVED
-T20.14/T20.15: BLOCKED
+T20.15 execution: BLOCKED
+T20.15A hybrid canary design: READY FOR OWNER APPROVAL (H1/H2 passed; not started)
 ```
+
+### T20.14H hybrid gate (2026-06-29)
+
+| Lane | Result |
+| ---- | ------ |
+| A — Pure vector overlap | **8/16 FAIL** (stable across 5 H1 runs) |
+| B — Hybrid anchored overlap | **16/16 PASS** |
+| C — Keyword production | **PASS** (default) |
+
+Deploy: `python-ai-service:t20-p214g3r` @ `cbe764a`. Docs: `T20-14H0-hybrid-vector-gate-design.md`, `T20-14H1-hybrid-vector-5run-stability-eval.md`, `T20-14H2-vector-rollout-decision-package.md`.
 
 ### Copilot-safe instruction
 
@@ -33,13 +44,13 @@ T20.14/T20.15: BLOCKED
 Use @docs/ai-platform/PHASE_21_COPILOT_CONTEXT.md as the source of truth for Phase 21.
 
 Do NOT enable vector retrieval as production default.
-Do NOT start T20.14/T20.15 or embedding tranches without explicit approval.
+Do NOT start T20.15A implementation without explicit owner approval (design is ready per H2).
 Do NOT enable hybrid rollout or default-on overlap flags.
 Do NOT use generative Ollama as production RAG default.
 Do NOT expose message bodies in UI or API responses.
 
 Phase 21 product track is CLOSED and tagged. P21.10+ product follow-ups require explicit approval (keyword/rule-engine only).
-T20.14 vector blocker burn-down is the only path toward rollout; T20.15 blocked until T20.14H passes all gates.
+T20.14H hybrid gate complete: pure vector NOT APPROVED; T20.15A hybrid canary design ready for owner approval only.
 ```
 
 ---
@@ -160,8 +171,9 @@ Design: `docs/ai-platform/P21-5A-ai-quality-telemetry-design.md`
 | Rule | Status |
 | ---- | ------ |
 | No vector default rollout | **BLOCKED** |
-| No hybrid rollout | **BLOCKED** |
-| No T20.14 / T20.15 | **BLOCKED** |
+| No hybrid rollout (production) | **BLOCKED** |
+| No T20.15A implementation | **BLOCKED** until owner approves design |
+| T20.15A hybrid canary design | **READY FOR OWNER APPROVAL** (H2) |
 | No embedding tranches without separate approval | **BLOCKED** |
 | No default-on overlap flags | **BLOCKED** |
 | No generative Ollama as production RAG default | **BLOCKED** |
@@ -176,7 +188,7 @@ Design: `docs/ai-platform/P21-5A-ai-quality-telemetry-design.md`
 - Four seller panels = four independent keyword retrievals
 - Collector field map not on free-form RAG card
 - Sparse corpus → excerpt unavailable fallback
-- Vector latency/overlap unresolved (Phase 20 blockers carry forward)
+- Vector pure overlap 8/16 — hybrid anchors required for 16/16 (shadow diagnostics only)
 
 ---
 
@@ -203,7 +215,7 @@ Release note: `docs/release/rp-ai-phase-21-non-vector-seller-intelligence.md`
 | Lane | Doc | Status |
 | ---- | --- | ------ |
 | **Product** (optional) | `P21-10-post-release-product-roadmap.md` | P21.10+ require approval; keyword/rule-engine only |
-| **Vector** (blocker burn-down) | `T20-14A-current-vector-readiness-baseline.md`, `T20-14B-vector-rollout-gate-template.md` | T20.14C next (design only); T20.15 blocked |
+| **Vector** (blocker burn-down) | `T20-14H0-hybrid-vector-gate-design.md` … `T20-14H2-vector-rollout-decision-package.md` | H0–H2 complete; T20.15A design ready for owner approval |
 
 Product work may continue on keyword/rule-engine. **No product ticket may silently enable vector.**
 
@@ -218,9 +230,9 @@ Product work may continue on keyword/rule-engine. **No product ticket may silent
 | **P21.12** | Observation-deck integration — feed telemetry JSON into `/observation-deck` |
 | **P21.13** | Seller intelligence polish |
 | **P21.14** | Dedicated session-memory UI |
-| **T20.14C** | Shadow latency implementation plan — read-only; **next vector candidate** |
+| **T20.15A** | Hybrid canary design — owner approval required before implementation |
 
-Do not start implementation tickets without approval. Vector rollout remains **NOT APPROVED**.
+Do not start T20.15A implementation without owner approval. Vector rollout remains **NOT APPROVED** for production default.
 
 ---
 
@@ -229,5 +241,7 @@ Do not start implementation tickets without approval. Vector rollout remains **N
 ```text
 Phase 21 non-vector seller intelligence: RELEASE TAGGED
 Vector rollout: NOT APPROVED
-T20.14/T20.15: BLOCKED
+T20.15 execution: BLOCKED
+T20.15A hybrid canary design: READY FOR OWNER APPROVAL
+Production default: keyword
 ```

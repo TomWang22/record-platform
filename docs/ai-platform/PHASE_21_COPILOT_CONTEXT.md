@@ -23,13 +23,13 @@ Production path:
 - vector default: OFF
 - AI_RAG_SHADOW_VECTOR: 0 (must remain off unless explicitly approved)
 
-T20.15A–F complete.
+T20.15A–G complete.
 Hybrid allowlist canary: KEEP for evidence collection only.
-AI_RAG_HYBRID_CANARY=1 for allowlisted contract user.
-AI_RAG_HYBRID_CANARY_PERCENT=0 (percentage gate implemented, not enabled).
+AI_RAG_HYBRID_CANARY_PERCENT=0 (restored after G eval).
+1% percentage cohort: PROVEN (bucket-0 test user).
 Production default remains keyword.
 Vector production default: NOT APPROVED.
-T20.15G 1% eval: NOT STARTED — explicit approval required.
+T20.15H decision package: NOT STARTED — explicit approval required.
 ```
 
 ### T20.15 hybrid canary (implemented)
@@ -190,7 +190,7 @@ Design: `docs/ai-platform/P21-5A-ai-quality-telemetry-design.md`
 | No vector default rollout | **BLOCKED** |
 | No hybrid rollout (production) | **BLOCKED** |
 | T20.15 execution | **BLOCKED** (allowlist canary active; percent gate deployed at 0) |
-| T20.15G 1% eval | **NOT STARTED** |
+| T20.15G 1% eval | **COMPLETE** (PASS; percent=0 restored) |
 | Hybrid allowlist canary | **KEEP** (`t20-p215f`, contract user allowlist) |
 | No embedding tranches without separate approval | **BLOCKED** |
 | No default-on overlap flags | **BLOCKED** |

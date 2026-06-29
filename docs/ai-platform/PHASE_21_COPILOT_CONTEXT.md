@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-29 (T20.15H complete; hybrid canary decision package)  
+**Last updated:** 2026-06-29 (T20.15I complete; 5% hybrid canary design only)  
 **Current main SHA:** verify with `git rev-parse --short HEAD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
@@ -23,13 +23,14 @@ Production path:
 - vector default: OFF
 - AI_RAG_SHADOW_VECTOR: 0 (must remain off unless explicitly approved)
 
-T20.15A–H complete.
+T20.15A–I complete.
 Hybrid allowlist canary: KEEP for evidence collection only.
-AI_RAG_HYBRID_CANARY_PERCENT=0 (restored after G eval).
-1% percentage cohort: PROVEN (bucket-0 test user, T20.15G PASS).
+AI_RAG_HYBRID_CANARY_PERCENT=0 (no change in I).
+1% percentage cohort: PROVEN (T20.15G PASS).
+5% design: COMPLETE (T20.15I) — no implementation, no env change.
 Production default remains keyword.
 Vector production default: NOT APPROVED.
-T20.15I 5% design: READY FOR OWNER APPROVAL only — NOT STARTED.
+T20.15J implementation: NOT STARTED — explicit approval required.
 ```
 
 ### T20.15 hybrid canary (implemented)
@@ -61,14 +62,14 @@ Use @docs/ai-platform/PHASE_21_COPILOT_CONTEXT.md as the source of truth for Pha
 
 Do NOT enable vector retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a future eval window.
-Do NOT start T20.15I 5% design without explicit approval.
-Do NOT start T20.15J implementation without approval after I.
+Do NOT start T20.15J 5% implementation without explicit approval after I.
+Do NOT start T20.15K 5% eval without approval after J.
 Do NOT enable vector production default.
 Do NOT use generative Ollama as production RAG default.
 Do NOT expose message bodies in UI or API responses.
 
 Phase 21 product track is CLOSED and tagged. P21.10+ product follow-ups require explicit approval (keyword/rule-engine only).
-T20.15A–H complete: allowlist hybrid canary KEEP; percent=0; G PASS; H recommends T20.15I design only if approved.
+T20.15A–I complete: allowlist hybrid canary KEEP; percent=0; I design done; J blocked until owner approval.
 ```
 
 ---
@@ -193,7 +194,8 @@ Design: `docs/ai-platform/P21-5A-ai-quality-telemetry-design.md`
 | T20.15 execution | **BLOCKED** (allowlist canary active; percent gate deployed at 0) |
 | T20.15G 1% eval | **COMPLETE** (PASS; percent=0 restored) |
 | T20.15H decision | **COMPLETE** — Option B active; Option C recommended |
-| T20.15I 5% design | **NOT STARTED** — owner approval required |
+| T20.15I 5% design | **COMPLETE** (design only; percent=0) |
+| T20.15J implementation | **NOT STARTED** — owner approval required |
 | Hybrid allowlist canary | **KEEP** (`t20-p215f`, contract user allowlist) |
 | No embedding tranches without separate approval | **BLOCKED** |
 | No default-on overlap flags | **BLOCKED** |
@@ -251,7 +253,7 @@ Product work may continue on keyword/rule-engine. **No product ticket may silent
 | **P21.12** | Observation-deck integration — feed telemetry JSON into `/observation-deck` |
 | **P21.13** | Seller intelligence polish |
 | **P21.14** | Dedicated session-memory UI |
-| **T20.15A–H** | Hybrid canary design → impl → eval → 1% → decision | **KEEP allowlist**; percent=0; T20.15I design only if approved |
+| **T20.15A–I** | Hybrid canary through 5% design | **KEEP allowlist**; percent=0; T20.15J blocked |
 
 Do not start T20.15A implementation without owner approval. Vector rollout remains **NOT APPROVED** for production default.
 

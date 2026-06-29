@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import ssl
 import subprocess
 import sys
 import time
@@ -17,6 +18,14 @@ import urllib.request
 
 REPO = Path(__file__).resolve().parents[1]
 OUT_DIR = REPO / "bench_logs/ai-platform/hybrid-canary-transcript"
+CA_FILE = REPO / "certs" / "dev-root.pem"
+
+
+def _ssl_context() -> ssl.SSLContext:
+    ctx = ssl.create_default_context()
+    if CA_FILE.is_file():
+        ctx.load_verify_locations(cafile=str(CA_FILE))
+    return ctx
 
 CANARY_PROMPTS = [
     ("listing_advice", "Which of my listings need attention first, and why?"),
@@ -45,7 +54,7 @@ def _login(email: str, password: str) -> str:
         headers={"Content-Type": "application/json", "X-RP-E2E-Contract": "1"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with urllib.request.urlopen(req, timeout=60, context=_ssl_context()) as resp:
         body = json.loads(resp.read().decode())
     return str(body["token"])
 
@@ -67,7 +76,7 @@ def _rag_query(token: str, question: str, *, user_id: Optional[str] = None) -> D
     )
     start = time.perf_counter()
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=120, context=_ssl_context()) as resp:
             body = json.loads(resp.read().decode())
         http_status = resp.status
         err = None

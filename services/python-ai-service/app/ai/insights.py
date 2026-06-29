@@ -127,6 +127,21 @@ async def rag_query(
                 hybrid_error = str(exc)[:200]
                 hybrid_shadow = {"status": "error", "error": hybrid_error, "chunks": []}
             hybrid_latency_ms = (time.perf_counter() - h_start) * 1000.0
+            if hybrid_shadow:
+                unweighted_result = {
+                    "candidate_count": hybrid_shadow.get(
+                        "unweighted_candidate_count", hybrid_shadow.get("candidate_count", 0)
+                    ),
+                    "chunks": hybrid_shadow.get("unweighted_chunks", hybrid_shadow.get("chunks", [])),
+                    "chunk_ids": hybrid_shadow.get("unweighted_chunk_ids", hybrid_shadow.get("chunk_ids", [])),
+                    "latency_ms": hybrid_shadow.get("latency_ms"),
+                }
+                if shadow_vector or shadow_debug:
+                    shadow_diag = build_shadow_vector_diagnostic(
+                        keyword["chunks"], hybrid_shadow, unweighted_result=unweighted_result
+                    )
+                if shadow_debug and hybrid_shadow.get("shadow_diagnostics"):
+                    shadow_diagnostics = hybrid_shadow["shadow_diagnostics"]
         elif shadow_vector:
             shadow = await retrieve_chunks_vector_shadow(
                 conn,

@@ -41,6 +41,7 @@ from app.ai.shadow_profiles import (
     preferred_type_quotas,
     profile_diagnostic_meta,
     preferred_source_types,
+    resolve_entity_expansion_allowed_source_types,
     resolve_shadow_fetch_strategy,
     resolve_shadow_profile,
     resolve_source_type_floor_plan,
@@ -49,6 +50,10 @@ from app.ai.shadow_profiles import (
     resolved_profile_for_diagnostics,
     source_type_quota_satisfied,
     source_type_weights,
+    ENTITY_EXPANSION_FETCH_LIMIT,
+    ENTITY_EXPANSION_MAX_ADDED,
+    ENTITY_EXPANSION_MAX_CANDIDATES_PER_ENTITY,
+    ENTITY_EXPANSION_MAX_ENTITIES,
 )
 
 FORBIDDEN_CHUNK_RE = re.compile(r"max_bid_cents|proxy_bids|proxy max", re.I)
@@ -155,20 +160,61 @@ def _collect_document_ids(chunks: Iterable[Mapping[str, Any]]) -> List[str]:
 # T20.10K — map source_type to canonical entity-id field for parity diagnostics.
 _SOURCE_TYPE_ENTITY_ID_FIELD: dict[str, str] = {
     "listing": "listing_id",
+    "listing_revision": "listing_id",
     "record": "record_id",
     "obo_offer_summary": "offer_id",
+    "auction_bid_summary": "auction_id",
 }
 
 
-# T20.10K / T20.10AC — safe metadata entity fields for shadow overlap hints (no body text).
+# T20.10K / T20.10AC / T20.14G3 — safe metadata entity fields (no body text).
 _SAFE_ENTITY_METADATA_FIELDS: Tuple[str, ...] = (
     "listing_id",
     "record_id",
     "offer_id",
     "obo_offer_id",
+    "offer_listing_id",
     "auction_id",
     "bid_id",
+    "seller_id",
+    "buyer_id",
 )
+
+_UUID_IN_CONTENT_RE = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+    re.I,
+)
+
+
+def _entity_keys_from_source_refs(chunk: Mapping[str, Any]) -> set[str]:
+    """T20.14G3 — entity keys from structured source_refs (no body text)."""
+    keys: set[str] = set()
+    for ref in chunk.get("source_refs") or []:
+        if not isinstance(ref, dict):
+            continue
+        source_type = ref.get("source_type")
+        source_id = ref.get("source_id")
+        if not source_type or not source_id:
+            continue
+        keys.add(f"{source_type}:{source_id}")
+        alias_field = _SOURCE_TYPE_ENTITY_ID_FIELD.get(str(source_type))
+        if alias_field:
+            keys.add(f"{alias_field}:{source_id}")
+    return keys
+
+
+def _entity_keys_from_safe_content(chunk: Mapping[str, Any]) -> set[str]:
+    """T20.14G3 — listing UUID bridges from non-message excerpt text."""
+    if str(chunk.get("source_type") or "") == "message":
+        return set()
+    content = str(chunk.get("content") or "")
+    if not content or FORBIDDEN_CHUNK_RE.search(content):
+        return set()
+    keys: set[str] = set()
+    for uuid_value in _UUID_IN_CONTENT_RE.findall(content)[:2]:
+        keys.add(f"listing_uuid:{uuid_value}")
+        keys.add(f"listing_id:{uuid_value}")
+    return keys
 
 
 def _entity_keys_for_chunk(chunk: Mapping[str, Any]) -> set[str]:
@@ -181,11 +227,16 @@ def _entity_keys_for_chunk(chunk: Mapping[str, Any]) -> set[str]:
         alias_field = _SOURCE_TYPE_ENTITY_ID_FIELD.get(str(source_type))
         if alias_field:
             keys.add(f"{alias_field}:{source_id}")
+    document_id = chunk.get("document_id")
+    if document_id:
+        keys.add(f"document_id:{document_id}")
     meta = _coerce_metadata(chunk.get("metadata"))
     for field in _SAFE_ENTITY_METADATA_FIELDS:
         value = meta.get(field)
         if value:
             keys.add(f"{field}:{value}")
+    keys.update(_entity_keys_from_source_refs(chunk))
+    keys.update(_entity_keys_from_safe_content(chunk))
     return keys
 
 
@@ -210,6 +261,11 @@ def _entity_keys_for_row(row: Mapping[str, Any]) -> set[str]:
         value = meta.get(field)
         if value:
             keys.add(f"{field}:{value}")
+    document_id = row.get("document_id")
+    if document_id:
+        keys.add(f"document_id:{document_id}")
+    keys.update(_entity_keys_from_source_refs(row))
+    keys.update(_entity_keys_from_safe_content(row))
     return keys
 
 
@@ -224,9 +280,90 @@ def listing_ids_from_entity_keys(entity_keys: set[str]) -> List[str]:
     """Bounded listing_id values for optional typed entity fetch."""
     listing_ids: List[str] = []
     for key in sorted(entity_keys):
-        if key.startswith("listing_id:"):
+        if key.startswith("listing_id:") or key.startswith("listing_uuid:"):
             listing_ids.append(key.split(":", 1)[1])
-    return listing_ids[:SHADOW_ENTITY_LISTING_ID_CAP]
+        elif key.startswith("offer_listing_id:"):
+            listing_ids.append(key.split(":", 1)[1])
+    seen: set[str] = set()
+    ordered: List[str] = []
+    for listing_id in listing_ids:
+        if listing_id not in seen:
+            seen.add(listing_id)
+            ordered.append(listing_id)
+    return ordered[:SHADOW_ENTITY_LISTING_ID_CAP]
+
+
+@dataclass(frozen=True, slots=True)
+class EntityExpansionTargets:
+    """Bounded entity fetch targets for G3 sibling expansion."""
+
+    listing_ids: Tuple[str, ...]
+    record_ids: Tuple[str, ...]
+    auction_ids: Tuple[str, ...]
+    document_ids: Tuple[str, ...]
+
+
+def _collect_entity_expansion_keys(
+    keyword_chunks: Sequence[Mapping[str, Any]],
+    shadow_chunks: Sequence[Mapping[str, Any]],
+    *,
+    max_entities: int = ENTITY_EXPANSION_MAX_ENTITIES,
+) -> set[str]:
+    keys = _collect_entity_keys(keyword_chunks)
+    keys.update(_collect_entity_keys(shadow_chunks))
+    if len(keys) <= max_entities:
+        return keys
+    return set(sorted(keys)[:max_entities])
+
+
+def _entity_expansion_targets_from_keys(
+    entity_keys: set[str],
+    *,
+    max_entities: int = ENTITY_EXPANSION_MAX_ENTITIES,
+) -> EntityExpansionTargets:
+    listing_ids: List[str] = []
+    record_ids: List[str] = []
+    auction_ids: List[str] = []
+    document_ids: List[str] = []
+    entity_count = 0
+    for key in sorted(entity_keys):
+        if entity_count >= max_entities:
+            break
+        prefix, _, value = key.partition(":")
+        if not value:
+            continue
+        if prefix in {"listing_id", "listing_uuid", "offer_listing_id", "listing"}:
+            listing_ids.append(value)
+            entity_count += 1
+        elif prefix in {"record_id", "record"}:
+            record_ids.append(value)
+            entity_count += 1
+        elif prefix in {"auction_id", "auction_bid_summary"}:
+            auction_ids.append(value)
+            entity_count += 1
+        elif prefix == "document_id":
+            document_ids.append(value)
+            entity_count += 1
+    return EntityExpansionTargets(
+        listing_ids=tuple(dict.fromkeys(listing_ids)),
+        record_ids=tuple(dict.fromkeys(record_ids)),
+        auction_ids=tuple(dict.fromkeys(auction_ids)),
+        document_ids=tuple(dict.fromkeys(document_ids)),
+    )
+
+
+def _overlap_counts_for_shadow_selection(
+    keyword_chunks: Sequence[Mapping[str, Any]],
+    shadow_chunks: Sequence[Mapping[str, Any]],
+) -> Tuple[int, int]:
+    keyword_doc_ids = set(_collect_document_ids(keyword_chunks))
+    shadow_doc_ids = set(_collect_document_ids(shadow_chunks))
+    keyword_entities = _collect_entity_keys(keyword_chunks)
+    shadow_entities = _collect_entity_keys(shadow_chunks)
+    return (
+        len(keyword_doc_ids.intersection(shadow_doc_ids)),
+        len(keyword_entities.intersection(shadow_entities)),
+    )
 
 
 def _entity_boost_match_count(
@@ -1574,6 +1711,224 @@ def _select_keyword_anchor_chunks(
     return anchors
 
 
+async def _fetch_entity_expansion_sibling_rows(
+    conn,
+    *,
+    filters: List[str],
+    scope_params: List[Any],
+    query_vec: str,
+    targets: EntityExpansionTargets,
+    allowed_source_types: Sequence[str],
+    existing_chunk_ids: Sequence[str],
+    fetch_limit: int,
+) -> List[Any]:
+    """T20.14G3 — bounded typed/metadata sibling fetch (no broad global retry)."""
+    bridge_conditions: List[str] = []
+    local_filters = list(filters)
+    local_params = list(scope_params)
+    idx = len(local_params) + 1
+
+    if targets.listing_ids:
+        bridge_conditions.append(
+            f"(d.metadata->>'listing_id' = ANY(${idx}::text[]) "
+            f"OR d.metadata->>'offer_listing_id' = ANY(${idx}::text[]) "
+            f"OR (d.source_type IN ('listing', 'listing_revision', 'obo_offer_summary') "
+            f"AND d.source_id = ANY(${idx}::text[])))"
+        )
+        local_params.append(list(targets.listing_ids))
+        idx += 1
+    if targets.record_ids:
+        bridge_conditions.append(
+            f"(d.metadata->>'record_id' = ANY(${idx}::text[]) "
+            f"OR (d.source_type = 'record' AND d.source_id = ANY(${idx}::text[])))"
+        )
+        local_params.append(list(targets.record_ids))
+        idx += 1
+    if targets.auction_ids:
+        bridge_conditions.append(
+            f"(d.metadata->>'auction_id' = ANY(${idx}::text[]) "
+            f"OR (d.source_type = 'auction_bid_summary' AND d.source_id = ANY(${idx}::text[])))"
+        )
+        local_params.append(list(targets.auction_ids))
+        idx += 1
+    if targets.document_ids:
+        bridge_conditions.append(f"c.document_id = ANY(${idx}::uuid[])")
+        local_params.append(list(targets.document_ids))
+        idx += 1
+
+    if not bridge_conditions:
+        return []
+
+    local_filters.append(f"d.source_type = ANY(${idx}::text[])")
+    local_params.append(list(allowed_source_types))
+    idx += 1
+    local_filters.append("(" + " OR ".join(bridge_conditions) + ")")
+    if existing_chunk_ids:
+        local_filters.append(f"c.id <> ALL(${idx}::uuid[])")
+        local_params.append(list(existing_chunk_ids))
+        idx += 1
+
+    local_params.append(query_vec)
+    vec_param = idx
+    idx += 1
+    local_params.append(fetch_limit)
+    limit_param = idx
+    sql = f"""
+        SELECT c.id, c.document_id, c.chunk_index, c.content, c.checksum, c.source_refs,
+               d.source_type, d.source_id, d.owner_user_id, d.visibility,
+               d.source_updated_at, d.title, d.metadata,
+               (1 - (c.embedding_vec <=> ${vec_param}::vector))::float AS score
+        FROM ai.ai_document_chunks c
+        JOIN ai.ai_documents d ON d.id = c.document_id
+        WHERE {' AND '.join(local_filters)}
+        ORDER BY c.embedding_vec <=> ${vec_param}::vector ASC
+        LIMIT ${limit_param}::int
+    """
+    return list(await conn.fetch(sql, *local_params))
+
+
+def _row_to_entity_expansion_chunk(row: Any) -> Dict[str, Any]:
+    source_updated_at = _row_get(row, "source_updated_at")
+    return {
+        "id": str(_row_get(row, "id")),
+        "document_id": str(_row_get(row, "document_id")),
+        "chunk_index": _row_get(row, "chunk_index"),
+        "content": _row_get(row, "content") or "",
+        "checksum": _row_get(row, "checksum"),
+        "source_refs": _row_get(row, "source_refs") or [],
+        "source_type": _row_get(row, "source_type"),
+        "source_id": _row_get(row, "source_id"),
+        "owner_user_id": _row_get(row, "owner_user_id"),
+        "visibility": _row_get(row, "visibility"),
+        "source_updated_at": source_updated_at.isoformat() if source_updated_at else None,
+        "title": _row_get(row, "title"),
+        "metadata": _row_get(row, "metadata") or {},
+        "score": _row_get(row, "score", 0),
+        "entity_expansion_added": True,
+    }
+
+
+def _merge_entity_expansion_chunks(
+    vector_selected: Sequence[Dict[str, Any]],
+    expansion_chunks: Sequence[Dict[str, Any]],
+    *,
+    max_added: int = ENTITY_EXPANSION_MAX_ADDED,
+) -> List[Dict[str, Any]]:
+    merged: List[Dict[str, Any]] = list(vector_selected)
+    seen = {_safe_chunk_id(chunk) for chunk in merged}
+    added = 0
+    for chunk in expansion_chunks:
+        if added >= max_added:
+            break
+        chunk_id = _safe_chunk_id(chunk)
+        if not chunk_id or chunk_id in seen:
+            continue
+        merged.append(chunk)
+        seen.add(chunk_id)
+        added += 1
+    return merged
+
+
+async def _apply_shadow_entity_expansion_v2(
+    conn,
+    *,
+    selected_chunks: List[Dict[str, Any]],
+    keyword_chunks: Optional[Sequence[Mapping[str, Any]]],
+    resolved_profile: str,
+    query: str,
+    filters: List[str],
+    params: List[Any],
+    vec_param: int,
+    words: List[str],
+    pin_source: bool,
+    query_vec: Optional[str],
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """T20.14G3 — shadow-only post-fallback entity sibling expansion."""
+    diag: Dict[str, Any] = {
+        "entity_expansion_attempted": False,
+        "entity_expansion_succeeded": False,
+        "entity_expansion_entities": [],
+        "entity_expansion_candidate_count": 0,
+        "entity_expansion_added_count": 0,
+        "entity_expansion_added_source_types": [],
+        "entity_expansion_skip_reason": None,
+        "doc_overlap_before_entity_expansion": 0,
+        "doc_overlap_after_entity_expansion": 0,
+        "entity_overlap_before_entity_expansion": 0,
+        "entity_overlap_after_entity_expansion": 0,
+    }
+    if not keyword_chunks:
+        diag["entity_expansion_skip_reason"] = "not_exposed"
+        return selected_chunks, diag
+
+    entity_keys = _collect_entity_expansion_keys(keyword_chunks, selected_chunks)
+    if not entity_keys:
+        diag["entity_expansion_skip_reason"] = "no_safe_entities"
+        return selected_chunks, diag
+
+    diag["entity_expansion_attempted"] = True
+    diag["entity_expansion_entities"] = sorted(entity_keys)[:ENTITY_EXPANSION_MAX_ENTITIES]
+    doc_before, entity_before = _overlap_counts_for_shadow_selection(keyword_chunks, selected_chunks)
+    diag["doc_overlap_before_entity_expansion"] = doc_before
+    diag["entity_overlap_before_entity_expansion"] = entity_before
+
+    if not query_vec:
+        diag["entity_expansion_skip_reason"] = "missing_query_vec"
+        diag["doc_overlap_after_entity_expansion"] = doc_before
+        diag["entity_overlap_after_entity_expansion"] = entity_before
+        return selected_chunks, diag
+
+    targets = _entity_expansion_targets_from_keys(entity_keys)
+    allowed_types = resolve_entity_expansion_allowed_source_types(resolved_profile, query=query)
+    existing_ids = _collect_chunk_ids(selected_chunks)
+    scope_params = params[: max(0, vec_param - 1)]
+    fetch_limit = min(
+        ENTITY_EXPANSION_FETCH_LIMIT,
+        ENTITY_EXPANSION_MAX_ENTITIES * ENTITY_EXPANSION_MAX_CANDIDATES_PER_ENTITY,
+    )
+    rows = await _fetch_entity_expansion_sibling_rows(
+        conn,
+        filters=filters,
+        scope_params=scope_params,
+        query_vec=query_vec,
+        targets=targets,
+        allowed_source_types=allowed_types,
+        existing_chunk_ids=existing_ids,
+        fetch_limit=fetch_limit,
+    )
+    diag["entity_expansion_candidate_count"] = len(rows)
+
+    expansion_chunks: List[Dict[str, Any]] = []
+    for row in rows:
+        if not _chunk_passes_privacy(row, words=words, pin_source=pin_source, query=query):
+            continue
+        expansion_chunks.append(_row_to_entity_expansion_chunk(row))
+        if len(expansion_chunks) >= ENTITY_EXPANSION_MAX_CANDIDATES_PER_ENTITY * ENTITY_EXPANSION_MAX_ENTITIES:
+            break
+
+    if not expansion_chunks:
+        diag["entity_expansion_skip_reason"] = "no_privacy_safe_candidates"
+        diag["doc_overlap_after_entity_expansion"] = doc_before
+        diag["entity_overlap_after_entity_expansion"] = entity_before
+        return selected_chunks, diag
+
+    merged = _merge_entity_expansion_chunks(selected_chunks, expansion_chunks)
+    added_chunks = merged[len(selected_chunks) :]
+    diag["entity_expansion_added_count"] = len(added_chunks)
+    diag["entity_expansion_added_source_types"] = sorted(
+        {str(chunk.get("source_type") or "") for chunk in added_chunks if chunk.get("source_type")}
+    )
+    if added_chunks:
+        diag["entity_expansion_succeeded"] = True
+    else:
+        diag["entity_expansion_skip_reason"] = "no_new_candidates"
+
+    doc_after, entity_after = _overlap_counts_for_shadow_selection(keyword_chunks, merged)
+    diag["doc_overlap_after_entity_expansion"] = doc_after
+    diag["entity_overlap_after_entity_expansion"] = entity_after
+    return merged, diag
+
+
 def _merge_selected_with_keyword_anchors(
     vector_selected: Sequence[Dict[str, Any]],
     anchor_chunks: Sequence[Dict[str, Any]],
@@ -2013,6 +2368,32 @@ async def retrieve_chunks_vector_shadow(
             fallback_diag["true_zero_result_after_fallback"] = True
             fallback_diag["fallback_reason"] = fallback_diag.get("fallback_reason") or "zero_result_after_fallback"
 
+    entity_expansion_diag: Dict[str, Any] = {}
+    if include_diagnostics and keyword_chunks_for_overlap:
+        entity_expansion_start = _now_ms()
+        expansion_base = weighted_selected if route_mode else unweighted_selected
+        expanded_selected, entity_expansion_diag = await _apply_shadow_entity_expansion_v2(
+            conn,
+            selected_chunks=list(expansion_base),
+            keyword_chunks=keyword_chunks_for_overlap,
+            resolved_profile=resolved_profile,
+            query=query,
+            filters=filters,
+            params=params,
+            vec_param=vec_param,
+            words=words,
+            pin_source=pin_source,
+            query_vec=str(params[vec_param - 1]) if len(params) >= vec_param else None,
+        )
+        if route_mode:
+            weighted_selected = expanded_selected
+            selected_for_output = expanded_selected
+        else:
+            unweighted_selected = expanded_selected
+            weighted_selected = expanded_selected
+            selected_for_output = expanded_selected
+        diagnostics.timings_ms.candidate_fetch += _elapsed_ms(entity_expansion_start)
+
     diagnostics.timings_ms.total = _elapsed_ms(total_start)
 
     latency_ms = float(diagnostics.timings_ms.total)
@@ -2070,6 +2451,7 @@ async def retrieve_chunks_vector_shadow(
         if overlap_refine_diag:
             diagnostics.debug.update(overlap_refine_diag)
         diagnostics.debug.update(fallback_diag)
+        diagnostics.debug.update(entity_expansion_diag)
         selected_count = len(selected_for_diag)
         if fallback_diag.get("zero_result_fallback_succeeded"):
             diagnostics.debug["zero_result_reason"] = "zero_result_fallback_applied"

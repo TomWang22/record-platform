@@ -22,6 +22,13 @@ SHADOW_ENTITY_LISTING_FETCH_LIMIT = 8
 SHADOW_ENTITY_LISTING_ID_CAP = 5
 SHADOW_ENTITY_HINT_SCORE_MULTIPLIER = 1.5
 
+# T20.14G3 — shadow-only entity expansion v2 caps (diagnostic path).
+ENTITY_EXPANSION_MAX_ENTITIES = 3
+ENTITY_EXPANSION_MAX_CANDIDATES_PER_ENTITY = 2
+ENTITY_EXPANSION_MAX_ADDED = 2
+ENTITY_EXPANSION_FETCH_LIMIT = 8
+ENTITY_EXPANSION_ALLOWED_SOURCE_TYPES: Tuple[str, ...] = ALLOWED_SHADOW_SOURCE_TYPES
+
 _PROFILE_ALIASES: Dict[str, str] = {
     "pricing_recommendation": "obo_helper",
     "buyer_collection_summary": "record_valuation",
@@ -666,6 +673,24 @@ def vector_fetch_extra_types(
                 ordered.append(st)
         return ordered[:4]
     return preferred_source_types(resolved)[:3]
+
+
+def resolve_entity_expansion_allowed_source_types(
+    profile: str | None,
+    *,
+    query: str = "",
+) -> Tuple[str, ...]:
+    """T20.14G3 — shadow-only source-type allowlist for entity expansion fetches."""
+    resolved = resolve_shadow_profile(profile)
+    if _query_has_terms(query, _NOTIFICATION_TERMS) or _query_has_terms(query, _OBO_QUERY_TERMS):
+        return ("obo_offer_summary", "listing", "listing_revision", "notification")
+    if _query_has_terms(query, _AUCTION_QUERY_TERMS):
+        return ("auction_bid_summary", "listing", "record")
+    if _query_has_terms(query, _CATALOG_ACTIVITY_TERMS) or _query_has_terms(query, _LISTING_QUERY_TERMS):
+        return ("listing", "listing_revision", "record")
+    if resolved == "seller_sales_summary":
+        return ENTITY_EXPANSION_ALLOWED_SOURCE_TYPES
+    return ENTITY_EXPANSION_ALLOWED_SOURCE_TYPES
 
 
 def profile_diagnostic_meta(profile: str | None) -> Dict[str, Any]:

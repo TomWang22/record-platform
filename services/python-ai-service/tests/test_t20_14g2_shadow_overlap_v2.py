@@ -156,13 +156,17 @@ class TestShadowZeroResultFallback(unittest.TestCase):
         async def run() -> Dict[str, Any]:
             with patch("app.ai.rag_retrieval._call_ollama_embed", AsyncMock(return_value=[0.1] * 768)):
                 with patch("app.ai.rag_retrieval._fetch_vector_rows", AsyncMock(side_effect=fake_fetch)):
-                    return await retrieve_chunks_vector_shadow(
-                        conn,
-                        query="What notifications matter most for my selling activity right now?",
-                        user_id="u1",
-                        include_diagnostics=True,
-                        keyword_chunks_for_overlap=keyword_chunks,
-                    )
+                    with patch(
+                        "app.ai.rag_retrieval._apply_shadow_entity_expansion_v2",
+                        AsyncMock(side_effect=lambda *args, **kwargs: (kwargs["selected_chunks"], {})),
+                    ):
+                        return await retrieve_chunks_vector_shadow(
+                            conn,
+                            query="What notifications matter most for my selling activity right now?",
+                            user_id="u1",
+                            include_diagnostics=True,
+                            keyword_chunks_for_overlap=keyword_chunks,
+                        )
 
         result = asyncio.run(run())
         debug = result["shadow_diagnostics"]["debug"]

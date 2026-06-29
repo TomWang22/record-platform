@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-29 (T20.15J–M complete; 5% eval PASS; 10% design only)  
+**Last updated:** 2026-06-29 (T20.15N–Q complete; 10% eval PASS; 25% design only)  
 **Current main SHA:** verify with `git rev-parse --short HEAD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
@@ -23,15 +23,15 @@ Production path:
 - vector default: OFF
 - AI_RAG_SHADOW_VECTOR: 0 (must remain off unless explicitly approved)
 
-T20.15A–M complete.
+T20.15A–Q complete.
 Hybrid allowlist canary: KEEP for evidence collection only.
-AI_RAG_HYBRID_CANARY_PERCENT=0 (restored after K eval).
-1% and 5% percentage cohort: PROVEN (G/K PASS).
-5% eval: PASS; percent restored to 0.
-10% design: COMPLETE (T20.15M) — no implementation.
+AI_RAG_HYBRID_CANARY_PERCENT=0 (restored after O eval).
+1%, 5%, and 10% percentage cohort: PROVEN (G/K/O PASS).
+10% eval: PASS; percent restored to 0.
+25% design: COMPLETE (T20.15Q) — no implementation.
 Production default remains keyword.
 Vector production default: NOT APPROVED.
-T20.15N implementation: NOT STARTED — explicit approval required.
+T20.15R implementation: NOT STARTED — explicit approval required.
 ```
 
 ### T20.15 hybrid canary (implemented)
@@ -44,7 +44,7 @@ T20.15N implementation: NOT STARTED — explicit approval required.
 | Pure overlap | 8/16 |
 | Anchored overlap | 16/16 |
 | Avg quality (T20.15C API) | 3.78 |
-| Hybrid p95 (T20.15K @ PERCENT=5) | 128 / 355 ms (transcript) |
+| Hybrid p95 (T20.15O @ PERCENT=10) | 112.9 / 223.8 ms (transcript) |
 
 ### T20.14H hybrid gate (2026-06-29)
 
@@ -63,15 +63,14 @@ Use @docs/ai-platform/PHASE_21_COPILOT_CONTEXT.md as the source of truth for Pha
 
 Do NOT enable vector retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a future eval window.
-Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a future eval window.
-Do NOT start T20.15N 10% implementation without explicit approval after M.
-Do NOT start T20.15O 10% eval without approval after N.
+Do NOT start T20.15R 25% implementation without explicit approval after Q.
+Do NOT start T20.15S 25% eval without approval after R.
 Do NOT enable vector production default.
 Do NOT use generative Ollama as production RAG default.
 Do NOT expose message bodies in UI or API responses.
 
 Phase 21 product track is CLOSED and tagged. P21.10+ product follow-ups require explicit approval (keyword/rule-engine only).
-T20.15A–M complete: allowlist KEEP; percent=0; K PASS; L recommends M done; N blocked.
+T20.15A–Q complete: allowlist KEEP; percent=0; O PASS; P recommends Q done; R blocked.
 ```
 
 ---
@@ -200,7 +199,11 @@ Design: `docs/ai-platform/P21-5A-ai-quality-telemetry-design.md`
 | T20.15K 5% eval | **COMPLETE** (PASS; percent=0 restored) |
 | T20.15L 5% decision | **COMPLETE** — Option B active; Option C → M |
 | T20.15M 10% design | **COMPLETE** (design only) |
-| T20.15N implementation | **NOT STARTED** |
+| T20.15N 10% gate verify | **COMPLETE** (verification-only) |
+| T20.15O 10% eval | **COMPLETE** (PASS; percent=0 restored) |
+| T20.15P 10% decision | **COMPLETE** — Option B active; Option C → Q |
+| T20.15Q 25% design | **COMPLETE** (design only) |
+| T20.15R implementation | **NOT STARTED** |
 | Hybrid allowlist canary | **KEEP** (`t20-p215f`, contract user allowlist) |
 | No embedding tranches without separate approval | **BLOCKED** |
 | No default-on overlap flags | **BLOCKED** |
@@ -258,7 +261,7 @@ Product work may continue on keyword/rule-engine. **No product ticket may silent
 | **P21.12** | Observation-deck integration — feed telemetry JSON into `/observation-deck` |
 | **P21.13** | Seller intelligence polish |
 | **P21.14** | Dedicated session-memory UI |
-| **T20.15A–M** | Hybrid canary through 10% design | **KEEP allowlist**; percent=0; T20.15N blocked |
+| **T20.15A–Q** | Hybrid canary through 25% design | **KEEP allowlist**; percent=0; T20.15R blocked |
 
 Do not start T20.15A implementation without owner approval. Vector rollout remains **NOT APPROVED** for production default.
 
@@ -271,5 +274,6 @@ Phase 21 non-vector seller intelligence: RELEASE TAGGED
 Vector rollout: NOT APPROVED
 Production default: keyword
 Hybrid allowlist canary: KEEP
-T20.15E: NOT STARTED
+AI_RAG_HYBRID_CANARY_PERCENT: 0
+T20.15R: NOT STARTED
 ```

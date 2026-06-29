@@ -236,6 +236,10 @@ fallback_applied_runs = []
 keyword_anchor_added_runs = []
 global_retry_skipped_runs = []
 entity_expansion_added_runs = []
+overlap_anchor_added_runs = []
+keyword_entity_bridge_added_runs = []
+pure_doc_entity_overlap_positive_runs = []
+anchored_doc_entity_overlap_positive_runs = []
 embed_retry_attempted_runs = []
 embed_retry_succeeded_runs = []
 shadow_fetch_attempted_runs = []
@@ -255,6 +259,8 @@ for r in rows:
         request_error_runs.append(r["mode"])
     ov = sd.get("overlap") or {}
     expl = ov.get("explanation") or {}
+    doc_ov = int(ov.get("document_overlap_count") or expl.get("document_overlap_count") or 0)
+    ent_ov = int(ov.get("entity_overlap_count") or expl.get("entity_overlap_count") or 0)
     timings = sd.get("timings_ms") or {}
     embed = sd.get("embed") or {}
     if not sd:
@@ -282,6 +288,18 @@ for r in rows:
             global_retry_skipped_runs.append(r["mode"])
         if int(debug.get("entity_expansion_added_count") or 0) > 0:
             entity_expansion_added_runs.append(r["mode"])
+        if debug.get("overlap_anchor_added"):
+            overlap_anchor_added_runs.append(r["mode"])
+        if debug.get("keyword_entity_bridge_added"):
+            keyword_entity_bridge_added_runs.append(r["mode"])
+        pure_doc = int(debug.get("pure_vector_doc_overlap") or 0)
+        pure_ent = int(debug.get("pure_vector_entity_overlap") or 0)
+        if pure_doc > 0 or pure_ent > 0:
+            pure_doc_entity_overlap_positive_runs.append(r["mode"])
+        anchored_doc = int(debug.get("shadow_plus_anchor_doc_overlap") or doc_ov)
+        anchored_ent = int(debug.get("shadow_plus_anchor_entity_overlap") or ent_ov)
+        if anchored_doc > 0 or anchored_ent > 0:
+            anchored_doc_entity_overlap_positive_runs.append(r["mode"])
         if (
             zero_reason == "embed_timeout_before_fetch"
             or embed.get("embed_timeout_before_fetch")
@@ -333,8 +351,6 @@ for r in rows:
             embed_timeouts.append(r["mode"])
     chunk_ov = int(ov.get("count") or 0)
     overlaps.append(chunk_ov)
-    doc_ov = int(ov.get("document_overlap_count") or expl.get("document_overlap_count") or 0)
-    ent_ov = int(ov.get("entity_overlap_count") or expl.get("entity_overlap_count") or 0)
     doc_overlaps.append(doc_ov)
     entity_overlaps.append(ent_ov)
     if chunk_ov == 0:
@@ -377,6 +393,10 @@ summary = {
     "keyword_anchor_added_count": len(keyword_anchor_added_runs),
     "global_retry_skipped_count": len(global_retry_skipped_runs),
     "entity_expansion_added_count": len(entity_expansion_added_runs),
+    "overlap_anchor_added_count": len(overlap_anchor_added_runs),
+    "keyword_entity_bridge_added_count": len(keyword_entity_bridge_added_runs),
+    "pure_doc_entity_overlap_gt0_runs": len(pure_doc_entity_overlap_positive_runs),
+    "anchored_doc_entity_overlap_gt0_runs": len(anchored_doc_entity_overlap_positive_runs),
     "shadow_fetch_attempted_count": len(shadow_fetch_attempted_runs),
     "embed_retry_attempted_count": len(embed_retry_attempted_runs),
     "embed_retry_succeeded_count": len(embed_retry_succeeded_runs),
@@ -436,6 +456,10 @@ lines = [
     f"- keyword anchors added: {summary['keyword_anchor_added_count']}/{summary['shadow_runs']}",
     f"- global retry skipped: {summary['global_retry_skipped_count']}/{summary['shadow_runs']}",
     f"- entity expansion added: {summary['entity_expansion_added_count']}/{summary['shadow_runs']}",
+    f"- overlap anchors added: {summary['overlap_anchor_added_count']}/{summary['shadow_runs']}",
+    f"- keyword entity bridge added: {summary['keyword_entity_bridge_added_count']}/{summary['shadow_runs']}",
+    f"- pure doc/entity overlap >0: {summary['pure_doc_entity_overlap_gt0_runs']}/{summary['shadow_runs']}",
+    f"- anchored doc/entity overlap >0: {summary['anchored_doc_entity_overlap_gt0_runs']}/{summary['shadow_runs']}",
     f"- shadow_fetch_attempted: {summary['shadow_fetch_attempted_count']}/{summary['shadow_runs']}",
     f"- embed_retry attempted/succeeded: {summary['embed_retry_attempted_count']}/{summary['embed_retry_succeeded_count']}",
     f"- request_error: {summary['request_error_count']}",

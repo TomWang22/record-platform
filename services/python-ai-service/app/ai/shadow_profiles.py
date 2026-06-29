@@ -29,6 +29,12 @@ ENTITY_EXPANSION_MAX_ADDED = 2
 ENTITY_EXPANSION_FETCH_LIMIT = 8
 ENTITY_EXPANSION_ALLOWED_SOURCE_TYPES: Tuple[str, ...] = ALLOWED_SHADOW_SOURCE_TYPES
 
+# T20.14G3R — overlap anchor + keyword entity bridge caps (shadow diagnostics only).
+SHADOW_OVERLAP_ANCHOR_MAX = 1
+SHADOW_OVERLAP_ANCHOR_SECOND_MAX = 2
+KEYWORD_ENTITY_BRIDGE_MAX_ENTITIES = 2
+KEYWORD_ENTITY_BRIDGE_MAX_ADDED = 1
+
 _PROFILE_ALIASES: Dict[str, str] = {
     "pricing_recommendation": "obo_helper",
     "buyer_collection_summary": "record_valuation",

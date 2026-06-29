@@ -54,6 +54,10 @@ from app.ai.shadow_profiles import (
     ENTITY_EXPANSION_MAX_ADDED,
     ENTITY_EXPANSION_MAX_CANDIDATES_PER_ENTITY,
     ENTITY_EXPANSION_MAX_ENTITIES,
+    KEYWORD_ENTITY_BRIDGE_MAX_ADDED,
+    KEYWORD_ENTITY_BRIDGE_MAX_ENTITIES,
+    SHADOW_OVERLAP_ANCHOR_MAX,
+    SHADOW_OVERLAP_ANCHOR_SECOND_MAX,
 )
 
 FORBIDDEN_CHUNK_RE = re.compile(r"max_bid_cents|proxy_bids|proxy max", re.I)
@@ -1711,6 +1715,121 @@ def _select_keyword_anchor_chunks(
     return anchors
 
 
+def _select_overlap_anchor_chunks(
+    keyword_chunks: Sequence[Mapping[str, Any]],
+    *,
+    existing_ids: Iterable[str],
+    max_anchors: int = SHADOW_OVERLAP_ANCHOR_MAX,
+) -> List[Dict[str, Any]]:
+    """T20.14G3R — shadow-only overlap repair anchors (nonzero shadow, zero doc/entity)."""
+    seen = {str(chunk_id) for chunk_id in existing_ids}
+    anchors: List[Dict[str, Any]] = []
+    for chunk in keyword_chunks:
+        if len(anchors) >= max_anchors:
+            break
+        chunk_id = _safe_chunk_id(chunk)
+        if not chunk_id or chunk_id in seen:
+            continue
+        if not _keyword_chunk_passes_anchor_privacy(chunk):
+            continue
+        anchors.append({
+            "id": chunk_id,
+            "document_id": str(chunk.get("document_id") or chunk_id),
+            "chunk_index": chunk.get("chunk_index", 0),
+            "content": chunk.get("content") or "",
+            "checksum": chunk.get("checksum"),
+            "source_refs": chunk.get("source_refs") or [],
+            "source_type": _safe_source_type(chunk),
+            "source_id": chunk.get("source_id"),
+            "owner_user_id": chunk.get("owner_user_id"),
+            "visibility": chunk.get("visibility"),
+            "source_updated_at": chunk.get("source_updated_at"),
+            "title": chunk.get("title"),
+            "metadata": chunk.get("metadata") or {},
+            "score": float(chunk.get("score") or 0.0),
+            "overlap_anchor_added": True,
+        })
+        seen.add(chunk_id)
+    return anchors
+
+
+def _merge_overlap_anchor_chunks(
+    vector_selected: Sequence[Dict[str, Any]],
+    anchor_chunks: Sequence[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    merged: List[Dict[str, Any]] = list(vector_selected)
+    seen = {_safe_chunk_id(chunk) for chunk in merged}
+    for anchor in anchor_chunks:
+        anchor_id = _safe_chunk_id(anchor)
+        if anchor_id in seen:
+            continue
+        merged.append(anchor)
+        seen.add(anchor_id)
+    return merged
+
+
+def _apply_overlap_anchor_topup(
+    selected_chunks: List[Dict[str, Any]],
+    *,
+    keyword_chunks: Sequence[Mapping[str, Any]],
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """T20.14G3R — add keyword overlap anchors when shadow selected but doc/entity overlap is zero."""
+    diag: Dict[str, Any] = {
+        "overlap_anchor_attempted": False,
+        "overlap_anchor_added": False,
+        "overlap_anchor_count": 0,
+        "overlap_anchor_reason": None,
+        "overlap_anchor_ids": [],
+        "doc_overlap_before_overlap_anchor": 0,
+        "doc_overlap_after_overlap_anchor": 0,
+        "entity_overlap_before_overlap_anchor": 0,
+        "entity_overlap_after_overlap_anchor": 0,
+    }
+    if not selected_chunks or not keyword_chunks:
+        diag["overlap_anchor_reason"] = "not_exposed"
+        return selected_chunks, diag
+
+    doc_before, ent_before = _overlap_counts_for_shadow_selection(keyword_chunks, selected_chunks)
+    diag["doc_overlap_before_overlap_anchor"] = doc_before
+    diag["entity_overlap_before_overlap_anchor"] = ent_before
+    if doc_before > 0 or ent_before > 0:
+        diag["overlap_anchor_reason"] = "overlap_already_positive"
+        diag["doc_overlap_after_overlap_anchor"] = doc_before
+        diag["entity_overlap_after_overlap_anchor"] = ent_before
+        return selected_chunks, diag
+
+    diag["overlap_anchor_attempted"] = True
+    diag["overlap_anchor_reason"] = "zero_doc_entity_overlap"
+    anchors = _select_overlap_anchor_chunks(
+        keyword_chunks,
+        existing_ids=_collect_chunk_ids(selected_chunks),
+        max_anchors=SHADOW_OVERLAP_ANCHOR_MAX,
+    )
+    merged = _merge_overlap_anchor_chunks(selected_chunks, anchors)
+    doc_after, ent_after = _overlap_counts_for_shadow_selection(keyword_chunks, merged)
+
+    if doc_after == 0 and ent_after == 0 and SHADOW_OVERLAP_ANCHOR_SECOND_MAX > len(anchors):
+        extra = _select_overlap_anchor_chunks(
+            keyword_chunks,
+            existing_ids=_collect_chunk_ids(merged),
+            max_anchors=1,
+        )
+        if extra:
+            anchors = list(anchors) + extra
+            merged = _merge_overlap_anchor_chunks(selected_chunks, anchors)
+            doc_after, ent_after = _overlap_counts_for_shadow_selection(keyword_chunks, merged)
+
+    diag["doc_overlap_after_overlap_anchor"] = doc_after
+    diag["entity_overlap_after_overlap_anchor"] = ent_after
+    if anchors:
+        diag["overlap_anchor_added"] = True
+        diag["overlap_anchor_count"] = len(anchors)
+        diag["overlap_anchor_ids"] = [_safe_chunk_id(chunk) for chunk in anchors]
+    else:
+        diag["overlap_anchor_reason"] = "no_safe_overlap_anchors"
+    return merged, diag
+
+
 async def _fetch_entity_expansion_sibling_rows(
     conn,
     *,
@@ -1926,6 +2045,108 @@ async def _apply_shadow_entity_expansion_v2(
     doc_after, entity_after = _overlap_counts_for_shadow_selection(keyword_chunks, merged)
     diag["doc_overlap_after_entity_expansion"] = doc_after
     diag["entity_overlap_after_entity_expansion"] = entity_after
+    return merged, diag
+
+
+def _collect_keyword_only_entity_keys(
+    keyword_chunks: Sequence[Mapping[str, Any]],
+    *,
+    max_entities: int = KEYWORD_ENTITY_BRIDGE_MAX_ENTITIES,
+) -> set[str]:
+    keys = _collect_entity_keys(keyword_chunks)
+    if len(keys) <= max_entities:
+        return keys
+    return set(sorted(keys)[:max_entities])
+
+
+def _row_to_keyword_bridge_chunk(row: Any) -> Dict[str, Any]:
+    chunk = _row_to_entity_expansion_chunk(row)
+    chunk.pop("entity_expansion_added", None)
+    chunk["keyword_entity_bridge_added"] = True
+    return chunk
+
+
+async def _apply_keyword_entity_bridge_v2(
+    conn,
+    *,
+    selected_chunks: List[Dict[str, Any]],
+    keyword_chunks: Optional[Sequence[Mapping[str, Any]]],
+    resolved_profile: str,
+    query: str,
+    filters: List[str],
+    params: List[Any],
+    vec_param: int,
+    words: List[str],
+    pin_source: bool,
+    query_vec: Optional[str],
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """T20.14G3R — expand from keyword-side entities when shadow overlap is still zero."""
+    diag: Dict[str, Any] = {
+        "keyword_entity_bridge_attempted": False,
+        "keyword_entity_bridge_added": False,
+        "keyword_entity_bridge_entities": [],
+        "keyword_entity_bridge_source_types": [],
+        "keyword_entity_bridge_skip_reason": None,
+    }
+    if not keyword_chunks:
+        diag["keyword_entity_bridge_skip_reason"] = "not_exposed"
+        return selected_chunks, diag
+
+    entity_keys = _collect_keyword_only_entity_keys(keyword_chunks)
+    if not entity_keys:
+        diag["keyword_entity_bridge_skip_reason"] = "no_keyword_entities"
+        return selected_chunks, diag
+
+    diag["keyword_entity_bridge_attempted"] = True
+    diag["keyword_entity_bridge_entities"] = sorted(entity_keys)[:KEYWORD_ENTITY_BRIDGE_MAX_ENTITIES]
+
+    if not query_vec:
+        diag["keyword_entity_bridge_skip_reason"] = "missing_query_vec"
+        return selected_chunks, diag
+
+    targets = _entity_expansion_targets_from_keys(
+        entity_keys,
+        max_entities=KEYWORD_ENTITY_BRIDGE_MAX_ENTITIES,
+    )
+    allowed_types = resolve_entity_expansion_allowed_source_types(resolved_profile, query=query)
+    existing_ids = _collect_chunk_ids(selected_chunks)
+    scope_params = params[: max(0, vec_param - 1)]
+    rows = await _fetch_entity_expansion_sibling_rows(
+        conn,
+        filters=filters,
+        scope_params=scope_params,
+        query_vec=query_vec,
+        targets=targets,
+        allowed_source_types=allowed_types,
+        existing_chunk_ids=existing_ids,
+        fetch_limit=KEYWORD_ENTITY_BRIDGE_MAX_ENTITIES * ENTITY_EXPANSION_MAX_CANDIDATES_PER_ENTITY,
+    )
+
+    bridge_chunks: List[Dict[str, Any]] = []
+    for row in rows:
+        if not _chunk_passes_privacy(row, words=words, pin_source=pin_source, query=query):
+            continue
+        bridge_chunks.append(_row_to_keyword_bridge_chunk(row))
+        if len(bridge_chunks) >= KEYWORD_ENTITY_BRIDGE_MAX_ENTITIES:
+            break
+
+    if not bridge_chunks:
+        diag["keyword_entity_bridge_skip_reason"] = "no_privacy_safe_candidates"
+        return selected_chunks, diag
+
+    merged = _merge_entity_expansion_chunks(
+        selected_chunks,
+        bridge_chunks,
+        max_added=KEYWORD_ENTITY_BRIDGE_MAX_ADDED,
+    )
+    added_chunks = merged[len(selected_chunks) :]
+    if added_chunks:
+        diag["keyword_entity_bridge_added"] = True
+        diag["keyword_entity_bridge_source_types"] = sorted(
+            {str(chunk.get("source_type") or "") for chunk in added_chunks if chunk.get("source_type")}
+        )
+    else:
+        diag["keyword_entity_bridge_skip_reason"] = "no_new_candidates"
     return merged, diag
 
 
@@ -2369,6 +2590,9 @@ async def retrieve_chunks_vector_shadow(
             fallback_diag["fallback_reason"] = fallback_diag.get("fallback_reason") or "zero_result_after_fallback"
 
     entity_expansion_diag: Dict[str, Any] = {}
+    overlap_tuning_diag: Dict[str, Any] = {}
+    keyword_bridge_diag: Dict[str, Any] = {}
+    overlap_anchor_diag: Dict[str, Any] = {}
     if include_diagnostics and keyword_chunks_for_overlap:
         entity_expansion_start = _now_ms()
         expansion_base = weighted_selected if route_mode else unweighted_selected
@@ -2385,13 +2609,71 @@ async def retrieve_chunks_vector_shadow(
             pin_source=pin_source,
             query_vec=str(params[vec_param - 1]) if len(params) >= vec_param else None,
         )
+        diagnostic_selected = list(expanded_selected)
+
+        pure_doc, pure_ent = _overlap_counts_for_shadow_selection(
+            keyword_chunks_for_overlap,
+            diagnostic_selected,
+        )
+        overlap_tuning_diag = {
+            "pure_vector_doc_overlap": pure_doc,
+            "pure_vector_entity_overlap": pure_ent,
+            "pure_vector_doc_entity_overlap_positive": pure_doc > 0 or pure_ent > 0,
+            "shadow_plus_entity_expansion_doc_overlap": pure_doc,
+            "shadow_plus_entity_expansion_entity_overlap": pure_ent,
+            "shadow_plus_entity_expansion_overlap_positive": pure_doc > 0 or pure_ent > 0,
+        }
+
+        if pure_doc == 0 and pure_ent == 0:
+            bridge_start = _now_ms()
+            diagnostic_selected, keyword_bridge_diag = await _apply_keyword_entity_bridge_v2(
+                conn,
+                selected_chunks=diagnostic_selected,
+                keyword_chunks=keyword_chunks_for_overlap,
+                resolved_profile=resolved_profile,
+                query=query,
+                filters=filters,
+                params=params,
+                vec_param=vec_param,
+                words=words,
+                pin_source=pin_source,
+                query_vec=str(params[vec_param - 1]) if len(params) >= vec_param else None,
+            )
+            diagnostics.timings_ms.candidate_fetch += _elapsed_ms(bridge_start)
+            pure_doc, pure_ent = _overlap_counts_for_shadow_selection(
+                keyword_chunks_for_overlap,
+                diagnostic_selected,
+            )
+            overlap_tuning_diag["shadow_plus_entity_expansion_doc_overlap"] = pure_doc
+            overlap_tuning_diag["shadow_plus_entity_expansion_entity_overlap"] = pure_ent
+            overlap_tuning_diag["shadow_plus_entity_expansion_overlap_positive"] = pure_doc > 0 or pure_ent > 0
+
+        if (
+            len(diagnostic_selected) > 0
+            and not fallback_diag.get("true_zero_result_after_fallback")
+            and pure_doc == 0
+            and pure_ent == 0
+        ):
+            diagnostic_selected, overlap_anchor_diag = _apply_overlap_anchor_topup(
+                diagnostic_selected,
+                keyword_chunks=keyword_chunks_for_overlap,
+            )
+
+        anchored_doc, anchored_ent = _overlap_counts_for_shadow_selection(
+            keyword_chunks_for_overlap,
+            diagnostic_selected,
+        )
+        overlap_tuning_diag["shadow_plus_anchor_doc_overlap"] = anchored_doc
+        overlap_tuning_diag["shadow_plus_anchor_entity_overlap"] = anchored_ent
+        overlap_tuning_diag["shadow_plus_anchor_overlap_positive"] = anchored_doc > 0 or anchored_ent > 0
+
         if route_mode:
-            weighted_selected = expanded_selected
-            selected_for_output = expanded_selected
+            weighted_selected = diagnostic_selected
+            selected_for_output = diagnostic_selected
         else:
-            unweighted_selected = expanded_selected
-            weighted_selected = expanded_selected
-            selected_for_output = expanded_selected
+            unweighted_selected = diagnostic_selected
+            weighted_selected = diagnostic_selected
+            selected_for_output = diagnostic_selected
         diagnostics.timings_ms.candidate_fetch += _elapsed_ms(entity_expansion_start)
 
     diagnostics.timings_ms.total = _elapsed_ms(total_start)
@@ -2452,6 +2734,9 @@ async def retrieve_chunks_vector_shadow(
             diagnostics.debug.update(overlap_refine_diag)
         diagnostics.debug.update(fallback_diag)
         diagnostics.debug.update(entity_expansion_diag)
+        diagnostics.debug.update(overlap_tuning_diag)
+        diagnostics.debug.update(keyword_bridge_diag)
+        diagnostics.debug.update(overlap_anchor_diag)
         selected_count = len(selected_for_diag)
         if fallback_diag.get("zero_result_fallback_succeeded"):
             diagnostics.debug["zero_result_reason"] = "zero_result_fallback_applied"

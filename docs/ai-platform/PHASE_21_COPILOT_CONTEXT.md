@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-30 (T20.15AG + T20.16A design complete)  
+**Last updated:** 2026-06-30 (T20.16B fallback remediation complete)  
 **Current main SHA:** verify with `git rev-parse --short HEAD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
@@ -25,21 +25,21 @@ Production path:
 
 T20.15A–AG complete. Hybrid canary ladder: CLOSED.
 T20.16A hybrid production-readiness design: COMPLETE (docs only).
+T20.16B final_tagged_plan fallback remediation: COMPLETE — 0/27 fallback (was 3/27).
 Hybrid allowlist canary: KEEP for evidence collection only.
 AI_RAG_HYBRID_CANARY_PERCENT=0.
-1% through 100% percentage cohort: PROVEN (G through AE PASS).
 Production default remains keyword.
 Vector production default: NOT APPROVED.
-T20.16B/C/D/E: NOT STARTED — explicit approval required per ticket.
+T20.16C/D/E: NOT STARTED — explicit approval required per ticket.
 ```
 
 ### T20.15 hybrid canary (implemented)
 
 | Item | Value |
 | ---- | ----- |
-| Image | `python-ai-service:t20-p215f` |
+| Image | `python-ai-service:t20-p216b` |
 | Allowlisted user | `2ed75568-7deb-4c29-91b0-6919f24a0c9f` |
-| API fallback | 1/9 on `final_tagged_plan` |
+| API fallback (T20.16B) | **0/9** transcript (`final_tagged_plan` hybrid_canary) |
 | Pure overlap | 8/16 |
 | Anchored overlap | 16/16 |
 | Avg quality (T20.15C API) | 3.78 |
@@ -62,14 +62,14 @@ Use @docs/ai-platform/PHASE_21_COPILOT_CONTEXT.md as the source of truth for Pha
 
 Do NOT enable vector retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
-Do NOT start T20.16B without: "Approved: start T20.16B final_tagged_plan fallback remediation"
-Do NOT start T20.16C/D/E without explicit owner approval.
+Do NOT start T20.16C without: "Approved: start T20.16C pure vector overlap research design"
+Do NOT start T20.16D/E without explicit owner approval.
 Do NOT enable vector production default.
 Do NOT use generative Ollama as production RAG default.
 Do NOT expose message bodies in UI or API responses.
 
 Phase 21 product track is CLOSED and tagged. P21.10+ product follow-ups require explicit approval (keyword/rule-engine only).
-T20.15 ladder CLOSED; T20.16A design COMPLETE: allowlist KEEP; percent=0; production keyword; vector NOT APPROVED.
+T20.15 ladder CLOSED; T20.16A design + T20.16B fallback fix COMPLETE: allowlist KEEP; percent=0; image t20-p216b; production keyword; vector NOT APPROVED.
 ```
 
 ---

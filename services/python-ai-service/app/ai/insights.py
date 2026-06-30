@@ -14,6 +14,8 @@ from app.ai.hybrid_canary import (
     hybrid_chunks_from_shadow,
     hybrid_failure_reason,
     hybrid_succeeded,
+    refine_hybrid_fallback_reason,
+    resolve_hybrid_retrieval_plan,
 )
 from app.ai.outbox import insert_pricing_recommendation_outbox, publish_python_ai_outbox_tick
 from app.ai.providers.registry import get_provider, resolve_model_used
@@ -98,11 +100,19 @@ async def rag_query(
     shadow_debug: bool = False,
 ) -> Dict[str, Any]:
     async def run(conn):
-        kw_start = time.perf_counter()
-        keyword = await retrieve_chunks(conn, query=question, user_id=user_id, source_types=source_types)
-        keyword_latency_ms = (time.perf_counter() - kw_start) * 1000.0
-
         gate = evaluate_hybrid_canary_gate(user_id)
+        retrieval_plan = (
+            resolve_hybrid_retrieval_plan(question) if gate.canary_allowed else None
+        )
+        retrieval_query = (
+            retrieval_plan.retrieval_query if retrieval_plan is not None else question
+        )
+
+        kw_start = time.perf_counter()
+        keyword = await retrieve_chunks(
+            conn, query=retrieval_query, user_id=user_id, source_types=source_types
+        )
+        keyword_latency_ms = (time.perf_counter() - kw_start) * 1000.0
         shadow_diag = None
         shadow_diagnostics = None
         hybrid_shadow: Optional[Dict[str, Any]] = None
@@ -114,7 +124,7 @@ async def rag_query(
             try:
                 hybrid_shadow = await retrieve_chunks_vector_shadow(
                     conn,
-                    query=question,
+                    query=retrieval_query,
                     user_id=user_id,
                     source_types=source_types,
                     route_shadow_profile=shadow_profile,
@@ -174,6 +184,7 @@ async def rag_query(
             keyword_latency_ms,
             hybrid_latency_ms,
             hybrid_error,
+            retrieval_plan,
         )
 
     result, err = await _with_conn(run)
@@ -188,10 +199,17 @@ async def rag_query(
             source_refs=[],
             degraded_reason=err,
         )
-    keyword_result, shadow_diag, shadow_diagnostics, gate, hybrid_shadow, keyword_latency_ms, hybrid_latency_ms, hybrid_error = result
+    keyword_result, shadow_diag, shadow_diagnostics, gate, hybrid_shadow, keyword_latency_ms, hybrid_latency_ms, hybrid_error, retrieval_plan = result
 
     use_hybrid = hybrid_succeeded(gate=gate, shadow=hybrid_shadow, hybrid_error=hybrid_error)
-    fallback_reason = hybrid_failure_reason(gate=gate, shadow=hybrid_shadow, hybrid_error=hybrid_error)
+    generic_fallback_reason = hybrid_failure_reason(
+        gate=gate, shadow=hybrid_shadow, hybrid_error=hybrid_error
+    )
+    prompt_class = retrieval_plan.prompt_class if retrieval_plan is not None else None
+    fallback_reason = refine_hybrid_fallback_reason(
+        prompt_class=prompt_class,
+        generic_reason=generic_fallback_reason,
+    )
     hybrid_fallback = gate.canary_allowed and not use_hybrid
 
     if use_hybrid:
@@ -232,6 +250,7 @@ async def rag_query(
             hybrid_fallback_reason=fallback_reason if hybrid_fallback else None,
             hybrid_error=hybrid_error,
             retrieval_mode=retrieval_mode,
+            retrieval_plan=retrieval_plan,
         )
     if shadow_diag is not None:
         details["shadow_vector"] = shadow_diag

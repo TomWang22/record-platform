@@ -25,6 +25,21 @@ _PRODUCTION_NAMESPACES = frozenset({"record-platform"})
 
 GateReason = str  # allowlist | percentage | keyword_default | prod_percent_blocked
 
+# T20.16B — seller-domain retrieval expansion for meta-prompt tagged plans (canary only).
+TAGGED_EXECUTIVE_SUMMARY_RETRIEVAL_QUERY = (
+    "prioritized seller action plan offers listings auction negotiation "
+    "collector metadata pricing review countered pending"
+)
+
+FINAL_TAGGED_PLAN_PROMPT_CLASS = "final_tagged_plan"
+
+
+@dataclass(frozen=True)
+class HybridRetrievalPlan:
+    retrieval_query: str
+    prompt_class: Optional[str]
+    query_expanded: bool
+
 
 @dataclass(frozen=True)
 class HybridCanaryGate:
@@ -42,6 +57,33 @@ class HybridCanaryGate:
     @property
     def active(self) -> bool:
         return self.canary_allowed
+
+
+def resolve_hybrid_retrieval_plan(question: str) -> HybridRetrievalPlan:
+    """Expand meta-prompt tagged plans to seller-domain terms for retrieval only."""
+    from app.ai.rag_synthesis import classify_rag_intent
+
+    if classify_rag_intent(question) != "tagged_executive_summary":
+        return HybridRetrievalPlan(
+            retrieval_query=question,
+            prompt_class=None,
+            query_expanded=False,
+        )
+    return HybridRetrievalPlan(
+        retrieval_query=TAGGED_EXECUTIVE_SUMMARY_RETRIEVAL_QUERY,
+        prompt_class=FINAL_TAGGED_PLAN_PROMPT_CLASS,
+        query_expanded=True,
+    )
+
+
+def refine_hybrid_fallback_reason(
+    *,
+    prompt_class: Optional[str],
+    generic_reason: Optional[str],
+) -> Optional[str]:
+    if prompt_class == FINAL_TAGGED_PLAN_PROMPT_CLASS and generic_reason == "true_zero_result":
+        return "final_tagged_plan_insufficient_hybrid_evidence"
+    return generic_reason
 
 
 def normalize_user_id(user_id: Optional[str]) -> Optional[str]:
@@ -275,6 +317,7 @@ def build_hybrid_canary_diagnostics(
     hybrid_fallback_reason: Optional[str],
     hybrid_error: Optional[str],
     retrieval_mode: str,
+    retrieval_plan: Optional[HybridRetrievalPlan] = None,
 ) -> Dict[str, Any]:
     meta = _gate_metadata(gate, retrieval_mode)
     if not gate.canary_allowed:
@@ -317,8 +360,16 @@ def build_hybrid_canary_diagnostics(
     else:
         canary_lane = "lane_b_hybrid_attempted"
 
+    retrieval_meta: Dict[str, Any] = {}
+    if retrieval_plan is not None:
+        retrieval_meta = {
+            "retrieval_prompt_class": retrieval_plan.prompt_class,
+            "retrieval_query_expanded": retrieval_plan.query_expanded,
+        }
+
     return {
         **meta,
+        **retrieval_meta,
         "canary_enabled": gate.canary_enabled,
         "canary_allowed": gate.canary_allowed,
         "canary_lane": canary_lane,

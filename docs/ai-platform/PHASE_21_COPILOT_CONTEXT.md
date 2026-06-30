@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-30 (T20.15AD–AG complete; hybrid canary ladder CLOSED)  
+**Last updated:** 2026-06-30 (T20.15AG + T20.16A design complete)  
 **Current main SHA:** verify with `git rev-parse --short HEAD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
@@ -24,13 +24,13 @@ Production path:
 - AI_RAG_SHADOW_VECTOR: 0 (must remain off unless explicitly approved)
 
 T20.15A–AG complete. Hybrid canary ladder: CLOSED.
+T20.16A hybrid production-readiness design: COMPLETE (docs only).
 Hybrid allowlist canary: KEEP for evidence collection only.
-AI_RAG_HYBRID_CANARY_PERCENT=0 (restored after AE eval).
+AI_RAG_HYBRID_CANARY_PERCENT=0.
 1% through 100% percentage cohort: PROVEN (G through AE PASS).
-100% eval: PASS (T20.15AE); decision B+C (T20.15AF); closeout (T20.15AG).
 Production default remains keyword.
 Vector production default: NOT APPROVED.
-T20.16A: NOT STARTED — requires explicit approval phrase.
+T20.16B/C/D/E: NOT STARTED — explicit approval required per ticket.
 ```
 
 ### T20.15 hybrid canary (implemented)
@@ -62,13 +62,14 @@ Use @docs/ai-platform/PHASE_21_COPILOT_CONTEXT.md as the source of truth for Pha
 
 Do NOT enable vector retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
-Do NOT start T20.16A without: "Approved: start T20.16A hybrid production-readiness design only"
+Do NOT start T20.16B without: "Approved: start T20.16B final_tagged_plan fallback remediation"
+Do NOT start T20.16C/D/E without explicit owner approval.
 Do NOT enable vector production default.
 Do NOT use generative Ollama as production RAG default.
 Do NOT expose message bodies in UI or API responses.
 
 Phase 21 product track is CLOSED and tagged. P21.10+ product follow-ups require explicit approval (keyword/rule-engine only).
-T20.15 hybrid canary ladder CLOSED: allowlist KEEP; percent=0; AE PASS; AF selects B+C; AG closeout complete.
+T20.15 ladder CLOSED; T20.16A design COMPLETE: allowlist KEEP; percent=0; production keyword; vector NOT APPROVED.
 ```
 
 ---

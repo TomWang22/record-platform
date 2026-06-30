@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-30 (T20.16C pure vector research design complete)  
+**Last updated:** 2026-06-30 (T20.16A–F hybrid production-readiness batch CLOSED)  
 **Current main SHA:** verify with `git rev-parse --short HEAD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
@@ -24,14 +24,16 @@ Production path:
 - AI_RAG_SHADOW_VECTOR: 0 (must remain off unless explicitly approved)
 
 T20.15A–AG complete. Hybrid canary ladder: CLOSED.
-T20.16A hybrid production-readiness design: COMPLETE (docs only).
-T20.16B final_tagged_plan fallback remediation: COMPLETE — 0/27 fallback (was 3/27).
-T20.16C pure vector overlap research: COMPLETE — pure 8/16 report-only; anchored 16/16.
-Hybrid allowlist canary: KEEP for evidence collection only.
+T20.16A–F complete. Hybrid production-readiness batch: CLOSED.
+T20.16B final_tagged_plan fallback: fixed (0% fallback on D-LIVE 45/45).
+T20.16C pure vector: 8/16 report-only; anchored 16/16.
+T20.16D-LIVE: PASS — 45/45 HTTP 200, avg score 4.0, hybrid p95 439 ms.
+T20.16E: B selected (KEEP allowlist); C recommended (future soak design).
+Hybrid allowlist canary: KEEP.
 AI_RAG_HYBRID_CANARY_PERCENT=0.
-Production default remains keyword.
+Production default: keyword.
 Vector production default: NOT APPROVED.
-T20.16D/E: NOT STARTED — explicit approval required per ticket.
+T20.17A: NOT STARTED — explicit approval required.
 ```
 
 ### T20.15 hybrid canary (implemented)
@@ -40,11 +42,11 @@ T20.16D/E: NOT STARTED — explicit approval required per ticket.
 | ---- | ----- |
 | Image | `python-ai-service:t20-p216b` |
 | Allowlisted user | `2ed75568-7deb-4c29-91b0-6919f24a0c9f` |
-| API fallback (T20.16B) | **0/9** transcript (`final_tagged_plan` hybrid_canary) |
-| Pure overlap | **8/16** (report-only; not a production gate) |
-| Anchored overlap | **16/16** (hybrid lane gate) |
-| Avg quality (T20.15C API) | 3.78 |
-| Hybrid p95 (T20.15AE @ PERCENT=100) | 110.29 / 345.97 ms (transcript) |
+| API fallback (D-LIVE) | **0/45** live transcript; `final_tagged_plan` hybrid_canary |
+| Hybrid p95 (D-LIVE) | **438.85 ms** (45-case aggregate) |
+| Pure overlap | **8/16** (report-only) |
+| Anchored overlap | **16/16** |
+| Avg quality (D-LIVE) | **4.0** |
 
 ### T20.14H hybrid gate (2026-06-29)
 
@@ -63,15 +65,14 @@ Use @docs/ai-platform/PHASE_21_COPILOT_CONTEXT.md as the source of truth for Pha
 
 Do NOT enable vector retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
-Do NOT start T20.16D without: "Approved: start T20.16D hybrid production-readiness eval plan"
-Do NOT start T20.16E without explicit owner approval.
+Do NOT start T20.17A without: "Approved: start T20.17A scoped hybrid soak design only"
 Pure vector overlap: report-only per T20.16C — do not promote vector default.
 Do NOT enable vector production default.
 Do NOT use generative Ollama as production RAG default.
 Do NOT expose message bodies in UI or API responses.
 
 Phase 21 product track is CLOSED and tagged. P21.10+ product follow-ups require explicit approval (keyword/rule-engine only).
-T20.16A–C COMPLETE: pure 8/16 report-only; anchored 16/16; recommend T20.16D; allowlist KEEP; percent=0; image t20-p216b; production keyword; vector NOT APPROVED.
+T20.16A–F CLOSED: D-LIVE PASS; E selects B+C; allowlist KEEP; percent=0; image t20-p216b; production keyword; vector NOT APPROVED.
 ```
 
 ---

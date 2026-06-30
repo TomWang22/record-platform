@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-30 (T20.16A–F hybrid production-readiness batch CLOSED)  
-**Current main SHA:** verify with `git rev-parse --short HEAD`  
+**Last updated:** 2026-06-30 (T20.16F-CONTEXT-FIX; T20.16A–F batch CLOSED)  
+**Current main SHA:** `39ccb26` (verify with `git rev-parse --short HEAD`)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -194,7 +194,7 @@ Design: `docs/ai-platform/P21-5A-ai-quality-telemetry-design.md`
 | ---- | ------ |
 | No vector default rollout | **BLOCKED** |
 | No hybrid rollout (production) | **BLOCKED** |
-| T20.15 execution | **BLOCKED** (allowlist canary active; percent gate deployed at 0) |
+| T20.15 execution (percentage ladder) | **CLOSED** (T20.15A–AG; percent=0 restored after each eval) |
 | T20.15G 1% eval | **COMPLETE** (PASS; percent=0 restored) |
 | T20.15H decision | **COMPLETE** — Option B active; Option C recommended |
 | T20.15J 5% gate verify | **COMPLETE** (verification-only) |
@@ -217,8 +217,16 @@ Design: `docs/ai-platform/P21-5A-ai-quality-telemetry-design.md`
 | T20.15AA 75% eval | **COMPLETE** (PASS; percent=0 restored) |
 | T20.15AB 75% decision | **COMPLETE** — Option B active; Option C → AC |
 | T20.15AC 100% design | **COMPLETE** (design only) |
-| T20.15AD implementation | **NOT STARTED** |
-| Hybrid allowlist canary | **KEEP** (`t20-p215f`, contract user allowlist) |
+| T20.15AD 100% gate verify | **COMPLETE** (verification-only) |
+| T20.15AE 100% eval | **COMPLETE** (PASS; percent=0 restored) |
+| T20.15AF 100% decision | **COMPLETE** — Option B active; Option C → AG |
+| T20.15AG ladder closeout | **COMPLETE** |
+| T20.16A production-readiness design | **COMPLETE** (design only) |
+| T20.16B final_tagged_plan fix | **COMPLETE** (`t20-p216b`) |
+| T20.16C pure vector research | **COMPLETE** (8/16 report-only) |
+| T20.16D–F production-readiness batch | **COMPLETE** (D-LIVE PASS) |
+| Hybrid allowlist canary | **KEEP** (`t20-p216b`, contract user allowlist) |
+| T20.17A scoped soak design | **NOT STARTED** — explicit approval required |
 | No embedding tranches without separate approval | **BLOCKED** |
 | No default-on overlap flags | **BLOCKED** |
 | No generative Ollama as production RAG default | **BLOCKED** |
@@ -260,7 +268,7 @@ Release note: `docs/release/rp-ai-phase-21-non-vector-seller-intelligence.md`
 | Lane | Doc | Status |
 | ---- | --- | ------ |
 | **Product** (optional) | `P21-10-post-release-product-roadmap.md` | P21.10+ require approval; keyword/rule-engine only |
-| **Vector** (blocker burn-down) | `T20-14H0-hybrid-vector-gate-design.md` … `T20-14H2-vector-rollout-decision-package.md` | H0–H2 complete; T20.15A design ready for owner approval |
+| **Vector** (blocker burn-down) | `T20-14H0` … `T20-16F` | H0–H2 complete; T20.15 ladder CLOSED; T20.16 production-readiness CLOSED |
 
 Product work may continue on keyword/rule-engine. **No product ticket may silently enable vector.**
 
@@ -275,9 +283,9 @@ Product work may continue on keyword/rule-engine. **No product ticket may silent
 | **P21.12** | Observation-deck integration — feed telemetry JSON into `/observation-deck` |
 | **P21.13** | Seller intelligence polish |
 | **P21.14** | Dedicated session-memory UI |
-| **T20.15A–AC** | Hybrid canary through 100% design | **KEEP allowlist**; percent=0; T20.15AD blocked |
+| **T20.17A** | Scoped hybrid soak **design only** (optional) | **NOT STARTED** — requires approval phrase |
 
-Do not start T20.15A implementation without owner approval. Vector rollout remains **NOT APPROVED** for production default.
+Do not start T20.17A without: `Approved: start T20.17A scoped hybrid soak design only`. Vector production default remains **NOT APPROVED**.
 
 ---
 
@@ -285,9 +293,12 @@ Do not start T20.15A implementation without owner approval. Vector rollout remai
 
 ```text
 Phase 21 non-vector seller intelligence: RELEASE TAGGED
-Vector rollout: NOT APPROVED
+Vector production default: NOT APPROVED
 Production default: keyword
 Hybrid allowlist canary: KEEP
 AI_RAG_HYBRID_CANARY_PERCENT: 0
-T20.15AD: NOT STARTED
+Image: python-ai-service:t20-p216b
+T20.15A–AG: CLOSED (hybrid canary ladder)
+T20.16A–F: CLOSED (production-readiness batch; D-LIVE PASS)
+T20.17A: NOT STARTED
 ```

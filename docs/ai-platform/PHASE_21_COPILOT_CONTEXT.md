@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-30 (T20.18E broader hybrid soak batch CLOSED)  
+**Last updated:** 2026-06-30 (T20.19E extended hybrid soak batch CLOSED)  
 **Current main SHA:** verify with `git rev-parse --short HEAD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
@@ -35,12 +35,16 @@ T20.17D: B selected (KEEP allowlist); C recommended (broader soak → T20.18A).
 T20.18A–E complete. Broader multi-user soak batch: CLOSED.
 T20.18C-LIVE: PASS — 270/270 HTTP 200 (6 users), 0% fallback, hybrid p95 146 ms.
 T20.18D: B selected (single contract-user allowlist); D recommended (T20.19A).
+T20.19A–E complete. Extended multi-window soak batch: CLOSED.
+T20.19C-LIVE: PASS — 810/810 HTTP 200 (6 users, 3 windows), 0% fallback, hybrid p95 119 ms.
+T20.19D: B selected (single contract-user allowlist); D recommended (T20.20A).
+Combined live evidence (D16→D19): 1215/1215 HTTP 200, 0% fallback.
 Hybrid allowlist canary: KEEP.
 AI_RAG_HYBRID_CANARY_USER_ALLOWLIST=2ed75568-7deb-4c29-91b0-6919f24a0c9f (contract user only).
 AI_RAG_HYBRID_CANARY_PERCENT=0.
 Production default: keyword.
 Vector production default: NOT APPROVED.
-T20.19A: NOT STARTED — explicit approval required.
+T20.20A: NOT STARTED — explicit approval required.
 ```
 
 ### T20 hybrid canary (implemented)
@@ -49,9 +53,9 @@ T20.19A: NOT STARTED — explicit approval required.
 | ---- | ----- |
 | Image | `python-ai-service:t20-p216b` |
 | Allowlisted user | `2ed75568-7deb-4c29-91b0-6919f24a0c9f` (contract only) |
-| API fallback (C18-LIVE) | **0/270** multi-user; `final_tagged_plan` hybrid_canary 30/30 |
-| Combined live (D16+D17+D18) | **405/405** HTTP 200, **0%** fallback |
-| Hybrid p95 (C18-LIVE) | **145.78 ms** (270-case aggregate) |
+| API fallback (C19-LIVE) | **0/810** (3 windows); `final_tagged_plan` hybrid_canary 90/90 |
+| Combined live (D16→D19) | **1215/1215** HTTP 200, **0%** fallback |
+| Hybrid p95 (C19-LIVE) | **119.34 ms** (810-case aggregate) |
 | Pure overlap | **8/16** (report-only) |
 | Anchored overlap | **16/16** |
 | Avg quality (C18-LIVE) | **4.0** |
@@ -73,7 +77,7 @@ Use @docs/ai-platform/PHASE_21_COPILOT_CONTEXT.md as the source of truth for Pha
 
 Do NOT enable vector retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
-Do NOT start T20.19A without: "Approved: start T20.19A extended hybrid soak design only"
+Do NOT start T20.20A without: "Approved: start T20.20A hybrid production-decision design only"
 Pure vector overlap: report-only per T20.16C — do not promote vector default.
 Do NOT enable vector production default.
 Do NOT use generative Ollama as production RAG default.
@@ -82,7 +86,8 @@ Do NOT expose message bodies in UI or API responses.
 Phase 21 product track is CLOSED and tagged. P21.10+ product follow-ups require explicit approval (keyword/rule-engine only).
 T20.16A–F CLOSED: D-LIVE PASS; E selects B+C.
 T20.17A–E CLOSED: C-LIVE PASS 90/90; D selects B+D.
-T20.18A–E CLOSED: C-LIVE PASS 270/270 (6 users); D selects B+D; single contract allowlist; percent=0; image t20-p216b; production keyword; vector NOT APPROVED.
+T20.18A–E CLOSED: C-LIVE PASS 270/270 (6 users); D selects B+D.
+T20.19A–E CLOSED: C-LIVE PASS 810/810 (3 windows); combined live 1215/1215; D selects B+D; single contract allowlist; percent=0; image t20-p216b; production keyword; vector NOT APPROVED.
 ```
 
 ---
@@ -245,8 +250,13 @@ Design: `docs/ai-platform/P21-5A-ai-quality-telemetry-design.md`
 | T20.18C-LIVE broader soak eval | **COMPLETE** (PASS; 270/270, 6 users) |
 | T20.18D broader soak decision | **COMPLETE** — Option B active; Option D → T20.19A |
 | T20.18E broader soak closeout | **COMPLETE** |
+| T20.19A extended soak design | **COMPLETE** (design only) |
+| T20.19B extended soak preflight | **COMPLETE** (6/6 JWT; controls PASS) |
+| T20.19C-LIVE extended soak eval | **COMPLETE** (PASS; 810/810, 3 windows) |
+| T20.19D extended soak decision | **COMPLETE** — Option B active; Option D → T20.20A |
+| T20.19E extended soak closeout | **COMPLETE** |
 | Hybrid allowlist canary | **KEEP** (`t20-p216b`, **single** contract user allowlist) |
-| T20.19A extended soak design | **NOT STARTED** — explicit approval required |
+| T20.20A production-decision design | **NOT STARTED** — explicit approval required |
 | No embedding tranches without separate approval | **BLOCKED** |
 | No default-on overlap flags | **BLOCKED** |
 | No generative Ollama as production RAG default | **BLOCKED** |
@@ -288,7 +298,7 @@ Release note: `docs/release/rp-ai-phase-21-non-vector-seller-intelligence.md`
 | Lane | Doc | Status |
 | ---- | --- | ------ |
 | **Product** (optional) | `P21-10-post-release-product-roadmap.md` | P21.10+ require approval; keyword/rule-engine only |
-| **Vector** (blocker burn-down) | `T20-14H0` … `T20-18E` | H0–H2 complete; T20.15–T20.18 soak batches CLOSED |
+| **Vector** (blocker burn-down) | `T20-14H0` … `T20-19E` | H0–H2 complete; T20.15–T20.19 soak batches CLOSED |
 
 Product work may continue on keyword/rule-engine. **No product ticket may silently enable vector.**
 
@@ -303,9 +313,9 @@ Product work may continue on keyword/rule-engine. **No product ticket may silent
 | **P21.12** | Observation-deck integration — feed telemetry JSON into `/observation-deck` |
 | **P21.13** | Seller intelligence polish |
 | **P21.14** | Dedicated session-memory UI |
-| **T20.19A** | Extended hybrid soak **design only** (optional) | **NOT STARTED** — requires approval phrase |
+| **T20.20A** | Hybrid production-decision **design only** (optional) | **NOT STARTED** — requires approval phrase |
 
-Do not start T20.19A without: `Approved: start T20.19A extended hybrid soak design only`. Vector production default remains **NOT APPROVED**.
+Do not start T20.20A without: `Approved: start T20.20A hybrid production-decision design only`. Vector production default remains **NOT APPROVED**.
 
 ---
 
@@ -319,9 +329,11 @@ Hybrid allowlist canary: KEEP
 AI_RAG_HYBRID_CANARY_USER_ALLOWLIST: 2ed75568-7deb-4c29-91b0-6919f24a0c9f
 AI_RAG_HYBRID_CANARY_PERCENT: 0
 Image: python-ai-service:t20-p216b
+Combined live (D16→D19): 1215/1215 HTTP 200, 0% fallback
 T20.15A–AG: CLOSED (hybrid canary ladder)
 T20.16A–F: CLOSED (production-readiness batch)
 T20.17A–E: CLOSED (scoped soak; 90/90)
 T20.18A–E: CLOSED (broader multi-user soak; 270/270)
-T20.19A: NOT STARTED
+T20.19A–E: CLOSED (extended 3-window soak; 810/810)
+T20.20A: NOT STARTED
 ```

@@ -161,6 +161,26 @@ class TestPercentageCohort(unittest.TestCase):
             self.assertEqual(percentage_bucket(uid), b)
             self.assertFalse(in_percentage_cohort(uid, 10))
 
+    def test_percent_twenty_five_includes_buckets_0_through_24(self) -> None:
+        in_cohort = {
+            0: "00000040-0000-4000-8000-000000000000",
+            1: "0000002a-0000-4000-8000-000000000000",
+            9: "5a68fe88-c134-4166-b145-57534a3656b9",
+            10: "000001bc-0000-4000-8000-000000000000",
+            20: "00000002-0000-4000-8000-000000000000",
+        }
+        out_cohort = {
+            25: "0000003b-0000-4000-8000-000000000000",
+            26: "00000033-0000-4000-8000-000000000000",
+            30: "000000f4-0000-4000-8000-000000000000",
+        }
+        for b, uid in in_cohort.items():
+            self.assertEqual(percentage_bucket(uid), b)
+            self.assertTrue(in_percentage_cohort(uid, 25))
+        for b, uid in out_cohort.items():
+            self.assertEqual(percentage_bucket(uid), b)
+            self.assertFalse(in_percentage_cohort(uid, 25))
+
 
 class TestGateEvaluation(unittest.TestCase):
     def test_percent_zero_non_allowlisted_keyword_default(self) -> None:

@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
 **Last updated:** 2026-07-01 (T20.27A–H opt-in hybrid preview UI implementation batch CLOSED)  
-**Current main SHA:** verify with `git rev-parse --short HEAD`  
+**Current main SHA:** `9632143`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -81,9 +81,10 @@ T20.28A: NOT STARTED — explicit approval required for post-UI soak design only
 | Item | Value |
 | ---- | ----- |
 | Image | `python-ai-service:t20-p225b` |
+| Webapp image | `webapp:t20-p227b` |
 | Allowlisted user | `2ed75568-7deb-4c29-91b0-6919f24a0c9f` (contract only) |
 | API-only preview | `GET/POST /api/ai/rag/preview/{status,enroll,revoke}` |
-| Combined live (D16→D26C) | **2835/2835** HTTP 200, **0%** fallback |
+| Combined live (D16→D27E) | **3105/3105** HTTP 200, **0%** fallback |
 | Pure overlap | **8/16** (report-only) |
 | Anchored overlap | **16/16** |
 | Avg quality (C18-LIVE) | **4.0** |

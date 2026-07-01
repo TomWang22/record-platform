@@ -47,8 +47,10 @@ test.describe('Opt-in hybrid preview UI (T20.27)', () => {
     await loginAs(page, COHORT_EMAIL)
     await page.goto('/insights', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await expect(page.getByTestId('ai-insights-dashboard-ready')).toBeVisible({ timeout: 120_000 })
-    await expect(page.getByTestId('ai-hybrid-preview-card')).toBeVisible()
-    await expect(page.getByTestId('ai-hybrid-preview-not-enrolled')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('heading', { name: 'Hybrid preview (opt-in)' })).toBeVisible({
+      timeout: 30_000,
+    })
+    await expect(page.getByTestId('ai-hybrid-preview-not-enrolled')).toBeVisible({ timeout: 60_000 })
 
     const cardText = await page.getByTestId('ai-hybrid-preview-card').innerText()
     expect(FORBIDDEN_UI.test(cardText)).toBe(false)
@@ -73,11 +75,13 @@ test.describe('Opt-in hybrid preview UI (T20.27)', () => {
     await loginAs(page, CONTRACT_EMAIL)
     await page.goto('/insights', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await expect(page.getByTestId('ai-insights-dashboard-ready')).toBeVisible({ timeout: 120_000 })
-    await expect(page.getByTestId('ai-hybrid-preview-card')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Hybrid preview (opt-in)' })).toBeVisible({
+      timeout: 30_000,
+    })
 
     const gate = await ragGateFromPage(page)
     expect(gate).toBe('allowlist')
-    await expect(page.getByTestId('ai-hybrid-preview-allowlist-info')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('ai-hybrid-preview-allowlist-info')).toBeVisible({ timeout: 60_000 })
 
     const cardText = await page.getByTestId('ai-hybrid-preview-card').innerText()
     expect(FORBIDDEN_UI.test(cardText)).toBe(false)

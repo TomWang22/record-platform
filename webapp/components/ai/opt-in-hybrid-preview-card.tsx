@@ -11,18 +11,12 @@ import {
   revokeHybridPreview,
 } from '@/lib/ai-insights-client'
 import type { HybridPreviewStatus } from '@/lib/ai-insights-types'
-import { isSessionAuthenticated, useSession } from '@/lib/use-session'
+import { useSession } from '@/lib/use-session'
 
 const REQUIRED_COPY = [
   'Hybrid preview is opt-in; keyword remains default.',
   'Preview is non-default and reversible.',
   'This does not change production retrieval defaults.',
-] as const
-
-const FORBIDDEN_COPY = [
-  'production default enabled',
-  'vector default',
-  'percentage rollout',
 ] as const
 
 type OptInHybridPreviewCardProps = {
@@ -60,16 +54,20 @@ export function OptInHybridPreviewCard({ ragGateReason }: OptInHybridPreviewCard
   }, [])
 
   useEffect(() => {
-    if (!isSessionAuthenticated(session)) {
-      setLoading(false)
+    if (session.status !== 'authenticated') {
+      if (session.status === 'unauthenticated') {
+        setLoading(false)
+      }
       return
     }
     void refreshStatus()
-  }, [session, refreshStatus])
+  }, [session.status, refreshStatus])
 
-  if (!isSessionAuthenticated(session)) {
+  if (session.status === 'unauthenticated') {
     return null
   }
+
+  const sessionPending = session.status === 'loading'
 
   const enrolled = Boolean(status?.enrolled)
   const allowlistInfo = !enrolled && ragGateReason === 'allowlist'
@@ -105,14 +103,20 @@ export function OptInHybridPreviewCard({ ragGateReason }: OptInHybridPreviewCard
   }
 
   return (
-    <Card
-      title="Hybrid preview (opt-in)"
-      description="Optional hybrid retrieval for your account only. Keyword remains the platform default."
-      className="border-amber-200/80 dark:border-amber-500/20"
-      data-testid="ai-hybrid-preview-card"
-    >
-      <div className="space-y-3">
-        {loading && (
+    <div data-testid="ai-hybrid-preview-card">
+      <Card
+        title="Hybrid preview (opt-in)"
+        description="Optional hybrid retrieval for your account only. Keyword remains the platform default."
+        className="border-amber-200/80 dark:border-amber-500/20"
+      >
+        <div className="space-y-3">
+          {sessionPending && (
+            <p className="text-sm text-slate-500" data-testid="ai-hybrid-preview-session-loading">
+              Checking session…
+            </p>
+          )}
+
+          {loading && !sessionPending && (
           <p className="text-sm text-slate-500" data-testid="ai-hybrid-preview-loading">
             Loading preview status…
           </p>
@@ -130,11 +134,6 @@ export function OptInHybridPreviewCard({ ragGateReason }: OptInHybridPreviewCard
               <p key={line} data-testid="ai-hybrid-preview-copy">
                 {line}
               </p>
-            ))}
-            {FORBIDDEN_COPY.map((line) => (
-              <span key={line} className="sr-only" data-testid="ai-hybrid-preview-forbidden-absent">
-                {line}
-              </span>
             ))}
           </div>
         )}
@@ -239,7 +238,8 @@ export function OptInHybridPreviewCard({ ragGateReason }: OptInHybridPreviewCard
             revoked
           </span>
         )}
-      </div>
-    </Card>
+        </div>
+      </Card>
+    </div>
   )
 }

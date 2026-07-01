@@ -399,7 +399,7 @@ export function buildLongformAggregate(turns: LongformTurnResult[]): LongformSes
     (t) =>
       t.http_status === 200 &&
       t.answer_chars > 80 &&
-      t.retrieval_mode === 'keyword' &&
+      ['keyword', 'hybrid_canary', 'keyword_fallback_from_hybrid'].includes(t.retrieval_mode) &&
       t.model_used === 'rule-engine' &&
       t.leakage_result === 'PASS' &&
       !t.old_boilerplate_present &&

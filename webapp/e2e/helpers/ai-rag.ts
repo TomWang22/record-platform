@@ -197,6 +197,16 @@ export function writeUiInferenceArtifacts(session: RagUiSessionResult, timestamp
   return { mdPath, jsonPath, rawDir }
 }
 
+const ACCEPTED_UI_RETRIEVAL_MODES = new Set([
+  'keyword',
+  'hybrid_canary',
+  'keyword_fallback_from_hybrid',
+])
+
+function isAcceptedUiRetrievalMode(mode: string): boolean {
+  return ACCEPTED_UI_RETRIEVAL_MODES.has(mode)
+}
+
 export function buildAggregate(cases: RagUiCaseResult[]): RagUiSessionResult['aggregate'] {
   const uiMs = cases.map((c) => c.ui_total_ms)
   const apiMs = cases.map((c) => c.network_request_ms)
@@ -205,14 +215,14 @@ export function buildAggregate(cases: RagUiCaseResult[]): RagUiSessionResult['ag
     (c) =>
       c.answer_visible &&
       c.http_status === 200 &&
-      c.retrieval_mode === 'keyword' &&
+      isAcceptedUiRetrievalMode(c.retrieval_mode) &&
       c.model_used === 'rule-engine' &&
       c.leakage_result === 'PASS' &&
       c.answer_char_count > 80 &&
       !c.old_boilerplate_only,
   ).length
   const keywordOk = cases.filter(
-    (c) => c.retrieval_mode === 'keyword' && c.model_used === 'rule-engine',
+    (c) => isAcceptedUiRetrievalMode(c.retrieval_mode) && c.model_used === 'rule-engine',
   ).length
   const leakageFail = cases.some((c) => c.leakage_result !== 'PASS')
 

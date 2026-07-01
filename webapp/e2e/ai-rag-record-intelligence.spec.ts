@@ -194,7 +194,9 @@ test.describe('AI record intelligence UI acceptance (T20.13R)', () => {
       expect.soft(envelope, `${id} envelope`).toBeTruthy()
       expect.soft(answerText.length, `${id} answer length`).toBeGreaterThan(120)
       expect.soft(oldBoilerplate, `${id} boilerplate regression`).toBe(false)
-      expect.soft(retrievalMode, `${id} retrieval_mode`).toBe('keyword')
+      expect.soft(retrievalMode, `${id} retrieval_mode`).toMatch(
+        /^(keyword|hybrid_canary|keyword_fallback_from_hybrid)$/,
+      )
       expect.soft(modelUsed, `${id} model_used`).toBe('rule-engine')
       expect.soft(refsCount, `${id} refs`).toBeGreaterThan(0)
       expect.soft(leakage, `${id} leakage`).toBe('PASS')

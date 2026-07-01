@@ -70,6 +70,8 @@ FORBIDDEN_RE = re.compile(r"message_body|proxy_bids|max_bid_cents", re.I)
 WINDOWS = int(os.environ.get("T20_25D_WINDOWS", "2"))
 RUNS_PER_USER = int(os.environ.get("T20_25D_RUNS", "5"))
 PER_WINDOW_RESET = os.environ.get("T20_PER_WINDOW_RESET", "") == "1"
+RAG_PAUSE_SEC = float(os.environ.get("T20_EVAL_RAG_PAUSE_SEC", "0"))
+RAG_RETRY_MAX = int(os.environ.get("T20_EVAL_RAG_RETRY_MAX", "8"))
 
 
 def ssl_ctx() -> ssl.SSLContext:
@@ -131,7 +133,17 @@ def preview_status(token: str, user_id: str) -> Dict[str, Any]:
 
 
 def rag_query(token: str, user_id: str, question: str) -> Dict[str, Any]:
-    return api_json("POST", "/api/ai/rag/query", token, user_id, {"question": question, "user_id": user_id})
+    last: Dict[str, Any] = {}
+    for attempt in range(RAG_RETRY_MAX):
+        if RAG_PAUSE_SEC > 0 and attempt == 0:
+            time.sleep(RAG_PAUSE_SEC)
+        last = api_json("POST", "/api/ai/rag/query", token, user_id, {"question": question, "user_id": user_id})
+        status = last.get("http_status")
+        if status == 429 and attempt + 1 < RAG_RETRY_MAX:
+            time.sleep(min(2.0, 0.1 * (2**attempt)))
+            continue
+        return last
+    return last
 
 
 def score_answer(summary: str, refs: List[Any], leakage: str) -> float:
@@ -163,6 +175,17 @@ def reset_window_enrollments(sessions: Dict[str, Dict[str, Any]]) -> None:
         if meta["role"] == "allowlist":
             continue
         preview_enroll(meta["token"], uid)
+    for uid, meta in sessions.items():
+        if meta["role"] == "allowlist":
+            continue
+        for attempt in range(10):
+            gate = (preview_status(meta["token"], uid)["body"] or {}).get("gate_reason")
+            if gate == "preview_opt_in":
+                break
+            time.sleep(0.15)
+            preview_enroll(meta["token"], uid)
+        else:
+            raise RuntimeError(f"preview enroll verify failed for {meta['email']}")
 
 
 def main() -> int:

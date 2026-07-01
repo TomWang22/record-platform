@@ -10,10 +10,11 @@
 | Ticket | SHA | Description |
 |--------|-----|-------------|
 | T20.29A/B | `6829aab` | Design + preflight |
-| T20.29B runner | (this batch) | 12-user eval + 429 retry |
-| T20.29C | (this batch) | Live soak 2160/2160 |
-| T20.29D–F | (this batch) | Rollback, telemetry, decision C |
-| T20.29G/H | (this batch) | Closeout + Phase 21 |
+| T20.29B runner | `a097184` | 12-user eval + 429 retry |
+| T20.29C | `cd18da6` | Live soak 2160/2160 |
+| T20.29D | `7b9a57c` | Rollback drill |
+| T20.29E/F | `3517c44` | Telemetry + decision C |
+| T20.29G/H | `54a9524` + `b838f45` | Closeout + Phase 21 |
 
 ## Images
 

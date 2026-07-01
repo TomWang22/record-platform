@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
 **Last updated:** 2026-07-01 (T20.29A–H participant-limited opt-in hybrid preview soak batch CLOSED)  
-**Current main SHA:** verify with `git rev-parse --short HEAD`  
+**Current main SHA:** `b838f45`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  

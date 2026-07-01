@@ -11,11 +11,10 @@
 |--------|-----|-------------|
 | T20.28A | `8005d82` | Post-UI soak design |
 | T20.28B | `a1e0f3a` | Preflight PASS + E2E stabilization |
-| T20.28C | (this batch) | Live soak 1080/1080 |
-| T20.28D | (this batch) | Rollback drill |
-| T20.28E | (this batch) | Telemetry audit |
-| T20.28F | (this batch) | Decision C |
-| T20.28G | (this batch) | Closeout |
+| T20.28C | `beeab85` | Live soak 1080/1080 |
+| T20.28D | `9b86b35` | Rollback drill |
+| T20.28E/F | `f3e9ead` | Telemetry + decision C |
+| T20.28G/H | `cf90c02` + `f4ac626` | Closeout + Phase 21 |
 
 ## 2. Images
 

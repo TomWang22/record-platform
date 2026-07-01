@@ -11,10 +11,11 @@
 |--------|-----|-------------|
 | T20.30A | `3e7aa64` | Expanded soak design |
 | T20.30B | `2b359f3` | Preflight PASS |
-| T20.30C runner | (this batch) | Per-window reset fix + RAG verify |
-| T20.30C | (this batch) | Live soak 3240/3240 |
-| T20.30D–F | (this batch) | Rollback, telemetry, decision C |
-| T20.30G/H | (this batch) | Closeout + Phase 21 |
+| T20.30C runner | `4f94872` | Per-window reset + RAG verify |
+| T20.30C | `8a88f79` | Live soak 3240/3240 |
+| T20.30D | `bf03891` | Rollback drill |
+| T20.30E/F | `c4ecca1` | Telemetry + decision C |
+| T20.30G/H | `1275d05` + `3b3e6d5` | Closeout + Phase 21 |
 
 ## Images
 

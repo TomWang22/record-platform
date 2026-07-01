@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-01 (T20.24A–D opt-in hybrid preview implementation design batch CLOSED; T20.24E context reconciled)  
+**Last updated:** 2026-07-01 (T20.25A–G opt-in hybrid preview implementation batch CLOSED; T20.25H context reconciled)  
 **Current main SHA:** verify with `git rev-parse --short HEAD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
@@ -53,27 +53,28 @@ T20.23C: B selected (single contract-user allowlist); D and E rejected (preview 
 T20.24A–D complete. Opt-in hybrid preview implementation design batch: CLOSED.
 T20.24B audit: PASS (no new live inference).
 T20.24C: B selected (single contract-user allowlist); D and E rejected (implementation NOT APPROVED).
-Combined live evidence (D16→D21B): 2025/2025 HTTP 200, 0% fallback.
+T20.25A–G complete. Opt-in hybrid preview implementation batch: CLOSED.
+T20.25D-LIVE: PASS — 540/540 HTTP 200 (6 users, 2 windows), 0% fallback, hybrid p95 214 ms.
+T20.25F: C selected (API-only preview enabled); E rejected (production default).
+Combined live evidence (D16→D25D): 2565/2565 HTTP 200, 0% fallback.
 Hybrid allowlist canary: KEEP.
 AI_RAG_HYBRID_CANARY_USER_ALLOWLIST=2ed75568-7deb-4c29-91b0-6919f24a0c9f (contract user only).
 AI_RAG_HYBRID_CANARY_PERCENT=0.
 Production default: keyword.
 Vector production default: NOT APPROVED.
 Hybrid production default: NOT APPROVED.
-Default rollout: NOT APPROVED.
-Opt-in preview implementation: NOT APPROVED.
-T20.25A: NOT STARTED — explicit approval required after sign-off.
+API-only opt-in preview: ENABLED (runtime); enrollments off until JWT opt-in.
+T20.26A: NOT STARTED — explicit approval required for UI design only.
 ```
 
 ### T20 hybrid canary (implemented)
 
 | Item | Value |
 | ---- | ----- |
-| Image | `python-ai-service:t20-p216b` |
+| Image | `python-ai-service:t20-p225b` |
 | Allowlisted user | `2ed75568-7deb-4c29-91b0-6919f24a0c9f` (contract only) |
-| API fallback (C21B-LIVE) | **0/270**; `final_tagged_plan` hybrid_canary 30/30 |
-| Combined live (D16→D21B) | **2025/2025** HTTP 200, **0%** fallback |
-| Hybrid p95 (C21B-LIVE) | **155.20 ms** (270-case aggregate) |
+| API-only preview | `GET/POST /api/ai/rag/preview/{status,enroll,revoke}` |
+| Combined live (D16→D25D) | **2565/2565** HTTP 200, **0%** fallback |
 | Pure overlap | **8/16** (report-only) |
 | Anchored overlap | **16/16** |
 | Avg quality (C18-LIVE) | **4.0** |
@@ -97,8 +98,8 @@ Do NOT enable vector retrieval as production default.
 Do NOT enable hybrid retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
 Do NOT broaden permanent allowlist without explicit approval and restore plan.
-Do NOT start T20.25A without: "Approved: start T20.25A opt-in hybrid preview implementation only after sign-off"
-Do NOT implement opt-in preview runtime without owner/product sign-off artifact in repo.
+Do NOT start T20.26A without: "Approved: start T20.26A opt-in hybrid preview UI design only"
+Do NOT implement opt-in preview UI without explicit approval.
 Do NOT implement rollout without owner/product sign-off.
 Pure vector overlap: report-only per T20.16C — do not promote vector default (8/16).
 Do NOT enable vector production default.
@@ -114,7 +115,8 @@ T20.20A–E CLOSED: C-LIVE PASS 540/540 (2 windows); combined live 1755/1755; D 
 T20.21A–D CLOSED: B-LIVE PASS 270/270; combined live 2025/2025; C selects B, rejects E; single contract allowlist; percent=0; image t20-p216b; production keyword; vector/hybrid default NOT APPROVED.
 T20.22A–D CLOSED: rollout design batch; B audit PASS; C selects B, rejects D; rollout NOT APPROVED; single contract allowlist; percent=0; image t20-p216b; production keyword; vector/hybrid default NOT APPROVED; T20.23A NOT STARTED.
 T20.23A–D CLOSED: opt-in preview design batch; B audit PASS; C selects B, rejects D+E; preview NOT APPROVED; single contract allowlist; percent=0; image t20-p216b; production keyword; vector/hybrid default NOT APPROVED; T20.24A NOT STARTED.
-T20.24A–D CLOSED: implementation design batch; B audit PASS; C selects B, rejects D+E; implementation NOT APPROVED; single contract allowlist; percent=0; image t20-p216b; production keyword; vector/hybrid default NOT APPROVED; T20.25A NOT STARTED.
+T20.24A–D CLOSED: implementation design batch; B audit PASS; C selects B, rejects D+E; implementation NOT APPROVED at design stage; sign-off required for T20.25.
+T20.25A–G CLOSED: sign-off verified; B implements API-only preview; D-LIVE PASS 540/540; E rollback PASS; F selects C, rejects E; combined live 2565/2565; image t20-p225b; production keyword; vector/hybrid default NOT APPROVED; PERCENT=0; T20.26A NOT STARTED.
 ```
 
 ---

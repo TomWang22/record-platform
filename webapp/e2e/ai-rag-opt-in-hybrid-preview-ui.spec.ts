@@ -12,7 +12,7 @@ const FORBIDDEN_UI =
   /message_body|thread_text|private obo message|proxy_bids|max_bid_cents|production default enabled|vector default|percentage rollout/i
 const RAG_QUESTION = 'Which of my listings need attention first, and why?'
 
-async function loginAs(page: import('@playwright/test').Page, email: string): Promise<void> {
+async function loginAs(page: import('@playwright/test').Page, email: string): Promise<string> {
   const res = await page.request.post('/api/auth/login', {
     data: { email, password: PASSWORD },
     headers: { 'X-RP-E2E-Contract': '1' },
@@ -20,6 +20,14 @@ async function loginAs(page: import('@playwright/test').Page, email: string): Pr
   expect(res.ok(), `login ${email}: ${await res.text()}`).toBeTruthy()
   const { token } = (await res.json()) as { token: string }
   await signInWithToken(page, token, email)
+  return token
+}
+
+async function revokePreviewViaApi(page: import('@playwright/test').Page, token: string): Promise<void> {
+  const res = await page.request.post('/api/ai/rag/preview/revoke', {
+    headers: { Authorization: `Bearer ${token}`, 'X-RP-E2E-Contract': '1' },
+  })
+  expect(res.ok(), `revoke preview: ${await res.text()}`).toBeTruthy()
 }
 
 async function ragGateFromPage(page: import('@playwright/test').Page): Promise<string | null> {
@@ -44,7 +52,8 @@ async function ragGateFromPage(page: import('@playwright/test').Page): Promise<s
 
 test.describe('Opt-in hybrid preview UI (T20.27)', () => {
   test('cohort user — enroll, preview_opt_in RAG, revoke to keyword_default', async ({ page }) => {
-    await loginAs(page, COHORT_EMAIL)
+    const token = await loginAs(page, COHORT_EMAIL)
+    await revokePreviewViaApi(page, token)
     await page.goto('/insights', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await expect(page.getByTestId('ai-insights-dashboard-ready')).toBeVisible({ timeout: 120_000 })
     await expect(page.getByRole('heading', { name: 'Hybrid preview (opt-in)' })).toBeVisible({
@@ -57,7 +66,15 @@ test.describe('Opt-in hybrid preview UI (T20.27)', () => {
     expect(cardText).toContain('Hybrid preview is opt-in; keyword remains default.')
 
     await page.getByTestId('ai-hybrid-preview-enroll-btn').click()
+    const enrollResponse = page.waitForResponse(
+      (res) =>
+        res.url().includes('/api/ai/rag/preview/enroll') &&
+        res.request().method() === 'POST' &&
+        res.status() === 200,
+      { timeout: 30_000 },
+    )
     await page.getByTestId('ai-hybrid-preview-confirm-enroll').click()
+    await enrollResponse
     await expect(page.getByTestId('ai-hybrid-preview-enrolled')).toBeVisible({ timeout: 30_000 })
 
     const gateEnrolled = await ragGateFromPage(page)
@@ -69,6 +86,7 @@ test.describe('Opt-in hybrid preview UI (T20.27)', () => {
 
     const gateRevoked = await ragGateFromPage(page)
     expect(gateRevoked).toBe('keyword_default')
+    await revokePreviewViaApi(page, token)
   })
 
   test('contract allowlist user — informational state, allowlist gate', async ({ page }) => {

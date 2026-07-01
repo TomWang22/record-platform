@@ -48,6 +48,7 @@ PROMPTS = [
 FORBIDDEN_RE = re.compile(r"message_body|proxy_bids|max_bid_cents", re.I)
 WINDOWS = int(os.environ.get("T20_25D_WINDOWS", "2"))
 RUNS_PER_USER = int(os.environ.get("T20_25D_RUNS", "5"))
+PER_WINDOW_RESET = os.environ.get("T20_PER_WINDOW_RESET", "") == "1"
 
 
 def ssl_ctx() -> ssl.SSLContext:
@@ -96,6 +97,10 @@ def api_json(method: str, path: str, token: str, user_id: str, body: Optional[Di
         return {"http_status": exc.code, "elapsed_ms": (time.perf_counter() - start) * 1000.0, "body": parsed}
 
 
+def preview_revoke(token: str, user_id: str) -> Dict[str, Any]:
+    return api_json("POST", "/api/ai/rag/preview/revoke", token, user_id)
+
+
 def preview_enroll(token: str, user_id: str) -> Dict[str, Any]:
     return api_json("POST", "/api/ai/rag/preview/enroll", token, user_id)
 
@@ -128,6 +133,17 @@ def pctl(vals: List[float], p: float) -> Optional[float]:
     return s[i]
 
 
+def reset_window_enrollments(sessions: Dict[str, Dict[str, Any]]) -> None:
+    for uid, meta in sessions.items():
+        if meta["role"] == "allowlist":
+            continue
+        preview_revoke(meta["token"], uid)
+    for uid, meta in sessions.items():
+        if meta["role"] == "allowlist":
+            continue
+        preview_enroll(meta["token"], uid)
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
@@ -145,10 +161,13 @@ def main() -> int:
         status_before[uid] = preview_status(meta["token"], uid)["body"]
 
     enroll_results: Dict[str, Any] = {}
-    for uid, meta in sessions.items():
-        if meta["role"] == "allowlist":
-            continue
-        enroll_results[uid] = preview_enroll(meta["token"], uid)
+    if not PER_WINDOW_RESET:
+        for uid, meta in sessions.items():
+            if meta["role"] == "allowlist":
+                continue
+            enroll_results[uid] = preview_enroll(meta["token"], uid)
+    else:
+        reset_window_enrollments(sessions)
 
     status_after: Dict[str, Any] = {}
     for uid, meta in sessions.items():
@@ -156,6 +175,8 @@ def main() -> int:
 
     cases: List[Dict[str, Any]] = []
     for window in range(1, WINDOWS + 1):
+        if PER_WINDOW_RESET and window > 1:
+            reset_window_enrollments(sessions)
         for uid, meta in sessions.items():
             for run in range(1, RUNS_PER_USER + 1):
                 for case_id, question in PROMPTS:

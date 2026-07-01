@@ -166,6 +166,19 @@ def pctl(vals: List[float], p: float) -> Optional[float]:
     return s[i]
 
 
+def rag_gate_reason(token: str, user_id: str) -> Optional[str]:
+    resp = api_json(
+        "POST",
+        "/api/ai/rag/query",
+        token,
+        user_id,
+        {"question": "Which of my listings need attention first, and why?", "user_id": user_id},
+    )
+    details = (resp.get("body") or {}).get("details") or {}
+    canary = details.get("hybrid_canary") or {}
+    return canary.get("gate_reason")
+
+
 def reset_window_enrollments(sessions: Dict[str, Dict[str, Any]]) -> None:
     for uid, meta in sessions.items():
         if meta["role"] == "allowlist":
@@ -179,10 +192,11 @@ def reset_window_enrollments(sessions: Dict[str, Dict[str, Any]]) -> None:
         if meta["role"] == "allowlist":
             continue
         for attempt in range(10):
-            gate = (preview_status(meta["token"], uid)["body"] or {}).get("gate_reason")
-            if gate == "preview_opt_in":
+            status_gate = (preview_status(meta["token"], uid)["body"] or {}).get("gate_reason")
+            rag_gate = rag_gate_reason(meta["token"], uid)
+            if status_gate == "preview_opt_in" and rag_gate == "preview_opt_in":
                 break
-            time.sleep(0.15)
+            time.sleep(0.2)
             preview_enroll(meta["token"], uid)
         else:
             raise RuntimeError(f"preview enroll verify failed for {meta['email']}")
@@ -210,17 +224,19 @@ def main() -> int:
             if meta["role"] == "allowlist":
                 continue
             enroll_results[uid] = preview_enroll(meta["token"], uid)
-    else:
-        reset_window_enrollments(sessions)
 
     status_after: Dict[str, Any] = {}
-    for uid, meta in sessions.items():
-        status_after[uid] = preview_status(meta["token"], uid)["body"]
+    if not PER_WINDOW_RESET:
+        for uid, meta in sessions.items():
+            status_after[uid] = preview_status(meta["token"], uid)["body"]
 
     cases: List[Dict[str, Any]] = []
     for window in range(1, WINDOWS + 1):
-        if PER_WINDOW_RESET and window > 1:
+        if PER_WINDOW_RESET:
             reset_window_enrollments(sessions)
+            if window == 1:
+                for uid, meta in sessions.items():
+                    status_after[uid] = preview_status(meta["token"], uid)["body"]
         for uid, meta in sessions.items():
             for run in range(1, RUNS_PER_USER + 1):
                 for case_id, question in PROMPTS:

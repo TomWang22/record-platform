@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-06-30 (T20.21A–D hybrid default RFC batch CLOSED; T20.21E context reconciled)  
+**Last updated:** 2026-07-01 (T20.22A–D hybrid production rollout design batch CLOSED; T20.22E context reconciled)  
 **Current main SHA:** verify with `git rev-parse --short HEAD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
@@ -44,6 +44,9 @@ T20.20D: B selected (single contract-user allowlist); D recommended (T20.21A).
 T20.21A–D complete. Hybrid default RFC / owner sign-off batch: CLOSED.
 T20.21B-LIVE: PASS — 270/270 HTTP 200 (6 users), 0% fallback, hybrid p95 155 ms.
 T20.21C: B selected (single contract-user allowlist); E rejected (default switch).
+T20.22A–D complete. Hybrid production rollout design batch: CLOSED.
+T20.22B audit: PASS (no new live inference).
+T20.22C: B selected (single contract-user allowlist); D rejected (rollout NOT APPROVED).
 Combined live evidence (D16→D21B): 2025/2025 HTTP 200, 0% fallback.
 Hybrid allowlist canary: KEEP.
 AI_RAG_HYBRID_CANARY_USER_ALLOWLIST=2ed75568-7deb-4c29-91b0-6919f24a0c9f (contract user only).
@@ -51,7 +54,8 @@ AI_RAG_HYBRID_CANARY_PERCENT=0.
 Production default: keyword.
 Vector production default: NOT APPROVED.
 Hybrid production default: NOT APPROVED.
-T20.22A: NOT STARTED — explicit approval required.
+Default rollout: NOT APPROVED.
+T20.23A: NOT STARTED — explicit approval required.
 ```
 
 ### T20 hybrid canary (implemented)
@@ -86,7 +90,8 @@ Do NOT enable vector retrieval as production default.
 Do NOT enable hybrid retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
 Do NOT broaden permanent allowlist without explicit approval and restore plan.
-Do NOT start T20.22A without: "Approved: start T20.22A hybrid production rollout design only"
+Do NOT start T20.23A without: "Approved: start T20.23A opt-in hybrid preview design only"
+Do NOT implement rollout without owner/product sign-off.
 Pure vector overlap: report-only per T20.16C — do not promote vector default (8/16).
 Do NOT enable vector production default.
 Do NOT use generative Ollama as production RAG default.
@@ -99,6 +104,7 @@ T20.18A–E CLOSED: C-LIVE PASS 270/270 (6 users); D selects B+D.
 T20.19A–E CLOSED: C-LIVE PASS 810/810 (3 windows); combined live 1215/1215; D selects B+D; single contract allowlist; percent=0; image t20-p216b; production keyword; vector NOT APPROVED.
 T20.20A–E CLOSED: C-LIVE PASS 540/540 (2 windows); combined live 1755/1755; D selects B+D; single contract allowlist; percent=0; image t20-p216b; production keyword; vector NOT APPROVED.
 T20.21A–D CLOSED: B-LIVE PASS 270/270; combined live 2025/2025; C selects B, rejects E; single contract allowlist; percent=0; image t20-p216b; production keyword; vector/hybrid default NOT APPROVED.
+T20.22A–D CLOSED: rollout design batch; B audit PASS; C selects B, rejects D; rollout NOT APPROVED; single contract allowlist; percent=0; image t20-p216b; production keyword; vector/hybrid default NOT APPROVED; T20.23A NOT STARTED.
 ```
 
 ---
@@ -276,7 +282,11 @@ Design: `docs/ai-platform/P21-5A-ai-quality-telemetry-design.md`
 | T20.21C RFC owner sign-off decision | **COMPLETE** — Option B active; Option E rejected |
 | T20.21D RFC closeout | **COMPLETE** |
 | Hybrid allowlist canary | **KEEP** (`t20-p216b`, **single** contract user allowlist) |
-| T20.22A production-rollout design | **NOT STARTED** — explicit approval required |
+| T20.22A production-rollout design | **COMPLETE** (design only) |
+| T20.22B rollout evidence audit | **COMPLETE** (PASS; no new live inference) |
+| T20.22C rollout decision package | **COMPLETE** — Option B active; Option D rejected; rollout NOT APPROVED |
+| T20.22D rollout closeout | **COMPLETE** |
+| T20.23A opt-in hybrid preview design | **NOT STARTED** — explicit approval required |
 | No embedding tranches without separate approval | **BLOCKED** |
 | No default-on overlap flags | **BLOCKED** |
 | No generative Ollama as production RAG default | **BLOCKED** |
@@ -333,9 +343,9 @@ Product work may continue on keyword/rule-engine. **No product ticket may silent
 | **P21.12** | Observation-deck integration — feed telemetry JSON into `/observation-deck` |
 | **P21.13** | Seller intelligence polish |
 | **P21.14** | Dedicated session-memory UI |
-| **T20.22A** | Hybrid production rollout **design only** (optional) | **NOT STARTED** — requires approval phrase + owner sign-off |
+| **T20.23A** | Opt-in hybrid preview **design only** (optional) | **NOT STARTED** — requires approval phrase + owner sign-off |
 
-Do not start T20.22A without: `Approved: start T20.22A hybrid production rollout design only`. Vector and hybrid production defaults remain **NOT APPROVED**.
+Do not start T20.23A without: `Approved: start T20.23A opt-in hybrid preview design only`. Vector and hybrid production defaults remain **NOT APPROVED**. Default rollout remains **NOT APPROVED**.
 
 ---
 
@@ -357,5 +367,6 @@ T20.18A–E: CLOSED (broader multi-user soak; 270/270)
 T20.19A–E: CLOSED (extended 3-window soak; 810/810)
 T20.20A–E: CLOSED (production-decision verification; 540/540)
 T20.21A–D: CLOSED (RFC live confirmation; 270/270; default switch REJECTED)
-T20.22A: NOT STARTED
+T20.22A–D: CLOSED (rollout design batch; rollout NOT APPROVED)
+T20.23A: NOT STARTED
 ```

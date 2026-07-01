@@ -18,12 +18,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 REPO = Path(__file__).resolve().parents[1]
-OUT = REPO / "bench_logs/ai-platform/t20-25d-preview-eval"
+OUT = REPO / "bench_logs/ai-platform" / os.environ.get("T20_EVAL_OUT_DIR", "t20-25d-preview-eval")
 CA = REPO / "certs/dev-chain.pem"
 BASE = os.environ.get("E2E_API_BASE", "https://record-platform.test").rstrip("/")
 PWD = "ContractPass123!"
 CONTRACT_UID = "2ed75568-7deb-4c29-91b0-6919f24a0c9f"
-USERS: List[Tuple[str, str, str]] = [
+DEFAULT_USERS: List[Tuple[str, str, str]] = [
     (CONTRACT_UID, "e2e-contract@record-platform.local", "allowlist"),
     ("00000040-0000-4000-8000-000000000000", "t20-15g-cohort0@record-platform.local", "preview"),
     ("0000002a-0000-4000-8000-000000000000", "t20-15k-cohort1@record-platform.local", "preview"),
@@ -31,6 +31,27 @@ USERS: List[Tuple[str, str, str]] = [
     ("000001bc-0000-4000-8000-000000000000", "t20-15o-bucket10@record-platform.local", "preview"),
     ("00000002-0000-4000-8000-000000000000", "t20-15s-bucket20@record-platform.local", "preview"),
 ]
+PARTICIPANT_12_USERS: List[Tuple[str, str, str]] = [
+    (CONTRACT_UID, "e2e-contract@record-platform.local", "allowlist"),
+    ("00000040-0000-4000-8000-000000000000", "t20-15g-cohort0@record-platform.local", "preview"),
+    ("0000002a-0000-4000-8000-000000000000", "t20-15k-cohort1@record-platform.local", "preview"),
+    ("5a68fe88-c134-4166-b145-57534a3656b9", "buyer-contract@record-platform.local", "preview"),
+    ("000001bc-0000-4000-8000-000000000000", "t20-15o-bucket10@record-platform.local", "preview"),
+    ("00000002-0000-4000-8000-000000000000", "t20-15s-bucket20@record-platform.local", "preview"),
+    ("b4ae4fcc-a2ad-4ec4-9ba6-81ea736bc018", "seller-contract@record-platform.local", "preview"),
+    ("5f18a924-c607-47d6-b1f3-71087ba08d66", "bidder2-contract@record-platform.local", "preview"),
+    ("2dbef265-5b37-40fb-acc1-aec84fd9b991", "bidder3-contract@record-platform.local", "preview"),
+    ("0000003b-0000-4000-8000-000000000000", "t20-15s-bucket25@record-platform.local", "preview"),
+    ("000000f4-0000-4000-8000-000000000000", "t20-15w-bucket30@record-platform.local", "preview"),
+    ("0000017b-0000-4000-8000-000000000000", "t20-15w-bucket50@record-platform.local", "preview"),
+]
+USER_SETS: Dict[str, List[Tuple[str, str, str]]] = {
+    "default": DEFAULT_USERS,
+    "participant-12": PARTICIPANT_12_USERS,
+}
+USERS: List[Tuple[str, str, str]] = USER_SETS.get(
+    os.environ.get("T20_EVAL_USER_SET", "default"), DEFAULT_USERS
+)
 PROMPTS = [
     ("listing_advice", "Which of my listings need attention first, and why?"),
     ("negotiation_strategy", "Given current offers, should I accept, counter, or wait?"),

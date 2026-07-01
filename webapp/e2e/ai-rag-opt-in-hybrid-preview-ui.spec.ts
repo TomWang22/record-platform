@@ -81,7 +81,15 @@ test.describe('Opt-in hybrid preview UI (T20.27)', () => {
     expect(gateEnrolled).toBe('preview_opt_in')
 
     await page.getByTestId('ai-hybrid-preview-revoke-btn').click()
+    const revokeResponse = page.waitForResponse(
+      (res) =>
+        res.url().includes('/api/ai/rag/preview/revoke') &&
+        res.request().method() === 'POST' &&
+        res.status() === 200,
+      { timeout: 30_000 },
+    )
     await page.getByTestId('ai-hybrid-preview-confirm-revoke').click()
+    await revokeResponse
     await expect(page.getByTestId('ai-hybrid-preview-not-enrolled')).toBeVisible({ timeout: 30_000 })
 
     const gateRevoked = await ragGateFromPage(page)

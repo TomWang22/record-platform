@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-01 (T20.28A–H opt-in hybrid preview post-UI soak batch CLOSED)  
-**Current main SHA:** `f4ac626`  
+**Last updated:** 2026-07-01 (T20.29A–H participant-limited opt-in hybrid preview soak batch CLOSED)  
+**Current main SHA:** verify with `git rev-parse --short HEAD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -65,7 +65,10 @@ T20.27G: C selected (KEEP opt-in preview UI); D recommended (T20.28A).
 T20.28A–H complete. Post-UI soak batch: CLOSED.
 T20.28C-LIVE: PASS — 1080/1080 HTTP 200 (4 windows), 0% fallback, hybrid p95 255 ms.
 T20.28F: C selected (KEEP opt-in preview UI); D recommended (T20.29A).
-Combined live evidence (D16→D28C): 4185/4185 HTTP 200, 0% fallback.
+T20.29A–H complete. Participant-limited soak batch: CLOSED.
+T20.29C-LIVE: PASS — 2160/2160 HTTP 200 (12 participants, 4 windows), 0% fallback, hybrid p95 176 ms.
+T20.29F: C selected (KEEP opt-in preview UI); D recommended (T20.30A).
+Combined live evidence (D16→D29C): 6345/6345 HTTP 200, 0% fallback.
 Hybrid allowlist canary: KEEP.
 AI_RAG_HYBRID_CANARY_USER_ALLOWLIST=2ed75568-7deb-4c29-91b0-6919f24a0c9f (contract user only).
 AI_RAG_HYBRID_CANARY_PERCENT=0.
@@ -76,7 +79,7 @@ API-only opt-in preview: ENABLED (runtime).
 Opt-in preview UI: ENABLED on /insights.
 Webapp image: webapp:t20-p227b.
 Preview enrollments: revoked after eval (safe default).
-T20.29A: NOT STARTED — explicit approval required for participant-limited soak design only.
+T20.30A: NOT STARTED — explicit approval required for expanded participant soak design only.
 ```
 
 ### T20 hybrid canary (implemented)
@@ -87,7 +90,7 @@ T20.29A: NOT STARTED — explicit approval required for participant-limited soak
 | Webapp image | `webapp:t20-p227b` |
 | Allowlisted user | `2ed75568-7deb-4c29-91b0-6919f24a0c9f` (contract only) |
 | API-only preview | `GET/POST /api/ai/rag/preview/{status,enroll,revoke}` |
-| Combined live (D16→D28C) | **4185/4185** HTTP 200, **0%** fallback |
+| Combined live (D16→D29C) | **6345/6345** HTTP 200, **0%** fallback |
 | Pure overlap | **8/16** (report-only) |
 | Anchored overlap | **16/16** |
 | Avg quality (C18-LIVE) | **4.0** |
@@ -111,7 +114,7 @@ Do NOT enable vector retrieval as production default.
 Do NOT enable hybrid retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
 Do NOT broaden permanent allowlist without explicit approval and restore plan.
-Do NOT start T20.29A without: "Approved: start T20.29A participant-limited opt-in hybrid preview soak design only"
+Do NOT start T20.30A without: "Approved: start T20.30A expanded opt-in hybrid preview participant soak design only"
 Do NOT implement rollout without owner/product sign-off.
 Pure vector overlap: report-only per T20.16C — do not promote vector default (8/16).
 Do NOT enable vector production default.
@@ -131,7 +134,8 @@ T20.24A–D CLOSED: implementation design batch; B audit PASS; C selects B, reje
 T20.25A–G CLOSED: sign-off verified; API-only preview implemented; D-LIVE PASS 540/540; F selects C; combined live 2565/2565; image t20-p225b.
 T20.26A–E CLOSED: UI design only; B runtime audit PASS; C-LIVE PASS 270/270; D selects B recommends C; UI NOT APPROVED at close.
 T20.27A–H CLOSED: UI on /insights; E-LIVE PASS 270/270; G selects C recommends D; webapp t20-p227b; python t20-p225b.
-T20.28A–H CLOSED: post-UI soak PASS 1080/1080; F selects C recommends D; combined live 4185/4185; T20.29A NOT STARTED.
+T20.28A–H CLOSED: post-UI soak PASS 1080/1080; F selects C recommends D; combined live 4185/4185.
+T20.29A–H CLOSED: participant soak PASS 2160/2160 (12 JWT); F selects C recommends D; combined live 6345/6345; T20.30A NOT STARTED.
 ```
 
 ---

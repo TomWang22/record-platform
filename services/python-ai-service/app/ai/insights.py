@@ -42,6 +42,12 @@ from app.ai.session_memory import (
     store as session_store,
     update_session_from_turn,
 )
+from app.ai.preview_enrollment import (
+    enroll_user as preview_enroll_user,
+    is_preview_enrolled,
+    preview_status_payload,
+    revoke_user as preview_revoke_user,
+)
 from app.db import get_pool
 
 
@@ -99,8 +105,11 @@ async def rag_query(
     shadow_custom_query_hints: Optional[List[str]] = None,
     shadow_debug: bool = False,
 ) -> Dict[str, Any]:
+    preview_enrolled = await is_preview_enrolled(user_id) if user_id else False
+    preview_source = "owner_opt_in" if preview_enrolled else None
+
     async def run(conn):
-        gate = evaluate_hybrid_canary_gate(user_id)
+        gate = evaluate_hybrid_canary_gate(user_id, preview_enrolled=preview_enrolled)
         retrieval_plan = (
             resolve_hybrid_retrieval_plan(question) if gate.canary_allowed else None
         )
@@ -251,6 +260,8 @@ async def rag_query(
             hybrid_error=hybrid_error,
             retrieval_mode=retrieval_mode,
             retrieval_plan=retrieval_plan,
+            preview_opt_in=preview_enrolled,
+            preview_source=preview_source,
         )
     if shadow_diag is not None:
         details["shadow_vector"] = shadow_diag
@@ -919,3 +930,15 @@ async def seller_collector_metadata_gaps(*, user_id: Optional[str]) -> Dict[str,
         confidence=0.5 if refs else 0.0,
         degraded_reason=None if status == "live" else "no_listing_corpus",
     )
+
+
+async def rag_preview_status(*, user_id: Optional[str]) -> Dict[str, Any]:
+    return await preview_status_payload(user_id)
+
+
+async def rag_preview_enroll(*, user_id: Optional[str]) -> Dict[str, Any]:
+    return await preview_enroll_user(user_id)
+
+
+async def rag_preview_revoke(*, user_id: Optional[str]) -> Dict[str, Any]:
+    return await preview_revoke_user(user_id)

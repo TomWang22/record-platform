@@ -23,7 +23,7 @@ _UUID_RE = re.compile(
 )
 _PRODUCTION_NAMESPACES = frozenset({"record-platform"})
 
-GateReason = str  # allowlist | percentage | keyword_default | prod_percent_blocked
+GateReason = str  # allowlist | preview_opt_in | percentage | keyword_default | prod_percent_blocked
 
 # T20.16B — seller-domain retrieval expansion for meta-prompt tagged plans (canary only).
 TAGGED_EXECUTIVE_SUMMARY_RETRIEVAL_QUERY = (
@@ -131,7 +131,11 @@ def _has_owner_scope(user_id: Optional[str]) -> bool:
     return normalize_user_id(user_id) is not None
 
 
-def evaluate_hybrid_canary_gate(user_id: Optional[str]) -> HybridCanaryGate:
+def evaluate_hybrid_canary_gate(
+    user_id: Optional[str],
+    *,
+    preview_enrolled: bool = False,
+) -> HybridCanaryGate:
     raw_uid = (user_id or "").strip()
     uid = normalize_user_id(user_id)
     allowlist = _parse_allowlist(AI_RAG_HYBRID_CANARY_USER_ALLOWLIST)
@@ -162,6 +166,14 @@ def evaluate_hybrid_canary_gate(user_id: Optional[str]) -> HybridCanaryGate:
         return HybridCanaryGate(
             canary_allowed=True,
             gate_reason="allowlist",
+            percentage_cohort=False,
+            **base,
+        )
+
+    if preview_enrolled and uid:
+        return HybridCanaryGate(
+            canary_allowed=True,
+            gate_reason="preview_opt_in",
             percentage_cohort=False,
             **base,
         )
@@ -290,7 +302,13 @@ def hybrid_succeeded(
     return hybrid_failure_reason(gate=gate, shadow=shadow, hybrid_error=hybrid_error) is None
 
 
-def _gate_metadata(gate: HybridCanaryGate, retrieval_mode: str) -> Dict[str, Any]:
+def _gate_metadata(
+    gate: HybridCanaryGate,
+    retrieval_mode: str,
+    *,
+    preview_opt_in: bool = False,
+    preview_source: Optional[str] = None,
+) -> Dict[str, Any]:
     return {
         "enabled": gate.canary_enabled,
         "eligible": gate.canary_allowed,
@@ -303,6 +321,8 @@ def _gate_metadata(gate: HybridCanaryGate, retrieval_mode: str) -> Dict[str, Any
         "pure_vector_logged": gate.log_pure_vector,
         "anchor_max": gate.anchor_max,
         "retrieval_mode": retrieval_mode,
+        "preview_opt_in": preview_opt_in,
+        "preview_source": preview_source,
     }
 
 
@@ -318,8 +338,15 @@ def build_hybrid_canary_diagnostics(
     hybrid_error: Optional[str],
     retrieval_mode: str,
     retrieval_plan: Optional[HybridRetrievalPlan] = None,
+    preview_opt_in: bool = False,
+    preview_source: Optional[str] = None,
 ) -> Dict[str, Any]:
-    meta = _gate_metadata(gate, retrieval_mode)
+    meta = _gate_metadata(
+        gate,
+        retrieval_mode,
+        preview_opt_in=preview_opt_in,
+        preview_source=preview_source,
+    )
     if not gate.canary_allowed:
         return {
             **meta,

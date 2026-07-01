@@ -105,6 +105,27 @@ async def post_session_reset(
     )
 
 
+@router.get("/rag/preview/status")
+async def get_rag_preview_status(
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.rag_preview_status(user_id=_user_id(x_user_id, None))
+
+
+@router.post("/rag/preview/enroll")
+async def post_rag_preview_enroll(
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.rag_preview_enroll(user_id=_user_id(x_user_id, None))
+
+
+@router.post("/rag/preview/revoke")
+async def post_rag_preview_revoke(
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    return await insights.rag_preview_revoke(user_id=_user_id(x_user_id, None))
+
+
 @router.post("/rag/query")
 async def post_rag_query(
     body: RagQueryBody,

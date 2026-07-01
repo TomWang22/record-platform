@@ -52,3 +52,24 @@ export type AiInsightPanel =
   | 'auction'
   | 'seller'
   | 'buyer'
+
+export type HybridPreviewStatus = {
+  enrolled: boolean
+  user_id: string | null
+  source: string | null
+  gate_reason: string | null
+  enrolled_at?: string
+  error?: string
+  ok?: boolean
+}
+
+export type HybridPreviewActionResult = {
+  ok: boolean
+  enrolled: boolean
+  user_id?: string
+  source?: string
+  enrolled_at?: string
+  revoked?: boolean
+  revoked_at?: string | null
+  error?: string
+}

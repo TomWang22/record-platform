@@ -2,13 +2,41 @@ import { apiFetch } from './api-client'
 import type {
   AiEnvelope,
   AuctionSignalsResponse,
+  HybridPreviewActionResult,
+  HybridPreviewStatus,
   RagStatus,
 } from './ai-insights-types'
 
-export type { AiEnvelope, AiSourceRef, RagStatus } from './ai-insights-types'
+export type {
+  AiEnvelope,
+  AiSourceRef,
+  HybridPreviewActionResult,
+  HybridPreviewStatus,
+  RagStatus,
+} from './ai-insights-types'
 
 export async function fetchRagStatus(): Promise<RagStatus> {
   return apiFetch<RagStatus>('/api/ai/rag/status', { auth: true })
+}
+
+export async function getHybridPreviewStatus(): Promise<HybridPreviewStatus> {
+  return apiFetch<HybridPreviewStatus>('/api/ai/rag/preview/status', { auth: true })
+}
+
+export async function enrollHybridPreview(): Promise<HybridPreviewActionResult> {
+  return apiFetch<HybridPreviewActionResult>('/api/ai/rag/preview/enroll', {
+    method: 'POST',
+    auth: true,
+    data: {},
+  })
+}
+
+export async function revokeHybridPreview(): Promise<HybridPreviewActionResult> {
+  return apiFetch<HybridPreviewActionResult>('/api/ai/rag/preview/revoke', {
+    method: 'POST',
+    auth: true,
+    data: {},
+  })
 }
 
 export async function queryRag(question: string, sourceTypes?: string[]): Promise<AiEnvelope> {

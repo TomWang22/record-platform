@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import { AiSourceEvidenceList } from '@/components/ai/ai-source-evidence-list'
+import { OptInHybridPreviewCard } from '@/components/ai/opt-in-hybrid-preview-card'
 import { AiInsightMeta } from '@/components/ai/ai-insight-meta'
 import { AiSourceRefsList } from '@/components/ai/ai-source-refs'
 import { SellerIntelligencePanels } from '@/components/ai/seller-intelligence-panels'
@@ -298,6 +299,13 @@ export function AiInsightsDashboard() {
   const panelClass = (panel: string) =>
     focusPanel === panel ? 'ring-2 ring-brand/40' : ''
 
+  const ragGateReason =
+    rag.envelope?.details &&
+    typeof rag.envelope.details.hybrid_canary === 'object' &&
+    rag.envelope.details.hybrid_canary !== null
+      ? String((rag.envelope.details.hybrid_canary as { gate_reason?: string }).gate_reason ?? '')
+      : null
+
   return (
     <div className="space-y-6" data-testid="ai-insights-dashboard">
       <header>
@@ -314,6 +322,8 @@ export function AiInsightsDashboard() {
       )}
 
       <SellerIntelligencePanels />
+
+      <OptInHybridPreviewCard ragGateReason={ragGateReason} />
 
       <Card
         title="RAG query"

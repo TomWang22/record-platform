@@ -11,10 +11,10 @@
 |--------|-----|-------------|
 | T20.32A | `4c3b14c` | Broader readiness design |
 | T20.32B | `8734cde` | Preflight PASS |
-| T20.32C | *(this batch)* | Live eval 8640/8640 |
-| T20.32D | *(this batch)* | Rollback drill |
-| T20.32E/F | *(this batch)* | Telemetry + decision C |
-| T20.32G/H | *(this batch)* | Closeout + Phase 21 |
+| T20.32C | `9340dc7` | Live eval 8640/8640 |
+| T20.32D | `beff95a` | Rollback drill |
+| T20.32E/F | `f5f7839` / `4499866` | Telemetry + decision C |
+| T20.32G/H | `6ed60bd` + *(H)* | Closeout + Phase 21 |
 
 ## Images
 

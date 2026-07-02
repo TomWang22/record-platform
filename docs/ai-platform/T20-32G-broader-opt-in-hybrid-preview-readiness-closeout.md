@@ -14,7 +14,7 @@
 | T20.32C | `9340dc7` | Live eval 8640/8640 |
 | T20.32D | `beff95a` | Rollback drill |
 | T20.32E/F | `f5f7839` / `4499866` | Telemetry + decision C |
-| T20.32G/H | `6ed60bd` + *(H)* | Closeout + Phase 21 |
+| T20.32G/H | `6ed60bd` / `dfde586` | Closeout + Phase 21 |
 
 ## Images
 

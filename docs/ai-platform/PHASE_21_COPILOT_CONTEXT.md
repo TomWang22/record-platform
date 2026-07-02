@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-02 (T20.32A–H broader opt-in hybrid preview readiness batch CLOSED)  
-**Current main SHA:** `dfde586`  
+**Last updated:** 2026-07-02 (T20.33A–H real-participant readiness batch CLOSED/BLOCKED)  
+**Current main SHA:** `ef284ff`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -77,7 +77,10 @@ T20.31F: C selected (KEEP opt-in preview UI); D recommended (T20.32A).
 T20.32A–H complete. Broader readiness soak batch: CLOSED.
 T20.32C-LIVE: PASS — 8640/8640 HTTP 200 (12 participants, 16 windows), 0% fallback, hybrid p95 180 ms.
 T20.32F: C selected (KEEP opt-in preview UI); D recommended (T20.33A).
-Combined live evidence (D16→D32C): 24705/24705 HTTP 200, 0% fallback.
+T20.33A–H complete. Real-participant readiness batch: CLOSED/BLOCKED.
+T20.33C-LIVE: BLOCKED — missing owner-approved participant artifact (`T20-33-owner-approved-real-preview-participants.md` absent; 0 real_owner_approved).
+T20.33F: C selected (KEEP preview UI/API); real-participant eval blocked; D recommends participant artifact collection.
+Combined live evidence (D16→D32C): 24705/24705 HTTP 200, 0% fallback (unchanged — no T20.33C soak).
 Hybrid allowlist canary: KEEP.
 AI_RAG_HYBRID_CANARY_USER_ALLOWLIST=2ed75568-7deb-4c29-91b0-6919f24a0c9f (contract user only).
 AI_RAG_HYBRID_CANARY_PERCENT=0.
@@ -88,7 +91,7 @@ API-only opt-in preview: ENABLED (runtime).
 Opt-in preview UI: ENABLED on /insights.
 Webapp image: webapp:t20-p227b.
 Preview enrollments: revoked after eval (safe default).
-T20.33A: NOT STARTED — explicit approval required for real-participant opt-in hybrid preview readiness design only.
+T20.34A: NOT STARTED — requires owner-approved participant artifact before larger real-participant soak design.
 ```
 
 ### T20 hybrid canary (implemented)
@@ -123,7 +126,8 @@ Do NOT enable vector retrieval as production default.
 Do NOT enable hybrid retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
 Do NOT broaden permanent allowlist without explicit approval and restore plan.
-Do NOT start T20.33A without: "Approved: start T20.33A real-participant opt-in hybrid preview readiness design only"
+Do NOT start T20.34A without: "Approved: start T20.34A larger owner-approved opt-in hybrid preview participant soak design only"
+Do NOT run real-participant live eval without committed `T20-33-owner-approved-real-preview-participants.md` (≥3 real_owner_approved).
 Do NOT implement rollout without owner/product sign-off.
 Pure vector overlap: report-only per T20.16C — do not promote vector default (8/16).
 Do NOT enable vector production default.
@@ -147,14 +151,15 @@ T20.28A–H CLOSED: post-UI soak PASS 1080/1080; F selects C recommends D; combi
 T20.29A–H CLOSED: participant soak PASS 2160/2160 (12 JWT); F selects C recommends D; combined live 6345/6345.
 T20.30A–H CLOSED: expanded soak PASS 3240/3240; cumulative 9585/9585.
 T20.31A–H CLOSED: sustained soak PASS 6480/6480; cumulative 16065/16065.
-T20.32A–H CLOSED: broader readiness soak PASS 8640/8640.
+T20.32A–H CLOSED: broader readiness soak PASS 8640/8640; cumulative 24705/24705.
+T20.33A–H CLOSED/BLOCKED: real-participant readiness blocked due to missing owner-approved participant artifacts.
 API-only opt-in preview runtime: KEEP.
 Opt-in preview UI: KEEP.
 Production default: keyword.
 Vector production default: NOT APPROVED.
 Hybrid production default: NOT APPROVED.
 AI_RAG_HYBRID_CANARY_PERCENT=0.
-T20.33A: NOT STARTED.
+T20.34A: NOT STARTED.
 ```
 
 ---

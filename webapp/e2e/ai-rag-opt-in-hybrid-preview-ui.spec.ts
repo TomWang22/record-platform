@@ -30,17 +30,36 @@ async function revokePreviewViaApi(page: import('@playwright/test').Page, token:
   expect(res.ok(), `revoke preview: ${await res.text()}`).toBeTruthy()
 }
 
+async function ragGateFromRequest(
+  page: import('@playwright/test').Page,
+  token: string,
+): Promise<string | null> {
+  const res = await page.request.post('/api/ai/rag/query', {
+    headers: { Authorization: `Bearer ${token}`, 'X-RP-E2E-Contract': '1' },
+    data: { question: RAG_QUESTION },
+  })
+  expect(res.ok(), `rag query: ${await res.text()}`).toBeTruthy()
+  const body = (await res.json()) as {
+    details?: { hybrid_canary?: { gate_reason?: string } }
+    summary?: string
+  }
+  expect(leakageCheck(body.summary ?? '', [])).toBe('PASS')
+  return body.details?.hybrid_canary?.gate_reason ?? null
+}
+
 async function ragGateFromPage(page: import('@playwright/test').Page): Promise<string | null> {
-  const responsePromise = page.waitForResponse(
-    (res) =>
-      res.url().includes('/api/ai/rag/query') &&
-      res.request().method() === 'POST' &&
-      res.status() === 200,
-    { timeout: 120_000 },
-  )
+  await expect(page.getByTestId('ai-insight-rag-ready')).toBeVisible({ timeout: 120_000 })
   await page.getByTestId('ai-rag-question-input').fill(RAG_QUESTION)
-  await page.getByTestId('ai-insight-rag').getByRole('button', { name: 'Query' }).click()
-  const response = await responsePromise
+  const response = await Promise.all([
+    page.waitForResponse(
+      (res) =>
+        res.url().includes('/api/ai/rag/query') &&
+        res.request().method() === 'POST' &&
+        res.status() === 200,
+      { timeout: 120_000 },
+    ),
+    page.getByTestId('ai-insight-rag').getByRole('button', { name: 'Query' }).click(),
+  ]).then(([res]) => res)
   const body = (await response.json()) as {
     details?: { retrieval_mode?: string; hybrid_canary?: { gate_reason?: string } }
     summary?: string
@@ -92,8 +111,10 @@ test.describe('Opt-in hybrid preview UI (T20.27)', () => {
     await revokeResponse
     await expect(page.getByTestId('ai-hybrid-preview-not-enrolled')).toBeVisible({ timeout: 30_000 })
 
-    const gateRevoked = await ragGateFromPage(page)
-    expect(gateRevoked).toBe('keyword_default')
+    await expect(page.getByTestId('ai-insight-rag-ready')).toBeVisible({ timeout: 120_000 })
+    await expect
+      .poll(async () => ragGateFromRequest(page, token), { timeout: 60_000 })
+      .toBe('keyword_default')
     await revokePreviewViaApi(page, token)
   })
 

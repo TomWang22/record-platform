@@ -15,7 +15,7 @@
 | T20.31C | `ed8f590` | Live soak 6480/6480 |
 | T20.31D | `5a88969` | Rollback drill |
 | T20.31E/F | `c5f8531` / `52e15bd` | Telemetry + decision C |
-| T20.31G/H | `711c85e` / `b8413d2` | Closeout + Phase 21 |
+| T20.31G/H | `711c85e` / `d6f4e59` | Closeout + Phase 21 |
 
 ## Images
 

@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-03 (T20.36A–H real-participant soak batch CLOSED PASS)  
-**Current main SHA:** `5ae1d35`  
+**Last updated:** 2026-07-03 (T20.37A real-participant extension design — design only)  
+**Current main SHA:** `ad8fbfc`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -110,7 +110,8 @@ T20.35B-REBLOCKED: artifact re-audit 0/3 — do not re-audit unless artifact row
 T20.36A: COMPLETE — expansion/readiness design only.
 T20.36B: COMPLETE — validator PASS 3/3.
 T20.36A–H CLOSED PASS: first real-participant soak 1440/1440; cumulative 26145/26145.
-T20.37A: NOT STARTED.
+T20.37A complete. Real-participant extension design only — 2880-case matrix (16 windows); no live eval.
+T20.37B: NOT STARTED.
 ```
 
 ### T20 hybrid canary (implemented)
@@ -145,8 +146,8 @@ Do NOT enable vector retrieval as production default.
 Do NOT enable hybrid retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
 Do NOT broaden permanent allowlist without explicit approval and restore plan.
-Do NOT start T20.37A without: "Approved: start T20.37A real-participant opt-in hybrid preview extension design only"
-Do NOT re-run T20.35B/T20.36B audit unless T20-35-owner-approved-real-preview-participants.md participant rows have changed.
+Do NOT start T20.37B without: "Approved: start T20.37B real-participant extension validator audit and proceed to T20.37C-LIVE only if artifact unchanged and preflight PASS"
+Do NOT re-run T20.36C-LIVE or T20.35B/T20.36B audit unless artifact rows change.
 Do NOT create duplicate REBLOCKED docs for unchanged artifact.
 Do NOT run owner-approved participant live eval without complete `T20-35-owner-approved-real-preview-participants.md` (≥3 real_owner_approved or owner-approved internal_staff with email, UUID, consent, signature).
 Do NOT relabel staging/JWT cohort accounts as real participants.
@@ -181,6 +182,8 @@ T20.35B-REBLOCKED: re-audit 2026-07-03 — still 0/3; C-LIVE not run; scope appr
 T20.36A COMPLETE: expansion/readiness design only.
 T20.36B COMPLETE: artifact validator PASS 3/3.
 T20.36A–H CLOSED PASS: real-participant soak 1440/1440; cumulative 26145/26145.
+T20.37A COMPLETE: extension design only (2880-case matrix); no live eval.
+T20.37B: NOT STARTED.
 API-only opt-in preview runtime: KEEP.
 Opt-in preview UI: KEEP.
 Production default: keyword.
@@ -189,7 +192,9 @@ Hybrid production default: NOT APPROVED.
 AI_RAG_HYBRID_CANARY_PERCENT=0.
 AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0.
 T20.36C-LIVE: PASS 1440/1440.
-T20.37A: NOT STARTED.
+T20.37A: COMPLETE — design only.
+T20.37B: NOT STARTED.
+T20.37C-LIVE: NOT RUN.
 ```
 
 ---

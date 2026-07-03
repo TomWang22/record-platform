@@ -1,6 +1,6 @@
 # Owner-approved real preview participants — T20.35
 
-**Status:** OWNER ARTIFACT — scope approved; participant rows **incomplete** (0/3)  
+**Status:** OWNER ARTIFACT — **complete** (3 owner-approved participants)  
 **Date (UTC):** 2026-07-03  
 **Approver:** Tom Wang / repository owner  
 **Scope:** Real-participant opt-in hybrid preview soak only
@@ -8,7 +8,7 @@
 ## Explicitly approved
 
 * [x] Real participant opt-in hybrid preview soak only
-* [ ] Participants listed below have owner approval / consent for preview testing *(pending — rows incomplete)*
+* [x] Participants listed below have owner approval / consent for preview testing
 * [x] JWT-authenticated users only
 * [x] User-scoped opt-in enrollment only
 * [x] Keyword default unchanged for non-enrolled users
@@ -36,9 +36,9 @@
 
 | # | Email | UUID / JWT sub | Participant type    | Approval source | Consent confirmed | Scope                    | Message bodies exposed? | Production default approved? | PERCENT > 0 approved? |
 | - | ----- | -------------- | ------------------- | --------------- | ----------------- | ------------------------ | ----------------------- | ---------------------------- | --------------------- |
-| 1 | TBD   | TBD            | real_owner_approved | TBD             | yes/no            | opt-in preview soak only | NO                      | NO                           | NO                    |
-| 2 | TBD   | TBD            | real_owner_approved | TBD             | yes/no            | opt-in preview soak only | NO                      | NO                           | NO                    |
-| 3 | TBD   | TBD            | real_owner_approved | TBD             | yes/no            | opt-in preview soak only | NO                      | NO                           | NO                    |
+| 1 | tom@example.com | `0dc268d0-a86f-4e12-8d10-9db0f1b735e0` | real_owner_approved | Owner chat instruction approving T20.36B active participant completion and real/internal-staff opt-in preview soak — 2026-07-03 | yes | opt-in preview soak only | NO | NO | NO |
+| 2 | tw5126@example.com | `950a40b1-d12e-4839-aefd-0d353b90182a` | internal_staff | Owner chat instruction approving T20.36B active participant completion and real/internal-staff opt-in preview soak — 2026-07-03 | yes | opt-in preview soak only | NO | NO | NO |
+| 3 | seed@example.com | `2901355e-7d04-4da1-b3a7-c22807326b94` | internal_staff | Owner chat instruction approving T20.36B active participant completion and real/internal-staff opt-in preview soak — 2026-07-03 | yes | opt-in preview soak only | NO | NO | NO |
 
 ## Minimum gate
 
@@ -47,7 +47,7 @@ At least **3** participants must be complete and marked `real_owner_approved` or
 ## Signature / approval reference
 
 Owner approval reference:  
-Owner chat instruction approving real-participant opt-in hybrid preview soak scope.
+Owner chat instruction approving T20.36B active participant completion and real/internal-staff opt-in preview soak — 2026-07-03
 
 Signed:  
 Tom Wang / repository owner — 2026-07-03

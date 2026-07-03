@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-03 (T20.35A–H real-participant soak batch CLOSED/BLOCKED)  
-**Current main SHA:** `7909d5a`  
+**Last updated:** 2026-07-03 (T20.35B-REBLOCKED artifact re-audit — still 0/3 complete rows)  
+**Current main SHA:** `TBD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -86,6 +86,7 @@ T20.34F: C selected (KEEP preview UI/API); owner-approved soak blocked; D recomm
 T20.35A–H complete. Real-participant soak batch: CLOSED/BLOCKED.
 T20.35C-LIVE: BLOCKED — artifact committed but incomplete (`T20-35-owner-approved-real-preview-participants.md`; 0/3 complete real_owner_approved rows; TBD email/UUID/consent/signature).
 T20.35F: C selected (KEEP preview UI/API); real-participant soak blocked; D recommends completing artifact rows.
+T20.35B-REBLOCKED (2026-07-03): re-audit confirms artifact unchanged — still 0/3 complete rows; C-LIVE NOT RUN; staging cohort NOT used.
 Combined live evidence (D16→D32C): 24705/24705 HTTP 200, 0% fallback (unchanged — no T20.33C/T20.34C/T20.35C soak).
 Hybrid allowlist canary: KEEP.
 AI_RAG_HYBRID_CANARY_USER_ALLOWLIST=2ed75568-7deb-4c29-91b0-6919f24a0c9f (contract user only).
@@ -99,6 +100,7 @@ Opt-in preview UI: ENABLED on /insights.
 Webapp image: webapp:t20-p227b.
 Preview enrollments: revoked after eval (safe default).
 T20.35A–H CLOSED/BLOCKED: real-participant soak blocked due to incomplete participant artifact (template committed; ≥3 complete rows required for C-LIVE).
+T20.35B-REBLOCKED: artifact re-audit 0/3 — owner must complete participant rows before C-LIVE.
 ```
 
 ### T20 hybrid canary (implemented)
@@ -163,6 +165,7 @@ T20.32A–H CLOSED: broader readiness soak PASS 8640/8640; cumulative 24705/2470
 T20.33A–H CLOSED/BLOCKED: real-participant readiness blocked due to missing owner-approved participant artifacts.
 T20.34A–H CLOSED/BLOCKED: owner-approved participant soak blocked due to missing/incomplete participant artifact.
 T20.35A–H CLOSED/BLOCKED: real-participant soak blocked due to incomplete participant artifact (0/3 complete rows).
+T20.35B-REBLOCKED: re-audit 2026-07-03 — still 0/3; C-LIVE not run.
 API-only opt-in preview runtime: KEEP.
 Opt-in preview UI: KEEP.
 Production default: keyword.

@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-03 (T20.36B artifact validator PASS — 3 complete participants)  
-**Current main SHA:** `ef0b03d`  
+**Last updated:** 2026-07-03 (T20.36A–H real-participant soak batch CLOSED PASS)  
+**Current main SHA:** `TBD`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -89,9 +89,11 @@ T20.35F: C selected (KEEP preview UI/API); real-participant soak blocked; D reco
 T20.35B-REBLOCKED (2026-07-03): re-audit confirms artifact unchanged — still 0/3 complete rows; C-LIVE NOT RUN; staging cohort NOT used.
 T20.35 scope approval recorded @ d650971; participant rows still incomplete (0/3).
 T20.36A complete. Real-participant expansion readiness design only — no live eval.
-T20.36B complete. Artifact validator PASS — 3 complete participants (1× real_owner_approved, 2× internal_staff from init-auth seed); JWT verified.
-T20.35C-LIVE / T20.36C-LIVE: NOT RUN — requires separate C-LIVE authorization.
-Combined live evidence (D16→D32C): 24705/24705 HTTP 200, 0% fallback (unchanged — no T20.33C/T20.34C/T20.35C soak).
+T20.36B complete. Artifact validator PASS — 3 complete participants (1× real_owner_approved, 2× internal_staff).
+T20.36A–H complete. Real-participant soak batch: CLOSED PASS.
+T20.36C-LIVE: PASS — 1440/1440 HTTP 200 (3 artifact participants + contract control, 8 windows), 0% fallback, hybrid p95 160 ms, avg quality 4.0.
+T20.36F: C selected (KEEP preview UI/API); D recommends T20.37A extension; E rejected.
+Combined live evidence (D16→D32C + T20.36C): 26145/26145 HTTP 200, 0% fallback.
 Hybrid allowlist canary: KEEP.
 AI_RAG_HYBRID_CANARY_USER_ALLOWLIST=2ed75568-7deb-4c29-91b0-6919f24a0c9f (contract user only).
 AI_RAG_HYBRID_CANARY_PERCENT=0.
@@ -106,7 +108,9 @@ Preview enrollments: revoked after eval (safe default).
 T20.35A–H CLOSED/BLOCKED: real-participant soak blocked due to incomplete participant artifact (template committed; ≥3 complete rows required for C-LIVE).
 T20.35B-REBLOCKED: artifact re-audit 0/3 — do not re-audit unless artifact rows change.
 T20.36A: COMPLETE — expansion/readiness design only.
-T20.36B: COMPLETE — validator PASS 3/3; C-LIVE requires separate approval.
+T20.36B: COMPLETE — validator PASS 3/3.
+T20.36A–H CLOSED PASS: first real-participant soak 1440/1440; cumulative 26145/26145.
+T20.37A: NOT STARTED.
 ```
 
 ### T20 hybrid canary (implemented)
@@ -117,7 +121,7 @@ T20.36B: COMPLETE — validator PASS 3/3; C-LIVE requires separate approval.
 | Webapp image | `webapp:t20-p227b` |
 | Allowlisted user | `2ed75568-7deb-4c29-91b0-6919f24a0c9f` (contract only) |
 | API-only preview | `GET/POST /api/ai/rag/preview/{status,enroll,revoke}` |
-| Combined live (D16→D32C) | **24705/24705** HTTP 200, **0%** fallback |
+| Combined live (D16→D36C) | **26145/26145** HTTP 200, **0%** fallback |
 | Pure overlap | **8/16** (report-only) |
 | Anchored overlap | **16/16** |
 | Avg quality (C18-LIVE) | **4.0** |
@@ -141,7 +145,7 @@ Do NOT enable vector retrieval as production default.
 Do NOT enable hybrid retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
 Do NOT broaden permanent allowlist without explicit approval and restore plan.
-Do NOT start T20.36C-LIVE without: "Approved: start T20.36C-LIVE real-participant opt-in hybrid preview soak only after T20.36B validator PASS"
+Do NOT start T20.37A without: "Approved: start T20.37A real-participant opt-in hybrid preview extension design only"
 Do NOT re-run T20.35B/T20.36B audit unless T20-35-owner-approved-real-preview-participants.md participant rows have changed.
 Do NOT create duplicate REBLOCKED docs for unchanged artifact.
 Do NOT run owner-approved participant live eval without complete `T20-35-owner-approved-real-preview-participants.md` (≥3 real_owner_approved or owner-approved internal_staff with email, UUID, consent, signature).
@@ -175,7 +179,8 @@ T20.34A–H CLOSED/BLOCKED: owner-approved participant soak blocked due to missi
 T20.35A–H CLOSED/BLOCKED: real-participant soak blocked due to incomplete participant artifact (0/3 complete rows).
 T20.35B-REBLOCKED: re-audit 2026-07-03 — still 0/3; C-LIVE not run; scope approval @ d650971.
 T20.36A COMPLETE: expansion/readiness design only.
-T20.36B COMPLETE: artifact validator PASS 3/3; C-LIVE requires separate approval.
+T20.36B COMPLETE: artifact validator PASS 3/3.
+T20.36A–H CLOSED PASS: real-participant soak 1440/1440; cumulative 26145/26145.
 API-only opt-in preview runtime: KEEP.
 Opt-in preview UI: KEEP.
 Production default: keyword.
@@ -183,7 +188,8 @@ Vector production default: NOT APPROVED.
 Hybrid production default: NOT APPROVED.
 AI_RAG_HYBRID_CANARY_PERCENT=0.
 AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0.
-T20.36C-LIVE: NOT RUN.
+T20.36C-LIVE: PASS 1440/1440.
+T20.37A: NOT STARTED.
 ```
 
 ---

@@ -14,7 +14,7 @@
 | T20.34C | `541e8e7` | C-BLOCKED — no live eval |
 | T20.34D | `58e9d46` | Rollback drill SKIPPED |
 | T20.34E/F | `fd39e6f` / `45c6d4c` | Telemetry + decision |
-| T20.34G/H | `34b7182` + *(H)* | Closeout + Phase 21 |
+| T20.34G/H | `34b7182` / `102d14c` | Closeout + Phase 21 |
 
 ## Images
 

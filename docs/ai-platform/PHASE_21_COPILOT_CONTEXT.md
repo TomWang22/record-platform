@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-03 (T20.38A–H broader real-participant depth batch — CLOSED PASS)  
-**Current main SHA:** `9b06997` (T20.38G/H closeout)  
+**Last updated:** 2026-07-03 (T20.39A broader real-participant expansion design — design only)  
+**Current main SHA:** `2f21024`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -118,7 +118,8 @@ T20.38A–H complete. Broader real-participant depth batch: CLOSED PASS.
 T20.38C-LIVE: PASS — 4320/4320 HTTP 200 (3 artifact participants + contract control, 24 windows), 0% fallback, hybrid p95 151 ms, avg quality 4.0.
 T20.38F: C selected (KEEP preview UI/API); D recommends T20.39A expansion design; E rejected.
 Combined live evidence (D16→T20.38C): 33345/33345 HTTP 200, 0% fallback.
-T20.39A: NOT STARTED.
+T20.39A complete. Broader real-participant expansion design only — no live eval.
+T20.39B: NOT STARTED. N=5 C-LIVE requires two additional complete owner-approved participant rows.
 ```
 
 ### T20 hybrid canary (implemented)
@@ -154,7 +155,7 @@ Do NOT enable vector retrieval as production default.
 Do NOT enable hybrid retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
 Do NOT broaden permanent allowlist without explicit approval and restore plan.
-Do NOT start T20.39A without: "Approved: start T20.39A broader real-participant opt-in hybrid preview expansion design only"
+Do NOT start T20.39B without: "Approved: start T20.39B broader real-participant expansion validator audit only"
 Do NOT run N=5 expansion without adding two more approved participant rows.
 Do NOT re-run T20.38C-LIVE or T20.38B audit unless artifact rows change or an explicit depth-extension approval is given.
 Use `scripts/audit-real-participant-artifact.sh` for participant gate automation.
@@ -194,7 +195,8 @@ T20.36B COMPLETE: artifact validator PASS 3/3.
 T20.36A–H CLOSED PASS: real-participant soak 1440/1440; cumulative 26145/26145.
 T20.37A–H CLOSED PASS: extension soak 2880/2880; cumulative 29025/29025.
 T20.38A–H CLOSED PASS: Option B depth soak 4320/4320; cumulative 33345/33345.
-T20.39A: NOT STARTED.
+T20.39A COMPLETE: broader real-participant expansion design only; current validated N=3.
+T20.39B: NOT STARTED; N=5 requires two additional complete owner-approved participant rows.
 API-only opt-in preview runtime: KEEP.
 Opt-in preview UI: KEEP.
 Production default: keyword.

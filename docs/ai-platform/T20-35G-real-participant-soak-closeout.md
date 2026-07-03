@@ -15,7 +15,7 @@
 | T20.35D | `a9a5a73` | Rollback SKIPPED |
 | T20.35E | `d8af891` | Telemetry audit |
 | T20.35F | `3d92abc` | Decision package |
-| T20.35G/H | `d1975c2`+ | Closeout + Phase 21 |
+| T20.35G/H | `d1975c2` / `7909d5a` | Closeout + Phase 21 |
 
 ## Images & env
 

@@ -9,12 +9,12 @@
 
 | Ticket | SHA | Description |
 |--------|-----|-------------|
-| T20.34A | *(A)* | Larger owner-approved soak design |
-| T20.34B | *(B)* | Artifact audit BLOCKED; preflight PASS |
-| T20.34C | *(C)* | C-BLOCKED — no live eval |
-| T20.34D | *(D)* | Rollback drill SKIPPED |
-| T20.34E/F | *(E/F)* | Telemetry + decision |
-| T20.34G/H | *(G/H)* | Closeout + Phase 21 |
+| T20.34A | `eddc690` | Larger owner-approved soak design |
+| T20.34B | `cea5fcf` | Artifact audit BLOCKED; preflight PASS |
+| T20.34C | `541e8e7` | C-BLOCKED — no live eval |
+| T20.34D | `58e9d46` | Rollback drill SKIPPED |
+| T20.34E/F | `fd39e6f` / `45c6d4c` | Telemetry + decision |
+| T20.34G/H | `34b7182` + *(H)* | Closeout + Phase 21 |
 
 ## Images
 

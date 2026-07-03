@@ -31,6 +31,12 @@ DEFAULT_USERS: List[Tuple[str, str, str]] = [
     ("000001bc-0000-4000-8000-000000000000", "t20-15o-bucket10@record-platform.local", "preview"),
     ("00000002-0000-4000-8000-000000000000", "t20-15s-bucket20@record-platform.local", "preview"),
 ]
+REAL_PARTICIPANT_36_USERS: List[Tuple[str, str, str]] = [
+    (CONTRACT_UID, "e2e-contract@record-platform.local", "allowlist"),
+    ("0dc268d0-a86f-4e12-8d10-9db0f1b735e0", "tom@example.com", "preview"),
+    ("950a40b1-d12e-4839-aefd-0d353b90182a", "tw5126@example.com", "preview"),
+    ("2901355e-7d04-4da1-b3a7-c22807326b94", "seed@example.com", "preview"),
+]
 PARTICIPANT_12_USERS: List[Tuple[str, str, str]] = [
     (CONTRACT_UID, "e2e-contract@record-platform.local", "allowlist"),
     ("00000040-0000-4000-8000-000000000000", "t20-15g-cohort0@record-platform.local", "preview"),
@@ -48,6 +54,7 @@ PARTICIPANT_12_USERS: List[Tuple[str, str, str]] = [
 USER_SETS: Dict[str, List[Tuple[str, str, str]]] = {
     "default": DEFAULT_USERS,
     "participant-12": PARTICIPANT_12_USERS,
+    "real-participant-36": REAL_PARTICIPANT_36_USERS,
 }
 USERS: List[Tuple[str, str, str]] = USER_SETS.get(
     os.environ.get("T20_EVAL_USER_SET", "default"), DEFAULT_USERS

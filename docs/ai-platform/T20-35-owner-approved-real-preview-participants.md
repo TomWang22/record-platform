@@ -1,23 +1,23 @@
 # Owner-approved real preview participants — T20.35
 
-**Status:** OWNER ARTIFACT (template — participant rows incomplete)  
+**Status:** OWNER ARTIFACT — scope approved; participant rows **incomplete** (0/3)  
 **Date (UTC):** 2026-07-03  
 **Approver:** Tom Wang / repository owner  
 **Scope:** Real-participant opt-in hybrid preview soak only
 
 ## Explicitly approved
 
-* [ ] Real participant opt-in hybrid preview soak only
-* [ ] Participants listed below have owner approval / consent for preview testing
-* [ ] JWT-authenticated users only
-* [ ] User-scoped opt-in enrollment only
-* [ ] Keyword default unchanged for non-enrolled users
-* [ ] `AI_RAG_HYBRID_CANARY_PERCENT=0`
-* [ ] `AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0`
-* [ ] Hybrid anchored Lane B only
-* [ ] Keyword fallback retained
-* [ ] Overlap anchors retained
-* [ ] Revoke and rollback drill required after live eval
+* [x] Real participant opt-in hybrid preview soak only
+* [ ] Participants listed below have owner approval / consent for preview testing *(pending — rows incomplete)*
+* [x] JWT-authenticated users only
+* [x] User-scoped opt-in enrollment only
+* [x] Keyword default unchanged for non-enrolled users
+* [x] `AI_RAG_HYBRID_CANARY_PERCENT=0`
+* [x] `AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0`
+* [x] Hybrid anchored Lane B only
+* [x] Keyword fallback retained
+* [x] Overlap anchors retained
+* [x] Revoke and rollback drill required after live eval
 
 ## Explicitly NOT approved
 
@@ -47,7 +47,7 @@ At least **3** participants must be complete and marked `real_owner_approved` or
 ## Signature / approval reference
 
 Owner approval reference:  
-TBD
+Owner chat instruction approving real-participant opt-in hybrid preview soak scope.
 
 Signed:  
-TBD
+Tom Wang / repository owner — 2026-07-03

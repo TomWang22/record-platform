@@ -13,7 +13,7 @@
 | T20.38C | `71d3465` — live eval PASS 4320/4320 + `t20-38c-broader-real-participant-depth-soak-eval.py` |
 | T20.38D | `a75fee3` — rollback drill PASS |
 | T20.38E/F | `2501331` — telemetry + decision |
-| T20.38G/H | Closeout + Phase 21 (this commit) |
+| T20.38G/H | `9b06997` — closeout + Phase 21 |
 
 ## Images & env
 

@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-03 (T20.37A real-participant extension design — design only)  
-**Current main SHA:** `629b1f2`  
+**Last updated:** 2026-07-03 (T20.37A–H real-participant extension batch — CLOSED PASS)  
+**Current main SHA:** `6858a38` (T20.37B; T20.37C–H commits follow)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -110,8 +110,13 @@ T20.35B-REBLOCKED: artifact re-audit 0/3 — do not re-audit unless artifact row
 T20.36A: COMPLETE — expansion/readiness design only.
 T20.36B: COMPLETE — validator PASS 3/3.
 T20.36A–H CLOSED PASS: first real-participant soak 1440/1440; cumulative 26145/26145.
-T20.37A complete. Real-participant extension design only — 2880-case matrix (16 windows); no live eval.
-T20.37B: NOT STARTED.
+T20.37A complete. Real-participant extension design only — 2880-case matrix (16 windows).
+T20.37A–H complete. Real-participant extension batch: CLOSED PASS.
+T20.37C-LIVE: PASS — 2880/2880 HTTP 200 (3 artifact participants + contract control, 16 windows), 0% fallback, hybrid p95 184 ms, avg quality 4.0.
+T20.37F: C selected (KEEP preview UI/API); D recommends T20.38A broader readiness; E rejected.
+Combined live evidence (D16→T20.37C): 29025/29025 HTTP 200, 0% fallback.
+T20.38A: COMPLETE — broader readiness design only; no live eval.
+T20.38B: NOT STARTED.
 ```
 
 ### T20 hybrid canary (implemented)
@@ -122,7 +127,8 @@ T20.37B: NOT STARTED.
 | Webapp image | `webapp:t20-p227b` |
 | Allowlisted user | `2ed75568-7deb-4c29-91b0-6919f24a0c9f` (contract only) |
 | API-only preview | `GET/POST /api/ai/rag/preview/{status,enroll,revoke}` |
-| Combined live (D16→D36C) | **26145/26145** HTTP 200, **0%** fallback |
+| Combined live (D16→T20.37C) | **29025/29025** HTTP 200, **0%** fallback |
+| Artifact validator | `scripts/audit-real-participant-artifact.sh` |
 | Pure overlap | **8/16** (report-only) |
 | Anchored overlap | **16/16** |
 | Avg quality (C18-LIVE) | **4.0** |
@@ -146,8 +152,9 @@ Do NOT enable vector retrieval as production default.
 Do NOT enable hybrid retrieval as production default.
 Do NOT set AI_RAG_HYBRID_CANARY_PERCENT above 0 without explicit owner approval for a scoped eval window.
 Do NOT broaden permanent allowlist without explicit approval and restore plan.
-Do NOT start T20.37B without: "Approved: start T20.37B real-participant extension validator audit and proceed to T20.37C-LIVE only if artifact unchanged and preflight PASS"
-Do NOT re-run T20.36C-LIVE or T20.35B/T20.36B audit unless artifact rows change.
+Do NOT start T20.38B without: "Approved: start T20.38B broader real-participant validator audit and proceed to T20.38C-LIVE only if artifact updated and preflight PASS"
+Do NOT re-run T20.37C-LIVE or T20.37B audit unless artifact rows change.
+Use `scripts/audit-real-participant-artifact.sh` for participant gate automation.
 Do NOT create duplicate REBLOCKED docs for unchanged artifact.
 Do NOT run owner-approved participant live eval without complete `T20-35-owner-approved-real-preview-participants.md` (≥3 real_owner_approved or owner-approved internal_staff with email, UUID, consent, signature).
 Do NOT relabel staging/JWT cohort accounts as real participants.
@@ -182,8 +189,9 @@ T20.35B-REBLOCKED: re-audit 2026-07-03 — still 0/3; C-LIVE not run; scope appr
 T20.36A COMPLETE: expansion/readiness design only.
 T20.36B COMPLETE: artifact validator PASS 3/3.
 T20.36A–H CLOSED PASS: real-participant soak 1440/1440; cumulative 26145/26145.
-T20.37A COMPLETE: extension design only (2880-case matrix); no live eval.
-T20.37B: NOT STARTED.
+T20.37A–H CLOSED PASS: extension soak 2880/2880; cumulative 29025/29025.
+T20.38A COMPLETE: broader readiness design only.
+T20.38B: NOT STARTED.
 API-only opt-in preview runtime: KEEP.
 Opt-in preview UI: KEEP.
 Production default: keyword.
@@ -191,10 +199,7 @@ Vector production default: NOT APPROVED.
 Hybrid production default: NOT APPROVED.
 AI_RAG_HYBRID_CANARY_PERCENT=0.
 AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0.
-T20.36C-LIVE: PASS 1440/1440.
-T20.37A: COMPLETE — design only.
-T20.37B: NOT STARTED.
-T20.37C-LIVE: NOT RUN.
+T20.37C-LIVE: PASS 2880/2880.
 ```
 
 ---

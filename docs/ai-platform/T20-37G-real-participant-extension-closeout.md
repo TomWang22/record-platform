@@ -13,7 +13,7 @@
 | T20.37C | Live eval PASS 2880/2880 + `t20-37c-real-participant-extension-soak-eval.py` |
 | T20.37D | Rollback drill PASS |
 | T20.37E/F | Telemetry + decision |
-| T20.37G/H | Closeout + Phase 21 + artifact validator script |
+| T20.37G/H | Closeout + Phase 21 + validator + T20.38A design @ `0da5aab` |
 
 ## Images & env
 

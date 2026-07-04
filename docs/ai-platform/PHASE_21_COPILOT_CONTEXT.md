@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-03 (T20.39E telemetry PASS / T20.39F decision C KEEP)  
-**Current main SHA:** `fbd6574` (T20.39E/F decision commit follows)  
+**Last updated:** 2026-07-03 (T20.39G closeout — T20.39 CLOSED PASS)  
+**Current main SHA:** `4f29b00` (T20.39G closeout commit follows)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -127,6 +127,7 @@ T20.39C-LIVE: PASS — 4320/4320 HTTP 200 (5 artifact participants + contract co
 T20.39D complete. Rollback drill PASS — UI/API enroll→revoke, bulk revoke all 5, CANARY=0 drill, KEEP restore verified.
 T20.39E complete. Telemetry audit PASS — OCH PASS, telemetry WARNs 0, Playwright C-suite 7/7.
 T20.39F complete. Decision C selected: KEEP broader real-participant opt-in preview UI/API, PERCENT=0; D recommended; E rejected.
+T20.39G complete. Broader real-participant N=5 batch CLOSED PASS; next approval phrase: "Approved: start T20.40A broader real-participant opt-in hybrid preview readiness decision design only".
 Combined live evidence (D16→T20.39C): 37665/37665 HTTP 200, 0% fallback.
 ```
 
@@ -212,6 +213,7 @@ T20.39C-LIVE PASS: N=5 matrix 4320/4320; cumulative 37665/37665; fallback 0%; po
 T20.39D ROLLBACK PASS: UI/API enroll-revoke, bulk revoke, CANARY=0, and KEEP restore verified.
 T20.39E TELEMETRY PASS: OCH PASS, WARNs 0, C-suite 7/7.
 T20.39F DECISION: C KEEP selected; D recommended; E production default rejected.
+T20.39G CLOSED PASS: T20.39 complete; next T20.40A design-only approval required.
 API-only opt-in preview runtime: KEEP.
 Opt-in preview UI: KEEP.
 Production default: keyword.

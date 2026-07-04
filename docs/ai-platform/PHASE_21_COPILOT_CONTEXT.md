@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-04 (T20.42A N5 production-readiness closeout design — design only)  
-**Current main SHA:** `4a7624c` (T20.42A design-only commit follows)  
+**Last updated:** 2026-07-04 (T20.42B N5 production-readiness closeout validator audit — PASS)  
+**Current main SHA:** `6c7fb38` (T20.42B validator PASS commit follows)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -146,9 +146,12 @@ T20.41G CLOSED PASS.
 Cumulative live: 52785/52785 HTTP 200, 0% fallback.
 T20.41A–G CLOSED PASS: N=5 32-window production-readiness depth eval 8640/8640; cumulative 52785/52785.
 T20.42A COMPLETE: N5 opt-in hybrid preview production-readiness closeout design only.
-T20.42B: NOT STARTED.
+T20.42B COMPLETE: N5 production-readiness closeout validator PASS.
 T20.42C-LIVE: NOT RUN.
 Production default: keyword.
+Preview UI/API: KEEP.
+PERCENT=0.
+ALLOW_PROD_PERCENT=0.
 Preview UI/API: KEEP.
 PERCENT=0.
 ALLOW_PROD_PERCENT=0.
@@ -257,9 +260,12 @@ T20.41G CLOSED PASS.
 Cumulative live: 52785/52785 HTTP 200, 0% fallback.
 T20.41A–G CLOSED PASS: N=5 32-window production-readiness depth eval 8640/8640; cumulative 52785/52785.
 T20.42A COMPLETE: N5 opt-in hybrid preview production-readiness closeout design only.
-T20.42B: NOT STARTED.
+T20.42B COMPLETE: N5 production-readiness closeout validator PASS.
 T20.42C-LIVE: NOT RUN.
 Production default: keyword.
+Preview UI/API: KEEP.
+PERCENT=0.
+ALLOW_PROD_PERCENT=0.
 Preview UI/API: KEEP.
 PERCENT=0.
 ALLOW_PROD_PERCENT=0.

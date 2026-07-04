@@ -73,7 +73,9 @@ INSERT INTO auth.users(id, email, password_hash, created_at) VALUES
   ('00000000-0000-0000-0000-0000000000aa', 'pvc@test.local', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP),
   ('2901355e-7d04-4da1-b3a7-c22807326b94', 'seed@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP),
   ('0dc268d0-a86f-4e12-8d10-9db0f1b735e0', 'tom@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP),
-  ('950a40b1-d12e-4839-aefd-0d353b90182a', 'tw5126@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP)
+  ('950a40b1-d12e-4839-aefd-0d353b90182a', 'tw5126@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP),
+  ('8f0f4a52-8e01-4f8f-9c31-1c3b3949d101', 'phase21-preview-internal-1@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP),
+  ('b3d9d25b-4f37-4c7f-a7db-48f3c97a02c2', 'phase21-preview-internal-2@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP)
 ON CONFLICT (id) DO NOTHING;
 
 -- Verify
@@ -160,7 +162,9 @@ INSERT INTO auth.users(id, email, password_hash, created_at) VALUES
   ('00000000-0000-0000-0000-0000000000aa', 'pvc@test.local', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP),
   ('2901355e-7d04-4da1-b3a7-c22807326b94', 'seed@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP),
   ('0dc268d0-a86f-4e12-8d10-9db0f1b735e0', 'tom@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP),
-  ('950a40b1-d12e-4839-aefd-0d353b90182a', 'tw5126@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP)
+  ('950a40b1-d12e-4839-aefd-0d353b90182a', 'tw5126@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP),
+  ('8f0f4a52-8e01-4f8f-9c31-1c3b3949d101', 'phase21-preview-internal-1@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP),
+  ('b3d9d25b-4f37-4c7f-a7db-48f3c97a02c2', 'phase21-preview-internal-2@example.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', CURRENT_TIMESTAMP)
 ON CONFLICT (id) DO NOTHING;
 
 -- Verify table was created and has seed data

@@ -8,6 +8,7 @@ cd "$REPO_ROOT"
 
 ARTIFACT="${REPO_ROOT}/docs/ai-platform/T20-35-owner-approved-real-preview-participants.md"
 BASELINE_SHA="${T20_ARTIFACT_BASELINE_SHA:-}"
+MIN_ROWS="${T20_MIN_PARTICIPANT_ROWS:-3}"
 PWD="${T20_PARTICIPANT_LOGIN_PASSWORD:-ContractPass123!}"
 API_BASE="${E2E_API_BASE:-https://record-platform.test}"
 CA="${REPO_ROOT}/certs/dev-chain.pem"
@@ -19,14 +20,14 @@ pass() { echo "✅ $*"; }
 
 # --- artifact structure ---
 complete_rows=$(grep -cE '^\| [0-9]+ \| [^|]+@' "$ARTIFACT" || true)
-[[ "$complete_rows" -ge 3 ]] || fail "need ≥3 complete participant rows (found ${complete_rows})"
+[[ "$complete_rows" -ge "$MIN_ROWS" ]] || fail "need ≥${MIN_ROWS} complete participant rows (found ${complete_rows})"
 
 if grep -qE 'TBD|tbd@|00000000-0000-0000-0000-000000000000' "$ARTIFACT"; then
   fail "artifact contains TBD or placeholder UUID"
 fi
 
 no_msg_rows=$(grep -cE 'opt-in preview soak only \| NO \| NO \| NO \|' "$ARTIFACT" || true)
-[[ "$no_msg_rows" -ge 3 ]] || fail "artifact rows must mark message bodies / prod default / PERCENT as NO"
+[[ "$no_msg_rows" -ge "$complete_rows" ]] || fail "artifact rows must mark message bodies / prod default / PERCENT as NO"
 
 # --- unchanged hash (optional baseline) ---
 current_hash=$(shasum -a 256 "$ARTIFACT" | awk '{print $1}')
@@ -38,8 +39,8 @@ if [[ -n "$BASELINE_SHA" ]]; then
   pass "artifact unchanged since ${BASELINE_SHA}"
 fi
 
-# --- extract participant emails/uuids from table rows 1-3 ---
-mapfile -t rows < <(grep -E '^\| [123] \|' "$ARTIFACT" | head -3)
+# --- extract participant emails/uuids from every participant table row ---
+mapfile -t rows < <(grep -E '^\| [0-9]+ \|' "$ARTIFACT")
 participants=()
 for row in "${rows[@]}"; do
   email=$(echo "$row" | awk -F'|' '{gsub(/^ +| +$/,"",$3); print $3}')
@@ -53,11 +54,12 @@ for row in "${rows[@]}"; do
   esac
   # reject staging cohort patterns
   case "$email" in
-    *@record-platform.local|t20-*|*-contract@*|bidder*|buyer-contract*|seller-contract*) fail "staging/test cohort rejected: $email" ;;
+    *@record-platform.local|t20-*|e2e-*|*-contract@*|auth-test-*|microservice-test-*|test-*|k6-*|benchmark*|bidder*|buyer-contract*|seller-contract*) fail "staging/test cohort rejected: $email" ;;
   esac
   participants+=("${email}|${uuid}")
 done
 
+[[ "${#participants[@]}" -ge "$MIN_ROWS" ]] || fail "need ≥${MIN_ROWS} parsed participant rows (found ${#participants[@]})"
 pass "participant rows validated (${#participants[@]})"
 
 # --- JWT sub match ---

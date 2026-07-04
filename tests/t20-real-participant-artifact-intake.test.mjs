@@ -37,10 +37,23 @@ function participantRowCount(markdown) {
   return (markdown.match(/^\| \d+ \| [^|]+@/gm) ?? []).length
 }
 
+function n3ArtifactFixture() {
+  return readFileSync(sourceArtifact, 'utf8')
+    .replace(
+      '**Status:** OWNER ARTIFACT — **complete** (5 owner-approved participants)',
+      '**Status:** OWNER ARTIFACT — **complete** (3 owner-approved participants)',
+    )
+    .replace(
+      /\| 4 \| phase21-preview-internal-1@example\.com \|[^\n]+\n\| 5 \| phase21-preview-internal-2@example\.com \|[^\n]+\n/,
+      '',
+    )
+    .replace('At least **5** participants', 'At least **3** participants')
+}
+
 function withArtifactCopy(fn) {
   const dir = mkdtempSync(path.join(tmpdir(), 't20-intake-'))
   const artifact = path.join(dir, 'participants.md')
-  writeFileSync(artifact, readFileSync(sourceArtifact, 'utf8'))
+  writeFileSync(artifact, n3ArtifactFixture())
   try {
     return fn({ dir, artifact })
   } finally {

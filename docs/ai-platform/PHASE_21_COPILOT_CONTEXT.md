@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-03 (T20.39B3 owner-approved internal-staff participant provisioning)  
-**Current main SHA:** `2d0d86d` (T20.39B3 provisioning commit follows)  
+**Last updated:** 2026-07-03 (T20.39B N=5 validator re-run PASS)  
+**Current main SHA:** `5564507` (T20.39B re-run PASS commit follows)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -122,7 +122,8 @@ T20.39A complete. Broader real-participant expansion design only — no live eva
 T20.39B complete. Validator BLOCKED — current artifact remains N=3; no two additional valid owner-approved/internal-staff participants found.
 T20.39B2 complete. Real-participant artifact intake tooling added; artifact remains N=3 until owner-provided JSON is appended and validated.
 T20.39B3 complete. Two owner-approved internal_staff preview participants provisioned; artifact is now N=5 (`1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa`); 5/5 JWT-sub audit PASS.
-T20.39C-LIVE: NOT RUN. N=5 C-LIVE requires fresh T20.39B validator PASS.
+T20.39B RERUN complete. N=5 validator PASS; preflight PASS; telemetry WARNs 0; preview UI smoke 4/4 PASS.
+T20.39C-LIVE: APPROVED NEXT, NOT RUN.
 ```
 
 ### T20 hybrid canary (implemented)
@@ -202,7 +203,8 @@ T20.39A COMPLETE: broader real-participant expansion design only; current valida
 T20.39B COMPLETE/BLOCKED: current artifact still N=3; no two additional valid participants found; preflight/UI smoke PASS.
 T20.39B2 COMPLETE: intake tooling added for owner-provided rows; artifact unchanged until JSON is supplied.
 T20.39B3 COMPLETE: two owner-approved internal_staff preview participants provisioned; artifact N=5; 5/5 JWT-sub audit PASS.
-T20.39C-LIVE: NOT RUN; requires T20.39B validator re-run PASS first.
+T20.39B RERUN PASS: N=5 artifact validator, preflight, telemetry, and preview UI smoke PASS.
+T20.39C-LIVE: APPROVED NEXT; not yet run.
 API-only opt-in preview runtime: KEEP.
 Opt-in preview UI: KEEP.
 Production default: keyword.

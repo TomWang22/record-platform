@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-04 (T20.41A N5 production-readiness decision design — design only)  
-**Current main SHA:** `aea354c` (T20.41A design-only commit follows)  
+**Last updated:** 2026-07-04 (T20.41B N5 production-readiness validator audit — PASS)  
+**Current main SHA:** `e069c15` (T20.41B validator PASS commit follows)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -138,7 +138,7 @@ T20.40G CLOSED PASS.
 Cumulative live: 44145/44145 HTTP 200, 0% fallback.
 T20.40A–G CLOSED PASS: N=5 24-window real-participant depth eval 6480/6480; cumulative 44145/44145.
 T20.41A COMPLETE: N5 opt-in hybrid preview production-readiness decision design only.
-T20.41B: NOT STARTED.
+T20.41B COMPLETE: N5 production-readiness validator audit PASS.
 T20.41C-LIVE: NOT RUN.
 Production default: keyword.
 Preview UI/API: KEEP.
@@ -241,7 +241,7 @@ T20.40G CLOSED PASS.
 Cumulative live: 44145/44145 HTTP 200, 0% fallback.
 T20.40A–G CLOSED PASS: N=5 24-window real-participant depth eval 6480/6480; cumulative 44145/44145.
 T20.41A COMPLETE: N5 opt-in hybrid preview production-readiness decision design only.
-T20.41B: NOT STARTED.
+T20.41B COMPLETE: N5 production-readiness validator audit PASS.
 T20.41C-LIVE: NOT RUN.
 Production default: keyword.
 Preview UI/API: KEEP.

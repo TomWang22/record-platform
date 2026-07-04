@@ -56,9 +56,23 @@ USER_SETS: Dict[str, List[Tuple[str, str, str]]] = {
     "participant-12": PARTICIPANT_12_USERS,
     "real-participant-36": REAL_PARTICIPANT_36_USERS,
 }
-USERS: List[Tuple[str, str, str]] = USER_SETS.get(
-    os.environ.get("T20_EVAL_USER_SET", "default"), DEFAULT_USERS
-)
+
+
+def users_from_env() -> List[Tuple[str, str, str]]:
+    raw = os.environ.get("T20_EVAL_USERS_JSON")
+    if raw:
+        parsed = json.loads(raw)
+        users: List[Tuple[str, str, str]] = []
+        for row in parsed:
+            uid = str(row["uuid"])
+            email = str(row["email"])
+            role = str(row["role"])
+            users.append((uid, email, role))
+        return users
+    return USER_SETS.get(os.environ.get("T20_EVAL_USER_SET", "default"), DEFAULT_USERS)
+
+
+USERS: List[Tuple[str, str, str]] = users_from_env()
 PROMPTS = [
     ("listing_advice", "Which of my listings need attention first, and why?"),
     ("negotiation_strategy", "Given current offers, should I accept, counter, or wait?"),

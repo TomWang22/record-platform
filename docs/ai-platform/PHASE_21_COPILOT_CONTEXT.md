@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-04 (T20.41B N5 production-readiness validator audit — PASS)  
-**Current main SHA:** `e069c15` (T20.41B validator PASS commit follows)  
+**Last updated:** 2026-07-04 (T20.41G closeout — T20.41 CLOSED PASS)  
+**Current main SHA:** `(T20.41G closeout commit follows)`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -139,13 +139,19 @@ Cumulative live: 44145/44145 HTTP 200, 0% fallback.
 T20.40A–G CLOSED PASS: N=5 24-window real-participant depth eval 6480/6480; cumulative 44145/44145.
 T20.41A COMPLETE: N5 opt-in hybrid preview production-readiness decision design only.
 T20.41B COMPLETE: N5 production-readiness validator audit PASS.
-T20.41C-LIVE: NOT RUN.
+T20.41C-LIVE PASS: N=5 32-window production-readiness depth eval 8640/8640, 0% fallback, hybrid p95 140.4 ms.
+T20.41D PASS: rollback + CANARY=0 + KEEP restore.
+T20.41E/F COMPLETE: telemetry audit PASS; decision C KEEP selected.
+T20.41G CLOSED PASS.
+Cumulative live: 52785/52785 HTTP 200, 0% fallback.
+T20.41A–G CLOSED PASS: N=5 32-window production-readiness depth eval 8640/8640; cumulative 52785/52785.
+T20.42A: NOT STARTED.
 Production default: keyword.
 Preview UI/API: KEEP.
 PERCENT=0.
 ALLOW_PROD_PERCENT=0.
 Hybrid/vector production default: NOT APPROVED.
-Combined live evidence (D16→T20.40C): 44145/44145 HTTP 200, 0% fallback.
+Combined live evidence (D16→T20.41C): 52785/52785 HTTP 200, 0% fallback.
 ```
 
 ### T20 hybrid canary (implemented)
@@ -156,7 +162,7 @@ Combined live evidence (D16→T20.40C): 44145/44145 HTTP 200, 0% fallback.
 | Webapp image | `webapp:t20-p227b` |
 | Allowlisted user | `2ed75568-7deb-4c29-91b0-6919f24a0c9f` (contract only) |
 | API-only preview | `GET/POST /api/ai/rag/preview/{status,enroll,revoke}` |
-| Combined live (D16→T20.40C) | **44145/44145** HTTP 200, **0%** fallback |
+| Combined live (D16→T20.41C) | **52785/52785** HTTP 200, **0%** fallback |
 | Artifact validator | `scripts/audit-real-participant-artifact.sh` |
 | Pure overlap | **8/16** (report-only) |
 | Anchored overlap | **16/16** |
@@ -242,7 +248,13 @@ Cumulative live: 44145/44145 HTTP 200, 0% fallback.
 T20.40A–G CLOSED PASS: N=5 24-window real-participant depth eval 6480/6480; cumulative 44145/44145.
 T20.41A COMPLETE: N5 opt-in hybrid preview production-readiness decision design only.
 T20.41B COMPLETE: N5 production-readiness validator audit PASS.
-T20.41C-LIVE: NOT RUN.
+T20.41C-LIVE PASS: N=5 32-window production-readiness depth eval 8640/8640, 0% fallback.
+T20.41D PASS: rollback + CANARY=0 + KEEP restore.
+T20.41E/F COMPLETE: telemetry audit PASS; decision C KEEP selected.
+T20.41G CLOSED PASS.
+Cumulative live: 52785/52785 HTTP 200, 0% fallback.
+T20.41A–G CLOSED PASS: N=5 32-window production-readiness depth eval 8640/8640; cumulative 52785/52785.
+T20.42A: NOT STARTED.
 Production default: keyword.
 Preview UI/API: KEEP.
 PERCENT=0.
@@ -255,7 +267,7 @@ Vector production default: NOT APPROVED.
 Hybrid production default: NOT APPROVED.
 AI_RAG_HYBRID_CANARY_PERCENT=0.
 AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0.
-T20.40C-LIVE: PASS 6480/6480.
+T20.41C-LIVE: PASS 8640/8640.
 ```
 
 ---

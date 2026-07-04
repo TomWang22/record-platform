@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-04 (T20.40G closeout — T20.40 CLOSED PASS)  
-**Current main SHA:** `541fb88` (T20.40G closeout commit follows)  
+**Last updated:** 2026-07-04 (T20.41A N5 production-readiness decision design — design only)  
+**Current main SHA:** `aea354c` (T20.41A design-only commit follows)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -136,10 +136,15 @@ T20.40D PASS: rollback + CANARY=0 + KEEP restore.
 T20.40E/F COMPLETE: telemetry audit PASS; decision C KEEP selected.
 T20.40G CLOSED PASS.
 Cumulative live: 44145/44145 HTTP 200, 0% fallback.
+T20.40A–G CLOSED PASS: N=5 24-window real-participant depth eval 6480/6480; cumulative 44145/44145.
+T20.41A COMPLETE: N5 opt-in hybrid preview production-readiness decision design only.
+T20.41B: NOT STARTED.
+T20.41C-LIVE: NOT RUN.
 Production default: keyword.
 Preview UI/API: KEEP.
 PERCENT=0.
 ALLOW_PROD_PERCENT=0.
+Hybrid/vector production default: NOT APPROVED.
 Combined live evidence (D16→T20.40C): 44145/44145 HTTP 200, 0% fallback.
 ```
 
@@ -234,6 +239,15 @@ T20.40D PASS: rollback + CANARY=0 + KEEP restore.
 T20.40E/F COMPLETE: telemetry audit PASS; decision C KEEP selected.
 T20.40G CLOSED PASS.
 Cumulative live: 44145/44145 HTTP 200, 0% fallback.
+T20.40A–G CLOSED PASS: N=5 24-window real-participant depth eval 6480/6480; cumulative 44145/44145.
+T20.41A COMPLETE: N5 opt-in hybrid preview production-readiness decision design only.
+T20.41B: NOT STARTED.
+T20.41C-LIVE: NOT RUN.
+Production default: keyword.
+Preview UI/API: KEEP.
+PERCENT=0.
+ALLOW_PROD_PERCENT=0.
+Hybrid/vector production default: NOT APPROVED.
 API-only opt-in preview runtime: KEEP.
 Opt-in preview UI: KEEP.
 Production default: keyword.

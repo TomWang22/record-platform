@@ -29,7 +29,7 @@ Phase 21: production-readiness-closeout-ready for opt-in preview at PERCENT=0
 | T20.42C-LIVE | `e042731` | `feat(ai): T20.42C N5 production-readiness final verification PASS` |
 | T20.42D | `33d41dd` | `docs(ai): T20.42D final rollback drill PASS` |
 | T20.42E/F | `6c5072b` | `docs(ai): T20.42E telemetry audit and T20.42F decision C KEEP` |
-| T20.42G | `(this commit)` | `docs(ai): T20.42G final closeout and Phase 21 reconciliation` |
+| T20.42G | `347d09d` | `docs(ai): T20.42G final closeout and Phase 21 reconciliation` |
 
 ---
 

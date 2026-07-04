@@ -28,7 +28,7 @@ Decision: C KEEP selected, D recommended, E rejected
 | T20.41C-LIVE | `1ed5af5` | `feat(ai): T20.41C N5 production-readiness depth eval PASS` |
 | T20.41D | `2c17f6f` | `docs(ai): T20.41D N5 production-readiness rollback drill PASS` |
 | T20.41E/F | `f9045de` | `docs(ai): T20.41E telemetry audit and T20.41F decision C KEEP` |
-| T20.41G | `(this commit)` | `docs(ai): T20.41G closeout and Phase 21 reconciliation` |
+| T20.41G | `3e7a4b0` | `docs(ai): T20.41G closeout and Phase 21 reconciliation` |
 
 ---
 

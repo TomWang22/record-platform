@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-03 (T20.39D N=5 rollback drill PASS)  
-**Current main SHA:** `a19ca87` (T20.39D rollback commit follows)  
+**Last updated:** 2026-07-03 (T20.39E telemetry PASS / T20.39F decision C KEEP)  
+**Current main SHA:** `fbd6574` (T20.39E/F decision commit follows)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
@@ -125,6 +125,8 @@ T20.39B3 complete. Two owner-approved internal_staff preview participants provis
 T20.39B RERUN complete. N=5 validator PASS; preflight PASS; telemetry WARNs 0; preview UI smoke 4/4 PASS.
 T20.39C-LIVE: PASS — 4320/4320 HTTP 200 (5 artifact participants + contract control, 16 windows), 0% fallback, hybrid p95 131.99 ms, avg quality 4.0, Playwright C-suite 7/7, OCH PASS, WARNs 0.
 T20.39D complete. Rollback drill PASS — UI/API enroll→revoke, bulk revoke all 5, CANARY=0 drill, KEEP restore verified.
+T20.39E complete. Telemetry audit PASS — OCH PASS, telemetry WARNs 0, Playwright C-suite 7/7.
+T20.39F complete. Decision C selected: KEEP broader real-participant opt-in preview UI/API, PERCENT=0; D recommended; E rejected.
 Combined live evidence (D16→T20.39C): 37665/37665 HTTP 200, 0% fallback.
 ```
 
@@ -208,6 +210,8 @@ T20.39B3 COMPLETE: two owner-approved internal_staff preview participants provis
 T20.39B RERUN PASS: N=5 artifact validator, preflight, telemetry, and preview UI smoke PASS.
 T20.39C-LIVE PASS: N=5 matrix 4320/4320; cumulative 37665/37665; fallback 0%; post-revoke keyword_default PASS for all 5.
 T20.39D ROLLBACK PASS: UI/API enroll-revoke, bulk revoke, CANARY=0, and KEEP restore verified.
+T20.39E TELEMETRY PASS: OCH PASS, WARNs 0, C-suite 7/7.
+T20.39F DECISION: C KEEP selected; D recommended; E production default rejected.
 API-only opt-in preview runtime: KEEP.
 Opt-in preview UI: KEEP.
 Production default: keyword.

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Read-only transport smoke: HTTP status, negotiated version, gate/fallback only.
+# For response-body + sentiment/intent assertions across H1/H2/H3, use:
+#   scripts/smoke-ai-rag-real-inference-response-readonly.sh
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-https://record-platform.test}"

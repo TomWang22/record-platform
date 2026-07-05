@@ -95,13 +95,18 @@ EOF
 )"
 
 TMP_DIR="$(mktemp -d)"
+PHASE22_RUN_ID="$(date -u +"%Y%m%dT%H%M%SZ")"
+JSONL_OUT="${PHASE22_JSONL_OUT:-/tmp/phase22-smoke-${PHASE22_RUN_ID}.jsonl}"
+SUMMARY_OUT="${PHASE22_SUMMARY_OUT:-/tmp/phase22-smoke-${PHASE22_RUN_ID}.json}"
+GIT_SHA="$(git -C "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" rev-parse HEAD 2>/dev/null || echo "unknown")"
+ARTIFACT_SHA="$(shasum -a 256 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/docs/ai-platform/T20-35-owner-approved-real-preview-participants.md" 2>/dev/null | awk '{print $1}' || echo "unknown")"
+jsonl_path="$TMP_DIR/results.jsonl"
+summary_path="$TMP_DIR/summary.json"
+
 cleanup() {
   rm -rf "$TMP_DIR"
 }
 trap cleanup EXIT
-
-jsonl_path="$TMP_DIR/results.jsonl"
-summary_path="$TMP_DIR/summary.json"
 
 extract_response_text() {
   local body_file="$1"
@@ -224,6 +229,35 @@ is_placeholder_text() {
   return 1
 }
 
+is_generic_ungrounded_refusal() {
+  local text="$1"
+  local lower
+  lower="$(printf '%s' "$text" | tr '[:upper:]' '[:lower:]')"
+
+  local has_refusal=1
+  [[ "$lower" == *"can't"* || "$lower" == *"cannot"* ]] && has_refusal=0
+
+  local has_grounding=1
+  [[ "$lower" == *"private"* ]] && has_grounding=0
+  [[ "$lower" == *"not ingested"* ]] && has_grounding=0
+  [[ "$lower" == *"not used"* ]] && has_grounding=0
+  [[ "$lower" == *"not included"* ]] && has_grounding=0
+  [[ "$lower" == *"allowed"* ]] && has_grounding=0
+  [[ "$lower" == *"instead"* ]] && has_grounding=0
+
+  [[ "$has_refusal" -eq 0 && "$has_grounding" -ne 0 ]]
+}
+
+extract_hybrid_retrieval_ms() {
+  local body_file="$1"
+  jq -r '
+    .details.hybrid_canary.hybrid_latency_ms //
+    .details.hybrid_latency_ms //
+    .hybrid_latency_ms //
+    empty
+  ' "$body_file"
+}
+
 login_contract() {
   local label="$1"
   local curl_protocol_flag="$2"
@@ -311,13 +345,17 @@ assert_case() {
     --header "authorization: Bearer ${token}" \
     --header "x-user-id: ${CONTRACT_USER_SUB}" \
     --data "$rag_payload" \
-    --write-out '%{http_code}|%{http_version}' \
+    --write-out '%{http_code}|%{http_version}|%{time_total}' \
     --output "$rag_body" \
     "${BASE_URL}/api/ai/rag/query" > "$rag_meta"
 
-  local rag_status rag_version
+  local rag_status rag_version rag_time_total rag_total_ms hybrid_retrieval_ms
   rag_status="$(cut -d'|' -f1 "$rag_meta")"
   rag_version="$(cut -d'|' -f2 "$rag_meta")"
+  rag_time_total="$(cut -d'|' -f3 "$rag_meta")"
+  rag_total_ms="$(awk -v t="$rag_time_total" 'BEGIN { printf "%.1f", t * 1000 }')"
+  hybrid_retrieval_ms="$(extract_hybrid_retrieval_ms "$rag_body")"
+  [[ -n "$hybrid_retrieval_ms" && "$hybrid_retrieval_ms" != "null" ]] || hybrid_retrieval_ms=""
 
   [[ "$rag_status" == "200" ]] || {
     echo "FAIL: $protocol_label $case_id rag status=$rag_status version=$rag_version" >&2
@@ -412,11 +450,14 @@ assert_case() {
   fi
 
   if [[ "$intent" == "safety_refusal" ]]; then
-    text_contains_any "$response_text" "I cannot help" "I can't help" && {
-      echo "FAIL: $protocol_label $case_id unsafe generic refusal without grounding context" >&2
+    is_generic_ungrounded_refusal "$response_text" && {
+      echo "FAIL: $protocol_label $case_id generic ungrounded refusal" >&2
       exit 1
     }
   fi
+
+  local grounding_pass=PASS
+  local leakage_pass=PASS
 
   if [[ "$WRITE_JSONL" == "1" ]]; then
     jq -nc \
@@ -428,7 +469,15 @@ assert_case() {
       --arg gate_reason "$gate_reason" \
       --arg response_pass "$response_pass" \
       --arg sentiment_pass "$sentiment_pass" \
+      --arg grounding_pass "$grounding_pass" \
+      --arg leakage_pass "$leakage_pass" \
       --arg response_len "${#response_text}" \
+      --arg rag_total_ms "$rag_total_ms" \
+      --arg hybrid_retrieval_ms "$hybrid_retrieval_ms" \
+      --arg quality_score "${quality_score:-}" \
+      --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+      --arg git_sha "$GIT_SHA" \
+      --arg artifact_sha "$ARTIFACT_SHA" \
       '{
         protocol: $protocol,
         case_id: $case_id,
@@ -440,11 +489,19 @@ assert_case() {
         fallback_count: 0,
         response_pass: $response_pass,
         sentiment_pass: $sentiment_pass,
-        response_len: ($response_len|tonumber)
+        grounding_pass: $grounding_pass,
+        leakage_pass: $leakage_pass,
+        response_len: ($response_len|tonumber),
+        rag_total_ms: (if ($rag_total_ms|length) > 0 then ($rag_total_ms|tonumber) else null end),
+        hybrid_retrieval_ms: (if ($hybrid_retrieval_ms|length) > 0 then ($hybrid_retrieval_ms|tonumber) else null end),
+        quality_score: (if ($quality_score|length) > 0 and $quality_score != "null" then ($quality_score|tonumber) else null end),
+        timestamp: $timestamp,
+        git_sha: $git_sha,
+        artifact_sha: $artifact_sha
       }' >> "$jsonl_path"
   fi
 
-  echo "$protocol_label $case_id status=200 http=$rag_version gate=${retrieval_mode}/${gate_reason} fallback=0 response=$response_pass sentiment=$sentiment_pass"
+  echo "$protocol_label $case_id status=200 http=$rag_version gate=${retrieval_mode}/${gate_reason} fallback=0 response=$response_pass sentiment=$sentiment_pass rag_total_ms=$rag_total_ms"
 }
 
 run_protocol() {
@@ -475,15 +532,22 @@ if [[ "$WRITE_JSONL" == "1" ]]; then
   jq -s \
     --arg generated_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
     --arg base_url "$BASE_URL" \
+    --arg git_sha "$GIT_SHA" \
+    --arg artifact_sha "$ARTIFACT_SHA" \
     '{
       generated_at: $generated_at,
       base_url: $base_url,
+      git_sha: $git_sha,
+      artifact_sha: $artifact_sha,
       case_count: (length / 3),
       protocol_count: 3,
       total_rows: length,
       results: .
     }' "$jsonl_path" > "$summary_path"
-  echo "summary_json=$summary_path"
+  cp "$jsonl_path" "$JSONL_OUT"
+  cp "$summary_path" "$SUMMARY_OUT"
+  echo "jsonl_out=$JSONL_OUT"
+  echo "summary_json=$SUMMARY_OUT"
 fi
 
 echo "PASS: real inference response smoke across HTTP/1.1, HTTP/2, and HTTP/3"

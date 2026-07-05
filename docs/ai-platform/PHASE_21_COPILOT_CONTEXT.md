@@ -1,11 +1,11 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-04 (Phase 22A real-inference response validation design)  
-**Current main SHA:** `b46667c` or later (Phase 21 archive HEAD @ `328161d`; pre-archive validation @ `bd76875`)  
+**Last updated:** 2026-07-05 (Phase 22B validator PASS + KPI/observability readiness)  
+**Current main SHA:** `21f46c4` or later (Phase 21 archive HEAD @ `328161d`)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **CLOSED PASS** — N=5 opt-in hybrid preview production-readiness **ARCHIVED** @ `328161d`; no further T20 live eval unless explicitly approved  
-**Phase 22 status:** **22A COMPLETE** (planning/readiness only — response validation design; live matrix **NOT STARTED** — see `PHASE_22A_REAL_INFERENCE_RESPONSE_VALIDATION_DESIGN.md`, `PHASE_22_REAL_INFERENCE_TRANSPORT_READINESS_PLAN.md`)  
+**Phase 22 status:** **22B PASS** (validator smoke 15/15 + KPI readiness COMPLETE; live matrix **NOT STARTED** — see `PHASE_22B_REAL_INFERENCE_RESPONSE_TRANSPORT_VALIDATOR.md`, `PHASE_22_KPI_OBSERVABILITY_READINESS.md`)  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -166,6 +166,8 @@ AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0.
 Hybrid/vector production default: NOT APPROVED.
 Phase 22: NOT STARTED as live matrix.
 Phase 22A: COMPLETE — real inference response validation design only (read-only scripts; no matrix).
+Phase 22B: PASS — response+transport validator smoke 15/15; KPI/observability readiness COMPLETE.
+Protocol note: cumulative matrix evidence came from the existing HTTP/1.1 live runner stack. Separate read-only transport/response smoke (15 probes) and KPI summarizer output are not added to the cumulative matrix total.
 Permanent allowlist: contract user only.
 Combined live evidence (D16→T20.42C): 57105/57105 HTTP 200, 0% fallback.
 ```

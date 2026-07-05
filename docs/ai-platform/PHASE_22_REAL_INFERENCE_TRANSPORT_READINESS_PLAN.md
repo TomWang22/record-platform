@@ -1,13 +1,13 @@
 # Phase 22 — real inference + transport readiness plan
 
-**Status:** Phase 22A COMPLETE (planning/readiness) — **NOT STARTED** as live matrix  
+**Status:** Phase 22B PASS (validator smoke + KPI readiness) — **NOT STARTED** as live matrix  
 **Created:** 2026-07-04  
-**Updated:** 2026-07-04 (Phase 22A response validation design)  
+**Updated:** 2026-07-05 (Phase 22B response+transport validator + KPI/observability readiness)  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 This document is a **planning and readiness handoff only**. It does not authorize runtime changes, production-default switches, percentage rollout, allowlist broadening, participant artifact edits, user provisioning, or a new live matrix.
 
-See also: `docs/ai-platform/PHASE_22A_REAL_INFERENCE_RESPONSE_VALIDATION_DESIGN.md`
+See also: `docs/ai-platform/PHASE_22A_REAL_INFERENCE_RESPONSE_VALIDATION_DESIGN.md`, `docs/ai-platform/PHASE_22B_REAL_INFERENCE_RESPONSE_TRANSPORT_VALIDATOR.md`, `docs/ai-platform/PHASE_22_KPI_OBSERVABILITY_READINESS.md`
 
 ---
 
@@ -89,6 +89,19 @@ Script: `scripts/smoke-ai-rag-real-inference-response-readonly.sh`
 
 These remain governed by existing T20 closeout patterns; Phase 22 does not reopen Phase 21 matrix totals without explicit approval.
 
+### 5. KPI / observability evidence (Phase 22B+)
+
+Separate from matrix totals and from H1/H2/H3 smoke counts:
+
+- Recommendation usefulness / rubric pass rates over time
+- Retrieval latency baselines (`rag_total_ms`, hybrid latency when exposed)
+- Ingestion pipeline success rates (defined; instrumentation gaps documented)
+- Data-to-searchable lifecycle timing (defined; no invented data)
+- Operational health gates (uptime, error rates, fallback, telemetry, OCH)
+
+See: `docs/ai-platform/PHASE_22_KPI_OBSERVABILITY_READINESS.md`  
+Summarizer: `scripts/summarize-phase22-ai-kpis-readonly.mjs`
+
 ---
 
 ## Phase 22 protocol test requirement
@@ -147,9 +160,9 @@ No adding protocol-smoke probes to 57105 cumulative matrix.
 
 | Workstream | Scope | Status |
 | ---------- | ----- | ------ |
-| **22A** | Response validation design + read-only scripts/docs | **COMPLETE** |
-| **22B** | Response + transport validator smoke only (no live matrix) | NOT STARTED |
-| **22C** | Live real-inference matrix (protocol declared per batch) | NOT STARTED — requires 22B PASS + explicit approval |
+| **22A** | Response validation design + read-only scripts/docs | **COMPLETE** @ `21f46c4` |
+| **22B** | Response + transport validator smoke + KPI readiness | **PASS** — 15/15 smoke, KPI defined |
+| **22C** | Live real-inference matrix (protocol declared per batch) | NOT STARTED — requires explicit approval |
 
 ---
 
@@ -187,4 +200,5 @@ Do not start T20.43, production-default RFC, PERCENT/ALLOW_PROD_PERCENT rollout,
 bash scripts/verify-phase-21-archive-readonly.sh
 bash scripts/smoke-ai-rag-transport-protocols-readonly.sh   # requires CONTRACT_PASSWORD
 bash scripts/smoke-ai-rag-real-inference-response-readonly.sh
+node scripts/summarize-phase22-ai-kpis-readonly.mjs
 ```

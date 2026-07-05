@@ -27,6 +27,10 @@ function parseGlobPattern(pattern) {
       .map((name) => path.join('/tmp', name));
   }
   const rel = pattern.replace(/^\.\//, '');
+  const absDirect = path.isAbsolute(rel) ? rel : path.join(REPO_ROOT, rel);
+  if (!rel.includes('**/') && fs.existsSync(absDirect) && fs.statSync(absDirect).isFile()) {
+    return [absDirect];
+  }
   const base = path.join(REPO_ROOT, rel.split('/**/')[0]);
   if (!fs.existsSync(base)) return [];
   const ext = rel.endsWith('.jsonl') ? '.jsonl' : '.json';
@@ -69,7 +73,16 @@ function loadRowsFromFile(filePath) {
   if (Array.isArray(parsed)) return parsed;
   if (parsed && Array.isArray(parsed.results)) return parsed.results;
   if (parsed && parsed.results && Array.isArray(parsed.results.results)) return parsed.results.results;
+  if (parsed && parsed.protocol_matrix_total != null && parsed.http200 != null) {
+    return [];
+  }
   return [];
+}
+
+function loadSummaryFile(filePath) {
+  const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  if (parsed && parsed.protocol_matrix_total != null) return parsed;
+  return null;
 }
 
 function percentile(values, p) {
@@ -85,9 +98,74 @@ function isPass(value) {
 
 function main() {
   const files = collectInputFiles();
-  if (!files.length) {
+  const phase22cSummary = files
+    .filter((f) => f.includes('phase22c-matrix-summary') || f.includes('phase22c-matrix-summary.json'))
+    .sort()
+    .pop();
+  if (phase22cSummary) {
+    const summaryDoc = loadSummaryFile(phase22cSummary);
+    if (summaryDoc) {
+      const output = `${JSON.stringify({
+        status: summaryDoc.status || 'PASS',
+        source: 'phase22c-matrix-summary',
+        input_files: 1,
+        total_cases: summaryDoc.protocol_matrix_total,
+        response_pass_rate: summaryDoc.response_pass_rate,
+        sentiment_pass_rate: summaryDoc.sentiment_pass_rate,
+        red_team_safety_pass_rate: summaryDoc.red_team_safety_pass_rate,
+        grounding_pass_rate: summaryDoc.grounding_pass_rate,
+        fallback_count: summaryDoc.fallback_count,
+        leakage_failures: summaryDoc.leakage_failures,
+        http200_by_protocol: summaryDoc.http200_by_protocol,
+        gate_reason_counts: summaryDoc.gate_reason_counts,
+        latency: {
+          by_protocol: summaryDoc.latency_by_protocol,
+          by_case: summaryDoc.latency_by_case,
+        },
+        notes: [
+          'Loaded from Phase 22C matrix summary JSON (no raw response bodies)',
+          'Protocol matrix is separate from Phase 21 cumulative 57105',
+        ],
+      }, null, 2)}\n`;
+      process.stdout.write(output);
+      process.exit(0);
+    }
+  }
+
+  const summaryFiles = files.filter((f) => f.endsWith('-summary.json') || f.endsWith('summary.json'));
+  if (!files.length && !summaryFiles.length) {
     console.log('NO_DATA: KPI summarizer found no local Phase 22 result files');
     process.exit(0);
+  }
+
+  if (!files.some((f) => f.endsWith('.jsonl')) && summaryFiles.length) {
+    const summaryDoc = loadSummaryFile(summaryFiles[summaryFiles.length - 1]);
+    if (summaryDoc) {
+      const output = `${JSON.stringify({
+        status: summaryDoc.status || 'PASS',
+        source: 'phase22-summary-json',
+        input_files: summaryFiles.length,
+        total_cases: summaryDoc.protocol_matrix_total,
+        response_pass_rate: summaryDoc.response_pass_rate,
+        sentiment_pass_rate: summaryDoc.sentiment_pass_rate,
+        red_team_safety_pass_rate: summaryDoc.red_team_safety_pass_rate,
+        grounding_pass_rate: summaryDoc.grounding_pass_rate,
+        fallback_count: summaryDoc.fallback_count,
+        leakage_failures: summaryDoc.leakage_failures,
+        http200_by_protocol: summaryDoc.http200_by_protocol,
+        gate_reason_counts: summaryDoc.gate_reason_counts,
+        latency: {
+          by_protocol: summaryDoc.latency_by_protocol,
+          by_case: summaryDoc.latency_by_case,
+        },
+        notes: [
+          'Loaded from Phase 22C summary JSON (no raw response bodies)',
+          'Protocol matrix is separate from Phase 21 cumulative 57105',
+        ],
+      }, null, 2)}\n`;
+      process.stdout.write(output);
+      process.exit(0);
+    }
   }
 
   const rows = [];

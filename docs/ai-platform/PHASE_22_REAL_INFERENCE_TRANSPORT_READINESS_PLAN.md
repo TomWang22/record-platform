@@ -1,8 +1,8 @@
 # Phase 22 — real inference + transport readiness plan
 
-**Status:** Phase 22B PASS (validator smoke + KPI readiness) — **NOT STARTED** as live matrix  
+**Status:** Phase 22C–G CLOSED PASS — protocol-parity live matrix **7200/7200** — no further live matrix unless explicitly approved  
 **Created:** 2026-07-04  
-**Updated:** 2026-07-05 (Phase 22B response+transport validator + KPI/observability readiness)  
+**Updated:** 2026-07-05 (Phase 22C protocol-parity live matrix PASS + closeout)  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 This document is a **planning and readiness handoff only**. It does not authorize runtime changes, production-default switches, percentage rollout, allowlist broadening, participant artifact edits, user provisioning, or a new live matrix.
@@ -161,8 +161,12 @@ No adding protocol-smoke probes to 57105 cumulative matrix.
 | Workstream | Scope | Status |
 | ---------- | ----- | ------ |
 | **22A** | Response validation design + read-only scripts/docs | **COMPLETE** @ `21f46c4` |
-| **22B** | Response + transport validator smoke + KPI readiness | **PASS** — 15/15 smoke, KPI defined |
-| **22C** | Live real-inference matrix (protocol declared per batch) | NOT STARTED — requires explicit approval |
+| **22B** | Response + transport validator smoke + KPI readiness | **PASS** @ `0f49545` |
+| **22C** | Protocol-parity live matrix (H1/H2/H3) | **PASS 7200/7200** |
+| **22D** | Rollback drill | **PASS** |
+| **22E** | KPI telemetry audit | **PASS** |
+| **22F** | Decision C KEEP | **SELECTED** |
+| **22G** | Closeout | **CLOSED PASS** |
 
 ---
 

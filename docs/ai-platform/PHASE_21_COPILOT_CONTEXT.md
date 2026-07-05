@@ -1,10 +1,10 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-04 (T20.42G final closeout — T20.42 CLOSED PASS)  
-**Current main SHA:** `347d09d` (T20.42G final closeout)  
+**Last updated:** 2026-07-04 (Phase 21 final closed-pass archive — T20.42 CLOSED PASS)  
+**Current main SHA:** `bd76875` (Phase 21 archive checkpoint)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
-**Phase 21 status:** **RELEASE TAGGED** — non-vector seller intelligence product track **CLOSED**  
+**Phase 21 status:** **CLOSED PASS** — N=5 opt-in hybrid preview production-readiness **ARCHIVED** @ `bd76875`; no further T20 live eval unless explicitly approved  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.

@@ -1,10 +1,11 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-04 (Phase 21 final closed-pass archive — T20.42 CLOSED PASS)  
-**Current main SHA:** `bd76875` (Phase 21 archive checkpoint)  
+**Last updated:** 2026-07-04 (Phase 21 final closed-pass archive + read-only transport smoke)  
+**Current main SHA:** `22751a8` (Phase 21 archive HEAD @ `328161d`; pre-archive validation @ `bd76875`)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
-**Phase 21 status:** **CLOSED PASS** — N=5 opt-in hybrid preview production-readiness **ARCHIVED** @ `bd76875`; no further T20 live eval unless explicitly approved  
+**Phase 21 status:** **CLOSED PASS** — N=5 opt-in hybrid preview production-readiness **ARCHIVED** @ `328161d`; no further T20 live eval unless explicitly approved  
+**Phase 22 status:** **NOT STARTED** (planning/readiness only — see `PHASE_22_REAL_INFERENCE_TRANSPORT_READINESS_PLAN.md`)  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -154,11 +155,16 @@ T20.42G CLOSED PASS.
 T20.42A–G CLOSED PASS: N5 opt-in hybrid preview production-readiness final verification PASS.
 T20.42C-LIVE: PASS 4320/4320.
 Cumulative live: 57105/57105 HTTP 200, 0% fallback.
+Cumulative live matrix: 57105/57105 HTTP 200, 0% fallback.
+Protocol note: cumulative matrix evidence came from the existing HTTP/1.1 live runner stack. Separate read-only transport smoke confirms the contract allowlist RAG path over HTTP/1.1, HTTP/2, and HTTP/3; those smoke calls are not added to the cumulative matrix total.
 Production default: keyword.
 Preview UI/API: KEEP.
+AI_RAG_HYBRID_CANARY=1
+AI_RAG_HYBRID_CANARY_USER_ALLOWLIST=2ed75568-7deb-4c29-91b0-6919f24a0c9f
 AI_RAG_HYBRID_CANARY_PERCENT=0.
 AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0.
 Hybrid/vector production default: NOT APPROVED.
+Phase 22: NOT STARTED.
 Permanent allowlist: contract user only.
 Combined live evidence (D16→T20.42C): 57105/57105 HTTP 200, 0% fallback.
 ```

@@ -1,7 +1,7 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
 **Last updated:** 2026-07-04 (Phase 21 final closed-pass archive + read-only transport smoke)  
-**Current main SHA:** `22751a8` (Phase 21 archive HEAD @ `328161d`; pre-archive validation @ `bd76875`)  
+**Current main SHA:** `b17953a` (Phase 21 archive HEAD @ `328161d`; pre-archive validation @ `bd76875`)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **CLOSED PASS** — N=5 opt-in hybrid preview production-readiness **ARCHIVED** @ `328161d`; no further T20 live eval unless explicitly approved  

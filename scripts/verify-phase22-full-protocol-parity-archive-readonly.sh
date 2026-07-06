@@ -38,6 +38,9 @@ grep -q "ALLOW_PROD_PERCENT=0" "$ARCHIVE_PATH" || fail "archive missing ALLOW_PR
 grep -q "Hybrid/vector production default: NOT APPROVED" "$ARCHIVE_PATH" || fail "archive missing hybrid/vector NOT APPROVED"
 
 [[ -f "$ACTIVE_CONTEXT_PATH" ]] || fail "missing active context doc $ACTIVE_CONTEXT_PATH"
+grep -q "Current handoff HEAD:" "$ACTIVE_CONTEXT_PATH" || fail "active context missing Current handoff HEAD"
+grep -q "Phase 22 archive HEAD: 5588779" "$ACTIVE_CONTEXT_PATH" || fail "active context missing Phase 22 archive HEAD 5588779"
+grep -q "Phase 21 archive checkpoint: 328161d" "$ACTIVE_CONTEXT_PATH" || fail "active context missing Phase 21 archive checkpoint 328161d"
 grep -q "Phase 22: CLOSED PASS" "$ACTIVE_CONTEXT_PATH" || fail "active context missing Phase 22 CLOSED PASS"
 grep -q "H1 baseline: 57105/57105" "$ACTIVE_CONTEXT_PATH" || fail "active context missing H1 baseline 57105/57105"
 grep -q "H2 replay: 57105/57105" "$ACTIVE_CONTEXT_PATH" || fail "active context missing H2 replay 57105/57105"

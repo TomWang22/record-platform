@@ -2,7 +2,7 @@ ACTIVE CONTEXT — AI Platform
 Do not use chat memory as source of truth. Run archive verifiers and read this file plus PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md before any future work.
 Phase 21: CLOSED PASS / ARCHIVED
 Phase 22: CLOSED PASS — full labeled protocol parity
-Current handoff HEAD: 4022422
+Current handoff HEAD: 77af124
 Phase 22 archive HEAD: 5588779
 Phase 21 archive checkpoint: 328161d
 Phase 21 pre-archive validation HEAD: bd76875

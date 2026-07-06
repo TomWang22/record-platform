@@ -1,11 +1,11 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-05 (Phase 22C–G protocol-parity live matrix CLOSED PASS)  
-**Current main SHA:** `0f49545` or later  
+**Last updated:** 2026-07-06 (Phase 22K full protocol parity CLOSED PASS)  
+**Current main SHA:** post-22K or later  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **CLOSED PASS** — N=5 opt-in hybrid preview production-readiness **ARCHIVED** @ `328161d`; no further T20 live eval unless explicitly approved  
-**Phase 22 status:** **CLOSED PASS** (22C protocol-parity matrix 7200/7200 H1/H2/H3; decision C KEEP — see `PHASE_22G_PROTOCOL_PARITY_CLOSEOUT.md`)  
+**Phase 22 status:** **CLOSED PASS** — full labeled protocol parity H1/H2/H3 each **57105/57105** (see `PHASE_22K_FULL_PROTOCOL_PARITY_CLOSEOUT.md`)  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -164,12 +164,13 @@ AI_RAG_HYBRID_CANARY_USER_ALLOWLIST=2ed75568-7deb-4c29-91b0-6919f24a0c9f
 AI_RAG_HYBRID_CANARY_PERCENT=0.
 AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0.
 Hybrid/vector production default: NOT APPROVED.
-Phase 22: CLOSED PASS (22C–G).
-Phase 22C protocol-parity live matrix: 7200/7200 HTTP 200, 0% fallback (H1=2400, H2=2400, H3=2400).
-Phase 21 cumulative matrix remains: 57105/57105 HTTP 200, 0% fallback (HTTP/1.1 only).
-Do not merge Phase 22C counts into 57105 without labels.
-Phase 22A: COMPLETE. Phase 22B: PASS. Phase 22D rollback: PASS. Phase 22F: C KEEP.
-Protocol note: cumulative matrix evidence came from the existing HTTP/1.1 live runner stack. Phase 22C adds labeled H1/H2/H3 protocol-parity matrix evidence separately.
+Phase 22: CLOSED PASS — full labeled protocol parity.
+Phase 21 H1 baseline: 57105/57105 HTTP/1.1 (historical, not re-run).
+Phase 22I H2 replay: 57105/57105 HTTP/2 explicit — PASS.
+Phase 22J H3 replay: 57105/57105 HTTP/3 explicit — PASS.
+Phase 22C sample: 7200/7200 — sample only, not full parity.
+Do not merge H1/H2/H3 counts without labels.
+Production default: keyword. PERCENT=0. ALLOW_PROD_PERCENT=0.
 Permanent allowlist: contract user only.
 Combined live evidence (D16→T20.42C): 57105/57105 HTTP 200, 0% fallback.
 ```

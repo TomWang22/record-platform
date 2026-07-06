@@ -1,8 +1,8 @@
 # Phase 22 — real inference + transport readiness plan
 
-**Status:** Phase 22C–G CLOSED PASS — protocol-parity live matrix **7200/7200** — no further live matrix unless explicitly approved  
+**Status:** Phase 22 CLOSED PASS — full labeled protocol parity H1/H2/H3 each **57105/57105**  
 **Created:** 2026-07-04  
-**Updated:** 2026-07-05 (Phase 22C protocol-parity live matrix PASS + closeout)  
+**Updated:** 2026-07-06 (Phase 22I H2 + 22J H3 full 57105 replay PASS + 22K closeout)  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 This document is a **planning and readiness handoff only**. It does not authorize runtime changes, production-default switches, percentage rollout, allowlist broadening, participant artifact edits, user provisioning, or a new live matrix.
@@ -167,6 +167,24 @@ No adding protocol-smoke probes to 57105 cumulative matrix.
 | **22E** | KPI telemetry audit | **PASS** |
 | **22F** | Decision C KEEP | **SELECTED** |
 | **22G** | Closeout | **CLOSED PASS** |
+| **22H** | Full 57105 replay manifest + design | **PASS** |
+| **22I** | H2 full 57105 replay | **PASS 57105/57105** |
+| **22J** | H3 full 57105 replay | **PASS 57105/57105** |
+| **22K** | Full protocol parity closeout | **CLOSED PASS** |
+
+---
+
+## Full protocol parity (22I–K — COMPLETE)
+
+```text
+Phase 21 H1 baseline: 57105/57105 HTTP/1.1 — historical, not re-run
+Phase 22I H2 replay:  57105/57105 HTTP/2 explicit — PASS
+Phase 22J H3 replay:  57105/57105 HTTP/3 explicit — PASS
+Full labeled protocol parity: PASS
+Phase 22C sample: 7200/7200 — sample only
+```
+
+See: `PHASE_22I_H2_FULL_57105_REPLAY.md`, `PHASE_22J_H3_FULL_57105_REPLAY.md`, `PHASE_22K_FULL_PROTOCOL_PARITY_CLOSEOUT.md`
 
 ---
 
@@ -188,6 +206,18 @@ Approved: start Phase 22B real-inference response and transport validator smoke 
 
 ```text
 Approved: start Phase 22C live real-inference matrix only after Phase 22B response+transport validator PASS.
+```
+
+**H2 full 57105 replay (22I — after 22H manifest PASS):**
+
+```text
+Approved: start Phase 22I HTTP/2 full 57105 real-inference replay only after Phase 22H replay manifest PASS.
+```
+
+**H3 full 57105 replay (22J — after 22I PASS):**
+
+```text
+Approved: start Phase 22J HTTP/3 full 57105 real-inference replay only after Phase 22I HTTP/2 replay PASS.
 ```
 
 ---

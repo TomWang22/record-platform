@@ -1,8 +1,8 @@
 # Phase 22 — real inference + transport readiness plan
 
-**Status:** Phase 22 CLOSED PASS — full labeled protocol parity H1/H2/H3 each **57105/57105**  
+**Status:** Phase 22 CLOSED PASS — archived @ `PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md` — no further live matrix unless separately approved  
 **Created:** 2026-07-04  
-**Updated:** 2026-07-06 (Phase 22I H2 + 22J H3 full 57105 replay PASS + 22K closeout)  
+**Updated:** 2026-07-06 (Phase 22 archive + Phase 23A context continuity handoff)  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 This document is a **planning and readiness handoff only**. It does not authorize runtime changes, production-default switches, percentage rollout, allowlist broadening, participant artifact edits, user provisioning, or a new live matrix.
@@ -171,6 +171,22 @@ No adding protocol-smoke probes to 57105 cumulative matrix.
 | **22I** | H2 full 57105 replay | **PASS 57105/57105** |
 | **22J** | H3 full 57105 replay | **PASS 57105/57105** |
 | **22K** | Full protocol parity closeout | **CLOSED PASS** |
+
+---
+
+## Archive and next work
+
+```text
+Phase 22: CLOSED PASS — full labeled protocol parity complete.
+H1/H2/H3 each have 57105/57105 labeled evidence.
+Phase 22C 7200/7200 remains sample-only.
+No further live matrix is required unless separately approved.
+Next work is Phase 23A context-continuity/design only.
+```
+
+Verifier: `bash scripts/verify-phase22-full-protocol-parity-archive-readonly.sh`  
+Archive: `docs/ai-platform/PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md`  
+Context continuity: `docs/ai-platform/PHASE_23A_CONTEXT_CONTINUITY_AND_LONG_RUN_REPLAY_DESIGN.md`
 
 ---
 

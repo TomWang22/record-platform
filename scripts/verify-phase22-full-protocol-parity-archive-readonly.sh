@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+ARCHIVE_PATH="docs/ai-platform/PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md"
+ARTIFACT_PATH="docs/ai-platform/T20-35-owner-approved-real-preview-participants.md"
+EXPECTED_ARTIFACT_SHA="1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa"
+CONTRACT_UID="2ed75568-7deb-4c29-91b0-6919f24a0c9f"
+
+fail() {
+  echo "FAIL: $*" >&2
+  exit 1
+}
+
+current_head="$(git rev-parse --short HEAD)"
+full_head="$(git rev-parse HEAD)"
+echo "current_head_short=$current_head"
+echo "current_head_full=$full_head"
+
+[[ -f "$ARCHIVE_PATH" ]] || fail "missing archive doc $ARCHIVE_PATH"
+
+actual_artifact_sha="$(shasum -a 256 "$ARTIFACT_PATH" | awk '{print $1}')"
+echo "artifact_sha256=$actual_artifact_sha"
+[[ "$actual_artifact_sha" == "$EXPECTED_ARTIFACT_SHA" ]] || fail "artifact SHA mismatch"
+
+grep -q "Phase 22 status: CLOSED PASS" "$ARCHIVE_PATH" || fail "archive missing Phase 22 status CLOSED PASS"
+grep -q "H1 baseline: 57105/57105" "$ARCHIVE_PATH" || fail "archive missing H1 baseline 57105/57105"
+grep -q "H2 replay: 57105/57105" "$ARCHIVE_PATH" || fail "archive missing H2 replay 57105/57105"
+grep -q "H3 replay: 57105/57105" "$ARCHIVE_PATH" || fail "archive missing H3 replay 57105/57105"
+grep -q "Full labeled protocol parity: PASS" "$ARCHIVE_PATH" || fail "archive missing full labeled protocol parity PASS"
+grep -q "Phase 22C 7200/7200: sample only" "$ARCHIVE_PATH" || fail "archive missing Phase 22C sample only"
+grep -q "Production default: keyword" "$ARCHIVE_PATH" || fail "archive missing Production default keyword"
+grep -q "PERCENT=0" "$ARCHIVE_PATH" || fail "archive missing PERCENT=0"
+grep -q "ALLOW_PROD_PERCENT=0" "$ARCHIVE_PATH" || fail "archive missing ALLOW_PROD_PERCENT=0"
+grep -q "Hybrid/vector production default: NOT APPROVED" "$ARCHIVE_PATH" || fail "archive missing hybrid/vector NOT APPROVED"
+
+if ! kubectl -n record-platform exec deploy/python-ai-service -- printenv >/tmp/rp-phase22-archive-env.txt 2>/dev/null; then
+  fail "kubectl printenv failed (cluster unavailable)"
+fi
+
+grep -q "^AI_RAG_HYBRID_CANARY=1$" /tmp/rp-phase22-archive-env.txt || fail "AI_RAG_HYBRID_CANARY != 1"
+grep -q "^AI_RAG_HYBRID_CANARY_USER_ALLOWLIST=${CONTRACT_UID}$" /tmp/rp-phase22-archive-env.txt || fail "allowlist mismatch"
+grep -q "^AI_RAG_HYBRID_CANARY_PERCENT=0$" /tmp/rp-phase22-archive-env.txt || fail "AI_RAG_HYBRID_CANARY_PERCENT != 0"
+grep -q "^AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0$" /tmp/rp-phase22-archive-env.txt || fail "AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT != 0"
+
+echo "PASS: Phase 22 full protocol parity archive verification"

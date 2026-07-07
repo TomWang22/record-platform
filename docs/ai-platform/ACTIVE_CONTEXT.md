@@ -3,7 +3,7 @@ Agent ACTIVE CONTEXT — AI Platform
 Do not use chat memory as source of truth.
 Before any future AI-platform work, run:
 
-make ai-platform-verify-phase23-guardrails
+make ai-platform-verify-phase24-kpis
 
 Then read:
 - docs/ai-platform/ACTIVE_CONTEXT.md
@@ -17,6 +17,7 @@ Phase handoff lineage:
 - Phase 23A operations-design commit: 77af124
 - Phase 23A metadata-sync commit: 6442d87
 - Phase 23B context-archive verifier hardening commit: 304277a
+- Phase 23 context-continuity guardrail closeout commit: 6f3d2bd
 
 Frozen archive heads:
 - Phase 22 archive HEAD: 5588779
@@ -26,9 +27,11 @@ Frozen archive heads:
 Phase 21: CLOSED PASS / ARCHIVED
 Phase 22: CLOSED PASS — full labeled protocol parity
 Phase 23: CLOSED PASS — context continuity and long-run replay guardrails
-Phase 23C: dry-run resume/checkpoint validation PASS
-Phase 23D: CI/Makefile guard integration PASS
-Phase 23E: archive closeout PASS
+Phase 24: CLOSED PASS — KPI observability read-only extraction and gap inventory
+Phase 24A: KPI observability implementation design COMPLETE
+Phase 24B: read-only KPI extractor scripts PASS
+Phase 24C: KPI guard tests + Makefile target PASS
+Phase 24D: KPI observability closeout PASS
 
 Artifact SHA256:
 1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa
@@ -49,6 +52,12 @@ Evidence label rules:
 - Phase 22C 7200/7200 is sample only; never call it full parity.
 - Phase 22B 15/15 is smoke only; never call it matrix evidence.
 
+KPI gaps still open:
+- ingestion_success_rate per source type: GAP / PARTIAL
+- data_to_searchable_ms end-to-end: GAP
+- H1 full-matrix latency summary in committed docs: GAP
+- usefulness over time time-series: GAP
+
 Locked production posture:
 - Production default: keyword
 - Preview UI/API: KEEP
@@ -58,4 +67,4 @@ Locked production posture:
 - Runtime/env/default/allowlist changes: NONE
 
 Next allowed step:
-No further Phase 23 work required. Any future live inference, production-default RFC, PERCENT rollout, allowlist change, participant artifact edit, or user provisioning requires a new explicit owner approval phrase and both archive verifiers PASS first.
+No production-default RFC, PERCENT rollout, live matrix, allowlist change, participant artifact edit, or user provisioning without explicit owner approval. If KPI gaps remain, next work should be Phase 25 observability instrumentation design only.

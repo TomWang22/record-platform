@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-06 (Phase 23 context continuity guardrail closeout complete)  
+**Last updated:** 2026-07-06 (Phase 24 KPI observability read-only closeout complete)  
 **Current repo tip:** compute live with `git rev-parse --short HEAD` (see `docs/ai-platform/ACTIVE_CONTEXT.md`)  
 **Phase 22 archive HEAD:** `5588779`  
 **Phase 21 archive checkpoint:** `328161d`  
@@ -8,7 +8,8 @@
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **CLOSED PASS** — N=5 opt-in hybrid preview production-readiness **ARCHIVED** @ `328161d`; no further T20 live eval unless explicitly approved  
 **Phase 22 status:** **CLOSED PASS / ARCHIVED** — full labeled protocol parity H1/H2/H3 each **57105/57105** (see `PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md`)  
-**Phase 23 status:** **CLOSED PASS** — context continuity and long-run replay guardrails. **23A COMPLETE** (design). **23B COMPLETE** (verifier/evidence-label guard). **23C PASS** (dry-run resume validation). **23D PASS** (Makefile guard). **23E PASS** (archive closeout). Phase 23 live work: **NOT APPROVED.**  
+**Phase 23 status:** **CLOSED PASS** — context continuity and long-run replay guardrails.  
+**Phase 24 status:** **CLOSED PASS** — KPI observability read-only extraction and gap inventory. **24A COMPLETE** (design). **24B PASS** (read-only extractors). **24C PASS** (guard tests/Makefile). **24D PASS** (closeout). Phase 24 live work: **NOT APPROVED.**  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -175,10 +176,15 @@ Phase 23A COMPLETE: context-continuity and long-run replay operations design onl
 Phase 23B COMPLETE: context/archive verifier hardening and evidence-label CI guard; no live eval; no runtime changes.
 Phase 23C PASS: dry-run resume/checkpoint validation only; no live eval; no runtime changes.
 Phase 23D PASS: CI/Makefile guard integration; no live eval; no runtime changes.
-Phase 23E PASS: Phase 23 archive closeout; no live eval; no runtime changes.
 Phase 23: CLOSED PASS.
-Phase 23 live work: NOT APPROVED.
-Next work: no further Phase 23 work required unless owner explicitly approves new live work.
+Phase 24A COMPLETE: KPI observability implementation design only; no live eval; no runtime changes.
+Phase 24B PASS: read-only KPI extractor scripts; no live eval; no runtime changes.
+Phase 24C PASS: KPI guard tests and Makefile target; no live eval; no runtime changes.
+Phase 24D PASS: Phase 24 KPI observability closeout; no live eval; no runtime changes.
+Phase 24: CLOSED PASS.
+Phase 24 live work: NOT APPROVED.
+KPI gaps still open: ingestion_success_rate per source (GAP/PARTIAL), data_to_searchable_ms (GAP), H1 full-matrix latency summary (GAP), usefulness time-series (GAP).
+Next work: Phase 25 observability instrumentation design only unless owner explicitly approves live work.
 Phase 22 CLOSED PASS — full labeled protocol parity.
 H1 baseline: 57105/57105 HTTP/1.1.
 H2 replay: 57105/57105 HTTP/2 PASS.

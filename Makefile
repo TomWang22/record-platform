@@ -128,6 +128,10 @@ ai-platform-verify-context-continuity: ## Archive verifiers + Phase 23C dry-run 
 ai-platform-verify-phase23-guardrails: ## Full Phase 23 continuity guardrail batch
 	$(MAKE) ai-platform-verify-context-continuity
 	node --test tests/phase23c-dry-run-replay-resume-validation.test.mjs
+ai-platform-verify-phase24-kpis: ## Phase 23 guardrails + Phase 24 read-only KPI report/tests
+	$(MAKE) ai-platform-verify-phase23-guardrails
+	node scripts/phase24b-ai-kpi-readonly-report.mjs
+	node --test tests/phase24b-ai-kpi-readonly-report.test.mjs
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

@@ -14,11 +14,11 @@
 
 ## 1. Executive verdict
 
-Phase 23A closes the **context-continuity gap** exposed after Phase 22 archive handoff. Agents were treating `HEAD: 5588779` in `ACTIVE_CONTEXT.md` as the live repo tip; that value is the **Phase 22 archive HEAD**, not current handoff HEAD.
+Phase 23A closes the **context-continuity gap** exposed after Phase 22 archive handoff. Agents were treating `HEAD: 5588779` in `ACTIVE_CONTEXT.md` as the live repo tip; that value is the **Phase 22 archive HEAD**, not the current repo tip.
 
 Phase 23A defines:
 
-- Unambiguous **current handoff HEAD** vs **archive HEAD** fields
+- Unambiguous **current repo tip** (computed live) vs **phase handoff lineage** vs **frozen archive heads**
 - A **source-of-truth hierarchy** (verifiers first, chat memory never)
 - **Evidence label rules** so 57105 full parity, 7200 sample, and 15-probe smoke are never conflated
 - **Long-run replay resume** and **bench-log handling** rules for future approved live work
@@ -51,25 +51,32 @@ Before any future AI-platform work, run both archive verifiers (or `make ai-plat
 `docs/ai-platform/ACTIVE_CONTEXT.md` is the compact agent entrypoint. Required fields:
 
 ```text
-Do not use chat memory as source of truth. Run archive verifiers and read this file plus PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md before any future work.
-Current handoff HEAD: <git rev-parse --short HEAD at tip after each handoff push>
-Phase 22 archive HEAD: 5588779
-Phase 21 archive checkpoint: 328161d
-Phase 21 pre-archive validation HEAD: bd76875
+Current repo tip:
+- Always compute live with `git rev-parse --short HEAD`.
+- Do not store current repo tip as source of truth in ACTIVE_CONTEXT.md.
+
+Phase handoff lineage:
+- Store historical handoff commits by phase.
+- These commits may be older than the current repo tip.
+
+Frozen archive heads:
+- Store immutable archive commits.
+- Verifiers must check that archive commits exist and archive docs contain locked evidence.
 ```
+
+Do not require ACTIVE_CONTEXT.md to equal the current git tip. That creates endless metadata drift after every sync commit.
 
 **Semantics:**
 
 | Field | Meaning | Updates when |
 | ----- | ------- | ------------ |
-| Current handoff HEAD | Tip commit containing the latest context handoff | Each approved handoff commit on main |
+| Current repo tip | Live `git rev-parse --short HEAD` | Never stored in ACTIVE_CONTEXT.md |
+| Phase handoff lineage | Historical commits that explain how context evolved | Append on each approved handoff commit |
 | Phase 22 archive HEAD | Commit that archived full labeled protocol parity | Frozen at `5588779` |
 | Phase 21 archive checkpoint | Phase 21 archive closeout commit | Frozen at `328161d` |
 | Phase 21 pre-archive validation HEAD | Last Phase 21 validation before archive | Frozen at `bd76875` |
 
-Do **not** set Current handoff HEAD to an archive HEAD. Do **not** infer counts or production state from chat memory.
-
-On each handoff commit, update `Current handoff HEAD` to that commit's short SHA before push.
+Do **not** use the banned label `Current handoff HEAD:`. Do **not** infer counts or production state from chat memory.
 
 ---
 
@@ -155,7 +162,7 @@ Phase 23 final desired end state:
 Phase 23 final desired end state:
 - Phase 21 archive verifier PASS.
 - Phase 22 full protocol parity verifier PASS.
-- ACTIVE_CONTEXT.md has unambiguous current handoff HEAD and archive HEADs.
+- ACTIVE_CONTEXT.md separates current repo tip (computed live), phase handoff lineage, and frozen archive heads.
 - Long-run replay resume/runbook templates exist.
 - CI or script guard exists to prevent mislabeling Phase 22C 7200 as full parity.
 - No live eval run in Phase 23 unless separately approved.

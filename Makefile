@@ -116,9 +116,12 @@ reset: kafka-clean-slate ## Alias: wipe Kafka broker data + service reset (DESTR
 verify: ## Kafka cluster + edge routing checks
 	$(MAKE) verify-kafka-cluster
 	$(MAKE) verify-preflight-edge-routing
+ai-platform-verify-evidence-labels: ## Read-only AI-platform evidence label drift guard
+	bash scripts/verify-ai-platform-evidence-labels-readonly.sh
 ai-platform-verify-archive: ## Read-only Phase 21 + Phase 22 archive metadata checks
 	bash scripts/verify-phase-21-archive-readonly.sh
 	bash scripts/verify-phase22-full-protocol-parity-archive-readonly.sh
+	bash scripts/verify-ai-platform-evidence-labels-readonly.sh
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

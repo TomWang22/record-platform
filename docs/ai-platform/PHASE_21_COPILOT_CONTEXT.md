@@ -1,14 +1,14 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-06 (Phase 23A context continuity operations design complete)  
-**Current handoff HEAD:** see `docs/ai-platform/ACTIVE_CONTEXT.md` (run `git rev-parse --short HEAD`)  
+**Last updated:** 2026-07-06 (Phase 23B context/archive verifier hardening complete)  
+**Current repo tip:** compute live with `git rev-parse --short HEAD` (see `docs/ai-platform/ACTIVE_CONTEXT.md`)  
 **Phase 22 archive HEAD:** `5588779`  
 **Phase 21 archive checkpoint:** `328161d`  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
 **Final validation SHA (P21.7B):** `13bc0ad`  
 **Phase 21 status:** **CLOSED PASS** — N=5 opt-in hybrid preview production-readiness **ARCHIVED** @ `328161d`; no further T20 live eval unless explicitly approved  
 **Phase 22 status:** **CLOSED PASS / ARCHIVED** — full labeled protocol parity H1/H2/H3 each **57105/57105** (see `PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md`)  
-**Phase 23 status:** **23A COMPLETE** — context-continuity and long-run replay operations design only; no live eval; no runtime changes. **23B NOT STARTED.** Phase 23 live work: **NOT APPROVED.**  
+**Phase 23 status:** **23A COMPLETE** — context-continuity and long-run replay operations design only; no live eval; no runtime changes. **23B COMPLETE** — context/archive verifier hardening and evidence-label CI guard; no live eval; no runtime changes. **23C NOT STARTED.** Phase 23 live work: **NOT APPROVED.**  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -172,9 +172,15 @@ H1/H2/H3 each have 57105/57105 labeled evidence.
 Phase 22C 7200/7200 remains sample-only.
 No further live matrix required unless separately approved.
 Phase 23A COMPLETE: context-continuity and long-run replay operations design only; no live eval; no runtime changes.
-Phase 23B: NOT STARTED.
+Phase 23B COMPLETE: context/archive verifier hardening and evidence-label CI guard; no live eval; no runtime changes.
+Phase 23C: NOT STARTED.
 Phase 23 live work: NOT APPROVED.
-Next work: Phase 23B context/archive verifier hardening and CI guard only unless separately approved.
+Next work: Phase 23C dry-run resume/checkpoint validation only unless separately approved.
+Phase 22 CLOSED PASS — full labeled protocol parity.
+H1 baseline: 57105/57105 HTTP/1.1.
+H2 replay: 57105/57105 HTTP/2 PASS.
+H3 replay: 57105/57105 HTTP/3 PASS.
+Phase 22C: 7200/7200 sample only.
 Phase 21 H1 baseline: 57105/57105 HTTP/1.1 (historical, not re-run).
 Phase 22I H2 replay: 57105/57105 HTTP/2 explicit — PASS.
 Phase 22J H3 replay: 57105/57105 HTTP/3 explicit — PASS.

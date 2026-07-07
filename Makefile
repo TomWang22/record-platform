@@ -132,6 +132,11 @@ ai-platform-verify-phase24-kpis: ## Phase 23 guardrails + Phase 24 read-only KPI
 	$(MAKE) ai-platform-verify-phase23-guardrails
 	node scripts/phase24b-ai-kpi-readonly-report.mjs
 	node --test tests/phase24b-ai-kpi-readonly-report.test.mjs
+
+ai-platform-verify-phase25-design: ## Phase 24 KPIs + Phase 25 observability design guard (read-only)
+	$(MAKE) ai-platform-verify-phase24-kpis
+	node scripts/phase25-observability-design-guard-readonly.mjs
+	node --test tests/phase25-observability-design-guard.test.mjs
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

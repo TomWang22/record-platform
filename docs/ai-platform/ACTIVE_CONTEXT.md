@@ -3,7 +3,7 @@ Agent ACTIVE CONTEXT — AI Platform
 Do not use chat memory as source of truth.
 Before any future AI-platform work, run:
 
-make ai-platform-verify-archive
+make ai-platform-verify-phase23-guardrails
 
 Then read:
 - docs/ai-platform/ACTIVE_CONTEXT.md
@@ -16,6 +16,7 @@ Current repo tip:
 Phase handoff lineage:
 - Phase 23A operations-design commit: 77af124
 - Phase 23A metadata-sync commit: 6442d87
+- Phase 23B context-archive verifier hardening commit: 304277a
 
 Frozen archive heads:
 - Phase 22 archive HEAD: 5588779
@@ -24,6 +25,10 @@ Frozen archive heads:
 
 Phase 21: CLOSED PASS / ARCHIVED
 Phase 22: CLOSED PASS — full labeled protocol parity
+Phase 23: CLOSED PASS — context continuity and long-run replay guardrails
+Phase 23C: dry-run resume/checkpoint validation PASS
+Phase 23D: CI/Makefile guard integration PASS
+Phase 23E: archive closeout PASS
 
 Artifact SHA256:
 1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa
@@ -53,4 +58,4 @@ Locked production posture:
 - Runtime/env/default/allowlist changes: NONE
 
 Next allowed step:
-Phase 23C dry-run resume/checkpoint validation only unless owner explicitly approves live work.
+No further Phase 23 work required. Any future live inference, production-default RFC, PERCENT rollout, allowlist change, participant artifact edit, or user provisioning requires a new explicit owner approval phrase and both archive verifiers PASS first.

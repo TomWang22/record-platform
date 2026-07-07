@@ -122,6 +122,12 @@ ai-platform-verify-archive: ## Read-only Phase 21 + Phase 22 archive metadata ch
 	bash scripts/verify-phase-21-archive-readonly.sh
 	bash scripts/verify-phase22-full-protocol-parity-archive-readonly.sh
 	bash scripts/verify-ai-platform-evidence-labels-readonly.sh
+ai-platform-verify-context-continuity: ## Archive verifiers + Phase 23C dry-run resume validation
+	$(MAKE) ai-platform-verify-archive
+	node scripts/phase23c-dry-run-replay-resume-validation.mjs
+ai-platform-verify-phase23-guardrails: ## Full Phase 23 continuity guardrail batch
+	$(MAKE) ai-platform-verify-context-continuity
+	node --test tests/phase23c-dry-run-replay-resume-validation.test.mjs
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

@@ -327,6 +327,46 @@ export function previewApi(method, pathSuffix, token, userId, cfg) {
   });
 }
 
+export function previewRevoke(token, userId, cfg) {
+  return previewApi('POST', 'revoke', token, userId, cfg);
+}
+
+export function previewEnroll(token, userId, cfg) {
+  return previewApi('POST', 'enroll', token, userId, cfg);
+}
+
+export function ragGateReason(token, userId, cfg) {
+  const resp = ragQuery(token, userId, 'Which of my listings need attention first, and why?', cfg, cfg.mgmtProto || PROTOCOLS.h1, {
+    maxRetries: 3,
+  });
+  return extractMeta(resp.body || {}).gate_reason;
+}
+
+export function resetWindowEnrollments(users, getToken, cfg) {
+  for (const user of users) {
+    if (user.role === 'allowlist') continue;
+    previewRevoke(getToken(user.email), user.uid, cfg);
+  }
+  for (const user of users) {
+    if (user.role === 'allowlist') continue;
+    previewEnroll(getToken(user.email), user.uid, cfg);
+  }
+  for (const user of users) {
+    if (user.role === 'allowlist') continue;
+    const token = getToken(user.email);
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const statusGate = previewApi('GET', 'status', token, user.uid, cfg).body?.gate_reason;
+      const ragGate = ragGateReason(token, user.uid, cfg);
+      if (statusGate === 'preview_opt_in' && ragGate === 'preview_opt_in') break;
+      sleepMs(200);
+      previewEnroll(token, user.uid, cfg);
+      if (attempt === 9) {
+        throw new Error(`preview enroll verify failed for ${user.email}`);
+      }
+    }
+  }
+}
+
 export function ragQuery(token, userId, question, cfg, proto, retryOpts = {}) {
   const maxRetries = retryOpts.maxRetries ?? 8;
   let last;
@@ -345,8 +385,11 @@ export function ragQuery(token, userId, question, cfg, proto, retryOpts = {}) {
       curlResolve: cfg.curlResolve,
     });
     const mode = extractMeta(last.body || {}).retrieval_mode;
-    if (last.http_status === 429 && attempt + 1 < maxRetries) {
-      sleepMs(Math.min(2000, 100 * 2 ** attempt));
+    if (
+      (last.http_status === 429 || last.http_status === 502 || last.http_status === 503 || last.http_status === 504) &&
+      attempt + 1 < maxRetries
+    ) {
+      sleepMs(Math.min(8000, 250 * 2 ** attempt));
       continue;
     }
     if (mode === 'keyword_fallback_from_hybrid' && attempt + 1 < maxRetries) {

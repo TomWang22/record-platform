@@ -20,6 +20,9 @@ import {
   resolveCurlTarget,
   login,
   previewApi,
+  previewRevoke,
+  previewEnroll,
+  resetWindowEnrollments,
   ragQuery,
   extractMeta,
   extractResponseText,
@@ -58,6 +61,8 @@ function parseArgs(argv) {
     resume: false,
     failFast: false,
     summaryOnly: false,
+    retryFailures: null,
+    onlyFailures: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -70,6 +75,8 @@ function parseArgs(argv) {
     else if (arg === '--resume') opts.resume = true;
     else if (arg === '--fail-fast') opts.failFast = true;
     else if (arg === '--summary-only') opts.summaryOnly = true;
+    else if (arg === '--retry-failures') opts.retryFailures = argv[++i];
+    else if (arg === '--only-failures') opts.onlyFailures = argv[++i];
   }
   return opts;
 }
@@ -201,7 +208,96 @@ const ENABLE_ENV = {
 function ensurePreviewEnrolled(token, userId, cfg) {
   const status = previewApi('GET', 'status', token, userId, cfg);
   if (status.body?.enrolled) return;
-  previewApi('POST', 'enroll', token, userId, cfg);
+  previewEnroll(token, userId, cfg);
+}
+
+function loadFailureProbeIds(triagePath) {
+  const triage = JSON.parse(fs.readFileSync(triagePath, 'utf8'));
+  const probes = triage.failure_probes || triage.retryable_failures || [];
+  const keys = new Set(
+    probes.map((f) =>
+      [f.matrix_protocol, f.window, f.run, f.case_id, f.user_uid_hash].join('|'),
+    ),
+  );
+  return { keys, probes, triage };
+}
+
+function probeMatchKey(probe, userUidHash) {
+  const hash =
+    userUidHash ||
+    createHash('sha256').update(probe.user_uid).digest('hex').slice(0, 12);
+  return [probe.matrix_protocol, probe.window, probe.run, probe.case_id, hash].join('|');
+}
+
+function executeProbe(probe, cfg, getToken) {
+  const proto = PROTOCOLS[probe.matrix_protocol];
+  const token = getToken(probe.user_email);
+  const userId = probe.user_uid;
+
+  let resp;
+  let meta;
+  let text;
+  let refs;
+  let leakagePass;
+  let qualityScore;
+  let rubric;
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    try {
+      resp = ragQuery(token, userId, probe.question, cfg, proto, { maxRetries: 8 });
+      if ([502, 503, 504, 429].includes(resp.http_status) && attempt + 1 < 16) {
+        sleepMs(Math.min(10000, 500 * 2 ** attempt));
+        continue;
+      }
+      meta = extractMeta(resp.body || {});
+      text = extractResponseText(resp.body || {});
+      refs = extractRefs(resp.body || {});
+      leakagePass = checkLeakage(text);
+      qualityScore = scoreAnswer(text, refs, leakagePass);
+      rubric = assertPhase21Row(probe, text, refs, leakagePass, qualityScore);
+      if (resp.http_status !== 200 && attempt + 1 < 16) {
+        sleepMs(Math.min(10000, 500 * 2 ** attempt));
+        continue;
+      }
+      break;
+    } catch (err) {
+      if (attempt + 1 >= 16) throw err;
+      sleepMs(Math.min(10000, 500 * 2 ** attempt));
+    }
+  }
+  const kpiWrites = writeMatrixKpiRows(probe, resp, meta, rubric, qualityScore);
+  const row = redactedRow(probe, {
+    http_status: resp.http_status,
+    http_version: resp.http_version,
+    version_ok: resp.version_ok,
+    rag_total_ms: resp.rag_total_ms,
+    retrieval_mode: meta.retrieval_mode,
+    gate_reason: meta.gate_reason,
+    fallback_count: meta.hybrid_fallback ? 1 : 0,
+    response_pass: rubric.response_pass,
+    sentiment_pass: rubric.sentiment_pass,
+    leakage_pass: leakagePass,
+    usefulness_write: kpiWrites.usefulness?.status,
+    query_observation_write: kpiWrites.query?.status,
+    quality_score: qualityScore,
+    sentiment_required: probe.sentiment_required,
+    red_team_case: probe.red_team_case,
+    completed_at: new Date().toISOString(),
+  });
+  const probeFail =
+    resp.http_status !== 200 ||
+    !resp.version_ok ||
+    meta.gate_reason !== probe.expected_gate_reason ||
+    meta.gate_reason === 'keyword_default' ||
+    rubric.response_pass !== 'PASS' ||
+    leakagePass === 'FAIL' ||
+    (probe.sentiment_required && rubric.sentiment_pass !== 'PASS');
+  return { row, probeFail, meta, resp };
+}
+
+function resolveMatrixRoot(outDir) {
+  const base = path.basename(outDir);
+  if (base.startsWith('shard-')) return path.dirname(outDir);
+  return outDir;
 }
 
 function loadCompletedIds(jsonlPath) {
@@ -217,10 +313,27 @@ function runMatrix(opts) {
     throw new Error('participant artifact SHA mismatch');
   }
 
+  const triagePath = opts.retryFailures || opts.onlyFailures;
+  const retryMode = Boolean(triagePath);
+  const matrixRoot = resolveMatrixRoot(opts.out);
   fs.mkdirSync(opts.out, { recursive: true });
-  const jsonlPath = path.join(opts.out, 'phase28-matrix.jsonl');
+  const jsonlPath = retryMode
+    ? path.join(matrixRoot, 'phase28-retry-failures.jsonl')
+    : path.join(opts.out, 'phase28-matrix.jsonl');
   const manifest = buildManifest(opts);
-  const completed = opts.resume ? loadCompletedIds(jsonlPath) : new Set();
+  const users = loadN5Participants();
+  let targetProbes = manifest;
+  if (retryMode) {
+    const loaded = loadFailureProbeIds(triagePath);
+    targetProbes = manifest.filter((p) => loaded.keys.has(probeMatchKey(p)));
+    if (opts.onlyFailures && opts.protocol !== 'all') {
+      const proto = opts.protocol.replace(/^h/i, 'h');
+      targetProbes = targetProbes.filter((p) => p.matrix_protocol === proto);
+    }
+    fs.writeFileSync(jsonlPath, '', 'utf8');
+  }
+
+  const completed = !retryMode && opts.resume ? loadCompletedIds(jsonlPath) : new Set();
   const cfg = {
     ...DEFAULTS,
     password: DEFAULTS.password || process.env.T20_PARTICIPANT_LOGIN_PASSWORD || 'ContractPass123!',
@@ -236,89 +349,63 @@ function runMatrix(opts) {
   };
 
   const failures = [];
-  for (const probe of manifest) {
-    if (completed.has(probe.probe_id)) continue;
-    const proto = PROTOCOLS[probe.matrix_protocol];
-    const token = getToken(probe.user_email);
-    const userId = probe.user_uid;
-    if (probe.role === 'preview') ensurePreviewEnrolled(token, userId, cfg);
+  let lastWindow = null;
+  for (const probe of targetProbes) {
+    if (!retryMode && completed.has(probe.probe_id)) continue;
 
-    let resp;
-    let meta;
-    let text;
-    let refs;
-    let leakagePass;
-    let qualityScore;
-    let rubric;
-    for (let attempt = 0; attempt < 12; attempt += 1) {
-      try {
-        resp = ragQuery(token, userId, probe.question, cfg, proto, { maxRetries: 3 });
-        meta = extractMeta(resp.body || {});
-        text = extractResponseText(resp.body || {});
-        refs = extractRefs(resp.body || {});
-        leakagePass = checkLeakage(text);
-        qualityScore = scoreAnswer(text, refs, leakagePass);
-        rubric = assertPhase21Row(probe, text, refs, leakagePass, qualityScore);
-        break;
-      } catch (err) {
-        if (attempt + 1 >= 12) throw err;
-        const delay = Math.min(8000, 500 * 2 ** attempt);
-        sleepMs(delay);
-      }
+    if (probe.window !== lastWindow) {
+      resetWindowEnrollments(users, getToken, cfg);
+      lastWindow = probe.window;
     }
-    const kpiWrites = writeMatrixKpiRows(probe, resp, meta, rubric, qualityScore);
 
-    const row = redactedRow(probe, {
-      http_status: resp.http_status,
-      http_version: resp.http_version,
-      version_ok: resp.version_ok,
-      rag_total_ms: resp.rag_total_ms,
-      retrieval_mode: meta.retrieval_mode,
-      gate_reason: meta.gate_reason,
-      fallback_count: meta.hybrid_fallback ? 1 : 0,
-      response_pass: rubric.response_pass,
-      sentiment_pass: rubric.sentiment_pass,
-      leakage_pass: leakagePass,
-      usefulness_write: kpiWrites.usefulness?.status,
-      query_observation_write: kpiWrites.query?.status,
-      quality_score: qualityScore,
-      sentiment_required: probe.sentiment_required,
-      red_team_case: probe.red_team_case,
-      completed_at: new Date().toISOString(),
-    });
-
+    const { row, probeFail } = executeProbe(probe, cfg, getToken);
+    if (retryMode) row.retry_of_probe_id = probe.probe_id;
     fs.appendFileSync(jsonlPath, `${JSON.stringify(row)}\n`, 'utf8');
-    completed.add(probe.probe_id);
-
-    const probeFail =
-      resp.http_status !== 200 ||
-      !resp.version_ok ||
-      meta.gate_reason !== probe.expected_gate_reason ||
-      meta.gate_reason === 'keyword_default' ||
-      rubric.response_pass !== 'PASS' ||
-      leakagePass === 'FAIL' ||
-      (probe.sentiment_required && rubric.sentiment_pass !== 'PASS');
+    if (!retryMode) completed.add(probe.probe_id);
 
     if (probeFail) {
-      failures.push({ probe_id: probe.probe_id, gate_reason: meta.gate_reason, http_status: resp.http_status });
+      failures.push({
+        probe_id: probe.probe_id,
+        gate_reason: row.gate_reason,
+        http_status: row.http_status,
+        response_pass: row.response_pass,
+      });
       if (opts.failFast) break;
     }
 
-    if (completed.size % 100 === 0) {
+    const progressTotal = retryMode ? targetProbes.length : manifest.length;
+    const progressCount = retryMode
+      ? failures.length + (targetProbes.length - failures.length)
+      : completed.size;
+    if (!retryMode && completed.size % 100 === 0) {
       process.stderr.write(`phase28 matrix progress: ${completed.size}/${manifest.length}\n`);
+    } else if (retryMode && progressCount % 5 === 0) {
+      process.stderr.write(`phase28 retry progress: ${progressCount}/${progressTotal}\n`);
     }
   }
 
   const allRows = loadJsonl(jsonlPath);
-  const summary = writeMatrixArtifacts(opts.out, allRows, {
-    git_sha: gitSha(),
-    artifact_sha: sha256File(DEFAULTS.artifactPath),
-    probes_executed: allRows.length,
-    manifest_target: manifest.length,
-    failures: failures.slice(0, 20),
-  });
+  const summary = writeMatrixArtifacts(
+    retryMode ? matrixRoot : opts.out,
+    allRows,
+    {
+      git_sha: gitSha(),
+      artifact_sha: sha256File(DEFAULTS.artifactPath),
+      probes_executed: allRows.length,
+      manifest_target: retryMode ? targetProbes.length : manifest.length,
+      retry_mode: retryMode,
+      failures: failures.slice(0, 50),
+    },
+  );
+  if (retryMode) {
+    fs.writeFileSync(
+      path.join(matrixRoot, 'phase28-retry-summary.json'),
+      `${JSON.stringify({ ...summary, retried_probe_ids: targetProbes.map((p) => p.probe_id), failures }, null, 2)}\n`,
+      'utf8',
+    );
+  }
 
-  return { summary, jsonlPath, failures };
+  return { summary, jsonlPath, failures, retryMode };
 }
 
 function main() {

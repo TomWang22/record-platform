@@ -77,9 +77,6 @@ export function validatePhase26cSearchability(repoRoot) {
   if (!observabilityPy.includes('write_kpi_searchability_check_sync')) {
     throw new Phase26cSearchabilityGuardError('kpi_observability searchability path not wired');
   }
-  if (!observabilityPy.includes('NotImplementedError')) {
-    throw new Phase26cSearchabilityGuardError('usefulness channel must remain stubbed');
-  }
 
   if (!/Phase 26C:.*PASS/i.test(active)) {
     throw new Phase26cSearchabilityGuardError('ACTIVE_CONTEXT missing Phase 26C PASS');

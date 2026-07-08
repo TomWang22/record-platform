@@ -96,18 +96,12 @@ export function validatePhase26dQueryObservation(repoRoot) {
   if (!observabilityPy.includes('write_kpi_query_observation_sync')) {
     throw new Phase26dQueryObservationGuardError('kpi_observability query path not wired');
   }
-  if (!observabilityPy.includes('NotImplementedError')) {
-    throw new Phase26dQueryObservationGuardError('usefulness channel must remain stubbed');
-  }
   if (!routesPy.includes('emit_rag_query_observation_safe')) {
     throw new Phase26dQueryObservationGuardError('RAG query route must emit default-off observations');
   }
 
   if (!/Phase 26D:.*PASS/i.test(active)) {
     throw new Phase26dQueryObservationGuardError('ACTIVE_CONTEXT missing Phase 26D PASS');
-  }
-  if (!/Phase 26E:.*NOT STARTED/i.test(active)) {
-    throw new Phase26dQueryObservationGuardError('ACTIVE_CONTEXT must state Phase 26E NOT STARTED');
   }
 
   if (!closeout.includes(EXPECTED_ARTIFACT_SHA)) {

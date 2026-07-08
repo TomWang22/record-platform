@@ -164,6 +164,13 @@ ai-platform-verify-phase26d-query-observations: ## Phase 26C searchability + Pha
 	node --test tests/phase26d-query-observation-guard.test.mjs
 	node --test tests/phase26d-query-observation-kpi-readonly.test.mjs
 	cd services/python-ai-service && python -m unittest tests.test_phase26d_kpi_query_observations
+
+ai-platform-verify-phase26e-usefulness: ## Phase 26D query obs + Phase 26E usefulness guard
+	$(MAKE) ai-platform-verify-phase26d-query-observations
+	node scripts/phase26e-usefulness-observation-guard-readonly.mjs
+	node --test tests/phase26e-usefulness-observation-guard.test.mjs
+	node --test tests/phase26e-usefulness-observation-kpi-readonly.test.mjs
+	cd services/python-ai-service && python -m unittest tests.test_phase26e_kpi_usefulness
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

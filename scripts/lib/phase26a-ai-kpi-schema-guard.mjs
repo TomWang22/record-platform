@@ -120,8 +120,15 @@ export function validatePhase26aSchema(repoRoot) {
   if (!kpiPy.includes('def kpi_writes_allowed')) {
     throw new Phase26aSchemaGuardError('kpi_observability.py missing kpi_writes_allowed guard');
   }
-  if (!kpiPy.includes('NotImplementedError')) {
-    throw new Phase26aSchemaGuardError('kpi_observability.py missing no-op NotImplementedError stubs');
+  for (const fn of [
+    'noop_write_kpi_ingestion_event',
+    'noop_write_kpi_searchability_check',
+    'noop_write_kpi_query_observation',
+    'noop_write_kpi_usefulness_observation',
+  ]) {
+    if (!kpiPy.includes(fn)) {
+      throw new Phase26aSchemaGuardError(`kpi_observability.py missing ${fn}`);
+    }
   }
 
   if (!/Phase 26A:.*PASS/i.test(closeout)) {

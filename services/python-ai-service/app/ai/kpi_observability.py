@@ -81,7 +81,13 @@ def noop_write_kpi_query_observation(
     return write_kpi_query_observation_sync(payload, insert_fn=insert_fn)
 
 
-def noop_write_kpi_usefulness_observation(_payload: Mapping[str, Any]) -> Optional[str]:
+def noop_write_kpi_usefulness_observation(
+    payload: Mapping[str, Any],
+    *,
+    insert_fn: Optional[Any] = None,
+) -> Optional[str]:
     if not kpi_writes_allowed("usefulness"):
         return None
-    raise NotImplementedError("KPI usefulness observation writes are not implemented until Phase 26E")
+    from app.ai.kpi_usefulness_observations import write_kpi_usefulness_observation_sync
+
+    return write_kpi_usefulness_observation_sync(payload, insert_fn=insert_fn)

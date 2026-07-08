@@ -59,7 +59,14 @@ describe('phase26a ai kpi schema guard', () => {
     const kpiPy = readFile(repoRoot, 'services/python-ai-service/app/ai/kpi_observability.py');
     assert.ok(kpiPy.includes('AI_KPI_OBSERVABILITY_MASTER_DISABLE'));
     assert.ok(kpiPy.includes('return None'));
-    assert.ok(kpiPy.includes('NotImplementedError'));
+    for (const fn of [
+      'noop_write_kpi_ingestion_event',
+      'noop_write_kpi_searchability_check',
+      'noop_write_kpi_query_observation',
+      'noop_write_kpi_usefulness_observation',
+    ]) {
+      assert.ok(kpiPy.includes(fn), `missing ${fn}`);
+    }
   });
 
   it('closeout claims schema-only posture', () => {

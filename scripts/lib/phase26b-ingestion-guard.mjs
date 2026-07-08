@@ -78,9 +78,6 @@ export function validatePhase26bIngestion(repoRoot) {
   if (!observabilityPy.includes('write_kpi_ingestion_event_sync')) {
     throw new Phase26bIngestionGuardError('kpi_observability ingestion path not wired');
   }
-  if (!observabilityPy.includes('NotImplementedError')) {
-    throw new Phase26bIngestionGuardError('usefulness channel must remain stubbed');
-  }
 
   if (!configPy.includes('AI_KPI_OBSERVABILITY_MASTER_DISABLE", "1"')) {
     throw new Phase26bIngestionGuardError('master disable must default to 1');

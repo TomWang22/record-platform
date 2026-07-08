@@ -3,7 +3,7 @@ Agent ACTIVE CONTEXT — AI Platform
 Do not use chat memory as source of truth.
 Before any future AI-platform work, run:
 
-make ai-platform-verify-phase26f-kpi-report
+make ai-platform-verify-phase26-observability
 
 Then read:
 - docs/ai-platform/ACTIVE_CONTEXT.md
@@ -42,7 +42,8 @@ Phase 26C: PASS — searchability verification probe (default-off)
 Phase 26D: PASS — query observation instrumentation (default-off)
 Phase 26E: PASS — usefulness observation export (default-off)
 Phase 26F: PASS — KPI dashboard/report generation (read-only)
-Phase 26G: NOT STARTED
+Phase 26G: PASS — observability disable-switch drill and closeout
+Phase 26: CLOSED PASS — observability implementation batch
 
 Local/dev KPI schema:
 - Applied to python_ai @ 127.0.0.1:5440 (Phase 26C preflight)
@@ -67,13 +68,17 @@ Evidence label rules:
 - Phase 22C 7200/7200 is sample only; never call it full parity.
 - Phase 22B 15/15 is smoke only; never call it matrix evidence.
 
-KPI gaps — combined report in Phase 26F; remaining in 26G:
+KPI truth after Phase 26 closeout:
+- KPI observability implementation is complete behind default-off gates
+- Operational KPI row population remains disabled by default
+- KPI reports show PASS/PARTIAL/GAP based on available rows
 - ingestion_success_rate per source type: 26B write path (default-off; extractor PASS when rows exist)
 - data_to_searchable_ms end-to-end: 26C write path + extractor PASS when check rows exist; GAP when absent
 - query latency from ai_kpi_query_observations: 26D write path + extractor PASS/PARTIAL/GAP when rows exist/absent
 - H1 full-matrix latency summary in committed docs: GAP — not backfilled from observation rows
 - usefulness over time time-series: 26E write path + extractor PASS/PARTIAL/GAP when rows exist/absent
 - combined Phase 25C JSON report generation: 26F read-only PASS
+- disable-switch drill: 26G PASS — all channels blocked under master disable and global off
 
 Locked production posture:
 - Production default: keyword
@@ -85,4 +90,4 @@ Locked production posture:
 - AI_KPI_* observability flags: default OFF, master disable ON
 
 Next allowed step:
-Approved: start Phase 26G observability disable-switch drill and implementation closeout only after Phase 26F KPI report PASS — no live eval, no production default, no PERCENT rollout.
+No further Phase 26 work required. Any Phase 27 work must be explicitly approved. Suggested next safe path: Phase 27 observability operational enablement design only — no production default, no PERCENT rollout, no live eval.

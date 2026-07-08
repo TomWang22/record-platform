@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-08 (Phase 26F KPI dashboard/report generation PASS)  
+**Last updated:** 2026-07-08 (Phase 26 observability implementation CLOSED PASS)  
 **Current repo tip:** compute live with `git rev-parse --short HEAD` (see `docs/ai-platform/ACTIVE_CONTEXT.md`)  
 **Phase 22 archive HEAD:** `5588779`  
 **Phase 21 archive checkpoint:** `328161d`  
@@ -16,7 +16,9 @@
 **Phase 26C status:** **PASS** — searchability verification probe behind default-off flags. Local/dev python_ai schema applied @ 127.0.0.1:5440.  
 **Phase 26D status:** **PASS** — query observation instrumentation behind default-off flags. H1/H2/H3 protocol capture unit-tested. Optional 3-probe smoke NOT RUN.  
 **Phase 26E status:** **PASS** — usefulness observation export behind default-off flags. H1/H2/H3 evidence labels unit-tested. No live eval.  
-**Phase 26F status:** **PASS** — combined read-only KPI dashboard/report generation. Output to `/tmp` only; not committed. **26G NOT STARTED.**  
+**Phase 26F status:** **PASS** — combined read-only KPI dashboard/report generation. Output to `/tmp` only; not committed.
+**Phase 26G status:** **PASS** — observability disable-switch drill and implementation closeout. All KPI write channels blocked under master disable and global off.
+**Phase 26 status:** **CLOSED PASS** — observability implementation batch (26A–26G). Operational KPI row population remains disabled by default. No production rollout approved.  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -205,9 +207,14 @@ Phase 26B runtime writes default enabled: NO.
 Phase 26C PASS: searchability verification probe write path + data_to_searchable_ms extractor.
 Phase 26C local/dev schema applied: YES (python_ai @ 127.0.0.1:5440).
 Phase 26C runtime writes default enabled: NO.
-Phase 26D: NOT STARTED.
-KPI gaps — searchability write path in 26C; remaining in 26D–26E: H1 full-matrix latency (26D), usefulness time-series (26E).
-Next work: Phase 26D query observation instrumentation only after explicit approval — no live eval, no production default, no PERCENT rollout.
+Phase 26D PASS: query observation write path + extractor; H1/H2/H3 protocol capture unit-tested; smoke NOT RUN.
+Phase 26D runtime writes default enabled: NO.
+Phase 26E PASS: usefulness observation export write path + extractor; no live eval.
+Phase 26E runtime writes default enabled: NO.
+Phase 26F PASS: combined read-only KPI dashboard/report generation; output /tmp only.
+Phase 26G PASS: disable-switch drill verified; Phase 26 CLOSED PASS.
+KPI truth: implementation complete behind default-off gates; operational row population disabled by default; H1 full-matrix latency in committed docs remains GAP.
+Next work: No further Phase 26 work required. Phase 27 operational enablement design only after explicit approval — no production default, no PERCENT rollout, no live eval.
 Phase 22 CLOSED PASS — full labeled protocol parity.
 H1 baseline: 57105/57105 HTTP/1.1.
 H2 replay: 57105/57105 HTTP/2 PASS.

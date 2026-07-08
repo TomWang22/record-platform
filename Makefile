@@ -178,6 +178,12 @@ ai-platform-verify-phase26f-kpi-report: ## Phase 26E usefulness + Phase 26F comb
 	node scripts/phase26f-dashboard-report-guard-readonly.mjs
 	node --test tests/phase26f-combined-kpi-report-readonly.test.mjs
 	node --test tests/phase26f-dashboard-report-guard.test.mjs
+
+ai-platform-verify-phase26-observability: ## Phase 26F KPI report + Phase 26G disable-switch closeout guard
+	$(MAKE) ai-platform-verify-phase26f-kpi-report
+	node scripts/phase26g-observability-disable-switch-guard-readonly.mjs
+	node --test tests/phase26g-observability-disable-switch-guard.test.mjs
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

@@ -53,9 +53,6 @@ export function validatePhase26fDashboardReport(repoRoot) {
   if (!/Phase 26F:.*PASS/i.test(closeout)) {
     throw new Phase26fDashboardReportGuardError('closeout missing Phase 26F: PASS');
   }
-  if (!/Phase 26G:.*NOT STARTED/i.test(closeout)) {
-    throw new Phase26fDashboardReportGuardError('closeout must state Phase 26G NOT STARTED');
-  }
   if (!/Live eval:.*NOT RUN/i.test(closeout)) {
     throw new Phase26fDashboardReportGuardError('closeout must state Live eval NOT RUN');
   }
@@ -124,9 +121,6 @@ export function validatePhase26fDashboardReport(repoRoot) {
 
   if (!/Phase 26F:.*PASS/i.test(active)) {
     throw new Phase26fDashboardReportGuardError('ACTIVE_CONTEXT missing Phase 26F PASS');
-  }
-  if (!/Phase 26G:.*NOT STARTED/i.test(active)) {
-    throw new Phase26fDashboardReportGuardError('ACTIVE_CONTEXT must state Phase 26G NOT STARTED');
   }
 
   if (!closeout.includes(EXPECTED_ARTIFACT_SHA)) {

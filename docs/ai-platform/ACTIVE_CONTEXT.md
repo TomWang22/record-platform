@@ -3,10 +3,11 @@ Agent ACTIVE CONTEXT — AI Platform
 Do not use chat memory as source of truth.
 Before any future AI-platform work, run:
 
-make ai-platform-verify-phase26-observability
+make ai-platform-verify-phase27-operational-enablement
 
 Then read:
 - docs/ai-platform/ACTIVE_CONTEXT.md
+- docs/ai-platform/PHASE_27H_OBSERVABILITY_OPERATIONAL_ENABLEMENT_CLOSEOUT.md
 - docs/ai-platform/PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md
 - docs/ai-platform/PHASE_26_OBSERVABILITY_OPERATOR_GUIDE.md
 - docs/ai-platform/PHASE_26_OBSERVABILITY_CODE_MAP.md
@@ -53,13 +54,23 @@ Phase 26I: PASS — archive consistency / supersession notes (historical closeou
 Phase 26J: PASS — archive supersession guard (read-only; prevents historical-snapshot drift)
 Phase 26: CLOSED PASS — observability implementation batch (closeout 4409ffc)
 Phase 27A: PASS — observability operational enablement roadmap (design only)
+Phase 27B: PASS — local/dev KPI schema apply verification
+Phase 27C: PASS — controlled KPI flag enablement drill (process env only)
+Phase 27D: PASS — controlled KPI row population via write paths (real local/dev DB rows)
+Phase 27E: PASS — controlled query/usefulness observation smoke (no 57105)
+Phase 27F: PASS — combined KPI report from controlled rows (/tmp only)
+Phase 27G: PASS — KPI disable-switch rollback drill
+Phase 27H: PASS — observability operational enablement closeout
+Phase 27: CLOSED PASS — controlled local/dev operational enablement batch
 
 Live eval: NOT RUN
-DB writes (26J/27A): NO
-Migrations applied (26J/27A): NO
+Production DB migration: NOT RUN
+Local/dev schema apply: PASS (python_ai @ 127.0.0.1:5440)
+DB writes: YES — controlled local/dev synthetic KPI rows only; writes re-disabled after drill
+Migrations applied to live: NO
 
 Local/dev KPI schema:
-- Applied to python_ai @ 127.0.0.1:5440 (Phase 26C preflight)
+- Applied to python_ai @ 127.0.0.1:5440 (Phase 26C preflight + Phase 27B verify)
 - Production/live DB migration: NOT APPLIED
 
 Artifact SHA256:
@@ -81,17 +92,14 @@ Evidence label rules:
 - Phase 22C 7200/7200 is sample only; never call it full parity.
 - Phase 22B 15/15 is smoke only; never call it matrix evidence.
 
-KPI truth after Phase 26 closeout:
+KPI truth after Phase 27 closeout:
 - KPI observability implementation is complete behind default-off gates
 - Operational KPI row population remains disabled by default
-- KPI reports show PASS/PARTIAL/GAP based on available rows
-- ingestion_success_rate per source type: 26B write path (default-off; extractor PASS when rows exist)
-- data_to_searchable_ms end-to-end: 26C write path + extractor PASS when check rows exist; GAP when absent
-- query latency from ai_kpi_query_observations: 26D write path + extractor PASS/PARTIAL/GAP when rows exist/absent
-- H1 full-matrix latency summary in committed docs: GAP — not backfilled from observation rows
-- usefulness over time time-series: 26E write path + extractor PASS/PARTIAL/GAP when rows exist/absent
-- combined Phase 25C JSON report generation: 26F read-only PASS
-- disable-switch drill: 26G PASS — all channels blocked under master disable and global off
+- Phase 27 proved controlled local/dev enablement can populate redacted rows and report on them
+- Combined /tmp reports from controlled rows: ingestion/searchability/query/usefulness PASS; operational_health PARTIAL
+- Disable-switch rollback PASS after the drill
+- H1 full-matrix latency summary in committed docs: GAP — not backfilled
+- No production rollout is approved
 
 Locked production posture:
 - Production default: keyword
@@ -101,13 +109,23 @@ Locked production posture:
 - Hybrid/vector production default: NOT APPROVED
 - Runtime/env/default/allowlist changes: NONE
 - AI_KPI_* observability flags: default OFF, master disable ON
+- Production enablement: NOT APPROVED
 
-Explainer docs (Phase 26H) + supersession guard (26J) + roadmap (27A):
+Phase 27 docs:
+- docs/ai-platform/PHASE_27A_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ROADMAP.md
+- docs/ai-platform/PHASE_27B_LOCAL_DEV_KPI_SCHEMA_APPLY_VERIFICATION.md
+- docs/ai-platform/PHASE_27C_CONTROLLED_KPI_FLAG_ENABLEMENT_DRILL.md
+- docs/ai-platform/PHASE_27D_CONTROLLED_KPI_ROW_POPULATION_DRILL.md
+- docs/ai-platform/PHASE_27E_CONTROLLED_QUERY_USEFULNESS_OBSERVATION_SMOKE.md
+- docs/ai-platform/PHASE_27F_COMBINED_KPI_REPORT_FROM_CONTROLLED_ROWS.md
+- docs/ai-platform/PHASE_27G_KPI_DISABLE_SWITCH_ROLLBACK_DRILL.md
+- docs/ai-platform/PHASE_27H_OBSERVABILITY_OPERATIONAL_ENABLEMENT_CLOSEOUT.md
+
+Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md
 - docs/ai-platform/PHASE_26_OBSERVABILITY_OPERATOR_GUIDE.md
 - docs/ai-platform/PHASE_26_OBSERVABILITY_CODE_MAP.md
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
-- docs/ai-platform/PHASE_27A_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ROADMAP.md
 
 Next allowed step:
-Approved: start Phase 27B local/dev KPI schema apply verification only after Phase 27A roadmap PASS — no live DB migration, no live eval, no production default, no PERCENT rollout.
+No production rollout approved. Next safe path: Phase 28 observability production-readiness design only, or Phase 27I docs-only archive/explainer if more operator clarity is needed.

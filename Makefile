@@ -189,6 +189,12 @@ ai-platform-verify-phase26-archive-supersession: ## Phase 26J archive supersessi
 	node scripts/phase26j-archive-supersession-guard-readonly.mjs
 	node --test tests/phase26j-archive-supersession-guard.test.mjs
 
+ai-platform-verify-phase27-operational-enablement: ## Phase 26 observ + Phase 27 controlled enablement closeout
+	$(MAKE) ai-platform-verify-phase26-observability
+	node scripts/phase26f-combined-kpi-report-readonly.mjs --out /tmp/phase27f-kpi-report
+	node scripts/phase27-operational-enablement-guard-readonly.mjs
+	node --test tests/phase27-operational-enablement-guard.test.mjs
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

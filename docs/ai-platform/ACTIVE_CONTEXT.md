@@ -3,7 +3,7 @@ Agent ACTIVE CONTEXT — AI Platform
 Do not use chat memory as source of truth.
 Before any future AI-platform work, run:
 
-make ai-platform-verify-phase26e-usefulness
+make ai-platform-verify-phase26f-kpi-report
 
 Then read:
 - docs/ai-platform/ACTIVE_CONTEXT.md
@@ -24,6 +24,7 @@ Phase handoff lineage:
 - Phase 26B ingestion KPI instrumentation closeout commit: b243699
 - Phase 26C searchability verification probe closeout commit: eb7079a
 - Phase 26D query observation instrumentation closeout commit: 104979c
+- Phase 26E usefulness observation export closeout commit: 883cb61
 
 Frozen archive heads:
 - Phase 22 archive HEAD: 5588779
@@ -40,7 +41,8 @@ Phase 26B: PASS — ingestion KPI event instrumentation (default-off)
 Phase 26C: PASS — searchability verification probe (default-off)
 Phase 26D: PASS — query observation instrumentation (default-off)
 Phase 26E: PASS — usefulness observation export (default-off)
-Phase 26F: NOT STARTED
+Phase 26F: PASS — KPI dashboard/report generation (read-only)
+Phase 26G: NOT STARTED
 
 Local/dev KPI schema:
 - Applied to python_ai @ 127.0.0.1:5440 (Phase 26C preflight)
@@ -65,12 +67,13 @@ Evidence label rules:
 - Phase 22C 7200/7200 is sample only; never call it full parity.
 - Phase 22B 15/15 is smoke only; never call it matrix evidence.
 
-KPI gaps — usefulness write path in Phase 26E; remaining in 26F:
+KPI gaps — combined report in Phase 26F; remaining in 26G:
 - ingestion_success_rate per source type: 26B write path (default-off; extractor PASS when rows exist)
 - data_to_searchable_ms end-to-end: 26C write path + extractor PASS when check rows exist; GAP when absent
 - query latency from ai_kpi_query_observations: 26D write path + extractor PASS/PARTIAL/GAP when rows exist/absent
 - H1 full-matrix latency summary in committed docs: GAP — not backfilled from observation rows
 - usefulness over time time-series: 26E write path + extractor PASS/PARTIAL/GAP when rows exist/absent
+- combined Phase 25C JSON report generation: 26F read-only PASS
 
 Locked production posture:
 - Production default: keyword
@@ -82,4 +85,4 @@ Locked production posture:
 - AI_KPI_* observability flags: default OFF, master disable ON
 
 Next allowed step:
-Approved: start Phase 26F KPI dashboard/report generation only after Phase 26E usefulness export PASS — no live eval, no production default, no PERCENT rollout.
+Approved: start Phase 26G observability disable-switch drill and implementation closeout only after Phase 26F KPI report PASS — no live eval, no production default, no PERCENT rollout.

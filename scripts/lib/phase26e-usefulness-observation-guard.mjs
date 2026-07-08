@@ -115,9 +115,6 @@ export function validatePhase26eUsefulnessObservation(repoRoot) {
   if (!/Phase 26E:.*PASS/i.test(active)) {
     throw new Phase26eUsefulnessObservationGuardError('ACTIVE_CONTEXT missing Phase 26E PASS');
   }
-  if (!/Phase 26F:.*NOT STARTED/i.test(active)) {
-    throw new Phase26eUsefulnessObservationGuardError('ACTIVE_CONTEXT must state Phase 26F NOT STARTED');
-  }
 
   for (const pattern of LIVE_PATTERNS) {
     if (pattern.test(pyTests) || pattern.test(nodeTests)) {

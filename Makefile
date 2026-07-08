@@ -195,6 +195,11 @@ ai-platform-verify-phase27-operational-enablement: ## Phase 26 observ + Phase 27
 	node scripts/phase27-operational-enablement-guard-readonly.mjs
 	node --test tests/phase27-operational-enablement-guard.test.mjs
 
+ai-platform-verify-phase27-archive: ## Phase 27 enablement verifier + Phase 27I archive/explainer guard
+	$(MAKE) ai-platform-verify-phase27-operational-enablement
+	node scripts/phase27-archive-guard-readonly.mjs
+	node --test tests/phase27-archive-guard.test.mjs
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

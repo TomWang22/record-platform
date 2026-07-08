@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-08 (Phase 27 controlled operational enablement CLOSED PASS; Phase 26 CLOSED PASS)  
+**Last updated:** 2026-07-08 (Phase 27I archive/explainer docs; Phase 27 CLOSED PASS @ 15d8d08)  
 **Current repo tip:** compute live with `git rev-parse --short HEAD` (see `docs/ai-platform/ACTIVE_CONTEXT.md`)  
 **Phase 22 archive HEAD:** `5588779`  
 **Phase 21 archive checkpoint:** `328161d`  
@@ -24,7 +24,8 @@
 **Phase 26 status:** **CLOSED PASS** — observability implementation batch (26A–26G closeout `4409ffc`; 26H–26J docs/guards). Operational KPI row population remains disabled by default. No production rollout approved.
 **Phase 27A status:** **PASS** — operational enablement roadmap design only.
 **Phase 27B–27H status:** **PASS** — controlled local/dev schema verify, flag enablement, real write-path row population, query/usefulness smoke, /tmp combined report, disable-switch rollback, closeout. No production enablement. No 57105 replay.
-**Phase 27 status:** **CLOSED PASS** — see `PHASE_27H_OBSERVABILITY_OPERATIONAL_ENABLEMENT_CLOSEOUT.md`. 
+**Phase 27I status:** **PASS** — archive/explainer docs only (`PHASE_27_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ARCHIVE.md`, operator guide, code map). No runtime/DB/live changes.
+**Phase 27 status:** **CLOSED PASS** — see archive + `PHASE_27H_OBSERVABILITY_OPERATIONAL_ENABLEMENT_CLOSEOUT.md`. 
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -224,9 +225,10 @@ Phase 26I PASS: archive supersession/historical-snapshot clarity; older 26A–26
 Phase 26J PASS: archive supersession guard; historical-snapshot drift blocked.
 Phase 27A PASS: operational enablement roadmap design only (tickets 27A–27H); no live work at design time.
 Phase 27B–27H PASS: controlled local/dev enablement executed — real python_ai@5440 rows via write paths; /tmp reports; disable-switch rollback; production enablement NOT APPROVED.
+Phase 27I PASS: archive/explainer docs (operational enablement archive, operator guide, code map); no runtime changes.
 Phase 27: CLOSED PASS.
 KPI truth: implementation complete behind default-off gates; operational row population disabled by default; Phase 27 proved controlled local/dev population only; H1 full-matrix latency in committed docs remains GAP.
-Next work: No production rollout approved. Next safe path: Phase 28 observability production-readiness design only, or Phase 27I docs-only archive/explainer if more operator clarity is needed.
+Next work: Approved: start Phase 28A observability production-readiness design only after Phase 27 archive PASS — no live eval, no production default, no PERCENT rollout, no production DB migration.
 Phase 22 CLOSED PASS — full labeled protocol parity.
 H1 baseline: 57105/57105 HTTP/1.1.
 H2 replay: 57105/57105 HTTP/2 PASS.

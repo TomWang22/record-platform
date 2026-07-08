@@ -3,15 +3,15 @@ Agent ACTIVE CONTEXT — AI Platform
 Do not use chat memory as source of truth.
 Before any future AI-platform work, run:
 
-make ai-platform-verify-phase27-operational-enablement
+make ai-platform-verify-phase27-archive
 
 Then read:
 - docs/ai-platform/ACTIVE_CONTEXT.md
+- docs/ai-platform/PHASE_27_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ARCHIVE.md
+- docs/ai-platform/PHASE_27_OBSERVABILITY_OPERATOR_GUIDE.md
+- docs/ai-platform/PHASE_27_OBSERVABILITY_CODE_MAP.md
 - docs/ai-platform/PHASE_27H_OBSERVABILITY_OPERATIONAL_ENABLEMENT_CLOSEOUT.md
 - docs/ai-platform/PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md
-- docs/ai-platform/PHASE_26_OBSERVABILITY_OPERATOR_GUIDE.md
-- docs/ai-platform/PHASE_26_OBSERVABILITY_CODE_MAP.md
-- docs/ai-platform/PHASE_27A_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ROADMAP.md
 - docs/ai-platform/PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md
 
 Current repo tip:
@@ -61,7 +61,9 @@ Phase 27E: PASS — controlled query/usefulness observation smoke (no 57105)
 Phase 27F: PASS — combined KPI report from controlled rows (/tmp only)
 Phase 27G: PASS — KPI disable-switch rollback drill
 Phase 27H: PASS — observability operational enablement closeout
+Phase 27I: PASS — archive/explainer docs only (no runtime/DB changes)
 Phase 27: CLOSED PASS — controlled local/dev operational enablement batch
+Phase 27 archive source of truth: PHASE_27_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ARCHIVE.md plus ACTIVE_CONTEXT.md.
 
 Live eval: NOT RUN
 Production DB migration: NOT RUN
@@ -120,6 +122,10 @@ Phase 27 docs:
 - docs/ai-platform/PHASE_27F_COMBINED_KPI_REPORT_FROM_CONTROLLED_ROWS.md
 - docs/ai-platform/PHASE_27G_KPI_DISABLE_SWITCH_ROLLBACK_DRILL.md
 - docs/ai-platform/PHASE_27H_OBSERVABILITY_OPERATIONAL_ENABLEMENT_CLOSEOUT.md
+- docs/ai-platform/PHASE_27I_OPERATIONAL_ENABLEMENT_ARCHIVE_EXPLAINER.md
+- docs/ai-platform/PHASE_27_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ARCHIVE.md
+- docs/ai-platform/PHASE_27_OBSERVABILITY_OPERATOR_GUIDE.md
+- docs/ai-platform/PHASE_27_OBSERVABILITY_CODE_MAP.md
 
 Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md
@@ -128,4 +134,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-No production rollout approved. Next safe path: Phase 28 observability production-readiness design only, or Phase 27I docs-only archive/explainer if more operator clarity is needed.
+Approved: start Phase 28A observability production-readiness design only after Phase 27 archive PASS — no live eval, no production default, no PERCENT rollout, no production DB migration.

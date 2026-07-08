@@ -200,6 +200,16 @@ ai-platform-verify-phase27-archive: ## Phase 27 enablement verifier + Phase 27I 
 	node scripts/phase27-archive-guard-readonly.mjs
 	node --test tests/phase27-archive-guard.test.mjs
 
+ai-platform-verify-phase28-durability-harness: ## Phase 28B offline durability harness + unit tests
+	node scripts/phase28-observability-durability-harness-readonly.mjs
+	node --test tests/phase28-observability-durability-harness.test.mjs
+
+ai-platform-verify-phase28-production-readiness: ## Phase 28A/28B production-readiness guard + durability harness
+	$(MAKE) ai-platform-verify-phase27-archive
+	node scripts/phase28-observability-production-readiness-guard-readonly.mjs
+	node --test tests/phase28-observability-production-readiness-guard.test.mjs
+	$(MAKE) ai-platform-verify-phase28-durability-harness
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

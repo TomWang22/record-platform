@@ -3,10 +3,12 @@ Agent ACTIVE CONTEXT — AI Platform
 Do not use chat memory as source of truth.
 Before any future AI-platform work, run:
 
-make ai-platform-verify-phase27-archive
+make ai-platform-verify-phase28-production-readiness
 
 Then read:
 - docs/ai-platform/ACTIVE_CONTEXT.md
+- docs/ai-platform/PHASE_28A_OBSERVABILITY_PRODUCTION_READINESS_TEST_ARCHITECTURE.md
+- docs/ai-platform/PHASE_28B_OBSERVABILITY_DURABILITY_HARNESS_AND_GUARDS.md
 - docs/ai-platform/PHASE_27_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ARCHIVE.md
 - docs/ai-platform/PHASE_27_OBSERVABILITY_OPERATOR_GUIDE.md
 - docs/ai-platform/PHASE_27_OBSERVABILITY_CODE_MAP.md
@@ -64,12 +66,21 @@ Phase 27H: PASS — observability operational enablement closeout
 Phase 27I: PASS — archive/explainer docs only (no runtime/DB changes)
 Phase 27: CLOSED PASS — controlled local/dev operational enablement batch
 Phase 27 archive source of truth: PHASE_27_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ARCHIVE.md plus ACTIVE_CONTEXT.md.
+Phase 28A: PASS — observability production-readiness test architecture (docs + acceptance matrix)
+Phase 28B: PASS — offline durability harness + strict guards (fixtures only; no network)
+Phase 28C: NOT STARTED
+Phase 28: IN PROGRESS — production-readiness layer (28A/28B PASS; 28C–28H pending separate approval)
 
-Live eval: NOT RUN
+Live eval run: NOT RUN
 Production DB migration: NOT RUN
-Local/dev schema apply: PASS (python_ai @ 127.0.0.1:5440)
-DB writes: YES — controlled local/dev synthetic KPI rows only; writes re-disabled after drill
+Local/dev schema apply: PASS (python_ai @ 127.0.0.1:5440; Phase 27 only — no new writes in 28A/28B)
+DB writes: NO (28A/28B offline harness only; Phase 27 historical rows remain on local/dev)
 Migrations applied to live: NO
+Real inference run: NOT RUN
+Pipeline durability harness: PASS (offline fixtures)
+H1/H2/H3 real protocol smoke: NOT RUN
+Bench logs committed: NO
+Generated reports committed: NO
 
 Local/dev KPI schema:
 - Applied to python_ai @ 127.0.0.1:5440 (Phase 26C preflight + Phase 27B verify)
@@ -113,6 +124,10 @@ Locked production posture:
 - AI_KPI_* observability flags: default OFF, master disable ON
 - Production enablement: NOT APPROVED
 
+Phase 28 docs:
+- docs/ai-platform/PHASE_28A_OBSERVABILITY_PRODUCTION_READINESS_TEST_ARCHITECTURE.md
+- docs/ai-platform/PHASE_28B_OBSERVABILITY_DURABILITY_HARNESS_AND_GUARDS.md
+
 Phase 27 docs:
 - docs/ai-platform/PHASE_27A_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ROADMAP.md
 - docs/ai-platform/PHASE_27B_LOCAL_DEV_KPI_SCHEMA_APPLY_VERIFICATION.md
@@ -134,4 +149,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Approved: start Phase 28A observability production-readiness design only after Phase 27 archive PASS — no live eval, no production default, no PERCENT rollout, no production DB migration.
+Approved: start Phase 28C local/dev KPI pipeline durability drill only after Phase 28B harness PASS — no live eval, no production DB migration, no production default, no PERCENT rollout.

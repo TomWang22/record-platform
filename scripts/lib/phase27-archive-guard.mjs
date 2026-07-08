@@ -160,11 +160,27 @@ export function validateActiveContext(active) {
 
   const nextBlockMatch = active.match(/Next allowed step:\s*\n([\s\S]*?)(?:\n\n|$)/i);
   const nextBlock = nextBlockMatch ? nextBlockMatch[1] : active;
-  assertMatch(
-    nextBlock,
-    /Phase 28A|production-readiness design only/i,
-    `${DOC_ACTIVE} next step must be Phase 28A design only unless explicit owner approval`,
-  );
+  const phase28BPass = /Phase 28B:\s*PASS/i.test(active);
+  const phase28APass = /Phase 28A:\s*PASS/i.test(active);
+  if (phase28BPass) {
+    assertMatch(
+      nextBlock,
+      /Phase 28C/i,
+      `${DOC_ACTIVE} next step must be Phase 28C after Phase 28B PASS`,
+    );
+  } else if (phase28APass) {
+    assertMatch(
+      nextBlock,
+      /Phase 28B/i,
+      `${DOC_ACTIVE} next step must be Phase 28B after Phase 28A PASS`,
+    );
+  } else {
+    assertMatch(
+      nextBlock,
+      /Phase 28A|production-readiness design only/i,
+      `${DOC_ACTIVE} next step must be Phase 28A design only unless explicit owner approval`,
+    );
+  }
   if (/Approved:\s*start Phase 27[B-H]/i.test(nextBlock)) {
     throw new Phase27ArchiveGuardError(
       `${DOC_ACTIVE} must not still propose Phase 27B–27H as next allowed step`,

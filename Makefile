@@ -150,6 +150,13 @@ ai-platform-verify-phase26b-ingestion: ## Phase 26A schema + Phase 26B ingestion
 	node --test tests/phase26b-ingestion-kpi-readonly.test.mjs
 	node --test tests/phase26b-ingestion-guard.test.mjs
 	cd services/python-ai-service && python -m unittest tests.test_phase26b_kpi_ingestion
+
+ai-platform-verify-phase26c-searchability: ## Phase 26B ingestion + Phase 26C searchability guard
+	$(MAKE) ai-platform-verify-phase26b-ingestion
+	node scripts/phase26c-searchability-guard-readonly.mjs
+	node --test tests/phase26c-searchability-kpi-readonly.test.mjs
+	node --test tests/phase26c-searchability-guard.test.mjs
+	cd services/python-ai-service && python -m unittest tests.test_phase26c_kpi_searchability
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

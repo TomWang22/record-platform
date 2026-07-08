@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-08 (Phase 26B ingestion KPI instrumentation PASS)  
+**Last updated:** 2026-07-08 (Phase 26C searchability verification probe PASS)  
 **Current repo tip:** compute live with `git rev-parse --short HEAD` (see `docs/ai-platform/ACTIVE_CONTEXT.md`)  
 **Phase 22 archive HEAD:** `5588779`  
 **Phase 21 archive checkpoint:** `328161d`  
@@ -12,7 +12,8 @@
 **Phase 24 status:** **CLOSED PASS** — KPI observability read-only extraction and gap inventory. **24A COMPLETE** (design). **24B PASS** (read-only extractors). **24C PASS** (guard tests/Makefile). **24D PASS** (closeout). Phase 24 live work: **NOT APPROVED.**  
 **Phase 25 status:** **CLOSED PASS** — observability instrumentation design batch. **25A–25D COMPLETE** (architecture, schema contracts, extractor/dashboard contracts, rollout plan). **25E PASS** (design guard + tests). **25F PASS** (closeout). No runtime/schema/live changes.  
 **Phase 26A status:** **PASS** — observability schema and no-op instrumentation foundation. Migration SQL committed; live DB not migrated. **AI_KPI_* flags default OFF.** Runtime writes disabled.  
-**Phase 26B status:** **PASS** — ingestion KPI event instrumentation behind default-off flags. Per-source_type extractor PASS when event rows exist; run-level PARTIAL fallback preserved. **26C NOT STARTED.**  
+**Phase 26B status:** **PASS** — ingestion KPI event instrumentation behind default-off flags. Per-source_type extractor PASS when event rows exist; run-level PARTIAL fallback preserved.  
+**Phase 26C status:** **PASS** — searchability verification probe behind default-off flags. Local/dev python_ai schema applied @ 127.0.0.1:5440. **26D NOT STARTED.**  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -198,9 +199,12 @@ Phase 26A PASS: KPI observability schema migration SQL + default-off AI_KPI_* fl
 Phase 26A live DB migration: NOT APPLIED.
 Phase 26B PASS: ingestion KPI event write path + redacted payload builder + per-source_type extractor.
 Phase 26B runtime writes default enabled: NO.
-Phase 26C: NOT STARTED.
-KPI gaps — ingestion write path in 26B; remaining in 26C–26E: data_to_searchable_ms (26C), H1 full-matrix latency (26D), usefulness time-series (26E).
-Next work: Phase 26C searchability verification probe only after explicit approval — no live eval, no production default, no PERCENT rollout.
+Phase 26C PASS: searchability verification probe write path + data_to_searchable_ms extractor.
+Phase 26C local/dev schema applied: YES (python_ai @ 127.0.0.1:5440).
+Phase 26C runtime writes default enabled: NO.
+Phase 26D: NOT STARTED.
+KPI gaps — searchability write path in 26C; remaining in 26D–26E: H1 full-matrix latency (26D), usefulness time-series (26E).
+Next work: Phase 26D query observation instrumentation only after explicit approval — no live eval, no production default, no PERCENT rollout.
 Phase 22 CLOSED PASS — full labeled protocol parity.
 H1 baseline: 57105/57105 HTTP/1.1.
 H2 replay: 57105/57105 HTTP/2 PASS.

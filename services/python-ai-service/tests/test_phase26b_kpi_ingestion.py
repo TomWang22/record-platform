@@ -138,15 +138,12 @@ class Phase26bKpiIngestionTests(unittest.TestCase):
             {
                 "AI_KPI_OBSERVABILITY_MASTER_DISABLE": "0",
                 "AI_KPI_OBSERVABILITY_ENABLED": "1",
-                "AI_KPI_SEARCHABILITY_CHECKS_ENABLED": "1",
                 "AI_KPI_QUERY_OBSERVATIONS_ENABLED": "1",
                 "AI_KPI_USEFULNESS_OBSERVATIONS_ENABLED": "1",
             }
         )
         import app.ai.kpi_observability as kpi_observability
 
-        with self.assertRaises(NotImplementedError):
-            kpi_observability.noop_write_kpi_searchability_check({})
         with self.assertRaises(NotImplementedError):
             kpi_observability.noop_write_kpi_query_observation({"rag_total_ms": 1})
         with self.assertRaises(NotImplementedError):

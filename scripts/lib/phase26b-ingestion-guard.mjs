@@ -89,9 +89,6 @@ export function validatePhase26bIngestion(repoRoot) {
   if (!/Phase 26B:.*PASS/i.test(active)) {
     throw new Phase26bIngestionGuardError('ACTIVE_CONTEXT missing Phase 26B PASS');
   }
-  if (!/Phase 26C:.*NOT STARTED/i.test(active)) {
-    throw new Phase26bIngestionGuardError('ACTIVE_CONTEXT must state Phase 26C NOT STARTED');
-  }
 
   if (!closeout.includes(EXPECTED_ARTIFACT_SHA)) {
     throw new Phase26bIngestionGuardError('closeout missing locked artifact SHA');

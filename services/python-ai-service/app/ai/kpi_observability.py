@@ -57,10 +57,16 @@ def noop_write_kpi_ingestion_event(
     return write_kpi_ingestion_event_sync(payload, insert_fn=insert_fn)
 
 
-def noop_write_kpi_searchability_check(_payload: Mapping[str, Any]) -> Optional[str]:
+def noop_write_kpi_searchability_check(
+    payload: Mapping[str, Any],
+    *,
+    insert_fn: Optional[Any] = None,
+) -> Optional[str]:
     if not kpi_writes_allowed("searchability"):
         return None
-    raise NotImplementedError("KPI searchability writes are not implemented until Phase 26C")
+    from app.ai.kpi_searchability_checks import write_kpi_searchability_check_sync
+
+    return write_kpi_searchability_check_sync(payload, insert_fn=insert_fn)
 
 
 def noop_write_kpi_query_observation(_payload: Mapping[str, Any]) -> Optional[str]:

@@ -1,9 +1,8 @@
 # Phase 28D-R — Controlled Matrix Recovery and Triage
 
 ```text
-Phase 28D-R: RECOVERY_PASS (retried failure set)
-Phase 28D: IN_PROGRESS (8025/25920 before resume)
-Phase 28: BLOCKED until full matrix PASS
+Phase 28D-R: RECOVERY_PASS → matrix completed 25920/25920 with retry overrides merged
+Phase 28: CLOSED PASS (see PHASE_28H closeout)
 HEAD SHA at triage: 1685716
 Triage artifact: /tmp/phase28-controlled-observability-matrix/phase28-failure-triage.json
 ```

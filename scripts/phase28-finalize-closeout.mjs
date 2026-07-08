@@ -6,18 +6,14 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadJsonl, writeMatrixArtifacts, summarizeMatrixRows, MATRIX_TARGET } from './lib/phase28-controlled-matrix-summary.mjs';
+import { writeMatrixArtifacts, MATRIX_TARGET } from './lib/phase28-controlled-matrix-summary.mjs';
+import { mergeRows } from './phase28-summarize-controlled-matrix.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outBase = process.env.PHASE28_MATRIX_OUT || '/tmp/phase28-controlled-observability-matrix';
-const shards = ['h1', 'h2', 'h3'];
 
-function mergeShards() {
-  const rows = [];
-  for (const shard of shards) {
-    const jsonl = path.join(outBase, `shard-${shard}`, 'phase28-matrix.jsonl');
-    if (fs.existsSync(jsonl)) rows.push(...loadJsonl(jsonl));
-  }
+function mergeShardsWithRetryOverrides() {
+  const rows = mergeRows(outBase);
   const merged = path.join(outBase, 'phase28-matrix.jsonl');
   fs.mkdirSync(outBase, { recursive: true });
   fs.writeFileSync(merged, `${rows.map((r) => JSON.stringify(r)).join('\n')}\n`, 'utf8');
@@ -30,7 +26,7 @@ function run(cmd, args, env = {}) {
   return r.stdout;
 }
 
-const rows = mergeShards();
+const rows = mergeShardsWithRetryOverrides();
 const summary = writeMatrixArtifacts(outBase, rows, {
   git_sha: run('git', ['rev-parse', 'HEAD']).trim(),
 });

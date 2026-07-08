@@ -213,7 +213,7 @@ ai-platform-verify-phase28-production-readiness: ## Phase 28A/28B production-rea
 ai-platform-verify-phase28-controlled-matrix: ## Phase 28D/E matrix summary unit tests + /tmp summary check
 	node --test tests/phase28-controlled-matrix-summary.test.mjs
 	@test -f /tmp/phase28-controlled-observability-matrix/phase28-matrix.jsonl || (echo "missing /tmp matrix jsonl; run phase28 matrix first" && exit 1)
-	node scripts/phase28-controlled-observability-matrix-runner.mjs --summary-only --out /tmp/phase28-controlled-observability-matrix
+	node scripts/phase28-summarize-controlled-matrix.mjs --in /tmp/phase28-controlled-observability-matrix
 
 ai-platform-verify-phase28-closeout: ## Phase 28H closeout guard (requires 28C–28H docs PASS)
 	$(MAKE) ai-platform-verify-phase28-production-readiness

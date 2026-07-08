@@ -12,11 +12,12 @@ import { gitSha } from './lib/phase22-full-replay-common.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(argv) {
-  const opts = { in: '/tmp/phase28-controlled-observability-matrix', out: null };
+  const opts = { in: '/tmp/phase28-controlled-observability-matrix', out: null, json: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--in') opts.in = argv[++i];
     else if (arg === '--out') opts.out = argv[++i];
+    else if (arg === '--json') opts.json = true;
   }
   if (!opts.out) opts.out = opts.in;
   return opts;
@@ -56,10 +57,40 @@ function main() {
     merged_from_shards: true,
     retry_overrides: loadJsonl(path.join(opts.in, 'phase28-retry-failures.jsonl')).length,
   });
-  process.stderr.write(
-    `phase28 summarize: ${summary.matrix_total} status=${summary.status} wrong_gate=${summary.wrong_gate_count} response_pass=${(summary.response_pass_rate * 100).toFixed(1)}%\n`,
-  );
-  console.log(JSON.stringify(summary, null, 2));
+  if (opts.json) {
+    const total = rows.length;
+    const per = summary.per_protocol_counts || {};
+    const lat = Object.fromEntries((summary.latency_by_protocol || []).map((r) => [r.protocol, r]));
+    const compact = {
+      total,
+      status: summary.status,
+      matrix_total: summary.matrix_total,
+      http200: summary.http200,
+      per_protocol: per,
+      fallback: summary.fallback_count,
+      wrong_protocol: summary.wrong_protocol_count,
+      wrong_gate: summary.wrong_gate_count,
+      response_pass_rate: summary.response_pass_rate,
+      sentiment_pass_rate: summary.sentiment_pass_rate,
+      red_team_safety_pass_rate: summary.red_team_safety_pass_rate,
+      leakage_failures: summary.leakage_failures,
+      latency_h1: lat['HTTP/1.1']
+        ? { p50: lat['HTTP/1.1'].p50, p95: lat['HTTP/1.1'].p95, p99: lat['HTTP/1.1'].p99, max: lat['HTTP/1.1'].max }
+        : null,
+      latency_h2: lat['HTTP/2']
+        ? { p50: lat['HTTP/2'].p50, p95: lat['HTTP/2'].p95, p99: lat['HTTP/2'].p99, max: lat['HTTP/2'].max }
+        : null,
+      latency_h3: lat['HTTP/3']
+        ? { p50: lat['HTTP/3'].p50, p95: lat['HTTP/3'].p95, p99: lat['HTTP/3'].p99, max: lat['HTTP/3'].max }
+        : null,
+    };
+    console.log(JSON.stringify(compact));
+  } else {
+    process.stderr.write(
+      `phase28 summarize: ${summary.matrix_total} status=${summary.status} wrong_gate=${summary.wrong_gate_count} response_pass=${(summary.response_pass_rate * 100).toFixed(1)}%\n`,
+    );
+    console.log(JSON.stringify(summary, null, 2));
+  }
   return summary.status === 'PASS' ? 0 : 2;
 }
 

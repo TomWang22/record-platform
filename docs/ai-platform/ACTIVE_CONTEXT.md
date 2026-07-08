@@ -10,6 +10,7 @@ Then read:
 - docs/ai-platform/PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md
 - docs/ai-platform/PHASE_26_OBSERVABILITY_OPERATOR_GUIDE.md
 - docs/ai-platform/PHASE_26_OBSERVABILITY_CODE_MAP.md
+- docs/ai-platform/PHASE_27A_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ROADMAP.md
 - docs/ai-platform/PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md
 
 Current repo tip:
@@ -49,7 +50,13 @@ Phase 26G: PASS — observability disable-switch drill and closeout
 Phase 26H: PASS — archive/explainer docs only (no runtime changes)
 Phase 26H: archive/explainer docs PASS — current Phase 26 source of truth is PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md plus ACTIVE_CONTEXT.md.
 Phase 26I: PASS — archive consistency / supersession notes (historical closeouts clarified; no runtime changes)
+Phase 26J: PASS — archive supersession guard (read-only; prevents historical-snapshot drift)
 Phase 26: CLOSED PASS — observability implementation batch (closeout 4409ffc)
+Phase 27A: PASS — observability operational enablement roadmap (design only)
+
+Live eval: NOT RUN
+DB writes (26J/27A): NO
+Migrations applied (26J/27A): NO
 
 Local/dev KPI schema:
 - Applied to python_ai @ 127.0.0.1:5440 (Phase 26C preflight)
@@ -95,10 +102,12 @@ Locked production posture:
 - Runtime/env/default/allowlist changes: NONE
 - AI_KPI_* observability flags: default OFF, master disable ON
 
-Explainer docs (Phase 26H):
+Explainer docs (Phase 26H) + supersession guard (26J) + roadmap (27A):
 - docs/ai-platform/PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md
 - docs/ai-platform/PHASE_26_OBSERVABILITY_OPERATOR_GUIDE.md
 - docs/ai-platform/PHASE_26_OBSERVABILITY_CODE_MAP.md
+- docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
+- docs/ai-platform/PHASE_27A_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ROADMAP.md
 
 Next allowed step:
-No further Phase 26 work required. Suggested next safe path: Approved: start Phase 27A observability operational enablement design only — no live eval, no production default, no PERCENT rollout, no live DB migration.
+Approved: start Phase 27B local/dev KPI schema apply verification only after Phase 27A roadmap PASS — no live DB migration, no live eval, no production default, no PERCENT rollout.

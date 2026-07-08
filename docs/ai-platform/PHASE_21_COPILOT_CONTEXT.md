@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-08 (Phase 26I archive supersession notes; Phase 26 CLOSED PASS @ 4409ffc / 26H `d16d195`)  
+**Last updated:** 2026-07-08 (Phase 26J supersession guard + Phase 27A enablement roadmap; Phase 26 CLOSED PASS)  
 **Current repo tip:** compute live with `git rev-parse --short HEAD` (see `docs/ai-platform/ACTIVE_CONTEXT.md`)  
 **Phase 22 archive HEAD:** `5588779`  
 **Phase 21 archive checkpoint:** `328161d`  
@@ -20,7 +20,9 @@
 **Phase 26G status:** **PASS** — observability disable-switch drill and implementation closeout. All KPI write channels blocked under master disable and global off.
 **Phase 26H status:** **PASS** — archive/explainer docs only (`PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md`, operator guide, code map). No runtime/DB/live changes. Current Phase 26 source of truth is that archive plus `ACTIVE_CONTEXT.md`.
 **Phase 26I status:** **PASS** — archive consistency / supersession notes so historical closeouts (e.g. 26F “26G NOT STARTED”) are not mistaken for current state. No runtime/DB/live changes.
-**Phase 26 status:** **CLOSED PASS** — observability implementation batch (26A–26G closeout `4409ffc`; 26H/26I docs addenda). Operational KPI row population remains disabled by default. No production rollout approved. 
+**Phase 26J status:** **PASS** — read-only archive supersession guard (`make ai-platform-verify-phase26-archive-supersession`). No runtime/DB/live changes.
+**Phase 26 status:** **CLOSED PASS** — observability implementation batch (26A–26G closeout `4409ffc`; 26H–26J docs/guards). Operational KPI row population remains disabled by default. No production rollout approved.
+**Phase 27A status:** **PASS** — operational enablement roadmap design only (`PHASE_27A_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ROADMAP.md`). No live work. Next gated ticket: 27B local/dev schema verification after explicit approval. 
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -217,8 +219,10 @@ Phase 26F PASS: combined read-only KPI dashboard/report generation; output /tmp 
 Phase 26G PASS: disable-switch drill verified; Phase 26 CLOSED PASS @ 4409ffc.
 Phase 26H PASS: archive/explainer docs (implementation archive, operator guide, code map); no runtime changes.
 Phase 26I PASS: archive supersession/historical-snapshot clarity; older 26A–26G docs remain point-in-time records.
+Phase 26J PASS: archive supersession guard; historical-snapshot drift blocked.
+Phase 27A PASS: operational enablement roadmap design only (tickets 27A–27H); no live work.
 KPI truth: implementation complete behind default-off gates; operational row population disabled by default; H1 full-matrix latency in committed docs remains GAP.
-Next work: No further Phase 26 work required. Suggested next safe path: Approved: start Phase 27A observability operational enablement design only — no live eval, no production default, no PERCENT rollout, no live DB migration.
+Next work: Approved: start Phase 27B local/dev KPI schema apply verification only after Phase 27A roadmap PASS — no live DB migration, no live eval, no production default, no PERCENT rollout.
 Phase 22 CLOSED PASS — full labeled protocol parity.
 H1 baseline: 57105/57105 HTTP/1.1.
 H2 replay: 57105/57105 HTTP/2 PASS.

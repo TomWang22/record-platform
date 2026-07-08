@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-08 (Phase 26C searchability verification probe PASS)  
+**Last updated:** 2026-07-08 (Phase 26D query observation instrumentation PASS)  
 **Current repo tip:** compute live with `git rev-parse --short HEAD` (see `docs/ai-platform/ACTIVE_CONTEXT.md`)  
 **Phase 22 archive HEAD:** `5588779`  
 **Phase 21 archive checkpoint:** `328161d`  
@@ -13,7 +13,8 @@
 **Phase 25 status:** **CLOSED PASS** — observability instrumentation design batch. **25A–25D COMPLETE** (architecture, schema contracts, extractor/dashboard contracts, rollout plan). **25E PASS** (design guard + tests). **25F PASS** (closeout). No runtime/schema/live changes.  
 **Phase 26A status:** **PASS** — observability schema and no-op instrumentation foundation. Migration SQL committed; live DB not migrated. **AI_KPI_* flags default OFF.** Runtime writes disabled.  
 **Phase 26B status:** **PASS** — ingestion KPI event instrumentation behind default-off flags. Per-source_type extractor PASS when event rows exist; run-level PARTIAL fallback preserved.  
-**Phase 26C status:** **PASS** — searchability verification probe behind default-off flags. Local/dev python_ai schema applied @ 127.0.0.1:5440. **26D NOT STARTED.**  
+**Phase 26C status:** **PASS** — searchability verification probe behind default-off flags. Local/dev python_ai schema applied @ 127.0.0.1:5440.  
+**Phase 26D status:** **PASS** — query observation instrumentation behind default-off flags. H1/H2/H3 protocol capture unit-tested. Optional 3-probe smoke NOT RUN. **26E NOT STARTED.**  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.

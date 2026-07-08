@@ -67,7 +67,7 @@ class Phase26aKpiObservabilityTests(unittest.TestCase):
 
         self.assertFalse(kpi_observability.kpi_writes_allowed("ingestion"))
 
-    def test_enabled_channel_raises_not_implemented_in_phase26a(self) -> None:
+    def test_enabled_query_channel_allowed_when_flags_on(self) -> None:
         self._reload_modules(
             {
                 "AI_KPI_OBSERVABILITY_MASTER_DISABLE": "0",
@@ -78,8 +78,6 @@ class Phase26aKpiObservabilityTests(unittest.TestCase):
         import app.ai.kpi_observability as kpi_observability
 
         self.assertTrue(kpi_observability.kpi_writes_allowed("query"))
-        with self.assertRaises(NotImplementedError):
-            kpi_observability.noop_write_kpi_query_observation({"rag_total_ms": 1})
 
 
 if __name__ == "__main__":

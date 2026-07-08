@@ -133,19 +133,16 @@ class Phase26bKpiIngestionTests(unittest.TestCase):
         with self.assertRaises(KpiIngestionWriteError):
             write_kpi_ingestion_event_sync(self._base_payload())
 
-    def test_other_channels_remain_stubbed(self) -> None:
+    def test_usefulness_channel_remains_stubbed(self) -> None:
         self._reload_kpi_modules(
             {
                 "AI_KPI_OBSERVABILITY_MASTER_DISABLE": "0",
                 "AI_KPI_OBSERVABILITY_ENABLED": "1",
-                "AI_KPI_QUERY_OBSERVATIONS_ENABLED": "1",
                 "AI_KPI_USEFULNESS_OBSERVATIONS_ENABLED": "1",
             }
         )
         import app.ai.kpi_observability as kpi_observability
 
-        with self.assertRaises(NotImplementedError):
-            kpi_observability.noop_write_kpi_query_observation({"rag_total_ms": 1})
         with self.assertRaises(NotImplementedError):
             kpi_observability.noop_write_kpi_usefulness_observation({"response_pass": True})
 

@@ -1,13 +1,15 @@
 """T15.3C — Canonical AI HTTP routes."""
 from __future__ import annotations
 
+import time
 from typing import List, Optional
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Header, Query, Request
 from pydantic import BaseModel, Field
 
 from app.ai import insights
 from app.ai.config import AI_RAG_SHADOW_VECTOR
+from app.ai.kpi_query_observations import emit_rag_query_observation_safe
 
 router = APIRouter(prefix="/ai", tags=["ai-platform"])
 
@@ -128,6 +130,7 @@ async def post_rag_preview_revoke(
 
 @router.post("/rag/query")
 async def post_rag_query(
+    request: Request,
     body: RagQueryBody,
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
     shadow_vector: bool = Query(False),
@@ -139,7 +142,8 @@ async def post_rag_query(
     ),
     shadow_debug: bool = Query(False),
 ):
-    return await insights.rag_query(
+    started = time.perf_counter()
+    result = await insights.rag_query(
         user_id=_user_id(x_user_id, body.user_id),
         question=body.question,
         source_types=body.source_types,
@@ -149,6 +153,14 @@ async def post_rag_query(
         shadow_custom_query_hints=_parse_custom_query_hints(shadow_query_hints),
         shadow_debug=shadow_debug,
     )
+    rag_total_ms = int((time.perf_counter() - started) * 1000)
+    await emit_rag_query_observation_safe(
+        http_scope=request.scope,
+        rag_envelope=result,
+        rag_total_ms=rag_total_ms,
+        http_status=200,
+    )
+    return result
 
 
 @router.post("/records/valuation")

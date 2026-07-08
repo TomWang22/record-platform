@@ -44,11 +44,17 @@ def kpi_observability_posture() -> Dict[str, Any]:
     }
 
 
-def noop_write_kpi_ingestion_event(_payload: Mapping[str, Any]) -> Optional[str]:
-    """No-op stub for Phase 26B; returns None when writes are disabled."""
+def noop_write_kpi_ingestion_event(
+    payload: Mapping[str, Any],
+    *,
+    insert_fn: Optional[Any] = None,
+) -> Optional[str]:
+    """Write ingestion KPI event when channel flags allow; no-op when disabled."""
     if not kpi_writes_allowed("ingestion"):
         return None
-    raise NotImplementedError("KPI ingestion event writes are not implemented until Phase 26B")
+    from app.ai.kpi_ingestion_events import write_kpi_ingestion_event_sync
+
+    return write_kpi_ingestion_event_sync(payload, insert_fn=insert_fn)
 
 
 def noop_write_kpi_searchability_check(_payload: Mapping[str, Any]) -> Optional[str]:

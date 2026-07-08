@@ -3,7 +3,7 @@ Agent ACTIVE CONTEXT — AI Platform
 Do not use chat memory as source of truth.
 Before any future AI-platform work, run:
 
-make ai-platform-verify-phase26a-schema
+make ai-platform-verify-phase26b-ingestion
 
 Then read:
 - docs/ai-platform/ACTIVE_CONTEXT.md
@@ -20,6 +20,7 @@ Phase handoff lineage:
 - Phase 23 context-continuity guardrail closeout commit: 6f3d2bd
 - Phase 24 KPI observability read-only closeout commit: c21c2ae
 - Phase 25 observability instrumentation design closeout commit: 3fc3be4
+- Phase 26A observability schema/no-op closeout commit: edb7570
 
 Frozen archive heads:
 - Phase 22 archive HEAD: 5588779
@@ -32,7 +33,8 @@ Phase 23: CLOSED PASS — context continuity and long-run replay guardrails
 Phase 24: CLOSED PASS — KPI observability read-only extraction and gap inventory
 Phase 25: CLOSED PASS — observability instrumentation design batch
 Phase 26A: PASS — observability schema and no-op instrumentation foundation
-Phase 26B: NOT STARTED
+Phase 26B: PASS — ingestion KPI event instrumentation (default-off)
+Phase 26C: NOT STARTED
 
 Artifact SHA256:
 1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa
@@ -53,8 +55,8 @@ Evidence label rules:
 - Phase 22C 7200/7200 is sample only; never call it full parity.
 - Phase 22B 15/15 is smoke only; never call it matrix evidence.
 
-KPI gaps — schema in Phase 26A; writes in Phase 26B–26E:
-- ingestion_success_rate per source type: GAP — Phase 26B
+KPI gaps — ingestion write path in Phase 26B; remaining in 26C–26E:
+- ingestion_success_rate per source type: extractor PASS when event rows exist; operational population default-off
 - data_to_searchable_ms end-to-end: GAP — Phase 26C
 - H1 full-matrix latency summary in committed docs: GAP — Phase 26D
 - usefulness over time time-series: GAP — Phase 26E
@@ -69,4 +71,4 @@ Locked production posture:
 - AI_KPI_* observability flags: default OFF, master disable ON
 
 Next allowed step:
-Approved: start Phase 26B ingestion event instrumentation only after Phase 26A schema/no-op PASS — no live eval, no production default, no PERCENT rollout.
+Approved: start Phase 26C searchability verification probe implementation only after Phase 26B ingestion instrumentation PASS — no live eval, no production default, no PERCENT rollout.

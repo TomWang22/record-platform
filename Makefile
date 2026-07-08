@@ -143,6 +143,13 @@ ai-platform-verify-phase26a-schema: ## Phase 25 design + Phase 26A KPI schema/no
 	node scripts/phase26a-ai-kpi-schema-guard-readonly.mjs
 	node --test tests/phase26a-ai-kpi-schema-guard.test.mjs
 	cd services/python-ai-service && python -m unittest tests.test_phase26a_kpi_observability
+
+ai-platform-verify-phase26b-ingestion: ## Phase 26A schema + Phase 26B ingestion instrumentation guard
+	$(MAKE) ai-platform-verify-phase26a-schema
+	node scripts/phase26b-ingestion-guard-readonly.mjs
+	node --test tests/phase26b-ingestion-kpi-readonly.test.mjs
+	node --test tests/phase26b-ingestion-guard.test.mjs
+	cd services/python-ai-service && python -m unittest tests.test_phase26b_kpi_ingestion
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

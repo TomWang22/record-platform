@@ -5,6 +5,10 @@ Map from Phase 26 documents → code → flags → tests → operational status.
 Archive: `PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md`  
 Operator guide: `PHASE_26_OBSERVABILITY_OPERATOR_GUIDE.md`
 
+```text
+Archive precedence / supersession: When older 26A–26G closeout docs conflict with the archive or ACTIVE_CONTEXT.md, the archive and ACTIVE_CONTEXT.md win for current state. Older docs are historical snapshots (e.g. 26F saying “26G NOT STARTED”).
+```
+
 ---
 
 ## Config and gate layer

@@ -1,5 +1,7 @@
 # Phase 26F — KPI dashboard/report generation closeout
 
+> **Historical snapshot note:** This document was written at Phase 26F time, before Phase 26G/H. Its “Phase 26G: NOT STARTED” and “Next allowed step: Phase 26G” lines are historical, not current. Current Phase 26 status is CLOSED PASS after Phase 26G closeout `4409ffc` and Phase 26H archive/explainer docs `d16d195`. Use `PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md` and `ACTIVE_CONTEXT.md` for current state.
+
 **Phase 26F:** PASS  
 **Phase 26G:** NOT STARTED  
 **Live eval:** NOT RUN  

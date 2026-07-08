@@ -21,6 +21,17 @@ ALLOW_PROD_PERCENT=0
 Hybrid/vector production default: NOT APPROVED
 ```
 
+```text
+Archive precedence: When older phase docs conflict with this archive, this archive and ACTIVE_CONTEXT.md are authoritative for current state. Older docs are historical snapshots of their phase at the time they were committed.
+```
+
+| Snapshot / addendum | Status reading |
+| ------------------- | -------------- |
+| 26F doc says 26G NOT STARTED | historical snapshot |
+| 26G doc closes Phase 26 implementation | current implementation closeout (`4409ffc`) |
+| 26H docs explain/archive Phase 26 | current human-readable archive addendum (`d16d195`) |
+| 26I docs note supersession / historical snapshots | consistency pass so older “NOT STARTED” lines cannot be mistaken for current state |
+
 ---
 
 ## Why Phase 26 existed
@@ -47,6 +58,7 @@ Phases 24–25 designed KPI observability (gap inventory, schema contracts, extr
 26F — combined KPI report generation
 26G — disable-switch drill + implementation closeout
 26H — archive/explainer docs only
+26I — archive consistency / supersession notes only
 ```
 
 | Phase | Closeout doc | Status |
@@ -59,6 +71,7 @@ Phases 24–25 designed KPI observability (gap inventory, schema contracts, extr
 | 26F | `PHASE_26F_KPI_DASHBOARD_REPORT_GENERATION_CLOSEOUT.md` | PASS |
 | 26G | `PHASE_26G_OBSERVABILITY_DISABLE_SWITCH_AND_CLOSEOUT.md` | PASS |
 | 26H | this archive + operator guide + code map | docs only |
+| 26I | supersession / historical-snapshot consistency notes | docs only |
 
 Companion docs:
 

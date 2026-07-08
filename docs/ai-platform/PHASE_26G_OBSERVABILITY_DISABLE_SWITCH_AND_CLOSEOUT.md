@@ -1,5 +1,7 @@
 # Phase 26G — observability disable-switch drill and implementation closeout
 
+> **Supersession note:** This document is the Phase 26 **implementation** closeout (`4409ffc`). Later Phase 26H/26I docs add archive/explainer and historical-snapshot clarity only — they do not reopen implementation. For current human-readable status, prefer `PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md` and `ACTIVE_CONTEXT.md`.
+
 **Phase 26:** CLOSED PASS  
 **Phase 26G:** PASS  
 **Live eval:** NOT RUN  

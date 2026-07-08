@@ -10,6 +10,20 @@ Related:
 
 ---
 
+## How to read Phase 26 docs
+
+```text
+How to read Phase 26 docs:
+1. Start with ACTIVE_CONTEXT.md.
+2. Then read PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md.
+3. Use 26A–26G docs as historical closeout records.
+4. If an older doc says a later phase is NOT STARTED, treat that as true only at the time that older doc was committed.
+```
+
+Current Phase 26 source of truth: this operator guide (for how to verify) plus the archive and `ACTIVE_CONTEXT.md` (for status). Older “Next allowed step: Phase 26G” lines in 26F are historical snapshots only.
+
+---
+
 ## Hard stops
 
 ```text

@@ -47,6 +47,8 @@ Phase 26E: PASS — usefulness observation export (default-off)
 Phase 26F: PASS — KPI dashboard/report generation (read-only)
 Phase 26G: PASS — observability disable-switch drill and closeout
 Phase 26H: PASS — archive/explainer docs only (no runtime changes)
+Phase 26H: archive/explainer docs PASS — current Phase 26 source of truth is PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md plus ACTIVE_CONTEXT.md.
+Phase 26I: PASS — archive consistency / supersession notes (historical closeouts clarified; no runtime changes)
 Phase 26: CLOSED PASS — observability implementation batch (closeout 4409ffc)
 
 Local/dev KPI schema:

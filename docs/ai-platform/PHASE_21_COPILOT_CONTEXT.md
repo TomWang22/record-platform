@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-07 (Phase 25 observability instrumentation design closeout complete)  
+**Last updated:** 2026-07-08 (Phase 26A observability schema and no-op instrumentation PASS)  
 **Current repo tip:** compute live with `git rev-parse --short HEAD` (see `docs/ai-platform/ACTIVE_CONTEXT.md`)  
 **Phase 22 archive HEAD:** `5588779`  
 **Phase 21 archive checkpoint:** `328161d`  
@@ -10,7 +10,8 @@
 **Phase 22 status:** **CLOSED PASS / ARCHIVED** — full labeled protocol parity H1/H2/H3 each **57105/57105** (see `PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md`)  
 **Phase 23 status:** **CLOSED PASS** — context continuity and long-run replay guardrails.  
 **Phase 24 status:** **CLOSED PASS** — KPI observability read-only extraction and gap inventory. **24A COMPLETE** (design). **24B PASS** (read-only extractors). **24C PASS** (guard tests/Makefile). **24D PASS** (closeout). Phase 24 live work: **NOT APPROVED.**  
-**Phase 25 status:** **CLOSED PASS** — observability instrumentation design batch. **25A–25D COMPLETE** (architecture, schema contracts, extractor/dashboard contracts, rollout plan). **25E PASS** (design guard + tests). **25F PASS** (closeout). No runtime/schema/live changes. Phase 26 implementation: **NOT STARTED** until explicit 26A approval.  
+**Phase 25 status:** **CLOSED PASS** — observability instrumentation design batch. **25A–25D COMPLETE** (architecture, schema contracts, extractor/dashboard contracts, rollout plan). **25E PASS** (design guard + tests). **25F PASS** (closeout). No runtime/schema/live changes.  
+**Phase 26A status:** **PASS** — observability schema and no-op instrumentation foundation. Migration SQL committed; live DB not migrated. **AI_KPI_* flags default OFF.** Runtime writes disabled. **26B NOT STARTED.**  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -192,8 +193,11 @@ Phase 25E PASS: design guard script and unit tests (read-only).
 Phase 25F PASS: Phase 25 observability instrumentation design closeout.
 Phase 25: CLOSED PASS.
 Phase 25 live work: NOT RUN.
-KPI gaps — design path complete; implementation in Phase 26: ingestion_success_rate per source (26B), data_to_searchable_ms (26C), H1 full-matrix latency (26D), usefulness time-series (26E).
-Next work: Phase 26A observability schema and no-op instrumentation only after explicit approval — no live eval, no production default, no PERCENT rollout.
+Phase 26A PASS: KPI observability schema migration SQL + default-off AI_KPI_* flags + no-op write guards.
+Phase 26A live DB migration: NOT APPLIED.
+Phase 26B: NOT STARTED.
+KPI gaps — schema foundation in 26A; writes in 26B–26E: ingestion_success_rate per source (26B), data_to_searchable_ms (26C), H1 full-matrix latency (26D), usefulness time-series (26E).
+Next work: Phase 26B ingestion event instrumentation only after explicit approval — no live eval, no production default, no PERCENT rollout.
 Phase 22 CLOSED PASS — full labeled protocol parity.
 H1 baseline: 57105/57105 HTTP/1.1.
 H2 replay: 57105/57105 HTTP/2 PASS.

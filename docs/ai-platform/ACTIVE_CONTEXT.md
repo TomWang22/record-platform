@@ -3,7 +3,7 @@ Agent ACTIVE CONTEXT — AI Platform
 Do not use chat memory as source of truth.
 Before any future AI-platform work, run:
 
-make ai-platform-verify-phase25-design
+make ai-platform-verify-phase26a-schema
 
 Then read:
 - docs/ai-platform/ACTIVE_CONTEXT.md
@@ -19,6 +19,7 @@ Phase handoff lineage:
 - Phase 23B context-archive verifier hardening commit: 304277a
 - Phase 23 context-continuity guardrail closeout commit: 6f3d2bd
 - Phase 24 KPI observability read-only closeout commit: c21c2ae
+- Phase 25 observability instrumentation design closeout commit: 3fc3be4
 
 Frozen archive heads:
 - Phase 22 archive HEAD: 5588779
@@ -30,12 +31,8 @@ Phase 22: CLOSED PASS — full labeled protocol parity
 Phase 23: CLOSED PASS — context continuity and long-run replay guardrails
 Phase 24: CLOSED PASS — KPI observability read-only extraction and gap inventory
 Phase 25: CLOSED PASS — observability instrumentation design batch
-Phase 25A: observability instrumentation architecture design COMPLETE
-Phase 25B: KPI event and schema contract proposal COMPLETE
-Phase 25C: KPI extractor and dashboard contract design COMPLETE
-Phase 25D: observability implementation rollout plan COMPLETE
-Phase 25E: observability guardrails and test design PASS
-Phase 25F: observability instrumentation design closeout PASS
+Phase 26A: PASS — observability schema and no-op instrumentation foundation
+Phase 26B: NOT STARTED
 
 Artifact SHA256:
 1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa
@@ -56,7 +53,7 @@ Evidence label rules:
 - Phase 22C 7200/7200 is sample only; never call it full parity.
 - Phase 22B 15/15 is smoke only; never call it matrix evidence.
 
-KPI gaps — design path in Phase 25; implementation in Phase 26:
+KPI gaps — schema in Phase 26A; writes in Phase 26B–26E:
 - ingestion_success_rate per source type: GAP — Phase 26B
 - data_to_searchable_ms end-to-end: GAP — Phase 26C
 - H1 full-matrix latency summary in committed docs: GAP — Phase 26D
@@ -69,6 +66,7 @@ Locked production posture:
 - ALLOW_PROD_PERCENT=0
 - Hybrid/vector production default: NOT APPROVED
 - Runtime/env/default/allowlist changes: NONE
+- AI_KPI_* observability flags: default OFF, master disable ON
 
 Next allowed step:
-Approved: start Phase 26A observability schema and no-op instrumentation implementation only after Phase 25 design PASS — no live eval, no production default, no PERCENT rollout.
+Approved: start Phase 26B ingestion event instrumentation only after Phase 26A schema/no-op PASS — no live eval, no production default, no PERCENT rollout.

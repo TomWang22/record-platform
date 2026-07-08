@@ -137,6 +137,12 @@ ai-platform-verify-phase25-design: ## Phase 24 KPIs + Phase 25 observability des
 	$(MAKE) ai-platform-verify-phase24-kpis
 	node scripts/phase25-observability-design-guard-readonly.mjs
 	node --test tests/phase25-observability-design-guard.test.mjs
+
+ai-platform-verify-phase26a-schema: ## Phase 25 design + Phase 26A KPI schema/no-op guard
+	$(MAKE) ai-platform-verify-phase25-design
+	node scripts/phase26a-ai-kpi-schema-guard-readonly.mjs
+	node --test tests/phase26a-ai-kpi-schema-guard.test.mjs
+	cd services/python-ai-service && python -m unittest tests.test_phase26a_kpi_observability
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

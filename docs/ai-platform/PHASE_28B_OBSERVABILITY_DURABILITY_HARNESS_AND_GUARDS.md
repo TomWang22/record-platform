@@ -4,7 +4,8 @@ Offline/local durability harness and strict production-readiness guards. **Fixtu
 
 ```text
 Phase 28B: PASS — offline durability harness + guards
-Phase 28C: NOT STARTED
+Phase 28C: PASS — local/dev pipeline durability drill
+Phase 28D–28H: IN_PROGRESS / BLOCKED (controlled matrix execution)
 Live eval run: NOT RUN
 Runtime/env/default/allowlist changes: NONE
 Production DB migration: NOT RUN

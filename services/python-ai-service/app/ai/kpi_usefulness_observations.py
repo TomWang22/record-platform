@@ -62,6 +62,7 @@ KNOWN_EVIDENCE_LABELS = frozenset(
         "Phase 22C 7200/7200 sample only",
         "Phase 22B 15/15 smoke only",
         "manual/dev usefulness observation",
+        "Phase 28 controlled observability production-readiness matrix: 25920/25920 target",
     }
 )
 

@@ -68,10 +68,16 @@ Phase 27: CLOSED PASS — controlled local/dev operational enablement batch
 Phase 27 archive source of truth: PHASE_27_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ARCHIVE.md plus ACTIVE_CONTEXT.md.
 Phase 28A: PASS — observability production-readiness test architecture (docs + acceptance matrix)
 Phase 28B: PASS — offline durability harness + strict guards (fixtures only; no network)
-Phase 28C: NOT STARTED
-Phase 28: IN PROGRESS — production-readiness layer (28A/28B PASS; 28C–28H pending separate approval)
+Phase 28C: PASS — local/dev KPI pipeline durability drill
+Phase 28D: IN_PROGRESS — controlled real-inference observability matrix (25920 target)
+Phase 28E: IN_PROGRESS — H1/H2/H3 protocol verification (blocked on 28D)
+Phase 28F: NOT STARTED
+Phase 28G: NOT STARTED
+Phase 28H: BLOCKED
+Phase 28: BLOCKED — matrix must reach 25920/25920 with zero fallback/wrong_protocol/wrong_gate/leakage before closeout
 
 Live eval run: NOT RUN
+Controlled real inference run: IN_PROGRESS
 Production DB migration: NOT RUN
 Local/dev schema apply: PASS (python_ai @ 127.0.0.1:5440; Phase 27 only — no new writes in 28A/28B)
 DB writes: NO (28A/28B offline harness only; Phase 27 historical rows remain on local/dev)

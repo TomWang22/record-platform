@@ -75,7 +75,9 @@ Phase 28E: PASS — H1/H2/H3 protocol verification
 Phase 28F: PASS — /tmp combined KPI report
 Phase 28G: PASS — disable-switch rollback drill
 Phase 28H: PASS — observability production-readiness closeout
+Phase 28I: PASS — archive/explainer docs only (no runtime/DB changes)
 Phase 28: CLOSED PASS — controlled observability production-readiness batch
+Phase 28 archive source of truth: PHASE_28_OBSERVABILITY_PRODUCTION_READINESS_ARCHIVE.md plus ACTIVE_CONTEXT.md.
 
 Live eval run: NOT RUN
 Controlled real inference run: PASS
@@ -134,6 +136,10 @@ Locked production posture:
 Phase 28 docs:
 - docs/ai-platform/PHASE_28A_OBSERVABILITY_PRODUCTION_READINESS_TEST_ARCHITECTURE.md
 - docs/ai-platform/PHASE_28B_OBSERVABILITY_DURABILITY_HARNESS_AND_GUARDS.md
+- docs/ai-platform/PHASE_28I_PRODUCTION_READINESS_ARCHIVE_EXPLAINER.md
+- docs/ai-platform/PHASE_28_OBSERVABILITY_PRODUCTION_READINESS_ARCHIVE.md
+- docs/ai-platform/PHASE_28_OBSERVABILITY_OPERATOR_GUIDE.md
+- docs/ai-platform/PHASE_28_OBSERVABILITY_CODE_MAP.md
 
 Phase 27 docs:
 - docs/ai-platform/PHASE_27A_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ROADMAP.md
@@ -156,4 +162,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Phase 28 closed PASS. Production enablement: NOT APPROVED. Next work requires explicit owner approval.
+Approved: start Phase 29A observability production enablement RFC/design only after Phase 28 archive PASS — no live eval, no production default, no PERCENT rollout, no production DB migration, no production KPI enablement.

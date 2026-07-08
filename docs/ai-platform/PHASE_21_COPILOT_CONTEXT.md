@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-08 (Phase 28A/28B production-readiness harness PASS)  
+**Last updated:** 2026-07-08 (Phase 28I archive/explainer PASS)  
 **Current repo tip:** compute live with `git rev-parse --short HEAD` (see `docs/ai-platform/ACTIVE_CONTEXT.md`)  
 **Phase 22 archive HEAD:** `5588779`  
 **Phase 21 archive checkpoint:** `328161d`  
@@ -26,8 +26,9 @@
 **Phase 27B–27H status:** **PASS** — controlled local/dev schema verify, flag enablement, real write-path row population, query/usefulness smoke, /tmp combined report, disable-switch rollback, closeout. No production enablement. No 57105 replay.
 **Phase 28A status:** **PASS** — production-readiness test architecture (docs + acceptance matrix). No live eval. No production rollout.
 **Phase 28B status:** **PASS** — offline durability harness + strict guards (fixtures only; 16 scenarios). No DB writes. No network.
-**Phase 28C status:** **NOT STARTED** — requires separate approval after 28B PASS.
-**Phase 28 status:** **IN PROGRESS** — 28A/28B PASS; 28C–28H pending. 
+**Phase 28C–28H status:** **PASS** — local/dev durability, 25920/25920 controlled matrix, H1/H2/H3 verification, /tmp KPI report, disable-switch rollback, closeout.
+**Phase 28I status:** **PASS** — archive/explainer docs only. No runtime/DB/live changes.
+**Phase 28 status:** **CLOSED PASS** — controlled observability production-readiness validation. 25920 matrix is **NOT** Phase 22 full parity; **NOT** merged into 57105/57105 or 171315/171315. Production enablement: **NOT APPROVED**.
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -229,11 +230,13 @@ Phase 27A PASS: operational enablement roadmap design only (tickets 27A–27H); 
 Phase 27B–27H PASS: controlled local/dev enablement executed — real python_ai@5440 rows via write paths; /tmp reports; disable-switch rollback; production enablement NOT APPROVED.
 Phase 27I PASS: archive/explainer docs (operational enablement archive, operator guide, code map); no runtime changes.
 Phase 27: CLOSED PASS.
-Phase 28A PASS: production-readiness test architecture — acceptance matrix, hard stops, future 28C–28H gates; no live work.
-Phase 28B PASS: offline durability harness — fixtures-only pipeline simulation, 16 scenario tests, strict guards; no DB writes, no network.
-Phase 28C: NOT STARTED.
-KPI truth: implementation complete behind default-off gates; Phase 28 proves offline production-readiness gates before any live inference.
-Next work: Approved: start Phase 28C local/dev KPI pipeline durability drill only after Phase 28B harness PASS — no live eval, no production DB migration, no production default, no PERCENT rollout.
+Phase 28A PASS: production-readiness test architecture — acceptance matrix, hard stops; no live work at design time.
+Phase 28B PASS: offline durability harness — fixtures-only pipeline simulation, 16 scenario tests, strict guards.
+Phase 28C–28H PASS: controlled 25920/25920 matrix, H1/H2/H3 verification, /tmp KPI report, disable-switch rollback, closeout.
+Phase 28I PASS: archive/explainer docs; 25920 matrix NOT merged into 57105/57105 or 171315/171315.
+Phase 28: CLOSED PASS — controlled observability production-readiness validation; production enablement NOT APPROVED.
+KPI truth: implementation complete behind default-off gates; Phase 28 proved controlled matrix + report + rollback on local/dev only.
+Next work: Approved: start Phase 29A observability production enablement RFC/design only after Phase 28 archive PASS — no live eval, no production default, no PERCENT rollout, no production DB migration, no production KPI enablement.
 Phase 22 CLOSED PASS — full labeled protocol parity.
 H1 baseline: 57105/57105 HTTP/1.1.
 H2 replay: 57105/57105 HTTP/2 PASS.

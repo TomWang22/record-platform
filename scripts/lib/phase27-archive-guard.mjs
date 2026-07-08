@@ -166,8 +166,8 @@ export function validateActiveContext(active) {
   if (phase28ClosedPass) {
     assertMatch(
       nextBlock,
-      /Phase 28 closed PASS|explicit owner approval|production enablement/i,
-      `${DOC_ACTIVE} next step must reflect Phase 28 closed PASS`,
+      /Phase 29A|Phase 28 archive PASS|explicit owner approval|production enablement/i,
+      `${DOC_ACTIVE} next step must reflect Phase 28 closed PASS and Phase 29A design only`,
     );
   } else if (phase28BPass) {
     assertMatch(

@@ -69,22 +69,23 @@ Phase 27 archive source of truth: PHASE_27_OBSERVABILITY_OPERATIONAL_ENABLEMENT_
 Phase 28A: PASS — observability production-readiness test architecture (docs + acceptance matrix)
 Phase 28B: PASS — offline durability harness + strict guards (fixtures only; no network)
 Phase 28C: PASS — local/dev KPI pipeline durability drill
-Phase 28D: IN_PROGRESS — controlled real-inference observability matrix (25920 target)
-Phase 28E: IN_PROGRESS — H1/H2/H3 protocol verification (blocked on 28D)
-Phase 28F: NOT STARTED
-Phase 28G: NOT STARTED
-Phase 28H: BLOCKED
-Phase 28: BLOCKED — matrix must reach 25920/25920 with zero fallback/wrong_protocol/wrong_gate/leakage before closeout
+Phase 28D: PASS — controlled real-inference observability matrix 25920/25920
+Phase 28D-R: PASS — recovery/retry infrastructure (15 transient 502/504 retried clean)
+Phase 28E: PASS — H1/H2/H3 protocol verification
+Phase 28F: PASS — /tmp combined KPI report
+Phase 28G: PASS — disable-switch rollback drill
+Phase 28H: PASS — observability production-readiness closeout
+Phase 28: CLOSED PASS — controlled observability production-readiness batch
 
 Live eval run: NOT RUN
-Controlled real inference run: IN_PROGRESS
+Controlled real inference run: PASS
 Production DB migration: NOT RUN
 Local/dev schema apply: PASS (python_ai @ 127.0.0.1:5440; Phase 27 only — no new writes in 28A/28B)
-DB writes: NO (28A/28B offline harness only; Phase 27 historical rows remain on local/dev)
+DB writes: controlled matrix KPI rows on local/dev only during 28D run; flags rolled back after 28G
 Migrations applied to live: NO
-Real inference run: NOT RUN
+Real inference run: NOT RUN (controlled matrix only)
 Pipeline durability harness: PASS (offline fixtures)
-H1/H2/H3 real protocol smoke: NOT RUN
+H1/H2/H3 real protocol smoke: PASS (25920/25920 controlled matrix)
 Bench logs committed: NO
 Generated reports committed: NO
 
@@ -155,4 +156,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Approved: start Phase 28C local/dev KPI pipeline durability drill only after Phase 28B harness PASS — no live eval, no production DB migration, no production default, no PERCENT rollout.
+Phase 28 closed PASS. Production enablement: NOT APPROVED. Next work requires explicit owner approval.

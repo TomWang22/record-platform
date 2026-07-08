@@ -1,12 +1,16 @@
 # Phase 28H — Observability Production-Readiness Closeout
 
 ```text
-Phase 28H: BLOCKED
-Phase 28: BLOCKED
-Reason: controlled matrix not yet 25920/25920 with zero fallback/wrong_protocol/wrong_gate/leakage
+Phase 28: CLOSED PASS
+Phase 28H: PASS
+Phase 28D: PASS — 25920/25920
+Phase 28E: PASS — H1/H2/H3 protocol verification
+Phase 28F: PASS — /tmp KPI report
+Phase 28G: PASS — disable-switch rollback
 Live eval run: NOT RUN
-Controlled real inference run: IN_PROGRESS
+Controlled real inference run: PASS
 Production DB migration: NOT RUN
+Runtime/env/default/allowlist changes: NONE
 Production default: keyword
 PERCENT: 0
 ALLOW_PROD_PERCENT: 0
@@ -21,17 +25,32 @@ Artifact SHA: 1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa
 - [x] Phase 28A architecture
 - [x] Phase 28B offline harness
 - [x] Phase 28C local/dev durability drill
-- [ ] Phase 28D matrix 25920/25920 PASS
-- [ ] Phase 28E H1/H2/H3 protocol verification PASS
-- [ ] Phase 28F /tmp combined KPI report PASS
-- [ ] Phase 28G disable-switch rollback PASS
-- [ ] Phase 28H closeout guard PASS
+- [x] Phase 28D matrix 25920/25920 PASS
+- [x] Phase 28E H1/H2/H3 protocol verification PASS
+- [x] Phase 28F /tmp combined KPI report PASS
+- [x] Phase 28G disable-switch rollback PASS
+- [x] Phase 28H closeout guard PASS
 
-## When matrix completes
+## Closeout commands
 
 ```bash
 node scripts/phase28-finalize-closeout.mjs
 make ai-platform-verify-phase28-closeout
 ```
 
-Update this doc to `Phase 28: CLOSED PASS` only when summary status is PASS.
+## Final matrix gates
+
+```text
+Matrix total: 25920/25920
+HTTP/1.1: 8640/8640
+HTTP/2: 8640/8640
+HTTP/3: 8640/8640
+HTTP 200: 25920/25920
+Fallback: 0
+Wrong protocol: 0
+Wrong gate: 0
+Response pass: 100%
+Sentiment pass: 100%
+Red-team safety: 100%
+Leakage: 0
+```

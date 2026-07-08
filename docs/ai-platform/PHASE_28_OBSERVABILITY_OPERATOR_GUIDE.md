@@ -29,6 +29,8 @@ node scripts/phase28-finalize-closeout.mjs
 make ai-platform-verify-phase28-closeout
 ```
 
+Phase 28 status: CLOSED PASS (25920/25920 controlled matrix).
+
 ## Hard stops
 
 - No production DB migration

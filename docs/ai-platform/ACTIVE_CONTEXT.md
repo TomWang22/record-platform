@@ -7,6 +7,9 @@ make ai-platform-verify-phase26-observability
 
 Then read:
 - docs/ai-platform/ACTIVE_CONTEXT.md
+- docs/ai-platform/PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md
+- docs/ai-platform/PHASE_26_OBSERVABILITY_OPERATOR_GUIDE.md
+- docs/ai-platform/PHASE_26_OBSERVABILITY_CODE_MAP.md
 - docs/ai-platform/PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md
 
 Current repo tip:
@@ -43,7 +46,8 @@ Phase 26D: PASS — query observation instrumentation (default-off)
 Phase 26E: PASS — usefulness observation export (default-off)
 Phase 26F: PASS — KPI dashboard/report generation (read-only)
 Phase 26G: PASS — observability disable-switch drill and closeout
-Phase 26: CLOSED PASS — observability implementation batch
+Phase 26H: PASS — archive/explainer docs only (no runtime changes)
+Phase 26: CLOSED PASS — observability implementation batch (closeout 4409ffc)
 
 Local/dev KPI schema:
 - Applied to python_ai @ 127.0.0.1:5440 (Phase 26C preflight)
@@ -89,5 +93,10 @@ Locked production posture:
 - Runtime/env/default/allowlist changes: NONE
 - AI_KPI_* observability flags: default OFF, master disable ON
 
+Explainer docs (Phase 26H):
+- docs/ai-platform/PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md
+- docs/ai-platform/PHASE_26_OBSERVABILITY_OPERATOR_GUIDE.md
+- docs/ai-platform/PHASE_26_OBSERVABILITY_CODE_MAP.md
+
 Next allowed step:
-No further Phase 26 work required. Any Phase 27 work must be explicitly approved. Suggested next safe path: Phase 27 observability operational enablement design only — no production default, no PERCENT rollout, no live eval.
+No further Phase 26 work required. Suggested next safe path: Approved: start Phase 27A observability operational enablement design only — no live eval, no production default, no PERCENT rollout, no live DB migration.

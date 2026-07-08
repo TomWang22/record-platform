@@ -1,6 +1,6 @@
 # Phase 21 — Copilot / agent context (Record Platform AI)
 
-**Last updated:** 2026-07-08 (Phase 26 observability implementation CLOSED PASS)  
+**Last updated:** 2026-07-08 (Phase 26H archive/explainer docs; Phase 26 CLOSED PASS @ 4409ffc)  
 **Current repo tip:** compute live with `git rev-parse --short HEAD` (see `docs/ai-platform/ACTIVE_CONTEXT.md`)  
 **Phase 22 archive HEAD:** `5588779`  
 **Phase 21 archive checkpoint:** `328161d`  
@@ -18,7 +18,8 @@
 **Phase 26E status:** **PASS** — usefulness observation export behind default-off flags. H1/H2/H3 evidence labels unit-tested. No live eval.  
 **Phase 26F status:** **PASS** — combined read-only KPI dashboard/report generation. Output to `/tmp` only; not committed.
 **Phase 26G status:** **PASS** — observability disable-switch drill and implementation closeout. All KPI write channels blocked under master disable and global off.
-**Phase 26 status:** **CLOSED PASS** — observability implementation batch (26A–26G). Operational KPI row population remains disabled by default. No production rollout approved.  
+**Phase 26H status:** **PASS** — archive/explainer docs only (`PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md`, operator guide, code map). No runtime/DB/live changes.
+**Phase 26 status:** **CLOSED PASS** — observability implementation batch (26A–26G closeout `4409ffc`; 26H docs addendum). Operational KPI row population remains disabled by default. No production rollout approved.  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -212,9 +213,10 @@ Phase 26D runtime writes default enabled: NO.
 Phase 26E PASS: usefulness observation export write path + extractor; no live eval.
 Phase 26E runtime writes default enabled: NO.
 Phase 26F PASS: combined read-only KPI dashboard/report generation; output /tmp only.
-Phase 26G PASS: disable-switch drill verified; Phase 26 CLOSED PASS.
+Phase 26G PASS: disable-switch drill verified; Phase 26 CLOSED PASS @ 4409ffc.
+Phase 26H PASS: archive/explainer docs (implementation archive, operator guide, code map); no runtime changes.
 KPI truth: implementation complete behind default-off gates; operational row population disabled by default; H1 full-matrix latency in committed docs remains GAP.
-Next work: No further Phase 26 work required. Phase 27 operational enablement design only after explicit approval — no production default, no PERCENT rollout, no live eval.
+Next work: No further Phase 26 work required. Suggested next safe path: Approved: start Phase 27A observability operational enablement design only — no live eval, no production default, no PERCENT rollout, no live DB migration.
 Phase 22 CLOSED PASS — full labeled protocol parity.
 H1 baseline: 57105/57105 HTTP/1.1.
 H2 replay: 57105/57105 HTTP/2 PASS.

@@ -107,14 +107,14 @@ Phase 30 archive source of truth: PHASE_30_OBSERVABILITY_STAGING_ENABLEMENT_ARCH
 Phase 31A: PASS — production KPI enablement RFC
 Phase 31B: PASS — preflight and archive verification
 Phase 31C: PASS — staging long-soak plan + monitor ownership
-Phase 31D: IN_PROGRESS — long-running staging real-inference soak 51840/51840 target
-Phase 31E: IN_PROGRESS — pipeline durability / failure injection
-Phase 31F: NOT STARTED — KPI report from soak evidence
-Phase 31G: NOT STARTED — latency and regression analysis
-Phase 31H: NOT STARTED — disable-switch rollback
-Phase 31I: NOT STARTED — go/no-go decision package
-Phase 31J: IN_PROGRESS — production enablement decision archive
-Phase 31: IN_PROGRESS — production KPI enablement decision track
+Phase 31D: BLOCKED — soak 51840/51840 complete; wrong_gate=8, red-team safety 99.991%
+Phase 31E: NOT RUN — blocked by 31D gate failures
+Phase 31F: NOT RUN — blocked by 31D gate failures
+Phase 31G: NOT RUN — blocked by 31D gate failures
+Phase 31H: NOT RUN — blocked by 31D gate failures
+Phase 31I: BLOCKED — decision D pending preview lifecycle fix
+Phase 31J: BLOCKED — production enablement decision archive
+Phase 31: BLOCKED — preview lifecycle gate mismatches on user 4c6830b9d086 (8 deterministic failures, 0 retryable)
 Phase 31 evidence label: Phase 31 staging production-enablement decision long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
 
 Live eval run: NOT RUN

@@ -167,7 +167,7 @@ export function validateActiveContext(active) {
   if (phase29ClosedPass) {
     assertMatch(
       nextBlock,
-      /Phase 30A|Phase 30|staging\/non-prod/i,
+      /Phase 30A|Phase 30|staging\/non-prod|Phase 30 CLOSED PASS/i,
       `${DOC_ACTIVE} next step must reflect Phase 29 closed PASS and Phase 30 staging track`,
     );
   } else if (phase28ClosedPass) {

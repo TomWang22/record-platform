@@ -94,20 +94,20 @@ Phase 29 archive source of truth: PHASE_29_OBSERVABILITY_PRODUCTION_ENABLEMENT_A
 Phase 30A: PASS — controlled staging KPI enablement plan
 Phase 30B: PASS — staging preflight verification
 Phase 30C: PASS — staging schema apply verification (python_ai @ 127.0.0.1:5440, AI_KPI_ENVIRONMENT=staging)
-Phase 30D: IN_PROGRESS — staging KPI flag enablement drill
-Phase 30E: IN_PROGRESS — pipeline durability soak
-Phase 30F: IN_PROGRESS — real-inference H1/H2/H3 soak 25920/25920 target
-Phase 30G: NOT STARTED — KPI report from staging rows (/tmp only)
-Phase 30H: NOT STARTED — disable-switch rollback
-Phase 30I: NOT STARTED — go/no-go decision
-Phase 30J: IN_PROGRESS — staging enablement archive
-Phase 30: IN_PROGRESS — controlled staging/non-prod KPI enablement batch
+Phase 30D: PASS — staging KPI flag enablement drill
+Phase 30E: PASS — pipeline durability soak
+Phase 30F: PASS — real-inference H1/H2/H3 soak 25920/25920 (4 preview lifecycle retries clean)
+Phase 30G: PASS — /tmp combined KPI report (usefulness PARTIAL acceptable)
+Phase 30H: PASS — disable-switch rollback drill
+Phase 30I: PASS — staging-only continue (no production enablement)
+Phase 30J: PASS — staging enablement archive
+Phase 30: CLOSED PASS — controlled staging/non-prod KPI enablement batch
 Phase 30 archive source of truth: PHASE_30J_CONTROLLED_STAGING_KPI_ENABLEMENT_ARCHIVE.md plus ACTIVE_CONTEXT.md.
 Phase 30 evidence label: Phase 30 controlled staging KPI enablement matrix: 25920/25920 target (NOT merged into 57105/171315 or Phase 29 25920)
 Phase 30 staging target: controlled staging/non-prod — k8s record-platform / python-ai-service / https://record-platform.test / python_ai@127.0.0.1:5440
 
 Live eval run: NOT RUN
-Controlled real inference run: PASS (Phase 29E matrix 25920/25920)
+Controlled real inference run: PASS (Phase 30F matrix 25920/25920)
 Production DB migration: NOT RUN
 Local/dev schema apply: PASS (python_ai @ 127.0.0.1:5440; Phase 27 only — no new writes in 28A/28B)
 DB writes: controlled matrix KPI rows on local/dev only during 28D run; flags rolled back after 28G
@@ -189,4 +189,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Approved: start Phase 30A controlled staging/non-prod KPI enablement execution track after Phase 29K archive PASS — no production default, no PERCENT rollout, no production DB migration, no production KPI enablement.
+Phase 30 CLOSED PASS — controlled staging/non-prod KPI enablement complete. No production enablement performed. Future production decision requires explicit owner approval.

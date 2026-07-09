@@ -226,7 +226,7 @@ export function validateActiveContext(active) {
 
   const nextBlockMatch = active.match(/Next allowed step:\s*\n([\s\S]*?)(?:\n\n|$)/i);
   const nextBlock = nextBlockMatch ? nextBlockMatch[1] : active;
-  if (!/Approved: start Phase 29A|Phase 29 CLOSED PASS|Approved: start Phase 30A|Phase 30/i.test(nextBlock)) {
+  if (!/Approved: start Phase 29A|Phase 29 CLOSED PASS|Approved: start Phase 30A|Phase 30 CLOSED PASS|Phase 30/i.test(nextBlock)) {
     throw new Phase28ArchiveGuardError(
       `${DOC_ACTIVE} next step must be Phase 29A RFC/design, Phase 29 CLOSED PASS, or Phase 30`,
     );

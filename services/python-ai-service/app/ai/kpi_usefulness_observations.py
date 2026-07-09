@@ -64,6 +64,7 @@ KNOWN_EVIDENCE_LABELS = frozenset(
         "manual/dev usefulness observation",
         "Phase 28 controlled observability production-readiness matrix: 25920/25920 target",
         "Phase 29 controlled observability production-enablement matrix: 25920/25920 target",
+        "Phase 30 controlled staging KPI enablement matrix: 25920/25920 target",
     }
 )
 

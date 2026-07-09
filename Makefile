@@ -245,6 +245,29 @@ ai-platform-verify-phase29-closeout: ## Phase 29J closeout — drills + guard + 
 	node scripts/phase29-production-enablement-guard-readonly.mjs
 	$(MAKE) ai-platform-verify-phase29-matrix
 
+ai-platform-verify-phase29-archive: ## Phase 29K archive/explainer guard
+	node scripts/phase29-archive-guard-readonly.mjs
+	node --test tests/phase29-archive-guard.test.mjs
+
+ai-platform-verify-phase30-preflight: ## Phase 30B preflight — Phase 29 archive + Phase 30 guard
+	$(MAKE) ai-platform-verify-phase29-archive
+	$(MAKE) ai-platform-verify-phase29-closeout
+	node scripts/phase30-staging-enablement-guard-readonly.mjs
+	node --test tests/phase30-staging-enablement-guard.test.mjs
+
+ai-platform-verify-phase30-matrix: ## Phase 30F matrix summary unit tests + /tmp summary check
+	node --test tests/phase30-controlled-matrix-summary.test.mjs
+	@test -f /tmp/phase30-controlled-staging-matrix/phase30-matrix.jsonl || (echo "missing /tmp phase30 matrix jsonl; run phase30 matrix first" && exit 1)
+	node scripts/phase30-summarize-controlled-matrix.mjs --in /tmp/phase30-controlled-staging-matrix
+
+ai-platform-verify-phase30-closeout: ## Phase 30J closeout — drills + guard + matrix verify
+	$(MAKE) ai-platform-verify-phase30-preflight
+	services/python-ai-service/.venv/bin/python scripts/phase30-staging-kpi-flag-enablement-drill.py
+	services/python-ai-service/.venv/bin/python scripts/phase30-pipeline-durability-drill.py
+	services/python-ai-service/.venv/bin/python scripts/phase30-disable-switch-rollback-drill.py
+	node scripts/phase30-staging-enablement-guard-readonly.mjs
+	$(MAKE) ai-platform-verify-phase30-matrix
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

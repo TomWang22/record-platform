@@ -160,10 +160,17 @@ export function validateActiveContext(active) {
 
   const nextBlockMatch = active.match(/Next allowed step:\s*\n([\s\S]*?)(?:\n\n|$)/i);
   const nextBlock = nextBlockMatch ? nextBlockMatch[1] : active;
+  const phase29ClosedPass = /Phase 29:\s*CLOSED PASS/i.test(active);
   const phase28ClosedPass = /Phase 28:\s*CLOSED PASS/i.test(active);
   const phase28BPass = /Phase 28B:\s*PASS/i.test(active);
   const phase28APass = /Phase 28A:\s*PASS/i.test(active);
-  if (phase28ClosedPass) {
+  if (phase29ClosedPass) {
+    assertMatch(
+      nextBlock,
+      /Phase 30A|Phase 30|staging\/non-prod/i,
+      `${DOC_ACTIVE} next step must reflect Phase 29 closed PASS and Phase 30 staging track`,
+    );
+  } else if (phase28ClosedPass) {
     assertMatch(
       nextBlock,
       /Phase 29A|Phase 28 archive PASS|explicit owner approval|production enablement/i,

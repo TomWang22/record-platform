@@ -226,11 +226,11 @@ export function validateActiveContext(active) {
 
   const nextBlockMatch = active.match(/Next allowed step:\s*\n([\s\S]*?)(?:\n\n|$)/i);
   const nextBlock = nextBlockMatch ? nextBlockMatch[1] : active;
-  assertMatch(
-    nextBlock,
-    /Approved: start Phase 29A/i,
-    `${DOC_ACTIVE} next step must be Phase 29A RFC/design only after Phase 28 archive PASS`,
-  );
+  if (!/Approved: start Phase 29A|Phase 29 CLOSED PASS/i.test(nextBlock)) {
+    throw new Phase28ArchiveGuardError(
+      `${DOC_ACTIVE} next step must be Phase 29A RFC/design or Phase 29 CLOSED PASS`,
+    );
+  }
   if (/Approved:\s*start Phase 28[C-H]/i.test(nextBlock)) {
     throw new Phase28ArchiveGuardError(
       `${DOC_ACTIVE} must not still propose Phase 28C–28H as next allowed step`,

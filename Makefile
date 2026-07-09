@@ -227,6 +227,24 @@ ai-platform-verify-phase28-closeout: ## Phase 28H closeout guard (requires 28C�
 	node --test tests/phase28-production-readiness-closeout-guard.test.mjs
 	$(MAKE) ai-platform-verify-phase28-controlled-matrix
 
+ai-platform-verify-phase29-preflight: ## Phase 29B preflight — Phase 28 archive + Phase 29 guard
+	$(MAKE) ai-platform-verify-phase28-archive
+	$(MAKE) ai-platform-verify-phase28-closeout
+	node scripts/phase29-production-enablement-guard-readonly.mjs
+	node --test tests/phase29-production-enablement-guard.test.mjs
+
+ai-platform-verify-phase29-matrix: ## Phase 29E matrix summary unit tests + /tmp summary check
+	node --test tests/phase29-controlled-matrix-summary.test.mjs
+	@test -f /tmp/phase29-controlled-observability-matrix/phase29-matrix.jsonl || (echo "missing /tmp phase29 matrix jsonl; run phase29 matrix first" && exit 1)
+	node scripts/phase29-summarize-controlled-matrix.mjs --in /tmp/phase29-controlled-observability-matrix
+
+ai-platform-verify-phase29-closeout: ## Phase 29J closeout — drills + guard + matrix verify
+	$(MAKE) ai-platform-verify-phase29-preflight
+	services/python-ai-service/.venv/bin/python scripts/phase29-pipeline-durability-drill.py
+	services/python-ai-service/.venv/bin/python scripts/phase29-disable-switch-rollback-drill.py
+	node scripts/phase29-production-enablement-guard-readonly.mjs
+	$(MAKE) ai-platform-verify-phase29-matrix
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

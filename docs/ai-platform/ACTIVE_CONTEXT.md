@@ -78,9 +78,22 @@ Phase 28H: PASS — observability production-readiness closeout
 Phase 28I: PASS — archive/explainer docs only (no runtime/DB changes)
 Phase 28: CLOSED PASS — controlled observability production-readiness batch
 Phase 28 archive source of truth: PHASE_28_OBSERVABILITY_PRODUCTION_READINESS_ARCHIVE.md plus ACTIVE_CONTEXT.md.
+Phase 29A: PASS — observability production enablement RFC
+Phase 29B: PASS — preflight verification (Phase 21/22/27/28 archive verifiers + posture locks)
+Phase 29C: PASS — controlled env readiness (local/dev python_ai @ 127.0.0.1:5440)
+Phase 29D: PASS — pipeline durability drill
+Phase 29E: PASS — controlled real-inference observability matrix 25920/25920 (2 preview lifecycle retries clean)
+Phase 29F: PASS — Cursor-owned monitor loop completed
+Phase 29G: PASS — /tmp combined KPI report (usefulness PARTIAL acceptable)
+Phase 29H: PASS — disable-switch rollback drill
+Phase 29I: PASS — CANDIDATE CONTROLLED ENABLEMENT (staging/non-prod only; no production enablement performed)
+Phase 29J: PASS — production enablement archive
+Phase 29: CLOSED PASS — controlled observability production-enablement batch
+Phase 29 archive source of truth: PHASE_29J_OBSERVABILITY_PRODUCTION_ENABLEMENT_ARCHIVE.md plus ACTIVE_CONTEXT.md.
+Phase 29 evidence label: Phase 29 controlled observability production-enablement matrix: 25920/25920 target (NOT merged into 57105/171315)
 
 Live eval run: NOT RUN
-Controlled real inference run: PASS
+Controlled real inference run: PASS (Phase 29E matrix 25920/25920)
 Production DB migration: NOT RUN
 Local/dev schema apply: PASS (python_ai @ 127.0.0.1:5440; Phase 27 only — no new writes in 28A/28B)
 DB writes: controlled matrix KPI rows on local/dev only during 28D run; flags rolled back after 28G
@@ -162,4 +175,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Approved: start Phase 29A observability production enablement RFC/design only after Phase 28 archive PASS — no live eval, no production default, no PERCENT rollout, no production DB migration, no production KPI enablement.
+Phase 29 CLOSED PASS — controlled observability production-enablement batch complete. No production enablement performed. Next step requires explicit owner approval for staging KPI enablement or future production decision.

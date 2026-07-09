@@ -268,6 +268,29 @@ ai-platform-verify-phase30-closeout: ## Phase 30J closeout — drills + guard + 
 	node scripts/phase30-staging-enablement-guard-readonly.mjs
 	$(MAKE) ai-platform-verify-phase30-matrix
 
+ai-platform-verify-phase30-archive: ## Phase 30K archive/explainer guard
+	node scripts/phase30-archive-guard-readonly.mjs
+	node --test tests/phase30-archive-guard.test.mjs
+
+ai-platform-verify-phase31-preflight: ## Phase 31B preflight — Phase 30 archive + Phase 31 guard
+	$(MAKE) ai-platform-verify-phase30-archive
+	$(MAKE) ai-platform-verify-phase30-closeout
+	node scripts/phase31-production-enablement-decision-guard-readonly.mjs
+	node --test tests/phase31-production-enablement-decision-guard.test.mjs
+
+ai-platform-verify-phase31-matrix: ## Phase 31D soak summary unit tests + /tmp summary check
+	node --test tests/phase31-controlled-matrix-summary.test.mjs
+	@test -f /tmp/phase31-staging-long-soak-matrix/phase31-matrix.jsonl || (echo "missing /tmp phase31 soak jsonl; run phase31 soak first" && exit 1)
+	node scripts/phase31-summarize-controlled-matrix.mjs --in /tmp/phase31-staging-long-soak-matrix
+
+ai-platform-verify-phase31-closeout: ## Phase 31J closeout — drills + guard + soak verify
+	$(MAKE) ai-platform-verify-phase31-preflight
+	services/python-ai-service/.venv/bin/python scripts/phase31-pipeline-durability-drill.py
+	services/python-ai-service/.venv/bin/python scripts/phase31-failure-injection-drill.py
+	services/python-ai-service/.venv/bin/python scripts/phase31-disable-switch-rollback-drill.py
+	node scripts/phase31-production-enablement-decision-guard-readonly.mjs
+	$(MAKE) ai-platform-verify-phase31-matrix
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

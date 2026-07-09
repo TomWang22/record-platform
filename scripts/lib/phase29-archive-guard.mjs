@@ -169,7 +169,7 @@ export function validateActiveContext(active) {
 
   const nextBlockMatch = active.match(/Next allowed step:\s*\n([\s\S]*?)(?:\n\n|$)/i);
   const nextBlock = nextBlockMatch ? nextBlockMatch[1] : active;
-  if (!/Approved: start Phase 30A|Phase 30 CLOSED PASS|staging\/non-prod/i.test(nextBlock)) {
+  if (!/Approved: start Phase 31A|Phase 30 CLOSED PASS|Phase 31/i.test(nextBlock)) {
     throw new Phase29ArchiveGuardError(
       `${DOC_ACTIVE} next step must reference Phase 30A or Phase 30 CLOSED PASS`,
     );

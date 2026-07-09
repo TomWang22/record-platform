@@ -101,10 +101,21 @@ Phase 30G: PASS — /tmp combined KPI report (usefulness PARTIAL acceptable)
 Phase 30H: PASS — disable-switch rollback drill
 Phase 30I: PASS — staging-only continue (no production enablement)
 Phase 30J: PASS — staging enablement archive
+Phase 30K: PASS — archive/explainer docs only (no runtime/DB changes)
 Phase 30: CLOSED PASS — controlled staging/non-prod KPI enablement batch
-Phase 30 archive source of truth: PHASE_30J_CONTROLLED_STAGING_KPI_ENABLEMENT_ARCHIVE.md plus ACTIVE_CONTEXT.md.
-Phase 30 evidence label: Phase 30 controlled staging KPI enablement matrix: 25920/25920 target (NOT merged into 57105/171315 or Phase 29 25920)
-Phase 30 staging target: controlled staging/non-prod — k8s record-platform / python-ai-service / https://record-platform.test / python_ai@127.0.0.1:5440
+Phase 30 archive source of truth: PHASE_30_OBSERVABILITY_STAGING_ENABLEMENT_ARCHIVE.md plus ACTIVE_CONTEXT.md.
+Phase 31A: PASS — production KPI enablement RFC
+Phase 31B: PASS — preflight and archive verification
+Phase 31C: PASS — staging long-soak plan + monitor ownership
+Phase 31D: IN_PROGRESS — long-running staging real-inference soak 51840/51840 target
+Phase 31E: IN_PROGRESS — pipeline durability / failure injection
+Phase 31F: NOT STARTED — KPI report from soak evidence
+Phase 31G: NOT STARTED — latency and regression analysis
+Phase 31H: NOT STARTED — disable-switch rollback
+Phase 31I: NOT STARTED — go/no-go decision package
+Phase 31J: IN_PROGRESS — production enablement decision archive
+Phase 31: IN_PROGRESS — production KPI enablement decision track
+Phase 31 evidence label: Phase 31 staging production-enablement decision long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
 
 Live eval run: NOT RUN
 Controlled real inference run: PASS (Phase 30F matrix 25920/25920)
@@ -189,4 +200,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Phase 30 CLOSED PASS — controlled staging/non-prod KPI enablement complete. No production enablement performed. Future production decision requires explicit owner approval.
+Approved: start Phase 31A production KPI enablement decision track after Phase 30K archive PASS — no production enablement performed in Phase 31.

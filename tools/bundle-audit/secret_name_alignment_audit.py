@@ -73,6 +73,24 @@ DYNAMIC_SECRET_ALLOWLIST = frozenset(
     }
 )
 
+CANONICAL_OCH_RP_MAPPINGS: list[tuple[str, str]] = [
+    ("och-kafka-ssl-secret", "kafka-ssl-secret"),
+    ("och-service-tls", "edge-service-tls"),
+]
+
+
+def append_canonical_mapping_rows(
+    rows: list[tuple[str, str, str, str]],
+    repo: Path,
+    prefixes: list[str],
+    globs: list[str],
+) -> None:
+    """Informational rows when production paths contain no legacy OCH secret literals."""
+    for och_token, rp_target in CANONICAL_OCH_RP_MAPPINGS:
+        exists = "Yes" if rp_equivalent_exists_in_repo(repo, prefixes, globs, rp_target) else "No"
+        needs = "No" if exists == "Yes" else "Yes"
+        rows.append((f"`_canonical:{och_token}`", och_token, exists, needs))
+
 
 def is_allowed_secret_ref(name: str) -> bool:
     if name in DYNAMIC_SECRET_ALLOWLIST:
@@ -238,6 +256,9 @@ def main() -> int:
                 rows.append((f"`{rel}`:{i}", token, exists, needs))
                 if rel.startswith(HARD_FAIL_PREFIXES) or rel == "Makefile":
                     hard_fail.append(f"OCH secret token in {rel}:{i}: {line.strip()[:200]}")
+
+    if not rows:
+        append_canonical_mapping_rows(rows, repo, prefixes, globs)
 
     defined: set[str] = set()
     per_file_refs: dict[str, set[str]] = {}

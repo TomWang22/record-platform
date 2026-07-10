@@ -97,6 +97,8 @@ jobs:
           printf '%s\n' "$out"
           test "$code" -eq 2
           printf '%s\n' "$out" | grep -q 'no pcap provided'
+      - name: Transport validator fixture self-test (HTTP/3 logic)
+        run: python3 scripts/lib/transport_validator_selftest.py
 
   endpoint-coverage-static:
     runs-on: ubuntu-latest

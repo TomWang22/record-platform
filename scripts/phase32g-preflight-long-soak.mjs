@@ -26,13 +26,17 @@ function fail(message) {
 }
 
 function main() {
-  const verify = spawnSync('make', ['ai-platform-verify-phase32f-latency-rca'], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-    env: process.env,
-  });
-  if (verify.status !== 0) {
-    fail(`make ai-platform-verify-phase32f-latency-rca failed\n${verify.stderr || verify.stdout}`);
+  const infraOnly = process.argv.includes('--infra-only');
+
+  if (!infraOnly) {
+    const verify = spawnSync('make', ['ai-platform-verify-phase32f-latency-rca'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: process.env,
+    });
+    if (verify.status !== 0) {
+      fail(`make ai-platform-verify-phase32f-latency-rca failed\n${verify.stderr || verify.stdout}`);
+    }
   }
 
   if (!fs.existsSync(PHASE32F_DOC)) {
@@ -63,6 +67,7 @@ function main() {
       {
         status: 'PASS',
         phase: '32G-0',
+        infra_only: infraOnly,
         evidence_label: PHASE32G_EVIDENCE_LABEL,
         target_total: TARGET_TOTAL,
         matrix_out: DEFAULT_PHASE32G_MATRIX_OUT,

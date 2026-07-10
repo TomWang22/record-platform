@@ -244,9 +244,10 @@ jobs:
           echo "$out"
           if echo "$out" | grep -q "no pcap provided"; then
             echo "Validator correctly requires pcap when none provided."
-            exit 0
+          else
+            echo "$out" | grep -q '"valid": true'
           fi
-          echo "$out" | grep -q '"valid": true'
+          python3 scripts/lib/transport_validator_selftest.py
 
       - name: Transport validation with pcap (if present)
         shell: bash
@@ -260,7 +261,7 @@ jobs:
             echo "$out"
             echo "$out" | grep -q '"valid": true'
           else
-            echo "No vm.pcap present — skipping full gate."
+            echo "BLOCKED: no live vm.pcap in CI — fixture self-test above validates HTTP/3 parser logic."
           fi
 
   python-ai:
@@ -286,6 +287,22 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
           python -c "import fastapi, uvicorn; print('ai ok')"
+
+  ai-platform-phase32g-infra:
+    name: Phase 32G infra verifier
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Phase 32G infrastructure verifier (CI-safe)
+        run: make ai-platform-verify-phase32g-infra
 
   artifacts:
     name: Upload rotation artifacts

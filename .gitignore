@@ -146,6 +146,7 @@ infra/docs/EIGHT-DATABASES_ARCHITECTURE.md
 !tsconfig.base.json
 !infra/kind/*.yaml
 !infra/transport/*.yaml
+!infra/ops/*.yaml
 *.conf
 *.ini
 !services/python-ai-service/pytest.ini
@@ -211,5 +212,6 @@ Dockerfile*
 # Backup environment files
 **/.env.bak
 
-# Ops folder (excluded from GitHub)
-ops/
+# Ops folder at repo root (excluded from GitHub); keep infra/ops Kafka KRaft bundle tracked
+/ops/
+!infra/ops/

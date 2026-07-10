@@ -339,10 +339,13 @@ ai-platform-verify-phase32f-latency-rca: ## Phase 32F latency stall RCA + instru
 	  --out /tmp/phase32f-latency-stall-analysis \
 	  --require-pass
 
-ai-platform-verify-phase32g-long-soak: ## Phase 32G timing-attributed repaired long soak verifier
-	$(MAKE) ai-platform-verify-phase32f-latency-rca
+ai-platform-verify-phase32g-infra: ## CI-safe Phase 32G infrastructure verifier (no /tmp long-soak evidence)
 	node --test tests/phase32g-long-soak.test.mjs
-	node scripts/phase32g-preflight-long-soak.mjs
+	node --test tests/phase32f-stall-attribution-analyzer.test.mjs
+	node scripts/phase32g-preflight-long-soak.mjs --infra-only
+
+ai-platform-verify-phase32g-long-soak: ## Operator Phase 32G long soak verifier (requires /tmp evidence 51840/51840)
+	$(MAKE) ai-platform-verify-phase32g-infra
 	node scripts/phase32g-summarize-long-soak.mjs --in /tmp/phase32g-timing-attributed-repaired-long-soak --require-pass
 	node scripts/phase32f-stall-attribution-analyzer.mjs \
 	  --phase31 /tmp/phase31d-r2-repaired-staging-long-soak \

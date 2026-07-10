@@ -294,12 +294,17 @@ ai-platform-verify-phase31-targeted-replay: ## Phase 31M targeted replay unit te
 	$(MAKE) ai-platform-verify-phase31-lifecycle-repair
 	node --test tests/phase31-targeted-replay-summary.test.mjs
 
+ai-platform-verify-phase31-latency-outlier: ## Phase 31K latency outlier + staging continue guard
+	node scripts/phase31-latency-outlier-guard-readonly.mjs
+	node --test tests/phase31-latency-outlier-guard.test.mjs
+
 ai-platform-verify-phase31-closeout: ## Phase 31J closeout — drills + guard + soak verify
 	$(MAKE) ai-platform-verify-phase31-preflight
 	services/python-ai-service/.venv/bin/python scripts/phase31-pipeline-durability-drill.py
 	services/python-ai-service/.venv/bin/python scripts/phase31-failure-injection-drill.py
 	services/python-ai-service/.venv/bin/python scripts/phase31-disable-switch-rollback-drill.py
 	node scripts/phase31-production-enablement-decision-guard-readonly.mjs
+	$(MAKE) ai-platform-verify-phase31-latency-outlier
 	$(MAKE) ai-platform-verify-phase31-matrix
 
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)

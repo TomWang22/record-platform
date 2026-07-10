@@ -29,6 +29,7 @@
 **Phase 28C–28H status:** **PASS** — local/dev durability, 25920/25920 controlled matrix, H1/H2/H3 verification, /tmp KPI report, disable-switch rollback, closeout.
 **Phase 28I status:** **PASS** — archive/explainer docs only. No runtime/DB/live changes.
 **Phase 28 status:** **CLOSED PASS** — controlled observability production-readiness validation. 25920 matrix is **NOT** Phase 22 full parity; **NOT** merged into 57105/57105 or 171315/171315. Production enablement: **NOT APPROVED**.
+**Phase 31 status:** **CLOSED PASS — STAGING CONTINUE** — 31D-R2 repaired soak 51840/51840 all gates clean. Production enablement: **NOT APPROVED**. Latency max outlier ~1,037,645 ms blocks production KPI enablement until RCA. **NOT** merged into 57105/171315 or Phase 28/29/30 25920 totals.
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 Use this document as the **source of truth** for Phase 21 state. For Phase 20 vector/shadow history, see `docs/ai-platform/PHASE_20_COPILOT_CONTEXT.md`.
@@ -235,8 +236,9 @@ Phase 28B PASS: offline durability harness — fixtures-only pipeline simulation
 Phase 28C–28H PASS: controlled 25920/25920 matrix, H1/H2/H3 verification, /tmp KPI report, disable-switch rollback, closeout.
 Phase 28I PASS: archive/explainer docs; 25920 matrix NOT merged into 57105/57105 or 171315/171315.
 Phase 28: CLOSED PASS — controlled observability production-readiness validation; production enablement NOT APPROVED.
+Phase 31: CLOSED PASS — STAGING CONTINUE; 31D-R2 51840/51840 PASS; production enablement NOT APPROVED; latency max outlier ~1,037,645 ms requires RCA before production KPI enablement.
 KPI truth: implementation complete behind default-off gates; Phase 28 proved controlled matrix + report + rollback on local/dev only.
-Next work: Approved: start Phase 29A observability production enablement RFC/design only after Phase 28 archive PASS — no live eval, no production default, no PERCENT rollout, no production DB migration, no production KPI enablement.
+Next work: Phase 32 latency/root-cause remediation design only, or explicit owner approval for staging-only continued soak — no production enablement.
 Phase 22 CLOSED PASS — full labeled protocol parity.
 H1 baseline: 57105/57105 HTTP/1.1.
 H2 replay: 57105/57105 HTTP/2 PASS.
@@ -291,6 +293,9 @@ Do NOT create duplicate REBLOCKED docs for unchanged artifact.
 Do NOT run owner-approved participant live eval without complete `T20-35-owner-approved-real-preview-participants.md` (≥3 real_owner_approved or owner-approved internal_staff with email, UUID, consent, signature).
 Do NOT relabel staging/JWT cohort accounts as real participants.
 Do NOT implement rollout without owner/product sign-off.
+Do NOT approve Phase 31 production KPI enablement — latency max outlier ~1,037,645 ms requires RCA first.
+Do NOT treat Phase 31 CLOSED PASS as production rollout approval.
+Do NOT merge Phase 31D-R2 evidence into Phase 22 57105/171315 totals.
 Pure vector overlap: report-only per T20.16C — do not promote vector default (8/16).
 Do NOT enable vector production default.
 Do NOT use generative Ollama as production RAG default.

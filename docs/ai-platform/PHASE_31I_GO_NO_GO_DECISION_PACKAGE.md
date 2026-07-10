@@ -17,6 +17,8 @@ Phase 31D-R2 repaired long-soak (51840/51840) passes all gates after preview lif
 
 **Recommendation:** Continue staging-only KPI observability operations. Do **not** enable production KPI writes or PERCENT rollout without separate owner approval.
 
+**Latency caveat:** Max latency outlier ~1,037,645 ms across H1/H2/H3 blocks production KPI enablement until RCA. See `PHASE_31K_LATENCY_OUTLIER_AND_STAGING_CONTINUE_ARCHIVE.md`.
+
 Not selected: production enablement, PERCENT rollout, hybrid/vector production default.
 
 ## Failure summary (31D-R2)

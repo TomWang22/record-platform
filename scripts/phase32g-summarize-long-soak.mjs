@@ -147,6 +147,21 @@ export function classifyRcaOutcome(rows, gates) {
 }
 
 export function buildPhase32gReport(root) {
+  if (!fs.existsSync(root)) {
+    return {
+      status: 'IN_PROGRESS',
+      phase: '32G',
+      evidence_label: PHASE32G_EVIDENCE_LABEL,
+      matrix_total: `0/${MATRIX_TARGET.total}`,
+      gates: { http200: 0, wrong_gate_count: 0, fallback_count: 0, leakage_failures: 0 },
+      timing_population: { timing: { rate: 0, total: 0, populated: 0 } },
+      latency_by_protocol: {},
+      maxima: {},
+      forbidden_field_violations: 0,
+      rca_outcome: 'IN_PROGRESS',
+      production_enablement: 'NOT APPROVED',
+    };
+  }
   const rows = mergeRows(root);
   const gates = summarizeMatrixRows(rows, {
     targetPerProtocol: MATRIX_TARGET.perProtocol,

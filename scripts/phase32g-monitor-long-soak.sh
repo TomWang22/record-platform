@@ -46,7 +46,7 @@ while true; do
   pgrep -fl "phase31-controlled-observability-matrix-runner" || true
 
   for p in h1 h2 h3; do
-    if ! pgrep -fl "phase31-controlled-observability-matrix-runner.mjs --protocol $p" >/dev/null; then
+    if ! pgrep -fl "phase31-controlled-observability-matrix-runner.mjs" 2>/dev/null | grep -F "$OUT/shard-$p" >/dev/null; then
       count="$(wc -l <"$OUT/shard-$p/phase31-matrix.jsonl" 2>/dev/null || echo 0)"
       if [ "$count" -ge "$TARGET_PER_PROTOCOL" ]; then
         echo "===== $p shard complete ($count/$TARGET_PER_PROTOCOL); skip restart ====="
@@ -56,7 +56,8 @@ while true; do
       tail -200 "$OUT/runner-$p.log" || true
       echo "===== restarting $p with --resume ====="
       record_restart "$p" "runner_exit_before_target"
-      nohup node "$REPO/scripts/phase31-controlled-observability-matrix-runner.mjs" \
+      nohup env PHASE32G_MATRIX_ROOT="$OUT" T20_EVAL_RAG_PAUSE_SEC="${T20_EVAL_RAG_PAUSE_SEC:-0.15}" \
+        node "$REPO/scripts/phase31-controlled-observability-matrix-runner.mjs" \
         --protocol "$p" \
         --windows 32 \
         --runs 10 \

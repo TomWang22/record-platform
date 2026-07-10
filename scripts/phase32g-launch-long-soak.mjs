@@ -46,31 +46,46 @@ function main() {
     T20_EVAL_RAG_PAUSE_SEC: process.env.T20_EVAL_RAG_PAUSE_SEC || '0.15',
   };
 
-  for (const proto of ['h1', 'h2', 'h3']) {
-    const shard = path.join(opts.out, `shard-${proto}`);
-    fs.mkdirSync(shard, { recursive: true });
-    const logPath = path.join(opts.out, `runner-${proto}.log`);
-    const args = [
-      RUNNER,
-      '--protocol',
-      proto,
-      '--windows',
-      String(MATRIX_TARGET.windows),
-      '--runs',
-      String(MATRIX_TARGET.runs),
-      '--out',
-      shard,
-      '--resume',
-    ];
-    const child = spawn(process.execPath, args, {
-      cwd: REPO_ROOT,
-      env: runnerEnv,
-      detached: true,
-      stdio: ['ignore', fs.openSync(logPath, 'a'), fs.openSync(logPath, 'a')],
-    });
-    child.unref();
-    process.stderr.write(`phase32g started ${proto} pid=${child.pid}\n`);
+function sleepMs(ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    /* spin */
   }
+}
+
+function launchShard(proto, opts, runnerEnv) {
+  const shard = path.join(opts.out, `shard-${proto}`);
+  fs.mkdirSync(shard, { recursive: true });
+  const logPath = path.join(opts.out, `runner-${proto}.log`);
+  const args = [
+    RUNNER,
+    '--protocol',
+    proto,
+    '--windows',
+    String(MATRIX_TARGET.windows),
+    '--runs',
+    String(MATRIX_TARGET.runs),
+    '--out',
+    shard,
+    '--resume',
+  ];
+  const child = spawn(process.execPath, args, {
+    cwd: REPO_ROOT,
+    env: runnerEnv,
+    detached: true,
+    stdio: ['ignore', fs.openSync(logPath, 'a'), fs.openSync(logPath, 'a')],
+  });
+  child.unref();
+  process.stderr.write(`phase32g started ${proto} pid=${child.pid}\n`);
+}
+
+  launchShard('h1', opts, runnerEnv);
+  process.stderr.write('phase32g staggering h2 launch by 45s\n');
+  sleepMs(45_000);
+  launchShard('h2', opts, runnerEnv);
+  process.stderr.write('phase32g staggering h3 launch by 45s\n');
+  sleepMs(45_000);
+  launchShard('h3', opts, runnerEnv);
 
   const monitorLog = path.join(opts.out, 'phase32g-monitor.log');
   const monitor = spawn('bash', [MONITOR], {

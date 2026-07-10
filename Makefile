@@ -288,6 +288,10 @@ ai-platform-verify-phase31-lifecycle-repair: ## Phase 31L preview window coordin
 	node --test tests/phase31-preview-lifecycle-repair.test.mjs
 	node --test tests/phase31-preview-lifecycle-triage.test.mjs
 
+ai-platform-verify-phase31-targeted-replay: ## Phase 31M targeted replay unit tests + lifecycle repair
+	$(MAKE) ai-platform-verify-phase31-lifecycle-repair
+	node --test tests/phase31-targeted-replay-summary.test.mjs
+
 ai-platform-verify-phase31-closeout: ## Phase 31J closeout — drills + guard + soak verify
 	$(MAKE) ai-platform-verify-phase31-preflight
 	services/python-ai-service/.venv/bin/python scripts/phase31-pipeline-durability-drill.py

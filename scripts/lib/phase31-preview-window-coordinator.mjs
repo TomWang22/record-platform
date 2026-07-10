@@ -95,6 +95,7 @@ export class PreviewWindowCoordinator {
     this.matrixRoot = matrixRoot;
     this.matrixId = options.matrixId || 'phase31';
     this.expectedProtocols = options.expectedProtocols || DEFAULT_EXPECTED_PROTOCOLS;
+    this.windowSequence = options.windowSequence || null;
     this.staleLockMs = options.staleLockMs ?? 10 * 60 * 1000;
     this.pollMs = options.pollMs ?? 50;
     this.waitTimeoutMs = options.waitTimeoutMs ?? 30 * 60 * 1000;
@@ -192,9 +193,18 @@ export class PreviewWindowCoordinator {
     return this.expectedProtocols.every((p) => ws.completed_protocols.includes(p));
   }
 
+  previousWindowInSequence(window) {
+    if (!this.windowSequence?.length) {
+      return window > 1 ? window - 1 : null;
+    }
+    const idx = this.windowSequence.indexOf(window);
+    if (idx <= 0) return null;
+    return this.windowSequence[idx - 1];
+  }
+
   waitForPreviousWindowComplete(window) {
-    if (window <= 1) return;
-    const prev = window - 1;
+    const prev = this.previousWindowInSequence(window);
+    if (prev == null) return;
     this.waitForCondition(`window ${prev} complete before ${window}`, () =>
       this.windowComplete(prev),
     );

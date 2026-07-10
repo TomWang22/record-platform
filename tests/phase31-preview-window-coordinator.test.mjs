@@ -122,6 +122,21 @@ describe('phase31 preview window coordinator', () => {
     assert.equal(coordinator.getWindowStatus(1).gate_verified, false);
   });
 
+  it('uses windowSequence for non-consecutive targeted replay windows', () => {
+    const coordinator = new PreviewWindowCoordinator(matrixRoot, {
+      pollMs: 5,
+      waitTimeoutMs: 3000,
+      windowSequence: [3, 4, 5, 16],
+      expectedProtocols: ['h1'],
+    });
+    const resetAndVerify = () => ({ ok: true, failures: [] });
+    coordinator.enterWindow(3, 'h1', { resetAndVerify });
+    coordinator.completeWindowProtocol(3, 'h1');
+    coordinator.enterWindow(4, 'h1', { resetAndVerify });
+    assert.equal(coordinator.getResetCount(3), 1);
+    assert.equal(coordinator.getResetCount(4), 1);
+  });
+
   it('persists redacted coordinator state shape', () => {
     const coordinator = new PreviewWindowCoordinator(matrixRoot, { pollMs: 5, waitTimeoutMs: 3000 });
     for (const proto of ['h1', 'h2', 'h3']) {

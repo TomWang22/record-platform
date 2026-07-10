@@ -7,9 +7,10 @@ import path from 'node:path';
 import {
   MATRIX_EVIDENCE_LABEL,
   MATRIX_TARGET,
+  resolvePhase31MatrixRoot,
 } from './phase31-controlled-matrix-config.mjs';
 
-export { MATRIX_EVIDENCE_LABEL, MATRIX_TARGET };
+export { MATRIX_EVIDENCE_LABEL, MATRIX_TARGET, resolvePhase31MatrixRoot };
 
 export const FORBIDDEN_FIELDS = [
   'response_body',

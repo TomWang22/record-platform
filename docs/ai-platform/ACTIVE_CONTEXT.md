@@ -115,6 +115,10 @@ Phase 31H: NOT RUN — blocked by 31D gate failures
 Phase 31I: BLOCKED — decision D pending preview lifecycle fix
 Phase 31J: BLOCKED — production enablement decision archive
 Phase 31: BLOCKED — preview lifecycle gate mismatches on user 4c6830b9d086 (8 deterministic failures, 0 retryable)
+Phase 31K: PASS — preview lifecycle gate root-cause analysis (parallel shard enrollment race)
+Phase 31L: NOT STARTED — preview lifecycle repair implementation
+Phase 31M: NOT STARTED — targeted replay after repair
+Phase 31N: NOT STARTED — full soak replay decision
 Phase 31 evidence label: Phase 31 staging production-enablement decision long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
 
 Live eval run: NOT RUN

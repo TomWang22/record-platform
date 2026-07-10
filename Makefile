@@ -283,6 +283,11 @@ ai-platform-verify-phase31-matrix: ## Phase 31D soak summary unit tests + /tmp s
 	@test -f /tmp/phase31-staging-long-soak-matrix/phase31-matrix.jsonl || (echo "missing /tmp phase31 soak jsonl; run phase31 soak first" && exit 1)
 	node scripts/phase31-summarize-controlled-matrix.mjs --in /tmp/phase31-staging-long-soak-matrix
 
+ai-platform-verify-phase31-lifecycle-repair: ## Phase 31L preview window coordinator repair tests
+	node --test tests/phase31-preview-window-coordinator.test.mjs
+	node --test tests/phase31-preview-lifecycle-repair.test.mjs
+	node --test tests/phase31-preview-lifecycle-triage.test.mjs
+
 ai-platform-verify-phase31-closeout: ## Phase 31J closeout — drills + guard + soak verify
 	$(MAKE) ai-platform-verify-phase31-preflight
 	services/python-ai-service/.venv/bin/python scripts/phase31-pipeline-durability-drill.py

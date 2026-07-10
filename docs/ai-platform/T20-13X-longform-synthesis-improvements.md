@@ -1,6 +1,6 @@
 # T20.13X — Longform synthesis improvements
 
-**Baseline:** `f249d6e`  
+**Baseline:** `e6df30d`  
 **Status:** Implemented (rule-engine, keyword retrieval unchanged)
 
 ## Problem

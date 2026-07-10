@@ -2,7 +2,7 @@
 
 **Status:** **BLOCKED** — owner/product sign-off artifact absent  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `c366781` (T20.24E closeout)  
+**Baseline SHA:** `1fa0c8b` (T20.24E closeout)  
 **Image:** `python-ai-service:t20-p216b` (unchanged)  
 **Mode:** Sign-off verification only — **no implementation**
 

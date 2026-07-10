@@ -2,9 +2,9 @@
 
 **Status:** Read-only design — no implementation  
 **Generated:** 2026-06-28  
-**Baseline SHA:** `d1141e0`  
+**Baseline SHA:** `0460cbb`  
 **Inputs:** T20.14A baseline, T20.13L/G triage, T20.10U EXPLAIN, fresh warm shadow run `20260628-140942`  
-**Release context:** Phase 21 non-vector seller intelligence **RELEASE TAGGED** @ `d0e4c58` — does not approve vector rollout
+**Release context:** Phase 21 non-vector seller intelligence **RELEASE TAGGED** @ `b741f91` — does not approve vector rollout
 
 ---
 

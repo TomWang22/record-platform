@@ -1,7 +1,7 @@
 # T20.9 — Tranche 3 dry-run plan (planning only; do not run actual write)
 
 **Status:** PLAN ONLY — requires explicit approval before backup or actual run  
-**Baseline SHA:** `108088653d0d0363440c58c969a4e01e1f2e53ef`  
+**Baseline SHA:** `46e1a4f0a7dd799c9a7be407dd72e9c69351b5b7`  
 **Pre-embedded count:** 5,049  
 **Tranche 2 lock:** `bench_logs/ai-platform/t20-tranche-2-actual-run.json` (do not rerun; exit **2**)
 

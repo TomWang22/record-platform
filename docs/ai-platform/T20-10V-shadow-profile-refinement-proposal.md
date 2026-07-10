@@ -1,7 +1,7 @@
 # T20.10V — Shadow profile refinement proposal (design-only)
 
 **Generated:** 2026-06-18  
-**Baseline SHA:** `3ec10eb` (T20.10U pgvector candidate-fetch diagnostics)  
+**Baseline SHA:** `3c051e9` (T20.10U pgvector candidate-fetch diagnostics)  
 **Mode:** design-only — no product behavior changes  
 **Vector rollout:** NOT APPROVED
 

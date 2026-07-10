@@ -2,7 +2,7 @@
 
 **Status:** C-LIVE **PASS**  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `900d31b`  
+**Baseline SHA:** `ba32eee`  
 **Artifact:** `bench_logs/ai-platform/t20-36c-real-participant-eval/20260703-035502/summary.json` (not committed)  
 **Webapp:** `webapp:t20-p227b`  
 **Python:** `python-ai-service:t20-p225b`

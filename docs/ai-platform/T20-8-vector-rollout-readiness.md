@@ -1,7 +1,7 @@
 # T20.8 — Vector rollout readiness evaluation (read-only)
 
 **Generated:** 2026-06-22  
-**Baseline SHA:** `8633149c6f8f74e351a19d82d92c08806902fce8`  
+**Baseline SHA:** `fb6bed6c33c3473036e6913fe5de5b1f85f4c934`  
 **Mode:** read-only — no embeddings, no product behavior changes, no vector default flip
 
 ## Executive verdict

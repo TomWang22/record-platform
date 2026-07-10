@@ -1,7 +1,7 @@
 # T20.13C — Diagnostic inference harness
 
 **Status:** IMPLEMENTED  
-**Baseline SHA:** `c197285` (pre-implementation)  
+**Baseline SHA:** `bf27414` (pre-implementation)  
 **Scope:** diagnostic/test harness only — no product behavior changes
 
 ## Components

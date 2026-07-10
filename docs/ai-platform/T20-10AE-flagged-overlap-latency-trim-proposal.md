@@ -1,7 +1,7 @@
 # T20.10AE — Flagged overlap latency-trim proposal (design-only)
 
 **Generated:** 2026-06-25  
-**Baseline SHA:** `0f42c06` (T20.10AD flagged overlap refinement evaluation)  
+**Baseline SHA:** `472e8b3` (T20.10AD flagged overlap refinement evaluation)  
 **Mode:** design-only — no product behavior changes  
 **Vector rollout:** NOT APPROVED
 

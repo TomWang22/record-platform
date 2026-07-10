@@ -1,7 +1,7 @@
 # P21.2A — Source evidence UX
 
 **Status:** Implemented  
-**Baseline SHA:** `1499bda`  
+**Baseline SHA:** `84b3315`  
 **Phase:** 21 — non-vector product track
 
 ---

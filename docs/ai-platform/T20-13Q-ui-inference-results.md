@@ -2,7 +2,7 @@
 
 **Status:** Playwright UI acceptance results (read-only report)
 **Generated:** 2026-06-27
-**Baseline SHA:** `91e94c6`
+**Baseline SHA:** `6423e6c`
 **Run artifact:** `bench_logs/ai-platform/ui-inference/20260627-031631/`
 
 ## Executive result

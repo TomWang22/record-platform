@@ -2,7 +2,7 @@
 
 **Status:** Design complete (docs only — **not** implementation, **not** rollout, **not** default switch)  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `06d127f` (T20.22E closeout)  
+**Baseline SHA:** `1fbd4da` (T20.22E closeout)  
 **Image:** `python-ai-service:t20-p216b` (unchanged)  
 **Parent:** T20.22C decision (B selected; rollout NOT APPROVED; owner sign-off absent)
 

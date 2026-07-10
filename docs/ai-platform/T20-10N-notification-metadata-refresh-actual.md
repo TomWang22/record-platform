@@ -1,7 +1,7 @@
 # T20.10N — Bounded contract-user notification metadata-only refresh
 
 **Generated:** 2026-06-23  
-**Base main:** `56fdae8` (T20.10M dry-run)  
+**Base main:** `243d312` (T20.10M dry-run)  
 **Mode:** actual write — metadata column only  
 **Vector rollout:** NOT APPROVED
 

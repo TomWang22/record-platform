@@ -2,7 +2,7 @@
 
 **Status:** Design / doc only — no implementation  
 **Generated:** 2026-06-26  
-**Baseline SHA:** `a579121`  
+**Baseline SHA:** `4658022`  
 **Predecessor:** [T20.13G-S real use-case answer quality report](./T20-13G-S-real-use-case-answer-quality-report.md)
 
 ---

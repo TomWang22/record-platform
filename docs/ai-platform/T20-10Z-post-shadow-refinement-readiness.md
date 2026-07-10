@@ -1,7 +1,7 @@
 # T20.10Z — Post shadow-refinement readiness re-evaluation
 
 **Generated:** 2026-06-25  
-**Baseline SHA:** `31d300f` (T20.10Y implementation SHA doc fix)  
+**Baseline SHA:** `ee435ca` (T20.10Y implementation SHA doc fix)  
 **Mode:** read-only — no embeddings, no metadata writes, no vector default flip  
 **Preceding work:** T20.10W shadow fetch strategy, T20.10X diversity diagnostics, T20.10Y diversity top-ups
 
@@ -26,7 +26,7 @@ Keyword retrieval remains the correct production default (`AI_RAG_SHADOW_VECTOR=
 
 † T20.10Z canonical run (`215017`). Prior T20.10O/T20.10Y runs on same corpus failed these gates — treat latency as **conditionally passing**, not stable.
 
-## Delta vs T20.10O (`2cdbf26` era)
+## Delta vs T20.10O (`85d6417` era)
 
 | Metric | T20.10O | T20.10Z | Change |
 |--------|--------:|--------:|--------|
@@ -43,7 +43,7 @@ Keyword retrieval remains the correct production default (`AI_RAG_SHADOW_VECTOR=
 | entity-overlap >0 runs | 4/16 | **5/16** | +1 |
 | zero-result shadow runs | 2/16 | **0/16** | improved |
 
-## Delta vs T20.10W (`b7e17b6` / `c838cda`)
+## Delta vs T20.10W (`334443d` / `0d7aa7c`)
 
 | Metric | T20.10W (best run) | T20.10Z | Change |
 |--------|-------------------:|--------:|--------|
@@ -52,7 +52,7 @@ Keyword retrieval remains the correct production default (`AI_RAG_SHADOW_VECTOR=
 | shadow p95 | 3,095 ms | 2,839 ms | improved |
 | Missing types | listing_revision, notification | none | fixed |
 
-## Delta vs T20.10Y (`3e2a80f` bad-variance run)
+## Delta vs T20.10Y (`e6efcd3` bad-variance run)
 
 | Metric | T20.10Y run `214301` | T20.10Z | Change |
 |--------|---------------------:|--------:|--------|

@@ -9,10 +9,10 @@
 
 | Ticket | Description |
 |--------|-------------|
-| T20.36C | `094f17e` | Live eval PASS 1440/1440 + runner |
-| T20.36D | `7c47569` | Rollback drill PASS |
-| T20.36E/F | `7a3c50b` | Telemetry + decision |
-| T20.36G/H | `5ae1d35` | Closeout + Phase 21 |
+| T20.36C | `ec90495` | Live eval PASS 1440/1440 + runner |
+| T20.36D | `d6c6690` | Rollback drill PASS |
+| T20.36E/F | `9de7571` | Telemetry + decision |
+| T20.36G/H | `fa1242e` | Closeout + Phase 21 |
 
 ## Images & env
 

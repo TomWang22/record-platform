@@ -2,8 +2,8 @@
 
 **Status:** Eval complete — **PASS**  
 **Generated:** 2026-06-30  
-**Plan SHA:** `ee4fa48` (T20.19B)  
-**Eval SHA:** `ee4fa48`  
+**Plan SHA:** `2b35ee3` (T20.19B)  
+**Eval SHA:** `2b35ee3`  
 **Image:** `python-ai-service:t20-p216b`
 
 ---

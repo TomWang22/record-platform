@@ -1,7 +1,7 @@
 # Phase 30 — Observability Staging Enablement Archive
 
 ```text
-Phase 30: CLOSED PASS @ c329a9c
+Phase 30: CLOSED PASS @ 2e3d99a
 Phase 30K: PASS
 Staging/non-prod only: YES
 Production enablement: NOT APPROVED

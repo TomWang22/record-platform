@@ -2,7 +2,7 @@
 
 **Status:** Validator **BLOCKED**  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `1e60434`  
+**Baseline SHA:** `ae26a03`  
 **Artifact:** `docs/ai-platform/T20-35-owner-approved-real-preview-participants.md`
 
 ---

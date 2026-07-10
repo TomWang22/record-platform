@@ -2,7 +2,7 @@
 
 **Status:** Approved — Phase 21 started  
 **Generated:** 2026-06-27  
-**Baseline SHA:** `d3c9cd1`  
+**Baseline SHA:** `4346158`  
 **Prior decision:** `docs/ai-platform/T20-13AA-phase21-readiness-decision-package.md`
 
 ---

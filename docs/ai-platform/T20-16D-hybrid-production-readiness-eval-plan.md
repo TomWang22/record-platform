@@ -2,7 +2,7 @@
 
 **Status:** Plan complete — ready for D-LIVE  
 **Generated:** 2026-06-30  
-**Baseline SHA:** `ef88664` (T20.16C)  
+**Baseline SHA:** `d28ed65` (T20.16C)  
 **Image:** `python-ai-service:t20-p216b`  
 **Parent:** T20.16C pure vector research (report-only 8/16)
 

@@ -6,7 +6,7 @@ Related:
 
 - Archive story: `PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md`
 - Code map: `PHASE_26_OBSERVABILITY_CODE_MAP.md`
-- Implementation closeout: commit `4409ffc` (`PHASE_26G_OBSERVABILITY_DISABLE_SWITCH_AND_CLOSEOUT.md`)
+- Implementation closeout: commit `f09a9ef` (`PHASE_26G_OBSERVABILITY_DISABLE_SWITCH_AND_CLOSEOUT.md`)
 
 ---
 

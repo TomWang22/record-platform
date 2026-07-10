@@ -50,7 +50,7 @@ Targeted replay of affected windows, runs, users, and protocols after Phase 31L 
 
 - **31K:** Root cause — uncoordinated parallel shard window resets
 - **31L:** Shared preview window coordinator
-- **31M runner repair:** `567e98e` — duplicate export, non-consecutive `windowSequence`, summarizer `path` import
+- **31M runner repair:** `e6b1ed6` — duplicate export, non-consecutive `windowSequence`, summarizer `path` import
 
 ## Next step
 

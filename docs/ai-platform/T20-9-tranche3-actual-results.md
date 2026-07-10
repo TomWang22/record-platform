@@ -1,7 +1,7 @@
 # T20.9 — Tranche 3 actual write results
 
 **Generated:** 2026-06-22
-**Baseline SHA:** `1f72c60e4f896f50a949c524b49231a63c1fb052`
+**Baseline SHA:** `e1e411fff9675d6b00276f5c32ba5038d063645e`
 **Tranche ID:** `t20-tranche-3`
 **Mode:** one bounded actual pass — no vector default flip, no FORCE
 

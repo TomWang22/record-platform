@@ -25,10 +25,10 @@ T20.19A: NOT STARTED
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| T20.18A | `607fb33` | Broader hybrid soak design |
-| T20.18B | `ac402d9` | Preflight + cohort JWT verification |
-| T20.18C-LIVE | `7db01b4` | Multi-user live soak PASS (270/270) |
-| T20.18D | `c25dc53` | Decision package (B selected) |
+| T20.18A | `7424efa` | Broader hybrid soak design |
+| T20.18B | `1c60701` | Preflight + cohort JWT verification |
+| T20.18C-LIVE | `6cf4814` | Multi-user live soak PASS (270/270) |
+| T20.18D | `a071f28` | Decision package (B selected) |
 | T20.18E | *(this batch)* | Closeout |
 
 ---

@@ -2,7 +2,7 @@
 
 **Status:** Eval complete — **PASS** (percent restored to 0)  
 **Generated:** 2026-06-29  
-**Baseline SHA:** `8c4ed7f` (T20.15F)  
+**Baseline SHA:** `75fd3f7` (T20.15F)  
 **Image:** `python-ai-service:t20-p215f`  
 **Parent:** T20.15F — percentage gate deployed at percent=0
 

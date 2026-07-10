@@ -2,7 +2,7 @@
 
 **Status:** DRY-RUN COMPLETE — **actual write NOT APPROVED**  
 **Generated:** 2026-06-25  
-**Baseline SHA:** `da8ca90`  
+**Baseline SHA:** `84a7ad4`  
 **Tranche id:** `t20-tranche-6`  
 **Related:** T20.12J-R capacity adjustment (Option B)
 

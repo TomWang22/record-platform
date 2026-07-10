@@ -2,7 +2,7 @@
 
 **Status:** Design approved for participant-limited soak evidence  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `0526c9c`  
+**Baseline SHA:** `cd82abb`  
 **Webapp:** `webapp:t20-p227b`  
 **Python:** `python-ai-service:t20-p225b`
 

@@ -3,7 +3,7 @@
 **Approver name:** Tom Wang / repository owner  
 **Approver role:** Owner / Product  
 **Date (UTC):** 2026-07-01  
-**Baseline SHA:** b722c4f  
+**Baseline SHA:** a90e008  
 **Scope:** Opt-in hybrid preview implementation only (T20.25A-H)
 
 ## Explicitly approved

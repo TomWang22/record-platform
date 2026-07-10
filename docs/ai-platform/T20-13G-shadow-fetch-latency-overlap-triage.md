@@ -2,7 +2,7 @@
 
 **Status:** READ-ONLY triage (no code changes)  
 **Generated:** 2026-06-26  
-**Baseline SHA:** `cbb4bdd`  
+**Baseline SHA:** `a249c14`  
 **Embedded:** 10,065 (~13.8% of non-message chunks)
 
 ## Context

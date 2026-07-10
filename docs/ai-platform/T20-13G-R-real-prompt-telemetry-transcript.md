@@ -2,7 +2,7 @@
 
 **Status:** READ-ONLY transcript report (no code changes)  
 **Generated:** 2026-06-26  
-**Baseline SHA:** `a2399ce`  
+**Baseline SHA:** `663697b`  
 **Source run:** T20.13G warmed harness (`20260626-190817`)  
 **Artifacts (local, not committed):** `bench_logs/ai-platform/live-inference/20260626-190817.{md,summary.json}`, `raw-20260626-190817/`
 

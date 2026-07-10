@@ -9,9 +9,9 @@
 
 | Ticket | SHA | Description |
 |--------|-----|-------------|
-| T20.27A | `4cfe345` | Implementation plan |
-| T20.27B | `79408ce` + `4dbb215` | UI + fixes |
-| T20.27C/D | `7cf5882` | Tests + preflight |
+| T20.27A | `634ed94` | Implementation plan |
+| T20.27B | `c9fed53` + `be823f6` | UI + fixes |
+| T20.27C/D | `ad88d55` | Tests + preflight |
 | T20.27E | (this batch) | Live eval 270/270 |
 | T20.27F | (this batch) | Rollback drill |
 | T20.27G | (this batch) | Decision C |

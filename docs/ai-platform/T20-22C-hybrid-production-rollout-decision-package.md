@@ -2,7 +2,7 @@
 
 **Status:** Decision complete (docs only — **rollout NOT APPROVED**)  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `18670c5` + T20.22B audit  
+**Baseline SHA:** `95f1cfb` + T20.22B audit  
 **Image:** `python-ai-service:t20-p216b`  
 **Parent:** T20.22B — **PASS**
 

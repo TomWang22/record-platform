@@ -2,7 +2,7 @@
 
 **Status:** READ-ONLY report from T20.13E warmed harness run  
 **Generated:** 2026-06-26  
-**Harness baseline SHA:** `bd2b607` (pre-commit); implementation in T20.13E commit
+**Harness baseline SHA:** `33c886f` (pre-commit); implementation in T20.13E commit
 
 ## Artifacts (local, not committed)
 

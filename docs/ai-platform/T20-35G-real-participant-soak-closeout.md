@@ -9,13 +9,13 @@
 
 | Ticket | SHA | Description |
 |--------|-----|-------------|
-| T20.35A | `8ede08b` | Design + artifact template committed |
-| T20.35B | `571ec65` | Artifact audit BLOCKED; preflight PASS |
-| T20.35C | `1773ef7` | C-BLOCKED |
-| T20.35D | `a9a5a73` | Rollback SKIPPED |
-| T20.35E | `d8af891` | Telemetry audit |
-| T20.35F | `3d92abc` | Decision package |
-| T20.35G/H | `d1975c2` / `7909d5a` | Closeout + Phase 21 |
+| T20.35A | `87f4a82` | Design + artifact template committed |
+| T20.35B | `8997418` | Artifact audit BLOCKED; preflight PASS |
+| T20.35C | `2675ad2` | C-BLOCKED |
+| T20.35D | `25c844d` | Rollback SKIPPED |
+| T20.35E | `518124f` | Telemetry audit |
+| T20.35F | `0768ce1` | Decision package |
+| T20.35G/H | `afa118b` / `c3b33e8` | Closeout + Phase 21 |
 
 ## Images & env
 

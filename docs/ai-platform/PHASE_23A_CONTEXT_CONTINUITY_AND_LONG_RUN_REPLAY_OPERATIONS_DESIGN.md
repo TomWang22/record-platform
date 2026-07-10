@@ -14,7 +14,7 @@
 
 ## 1. Executive verdict
 
-Phase 23A closes the **context-continuity gap** exposed after Phase 22 archive handoff. Agents were treating `HEAD: 5588779` in `ACTIVE_CONTEXT.md` as the live repo tip; that value is the **Phase 22 archive HEAD**, not the current repo tip.
+Phase 23A closes the **context-continuity gap** exposed after Phase 22 archive handoff. Agents were treating `HEAD: 7257380` in `ACTIVE_CONTEXT.md` as the live repo tip; that value is the **Phase 22 archive HEAD**, not the current repo tip.
 
 Phase 23A defines:
 
@@ -72,9 +72,9 @@ Do not require ACTIVE_CONTEXT.md to equal the current git tip. That creates endl
 | ----- | ------- | ------------ |
 | Current repo tip | Live `git rev-parse --short HEAD` | Never stored in ACTIVE_CONTEXT.md |
 | Phase handoff lineage | Historical commits that explain how context evolved | Append on each approved handoff commit |
-| Phase 22 archive HEAD | Commit that archived full labeled protocol parity | Frozen at `5588779` |
-| Phase 21 archive checkpoint | Phase 21 archive closeout commit | Frozen at `328161d` |
-| Phase 21 pre-archive validation HEAD | Last Phase 21 validation before archive | Frozen at `bd76875` |
+| Phase 22 archive HEAD | Commit that archived full labeled protocol parity | Frozen at `7257380` |
+| Phase 21 archive checkpoint | Phase 21 archive closeout commit | Frozen at `1422152` |
+| Phase 21 pre-archive validation HEAD | Last Phase 21 validation before archive | Frozen at `2eb1606` |
 
 Do **not** use the banned label `Current handoff HEAD:`. Do **not** infer counts or production state from chat memory.
 

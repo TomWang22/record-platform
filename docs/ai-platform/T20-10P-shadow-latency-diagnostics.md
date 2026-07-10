@@ -1,7 +1,7 @@
 # T20.10P — Shadow latency diagnostics (read-only)
 
 **Generated:** 2026-06-23  
-**Baseline SHA:** `16d4d43` (T20.10O readiness eval)  
+**Baseline SHA:** `387bdc7` (T20.10O readiness eval)  
 **Mode:** read-only diagnostics — no product behavior changes  
 **Vector rollout:** NOT APPROVED
 

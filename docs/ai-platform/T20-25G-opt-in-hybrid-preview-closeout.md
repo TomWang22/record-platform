@@ -10,15 +10,15 @@
 
 | Ticket | Commit | Description |
 |--------|--------|-------------|
-| Sign-off | `16981ca` | Owner/product sign-off artifact |
-| T20.25A | `c032a41` | Sign-off verification |
-| T20.25B | `2f3f11e` | API-only preview implementation |
-| T20.25C | `9017a81` | Deploy preflight PASS |
-| T20.25D | `42cda4c` | Live eval doc (+ `1fad690` e2e/eval runner) |
-| T20.25E | `03bc454` | Rollback drill doc |
-| T20.25F | `9595b18` | Decision C |
-| T20.25G | `24ddd03` | Closeout |
-| T20.25H | `75cfe2e` | PHASE_21 reconciliation |
+| Sign-off | `d0e8930` | Owner/product sign-off artifact |
+| T20.25A | `7cae149` | Sign-off verification |
+| T20.25B | `72038a0` | API-only preview implementation |
+| T20.25C | `025d887` | Deploy preflight PASS |
+| T20.25D | `b7e7120` | Live eval doc (+ `947a011` e2e/eval runner) |
+| T20.25E | `5472cc5` | Rollback drill doc |
+| T20.25F | `7106993` | Decision C |
+| T20.25G | `ad87e72` | Closeout |
+| T20.25H | `819f92e` | PHASE_21 reconciliation |
 
 ## 2. Sign-off
 

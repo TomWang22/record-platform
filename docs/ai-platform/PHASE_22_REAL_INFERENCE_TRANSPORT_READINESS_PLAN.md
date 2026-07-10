@@ -23,9 +23,9 @@ Phase 22 is **not** just “does the endpoint return 200.” It must validate re
 
 ```text
 Phase 21 archived: CLOSED PASS
-Archive HEAD: 328161d
-Pre-archive validation HEAD: bd76875
-Handoff commit: b17953a
+Archive HEAD: 1422152
+Pre-archive validation HEAD: 2eb1606
+Handoff commit: d27ebcd
 Cumulative live matrix: 57105/57105 HTTP 200, 0% fallback
 Cumulative live protocol class: HTTP/1.1 runner stack only
 Transport smoke: HTTP/1.1, HTTP/2, HTTP/3 PASS on contract allowlist RAG path
@@ -160,8 +160,8 @@ No adding protocol-smoke probes to 57105 cumulative matrix.
 
 | Workstream | Scope | Status |
 | ---------- | ----- | ------ |
-| **22A** | Response validation design + read-only scripts/docs | **COMPLETE** @ `21f46c4` |
-| **22B** | Response + transport validator smoke + KPI readiness | **PASS** @ `0f49545` |
+| **22A** | Response validation design + read-only scripts/docs | **COMPLETE** @ `fb44a8f` |
+| **22B** | Response + transport validator smoke + KPI readiness | **PASS** @ `27c405a` |
 | **22C** | Protocol-parity live matrix (H1/H2/H3) | **PASS 7200/7200** |
 | **22D** | Rollback drill | **PASS** |
 | **22E** | KPI telemetry audit | **PASS** |

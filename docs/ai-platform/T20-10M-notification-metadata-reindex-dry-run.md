@@ -1,7 +1,7 @@
 # T20.10M — Bounded notification metadata reindex dry-run
 
 **Generated:** 2026-06-23  
-**Base main:** `5a24c2c` (T20.10L notification metadata normalization)  
+**Base main:** `c70673a` (T20.10L notification metadata normalization)  
 **Mode:** dry-run only — **zero writes**  
 **Vector rollout:** NOT APPROVED
 

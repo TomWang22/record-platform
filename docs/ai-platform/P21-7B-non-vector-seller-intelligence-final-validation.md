@@ -1,7 +1,7 @@
 # P21.7B — Phase 21 non-vector seller intelligence final validation
 
 **Generated:** 2026-06-28  
-**Baseline SHA:** `aa9e566` (P21.7A RC)  
+**Baseline SHA:** `d6440d1` (P21.7A RC)  
 **RC doc:** `docs/ai-platform/P21-7A-non-vector-seller-intelligence-rc.md`
 
 ---

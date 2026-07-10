@@ -1,6 +1,6 @@
 # T20.13Z — Post-intelligence gauntlet scoreboard
 
-**Baseline SHA:** `f249d6e`  
+**Baseline SHA:** `e6df30d`  
 **Post-implementation run:** `20260627-043358` (record intelligence), `20260627-043448` (longform)  
 **Image:** `python-ai-service:t20-13xyz`
 

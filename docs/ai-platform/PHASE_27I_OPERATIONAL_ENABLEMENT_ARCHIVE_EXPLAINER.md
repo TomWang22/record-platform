@@ -21,7 +21,7 @@
 
 ## Purpose
 
-Docs-only archive/explainer after Phase 27 CLOSED PASS (`15d8d08`), so future agents can understand controlled local/dev enablement without mistaking it for production rollout.
+Docs-only archive/explainer after Phase 27 CLOSED PASS (`d289d0e`), so future agents can understand controlled local/dev enablement without mistaking it for production rollout.
 
 ## Deliverables
 

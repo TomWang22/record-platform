@@ -2,7 +2,7 @@
 
 **Status:** Decision complete  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `cfbc796`  
+**Baseline SHA:** `8931b10`  
 **Image:** `python-ai-service:t20-p225b` / `webapp:t20-p227b`
 
 ---

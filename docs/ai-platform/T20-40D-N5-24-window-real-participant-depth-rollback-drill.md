@@ -2,7 +2,7 @@
 
 **Status:** Rollback drill **PASS**  
 **Generated:** 2026-07-04  
-**Baseline SHA:** `11cdb08`  
+**Baseline SHA:** `de2b1e5`  
 **Artifact SHA256:** `1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa`
 
 ---

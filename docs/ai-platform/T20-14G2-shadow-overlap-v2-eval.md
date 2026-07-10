@@ -3,8 +3,8 @@
 **Status:** Eval complete  
 **Generated:** 2026-06-29  
 **Deploy tag:** `python-ai-service:t20-p214g2`  
-**Baseline SHA:** `1497455` (G2 implementation)  
-**F2 comparison baseline:** T20.14F2 (`d7cd4c3`)
+**Baseline SHA:** `08be7d7` (G2 implementation)  
+**F2 comparison baseline:** T20.14F2 (`352fa2d`)
 
 ---
 

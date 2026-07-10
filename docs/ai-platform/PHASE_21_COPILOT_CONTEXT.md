@@ -2,11 +2,11 @@
 
 **Last updated:** 2026-07-08 (Phase 28I archive/explainer PASS)  
 **Current repo tip:** compute live with `git rev-parse --short HEAD` (see `docs/ai-platform/ACTIVE_CONTEXT.md`)  
-**Phase 22 archive HEAD:** `5588779`  
-**Phase 21 archive checkpoint:** `328161d`  
-**Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
-**Final validation SHA (P21.7B):** `13bc0ad`  
-**Phase 21 status:** **CLOSED PASS** — N=5 opt-in hybrid preview production-readiness **ARCHIVED** @ `328161d`; no further T20 live eval unless explicitly approved  
+**Phase 22 archive HEAD:** `7257380`  
+**Phase 21 archive checkpoint:** `1422152`  
+**Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `b741f91`  
+**Final validation SHA (P21.7B):** `54f145a`  
+**Phase 21 status:** **CLOSED PASS** — N=5 opt-in hybrid preview production-readiness **ARCHIVED** @ `1422152`; no further T20 live eval unless explicitly approved  
 **Phase 22 status:** **CLOSED PASS / ARCHIVED** — full labeled protocol parity H1/H2/H3 each **57105/57105** (see `PHASE_22_FULL_PROTOCOL_PARITY_ARCHIVE.md`)  
 **Phase 23 status:** **CLOSED PASS** — context continuity and long-run replay guardrails.  
 **Phase 24 status:** **CLOSED PASS** — KPI observability read-only extraction and gap inventory. **24A COMPLETE** (design). **24B PASS** (read-only extractors). **24C PASS** (guard tests/Makefile). **24D PASS** (closeout). Phase 24 live work: **NOT APPROVED.**  
@@ -21,7 +21,7 @@
 **Phase 26H status:** **PASS** — archive/explainer docs only (`PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md`, operator guide, code map). No runtime/DB/live changes. Current Phase 26 source of truth is that archive plus `ACTIVE_CONTEXT.md`.
 **Phase 26I status:** **PASS** — archive consistency / supersession notes so historical closeouts (e.g. 26F “26G NOT STARTED”) are not mistaken for current state. No runtime/DB/live changes.
 **Phase 26J status:** **PASS** — read-only archive supersession guard (`make ai-platform-verify-phase26-archive-supersession`). No runtime/DB/live changes.
-**Phase 26 status:** **CLOSED PASS** — observability implementation batch (26A–26G closeout `4409ffc`; 26H–26J docs/guards). Operational KPI row population remains disabled by default. No production rollout approved.
+**Phase 26 status:** **CLOSED PASS** — observability implementation batch (26A–26G closeout `f09a9ef`; 26H–26J docs/guards). Operational KPI row population remains disabled by default. No production rollout approved.
 **Phase 27A status:** **PASS** — operational enablement roadmap design only.
 **Phase 27B–27H status:** **PASS** — controlled local/dev schema verify, flag enablement, real write-path row population, query/usefulness smoke, /tmp combined report, disable-switch rollback, closeout. No production enablement. No 57105 replay.
 **Phase 28A status:** **PASS** — production-readiness test architecture (docs + acceptance matrix). No live eval. No production rollout.
@@ -39,7 +39,7 @@ Use this document as the **source of truth** for Phase 21 state. For Phase 20 ve
 ## Locked takeaway
 
 ```text
-Phase 21 non-vector seller intelligence: RELEASE TAGGED @ d0e4c58
+Phase 21 non-vector seller intelligence: RELEASE TAGGED @ b741f91
 
 Production path:
 - retrieval: keyword (default for all non-allowlisted users)
@@ -112,7 +112,7 @@ T20.35A–H complete. Real-participant soak batch: CLOSED/BLOCKED.
 T20.35C-LIVE: BLOCKED — artifact committed but incomplete (`T20-35-owner-approved-real-preview-participants.md`; 0/3 complete real_owner_approved rows; TBD email/UUID/consent/signature).
 T20.35F: C selected (KEEP preview UI/API); real-participant soak blocked; D recommends completing artifact rows.
 T20.35B-REBLOCKED (2026-07-03): re-audit confirms artifact unchanged — still 0/3 complete rows; C-LIVE NOT RUN; staging cohort NOT used.
-T20.35 scope approval recorded @ d650971; participant rows still incomplete (0/3).
+T20.35 scope approval recorded @ 8af97b8; participant rows still incomplete (0/3).
 T20.36A complete. Real-participant expansion readiness design only — no live eval.
 T20.36B complete. Artifact validator PASS — 3 complete participants (1× real_owner_approved, 2× internal_staff).
 T20.36A–H complete. Real-participant soak batch: CLOSED PASS.
@@ -223,7 +223,7 @@ Phase 26D runtime writes default enabled: NO.
 Phase 26E PASS: usefulness observation export write path + extractor; no live eval.
 Phase 26E runtime writes default enabled: NO.
 Phase 26F PASS: combined read-only KPI dashboard/report generation; output /tmp only.
-Phase 26G PASS: disable-switch drill verified; Phase 26 CLOSED PASS @ 4409ffc.
+Phase 26G PASS: disable-switch drill verified; Phase 26 CLOSED PASS @ f09a9ef.
 Phase 26H PASS: archive/explainer docs (implementation archive, operator guide, code map); no runtime changes.
 Phase 26I PASS: archive supersession/historical-snapshot clarity; older 26A–26G docs remain point-in-time records.
 Phase 26J PASS: archive supersession guard; historical-snapshot drift blocked.
@@ -274,7 +274,7 @@ Combined live evidence (D16→T20.42C): 57105/57105 HTTP 200, 0% fallback.
 | B — Hybrid anchored overlap | **16/16 PASS** |
 | C — Keyword production | **PASS** (default) |
 
-Deploy: `python-ai-service:t20-p215b2` @ `cd12a85`.
+Deploy: `python-ai-service:t20-p215b2` @ `89cf785`.
 
 ### Copilot-safe instruction
 
@@ -322,7 +322,7 @@ T20.32A–H CLOSED: broader readiness soak PASS 8640/8640; cumulative 24705/2470
 T20.33A–H CLOSED/BLOCKED: real-participant readiness blocked due to missing owner-approved participant artifacts.
 T20.34A–H CLOSED/BLOCKED: owner-approved participant soak blocked due to missing/incomplete participant artifact.
 T20.35A–H CLOSED/BLOCKED: real-participant soak blocked due to incomplete participant artifact (0/3 complete rows).
-T20.35B-REBLOCKED: re-audit 2026-07-03 — still 0/3; C-LIVE not run; scope approval @ d650971.
+T20.35B-REBLOCKED: re-audit 2026-07-03 — still 0/3; C-LIVE not run; scope approval @ 8af97b8.
 T20.36A COMPLETE: expansion/readiness design only.
 T20.36B COMPLETE: artifact validator PASS 3/3.
 T20.36A–H CLOSED PASS: real-participant soak 1440/1440; cumulative 26145/26145.
@@ -457,7 +457,7 @@ Key files:
 
 ---
 
-## Validation metrics (P21.7B final @ `13bc0ad`)
+## Validation metrics (P21.7B final @ `54f145a`)
 
 | Metric | Value | Gate |
 | ------ | ----: | ---- |

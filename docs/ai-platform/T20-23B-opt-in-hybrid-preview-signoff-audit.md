@@ -2,7 +2,7 @@
 
 **Status:** Audit complete — **PASS**  
 **Generated:** 2026-07-01  
-**Plan SHA:** `0b47946` (T20.23A)  
+**Plan SHA:** `5c6a704` (T20.23A)  
 **Image:** `python-ai-service:t20-p216b`  
 **Mode:** Audit-only — **no new live inference**
 

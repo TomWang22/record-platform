@@ -1,7 +1,7 @@
 # T20.10L — Notification metadata normalization for entity parity
 
 **Generated:** 2026-06-23  
-**Base main:** `f55fa14` (T20.10K entity aliases)  
+**Base main:** `c05561f` (T20.10K entity aliases)  
 **Mode:** code + doc (ingest normalization + diagnostics fields)  
 **Vector rollout:** NOT APPROVED
 

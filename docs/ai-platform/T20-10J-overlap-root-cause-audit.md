@@ -1,7 +1,7 @@
 # T20.10J — Shadow/keyword overlap root-cause audit
 
 **Generated:** 2026-06-23  
-**Accepted main:** `4a497ad` (external Ollama warmup gate)  
+**Accepted main:** `66c1573` (external Ollama warmup gate)  
 **Mode:** read-only diagnostics — no ranking, keyword, or vector-default changes
 
 ## Benchmark artifact
@@ -134,7 +134,7 @@ Continue using **preflight-B external warmup gate** for benchmarks. If Phase 20 
 | Check | Result |
 |-------|--------|
 | OCH scan | **PASS** |
-| T20.10I product changes | **Reverted** — main at `4a497ad` |
+| T20.10I product changes | **Reverted** — main at `66c1573` |
 | Benchmark artifacts | **Not committed** |
 
 ## Vector rollout

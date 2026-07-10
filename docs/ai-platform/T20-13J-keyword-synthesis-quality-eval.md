@@ -2,7 +2,7 @@
 
 **Status:** Post-implementation evaluator report  
 **Generated:** 2026-06-26  
-**Implementation SHA:** `8698db3`  
+**Implementation SHA:** `8ed9c7b`  
 **Live inference run:** `20260626-213134`  
 **Artifacts (local):** `bench_logs/ai-platform/live-inference/raw-20260626-213134/`
 

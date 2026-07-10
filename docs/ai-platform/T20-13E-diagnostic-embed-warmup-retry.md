@@ -1,6 +1,6 @@
 # T20.13E — Diagnostic embed warmup/retry
 
-**Baseline:** `bd2b607`  
+**Baseline:** `33c886f`  
 **Scope:** Diagnostic harness/scripts only — no product route, retrieval, env default, DB, or rollout changes.
 
 ## Problem

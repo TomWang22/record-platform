@@ -2,7 +2,7 @@
 
 **Status:** Design **COMPLETE** — no live eval  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `ad8fbfc`  
+**Baseline SHA:** `291658f`  
 **Webapp:** `webapp:t20-p227b`  
 **Python:** `python-ai-service:t20-p225b`
 

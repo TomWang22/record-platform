@@ -25,10 +25,10 @@ T20.21A: NOT STARTED
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| T20.20A | `12c5955` | Hybrid production-decision design |
-| T20.20B | `f8ff69a` | Preflight + evidence audit |
-| T20.20C-LIVE | `82cf868` | Final verification PASS (540/540) |
-| T20.20D | `458125a` | Production-decision package (B selected) |
+| T20.20A | `2de1fe2` | Hybrid production-decision design |
+| T20.20B | `f4d0540` | Preflight + evidence audit |
+| T20.20C-LIVE | `55d520b` | Final verification PASS (540/540) |
+| T20.20D | `aff3948` | Production-decision package (B selected) |
 | T20.20E | *(this batch)* | Closeout |
 
 ---

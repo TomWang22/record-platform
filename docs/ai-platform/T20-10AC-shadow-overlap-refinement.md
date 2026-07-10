@@ -1,7 +1,7 @@
 # T20.10AC — Shadow overlap refinement implementation
 
 **Generated:** 2026-06-25  
-**Baseline SHA:** `2d7b3af` (T20.10AB shadow overlap refinement proposal)  
+**Baseline SHA:** `692b28e` (T20.10AB shadow overlap refinement proposal)  
 **Implementation SHA:** see commit `chore(ai): add flagged shadow overlap refinements`  
 **Mode:** shadow-only diagnostic flags (default off)  
 **Vector rollout:** NOT APPROVED

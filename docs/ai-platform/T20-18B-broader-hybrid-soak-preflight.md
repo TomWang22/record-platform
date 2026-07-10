@@ -2,7 +2,7 @@
 
 **Status:** Preflight complete — **PASS** (controls verified)  
 **Generated:** 2026-06-30  
-**Plan SHA:** `607fb33` (T20.18A)  
+**Plan SHA:** `7424efa` (T20.18A)  
 **Image:** `python-ai-service:t20-p216b`
 
 ---

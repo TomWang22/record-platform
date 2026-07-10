@@ -26,7 +26,7 @@ T20.22A: NOT STARTED
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| T20.21A | `5ba8233` | Hybrid default RFC / owner sign-off design |
+| T20.21A | `efd2845` | Hybrid default RFC / owner sign-off design |
 | T20.21B | *(this batch)* | RFC live confirmation PASS (270/270) |
 | T20.21C | *(this batch)* | RFC decision package (B selected, E rejected) |
 | T20.21D | *(this batch)* | RFC closeout |

@@ -2,7 +2,7 @@
 
 **Status:** Design complete (docs only — no implementation, no env change)  
 **Generated:** 2026-06-29  
-**Baseline SHA:** `3215c28` (T20.15D-T complete)  
+**Baseline SHA:** `fbe8013` (T20.15D-T complete)  
 **Image:** `python-ai-service:t20-p215b2`  
 **Parent:** T20.15D-T — allowlist canary KEEP, control + rollback PASS
 

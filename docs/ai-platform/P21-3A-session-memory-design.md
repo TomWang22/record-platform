@@ -1,7 +1,7 @@
 # P21.3A — Session memory design
 
 **Status:** Designed + minimal prototype  
-**Baseline SHA:** `0116091`  
+**Baseline SHA:** `432ef8f`  
 **Phase:** 21 — non-vector product track
 
 ---

@@ -2,7 +2,7 @@
 
 **Status:** Design complete (docs only — **no** UI code, **no** toggle implementation, **no** default switch)  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `121b02d` (T20.25H closeout)  
+**Baseline SHA:** `4d84c55` (T20.25H closeout)  
 **Image:** `python-ai-service:t20-p225b` (unchanged)  
 **Parent:** T20.25F decision (C selected; API-only preview ENABLED; T20.26A authorized)
 

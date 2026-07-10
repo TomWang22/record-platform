@@ -25,10 +25,10 @@ T20.20A: NOT STARTED
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| T20.19A | `55b2aff` | Extended hybrid soak design |
-| T20.19B | `ee4fa48` | Preflight + JWT verification |
-| T20.19C-LIVE | `4297e10` | 3-window live soak PASS (810/810) |
-| T20.19D | `1d52082` | Decision package (B selected) |
+| T20.19A | `6794774` | Extended hybrid soak design |
+| T20.19B | `2b35ee3` | Preflight + JWT verification |
+| T20.19C-LIVE | `7a88999` | 3-window live soak PASS (810/810) |
+| T20.19D | `ae091e5` | Decision package (B selected) |
 | T20.19E | *(this batch)* | Closeout |
 
 ---

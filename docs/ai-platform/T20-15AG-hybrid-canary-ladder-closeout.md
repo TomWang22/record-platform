@@ -24,33 +24,33 @@ T20.16A: NOT STARTED
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| T20.15A design | `14d3462` | Hybrid canary design |
-| T20.15C eval | `dd9e692` | Allowlist inference eval |
-| T20.15D-S soak | `956a139` | Allowlist soak |
-| T20.15D-T drill | `3215c28` | Control rollback drill |
-| T20.15E design | `70ed52d` | Limited percentage design |
-| T20.15G 1% eval | `4a491ff` | 1% live eval |
-| T20.15H decision | `349317b` | 1% decision package |
-| T20.15I design | `04f6af1` | 5% design |
-| T20.15J gate | `892582b` | 5% gate tests |
-| T20.15K 5% eval | `be7bcb2` | 5% live eval |
-| T20.15L decision | `d630c67` | 5% decision |
-| T20.15M design | `be87682` | 10% design |
-| T20.15O 10% eval | `908d281` | 10% live eval |
-| T20.15P decision | `6616d66` | 10% decision |
-| T20.15Q design | `73fa7d7` | 25% design |
-| T20.15S 25% eval | `b2e5f8b` | 25% live eval |
-| T20.15T decision | `d6b7fc2` | 25% decision |
-| T20.15U design | `a3faaa8` | 50% design |
-| T20.15V gate | `29a2674` | 50% gate verification |
-| T20.15W 50% eval | `409a865` | 50% live eval |
-| T20.15X decision | `ad17a5b` | 50% decision |
-| T20.15Y design | `34704df` | 75% design |
-| T20.15Z gate | `ef1cedf` | 75% gate verification |
-| T20.15AA 75% eval | `11da70c` | 75% live eval |
-| T20.15AB decision | `c2fc79f` | 75% decision |
-| T20.15AC design | `6f8d2cc` | 100% design |
-| T20.15AD gate | `2d2e32d` | 100% gate verification |
+| T20.15A design | `c8715e9` | Hybrid canary design |
+| T20.15C eval | `e5a2211` | Allowlist inference eval |
+| T20.15D-S soak | `d0897e0` | Allowlist soak |
+| T20.15D-T drill | `fbe8013` | Control rollback drill |
+| T20.15E design | `9f9fd59` | Limited percentage design |
+| T20.15G 1% eval | `8bbb493` | 1% live eval |
+| T20.15H decision | `11308cb` | 1% decision package |
+| T20.15I design | `3086d23` | 5% design |
+| T20.15J gate | `42fac2b` | 5% gate tests |
+| T20.15K 5% eval | `d3194d0` | 5% live eval |
+| T20.15L decision | `99ebeb2` | 5% decision |
+| T20.15M design | `32ad1ce` | 10% design |
+| T20.15O 10% eval | `58c6fcf` | 10% live eval |
+| T20.15P decision | `9c210aa` | 10% decision |
+| T20.15Q design | `836e6b9` | 25% design |
+| T20.15S 25% eval | `bca701b` | 25% live eval |
+| T20.15T decision | `d7799f2` | 25% decision |
+| T20.15U design | `f9d3069` | 50% design |
+| T20.15V gate | `517d85f` | 50% gate verification |
+| T20.15W 50% eval | `76fa090` | 50% live eval |
+| T20.15X decision | `64e875e` | 50% decision |
+| T20.15Y design | `cec27a3` | 75% design |
+| T20.15Z gate | `b178160` | 75% gate verification |
+| T20.15AA 75% eval | `bb6b282` | 75% live eval |
+| T20.15AB decision | `8e575eb` | 75% decision |
+| T20.15AC design | `c996ff7` | 100% design |
+| T20.15AD gate | `5155fd0` | 100% gate verification |
 | T20.15AE eval | *(this commit)* | 100% live eval |
 | T20.15AF decision | *(this commit)* | 100% decision package |
 

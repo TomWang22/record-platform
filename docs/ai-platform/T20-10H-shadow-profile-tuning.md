@@ -1,7 +1,7 @@
 # T20.10H — Shadow profile tuning and deploy worker hardening
 
 **Generated:** 2026-06-22  
-**Baseline SHA:** `04d3ab512896e5eb797cd1d1e3ff59e71f38df18` (T20.10G)  
+**Baseline SHA:** `dceb54de86d39f00024ea9e631acbbb84c4bac17` (T20.10G)  
 **Mode:** shadow-only tuning + runtime stability — no vector default flip
 
 ## Executive summary

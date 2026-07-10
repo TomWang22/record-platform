@@ -2,7 +2,7 @@
 
 **Status:** Soak complete  
 **Generated:** 2026-06-29  
-**SHA:** `8e09816`  
+**SHA:** `5e34072`  
 **Image:** `python-ai-service:t20-p215b2`
 
 ---

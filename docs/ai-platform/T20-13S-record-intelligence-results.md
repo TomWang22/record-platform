@@ -2,7 +2,7 @@
 
 **Generated:** 2026-06-27  
 **Run timestamp:** `20260627-032710`  
-**Baseline SHA:** `97af0d0`  
+**Baseline SHA:** `b3664fd`  
 **Harness:** T20.13R Playwright domain acceptance  
 **Artifacts (local):** `bench_logs/ai-platform/ui-record-intelligence/20260627-032710/`
 

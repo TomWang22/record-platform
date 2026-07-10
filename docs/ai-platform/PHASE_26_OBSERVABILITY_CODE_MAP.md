@@ -1,6 +1,6 @@
 # Phase 26 — Observability Code Map
 
-Map from Phase 26 documents → code → flags → tests → operational status. Implementation closed at `4409ffc`; this doc is explanatory only.
+Map from Phase 26 documents → code → flags → tests → operational status. Implementation closed at `f09a9ef`; this doc is explanatory only.
 
 Archive: `PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md`  
 Operator guide: `PHASE_26_OBSERVABILITY_OPERATOR_GUIDE.md`

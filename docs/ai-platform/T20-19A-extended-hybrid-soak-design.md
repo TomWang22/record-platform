@@ -2,7 +2,7 @@
 
 **Status:** Design complete (docs only — **not** rollout approval)  
 **Generated:** 2026-06-30  
-**Baseline SHA:** `cbac8da` (T20.18E closeout)  
+**Baseline SHA:** `27d60e9` (T20.18E closeout)  
 **Image:** `python-ai-service:t20-p216b` (unchanged)  
 **Parent:** T20.18D decision (B selected; D recommended → this extended soak)
 

@@ -2,7 +2,7 @@
 
 **Status:** READ-ONLY triage complete  
 **Generated:** 2026-06-26  
-**Baseline SHA:** `4e99509`  
+**Baseline SHA:** `e7728a7`  
 **Embedded:** 10,065 (~13.8%)  
 **Mode:** no code changes, no DB writes, no rollout
 

@@ -1,7 +1,7 @@
 # T20.12D-R — Shadow source diagnostic failure triage
 
 **Status:** READ-ONLY triage complete  
-**Baseline SHA:** `9298c9c`  
+**Baseline SHA:** `fa425f7`  
 **Generated:** 2026-06-25  
 **Trigger:** T20.12D reported `rp-ai-shadow-source-diagnostic.sh` **FAIL (3 issues)** after Tranche 4, while historical source-diversity gate was **PASS (6 types)**.
 

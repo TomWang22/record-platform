@@ -2,7 +2,7 @@
 
 **Status:** Provisioning **PASS** — artifact updated to N=5  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `2d0d86d`  
+**Baseline SHA:** `7aaa7fe`  
 **Artifact:** `docs/ai-platform/T20-35-owner-approved-real-preview-participants.md`
 
 ---

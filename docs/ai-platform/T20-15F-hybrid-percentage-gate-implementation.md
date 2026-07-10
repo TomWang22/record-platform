@@ -4,7 +4,7 @@
 **Generated:** 2026-06-29  
 **Parent:** T20.15E design  
 **Image:** `python-ai-service:t20-p215f`  
-**Baseline SHA:** `70ed52d` (T20.15E)
+**Baseline SHA:** `9f9fd59` (T20.15E)
 
 ---
 

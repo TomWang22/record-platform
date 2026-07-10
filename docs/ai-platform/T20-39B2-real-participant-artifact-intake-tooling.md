@@ -2,7 +2,7 @@
 
 **Status:** Tooling **COMPLETE** — no live eval  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `a4207eb`  
+**Baseline SHA:** `c6bb6b4`  
 **Artifact:** `docs/ai-platform/T20-35-owner-approved-real-preview-participants.md`
 
 ---

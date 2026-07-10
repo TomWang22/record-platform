@@ -9,12 +9,12 @@
 
 | Ticket | SHA | Description |
 |--------|-----|-------------|
-| T20.33A | `f2a2c93` | Real-participant readiness design |
-| T20.33B | `61faaff` | Artifact audit BLOCKED; preflight PASS |
-| T20.33C | `2c080e5` | C-BLOCKED — no live eval |
-| T20.33D | `532aabc` | Rollback drill SKIPPED |
-| T20.33E/F | `4c6ee6a` / `c3d3520` | Telemetry + decision |
-| T20.33G/H | `ef284ff` / `b2a1c44` | Closeout + Phase 21 |
+| T20.33A | `4f7ce5a` | Real-participant readiness design |
+| T20.33B | `2f85766` | Artifact audit BLOCKED; preflight PASS |
+| T20.33C | `c2ba698` | C-BLOCKED — no live eval |
+| T20.33D | `e5ee43b` | Rollback drill SKIPPED |
+| T20.33E/F | `a55ff0a` / `504ccfd` | Telemetry + decision |
+| T20.33G/H | `b1a071c` / `1ade678` | Closeout + Phase 21 |
 
 ## Images
 

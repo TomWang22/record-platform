@@ -2,7 +2,7 @@
 
 **Status:** Design approved for soak evidence only  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `3d2e139`  
+**Baseline SHA:** `7e02fc1`  
 **Webapp:** `webapp:t20-p227b`  
 **Python:** `python-ai-service:t20-p225b`
 

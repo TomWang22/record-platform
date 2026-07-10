@@ -3,7 +3,7 @@
 **Status:** Eval complete  
 **Generated:** 2026-06-29  
 **Deploy tag:** `python-ai-service:t20-p214g3`  
-**Baseline SHA:** `880db57` (G3 implementation)
+**Baseline SHA:** `b520ae8` (G3 implementation)
 
 ---
 

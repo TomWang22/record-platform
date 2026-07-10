@@ -1,7 +1,7 @@
 # P21.4A — Collector metadata extraction
 
 **Status:** Implemented  
-**Baseline SHA:** `791a7ba`  
+**Baseline SHA:** `9555bba`  
 **Phase:** 21 — non-vector product track
 
 ---

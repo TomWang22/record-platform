@@ -1,7 +1,7 @@
 # Phase 27A — Observability operational enablement roadmap (design only)
 
 **Phase 27A:** PASS — roadmap/design only  
-**Phase 26:** CLOSED PASS (implementation `4409ffc`; archive `d16d195`; supersession `f32dd76`; supersession guard this batch)  
+**Phase 26:** CLOSED PASS (implementation `f09a9ef`; archive `6d13e83`; supersession `feb7e13`; supersession guard this batch)  
 **Live eval:** NOT RUN  
 **Runtime/env/default/allowlist changes:** NONE  
 **DB writes:** NO  

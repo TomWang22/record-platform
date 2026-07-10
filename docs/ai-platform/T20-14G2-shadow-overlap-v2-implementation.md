@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Generated:** 2026-06-28  
-**Baseline SHA:** `2cc687c` (T20.14G design)  
+**Baseline SHA:** `e6bcd23` (T20.14G design)  
 **Scope:** Shadow/canary diagnostic path only — keyword production unchanged
 
 ---

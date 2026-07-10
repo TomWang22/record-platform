@@ -9,12 +9,12 @@
 
 | Ticket | SHA | Description |
 |--------|-----|-------------|
-| T20.32A | `4c3b14c` | Broader readiness design |
-| T20.32B | `8734cde` | Preflight PASS |
-| T20.32C | `9340dc7` | Live eval 8640/8640 |
-| T20.32D | `beff95a` | Rollback drill |
-| T20.32E/F | `f5f7839` / `4499866` | Telemetry + decision C |
-| T20.32G/H | `6ed60bd` / `dfde586` | Closeout + Phase 21 |
+| T20.32A | `881c0fb` | Broader readiness design |
+| T20.32B | `f94a1cc` | Preflight PASS |
+| T20.32C | `9c821b5` | Live eval 8640/8640 |
+| T20.32D | `6f8da2f` | Rollback drill |
+| T20.32E/F | `3ec8be1` / `c489d4c` | Telemetry + decision C |
+| T20.32G/H | `e096c4f` / `08143e3` | Closeout + Phase 21 |
 
 ## Images
 

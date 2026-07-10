@@ -1,8 +1,8 @@
 # T20.10Y — Shadow source diversity typed top-up implementation
 
 **Generated:** 2026-06-25  
-**Baseline SHA:** `8e5513d` (T20.10X shadow source diversity diagnostics)  
-**Implementation SHA:** `3e2a80f`  
+**Baseline SHA:** `203a1e9` (T20.10X shadow source diversity diagnostics)  
+**Implementation SHA:** `e6efcd3`  
 **Mode:** shadow-only — keyword retrieval unchanged  
 **Vector rollout:** NOT APPROVED
 

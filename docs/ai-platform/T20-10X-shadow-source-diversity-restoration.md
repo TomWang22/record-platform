@@ -1,7 +1,7 @@
 # T20.10X — Shadow source diversity restoration (diagnostics + proposal)
 
 **Generated:** 2026-06-24  
-**Baseline SHA:** `c838cda` (T20.10W implementation + doc SHA fix)  
+**Baseline SHA:** `0d7aa7c` (T20.10W implementation + doc SHA fix)  
 **Mode:** diagnostics/proposal only — no code changes  
 **Vector rollout:** NOT APPROVED
 
@@ -47,9 +47,9 @@ OBO owner-visible: 18 / 1118 embedded OBO
 
 | Eval | Hinted union (w+h) | Gate |
 |------|-------------------|------|
-| T20.10F (`e891edf`) | **All 6 shadow-allowed types** | **PASS** |
-| T20.10O (`2cdbf26`) | **6 types** (readiness doc) | **PASS** |
-| Post-T20.10W (`c838cda`) | **4 types** | **FAIL** |
+| T20.10F (`c6e7f5c`) | **All 6 shadow-allowed types** | **PASS** |
+| T20.10O (`85d6417`) | **6 types** (readiness doc) | **PASS** |
+| Post-T20.10W (`0d7aa7c`) | **4 types** | **FAIL** |
 
 The readiness docs (T20.10F/O) and T19.6C diagnostic use the same **≥5 types across weighted+hints contract prompts** threshold. T20.10W broke the diagnostic that previously passed.
 

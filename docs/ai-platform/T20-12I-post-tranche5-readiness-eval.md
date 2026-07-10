@@ -2,7 +2,7 @@
 
 **Status:** READ-ONLY eval complete  
 **Generated:** 2026-06-25  
-**Baseline SHA:** `2a98698`  
+**Baseline SHA:** `e2349ce`  
 **Tranche:** `t20-tranche-5` (+500 embeddings, 6,065 → 6,565)
 
 ## Corpus snapshot

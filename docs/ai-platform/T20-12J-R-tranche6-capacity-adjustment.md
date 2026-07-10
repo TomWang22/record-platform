@@ -2,7 +2,7 @@
 
 **Status:** READ-ONLY analysis complete — **actual write NOT APPROVED**  
 **Generated:** 2026-06-25  
-**Baseline SHA:** `03c5dec`  
+**Baseline SHA:** `c090149`  
 **Related:** T20.12J dry-run (`t20-tranche-6`, selected **476** not 500)
 
 ## Summary

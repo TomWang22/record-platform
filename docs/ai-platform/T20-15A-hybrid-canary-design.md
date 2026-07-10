@@ -2,9 +2,9 @@
 
 **Status:** Design complete (docs only — no implementation)  
 **Generated:** 2026-06-29  
-**Baseline SHA:** `d92f653` (T20.14H2 decision package)  
+**Baseline SHA:** `20d88c0` (T20.14H2 decision package)  
 **Deploy image:** `python-ai-service:t20-p214g3r`  
-**G3R implementation:** `cbe764a`  
+**G3R implementation:** `cc3fb42`  
 **Parent gate:** T20.14H2 — `T20.15A HYBRID CANARY DESIGN: READY FOR OWNER APPROVAL`
 
 ---
@@ -282,7 +282,7 @@ kubectl -n record-platform set image deployment/python-ai-service \
 kubectl -n record-platform rollout status deployment/python-ai-service --timeout=180s
 ```
 
-Prior stable pin: `python-ai-service:t20-p214g3r` @ `cbe764a`.
+Prior stable pin: `python-ai-service:t20-p214g3r` @ `cc3fb42`.
 
 ### Post-rollback verification
 

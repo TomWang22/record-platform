@@ -2,7 +2,7 @@
 
 ## Baseline
 
-- Main SHA (pre-G3R): `9fce54b`
+- Main SHA (pre-G3R): `0d464a7`
 - Cluster image (pre-G3R): `python-ai-service:t20-p214g3`
 - Gate state entering G3R: latency PASS, true zero-results 0/16, doc/entity overlap 8/16 (FAIL vs ≥10/16)
 

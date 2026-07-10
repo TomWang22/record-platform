@@ -2,7 +2,7 @@
 
 **Status:** Complete — **PASS**  
 **Generated:** 2026-06-30  
-**Baseline SHA:** `fd39db3` (T20.16A)  
+**Baseline SHA:** `a2e2d02` (T20.16A)  
 **Image:** `python-ai-service:t20-p216b`  
 **Parent:** T20.16A production-readiness design
 

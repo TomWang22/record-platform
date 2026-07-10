@@ -1,7 +1,7 @@
 # P21.4B — Collector metadata acceptance
 
 **Generated:** 2026-06-27  
-**Baseline SHA:** `791a7ba` (pre P21.4 commits)  
+**Baseline SHA:** `9555bba` (pre P21.4 commits)  
 **Implementation:** `docs/ai-platform/P21-4A-collector-metadata-extraction.md`
 
 ---

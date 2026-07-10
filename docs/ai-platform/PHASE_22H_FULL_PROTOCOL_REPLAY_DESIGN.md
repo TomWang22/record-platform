@@ -3,7 +3,7 @@
 **Status:** DESIGN PASS — manifest complete; live replay **NOT AUTHORIZED**  
 **Created:** 2026-07-05  
 **Prerequisite:** `PHASE_22H_FULL_PROTOCOL_REPLAY_MANIFEST.md` PASS  
-**Baseline HEAD:** `e1b04a3`
+**Baseline HEAD:** `3442f1a`
 
 ---
 

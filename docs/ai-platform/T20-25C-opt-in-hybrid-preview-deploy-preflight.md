@@ -2,7 +2,7 @@
 
 **Status:** Preflight **PASS**  
 **Generated:** 2026-07-01  
-**Implementation SHA:** `2f3f11e`  
+**Implementation SHA:** `72038a0`  
 **Image:** `python-ai-service:t20-p225b`
 
 ---

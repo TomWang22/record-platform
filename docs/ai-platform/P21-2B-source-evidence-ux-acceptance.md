@@ -1,7 +1,7 @@
 # P21.2B — Source evidence UX acceptance
 
 **Generated:** 2026-06-27  
-**Baseline SHA:** `1499bda` (pre P21.2A commit)  
+**Baseline SHA:** `84b3315` (pre P21.2A commit)  
 **Implementation:** `docs/ai-platform/P21-2A-source-evidence-ux.md`
 
 ---

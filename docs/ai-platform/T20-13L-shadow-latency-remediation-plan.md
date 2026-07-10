@@ -2,7 +2,7 @@
 
 **Status:** Read-only design + warmed telemetry analysis  
 **Generated:** 2026-06-27  
-**Baseline SHA:** `40bb4c1`  
+**Baseline SHA:** `e0e86f1`  
 **Embedded:** 10,065 (~13.8%)  
 **Rollout SLO:** shadow p95 ≤ **3,000 ms** → **FAIL**
 

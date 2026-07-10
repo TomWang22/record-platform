@@ -1,8 +1,8 @@
 # T20.10W — Shadow-only fetch strategy refinement implementation
 
 **Generated:** 2026-06-24  
-**Baseline SHA:** `ad0cd22` (T20.10V shadow profile refinement proposal)  
-**Implementation SHA:** `b7e17b6`  
+**Baseline SHA:** `ed64bf0` (T20.10V shadow profile refinement proposal)  
+**Implementation SHA:** `334443d`  
 **Mode:** shadow-only — keyword retrieval unchanged  
 **Vector rollout:** NOT APPROVED
 

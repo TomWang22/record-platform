@@ -10,8 +10,8 @@
 
 | Ticket | SHA | Description |
 |--------|-----|-------------|
-| T20.26A | `40cfdca` | UI design only |
-| T20.26B | `532b239` | Runtime/API audit PASS |
+| T20.26A | `50bc1f3` | UI design only |
+| T20.26B | `2aad8bd` | Runtime/API audit PASS |
 | T20.26C | (this batch) | Live UI-readiness smoke 270/270 |
 | T20.26D | (this batch) | Decision B; recommend C |
 | T20.26E | (this batch) | Closeout + PHASE_21 |

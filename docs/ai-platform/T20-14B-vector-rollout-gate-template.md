@@ -2,7 +2,7 @@
 
 **Generated:** 2026-06-28  
 **Baseline:** `docs/ai-platform/T20-14A-current-vector-readiness-baseline.md`  
-**Release context:** Phase 21 non-vector seller intelligence tagged @ `d0e4c58` — does **not** approve vector rollout
+**Release context:** Phase 21 non-vector seller intelligence tagged @ `b741f91` — does **not** approve vector rollout
 
 ---
 

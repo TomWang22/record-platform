@@ -2,7 +2,7 @@
 
 **Status:** Design complete (docs only — no implementation, no env change)  
 **Generated:** 2026-06-29  
-**Baseline SHA:** `349317b` (T20.15H)  
+**Baseline SHA:** `11308cb` (T20.15H)  
 **Image:** `python-ai-service:t20-p215f`  
 **Parent:** T20.15H — Option B active, Option C recommended
 

@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Generated:** 2026-06-29  
-**Baseline SHA:** `e1120dd` (T20.14G2 eval)  
+**Baseline SHA:** `252234a` (T20.14G2 eval)  
 **Deploy tag:** `python-ai-service:t20-p214g2r`
 
 ---

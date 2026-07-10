@@ -2,7 +2,7 @@
 
 **Status:** Research design complete (docs only — **no** implementation)  
 **Generated:** 2026-06-30  
-**Baseline SHA:** `37d09f6` (T20.16B)  
+**Baseline SHA:** `c95ff68` (T20.16B)  
 **Image:** `python-ai-service:t20-p216b` (unchanged)  
 **Parent:** T20.16B `final_tagged_plan` remediation complete
 
@@ -34,7 +34,7 @@ T20.16D: NOT STARTED
 | T20.14H1 (5 runs) | **8/16** all runs | **16/16** all runs | Stable plateau |
 | T20.15 ladder (all evals) | **8/16** | **16/16** | Unchanged post-canary |
 | T20.16B post-fix transcript | N/A (API) | hybrid **0/27** fallback | Shadow unchanged |
-| **C0 fresh snapshot** (`20260630-115733`) | **8/16** | **16/16** | SHA `37d09f6`, shadow p95 **298.5 ms** |
+| **C0 fresh snapshot** (`20260630-115733`) | **8/16** | **16/16** | SHA `c95ff68`, shadow p95 **298.5 ms** |
 
 ### C0 read-only checks (not committed)
 
@@ -107,7 +107,7 @@ Estimated **high effort, low confidence**:
 
 ## 4. Sixteen-case overlap table
 
-Snapshot: `bench_logs/ai-platform/t20-10-shadow-real-query-20260630-115733.jsonl` (SHA `37d09f6`, not committed).
+Snapshot: `bench_logs/ai-platform/t20-10-shadow-real-query-20260630-115733.jsonl` (SHA `c95ff68`, not committed).
 
 | case_id | prompt theme | mode/profile | keyword source types | pure vector source types | anchored source types | pure doc/ent | anchored doc/ent | zero-overlap reason | likely root cause | candidate remediation | risk | recommended |
 |---------|--------------|--------------|---------------------|--------------------------|----------------------|--------------|------------------|---------------------|-------------------|----------------------|------|-------------|

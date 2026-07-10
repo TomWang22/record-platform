@@ -28,9 +28,9 @@ T20.25A: NOT STARTED
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| T20.24A | `8893087` | Opt-in hybrid preview implementation design |
-| T20.24B | `66553d9` | Implementation sign-off gate audit |
-| T20.24C | `4df4f3e` | Implementation decision package (B selected; implementation NOT APPROVED) |
+| T20.24A | `615fce5` | Opt-in hybrid preview implementation design |
+| T20.24B | `4b868ae` | Implementation sign-off gate audit |
+| T20.24C | `23ccff5` | Implementation decision package (B selected; implementation NOT APPROVED) |
 | T20.24D | *(this commit)* | Implementation design closeout |
 | T20.24E | *(pending)* | `PHASE_21_COPILOT_CONTEXT.md` reconciliation |
 

@@ -1,7 +1,7 @@
 # P21.6A — Non-vector latency triage
 
 **Phase:** 21 — non-vector product track  
-**Baseline:** `4b959b4`  
+**Baseline:** `5388e4c`  
 **Status:** Triage complete, optimizations implemented
 
 ---

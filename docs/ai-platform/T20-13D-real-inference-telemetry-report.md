@@ -2,7 +2,7 @@
 
 **Status:** READ-ONLY report from T20.13C harness run  
 **Generated:** 2026-06-26  
-**Baseline SHA:** `c197285` (harness run); docs commit SHA verify at push time
+**Baseline SHA:** `bf27414` (harness run); docs commit SHA verify at push time
 
 ## Artifacts (local, not committed)
 

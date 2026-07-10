@@ -23,11 +23,11 @@ Decision: C KEEP selected, D recommended, E rejected
 
 | Step | Commit | Message |
 |------|--------|---------|
-| T20.40A | `8b4397b` | `docs(ai): T20.40A broader real-participant readiness decision design` |
-| T20.40B | `11cdb08` | `docs(ai): T20.40B N5 real-participant depth validator PASS` |
-| T20.40C-LIVE | `d6f79fa` | `feat(ai): T20.40C N5 24-window real-participant depth eval PASS` |
-| T20.40D | `2623d35` | `docs(ai): T20.40D N5 depth rollback drill PASS` |
-| T20.40E/F | `541fb88` | `docs(ai): T20.40E telemetry audit and T20.40F decision C KEEP` |
+| T20.40A | `dbe4c6c` | `docs(ai): T20.40A broader real-participant readiness decision design` |
+| T20.40B | `de2b1e5` | `docs(ai): T20.40B N5 real-participant depth validator PASS` |
+| T20.40C-LIVE | `9c9dadd` | `feat(ai): T20.40C N5 24-window real-participant depth eval PASS` |
+| T20.40D | `618540e` | `docs(ai): T20.40D N5 depth rollback drill PASS` |
+| T20.40E/F | `87e169c` | `docs(ai): T20.40E telemetry audit and T20.40F decision C KEEP` |
 | T20.40G | `(this commit)` | `docs(ai): T20.40G closeout and Phase 21 reconciliation` |
 
 ---

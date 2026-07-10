@@ -2,7 +2,7 @@
 
 **Status:** Implementation complete  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `16981ca` (owner sign-off)  
+**Baseline SHA:** `d0e8930` (owner sign-off)  
 **Image:** `python-ai-service:t20-p225b`
 
 ---

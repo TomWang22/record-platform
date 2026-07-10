@@ -1,7 +1,7 @@
 # Record Platform AI contracts (Phase 15 canonical)
 
 Generated: 2026-06-11  
-Baseline: `d0af166` / tag `rp-marketplace-release-20260611`  
+Baseline: `3023d3a` / tag `rp-marketplace-release-20260611`  
 Edge: `https://record-platform.test` (strict TLS only)
 
 This document defines the **target** AI platform contracts for Phase 15.  

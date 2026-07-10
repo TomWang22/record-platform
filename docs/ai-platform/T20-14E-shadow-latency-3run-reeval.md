@@ -2,7 +2,7 @@
 
 **Status:** Read-only evaluation  
 **Generated:** 2026-06-28  
-**Implementation SHA:** `a52baee` (T20.14D)  
+**Implementation SHA:** `6a04646` (T20.14D)  
 **Deploy image:** `python-ai-service:t20-p214` (cluster tag; rebuild + rollout restart required after D commit)
 
 ---

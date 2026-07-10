@@ -1,7 +1,7 @@
 # T20.11A — Node coverage manifest extension
 
 **Generated:** 2026-06-25  
-**Baseline SHA:** `f3bc531` (`docs(release): draft Phase 20 AI hardening notes`)  
+**Baseline SHA:** `33b99aa` (`docs(release): draft Phase 20 AI hardening notes`)  
 **Implementation SHA:** see commit `chore(ci): extend service coverage manifest`  
 **Mode:** coverage config/docs only — no product behavior changes
 

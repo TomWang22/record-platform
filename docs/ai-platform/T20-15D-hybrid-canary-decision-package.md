@@ -3,7 +3,7 @@
 **Status:** Decision complete  
 **Generated:** 2026-06-29  
 **Image:** `python-ai-service:t20-p215b2`  
-**SHA:** `cd12a85`
+**SHA:** `89cf785`
 
 ---
 

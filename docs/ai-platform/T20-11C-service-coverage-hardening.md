@@ -1,7 +1,7 @@
 # T20.11C — Service coverage hardening audit
 
 **Generated:** 2026-06-25  
-**Baseline SHA:** `b39a5d3` (`chore(ci): dry wire node service coverage runners`)  
+**Baseline SHA:** `e379a1e` (`chore(ci): dry wire node service coverage runners`)  
 **Audit SHA:** see commit `docs(ci): document Phase 20 service coverage hardening`  
 **Mode:** docs/audit only — no product behavior changes  
 **Vector rollout:** NOT APPROVED
@@ -22,8 +22,8 @@
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| **T20.11A** | `4f52a46` | Extended manifest to 18 services (manifest v1.1); 5 new Node entries |
-| **T20.11B** | `b39a5d3` | Dry-wired `run-service-coverage.sh` for 4 Node services (manifest v1.2) |
+| **T20.11A** | `44a8902` | Extended manifest to 18 services (manifest v1.1); 5 new Node entries |
+| **T20.11B** | `e379a1e` | Dry-wired `run-service-coverage.sh` for 4 Node services (manifest v1.2) |
 | **T20.11C** | _(this doc)_ | Stability audit and closeout documentation |
 
 ---
@@ -72,7 +72,7 @@ Dry-wire line percentages are **informational only**. None of these services blo
 
 ## Enforcement result
 
-Audit commands run at baseline `b39a5d3`:
+Audit commands run at baseline `e379a1e`:
 
 ```bash
 bash scripts/coverage/run-service-coverage.sh python-ai-service

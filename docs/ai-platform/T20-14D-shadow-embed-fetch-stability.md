@@ -2,7 +2,7 @@
 
 **Status:** IMPLEMENTED  
 **Generated:** 2026-06-28  
-**Baseline SHA:** `aaf4a82` (pre-implementation)  
+**Baseline SHA:** `e765207` (pre-implementation)  
 **Implementation SHA:** verify at commit time
 
 ---

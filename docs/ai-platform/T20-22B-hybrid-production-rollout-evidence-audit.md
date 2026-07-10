@@ -2,7 +2,7 @@
 
 **Status:** Audit complete — **PASS**  
 **Generated:** 2026-07-01  
-**Plan SHA:** `18670c5` (T20.22A)  
+**Plan SHA:** `95f1cfb` (T20.22A)  
 **Image:** `python-ai-service:t20-p216b`  
 **Mode:** Audit-only — **no new live inference**
 
@@ -25,7 +25,7 @@ Only intended docs committed per ticket; `bench_logs/`, screenshots, and scratch
 | `T20-19E-extended-hybrid-soak-closeout.md` | **Present** |
 | `T20-20E-hybrid-production-decision-closeout.md` | **Present** |
 | `T20-21D-hybrid-default-rfc-closeout.md` | **Present** |
-| T20.21E context reconciliation | **Present** (`246d083` — `PHASE_21_COPILOT_CONTEXT.md`) |
+| T20.21E context reconciliation | **Present** (`7689d25` — `PHASE_21_COPILOT_CONTEXT.md`) |
 
 ---
 

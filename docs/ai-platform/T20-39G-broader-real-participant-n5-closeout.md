@@ -23,11 +23,11 @@ Decision: C KEEP selected, D recommended, E rejected
 
 | Step | Commit | Message |
 |------|--------|---------|
-| T20.39B3 | `5564507` | `feat(ai): T20.39B3 provision owner-approved internal staff participants` |
-| T20.39B RERUN | `1e0feab` | `docs(ai): T20.39B validator PASS for N=5 expansion` |
-| T20.39C-LIVE | `a19ca87` | `feat(ai): T20.39C N=5 real-participant live eval PASS` |
-| T20.39D | `fbd6574` | `docs(ai): T20.39D rollback drill PASS` |
-| T20.39E/F | `4f29b00` | `docs(ai): T20.39E telemetry audit and T20.39F decision C KEEP` |
+| T20.39B3 | `82736a3` | `feat(ai): T20.39B3 provision owner-approved internal staff participants` |
+| T20.39B RERUN | `65c2b78` | `docs(ai): T20.39B validator PASS for N=5 expansion` |
+| T20.39C-LIVE | `a50e7de` | `feat(ai): T20.39C N=5 real-participant live eval PASS` |
+| T20.39D | `25e5865` | `docs(ai): T20.39D rollback drill PASS` |
+| T20.39E/F | `e5e1d07` | `docs(ai): T20.39E telemetry audit and T20.39F decision C KEEP` |
 | T20.39G | `(this commit)` | `docs(ai): T20.39G closeout and Phase 21 reconciliation` |
 
 ---

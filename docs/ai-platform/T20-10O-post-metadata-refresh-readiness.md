@@ -1,7 +1,7 @@
 # T20.10O — Post notification-metadata refresh readiness re-evaluation
 
 **Generated:** 2026-06-23  
-**Baseline SHA:** `2cdbf26` (T20.10N metadata-only refresh)  
+**Baseline SHA:** `85d6417` (T20.10N metadata-only refresh)  
 **Mode:** read-only — no embeddings, no metadata writes, no vector default flip  
 **Preceding work:** T20.9 Tranche 3 actual, T20.10J overlap audit, T20.10K entity aliases, T20.10L notification normalization, T20.10N contract-user metadata refresh
 
@@ -24,7 +24,7 @@ Keyword retrieval remains the correct production default. T20.10N improved notif
 | Shadow–keyword overlap | meaningful overlap | **12/16 zero-overlap** | **FAIL** |
 | Tranche rerun guard | exit 2 on lock | unchanged (T20.7R / T20.9 lock) | **PASS** |
 
-## Delta vs T20.10F (`e891edf`)
+## Delta vs T20.10F (`c6e7f5c`)
 
 | Metric | T20.10F | T20.10O | Change |
 |--------|--------:|--------:|--------|
@@ -41,7 +41,7 @@ Keyword retrieval remains the correct production default. T20.10N improved notif
 | doc-overlap >0 | n/a | **4/16** | — |
 | entity-overlap >0 | n/a | **4/16** | — |
 
-## Delta vs T20.9 post-tranche (`1f72c60` era)
+## Delta vs T20.9 post-tranche (`e1e411f` era)
 
 | Metric | T20.9 post-tranche | T20.10O | Change |
 |--------|-------------------:|--------:|--------|
@@ -130,7 +130,7 @@ Artifact: `bench_logs/ai-platform/t19-6-route-shadow-quality.md`
 | message_embeddings | **0** |
 | proxy_leaks (contract audit) | **0** |
 
-## Validation bundle (all PASS on `2cdbf26`)
+## Validation bundle (all PASS on `85d6417`)
 
 ```text
 BENCH_REQUIRE_OLLAMA_WARM=1 BENCH_WARMUP_RUNS=1 bash scripts/rp-ai-shadow-real-query-timing.sh

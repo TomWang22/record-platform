@@ -2,8 +2,8 @@
 
 **Status:** Docs-only decision package  
 **Generated:** 2026-06-27  
-**Baseline SHA:** `590494e`  
-**Prior:** T20.13X/Y/Z structured record intelligence (`73b9b5b`–`590494e`)
+**Baseline SHA:** `c389f16`  
+**Prior:** T20.13X/Y/Z structured record intelligence (`173e928`–`c389f16`)
 
 ---
 

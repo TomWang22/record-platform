@@ -1,7 +1,7 @@
 # T20.10K — Metadata/entity-linking parity hardening
 
 **Generated:** 2026-06-23  
-**Accepted main:** `e3aa883` (T20.10J audit)  
+**Accepted main:** `3bf156b` (T20.10J audit)  
 **Mode:** audit-first + targeted diagnostics patch  
 **Vector rollout:** NOT APPROVED
 

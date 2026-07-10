@@ -1,7 +1,7 @@
 # Phase 22B — real-inference response + transport validator
 
 **Validated:** 2026-07-05  
-**Validator commit baseline:** `21f46c4` (Phase 22A) → this document lands with Phase 22B commit  
+**Validator commit baseline:** `fb44a8f` (Phase 22A) → this document lands with Phase 22B commit  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 
 ---
@@ -25,8 +25,8 @@ Protocol response smoke: 15/15 PASS
 ## 2. Baseline
 
 ```text
-Phase 21: CLOSED PASS / ARCHIVED @ 328161d
-Phase 22A: COMPLETE @ 21f46c4
+Phase 21: CLOSED PASS / ARCHIVED @ 1422152
+Phase 22A: COMPLETE @ fb44a8f
 Artifact SHA256: 1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa
 Cumulative live matrix: 57105/57105 HTTP 200, 0% fallback (HTTP/1.1 only)
 Hybrid/vector production default: NOT APPROVED
@@ -41,7 +41,7 @@ bash scripts/verify-phase-21-archive-readonly.sh
 ```
 
 ```text
-current_head_short=21f46c4
+current_head_short=fb44a8f
 artifact_sha256=1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa
 PASS: Phase 21 archive read-only verification
 ```

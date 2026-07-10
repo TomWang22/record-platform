@@ -2,7 +2,7 @@
 
 **Status:** Complete — verification-only  
 **Generated:** 2026-06-29  
-**Baseline SHA:** `73fa7d7` (T20.15Q)  
+**Baseline SHA:** `836e6b9` (T20.15Q)  
 **Image:** `python-ai-service:t20-p215f` (unchanged — no runtime code changes)  
 **Parent:** T20.15Q design
 

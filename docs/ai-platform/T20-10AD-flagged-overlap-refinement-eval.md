@@ -1,7 +1,7 @@
 # T20.10AD — Flagged shadow overlap refinement evaluation
 
 **Generated:** 2026-06-25  
-**Baseline SHA:** `4bcbf51` (T20.10AC flagged shadow overlap refinements)  
+**Baseline SHA:** `2f8d227` (T20.10AC flagged shadow overlap refinements)  
 **Mode:** read-only evaluation — no code, flag default, or rollout changes  
 **Vector rollout:** NOT APPROVED
 
@@ -36,7 +36,7 @@ No committed env/config enables flags by default.
 ## Default/off vs flagged/on (T20.10AD confirmatory benchmarks)
 
 **Harness:** `BENCH_REQUIRE_OLLAMA_WARM=1 BENCH_WARMUP_RUNS=1`  
-**Baseline SHA at run time:** `4bcbf51`  
+**Baseline SHA at run time:** `2f8d227`  
 **Artifacts (local, not committed):**
 
 | Run | Artifact |

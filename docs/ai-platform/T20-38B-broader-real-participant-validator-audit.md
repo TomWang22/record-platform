@@ -2,7 +2,7 @@
 
 **Status:** Validator **PASS**  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `3c6623a`  
+**Baseline SHA:** `8cf12b6`  
 **Artifact:** `docs/ai-platform/T20-35-owner-approved-real-preview-participants.md`
 
 ---
@@ -12,7 +12,7 @@
 | Check | Result |
 |-------|--------|
 | Automated validator | **PASS** (`scripts/audit-real-participant-artifact.sh`) |
-| Baseline comparison | **PASS** (unchanged since T20.37B, `6858a38`) |
+| Baseline comparison | **PASS** (unchanged since T20.37B, `156e54f`) |
 | Artifact SHA256 | `2f540e4b01fa1a5e8ea4eafbe4d2e86f9cd27007307176574d2cb5a8f69166c1` |
 | Complete rows | **PASS** (3/3) |
 | Staging/test cohort excluded | **PASS** |

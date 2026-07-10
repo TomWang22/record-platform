@@ -27,9 +27,9 @@ T20.23A: NOT STARTED
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| T20.22A | `18670c5` | Hybrid production rollout design |
-| T20.22B | `862dfa4` | Evidence audit + sign-off inventory |
-| T20.22C | `a58b8a9` | Rollout decision package (B selected, rollout NOT APPROVED) |
+| T20.22A | `95f1cfb` | Hybrid production rollout design |
+| T20.22B | `85071f5` | Evidence audit + sign-off inventory |
+| T20.22C | `e324fd8` | Rollout decision package (B selected, rollout NOT APPROVED) |
 | T20.22D | *(this commit)* | Rollout design closeout |
 | T20.22E | *(pending)* | `PHASE_21_COPILOT_CONTEXT.md` reconciliation |
 

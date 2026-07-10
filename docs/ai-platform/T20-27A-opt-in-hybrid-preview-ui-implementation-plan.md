@@ -2,7 +2,7 @@
 
 **Status:** Plan complete — **UI implementation authorized** (T20.27A–H)  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `7f005f2` (T20.26E closeout)  
+**Baseline SHA:** `d2036e5` (T20.26E closeout)  
 **Image:** `python-ai-service:t20-p225b` (unchanged)  
 **Parent:** T20.26D decision B + C recommended; owner approval for T20.27A–H UI implementation
 

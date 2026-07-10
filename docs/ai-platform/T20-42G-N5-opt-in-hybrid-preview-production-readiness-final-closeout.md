@@ -24,12 +24,12 @@ Phase 21: production-readiness-closeout-ready for opt-in preview at PERCENT=0
 
 | Step | Commit | Message |
 |------|--------|---------|
-| T20.42A | `6c7fb38` | `docs(ai): T20.42A N5 production-readiness closeout design` |
-| T20.42B | `d8be867` | `docs(ai): T20.42B N5 production-readiness closeout validator PASS` |
-| T20.42C-LIVE | `e042731` | `feat(ai): T20.42C N5 production-readiness final verification PASS` |
-| T20.42D | `33d41dd` | `docs(ai): T20.42D final rollback drill PASS` |
-| T20.42E/F | `6c5072b` | `docs(ai): T20.42E telemetry audit and T20.42F decision C KEEP` |
-| T20.42G | `347d09d` | `docs(ai): T20.42G final closeout and Phase 21 reconciliation` |
+| T20.42A | `1112e14` | `docs(ai): T20.42A N5 production-readiness closeout design` |
+| T20.42B | `58c48af` | `docs(ai): T20.42B N5 production-readiness closeout validator PASS` |
+| T20.42C-LIVE | `275817b` | `feat(ai): T20.42C N5 production-readiness final verification PASS` |
+| T20.42D | `19f22fb` | `docs(ai): T20.42D final rollback drill PASS` |
+| T20.42E/F | `b813e3a` | `docs(ai): T20.42E telemetry audit and T20.42F decision C KEEP` |
+| T20.42G | `2478517` | `docs(ai): T20.42G final closeout and Phase 21 reconciliation` |
 
 ---
 

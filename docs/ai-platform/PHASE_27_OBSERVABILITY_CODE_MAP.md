@@ -1,6 +1,6 @@
 # Phase 27 — Observability Code Map
 
-Map from Phase 27 documents → code → drill → guards → operational status. Controlled local/dev enablement closed at `15d8d08`; this doc is explanatory only.
+Map from Phase 27 documents → code → drill → guards → operational status. Controlled local/dev enablement closed at `d289d0e`; this doc is explanatory only.
 
 Archive: `PHASE_27_OBSERVABILITY_OPERATIONAL_ENABLEMENT_ARCHIVE.md`  
 Operator guide: `PHASE_27_OBSERVABILITY_OPERATOR_GUIDE.md`

@@ -1,7 +1,7 @@
 # T20.10G — Shadow ranking / overlap alignment
 
 **Generated:** 2026-06-22  
-**Baseline SHA:** `6c427206918f0eb54124aacba8acb02dc3475cca` (post T20.9 results doc)  
+**Baseline SHA:** `88726ba840630c81b5ee0a21025c9c2c3b31360f` (post T20.9 results doc)  
 **Mode:** shadow-only diagnostics — no vector default flip, no keyword changes
 
 ## Executive summary

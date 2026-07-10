@@ -1,7 +1,7 @@
 # P21.5B — AI quality telemetry acceptance
 
 **Generated:** 2026-06-28  
-**Baseline SHA:** `92c293d` (P21.5A reporter)  
+**Baseline SHA:** `edf0f11` (P21.5A reporter)  
 **Design:** `docs/ai-platform/P21-5A-ai-quality-telemetry-design.md`
 
 ---

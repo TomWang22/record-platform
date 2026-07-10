@@ -1,7 +1,7 @@
 # P21.5A — AI quality telemetry design
 
 **Phase:** 21 — non-vector product track  
-**Baseline:** `6e6f91e`  
+**Baseline:** `4ae294e`  
 **Status:** Design + local reporter implemented
 
 ---

@@ -2,8 +2,8 @@
 
 **Status:** Eval complete — **PASS**  
 **Generated:** 2026-06-30  
-**Plan SHA:** `ad59260` (T20.17B preflight)  
-**Eval SHA:** `ad59260`  
+**Plan SHA:** `83769d7` (T20.17B preflight)  
+**Eval SHA:** `83769d7`  
 **Image:** `python-ai-service:t20-p216b`
 
 ---

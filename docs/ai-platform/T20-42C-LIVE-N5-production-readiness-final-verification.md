@@ -2,7 +2,7 @@
 
 **Status:** C-LIVE **PASS**  
 **Generated:** 2026-07-04  
-**Baseline SHA:** `d8be867`  
+**Baseline SHA:** `58c48af`  
 **Participant artifact SHA256:** `1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa`  
 **Summary artifact:** `bench_logs/ai-platform/t20-42c-n5-production-readiness-final-verification-eval/20260704-232144/summary.json`
 

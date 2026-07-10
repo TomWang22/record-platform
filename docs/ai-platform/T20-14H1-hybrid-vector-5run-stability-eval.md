@@ -3,8 +3,8 @@
 **Status:** Eval complete  
 **Generated:** 2026-06-29  
 **Deploy tag:** `python-ai-service:t20-p214g3r`  
-**Baseline SHA:** `521dee8` (H0 gate design)  
-**Implementation SHA:** `cbe764a` (G3R overlap tuning)
+**Baseline SHA:** `9f3f7cf` (H0 gate design)  
+**Implementation SHA:** `cc3fb42` (G3R overlap tuning)
 
 ---
 

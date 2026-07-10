@@ -2,8 +2,8 @@
 
 **Status:** **COMPLETE** — owner/product sign-off verified  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `b722c4f` (pre-sign-off block)  
-**Sign-off commit SHA:** `16981ca`  
+**Baseline SHA:** `a90e008` (pre-sign-off block)  
+**Sign-off commit SHA:** `d0e8930`  
 **Current SHA (post verification):** pending commit A  
 **Image:** `python-ai-service:t20-p216b` (unchanged until T20.25B deploy)
 
@@ -17,7 +17,7 @@
 | Approver name | Tom Wang / repository owner |
 | Approver role | Owner / Product |
 | Date (UTC) | 2026-07-01 |
-| Baseline SHA | `b722c4f` |
+| Baseline SHA | `a90e008` |
 | Approval reference | Owner chat instruction recorded in artifact |
 
 ## 2. Approved scope (verified)

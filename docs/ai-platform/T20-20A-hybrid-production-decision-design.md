@@ -2,7 +2,7 @@
 
 **Status:** Design complete (docs only — **not** rollout approval)  
 **Generated:** 2026-06-30  
-**Baseline SHA:** `24a3247` (T20.19E closeout)  
+**Baseline SHA:** `9bf192c` (T20.19E closeout)  
 **Image:** `python-ai-service:t20-p216b` (unchanged)  
 **Parent:** T20.19D decision (B selected; D recommended → this production-decision package)
 

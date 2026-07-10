@@ -2,7 +2,7 @@
 
 **Status:** Validator **PASS**  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `81cb044`  
+**Baseline SHA:** `cb22969`  
 **Artifact:** `docs/ai-platform/T20-35-owner-approved-real-preview-participants.md`
 
 ---

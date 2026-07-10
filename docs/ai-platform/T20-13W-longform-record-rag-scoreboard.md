@@ -1,7 +1,7 @@
 # T20.13W — Long-form record RAG scoreboard
 
 **Generated:** 2026-06-27  
-**Baseline SHA:** `8f30fb5` (harness); successful run after response-matching fix  
+**Baseline SHA:** `44412e3` (harness); successful run after response-matching fix  
 **Primary artifact:** `bench_logs/ai-platform/longform-rag-session/20260627-041713/`  
 **First run (UI timeout on long prompts):** `20260627-040930/` — turns 10–12 hit 120s Playwright wait (exact POST body match); API completed same prompts in ~500ms.
 

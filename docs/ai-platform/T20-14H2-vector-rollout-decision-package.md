@@ -2,9 +2,9 @@
 
 **Status:** Decision package complete  
 **Generated:** 2026-06-29  
-**Baseline SHA:** `521dee8` (H0) + H1 eval  
+**Baseline SHA:** `9f3f7cf` (H0) + H1 eval  
 **Deploy image:** `python-ai-service:t20-p214g3r`  
-**Implementation:** `cbe764a` (G3R)
+**Implementation:** `cc3fb42` (G3R)
 
 ---
 

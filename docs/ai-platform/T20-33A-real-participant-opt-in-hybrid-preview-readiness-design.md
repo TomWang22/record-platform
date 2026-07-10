@@ -2,7 +2,7 @@
 
 **Status:** Design complete — live eval **blocked** pending owner-approved participant artifacts  
 **Generated:** 2026-07-02  
-**Baseline SHA:** `71ffb97`  
+**Baseline SHA:** `155c36b`  
 **Webapp:** `webapp:t20-p227b`  
 **Python:** `python-ai-service:t20-p225b`
 

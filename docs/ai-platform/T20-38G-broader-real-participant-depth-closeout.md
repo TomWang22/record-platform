@@ -9,11 +9,11 @@
 
 | Ticket | Description |
 |--------|-------------|
-| T20.38B | `cfbc796` — validator PASS, artifact unchanged for Option B, preflight PASS |
-| T20.38C | `71d3465` — live eval PASS 4320/4320 + `t20-38c-broader-real-participant-depth-soak-eval.py` |
-| T20.38D | `a75fee3` — rollback drill PASS |
-| T20.38E/F | `2501331` — telemetry + decision |
-| T20.38G/H | `9b06997` — closeout + Phase 21 |
+| T20.38B | `8931b10` — validator PASS, artifact unchanged for Option B, preflight PASS |
+| T20.38C | `da9bf47` — live eval PASS 4320/4320 + `t20-38c-broader-real-participant-depth-soak-eval.py` |
+| T20.38D | `adc55a4` — rollback drill PASS |
+| T20.38E/F | `925de55` — telemetry + decision |
+| T20.38G/H | `9cffe88` — closeout + Phase 21 |
 
 ## Images & env
 

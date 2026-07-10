@@ -2,7 +2,7 @@
 
 **Status:** Docs-only runway map  
 **Generated:** 2026-06-27  
-**Baseline SHA:** `40bb4c1`
+**Baseline SHA:** `e0e86f1`
 
 ---
 
@@ -65,7 +65,7 @@ Phase 21 — only after T20.15 succeeds OR vector explicitly deferred
 |--------|-------|------|
 | T20.13K-R | Release-note wording cleanup | Anytime, docs-only |
 | ANN index ops ticket | HNSW design from T20.13L Option D | Parallel to T20.13O |
-| T20.13K | Post-synthesis closeout | **Complete** (`40bb4c1`) |
+| T20.13K | Post-synthesis closeout | **Complete** (`e0e86f1`) |
 | T20.13L/M/N | Blocker plans + runway | **This doc set** |
 
 **Explicitly not in sequence without approval:**

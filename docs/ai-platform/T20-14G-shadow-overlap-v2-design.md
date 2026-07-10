@@ -2,7 +2,7 @@
 
 **Status:** Design only — no implementation  
 **Generated:** 2026-06-28  
-**Baseline SHA:** `d7cd4c3` (T20.14F2 ANN dev experiment complete)  
+**Baseline SHA:** `352fa2d` (T20.14F2 ANN dev experiment complete)  
 **Mode:** Read-only analysis; no code, DB, index, or rollout changes
 
 ---

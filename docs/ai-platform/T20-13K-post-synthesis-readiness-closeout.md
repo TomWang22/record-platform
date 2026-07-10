@@ -2,7 +2,7 @@
 
 **Status:** Docs / read-only closeout  
 **Generated:** 2026-06-26  
-**Baseline SHA:** `9e26955`  
+**Baseline SHA:** `066ef6e`  
 **Supersedes:** T20.13 comprehensive re-eval (pre-synthesis product state)
 
 ---

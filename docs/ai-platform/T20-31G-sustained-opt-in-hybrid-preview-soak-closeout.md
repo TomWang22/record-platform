@@ -9,13 +9,13 @@
 
 | Ticket | SHA | Description |
 |--------|-----|-------------|
-| T20.31A | `3f3f526` | Sustained soak design |
-| T20.31B | `8013bc2` | Preflight PASS |
-| T20.31B e2e | `2f57ab2` | Playwright revoke gate stabilization |
-| T20.31C | `ed8f590` | Live soak 6480/6480 |
-| T20.31D | `5a88969` | Rollback drill |
-| T20.31E/F | `c5f8531` / `52e15bd` | Telemetry + decision C |
-| T20.31G/H | `711c85e` / `d6f4e59` | Closeout + Phase 21 |
+| T20.31A | `adb3e11` | Sustained soak design |
+| T20.31B | `ef160e8` | Preflight PASS |
+| T20.31B e2e | `ecfa384` | Playwright revoke gate stabilization |
+| T20.31C | `4c3d306` | Live soak 6480/6480 |
+| T20.31D | `5386506` | Rollback drill |
+| T20.31E/F | `63bf15e` / `1e2a724` | Telemetry + decision C |
+| T20.31G/H | `46372f0` / `f60a518` | Closeout + Phase 21 |
 
 ## Images
 

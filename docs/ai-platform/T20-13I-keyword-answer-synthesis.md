@@ -1,7 +1,7 @@
 # T20.13I — Keyword answer synthesis implementation
 
 **Status:** Implemented  
-**Baseline SHA:** `286904a`  
+**Baseline SHA:** `d9a0a89`  
 **Branch main after commit:** verify at push
 
 ## Summary

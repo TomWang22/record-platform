@@ -2,7 +2,7 @@
 
 **Status:** Live smoke **PASS**  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `532b239`  
+**Baseline SHA:** `2aad8bd`  
 **Image:** `python-ai-service:t20-p225b`  
 **Artifact:** `bench_logs/ai-platform/t20-25d-preview-eval/` (latest 1-window run)
 

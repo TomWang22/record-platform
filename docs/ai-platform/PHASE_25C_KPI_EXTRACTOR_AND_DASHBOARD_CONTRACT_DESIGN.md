@@ -14,7 +14,7 @@ Every artifact shares this envelope:
 ```json
 {
   "generated_at": "2026-07-07T18:00:00Z",
-  "git_sha": "c21c2ae",
+  "git_sha": "4d5b11b",
   "artifact_sha": "1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa",
   "environment": "readonly-design",
   "source": "phase25-design-contract",

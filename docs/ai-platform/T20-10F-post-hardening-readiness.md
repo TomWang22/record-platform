@@ -1,7 +1,7 @@
 # T20.10F — Post-hardening vector readiness re-evaluation (read-only)
 
 **Generated:** 2026-06-22
-**Baseline SHA:** `e891edf4bd2ef64cf8f5e1ef4d572712a6620c91`
+**Baseline SHA:** `c6e7f5c6f126338531b6c592286ce897c140c1a5`
 **Mode:** read-only — no embeddings, no product behavior changes, no vector default flip
 **Preceding hardening:** T20.10C (selection), T20.10D (OBO corpus repair), T20.10E (embed latency diagnostics)
 
@@ -26,7 +26,7 @@ Keyword retrieval remains the correct production default. Latency and OBO owner-
 | Coverage gate (python-ai) | ≥90% `app/ai/*` | **91.53%** | **PASS** |
 | Tranche rerun guard | exit 2 on lock | unchanged (T20.7R) | **PASS** |
 
-## Delta vs T20.8 (`8633149`)
+## Delta vs T20.8 (`fb6bed6`)
 
 | Metric | T20.8 | T20.10F | Change |
 |--------|------:|--------:|--------|
@@ -86,7 +86,7 @@ Artifact: `bench_logs/ai-platform/t19-6-route-shadow-quality.md`
 | message_embeddings | 0 |
 | proxy/forbidden in embedded content | 0 |
 
-## Validation bundle (all PASS on `e891edf`)
+## Validation bundle (all PASS on `c6e7f5c`)
 
 ```text
 bash scripts/rp-ai-shadow-real-query-timing.sh          # BENCH_WARMUP_RUNS=1

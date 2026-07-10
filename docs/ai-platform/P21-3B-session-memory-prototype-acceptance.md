@@ -1,7 +1,7 @@
 # P21.3B — Session memory prototype acceptance
 
 **Generated:** 2026-06-27  
-**Baseline SHA:** `0116091` (pre P21.3 commits)  
+**Baseline SHA:** `432ef8f` (pre P21.3 commits)  
 **Design:** `docs/ai-platform/P21-3A-session-memory-design.md`
 
 ---

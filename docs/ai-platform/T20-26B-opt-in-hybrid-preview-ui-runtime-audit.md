@@ -2,7 +2,7 @@
 
 **Status:** Runtime/API audit **PASS**  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `40cfdca` (T20.26A)  
+**Baseline SHA:** `50bc1f3` (T20.26A)  
 **Image:** `python-ai-service:t20-p225b` (unchanged)
 
 ---

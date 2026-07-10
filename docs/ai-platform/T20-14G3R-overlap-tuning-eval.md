@@ -32,7 +32,7 @@ Latency: runs 2–3 **PASS** (shadow p95 **132 / 126 ms**). Run 1 shows a cold-e
 | 2 | `bench_logs/ai-platform/t20-10-shadow-real-query-20260629-115446.jsonl` | `...115446.md` |
 | 3 | `bench_logs/ai-platform/t20-10-shadow-real-query-20260629-115458.jsonl` | `...115458.md` |
 
-- Implementation SHA: `cbe764a`
+- Implementation SHA: `cc3fb42`
 - Deploy image: `python-ai-service:t20-p214g3r`
 - Source diagnostic: `bench_logs/ai-platform/t19-6-route-shadow-quality.md` — PASS
 - Product telemetry: `bench_logs/ai-platform/quality-telemetry/20260629155553.md` — 0 WARNs

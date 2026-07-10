@@ -21,22 +21,22 @@ Current repo tip:
 - Do not infer current repo tip from this file.
 
 Phase handoff lineage:
-- Phase 23A operations-design commit: 77af124
-- Phase 23A metadata-sync commit: 6442d87
-- Phase 23B context-archive verifier hardening commit: 304277a
-- Phase 23 context-continuity guardrail closeout commit: 6f3d2bd
-- Phase 24 KPI observability read-only closeout commit: c21c2ae
-- Phase 25 observability instrumentation design closeout commit: 3fc3be4
-- Phase 26A observability schema/no-op closeout commit: edb7570
-- Phase 26B ingestion KPI instrumentation closeout commit: b243699
-- Phase 26C searchability verification probe closeout commit: eb7079a
-- Phase 26D query observation instrumentation closeout commit: 104979c
-- Phase 26E usefulness observation export closeout commit: 883cb61
+- Phase 23A operations-design commit: 2223168
+- Phase 23A metadata-sync commit: 0e8e6d2
+- Phase 23B context-archive verifier hardening commit: 8316b60
+- Phase 23 context-continuity guardrail closeout commit: 210df98
+- Phase 24 KPI observability read-only closeout commit: 4d5b11b
+- Phase 25 observability instrumentation design closeout commit: 7d054ad
+- Phase 26A observability schema/no-op closeout commit: e40683e
+- Phase 26B ingestion KPI instrumentation closeout commit: e75b6d2
+- Phase 26C searchability verification probe closeout commit: 7746b45
+- Phase 26D query observation instrumentation closeout commit: 5d8c82e
+- Phase 26E usefulness observation export closeout commit: 6500730
 
 Frozen archive heads:
-- Phase 22 archive HEAD: 5588779
-- Phase 21 archive checkpoint: 328161d
-- Phase 21 pre-archive validation HEAD: bd76875
+- Phase 22 archive HEAD: 7257380
+- Phase 21 archive checkpoint: 1422152
+- Phase 21 pre-archive validation HEAD: 2eb1606
 
 Phase 21: CLOSED PASS / ARCHIVED
 Phase 22: CLOSED PASS — full labeled protocol parity
@@ -54,7 +54,7 @@ Phase 26H: PASS — archive/explainer docs only (no runtime changes)
 Phase 26H: archive/explainer docs PASS — current Phase 26 source of truth is PHASE_26_OBSERVABILITY_IMPLEMENTATION_ARCHIVE.md plus ACTIVE_CONTEXT.md.
 Phase 26I: PASS — archive consistency / supersession notes (historical closeouts clarified; no runtime changes)
 Phase 26J: PASS — archive supersession guard (read-only; prevents historical-snapshot drift)
-Phase 26: CLOSED PASS — observability implementation batch (closeout 4409ffc)
+Phase 26: CLOSED PASS — observability implementation batch (closeout f09a9ef)
 Phase 27A: PASS — observability operational enablement roadmap (design only)
 Phase 27B: PASS — local/dev KPI schema apply verification
 Phase 27C: PASS — controlled KPI flag enablement drill (process env only)

@@ -1,7 +1,7 @@
 # T20.10U — pgvector candidate-fetch EXPLAIN diagnostics
 
 **Generated:** 2026-06-24  
-**Baseline SHA:** `02e80cb` (T20.10T benchmark hardening)  
+**Baseline SHA:** `d78e1e4` (T20.10T benchmark hardening)  
 **Mode:** read-only — no indexes, no product behavior changes  
 **Vector rollout:** NOT APPROVED
 

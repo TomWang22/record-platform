@@ -1,7 +1,7 @@
 # T20.13U — Protocol + pipeline RAG acceptance
 
 **Generated:** 2026-06-27  
-**Baseline SHA:** `6876e64` (includes T20.13T auction fix)  
+**Baseline SHA:** `dac8b72` (includes T20.13T auction fix)  
 **Prior:** T20.13R/S record-intelligence UI acceptance  
 **Artifacts (local, not committed):**
 

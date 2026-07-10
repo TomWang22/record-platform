@@ -1,7 +1,7 @@
 # T20.10AB — Shadow overlap refinement proposal (design-only)
 
 **Generated:** 2026-06-25  
-**Baseline SHA:** `37071f8` (T20.10AA shadow keyword overlap deep dive)  
+**Baseline SHA:** `61a0bae` (T20.10AA shadow keyword overlap deep dive)  
 **Mode:** design-only — no product behavior changes  
 **Vector rollout:** NOT APPROVED
 

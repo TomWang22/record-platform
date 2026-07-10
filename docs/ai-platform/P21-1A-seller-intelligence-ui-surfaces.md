@@ -1,7 +1,7 @@
 # P21.1A — Seller intelligence UI surfaces
 
 **Status:** Implemented  
-**Baseline SHA:** `aa83411` (P21.0 charter)  
+**Baseline SHA:** `78c3b1a` (P21.0 charter)  
 **Phase:** 21 — non-vector product track
 
 ---

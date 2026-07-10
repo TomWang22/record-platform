@@ -1,7 +1,7 @@
 # Phase 20 — Copilot / agent context (Record Platform AI)
 
 **Last updated:** 2026-06-26 (T20.13K post-synthesis closeout)  
-**Current main SHA:** `9e26955` (verify at commit time)  
+**Current main SHA:** `066ef6e` (verify at commit time)  
 **Phase 20 status:** **HARDENING CLOSED** — embedding tranche ops allowed only with explicit approval per tranche; **≥10k count gate complete**  
 **Audience:** GitHub Copilot, Cursor, and other coding agents working on `record-platform`
 
@@ -67,9 +67,9 @@ Allowed work only with explicit approval:
 
 | Branch | Closed at | Doc |
 |--------|-----------|-----|
-| T20.10 shadow overlap / latency | **T20.10AG** (`40fabfc`) | `docs/ai-platform/T20-10AG-flagged-overlap-stability-eval.md` |
-| T20.11 coverage hardening | **T20.11C** (`38f9030`) | `docs/ai-platform/T20-11C-service-coverage-hardening.md` |
-| T20.17 release note | **T20.17** (`f3bc531`) | `docs/release/rp-ai-phase-20-hardening-20260625.md` |
+| T20.10 shadow overlap / latency | **T20.10AG** (`ffff38a`) | `docs/ai-platform/T20-10AG-flagged-overlap-stability-eval.md` |
+| T20.11 coverage hardening | **T20.11C** (`65fda93`) | `docs/ai-platform/T20-11C-service-coverage-hardening.md` |
+| T20.17 release note | **T20.17** (`33b99aa`) | `docs/release/rp-ai-phase-20-hardening-20260625.md` |
 
 **Active verdict unchanged:** Vector rollout **NOT APPROVED / NOT READY**. Production keyword retrieval. Phase 21 not started.
 
@@ -94,31 +94,31 @@ Allowed work only with explicit approval:
 
 | Ticket | SHA | What it did |
 |--------|-----|-------------|
-| **T20.6** | `655ffee` | CI/coverage hardening: manifest, runner/enforcer, python-ai pytest-cov ≥90% on `app/ai/*` |
-| **T20.7** | `655ffee` (DB) | Bounded Tranche 2: +500 embeddings (4,549 → 5,049) |
-| **T20.7R** | `8633149` | Rerun guard hardening: lock blocks exit **2** |
-| **T20.8** | `3aba170` | Read-only vector rollout readiness eval → **NOT READY** |
+| **T20.6** | `6a922c0` | CI/coverage hardening: manifest, runner/enforcer, python-ai pytest-cov ≥90% on `app/ai/*` |
+| **T20.7** | `6a922c0` (DB) | Bounded Tranche 2: +500 embeddings (4,549 → 5,049) |
+| **T20.7R** | `fb6bed6` | Rerun guard hardening: lock blocks exit **2** |
+| **T20.8** | `1732d90` | Read-only vector rollout readiness eval → **NOT READY** |
 
 ### T20.10 shadow overlap / latency branch (closed)
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| **T20.10O** | `16d4d43` | Post notification-metadata refresh readiness eval; rollout NOT APPROVED |
-| **T20.10P** | `8ecfb94` | Shadow latency diagnostics |
-| **T20.10T** | `02e80cb` | Shadow benchmark timing hardening |
-| **T20.10U** | `3ec10eb` | pgvector candidate-fetch EXPLAIN diagnostics |
-| **T20.10V** | `ad0cd22` | Shadow profile refinement proposal |
-| **T20.10W** | `b7e17b6` / `c838cda` | Scoped-first + dedupe shadow fetch strategy |
-| **T20.10X** | `8e5513d` | Source diversity regression diagnostics |
-| **T20.10Y** | `3e2a80f` / `31d300f` | Typed diversity top-ups restored 6 types |
-| **T20.10Z** | `26eb884` | Post-refinement readiness eval; rollout still NOT APPROVED |
-| **T20.10AA** | `37071f8` / `b44f27a` | Overlap deep dive + count correction |
-| **T20.10AB** | `2d7b3af` | Overlap refinement proposal |
-| **T20.10AC** | `4bcbf51` | Default-off flagged overlap refinements |
-| **T20.10AD** | `0f42c06` | Flagged overlap eval |
-| **T20.10AE** | `8468921` | Flagged latency-trim proposal |
-| **T20.10AF** | `dc8cff4` / `0a4634c` | Flagged latency trims (AF1–AF4) |
-| **T20.10AG** | `40fabfc` | Flagged overlap stability eval — **branch closed** |
+| **T20.10O** | `387bdc7` | Post notification-metadata refresh readiness eval; rollout NOT APPROVED |
+| **T20.10P** | `809eaac` | Shadow latency diagnostics |
+| **T20.10T** | `d78e1e4` | Shadow benchmark timing hardening |
+| **T20.10U** | `3c051e9` | pgvector candidate-fetch EXPLAIN diagnostics |
+| **T20.10V** | `ed64bf0` | Shadow profile refinement proposal |
+| **T20.10W** | `334443d` / `0d7aa7c` | Scoped-first + dedupe shadow fetch strategy |
+| **T20.10X** | `203a1e9` | Source diversity regression diagnostics |
+| **T20.10Y** | `e6efcd3` / `ee435ca` | Typed diversity top-ups restored 6 types |
+| **T20.10Z** | `e6e3e90` | Post-refinement readiness eval; rollout still NOT APPROVED |
+| **T20.10AA** | `61a0bae` / `250d79b` | Overlap deep dive + count correction |
+| **T20.10AB** | `692b28e` | Overlap refinement proposal |
+| **T20.10AC** | `2f8d227` | Default-off flagged overlap refinements |
+| **T20.10AD** | `472e8b3` | Flagged overlap eval |
+| **T20.10AE** | `70e54be` | Flagged latency-trim proposal |
+| **T20.10AF** | `91c2120` / `bdc310d` | Flagged latency trims (AF1–AF4) |
+| **T20.10AG** | `ffff38a` | Flagged overlap stability eval — **branch closed** |
 
 **T20.10 branch outcome:** Flagged diagnostic mode improves overlap **11/16 → 8/16** zero chunk-overlap (stable across 3 warm runs per T20.10AG). Latency acceptable on warm runs; embed variance remains conditional. **Not rollout approval.** Flags stay default off.
 
@@ -126,9 +126,9 @@ Allowed work only with explicit approval:
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| **T20.11A** | `4f52a46` | Manifest v1.1 — enumerate 18 services; 5 new Node entries; all Node non-strict |
-| **T20.11B** | `b39a5d3` | Manifest v1.2 — dry-wire runners for messaging/notification/trust/media |
-| **T20.11C** | `38f9030` | Audit — python-ai only strict gate; 4 dry-wired Node, 13 skipped — **branch closed** |
+| **T20.11A** | `44a8902` | Manifest v1.1 — enumerate 18 services; 5 new Node entries; all Node non-strict |
+| **T20.11B** | `e379a1e` | Manifest v1.2 — dry-wire runners for messaging/notification/trust/media |
+| **T20.11C** | `65fda93` | Audit — python-ai only strict gate; 4 dry-wired Node, 13 skipped — **branch closed** |
 
 **T20.11 outcome:** `python-ai-service` remains the **only strict** coverage gate (≥90% `app/ai/*`). Node dry-wire runs are **non-blocking**. See `docs/ai-platform/T20-11C-service-coverage-hardening.md`.
 
@@ -136,16 +136,16 @@ Allowed work only with explicit approval:
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| **T20.16** | `967d877` | Phase 20 copilot context refresh (post T20.10AG) |
-| **T20.17** | `f3bc531` | Phase 20 release note draft — `docs/release/rp-ai-phase-20-hardening-20260625.md` |
-| **T20.16B** | `69709c1` | Final context reconciliation after T20.11C + T20.17 |
+| **T20.16** | `caabbc0` | Phase 20 copilot context refresh (post T20.10AG) |
+| **T20.17** | `33b99aa` | Phase 20 release note draft — `docs/release/rp-ai-phase-20-hardening-20260625.md` |
+| **T20.16B** | `a44e553` | Final context reconciliation after T20.11C + T20.17 |
 | **T20.12** | `t20-tranche-12` (ops) | Tranche 12 actual: +500 embeddings (9,565 → 10,065); ≥10k count gate clears; T20.13 rollout **NOT APPROVED** |
 | **T20.13** | (eval) | Comprehensive vector rollout readiness re-eval — `docs/ai-platform/T20-13-comprehensive-vector-rollout-readiness.md` |
 | **T20.13A–B** | (docs) | Shadow zero-result/latency triage + stability fix proposal |
-| **T20.13C–D** | `bd2b607` | Live inference telemetry harness + real inference report |
-| **T20.13E–F** | `cbb4bdd` | Diagnostic embed warmup/retry; shadow fetch unblocked |
-| **T20.13G–G-S** | `a579121` | Shadow fetch/latency/overlap triage + prompt/answer quality eval (RAG 2.6/5) |
-| **T20.13H–J** | `9e26955` | Keyword synthesis proposal + implementation + eval (RAG **3.6/5**) |
+| **T20.13C–D** | `33c886f` | Live inference telemetry harness + real inference report |
+| **T20.13E–F** | `a249c14` | Diagnostic embed warmup/retry; shadow fetch unblocked |
+| **T20.13G–G-S** | `4658022` | Shadow fetch/latency/overlap triage + prompt/answer quality eval (RAG 2.6/5) |
+| **T20.13H–J** | `066ef6e` | Keyword synthesis proposal + implementation + eval (RAG **3.6/5**) |
 | **T20.13K** | (docs) | Post-synthesis readiness closeout — `docs/ai-platform/T20-13K-post-synthesis-readiness-closeout.md` |
 
 ### Phase 20 tickets NOT started (require explicit approval)
@@ -202,7 +202,7 @@ Allowed work only with explicit approval:
 ## Current system snapshot (2026-06-26, T20.13K)
 
 ```text
-Current main SHA: 9e26955 (verify at commit time)
+Current main SHA: 066ef6e (verify at commit time)
 Embedded chunks: 10,065
 Non-message chunks: 73,043
 Embedded coverage: 13.8%

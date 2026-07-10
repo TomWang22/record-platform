@@ -1,7 +1,7 @@
 # Phase 20.12 — Tranche 9 bundle flight plan (T20.12W→Z)
 
 **Status:** PLAN ONLY — **T20.12W actual write NOT APPROVED**  
-**Baseline SHA:** `0ef658e`  
+**Baseline SHA:** `7c9f147`  
 **Audience:** Cursor / Copilot agents executing embedding ladder ops
 
 ## Locked baseline

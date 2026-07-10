@@ -2,7 +2,7 @@
 
 **Status:** Design complete (docs only — **not** rollout approval)  
 **Generated:** 2026-06-30  
-**Baseline SHA:** `a999792` (T20.20E closeout)  
+**Baseline SHA:** `ab32bb0` (T20.20E closeout)  
 **Image:** `python-ai-service:t20-p216b` (unchanged)  
 **Parent:** T20.20D decision (B selected; D recommended → this RFC/sign-off batch)
 

@@ -9,13 +9,13 @@
 
 | Ticket | SHA | Description |
 |--------|-----|-------------|
-| T20.30A | `3e7aa64` | Expanded soak design |
-| T20.30B | `2b359f3` | Preflight PASS |
-| T20.30C runner | `4f94872` | Per-window reset + RAG verify |
-| T20.30C | `8a88f79` | Live soak 3240/3240 |
-| T20.30D | `bf03891` | Rollback drill |
-| T20.30E/F | `c4ecca1` | Telemetry + decision C |
-| T20.30G/H | `1275d05` + `3b3e6d5` | Closeout + Phase 21 |
+| T20.30A | `f2a99cb` | Expanded soak design |
+| T20.30B | `cd84ea9` | Preflight PASS |
+| T20.30C runner | `5eb095b` | Per-window reset + RAG verify |
+| T20.30C | `2341266` | Live soak 3240/3240 |
+| T20.30D | `43a36ef` | Rollback drill |
+| T20.30E/F | `46ec599` | Telemetry + decision C |
+| T20.30G/H | `149dec9` + `86d6c93` | Closeout + Phase 21 |
 
 ## Images
 

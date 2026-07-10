@@ -1,7 +1,7 @@
 # P21.3C — Session endpoint hardening
 
 **Generated:** 2026-06-27  
-**Baseline SHA:** `7599707` (pre P21.3C commit)  
+**Baseline SHA:** `41addbf` (pre P21.3C commit)  
 **Phase:** 21 — non-vector product track
 
 ---

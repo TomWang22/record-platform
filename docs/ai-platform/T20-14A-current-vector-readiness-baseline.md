@@ -1,7 +1,7 @@
 # T20.14A — Current vector readiness baseline
 
 **Generated:** 2026-06-28  
-**Baseline SHA:** `6ab6472` (post P21.10A; release tag @ `d0e4c58`)  
+**Baseline SHA:** `eb2ad90` (post P21.10A; release tag @ `b741f91`)  
 **Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628`  
 **Method:** Read-only diagnostics only — no vector enablement, no indexes, no tranches
 
@@ -95,7 +95,7 @@ Vector index on `embedding_vec`: **NONE** (exact sort at 10,065 rows).
 
 ---
 
-## Comparison to Phase 20 closeout (T20.13K @ 9e26955)
+## Comparison to Phase 20 closeout (T20.13K @ 066ef6e)
 
 | Metric | T20.13K | T20.14A (today) | Delta |
 | ------ | ------- | --------------- | ----- |

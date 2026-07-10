@@ -1,7 +1,7 @@
 # P21.7A — Phase 21 non-vector seller intelligence release candidate
 
 **Generated:** 2026-06-28  
-**Baseline SHA:** `515269a`  
+**Baseline SHA:** `e70c565`  
 **Charter:** `docs/ai-platform/P21-0-non-vector-seller-intelligence-charter.md`  
 **Track:** keyword retrieval + rule-engine synthesis — **not** vector rollout
 

@@ -2,7 +2,7 @@
 
 **Status:** Audit complete — **PASS**  
 **Generated:** 2026-07-01  
-**Plan SHA:** `8893087` (T20.24A)  
+**Plan SHA:** `615fce5` (T20.24A)  
 **Image:** `python-ai-service:t20-p216b`  
 **Mode:** Audit-only — **no new live inference**
 
@@ -13,7 +13,7 @@
 | Check | Result |
 |-------|--------|
 | `T20-23D-opt-in-hybrid-preview-closeout.md` | **Present** |
-| T20.23E context reconciliation (`94d5ebb`) | **Present** |
+| T20.23E context reconciliation (`7188c28`) | **Present** |
 | `T20-24A-opt-in-hybrid-preview-implementation-design.md` | **Present** (this batch) |
 | Image `t20-p216b` | **Documented** (locked state) |
 | `PERCENT=0` | **Verified** (locked state) |

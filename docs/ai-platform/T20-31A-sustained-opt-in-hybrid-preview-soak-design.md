@@ -2,7 +2,7 @@
 
 **Status:** Design approved for sustained multi-window soak evidence  
 **Generated:** 2026-07-01  
-**Baseline SHA:** `ea86436`  
+**Baseline SHA:** `9a4560f`  
 **Webapp:** `webapp:t20-p227b`  
 **Python:** `python-ai-service:t20-p225b`
 

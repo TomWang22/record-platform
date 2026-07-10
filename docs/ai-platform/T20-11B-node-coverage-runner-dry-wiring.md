@@ -1,7 +1,7 @@
 # T20.11B — Node coverage runner dry-wiring
 
 **Generated:** 2026-06-25  
-**Baseline SHA:** `4f52a46` (`chore(ci): extend service coverage manifest`)  
+**Baseline SHA:** `44a8902` (`chore(ci): extend service coverage manifest`)  
 **Implementation SHA:** see commit `chore(ci): dry wire node service coverage runners`  
 **Mode:** coverage tooling only — no product behavior changes
 

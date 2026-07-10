@@ -2,7 +2,7 @@
 
 **Status:** Design approved for broader readiness live evidence  
 **Generated:** 2026-07-02  
-**Baseline SHA:** `5dbbf2a`  
+**Baseline SHA:** `42a3316`  
 **Webapp:** `webapp:t20-p227b`  
 **Python:** `python-ai-service:t20-p225b`
 

@@ -2,7 +2,7 @@
 
 **Status:** C-LIVE **PASS**  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `1e0feab`  
+**Baseline SHA:** `65c2b78`  
 **Artifact SHA256:** `1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa`  
 **Summary artifact:** `bench_logs/ai-platform/t20-39c-broader-real-participant-n5-eval/20260704-032203/summary.json`
 

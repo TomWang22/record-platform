@@ -3,7 +3,7 @@
 **Status:** Eval complete  
 **Generated:** 2026-06-29  
 **Deploy tag:** `python-ai-service:t20-p214g2r`  
-**Baseline SHA:** `e0a1250` (G2R implementation)
+**Baseline SHA:** `d3e7a63` (G2R implementation)
 
 ---
 

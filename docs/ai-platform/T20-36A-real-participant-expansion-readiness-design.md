@@ -2,7 +2,7 @@
 
 **Status:** Design / readiness **COMPLETE** — no live eval  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `d650971`  
+**Baseline SHA:** `8af97b8`  
 **Webapp:** `webapp:t20-p227b`  
 **Python:** `python-ai-service:t20-p225b`
 
@@ -24,7 +24,7 @@ Move Phase 21 forward **without faking real-participant evidence**. T20.35A–H 
 docs/ai-platform/T20-35-owner-approved-real-preview-participants.md
 ```
 
-Owner scope approval is recorded at `d650971`. Per-participant consent remains **pending** until ≥3 rows are complete and the “Participants listed below have owner approval / consent” box is checked.
+Owner scope approval is recorded at `8af97b8`. Per-participant consent remains **pending** until ≥3 rows are complete and the “Participants listed below have owner approval / consent” box is checked.
 
 ### 2.2 Required fields per participant row
 
@@ -196,7 +196,7 @@ Example N=3: preview_opt_in = 1080, allowlist = 360, **total = 1440**.
 |--------|-------|
 | T20.35A–H | CLOSED/BLOCKED |
 | T20.35B-REBLOCKED | 0/3 complete rows recorded |
-| T20.35 scope approval | `d650971` |
+| T20.35 scope approval | `8af97b8` |
 | T20.35C-LIVE | **NOT RUN** |
 | T20.36A | Design/readiness **COMPLETE** |
 | T20.36B | **NOT STARTED** — artifact validator audit |

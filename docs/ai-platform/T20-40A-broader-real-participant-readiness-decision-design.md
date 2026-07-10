@@ -2,7 +2,7 @@
 
 **Status:** Design only — **COMPLETE**  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `1be6e51`  
+**Baseline SHA:** `f4f5ae3`  
 **Participant artifact SHA256:** `1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa`
 
 ---

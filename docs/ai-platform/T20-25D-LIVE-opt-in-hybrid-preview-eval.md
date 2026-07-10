@@ -2,7 +2,7 @@
 
 **Status:** Live eval **PASS**  
 **Generated:** 2026-07-01  
-**Implementation SHA:** `9017a81`  
+**Implementation SHA:** `025d887`  
 **Image:** `python-ai-service:t20-p225b`  
 **Artifact:** `bench_logs/ai-platform/t20-25d-preview-eval/20260701-041033/summary.json`
 

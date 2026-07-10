@@ -18,7 +18,7 @@
 
 ## Purpose
 
-Docs-only archive/explainer after Phase 28 CLOSED PASS (`4132d01`), so future agents do not confuse the **25920 controlled observability matrix** with Phase 22 full parity or production rollout.
+Docs-only archive/explainer after Phase 28 CLOSED PASS (`39d9584`), so future agents do not confuse the **25920 controlled observability matrix** with Phase 22 full parity or production rollout.
 
 ## Deliverables
 

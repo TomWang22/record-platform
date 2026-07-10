@@ -1,6 +1,6 @@
 # Phase 28 — Observability Code Map
 
-Map from Phase 28 documents → code → drills → guards → operational status. Phase 28 closed at `4132d01`; this doc is explanatory only.
+Map from Phase 28 documents → code → drills → guards → operational status. Phase 28 closed at `39d9584`; this doc is explanatory only.
 
 Archive: `PHASE_28_OBSERVABILITY_PRODUCTION_READINESS_ARCHIVE.md`  
 Operator guide: `PHASE_28_OBSERVABILITY_OPERATOR_GUIDE.md`  

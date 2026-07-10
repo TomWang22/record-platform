@@ -1,7 +1,7 @@
 # T20.10T — Shadow benchmark hardening
 
 **Generated:** 2026-06-23  
-**Baseline SHA:** `8ecfb94` (T20.10P latency diagnostics)  
+**Baseline SHA:** `809eaac` (T20.10P latency diagnostics)  
 **Mode:** script hardening only — no product behavior changes  
 **Vector rollout:** NOT APPROVED
 

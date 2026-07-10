@@ -1,7 +1,7 @@
 # T20.10AA — Shadow/keyword overlap deep dive
 
 **Generated:** 2026-06-25  
-**Baseline SHA:** `26eb884` (T20.10Z post-refinement readiness eval)  
+**Baseline SHA:** `e6e3e90` (T20.10Z post-refinement readiness eval)  
 **Mode:** read-only diagnostics — no ranking, keyword, or vector-default changes  
 **Vector rollout:** NOT APPROVED
 

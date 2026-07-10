@@ -2,7 +2,7 @@
 
 **Status:** Design complete (docs only — **not** rollout approval)  
 **Generated:** 2026-06-30  
-**Baseline SHA:** `9e62703` (T20.15AG closeout)  
+**Baseline SHA:** `c44b9a1` (T20.15AG closeout)  
 **Image:** `python-ai-service:t20-p215f` (unchanged)  
 **Parent:** T20.15AG hybrid canary ladder closeout
 

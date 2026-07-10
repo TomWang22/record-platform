@@ -2,7 +2,7 @@
 
 **Status:** Validator audit **PASS**  
 **Generated:** 2026-07-04  
-**Baseline HEAD:** `e069c15`  
+**Baseline HEAD:** `5cf8466`  
 **Participant artifact SHA256:** `1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa`
 
 ---
@@ -22,7 +22,7 @@ T20.41B ran validator, runtime/env, preflight, telemetry, and preview UI smoke g
 
 | Item | Value |
 |------|-------|
-| Baseline HEAD | `e069c15` |
+| Baseline HEAD | `5cf8466` |
 | Participant artifact path | `docs/ai-platform/T20-35-owner-approved-real-preview-participants.md` |
 | Artifact SHA256 | `1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa` |
 | Counted participants | `N=5` |
@@ -36,7 +36,7 @@ Baseline verification:
 
 ```text
 git rev-parse --short HEAD
-e069c15
+5cf8466
 
 shasum -a 256 docs/ai-platform/T20-35-owner-approved-real-preview-participants.md
 1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa

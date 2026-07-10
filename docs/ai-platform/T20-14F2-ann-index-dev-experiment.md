@@ -2,7 +2,7 @@
 
 **Status:** Local/dev experiment complete  
 **Generated:** 2026-06-28  
-**Baseline SHA:** `5724437` (T20.14F design)  
+**Baseline SHA:** `fa46d0f` (T20.14F design)  
 **Scope:** HNSW partial index on local `python_ai` @ port 5440 only — no production rollout
 
 ---

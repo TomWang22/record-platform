@@ -28,9 +28,9 @@ T20.24A: NOT STARTED
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| T20.23A | `0b47946` | Opt-in hybrid preview design |
-| T20.23B | `28fde21` | Sign-off path and evidence audit |
-| T20.23C | `12738bc` | Preview decision package (B selected; preview NOT APPROVED) |
+| T20.23A | `5c6a704` | Opt-in hybrid preview design |
+| T20.23B | `c46c1dd` | Sign-off path and evidence audit |
+| T20.23C | `ade9297` | Preview decision package (B selected; preview NOT APPROVED) |
 | T20.23D | *(this commit)* | Opt-in preview closeout |
 | T20.23E | *(pending)* | `PHASE_21_COPILOT_CONTEXT.md` reconciliation |
 

@@ -1,7 +1,7 @@
 # T20.10AG — Flagged overlap stability re-evaluation
 
 **Generated:** 2026-06-25  
-**Baseline SHA:** `0a4634c` (`docs(ai): fix T20.10AF implementation SHA in closeout doc`)  
+**Baseline SHA:** `bdc310d` (`docs(ai): fix T20.10AF implementation SHA in closeout doc`)  
 **Mode:** read-only — no code, flag default, or rollout changes  
 **Vector rollout:** NOT APPROVED
 

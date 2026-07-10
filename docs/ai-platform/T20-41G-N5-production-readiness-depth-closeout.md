@@ -23,12 +23,12 @@ Decision: C KEEP selected, D recommended, E rejected
 
 | Step | Commit | Message |
 |------|--------|---------|
-| T20.41A | `e069c15` | `docs(ai): T20.41A N5 production-readiness decision design` |
-| T20.41B | `bd3808c` | `docs(ai): T20.41B N5 production-readiness validator PASS` |
-| T20.41C-LIVE | `1ed5af5` | `feat(ai): T20.41C N5 production-readiness depth eval PASS` |
-| T20.41D | `2c17f6f` | `docs(ai): T20.41D N5 production-readiness rollback drill PASS` |
-| T20.41E/F | `f9045de` | `docs(ai): T20.41E telemetry audit and T20.41F decision C KEEP` |
-| T20.41G | `3e7a4b0` | `docs(ai): T20.41G closeout and Phase 21 reconciliation` |
+| T20.41A | `5cf8466` | `docs(ai): T20.41A N5 production-readiness decision design` |
+| T20.41B | `6e6257a` | `docs(ai): T20.41B N5 production-readiness validator PASS` |
+| T20.41C-LIVE | `70257a7` | `feat(ai): T20.41C N5 production-readiness depth eval PASS` |
+| T20.41D | `0f064e0` | `docs(ai): T20.41D N5 production-readiness rollback drill PASS` |
+| T20.41E/F | `6d91e33` | `docs(ai): T20.41E telemetry audit and T20.41F decision C KEEP` |
+| T20.41G | `28491d9` | `docs(ai): T20.41G closeout and Phase 21 reconciliation` |
 
 ---
 

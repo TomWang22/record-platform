@@ -8,8 +8,8 @@ G3R established that **pure vector overlap (8/16)** and **anchor-assisted hybrid
 
 | Item | Value |
 | ---- | ----- |
-| Main SHA | `b2420bb` |
-| G3R implementation | `cbe764a` |
+| Main SHA | `9c24747` |
+| G3R implementation | `cc3fb42` |
 | Deploy image | `python-ai-service:t20-p214g3r` |
 | HNSW index | present (local/dev) |
 | Pure doc/entity overlap >0 | 8/16 |

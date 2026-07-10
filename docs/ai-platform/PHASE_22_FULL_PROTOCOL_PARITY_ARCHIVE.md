@@ -1,7 +1,7 @@
 # Phase 22 — full protocol parity archive
 
 **Phase 22 status:** CLOSED PASS  
-**Archive HEAD:** `5588779`  
+**Archive HEAD:** `7257380`  
 **Artifact SHA256:** `1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa`  
 **Audience:** Cursor, GitHub Copilot, and other coding agents working on `record-platform`
 

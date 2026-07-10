@@ -1,7 +1,7 @@
 # P21.10 — Post-release product roadmap
 
 **Generated:** 2026-06-28  
-**Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `d0e4c58`  
+**Release tag:** `rp-ai-phase-21-non-vector-seller-intelligence-20260628` @ `b741f91`  
 **Phase 21 non-vector track:** CLOSED / RELEASE TAGGED
 
 ---

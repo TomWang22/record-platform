@@ -24,9 +24,9 @@ T20.18A: NOT STARTED
 
 | Ticket | SHA | Summary |
 |--------|-----|---------|
-| T20.17A | `5856513` | Scoped hybrid soak design |
-| T20.17B | `ad59260` | Preflight + control drills PASS |
-| T20.17C-LIVE | `ad66b9e` | Live soak eval PASS (90/90) |
+| T20.17A | `b460e00` | Scoped hybrid soak design |
+| T20.17B | `83769d7` | Preflight + control drills PASS |
+| T20.17C-LIVE | `9856776` | Live soak eval PASS (90/90) |
 | T20.17D | *(this batch)* | Decision package (B selected, C recommended) |
 | T20.17E | *(this batch)* | Closeout |
 

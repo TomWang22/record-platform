@@ -2,7 +2,7 @@
 
 **Status:** Eval complete — **PASS** (percent restored to 0)  
 **Generated:** 2026-06-29  
-**Baseline SHA:** `b00de14` (T20.15N)  
+**Baseline SHA:** `61557ca` (T20.15N)  
 **Image:** `python-ai-service:t20-p215f`  
 **Parent:** T20.15N verification-only
 

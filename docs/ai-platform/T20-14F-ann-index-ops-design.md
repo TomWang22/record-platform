@@ -2,7 +2,7 @@
 
 **Status:** Design complete — **no index created**  
 **Generated:** 2026-06-28  
-**Baseline SHA:** `236d623`  
+**Baseline SHA:** `87f8a04`  
 **Prior work:** T20.14D (embed retry + fetch trim), T20.14E (3-run re-eval)
 
 ---

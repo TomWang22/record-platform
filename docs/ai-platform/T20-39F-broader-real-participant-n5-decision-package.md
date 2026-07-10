@@ -2,7 +2,7 @@
 
 **Status:** Decision **C selected — KEEP opt-in preview UI/API, PERCENT=0**  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `fbd6574`
+**Baseline SHA:** `25e5865`
 
 ---
 

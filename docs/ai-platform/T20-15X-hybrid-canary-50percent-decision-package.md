@@ -2,7 +2,7 @@
 
 **Status:** Decision complete (docs only)  
 **Generated:** 2026-06-29  
-**Baseline SHA:** `29a2674` + W eval  
+**Baseline SHA:** `517d85f` + W eval  
 **Image:** `python-ai-service:t20-p215f`  
 **Parent:** T20.15W — 50% eval PASS, percent restored to 0
 

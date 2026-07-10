@@ -9,12 +9,12 @@
 
 | Ticket | SHA | Description |
 |--------|-----|-------------|
-| T20.28A | `8005d82` | Post-UI soak design |
-| T20.28B | `a1e0f3a` | Preflight PASS + E2E stabilization |
-| T20.28C | `beeab85` | Live soak 1080/1080 |
-| T20.28D | `9b86b35` | Rollback drill |
-| T20.28E/F | `f3e9ead` | Telemetry + decision C |
-| T20.28G/H | `cf90c02` + `f4ac626` | Closeout + Phase 21 |
+| T20.28A | `47a9426` | Post-UI soak design |
+| T20.28B | `a410bac` | Preflight PASS + E2E stabilization |
+| T20.28C | `3e9fc54` | Live soak 1080/1080 |
+| T20.28D | `ef7fb69` | Rollback drill |
+| T20.28E/F | `fccd9a4` | Telemetry + decision C |
+| T20.28G/H | `a29c633` + `055cb43` | Closeout + Phase 21 |
 
 ## 2. Images
 

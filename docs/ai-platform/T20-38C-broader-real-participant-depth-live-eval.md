@@ -2,7 +2,7 @@
 
 **Status:** C-LIVE **PASS**  
 **Generated:** 2026-07-03  
-**Baseline SHA:** `cfbc796`  
+**Baseline SHA:** `8931b10`  
 **Artifact:** `bench_logs/ai-platform/t20-38c-broader-real-participant-depth-eval/20260703-160630/summary.json` (not committed)  
 **Webapp:** `webapp:t20-p227b`  
 **Python:** `python-ai-service:t20-p225b`

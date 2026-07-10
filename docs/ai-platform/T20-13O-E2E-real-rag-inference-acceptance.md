@@ -2,7 +2,7 @@
 
 **Status:** End-to-end acceptance test transcript (read-only)
 **Generated:** 2026-06-27
-**Baseline SHA:** `d9e9fa5`
+**Baseline SHA:** `8c1ab32`
 **Embedded:** 10,065
 
 ## Harness

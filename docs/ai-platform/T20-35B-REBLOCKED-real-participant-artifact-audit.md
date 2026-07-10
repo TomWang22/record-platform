@@ -2,7 +2,7 @@
 
 **Status:** Artifact audit **REBLOCKED**; preflight **PASS**  
 **Generated:** 2026-07-03  
-**Prior main SHA:** `c66f2b1`  
+**Prior main SHA:** `a52084f`  
 **Webapp image:** `webapp:t20-p227b`  
 **Python image:** `python-ai-service:t20-p225b`
 

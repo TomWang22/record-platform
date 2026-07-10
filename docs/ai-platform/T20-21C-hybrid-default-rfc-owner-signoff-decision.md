@@ -2,7 +2,7 @@
 
 **Status:** Decision complete (docs only — **not** rollout approval)  
 **Generated:** 2026-06-30  
-**Baseline SHA:** `5ba8233` + T20.21B eval  
+**Baseline SHA:** `efd2845` + T20.21B eval  
 **Image:** `python-ai-service:t20-p216b`  
 **Parent:** T20.21B — **PASS**
 

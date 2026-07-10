@@ -1,7 +1,7 @@
 # P21.4C — Collector metadata field-map UI
 
 **Generated:** 2026-06-28  
-**Baseline SHA:** `fec7457` (pre P21.4C commit)  
+**Baseline SHA:** `a318e8b` (pre P21.4C commit)  
 **Phase:** 21 — non-vector product track
 
 ---

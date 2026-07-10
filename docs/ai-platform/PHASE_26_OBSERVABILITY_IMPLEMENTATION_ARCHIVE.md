@@ -4,7 +4,7 @@ Human-readable archive of what Phase 26 built, why, how to verify it, and what r
 
 ```text
 Phase 26: CLOSED PASS
-Closeout commit: 4409ffc
+Closeout commit: f09a9ef
 Phase 26H: archive/explainer docs only (no code changes)
 Artifact SHA unchanged: 1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa
 Live eval: NOT RUN
@@ -28,8 +28,8 @@ Archive precedence: When older phase docs conflict with this archive, this archi
 | Snapshot / addendum | Status reading |
 | ------------------- | -------------- |
 | 26F doc says 26G NOT STARTED | historical snapshot |
-| 26G doc closes Phase 26 implementation | current implementation closeout (`4409ffc`) |
-| 26H docs explain/archive Phase 26 | current human-readable archive addendum (`d16d195`) |
+| 26G doc closes Phase 26 implementation | current implementation closeout (`f09a9ef`) |
+| 26H docs explain/archive Phase 26 | current human-readable archive addendum (`6d13e83`) |
 | 26I docs note supersession / historical snapshots | consistency pass so older “NOT STARTED” lines cannot be mistaken for current state |
 
 ---

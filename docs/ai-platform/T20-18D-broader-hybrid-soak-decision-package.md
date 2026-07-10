@@ -2,7 +2,7 @@
 
 **Status:** Decision complete (docs only)  
 **Generated:** 2026-06-30  
-**Baseline SHA:** `ac402d9` + C-LIVE eval  
+**Baseline SHA:** `1c60701` + C-LIVE eval  
 **Image:** `python-ai-service:t20-p216b`  
 **Parent:** T20.18C-LIVE — **PASS**
 

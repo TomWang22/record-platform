@@ -2,7 +2,7 @@
 
 **Status:** READ-ONLY evaluator report (no code changes)  
 **Generated:** 2026-06-26  
-**Baseline SHA:** `ef464ab`  
+**Baseline SHA:** `a3130c8`  
 **Evidence source:** `bench_logs/ai-platform/live-inference/raw-20260626-190817/` (T20.13G warmed run)
 
 ---

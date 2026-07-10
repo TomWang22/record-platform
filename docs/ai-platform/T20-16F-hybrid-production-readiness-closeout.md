@@ -24,10 +24,10 @@ T20.17A: NOT STARTED
 
 | Ticket | SHA (see git log) | Summary |
 |--------|-------------------|---------|
-| T20.16A | `fd39db3` | Production-readiness design |
-| T20.16B | `37d09f6` | `final_tagged_plan` fallback fix (`t20-p216b`) |
-| T20.16C | `ef88664` | Pure vector overlap research (report-only 8/16) |
-| T20.16D | `39c708e` | Production-readiness eval plan |
+| T20.16A | `a2e2d02` | Production-readiness design |
+| T20.16B | `c95ff68` | `final_tagged_plan` fallback fix (`t20-p216b`) |
+| T20.16C | `d28ed65` | Pure vector overlap research (report-only 8/16) |
+| T20.16D | `7872a5a` | Production-readiness eval plan |
 | T20.16D-LIVE | *(this batch)* | Live inference eval PASS |
 | T20.16E | *(this batch)* | Decision package |
 | T20.16F | *(this batch)* | Closeout |

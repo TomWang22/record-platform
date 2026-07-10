@@ -25,27 +25,6 @@ function parseArgs(argv) {
   return opts;
 }
 
-function main() {
-  const opts = parseArgs(process.argv.slice(2));
-  if (!opts.out.startsWith('/tmp/')) throw new Error('phase32g output must be under /tmp');
-
-  const preflight = spawnSync(process.execPath, [path.join(REPO_ROOT, 'scripts/phase32g-preflight-long-soak.mjs')], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-    env: { ...process.env, PHASE32G_MATRIX_ROOT: opts.out },
-  });
-  if (preflight.status !== 0) {
-    console.error(preflight.stderr || preflight.stdout);
-    process.exit(1);
-  }
-
-  fs.mkdirSync(opts.out, { recursive: true });
-  const runnerEnv = {
-    ...process.env,
-    PHASE32G_MATRIX_ROOT: opts.out,
-    T20_EVAL_RAG_PAUSE_SEC: process.env.T20_EVAL_RAG_PAUSE_SEC || '0.15',
-  };
-
 function sleepMs(ms) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
@@ -78,6 +57,27 @@ function launchShard(proto, opts, runnerEnv) {
   child.unref();
   process.stderr.write(`phase32g started ${proto} pid=${child.pid}\n`);
 }
+
+function main() {
+  const opts = parseArgs(process.argv.slice(2));
+  if (!opts.out.startsWith('/tmp/')) throw new Error('phase32g output must be under /tmp');
+
+  const preflight = spawnSync(process.execPath, [path.join(REPO_ROOT, 'scripts/phase32g-preflight-long-soak.mjs')], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    env: { ...process.env, PHASE32G_MATRIX_ROOT: opts.out },
+  });
+  if (preflight.status !== 0) {
+    console.error(preflight.stderr || preflight.stdout);
+    process.exit(1);
+  }
+
+  fs.mkdirSync(opts.out, { recursive: true });
+  const runnerEnv = {
+    ...process.env,
+    PHASE32G_MATRIX_ROOT: opts.out,
+    T20_EVAL_RAG_PAUSE_SEC: process.env.T20_EVAL_RAG_PAUSE_SEC || '0.15',
+  };
 
   launchShard('h1', opts, runnerEnv);
   process.stderr.write('phase32g staggering h2 launch by 45s\n');

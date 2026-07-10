@@ -15,6 +15,7 @@ function parseArgs(argv) {
     phase31: '/tmp/phase31d-r2-repaired-staging-long-soak',
     phase32d: '/tmp/phase32d-timing-attribution-micro-soak',
     phase32e: '/tmp/phase32e-slow-kpi-write-durability',
+    phase32g: null,
     out: DEFAULT_OUT,
     requirePass: false,
   };
@@ -23,6 +24,7 @@ function parseArgs(argv) {
     if (arg === '--phase31') opts.phase31 = argv[++i];
     else if (arg === '--phase32d') opts.phase32d = argv[++i];
     else if (arg === '--phase32e') opts.phase32e = argv[++i];
+    else if (arg === '--phase32g') opts.phase32g = argv[++i];
     else if (arg === '--out') opts.out = argv[++i];
     else if (arg === '--require-pass') opts.requirePass = true;
   }
@@ -35,9 +37,10 @@ function main() {
     phase31Root: opts.phase31,
     phase32dRoot: opts.phase32d,
     phase32eRoot: opts.phase32e,
+    phase32gRoot: opts.phase32g,
     outDir: opts.out,
   });
-  assertPhase32fPass(report);
+  assertPhase32fPass(report, { phase32gRequired: Boolean(opts.phase32g) });
   console.log(
     JSON.stringify(
       {

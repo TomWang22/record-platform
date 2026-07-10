@@ -339,6 +339,19 @@ ai-platform-verify-phase32f-latency-rca: ## Phase 32F latency stall RCA + instru
 	  --out /tmp/phase32f-latency-stall-analysis \
 	  --require-pass
 
+ai-platform-verify-phase32g-long-soak: ## Phase 32G timing-attributed repaired long soak verifier
+	$(MAKE) ai-platform-verify-phase32f-latency-rca
+	node --test tests/phase32g-long-soak.test.mjs
+	node scripts/phase32g-preflight-long-soak.mjs
+	node scripts/phase32g-summarize-long-soak.mjs --in /tmp/phase32g-timing-attributed-repaired-long-soak --require-pass
+	node scripts/phase32f-stall-attribution-analyzer.mjs \
+	  --phase31 /tmp/phase31d-r2-repaired-staging-long-soak \
+	  --phase32d /tmp/phase32d-timing-attribution-micro-soak \
+	  --phase32e /tmp/phase32e-slow-kpi-write-durability \
+	  --phase32g /tmp/phase32g-timing-attributed-repaired-long-soak \
+	  --out /tmp/phase32g-stall-attribution-analysis \
+	  --require-pass
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

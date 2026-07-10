@@ -13,6 +13,11 @@ import {
   rowProvenance,
   topOutliers,
 } from './phase32-latency-rca-analyzer.mjs';
+import {
+  RCA_ATTRIBUTION_SHARE,
+  RCA_NOT_REPRODUCED_THRESHOLD_MS,
+  RCA_OUTLIER_THRESHOLD_MS,
+} from './phase32g-long-soak-config.mjs';
 import { STALL_CAPTURE_FIELDS } from './phase32-timing-attribution.mjs';
 
 export const DEFAULT_OUT = '/tmp/phase32f-latency-stall-analysis';
@@ -218,10 +223,72 @@ function buildTopOutliersReport(sources) {
   return combined.sort((a, b) => (b.rag_total_ms ?? 0) - (a.rag_total_ms ?? 0)).slice(0, 50);
 }
 
+export function classifyPhase32gRcaOutcome(rows, gates) {
+  const maxWall = rows.reduce((max, row) => Math.max(max, wallMs(row) ?? 0), 0);
+  const maxCurl = rows.reduce(
+    (max, row) => Math.max(max, row.timing?.curl_time_total_ms ?? 0),
+    0,
+  );
+  const maxRag = rows.reduce(
+    (max, row) => Math.max(max, row.timing?.rag_total_ms ?? row.rag_total_ms ?? 0),
+    0,
+  );
+  const tierMax = Math.max(maxWall, maxCurl, maxRag);
+
+  if (gates?.status !== 'PASS') {
+    return { outcome: 'BLOCKED', tier_max_ms: tierMax };
+  }
+  if (tierMax < RCA_NOT_REPRODUCED_THRESHOLD_MS) {
+    return { outcome: 'RCA_NOT_REPRODUCED_FULL_SOAK', tier_max_ms: tierMax, max_wall_ms: maxWall };
+  }
+
+  const topRow = [...rows].sort((a, b) => (wallMs(b) ?? 0) - (wallMs(a) ?? 0))[0];
+  const components = [
+    ['coordinator_wait_ms', topRow?.timing?.coordinator_wait_ms],
+    ['window_reset_ms', topRow?.timing?.window_reset_ms],
+    ['curl_time_total_ms', topRow?.timing?.curl_time_total_ms],
+    ['rag_total_ms', topRow?.timing?.rag_total_ms ?? topRow?.rag_total_ms],
+    ['server_timing_rag_total_ms', topRow?.timing?.server_timing_rag_total_ms],
+    ['probe_gap_since_previous_ms', topRow?.timing?.probe_gap_since_previous_ms],
+    ['unattributed_ms', topRow?.timing?.unattributed_ms],
+  ].filter(([, v]) => typeof v === 'number' && v > 0);
+  const wall = wallMs(topRow) ?? tierMax;
+  const dominant = components.sort((a, b) => b[1] - a[1])[0];
+  const share = dominant && wall > 0 ? dominant[1] / wall : 0;
+
+  if (tierMax >= RCA_OUTLIER_THRESHOLD_MS && share >= RCA_ATTRIBUTION_SHARE) {
+    return {
+      outcome: 'RCA_REPRODUCED_ATTRIBUTED',
+      tier_max_ms: tierMax,
+      max_wall_ms: maxWall,
+      dominant_component: dominant?.[0] ?? null,
+      dominant_share: share,
+      top_probe_id: topRow?.probe_id ?? null,
+    };
+  }
+  if (tierMax >= RCA_OUTLIER_THRESHOLD_MS) {
+    return {
+      outcome: 'RCA_REPRODUCED_UNATTRIBUTED',
+      tier_max_ms: tierMax,
+      max_wall_ms: maxWall,
+      dominant_component: dominant?.[0] ?? null,
+      dominant_share: share,
+      top_probe_id: topRow?.probe_id ?? null,
+    };
+  }
+  return {
+    outcome: 'RCA_NOT_REPRODUCED_FULL_SOAK',
+    tier_max_ms: tierMax,
+    max_wall_ms: maxWall,
+    note: 'below 300000ms tier-1 reproduction threshold',
+  };
+}
+
 export function analyzePhase32fStallAttribution({
   phase31Root,
   phase32dRoot,
   phase32eRoot,
+  phase32gRoot = null,
   outDir = DEFAULT_OUT,
 }) {
   if (!String(outDir).startsWith('/tmp/')) {
@@ -233,6 +300,8 @@ export function analyzePhase32fStallAttribution({
   const phase32eBaseline = loadModeRows(phase32eRoot, 'baseline');
   const phase32eFailing = loadModeRows(phase32eRoot, 'failing_write');
 
+  const phase32g = phase32gRoot ? loadRowsWithShard(phase32gRoot) : { rows: [], rowsWithShard: [], exists: false };
+
   const monitorPath = path.join(phase31Root, 'phase31-monitor.log');
   const monitorEvents = fs.existsSync(monitorPath)
     ? parseMonitorEvents(fs.readFileSync(monitorPath, 'utf8'))
@@ -241,18 +310,34 @@ export function analyzePhase32fStallAttribution({
   const phase31Max = phase31.rows.reduce((max, row) => Math.max(max, wallMs(row) ?? 0), 0);
   const phase32dMax = phase32d.rows.reduce((max, row) => Math.max(max, wallMs(row) ?? 0), 0);
 
+  const phase32gMax = phase32g.rows.reduce((max, row) => Math.max(max, wallMs(row) ?? 0), 0);
+
   const maxOutlierExplained =
     phase31Max >= OUTLIER_THRESHOLD_MS &&
     phase31Max <= PHASE31_MAX_OUTLIER_MS + 50_000 &&
     false;
 
+  const phase32gGates =
+    phase32g.rows.length > 0
+      ? {
+          matrix_total: `${phase32g.rows.length}/51840`,
+          status: phase32g.rows.length === 51840 ? 'PASS' : 'IN_PROGRESS',
+        }
+      : null;
+  const phase32gRca =
+    phase32g.rows.length > 0
+      ? classifyPhase32gRcaOutcome(phase32g.rows, phase32gGates)
+      : null;
+
   const summary = {
     generated_at: new Date().toISOString(),
-    phase: '32F',
+    phase: phase32gRoot ? '32G' : '32F',
     status: 'PASS',
     max_outlier_explained: false,
     phase31_max_wall_or_rag_ms: phase31Max || PHASE31_MAX_OUTLIER_MS,
     phase32d_max_wall_ms: phase32dMax,
+    phase32g_max_wall_ms: phase32gMax || null,
+    phase32g_rca_outcome: phase32gRca?.outcome ?? null,
     outlier_threshold_ms: OUTLIER_THRESHOLD_MS,
     rca_conclusions: {
       phase32b: 'CLASSIFIED original outlier from 31D-R2 JSONL; attribution incomplete',
@@ -283,8 +368,13 @@ export function analyzePhase32fStallAttribution({
         baseline_rows: phase32eBaseline.length,
         failing_write_rows: phase32eFailing.length,
       },
+      phase32g: phase32gRoot
+        ? { path: phase32gRoot, exists: phase32g.exists, row_count: phase32g.rows.length }
+        : null,
     },
-    next_required: 'Phase 32G — timing-attributed repaired long soak (no production enablement)',
+    next_required: phase32gRoot
+      ? 'Phase 32H — post-32G remediation or staging-continue decision (no production enablement)'
+      : 'Phase 32G — timing-attributed repaired long soak (no production enablement)',
     production_enablement: 'NOT APPROVED',
     production_ready_claim: false,
   };
@@ -296,6 +386,10 @@ export function analyzePhase32fStallAttribution({
     phase32e_failing_write: phase32eFailing,
   };
 
+  if (phase32g.rows.length) {
+    sources.phase32g = phase32g.rows;
+  }
+
   const componentComparisonReport = buildComponentComparison(sources);
   const coordinatorCorrelationReport = coordinatorCorrelation(phase31.rowsWithShard, monitorEvents);
   const restartCorrelationReport = restartCorrelation(phase31.rowsWithShard, monitorEvents);
@@ -304,11 +398,15 @@ export function analyzePhase32fStallAttribution({
     ...phase32eFailing,
   ]);
 
-  const topOutliers = buildTopOutliersReport({
+  const topOutlierSources = {
     phase31d_r2: phase31.rowsWithShard,
     phase32d: phase32d.rowsWithShard,
     phase32e_baseline: phase32eBaseline.map((row) => ({ row, shardDir: phase32eRoot })),
-  });
+  };
+  if (phase32g.rowsWithShard.length) {
+    topOutlierSources.phase32g = phase32g.rowsWithShard;
+  }
+  const topOutliers = buildTopOutliersReport(topOutlierSources);
 
   const phase31MaxRow = phase31.rows.sort((a, b) => wallMs(b) - wallMs(a))[0] ?? null;
 
@@ -356,9 +454,9 @@ export function analyzePhase32fStallAttribution({
   };
 }
 
-export function assertPhase32fPass(report) {
+export function assertPhase32fPass(report, { phase32gRequired = false } = {}) {
   if (!report?.summary) throw new Error('phase32f report missing summary');
-  if (report.summary.max_outlier_explained === true) {
+  if (report.summary.max_outlier_explained === true && report.summary.phase32g_rca_outcome !== 'RCA_REPRODUCED_ATTRIBUTED') {
     throw new Error('phase32f must not claim max outlier explained without component attribution');
   }
   if (report.summary.production_ready_claim === true) {
@@ -366,6 +464,9 @@ export function assertPhase32fPass(report) {
   }
   if (report.summary.production_enablement !== 'NOT APPROVED') {
     throw new Error('phase32f must keep production_enablement NOT APPROVED');
+  }
+  if (phase32gRequired && report.summary.phase32g_rca_outcome === 'BLOCKED') {
+    throw new Error('phase32g quality gates failed');
   }
   return true;
 }

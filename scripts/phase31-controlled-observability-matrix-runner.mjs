@@ -41,6 +41,9 @@ import {
 } from './lib/phase31-controlled-matrix-summary.mjs';
 import { resolvePhase31MatrixRoot } from './lib/phase31-controlled-matrix-config.mjs';
 import {
+  resolveMatrixEvidenceLabel,
+} from './lib/phase32g-long-soak-config.mjs';
+import {
   PreviewWindowCoordinator,
   coordinatorRootFromRunnerOut,
   resetAndVerifyWindowGates,
@@ -90,7 +93,7 @@ function parseArgs(argv) {
   return opts;
 }
 
-function buildManifest(opts) {
+function buildManifest(opts, evidenceLabel = MATRIX_EVIDENCE_LABEL) {
   const users = loadN5Participants();
   const protocols =
     opts.protocol === 'all' ? ['h1', 'h2', 'h3'] : [opts.protocol.replace(/^h/i, 'h')];
@@ -120,7 +123,7 @@ function buildManifest(opts) {
               expected_retrieval_mode: 'hybrid_canary',
               sentiment_required: case_id === 'buyer_psychology',
               red_team_case: case_id === 'red_team_overclaim' || case_id === 'final_tagged_plan',
-              evidence_label: MATRIX_EVIDENCE_LABEL,
+              evidence_label: evidenceLabel,
             });
           }
         }
@@ -217,7 +220,7 @@ function writeMatrixKpiRows(probe, resp, meta, rubric, qualityScore) {
       sentiment_pass: rubric.sentiment_pass === 'PASS',
       red_team_safety_pass: rubric.response_pass === 'PASS',
       leakage_failures: rubric.leakage_pass === 'FAIL' ? 1 : 0,
-      evidence_label: MATRIX_EVIDENCE_LABEL,
+      evidence_label: probe.evidence_label || MATRIX_EVIDENCE_LABEL,
       environment: 'staging',
       workflow: 'phase31_staging_long_soak',
       case_id: probe.case_id,
@@ -466,10 +469,12 @@ function runMatrix(opts) {
   const retryMode = Boolean(triagePath);
   const matrixRoot = resolveMatrixRoot(opts.out);
   fs.mkdirSync(opts.out, { recursive: true });
+  const evidenceLabel =
+    resolveMatrixEvidenceLabel(process.env, opts.out) || MATRIX_EVIDENCE_LABEL;
   const jsonlPath = retryMode
     ? path.join(matrixRoot, 'phase31-retry-failures.jsonl')
     : path.join(opts.out, 'phase31-matrix.jsonl');
-  const manifest = buildManifest(opts);
+  const manifest = buildManifest(opts, evidenceLabel);
   const users = loadN5Participants();
   let targetProbes = manifest;
   if (retryMode) {

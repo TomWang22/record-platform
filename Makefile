@@ -314,6 +314,10 @@ ai-platform-verify-phase32-latency-rca: ## Phase 32B read-only latency RCA analy
 	@test -f $(PHASE31_MATRIX_ROOT)/shard-h1/phase31-matrix.jsonl || (echo "missing $(PHASE31_MATRIX_ROOT) shard jsonl; run phase31d-r2 soak first" && exit 1)
 	PHASE31_MATRIX_ROOT=$(PHASE31_MATRIX_ROOT) node scripts/phase32-latency-outlier-analyzer-readonly.mjs --in $(PHASE31_MATRIX_ROOT) --out $(PHASE32_LATENCY_RCA_OUT)
 
+ai-platform-verify-phase32-timing-attribution: ## Phase 32C timing attribution smoke + unit tests
+	node scripts/phase32-timing-attribution-smoke.mjs
+	node --test tests/phase32-timing-attribution.test.mjs
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

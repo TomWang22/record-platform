@@ -275,10 +275,12 @@ export function curlRequest({
     if (raw.trim()) parsed = JSON.parse(raw);
   }
   fs.rmSync(tmpBody, { recursive: true, force: true });
+  const curlMs = Math.round(Number(timeTotal) * 1000 * 10) / 10;
   return {
     http_status: Number(status),
     http_version: version,
-    rag_total_ms: Math.round(Number(timeTotal) * 1000 * 10) / 10,
+    curl_time_total_ms: curlMs,
+    rag_total_ms: curlMs,
     body: parsed,
     version_ok: version === expectedVersion,
   };
@@ -370,6 +372,8 @@ export function resetWindowEnrollments(users, getToken, cfg) {
 export function ragQuery(token, userId, question, cfg, proto, retryOpts = {}) {
   const maxRetries = retryOpts.maxRetries ?? 8;
   let last;
+  let retry_count = 0;
+  let retry_delay_ms = 0;
   for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     if (cfg.ragPauseMs > 0) sleepMs(cfg.ragPauseMs);
     last = curlRequest({
@@ -389,16 +393,22 @@ export function ragQuery(token, userId, question, cfg, proto, retryOpts = {}) {
       (last.http_status === 429 || last.http_status === 502 || last.http_status === 503 || last.http_status === 504) &&
       attempt + 1 < maxRetries
     ) {
-      sleepMs(Math.min(8000, 250 * 2 ** attempt));
+      const delay = Math.min(8000, 250 * 2 ** attempt);
+      retry_count += 1;
+      retry_delay_ms += delay;
+      sleepMs(delay);
       continue;
     }
     if (mode === 'keyword_fallback_from_hybrid' && attempt + 1 < maxRetries) {
-      sleepMs(Math.min(1000, 100 * 2 ** attempt));
+      const delay = Math.min(1000, 100 * 2 ** attempt);
+      retry_count += 1;
+      retry_delay_ms += delay;
+      sleepMs(delay);
       continue;
     }
-    return last;
+    return { ...last, retry_count, retry_delay_ms };
   }
-  return last;
+  return { ...last, retry_count, retry_delay_ms };
 }
 
 export function extractResponseText(body) {

@@ -215,7 +215,10 @@ export class PreviewWindowCoordinator {
       throw new Error(`unexpected protocol for coordinator: ${protocol}`);
     }
 
+    const timing = { coordinator_wait_ms: 0, window_reset_ms: 0 };
+    const waitStart = Date.now();
     this.waitForPreviousWindowComplete(window);
+    timing.coordinator_wait_ms = Date.now() - waitStart;
 
     return this.withLock(() => {
       const state = this.readState();
@@ -223,7 +226,9 @@ export class PreviewWindowCoordinator {
       const ws = state.window_status[key] || defaultWindowStatus();
 
       if (!ws.lifecycle_reset_done) {
+        const resetStart = Date.now();
         const verify = resetAndVerify();
+        timing.window_reset_ms = Date.now() - resetStart;
         if (!verify.ok) {
           const err = new Error(
             `preview gate verification failed for window ${window}: ${JSON.stringify(verify.failures)}`,
@@ -246,7 +251,7 @@ export class PreviewWindowCoordinator {
       state.active_window = window;
       state.window_status[key] = ws;
       this.writeState(state);
-      return { reset_count: ws.reset_count, gate_verified: ws.gate_verified };
+      return { reset_count: ws.reset_count, gate_verified: ws.gate_verified, timing };
     });
   }
 

@@ -45,6 +45,12 @@ import {
   resetAndVerifyWindowGates,
   validateParticipantIdentity,
 } from './lib/phase31-preview-window-coordinator.mjs';
+import {
+  attachTimingToProbeRow,
+  buildTimingAttribution,
+  extractAppRagTotalMs,
+  finalizeProbeTiming,
+} from './lib/phase32-timing-attribution.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -237,7 +243,9 @@ function probeMatchKey(probe, userUidHash) {
   return [probe.matrix_protocol, probe.window, probe.run, probe.case_id, hash].join('|');
 }
 
-function executeProbe(probe, cfg, getToken) {
+function executeProbe(probe, cfg, getToken, probeContext = {}) {
+  const probeStartedAt = new Date().toISOString();
+  const probeStartMs = Date.now();
   const proto = PROTOCOLS[probe.matrix_protocol];
   const token = getToken(probe.user_email);
   const userId = probe.user_uid;
@@ -249,11 +257,22 @@ function executeProbe(probe, cfg, getToken) {
   let leakagePass;
   let qualityScore;
   let rubric;
+  let retry_count = 0;
+  let retry_delay_ms = 0;
+  let curl_time_total_ms = null;
+  let app_rag_total_ms = null;
   for (let attempt = 0; attempt < 16; attempt += 1) {
     try {
       resp = ragQuery(token, userId, probe.question, cfg, proto, { maxRetries: 8 });
+      retry_count += Number(resp.retry_count || 0);
+      retry_delay_ms += Number(resp.retry_delay_ms || 0);
+      curl_time_total_ms = resp.curl_time_total_ms ?? resp.rag_total_ms ?? null;
+      app_rag_total_ms = extractAppRagTotalMs(resp.body || {});
       if ([502, 503, 504, 429].includes(resp.http_status) && attempt + 1 < 16) {
-        sleepMs(Math.min(10000, 500 * 2 ** attempt));
+        const delay = Math.min(10000, 500 * 2 ** attempt);
+        retry_count += 1;
+        retry_delay_ms += delay;
+        sleepMs(delay);
         continue;
       }
       meta = extractMeta(resp.body || {});
@@ -263,34 +282,61 @@ function executeProbe(probe, cfg, getToken) {
       qualityScore = scoreAnswer(text, refs, leakagePass);
       rubric = assertPhase21Row(probe, text, refs, leakagePass, qualityScore);
       if (resp.http_status !== 200 && attempt + 1 < 16) {
-        sleepMs(Math.min(10000, 500 * 2 ** attempt));
+        const delay = Math.min(10000, 500 * 2 ** attempt);
+        retry_count += 1;
+        retry_delay_ms += delay;
+        sleepMs(delay);
         continue;
       }
       break;
     } catch (err) {
       if (attempt + 1 >= 16) throw err;
-      sleepMs(Math.min(10000, 500 * 2 ** attempt));
+      const delay = Math.min(10000, 500 * 2 ** attempt);
+      retry_count += 1;
+      retry_delay_ms += delay;
+      sleepMs(delay);
     }
   }
+  const kpiStartMs = Date.now();
   const kpiWrites = writeMatrixKpiRows(probe, resp, meta, rubric, qualityScore);
-  const row = redactedRow(probe, {
-    http_status: resp.http_status,
-    http_version: resp.http_version,
-    version_ok: resp.version_ok,
-    rag_total_ms: resp.rag_total_ms,
-    retrieval_mode: meta.retrieval_mode,
-    gate_reason: meta.gate_reason,
-    fallback_count: meta.hybrid_fallback ? 1 : 0,
-    response_pass: rubric.response_pass,
-    sentiment_pass: rubric.sentiment_pass,
-    leakage_pass: leakagePass,
-    usefulness_write: kpiWrites.usefulness?.status,
-    query_observation_write: kpiWrites.query?.status,
-    quality_score: qualityScore,
-    sentiment_required: probe.sentiment_required,
-    red_team_case: probe.red_team_case,
-    completed_at: new Date().toISOString(),
+  const kpi_query_write_ms = Date.now() - kpiStartMs;
+  const probeFinishedAt = new Date().toISOString();
+  const timing = buildTimingAttribution({
+    probe_started_at: probeStartedAt,
+    probe_finished_at: probeFinishedAt,
+    wall_total_ms: Date.now() - probeStartMs,
+    curl_time_total_ms,
+    rag_total_ms: app_rag_total_ms,
+    coordinator_wait_ms: probeContext.coordinator_wait_ms ?? 0,
+    window_reset_ms: probeContext.window_reset_ms ?? 0,
+    pre_probe_gate_verify_ms: probeContext.pre_probe_gate_verify_ms ?? 0,
+    retry_count,
+    retry_delay_ms,
+    kpi_query_write_ms,
+    kpi_usefulness_write_ms: 0,
+    jsonl_write_ms: 0,
   });
+  const row = attachTimingToProbeRow(
+    redactedRow(probe, {
+      http_status: resp.http_status,
+      http_version: resp.http_version,
+      version_ok: resp.version_ok,
+      rag_total_ms: app_rag_total_ms ?? curl_time_total_ms,
+      retrieval_mode: meta.retrieval_mode,
+      gate_reason: meta.gate_reason,
+      fallback_count: meta.hybrid_fallback ? 1 : 0,
+      response_pass: rubric.response_pass,
+      sentiment_pass: rubric.sentiment_pass,
+      leakage_pass: leakagePass,
+      usefulness_write: kpiWrites.usefulness?.status,
+      query_observation_write: kpiWrites.query?.status,
+      quality_score: qualityScore,
+      sentiment_required: probe.sentiment_required,
+      red_team_case: probe.red_team_case,
+      completed_at: probeFinishedAt,
+    }),
+    timing,
+  );
   if (isDeterministicPreviewGateMismatch(row)) {
     row.lifecycle_diagnostic = {
       failure_class: 'deterministic',
@@ -375,6 +421,8 @@ function runMatrix(opts) {
 
   const failures = [];
   let lastWindow = null;
+  let windowTiming = { coordinator_wait_ms: 0, window_reset_ms: 0 };
+  let firstProbeInWindow = true;
   for (const probe of targetProbes) {
     if (!retryMode && completed.has(probe.probe_id)) continue;
 
@@ -383,15 +431,28 @@ function runMatrix(opts) {
         coordinator.completeWindowProtocol(lastWindow, protocolKey);
       }
       if (useCoordinator) {
-        coordinator.enterWindow(probe.window, protocolKey, {
+        const entered = coordinator.enterWindow(probe.window, protocolKey, {
           resetAndVerify: () => resetAndVerifyWindowGates(users, getToken, cfg),
         });
+        windowTiming = entered.timing || { coordinator_wait_ms: 0, window_reset_ms: 0 };
+      } else {
+        windowTiming = { coordinator_wait_ms: 0, window_reset_ms: 0 };
       }
       lastWindow = probe.window;
+      firstProbeInWindow = true;
     }
 
-    const { row, probeFail, failureClass } = executeProbe(probe, cfg, getToken);
+    const probeContext = firstProbeInWindow
+      ? windowTiming
+      : { coordinator_wait_ms: 0, window_reset_ms: 0, pre_probe_gate_verify_ms: 0 };
+    firstProbeInWindow = false;
+
+    const { row, probeFail, failureClass } = executeProbe(probe, cfg, getToken, probeContext);
     if (retryMode) row.retry_of_probe_id = probe.probe_id;
+    const jsonlStartMs = Date.now();
+    row.timing = finalizeProbeTiming(row, { jsonl_write_ms: 0 });
+    const jsonl_write_ms = Date.now() - jsonlStartMs;
+    row.timing = finalizeProbeTiming(row, { jsonl_write_ms });
     fs.appendFileSync(jsonlPath, `${JSON.stringify(row)}\n`, 'utf8');
     if (!retryMode) completed.add(probe.probe_id);
 

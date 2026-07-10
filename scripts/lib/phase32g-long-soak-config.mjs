@@ -37,12 +37,14 @@ export function isPhase32gRoot(rootOrEnv, maybeRoot) {
   const normalized = String(root).replace(/\/+$/, '');
   return (
     normalized === DEFAULT_PHASE32G_MATRIX_OUT ||
-    normalized.endsWith('phase32g-timing-attributed-repaired-long-soak')
+    normalized.endsWith('phase32g-timing-attributed-repaired-long-soak') ||
+    normalized.includes('/phase32g-timing-attributed-repaired-long-soak/')
   );
 }
 
 export function resolveMatrixEvidenceLabel(env = process.env, outDir = null) {
-  const root = outDir || env.PHASE32G_MATRIX_ROOT || env.PHASE31_MATRIX_ROOT || '';
+  if (env.PHASE32G_MATRIX_ROOT) return PHASE32G_EVIDENCE_LABEL;
+  const root = outDir || env.PHASE31_MATRIX_ROOT || '';
   if (isPhase32gRoot(root)) return PHASE32G_EVIDENCE_LABEL;
   return null;
 }

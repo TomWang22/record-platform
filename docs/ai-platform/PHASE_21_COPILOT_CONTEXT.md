@@ -238,7 +238,7 @@ Phase 28I PASS: archive/explainer docs; 25920 matrix NOT merged into 57105/57105
 Phase 28: CLOSED PASS — controlled observability production-readiness validation; production enablement NOT APPROVED.
 Phase 31: CLOSED PASS — STAGING CONTINUE; 31D-R2 51840/51840 PASS; production enablement NOT APPROVED; latency max outlier ~1,037,645 ms requires RCA before production KPI enablement.
 KPI truth: implementation complete behind default-off gates; Phase 28 proved controlled matrix + report + rollback on local/dev only.
-Next work: Phase 32D controlled H1/H2/H3 micro-soak with timing attribution — no production enablement.
+Next work: Phase 32E pipeline durability under injected slow DB/KPI write path — no production enablement.
 Phase 22 CLOSED PASS — full labeled protocol parity.
 H1 baseline: 57105/57105 HTTP/1.1.
 H2 replay: 57105/57105 HTTP/2 PASS.

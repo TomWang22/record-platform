@@ -70,6 +70,7 @@ export function extractAppRagTotalMs(body) {
   const candidates = [
     body.rag_total_ms,
     body.details?.rag_total_ms,
+    body.details?.server_total_ms,
     body.details?.hybrid_canary?.rag_total_ms,
     body.details?.server_timing?.rag_total_ms,
   ];
@@ -78,6 +79,22 @@ export function extractAppRagTotalMs(body) {
     if (Number.isFinite(num) && num >= 0) return roundMs(num);
   }
   return null;
+}
+
+export function extractServerTimingFromBody(body) {
+  if (!body || typeof body !== 'object') return {};
+  const details = body.details || {};
+  const pick = (key) => {
+    const num = Number(details[key]);
+    return Number.isFinite(num) && num >= 0 ? roundMs(num) : null;
+  };
+  return {
+    rag_total_ms: extractAppRagTotalMs(body),
+    server_total_ms: pick('server_total_ms'),
+    retrieval_total_ms: pick('retrieval_total_ms'),
+    kpi_query_write_ms: pick('kpi_query_write_ms'),
+    kpi_usefulness_write_ms: pick('kpi_usefulness_write_ms'),
+  };
 }
 
 export function computeWallTotalMs(probeStartedAt, probeFinishedAt) {

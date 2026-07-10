@@ -238,7 +238,7 @@ export function summarizeMatrixRows(
     latency_by_gate: latencyByGate,
     latency_by_user_class: latencyByUserClass,
     per_protocol_counts: perProtocolCounts,
-    status: complete ? 'PASS' : rows.length < MATRIX_TARGET.total ? 'IN_PROGRESS' : 'BLOCKED',
+    status: complete ? 'PASS' : rows.length < targetTotal ? 'IN_PROGRESS' : 'BLOCKED',
   };
 }
 

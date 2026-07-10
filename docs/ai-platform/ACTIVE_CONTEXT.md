@@ -124,6 +124,7 @@ Phase 31N: PASS — Decision B full repaired soak required and completed
 Phase 32A: PASS — latency RCA design + acceptance gates
 Phase 32B: PASS — read-only latency outlier analyzer; output /tmp/phase32-latency-rca/
 Phase 32C: PASS — timing attribution instrumentation ready for 32D micro-soak
+Phase 32D: PASS — timing attribution micro-soak 3888/3888; 17-minute outlier NOT reproduced
 Phase 31 evidence label: Phase 31D-R2 repaired staging long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
 Production enablement: NOT APPROVED — latency max outlier ~1,037,645 ms requires RCA before production KPI enablement
 

@@ -318,6 +318,11 @@ ai-platform-verify-phase32-timing-attribution: ## Phase 32C timing attribution s
 	node scripts/phase32-timing-attribution-smoke.mjs
 	node --test tests/phase32-timing-attribution.test.mjs
 
+ai-platform-verify-phase32d-timing-micro-soak: ## Phase 32D timing micro-soak summary verifier
+	$(MAKE) ai-platform-verify-phase32-timing-attribution
+	node --test tests/phase32d-timing-attribution-summary.test.mjs
+	node scripts/phase32d-summarize-timing-attribution.mjs --in /tmp/phase32d-timing-attribution-micro-soak --require-pass
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

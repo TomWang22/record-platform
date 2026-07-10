@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.ai import insights
 from app.ai.config import AI_RAG_SHADOW_VECTOR
 from app.ai.kpi_query_observations import emit_rag_query_observation_safe
+from app.ai.server_timing import inject_redacted_rag_timing_details
 
 router = APIRouter(prefix="/ai", tags=["ai-platform"])
 
@@ -154,11 +155,18 @@ async def post_rag_query(
         shadow_debug=shadow_debug,
     )
     rag_total_ms = int((time.perf_counter() - started) * 1000)
+    kpi_started = time.perf_counter()
     await emit_rag_query_observation_safe(
         http_scope=request.scope,
         rag_envelope=result,
         rag_total_ms=rag_total_ms,
         http_status=200,
+    )
+    kpi_query_write_ms = int((time.perf_counter() - kpi_started) * 1000)
+    inject_redacted_rag_timing_details(
+        result,
+        rag_total_ms=rag_total_ms,
+        kpi_query_write_ms=kpi_query_write_ms,
     )
     return result
 

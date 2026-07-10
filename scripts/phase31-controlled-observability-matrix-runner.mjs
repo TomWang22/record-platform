@@ -48,7 +48,7 @@ import {
 import {
   attachTimingToProbeRow,
   buildTimingAttribution,
-  extractAppRagTotalMs,
+  extractServerTimingFromBody,
   finalizeProbeTiming,
 } from './lib/phase32-timing-attribution.mjs';
 
@@ -267,7 +267,8 @@ function executeProbe(probe, cfg, getToken, probeContext = {}) {
       retry_count += Number(resp.retry_count || 0);
       retry_delay_ms += Number(resp.retry_delay_ms || 0);
       curl_time_total_ms = resp.curl_time_total_ms ?? resp.rag_total_ms ?? null;
-      app_rag_total_ms = extractAppRagTotalMs(resp.body || {});
+      const serverTiming = extractServerTimingFromBody(resp.body || {});
+      app_rag_total_ms = serverTiming.rag_total_ms;
       if ([502, 503, 504, 429].includes(resp.http_status) && attempt + 1 < 16) {
         const delay = Math.min(10000, 500 * 2 ** attempt);
         retry_count += 1;

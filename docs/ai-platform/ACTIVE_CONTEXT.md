@@ -107,19 +107,20 @@ Phase 30 archive source of truth: PHASE_30_OBSERVABILITY_STAGING_ENABLEMENT_ARCH
 Phase 31A: PASS — production KPI enablement RFC
 Phase 31B: PASS — preflight and archive verification
 Phase 31C: PASS — staging long-soak plan + monitor ownership
-Phase 31D: BLOCKED — soak 51840/51840 complete; wrong_gate=8, red-team safety 99.991%
-Phase 31E: NOT RUN — blocked by 31D gate failures
-Phase 31F: NOT RUN — blocked by 31D gate failures
-Phase 31G: NOT RUN — blocked by 31D gate failures
-Phase 31H: NOT RUN — blocked by 31D gate failures
-Phase 31I: BLOCKED — decision D pending preview lifecycle fix
-Phase 31J: BLOCKED — production enablement decision archive
-Phase 31: BLOCKED — preview lifecycle gate mismatches on user 4c6830b9d086 (8 deterministic failures, 0 retryable)
+Phase 31D: BLOCKED (original) — soak 51840/51840 complete; wrong_gate=8; superseded by 31D-R2
+Phase 31D-R2: PASS — repaired soak 51840/51840; all gates clean
+Phase 31E: PASS — pipeline durability + failure injection
+Phase 31F: PASS — /tmp KPI report (usefulness PASS)
+Phase 31G: PASS — latency regression analysis
+Phase 31H: PASS — disable-switch rollback
+Phase 31I: PASS — STAGING CONTINUE (no production enablement)
+Phase 31J: PASS — production enablement decision archive
+Phase 31: CLOSED PASS — repaired long-soak evidence under 31D-R2
 Phase 31K: PASS — preview lifecycle gate root-cause analysis (parallel shard enrollment race)
 Phase 31L: PASS — shared window coordinator + gate verify + JWT validation
-Phase 31M: NOT STARTED — targeted replay after repair
-Phase 31N: NOT STARTED — full soak replay decision
-Phase 31 evidence label: Phase 31 staging production-enablement decision long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
+Phase 31M: PASS — targeted replay 3672/3672
+Phase 31N: PASS — Decision B full repaired soak required and completed
+Phase 31 evidence label: Phase 31D-R2 repaired staging long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
 
 Live eval run: NOT RUN
 Controlled real inference run: PASS (Phase 30F matrix 25920/25920)

@@ -1,7 +1,14 @@
 # Phase 31E — Pipeline Durability / Failure Injection
 
 ```text
-Phase 31E: NOT RUN (blocked by Phase 31D gate failures)
+Phase 31E: PASS
+Pipeline durability: PASS — /tmp/phase31-pipeline-durability-drill.json
+Failure injection: PASS — /tmp/phase31-failure-injection-drill.json
+Evidence label: Phase 31D-R2 repaired staging long-soak matrix: 51840/51840 target
+Production enablement: NOT APPROVED
 ```
 
-31E drills were not executed because Phase 31D matrix summary remained BLOCKED after retry merge (`wrong_gate=8`, `red_team_safety_pass_rate<1`).
+```bash
+services/python-ai-service/.venv/bin/python scripts/phase31-pipeline-durability-drill.py
+services/python-ai-service/.venv/bin/python scripts/phase31-failure-injection-drill.py
+```

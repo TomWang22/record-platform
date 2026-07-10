@@ -1,22 +1,29 @@
 # Phase 31I — Go/No-Go Decision Package
 
 ```text
-Phase 31I: BLOCKED
-Decision: D — BLOCKED pending preview lifecycle gate fix
+Phase 31I: PASS
+Decision: B — STAGING CONTINUE
 Production enablement performed: NO
+Production default: keyword
+PERCENT=0
+ALLOW_PROD_PERCENT=0
+Hybrid/vector production default: NOT APPROVED
+Artifact SHA: 1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa
 ```
 
-## Failure summary
+## Rationale
 
-| Class | Count | Notes |
-| ----- | ----- | ----- |
-| retryable transient | 0 | no 502/503/504/rate-limit/non-200 with undefined gate |
-| true gate mismatch | 8 | HTTP 200; expected `preview_opt_in`, observed `keyword_default`; single user hash `4c6830b9d086` across H1/H2/H3 windows |
-| true response/rubric failure | 1 | probe 2142 `final_tagged_plan` (red-team); overlaps gate mismatch set |
-| leakage | 0 | |
+Phase 31D-R2 repaired long-soak (51840/51840) passes all gates after preview lifecycle coordinator repair (31L), targeted replay validation (31M), and full R2 soak. Pipeline durability, failure injection, KPI report, latency regression analysis, and disable-switch rollback all PASS.
 
-## Decision
+**Recommendation:** Continue staging-only KPI observability operations. Do **not** enable production KPI writes or PERCENT rollout without separate owner approval.
 
-**Option D — BLOCKED.** Production KPI enablement decision track cannot recommend STAGING CONTINUE or PROD CANDIDATE until preview enrollment lifecycle is fixed and soak re-run passes all gates.
+Not selected: production enablement, PERCENT rollout, hybrid/vector production default.
 
-Recommended next step: fix preview window enrollment persistence for real_participant users, then re-run Phase 31D soak (or targeted replay of 8 probes) before re-attempting 31E–31J.
+## Failure summary (31D-R2)
+
+| Class | Count |
+| ----- | ----- |
+| retryable transient | 0 |
+| true gate mismatch | 0 |
+| true response/rubric failure | 0 |
+| leakage | 0 |

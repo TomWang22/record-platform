@@ -1,20 +1,15 @@
 /**
- * Phase 31D/E — controlled observability matrix summary and latency tables.
+ * Phase 31D-R2 — controlled observability matrix summary and latency tables.
+ * Evidence label and targets sourced from phase31-controlled-matrix-config.mjs.
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  MATRIX_EVIDENCE_LABEL,
+  MATRIX_TARGET,
+} from './phase31-controlled-matrix-config.mjs';
 
-export const MATRIX_EVIDENCE_LABEL =
-  'Phase 31 staging production-enablement decision long-soak matrix: 51840/51840 target';
-
-export const MATRIX_TARGET = {
-  total: 51840,
-  perProtocol: 17280,
-  windows: 32,
-  users: 6,
-  runs: 10,
-  cases: 9,
-};
+export { MATRIX_EVIDENCE_LABEL, MATRIX_TARGET };
 
 export const FORBIDDEN_FIELDS = [
   'response_body',
@@ -55,7 +50,14 @@ export function protocolLabel(httpVersion) {
   return 'unknown';
 }
 
-export function summarizeMatrixRows(rows, { targetPerProtocol = MATRIX_TARGET.perProtocol } = {}) {
+export function summarizeMatrixRows(
+  rows,
+  {
+    targetPerProtocol = MATRIX_TARGET.perProtocol,
+    targetTotal = MATRIX_TARGET.total,
+    evidenceLabel = MATRIX_EVIDENCE_LABEL,
+  } = {},
+) {
   const byProtocol = {};
   const byCase = {};
   const byGate = {};
@@ -204,7 +206,7 @@ export function summarizeMatrixRows(rows, { targetPerProtocol = MATRIX_TARGET.pe
     latencyByProtocol.map((row) => [row.protocol, row.count]),
   );
   const complete =
-    rows.length === MATRIX_TARGET.total &&
+    rows.length === targetTotal &&
     perProtocolCounts['HTTP/1.1'] === targetPerProtocol &&
     perProtocolCounts['HTTP/2'] === targetPerProtocol &&
     perProtocolCounts['HTTP/3'] === targetPerProtocol &&
@@ -219,8 +221,8 @@ export function summarizeMatrixRows(rows, { targetPerProtocol = MATRIX_TARGET.pe
     (redTeamTotal === 0 || redTeamPass === redTeamTotal);
 
   return {
-    evidence_label: MATRIX_EVIDENCE_LABEL,
-    matrix_total: `${rows.length}/${MATRIX_TARGET.total}`,
+    evidence_label: evidenceLabel,
+    matrix_total: `${rows.length}/${targetTotal}`,
     http200,
     fallback_count: fallback,
     wrong_protocol_count: wrongProtocol,

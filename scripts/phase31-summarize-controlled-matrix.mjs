@@ -7,13 +7,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllShardRows } from './phase31-extract-controlled-matrix-failures.mjs';
 import { writeMatrixArtifacts, loadJsonl } from './lib/phase31-controlled-matrix-summary.mjs';
-import { DEFAULT_MATRIX_OUT } from './lib/phase31-controlled-matrix-config.mjs';
+import { resolvePhase31MatrixRoot } from './lib/phase31-controlled-matrix-config.mjs';
 import { gitSha } from './lib/phase22-full-replay-common.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(argv) {
-  const opts = { in: DEFAULT_MATRIX_OUT, out: null, json: false };
+  const opts = { in: resolvePhase31MatrixRoot(), out: null, json: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--in') opts.in = argv[++i];

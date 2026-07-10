@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolvePhase31MatrixRoot } from './lib/phase31-controlled-matrix-config.mjs';
 import { loadJsonl, protocolLabel, classifyMatrixProbeFailure } from './lib/phase31-controlled-matrix-summary.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -12,7 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TRANSIENT_HTTP = new Set([429, 502, 503, 504]);
 
 function parseArgs(argv) {
-  const opts = { in: '/tmp/phase31-staging-long-soak-matrix', out: null };
+  const opts = { in: resolvePhase31MatrixRoot(), out: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--in') opts.in = argv[++i];

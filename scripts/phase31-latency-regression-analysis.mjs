@@ -7,15 +7,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mergeRows } from './phase31-summarize-controlled-matrix.mjs';
 import { writeMatrixArtifacts } from './lib/phase31-controlled-matrix-summary.mjs';
+import { resolvePhase31MatrixRoot } from './lib/phase31-controlled-matrix-config.mjs';
 import { gitSha } from './lib/phase22-full-replay-common.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PHASE30_BASELINE = '/tmp/phase30-controlled-staging-matrix/phase30-summary.json';
 
 function parseArgs(argv) {
+  const matrixRoot = resolvePhase31MatrixRoot();
   const opts = {
-    in: '/tmp/phase31-staging-long-soak-matrix',
-    out: '/tmp/phase31-staging-long-soak-matrix/phase31-latency-regression.json',
+    in: matrixRoot,
+    out: `${matrixRoot}/phase31-latency-regression.json`,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];

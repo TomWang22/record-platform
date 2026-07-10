@@ -2,7 +2,7 @@
 # Drive Phase 31 from current soak state to CLOSED PASS or BLOCKED.
 set -euo pipefail
 REPO=/Users/tom/record-platform
-OUT=/tmp/phase31-staging-long-soak-matrix
+OUT="${PHASE31_MATRIX_ROOT:-/tmp/phase31d-r2-repaired-staging-long-soak}"
 RESULT="$OUT/phase31-final-result.json"
 TRIAGE="$OUT/phase31-failure-triage.json"
 RETRY_TRIAGE="$OUT/phase31-retryable-triage.json"

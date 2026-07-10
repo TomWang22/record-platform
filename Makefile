@@ -278,10 +278,12 @@ ai-platform-verify-phase31-preflight: ## Phase 31B preflight — Phase 30 archiv
 	node scripts/phase31-production-enablement-decision-guard-readonly.mjs
 	node --test tests/phase31-production-enablement-decision-guard.test.mjs
 
-ai-platform-verify-phase31-matrix: ## Phase 31D soak summary unit tests + /tmp summary check
+PHASE31_MATRIX_ROOT ?= /tmp/phase31d-r2-repaired-staging-long-soak
+
+ai-platform-verify-phase31-matrix: ## Phase 31D-R2 soak summary unit tests + /tmp summary check
 	node --test tests/phase31-controlled-matrix-summary.test.mjs
-	@test -f /tmp/phase31-staging-long-soak-matrix/phase31-matrix.jsonl || (echo "missing /tmp phase31 soak jsonl; run phase31 soak first" && exit 1)
-	node scripts/phase31-summarize-controlled-matrix.mjs --in /tmp/phase31-staging-long-soak-matrix
+	@test -f $(PHASE31_MATRIX_ROOT)/shard-h1/phase31-matrix.jsonl || (echo "missing $(PHASE31_MATRIX_ROOT) shard jsonl; run phase31d-r2 soak first" && exit 1)
+	PHASE31_MATRIX_ROOT=$(PHASE31_MATRIX_ROOT) node scripts/phase31-summarize-controlled-matrix.mjs --in $(PHASE31_MATRIX_ROOT)
 
 ai-platform-verify-phase31-lifecycle-repair: ## Phase 31L preview window coordinator repair tests
 	node --test tests/phase31-preview-window-coordinator.test.mjs

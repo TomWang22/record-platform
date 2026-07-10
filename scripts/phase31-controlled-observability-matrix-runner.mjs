@@ -38,6 +38,7 @@ import {
   classifyMatrixProbeFailure,
   isDeterministicPreviewGateMismatch,
 } from './lib/phase31-controlled-matrix-summary.mjs';
+import { resolvePhase31MatrixRoot } from './lib/phase31-controlled-matrix-config.mjs';
 import {
   PreviewWindowCoordinator,
   coordinatorRootFromRunnerOut,
@@ -51,8 +52,6 @@ const VENV_PYTHON = path.join(REPO_ROOT, 'services/python-ai-service/.venv/bin/p
 const USEFULNESS_HELPER = path.join(REPO_ROOT, 'scripts/phase31-write-usefulness-observation.py');
 const KPI_ROWS_HELPER = path.join(REPO_ROOT, 'scripts/phase31-write-matrix-kpi-rows.py');
 
-const DEFAULT_OUT = '/tmp/phase31-staging-long-soak-matrix';
-
 function parseArgs(argv) {
   const opts = {
     protocol: 'all',
@@ -60,7 +59,7 @@ function parseArgs(argv) {
     runs: MATRIX_TARGET.runs,
     cases: 'phase21-9',
     users: 'n5-plus-contract',
-    out: DEFAULT_OUT,
+    out: resolvePhase31MatrixRoot(),
     resume: false,
     failFast: false,
     summaryOnly: false,

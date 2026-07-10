@@ -27,3 +27,8 @@ export const DEFAULT_MATRIX_OUT = '/tmp/phase31d-r2-repaired-staging-long-soak';
 export const DEFAULT_KPI_REPORT_OUT = '/tmp/phase31-kpi-report';
 export const MATRIX_WORKFLOW = 'phase31d_r2_repaired_staging_long_soak';
 export const ARTIFACT_PREFIX = 'phase31';
+
+/** Env PHASE31_MATRIX_ROOT overrides default R2 soak output (never the blocked original soak). */
+export function resolvePhase31MatrixRoot(env = process.env) {
+  return env.PHASE31_MATRIX_ROOT || DEFAULT_MATRIX_OUT;
+}

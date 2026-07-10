@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 REPO=/Users/tom/record-platform
-OUT="${1:-/tmp/phase31-staging-long-soak-matrix}"
+OUT="${1:-${PHASE31_MATRIX_ROOT:-/tmp/phase31d-r2-repaired-staging-long-soak}}"
 LOG="$OUT/phase31-monitor.log"
 SUMMARY_JSON="$OUT/current-summary.json"
 export T20_EVAL_RAG_PAUSE_SEC=0.15

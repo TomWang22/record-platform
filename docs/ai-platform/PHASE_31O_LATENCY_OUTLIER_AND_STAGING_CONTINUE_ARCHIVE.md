@@ -1,7 +1,7 @@
-# Phase 31K — Latency Outlier and Staging Continue Archive
+# Phase 31O — Latency Outlier and Staging Continue Archive
 
 ```text
-Phase 31K: PASS
+Phase 31O: PASS
 Phase 31: CLOSED PASS
 Decision: B — STAGING CONTINUE
 Production enablement: NOT APPROVED
@@ -42,15 +42,16 @@ This archive clarifies that **CLOSED PASS** means **staging-only continuity**, n
 
 Outlier artifact: `/tmp/phase31d-r2-repaired-staging-long-soak/phase31-latency-outliers-top20.json`
 
-## Repair lineage (reference)
+## Phase 31 ticket map (no label collision)
 
-| Phase | Result |
-| ----- | ------ |
-| 31K (preview lifecycle) | `PHASE_31K_PREVIEW_LIFECYCLE_GATE_ROOT_CAUSE.md` — parallel shard enrollment race |
-| 31L | Shared preview window coordinator |
-| 31M | Targeted replay 3672/3672 PASS |
-| 31N | Decision B — full repaired soak |
-| 31D-R2 | 51840/51840 PASS |
+| Ticket | Scope |
+| ------ | ----- |
+| 31K | Preview lifecycle root cause only — `PHASE_31K_PREVIEW_LIFECYCLE_GATE_ROOT_CAUSE.md` |
+| 31L | Preview lifecycle repair |
+| 31M | Targeted replay PASS |
+| 31N | Full soak replay decision |
+| **31O** | **Latency outlier + staging-continue archive (this doc)** |
+| 31D-R2 | Repaired 51840/51840 soak |
 | 31E–31J | Closeout PASS — STAGING CONTINUE |
 
 ## Production-readiness caveat

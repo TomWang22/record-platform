@@ -117,10 +117,12 @@ Phase 31I: PASS — STAGING CONTINUE (no production enablement)
 Phase 31J: PASS — production enablement decision archive
 Phase 31: CLOSED PASS — repaired long-soak evidence under 31D-R2; staging-only continuity (NOT production enablement)
 Phase 31K (preview lifecycle): PASS — preview lifecycle gate root-cause analysis (parallel shard enrollment race)
-Phase 31K (latency outlier): PASS — latency max outlier ~1,037,645 ms documented; blocks production KPI enablement until RCA
+Phase 31O (latency outlier): PASS — latency max outlier ~1,037,645 ms documented; blocks production KPI enablement until RCA
 Phase 31L: PASS — shared window coordinator + gate verify + JWT validation
 Phase 31M: PASS — targeted replay 3672/3672
 Phase 31N: PASS — Decision B full repaired soak required and completed
+Phase 32A: PASS — latency RCA design + acceptance gates
+Phase 32B: PASS — read-only latency outlier analyzer; output /tmp/phase32-latency-rca/
 Phase 31 evidence label: Phase 31D-R2 repaired staging long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
 Production enablement: NOT APPROVED — latency max outlier ~1,037,645 ms requires RCA before production KPI enablement
 

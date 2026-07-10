@@ -1,11 +1,12 @@
 /**
- * Phase 31K — latency outlier + staging-continue archive guard (read-only).
+ * Phase 31O — latency outlier + staging-continue archive guard (read-only).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 
 export const DOC_LATENCY_ARCHIVE =
-  'docs/ai-platform/PHASE_31K_LATENCY_OUTLIER_AND_STAGING_CONTINUE_ARCHIVE.md';
+  'docs/ai-platform/PHASE_31O_LATENCY_OUTLIER_AND_STAGING_CONTINUE_ARCHIVE.md';
+export const DOC_31K_PREVIEW = 'docs/ai-platform/PHASE_31K_PREVIEW_LIFECYCLE_GATE_ROOT_CAUSE.md';
 export const DOC_OPERATOR = 'docs/ai-platform/PHASE_31_OBSERVABILITY_OPERATOR_GUIDE.md';
 export const DOC_ACTIVE = 'docs/ai-platform/ACTIVE_CONTEXT.md';
 export const DOC_COPILOT = 'docs/ai-platform/PHASE_21_COPILOT_CONTEXT.md';
@@ -67,6 +68,12 @@ function assertMatch(content, pattern, message) {
   }
 }
 
+function assertNoMatch(content, pattern, message) {
+  if (pattern.test(content)) {
+    throw new Phase31LatencyOutlierGuardError(message);
+  }
+}
+
 export function assertNoForbiddenClaims(content, relativePath) {
   for (const line of content.split('\n')) {
     for (const { pattern, label } of FORBIDDEN_PATTERNS) {
@@ -79,7 +86,31 @@ export function assertNoForbiddenClaims(content, relativePath) {
   }
 }
 
+export function validatePhase31KLabelUniqueness(repoRoot) {
+  const docsDir = path.join(repoRoot, 'docs/ai-platform');
+  const phase31kDocs = fs
+    .readdirSync(docsDir)
+    .filter((name) => name.startsWith('PHASE_31K_') && name.endsWith('.md'));
+  if (phase31kDocs.length !== 1 || phase31kDocs[0] !== path.basename(DOC_31K_PREVIEW)) {
+    throw new Phase31LatencyOutlierGuardError(
+      `only one Phase 31K doc allowed (${DOC_31K_PREVIEW}); found: ${phase31kDocs.join(', ')}`,
+    );
+  }
+  const staleLatency = path.join(docsDir, 'PHASE_31K_LATENCY_OUTLIER_AND_STAGING_CONTINUE_ARCHIVE.md');
+  if (fs.existsSync(staleLatency)) {
+    throw new Phase31LatencyOutlierGuardError(
+      'stale PHASE_31K_LATENCY_OUTLIER_AND_STAGING_CONTINUE_ARCHIVE.md must be removed; use Phase 31O',
+    );
+  }
+}
+
 export function validateLatencyArchiveDoc(archive) {
+  assertMatch(archive, /Phase 31O:\s*PASS/i, `${DOC_LATENCY_ARCHIVE} must state Phase 31O PASS`);
+  assertNoMatch(
+    archive,
+    /^Phase 31K:\s*PASS/m,
+    `${DOC_LATENCY_ARCHIVE} must not label itself Phase 31K`,
+  );
   assertMatch(archive, /Phase 31:\s*CLOSED PASS/i, `${DOC_LATENCY_ARCHIVE} must state Phase 31 CLOSED PASS`);
   assertMatch(
     archive,
@@ -117,8 +148,8 @@ export function validateOperatorGuide(operator) {
   );
   assertMatch(
     operator,
-    /latency max outlier|1[,.]?037[,.]?645/i,
-    `${DOC_OPERATOR} must document latency outlier caveat`,
+    /PHASE_31O_LATENCY_OUTLIER_AND_STAGING_CONTINUE_ARCHIVE\.md/i,
+    `${DOC_OPERATOR} must point to Phase 31O latency archive`,
   );
   assertMatch(
     operator,
@@ -139,10 +170,15 @@ export function validateActiveContext(active) {
     /Production enablement:.*NOT APPROVED/i,
     `${DOC_ACTIVE} must deny production enablement`,
   );
+  assertNoMatch(
+    active,
+    /31K \(latency|31K latency/i,
+    `${DOC_ACTIVE} must not label latency outlier as Phase 31K`,
+  );
   assertMatch(
     active,
-    /latency outlier|1[,.]?037[,.]?645|LATENCY_OUTLIER/i,
-    `${DOC_ACTIVE} must reference latency outlier caveat`,
+    /Phase 31O.*latency outlier/i,
+    `${DOC_ACTIVE} must reference Phase 31O latency outlier`,
   );
 }
 
@@ -161,6 +197,7 @@ export function validateCopilotContext(copilot) {
 }
 
 export function validatePhase31LatencyOutlierGuard(repoRoot) {
+  validatePhase31KLabelUniqueness(repoRoot);
   validateLatencyArchiveDoc(readFile(repoRoot, DOC_LATENCY_ARCHIVE));
   validateOperatorGuide(readFile(repoRoot, DOC_OPERATOR));
   validateActiveContext(readFile(repoRoot, DOC_ACTIVE));

@@ -294,7 +294,7 @@ ai-platform-verify-phase31-targeted-replay: ## Phase 31M targeted replay unit te
 	$(MAKE) ai-platform-verify-phase31-lifecycle-repair
 	node --test tests/phase31-targeted-replay-summary.test.mjs
 
-ai-platform-verify-phase31-latency-outlier: ## Phase 31K latency outlier + staging continue guard
+ai-platform-verify-phase31-latency-outlier: ## Phase 31O latency outlier + staging continue guard
 	node scripts/phase31-latency-outlier-guard-readonly.mjs
 	node --test tests/phase31-latency-outlier-guard.test.mjs
 
@@ -306,6 +306,13 @@ ai-platform-verify-phase31-closeout: ## Phase 31J closeout — drills + guard + 
 	node scripts/phase31-production-enablement-decision-guard-readonly.mjs
 	$(MAKE) ai-platform-verify-phase31-latency-outlier
 	$(MAKE) ai-platform-verify-phase31-matrix
+
+PHASE32_LATENCY_RCA_OUT ?= /tmp/phase32-latency-rca
+
+ai-platform-verify-phase32-latency-rca: ## Phase 32B read-only latency RCA analyzer + unit tests
+	node --test tests/phase32-latency-rca-analyzer.test.mjs
+	@test -f $(PHASE31_MATRIX_ROOT)/shard-h1/phase31-matrix.jsonl || (echo "missing $(PHASE31_MATRIX_ROOT) shard jsonl; run phase31d-r2 soak first" && exit 1)
+	PHASE31_MATRIX_ROOT=$(PHASE31_MATRIX_ROOT) node scripts/phase32-latency-outlier-analyzer-readonly.mjs --in $(PHASE31_MATRIX_ROOT) --out $(PHASE32_LATENCY_RCA_OUT)
 
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns

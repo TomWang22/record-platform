@@ -5,7 +5,7 @@ Practical runbook for Phase 31 staging-only observability. **No production enabl
 Related:
 
 - R2 soak: `PHASE_31D_R2_REPAIRED_STAGING_LONG_SOAK.md`
-- Latency caveat: `PHASE_31K_LATENCY_OUTLIER_AND_STAGING_CONTINUE_ARCHIVE.md`
+- Latency caveat: `PHASE_31O_LATENCY_OUTLIER_AND_STAGING_CONTINUE_ARCHIVE.md`
 - Closeout archive: `PHASE_31J_PRODUCTION_KPI_ENABLEMENT_DECISION_ARCHIVE.md`
 - Active context: `ACTIVE_CONTEXT.md`
 
@@ -15,7 +15,7 @@ Related:
 
 ```text
 1. Start with ACTIVE_CONTEXT.md.
-2. Read PHASE_31K_LATENCY_OUTLIER_AND_STAGING_CONTINUE_ARCHIVE.md for production-readiness caveat.
+2. Read PHASE_31O_LATENCY_OUTLIER_AND_STAGING_CONTINUE_ARCHIVE.md for production-readiness caveat.
 3. Use 31A–31J docs as ticket closeouts.
 4. Phase 31D-R2 matrix proves staging soak — NOT production enablement.
 ```

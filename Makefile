@@ -329,6 +329,16 @@ ai-platform-verify-phase32e-slow-kpi-write-durability: ## Phase 32E slow KPI wri
 	node --test tests/phase32e-slow-kpi-write-durability.test.mjs
 	node scripts/phase32e-summarize-slow-kpi-write-durability.mjs --in /tmp/phase32e-slow-kpi-write-durability --require-pass
 
+ai-platform-verify-phase32f-latency-rca: ## Phase 32F latency stall RCA + instrumentation verifier
+	$(MAKE) ai-platform-verify-phase32e-slow-kpi-write-durability
+	node --test tests/phase32f-stall-attribution-analyzer.test.mjs
+	node scripts/phase32f-stall-attribution-analyzer.mjs \
+	  --phase31 /tmp/phase31d-r2-repaired-staging-long-soak \
+	  --phase32d /tmp/phase32d-timing-attribution-micro-soak \
+	  --phase32e /tmp/phase32e-slow-kpi-write-durability \
+	  --out /tmp/phase32f-latency-stall-analysis \
+	  --require-pass
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

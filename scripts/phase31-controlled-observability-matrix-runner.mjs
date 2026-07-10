@@ -7,6 +7,7 @@
  */
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -156,9 +157,43 @@ function extractRefs(body) {
   );
 }
 
+const ENABLE_ENV = {
+  AI_KPI_OBSERVABILITY_MASTER_DISABLE: '0',
+  AI_KPI_OBSERVABILITY_ENABLED: '1',
+  AI_KPI_QUERY_OBSERVATIONS_ENABLED: '1',
+  AI_KPI_USEFULNESS_OBSERVATIONS_ENABLED: '1',
+  AI_KPI_ENVIRONMENT: 'local',
+};
+
+function loadShardRestartCount(outDir) {
+  const countPath = path.join(outDir, 'shard-restart-count.txt');
+  if (!fs.existsSync(countPath)) return 0;
+  const value = Number(String(fs.readFileSync(countPath, 'utf8')).trim());
+  return Number.isFinite(value) ? value : 0;
+}
+
+function sampleProcessMetrics(cpuStart, eventLoopHandle) {
+  const cpuDelta = process.cpuUsage(cpuStart);
+  if (eventLoopHandle) eventLoopHandle.disable();
+  const eventLoopDelayMs =
+    eventLoopHandle && eventLoopHandle.mean > 0
+      ? Math.round((eventLoopHandle.mean / 1e6) * 10) / 10
+      : null;
+  return {
+    event_loop_delay_ms: eventLoopDelayMs,
+    process_cpu_user_ms: Math.round((cpuDelta.user / 1000) * 10) / 10,
+    process_cpu_system_ms: Math.round((cpuDelta.system / 1000) * 10) / 10,
+    rss_mb: Math.round((process.memoryUsage().rss / (1024 * 1024)) * 10) / 10,
+  };
+}
+
 function writeMatrixKpiRows(probe, resp, meta, rubric, qualityScore) {
   if (!fs.existsSync(VENV_PYTHON) || !fs.existsSync(KPI_ROWS_HELPER)) {
-    return { query: { status: 'SKIPPED' }, usefulness: { status: 'SKIPPED' } };
+    return {
+      query: { status: 'SKIPPED' },
+      usefulness: { status: 'SKIPPED' },
+      child_process_spawn_ms: 0,
+    };
   }
   const payload = {
     query: {
@@ -195,6 +230,7 @@ function writeMatrixKpiRows(probe, resp, meta, rubric, qualityScore) {
     AI_KPI_TEST_INJECT_TIMEOUT_MS: process.env.AI_KPI_TEST_INJECT_TIMEOUT_MS || '0',
     AI_KPI_TEST_INJECT_DB_UNAVAILABLE: process.env.AI_KPI_TEST_INJECT_DB_UNAVAILABLE || '0',
   };
+  const spawnStartMs = Date.now();
   const result = spawnSync(VENV_PYTHON, [KPI_ROWS_HELPER, JSON.stringify(payload)], {
     encoding: 'utf8',
     env: {
@@ -206,19 +242,22 @@ function writeMatrixKpiRows(probe, resp, meta, rubric, qualityScore) {
         'postgresql://postgres:postgres@127.0.0.1:5440/python_ai',
     },
   });
+  const child_process_spawn_ms = Date.now() - spawnStartMs;
   if (result.status !== 0) {
-    return { query: { status: 'FAIL' }, usefulness: { status: 'FAIL' }, error: result.stderr || result.stdout };
+    return {
+      query: { status: 'FAIL' },
+      usefulness: { status: 'FAIL' },
+      error: result.stderr || result.stdout,
+      child_process_spawn_ms,
+    };
   }
-  return { query: { status: 'PASS' }, usefulness: { status: 'PASS' }, id: result.stdout.trim() };
+  return {
+    query: { status: 'PASS' },
+    usefulness: { status: 'PASS' },
+    id: result.stdout.trim(),
+    child_process_spawn_ms,
+  };
 }
-
-const ENABLE_ENV = {
-  AI_KPI_OBSERVABILITY_MASTER_DISABLE: '0',
-  AI_KPI_OBSERVABILITY_ENABLED: '1',
-  AI_KPI_QUERY_OBSERVATIONS_ENABLED: '1',
-  AI_KPI_USEFULNESS_OBSERVATIONS_ENABLED: '1',
-  AI_KPI_ENVIRONMENT: 'local',
-};
 
 function validateAllParticipants(users, getToken) {
   for (const user of users) {
@@ -253,6 +292,9 @@ function probeMatchKey(probe, userUidHash) {
 function executeProbe(probe, cfg, getToken, probeContext = {}) {
   const probeStartedAt = new Date().toISOString();
   const probeStartMs = Date.now();
+  const cpuStart = process.cpuUsage();
+  const eventLoopHandle = monitorEventLoopDelay({ resolution: 20 });
+  eventLoopHandle.enable();
   const proto = PROTOCOLS[probe.matrix_protocol];
   const token = getToken(probe.user_email);
   const userId = probe.user_uid;
@@ -268,13 +310,28 @@ function executeProbe(probe, cfg, getToken, probeContext = {}) {
   let retry_delay_ms = 0;
   let curl_time_total_ms = null;
   let app_rag_total_ms = null;
+  let serverTiming = {};
+  let curl_exit_code = null;
+  let curl_error_class = null;
+  let curl_time_namelookup_ms = null;
+  let curl_time_connect_ms = null;
+  let curl_time_appconnect_ms = null;
+  let curl_time_pretransfer_ms = null;
+  let curl_time_starttransfer_ms = null;
   for (let attempt = 0; attempt < 16; attempt += 1) {
     try {
       resp = ragQuery(token, userId, probe.question, cfg, proto, { maxRetries: 8 });
       retry_count += Number(resp.retry_count || 0);
       retry_delay_ms += Number(resp.retry_delay_ms || 0);
       curl_time_total_ms = resp.curl_time_total_ms ?? resp.rag_total_ms ?? null;
-      const serverTiming = extractServerTimingFromBody(resp.body || {});
+      curl_exit_code = resp.curl_exit_code ?? 0;
+      curl_error_class = resp.curl_error_class ?? 'ok';
+      curl_time_namelookup_ms = resp.curl_time_namelookup_ms ?? null;
+      curl_time_connect_ms = resp.curl_time_connect_ms ?? null;
+      curl_time_appconnect_ms = resp.curl_time_appconnect_ms ?? null;
+      curl_time_pretransfer_ms = resp.curl_time_pretransfer_ms ?? null;
+      curl_time_starttransfer_ms = resp.curl_time_starttransfer_ms ?? null;
+      serverTiming = extractServerTimingFromBody(resp.body || {});
       app_rag_total_ms = serverTiming.rag_total_ms;
       if ([502, 503, 504, 429].includes(resp.http_status) && attempt + 1 < 16) {
         const delay = Math.min(10000, 500 * 2 ** attempt);
@@ -308,6 +365,7 @@ function executeProbe(probe, cfg, getToken, probeContext = {}) {
   const kpiStartMs = Date.now();
   const kpiWrites = writeMatrixKpiRows(probe, resp, meta, rubric, qualityScore);
   const kpi_query_write_ms = Date.now() - kpiStartMs;
+  const processMetrics = sampleProcessMetrics(cpuStart, eventLoopHandle);
   const probeFinishedAt = new Date().toISOString();
   const timing = buildTimingAttribution({
     probe_started_at: probeStartedAt,
@@ -323,6 +381,26 @@ function executeProbe(probe, cfg, getToken, probeContext = {}) {
     kpi_query_write_ms,
     kpi_usefulness_write_ms: 0,
     jsonl_write_ms: 0,
+    stall: {
+      ...processMetrics,
+      coordinator_lock_wait_ms: probeContext.coordinator_lock_wait_ms ?? null,
+      coordinator_stale_lock_recovered: probeContext.coordinator_stale_lock_recovered ?? false,
+      coordinator_lock_owner_protocol: probeContext.coordinator_lock_owner_protocol ?? null,
+      coordinator_lock_owner_pid: probeContext.coordinator_lock_owner_pid ?? null,
+      child_process_spawn_ms: kpiWrites.child_process_spawn_ms ?? null,
+      curl_exit_code,
+      curl_error_class,
+      curl_time_namelookup_ms,
+      curl_time_connect_ms,
+      curl_time_appconnect_ms,
+      curl_time_pretransfer_ms,
+      curl_time_starttransfer_ms,
+      server_timing_rag_total_ms: serverTiming.server_timing_rag_total_ms ?? null,
+      server_timing_retrieval_total_ms: serverTiming.server_timing_retrieval_total_ms ?? null,
+      server_timing_kpi_query_write_ms: serverTiming.server_timing_kpi_query_write_ms ?? null,
+      probe_gap_since_previous_ms: probeContext.probe_gap_since_previous_ms ?? null,
+      shard_restart_count: probeContext.shard_restart_count ?? null,
+    },
   });
   const row = attachTimingToProbeRow(
     redactedRow(probe, {
@@ -429,8 +507,17 @@ function runMatrix(opts) {
 
   const failures = [];
   let lastWindow = null;
-  let windowTiming = { coordinator_wait_ms: 0, window_reset_ms: 0 };
+  let windowTiming = {
+    coordinator_wait_ms: 0,
+    window_reset_ms: 0,
+    coordinator_lock_wait_ms: 0,
+    coordinator_stale_lock_recovered: false,
+    coordinator_lock_owner_protocol: null,
+    coordinator_lock_owner_pid: null,
+  };
   let firstProbeInWindow = true;
+  let lastProbeFinishedMs = null;
+  const shardRestartCount = loadShardRestartCount(opts.out);
   for (const probe of targetProbes) {
     if (!retryMode && completed.has(probe.probe_id)) continue;
 
@@ -451,17 +538,34 @@ function runMatrix(opts) {
     }
 
     const probeContext = firstProbeInWindow
-      ? windowTiming
-      : { coordinator_wait_ms: 0, window_reset_ms: 0, pre_probe_gate_verify_ms: 0 };
+      ? {
+          ...windowTiming,
+          probe_gap_since_previous_ms:
+            lastProbeFinishedMs == null ? null : Math.max(0, Date.now() - lastProbeFinishedMs),
+          shard_restart_count: shardRestartCount,
+        }
+      : {
+          coordinator_wait_ms: 0,
+          window_reset_ms: 0,
+          pre_probe_gate_verify_ms: 0,
+          coordinator_lock_wait_ms: 0,
+          coordinator_stale_lock_recovered: false,
+          coordinator_lock_owner_protocol: null,
+          coordinator_lock_owner_pid: null,
+          probe_gap_since_previous_ms:
+            lastProbeFinishedMs == null ? null : Math.max(0, Date.now() - lastProbeFinishedMs),
+          shard_restart_count: shardRestartCount,
+        };
     firstProbeInWindow = false;
 
     const { row, probeFail, failureClass } = executeProbe(probe, cfg, getToken, probeContext);
     if (retryMode) row.retry_of_probe_id = probe.probe_id;
     const jsonlStartMs = Date.now();
     row.timing = finalizeProbeTiming(row, { jsonl_write_ms: 0 });
-    const jsonl_write_ms = Date.now() - jsonlStartMs;
-    row.timing = finalizeProbeTiming(row, { jsonl_write_ms });
+    const jsonl_flush_ms = Date.now() - jsonlStartMs;
+    row.timing = finalizeProbeTiming(row, { jsonl_write_ms: jsonl_flush_ms, jsonl_flush_ms });
     fs.appendFileSync(jsonlPath, `${JSON.stringify(row)}\n`, 'utf8');
+    lastProbeFinishedMs = Date.now();
     if (!retryMode) completed.add(probe.probe_id);
 
     if (probeFail) {

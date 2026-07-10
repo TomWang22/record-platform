@@ -128,20 +128,43 @@ export class PreviewWindowCoordinator {
     }
   }
 
-  acquireLock() {
+  acquireLock(protocol = null) {
+    let staleLockRecovered = false;
+    let lockOwnerProtocol = null;
+    let lockOwnerPid = null;
+    const lockWaitStart = Date.now();
     const deadline = Date.now() + this.waitTimeoutMs;
     while (Date.now() < deadline) {
+      if (fs.existsSync(this.lockMetaPath)) {
+        try {
+          const prior = JSON.parse(fs.readFileSync(this.lockMetaPath, 'utf8'));
+          lockOwnerProtocol = prior.protocol ?? null;
+          lockOwnerPid = Number.isFinite(Number(prior.pid)) ? Number(prior.pid) : null;
+        } catch {
+          /* ignore unreadable lock meta */
+        }
+      }
       try {
         fs.mkdirSync(this.lockDir, { recursive: false });
         fs.writeFileSync(
           this.lockMetaPath,
-          `${JSON.stringify({ pid: process.pid, acquired_at: new Date().toISOString() }, null, 2)}\n`,
+          `${JSON.stringify(
+            { pid: process.pid, protocol, acquired_at: new Date().toISOString() },
+            null,
+            2,
+          )}\n`,
           'utf8',
         );
-        return;
+        return {
+          coordinator_lock_wait_ms: Date.now() - lockWaitStart,
+          coordinator_stale_lock_recovered: staleLockRecovered,
+          coordinator_lock_owner_protocol: lockOwnerProtocol,
+          coordinator_lock_owner_pid: lockOwnerPid,
+        };
       } catch (err) {
         if (err?.code !== 'EEXIST') throw err;
         if (this.isLockStale()) {
+          staleLockRecovered = true;
           this.forceReleaseLock();
           continue;
         }
@@ -169,10 +192,10 @@ export class PreviewWindowCoordinator {
     }
   }
 
-  withLock(fn) {
-    this.acquireLock();
+  withLock(fn, protocol = null) {
+    const lockMeta = this.acquireLock(protocol);
     try {
-      return fn();
+      return fn(lockMeta);
     } finally {
       this.releaseLock();
     }
@@ -215,12 +238,23 @@ export class PreviewWindowCoordinator {
       throw new Error(`unexpected protocol for coordinator: ${protocol}`);
     }
 
-    const timing = { coordinator_wait_ms: 0, window_reset_ms: 0 };
+    const timing = {
+      coordinator_wait_ms: 0,
+      window_reset_ms: 0,
+      coordinator_lock_wait_ms: 0,
+      coordinator_stale_lock_recovered: false,
+      coordinator_lock_owner_protocol: null,
+      coordinator_lock_owner_pid: null,
+    };
     const waitStart = Date.now();
     this.waitForPreviousWindowComplete(window);
     timing.coordinator_wait_ms = Date.now() - waitStart;
 
-    return this.withLock(() => {
+    return this.withLock((lockMeta) => {
+      timing.coordinator_lock_wait_ms = lockMeta.coordinator_lock_wait_ms ?? 0;
+      timing.coordinator_stale_lock_recovered = lockMeta.coordinator_stale_lock_recovered === true;
+      timing.coordinator_lock_owner_protocol = lockMeta.coordinator_lock_owner_protocol ?? null;
+      timing.coordinator_lock_owner_pid = lockMeta.coordinator_lock_owner_pid ?? null;
       const state = this.readState();
       const key = String(window);
       const ws = state.window_status[key] || defaultWindowStatus();
@@ -252,7 +286,7 @@ export class PreviewWindowCoordinator {
       state.window_status[key] = ws;
       this.writeState(state);
       return { reset_count: ws.reset_count, gate_verified: ws.gate_verified, timing };
-    });
+    }, protocol);
   }
 
   completeWindowProtocol(window, protocol) {

@@ -225,6 +225,53 @@ export function percentile(values, p) {
   return sorted[idx];
 }
 
+export function classifyCurlError(exitCode, stderr = '', httpStatus = null) {
+  const code = Number(exitCode);
+  const err = String(stderr || '').toLowerCase();
+  if (code === 0 && httpStatus != null && httpStatus >= 200 && httpStatus < 500) return 'ok';
+  if (code === 28 || /timed out|timeout/i.test(err)) return 'timeout';
+  if (code === 35 || code === 51 || code === 60 || /ssl|certificate|tls/i.test(err)) return 'tls';
+  if (code === 6 || code === 7 || /could not resolve|connection refused|failed to connect/i.test(err)) {
+    return 'connection';
+  }
+  if (httpStatus != null && httpStatus >= 500) return 'http';
+  if (code !== 0) return 'curl_exit';
+  return 'unknown';
+}
+
+function parseCurlWriteOut(stdout) {
+  const parts = String(stdout || '').trim().split('|');
+  const toMs = (v) => {
+    const num = Number(v);
+    return Number.isFinite(num) && num >= 0 ? Math.round(num * 1000 * 10) / 10 : null;
+  };
+  if (parts.length < 3) {
+    return {
+      http_status: null,
+      http_version: null,
+      curl_time_namelookup_ms: null,
+      curl_time_connect_ms: null,
+      curl_time_appconnect_ms: null,
+      curl_time_pretransfer_ms: null,
+      curl_time_starttransfer_ms: null,
+      curl_time_total_ms: null,
+      curl_exit_code: null,
+    };
+  }
+  const hasExtended = parts.length >= 9;
+  return {
+    http_status: Number(parts[0]),
+    http_version: parts[1],
+    curl_time_namelookup_ms: hasExtended ? toMs(parts[2]) : null,
+    curl_time_connect_ms: hasExtended ? toMs(parts[3]) : null,
+    curl_time_appconnect_ms: hasExtended ? toMs(parts[4]) : null,
+    curl_time_pretransfer_ms: hasExtended ? toMs(parts[5]) : null,
+    curl_time_starttransfer_ms: hasExtended ? toMs(parts[6]) : null,
+    curl_time_total_ms: toMs(hasExtended ? parts[7] : parts[2]),
+    curl_exit_code: hasExtended ? Number(parts[8]) : 0,
+  };
+}
+
 export function curlRequest({
   method = 'GET',
   urlPath,
@@ -248,7 +295,7 @@ export function curlRequest({
     '--request',
     method,
     '--write-out',
-    '%{http_code}|%{http_version}|%{time_total}',
+    '%{http_code}|%{http_version}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_pretransfer}|%{time_starttransfer}|%{time_total}|%{exitcode}',
     '--output',
     outFile,
   ];
@@ -264,25 +311,41 @@ export function curlRequest({
 
   const env = { ...process.env, NGTCP2_ENABLE_GSO: '0' };
   const result = spawnSync(DEFAULTS.curlBin, args, { encoding: 'utf8', env, maxBuffer: 20 * 1024 * 1024 });
+  const parsedOut = parseCurlWriteOut(result.stdout);
+  const curlExitCode = result.status !== 0 ? result.status : (parsedOut.curl_exit_code ?? 0);
+  const curlErrorClass = classifyCurlError(
+    curlExitCode,
+    result.stderr || result.stdout,
+    parsedOut.http_status,
+  );
   if (result.error) throw result.error;
   if (result.status !== 0) {
-    throw new Error(`curl failed: ${result.stderr || result.stdout}`);
+    const err = new Error(`curl failed: ${result.stderr || result.stdout}`);
+    err.curl_exit_code = curlExitCode;
+    err.curl_error_class = curlErrorClass;
+    throw err;
   }
-  const [status, version, timeTotal] = (result.stdout || '').trim().split('|');
   let parsed = {};
   if (fs.existsSync(outFile)) {
     const raw = fs.readFileSync(outFile, 'utf8');
     if (raw.trim()) parsed = JSON.parse(raw);
   }
   fs.rmSync(tmpBody, { recursive: true, force: true });
-  const curlMs = Math.round(Number(timeTotal) * 1000 * 10) / 10;
+  const curlMs = parsedOut.curl_time_total_ms;
   return {
-    http_status: Number(status),
-    http_version: version,
+    http_status: parsedOut.http_status,
+    http_version: parsedOut.http_version,
     curl_time_total_ms: curlMs,
     rag_total_ms: curlMs,
+    curl_exit_code: curlExitCode,
+    curl_error_class: curlErrorClass,
+    curl_time_namelookup_ms: parsedOut.curl_time_namelookup_ms,
+    curl_time_connect_ms: parsedOut.curl_time_connect_ms,
+    curl_time_appconnect_ms: parsedOut.curl_time_appconnect_ms,
+    curl_time_pretransfer_ms: parsedOut.curl_time_pretransfer_ms,
+    curl_time_starttransfer_ms: parsedOut.curl_time_starttransfer_ms,
     body: parsed,
-    version_ok: version === expectedVersion,
+    version_ok: parsedOut.http_version === expectedVersion,
   };
 }
 

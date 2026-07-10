@@ -1,5 +1,5 @@
 /**
- * Phase 32C — timing attribution helpers for matrix probe JSONL rows.
+ * Phase 32C/32F — timing attribution helpers for matrix probe JSONL rows.
  */
 import { FORBIDDEN_FIELDS as MATRIX_FORBIDDEN_FIELDS } from './phase31-controlled-matrix-summary.mjs';
 
@@ -19,6 +19,33 @@ export const TIMING_FIELDS = [
   'jsonl_write_ms',
   'unattributed_ms',
 ];
+
+export const STALL_CAPTURE_FIELDS = [
+  'event_loop_delay_ms',
+  'process_cpu_user_ms',
+  'process_cpu_system_ms',
+  'rss_mb',
+  'coordinator_lock_wait_ms',
+  'coordinator_stale_lock_recovered',
+  'coordinator_lock_owner_protocol',
+  'coordinator_lock_owner_pid',
+  'child_process_spawn_ms',
+  'curl_exit_code',
+  'curl_error_class',
+  'curl_time_namelookup_ms',
+  'curl_time_connect_ms',
+  'curl_time_appconnect_ms',
+  'curl_time_pretransfer_ms',
+  'curl_time_starttransfer_ms',
+  'server_timing_rag_total_ms',
+  'server_timing_retrieval_total_ms',
+  'server_timing_kpi_query_write_ms',
+  'jsonl_flush_ms',
+  'probe_gap_since_previous_ms',
+  'shard_restart_count',
+];
+
+export const ALL_TIMING_FIELDS = [...TIMING_FIELDS, ...STALL_CAPTURE_FIELDS];
 
 export const KNOWN_TIMING_MS_FIELDS = [
   'coordinator_wait_ms',
@@ -88,13 +115,42 @@ export function extractServerTimingFromBody(body) {
     const num = Number(details[key]);
     return Number.isFinite(num) && num >= 0 ? roundMs(num) : null;
   };
+  const rag = extractAppRagTotalMs(body);
   return {
-    rag_total_ms: extractAppRagTotalMs(body),
+    rag_total_ms: rag,
     server_total_ms: pick('server_total_ms'),
     retrieval_total_ms: pick('retrieval_total_ms'),
     kpi_query_write_ms: pick('kpi_query_write_ms'),
     kpi_usefulness_write_ms: pick('kpi_usefulness_write_ms'),
+    server_timing_rag_total_ms: rag,
+    server_timing_retrieval_total_ms: pick('retrieval_total_ms'),
+    server_timing_kpi_query_write_ms: pick('kpi_query_write_ms'),
   };
+}
+
+export function mergeStallCaptureFields(timing, stall = {}) {
+  const merged = { ...timing };
+  for (const field of STALL_CAPTURE_FIELDS) {
+    if (field === 'coordinator_stale_lock_recovered') {
+      merged[field] = stall[field] === true;
+      continue;
+    }
+    if (field === 'coordinator_lock_owner_protocol') {
+      merged[field] = stall[field] ?? null;
+      continue;
+    }
+    if (field === 'curl_error_class') {
+      merged[field] = stall[field] ?? null;
+      continue;
+    }
+    if (field === 'shard_restart_count' || field === 'coordinator_lock_owner_pid' || field === 'curl_exit_code') {
+      const num = stall[field];
+      merged[field] = Number.isFinite(Number(num)) ? Number(num) : null;
+      continue;
+    }
+    merged[field] = roundMs(stall[field]);
+  }
+  return merged;
 }
 
 export function computeWallTotalMs(probeStartedAt, probeFinishedAt) {
@@ -172,13 +228,40 @@ export function buildTimingAttribution(input = {}) {
   }
 
   timing.unattributed_ms = computeUnattributedMs(timing);
-  return timing;
+  return mergeStallCaptureFields(timing, input.stall || input);
+}
+
+export function buildStallCaptureSnapshot(input = {}) {
+  const stall = {};
+  for (const field of STALL_CAPTURE_FIELDS) {
+    if (field in input) stall[field] = input[field];
+  }
+  return mergeStallCaptureFields(
+    {
+      probe_started_at: null,
+      probe_finished_at: null,
+      wall_total_ms: null,
+      curl_time_total_ms: null,
+      rag_total_ms: null,
+      coordinator_wait_ms: 0,
+      window_reset_ms: 0,
+      pre_probe_gate_verify_ms: 0,
+      retry_count: 0,
+      retry_delay_ms: 0,
+      kpi_query_write_ms: 0,
+      kpi_usefulness_write_ms: 0,
+      jsonl_write_ms: 0,
+      unattributed_ms: null,
+    },
+    stall,
+  );
 }
 
 export function finalizeProbeTiming(row, extra = {}) {
   const merged = buildTimingAttribution({
     ...row.timing,
     ...extra,
+    stall: { ...row.timing, ...extra },
     probe_started_at: row.timing?.probe_started_at ?? extra.probe_started_at,
     probe_finished_at: extra.probe_finished_at ?? row.timing?.probe_finished_at,
   });

@@ -294,9 +294,11 @@ async def insert_kpi_ingestion_event_row(row: RedactedIngestionEventRow) -> str:
 
 async def write_kpi_ingestion_event(payload: Mapping[str, Any]) -> Optional[str]:
     from app.ai.kpi_observability import kpi_writes_allowed
+    from app.ai.kpi_write_injection import apply_kpi_write_injection_async
 
     if not kpi_writes_allowed("ingestion"):
         return None
+    await apply_kpi_write_injection_async("ingestion")
     row = build_redacted_ingestion_event(payload)
     return await insert_kpi_ingestion_event_row(row)
 
@@ -313,6 +315,9 @@ def write_kpi_ingestion_event_sync(
 
     if not kpi_writes_allowed("ingestion"):
         return None
+    from app.ai.kpi_write_injection import apply_kpi_write_injection_sync
+
+    apply_kpi_write_injection_sync("ingestion")
     row = build_redacted_ingestion_event(payload)
     if insert_fn is not None:
         return insert_fn(row)

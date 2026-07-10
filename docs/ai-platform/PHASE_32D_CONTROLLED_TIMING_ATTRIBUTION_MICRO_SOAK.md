@@ -2,8 +2,8 @@
 
 ```text
 Phase 32D: PASS
-Matrix: 3888/3888
-17-minute outlier reproduced: NO
+Controlled real inference: RUN (3888/3888 timing attribution micro-soak)
+Production/live eval: NOT RUN
 Max wall latency: HTTP/1.1 9315ms, HTTP/2 7809ms, HTTP/3 9245ms
 Attribution: window_reset_ms dominant component in micro-soak (not outlier tier)
 Production enablement: NOT APPROVED

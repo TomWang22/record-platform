@@ -125,11 +125,13 @@ Phase 32A: PASS — latency RCA design + acceptance gates
 Phase 32B: PASS — read-only latency outlier analyzer; output /tmp/phase32-latency-rca/
 Phase 32C: PASS — timing attribution instrumentation ready for 32D micro-soak
 Phase 32D: PASS — timing attribution micro-soak 3888/3888; 17-minute outlier NOT reproduced
+Phase 32E: PASS — slow KPI write durability 1296/1296 × 3 modes; KPI write path fail-open under injected delay/failure
 Phase 31 evidence label: Phase 31D-R2 repaired staging long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
 Production enablement: NOT APPROVED — latency max outlier ~1,037,645 ms requires RCA before production KPI enablement
 
 Live eval run: NOT RUN
-Controlled real inference run: PASS (Phase 30F matrix 25920/25920)
+Controlled real inference: RUN (Phase 32D 3888/3888 timing micro-soak PASS; Phase 32E 3888/3888 KPI durability PASS)
+Production/live eval: NOT RUN
 Production DB migration: NOT RUN
 Local/dev schema apply: PASS (python_ai @ 127.0.0.1:5440; Phase 27 only — no new writes in 28A/28B)
 DB writes: controlled matrix KPI rows on local/dev only during 28D run; flags rolled back after 28G
@@ -211,4 +213,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Approved: start Phase 31A production KPI enablement decision track after Phase 30K archive PASS — no production enablement performed in Phase 31.
+Phase 32E PASS — KPI write path fail-open verified. Next: Phase 32F remediation/design only after explicit approval (no production enablement).

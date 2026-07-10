@@ -189,11 +189,18 @@ function writeMatrixKpiRows(probe, resp, meta, rubric, qualityScore) {
       quality_score: qualityScore,
     },
   };
+  const injectionEnv = {
+    AI_KPI_TEST_INJECT_WRITE_DELAY_MS: process.env.AI_KPI_TEST_INJECT_WRITE_DELAY_MS || '0',
+    AI_KPI_TEST_INJECT_WRITE_FAILURE_RATE: process.env.AI_KPI_TEST_INJECT_WRITE_FAILURE_RATE || '0',
+    AI_KPI_TEST_INJECT_TIMEOUT_MS: process.env.AI_KPI_TEST_INJECT_TIMEOUT_MS || '0',
+    AI_KPI_TEST_INJECT_DB_UNAVAILABLE: process.env.AI_KPI_TEST_INJECT_DB_UNAVAILABLE || '0',
+  };
   const result = spawnSync(VENV_PYTHON, [KPI_ROWS_HELPER, JSON.stringify(payload)], {
     encoding: 'utf8',
     env: {
       ...process.env,
       ...ENABLE_ENV,
+      ...injectionEnv,
       POSTGRES_URL_PYTHON_AI:
         process.env.POSTGRES_URL_PYTHON_AI ||
         'postgresql://postgres:postgres@127.0.0.1:5440/python_ai',

@@ -299,9 +299,11 @@ async def insert_kpi_query_observation_row(row: RedactedQueryObservationRow) -> 
 
 async def write_kpi_query_observation(payload: Mapping[str, Any]) -> Optional[str]:
     from app.ai.kpi_observability import kpi_writes_allowed
+    from app.ai.kpi_write_injection import apply_kpi_write_injection_async
 
     if not kpi_writes_allowed("query"):
         return None
+    await apply_kpi_write_injection_async("query")
     row = build_redacted_query_observation(payload)
     return await insert_kpi_query_observation_row(row)
 
@@ -318,6 +320,9 @@ def write_kpi_query_observation_sync(
 
     if not kpi_writes_allowed("query"):
         return None
+    from app.ai.kpi_write_injection import apply_kpi_write_injection_sync
+
+    apply_kpi_write_injection_sync("query")
     row = build_redacted_query_observation(payload)
     if insert_fn is not None:
         return insert_fn(row)
@@ -350,5 +355,10 @@ async def emit_rag_query_observation_safe(
         )
         return await write_kpi_query_observation(payload)
     except Exception as exc:
-        logger.warning("KPI query observation emit skipped: %s", str(exc)[:200])
+        from app.ai.kpi_write_injection import KpiWriteInjectionError
+
+        if isinstance(exc, KpiWriteInjectionError):
+            logger.warning("KPI query observation emit skipped (injection): %s", str(exc)[:200])
+        else:
+            logger.warning("KPI query observation emit skipped: %s", str(exc)[:200])
         return None

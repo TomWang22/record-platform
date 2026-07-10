@@ -323,6 +323,12 @@ ai-platform-verify-phase32d-timing-micro-soak: ## Phase 32D timing micro-soak su
 	node --test tests/phase32d-timing-attribution-summary.test.mjs
 	node scripts/phase32d-summarize-timing-attribution.mjs --in /tmp/phase32d-timing-attribution-micro-soak --require-pass
 
+ai-platform-verify-phase32e-slow-kpi-write-durability: ## Phase 32E slow KPI write durability verifier
+	$(MAKE) ai-platform-verify-phase32d-timing-micro-soak
+	cd services/python-ai-service && python -m unittest tests.test_phase32e_kpi_write_injection
+	node --test tests/phase32e-slow-kpi-write-durability.test.mjs
+	node scripts/phase32e-summarize-slow-kpi-write-durability.mjs --in /tmp/phase32e-slow-kpi-write-durability --require-pass
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

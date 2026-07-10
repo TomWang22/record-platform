@@ -217,9 +217,11 @@ async def insert_kpi_searchability_check_row(row: RedactedSearchabilityCheckRow)
 
 async def write_kpi_searchability_check(payload: Mapping[str, Any]) -> Optional[str]:
     from app.ai.kpi_observability import kpi_writes_allowed
+    from app.ai.kpi_write_injection import apply_kpi_write_injection_async
 
     if not kpi_writes_allowed("searchability"):
         return None
+    await apply_kpi_write_injection_async("searchability")
     row = build_redacted_searchability_check(payload)
     return await insert_kpi_searchability_check_row(row)
 
@@ -236,6 +238,9 @@ def write_kpi_searchability_check_sync(
 
     if not kpi_writes_allowed("searchability"):
         return None
+    from app.ai.kpi_write_injection import apply_kpi_write_injection_sync
+
+    apply_kpi_write_injection_sync("searchability")
     row = build_redacted_searchability_check(payload)
     if insert_fn is not None:
         return insert_fn(row)

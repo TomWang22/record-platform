@@ -641,4 +641,13 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   process.exit(main());
 }
 
-export { buildManifest, runMatrix, parseArgs };
+export {
+  buildManifest,
+  runMatrix,
+  parseArgs,
+  executeProbe,
+  validateAllParticipants,
+  normalizeProtocolKey,
+  resolveMatrixRoot,
+  loadCompletedIds,
+};

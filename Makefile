@@ -355,6 +355,31 @@ ai-platform-verify-phase32g-long-soak: ## Operator Phase 32G long soak verifier 
 	  --out /tmp/phase32g-stall-attribution-analysis \
 	  --require-pass
 
+PHASE32H_MATRIX_ROOT ?= /tmp/phase32h-targeted-reproduction
+
+ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
+	node --test tests/phase32h-targeted-manifest.test.mjs
+	node --test tests/phase32h-inflight-probe-registry.test.mjs
+	node --test tests/phase32h-extreme-watchdog.test.mjs
+	node --test tests/phase32h-targeted-summary.test.mjs
+	node --test tests/phase32h-diagnostic-correlation.test.mjs
+	node --test tests/phase32h-targeted-reproduction-guard.test.mjs
+	node scripts/phase32h-preflight-targeted-reproduction.mjs --infra-only
+
+ai-platform-verify-phase32h-targeted-reproduction: ## Operator Phase 32H targeted matrix verifier (requires /tmp evidence 17280/17280)
+	$(MAKE) ai-platform-verify-phase32h-infra
+	PHASE32H_MATRIX_ROOT=$(PHASE32H_MATRIX_ROOT) node scripts/phase32h-targeted-reproduction-guard-readonly.mjs --require-complete
+	node scripts/phase32h-summarize-targeted-reproduction.mjs --in $(PHASE32H_MATRIX_ROOT) --require-pass
+	node scripts/phase32h-correlate-diagnostic-evidence.mjs --in $(PHASE32H_MATRIX_ROOT)
+
+ai-platform-verify-phase32h-closeout: ## Phase 32H closeout guard + docs
+	$(MAKE) ai-platform-verify-phase32h-targeted-reproduction
+	PHASE32H_MATRIX_ROOT=$(PHASE32H_MATRIX_ROOT) node scripts/phase32h-closeout-guard-readonly.mjs --require-complete
+
+ai-platform-verify-phase32h-capture-smoke: ## Phase 32H-E2 six-probe capture integrity smoke (staging)
+	$(MAKE) ai-platform-verify-phase32h-infra
+	node scripts/phase32h-capture-integrity-smoke.mjs
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

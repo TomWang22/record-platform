@@ -31,7 +31,7 @@ Artifacts under `/tmp` only — not committed.
 - [x] Correct RCA wording (transport-wait localized; root cause unresolved)
 - [x] Run verifiers
 - [x] Commit correction
-- [ ] Push to origin/main (no force push)
+- [x] Push to origin/main (`126bfa6`, no force push)
 
 ### 32H-B — Extreme latency timeline and correlation
 

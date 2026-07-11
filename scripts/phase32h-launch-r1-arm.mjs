@@ -8,6 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   acquireLauncherLock,
+  assertLaunchableEvidenceRoot,
   generateRunId,
   initRunState,
   isCoverageBlocked,
@@ -86,6 +87,7 @@ function startDetached(cmd, args, env = process.env) {
 
 function main() {
   const opts = parseArgs(process.argv.slice(2));
+  assertLaunchableEvidenceRoot(opts.out);
   if (!opts.out.startsWith('/tmp/')) throw new Error('R1 out must be under /tmp');
   if (fs.existsSync(path.join(opts.out, 'FROZEN_BLOCKED_EVIDENCE'))) {
     throw new Error('refusing launch in frozen evidence root');
@@ -193,7 +195,15 @@ function main() {
   }
 
   const tripletRunnerPid = launchTripletRunner(opts, env);
-  const monitorPid = startDetached('bash', [path.join(REPO_ROOT, 'scripts/phase32h-monitor-targeted-reproduction.sh')], env);
+  const monitorLog = path.join(opts.out, 'phase32h-monitor.log');
+  const monitorPid = startDetached(
+    'bash',
+    [
+      '-c',
+      `exec >>"${monitorLog}" 2>&1; export PHASE32H_MATRIX_ROOT="${opts.out}"; while true; do "${path.join(REPO_ROOT, 'scripts/phase32h-monitor-targeted-reproduction.sh')}"; sleep 5; done`,
+    ],
+    env,
+  );
 
   const launchRecord = {
     status: 'IN_PROGRESS',

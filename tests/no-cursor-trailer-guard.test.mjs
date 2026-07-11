@@ -37,11 +37,7 @@ describe('no-cursor-trailer guard', () => {
   });
 
   it('multiple commits with one violation FAIL', () => {
-    const report = auditGitHistory({
-      ref: 'HEAD',
-      strict: true,
-      grandfather: new Set(),
-    });
+    const report = auditGitHistory({ ref: 'HEAD' });
     if (report.violations.length > 0) {
       assert.equal(report.status, 'FAIL');
       assert.ok(report.violations.length >= 1);
@@ -50,8 +46,9 @@ describe('no-cursor-trailer guard', () => {
     }
   });
 
-  it('grandfathered historical violations PASS under enforce policy', () => {
-    const report = auditGitHistory({ ref: 'HEAD', strict: false });
-    assert.equal(report.status, 'PASS');
+  it('strict policy has no grandfather exceptions', () => {
+    const report = auditGitHistory({ ref: 'HEAD' });
+    assert.equal(report.policy, 'strict-all-commits');
+    assert.ok(!('grandfathered_count' in report));
   });
 });

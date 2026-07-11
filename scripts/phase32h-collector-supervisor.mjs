@@ -26,12 +26,12 @@ function parseArgs(argv) {
 }
 
 function listProcesses() {
-  const ps = spawnSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' });
+  const ps = spawnSync('ps', ['-axo', 'pid=,args='], { encoding: 'utf8' });
   return (ps.stdout || '')
     .split('\n')
     .filter(Boolean)
     .map((line) => {
-      const match = line.trim().match(/^(\d+)\s+(.*)$/);
+      const match = line.trim().match(/^(\d+)\s+(.*)$/s);
       if (!match) return null;
       return { pid: Number(match[1]), command: match[2] };
     })
@@ -39,6 +39,15 @@ function listProcesses() {
 }
 
 function probesActive(outRoot, processes) {
+  if (
+    processes.some(
+      (p) =>
+        /scripts\/phase32h-r1-triplet-runner\.mjs/.test(p.command || '') &&
+        (p.command || '').includes(outRoot),
+    )
+  ) {
+    return true;
+  }
   return ['h1', 'h2', 'h3'].some((proto) =>
     processes.some(
       (p) =>

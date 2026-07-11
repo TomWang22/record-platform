@@ -210,4 +210,15 @@ describe('phase32h run integrity', () => {
     assert.ok(index.probe_ids.includes(99));
     assert.equal(index.coordinates.length, 1);
   });
+
+  it('refuses to clear an immutable collector coverage block', () => {
+    markCoverageBlocked(root, 'test block');
+    assert.throws(() => markCoverageBlocked(root, 'second block'), /immutable/);
+    assert.equal(isCoverageBlocked(root), true);
+  });
+
+  it('treats frozen evidence roots as blocked', () => {
+    fs.writeFileSync(path.join(root, 'FROZEN_BLOCKED_EVIDENCE'), 'frozen\n', 'utf8');
+    assert.equal(isCoverageBlocked(root), true);
+  });
 });

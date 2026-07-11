@@ -11,6 +11,8 @@
 
 | File | OCH Secret | RP Equivalent Exists? | Needs Rewrite? |
 |------|------------|-------------------------|----------------|
+| `_canonical:och-kafka-ssl-secret` | `och-kafka-ssl-secret` | Yes | No |
+| `_canonical:och-service-tls` | `och-service-tls` | Yes | No |
 
 ## Deployment / volume secret refs vs static `kind: Secret`
 

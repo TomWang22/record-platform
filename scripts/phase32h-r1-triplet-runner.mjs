@@ -23,6 +23,7 @@ import {
 import {
   acquireLauncherLock,
   assertAppendAllowed,
+  assertLaunchableEvidenceRoot,
   isCoverageBlocked,
   readLaunchHead,
   readRunId,
@@ -56,12 +57,25 @@ function appendRow(outRoot, proto, row) {
 }
 
 export async function runTripletMatrix(opts) {
+  assertLaunchableEvidenceRoot(opts.out);
   if (!opts.out.startsWith('/tmp/')) throw new Error('triplet runner out must be under /tmp');
   const outRoot = opts.out;
   const manifestPath = path.join(outRoot, 'phase32h-r1-manifest.jsonl');
   const manifest = loadJsonl(manifestPath);
   let batches = groupManifestIntoTriplets(manifest);
   if (opts.limit != null) batches = batches.slice(0, opts.limit);
+
+  const completedBatchIds = new Set(
+    fs.existsSync(path.join(outRoot, 'batches'))
+      ? fs
+          .readdirSync(path.join(outRoot, 'batches'))
+          .filter((name) => name.endsWith('.json'))
+          .map((name) => name.replace(/\.json$/, ''))
+      : [],
+  );
+  if (completedBatchIds.size > 0) {
+    batches = batches.filter((batch) => !completedBatchIds.has(batch.batch_id));
+  }
 
   const runId = readRunId(outRoot);
   const launchHead = readLaunchHead(outRoot) || gitSha();
@@ -99,7 +113,7 @@ export async function runTripletMatrix(opts) {
     expectedProtocols: ['triplet'],
   });
 
-  let completedBatches = 0;
+  let completedBatches = completedBatchIds.size;
   for (const batch of batches) {
     if (isCoverageBlocked(outRoot)) {
       throw new Error('collector coverage blocked; stopping triplet matrix');

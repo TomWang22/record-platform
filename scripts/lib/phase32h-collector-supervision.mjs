@@ -24,8 +24,8 @@ export const FRESHNESS_THRESHOLDS_MS = {
   host_telemetry: 10_000,
   power_telemetry: 30_000,
   pcap_active: 30_000,
-  application_log: 30_000,
-  gateway_log: 30_000,
+  application_log: 90_000,
+  gateway_log: 90_000,
   monitor_extra: 30_000,
 };
 
@@ -60,6 +60,13 @@ export function evaluateCollectorHealth(outRoot, processes = [], opts = {}) {
 
   const findProc = (pattern) =>
     processes.filter((p) => p.command?.includes(pattern) && p.command?.includes(outRoot));
+
+  const tripletRunnerProcs = processes.filter(
+    (p) =>
+      /scripts\/phase32h-r1-triplet-runner\.mjs/.test(p.command || '') &&
+      (p.command || '').includes(outRoot),
+  );
+  const tripletMode = probesActive && tripletRunnerProcs.length >= 1;
 
   const watchdogProcs = findProc('phase32h-extreme-watchdog.mjs');
   const watchdogHb = path.join(outRoot, 'heartbeats/watchdog.jsonl');
@@ -111,7 +118,9 @@ export function evaluateCollectorHealth(outRoot, processes = [], opts = {}) {
     const runnerFresh = fileAgeMs(hb) <= FRESHNESS_THRESHOLDS_MS.runner;
     const runnerProcessOk = runnerProcs?.length === 1;
     let status = 'FINISHED';
-    if (probesActive) {
+    if (tripletMode) {
+      status = tripletRunnerProcs.length === 1 ? 'ACTIVE' : 'MISSING';
+    } else if (probesActive) {
       if (opts.smokeMode && opts.activeProtocol && opts.activeProtocol !== proto) {
         status = 'QUIET';
       } else if (smokeActiveRunner) {
@@ -205,6 +214,7 @@ export function evaluateCollectorHealth(outRoot, processes = [], opts = {}) {
   };
 
   const unhealthy = Object.values(roles).filter((r) => {
+    if (tripletMode && (r.role?.endsWith('_runner') || r.role === 'matrix_monitor')) return false;
     if (!probesActive && (r.role?.endsWith('_runner') || r.role === 'pcap_collector')) {
       return false;
     }

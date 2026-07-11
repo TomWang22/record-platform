@@ -8,6 +8,29 @@ import { gitSha } from './phase22-full-replay-common.mjs';
 
 export const RUN_STATE_DIR = 'run-state';
 export const BLOCKED_MARKER = 'COLLECTOR_COVERAGE_BLOCKED';
+export const FROZEN_BLOCKED_MARKER = 'FROZEN_BLOCKED_EVIDENCE';
+export const INVALID_BASELINE_ROOTS = new Set([
+  '/tmp/phase32h-r1-baseline',
+]);
+
+export function isEvidenceRootFrozen(outRoot) {
+  return fs.existsSync(path.join(outRoot, FROZEN_BLOCKED_MARKER));
+}
+
+export function assertLaunchableEvidenceRoot(outRoot) {
+  if (!outRoot.startsWith('/tmp/')) {
+    throw new Error(`evidence root must be under /tmp: ${outRoot}`);
+  }
+  if (INVALID_BASELINE_ROOTS.has(outRoot)) {
+    throw new Error(`evidence root is frozen invalid baseline: ${outRoot}`);
+  }
+  if (isEvidenceRootFrozen(outRoot)) {
+    throw new Error(`evidence root is frozen: ${outRoot}`);
+  }
+  if (isCoverageBlocked(outRoot)) {
+    throw new Error(`evidence root has immutable collector coverage block: ${outRoot}`);
+  }
+}
 
 export function matrixCoordinateKey(row) {
   const userHash =
@@ -232,14 +255,19 @@ export function countJsonlRows(jsonlPath) {
 
 export function isCoverageBlocked(outRoot) {
   const paths = runStatePaths(outRoot);
-  return fs.existsSync(paths.blockedMarker);
+  return fs.existsSync(paths.blockedMarker) || isEvidenceRootFrozen(outRoot);
 }
 
 export function markCoverageBlocked(outRoot, reason) {
   const paths = runStatePaths(outRoot);
+  if (fs.existsSync(paths.blockedMarker)) {
+    const error = new Error('collector coverage block is immutable for this evidence generation');
+    error.code = 'BLOCKED_MARKER_IMMUTABLE';
+    throw error;
+  }
   fs.writeFileSync(
     paths.blockedMarker,
-    `${JSON.stringify({ at: new Date().toISOString(), reason, status: 'BLOCKED' }, null, 2)}\n`,
+    `${JSON.stringify({ at: new Date().toISOString(), reason, status: 'BLOCKED', immutable: true }, null, 2)}\n`,
     'utf8',
   );
 }

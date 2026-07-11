@@ -107,19 +107,27 @@ export function evaluateCollectorHealth(outRoot, processes = [], opts = {}) {
       p.command?.includes(`--protocol ${proto}`),
     );
     const hb = path.join(outRoot, 'heartbeats', `${proto}.jsonl`);
+    const smokeActiveRunner = opts.smokeMode && opts.activeProtocol === proto;
+    const runnerFresh = fileAgeMs(hb) <= FRESHNESS_THRESHOLDS_MS.runner;
+    const runnerProcessOk = runnerProcs?.length === 1;
+    let status = 'FINISHED';
+    if (probesActive) {
+      if (opts.smokeMode && opts.activeProtocol && opts.activeProtocol !== proto) {
+        status = 'QUIET';
+      } else if (smokeActiveRunner) {
+        status = runnerFresh ? 'ACTIVE' : 'STALE';
+      } else {
+        status = runnerProcessOk && runnerFresh ? 'ACTIVE' : 'STALE';
+      }
+    }
     roles[`${proto}_runner`] = {
       role: `${proto}_runner`,
-      pid: runnerProcs?.[0]?.pid ?? null,
-      process_count: runnerProcs?.length ?? 0,
+      pid: runnerProcs?.[0]?.pid ?? (smokeActiveRunner ? process.pid : null),
+      process_count: runnerProcs?.length ?? (smokeActiveRunner ? 1 : 0),
       output_path: hb,
       last_output_age_ms: fileAgeMs(hb),
       freshness_threshold_ms: FRESHNESS_THRESHOLDS_MS.runner,
-      status:
-        probesActive && runnerProcs?.length === 1 && fileAgeMs(hb) <= FRESHNESS_THRESHOLDS_MS.runner
-          ? 'ACTIVE'
-          : probesActive
-            ? 'STALE'
-            : 'FINISHED',
+      status,
     };
   }
 
@@ -199,6 +207,10 @@ export function evaluateCollectorHealth(outRoot, processes = [], opts = {}) {
   const unhealthy = Object.values(roles).filter((r) => {
     if (!probesActive && (r.role?.endsWith('_runner') || r.role === 'pcap_collector')) {
       return false;
+    }
+    if (opts.smokeMode) {
+      if (r.role === 'matrix_monitor') return false;
+      if (r.status === 'QUIET' || r.status === 'FINISHED') return false;
     }
     return r.status === 'STALE' || r.status === 'MISSING';
   });

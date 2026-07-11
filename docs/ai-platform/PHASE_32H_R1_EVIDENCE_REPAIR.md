@@ -63,9 +63,22 @@ Never reuse `/tmp/phase32h-targeted-reproduction`.
 ## Launch
 
 ```bash
+# Do not launch until transport forensics + QUIC lifecycle smoke PASS.
+make ai-platform-verify-phase32h-transport-forensics
+make ai-platform-verify-phase32h-quic-lifecycle
+make ai-platform-verify-phase32h-quic-lifecycle-smoke
+
 node scripts/phase32h-launch-r1-arm.mjs --arm baseline
 node scripts/phase32h-launch-r1-arm.mjs --arm caffeinate
 ```
+
+### Capture design
+
+- **One continuous ring-buffer PCAP per arm** (not per probe)
+- **Per-probe packet index** under `probe-packet-index/<probe_id>.json`
+- **Synchronized H1/H2/H3 triplet batches** with <=100ms start spread gate
+- **QUIC lifecycle mini-matrix** (cold/warm/resumed/0-RTT) separate from 8,640 application probes
+- Safe 0-RTT testing uses `GET/HEAD /api/ai/rag/transport-probe` only — never RAG POST as early data
 
 Both arms: 8,640 probes (2,880 per protocol), H1/H2/H3 together.
 

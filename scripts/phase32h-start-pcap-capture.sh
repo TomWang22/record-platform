@@ -17,14 +17,15 @@ fi
 DUMPCAP_BIN="$(phase32h_dumpcap_bin)"
 IFACE="$(phase32h_resolve_capture_iface)"
 FILE="$PCAP_DIR/phase32h-$(date -u +%Y%m%dT%H%M%SZ).pcapng"
-FILTER="${PHASE32H_PCAP_FILTER:-tcp port 443 or udp port 443 or port 53}"
+FILTER="${PHASE32H_PCAP_FILTER:-tcp port 443 or udp port 443 or port 53 or icmp or icmp6}"
+RING_FILES="${PHASE32H_PCAP_RING_FILES:-48}"
 
 "$DUMPCAP_BIN" \
   -q \
   -i "$IFACE" \
   -f "$FILTER" \
   -b filesize:250000 \
-  -b files:24 \
+  -b files:"$RING_FILES" \
   -w "$FILE" \
   </dev/null >>"$PCAP_DIR/dumpcap.log" 2>&1 &
 PID=$!
@@ -47,6 +48,8 @@ json.dump(
     "file": file,
     "tool": tool,
     "filter": filt,
+    "ring_files": int(__import__("os").environ.get("PHASE32H_PCAP_RING_FILES", "48")),
+    "ring_filesize_kb": 250000,
     "chmodbpf": True,
     "sudo": False,
     "started_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",

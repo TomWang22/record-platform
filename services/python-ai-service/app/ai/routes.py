@@ -129,6 +129,23 @@ async def post_rag_preview_revoke(
     return await insights.rag_preview_revoke(user_id=_user_id(x_user_id, None))
 
 
+@router.head("/rag/transport-probe")
+@router.get("/rag/transport-probe")
+async def rag_transport_probe(
+    correlation_id: str = Query(..., min_length=8, max_length=128),
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Read-only transport forensics endpoint — safe for QUIC/TLS 0-RTT replay testing."""
+    _ = _user_id(x_user_id, None)
+    return {
+        "ok": True,
+        "transport_probe": True,
+        "mutating": False,
+        "correlation_id": correlation_id,
+        "rag_post_early_data_blocked": True,
+    }
+
+
 @router.post("/rag/query")
 async def post_rag_query(
     request: Request,

@@ -91,6 +91,26 @@ class TestRoutes(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         mock_rag.assert_called_once()
 
+    def test_rag_transport_probe_get(self):
+        r = self.client.get(
+            "/ai/rag/transport-probe",
+            params={"correlation_id": "corr-smoke-01"},
+            headers={"x-user-id": "u1"},
+        )
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertTrue(body["transport_probe"])
+        self.assertFalse(body["mutating"])
+        self.assertEqual(body["correlation_id"], "corr-smoke-01")
+
+    def test_rag_transport_probe_head(self):
+        r = self.client.head(
+            "/ai/rag/transport-probe",
+            params={"correlation_id": "corr-smoke-head"},
+            headers={"x-user-id": "u1"},
+        )
+        self.assertEqual(r.status_code, 200)
+
     @patch.object(insights, "record_valuation", new_callable=AsyncMock)
     def test_post_record_valuation(self, mock_fn):
         mock_fn.return_value = {"contract_id": "record_valuation"}

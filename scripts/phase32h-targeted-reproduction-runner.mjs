@@ -98,6 +98,7 @@ function startHeartbeat(outRoot, protocolKey) {
   const loopHandle = monitorEventLoopDelay({ resolution: 20 });
   loopHandle.enable();
   let current = { probe_id: null, window: null, run: null };
+  writeHeartbeatRow(hbPath, loopHandle, current);
   const timer = setInterval(() => {
     writeHeartbeatRow(hbPath, loopHandle, current);
   }, 1000);
@@ -191,7 +192,11 @@ export function runPhase32hTargeted(opts) {
     }
     assertHeadUnchanged(outRoot);
     assertManifestUnchanged(outRoot, opts.manifest);
-    supervisorTick(outRoot, { probesActive: true });
+    supervisorTick(outRoot, {
+      probesActive: true,
+      smokeMode: smokeMode,
+      activeProtocol: protocolKey,
+    });
     heartbeat.setCurrent(probe);
 
     if (probe.window !== lastWindow) {

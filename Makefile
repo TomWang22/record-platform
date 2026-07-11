@@ -393,8 +393,22 @@ PHASE32H_R1_PROTECTED ?= /tmp/phase32h-r1-caffeinate
 ai-platform-verify-phase32h-r1: ## Phase 32H-R1 host-suspension A/B comparison verifier
 	$(MAKE) ai-platform-verify-phase32h-run-integrity
 	$(MAKE) ai-platform-verify-phase32h-collector-supervision
+	$(MAKE) ai-platform-verify-phase32h-transport-forensics
+	$(MAKE) ai-platform-verify-phase32h-quic-lifecycle
 	$(MAKE) ai-platform-verify-phase32h-infra
 	node scripts/phase32h-r1-comparison.mjs
+
+ai-platform-verify-phase32h-transport-forensics: ## Phase 32H-R1 transport forensics unit tests
+	node --test tests/phase32h-transport-forensics.test.mjs
+
+ai-platform-verify-phase32h-quic-lifecycle: ## Phase 32H-R1 QUIC lifecycle safety unit tests
+	node --test tests/phase32h-quic-lifecycle.test.mjs
+	cd services/python-ai-service && .venv/bin/python -m unittest tests.test_ai_routes_insights.TestRoutes.test_rag_transport_probe_get tests.test_ai_routes_insights.TestRoutes.test_rag_transport_probe_head -v
+
+ai-platform-verify-phase32h-quic-lifecycle-smoke: ## Phase 32H-R1 live QUIC lifecycle smoke (4 probes)
+	$(MAKE) ai-platform-verify-phase32h-transport-forensics
+	$(MAKE) ai-platform-verify-phase32h-quic-lifecycle
+	node scripts/phase32h-quic-lifecycle-smoke.mjs
 
 ai-platform-freeze-phase32h-blocked-run: ## Freeze blocked E3 evidence (no JSONL edits)
 	node scripts/phase32h-freeze-blocked-run.mjs

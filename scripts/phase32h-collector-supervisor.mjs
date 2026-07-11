@@ -75,10 +75,12 @@ export function supervisorTick(outRoot, opts = {}) {
   const health = evaluateCollectorHealth(outRoot, processes, {
     probesActive: active,
     monitorIntervalMs: opts.monitorIntervalMs || 300_000,
+    smokeMode: Boolean(opts.smokeMode),
+    activeProtocol: opts.activeProtocol || null,
   });
   writeSupervisorHeartbeat(outRoot, health);
 
-  if (health.overall_status === 'BLOCKED' && active) {
+  if (health.overall_status === 'BLOCKED' && active && !opts.smokeMode) {
     markUnhealthySince(outRoot);
     if (unhealthyDurationMs(outRoot) > 10_000) {
       assertCollectorCoverageOrBlock(outRoot, health);

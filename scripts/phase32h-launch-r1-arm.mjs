@@ -169,13 +169,21 @@ function main() {
   }
 
   if (!opts.skipSmoke) {
-    const smoke = spawnSync('make', ['ai-platform-verify-phase32h-capture-smoke'], {
+    const captureSmoke = spawnSync('make', ['ai-platform-verify-phase32h-capture-smoke'], {
       cwd: REPO_ROOT,
       env: { ...env, PHASE32H_MATRIX_ROOT: `${opts.out}-capture-smoke` },
       encoding: 'utf8',
     });
-    if (smoke.status !== 0) {
-      console.error(smoke.stderr || smoke.stdout);
+    if (captureSmoke.status !== 0) {
+      console.error(captureSmoke.stderr || captureSmoke.stdout);
+      process.exit(2);
+    }
+    const quicSmoke = spawnSync('make', ['ai-platform-verify-phase32h-quic-lifecycle-smoke'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+    if (quicSmoke.status !== 0) {
+      console.error(quicSmoke.stderr || quicSmoke.stdout);
       process.exit(2);
     }
   }

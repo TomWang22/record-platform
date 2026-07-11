@@ -991,6 +991,30 @@ app.use(async (req: AuthedRequest, res: Response, next: NextFunction) => {
   if (ok) next();
 });
 
+/* Read-only transport forensics probe — safe for QUIC 0-RTT replay testing; no upstream mutation. */
+app.get("/api/ai/rag/transport-probe", (req: Request, res: Response) => {
+  const correlationId = String(req.query.correlation_id || "").trim();
+  if (correlationId.length < 8 || correlationId.length > 128) {
+    res.status(400).json({ error: "correlation_id required (8-128 chars)" });
+    return;
+  }
+  res.status(200).json({
+    ok: true,
+    transport_probe: true,
+    mutating: false,
+    correlation_id: correlationId,
+    rag_post_early_data_blocked: true,
+  });
+});
+app.head("/api/ai/rag/transport-probe", (req: Request, res: Response) => {
+  const correlationId = String(req.query.correlation_id || "").trim();
+  if (correlationId.length < 8 || correlationId.length > 128) {
+    res.status(400).end();
+    return;
+  }
+  res.status(200).end();
+});
+
 /* ----------------------- API Python AI Routes (after auth — owner-scoped RAG) ----------------------- */
 app.use(
   "/api/ai",

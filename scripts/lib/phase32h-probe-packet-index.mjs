@@ -44,6 +44,7 @@ export function emptyProbePacketRecord(base = {}) {
     connection_reused: false,
     session_resumed: false,
     zero_rtt_attempted: false,
+    zero_rtt_observed: false,
     zero_rtt_accepted: false,
     zero_rtt_rejected: false,
     one_rtt_confirmed: false,
@@ -70,11 +71,16 @@ export function writeProbePacketIndex(outRoot, probeId, record) {
   return file;
 }
 
-export function mergeProbeCorrelation(record, analysis, pcapFiles = []) {
+export function mergeProbeCorrelation(record, analysis, pcapFiles = [], opts = {}) {
   const packets = analysis?.packets || [];
   const first = packets[0];
   const last = packets[packets.length - 1];
-  const counts = analysis?.counts || {};
+  let counts = analysis?.counts || {};
+  counts = {
+    ...counts,
+    ...(opts.capabilityFilter || {}),
+  };
+  const handshakeEvidence = opts.handshakeEvidence || null;
   return {
     ...record,
     pcap_first_frame: analysis?.pcap_first_frame ?? record.pcap_first_frame,
@@ -96,9 +102,17 @@ export function mergeProbeCorrelation(record, analysis, pcapFiles = []) {
     initial_packets: counts.initial_packets ?? record.initial_packets,
     handshake_packets: counts.handshake_packets ?? record.handshake_packets,
     zero_rtt_packets: counts.zero_rtt_packets ?? record.zero_rtt_packets,
+    zero_rtt_observed: (counts.zero_rtt_packets ?? 0) > 0,
+    wire_zero_rtt_frames: counts.wire_zero_rtt_frames ?? 0,
     one_rtt_packets: counts.one_rtt_packets ?? record.one_rtt_packets,
     one_rtt_confirmed: (counts.one_rtt_packets ?? 0) > 0,
+    handshake_evidence: handshakeEvidence?.status ?? record.handshake_evidence,
+    handshake_inference_reason: handshakeEvidence?.inference_reason ?? null,
+    classifier_contradiction: counts.classifier_contradiction ?? false,
+    classifier_notes: counts.classifier_notes ?? [],
     correlation_status: analysis?.correlation_status || record.correlation_status,
+    connection_lineage: opts.connectionLineage ?? record.connection_lineage,
+    warm_reuse_proof: opts.warmReuseProof ?? record.warm_reuse_proof,
   };
 }
 

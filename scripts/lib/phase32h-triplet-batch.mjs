@@ -21,6 +21,7 @@ export function computeStartSpreadMs(startedAts) {
 export function batchTimingStatus(spreadMs) {
   if (spreadMs > BATCH_SPREAD_REJECT_MS) return 'REJECTED';
   if (spreadMs > BATCH_SPREAD_MAX_PASS_MS) return 'PARTIAL';
+  if (spreadMs > BATCH_SPREAD_PREFERRED_MS) return 'PASS_WITH_NOTE';
   return 'PASS';
 }
 

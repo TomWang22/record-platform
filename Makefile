@@ -393,10 +393,23 @@ PHASE32H_R1_PROTECTED ?= /tmp/phase32h-r1-caffeinate
 ai-platform-verify-phase32h-r1: ## Phase 32H-R1 host-suspension A/B comparison verifier
 	$(MAKE) ai-platform-verify-phase32h-run-integrity
 	$(MAKE) ai-platform-verify-phase32h-collector-supervision
+	$(MAKE) ai-platform-verify-phase32h-triplet-runner
 	$(MAKE) ai-platform-verify-phase32h-transport-forensics
 	$(MAKE) ai-platform-verify-phase32h-quic-lifecycle
+	$(MAKE) ai-platform-verify-phase32h-r1-prelaunch
 	$(MAKE) ai-platform-verify-phase32h-infra
 	node scripts/phase32h-r1-comparison.mjs
+
+ai-platform-verify-phase32h-triplet-runner: ## Phase 32H-R1 synchronized triplet orchestrator tests
+	node --test tests/phase32h-triplet-runner.test.mjs
+
+ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (source wiring)
+	node --test tests/phase32h-r1-prelaunch-guard.test.mjs
+	node scripts/phase32h-r1-prelaunch-guard-readonly.mjs
+
+ai-platform-verify-phase32h-r1-prelaunch-smoke: ## Phase 32H-R1-T live prelaunch smoke (triplets + lifecycle)
+	$(MAKE) ai-platform-verify-phase32h-r1-prelaunch
+	node scripts/phase32h-r1-prelaunch-smoke.mjs
 
 ai-platform-verify-phase32h-transport-forensics: ## Phase 32H-R1 transport forensics unit tests
 	node --test tests/phase32h-transport-forensics.test.mjs

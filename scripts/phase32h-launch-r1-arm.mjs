@@ -12,21 +12,21 @@ import {
   initRunState,
   isCoverageBlocked,
   readRunId,
-  runStatePaths,
   sha256File,
 } from './lib/phase32h-run-integrity.mjs';
 import { evidenceLabelForArm, rootForArm } from './lib/phase32h-r1-config.mjs';
 import { gitSha } from './lib/phase22-full-replay-common.mjs';
+import { evaluatePrelaunchGuard } from './lib/phase32h-r1-prelaunch-guard.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
 
 function parseArgs(argv) {
-  const opts = { arm: 'baseline', out: null, skipSmoke: false };
+  const opts = { arm: 'baseline', out: null, skipPreflight: false };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--arm') opts.arm = argv[++i];
     if (argv[i] === '--out') opts.out = argv[++i];
-    if (argv[i] === '--skip-smoke') opts.skipSmoke = true;
+    if (argv[i] === '--skip-preflight') opts.skipPreflight = true;
   }
   opts.out = opts.out || rootForArm(opts.arm);
   return opts;
@@ -59,17 +59,14 @@ function recordPowerSnapshot(outRoot) {
   return snapshot;
 }
 
-function launchShard(proto, opts, env) {
-  const logPath = path.join(opts.out, `runner-${proto}.log`);
+function launchTripletRunner(opts, env) {
+  const logPath = path.join(opts.out, 'runner-triplet.log');
   const args = [
-    path.join(REPO_ROOT, 'scripts/phase32h-targeted-reproduction-runner.mjs'),
-    '--protocol',
-    proto,
+    path.join(REPO_ROOT, 'scripts/phase32h-r1-triplet-runner.mjs'),
     '--out',
     opts.out,
-    '--manifest',
-    path.join(opts.out, 'phase32h-r1-manifest.jsonl'),
-    '--resume',
+    '--arm',
+    opts.arm,
   ];
   const child = spawn(process.execPath, args, {
     cwd: REPO_ROOT,
@@ -99,6 +96,33 @@ function main() {
       throw new Error(`evidence root ${opts.out} is not empty; use a fresh root`);
     }
   }
+
+  const staticGuard = evaluatePrelaunchGuard();
+  if (staticGuard.status !== 'PASS') {
+    console.error(JSON.stringify(staticGuard, null, 2));
+    process.exit(2);
+  }
+
+  if (!opts.skipPreflight) {
+    const preflight = spawnSync('make', ['ai-platform-verify-phase32h-r1-prelaunch'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+    if (preflight.status !== 0) {
+      console.error(preflight.stderr || preflight.stdout);
+      process.exit(2);
+    }
+    const smoke = spawnSync(
+      process.execPath,
+      [path.join(REPO_ROOT, 'scripts/phase32h-r1-prelaunch-smoke.mjs')],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    if (smoke.status !== 0) {
+      console.error(smoke.stderr || smoke.stdout);
+      process.exit(2);
+    }
+  }
+
   fs.mkdirSync(opts.out, { recursive: true });
 
   const evidenceLabel = evidenceLabelForArm(opts.arm);
@@ -168,29 +192,7 @@ function main() {
     );
   }
 
-  if (!opts.skipSmoke) {
-    const captureSmoke = spawnSync('make', ['ai-platform-verify-phase32h-capture-smoke'], {
-      cwd: REPO_ROOT,
-      env: { ...env, PHASE32H_MATRIX_ROOT: `${opts.out}-capture-smoke` },
-      encoding: 'utf8',
-    });
-    if (captureSmoke.status !== 0) {
-      console.error(captureSmoke.stderr || captureSmoke.stdout);
-      process.exit(2);
-    }
-    const quicSmoke = spawnSync('make', ['ai-platform-verify-phase32h-quic-lifecycle-smoke'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    });
-    if (quicSmoke.status !== 0) {
-      console.error(quicSmoke.stderr || quicSmoke.stdout);
-      process.exit(2);
-    }
-  }
-
-  const h1Pid = launchShard('h1', opts, env);
-  const h2Pid = launchShard('h2', opts, env);
-  const h3Pid = launchShard('h3', opts, env);
+  const tripletRunnerPid = launchTripletRunner(opts, env);
   const monitorPid = startDetached('bash', [path.join(REPO_ROOT, 'scripts/phase32h-monitor-targeted-reproduction.sh')], env);
 
   const launchRecord = {
@@ -203,12 +205,13 @@ function main() {
     launch_head: launchHead,
     manifest_sha256: sha256File(manifestPath),
     target_total: 8640,
+    orchestrator: 'phase32h-r1-triplet-runner',
     supervisor_pid: supervisorPid,
     caffeinate_pid: caffeinatePid,
     watchdog_pid: watchdogPid,
     telemetry_pid: telemetryPid,
     monitor_pid: monitorPid,
-    runner_pids: { h1: h1Pid, h2: h2Pid, h3: h3Pid },
+    triplet_runner_pid: tripletRunnerPid,
     production_enablement: 'NOT APPROVED',
   };
   fs.writeFileSync(

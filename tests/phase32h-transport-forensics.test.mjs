@@ -16,8 +16,12 @@ import {
 } from '../scripts/lib/phase32h-triplet-batch.mjs';
 import {
   classifyPacketSpaceFromTsharkFields,
+  classifyPacketSpacesFromTsharkFields,
   classifySessionResumeOutcome,
   classifyZeroRttOutcome,
+  applyClientZeroRttCapabilityFilter,
+  inferHandshakeEvidence,
+  HANDSHAKE_EVIDENCE,
   hashConnectionId,
   normalizeQuicVersion,
   PACKET_SPACE,
@@ -52,11 +56,51 @@ describe('phase32h transport forensics', () => {
     const spread = computeStartSpreadMs(['2026-07-11T20:00:00.000Z', '2026-07-11T20:00:00.040Z', '2026-07-11T20:00:00.080Z']);
     assert.equal(spread, 80);
     assert.equal(batchTimingStatus(40), 'PASS');
+    assert.equal(batchTimingStatus(75), 'PASS_WITH_NOTE');
     assert.equal(batchTimingStatus(BATCH_SPREAD_MAX_PASS_MS + 1), 'PARTIAL');
     assert.equal(batchTimingStatus(BATCH_SPREAD_REJECT_MS + 1), 'REJECTED');
   });
 
-  it('classifies QUIC packet spaces', () => {
+  it('classifies coalesced QUIC packet spaces independently', () => {
+    const spaces = classifyPacketSpacesFromTsharkFields({
+      headerForm: '1,1',
+      longPacketType: '0,2',
+      version: '0x00000001',
+    });
+    assert.ok(spaces.includes(PACKET_SPACE.INITIAL));
+    assert.ok(spaces.includes(PACKET_SPACE.ZERO_RTT));
+    const suppressed = classifyPacketSpacesFromTsharkFields(
+      {
+        headerForm: '1,1',
+        longPacketType: '0,2',
+        version: '0x00000001',
+      },
+      { clientUnsupported: true, zeroRttAttempted: false, connectionMode: 'cold' },
+    );
+    assert.ok(suppressed.includes(PACKET_SPACE.INITIAL));
+    assert.ok(suppressed.includes(PACKET_SPACE.HANDSHAKE));
+    assert.ok(!suppressed.includes(PACKET_SPACE.ZERO_RTT));
+  });
+
+  it('suppresses zero_rtt_packets when client cannot attempt 0-RTT', () => {
+    const counts = applyClientZeroRttCapabilityFilter(
+      { zero_rtt_packets: 3, wire_zero_rtt_frames: 3, one_rtt_packets: 5, initial_packets: 2 },
+      { clientUnsupported: true, zeroRttAttempted: false, connectionMode: 'cold' },
+    );
+    assert.equal(counts.zero_rtt_packets, 0);
+    assert.equal(counts.classifier_contradiction, true);
+  });
+
+  it('infers handshake evidence from Initial plus 1-RTT without keylog', () => {
+    const evidence = inferHandshakeEvidence({
+      counts: { handshake_packets: 0, initial_packets: 2, one_rtt_packets: 4 },
+      connectionMode: 'cold',
+      hasKeylog: false,
+    });
+    assert.equal(evidence.status, HANDSHAKE_EVIDENCE.INFERRED_POST_INITIAL_1RTT);
+  });
+
+  it('classifies QUIC packet spaces from fixtures', () => {
     assert.equal(classifyPacketSpaceFromTsharkFields({ longPacketType: 0 }), PACKET_SPACE.INITIAL);
     assert.equal(classifyPacketSpaceFromTsharkFields({ longPacketType: 1 }), PACKET_SPACE.HANDSHAKE);
     assert.equal(classifyPacketSpaceFromTsharkFields({ longPacketType: 2 }), PACKET_SPACE.ZERO_RTT);

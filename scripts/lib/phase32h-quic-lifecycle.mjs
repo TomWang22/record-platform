@@ -19,10 +19,19 @@ import {
 } from './phase32h-transport-capabilities.mjs';
 import {
   analyzePcapPacketSpace,
+  applyClientZeroRttCapabilityFilter,
   classifySessionResumeOutcome,
   classifyZeroRttOutcome,
+  coldH3GatePass,
   correlateProbeToPackets,
+  connectionLineageProof,
+  inferHandshakeEvidence,
+  warmH3ReuseProof,
 } from './phase32h-quic-packet-space.mjs';
+import {
+  curlH3Cold,
+  curlH3PersistentPair,
+} from './phase32h-persistent-curl-client.mjs';
 import {
   emptyProbePacketRecord,
   mergeProbeCorrelation,
@@ -92,25 +101,44 @@ function curlLifecycleRequest({
   };
 }
 
-export function runH3ColdProbe({ outRoot, cfg, token, userId, probeId, pcapPath }) {
-  const result = curlLifecycleRequest({
-    cfg,
-    token,
-    userId,
-    protocolFlag: PROTOCOLS.h3.flag,
-    expectedVersion: PROTOCOLS.h3.expected,
-    connectionMode: 'cold',
-    extraArgs: ['--http3-only'],
-  });
-  let analysis = { correlation_status: 'PARTIAL', packets: [], counts: {} };
-  if (pcapPath && fs.existsSync(pcapPath)) {
-    const space = analyzePcapPacketSpace(pcapPath);
-    analysis = correlateProbeToPackets(space.packets, result.started_epoch, result.finished_epoch);
-    analysis.counts = space.counts;
-    analysis.packets = space.packets.filter(
-      (p) => p.time_epoch >= result.started_epoch - 2 && p.time_epoch <= result.finished_epoch + 2,
-    );
+export function analyzeLifecycleProbeWindow(pcapPath, startedEpoch, finishedEpoch, capabilityOpts = {}) {
+  if (!pcapPath || !fs.existsSync(pcapPath)) {
+    return { correlation_status: 'PARTIAL', packets: [], counts: {} };
   }
+  const space = analyzePcapPacketSpace(pcapPath, {
+    zeroRttAttempted: capabilityOpts.zeroRttAttempted ?? false,
+    clientUnsupported: capabilityOpts.clientUnsupported ?? false,
+    connectionMode: capabilityOpts.connectionMode ?? 'cold',
+  });
+  const analysis = correlateProbeToPackets(space.packets, startedEpoch, finishedEpoch);
+  analysis.counts = applyClientZeroRttCapabilityFilter(analysis.counts, capabilityOpts);
+  return analysis;
+}
+
+export function runH3ColdProbe({ outRoot, cfg, token, userId, probeId, pcapPath, capabilities }) {
+  const caps = capabilities || parseTransportCapabilities(curlVersionText(cfg.curlBin));
+  const clientUnsupported = caps.zero_rtt_client_support === 'CLIENT_BACKEND_ZERO_RTT_UNSUPPORTED';
+  const correlationId = `lifecycle-cold-${Date.now()}`;
+  const result = curlH3Cold({ cfg, token, userId, correlationId });
+  const versionOk = String(result.http_version || '').startsWith('3');
+
+  const analysis = analyzeLifecycleProbeWindow(
+    pcapPath,
+    result.started_epoch,
+    result.finished_epoch,
+    {
+      zeroRttAttempted: false,
+      clientUnsupported,
+      connectionMode: 'cold',
+    },
+  );
+  const handshakeEvidence = inferHandshakeEvidence({
+    counts: analysis.counts,
+    connectionMode: 'cold',
+    hasKeylog: caps.keylog_support,
+  });
+  const lineage = connectionLineageProof(analysis.packets || []);
+
   const record = mergeProbeCorrelation(
     emptyProbePacketRecord({
       probe_id: probeId,
@@ -120,66 +148,120 @@ export function runH3ColdProbe({ outRoot, cfg, token, userId, probeId, pcapPath 
       started_at: result.started_at,
       finished_at: result.finished_at,
       connection_reused: false,
+      connection_generation: 1,
       session_resumed: false,
       zero_rtt_attempted: false,
+      persistent_client: false,
     }),
     analysis,
     pcapPath ? [pcapPath] : [],
+    {
+      handshakeEvidence,
+      connectionLineage: lineage,
+      capabilityFilter: analysis.counts,
+    },
   );
-  const gatePass =
-    result.version_ok &&
-    result.http_status === 200 &&
-    record.initial_packets > 0 &&
-    record.one_rtt_packets > 0 &&
-    record.quic_version != null;
+
+  const gatePass = coldH3GatePass({
+    httpStatus: result.http_status,
+    versionOk,
+    counts: analysis.counts,
+    handshakeEvidence,
+    classifierContradiction: analysis.counts.classifier_contradiction,
+    correlationStatus: analysis.correlation_status,
+  });
+
   writeProbePacketIndex(outRoot, probeId, record);
-  return { mode: 'cold', result, record, gate: gatePass ? 'PASS' : 'BLOCKED' };
+  return {
+    mode: 'cold',
+    result: { ...result, http_status: result.http_status, version_ok: versionOk },
+    record,
+    handshake_evidence: handshakeEvidence,
+    gate: gatePass ? 'PASS' : 'BLOCKED',
+    classification: 'SUPPORTED_AND_TESTED',
+  };
 }
 
-export function runH3WarmReuseProbe({ outRoot, cfg, token, userId, probeId, pcapPath, primeFirst = true }) {
-  if (primeFirst) {
-    curlLifecycleRequest({
-      cfg,
-      token,
-      userId,
-      protocolFlag: PROTOCOLS.h3.flag,
-      expectedVersion: PROTOCOLS.h3.expected,
-      connectionMode: 'warm_reuse',
-      extraArgs: ['--http3-only'],
-    });
-  }
-  const result = curlLifecycleRequest({
+export function runH3WarmReuseProbe({ outRoot, cfg, token, userId, probeId, pcapPath, capabilities }) {
+  const caps = capabilities || parseTransportCapabilities(curlVersionText(cfg.curlBin));
+  const clientUnsupported = caps.zero_rtt_client_support === 'CLIENT_BACKEND_ZERO_RTT_UNSUPPORTED';
+  const ts = Date.now();
+  const pair = curlH3PersistentPair({
     cfg,
     token,
     userId,
-    protocolFlag: PROTOCOLS.h3.flag,
-    expectedVersion: PROTOCOLS.h3.expected,
-    connectionMode: 'warm_reuse',
-    extraArgs: ['--http3-only'],
+    primeCorrelationId: `lifecycle-warm-prime-${ts}`,
+    reuseCorrelationId: `lifecycle-warm-reuse-${ts}`,
   });
-  let analysis = { correlation_status: 'PARTIAL', counts: {} };
-  if (pcapPath && fs.existsSync(pcapPath)) {
-    const space = analyzePcapPacketSpace(pcapPath);
-    analysis = correlateProbeToPackets(space.packets, result.started_epoch, result.finished_epoch);
-    analysis.counts = space.counts;
-  }
+  const result = pair.reuse;
+  const versionOk = String(result.http_version || '').startsWith('3');
+
+  const primeAnalysis = analyzeLifecycleProbeWindow(
+    pcapPath,
+    pair.started_epoch,
+    pair.reuse.started_epoch || pair.started_epoch + 0.05,
+    { zeroRttAttempted: false, clientUnsupported, connectionMode: 'warm_reuse' },
+  );
+  const reuseAnalysis = analyzeLifecycleProbeWindow(
+    pcapPath,
+    pair.reuse.started_epoch || pair.started_epoch,
+    pair.finished_epoch,
+    { zeroRttAttempted: false, clientUnsupported, connectionMode: 'warm_reuse' },
+  );
+  const warmProof = warmH3ReuseProof(primeAnalysis.packets || [], reuseAnalysis.packets || [], {
+    zeroRttAttempted: false,
+    clientUnsupported,
+  });
+
   const record = mergeProbeCorrelation(
     emptyProbePacketRecord({
       probe_id: probeId,
       protocol_label: 'HTTP/3',
       connection_mode: 'warm_reuse',
       transport: 'quic',
-      started_at: result.started_at,
-      finished_at: result.finished_at,
+      started_at: pair.started_at,
+      finished_at: pair.finished_at,
       connection_reused: true,
+      connection_generation: warmProof.after_lineage?.connection_generation ?? 1,
+      session_resumed: false,
       zero_rtt_attempted: false,
+      persistent_client: true,
     }),
-    analysis,
+    reuseAnalysis,
     pcapPath ? [pcapPath] : [],
+    {
+      warmReuseProof: warmProof,
+      connectionLineage: warmProof.after_lineage,
+      capabilityFilter: reuseAnalysis.counts,
+    },
   );
-  const gatePass = result.version_ok && result.http_status === 200 && record.one_rtt_packets > 0;
+
+  const gatePass =
+    pair.prime.http_status === 200 &&
+    result.http_status === 200 &&
+    versionOk &&
+    warmProof.pass &&
+    !reuseAnalysis.counts.classifier_contradiction;
+
   writeProbePacketIndex(outRoot, probeId, record);
-  return { mode: 'warm_reuse', result, record, gate: gatePass ? 'PASS' : 'BLOCKED' };
+  return {
+    mode: 'warm_reuse',
+    result: {
+      ...result,
+      http_status: result.http_status,
+      version_ok: versionOk,
+      started_at: pair.started_at,
+      finished_at: pair.finished_at,
+      started_epoch: pair.reuse.started_epoch || pair.started_epoch,
+      finished_epoch: pair.finished_epoch,
+    },
+    record,
+    warm_reuse_proof: warmProof,
+    pair_started_epoch: pair.started_epoch,
+    pair_finished_epoch: pair.finished_epoch,
+    gate: gatePass ? 'PASS' : 'BLOCKED',
+    classification: gatePass ? 'SUPPORTED_AND_TESTED' : 'WARM_REUSE_UNPROVEN',
+  };
 }
 
 export function runH3Resumed1RttProbe({ outRoot, cfg, token, userId, probeId, pcapPath, capabilities }) {
@@ -233,8 +315,8 @@ export function runH3Resumed1RttProbe({ outRoot, cfg, token, userId, probeId, pc
   const classification = classifySessionResumeOutcome({
     sessionResumeSupported: sessionSupported,
     httpStatus: result.http_status,
-    oneRttConfirmed: analysis.one_rtt_confirmed,
-    zeroRttPackets: analysis.zero_rtt_packets || 0,
+    oneRttConfirmed: (analysis.one_rtt_packets || analysis.counts?.one_rtt_packets || 0) > 0,
+    zeroRttPackets: 0,
   });
 
   const record = mergeProbeCorrelation(
@@ -258,7 +340,7 @@ export function runH3Resumed1RttProbe({ outRoot, cfg, token, userId, probeId, pc
     classification === 'CLIENT_SESSION_RESUME_UNSUPPORTED' ||
     (classification === 'RESUMED_1RTT_CONFIRMED' && record.zero_rtt_packets === 0);
   writeProbePacketIndex(outRoot, probeId, record);
-  return { mode: 'resumed_1rtt', result, record, classification, gate: gatePass ? 'PASS' : 'BLOCKED' };
+  return { mode: 'resumed_1rtt', result, record, classification, gate: gatePass ? 'PASS' : 'BLOCKED', lifecycle_status: classification };
 }
 
 export function runH3Attempted0RttProbe({ outRoot, cfg, token, userId, probeId, pcapPath, capabilities }) {
@@ -321,12 +403,19 @@ export function runH3Attempted0RttProbe({ outRoot, cfg, token, userId, probeId, 
     analysis.counts = space.counts;
   }
 
+  const filteredCounts = applyClientZeroRttCapabilityFilter(analysis.counts || {}, {
+    zeroRttAttempted: earlyDataAttempted,
+    clientUnsupported,
+    connectionMode: 'attempted_0rtt',
+  });
+
   const classification = classifyZeroRttOutcome({
-    zeroRttPackets: analysis.zero_rtt_packets || analysis.counts?.zero_rtt_packets || 0,
-    oneRttPackets: analysis.one_rtt_packets || analysis.counts?.one_rtt_packets || 0,
+    zeroRttPackets: filteredCounts.zero_rtt_packets,
+    oneRttPackets: filteredCounts.one_rtt_packets || analysis.one_rtt_packets || 0,
     httpStatus: result.http_status,
     earlyDataAttempted,
     clientUnsupported,
+    classifierContradiction: filteredCounts.classifier_contradiction,
   });
 
   const record = mergeProbeCorrelation(
@@ -343,8 +432,11 @@ export function runH3Attempted0RttProbe({ outRoot, cfg, token, userId, probeId, 
     }),
     analysis,
     pcapPath ? [pcapPath] : [],
+    { capabilityFilter: filteredCounts },
   );
   record.zero_rtt_classification = classification;
+  record.zero_rtt_observed = false;
+  record.zero_rtt_packets = 0;
   writeProbePacketIndex(outRoot, probeId, record);
 
   const gatePass =
@@ -354,7 +446,14 @@ export function runH3Attempted0RttProbe({ outRoot, cfg, token, userId, probeId, 
     classification === 'ZERO_RTT_REJECTED_REPLAYED_AS_1RTT' ||
     classification === 'FULL_HANDSHAKE' ||
     classification === 'RESUMED_WITHOUT_ZERO_RTT';
-  return { mode: 'attempted_0rtt', result, record, classification, gate: gatePass ? 'PASS' : 'BLOCKED' };
+  return {
+    mode: 'attempted_0rtt',
+    result,
+    record,
+    classification,
+    gate: gatePass && !filteredCounts.classifier_contradiction ? 'PASS' : 'BLOCKED',
+    lifecycle_status: classification,
+  };
 }
 
 export function buildLifecycleCfg() {

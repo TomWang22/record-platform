@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 32H — read-only gateway / edge log tail collector.
+# Phase 32H — read-only gateway / edge log tail collector (detached; non-blocking).
 set -euo pipefail
 OUT="${1:-/tmp/phase32h-targeted-reproduction}"
 LOG_DIR="$OUT/logs"
@@ -13,17 +13,18 @@ collect() {
     echo "===== $(date -u +%Y-%m-%dT%H:%M:%SZ) gateway log snapshot ====="
     kubectl -n "$NS_EDGE" logs -l app=caddy-h3 --tail=500 --timestamps=true 2>&1 || echo "PARTIAL: caddy-h3 logs unavailable"
     kubectl -n "$NS_APP" logs deployment/api-gateway --tail=500 --timestamps=true 2>&1 || echo "PARTIAL: api-gateway logs unavailable"
-  } >> "$LOG_DIR/gateway-access-tail.txt"
+  } >>"$LOG_DIR/gateway-access-tail.txt"
 }
 
-collect
 (
+  collect
   while true; do
     sleep 60
     collect
   done
-) &
+) >>"$LOG_DIR/gateway-collector.log" 2>&1 &
 PID=$!
+disown "$PID" 2>/dev/null || true
 
 python3 -c "import json;json.dump({'status':'ACTIVE','pid':$PID,'edge_ns':'$NS_EDGE','app_ns':'$NS_APP'},open('$STATUS','w'),indent=2)"
 echo "phase32h gateway log collector pid=$PID"

@@ -59,12 +59,18 @@ function main() {
   spawnSync('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-pcap-capture.sh'), opts.out], {
     cwd: REPO_ROOT,
   });
-  spawnSync('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-gateway-log-capture.sh'), opts.out], {
+  spawn('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-gateway-log-capture.sh'), opts.out], {
     cwd: REPO_ROOT,
-  });
-  spawnSync('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-application-log-capture.sh'), opts.out], {
+    env,
+    detached: true,
+    stdio: 'ignore',
+  }).unref();
+  spawn('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-application-log-capture.sh'), opts.out], {
     cwd: REPO_ROOT,
-  });
+    env,
+    detached: true,
+    stdio: 'ignore',
+  }).unref();
 
   const watchdog = spawn(process.execPath, [path.join(REPO_ROOT, 'scripts/phase32h-extreme-watchdog.mjs'), '--out', opts.out], {
     cwd: REPO_ROOT,

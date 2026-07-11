@@ -391,6 +391,7 @@ PHASE32H_R1_BASELINE ?= /tmp/phase32h-r1-baseline
 PHASE32H_R1_PROTECTED ?= /tmp/phase32h-r1-caffeinate
 
 ai-platform-verify-phase32h-r1: ## Phase 32H-R1 host-suspension A/B comparison verifier
+	$(MAKE) git-verify-no-cursor-trailers
 	$(MAKE) ai-platform-verify-phase32h-run-integrity
 	$(MAKE) ai-platform-verify-phase32h-collector-supervision
 	$(MAKE) ai-platform-verify-phase32h-triplet-runner
@@ -404,8 +405,13 @@ ai-platform-verify-phase32h-triplet-runner: ## Phase 32H-R1 synchronized triplet
 	node --test tests/phase32h-triplet-runner.test.mjs
 
 ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (source wiring)
+	$(MAKE) git-verify-no-cursor-trailers
 	node --test tests/phase32h-r1-prelaunch-guard.test.mjs
 	node scripts/phase32h-r1-prelaunch-guard-readonly.mjs
+
+git-verify-no-cursor-trailers: ## Reject Cursor/CursorAgent commit trailers (post-grandfather policy)
+	node --test tests/no-cursor-trailer-guard.test.mjs
+	node scripts/no-cursor-trailer-guard-readonly.mjs
 
 ai-platform-verify-phase32h-r1-prelaunch-smoke: ## Phase 32H-R1-T live prelaunch smoke (triplets + lifecycle)
 	$(MAKE) ai-platform-verify-phase32h-r1-prelaunch

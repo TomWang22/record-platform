@@ -304,6 +304,24 @@ jobs:
       - name: Phase 32G infrastructure verifier (CI-safe)
         run: make ai-platform-verify-phase32g-infra
 
+  git-no-cursor-trailers:
+    name: Git no-Cursor trailer guard
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Verify no Cursor commit trailers
+        run: make git-verify-no-cursor-trailers
+
   artifacts:
     name: Upload rotation artifacts
     if: always()

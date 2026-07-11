@@ -28,6 +28,8 @@ function launchShard(proto, opts, env) {
     proto,
     '--out',
     opts.out,
+    '--manifest',
+    path.join(opts.out, 'phase32h-targeted-manifest.jsonl'),
     '--resume',
   ];
   const child = spawn(process.execPath, args, {

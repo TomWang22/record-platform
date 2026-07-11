@@ -48,7 +48,7 @@ function parseArgs(argv) {
   if (!base.out || base.out === '/tmp/phase31-preview-lifecycle-repair-replay') {
     base.out = resolvePhase32hRoot();
   }
-  if (!base.manifest) {
+  if (!argv.includes('--manifest')) {
     base.manifest = path.join(base.out, 'phase32h-targeted-manifest.jsonl');
   }
   return base;

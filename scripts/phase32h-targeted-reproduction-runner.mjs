@@ -40,6 +40,21 @@ import {
 } from './lib/phase32h-targeted-reproduction-config.mjs';
 import { buildPhase32hSummary, writePhase32hSummary } from './lib/phase32h-targeted-summary.mjs';
 import { loadManifestForProtocol, parseTargetedReplayArgs } from './phase31-targeted-preview-lifecycle-replay.mjs';
+import {
+  acquireShardLock,
+  assertAppendAllowed,
+  assertHeadUnchanged,
+  assertManifestUnchanged,
+  detectTruncatedJsonl,
+  isCoverageBlocked,
+  readLaunchHead,
+  readRunId,
+  recordCompletedProbe,
+  releaseLock,
+  runStatePaths,
+  shardLockIsActive,
+} from './lib/phase32h-run-integrity.mjs';
+import { supervisorTick } from './phase32h-collector-supervisor.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -123,6 +138,20 @@ export function runPhase32hTargeted(opts) {
   }
 
   const jsonlPath = path.join(shard, 'phase32h-matrix.jsonl');
+  const statePaths = runStatePaths(outRoot);
+  const runId = readRunId(outRoot);
+  const launchHead = readLaunchHead(outRoot) || gitSha();
+  const evidenceLabel = opts.evidenceLabel || PHASE32H_EVIDENCE_LABEL;
+
+  if (detectTruncatedJsonl(jsonlPath)) {
+    throw new Error(`truncated JSONL detected before resume: ${jsonlPath}`);
+  }
+  if (opts.resume && shardLockIsActive(outRoot, protocolKey)) {
+    throw new Error(`active ${protocolKey} runner lock exists; refusing overlapping resume`);
+  }
+  const lockOwner = { pid: process.pid, protocol: protocolKey, run_id: runId };
+  acquireShardLock(outRoot, protocolKey, lockOwner);
+
   const users = loadN5Participants();
   const completed = opts.resume && fs.existsSync(jsonlPath) ? loadCompletedIds(jsonlPath) : new Set();
 
@@ -153,8 +182,16 @@ export function runPhase32hTargeted(opts) {
   let lastWindow = null;
   let wroteRows = 0;
 
+  let completedCount = completed.size;
+  try {
   for (const probe of manifest) {
     if (completed.has(probe.probe_id)) continue;
+    if (isCoverageBlocked(outRoot)) {
+      throw new Error('collector coverage blocked; stopping runner');
+    }
+    assertHeadUnchanged(outRoot);
+    assertManifestUnchanged(outRoot, opts.manifest);
+    supervisorTick(outRoot, { probesActive: true });
     heartbeat.setCurrent(probe);
 
     if (probe.window !== lastWindow) {
@@ -169,13 +206,24 @@ export function runPhase32hTargeted(opts) {
     const inflightStarted = Date.now();
     heartbeat.pulse(0);
     const { row, probeFail, failureClass } = executeProbe(probe, cfg, getToken);
-    row.evidence_label = PHASE32H_EVIDENCE_LABEL;
-    row.git_sha = gitSha();
+    row.evidence_label = evidenceLabel;
+    row.run_id = runId;
+    row.git_sha = launchHead;
+    assertAppendAllowed(outRoot, probe, row, {
+      manifestPath: opts.manifest,
+      evidenceLabel,
+      launchHead,
+      protocolKey,
+      completedCount,
+      expectedOffset: completedCount,
+    });
     completeInflight(outRoot, protocolKey, { probe_finished_at: row.timing?.probe_finished_at });
     heartbeat.pulse(Date.now() - inflightStarted);
     fs.appendFileSync(jsonlPath, `${JSON.stringify(row)}\n`, 'utf8');
+    recordCompletedProbe(outRoot, probe, row);
     wroteRows += 1;
     completed.add(probe.probe_id);
+    completedCount += 1;
 
     if (probeFail) {
       failures.push({
@@ -194,6 +242,9 @@ export function runPhase32hTargeted(opts) {
   }
 
   if (lastWindow !== null) coordinator.completeWindowProtocol(lastWindow, protocolKey);
+  } finally {
+    releaseLock(statePaths[`${protocolKey}Lock`]);
+  }
   heartbeat.stop();
 
   const allRows = loadShardRowsAll(outRoot);

@@ -216,4 +216,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Phase 30 CLOSED PASS. Phase 31 CLOSED PASS — STAGING CONTINUE. Phase 32G controlled soak PASS published. Phase 32H IN PROGRESS — latency root-cause/remediation (transport-wait localized; underlying layer unresolved). Production enablement NOT APPROVED.
+Phase 30 CLOSED PASS. Phase 31 CLOSED PASS — STAGING CONTINUE. Phase 32G controlled soak PASS published. Phase 32H-E3 targeted reproduction BLOCKED (frozen at `/tmp/phase32h-targeted-reproduction`). Phase 32H-R1 IN PROGRESS — evidence repair + host-suspension A/B validation (baseline vs caffeinate, 8640 probes/arm, H1/H2/H3 together). Production enablement NOT APPROVED.

@@ -380,6 +380,25 @@ ai-platform-verify-phase32h-capture-smoke: ## Phase 32H-E2 six-probe capture int
 	$(MAKE) ai-platform-verify-phase32h-infra
 	node scripts/phase32h-capture-integrity-smoke.mjs
 
+ai-platform-verify-phase32h-run-integrity: ## Phase 32H-R1 atomic run locks and append guards
+	node --test tests/phase32h-run-integrity.test.mjs
+	node --test tests/phase32h-r1-manifest.test.mjs
+
+ai-platform-verify-phase32h-collector-supervision: ## Phase 32H-R1 mandatory collector supervision gates
+	node --test tests/phase32h-collector-supervision.test.mjs
+
+PHASE32H_R1_BASELINE ?= /tmp/phase32h-r1-baseline
+PHASE32H_R1_PROTECTED ?= /tmp/phase32h-r1-caffeinate
+
+ai-platform-verify-phase32h-r1: ## Phase 32H-R1 host-suspension A/B comparison verifier
+	$(MAKE) ai-platform-verify-phase32h-run-integrity
+	$(MAKE) ai-platform-verify-phase32h-collector-supervision
+	$(MAKE) ai-platform-verify-phase32h-infra
+	node scripts/phase32h-r1-comparison.mjs
+
+ai-platform-freeze-phase32h-blocked-run: ## Freeze blocked E3 evidence (no JSONL edits)
+	node scripts/phase32h-freeze-blocked-run.mjs
+
 diagnose: ## Narrower diagnostics (DNS, bootstrap, k6 edge hints)
 	$(MAKE) verify-kafka-dns
 	$(MAKE) verify-kafka-bootstrap

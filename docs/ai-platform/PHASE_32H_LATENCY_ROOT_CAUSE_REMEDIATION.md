@@ -72,6 +72,15 @@ Focused controlled staging matrix:
 - Diagnostic trigger at wall ≥60 s
 - Output under `/tmp/phase32h-targeted-reproduction/`
 
+**E3 result: BLOCKED** — see `PHASE_32H_E3_BLOCKED_TARGETED_REPRODUCTION.md`. Not valid PASS evidence.
+
+### 32H-R1 — Evidence repair and host-suspension validation
+
+- Freeze blocked E3 run (no JSONL edits)
+- Atomic run locks + collector supervision
+- A/B validation: baseline vs `caffeinate` (8,640 probes per arm, all three protocols)
+- See `PHASE_32H_R1_EVIDENCE_REPAIR.md` and `PHASE_32H_R1_HOST_SUSPENSION_VALIDATION.md`
+
 Do **not** run another 51,840 matrix without owner approval.
 
 ### 32H-F — Validation decision

@@ -58,6 +58,25 @@ function shardDir(outRoot, protocolKey) {
   return path.join(outRoot, `shard-${protocolKey}`);
 }
 
+function writeHeartbeatRow(hbPath, loopHandle, current, inflightMs = null) {
+  const cpu = process.cpuUsage();
+  const mem = process.memoryUsage();
+  const row = {
+    ts: new Date().toISOString(),
+    monotonic_ms: Date.now(),
+    pid: process.pid,
+    event_loop_delay_ms: loopHandle.mean / 1e6,
+    cpu_user_ms: cpu.user / 1000,
+    cpu_system_ms: cpu.system / 1000,
+    rss_mb: mem.rss / (1024 * 1024),
+    probe_id: current.probe_id,
+    window: current.window,
+    run: current.run,
+    in_flight_elapsed_ms: inflightMs,
+  };
+  fs.appendFileSync(hbPath, `${JSON.stringify(row)}\n`);
+}
+
 function startHeartbeat(outRoot, protocolKey) {
   const hbPath = path.join(outRoot, 'heartbeats', `${protocolKey}.jsonl`);
   fs.mkdirSync(path.dirname(hbPath), { recursive: true });
@@ -65,25 +84,16 @@ function startHeartbeat(outRoot, protocolKey) {
   loopHandle.enable();
   let current = { probe_id: null, window: null, run: null };
   const timer = setInterval(() => {
-    const cpu = process.cpuUsage();
-    const mem = process.memoryUsage();
-    const row = {
-      ts: new Date().toISOString(),
-      monotonic_ms: Date.now(),
-      pid: process.pid,
-      event_loop_delay_ms: loopHandle.mean / 1e6,
-      cpu_user_ms: cpu.user / 1000,
-      cpu_system_ms: cpu.system / 1000,
-      rss_mb: mem.rss / (1024 * 1024),
-      probe_id: current.probe_id,
-      window: current.window,
-      run: current.run,
-    };
-    fs.appendFileSync(hbPath, `${JSON.stringify(row)}\n`);
+    writeHeartbeatRow(hbPath, loopHandle, current);
   }, 1000);
   return {
+    path: hbPath,
+    loopHandle,
     setCurrent(probe) {
       current = { probe_id: probe?.probe_id ?? null, window: probe?.window ?? null, run: probe?.run ?? null };
+    },
+    pulse(inflightMs = null) {
+      writeHeartbeatRow(hbPath, loopHandle, current, inflightMs);
     },
     stop() {
       clearInterval(timer);
@@ -156,10 +166,13 @@ export function runPhase32hTargeted(opts) {
     }
 
     registerInflight(outRoot, protocolKey, buildInflightRecord(probe, { runnerPid: process.pid }));
+    const inflightStarted = Date.now();
+    heartbeat.pulse(0);
     const { row, probeFail, failureClass } = executeProbe(probe, cfg, getToken);
     row.evidence_label = PHASE32H_EVIDENCE_LABEL;
     row.git_sha = gitSha();
     completeInflight(outRoot, protocolKey, { probe_finished_at: row.timing?.probe_finished_at });
+    heartbeat.pulse(Date.now() - inflightStarted);
     fs.appendFileSync(jsonlPath, `${JSON.stringify(row)}\n`, 'utf8');
     wroteRows += 1;
     completed.add(probe.probe_id);

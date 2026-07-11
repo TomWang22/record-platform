@@ -217,4 +217,4 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   process.exit(main());
 }
 
-export { runPhase32hTargeted, parseArgs as parsePhase32hArgs };
+export { parseArgs as parsePhase32hArgs };

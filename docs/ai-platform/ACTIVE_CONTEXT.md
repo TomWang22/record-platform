@@ -127,12 +127,12 @@ Phase 32C: PASS — timing attribution instrumentation ready for 32D micro-soak
 Phase 32D: PASS — timing attribution micro-soak 3888/3888; 17-minute outlier NOT reproduced
 Phase 32E: PASS — slow KPI write durability 1296/1296 × 3 modes; KPI write path fail-open under injected delay/failure
 Phase 32F: PASS — RCA narrowed; stall-capture instrumentation + analyzer ready for 32G long soak
-Phase 32G: IN PROGRESS — timing-attributed repaired long-soak matrix 51840/51840 target
+Phase 32G: PASS — timing-attributed repaired long-soak 51840/51840; RCA_REPRODUCED_ATTRIBUTED; ~1,008,863 ms max wall; production enablement NOT APPROVED
 Phase 31 evidence label: Phase 31D-R2 repaired staging long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
 Production enablement: NOT APPROVED — latency max outlier ~1,037,645 ms requires RCA before production KPI enablement
 
 Live eval run: NOT RUN
-Controlled real inference: RUN (Phase 32G timing-attributed long soak IN_PROGRESS)
+Controlled real inference: RUN (Phase 32G timing-attributed long soak PASS — 51840/51840)
 Production/live eval: NOT RUN
 Production DB migration: NOT RUN
 Local/dev schema apply: PASS (python_ai @ 127.0.0.1:5440; Phase 27 only — no new writes in 28A/28B)
@@ -215,4 +215,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Phase 32G IN_PROGRESS — timing-attributed repaired long soak. Do not start Phase 32H until 32G PASS/BLOCKED and committed.
+Phase 32G PASS committed — owner decision on Phase 32H (post-32G remediation / staging-continue). Phase 32H NOT STARTED. Production enablement NOT APPROVED.

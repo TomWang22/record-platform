@@ -180,6 +180,12 @@ results.csv
 bench_export*.csv
 bench_sweep.csv
 bench_logs/
+!bench_logs/security-contract/
+bench_logs/security-contract/*
+!bench_logs/security-contract/pcap/
+bench_logs/security-contract/pcap/*
+!bench_logs/security-contract/pcap/vm-*.pcap
+!bench_logs/security-contract/pcap/SHA256SUMS
 bench_plots_*/
 pgbench_log*
 pgbb.err.log

@@ -249,20 +249,19 @@ jobs:
           fi
           python3 scripts/lib/transport_validator_selftest.py
 
-      - name: Transport validation with pcap (if present)
+      - name: Transport validation with canonical PCAP (required)
         shell: bash
         run: |
           set -euo pipefail
-          PCAP="$(ls -1 bench_logs/security-contract/pcap/vm-*.pcap 2>/dev/null | head -1)"
-          if [ -n "$PCAP" ] && [ -f "$PCAP" ]; then
-            sudo apt-get update -qq
-            sudo apt-get install -y tshark
-            out=$(python3 scripts/lib/transport_validator.py "$PCAP" 2>&1)
-            echo "$out"
-            echo "$out" | grep -q '"valid": true'
-          else
-            echo "BLOCKED: no live vm.pcap in CI — fixture self-test above validates HTTP/3 parser logic."
-          fi
+          echo "Tracked PCAP files:"
+          git ls-files 'bench_logs/security-contract/pcap/**' || true
+          echo "LFS PCAP files:"
+          git lfs ls-files 'bench_logs/security-contract/pcap' || true
+          echo "Materialized captures:"
+          find bench_logs/security-contract/pcap -maxdepth 1 -type f -ls || true
+          sudo apt-get update -qq
+          sudo apt-get install -y tshark
+          bash scripts/verify-transport-pcap-fixture.sh
 
   python-ai:
     name: Python AI validation

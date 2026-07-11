@@ -416,8 +416,38 @@ git-verify-no-cursor-trailers: ## Reject Cursor/CursorAgent commit trailers (str
 	node --test tests/no-cursor-trailer-guard.test.mjs
 	node scripts/no-cursor-trailer-guard-readonly.mjs
 
-	node --test tests/no-cursor-trailer-guard.test.mjs
-	node scripts/no-cursor-trailer-guard-readonly.mjs
+bundle-secret-alignment-audit: ## Secret name alignment audit (exit 1 when hard_fail>0)
+	python3 tools/bundle-audit/secret_name_alignment_audit.py --repo-root "$(REPO_ROOT)"
+	python3 tests/secret-name-alignment-audit.test.py -v
+
+verify-kafka-prometheus-rules-offline: ## Offline kustomize + semantic Kafka health rules validation
+	bash scripts/verify-kafka-prometheus-rules-offline.sh
+
+transport-validation-real-pcap: ## Canonical HTTP/3 PCAP checksum + validator gate
+	bash scripts/verify-transport-pcap-fixture.sh
+
+ai-platform-verify-phase32h-preview-gate: ## Phase 32H preview-gate retry policy + smoke wiring
+	node --test tests/phase32h-preview-gate-retry.test.mjs
+	node --test tests/phase31-preview-lifecycle-repair.test.mjs
+	node scripts/phase32h-preview-gate-smoke.mjs --infra-only
+
+ci-verify-ai-platform-blockers: ## Combined CI repair gate (offline)
+	$(MAKE) git-verify-no-cursor-trailers
+	$(MAKE) bundle-secret-alignment-audit
+	kubectl kustomize infra/ops/ >/tmp/kafka-ops.yaml
+	test -s /tmp/kafka-ops.yaml
+	$(MAKE) verify-kafka-prometheus-rules-offline
+	$(MAKE) transport-validation-real-pcap
+	python3 scripts/lib/transport_validator.py 2>/dev/null || test $$? -eq 2
+	python3 scripts/lib/transport_validator_selftest.py
+	$(MAKE) ai-platform-verify-phase32h-preview-gate
+	$(MAKE) ai-platform-verify-phase32h-run-integrity
+	$(MAKE) ai-platform-verify-phase32h-collector-supervision
+	$(MAKE) ai-platform-verify-phase32h-triplet-runner
+	$(MAKE) ai-platform-verify-phase32h-transport-forensics
+	$(MAKE) ai-platform-verify-phase32h-quic-lifecycle
+	$(MAKE) ai-platform-verify-phase32h-r1-prelaunch
+	$(MAKE) ai-platform-verify-phase32h-infra
 
 ai-platform-verify-phase32h-r1-prelaunch-smoke: ## Phase 32H-R1-T live prelaunch smoke (triplets + lifecycle)
 	$(MAKE) ai-platform-verify-phase32h-r1-prelaunch

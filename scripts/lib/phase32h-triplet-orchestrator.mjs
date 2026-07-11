@@ -14,8 +14,7 @@ import {
   writeBatchRecord,
 } from './phase32h-triplet-batch.mjs';
 import { writeBatchPacketIndex } from './phase32h-batch-packet-index.mjs';
-import { supervisorTick } from '../phase32h-collector-supervisor.mjs';
-import { isCoverageBlocked } from './phase32h-run-integrity.mjs';
+import { classifyMatrixProbeFailure } from './phase31-controlled-matrix-summary.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKER_PATH = path.join(__dirname, 'phase32h-triplet-probe-worker.mjs');
@@ -199,6 +198,26 @@ export async function executeTripletBatch({
     for (const proto of ['h1', 'h2', 'h3']) {
       onProbeComplete(batch[proto], results[proto].row, outRoot);
     }
+  }
+
+  const deterministicMember = ['h1', 'h2', 'h3'].find((proto) => {
+    const row = results[proto].row;
+    return row.http_status !== 200 && classifyMatrixProbeFailure(row) === 'deterministic';
+  });
+  if (deterministicMember) {
+    const row = results[deterministicMember].row;
+    batchRecord.packet_correlation_status = 'BLOCKED';
+    batchRecord.deterministic_failure = {
+      protocol: deterministicMember,
+      http_status: row.http_status,
+      gate_reason: row.gate_reason,
+      expected_gate_reason: row.expected_gate_reason,
+      retry_count: row.timing?.retry_count ?? row.retry_count,
+    };
+    writeBatchRecord(outRoot, batchRecord);
+    throw new Error(
+      `deterministic gate failure on ${deterministicMember}: http_status=${row.http_status} gate=${row.gate_reason}`,
+    );
   }
 
   coordinator.completeWindowProtocol(window, 'triplet');

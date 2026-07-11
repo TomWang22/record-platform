@@ -50,6 +50,11 @@ import {
   validateParticipantIdentity,
 } from './lib/phase31-preview-window-coordinator.mjs';
 import {
+  isDeterministicHttpStatus,
+  probeAttemptDelayMs,
+  shouldRetryProbeResponse,
+} from './lib/http-retry-policy.mjs';
+import {
   attachTimingToProbeRow,
   buildTimingAttribution,
   extractServerTimingFromBody,
@@ -321,9 +326,10 @@ function executeProbe(probe, cfg, getToken, probeContext = {}) {
   let curl_time_appconnect_ms = null;
   let curl_time_pretransfer_ms = null;
   let curl_time_starttransfer_ms = null;
+  let deterministic_failure = null;
   for (let attempt = 0; attempt < 16; attempt += 1) {
     try {
-      resp = ragQuery(token, userId, probe.question, cfg, proto, { maxRetries: 8 });
+      resp = ragQuery(token, userId, probe.question, cfg, proto, { maxRetries: 1 });
       retry_count += Number(resp.retry_count || 0);
       retry_delay_ms += Number(resp.retry_delay_ms || 0);
       curl_time_total_ms = resp.curl_time_total_ms ?? resp.rag_total_ms ?? null;
@@ -336,34 +342,53 @@ function executeProbe(probe, cfg, getToken, probeContext = {}) {
       curl_time_starttransfer_ms = resp.curl_time_starttransfer_ms ?? null;
       serverTiming = extractServerTimingFromBody(resp.body || {});
       app_rag_total_ms = serverTiming.rag_total_ms;
-      if ([502, 503, 504, 429].includes(resp.http_status) && attempt + 1 < 16) {
-        const delay = Math.min(10000, 500 * 2 ** attempt);
+
+      if (isDeterministicHttpStatus(resp.http_status)) {
+        deterministic_failure = {
+          failure_class: 'deterministic',
+          http_status: resp.http_status,
+          reason: resp.http_status === 422 ? 'preview_gate_http_422' : 'deterministic_http_4xx',
+        };
+        break;
+      }
+
+      if (
+        shouldRetryProbeResponse({
+          http_status: resp.http_status,
+          retrieval_mode: extractMeta(resp.body || {}).retrieval_mode,
+          attempt,
+          maxAttempts: 16,
+        })
+      ) {
+        const delay = probeAttemptDelayMs(attempt, resp.http_status);
         retry_count += 1;
         retry_delay_ms += delay;
         sleepMs(delay);
         continue;
       }
+
       meta = extractMeta(resp.body || {});
       text = extractResponseText(resp.body || {});
       refs = extractRefs(resp.body || {});
       leakagePass = checkLeakage(text);
       qualityScore = scoreAnswer(text, refs, leakagePass);
       rubric = assertPhase21Row(probe, text, refs, leakagePass, qualityScore);
-      if (resp.http_status !== 200 && attempt + 1 < 16) {
-        const delay = Math.min(10000, 500 * 2 ** attempt);
-        retry_count += 1;
-        retry_delay_ms += delay;
-        sleepMs(delay);
-        continue;
-      }
       break;
     } catch (err) {
       if (attempt + 1 >= 16) throw err;
-      const delay = Math.min(10000, 500 * 2 ** attempt);
+      const delay = probeAttemptDelayMs(attempt, 503);
       retry_count += 1;
       retry_delay_ms += delay;
       sleepMs(delay);
     }
+  }
+  if (deterministic_failure) {
+    meta = extractMeta(resp?.body || {});
+    text = extractResponseText(resp?.body || {});
+    refs = extractRefs(resp?.body || {});
+    leakagePass = 'PASS';
+    qualityScore = 0;
+    rubric = { response_pass: 'FAIL', sentiment_pass: 'SKIP' };
   }
   const kpiStartMs = Date.now();
   const kpiWrites = writeMatrixKpiRows(probe, resp, meta, rubric, qualityScore);
@@ -426,6 +451,9 @@ function executeProbe(probe, cfg, getToken, probeContext = {}) {
     }),
     timing,
   );
+  if (deterministic_failure) {
+    row.lifecycle_diagnostic = deterministic_failure;
+  }
   if (isDeterministicPreviewGateMismatch(row)) {
     row.lifecycle_diagnostic = {
       failure_class: 'deterministic',

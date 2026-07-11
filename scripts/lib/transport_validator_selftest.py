@@ -44,6 +44,10 @@ class TransportValidatorFixtureTests(unittest.TestCase):
 
         def fake_run(cmd, timeout=30):
             cmd_s = " ".join(cmd)
+            if "udp.port == 443" in cmd_s and "-c" in cmd and "1" in cmd:
+                return subprocess.CompletedProcess(cmd, 0, stdout="1\n", stderr="")
+            if "tcp.port == 443" in cmd_s and "-c" in cmd and "1" in cmd:
+                return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
             if "-Y" in cmd and "quic" in cmd_s and "-c" in cmd and "1" in cmd:
                 return subprocess.CompletedProcess(cmd, 0, stdout="1\n", stderr="")
             if "quic.version" in cmd_s:
@@ -84,6 +88,10 @@ class TransportValidatorFixtureTests(unittest.TestCase):
 
         def fake_run(cmd, timeout=30):
             cmd_s = " ".join(cmd)
+            if "udp.port == 443" in cmd_s and "-c" in cmd and "1" in cmd:
+                return subprocess.CompletedProcess(cmd, 0, stdout="1\n", stderr="")
+            if "tcp.port == 443" in cmd_s and "-c" in cmd and "1" in cmd:
+                return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
             if "-Y" in cmd and "quic" in cmd_s and "-c" in cmd and "1" in cmd:
                 return subprocess.CompletedProcess(cmd, 0, stdout="1\n", stderr="")
             if "http2" in cmd_s and "-c" in cmd and "1" in cmd:

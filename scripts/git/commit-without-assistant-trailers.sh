@@ -21,9 +21,13 @@ if git diff --cached --quiet; then
   exit 2
 fi
 
-FORBIDDEN='(^|/)(tmp/|bench_logs/|webapp/e2e/screenshots/)|\.pcap|\.pcapng|\.jsonl$|\.keylog$|\.qlog$|tsconfig\.tsbuildinfo$|scripts/coverage/'
+FORBIDDEN='(^|/)(tmp/|webapp/e2e/screenshots/)|\.jsonl$|\.keylog$|\.qlog$|tsconfig\.tsbuildinfo$|scripts/coverage/'
+ALLOWED='^bench_logs/security-contract/pcap/(vm-[^/]+\.pcap|SHA256SUMS)$'
 while IFS= read -r path; do
-  if [[ "$path" =~ $FORBIDDEN ]]; then
+  if [[ "$path" =~ $ALLOWED ]]; then
+    continue
+  fi
+  if [[ "$path" =~ $FORBIDDEN ]] || [[ "$path" =~ \.pcapng$ ]] || [[ "$path" =~ (^|/)bench_logs/ ]]; then
     echo "BLOCKED: forbidden staged path: $path" >&2
     exit 2
   fi

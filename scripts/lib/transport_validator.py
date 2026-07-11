@@ -51,6 +51,12 @@ def main():
         print(json.dumps(result), flush=True)
         sys.exit(2)
 
+    # 0. TCP/UDP 443 presence (transport contract)
+    r_tcp = run([tshark, "-r", pcap, "-Y", "tcp.port == 443", "-c", "1"])
+    tcp_443_observed = r_tcp.returncode == 0 and bool((r_tcp.stdout or "").strip())
+    r_udp = run([tshark, "-r", pcap, "-Y", "udp.port == 443", "-c", "1"])
+    udp_443_observed = r_udp.returncode == 0 and bool((r_udp.stdout or "").strip())
+
     # 1. Detect QUIC presence
     r = run([tshark, "-r", pcap, "-Y", "quic", "-c", "1"])
     quic_detected = r.returncode == 0 and bool((r.stdout or "").strip())
@@ -184,9 +190,11 @@ def main():
 
     # Valid: QUIC + no HTTP/2; 1-RTT gate: default ≥10 (sustained data); set MIN_1RTT_PACKETS=1 for short PCAP forensics.
     min_1rtt = int(os.environ.get("MIN_1RTT_PACKETS", "10"))
-    valid = bool(quic_detected and not http2_detected)
+    valid = bool(quic_detected and udp_443_observed and not http2_detected)
     error = None
-    if not quic_detected:
+    if not udp_443_observed:
+        error = "no UDP port 443 traffic"
+    elif not quic_detected:
         error = "no QUIC packets"
     elif http2_detected:
         error = "HTTP/2 frames detected"
@@ -200,6 +208,8 @@ def main():
     result = {
         "valid": valid,
         "error": error,
+        "tcp_443_observed": tcp_443_observed,
+        "udp_443_observed": udp_443_observed,
         "quic_version": version,
         "alpn_h3": alpn_h3,
         "alpn_protocol": alpn_protocol,

@@ -14,7 +14,7 @@ import {
   gitSha,
   loadN5Participants,
 } from './lib/phase22-full-replay-common.mjs';
-import { loadJsonl } from './lib/phase31-controlled-matrix-summary.mjs';
+import { loadJsonl, classifyMatrixProbeFailure } from './lib/phase31-controlled-matrix-summary.mjs';
 import {
   coordinatorRootFromRunnerOut,
   PreviewWindowCoordinator,

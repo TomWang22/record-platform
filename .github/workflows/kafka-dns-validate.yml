@@ -110,7 +110,5 @@ jobs:
           }
       - name: Kustomize build infra ops
         run: kubectl kustomize infra/ops/ >/tmp/kafka-ops.yaml && test -s /tmp/kafka-ops.yaml
-      - name: Validate Kafka health Prometheus ConfigMap (client dry-run)
-        run: kubectl apply --dry-run=client --validate=false -f infra/k8s/base/observability/prometheus-rules-kafka-health.yaml
-      - name: Validate kafka replica guard VAP (client dry-run)
-        run: kubectl apply --dry-run=client --validate=false -f infra/policies/kafka-replica-guard.yaml
+      - name: Offline infra schema validation (ops, observability, VAP)
+        run: bash scripts/verify-kafka-prometheus-rules-offline.sh

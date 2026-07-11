@@ -295,6 +295,9 @@ export function isDeterministicPreviewGateMismatch(row) {
 }
 
 export function classifyMatrixProbeFailure(row) {
+  if (row.http_status === 422) {
+    return 'deterministic';
+  }
   if (row.http_status !== 200) {
     return TRANSIENT_HTTP_STATUSES.has(row.http_status) ? 'retryable' : 'deterministic';
   }

@@ -8,6 +8,7 @@ import {
   executeFreezeIntegrity,
   listRootScopedProcesses,
   stopWritersForRoot,
+  waitForOpenFilesQuiescence,
 } from './phase32h-freeze-integrity.mjs';
 import { readCollectorRegistry } from './phase32h-collector-registry.mjs';
 import { readCorrelationQueueSnapshot } from './phase32h-correlation-queue.mjs';
@@ -19,7 +20,14 @@ export function stopSmokeCollectors(outRoot, { repoRoot, gracefulMs = 10_000 } =
       cwd: repoRoot,
     });
   }
-  const remaining = listRootScopedProcesses(outRoot).filter((p) => p.pid !== process.pid);
+  const deadline = Date.now() + gracefulMs;
+  let remaining = listRootScopedProcesses(outRoot).filter((p) => p.pid !== process.pid);
+  while (remaining.length > 0 && Date.now() < deadline) {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+    remaining = listRootScopedProcesses(outRoot).filter((p) => p.pid !== process.pid);
+  }
+  waitForOpenFilesQuiescence(outRoot, { maxWaitMs: gracefulMs * 2 });
+  remaining = listRootScopedProcesses(outRoot).filter((p) => p.pid !== process.pid);
   return {
     stopped_at: new Date().toISOString(),
     ledger,

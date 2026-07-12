@@ -18,6 +18,7 @@ import {
   snapshotFileMetadata,
   stopWritersForRoot,
   verifyZeroWriters,
+  waitForOpenFilesQuiescence,
   waitQuietPeriod,
 } from '../scripts/lib/phase32h-freeze-integrity.mjs';
 
@@ -115,6 +116,16 @@ describe('phase32h freeze integrity', () => {
         }
       }
     }
+  });
+
+  it('launcher processes are not treated as stoppable writers', () => {
+    const cmd = `node scripts/phase32h-r1-collector-exclusivity-smoke.mjs --out ${root}`;
+    assert.equal(roleForCommand(cmd, root), null);
+  });
+
+  it('waitForOpenFilesQuiescence passes when no handles remain', () => {
+    const check = waitForOpenFilesQuiescence(root, { maxWaitMs: 500 });
+    assert.equal(check.pass, true);
   });
 
   it('hash manifest is written after writers stop on clean root', () => {

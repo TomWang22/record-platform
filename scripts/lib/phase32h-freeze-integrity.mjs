@@ -41,6 +41,9 @@ export function roleForCommand(command, outRoot) {
   if (command.includes('phase32h-capture-host-telemetry.sh')) return 'host_power_telemetry';
   if (command.includes('dumpcap') && command.includes(outRoot)) return 'pcap_collector';
   if (command.includes('phase32h-runtime-hygiene-checkpoint.mjs')) return 'checkpoint_loop';
+  if (command.includes('phase32h-r1-collector-exclusivity-smoke.mjs')) return null;
+  if (command.includes('phase32h-r1-correlation-drain-smoke.mjs')) return null;
+  if (command.includes('phase32h-freeze-baseline-')) return null;
   if (command.includes(outRoot)) return 'other';
   return null;
 }
@@ -78,7 +81,7 @@ export function assertWritableEvidenceRoot(outRoot, targetPath) {
   }
 }
 
-function sleepMs(ms) {
+export function sleepMs(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
@@ -203,6 +206,16 @@ export function verifyOpenFiles(outRoot) {
   };
 }
 
+export function waitForOpenFilesQuiescence(outRoot, { maxWaitMs = DEFAULT_GRACEFUL_MS, pollMs = 250 } = {}) {
+  const deadline = Date.now() + maxWaitMs;
+  let check = verifyOpenFiles(outRoot);
+  while (!check.skipped && check.open_files_remaining > 0 && Date.now() < deadline) {
+    sleepMs(pollMs);
+    check = verifyOpenFiles(outRoot);
+  }
+  return check;
+}
+
 export function walkEvidenceFiles(root, { excludeSuffixes = [] } = {}) {
   const files = [];
   if (!fs.existsSync(root)) return files;
@@ -317,6 +330,7 @@ export function buildHistoricalFreezeMismatchReport({
 export function finalizeFreezeIntegrity({
   outRoot,
   quietPeriodMs = DEFAULT_QUIET_PERIOD_MS,
+  gracefulMs = DEFAULT_GRACEFUL_MS,
   hashManifestName,
   hashExcludeSuffixes = [],
   markerName,
@@ -340,7 +354,9 @@ export function finalizeFreezeIntegrity({
     Object.fromEntries(jsonlPaths.filter((p) => fs.existsSync(p)).map((p) => [p, sha256FileSync(p)]));
 
   const writerCheck = verifyZeroWriters(outRoot);
-  const openFileCheck = verifyOpenFiles(outRoot);
+  const openFileCheck = waitForOpenFilesQuiescence(outRoot, {
+    maxWaitMs: quietPeriodMs + gracefulMs * 3,
+  });
   const quietCheck = waitQuietPeriod(outRoot, {
     quietPeriodMs,
     excludeSuffixes: hashExcludeSuffixes,
@@ -451,6 +467,7 @@ export function executeFreezeIntegrity({
   const finalized = finalizeFreezeIntegrity({
     outRoot,
     quietPeriodMs,
+    gracefulMs,
     hashManifestName,
     hashExcludeSuffixes,
     markerName,

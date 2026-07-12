@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { login, loadN5Participants } from './lib/phase22-full-replay-common.mjs';
 import { buildPhase32hSmokeManifest } from './lib/phase32h-smoke-manifest.mjs';
+import { assertManifestContract } from './lib/phase32h-manifest-contract.mjs';
 import { writeTransportCapabilities } from './lib/phase32h-transport-capabilities.mjs';
 import { buildPcapCaptureIndex } from './lib/phase32h-probe-packet-index.mjs';
 import {
@@ -128,6 +129,11 @@ async function main() {
 
   const previewUser = loadN5Participants().find((u) => u.user_class === 'real_participant');
   const smokeRows = buildPhase32hSmokeManifest(previewUser);
+  assertManifestContract(smokeRows, {
+    evidenceLabel: smokeRows[0]?.evidence_label,
+    expectedTotal: 6,
+    expectedPerProtocol: 2,
+  });
   const tripletBatches = groupManifestIntoTriplets(smokeRows);
   const coldBatch = tripletBatches[0];
   const warmBatch = tripletBatches[0];

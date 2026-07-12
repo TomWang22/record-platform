@@ -24,6 +24,7 @@ import {
 } from './lib/phase32h-r1-config.mjs';
 import { sha256File, initRunState, generateRunId } from './lib/phase32h-run-integrity.mjs';
 import { gitSha } from './lib/phase22-full-replay-common.mjs';
+import { assertManifestContract } from './lib/phase32h-manifest-contract.mjs';
 
 function parseArgs(argv) {
   const opts = { out: '/tmp/phase32h-r1-baseline', arm: 'baseline', canary: false };
@@ -112,6 +113,11 @@ function main() {
   if (rows.length !== expectedTotal) throw new Error(`manifest size ${rows.length} != ${expectedTotal}`);
   const perProto = rows.filter((r) => r.matrix_protocol === 'h1').length;
   if (perProto !== expectedPerProto) throw new Error(`per-protocol ${perProto} != ${expectedPerProto}`);
+  assertManifestContract(rows, {
+    evidenceLabel,
+    expectedTotal,
+    expectedPerProtocol: expectedPerProto,
+  });
 
   fs.mkdirSync(opts.out, { recursive: true });
   const manifestPath = path.join(opts.out, 'phase32h-r1-manifest.jsonl');

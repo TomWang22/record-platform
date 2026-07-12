@@ -35,8 +35,15 @@ import {
   executeTripletBatch,
   writeTripletOrchestratorMarker,
 } from './lib/phase32h-triplet-orchestrator.mjs';
-import { evidenceLabelForArm } from './lib/phase32h-r1-config.mjs';
+import {
+  evidenceLabelForArm,
+  R1_CANARY_PER_PROTOCOL,
+  R1_CANARY_TOTAL,
+  R1_PER_PROTOCOL,
+  R1_TOTAL,
+} from './lib/phase32h-r1-config.mjs';
 import { supervisorTick } from './phase32h-collector-supervisor.mjs';
+import { assertManifestContract } from './lib/phase32h-manifest-contract.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -63,6 +70,14 @@ export async function runTripletMatrix(opts) {
   const outRoot = opts.out;
   const manifestPath = path.join(outRoot, 'phase32h-r1-manifest.jsonl');
   const manifest = loadJsonl(manifestPath);
+  const evidenceLabel = opts.evidenceLabel || evidenceLabelForArm(opts.arm, { canary: opts.canary });
+  const expectedTotal = opts.expectedTotal ?? (opts.canary ? R1_CANARY_TOTAL : R1_TOTAL);
+  const expectedPerProtocol = opts.expectedPerProtocol ?? (opts.canary ? R1_CANARY_PER_PROTOCOL : R1_PER_PROTOCOL);
+  assertManifestContract(manifest, {
+    evidenceLabel,
+    expectedTotal,
+    expectedPerProtocol,
+  });
   let batches = groupManifestIntoTriplets(manifest);
   if (opts.limit != null) batches = batches.slice(0, opts.limit);
 
@@ -81,7 +96,6 @@ export async function runTripletMatrix(opts) {
   const runId = readRunId(outRoot);
   const launchHead = readLaunchHead(outRoot) || gitSha();
   const manifestSha = sha256File(manifestPath);
-  const evidenceLabel = evidenceLabelForArm(opts.arm, { canary: opts.canary });
 
   writeTripletOrchestratorMarker(outRoot, {
     status: 'IN_PROGRESS',
@@ -132,6 +146,10 @@ export async function runTripletMatrix(opts) {
       coordinator,
       probeContext: {
         resetAndVerify: () => resetAndVerifyWindowGates(users, getToken, cfg),
+        manifestSha,
+        launchHead,
+        runId,
+        evidenceLabel,
       },
       onProbeComplete: (probe, row, root) => {
         row.run_id = runId;

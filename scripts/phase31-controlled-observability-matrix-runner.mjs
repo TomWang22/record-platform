@@ -54,6 +54,7 @@ import {
   probeAttemptDelayMs,
   shouldRetryProbeResponse,
 } from './lib/http-retry-policy.mjs';
+import { assertRequestContractBeforeNetwork } from './lib/phase32h-manifest-contract.mjs';
 import {
   attachTimingToProbeRow,
   buildTimingAttribution,
@@ -298,6 +299,12 @@ function probeMatchKey(probe, userUidHash) {
 }
 
 function executeProbe(probe, cfg, getToken, probeContext = {}) {
+  assertRequestContractBeforeNetwork(probe, {
+    manifestSha: probeContext.manifestSha ?? null,
+    launchHead: probeContext.launchHead ?? null,
+    runId: probeContext.runId ?? null,
+    evidenceLabel: probeContext.evidenceLabel ?? probe.evidence_label,
+  });
   const probeStartedAt = new Date().toISOString();
   const probeStartMs = Date.now();
   const cpuStart = process.cpuUsage();

@@ -18,6 +18,8 @@ import {
 import { evidenceLabelForArm, rootForArm, R1_CANARY_TOTAL, R1_CANARY_PER_PROTOCOL } from './lib/phase32h-r1-config.mjs';
 import { gitSha } from './lib/phase22-full-replay-common.mjs';
 import { evaluatePrelaunchGuard } from './lib/phase32h-r1-prelaunch-guard.mjs';
+import { loadJsonl } from './lib/phase31-controlled-matrix-summary.mjs';
+import { assertManifestContract } from './lib/phase32h-manifest-contract.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -151,6 +153,14 @@ function main() {
   }
 
   const manifestPath = path.join(opts.out, 'phase32h-r1-manifest.jsonl');
+  const manifestRows = loadJsonl(manifestPath);
+  assertManifestContract(manifestRows, {
+    evidenceLabel,
+    launchHead,
+    runId,
+    expectedTotal: opts.canary ? R1_CANARY_TOTAL : 8640,
+    expectedPerProtocol: opts.canary ? R1_CANARY_PER_PROTOCOL : 2880,
+  });
   initRunState(opts.out, { runId, launchHead, evidenceLabel, manifestPath });
   acquireLauncherLock(opts.out, { pid: process.pid, run_id: runId, role: 'launcher' });
 

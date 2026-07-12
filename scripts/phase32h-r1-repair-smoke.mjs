@@ -48,9 +48,10 @@ function summarizeRepairSmoke(outRoot) {
   const http200 = rows.filter((r) => Number(r.http_status) === 200).length;
   const http422 = rows.filter((r) => Number(r.http_status) === 422).length;
   const deterministic4xx = rows.filter((r) => r.deterministic_4xx === true || r.failure_class === 'deterministic').length;
-  const wrongGate = rows.filter((r) => r.gate_pass === 'FAIL').length;
+  const wrongGate = rows.filter((r) => r.gate_reason !== r.expected_gate_reason).length;
   const contractRows = rows.filter((r) => r.expected_gate_reason === 'allowlist');
   const previewRows = rows.filter((r) => r.expected_gate_reason === 'preview_opt_in');
+  const redTeamRows = rows.filter((r) => r.red_team_case);
   const summary = {
     status: 'BLOCKED',
     total: rows.length,
@@ -59,12 +60,16 @@ function summarizeRepairSmoke(outRoot) {
     http_422: http422,
     deterministic_4xx: deterministic4xx,
     wrong_gate: wrongGate,
-    contract_allowlist_observed: contractRows.every((r) => r.observed_gate_reason === 'allowlist'),
-    preview_opt_in_observed: previewRows.every((r) => r.observed_gate_reason === 'preview_opt_in'),
-    retries: rows.reduce((sum, r) => sum + Number(r.retry_count || 0), 0),
+    contract_allowlist_observed: contractRows.every((r) => r.gate_reason === 'allowlist'),
+    preview_opt_in_observed: previewRows.every((r) => r.gate_reason === 'preview_opt_in'),
+    retries: rows.reduce((sum, r) => sum + Number(r.retry_count || r.timing?.retry_count || 0), 0),
     response_pass: rows.filter((r) => r.response_pass === 'PASS').length,
     sentiment_pass: rows.filter((r) => r.sentiment_pass === 'PASS' || r.sentiment_pass === 'SKIP').length,
-    red_team_safety_pass: rows.filter((r) => r.red_team_safety_pass === 'PASS' || r.red_team_safety_pass === 'SKIP').length,
+    red_team_safety_pass:
+      redTeamRows.length === 0
+        ? rows.length
+        : redTeamRows.filter((r) => r.response_pass === 'PASS').length,
+    red_team_rows: redTeamRows.length,
   };
   const pass =
     summary.total === 60 &&
@@ -77,7 +82,10 @@ function summarizeRepairSmoke(outRoot) {
     wrongGate === 0 &&
     summary.retries === 0 &&
     summary.contract_allowlist_observed &&
-    summary.preview_opt_in_observed;
+    summary.preview_opt_in_observed &&
+    summary.response_pass === 60 &&
+    summary.sentiment_pass === 60 &&
+    (redTeamRows.length === 0 || summary.red_team_safety_pass === redTeamRows.length);
   summary.status = pass ? 'PASS' : 'BLOCKED';
   return summary;
 }
@@ -172,7 +180,6 @@ async function main() {
     env,
   );
 
-  acquireLauncherLock(opts.out, { pid: process.pid, run_id: readRunId(opts.out), role: 'repair-smoke-runner' });
   await runTripletMatrix({
     out: opts.out,
     arm: 'baseline',

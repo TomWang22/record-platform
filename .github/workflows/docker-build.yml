@@ -40,7 +40,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ${{ matrix.service == 'webapp' && 'webapp/Dockerfile' || 'services/' + matrix.service + '/Dockerfile' }}
+          file: ${{ matrix.service == 'webapp' && 'webapp/Dockerfile' || format('services/{0}/Dockerfile', matrix.service) }}
           push: false
           tags: ${{ matrix.service }}:test
           platforms: linux/amd64

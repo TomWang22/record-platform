@@ -419,6 +419,11 @@ git-verify-no-cursor-trailers: ## Reject Cursor/CursorAgent attribution on origi
 	node scripts/no-cursor-trailer-guard-readonly.mjs --detailed
 	node scripts/no-cursor-ref-policy-readonly.mjs
 
+git-verify-workflow-syntax: ## Validate GitHub Actions workflow syntax with actionlint
+	bash scripts/verify-workflow-syntax.sh
+	node --test tests/workflow-syntax.test.mjs
+	node --test tests/docker-build-dockerfiles.test.mjs
+
 git-config-attribution-hooks: ## Point core.hooksPath at versioned .githooks
 	git config --local core.hooksPath .githooks
 	chmod +x .githooks/commit-msg .githooks/pre-push
@@ -445,6 +450,7 @@ ai-platform-verify-phase32h-preview-gate: ## Phase 32H preview-gate retry policy
 
 ci-verify-ai-platform-blockers: ## Combined CI repair gate (offline)
 	$(MAKE) git-verify-no-cursor-trailers
+	$(MAKE) git-verify-workflow-syntax
 	$(MAKE) bundle-secret-alignment-audit
 	$(MAKE) bundle-preflight-static-contract
 	kubectl kustomize infra/ops/ >/tmp/kafka-ops.yaml

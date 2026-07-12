@@ -100,6 +100,19 @@ function main() {
     if (allReport.status !== 'PASS') {
       violations.push(...allReport.violations.map((v) => ({ ...v, scope: '--all' })));
     }
+    const workflowSyntax = spawnSync('make', ['git-verify-workflow-syntax'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: 'pipe',
+    });
+    if (workflowSyntax.status !== 0) {
+      violations.push({
+        ref: 'origin/main',
+        kind: 'workflow-syntax',
+        field: 'actionlint',
+        value: workflowSyntax.stderr || workflowSyntax.stdout || 'git-verify-workflow-syntax failed',
+      });
+    }
   }
 
   if (violations.length > 0) {

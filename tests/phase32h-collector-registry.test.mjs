@@ -251,6 +251,12 @@ describe('phase32h collector launch spec', () => {
     assert.deepEqual(normalizeArgvForComparison(argv), normalizeArgvForComparison(quoted));
   });
 
+  it('ps-style split capture filter tokens normalize safely', () => {
+    const argv = writeCaptureStatus(root);
+    const psStyle = `/opt/homebrew/bin/dumpcap -q -i bridge100 -f tcp port 443 or udp port 443 or port 53 or icmp or icmp6 -b filesize:250000 -b files:48 -w ${root}/pcap/live.pcapng`;
+    assert.deepEqual(normalizeArgvForComparison(argv), normalizeArgvForComparison(psStyle));
+  });
+
   it('valid option reordering normalizes safely', () => {
     const argv = writeCaptureStatus(root);
     const reordered = [

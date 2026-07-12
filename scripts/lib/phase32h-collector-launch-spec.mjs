@@ -75,7 +75,13 @@ export function parseDumpcapSemantic(argvOrCommand) {
       continue;
     }
     if (token === '-f' && argv[i + 1]) {
-      semantic.capture_filter = argv[++i];
+      const parts = [];
+      i += 1;
+      while (i < argv.length && !argv[i].startsWith('-')) {
+        parts.push(argv[i++]);
+      }
+      i -= 1;
+      semantic.capture_filter = parts.join(' ');
       continue;
     }
     if (token === '-w' && argv[i + 1]) {

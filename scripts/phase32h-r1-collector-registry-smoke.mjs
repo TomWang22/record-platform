@@ -18,6 +18,7 @@ import {
 import { assertCollectorExclusivityPreflight } from './lib/phase32h-collector-exclusivity.mjs';
 import {
   evaluatePcapCollectorIdentity,
+  enrichPcapProcessFromCaptureStatus,
   readCollectorRegistry,
   registerPcapCollector,
 } from './lib/phase32h-collector-registry.mjs';
@@ -53,7 +54,10 @@ function evaluateRegistrySemantic(outRoot, runId, launchHead) {
   const registry = readCollectorRegistry(outRoot);
   const entry = registry?.collectors?.pcap_collector;
   const processes = listPhase32hCaptureProcesses().filter((p) => p.evidence_root === outRoot);
-  const proc = processes.find((p) => p.pid === entry?.pid) || null;
+  const proc = enrichPcapProcessFromCaptureStatus(
+    outRoot,
+    processes.find((p) => p.pid === entry?.pid) || null,
+  );
   const identity = evaluatePcapCollectorIdentity(outRoot, listPhase32hCaptureProcesses(), registry, {
     probesActive: true,
     runId,

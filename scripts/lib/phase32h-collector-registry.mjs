@@ -44,6 +44,26 @@ function fileAgeMs(filePath) {
   return Date.now() - fs.statSync(filePath).mtimeMs;
 }
 
+export function enrichPcapProcessFromCaptureStatus(outRoot, proc) {
+  if (!proc) return proc;
+  const statusPath = path.join(outRoot, 'pcap/capture-status.json');
+  if (!fs.existsSync(statusPath)) return proc;
+  try {
+    const status = JSON.parse(fs.readFileSync(statusPath, 'utf8'));
+    if (status.pid === proc.pid && Array.isArray(status.argv) && status.argv.length) {
+      return {
+        ...proc,
+        argv: status.argv,
+        output_path: status.file || proc.output_path,
+        interface: status.iface || proc.interface,
+      };
+    }
+  } catch {
+    return proc;
+  }
+  return proc;
+}
+
 export function collectorRegistryPath(outRoot) {
   return path.join(outRoot, 'run-state', COLLECTOR_REGISTRY_FILE);
 }
@@ -174,7 +194,10 @@ export function evaluatePcapCollectorIdentity(outRoot, processes, registry, opts
       process_count: captureProcesses.length,
     };
   }
-  const proc = captureProcesses.find((p) => p.pid === entry.pid);
+  const proc = enrichPcapProcessFromCaptureStatus(
+    outRoot,
+    captureProcesses.find((p) => p.pid === entry.pid),
+  );
   if (!proc || !pidAlive(entry.pid)) {
     return {
       role: 'pcap_collector',

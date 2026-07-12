@@ -358,6 +358,7 @@ ai-platform-verify-phase32g-long-soak: ## Operator Phase 32G long soak verifier 
 PHASE32H_MATRIX_ROOT ?= /tmp/phase32h-targeted-reproduction
 
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
+	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
 	$(MAKE) ai-platform-verify-phase32h-manifest-contract
 	node --test tests/phase32h-targeted-manifest.test.mjs
 	node --test tests/phase32h-inflight-probe-registry.test.mjs
@@ -382,6 +383,7 @@ ai-platform-verify-phase32h-capture-smoke: ## Phase 32H-E2 six-probe capture int
 	node scripts/phase32h-capture-integrity-smoke.mjs
 
 ai-platform-verify-phase32h-run-integrity: ## Phase 32H-R1 atomic run locks and append guards
+	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
 	node --test tests/phase32h-run-integrity.test.mjs
 	node --test tests/phase32h-r1-manifest.test.mjs
 
@@ -416,11 +418,19 @@ ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (sou
 	node --test tests/phase32h-r1-prelaunch-guard.test.mjs
 	node scripts/phase32h-r1-prelaunch-guard-readonly.mjs
 
+ai-platform-verify-phase32h-freeze-integrity: ## Phase 32H freeze ordering + ESM readiness guards
+	node --test tests/phase32h-freeze-integrity.test.mjs
+	node --test tests/phase32h-esm-readiness.test.mjs
+	node scripts/phase32h-record-readiness-esm-incident.mjs
+	node scripts/phase32h-launch-package-readonly.mjs >/dev/null
+
 ai-platform-verify-phase32h-baseline-preflight: ## Phase 32H-R1 baseline prelaunch hardening (ESM/disk/index)
+	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
 	node --test tests/phase32h-baseline-preflight.test.mjs
 	node --test tests/phase32h-probe-packet-index.test.mjs
 	node --test tests/phase32h-ci-disk-launch-gates.test.mjs
 	node scripts/phase32h-baseline-preflight-readonly.mjs
+	node scripts/phase32h-launch-package-readonly.mjs >/dev/null
 
 git-commit-without-assistant-trailers: ## Create a commit via commit-tree without assistant trailers
 	bash scripts/git/commit-without-assistant-trailers.sh

@@ -95,7 +95,9 @@ Both arms: 8,640 probes (2,880 per protocol), H1/H2/H3 together.
 
 ### Baseline prelaunch hardening (r2)
 
-- **ESM closeout**: committed `.mjs` CLIs replace fragile `node -e` / `node -p` ESM eval (`ERR_EVAL_ESM_CANNOT_PRINT` was ad-hoc debug only)
+- **ESM closeout**: committed `.mjs` CLIs replace fragile `node -e` ESM eval; launch package via `scripts/phase32h-launch-package-readonly.mjs`
+- **Freeze integrity**: `scripts/lib/phase32h-freeze-integrity.mjs` quiesces writers, quiet-period verification, hash manifest, frozen marker last
+- **baseline-r2 historical addendum**: `phase32h-r1-baseline-r2-freeze-integrity-addendum.json` (monitor.log post-freeze mismatch; JSONL intact; not repaired)
 - **Per-probe packet indexes**: triplet path writes `probe-packet-index/<probe_id>.json` after each batch
 - **Disk gate**: hard minimum **40 GB** free; preferred **50 GB**; worst-case footprint ~27 GB evidence+PCAP
 

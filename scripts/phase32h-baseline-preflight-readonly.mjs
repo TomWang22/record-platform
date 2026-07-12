@@ -16,6 +16,7 @@ import { evaluateDiskPreflight } from './lib/phase32h-disk-preflight.mjs';
 import { evaluatePacketIndexCoverage } from './lib/phase32h-packet-index-coverage.mjs';
 import { validateManifestContract } from './lib/phase32h-manifest-contract.mjs';
 import { gitSha } from './lib/phase22-full-replay-common.mjs';
+import { assertNoFragileEvalUsage } from './lib/phase32h-esm-eval-guard.mjs';
 
 const CANARY_V2_ROOT = '/tmp/phase32h-r1-baseline-r2-canary-v2';
 
@@ -61,14 +62,18 @@ export function evaluateBaselinePreflight() {
     expectedBatchCorrelations: 30,
     requirePerProbeIndexes: false,
   });
+  const esmAudit = assertNoFragileEvalUsage(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
   return {
     status: manifestContract.status === 'PASS' ? 'PASS' : 'BLOCKED',
     launch_ready: manifestContract.status === 'PASS' && disk.launch_ready === true,
     esm_closeout_tooling: {
-      status: 'PASS',
+      status: esmAudit.status,
       root_cause:
-        'ERR_EVAL_ESM_CANNOT_PRINT came from ad-hoc debug using `node -p` with ESM import syntax; not production closeout code',
-      fix: 'Committed .mjs CLIs (phase32h-pcap-stats-readonly.mjs, phase32h-baseline-preflight-readonly.mjs) replace inline eval',
+        'ERR_EVAL_ESM_CANNOT_PRINT from ad-hoc node -e with top-level ESM import during readiness launch-package extraction',
+      fix:
+        'Committed CLIs: phase32h-baseline-preflight-readonly.mjs, phase32h-launch-package-readonly.mjs, phase32h-pcap-stats-readonly.mjs',
+      replacement_cli: 'scripts/phase32h-launch-package-readonly.mjs',
+      fragile_eval_violations: esmAudit.violations,
       ignored_nonzero_exits: 0,
     },
     manifest_contract: manifestContract,

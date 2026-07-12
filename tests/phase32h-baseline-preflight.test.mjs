@@ -45,7 +45,7 @@ describe('phase32h baseline preflight hardening', () => {
     const payload = JSON.parse(result.stdout);
     assert.equal(payload.status, 'PASS');
     assert.equal(payload.esm_closeout_tooling.status, 'PASS');
-    assert.equal(payload.esm_closeout_tooling.ignored_nonzero_exits, 0);
+    assert.equal(payload.esm_closeout_tooling.replacement_cli, 'scripts/phase32h-launch-package-readonly.mjs');
     assert.equal(payload.canary_v2_historical_indexing.per_probe_indexing.includes('not available'), true);
     if (payload.disk_preflight.status === 'BLOCKED') {
       assert.equal(payload.launch_ready, false);

@@ -50,119 +50,12 @@ function loadShardRows(outRoot) {
   return rows;
 }
 
-function listProcesses() {
-  const ps = spawnSync('ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8' });
-  const rows = [];
-  for (const line of (ps.stdout || '').split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const match = trimmed.match(/^(\d+)\s+(\d+)\s+(.*)$/);
-    if (!match) continue;
-    rows.push({ pid: Number(match[1]), ppid: Number(match[2]), command: match[3] });
-  }
-  return rows;
-}
-
-function roleForCommand(command, outRoot) {
-  if (!command.includes(outRoot)) return null;
-  if (command.includes('phase32h-collector-supervisor.mjs')) return 'collector_supervisor';
-  if (command.includes('phase32h-extreme-watchdog.mjs')) return 'extreme_watchdog';
-  if (command.includes('phase32h-capture-host-telemetry.sh')) return 'host_power_telemetry';
-  if (command.includes('phase32h-start-gateway-log-capture.sh')) return 'gateway_log_collector';
-  if (command.includes('phase32h-start-application-log-capture.sh')) return 'application_log_collector';
-  if (command.includes('phase32h-monitor-targeted-reproduction.sh')) return 'matrix_monitor';
-  if (command.includes('dumpcap') && command.includes(outRoot)) return 'pcap_collector';
-  if (command.includes('phase32h-r1-triplet-runner.mjs')) return 'triplet_runner';
-  return 'other';
-}
-
-function stopProcessesForRoot(outRoot) {
-  const ledger = [];
-  const seen = new Set();
-
-  const attemptStop = (proc, signal) => {
-    const key = `${proc.pid}:${signal}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    const role = roleForCommand(proc.command, outRoot);
-    if (!role) return;
-    const entry = {
-      pid: proc.pid,
-      role,
-      command: proc.command,
-      signal,
-      signal_at: new Date().toISOString(),
-      exit_at: null,
-      exit_code: null,
-      sigkill_required: false,
-    };
-    try {
-      process.kill(proc.pid, signal);
-      ledger.push(entry);
-    } catch (err) {
-      entry.exit_at = new Date().toISOString();
-      entry.exit_code = err.code === 'ESRCH' ? 0 : null;
-      entry.note = err.message;
-      ledger.push(entry);
-    }
-    return entry;
-  };
-
-  const procs = listProcesses().filter((p) => roleForCommand(p.command, outRoot));
-  for (const proc of procs) {
-    attemptStop(proc, 'SIGTERM');
-  }
-
-  const deadline = Date.now() + GRACEFUL_MS;
-  while (Date.now() < deadline) {
-    const alive = ledger
-      .filter((e) => e.signal === 'SIGTERM' && e.exit_at == null)
-      .filter((e) => {
-        try {
-          process.kill(e.pid, 0);
-          return true;
-        } catch {
-          return false;
-        }
-      });
-    if (!alive.length) break;
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
-  }
-
-  for (const entry of ledger.filter((e) => e.signal === 'SIGTERM' && e.exit_at == null)) {
-    try {
-      process.kill(entry.pid, 0);
-      const proc = procs.find((p) => p.pid === entry.pid);
-      if (proc) {
-        attemptStop(proc, 'SIGKILL');
-        const killEntry = ledger[ledger.length - 1];
-        if (killEntry) {
-          killEntry.sigkill_required = true;
-          entry.sigkill_required = true;
-        }
-      }
-    } catch {
-      entry.exit_at = new Date().toISOString();
-      entry.exit_code = 0;
-    }
-  }
-
-  for (const entry of ledger) {
-    if (entry.exit_at) continue;
-    try {
-      process.kill(entry.pid, 0);
-    } catch {
-      entry.exit_at = new Date().toISOString();
-      entry.exit_code = 0;
-    }
-  }
-
-  spawnSync('bash', [path.join(REPO_ROOT, 'scripts/phase32h-stop-pcap-capture.sh'), outRoot], {
-    cwd: REPO_ROOT,
-  });
-
-  return ledger;
-}
+import {
+  buildHistoricalFreezeMismatchReport,
+  executeFreezeIntegrity,
+  listRootScopedProcesses,
+  stopWritersForRoot,
+} from './lib/phase32h-freeze-integrity.mjs';
 
 function walkFiles(root, { exclude = [] } = {}) {
   const files = [];
@@ -203,7 +96,10 @@ function main() {
     jsonlPaths.filter((p) => fs.existsSync(p)).map((p) => [p, sha256FileSync(p)]),
   );
 
-  const stopLedger = stopProcessesForRoot(outRoot);
+  const stopLedger = stopWritersForRoot(outRoot, { gracefulMs: GRACEFUL_MS });
+  spawnSync('bash', [path.join(REPO_ROOT, 'scripts/phase32h-stop-pcap-capture.sh'), outRoot], {
+    cwd: REPO_ROOT,
+  });
 
   const rows = loadShardRows(outRoot);
   const matrix = summarizeMatrix(rows);
@@ -309,10 +205,8 @@ function main() {
     'phase32h-r1-baseline-r2-sha256.txt',
     'FROZEN_BLOCKED_EVIDENCE',
     'FROZEN_PASS_EVIDENCE',
+    'phase32h-r1-baseline-r2-freeze-integrity-addendum.json',
   ];
-  const files = walkFiles(outRoot).filter((f) => !shaExclude.some((s) => f.endsWith(s)));
-  const shaLines = files.sort().map((f) => `${sha256FileSync(f)}  ${f}`);
-  fs.writeFileSync(path.join(outRoot, 'phase32h-r1-baseline-r2-sha256.txt'), `${shaLines.join('\n')}\n`, 'utf8');
 
   const report = `# Phase 32H-R1 Baseline-r2 BLOCKED
 
@@ -338,9 +232,38 @@ Matrix rows may be technically clean; this does **not** make the run admissible 
 Never resume this root. Future root: \`/tmp/phase32h-r1-baseline-r3\`
 `;
   fs.writeFileSync(path.join(outRoot, 'phase32h-r1-baseline-r2-blocked-report.md'), report, 'utf8');
-  fs.writeFileSync(path.join(outRoot, 'FROZEN_BLOCKED_EVIDENCE'), `${frozenAt}\n${BLOCKED_REASON}\n`, 'utf8');
 
-  const remaining = listProcesses().filter((p) => p.command.includes(outRoot));
+  let freezeIntegrity;
+  try {
+    freezeIntegrity = executeFreezeIntegrity({
+      outRoot,
+      repoRoot: REPO_ROOT,
+      quietPeriodMs: Number(process.env.PHASE32H_FREEZE_QUIET_MS || 5000),
+      gracefulMs: GRACEFUL_MS,
+      hashManifestName: 'phase32h-r1-baseline-r2-sha256.txt',
+      hashExcludeSuffixes: shaExclude,
+      markerName: 'FROZEN_BLOCKED_EVIDENCE',
+      markerContent: `${frozenAt}\n${BLOCKED_REASON}\n`,
+      jsonlPaths,
+      writersAlreadyStopped: true,
+    });
+  } catch (err) {
+    console.error(
+      JSON.stringify(
+        {
+          status: 'BLOCKED',
+          code: err.code || 'PHASE32H_FREEZE_INTEGRITY_BLOCKED',
+          message: err.message,
+          details: err.details || null,
+        },
+        null,
+        2,
+      ),
+    );
+    process.exit(2);
+  }
+
+  const remaining = listRootScopedProcesses(outRoot);
   console.log(
     JSON.stringify(
       {
@@ -356,6 +279,7 @@ Never resume this root. Future root: \`/tmp/phase32h-r1-baseline-r3\`
         processes_remaining: remaining.length,
         jsonl_modified: jsonlModified,
         frozen_marker: 'FROZEN_BLOCKED_EVIDENCE',
+        freeze_integrity: freezeIntegrity,
       },
       null,
       2,

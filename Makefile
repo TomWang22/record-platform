@@ -412,7 +412,7 @@ ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (sou
 git-commit-without-assistant-trailers: ## Create a commit via commit-tree without assistant trailers
 	bash scripts/git/commit-without-assistant-trailers.sh
 
-git-verify-no-cursor-trailers: ## Reject Cursor/CursorAgent commit trailers (strict all-history scan)
+git-verify-no-cursor-trailers: ## Reject Cursor/CursorAgent attribution in trailers and identity metadata
 	node --test tests/no-cursor-trailer-guard.test.mjs
 	node scripts/no-cursor-trailer-guard-readonly.mjs
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Read-only verifier: no Cursor/CursorAgent commit trailers (post-grandfather).
+ * Read-only verifier: no Cursor/CursorAgent commit attribution.
  */
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -9,9 +9,10 @@ import { evaluateNoCursorTrailerGuard } from './lib/no-cursor-trailer-guard.mjs'
 const __filename = fileURLToPath(import.meta.url);
 
 function parseArgs(argv) {
-  const opts = { ref: 'HEAD', strict: false };
+  const opts = { ref: 'HEAD', range: undefined, strict: false };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--ref') opts.ref = argv[++i];
+    if (argv[i] === '--range') opts.range = argv[++i];
     if (argv[i] === '--strict') opts.strict = true;
   }
   return opts;
@@ -21,6 +22,7 @@ function main() {
   const opts = parseArgs(process.argv.slice(2));
   const report = evaluateNoCursorTrailerGuard({
     ref: opts.ref,
+    range: opts.range,
     strict: opts.strict,
   });
   console.log(JSON.stringify(report, null, 2));

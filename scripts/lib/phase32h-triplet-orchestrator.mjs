@@ -240,6 +240,6 @@ export function mainMatrixUsesTripletOrchestrator(launchScriptPath) {
   return (
     text.includes('phase32h-r1-triplet-runner.mjs') &&
     !text.includes("launchShard('h1'") &&
-    text.includes('phase32h-r1-prelaunch')
+    (text.includes('runBaselineLaunchPreflight') || text.includes('phase32h-r1-prelaunch'))
   );
 }

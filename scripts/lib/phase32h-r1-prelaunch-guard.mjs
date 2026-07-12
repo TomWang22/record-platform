@@ -54,11 +54,12 @@ export function checkLifecyclePreflightWired() {
   const launchScript = path.join(REPO_ROOT, 'scripts/phase32h-launch-r1-arm.mjs');
   const text = fs.readFileSync(launchScript, 'utf8');
   const violations = [];
-  if (!text.includes('phase32h-r1-prelaunch-smoke')) {
-    violations.push('arm launcher missing prelaunch smoke');
+  if (!text.includes('runBaselineLaunchPreflight')) {
+    violations.push('arm launcher missing ordered baseline launch preflight');
   }
-  if (!text.includes('ai-platform-verify-phase32h-r1-prelaunch')) {
-    violations.push('arm launcher missing prelaunch verifier gate');
+  const preflightLib = path.join(REPO_ROOT, 'scripts/lib/phase32h-baseline-launch-preflight.mjs');
+  if (!fs.existsSync(preflightLib)) {
+    violations.push('baseline launch preflight module missing');
   }
   return violations;
 }
@@ -77,17 +78,42 @@ export function checkDiskPreflightWired() {
   const launchScript = path.join(REPO_ROOT, 'scripts/phase32h-launch-r1-arm.mjs');
   const text = fs.readFileSync(launchScript, 'utf8');
   const violations = [];
-  if (!text.includes('assertDiskPreflight')) {
-    violations.push('arm launcher missing disk preflight gate');
+  if (!text.includes('runBaselineLaunchPreflight')) {
+    violations.push('arm launcher missing ordered baseline launch preflight');
   }
   const diskLib = path.join(REPO_ROOT, 'scripts/lib/phase32h-disk-preflight.mjs');
   if (!fs.existsSync(diskLib)) {
     violations.push('disk preflight module missing');
   } else {
     const diskText = fs.readFileSync(diskLib, 'utf8');
-    if (!diskText.includes('40 * 1024 ** 3')) {
-      violations.push('disk hard minimum must be 40 GB');
+    if (!diskText.includes('DISK_HARD_MIN_BYTES =\n  DISK_PROJECTED_FOOTPRINT_BYTES + DISK_OPERATIONAL_UNCERTAINTY_BYTES')) {
+      if (!diskText.includes('47 * 1024 ** 3') && !diskText.includes('DISK_OPERATIONAL_UNCERTAINTY_BYTES')) {
+        violations.push('disk hard minimum must include 47 GB operational reserve');
+      }
     }
+  }
+  const preflightLib = path.join(REPO_ROOT, 'scripts/lib/phase32h-baseline-launch-preflight.mjs');
+  if (!fs.existsSync(preflightLib)) {
+    violations.push('baseline launch preflight module missing');
+  }
+  return violations;
+}
+
+export function checkCiApprovalWired() {
+  const violations = [];
+  const ciLib = path.join(REPO_ROOT, 'scripts/lib/phase32h-ci-approval.mjs');
+  const launcher = path.join(REPO_ROOT, 'scripts/phase32h-launch-r1-arm.mjs');
+  const generator = path.join(REPO_ROOT, 'scripts/phase32h-generate-ci-approval.mjs');
+  if (!fs.existsSync(ciLib)) violations.push('CI approval module missing');
+  if (!fs.existsSync(generator)) violations.push('CI approval generator missing');
+  const text = fs.readFileSync(launcher, 'utf8');
+  if (!text.includes('runBaselineLaunchPreflight')) {
+    violations.push('launcher must use runBaselineLaunchPreflight before root creation');
+  }
+  const integrity = path.join(REPO_ROOT, 'scripts/lib/phase32h-run-integrity.mjs');
+  const integrityText = fs.readFileSync(integrity, 'utf8');
+  if (!integrityText.includes('R1_FORBIDDEN_BASELINE_ROOTS')) {
+    violations.push('forbidden baseline roots must be centralized');
   }
   return violations;
 }
@@ -159,6 +185,7 @@ export function evaluatePrelaunchGuard(opts = {}) {
     ...checkContinuousPcapModel(),
     ...checkLifecycleTotalsSeparate(),
     ...checkDiskPreflightWired(),
+    ...checkCiApprovalWired(),
     ...checkPerProbePacketIndexWired(),
     ...checkEsmCloseoutTooling(),
   ];

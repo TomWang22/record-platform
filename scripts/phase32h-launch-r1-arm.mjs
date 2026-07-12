@@ -8,19 +8,18 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   acquireLauncherLock,
-  assertLaunchableEvidenceRoot,
   generateRunId,
   initRunState,
-  isCoverageBlocked,
   readRunId,
   sha256File,
 } from './lib/phase32h-run-integrity.mjs';
-import { evidenceLabelForArm, rootForArm, R1_BASELINE_R2_ROOT, R1_CANARY_TOTAL, R1_CANARY_PER_PROTOCOL } from './lib/phase32h-r1-config.mjs';
-import { gitSha } from './lib/phase22-full-replay-common.mjs';
-import { evaluatePrelaunchGuard } from './lib/phase32h-r1-prelaunch-guard.mjs';
-import { loadJsonl } from './lib/phase31-controlled-matrix-summary.mjs';
-import { assertManifestContract } from './lib/phase32h-manifest-contract.mjs';
-import { assertDiskPreflight } from './lib/phase32h-disk-preflight.mjs';
+import {
+  evidenceLabelForArm,
+  rootForArm,
+  R1_CANARY_TOTAL,
+  R1_CANARY_PER_PROTOCOL,
+} from './lib/phase32h-r1-config.mjs';
+import { runBaselineLaunchPreflight } from './lib/phase32h-baseline-launch-preflight.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -90,82 +89,27 @@ function startDetached(cmd, args, env = process.env) {
   return child.pid;
 }
 
+function writeManifest(outRoot, rows) {
+  const manifestPath = path.join(outRoot, 'phase32h-r1-manifest.jsonl');
+  fs.writeFileSync(manifestPath, `${rows.map((r) => JSON.stringify(r)).join('\n')}\n`, 'utf8');
+  return manifestPath;
+}
+
 function main() {
   const opts = parseArgs(process.argv.slice(2));
-  assertLaunchableEvidenceRoot(opts.out);
   if (!opts.out.startsWith('/tmp/')) throw new Error('R1 out must be under /tmp');
-  if (fs.existsSync(path.join(opts.out, 'FROZEN_BLOCKED_EVIDENCE'))) {
-    throw new Error('refusing launch in frozen evidence root');
-  }
-  if (fs.existsSync(opts.out) && fs.readdirSync(opts.out).length > 0) {
-    const marker = path.join(opts.out, 'run-state/run-id');
-    if (!fs.existsSync(marker)) {
-      throw new Error(`evidence root ${opts.out} is not empty; use a fresh root`);
-    }
-  }
 
-  const staticGuard = evaluatePrelaunchGuard();
-  if (staticGuard.status !== 'PASS') {
-    console.error(JSON.stringify(staticGuard, null, 2));
-    process.exit(2);
-  }
+  const preflight = runBaselineLaunchPreflight(opts, {
+    repoRoot: REPO_ROOT,
+    skipPreflight: opts.skipPreflight,
+  });
 
-  if (!opts.skipPreflight) {
-    const preflight = spawnSync('make', ['ai-platform-verify-phase32h-r1-prelaunch'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    });
-    if (preflight.status !== 0) {
-      console.error(preflight.stderr || preflight.stdout);
-      process.exit(2);
-    }
-    const smoke = spawnSync(
-      process.execPath,
-      [path.join(REPO_ROOT, 'scripts/phase32h-r1-prelaunch-smoke.mjs')],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    );
-    if (smoke.status !== 0) {
-      console.error(smoke.stderr || smoke.stdout);
-      process.exit(2);
-    }
-  }
-
-  if (!opts.canary) {
-    assertDiskPreflight(opts.out);
-  }
+  const runId = generateRunId();
+  const launchHead = preflight.headSha;
+  const evidenceLabel = preflight.evidenceLabel;
 
   fs.mkdirSync(opts.out, { recursive: true });
-
-  const evidenceLabel = evidenceLabelForArm(opts.arm, { canary: opts.canary });
-  const runId = generateRunId();
-  const launchHead = gitSha();
-
-  const manifestArgs = [
-    path.join(REPO_ROOT, 'scripts/phase32h-build-r1-manifest.mjs'),
-    '--out',
-    opts.out,
-    '--arm',
-    opts.arm,
-  ];
-  if (opts.canary) manifestArgs.push('--canary');
-  const manifestBuild = spawnSync(process.execPath, manifestArgs, {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-  });
-  if (manifestBuild.status !== 0) {
-    console.error(manifestBuild.stderr || manifestBuild.stdout);
-    process.exit(1);
-  }
-
-  const manifestPath = path.join(opts.out, 'phase32h-r1-manifest.jsonl');
-  const manifestRows = loadJsonl(manifestPath);
-  assertManifestContract(manifestRows, {
-    evidenceLabel,
-    launchHead,
-    runId,
-    expectedTotal: opts.canary ? R1_CANARY_TOTAL : 8640,
-    expectedPerProtocol: opts.canary ? R1_CANARY_PER_PROTOCOL : 2880,
-  });
+  const manifestPath = writeManifest(opts.out, preflight.manifestRows);
   initRunState(opts.out, { runId, launchHead, evidenceLabel, manifestPath });
   acquireLauncherLock(opts.out, { pid: process.pid, run_id: runId, role: 'launcher' });
 
@@ -203,12 +147,16 @@ function main() {
     caffeinatePid = startDetached('caffeinate', ['-dimsu', '-w', String(supervisorPid)], env);
     fs.writeFileSync(
       path.join(opts.out, 'power/caffeinate-assertion.json'),
-      `${JSON.stringify({
-        caffeinate_pid: caffeinatePid,
-        supervisor_pid: supervisorPid,
-        started_at: new Date().toISOString(),
-        command: `caffeinate -dimsu -w ${supervisorPid}`,
-      }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          caffeinate_pid: caffeinatePid,
+          supervisor_pid: supervisorPid,
+          started_at: new Date().toISOString(),
+          command: `caffeinate -dimsu -w ${supervisorPid}`,
+        },
+        null,
+        2,
+      )}\n`,
     );
   }
 

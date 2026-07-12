@@ -419,6 +419,7 @@ ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (sou
 ai-platform-verify-phase32h-baseline-preflight: ## Phase 32H-R1 baseline prelaunch hardening (ESM/disk/index)
 	node --test tests/phase32h-baseline-preflight.test.mjs
 	node --test tests/phase32h-probe-packet-index.test.mjs
+	node --test tests/phase32h-ci-disk-launch-gates.test.mjs
 	node scripts/phase32h-baseline-preflight-readonly.mjs
 
 git-commit-without-assistant-trailers: ## Create a commit via commit-tree without assistant trailers

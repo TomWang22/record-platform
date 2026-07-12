@@ -26,8 +26,8 @@ function runNodeScript(script, args = []) {
 }
 
 describe('phase32h baseline preflight hardening', () => {
-  it('disk gate requires at least 40 GB hard minimum and 50 GB preferred', () => {
-    assert.equal(DISK_HARD_MIN_BYTES, 40 * 1024 ** 3);
+  it('disk gate requires 47 GB hard minimum and 50 GB preferred', () => {
+    assert.equal(DISK_HARD_MIN_BYTES, 47 * 1024 ** 3);
     assert.equal(DISK_PREFERRED_MIN_BYTES, 50 * 1024 ** 3);
     assert.equal(DISK_WORST_CASE_COMBINED_BYTES, 37 * 1024 ** 3);
     const report = evaluateDiskPreflight(os.tmpdir());

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { buildR1Manifest } from './phase32h-build-r1-manifest.mjs';
 import { createHash } from 'node:crypto';
 import {
-  R1_BASELINE_R2_ROOT,
+  R1_BASELINE_R3_ROOT,
   R1_EVIDENCE_LABEL_BASELINE,
   R1_PER_PROTOCOL,
   R1_TOTAL,
@@ -23,12 +23,13 @@ export function buildBaselineLaunchPackage() {
   const rows = buildR1Manifest({ evidenceLabel: R1_EVIDENCE_LABEL_BASELINE });
   const manifestJson = `${rows.map((r) => JSON.stringify(r)).join('\n')}\n`;
   const manifestSha = createHash('sha256').update(manifestJson).digest('hex');
-  const disk = evaluateDiskPreflight(R1_BASELINE_R2_ROOT);
+  const disk = evaluateDiskPreflight(R1_BASELINE_R3_ROOT);
   return {
     status: 'APPROVAL_PENDING',
-    proposed_root: R1_BASELINE_R2_ROOT,
+    proposed_root: R1_BASELINE_R3_ROOT,
     forbidden_roots: [
       '/tmp/phase32h-r1-baseline',
+      '/tmp/phase32h-r1-baseline-r2',
       '/tmp/phase32h-r1-baseline-r2-canary',
       CANARY_V2_ROOT,
       '/tmp/phase32h-targeted-reproduction',
@@ -40,9 +41,9 @@ export function buildBaselineLaunchPackage() {
     triplet_batches: R1_PER_PROTOCOL,
     expected_runtime_hours: '3–6 (staging-dependent; not guaranteed)',
     disk,
-    launch_command: `node scripts/phase32h-launch-r1-arm.mjs --arm baseline --out ${R1_BASELINE_R2_ROOT}`,
+    launch_command: `node scripts/phase32h-launch-r1-arm.mjs --arm baseline --out ${R1_BASELINE_R3_ROOT}`,
     owner_approval_command:
-      `APPROVE Phase 32H-R1 baseline 8640 launch at ${R1_BASELINE_R2_ROOT}`,
+      `APPROVE Phase 32H-R1 baseline 8640 launch at ${R1_BASELINE_R3_ROOT}`,
     production_enablement: 'NOT APPROVED',
   };
 }
@@ -54,7 +55,7 @@ export function evaluateBaselinePreflight() {
     expectedTotal: R1_TOTAL,
     expectedPerProtocol: R1_PER_PROTOCOL,
   });
-  const disk = evaluateDiskPreflight(R1_BASELINE_R2_ROOT);
+  const disk = evaluateDiskPreflight(R1_BASELINE_R3_ROOT);
   const canaryHistorical = evaluatePacketIndexCoverage(CANARY_V2_ROOT, {
     expectedProbeIndexes: 90,
     expectedBatchCorrelations: 30,
@@ -62,7 +63,7 @@ export function evaluateBaselinePreflight() {
   });
   return {
     status: manifestContract.status === 'PASS' ? 'PASS' : 'BLOCKED',
-    launch_ready: manifestContract.status === 'PASS' && disk.status !== 'BLOCKED',
+    launch_ready: manifestContract.status === 'PASS' && disk.launch_ready === true,
     esm_closeout_tooling: {
       status: 'PASS',
       root_cause:

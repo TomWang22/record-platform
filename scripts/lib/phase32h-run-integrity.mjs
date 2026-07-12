@@ -5,13 +5,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gitSha } from './phase22-full-replay-common.mjs';
+import { R1_FORBIDDEN_BASELINE_ROOTS } from './phase32h-r1-config.mjs';
 
 export const RUN_STATE_DIR = 'run-state';
 export const BLOCKED_MARKER = 'COLLECTOR_COVERAGE_BLOCKED';
 export const FROZEN_BLOCKED_MARKER = 'FROZEN_BLOCKED_EVIDENCE';
-export const INVALID_BASELINE_ROOTS = new Set([
-  '/tmp/phase32h-r1-baseline',
-]);
+export const INVALID_BASELINE_ROOTS = new Set(R1_FORBIDDEN_BASELINE_ROOTS);
 
 export function isEvidenceRootFrozen(outRoot) {
   return fs.existsSync(path.join(outRoot, FROZEN_BLOCKED_MARKER));

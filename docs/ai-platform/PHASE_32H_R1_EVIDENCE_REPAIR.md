@@ -103,7 +103,9 @@ Both arms: 8,640 probes (2,880 per protocol), H1/H2/H3 together.
 make ai-platform-verify-phase32h-baseline-preflight
 ```
 
-Proposed baseline root: `/tmp/phase32h-r1-baseline-r2` (must not exist before launch)
+Proposed baseline root: `/tmp/phase32h-r1-baseline-r3` (must not exist before launch)
+
+**baseline-r2** (`/tmp/phase32h-r1-baseline-r2`) is **FROZEN BLOCKED** — `PRELAUNCH_POLICY_VIOLATION` (CI non-terminal at launch + disk reserve below 10 GB). Never resume.
 
 ## Hard stops
 

@@ -136,7 +136,7 @@ async function main() {
   });
   const tripletBatches = groupManifestIntoTriplets(smokeRows);
   const coldBatch = tripletBatches[0];
-  const warmBatch = tripletBatches[0];
+  const warmBatch = tripletBatches[1] ?? tripletBatches[0];
 
   const matrixCfg = {
     ...DEFAULTS,

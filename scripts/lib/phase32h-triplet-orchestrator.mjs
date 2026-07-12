@@ -15,6 +15,8 @@ import {
 } from './phase32h-triplet-batch.mjs';
 import { writeBatchPacketIndex } from './phase32h-batch-packet-index.mjs';
 import { classifyMatrixProbeFailure } from './phase31-controlled-matrix-summary.mjs';
+import { isCoverageBlocked } from './phase32h-run-integrity.mjs';
+import { supervisorTick } from '../phase32h-collector-supervisor.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKER_PATH = path.join(__dirname, 'phase32h-triplet-probe-worker.mjs');

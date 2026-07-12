@@ -82,6 +82,13 @@ node scripts/phase32h-launch-r1-arm.mjs --arm caffeinate
 
 Both arms: 8,640 probes (2,880 per protocol), H1/H2/H3 together.
 
+### Canary (baseline-r2)
+
+- **90-probe canary** at `/tmp/phase32h-r1-baseline-r2-canary` — **FROZEN BLOCKED** (3/90, HTTP 422)
+- First blocked root used **partial source provenance** (uncommitted canary launcher at reported HEAD `92be1a6b`)
+- Never resume frozen roots; use `-v2` suffix for reruns after repair
+- Launch: `node scripts/phase32h-launch-r1-arm.mjs --arm baseline --canary --out /tmp/phase32h-r1-baseline-r2-canary-v2`
+
 ## Hard stops
 
 - Production enablement: NOT APPROVED

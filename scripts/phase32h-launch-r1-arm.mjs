@@ -15,7 +15,7 @@ import {
   readRunId,
   sha256File,
 } from './lib/phase32h-run-integrity.mjs';
-import { evidenceLabelForArm, rootForArm } from './lib/phase32h-r1-config.mjs';
+import { evidenceLabelForArm, rootForArm, R1_CANARY_TOTAL, R1_CANARY_PER_PROTOCOL } from './lib/phase32h-r1-config.mjs';
 import { gitSha } from './lib/phase22-full-replay-common.mjs';
 import { evaluatePrelaunchGuard } from './lib/phase32h-r1-prelaunch-guard.mjs';
 
@@ -23,13 +23,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
 
 function parseArgs(argv) {
-  const opts = { arm: 'baseline', out: null, skipPreflight: false };
+  const opts = { arm: 'baseline', out: null, skipPreflight: false, canary: false };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--arm') opts.arm = argv[++i];
     if (argv[i] === '--out') opts.out = argv[++i];
     if (argv[i] === '--skip-preflight') opts.skipPreflight = true;
+    if (argv[i] === '--canary') opts.canary = true;
   }
-  opts.out = opts.out || rootForArm(opts.arm);
+  opts.out = opts.out || rootForArm(opts.arm, { canary: opts.canary });
   return opts;
 }
 
@@ -127,21 +128,22 @@ function main() {
 
   fs.mkdirSync(opts.out, { recursive: true });
 
-  const evidenceLabel = evidenceLabelForArm(opts.arm);
+  const evidenceLabel = evidenceLabelForArm(opts.arm, { canary: opts.canary });
   const runId = generateRunId();
   const launchHead = gitSha();
 
-  const manifestBuild = spawnSync(
-    process.execPath,
-    [
-      path.join(REPO_ROOT, 'scripts/phase32h-build-r1-manifest.mjs'),
-      '--out',
-      opts.out,
-      '--arm',
-      opts.arm,
-    ],
-    { cwd: REPO_ROOT, encoding: 'utf8' },
-  );
+  const manifestArgs = [
+    path.join(REPO_ROOT, 'scripts/phase32h-build-r1-manifest.mjs'),
+    '--out',
+    opts.out,
+    '--arm',
+    opts.arm,
+  ];
+  if (opts.canary) manifestArgs.push('--canary');
+  const manifestBuild = spawnSync(process.execPath, manifestArgs, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  });
   if (manifestBuild.status !== 0) {
     console.error(manifestBuild.stderr || manifestBuild.stdout);
     process.exit(1);
@@ -209,12 +211,15 @@ function main() {
     status: 'IN_PROGRESS',
     phase: '32H-R1',
     arm: opts.arm,
+    mode: opts.canary ? 'canary' : 'full',
     evidence_label: evidenceLabel,
     out: opts.out,
     run_id: readRunId(opts.out),
     launch_head: launchHead,
     manifest_sha256: sha256File(manifestPath),
-    target_total: 8640,
+    target_total: opts.canary ? R1_CANARY_TOTAL : 8640,
+    target_per_protocol: opts.canary ? R1_CANARY_PER_PROTOCOL : 2880,
+    triplet_batches: opts.canary ? R1_CANARY_PER_PROTOCOL : 2880,
     orchestrator: 'phase32h-r1-triplet-runner',
     supervisor_pid: supervisorPid,
     caffeinate_pid: caffeinatePid,

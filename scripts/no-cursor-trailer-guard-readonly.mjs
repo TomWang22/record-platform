@@ -9,10 +9,11 @@ import { evaluateNoCursorTrailerGuard } from './lib/no-cursor-trailer-guard.mjs'
 const __filename = fileURLToPath(import.meta.url);
 
 function parseArgs(argv) {
-  const opts = { ref: 'HEAD', range: undefined, strict: false };
+  const opts = { ref: 'origin/main', range: undefined, allRefs: false, strict: false };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--ref') opts.ref = argv[++i];
     if (argv[i] === '--range') opts.range = argv[++i];
+    if (argv[i] === '--all-refs') opts.allRefs = true;
     if (argv[i] === '--strict') opts.strict = true;
   }
   return opts;
@@ -23,7 +24,7 @@ function main() {
   const report = evaluateNoCursorTrailerGuard({
     ref: opts.ref,
     range: opts.range,
-    strict: opts.strict,
+    includeAllRefs: opts.allRefs,
   });
   console.log(JSON.stringify(report, null, 2));
   if (report.status !== 'PASS') process.exit(2);

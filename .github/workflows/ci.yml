@@ -319,25 +319,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Verify no Cursor commit attribution
-        shell: bash
-        run: |
-          set -euo pipefail
-          node --test tests/no-cursor-trailer-guard.test.mjs
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-            HEAD="${{ github.sha }}"
-          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            BASE="${{ github.event.before }}"
-            HEAD="${{ github.sha }}"
-          else
-            BASE=""
-            HEAD=""
-          fi
-          if [ -n "$BASE" ]; then
-            node scripts/no-cursor-trailer-guard-readonly.mjs --range "${BASE}..${HEAD}"
-          else
-            node scripts/no-cursor-trailer-guard-readonly.mjs --ref HEAD
-          fi
+        run: make git-verify-no-cursor-trailers
 
   artifacts:
     name: Upload rotation artifacts

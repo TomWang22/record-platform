@@ -1,6 +1,6 @@
 /**
  * Reject Cursor/CursorAgent commit attribution in git history (read-only).
- * Covers commit-message trailers and author/committer identity metadata.
+ * Covers exact co-author trailers, related attribution trailers, and identity metadata.
  */
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -9,10 +9,18 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
-const TRAILER_RE =
-  /^(?:co-authored-by|signed-off-by|reviewed-by|assisted-by):\s*.*(?:cursoragent@cursor\.com|\bcursor\b).*$/im;
+const EXACT_CURSOR_COAUTHOR_TRAILER_RE =
+  /^Co-authored-by:\s*Cursor(?:\s+Agent)?\s*<cursoragent@cursor\.com>\s*$/i;
 
-const FORBIDDEN_IDENTITY_TOKENS = ['cursor', 'cursoragent', 'cursor.com'];
+const ATTRIBUTION_TRAILER_RE =
+  /^(?:co-authored-by|signed-off-by|reviewed-by|assisted-by):\s*.*(?:cursoragent@cursor\.com|cursoragent@users\.noreply\.github\.com|\bcursor\b).*$/i;
+
+const FORBIDDEN_IDENTITY_EMAILS = [
+  'cursoragent@cursor.com',
+  'cursoragent@users.noreply.github.com',
+];
+
+const FORBIDDEN_IDENTITY_NAME_TOKENS = ['cursor', 'cursoragent'];
 
 export const TRAILER_KEYS = [
   'Co-authored-by',
@@ -21,15 +29,34 @@ export const TRAILER_KEYS = [
   'Assisted-by',
 ];
 
-function containsForbiddenIdentity(value) {
+function containsForbiddenIdentityName(value) {
   const normalized = String(value || '').toLowerCase();
-  return FORBIDDEN_IDENTITY_TOKENS.some((token) => normalized.includes(token));
+  return FORBIDDEN_IDENTITY_NAME_TOKENS.some((token) => normalized.includes(token));
+}
+
+function containsForbiddenIdentityEmail(value) {
+  const normalized = String(value || '').toLowerCase();
+  return (
+    FORBIDDEN_IDENTITY_EMAILS.some((email) => normalized === email) ||
+    normalized.includes('cursor.com')
+  );
+}
+
+export function findExactCursorCoauthorTrailerLine(message) {
+  for (const line of String(message || '').split(/\r?\n/)) {
+    if (EXACT_CURSOR_COAUTHOR_TRAILER_RE.test(line.trim())) {
+      return line.trim();
+    }
+  }
+  return null;
 }
 
 export function findCursorTrailerLine(message) {
-  const lines = String(message || '').split(/\r?\n/);
-  for (const line of lines) {
-    if (TRAILER_RE.test(line)) return line.trim();
+  const exact = findExactCursorCoauthorTrailerLine(message);
+  if (exact) return exact;
+
+  for (const line of String(message || '').split(/\r?\n/)) {
+    if (ATTRIBUTION_TRAILER_RE.test(line)) return line.trim();
   }
   return null;
 }
@@ -37,14 +64,14 @@ export function findCursorTrailerLine(message) {
 export function findCursorIdentityViolations(commit) {
   const violations = [];
   const fields = [
-    ['author_name', commit.authorName],
-    ['author_email', commit.authorEmail],
-    ['committer_name', commit.committerName],
-    ['committer_email', commit.committerEmail],
+    ['author_name', commit.authorName, containsForbiddenIdentityName],
+    ['author_email', commit.authorEmail, containsForbiddenIdentityEmail],
+    ['committer_name', commit.committerName, containsForbiddenIdentityName],
+    ['committer_email', commit.committerEmail, containsForbiddenIdentityEmail],
   ];
 
-  for (const [field, value] of fields) {
-    if (containsForbiddenIdentity(value)) {
+  for (const [field, value, predicate] of fields) {
+    if (predicate(value)) {
       violations.push({ field, value: String(value) });
     }
   }
@@ -88,6 +115,21 @@ export function listCommits(ref = 'HEAD') {
   );
   if (r.status !== 0) {
     throw new Error(r.stderr?.toString('utf8') || `git log failed for ${ref}`);
+  }
+  return parseCommitRecords(r.stdout);
+}
+
+export function listAllCommits() {
+  const r = spawnSync(
+    'git',
+    ['log', '--all', '--format=%H%x00%an%x00%ae%x00%cn%x00%ce%x00%B%x00'],
+    {
+      cwd: REPO_ROOT,
+      maxBuffer: 128 * 1024 * 1024,
+    },
+  );
+  if (r.status !== 0) {
+    throw new Error(r.stderr?.toString('utf8') || 'git log --all failed');
   }
   return parseCommitRecords(r.stdout);
 }
@@ -142,6 +184,10 @@ function auditCommits(commits, refLabel) {
   };
 }
 
+export function auditCommitRecords(commits, refLabel) {
+  return auditCommits(commits, refLabel);
+}
+
 /**
  * @param {{ ref?: string }} [opts]
  */
@@ -161,20 +207,37 @@ export function auditGitPushRange(opts) {
   return auditCommits(listCommitsInRange(range), range);
 }
 
+export function auditAllRefs() {
+  return auditCommits(listAllCommits(), '--all');
+}
+
 /**
- * @param {{ ref?: string, range?: string }} [opts]
+ * @param {{ ref?: string, range?: string, includeAllRefs?: boolean }} [opts]
  */
 export function evaluateNoCursorTrailerGuard(opts = {}) {
+  if (opts.includeAllRefs) {
+    const report = auditAllRefs();
+    return {
+      guard: 'no-cursor-attribution',
+      status: report.status,
+      ref: report.ref,
+      commits_scanned: report.commits_scanned,
+      violations: report.violations,
+      policy: report.policy,
+    };
+  }
+
+  const ref = opts.ref || 'origin/main';
   const report = opts.range
     ? auditGitPushRange({ range: opts.range })
-    : auditGitHistory({ ref: opts.ref || 'HEAD' });
+    : auditGitHistory({ ref });
 
   return {
     guard: 'no-cursor-attribution',
     status: report.status,
+    violations: report.violations,
     ref: report.ref,
     commits_scanned: report.commits_scanned,
-    violations: report.violations,
     policy: report.policy,
   };
 }

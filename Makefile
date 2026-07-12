@@ -412,9 +412,10 @@ ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (sou
 git-commit-without-assistant-trailers: ## Create a commit via commit-tree without assistant trailers
 	bash scripts/git/commit-without-assistant-trailers.sh
 
-git-verify-no-cursor-trailers: ## Reject Cursor/CursorAgent attribution in trailers and identity metadata
+git-verify-no-cursor-trailers: ## Reject Cursor/CursorAgent attribution on origin/main and all refs
 	node --test tests/no-cursor-trailer-guard.test.mjs
-	node scripts/no-cursor-trailer-guard-readonly.mjs
+	node scripts/no-cursor-trailer-guard-readonly.mjs --ref origin/main
+	node scripts/no-cursor-trailer-guard-readonly.mjs --all-refs
 
 bundle-secret-alignment-audit: ## Secret name alignment audit (exit 1 when hard_fail>0)
 	python3 tools/bundle-audit/secret_name_alignment_audit.py --repo-root "$(REPO_ROOT)"

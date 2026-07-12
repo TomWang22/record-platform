@@ -414,8 +414,14 @@ git-commit-without-assistant-trailers: ## Create a commit via commit-tree withou
 
 git-verify-no-cursor-trailers: ## Reject Cursor/CursorAgent attribution on origin/main and all refs
 	node --test tests/no-cursor-trailer-guard.test.mjs
-	node scripts/no-cursor-trailer-guard-readonly.mjs --ref origin/main
-	node scripts/no-cursor-trailer-guard-readonly.mjs --all-refs
+	node --test tests/no-cursor-githooks.test.mjs
+	node --test tests/retained-ref-policy.test.mjs
+	node scripts/no-cursor-trailer-guard-readonly.mjs --detailed
+	node scripts/no-cursor-ref-policy-readonly.mjs
+
+git-config-attribution-hooks: ## Point core.hooksPath at versioned .githooks
+	git config --local core.hooksPath .githooks
+	chmod +x .githooks/commit-msg .githooks/pre-push
 
 bundle-secret-alignment-audit: ## Secret name alignment audit (exit 1 when hard_fail>0)
 	python3 tools/bundle-audit/secret_name_alignment_audit.py --repo-root "$(REPO_ROOT)"

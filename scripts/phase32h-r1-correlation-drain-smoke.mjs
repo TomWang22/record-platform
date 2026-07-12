@@ -20,6 +20,8 @@ import { evaluatePacketIndexCoverage } from './lib/phase32h-packet-index-coverag
 import { runTripletMatrix } from './phase32h-r1-triplet-runner.mjs';
 import { gitSha } from './lib/phase22-full-replay-common.mjs';
 import { executeFreezeIntegrity, stopWritersForRoot } from './lib/phase32h-freeze-integrity.mjs';
+import { withSmokeCollectorCleanup } from './lib/phase32h-smoke-collector-cleanup.mjs';
+import { registerPcapCollector } from './lib/phase32h-collector-registry.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -56,6 +58,10 @@ function isMainModule() {
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (!opts.out.startsWith('/tmp/')) throw new Error('drain smoke out must be under /tmp');
+
+  return withSmokeCollectorCleanup(
+    opts.out,
+    async () => {
   fs.rmSync(opts.out, { recursive: true, force: true });
   fs.mkdirSync(opts.out, { recursive: true });
 
@@ -73,6 +79,7 @@ async function main() {
 
   const env = { ...process.env, PHASE32H_MATRIX_ROOT: opts.out, T20_EVAL_RAG_PAUSE_SEC: '0.15' };
   spawnSync('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-pcap-capture.sh'), opts.out], { cwd: REPO_ROOT });
+  registerPcapCollector(opts.out, { run_id: runId, launch_head: launchHead, manifest_sha: sha256File(manifestPath) });
   startDetached('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-gateway-log-capture.sh'), opts.out], env);
   startDetached('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-application-log-capture.sh'), opts.out], env);
   startDetached(process.execPath, [path.join(REPO_ROOT, 'scripts/phase32h-extreme-watchdog.mjs'), '--out', opts.out], env);
@@ -122,9 +129,6 @@ async function main() {
   };
   fs.writeFileSync(path.join(opts.out, 'phase32h-r1-correlation-drain-smoke.json'), `${JSON.stringify(report, null, 2)}\n`);
 
-  stopWritersForRoot(opts.out);
-  spawnSync('bash', [path.join(REPO_ROOT, 'scripts/phase32h-stop-pcap-capture.sh'), opts.out], { cwd: REPO_ROOT });
-
   if (pass) {
     executeFreezeIntegrity({
       outRoot: opts.out,
@@ -140,6 +144,9 @@ async function main() {
 
   console.log(JSON.stringify(report, null, 2));
   process.exit(pass ? 0 : 2);
+    },
+    { repoRoot: REPO_ROOT },
+  );
 }
 
 if (isMainModule()) {

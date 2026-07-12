@@ -11,7 +11,14 @@ import {
   evaluateCollectorHealth,
   writeSupervisorHeartbeat,
 } from './lib/phase32h-collector-supervision.mjs';
-import { isCoverageBlocked } from './lib/phase32h-run-integrity.mjs';
+import {
+  markDuplicateCollectorBlocked,
+  markForeignCollectorBlocked,
+  PCAP_FAILURE_CLASS,
+  readCollectorRegistry,
+} from './lib/phase32h-collector-registry.mjs';
+import { listProcessesWide } from './lib/phase32h-process-list.mjs';
+import { isCoverageBlocked, readLaunchHead, readRunId } from './lib/phase32h-run-integrity.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,16 +33,7 @@ function parseArgs(argv) {
 }
 
 function listProcesses() {
-  const ps = spawnSync('ps', ['-axo', 'pid=,args='], { encoding: 'utf8' });
-  return (ps.stdout || '')
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => {
-      const match = line.trim().match(/^(\d+)\s+(.*)$/s);
-      if (!match) return null;
-      return { pid: Number(match[1]), command: match[2] };
-    })
-    .filter(Boolean);
+  return listProcessesWide();
 }
 
 function probesActive(outRoot, processes) {
@@ -81,17 +79,43 @@ function clearUnhealthySince(outRoot) {
 export function supervisorTick(outRoot, opts = {}) {
   const processes = listProcesses();
   const active = opts.probesActive ?? probesActive(outRoot, processes);
+  const registry = readCollectorRegistry(outRoot);
   const health = evaluateCollectorHealth(outRoot, processes, {
     probesActive: active,
     monitorIntervalMs: opts.monitorIntervalMs || 300_000,
     smokeMode: Boolean(opts.smokeMode),
     activeProtocol: opts.activeProtocol || null,
+    registry,
+    runId: readRunId(outRoot),
+    launchHead: readLaunchHead(outRoot),
   });
   writeSupervisorHeartbeat(outRoot, health);
 
-  if (health.overall_status === 'BLOCKED' && active && !opts.smokeMode) {
+  if (health.foreign_blocked && active) {
+    markForeignCollectorBlocked(outRoot, {
+      failure_class: health.pcap_failure_class,
+      foreign_collectors: health.roles?.pcap_collector?.foreign_collectors || [],
+      expected_pid: registry?.collectors?.pcap_collector?.pid ?? null,
+    });
+  }
+  if (health.duplicate_blocked && active) {
+    markDuplicateCollectorBlocked(outRoot, {
+      failure_class: health.pcap_failure_class,
+      duplicate_collectors: health.roles?.pcap_collector?.duplicate_collectors || [],
+      expected_pid: registry?.collectors?.pcap_collector?.pid ?? null,
+    });
+  }
+
+  if (
+    (health.overall_status === 'BLOCKED' || health.foreign_blocked || health.duplicate_blocked) &&
+    active &&
+    !opts.smokeMode
+  ) {
     markUnhealthySince(outRoot);
     if (unhealthyDurationMs(outRoot) > 10_000) {
+      if (health.foreign_blocked || health.duplicate_blocked) {
+        return { ...health, blocked: true, block_reason: health.pcap_failure_class };
+      }
       assertCollectorCoverageOrBlock(outRoot, health);
     }
   } else {

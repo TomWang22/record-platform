@@ -3,7 +3,12 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { markCoverageBlocked, isCoverageBlocked } from './phase32h-run-integrity.mjs';
+import { markCoverageBlocked } from './phase32h-run-integrity.mjs';
+import {
+  evaluatePcapCollectorIdentity,
+  PCAP_FAILURE_CLASS,
+  readCollectorRegistry,
+} from './phase32h-collector-registry.mjs';
 
 export const MANDATORY_COLLECTORS = [
   'pcap_collector',
@@ -56,6 +61,7 @@ function ageFromIso(iso) {
 export function evaluateCollectorHealth(outRoot, processes = [], opts = {}) {
   const monitorIntervalMs = Number(opts.monitorIntervalMs || 300_000);
   const probesActive = Boolean(opts.probesActive);
+  const registry = opts.registry ?? readCollectorRegistry(outRoot);
   const roles = {};
 
   const findProc = (pattern) =>
@@ -83,30 +89,23 @@ export function evaluateCollectorHealth(outRoot, processes = [], opts = {}) {
         : 'STALE',
   };
 
-  const dumpcaps = processes.filter(
-    (p) => p.command?.includes('dumpcap') && p.command?.includes(outRoot),
-  );
   const pcapStatus = path.join(outRoot, 'pcap/capture-status.json');
-  let latestPcap = null;
-  const pcapDir = path.join(outRoot, 'pcap');
-  if (fs.existsSync(pcapDir)) {
-    const files = fs
-      .readdirSync(pcapDir)
-      .filter((f) => f.endsWith('.pcapng') || f.endsWith('.pcap'))
-      .map((f) => path.join(pcapDir, f));
-    if (files.length) latestPcap = files.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
-  }
-  const pcapAge = latestPcap ? fileAgeMs(latestPcap) : Number.POSITIVE_INFINITY;
-  const pcapThreshold = probesActive ? FRESHNESS_THRESHOLDS_MS.pcap_active : Number.POSITIVE_INFINITY;
+  const pcapIdentity = evaluatePcapCollectorIdentity(outRoot, processes, registry, {
+    probesActive,
+    runId: opts.runId,
+    launchHead: opts.launchHead,
+  });
   roles.pcap_collector = {
     role: 'pcap_collector',
-    pid: dumpcaps[0]?.pid ?? null,
-    process_count: dumpcaps.length,
-    output_path: latestPcap,
-    last_output_age_ms: pcapAge,
-    freshness_threshold_ms: pcapThreshold,
-    status:
-      dumpcaps.length === 1 && (!probesActive || pcapAge <= pcapThreshold) ? 'ACTIVE' : probesActive ? 'STALE' : 'QUIET',
+    pid: pcapIdentity.pid,
+    process_count: pcapIdentity.process_count,
+    output_path: pcapIdentity.output_path,
+    last_output_age_ms: pcapIdentity.last_output_age_ms ?? Number.POSITIVE_INFINITY,
+    freshness_threshold_ms: probesActive ? FRESHNESS_THRESHOLDS_MS.pcap_active : Number.POSITIVE_INFINITY,
+    status: pcapIdentity.status === 'BLOCKED' ? 'STALE' : pcapIdentity.status,
+    failure_class: pcapIdentity.failure_class,
+    foreign_collectors: pcapIdentity.foreign_collectors || [],
+    duplicate_collectors: pcapIdentity.duplicate_collectors || [],
   };
 
   for (const proto of ['h1', 'h2', 'h3']) {
@@ -213,6 +212,12 @@ export function evaluateCollectorHealth(outRoot, processes = [], opts = {}) {
       monitorProcs.length >= 1 && fileAgeMs(monitorLog) <= monitorThreshold ? 'ACTIVE' : 'STALE',
   };
 
+  if (pcapIdentity.failure_class === PCAP_FAILURE_CLASS.FOREIGN_PHASE32H_PCAP_PROCESS) {
+    // classified below; supervisor writes immutable marker after grace period
+  } else if (pcapIdentity.failure_class === PCAP_FAILURE_CLASS.DUPLICATE_PCAP_PROCESS_SAME_ROOT) {
+    // classified below; supervisor writes immutable marker after grace period
+  }
+
   const unhealthy = Object.values(roles).filter((r) => {
     if (tripletMode && (r.role?.endsWith('_runner') || r.role === 'matrix_monitor')) return false;
     if (!probesActive && (r.role?.endsWith('_runner') || r.role === 'pcap_collector')) {
@@ -225,27 +230,45 @@ export function evaluateCollectorHealth(outRoot, processes = [], opts = {}) {
     return r.status === 'STALE' || r.status === 'MISSING';
   });
 
+  const foreignBlocked = pcapIdentity.failure_class === PCAP_FAILURE_CLASS.FOREIGN_PHASE32H_PCAP_PROCESS;
+  const duplicateBlocked = pcapIdentity.failure_class === PCAP_FAILURE_CLASS.DUPLICATE_PCAP_PROCESS_SAME_ROOT;
+
   return {
     generated_at: new Date().toISOString(),
     out_root: outRoot,
     probes_active: probesActive,
     roles,
-    overall_status: unhealthy.length ? 'BLOCKED' : 'ACTIVE',
+    overall_status: unhealthy.length || foreignBlocked || duplicateBlocked ? 'BLOCKED' : 'ACTIVE',
     unhealthy_roles: unhealthy.map((r) => r.role),
+    pcap_failure_class: pcapIdentity.failure_class,
+    foreign_blocked: foreignBlocked,
+    duplicate_blocked: duplicateBlocked,
     pcap_status: fs.existsSync(pcapStatus) ? JSON.parse(fs.readFileSync(pcapStatus, 'utf8')) : null,
   };
 }
 
 export function pcapCoverageIsComplete(health, { probesActive = true } = {}) {
   if (!probesActive) return true;
+  if (health.foreign_blocked || health.duplicate_blocked) return false;
   const pcap = health.roles?.pcap_collector;
   if (!pcap || pcap.status !== 'ACTIVE') return false;
-  return pcap.process_count === 1;
+  return pcap.process_count === 1 && pcap.failure_class === PCAP_FAILURE_CLASS.ACTIVE;
 }
 
 export function assertCollectorCoverageOrBlock(outRoot, health, reasonPrefix = 'mandatory collector unhealthy') {
+  if (health.foreign_blocked || health.duplicate_blocked) {
+    return {
+      ...health,
+      blocked: true,
+      block_reason: health.pcap_failure_class,
+    };
+  }
   if (health.overall_status === 'ACTIVE') return health;
-  const reason = `${reasonPrefix}: ${health.unhealthy_roles.join(', ')}`;
+  const pcap = health.roles?.pcap_collector;
+  const reason =
+    pcap?.failure_class && pcap.failure_class !== PCAP_FAILURE_CLASS.ACTIVE
+      ? `${reasonPrefix}: pcap_collector (${pcap.failure_class})`
+      : `${reasonPrefix}: ${health.unhealthy_roles.join(', ')}`;
   markCoverageBlocked(outRoot, reason);
   return { ...health, blocked: true, block_reason: reason };
 }

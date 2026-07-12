@@ -8,6 +8,7 @@ import {
   pcapCoverageIsComplete,
   assertCollectorCoverageOrBlock,
 } from '../scripts/lib/phase32h-collector-supervision.mjs';
+import { registerPcapCollector } from '../scripts/lib/phase32h-collector-registry.mjs';
 import { isCoverageBlocked } from '../scripts/lib/phase32h-run-integrity.mjs';
 
 function tempRoot() {
@@ -36,10 +37,12 @@ describe('phase32h collector supervision', () => {
   });
 
   it('flags stale PCAP during active probes', () => {
+    const cmd = `/dumpcap -w ${root}/pcap/phase32h-test.pcapng`;
     touch(path.join(root, 'pcap/phase32h-test.pcapng'), 120_000);
+    registerPcapCollector(root, { pid: process.pid, command: cmd });
     const health = evaluateCollectorHealth(
       root,
-      [{ pid: 1, command: `/dumpcap -w ${root}/pcap/phase32h-test.pcapng` }],
+      [{ pid: process.pid, command: cmd, evidence_root: root, output_path: `${root}/pcap/phase32h-test.pcapng` }],
       { probesActive: true },
     );
     assert.equal(health.roles.pcap_collector.status, 'STALE');
@@ -65,6 +68,7 @@ describe('phase32h collector supervision', () => {
   });
 
   it('accepts fresh heartbeats during active probes', () => {
+    const pcapCmd = `dumpcap -w ${root}/pcap/live.pcapng`;
     touch(path.join(root, 'heartbeats/h1.jsonl'), 500);
     touch(path.join(root, 'heartbeats/h2.jsonl'), 500);
     touch(path.join(root, 'heartbeats/h3.jsonl'), 500);
@@ -75,8 +79,15 @@ describe('phase32h collector supervision', () => {
     touch(path.join(root, 'logs/application-log-tail.txt'), 1000);
     touch(path.join(root, 'phase32h-monitor.log'), 1000);
     touch(path.join(root, 'pcap/live.pcapng'), 500);
+    const statusPath = path.join(root, 'pcap/capture-status.json');
+    fs.writeFileSync(
+      statusPath,
+      `${JSON.stringify({ pid: process.pid, iface: 'bridge100', file: `${root}/pcap/live.pcapng`, tool: 'dumpcap' })}\n`,
+    );
+    touch(statusPath, 500);
+    registerPcapCollector(root, { pid: process.pid, command: pcapCmd, interface: 'bridge100' });
     const processes = [
-      { pid: 1, command: `dumpcap -w ${root}/pcap/live.pcapng` },
+      { pid: process.pid, command: pcapCmd, evidence_root: root, output_path: `${root}/pcap/live.pcapng`, interface: 'bridge100' },
       { pid: 2, command: `phase32h-extreme-watchdog.mjs --out ${root}` },
       { pid: 3, command: `phase32h-capture-host-telemetry.sh ${root}` },
       { pid: 4, command: `phase32h-start-gateway-log-capture.sh ${root}` },

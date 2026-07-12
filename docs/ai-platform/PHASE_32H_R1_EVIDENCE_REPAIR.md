@@ -105,7 +105,9 @@ Both arms: 8,640 probes (2,880 per protocol), H1/H2/H3 together.
 make ai-platform-verify-phase32h-baseline-preflight
 ```
 
-Proposed baseline root: `/tmp/phase32h-r1-baseline-r4` (must not exist before launch)
+Proposed baseline root: `/tmp/phase32h-r1-baseline-r5` (must not exist before launch)
+
+**baseline-r4** (`/tmp/phase32h-r1-baseline-r4`) is **FROZEN BLOCKED** — `FOREIGN_PCAP_COLLECTOR_PRELAUNCH_CONTAMINATION` (24/8640 probes; immutable `COLLECTOR_COVERAGE_BLOCKED`; never resume). Launch HEAD `62902092`.
 
 **baseline-r3** (`/tmp/phase32h-r1-baseline-r3`) is **FROZEN BLOCKED** — `CORRELATION_BACKLOG_DRAIN_DEFECT` (153/8640 probes; correlation jobs enqueued but never drained; never resume). Launch HEAD `b53ab6af`.
 
@@ -120,6 +122,8 @@ Proposed baseline root: `/tmp/phase32h-r1-baseline-r4` (must not exist before la
 
 ```bash
 make ai-platform-verify-phase32h-correlation-queue
+make ai-platform-verify-phase32h-collector-exclusivity
+make ai-platform-verify-phase32h-smoke-cleanup
 ```
 
 ## Hard stops

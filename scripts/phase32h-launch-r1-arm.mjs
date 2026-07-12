@@ -19,6 +19,7 @@ import {
   R1_CANARY_TOTAL,
   R1_CANARY_PER_PROTOCOL,
 } from './lib/phase32h-r1-config.mjs';
+import { registerPcapCollector } from './lib/phase32h-collector-registry.mjs';
 import { runBaselineLaunchPreflight } from './lib/phase32h-baseline-launch-preflight.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -123,6 +124,11 @@ function main() {
 
   spawnSync('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-pcap-capture.sh'), opts.out], {
     cwd: REPO_ROOT,
+  });
+  registerPcapCollector(opts.out, {
+    run_id: runId,
+    launch_head: launchHead,
+    manifest_sha: sha256File(manifestPath),
   });
   startDetached('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-gateway-log-capture.sh'), opts.out], env);
   startDetached('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-application-log-capture.sh'), opts.out], env);

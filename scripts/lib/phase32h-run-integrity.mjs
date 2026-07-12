@@ -9,6 +9,8 @@ import { R1_FORBIDDEN_BASELINE_ROOTS } from './phase32h-r1-config.mjs';
 
 export const RUN_STATE_DIR = 'run-state';
 export const BLOCKED_MARKER = 'COLLECTOR_COVERAGE_BLOCKED';
+export const FOREIGN_COLLECTOR_MARKER = 'PHASE32H_FOREIGN_COLLECTOR_BLOCKED';
+export const DUPLICATE_COLLECTOR_MARKER = 'PHASE32H_DUPLICATE_COLLECTOR_BLOCKED';
 export const FROZEN_BLOCKED_MARKER = 'FROZEN_BLOCKED_EVIDENCE';
 export const INVALID_BASELINE_ROOTS = new Set(R1_FORBIDDEN_BASELINE_ROOTS);
 
@@ -254,7 +256,12 @@ export function countJsonlRows(jsonlPath) {
 
 export function isCoverageBlocked(outRoot) {
   const paths = runStatePaths(outRoot);
-  return fs.existsSync(paths.blockedMarker) || isEvidenceRootFrozen(outRoot);
+  return (
+    fs.existsSync(paths.blockedMarker) ||
+    fs.existsSync(path.join(outRoot, FOREIGN_COLLECTOR_MARKER)) ||
+    fs.existsSync(path.join(outRoot, DUPLICATE_COLLECTOR_MARKER)) ||
+    isEvidenceRootFrozen(outRoot)
+  );
 }
 
 export function markCoverageBlocked(outRoot, reason) {

@@ -22,6 +22,7 @@ import {
   R1_TOTAL,
 } from './phase32h-r1-config.mjs';
 import { assertLaunchableEvidenceRoot } from './phase32h-run-integrity.mjs';
+import { assertCollectorExclusivityPreflight } from './phase32h-collector-exclusivity.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -84,6 +85,7 @@ export function runBaselineLaunchPreflight(opts, {
   originMainSha = null,
 } = {}) {
   assertLaunchableEvidenceRoot(opts.out);
+  assertCollectorExclusivityPreflight({ interface: process.env.PHASE32H_CAPTURE_IFACE || 'bridge100' });
   assertEvidenceRootAbsent(opts.out);
 
   if (!skipStaticGuard) {

@@ -1,0 +1,121 @@
+{
+  "generated_at": "2026-07-12T01:27:51.164Z",
+  "workflow_job_count": 23,
+  "jobs": [
+    {
+      "workflow_file": "bundle-ingestion.yml",
+      "job_id": "bundle-audit-tools",
+      "stable_id": "bundle-ingestion.yml#bundle-audit-tools"
+    },
+    {
+      "workflow_file": "ci.yml",
+      "job_id": "build",
+      "stable_id": "ci.yml#build"
+    },
+    {
+      "workflow_file": "ci.yml",
+      "job_id": "test",
+      "stable_id": "ci.yml#test"
+    },
+    {
+      "workflow_file": "ci.yml",
+      "job_id": "docker-build",
+      "stable_id": "ci.yml#docker-build"
+    },
+    {
+      "workflow_file": "ci.yml",
+      "job_id": "quic-invariants",
+      "stable_id": "ci.yml#quic-invariants"
+    },
+    {
+      "workflow_file": "ci.yml",
+      "job_id": "transport-validation",
+      "stable_id": "ci.yml#transport-validation"
+    },
+    {
+      "workflow_file": "ci.yml",
+      "job_id": "python-ai",
+      "stable_id": "ci.yml#python-ai"
+    },
+    {
+      "workflow_file": "ci.yml",
+      "job_id": "ai-platform-phase32g-infra",
+      "stable_id": "ci.yml#ai-platform-phase32g-infra"
+    },
+    {
+      "workflow_file": "ci.yml",
+      "job_id": "git-no-cursor-trailers",
+      "stable_id": "ci.yml#git-no-cursor-trailers"
+    },
+    {
+      "workflow_file": "ci.yml",
+      "job_id": "artifacts",
+      "stable_id": "ci.yml#artifacts"
+    },
+    {
+      "workflow_file": "coverage.yml",
+      "job_id": "service-coverage",
+      "stable_id": "coverage.yml#service-coverage"
+    },
+    {
+      "workflow_file": "docker-build.yml",
+      "job_id": "build-images",
+      "stable_id": "docker-build.yml#build-images"
+    },
+    {
+      "workflow_file": "docker-build.yml",
+      "job_id": "python-ai",
+      "stable_id": "docker-build.yml#python-ai"
+    },
+    {
+      "workflow_file": "kafka-alignment.yml",
+      "job_id": "static",
+      "stable_id": "kafka-alignment.yml#static"
+    },
+    {
+      "workflow_file": "kafka-alignment.yml",
+      "job_id": "live",
+      "stable_id": "kafka-alignment.yml#live"
+    },
+    {
+      "workflow_file": "kafka-cluster-verify.yml",
+      "job_id": "verify",
+      "stable_id": "kafka-cluster-verify.yml#verify"
+    },
+    {
+      "workflow_file": "kafka-dns-validate.yml",
+      "job_id": "shell-and-kustomize",
+      "stable_id": "kafka-dns-validate.yml#shell-and-kustomize"
+    },
+    {
+      "workflow_file": "protocol-validation.yml",
+      "job_id": "shellcheck-preflight",
+      "stable_id": "protocol-validation.yml#shellcheck-preflight"
+    },
+    {
+      "workflow_file": "protocol-validation.yml",
+      "job_id": "transport-quic-pipeline",
+      "stable_id": "protocol-validation.yml#transport-quic-pipeline"
+    },
+    {
+      "workflow_file": "protocol-validation.yml",
+      "job_id": "endpoint-coverage-static",
+      "stable_id": "protocol-validation.yml#endpoint-coverage-static"
+    },
+    {
+      "workflow_file": "protocol-validation.yml",
+      "job_id": "readiness-with-transport-fixture",
+      "stable_id": "protocol-validation.yml#readiness-with-transport-fixture"
+    },
+    {
+      "workflow_file": "protocol-validation.yml",
+      "job_id": "playwright-strict-verticals",
+      "stable_id": "protocol-validation.yml#playwright-strict-verticals"
+    },
+    {
+      "workflow_file": "rp-namespace-lint.yml",
+      "job_id": "lint",
+      "stable_id": "rp-namespace-lint.yml#lint"
+    }
+  ]
+}

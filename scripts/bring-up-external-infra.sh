@@ -36,7 +36,7 @@ POSTGRES_SERVICES=(
   postgres-notification postgres-trust postgres-media
 )
 
-bash "$SCRIPT_DIR/rp-stop-och-external-containers.sh" || true
+bash "$SCRIPT_DIR/rp-stop-external-runtime-containers.sh" || true
 
 chmod +x "$SCRIPT_DIR/rp-verify-compose-contract.sh" 2>/dev/null || true
 bash "$SCRIPT_DIR/rp-verify-compose-contract.sh" || { warn "RP compose contract failed — fix docker-compose.yml"; exit 1; }

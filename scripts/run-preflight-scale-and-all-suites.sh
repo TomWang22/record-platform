@@ -260,11 +260,11 @@ IFS=$'\n\t'
 #   Issue 9 — Tail Latency Optimization (Advanced)
 #   Title: After PR1 complete: optimize tail latency (p95/p99) under concurrent load
 #   Already done (PR1): first-time path GITHUB_PR_DESCRIPTION.txt §4; rebuild scripts rebuild-housing-colima.sh +
-#     rebuild-och-images-and-rollout.sh; cert/JKS preflight bootstrap (step 1c).
+#     rebuild-record-platform-images-and-rollout.sh; cert/JKS preflight bootstrap (step 1c).
 #   Scope: cross-service via edge/gateway (auth, listings, booking, trust, analytics, media); k6 orchestration + hooks +
 #     bench_logs/.
-#   Rebuild after code: one backend SERVICES=<n> ./scripts/rebuild-och-images-and-rollout.sh or pnpm rebuild:service:*;
-#     several backends SERVICES="a b" .../rebuild-och-images-and-rollout.sh; webapp + default listings
+#   Rebuild after code: one backend SERVICES=<n> ./scripts/rebuild-record-platform-images-and-rollout.sh or pnpm rebuild:service:*;
+#     several backends SERVICES="a b" .../rebuild-record-platform-images-and-rollout.sh; webapp + default listings
 #     ./scripts/rebuild-housing-colima.sh; webapp + many SERVICES="..." ./scripts/rebuild-housing-colima.sh.
 #     k6-only edits do not require image rebuild unless you change services.
 #   Problem: high tails under concurrency (unstable p95/p99), not single-endpoint microbench.

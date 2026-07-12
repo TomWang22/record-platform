@@ -13,6 +13,7 @@ Structural integrity checks for preflight wiring (no cluster, no kubectl).
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -92,13 +93,34 @@ def main() -> int:
     all_refs = extract_script_refs_from_shell(pf) | makefile_script_refs(mk) | makefile_target_script_refs(mk)
 
     issues: list[str] = []
+    blocking: list[dict[str, str]] = []
     for rel in sorted(all_refs):
         if "och-" in rel.lower() or "/och" in rel.lower():
-            issues.append(f"Legacy OCH path still referenced: `{rel}`")
+            msg = f"Legacy OCH path still referenced: `{rel}`"
+            issues.append(msg)
+            blocking.append(
+                {
+                    "issue_code": "LEGACY_OCH_SCRIPT_REFERENCE",
+                    "severity": "error",
+                    "variable_or_contract": rel,
+                    "source_paths": rel,
+                    "reason": "OCH-era script path still referenced in preflight/Makefile union",
+                }
+            )
             continue
         p = repo / rel
         if not p.is_file():
-            issues.append(f"Missing script: `{rel}`")
+            msg = f"Missing script: `{rel}`"
+            issues.append(msg)
+            blocking.append(
+                {
+                    "issue_code": "MISSING_SCRIPT_REFERENCE",
+                    "severity": "error",
+                    "variable_or_contract": rel,
+                    "source_paths": rel,
+                    "reason": "Referenced script path does not exist in repository checkout",
+                }
+            )
 
     trace_dir = repo / "scripts" / "trace-validators"
     trace_ok = trace_dir.is_dir() and any(trace_dir.glob("*.mjs"))
@@ -114,8 +136,30 @@ def main() -> int:
     audit_tool = repo / "tools" / "bundle-audit" / "secret_name_alignment_audit.py"
     if not audit_tool.is_file():
         issues.append("Missing `tools/bundle-audit/secret_name_alignment_audit.py`")
+        blocking.append(
+            {
+                "issue_code": "MISSING_SECRET_ALIGNMENT_TOOL",
+                "severity": "error",
+                "variable_or_contract": "tools/bundle-audit/secret_name_alignment_audit.py",
+                "source_paths": "tools/bundle-audit/secret_name_alignment_audit.py",
+                "reason": "Secret alignment audit tool missing",
+            }
+        )
 
-    och_path_hits = sorted(set(re.findall(r"scripts/[a-zA-Z0-9_./-]*och[a-zA-Z0-9_./-]*\.sh", pf, re.I)))
+    och_path_hits = sorted(
+        set(re.findall(r"scripts/[a-zA-Z0-9_./-]*och[a-zA-Z0-9_./-]*\.sh", pf, re.I))
+        - {b["variable_or_contract"] for b in blocking if b["issue_code"] == "LEGACY_OCH_SCRIPT_REFERENCE"}
+    )
+    for hit in och_path_hits:
+        blocking.append(
+            {
+                "issue_code": "LEGACY_OCH_PREFLIGHT_BODY_TOKEN",
+                "severity": "error",
+                "variable_or_contract": hit,
+                "source_paths": str(pre.relative_to(repo)),
+                "reason": "OCH-era script token appears in preflight body",
+            }
+        )
 
     undoc = undocumented_preflight_vars(pf)
     env_info = [f"`{v}` — used as `${{…}}` in body; not spelled in contiguous leading `#` block" for v in undoc[:40]]
@@ -162,6 +206,16 @@ def main() -> int:
     ]
     if obs_missing:
         lines += [f"- **MISSING:** `{m}`" for m in obs_missing]
+        for m in obs_missing:
+            blocking.append(
+                {
+                    "issue_code": "MISSING_OBSERVABILITY_SCRIPT",
+                    "severity": "error",
+                    "variable_or_contract": m,
+                    "source_paths": m,
+                    "reason": "Required observability spot-check script missing",
+                }
+            )
     else:
         lines.append("- _(all spot-check paths present)_")
 
@@ -178,8 +232,10 @@ def main() -> int:
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    n_issues = len(issues) + len(obs_missing) + len(och_path_hits) + (0 if audit_tool.is_file() else 1)
+    n_issues = len(blocking)
     print(f"Wrote {out} issues={n_issues} undocumented_vars_info={len(undoc)}")
+    for item in blocking:
+        print(json.dumps(item), file=sys.stderr)
     return 1 if n_issues else 0
 
 

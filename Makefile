@@ -420,6 +420,10 @@ bundle-secret-alignment-audit: ## Secret name alignment audit (exit 1 when hard_
 	python3 tools/bundle-audit/secret_name_alignment_audit.py --repo-root "$(REPO_ROOT)"
 	python3 tests/secret-name-alignment-audit.test.py -v
 
+bundle-preflight-static-contract: ## Preflight static contract check (exit 1 when issues>0)
+	python3 tools/bundle-audit/preflight_static_contract_check.py --repo-root "$(REPO_ROOT)"
+	python3 tests/preflight-static-contract-check.test.py -v
+
 verify-kafka-prometheus-rules-offline: ## Offline kustomize + semantic Kafka health rules validation
 	bash scripts/verify-kafka-prometheus-rules-offline.sh
 	node --test tests/kustomize-resources-exist.test.mjs
@@ -435,6 +439,7 @@ ai-platform-verify-phase32h-preview-gate: ## Phase 32H preview-gate retry policy
 ci-verify-ai-platform-blockers: ## Combined CI repair gate (offline)
 	$(MAKE) git-verify-no-cursor-trailers
 	$(MAKE) bundle-secret-alignment-audit
+	$(MAKE) bundle-preflight-static-contract
 	kubectl kustomize infra/ops/ >/tmp/kafka-ops.yaml
 	test -s /tmp/kafka-ops.yaml
 	$(MAKE) verify-kafka-prometheus-rules-offline
@@ -1412,9 +1417,9 @@ package-rp-hybrid-toolkit: ## record-platform-hybrid-cold-bootstrap-toolkit-<sta
 check-rp-hybrid-toolkit: ## Verify hybrid toolkit tarball (TOOLKIT_TARBALL=path)
 	@bash $(SCRIPTS)/check-rp-hybrid-cold-bootstrap-toolkit.sh "$(TOOLKIT_TARBALL)"
 
-init-hybrid-backup-layout: ## Symlink RP+OCH sources and rebuild materialized-rp-runtime
-	@chmod +x $(SCRIPTS)/init-hybrid-rp-och-backup-layout.sh $(SCRIPTS)/rp-stop-och-external-containers.sh $(SCRIPTS)/rp-verify-external-runtime-ports.sh
-	@bash $(SCRIPTS)/init-hybrid-rp-och-backup-layout.sh
+init-hybrid-backup-layout: ## Symlink RP hybrid sources and rebuild materialized-rp-runtime
+	@chmod +x $(SCRIPTS)/init-hybrid-rp-backup-layout.sh $(SCRIPTS)/rp-stop-external-runtime-containers.sh $(SCRIPTS)/rp-verify-external-runtime-ports.sh
+	@bash $(SCRIPTS)/init-hybrid-rp-backup-layout.sh
 
 rp-wait-caddy-metallb: ## Block until caddy-h3 has MetalLB IP; print /etc/hosts instructions
 	@chmod +x $(SCRIPTS)/wait-caddy-metallb-ip.sh

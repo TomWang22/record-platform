@@ -211,7 +211,7 @@ else
   printf '\n[P3] EXTERNAL INFRA — compose up (restore is E.restore only)\n'
 fi
 export RP_CB_RUN_LABEL="stop legacy external containers"
-rp_cb_run bash "$SCRIPT_DIR/rp-stop-och-external-containers.sh"
+rp_cb_run bash "$SCRIPT_DIR/rp-stop-external-runtime-containers.sh"
 export RP_CB_RUN_LABEL="verify compose contract"
 rp_cb_run bash "$SCRIPT_DIR/rp-verify-compose-contract.sh" || \
   rp_cb_phase_fail C.infra "compose contract failed" "bash scripts/rp-verify-compose-contract.sh"

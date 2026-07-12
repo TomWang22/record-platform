@@ -22,7 +22,7 @@ if git diff --cached --quiet; then
 fi
 
 FORBIDDEN='(^|/)(tmp/|webapp/e2e/screenshots/)|\.jsonl$|\.keylog$|\.qlog$|tsconfig\.tsbuildinfo$|scripts/coverage/'
-ALLOWED='^bench_logs/security-contract/pcap/(vm-[^/]+\.pcap|SHA256SUMS)$'
+ALLOWED='^bench_logs/security-contract/pcap/(vm-[^/]+\.pcap|SHA256SUMS)$|^scripts/coverage/(gateway-image-source-staleness-guard|kubectl-fetch-route-log|run-matrix-vitest-coverage)\.sh$'
 while IFS= read -r path; do
   if [[ "$path" =~ $ALLOWED ]]; then
     continue

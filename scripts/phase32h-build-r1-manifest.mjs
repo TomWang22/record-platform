@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expectedGate, PROTOCOLS, loadN5Participants } from './lib/phase22-full-replay-common.mjs';
+import { expectedGate, PROTOCOLS, PROMPTS, loadN5Participants } from './lib/phase22-full-replay-common.mjs';
 import { protocolLabel } from './lib/phase31-controlled-matrix-summary.mjs';
 import {
   R1_CASE_IDS,
@@ -42,6 +42,7 @@ function buildManifestRows({
   caseIds,
 }) {
   const users = loadN5Participants();
+  const promptByCaseId = new Map(PROMPTS);
   const rows = [];
   let probeId = 0;
   for (const protoKey of R1_PROTOCOLS) {
@@ -50,6 +51,10 @@ function buildManifestRows({
       for (const user of users) {
         for (const run of runs) {
           for (const caseId of caseIds) {
+            const question = promptByCaseId.get(caseId);
+            if (!question) {
+              throw new Error(`missing prompt for case_id=${caseId}`);
+            }
             probeId += 1;
             rows.push({
               probe_id: probeId,
@@ -58,6 +63,7 @@ function buildManifestRows({
               window,
               run,
               case_id: caseId,
+              question,
               user_uid: user.uid,
               user_email: user.email,
               user_class: user.user_class,

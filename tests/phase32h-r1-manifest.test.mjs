@@ -45,4 +45,16 @@ describe('phase32h R1 manifest', () => {
     assert.equal(dims.total, 90);
     assert.equal(dims.triplet_batches, 30);
   });
+
+  it('includes a prompt question on every R1 manifest row', () => {
+    for (const rows of [
+      buildR1Manifest({ evidenceLabel: R1_EVIDENCE_LABEL_BASELINE }),
+      buildR1CanaryManifest({ evidenceLabel: R1_EVIDENCE_LABEL_CANARY }),
+    ]) {
+      for (const row of rows) {
+        assert.equal(typeof row.question, 'string');
+        assert.ok(row.question.length >= 2, `case ${row.case_id} probe ${row.probe_id}`);
+      }
+    }
+  });
 });

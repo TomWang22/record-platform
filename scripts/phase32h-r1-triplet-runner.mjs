@@ -41,11 +41,12 @@ import { supervisorTick } from './phase32h-collector-supervisor.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(argv) {
-  const opts = { out: '/tmp/phase32h-r1-baseline', arm: 'baseline', limit: null };
+  const opts = { out: '/tmp/phase32h-r1-baseline', arm: 'baseline', limit: null, canary: false };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--out') opts.out = argv[++i];
     if (argv[i] === '--arm') opts.arm = argv[++i];
     if (argv[i] === '--limit') opts.limit = Number(argv[++i]);
+    if (argv[i] === '--canary') opts.canary = true;
   }
   return opts;
 }
@@ -80,7 +81,7 @@ export async function runTripletMatrix(opts) {
   const runId = readRunId(outRoot);
   const launchHead = readLaunchHead(outRoot) || gitSha();
   const manifestSha = sha256File(manifestPath);
-  const evidenceLabel = evidenceLabelForArm(opts.arm);
+  const evidenceLabel = evidenceLabelForArm(opts.arm, { canary: opts.canary });
 
   writeTripletOrchestratorMarker(outRoot, {
     status: 'IN_PROGRESS',

@@ -70,6 +70,7 @@ function launchTripletRunner(opts, env) {
     '--arm',
     opts.arm,
   ];
+  if (opts.canary) args.push('--canary');
   const child = spawn(process.execPath, args, {
     cwd: REPO_ROOT,
     env,

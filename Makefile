@@ -422,6 +422,7 @@ bundle-secret-alignment-audit: ## Secret name alignment audit (exit 1 when hard_
 
 verify-kafka-prometheus-rules-offline: ## Offline kustomize + semantic Kafka health rules validation
 	bash scripts/verify-kafka-prometheus-rules-offline.sh
+	node --test tests/kustomize-resources-exist.test.mjs
 
 transport-validation-real-pcap: ## Canonical HTTP/3 PCAP checksum + validator gate
 	bash scripts/verify-transport-pcap-fixture.sh

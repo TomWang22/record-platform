@@ -364,7 +364,38 @@ def main() -> int:
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"Wrote {out} matrix_rows={len(rows)} hard_fail={len(set(hard_fail))}")
+    deduped = sorted(set(hard_fail))
+    hard_fail_count = len(deduped)
+    print(f"Wrote {out} matrix_rows={len(rows)} hard_fail={hard_fail_count}")
+    if deduped:
+        import json
+
+        for entry in deduped:
+            payload = {
+                "failure_code": "SECRET_ALIGNMENT_HARD_FAIL",
+                "logical_secret": None,
+                "producer": None,
+                "consumer": None,
+                "expected": None,
+                "actual": None,
+                "source_path": None,
+                "explanation": entry,
+            }
+            ref_match = re.search(
+                r"Referenced secret `([^`]+)` not in static Secret manifests nor allowlist \(([^)]+)\)",
+                entry,
+            )
+            if ref_match:
+                payload.update(
+                    {
+                        "logical_secret": ref_match.group(1),
+                        "consumer": ref_match.group(1),
+                        "actual": ref_match.group(1),
+                        "source_path": ref_match.group(2),
+                        "failure_code": "UNDEFINED_SECRET_REF",
+                    }
+                )
+            print(json.dumps(payload), file=sys.stderr)
     return 1 if hard_fail else 0
 
 

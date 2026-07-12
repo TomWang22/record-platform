@@ -148,6 +148,7 @@ infra/docs/EIGHT-DATABASES_ARCHITECTURE.md
 !infra/transport/*.yaml
 !infra/ops/*.yaml
 !infra/k8s/base/observability/*.yaml
+!infra/policies/*.yaml
 *.conf
 *.ini
 !services/python-ai-service/pytest.ini

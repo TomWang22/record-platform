@@ -42,11 +42,25 @@ Repair matrix and collector integrity failures that invalidated the Phase 32H-E3
 - Hashes all blocked-root evidence without modifying JSONL
 - Writes blocked-run manifest and integrity artifacts
 
+### Collector registry (`scripts/lib/phase32h-collector-launch-spec.mjs`)
+
+- Structured launch spec built from actual `capture-status.json` argv at spawn
+- Semantic verification replaces brittle command-string equality
+- Granular failure classes (`EXPECTED_PCAP_ARGUMENT_MISMATCH`, `EXPECTED_PCAP_EXECUTABLE_MISMATCH`, etc.)
+- Automatic blocked-run teardown preserves `COLLECTOR_COVERAGE_BLOCKED` (`scripts/lib/phase32h-blocked-run-teardown.mjs`)
+
+### Baseline-r5 incident (frozen)
+
+- Root: `/tmp/phase32h-r1-baseline-r5` — **BLOCKED**, never resume
+- Reason: `PCAP_COLLECTOR_REGISTRY_COMMAND_FIDELITY_DEFECT`
+- Next root: `/tmp/phase32h-r1-baseline-r6` (requires new SHA + CI approval)
+
 ## Verifiers
 
 ```bash
 make ai-platform-verify-phase32h-run-integrity
 make ai-platform-verify-phase32h-collector-supervision
+make ai-platform-verify-phase32h-collector-registry
 make ai-platform-verify-phase32h-infra
 make ai-platform-freeze-phase32h-blocked-run   # operator; frozen root only
 ```

@@ -46,8 +46,10 @@ import {
 import { supervisorTick } from './phase32h-collector-supervisor.mjs';
 import { assertManifestContract } from './lib/phase32h-manifest-contract.mjs';
 import { assertPacketIndexCoverage } from './lib/phase32h-packet-index-coverage.mjs';
+import { teardownBlockedRun } from './lib/phase32h-blocked-run-teardown.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, '..');
 
 function parseArgs(argv) {
   const opts = { out: '/tmp/phase32h-r1-baseline', arm: 'baseline', limit: null, canary: false };
@@ -206,8 +208,23 @@ async function main() {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  const cliOpts = parseArgs(process.argv.slice(2));
   main().catch((err) => {
-    console.error(err);
+    if (cliOpts.out && (err?.code === 'COVERAGE_BLOCKED' || isCoverageBlocked(cliOpts.out))) {
+      try {
+        const teardown = teardownBlockedRun(cliOpts.out, {
+          repoRoot: REPO_ROOT,
+          reason: err?.message || 'COLLECTOR_COVERAGE_BLOCKED',
+          classification: 'BLOCKED',
+          hashManifestName: 'phase32h-r1-blocked-sha256.txt',
+        });
+        console.error(JSON.stringify({ teardown, original_error: err.message }, null, 2));
+      } catch (teardownErr) {
+        console.error(teardownErr);
+      }
+    } else {
+      console.error(err);
+    }
     process.exit(2);
   });
 }

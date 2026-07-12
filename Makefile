@@ -359,6 +359,7 @@ PHASE32H_MATRIX_ROOT ?= /tmp/phase32h-targeted-reproduction
 
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
+	$(MAKE) ai-platform-verify-phase32h-collector-registry
 	$(MAKE) ai-platform-verify-phase32h-manifest-contract
 	node --test tests/phase32h-targeted-manifest.test.mjs
 	node --test tests/phase32h-inflight-probe-registry.test.mjs
@@ -389,11 +390,15 @@ ai-platform-verify-phase32h-run-integrity: ## Phase 32H-R1 atomic run locks and 
 
 ai-platform-verify-phase32h-collector-supervision: ## Phase 32H-R1 mandatory collector supervision gates
 	$(MAKE) ai-platform-verify-phase32h-collector-exclusivity
+	$(MAKE) ai-platform-verify-phase32h-collector-registry
 	$(MAKE) ai-platform-verify-phase32h-smoke-cleanup
 	node --test tests/phase32h-collector-supervision.test.mjs
 
 ai-platform-verify-phase32h-collector-exclusivity: ## Phase 32H-R1 collector registry and exclusivity gates
 	node --test tests/phase32h-collector-exclusivity.test.mjs
+
+ai-platform-verify-phase32h-collector-registry: ## Phase 32H-R1 structured collector launch spec and registry gates
+	node --test tests/phase32h-collector-registry.test.mjs
 
 ai-platform-verify-phase32h-smoke-cleanup: ## Phase 32H-R1 smoke collector teardown guarantees
 	node --test tests/phase32h-smoke-cleanup.test.mjs
@@ -427,6 +432,7 @@ ai-platform-verify-phase32h-manifest-contract: ## Phase 32H manifest row contrac
 ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (source wiring)
 	$(MAKE) git-verify-no-cursor-trailers
 	$(MAKE) ai-platform-verify-phase32h-collector-exclusivity
+	$(MAKE) ai-platform-verify-phase32h-collector-registry
 	$(MAKE) ai-platform-verify-phase32h-manifest-contract
 	$(MAKE) ai-platform-verify-phase32h-baseline-preflight
 	node --test tests/phase32h-r1-prelaunch-guard.test.mjs

@@ -37,9 +37,10 @@ if ! kill -0 "$PID" 2>/dev/null; then
   exit 2
 fi
 
-python3 - <<PY "$STATUS" "$PID" "$IFACE" "$FILE" "$DUMPCAP_BIN" "$FILTER"
+python3 - <<PY "$STATUS" "$PID" "$IFACE" "$FILE" "$DUMPCAP_BIN" "$FILTER" "$RING_FILES"
 import json, sys
-status, pid, iface, file, tool, filt = sys.argv[1:7]
+status, pid, iface, file, tool, filt, ring_files = sys.argv[1:8]
+argv = [tool, "-q", "-i", iface, "-f", filt, "-b", "filesize:250000", "-b", f"files:{ring_files}", "-w", file]
 json.dump(
   {
     "status": "ACTIVE",
@@ -48,7 +49,8 @@ json.dump(
     "file": file,
     "tool": tool,
     "filter": filt,
-    "ring_files": int(__import__("os").environ.get("PHASE32H_PCAP_RING_FILES", "48")),
+    "argv": argv,
+    "ring_files": int(ring_files),
     "ring_filesize_kb": 250000,
     "chmodbpf": True,
     "sudo": False,

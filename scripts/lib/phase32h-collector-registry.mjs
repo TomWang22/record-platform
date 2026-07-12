@@ -12,6 +12,11 @@ import {
 } from './phase32h-process-list.mjs';
 import { pidAlive } from './phase32h-process-registry.mjs';
 import { FRESHNESS_THRESHOLDS_MS } from './phase32h-collector-supervision.mjs';
+import {
+  buildLaunchSpecFromCaptureStatus,
+  parseDumpcapSemantic,
+  verifyLaunchSpecAgainstProcess,
+} from './phase32h-collector-launch-spec.mjs';
 
 export const COLLECTOR_REGISTRY_FILE = 'collector-registry.json';
 export const FOREIGN_COLLECTOR_MARKER = 'PHASE32H_FOREIGN_COLLECTOR_BLOCKED';
@@ -20,12 +25,17 @@ export const DUPLICATE_COLLECTOR_MARKER = 'PHASE32H_DUPLICATE_COLLECTOR_BLOCKED'
 export const PCAP_FAILURE_CLASS = {
   ACTIVE: 'ACTIVE',
   EXPECTED_PCAP_PROCESS_MISSING: 'EXPECTED_PCAP_PROCESS_MISSING',
+  EXPECTED_PCAP_PID_REUSED: 'EXPECTED_PCAP_PID_REUSED',
+  EXPECTED_PCAP_EXECUTABLE_MISMATCH: 'EXPECTED_PCAP_EXECUTABLE_MISMATCH',
+  EXPECTED_PCAP_ARGUMENT_MISMATCH: 'EXPECTED_PCAP_ARGUMENT_MISMATCH',
+  EXPECTED_PCAP_OUTPUT_MISMATCH: 'EXPECTED_PCAP_OUTPUT_MISMATCH',
   EXPECTED_PCAP_PROCESS_STALE: 'EXPECTED_PCAP_PROCESS_STALE',
   DUPLICATE_PCAP_PROCESS_SAME_ROOT: 'DUPLICATE_PCAP_PROCESS_SAME_ROOT',
   FOREIGN_PHASE32H_PCAP_PROCESS: 'FOREIGN_PHASE32H_PCAP_PROCESS',
   PCAP_OUTPUT_NOT_GROWING: 'PCAP_OUTPUT_NOT_GROWING',
   PCAP_HEARTBEAT_STALE: 'PCAP_HEARTBEAT_STALE',
   PCAP_DROP_DETECTED: 'PCAP_DROP_DETECTED',
+  PCAP_DROP_BLOCKED: 'PCAP_DROP_BLOCKED',
   UNRELATED_NON_PHASE32H_CAPTURE: 'UNRELATED_NON_PHASE32H_CAPTURE',
 };
 
@@ -56,25 +66,26 @@ export function registerPcapCollector(outRoot, record) {
   const captureStatus = fs.existsSync(statusPath)
     ? JSON.parse(fs.readFileSync(statusPath, 'utf8'))
     : {};
-  const command =
-    record.command ||
-    `${captureStatus.tool || 'dumpcap'} -i ${captureStatus.iface} -w ${captureStatus.file}`;
+  const launchSpec = buildLaunchSpecFromCaptureStatus(outRoot, captureStatus, record);
+  const parsed = parseDumpcapSemantic(launchSpec.argv);
   const registry = {
-    version: 1,
+    version: 2,
     updated_at: new Date().toISOString(),
     collectors: {
       pcap_collector: {
         role: 'pcap_collector',
-        pid: record.pid ?? captureStatus.pid,
-        ppid: record.ppid ?? process.ppid,
+        pid: launchSpec.pid,
+        ppid: launchSpec.ppid,
         run_id: record.run_id,
         launch_head: record.launch_head,
         manifest_sha: record.manifest_sha,
         evidence_root: outRoot,
-        command,
-        interface: record.interface ?? captureStatus.iface,
-        output_path: record.output_path ?? captureStatus.file,
-        started_at: record.started_at ?? captureStatus.started_at ?? new Date().toISOString(),
+        command: launchSpec.argv.join(' '),
+        launch_spec: launchSpec,
+        semantic: parsed.semantic,
+        interface: parsed.semantic.interface ?? record.interface ?? captureStatus.iface,
+        output_path: parsed.semantic.output_path ?? record.output_path ?? captureStatus.file,
+        started_at: launchSpec.process_start.started_at,
         heartbeat_path: statusPath,
         expected_singleton_scope: record.expected_singleton_scope || 'pcap_collector_per_root',
       },
@@ -83,13 +94,12 @@ export function registerPcapCollector(outRoot, record) {
   return writeCollectorRegistry(outRoot, registry);
 }
 
-function commandMatchesRegistry(proc, entry) {
-  if (!entry) return false;
-  if (proc.pid !== entry.pid) return false;
-  if (proc.command !== entry.command) return false;
-  if (entry.evidence_root && proc.evidence_root !== entry.evidence_root) return false;
-  if (entry.output_path && proc.output_path !== entry.output_path) return false;
-  return true;
+function verifyRegistryProcess(entry, proc, opts) {
+  return verifyLaunchSpecAgainstProcess(
+    { launch_spec: entry.launch_spec, pid: entry.pid, run_id: entry.run_id, launch_head: entry.launch_head, evidence_root: entry.evidence_root, process_start: entry.launch_spec?.process_start },
+    proc,
+    { ...opts, pidAlive: pidAlive(entry.pid) },
+  );
 }
 
 export function detectForeignPcapCollectors(outRoot, processes, registry, iface) {
@@ -174,34 +184,21 @@ export function evaluatePcapCollectorIdentity(outRoot, processes, registry, opts
       process_count: captureProcesses.length,
     };
   }
-  if (!commandMatchesRegistry(proc, entry)) {
+  const verification = verifyRegistryProcess(entry, proc, {
+    runId: opts.runId,
+    launchHead: opts.launchHead,
+  });
+  if (!verification.pass) {
     return {
       role: 'pcap_collector',
       status: 'STALE',
-      failure_class: PCAP_FAILURE_CLASS.EXPECTED_PCAP_PROCESS_STALE,
+      failure_class: verification.failure_class,
       pid: entry.pid,
       process_count: captureProcesses.length,
       registry_mismatch: true,
-    };
-  }
-  if (entry.run_id && opts.runId && entry.run_id !== opts.runId) {
-    return {
-      role: 'pcap_collector',
-      status: 'STALE',
-      failure_class: PCAP_FAILURE_CLASS.EXPECTED_PCAP_PROCESS_STALE,
-      pid: entry.pid,
-      process_count: 1,
-      run_id_mismatch: true,
-    };
-  }
-  if (entry.launch_head && opts.launchHead && entry.launch_head !== opts.launchHead) {
-    return {
-      role: 'pcap_collector',
-      status: 'STALE',
-      failure_class: PCAP_FAILURE_CLASS.EXPECTED_PCAP_PROCESS_STALE,
-      pid: entry.pid,
-      process_count: 1,
-      launch_head_mismatch: true,
+      verification,
+      run_id_mismatch: verification.run_id_mismatch === true,
+      launch_head_mismatch: verification.launch_head_mismatch === true,
     };
   }
 

@@ -9,12 +9,14 @@ export const R1_COMPARISON_ROOT = '/tmp/phase32h-r1-comparison';
 export const R1_CANARY_ROOT = '/tmp/phase32h-r1-baseline-r2-canary';
 export const R1_BASELINE_R2_ROOT = '/tmp/phase32h-r1-baseline-r2';
 export const R1_BASELINE_R3_ROOT = '/tmp/phase32h-r1-baseline-r3';
+export const R1_BASELINE_R4_ROOT = '/tmp/phase32h-r1-baseline-r4';
 
 export const R1_FORBIDDEN_BASELINE_ROOTS = [
   '/tmp/phase32h-r1-baseline',
   '/tmp/phase32h-r1-baseline-r2',
   '/tmp/phase32h-r1-baseline-r2-canary',
   '/tmp/phase32h-r1-baseline-r2-canary-v2',
+  '/tmp/phase32h-r1-baseline-r3',
   '/tmp/phase32h-targeted-reproduction',
 ];
 

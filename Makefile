@@ -398,6 +398,7 @@ ai-platform-verify-phase32h-r1: ## Phase 32H-R1 host-suspension A/B comparison v
 	$(MAKE) ai-platform-verify-phase32h-run-integrity
 	$(MAKE) ai-platform-verify-phase32h-collector-supervision
 	$(MAKE) ai-platform-verify-phase32h-triplet-runner
+	$(MAKE) ai-platform-verify-phase32h-correlation-queue
 	$(MAKE) ai-platform-verify-phase32h-transport-forensics
 	$(MAKE) ai-platform-verify-phase32h-quic-lifecycle
 	$(MAKE) ai-platform-verify-phase32h-r1-prelaunch
@@ -406,6 +407,9 @@ ai-platform-verify-phase32h-r1: ## Phase 32H-R1 host-suspension A/B comparison v
 
 ai-platform-verify-phase32h-triplet-runner: ## Phase 32H-R1 synchronized triplet orchestrator tests
 	node --test tests/phase32h-triplet-runner.test.mjs
+
+ai-platform-verify-phase32h-correlation-queue: ## Phase 32H-R1 durable correlation queue drain tests
+	node --test tests/phase32h-correlation-queue.test.mjs
 
 ai-platform-verify-phase32h-manifest-contract: ## Phase 32H manifest row contract validator
 	node --test tests/phase32h-manifest-contract.test.mjs
@@ -486,6 +490,7 @@ ci-verify-ai-platform-blockers: ## Combined CI repair gate (offline)
 	$(MAKE) ai-platform-verify-phase32h-run-integrity
 	$(MAKE) ai-platform-verify-phase32h-collector-supervision
 	$(MAKE) ai-platform-verify-phase32h-triplet-runner
+	$(MAKE) ai-platform-verify-phase32h-correlation-queue
 	$(MAKE) ai-platform-verify-phase32h-transport-forensics
 	$(MAKE) ai-platform-verify-phase32h-quic-lifecycle
 	$(MAKE) ai-platform-verify-phase32h-r1-prelaunch

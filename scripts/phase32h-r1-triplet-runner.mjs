@@ -35,6 +35,7 @@ import {
   executeTripletBatch,
   writeTripletOrchestratorMarker,
 } from './lib/phase32h-triplet-orchestrator.mjs';
+import { serviceCorrelationQueueBeforeBatch } from './lib/phase32h-correlation-queue.mjs';
 import {
   evidenceLabelForArm,
   R1_CANARY_PER_PROTOCOL,
@@ -97,6 +98,8 @@ export async function runTripletMatrix(opts) {
   const runId = readRunId(outRoot);
   const launchHead = readLaunchHead(outRoot) || gitSha();
   const manifestSha = sha256File(manifestPath);
+
+  serviceCorrelationQueueBeforeBatch(outRoot, { runId, launchHead, manifestSha });
 
   writeTripletOrchestratorMarker(outRoot, {
     status: 'IN_PROGRESS',

@@ -105,9 +105,22 @@ Both arms: 8,640 probes (2,880 per protocol), H1/H2/H3 together.
 make ai-platform-verify-phase32h-baseline-preflight
 ```
 
-Proposed baseline root: `/tmp/phase32h-r1-baseline-r3` (must not exist before launch)
+Proposed baseline root: `/tmp/phase32h-r1-baseline-r4` (must not exist before launch)
+
+**baseline-r3** (`/tmp/phase32h-r1-baseline-r3`) is **FROZEN BLOCKED** — `CORRELATION_BACKLOG_DRAIN_DEFECT` (153/8640 probes; correlation jobs enqueued but never drained; never resume). Launch HEAD `b53ab6af`.
 
 **baseline-r2** (`/tmp/phase32h-r1-baseline-r2`) is **FROZEN BLOCKED** — `PRELAUNCH_POLICY_VIOLATION` (CI non-terminal at launch + disk reserve below 10 GB). Never resume.
+
+### Correlation queue repair (post-r3)
+
+- Durable queue: `run-state/correlation-queue.json` with `PENDING` / `RUNNING` / `COMPLETE` / `FAILED`
+- Backlog counts only unresolved jobs (`PENDING` + `RUNNING`); `COMPLETE` does not block launch
+- `finalizeTripletCorrelationJob` runs after per-probe and batch packet indexes are written
+- Drain smoke target: 60 triplet batches / 180 probes at `/tmp/phase32h-r1-correlation-drain-smoke-v1`
+
+```bash
+make ai-platform-verify-phase32h-correlation-queue
+```
 
 ## Hard stops
 

@@ -113,9 +113,10 @@ function signalProcess(proc, signal, ledger, seen) {
 export function stopWritersForRoot(outRoot, { gracefulMs = DEFAULT_GRACEFUL_MS } = {}) {
   const ledger = [];
   const seen = new Set();
+  const ownPid = process.pid;
   const procs = () =>
     listProcesses()
-      .filter((p) => roleForCommand(p.command, outRoot))
+      .filter((p) => p.pid !== ownPid && roleForCommand(p.command, outRoot))
       .map((p) => ({ ...p, outRoot }));
 
   for (const proc of procs()) {
@@ -170,7 +171,7 @@ export function stopWritersForRoot(outRoot, { gracefulMs = DEFAULT_GRACEFUL_MS }
 }
 
 export function verifyZeroWriters(outRoot) {
-  const remaining = listRootScopedProcesses(outRoot);
+  const remaining = listRootScopedProcesses(outRoot).filter((p) => p.pid !== process.pid);
   return {
     writers_remaining: remaining.length,
     remaining,

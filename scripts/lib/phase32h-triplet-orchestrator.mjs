@@ -18,11 +18,18 @@ import { classifyMatrixProbeFailure } from './phase31-controlled-matrix-summary.
 import { isCoverageBlocked } from './phase32h-run-integrity.mjs';
 import { supervisorTick } from '../phase32h-collector-supervisor.mjs';
 import { writeTripletProbePacketIndexes } from './phase32h-triplet-probe-packet-index.mjs';
+import {
+  CORRELATION_BACKLOG_LIMIT,
+  correlationBacklogBlocksLaunch,
+  finalizeTripletCorrelationJob,
+  readCorrelationQueueSnapshot,
+  serviceCorrelationQueueBeforeBatch,
+} from './phase32h-correlation-queue.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKER_PATH = path.join(__dirname, 'phase32h-triplet-probe-worker.mjs');
 
-export const CORRELATION_BACKLOG_LIMIT = Number(process.env.PHASE32H_CORRELATION_BACKLOG_LIMIT || 50);
+export { CORRELATION_BACKLOG_LIMIT, correlationBacklogBlocksLaunch };
 
 export function tripletOrchestratorMarker(outRoot) {
   return path.join(outRoot, 'run-state', 'triplet-orchestrator.json');
@@ -33,33 +40,6 @@ export function writeTripletOrchestratorMarker(outRoot, payload) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
   return file;
-}
-
-export function correlationBacklogPath(outRoot) {
-  return path.join(outRoot, 'run-state', 'correlation-backlog.json');
-}
-
-export function readCorrelationBacklog(outRoot) {
-  const file = correlationBacklogPath(outRoot);
-  if (!fs.existsSync(file)) return { pending: 0 };
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
-}
-
-export function enqueueCorrelationJob(outRoot, batchId) {
-  const file = correlationBacklogPath(outRoot);
-  const row = fs.existsSync(file)
-    ? JSON.parse(fs.readFileSync(file, 'utf8'))
-    : { pending: 0, batches: [] };
-  row.batches = row.batches || [];
-  row.batches.push({ batch_id: batchId, enqueued_at: new Date().toISOString() });
-  row.pending = row.batches.length;
-  fs.writeFileSync(file, `${JSON.stringify(row, null, 2)}\n`, 'utf8');
-  return row.pending;
-}
-
-export function correlationBacklogBlocksLaunch(outRoot) {
-  const backlog = readCorrelationBacklog(outRoot);
-  return backlog.pending > CORRELATION_BACKLOG_LIMIT;
 }
 
 function runProbeWorker(probe, cfg, releaseAtMs, probeContext) {
@@ -96,8 +76,14 @@ export async function executeTripletBatch({
   if (isCoverageBlocked(outRoot)) {
     throw new Error('collector coverage blocked; refusing triplet batch');
   }
+
+  serviceCorrelationQueueBeforeBatch(outRoot, { runId, launchHead, manifestSha });
+
   if (correlationBacklogBlocksLaunch(outRoot)) {
-    throw new Error('correlation backlog exceeded; pausing new batches');
+    const snapshot = readCorrelationQueueSnapshot(outRoot);
+    throw new Error(
+      `correlation backlog exceeded; pausing new batches (unresolved=${snapshot.unresolved_count ?? snapshot.pending_count}, limit=${CORRELATION_BACKLOG_LIMIT})`,
+    );
   }
 
   supervisorTick(outRoot, { probesActive: true, smokeMode: false });
@@ -183,7 +169,6 @@ export async function executeTripletBatch({
   }
 
   writeBatchRecord(outRoot, batchRecord);
-  enqueueCorrelationJob(outRoot, batchId);
 
   const batchIndex = writeBatchPacketIndex(outRoot, {
     batch_id: batchId,
@@ -231,8 +216,19 @@ export async function executeTripletBatch({
     );
   }
 
+  const correlationJob = finalizeTripletCorrelationJob(outRoot, {
+    batchId,
+    runId,
+    launchHead,
+    manifestSha,
+    expectedProbeIds: batch.probe_ids,
+  });
+  batchRecord.packet_correlation_status = 'COMPLETE';
+  batchRecord.correlation_job_id = correlationJob.job_id;
+  writeBatchRecord(outRoot, batchRecord);
+
   coordinator.completeWindowProtocol(window, 'triplet');
-  return results;
+  return { ...results, correlationJob };
 }
 
 export function mainMatrixUsesTripletOrchestrator(launchScriptPath) {

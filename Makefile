@@ -412,8 +412,14 @@ ai-platform-verify-phase32h-manifest-contract: ## Phase 32H manifest row contrac
 ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (source wiring)
 	$(MAKE) git-verify-no-cursor-trailers
 	$(MAKE) ai-platform-verify-phase32h-manifest-contract
+	$(MAKE) ai-platform-verify-phase32h-baseline-preflight
 	node --test tests/phase32h-r1-prelaunch-guard.test.mjs
 	node scripts/phase32h-r1-prelaunch-guard-readonly.mjs
+
+ai-platform-verify-phase32h-baseline-preflight: ## Phase 32H-R1 baseline prelaunch hardening (ESM/disk/index)
+	node --test tests/phase32h-baseline-preflight.test.mjs
+	node --test tests/phase32h-probe-packet-index.test.mjs
+	node scripts/phase32h-baseline-preflight-readonly.mjs
 
 git-commit-without-assistant-trailers: ## Create a commit via commit-tree without assistant trailers
 	bash scripts/git/commit-without-assistant-trailers.sh

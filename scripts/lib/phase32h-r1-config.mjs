@@ -7,6 +7,7 @@ export const R1_BASELINE_ROOT = '/tmp/phase32h-r1-baseline';
 export const R1_PROTECTED_ROOT = '/tmp/phase32h-r1-caffeinate';
 export const R1_COMPARISON_ROOT = '/tmp/phase32h-r1-comparison';
 export const R1_CANARY_ROOT = '/tmp/phase32h-r1-baseline-r2-canary';
+export const R1_BASELINE_R2_ROOT = '/tmp/phase32h-r1-baseline-r2';
 
 export const R1_EVIDENCE_LABEL_BASELINE =
   'Phase 32H-R1 baseline synchronized-stall validation';

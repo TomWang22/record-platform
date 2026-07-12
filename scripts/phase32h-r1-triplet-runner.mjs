@@ -44,6 +44,7 @@ import {
 } from './lib/phase32h-r1-config.mjs';
 import { supervisorTick } from './phase32h-collector-supervisor.mjs';
 import { assertManifestContract } from './lib/phase32h-manifest-contract.mjs';
+import { assertPacketIndexCoverage } from './lib/phase32h-packet-index-coverage.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -182,6 +183,14 @@ export async function runTripletMatrix(opts) {
     completed_batches: completedBatches,
     finished_at: new Date().toISOString(),
   });
+
+  if (completedBatches === batches.length) {
+    assertPacketIndexCoverage(outRoot, {
+      expectedProbeIndexes: manifest.length,
+      expectedBatchCorrelations: batches.length,
+      requirePerProbeIndexes: true,
+    });
+  }
 
   return { completedBatches, totalBatches: batches.length };
 }

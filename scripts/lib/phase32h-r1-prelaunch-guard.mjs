@@ -73,6 +73,57 @@ export function checkContinuousPcapModel() {
   return violations;
 }
 
+export function checkDiskPreflightWired() {
+  const launchScript = path.join(REPO_ROOT, 'scripts/phase32h-launch-r1-arm.mjs');
+  const text = fs.readFileSync(launchScript, 'utf8');
+  const violations = [];
+  if (!text.includes('assertDiskPreflight')) {
+    violations.push('arm launcher missing disk preflight gate');
+  }
+  const diskLib = path.join(REPO_ROOT, 'scripts/lib/phase32h-disk-preflight.mjs');
+  if (!fs.existsSync(diskLib)) {
+    violations.push('disk preflight module missing');
+  } else {
+    const diskText = fs.readFileSync(diskLib, 'utf8');
+    if (!diskText.includes('40 * 1024 ** 3')) {
+      violations.push('disk hard minimum must be 40 GB');
+    }
+  }
+  return violations;
+}
+
+export function checkPerProbePacketIndexWired() {
+  const violations = [];
+  const orchestrator = path.join(REPO_ROOT, 'scripts/lib/phase32h-triplet-orchestrator.mjs');
+  const runner = path.join(REPO_ROOT, 'scripts/phase32h-r1-triplet-runner.mjs');
+  const orchText = fs.readFileSync(orchestrator, 'utf8');
+  const runnerText = fs.readFileSync(runner, 'utf8');
+  if (!orchText.includes('writeTripletProbePacketIndexes')) {
+    violations.push('triplet orchestrator missing per-probe packet index writer');
+  }
+  if (!runnerText.includes('assertPacketIndexCoverage')) {
+    violations.push('triplet runner missing packet index coverage gate');
+  }
+  const baselinePreflight = path.join(REPO_ROOT, 'scripts/phase32h-baseline-preflight-readonly.mjs');
+  if (!fs.existsSync(baselinePreflight)) {
+    violations.push('baseline preflight readonly script missing');
+  }
+  return violations;
+}
+
+export function checkEsmCloseoutTooling() {
+  const violations = [];
+  for (const script of [
+    'scripts/phase32h-baseline-preflight-readonly.mjs',
+    'scripts/phase32h-pcap-stats-readonly.mjs',
+  ]) {
+    if (!fs.existsSync(path.join(REPO_ROOT, script))) {
+      violations.push(`missing committed ESM closeout CLI: ${script}`);
+    }
+  }
+  return violations;
+}
+
 export function checkLifecycleTotalsSeparate() {
   if (LIFECYCLE_MINI_MATRIX_PER_ARM >= R1_TOTAL) {
     return ['lifecycle mini-matrix not excluded from main totals'];
@@ -107,6 +158,9 @@ export function evaluatePrelaunchGuard(opts = {}) {
     ...checkLifecyclePreflightWired(),
     ...checkContinuousPcapModel(),
     ...checkLifecycleTotalsSeparate(),
+    ...checkDiskPreflightWired(),
+    ...checkPerProbePacketIndexWired(),
+    ...checkEsmCloseoutTooling(),
   ];
 
   if (opts.smokeReport) {

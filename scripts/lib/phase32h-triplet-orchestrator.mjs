@@ -17,6 +17,7 @@ import { writeBatchPacketIndex } from './phase32h-batch-packet-index.mjs';
 import { classifyMatrixProbeFailure } from './phase31-controlled-matrix-summary.mjs';
 import { isCoverageBlocked } from './phase32h-run-integrity.mjs';
 import { supervisorTick } from '../phase32h-collector-supervisor.mjs';
+import { writeTripletProbePacketIndexes } from './phase32h-triplet-probe-packet-index.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKER_PATH = path.join(__dirname, 'phase32h-triplet-probe-worker.mjs');
@@ -195,6 +196,14 @@ export async function executeTripletBatch({
   });
 
   const results = { h1: h1Result, h2: h2Result, h3: h3Result, batchRecord, batchIndex };
+  writeTripletProbePacketIndexes({
+    outRoot,
+    batch,
+    runId,
+    launchHead,
+    results,
+    failIfExists: true,
+  });
 
   if (onProbeComplete) {
     for (const proto of ['h1', 'h2', 'h3']) {

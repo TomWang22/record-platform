@@ -15,11 +15,12 @@ import {
   readRunId,
   sha256File,
 } from './lib/phase32h-run-integrity.mjs';
-import { evidenceLabelForArm, rootForArm, R1_CANARY_TOTAL, R1_CANARY_PER_PROTOCOL } from './lib/phase32h-r1-config.mjs';
+import { evidenceLabelForArm, rootForArm, R1_BASELINE_R2_ROOT, R1_CANARY_TOTAL, R1_CANARY_PER_PROTOCOL } from './lib/phase32h-r1-config.mjs';
 import { gitSha } from './lib/phase22-full-replay-common.mjs';
 import { evaluatePrelaunchGuard } from './lib/phase32h-r1-prelaunch-guard.mjs';
 import { loadJsonl } from './lib/phase31-controlled-matrix-summary.mjs';
 import { assertManifestContract } from './lib/phase32h-manifest-contract.mjs';
+import { assertDiskPreflight } from './lib/phase32h-disk-preflight.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -127,6 +128,10 @@ function main() {
       console.error(smoke.stderr || smoke.stdout);
       process.exit(2);
     }
+  }
+
+  if (!opts.canary) {
+    assertDiskPreflight(opts.out);
   }
 
   fs.mkdirSync(opts.out, { recursive: true });

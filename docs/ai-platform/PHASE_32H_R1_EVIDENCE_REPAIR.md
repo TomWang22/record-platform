@@ -85,9 +85,25 @@ Both arms: 8,640 probes (2,880 per protocol), H1/H2/H3 together.
 ### Canary (baseline-r2)
 
 - **90-probe canary** at `/tmp/phase32h-r1-baseline-r2-canary` — **FROZEN BLOCKED** (3/90, HTTP 422)
+- **90-probe canary-v2** at `/tmp/phase32h-r1-baseline-r2-canary-v2` — **FROZEN PASS** (90/90 functional)
+  - Batch correlation: **30/30 PASS**
+  - Per-probe packet indexes: **not available** (historical pre-repair triplet path; 0/90)
+  - Baseline launch requires repaired per-probe indexing (**8,640/8,640**)
 - First blocked root used **partial source provenance** (uncommitted canary launcher at reported HEAD `92be1a6b`)
 - Never resume frozen roots; use `-v2` suffix for reruns after repair
 - Launch: `node scripts/phase32h-launch-r1-arm.mjs --arm baseline --canary --out /tmp/phase32h-r1-baseline-r2-canary-v2`
+
+### Baseline prelaunch hardening (r2)
+
+- **ESM closeout**: committed `.mjs` CLIs replace fragile `node -e` / `node -p` ESM eval (`ERR_EVAL_ESM_CANNOT_PRINT` was ad-hoc debug only)
+- **Per-probe packet indexes**: triplet path writes `probe-packet-index/<probe_id>.json` after each batch
+- **Disk gate**: hard minimum **40 GB** free; preferred **50 GB**; worst-case footprint ~27 GB evidence+PCAP
+
+```bash
+make ai-platform-verify-phase32h-baseline-preflight
+```
+
+Proposed baseline root: `/tmp/phase32h-r1-baseline-r2` (must not exist before launch)
 
 ## Hard stops
 

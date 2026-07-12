@@ -126,6 +126,8 @@ make ai-platform-verify-phase32h-collector-exclusivity
 make ai-platform-verify-phase32h-smoke-cleanup
 ```
 
+Smoke freeze order: `finalizeSmokeWithFreeze()` stops collectors before hashing; `FROZEN_PASS_EVIDENCE` is written last.
+
 ## Hard stops
 
 - Production enablement: NOT APPROVED

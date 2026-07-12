@@ -397,6 +397,7 @@ ai-platform-verify-phase32h-collector-exclusivity: ## Phase 32H-R1 collector reg
 
 ai-platform-verify-phase32h-smoke-cleanup: ## Phase 32H-R1 smoke collector teardown guarantees
 	node --test tests/phase32h-smoke-cleanup.test.mjs
+	node --test tests/phase32h-smoke-freeze-order.test.mjs
 
 PHASE32H_R1_BASELINE ?= /tmp/phase32h-r1-baseline
 PHASE32H_R1_PROTECTED ?= /tmp/phase32h-r1-caffeinate
@@ -433,6 +434,7 @@ ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (sou
 
 ai-platform-verify-phase32h-freeze-integrity: ## Phase 32H freeze ordering + ESM readiness guards
 	node --test tests/phase32h-freeze-integrity.test.mjs
+	node --test tests/phase32h-smoke-freeze-order.test.mjs
 	node --test tests/phase32h-esm-readiness.test.mjs
 	node scripts/phase32h-record-readiness-esm-incident.mjs
 	node scripts/phase32h-launch-package-readonly.mjs >/dev/null

@@ -20,7 +20,7 @@ import { evaluatePacketIndexCoverage } from './lib/phase32h-packet-index-coverag
 import { runTripletMatrix } from './phase32h-r1-triplet-runner.mjs';
 import { gitSha } from './lib/phase22-full-replay-common.mjs';
 import { executeFreezeIntegrity, stopWritersForRoot } from './lib/phase32h-freeze-integrity.mjs';
-import { withSmokeCollectorCleanup } from './lib/phase32h-smoke-collector-cleanup.mjs';
+import { finalizeSmokeWithFreeze, withSmokeCollectorCleanup } from './lib/phase32h-smoke-collector-cleanup.mjs';
 import { registerPcapCollector } from './lib/phase32h-collector-registry.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -129,23 +129,21 @@ async function main() {
   };
   fs.writeFileSync(path.join(opts.out, 'phase32h-r1-correlation-drain-smoke.json'), `${JSON.stringify(report, null, 2)}\n`);
 
-  if (pass) {
-    executeFreezeIntegrity({
-      outRoot: opts.out,
-      repoRoot: REPO_ROOT,
-      hashManifestName: 'phase32h-r1-correlation-drain-smoke-sha256.txt',
-      hashExcludeSuffixes: ['phase32h-r1-correlation-drain-smoke-sha256.txt', 'FROZEN_PASS_EVIDENCE'],
-      markerName: 'FROZEN_PASS_EVIDENCE',
-      markerContent: `${new Date().toISOString()}\nCORRELATION_DRAIN_SMOKE_PASS\n`,
-      jsonlPaths: ['h1', 'h2', 'h3'].map((s) => path.join(opts.out, `shard-${s}`, 'phase32h-matrix.jsonl')),
-      writersAlreadyStopped: true,
-    });
-  }
+  const shutdown = finalizeSmokeWithFreeze(opts.out, {
+    repoRoot: REPO_ROOT,
+    pass,
+    hashManifestName: 'phase32h-r1-correlation-drain-smoke-sha256.txt',
+    hashExcludeSuffixes: ['phase32h-r1-correlation-drain-smoke-sha256.txt', 'FROZEN_PASS_EVIDENCE'],
+    markerName: 'FROZEN_PASS_EVIDENCE',
+    markerContent: `${new Date().toISOString()}\nCORRELATION_DRAIN_SMOKE_PASS\n`,
+    jsonlPaths: ['h1', 'h2', 'h3'].map((s) => path.join(opts.out, `shard-${s}`, 'phase32h-matrix.jsonl')),
+  });
+  report.shutdown = shutdown;
 
   console.log(JSON.stringify(report, null, 2));
-  process.exit(pass ? 0 : 2);
+  process.exit(pass && shutdown.freezeReady && shutdown.freeze?.status === 'PASS' ? 0 : 2);
     },
-    { repoRoot: REPO_ROOT },
+    { repoRoot: REPO_ROOT, skipCleanup: true },
   );
 }
 

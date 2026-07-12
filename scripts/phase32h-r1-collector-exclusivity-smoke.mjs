@@ -21,12 +21,11 @@ import { readCorrelationQueueSnapshot } from './lib/phase32h-correlation-queue.m
 import { evaluatePacketIndexCoverage } from './lib/phase32h-packet-index-coverage.mjs';
 import { runTripletMatrix } from './phase32h-r1-triplet-runner.mjs';
 import { gitSha } from './lib/phase22-full-replay-common.mjs';
-import { executeFreezeIntegrity, listRootScopedProcesses } from './lib/phase32h-freeze-integrity.mjs';
-import { withSmokeCollectorCleanup } from './lib/phase32h-smoke-collector-cleanup.mjs';
+import { finalizeSmokeWithFreeze, withSmokeCollectorCleanup } from './lib/phase32h-smoke-collector-cleanup.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
-const DEFAULT_OUT = '/tmp/phase32h-r1-collector-exclusivity-smoke-v1';
+const DEFAULT_OUT = '/tmp/phase32h-r1-collector-exclusivity-smoke-v2';
 const TARGET_BATCHES = 30;
 const TARGET_PROBES = TARGET_BATCHES * 3;
 
@@ -138,28 +137,27 @@ async function main() {
         `${JSON.stringify(report, null, 2)}\n`,
       );
 
-      if (pass) {
-        executeFreezeIntegrity({
-          outRoot: opts.out,
-          repoRoot: REPO_ROOT,
-          hashManifestName: 'phase32h-r1-collector-exclusivity-smoke-sha256.txt',
-          hashExcludeSuffixes: [
-            'phase32h-r1-collector-exclusivity-smoke-sha256.txt',
-            'FROZEN_PASS_EVIDENCE',
-          ],
-          markerName: 'FROZEN_PASS_EVIDENCE',
-          markerContent: `${new Date().toISOString()}\nCOLLECTOR_EXCLUSIVITY_SMOKE_PASS\n`,
-          jsonlPaths: ['h1', 'h2', 'h3'].map((s) => path.join(opts.out, `shard-${s}`, 'phase32h-matrix.jsonl')),
-          writersAlreadyStopped: true,
-        });
-      }
+      const shutdown = finalizeSmokeWithFreeze(opts.out, {
+        repoRoot: REPO_ROOT,
+        pass,
+        hashManifestName: 'phase32h-r1-collector-exclusivity-smoke-sha256.txt',
+        hashExcludeSuffixes: [
+          'phase32h-r1-collector-exclusivity-smoke-sha256.txt',
+          'FROZEN_PASS_EVIDENCE',
+        ],
+        markerName: 'FROZEN_PASS_EVIDENCE',
+        markerContent: `${new Date().toISOString()}\nCOLLECTOR_EXCLUSIVITY_SMOKE_PASS\n`,
+        jsonlPaths: ['h1', 'h2', 'h3'].map((s) => path.join(opts.out, `shard-${s}`, 'phase32h-matrix.jsonl')),
+      });
+      report.shutdown = shutdown;
+      report.post_smoke_processes = shutdown.post_smoke_processes;
+      report.freeze_integrity = shutdown.freeze?.status || (shutdown.freezeReady ? 'PASS' : 'BLOCKED');
+      report.automatic_collector_shutdown = shutdown.cleanup.zero_root_scoped;
 
-      const remaining = listRootScopedProcesses(opts.out).filter((p) => p.pid !== process.pid);
-      report.post_smoke_processes = remaining.length;
       console.log(JSON.stringify(report, null, 2));
-      process.exit(pass && remaining.length === 0 ? 0 : 2);
+      process.exit(pass && shutdown.freezeReady && shutdown.freeze?.status === 'PASS' ? 0 : 2);
     },
-    { repoRoot: REPO_ROOT },
+    { repoRoot: REPO_ROOT, skipCleanup: true },
   );
 }
 

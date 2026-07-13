@@ -25,7 +25,7 @@ import { resolveEvidenceRootFromCommand } from '../scripts/lib/phase32h-process-
 const FILTER = 'tcp port 443 or udp port 443 or port 53 or icmp or icmp6';
 
 function tempRoot() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'phase32h-excl-'));
+  return fs.mkdtempSync(path.join('/tmp', 'phase32h-excl-'));
 }
 
 function touch(filePath, ageMs = 0) {
@@ -61,7 +61,15 @@ function writeCaptureStatus(root, { pid = process.pid, file = `${root}/pcap/live
 
 function procFromCapture(root, { pid = process.pid, file = `${root}/pcap/live.pcapng` } = {}) {
   const { cmd, argv } = writeCaptureStatus(root, { pid, file });
-  return { pid, argv, command: cmd, evidence_root: root, interface: 'bridge100', output_path: file };
+  return {
+    pid,
+    comm: 'dumpcap',
+    argv,
+    command: cmd,
+    evidence_root: root,
+    interface: 'bridge100',
+    output_path: file,
+  };
 }
 
 describe('phase32h collector exclusivity', () => {

@@ -2,39 +2,29 @@
  * Phase 32H — wide process listing for collector identity (full args via -ww).
  */
 import { spawnSync } from 'node:child_process';
+import {
+  enrichProcessAsCollectorCandidate,
+  listCaptureCollectorCandidates,
+  resolveCaptureInterface,
+  resolveEvidenceRootFromCommand,
+  resolvePcapOutputPath,
+  tokenizeProcessCommand,
+} from './phase32h-process-identity.mjs';
 
-const CAPTURE_RE = /dumpcap|tcpdump/i;
-const PHASE32H_RE = /phase32h/i;
+export {
+  resolveCaptureInterface,
+  resolveEvidenceRootFromCommand,
+  resolvePcapOutputPath,
+} from './phase32h-process-identity.mjs';
 
-export function resolveEvidenceRootFromCommand(command = '') {
-  const outFlag = command.match(/--out\s+(\S+)/);
-  if (outFlag) return outFlag[1];
-  const tmpMatch = command.match(/(\/tmp\/phase32h[^\s'"]+)/);
-  if (!tmpMatch) return null;
-  const matched = tmpMatch[1];
-  if (/\.pcap/i.test(matched)) {
-    const parts = matched.split('/');
-    const rootIdx = parts.findIndex((part) => part.startsWith('phase32h'));
-    if (rootIdx >= 0) return parts.slice(0, rootIdx + 1).join('/');
+/** @deprecated use isPcapCollectorCandidate from phase32h-process-identity.mjs */
+export function isPhase32hCaptureProcess(procOrCommand = '') {
+  if (typeof procOrCommand === 'string') {
+    return Boolean(
+      enrichProcessAsCollectorCandidate({ command: procOrCommand, comm: null }),
+    );
   }
-  return matched;
-}
-
-export function resolveCaptureInterface(command = '') {
-  const match = command.match(/(?:^|\s)-i\s+(\S+)/);
-  return match ? match[1] : null;
-}
-
-export function resolvePcapOutputPath(command = '') {
-  const match = command.match(/(?:^|\s)-w\s+(\S+)/);
-  return match ? match[1] : null;
-}
-
-export function isPhase32hCaptureProcess(command = '') {
-  if (!CAPTURE_RE.test(command)) return false;
-  const root = resolveEvidenceRootFromCommand(command);
-  if (root?.startsWith('/tmp/phase32h')) return true;
-  return PHASE32H_RE.test(command) && CAPTURE_RE.test(command);
+  return Boolean(enrichProcessAsCollectorCandidate(procOrCommand));
 }
 
 export function listProcessesWide() {
@@ -53,21 +43,24 @@ export function listProcessesWide() {
     const prefixMatch = prefix.match(/^(\d+)\s+(\d+)\s+(.+)\s+(\S+)$/);
     if (!prefixMatch) continue;
     const [, pid, ppid, lstart, etime] = prefixMatch;
+    const argv = tokenizeProcessCommand(args);
     rows.push({
       pid: Number(pid),
       ppid: Number(ppid),
       lstart,
       etime,
+      comm: null,
       command: args,
+      argv,
       evidence_root: resolveEvidenceRootFromCommand(args),
       interface: resolveCaptureInterface(args),
       output_path: resolvePcapOutputPath(args),
-      role: CAPTURE_RE.test(args) ? 'pcap_collector' : null,
+      role: null,
     });
   }
   return rows;
 }
 
 export function listPhase32hCaptureProcesses() {
-  return listProcessesWide().filter((p) => isPhase32hCaptureProcess(p.command));
+  return listCaptureCollectorCandidates(listProcessesWide());
 }

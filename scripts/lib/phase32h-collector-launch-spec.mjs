@@ -8,7 +8,7 @@ import {
   resolveCaptureInterface,
   resolveEvidenceRootFromCommand,
   resolvePcapOutputPath,
-} from './phase32h-process-list.mjs';
+} from './phase32h-process-identity.mjs';
 import { deriveRingOutputSpec } from './phase32h-pcap-ring-segments.mjs';
 
 const FC = {

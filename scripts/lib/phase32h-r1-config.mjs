@@ -13,6 +13,7 @@ export const R1_BASELINE_R4_ROOT = '/tmp/phase32h-r1-baseline-r4';
 export const R1_BASELINE_R5_ROOT = '/tmp/phase32h-r1-baseline-r5';
 export const R1_BASELINE_R6_ROOT = '/tmp/phase32h-r1-baseline-r6';
 export const R1_BASELINE_R7_ROOT = '/tmp/phase32h-r1-baseline-r7';
+export const R1_BASELINE_R8_ROOT = '/tmp/phase32h-r1-baseline-r8';
 
 export const R1_FORBIDDEN_BASELINE_ROOTS = [
   '/tmp/phase32h-r1-baseline',
@@ -23,6 +24,7 @@ export const R1_FORBIDDEN_BASELINE_ROOTS = [
   '/tmp/phase32h-r1-baseline-r4',
   '/tmp/phase32h-r1-baseline-r5',
   '/tmp/phase32h-r1-baseline-r6',
+  '/tmp/phase32h-r1-baseline-r7',
   '/tmp/phase32h-targeted-reproduction',
 ];
 

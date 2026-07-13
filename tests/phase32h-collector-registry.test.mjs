@@ -21,7 +21,7 @@ import { isCoverageBlocked, markCoverageBlocked } from '../scripts/lib/phase32h-
 const FILTER = 'tcp port 443 or udp port 443 or port 53 or icmp or icmp6';
 
 function tempRoot() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'phase32h-reg-'));
+  return fs.mkdtempSync(path.join('/tmp', 'phase32h-reg-'));
 }
 
 function fullDumpcapArgv(root, overrides = {}) {
@@ -75,6 +75,7 @@ function writeCaptureStatus(root, { pid = process.pid, argv, ...rest } = {}) {
 function procFromArgv(root, argv, pid = process.pid, lstart = 'Sun Jan  1 00:00:00 2026') {
   return {
     pid,
+    comm: path.basename(argv[0]),
     argv,
     command: argv.join(' '),
     evidence_root: root,

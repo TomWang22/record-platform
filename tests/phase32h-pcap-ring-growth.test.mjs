@@ -29,7 +29,7 @@ import { markCoverageBlocked } from '../scripts/lib/phase32h-run-integrity.mjs';
 const FILTER = 'tcp port 443 or udp port 443 or port 53 or icmp or icmp6';
 
 function tempRoot() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'phase32h-ring-'));
+  return fs.mkdtempSync(path.join('/tmp', 'phase32h-ring-'));
 }
 
 function touch(filePath, { ageMs = 500, content = 'pcap-bytes' } = {}) {
@@ -85,6 +85,7 @@ function writeCaptureStatus(root, { pid = process.pid, file, startedAt, ringMode
 function procFromCapture(root, captureStatus, pid = process.pid) {
   return {
     pid,
+    comm: 'dumpcap',
     argv: captureStatus.argv,
     command: captureStatus.argv.join(' '),
     evidence_root: root,

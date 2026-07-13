@@ -4,13 +4,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  isPhase32hCaptureProcess,
   listPhase32hCaptureProcesses,
-  resolveCaptureInterface,
-  resolveEvidenceRootFromCommand,
-  resolvePcapOutputPath,
 } from './phase32h-process-list.mjs';
+import {
+  buildStartIdentity,
+  enrichProcessAsCollectorCandidate,
+  listCaptureCollectorCandidates,
+} from './phase32h-process-identity.mjs';
 import { pidAlive } from './phase32h-process-registry.mjs';
+import { resolveCaptureInterface, resolveEvidenceRootFromCommand, resolvePcapOutputPath } from './phase32h-process-identity.mjs';
 import { FRESHNESS_THRESHOLDS_MS } from './phase32h-collector-supervision.mjs';
 import {
   buildLaunchSpecFromCaptureStatus,
@@ -144,17 +146,26 @@ export function detectForeignPcapCollectors(outRoot, processes, registry, iface)
   const entry = registry?.collectors?.pcap_collector;
   const captureIface = iface || entry?.interface;
   const foreign = [];
+  const registeredStart = entry?.launch_spec?.process_start
+    ? buildStartIdentity({
+        pid: entry.pid,
+        lstart: entry.launch_spec.process_start.lstart,
+      })
+    : null;
   for (const proc of processes) {
-    if (!isPhase32hCaptureProcess(proc.command)) continue;
-    if (captureIface && proc.interface && proc.interface !== captureIface) continue;
-    if (entry && proc.pid === entry.pid && proc.evidence_root === outRoot) continue;
-    if (proc.evidence_root === outRoot && entry && proc.pid === entry.pid) continue;
-    if (proc.evidence_root && proc.evidence_root !== outRoot) {
-      foreign.push(proc);
+    const candidate = enrichProcessAsCollectorCandidate(proc);
+    if (!candidate) continue;
+    if (captureIface && candidate.interface && candidate.interface !== captureIface) continue;
+    if (entry && candidate.pid === entry.pid && candidate.evidence_root === outRoot) {
+      if (registeredStart && candidate.start_identity !== registeredStart) continue;
       continue;
     }
-    if (!proc.evidence_root || proc.evidence_root !== outRoot) {
-      foreign.push(proc);
+    if (candidate.evidence_root && candidate.evidence_root !== outRoot) {
+      foreign.push(candidate);
+      continue;
+    }
+    if (!candidate.evidence_root || candidate.evidence_root !== outRoot) {
+      if (entry && candidate.pid !== entry.pid) foreign.push(candidate);
     }
   }
   return foreign;
@@ -162,12 +173,9 @@ export function detectForeignPcapCollectors(outRoot, processes, registry, iface)
 
 export function detectDuplicatePcapCollectors(outRoot, processes, registry) {
   const entry = registry?.collectors?.pcap_collector;
-  const sameRoot = processes.filter(
-    (p) => isPhase32hCaptureProcess(p.command) && p.evidence_root === outRoot,
-  );
+  const sameRoot = listCaptureCollectorCandidates(processes).filter((p) => p.evidence_root === outRoot);
   if (sameRoot.length <= 1) return [];
   if (!entry) return sameRoot.slice(1);
-  const registered = sameRoot.filter((p) => p.pid === entry.pid);
   return sameRoot.filter((p) => p.pid !== entry.pid);
 }
 
@@ -175,9 +183,7 @@ export function evaluatePcapCollectorIdentity(outRoot, processes, registry, opts
   const entry = registry?.collectors?.pcap_collector;
   const probesActive = Boolean(opts.probesActive);
   const pcapThreshold = probesActive ? FRESHNESS_THRESHOLDS_MS.pcap_active : Number.POSITIVE_INFINITY;
-  const captureProcesses = processes.filter(
-    (p) => isPhase32hCaptureProcess(p.command) && p.evidence_root === outRoot,
-  );
+  const captureProcesses = listCaptureCollectorCandidates(processes).filter((p) => p.evidence_root === outRoot);
   const foreign = detectForeignPcapCollectors(outRoot, processes, registry, entry?.interface);
   const duplicates = detectDuplicatePcapCollectors(outRoot, processes, registry);
 
@@ -352,11 +358,14 @@ export function scanCaptureInventory({ interface: iface } = {}) {
     .map((p) => ({
       pid: p.pid,
       ppid: p.ppid,
+      comm: p.comm,
+      executable_basename: p.executable_basename,
       evidence_root: p.evidence_root || resolveEvidenceRootFromCommand(p.command),
       interface: p.interface || resolveCaptureInterface(p.command),
       output_path: p.output_path || resolvePcapOutputPath(p.command),
       command: p.command,
       lstart: p.lstart,
       etime: p.etime,
+      start_identity: p.start_identity,
     }));
 }

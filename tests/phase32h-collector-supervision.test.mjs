@@ -14,7 +14,7 @@ import { isCoverageBlocked } from '../scripts/lib/phase32h-run-integrity.mjs';
 const FILTER = 'tcp port 443 or udp port 443 or port 53 or icmp or icmp6';
 
 function tempRoot() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'phase32h-supervisor-'));
+  return fs.mkdtempSync(path.join('/tmp', 'phase32h-supervisor-'));
 }
 
 function touch(filePath, ageMs = 0) {
@@ -60,12 +60,21 @@ describe('phase32h collector supervision', () => {
   });
 
   it('flags stale PCAP during active probes', () => {
-    const cmd = `/dumpcap -w ${root}/pcap/phase32h-test.pcapng`;
+    const { cmd, argv } = writeCaptureStatus(root, { pid: process.pid, file: `${root}/pcap/phase32h-test.pcapng` });
     touch(path.join(root, 'pcap/phase32h-test.pcapng'), 120_000);
-    registerPcapCollector(root, { pid: process.pid, command: cmd });
+    touch(path.join(root, 'pcap/capture-status.json'), 120_000);
+    registerPcapCollector(root, { pid: process.pid, interface: 'bridge100' });
     const health = evaluateCollectorHealth(
       root,
-      [{ pid: process.pid, command: cmd, evidence_root: root, output_path: `${root}/pcap/phase32h-test.pcapng` }],
+      [{
+        pid: process.pid,
+        comm: 'dumpcap',
+        argv,
+        command: cmd,
+        evidence_root: root,
+        output_path: `${root}/pcap/phase32h-test.pcapng`,
+        interface: 'bridge100',
+      }],
       { probesActive: true },
     );
     assert.equal(health.roles.pcap_collector.status, 'STALE');
@@ -102,10 +111,12 @@ describe('phase32h collector supervision', () => {
     touch(path.join(root, 'logs/application-log-tail.txt'), 1000);
     touch(path.join(root, 'phase32h-monitor.log'), 1000);
     touch(path.join(root, 'pcap/live.pcapng'), 500);
+    const seg = path.join(root, 'pcap', 'live_00001_20260712203306.pcapng');
+    touch(seg, 500);
     registerPcapCollector(root, { pid: process.pid, interface: 'bridge100' });
     touch(path.join(root, 'pcap/capture-status.json'), 500);
     const processes = [
-      { pid: process.pid, argv, command: pcapCmd, evidence_root: root, output_path: `${root}/pcap/live.pcapng`, interface: 'bridge100' },
+      { pid: process.pid, comm: 'dumpcap', argv, command: pcapCmd, evidence_root: root, output_path: `${root}/pcap/live.pcapng`, interface: 'bridge100' },
       { pid: 2, command: `phase32h-extreme-watchdog.mjs --out ${root}` },
       { pid: 3, command: `phase32h-capture-host-telemetry.sh ${root}` },
       { pid: 4, command: `phase32h-start-gateway-log-capture.sh ${root}` },

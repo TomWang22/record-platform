@@ -359,6 +359,7 @@ PHASE32H_MATRIX_ROOT ?= /tmp/phase32h-targeted-reproduction
 
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
+	$(MAKE) ai-platform-verify-phase32h-process-identity
 	$(MAKE) ai-platform-verify-phase32h-collector-registry
 	$(MAKE) ai-platform-verify-phase32h-manifest-contract
 	node --test tests/phase32h-targeted-manifest.test.mjs
@@ -390,6 +391,7 @@ ai-platform-verify-phase32h-run-integrity: ## Phase 32H-R1 atomic run locks and 
 
 ai-platform-verify-phase32h-collector-supervision: ## Phase 32H-R1 mandatory collector supervision gates
 	$(MAKE) ai-platform-verify-phase32h-collector-exclusivity
+	$(MAKE) ai-platform-verify-phase32h-process-identity
 	$(MAKE) ai-platform-verify-phase32h-pcap-ring-growth
 	$(MAKE) ai-platform-verify-phase32h-collector-registry
 	$(MAKE) ai-platform-verify-phase32h-smoke-cleanup
@@ -399,11 +401,15 @@ ai-platform-verify-phase32h-collector-exclusivity: ## Phase 32H-R1 collector reg
 	node --test tests/phase32h-collector-exclusivity.test.mjs
 
 ai-platform-verify-phase32h-collector-registry: ## Phase 32H-R1 structured collector launch spec and registry gates
+	$(MAKE) ai-platform-verify-phase32h-process-identity
 	$(MAKE) ai-platform-verify-phase32h-pcap-ring-growth
 	node --test tests/phase32h-collector-registry.test.mjs
 
 ai-platform-verify-phase32h-pcap-ring-growth: ## Phase 32H-R1 PCAP ring segment discovery and growth gates
 	node --test tests/phase32h-pcap-ring-growth.test.mjs
+
+ai-platform-verify-phase32h-process-identity: ## Phase 32H-R1 executable-identity collector classification gates
+	node --test tests/phase32h-process-identity.test.mjs
 
 ai-platform-verify-phase32h-smoke-cleanup: ## Phase 32H-R1 smoke collector teardown guarantees
 	node --test tests/phase32h-smoke-cleanup.test.mjs
@@ -436,6 +442,7 @@ ai-platform-verify-phase32h-manifest-contract: ## Phase 32H manifest row contrac
 
 ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (source wiring)
 	$(MAKE) git-verify-no-cursor-trailers
+	$(MAKE) ai-platform-verify-phase32h-process-identity
 	$(MAKE) ai-platform-verify-phase32h-collector-exclusivity
 	$(MAKE) ai-platform-verify-phase32h-collector-registry
 	$(MAKE) ai-platform-verify-phase32h-manifest-contract

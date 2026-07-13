@@ -19,13 +19,14 @@ IFACE="$(phase32h_resolve_capture_iface)"
 FILE="$PCAP_DIR/phase32h-$(date -u +%Y%m%dT%H%M%SZ).pcapng"
 FILTER="${PHASE32H_PCAP_FILTER:-tcp port 443 or udp port 443 or port 53 or icmp or icmp6}"
 RING_FILES="${PHASE32H_PCAP_RING_FILES:-48}"
+RING_FILESIZE_KB="${PHASE32H_PCAP_RING_FILESIZE_KB:-250000}"
 
 "$DUMPCAP_BIN" \
   -q \
   -i "$IFACE" \
   -f "$FILTER" \
-  -b filesize:250000 \
-  -b files:"$RING_FILES" \
+  -b "filesize:${RING_FILESIZE_KB}" \
+  -b "files:$RING_FILES" \
   -w "$FILE" \
   </dev/null >>"$PCAP_DIR/dumpcap.log" 2>&1 &
 PID=$!
@@ -37,10 +38,10 @@ if ! kill -0 "$PID" 2>/dev/null; then
   exit 2
 fi
 
-python3 - <<PY "$STATUS" "$PID" "$IFACE" "$FILE" "$DUMPCAP_BIN" "$FILTER" "$RING_FILES"
+python3 - <<PY "$STATUS" "$PID" "$IFACE" "$FILE" "$DUMPCAP_BIN" "$FILTER" "$RING_FILES" "$RING_FILESIZE_KB"
 import json, sys
-status, pid, iface, file, tool, filt, ring_files = sys.argv[1:8]
-argv = [tool, "-q", "-i", iface, "-f", filt, "-b", "filesize:250000", "-b", f"files:{ring_files}", "-w", file]
+status, pid, iface, file, tool, filt, ring_files, ring_filesize_kb = sys.argv[1:9]
+argv = [tool, "-q", "-i", iface, "-f", filt, "-b", f"filesize:{ring_filesize_kb}", "-b", f"files:{ring_files}", "-w", file]
 json.dump(
   {
     "status": "ACTIVE",
@@ -51,7 +52,7 @@ json.dump(
     "filter": filt,
     "argv": argv,
     "ring_files": int(ring_files),
-    "ring_filesize_kb": 250000,
+    "ring_filesize_kb": int(ring_filesize_kb),
     "chmodbpf": True,
     "sudo": False,
     "started_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",

@@ -17,6 +17,12 @@ import {
   parseDumpcapSemantic,
   verifyLaunchSpecAgainstProcess,
 } from './phase32h-collector-launch-spec.mjs';
+import {
+  deriveRingOutputSpec,
+  evaluateRingGrowthHealth,
+  PCAP_GROWTH_STATE,
+  persistCaptureStatusRingHealth,
+} from './phase32h-pcap-ring-segments.mjs';
 
 export const COLLECTOR_REGISTRY_FILE = 'collector-registry.json';
 export const FOREIGN_COLLECTOR_MARKER = 'PHASE32H_FOREIGN_COLLECTOR_BLOCKED';
@@ -36,7 +42,19 @@ export const PCAP_FAILURE_CLASS = {
   PCAP_HEARTBEAT_STALE: 'PCAP_HEARTBEAT_STALE',
   PCAP_DROP_DETECTED: 'PCAP_DROP_DETECTED',
   PCAP_DROP_BLOCKED: 'PCAP_DROP_BLOCKED',
+  PCAP_NO_SEGMENT_BLOCKED: 'PCAP_NO_SEGMENT_BLOCKED',
+  PCAP_SEGMENT_SEQUENCE_BLOCKED: 'PCAP_SEGMENT_SEQUENCE_BLOCKED',
+  PCAP_SEGMENT_OUTSIDE_ROOT_BLOCKED: 'PCAP_SEGMENT_OUTSIDE_ROOT_BLOCKED',
+  PCAP_FOREIGN_SEGMENT_BLOCKED: 'PCAP_FOREIGN_SEGMENT_BLOCKED',
   UNRELATED_NON_PHASE32H_CAPTURE: 'UNRELATED_NON_PHASE32H_CAPTURE',
+};
+
+const RING_GROWTH_TO_FAILURE = {
+  [PCAP_GROWTH_STATE.OUTPUT_NOT_GROWING]: PCAP_FAILURE_CLASS.PCAP_OUTPUT_NOT_GROWING,
+  [PCAP_GROWTH_STATE.NO_SEGMENT_BLOCKED]: PCAP_FAILURE_CLASS.PCAP_NO_SEGMENT_BLOCKED,
+  [PCAP_GROWTH_STATE.SEGMENT_SEQUENCE_BLOCKED]: PCAP_FAILURE_CLASS.PCAP_SEGMENT_SEQUENCE_BLOCKED,
+  [PCAP_GROWTH_STATE.SEGMENT_OUTSIDE_ROOT_BLOCKED]: PCAP_FAILURE_CLASS.PCAP_SEGMENT_OUTSIDE_ROOT_BLOCKED,
+  [PCAP_GROWTH_STATE.FOREIGN_SEGMENT_BLOCKED]: PCAP_FAILURE_CLASS.PCAP_FOREIGN_SEGMENT_BLOCKED,
 };
 
 function fileAgeMs(filePath) {
@@ -225,9 +243,20 @@ export function evaluatePcapCollectorIdentity(outRoot, processes, registry, opts
     };
   }
 
-  const outputPath = entry.output_path || proc.output_path;
-  const outputAge = fileAgeMs(outputPath);
+  const configuredOutputBase = entry.output_path || proc.output_path;
+  const statusPath = path.join(outRoot, 'pcap/capture-status.json');
+  const captureStatus = fs.existsSync(statusPath)
+    ? JSON.parse(fs.readFileSync(statusPath, 'utf8'))
+    : { file: configuredOutputBase };
   const heartbeatAge = fileAgeMs(entry.heartbeat_path);
+  const ringSpec = deriveRingOutputSpec(configuredOutputBase, captureStatus, outRoot);
+  const growth = evaluateRingGrowthHealth(outRoot, ringSpec, { probesActive });
+  if (fs.existsSync(statusPath)) {
+    persistCaptureStatusRingHealth(outRoot, captureStatus, growth);
+  }
+  const outputPath = configuredOutputBase;
+  const outputAge = growth.last_output_age_ms ?? fileAgeMs(configuredOutputBase);
+  const activeSegment = growth.discovery?.active_segment ?? null;
   if (probesActive && heartbeatAge > pcapThreshold) {
     return {
       role: 'pcap_collector',
@@ -236,17 +265,39 @@ export function evaluatePcapCollectorIdentity(outRoot, processes, registry, opts
       pid: entry.pid,
       process_count: 1,
       output_path: outputPath,
+      active_segment: activeSegment,
+      ring_growth_state: growth.growth_state,
       last_output_age_ms: outputAge,
     };
   }
-  if (probesActive && outputAge > pcapThreshold) {
+  if (probesActive && growth.blocked) {
+    const failureClass = RING_GROWTH_TO_FAILURE[growth.failure_class] || growth.failure_class;
     return {
       role: 'pcap_collector',
       status: 'STALE',
-      failure_class: PCAP_FAILURE_CLASS.PCAP_OUTPUT_NOT_GROWING,
+      failure_class: failureClass,
       pid: entry.pid,
       process_count: 1,
       output_path: outputPath,
+      active_segment: activeSegment,
+      ring_growth_state: growth.growth_state,
+      last_output_age_ms: outputAge,
+      ring_discovery: growth.discovery,
+    };
+  }
+  if (
+    probesActive &&
+    growth.growth_state === PCAP_GROWTH_STATE.WAITING_FOR_FIRST_SEGMENT
+  ) {
+    return {
+      role: 'pcap_collector',
+      status: 'ACTIVE',
+      failure_class: PCAP_FAILURE_CLASS.ACTIVE,
+      pid: entry.pid,
+      process_count: 1,
+      output_path: outputPath,
+      active_segment: activeSegment,
+      ring_growth_state: growth.growth_state,
       last_output_age_ms: outputAge,
     };
   }
@@ -258,6 +309,8 @@ export function evaluatePcapCollectorIdentity(outRoot, processes, registry, opts
     pid: entry.pid,
     process_count: 1,
     output_path: outputPath,
+    active_segment: activeSegment,
+    ring_growth_state: growth.growth_state,
     last_output_age_ms: outputAge,
     command: entry.command,
     interface: entry.interface,

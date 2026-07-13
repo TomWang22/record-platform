@@ -297,9 +297,11 @@ describe('phase32h collector launch spec', () => {
     assert.equal(registry.collectors.pcap_collector.semantic.capture_filter, FILTER);
   });
 
-  it('output growth verification passes when output is fresh', () => {
+  it('output growth verification passes when ring segment is fresh', () => {
     const argv = writeCaptureStatus(root);
-    touch(`${root}/pcap/live.pcapng`, 500);
+    const prefix = path.basename(argv[argv.indexOf('-w') + 1], '.pcapng');
+    const seg = path.join(root, 'pcap', `${prefix}_00001_20260712203306.pcapng`);
+    touch(seg, 500);
     registerPcapCollector(root, { pid: process.pid, run_id: 'run-a', launch_head: 'abc' });
     const identity = evaluatePcapCollectorIdentity(root, [procFromArgv(root, argv)], readCollectorRegistry(root), {
       probesActive: true,
@@ -309,10 +311,28 @@ describe('phase32h collector launch spec', () => {
     assert.equal(identity.failure_class, PCAP_FAILURE_CLASS.ACTIVE);
   });
 
-  it('non-growing output fails with PCAP_OUTPUT_NOT_GROWING', () => {
+  it('non-growing ring segment fails with PCAP_OUTPUT_NOT_GROWING', () => {
     const argv = writeCaptureStatus(root);
-    touch(`${root}/pcap/live.pcapng`, 60_000);
+    const prefix = path.basename(argv[argv.indexOf('-w') + 1], '.pcapng');
+    const seg = path.join(root, 'pcap', `${prefix}_00001_20260712203306.pcapng`);
+    touch(seg, 60_000);
+    const capture = JSON.parse(fs.readFileSync(path.join(root, 'pcap/capture-status.json'), 'utf8'));
+    capture.started_at = new Date(Date.now() - 120_000).toISOString();
+    fs.writeFileSync(path.join(root, 'pcap/capture-status.json'), `${JSON.stringify(capture)}\n`);
     registerPcapCollector(root, { pid: process.pid });
+    const prev = {
+      schema_version: 1,
+      observed_at: new Date(Date.now() - 60_000).toISOString(),
+      segments: [{ path: seg, sequence: 1, size_bytes: fs.statSync(seg).size, mtime_ms: fs.statSync(seg).mtimeMs, inode: fs.statSync(seg).ino }],
+      active_segment: seg,
+      active_sequence: 1,
+      aggregate_bytes: fs.statSync(seg).size,
+      newest_mtime_ms: fs.statSync(seg).mtimeMs,
+      segment_count: 1,
+      sequence_contiguous: true,
+    };
+    fs.mkdirSync(path.join(root, 'run-state'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'run-state/pcap-ring-growth-observation.json'), `${JSON.stringify(prev)}\n`);
     const identity = evaluatePcapCollectorIdentity(root, [procFromArgv(root, argv)], readCollectorRegistry(root), { probesActive: true });
     assert.equal(identity.failure_class, PCAP_FAILURE_CLASS.PCAP_OUTPUT_NOT_GROWING);
   });

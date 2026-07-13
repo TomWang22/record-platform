@@ -9,6 +9,7 @@ import {
   resolveEvidenceRootFromCommand,
   resolvePcapOutputPath,
 } from './phase32h-process-list.mjs';
+import { deriveRingOutputSpec } from './phase32h-pcap-ring-segments.mjs';
 
 const FC = {
   ACTIVE: 'ACTIVE',
@@ -130,6 +131,7 @@ export function buildLaunchSpecFromCaptureStatus(outRoot, captureStatus, record 
   } catch {
     executableRealpath = null;
   }
+  const ringOutput = deriveRingOutputSpec(parsed.semantic.output_path, captureStatus, outRoot);
   return {
     schema_version: LAUNCH_SPEC_SCHEMA_VERSION,
     role: 'pcap_collector',
@@ -143,6 +145,7 @@ export function buildLaunchSpecFromCaptureStatus(outRoot, captureStatus, record 
     executable_realpath: executableRealpath,
     argv: parsed.argv,
     semantic: parsed.semantic,
+    ring_output: ringOutput,
     evidence_root: outRoot,
     run_id: record.run_id ?? null,
     launch_head: record.launch_head ?? null,

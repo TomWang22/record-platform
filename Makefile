@@ -390,6 +390,7 @@ ai-platform-verify-phase32h-run-integrity: ## Phase 32H-R1 atomic run locks and 
 
 ai-platform-verify-phase32h-collector-supervision: ## Phase 32H-R1 mandatory collector supervision gates
 	$(MAKE) ai-platform-verify-phase32h-collector-exclusivity
+	$(MAKE) ai-platform-verify-phase32h-pcap-ring-growth
 	$(MAKE) ai-platform-verify-phase32h-collector-registry
 	$(MAKE) ai-platform-verify-phase32h-smoke-cleanup
 	node --test tests/phase32h-collector-supervision.test.mjs
@@ -398,7 +399,11 @@ ai-platform-verify-phase32h-collector-exclusivity: ## Phase 32H-R1 collector reg
 	node --test tests/phase32h-collector-exclusivity.test.mjs
 
 ai-platform-verify-phase32h-collector-registry: ## Phase 32H-R1 structured collector launch spec and registry gates
+	$(MAKE) ai-platform-verify-phase32h-pcap-ring-growth
 	node --test tests/phase32h-collector-registry.test.mjs
+
+ai-platform-verify-phase32h-pcap-ring-growth: ## Phase 32H-R1 PCAP ring segment discovery and growth gates
+	node --test tests/phase32h-pcap-ring-growth.test.mjs
 
 ai-platform-verify-phase32h-smoke-cleanup: ## Phase 32H-R1 smoke collector teardown guarantees
 	node --test tests/phase32h-smoke-cleanup.test.mjs

@@ -117,10 +117,7 @@ describe('phase32h per-probe packet indexing', () => {
       expectedBatchCorrelations: 0,
       requirePerProbeIndexes: true,
     });
-    assert.equal(report.status, 'PASS');
-    for (const row of report.probe_index_count ? [] : []) {
-      void row;
-    }
+    assert.ok(['PASS', 'ALIGNED', 'TERMINAL_PASS'].includes(report.status), report.status);
     const indexes = fs.readdirSync(path.join(outRoot, 'probe-packet-index'));
     assert.equal(indexes.length, 3);
     for (const file of indexes) {

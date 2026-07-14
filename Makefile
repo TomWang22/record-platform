@@ -363,6 +363,7 @@ ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction in
 	$(MAKE) ai-platform-verify-phase32h-process-identity
 	$(MAKE) ai-platform-verify-phase32h-collector-registry
 	$(MAKE) ai-platform-verify-phase32h-manifest-contract
+	$(MAKE) ai-platform-verify-phase32h-packet-index-lifecycle
 	node --test tests/phase32h-targeted-manifest.test.mjs
 	node --test tests/phase32h-inflight-probe-registry.test.mjs
 	node --test tests/phase32h-extreme-watchdog.test.mjs
@@ -385,9 +386,19 @@ ai-platform-verify-phase32h-capture-smoke: ## Phase 32H-E2 six-probe capture int
 	$(MAKE) ai-platform-verify-phase32h-infra
 	node scripts/phase32h-capture-integrity-smoke.mjs
 
+ai-platform-verify-phase32h-packet-index-lifecycle: ## Phase 32H packet-index lifecycle + terminal summary semantics
+	node --test tests/phase32h-packet-index-lifecycle.test.mjs
+	node --test tests/phase32h-probe-packet-index.test.mjs
+	node --test tests/phase32h-targeted-summary.test.mjs
+
+ai-platform-verify-phase32h-packet-index-lifecycle-smoke: ## Phase 32H 90-probe packet-index lifecycle live smoke
+	$(MAKE) ai-platform-verify-phase32h-packet-index-lifecycle
+	node scripts/phase32h-r1-packet-index-lifecycle-smoke.mjs --out /tmp/phase32h-r1-packet-index-lifecycle-smoke-v1
+
 ai-platform-verify-phase32h-run-integrity: ## Phase 32H-R1 atomic run locks and append guards
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
 	$(MAKE) ai-platform-verify-phase32h-runner-memory
+	$(MAKE) ai-platform-verify-phase32h-packet-index-lifecycle
 	node --test tests/phase32h-run-integrity.test.mjs
 	node --test tests/phase32h-r1-manifest.test.mjs
 
@@ -468,6 +479,7 @@ ai-platform-verify-phase32h-freeze-integrity: ## Phase 32H freeze ordering + ESM
 ai-platform-verify-phase32h-baseline-preflight: ## Phase 32H-R1 baseline prelaunch hardening (ESM/disk/index)
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
 	$(MAKE) ai-platform-verify-phase32h-runner-memory
+	$(MAKE) ai-platform-verify-phase32h-packet-index-lifecycle
 	node --test tests/phase32h-baseline-preflight.test.mjs
 	node --test tests/phase32h-probe-packet-index.test.mjs
 	node --test tests/phase32h-ci-disk-launch-gates.test.mjs

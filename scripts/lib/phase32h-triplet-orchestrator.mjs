@@ -15,6 +15,13 @@ import {
   writeBatchRecord,
 } from './phase32h-triplet-batch.mjs';
 import { writeBatchPacketIndex } from './phase32h-batch-packet-index.mjs';
+import {
+  BATCH_INDEX_LIFECYCLE,
+  completeBatchPacketIndex,
+  failBatchPacketIndex,
+  markBatchPacketIndexStatus,
+  patchTripletOrchestratorMarker,
+} from './phase32h-packet-index-lifecycle.mjs';
 import { classifyMatrixProbeFailure } from './phase31-controlled-matrix-summary.mjs';
 import { isCoverageBlocked } from './phase32h-run-integrity.mjs';
 import { supervisorTick } from '../phase32h-collector-supervisor.mjs';
@@ -131,6 +138,21 @@ export async function executeTripletBatch({
   const batchId = batch.batch_id;
   const window = batch.coordinate.window;
 
+  patchTripletOrchestratorMarker(outRoot, {
+    status: 'IN_PROGRESS',
+    phase: 'PRE_MATRIX',
+    active_batch_id: batchId,
+  });
+
+  // PENDING index before matrix append (valid ACTIVE_TRANSIENT_LEAD window).
+  writeBatchPacketIndex(outRoot, {
+    batch_id: batchId,
+    run_id: runId,
+    member_probe_ids: batch.probe_ids,
+    coordinate: batch.coordinate,
+    packet_correlation_status: BATCH_INDEX_LIFECYCLE.PENDING,
+  });
+
   coordinator.enterWindow(window, 'triplet', {
     resetAndVerify: probeContext.resetAndVerify,
   });
@@ -145,6 +167,13 @@ export async function executeTripletBatch({
   const barrierReadyAt = new Date().toISOString();
   const releasedAt = waitForTripletBarrier(outRoot, batchId);
   const releaseAtMs = Date.parse(releasedAt) + 5;
+
+  patchTripletOrchestratorMarker(outRoot, {
+    status: 'IN_PROGRESS',
+    phase: 'RUNNING',
+    active_batch_id: batchId,
+  });
+  markBatchPacketIndexStatus(outRoot, batchId, BATCH_INDEX_LIFECYCLE.RUNNING);
 
   const workerContext = {
     coordinator_wait_ms: probeContext.coordinator_wait_ms ?? 0,
@@ -193,7 +222,7 @@ export async function executeTripletBatch({
       h2: h2Result.probeFail ? 'FAIL' : 'PASS',
       h3: h3Result.probeFail ? 'FAIL' : 'PASS',
     },
-    packet_correlation_status: 'PENDING',
+    packet_correlation_status: BATCH_INDEX_LIFECYCLE.PENDING,
     collector_health_status: 'ACTIVE',
     power_snapshot_id: null,
     route_snapshot_id: null,
@@ -205,19 +234,21 @@ export async function executeTripletBatch({
   if (timingStatus === 'REJECTED') {
     batchRecord.packet_correlation_status = 'BLOCKED';
     writeBatchRecord(outRoot, batchRecord);
+    failBatchPacketIndex(outRoot, batchId, { batch_timing_status: timingStatus });
+    patchTripletOrchestratorMarker(outRoot, {
+      phase: 'FAILED',
+      active_batch_id: null,
+      latest_completed_batch_id: null,
+      latest_failed_batch_id: batchId,
+    });
     throw new Error(`batch ${batchId} rejected: start spread ${spreadMs}ms`);
   }
 
   writeBatchRecord(outRoot, batchRecord);
 
-  const batchIndex = writeBatchPacketIndex(outRoot, {
-    batch_id: batchId,
-    run_id: runId,
-    member_probe_ids: batch.probe_ids,
-    coordinate: batch.coordinate,
+  const batchIndex = markBatchPacketIndexStatus(outRoot, batchId, BATCH_INDEX_LIFECYCLE.RUNNING, {
     start_spread_ms: spreadMs,
     batch_timing_status: timingStatus,
-    packet_correlation_status: 'PENDING',
   });
 
   const results = { h1: h1Result, h2: h2Result, h3: h3Result, batchRecord, batchIndex };
@@ -251,10 +282,23 @@ export async function executeTripletBatch({
       retry_count: row.timing?.retry_count ?? row.retry_count,
     };
     writeBatchRecord(outRoot, batchRecord);
+    failBatchPacketIndex(outRoot, batchId, { deterministic_failure: batchRecord.deterministic_failure });
+    patchTripletOrchestratorMarker(outRoot, {
+      phase: 'FAILED',
+      active_batch_id: null,
+      latest_failed_batch_id: batchId,
+    });
     throw new Error(
       `deterministic gate failure on ${deterministicMember}: http_status=${row.http_status} gate=${row.gate_reason}`,
     );
   }
+
+  patchTripletOrchestratorMarker(outRoot, {
+    status: 'IN_PROGRESS',
+    phase: 'CORRELATING',
+    active_batch_id: batchId,
+  });
+  markBatchPacketIndexStatus(outRoot, batchId, BATCH_INDEX_LIFECYCLE.CORRELATING);
 
   const correlationJob = finalizeTripletCorrelationJob(outRoot, {
     batchId,
@@ -263,11 +307,22 @@ export async function executeTripletBatch({
     manifestSha,
     expectedProbeIds: batch.probe_ids,
   });
-  batchRecord.packet_correlation_status = 'COMPLETE';
+  batchRecord.packet_correlation_status = BATCH_INDEX_LIFECYCLE.COMPLETE;
   batchRecord.correlation_job_id = correlationJob.job_id;
   writeBatchRecord(outRoot, batchRecord);
+  completeBatchPacketIndex(outRoot, batchId, {
+    correlation_job_id: correlationJob.job_id,
+    start_spread_ms: spreadMs,
+    batch_timing_status: timingStatus,
+  });
 
   coordinator.completeWindowProtocol(window, 'triplet');
+  patchTripletOrchestratorMarker(outRoot, {
+    status: 'IN_PROGRESS',
+    phase: 'BETWEEN_BATCHES',
+    active_batch_id: null,
+    latest_completed_batch_id: batchId,
+  });
   return { ...results, correlationJob };
 }
 

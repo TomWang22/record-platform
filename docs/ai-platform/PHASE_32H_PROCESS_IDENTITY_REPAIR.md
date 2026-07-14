@@ -20,4 +20,6 @@ That shell was not the capture executable and did not own PCAP output.
 | Root | Status |
 |------|--------|
 | `/tmp/phase32h-r1-baseline-r7` | **BLOCKED** — false foreign classifier; never resume |
-| `/tmp/phase32h-r1-baseline-r8` | Future launch root (not created by repair pass) |
+| `/tmp/phase32h-r1-baseline-r8` | superseded / not the frozen PASS root |
+| `/tmp/phase32h-r1-baseline-r9` | **FROZEN PASS** — immutable; packet-index status repair is post-R9 source work |
+| `/tmp/phase32h-r1-caffeinate-r1` | Protected arm (not launched until new SHA + owner approval) |

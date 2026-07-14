@@ -215,6 +215,12 @@ export async function runTripletMatrix(opts) {
     completedBatches += 1;
     emitMemorySample(false);
 
+    // Optional boundary pause so status polls can observe ALIGNED between batches.
+    const boundaryPauseMs = Number(process.env.PHASE32H_LIFECYCLE_BOUNDARY_PAUSE_MS || 0);
+    if (Number.isFinite(boundaryPauseMs) && boundaryPauseMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, boundaryPauseMs));
+    }
+
     if (results.batchRecord.batch_timing_status === 'REJECTED') break;
   }
   emitMemorySample(true);
@@ -224,6 +230,8 @@ export async function runTripletMatrix(opts) {
     orchestrator: 'phase32h-r1-triplet-runner',
     run_id: runId,
     completed_batches: completedBatches,
+    phase: 'COMPLETE',
+    active_batch_id: null,
     finished_at: new Date().toISOString(),
   });
 

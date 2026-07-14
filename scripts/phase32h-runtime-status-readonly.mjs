@@ -56,10 +56,19 @@ export function buildRuntimeStatus(outRoot) {
   const identity = evaluatePcapCollectorIdentity(outRoot, processes, registry, { probesActive: true });
   const queue = readCorrelationQueueSnapshot(outRoot);
   const matrix = matrixCounts(outRoot);
+  const completedBatches = Math.floor((matrix.total || 0) / 3);
+  const batchDir = path.join(outRoot, 'batches');
+  const completedFromFs = fs.existsSync(batchDir)
+    ? fs.readdirSync(batchDir).filter((n) => n.endsWith('.json')).length
+    : completedBatches;
   const packetIndex = evaluatePacketIndexCoverage(outRoot, {
     expectedProbeIndexes: matrix.total || null,
-    expectedBatchCorrelations: matrix.total ? Math.floor(matrix.total / 3) : null,
+    expectedBatchCorrelations: completedFromFs || null,
     requirePerProbeIndexes: false,
+    completedBatchCount: completedFromFs,
+    matrixTotal: matrix.total,
+    targetBatches: completedFromFs || null,
+    targetProbes: matrix.total || null,
   });
   const captureStatus = fs.existsSync(path.join(outRoot, 'pcap/capture-status.json'))
     ? JSON.parse(fs.readFileSync(path.join(outRoot, 'pcap/capture-status.json'), 'utf8'))

@@ -39,6 +39,33 @@ function fileAgeMs(filePath) {
   return Date.now() - fs.statSync(filePath).mtimeMs;
 }
 
+function sleepMs(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Read an atomic-ish JSON snapshot with retries for mid-write truncation.
+ */
+export function readJsonFileResilient(filePath, { attempts = 5, delayMs = 25, fallback = null } = {}) {
+  if (!filePath || !fs.existsSync(filePath)) return fallback;
+  let lastErr = null;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const text = fs.readFileSync(filePath, 'utf8');
+      if (!text.trim()) {
+        sleepMs(delayMs);
+        continue;
+      }
+      return JSON.parse(text);
+    } catch (err) {
+      lastErr = err;
+      sleepMs(delayMs * (i + 1));
+    }
+  }
+  if (fallback !== undefined) return fallback;
+  throw lastErr || new Error(`failed to read JSON: ${filePath}`);
+}
+
 function lastJsonlTimestamp(filePath) {
   if (!fs.existsSync(filePath)) return null;
   const lines = fs.readFileSync(filePath, 'utf8').split('\n').filter(Boolean);
@@ -243,7 +270,7 @@ export function evaluateCollectorHealth(outRoot, processes = [], opts = {}) {
     pcap_failure_class: pcapIdentity.failure_class,
     foreign_blocked: foreignBlocked,
     duplicate_blocked: duplicateBlocked,
-    pcap_status: fs.existsSync(pcapStatus) ? JSON.parse(fs.readFileSync(pcapStatus, 'utf8')) : null,
+    pcap_status: readJsonFileResilient(pcapStatus, { fallback: null }),
   };
 }
 
@@ -285,8 +312,7 @@ export function writeSupervisorHeartbeat(outRoot, health) {
 
 export function readSupervisorHeartbeat(outRoot) {
   const file = path.join(outRoot, 'run-state/collector-supervisor.json');
-  if (!fs.existsSync(file)) return null;
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
+  return readJsonFileResilient(file, { fallback: null });
 }
 
 export function supervisorHeartbeatAgeMs(outRoot) {

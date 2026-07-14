@@ -27,6 +27,9 @@ import {
   serviceCorrelationQueueBeforeBatch,
   verifyCorrelationJobOutputs,
   writeCorrelationQueue,
+  getActiveQueueMemoryJobs,
+  activeJobsOnly,
+  correlationQueueHistoryPath,
   writeQueueBlockedMarker,
 } from '../scripts/lib/phase32h-correlation-queue.mjs';
 import { probeIndexPath, writeProbePacketIndex } from '../scripts/lib/phase32h-probe-packet-index.mjs';
@@ -129,8 +132,17 @@ describe('phase32h correlation queue', () => {
   });
 
   it('verifies three probe indexes and one batch index per job', () => {
-    const job = finalizeBatch(root, 7);
-    const verified = verifyCorrelationJobOutputs(root, job);
+    const batchId = 'batch-verify-7';
+    const probeIds = { h1: 71, h2: 72, h3: 73 };
+    writeIndexes(root, batchId, probeIds);
+    const enq = enqueueCorrelationJob(root, {
+      batchId,
+      runId: RUN_ID,
+      launchHead: LAUNCH_HEAD,
+      manifestSha: MANIFEST_SHA,
+      expectedProbeIds: probeIds,
+    });
+    const verified = verifyCorrelationJobOutputs(root, enq.job);
     assert.equal(Object.keys(verified.outputHashes.probe).length, 3);
     assert.ok(verified.outputHashes.batch);
   });
@@ -156,13 +168,23 @@ describe('phase32h correlation queue', () => {
     assert.equal(first.created, true);
     assert.equal(second.created, false);
     assert.equal(readCorrelationQueue(root).jobs.length, 1);
+    assert.equal(getActiveQueueMemoryJobs(readCorrelationQueue(root)).length, 1);
   });
 
-  it('duplicate completion is idempotent', () => {
+  it('COMPLETE jobs page to history and leave active queue empty', () => {
+    finalizeBatch(root, 1);
+    const queue = readCorrelationQueue(root);
+    assert.equal(queue.stats.complete_count, 1);
+    assert.equal(activeJobsOnly(queue).length, 0);
+    assert.ok(fs.existsSync(correlationQueueHistoryPath(root)));
+  });
+
+  it('duplicate completion is idempotent via history', () => {
     const job = finalizeBatch(root, 3);
     const again = completeCorrelationJob(root, job.job_id);
     assert.equal(again.status, JOB_STATUS.COMPLETE);
     assert.equal(readCorrelationQueue(root).stats.complete_count, 1);
+    assert.equal(readCorrelationQueue(root).jobs.length, 0);
   });
 
   it('missing probe index prevents COMPLETE', () => {
@@ -220,15 +242,22 @@ describe('phase32h correlation queue', () => {
   });
 
   it('stale RUNNING job with valid outputs recovers to COMPLETE', () => {
-    const job = finalizeBatch(root, 5);
-    const queue = readCorrelationQueue(root);
-    const stored = queue.jobs.find((j) => j.job_id === job.job_id);
-    stored.status = JOB_STATUS.RUNNING;
-    stored.completed_at = null;
-    writeCorrelationQueue(root, queue);
+    const batchId = 'batch-stale-complete';
+    const probeIds = { h1: 51, h2: 52, h3: 53 };
+    writeIndexes(root, batchId, probeIds);
+    const enq = enqueueCorrelationJob(root, {
+      batchId,
+      runId: RUN_ID,
+      launchHead: LAUNCH_HEAD,
+      manifestSha: MANIFEST_SHA,
+      expectedProbeIds: probeIds,
+    });
+    claimCorrelationJob(root, enq.job.job_id);
     const result = recoverStaleRunningJobs(root);
     assert.equal(result.completed, 1);
-    assert.equal(readCorrelationQueue(root).stats.complete_count, 1);
+    const queue = readCorrelationQueue(root);
+    assert.equal(queue.stats.complete_count, 1);
+    assert.equal(queue.jobs.length, 0);
   });
 
   it('stale RUNNING job with missing outputs returns to PENDING', () => {
@@ -325,7 +354,8 @@ describe('phase32h correlation queue', () => {
   it('restart does not duplicate queue entries', () => {
     finalizeBatch(root, 12);
     serviceCorrelationQueueBeforeBatch(root, { runId: RUN_ID, launchHead: LAUNCH_HEAD, manifestSha: MANIFEST_SHA });
-    assert.equal(readCorrelationQueue(root).jobs.length, 1);
+    assert.equal(readCorrelationQueue(root).jobs.length, 0);
+    assert.equal(readCorrelationQueue(root).stats.complete_count, 1);
   });
 
   it('restart does not duplicate packet indexes', () => {

@@ -359,6 +359,7 @@ PHASE32H_MATRIX_ROOT ?= /tmp/phase32h-targeted-reproduction
 
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
+	$(MAKE) ai-platform-verify-phase32h-runner-memory
 	$(MAKE) ai-platform-verify-phase32h-process-identity
 	$(MAKE) ai-platform-verify-phase32h-collector-registry
 	$(MAKE) ai-platform-verify-phase32h-manifest-contract
@@ -386,10 +387,12 @@ ai-platform-verify-phase32h-capture-smoke: ## Phase 32H-E2 six-probe capture int
 
 ai-platform-verify-phase32h-run-integrity: ## Phase 32H-R1 atomic run locks and append guards
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
+	$(MAKE) ai-platform-verify-phase32h-runner-memory
 	node --test tests/phase32h-run-integrity.test.mjs
 	node --test tests/phase32h-r1-manifest.test.mjs
 
 ai-platform-verify-phase32h-collector-supervision: ## Phase 32H-R1 mandatory collector supervision gates
+	$(MAKE) ai-platform-verify-phase32h-runner-memory
 	$(MAKE) ai-platform-verify-phase32h-collector-exclusivity
 	$(MAKE) ai-platform-verify-phase32h-process-identity
 	$(MAKE) ai-platform-verify-phase32h-pcap-ring-growth
@@ -433,7 +436,11 @@ ai-platform-verify-phase32h-r1: ## Phase 32H-R1 host-suspension A/B comparison v
 ai-platform-verify-phase32h-triplet-runner: ## Phase 32H-R1 synchronized triplet orchestrator tests
 	node --test tests/phase32h-triplet-runner.test.mjs
 
+ai-platform-verify-phase32h-runner-memory: ## Phase 32H bounded runner memory + parser contracts
+	node --test tests/phase32h-runner-memory.test.mjs
+
 ai-platform-verify-phase32h-correlation-queue: ## Phase 32H-R1 durable correlation queue drain tests
+	$(MAKE) ai-platform-verify-phase32h-runner-memory
 	node --test tests/phase32h-correlation-queue.test.mjs
 
 ai-platform-verify-phase32h-manifest-contract: ## Phase 32H manifest row contract validator
@@ -442,6 +449,7 @@ ai-platform-verify-phase32h-manifest-contract: ## Phase 32H manifest row contrac
 
 ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (source wiring)
 	$(MAKE) git-verify-no-cursor-trailers
+	$(MAKE) ai-platform-verify-phase32h-runner-memory
 	$(MAKE) ai-platform-verify-phase32h-process-identity
 	$(MAKE) ai-platform-verify-phase32h-collector-exclusivity
 	$(MAKE) ai-platform-verify-phase32h-collector-registry
@@ -459,6 +467,7 @@ ai-platform-verify-phase32h-freeze-integrity: ## Phase 32H freeze ordering + ESM
 
 ai-platform-verify-phase32h-baseline-preflight: ## Phase 32H-R1 baseline prelaunch hardening (ESM/disk/index)
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
+	$(MAKE) ai-platform-verify-phase32h-runner-memory
 	node --test tests/phase32h-baseline-preflight.test.mjs
 	node --test tests/phase32h-probe-packet-index.test.mjs
 	node --test tests/phase32h-ci-disk-launch-gates.test.mjs

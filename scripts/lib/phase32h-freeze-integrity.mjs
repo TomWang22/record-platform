@@ -28,8 +28,38 @@ const FREEZE_MARKER_NAMES = new Set([
   'FROZEN_PASS_EVIDENCE',
 ]);
 
-export function roleForCommand(command, outRoot) {
-  if (!command.includes(outRoot)) return null;
+const KNOWN_WRITER_ROLES = new Set([
+  'triplet_runner',
+  'matrix_monitor',
+  'collector_supervisor',
+  'extreme_watchdog',
+  'gateway_log_collector',
+  'application_log_collector',
+  'host_power_telemetry',
+  'pcap_collector',
+  'checkpoint_loop',
+]);
+
+export function isFreezeOrchestratorCommand(command) {
+  if (!command) return false;
+  if (/\bphase32h-freeze-[\w-]+\.mjs\b/.test(command)) return true;
+  if (/\bnode\b/.test(command) && /\bphase32h-freeze-/.test(command)) return true;
+  if (/--input-type=module/.test(command) && /\bfreeze\b/i.test(command)) return true;
+  return false;
+}
+
+export function roleForCommand(command, outRoot = null) {
+  if (!command) return null;
+  // Freeze/orchestrator CLIs are never writers solely because argv mentions the root.
+  if (isFreezeOrchestratorCommand(command)) return null;
+  if (command.includes('phase32h-runtime-status-readonly.mjs')) return null;
+  if (command.includes('phase32h-summarize-targeted-reproduction.mjs')) return null;
+  if (command.includes('phase32h-summarize-controlled-matrix.mjs')) return null;
+  if (command.includes('phase32h-r1-collector-exclusivity-smoke.mjs')) return null;
+  if (command.includes('phase32h-r1-correlation-drain-smoke.mjs')) return null;
+  if (command.includes('phase32h-freeze-baseline-')) return null;
+  // Scope known writers to this evidence root when provided (no argv-only 'other').
+  if (outRoot && !command.includes(outRoot)) return null;
   if (command.includes('phase32h-r1-triplet-runner.mjs')) return 'triplet_runner';
   if (command.includes('phase32h-monitor-targeted-reproduction.sh') || command.includes('phase32h-monitor.log')) {
     return 'matrix_monitor';
@@ -39,13 +69,20 @@ export function roleForCommand(command, outRoot) {
   if (command.includes('phase32h-start-gateway-log-capture.sh')) return 'gateway_log_collector';
   if (command.includes('phase32h-start-application-log-capture.sh')) return 'application_log_collector';
   if (command.includes('phase32h-capture-host-telemetry.sh')) return 'host_power_telemetry';
-  if (command.includes('dumpcap') && command.includes(outRoot)) return 'pcap_collector';
+  if (/\bdumpcap\b/.test(command)) return 'pcap_collector';
   if (command.includes('phase32h-runtime-hygiene-checkpoint.mjs')) return 'checkpoint_loop';
-  if (command.includes('phase32h-r1-collector-exclusivity-smoke.mjs')) return null;
-  if (command.includes('phase32h-r1-correlation-drain-smoke.mjs')) return null;
-  if (command.includes('phase32h-freeze-baseline-')) return null;
-  if (command.includes(outRoot)) return 'other';
+  // Do not classify as writer merely because argv contains outRoot.
   return null;
+}
+
+export function classifyProcessForFreeze(outRoot, proc) {
+  const role = roleForCommand(proc.command, outRoot);
+  return {
+    ...proc,
+    outRoot,
+    role,
+    is_known_writer: role != null && KNOWN_WRITER_ROLES.has(role),
+  };
 }
 
 export function listProcesses() {
@@ -62,7 +99,9 @@ export function listProcesses() {
 }
 
 export function listRootScopedProcesses(outRoot) {
-  return listProcesses().filter((proc) => roleForCommand(proc.command, outRoot));
+  return listProcesses()
+    .map((proc) => classifyProcessForFreeze(outRoot, proc))
+    .filter((proc) => proc.is_known_writer && (proc.command || '').includes(outRoot));
 }
 
 export function isFrozenRoot(outRoot) {
@@ -89,7 +128,7 @@ function signalProcess(proc, signal, ledger, seen) {
   const key = `${proc.pid}:${signal}`;
   if (seen.has(key)) return null;
   seen.add(key);
-  const role = roleForCommand(proc.command, proc.outRoot) || 'other';
+  const role = roleForCommand(proc.command) || 'other';
   const entry = {
     pid: proc.pid,
     role,
@@ -119,8 +158,8 @@ export function stopWritersForRoot(outRoot, { gracefulMs = DEFAULT_GRACEFUL_MS }
   const ownPid = process.pid;
   const procs = () =>
     listProcesses()
-      .filter((p) => p.pid !== ownPid && roleForCommand(p.command, outRoot))
-      .map((p) => ({ ...p, outRoot }));
+      .map((p) => classifyProcessForFreeze(outRoot, p))
+      .filter((p) => p.pid !== ownPid && p.is_known_writer);
 
   for (const proc of procs()) {
     signalProcess(proc, 'SIGTERM', ledger, seen);
@@ -145,14 +184,25 @@ export function stopWritersForRoot(outRoot, { gracefulMs = DEFAULT_GRACEFUL_MS }
   for (const entry of ledger.filter((e) => e.signal === 'SIGTERM' && e.exit_at == null)) {
     try {
       process.kill(entry.pid, 0);
-      const proc = procs().find((p) => p.pid === entry.pid);
-      if (proc) {
-        signalProcess(proc, 'SIGKILL', ledger, seen);
-        const killEntry = ledger[ledger.length - 1];
-        if (killEntry) {
-          killEntry.sigkill_required = true;
-          entry.sigkill_required = true;
-        }
+      const live = listProcesses().find((p) => p.pid === entry.pid);
+      // Zombies still pass kill(0) but lose argv classification — treat as exited.
+      if (!live || live.command === '<defunct>') {
+        entry.exit_at = new Date().toISOString();
+        entry.exit_code = 0;
+        entry.note = 'exited_or_defunct_after_sigterm';
+        continue;
+      }
+      // Escalate by PID even if the process no longer reclassifies as a known writer.
+      const proc = procs().find((p) => p.pid === entry.pid) || {
+        pid: entry.pid,
+        command: live.command || entry.command,
+        role: entry.role,
+      };
+      signalProcess(proc, 'SIGKILL', ledger, seen);
+      const killEntry = ledger[ledger.length - 1];
+      if (killEntry) {
+        killEntry.sigkill_required = true;
+        entry.sigkill_required = true;
       }
     } catch {
       entry.exit_at = new Date().toISOString();
@@ -174,11 +224,40 @@ export function stopWritersForRoot(outRoot, { gracefulMs = DEFAULT_GRACEFUL_MS }
 }
 
 export function verifyZeroWriters(outRoot) {
-  const remaining = listRootScopedProcesses(outRoot).filter((p) => p.pid !== process.pid);
+  const openFileCheck = verifyOpenFiles(outRoot);
+  const knownWriters = listRootScopedProcesses(outRoot).filter((p) => p.pid !== process.pid);
+
+  if (!openFileCheck.skipped) {
+    const writersRemaining = openFileCheck.open_files_remaining + knownWriters.length;
+    const remaining = [
+      ...openFileCheck.open_files.map((row) => ({
+        pid: row.pid,
+        command: row.command,
+        file: row.file,
+        source: 'lsof',
+      })),
+      ...knownWriters.map((proc) => ({
+        pid: proc.pid,
+        command: proc.command,
+        source: 'process_list',
+        role: proc.role,
+      })),
+    ];
+    return {
+      writers_remaining: writersRemaining,
+      remaining,
+      pass: writersRemaining === 0,
+      open_files: openFileCheck,
+      known_process_writers: knownWriters,
+    };
+  }
+
   return {
-    writers_remaining: remaining.length,
-    remaining,
-    pass: remaining.length === 0,
+    writers_remaining: knownWriters.length,
+    remaining: knownWriters,
+    pass: knownWriters.length === 0,
+    open_files: openFileCheck,
+    known_process_writers: knownWriters,
   };
 }
 

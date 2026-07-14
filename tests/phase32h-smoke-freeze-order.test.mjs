@@ -7,6 +7,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import {
   FREEZE_INTEGRITY_BLOCKED,
   executeFreezeIntegrity,
+  listProcesses,
   listRootScopedProcesses,
   stopWritersForRoot,
   verifyZeroWriters,
@@ -31,6 +32,16 @@ function mkRoot() {
 }
 
 function killRootProcs(root) {
+  for (const proc of listProcesses()) {
+    if (!proc.command || !proc.command.includes(root)) continue;
+    if (proc.pid === process.pid) continue;
+    try {
+      process.kill(proc.pid, 'SIGKILL');
+    } catch {
+      // ignore
+    }
+  }
+  // Also clear known-writer classification path for coverage.
   for (const proc of listRootScopedProcesses(root)) {
     try {
       process.kill(proc.pid, 'SIGKILL');
@@ -108,20 +119,25 @@ describe('phase32h smoke freeze order', () => {
       stdio: 'ignore',
     });
     child.unref();
-    assert.throws(
-      () =>
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 80);
+    let blocked = false;
+    for (let attempt = 0; attempt < 3 && !blocked; attempt += 1) {
+      try {
         executeFreezeIntegrity({
           outRoot: root,
-          quietPeriodMs: 200,
+          quietPeriodMs: 400,
           hashManifestName: 'freeze-sha256.txt',
           hashExcludeSuffixes: ['freeze-sha256.txt', 'FROZEN_PASS_EVIDENCE'],
           markerName: 'FROZEN_PASS_EVIDENCE',
           markerContent: 'pass\n',
           jsonlPaths: [path.join(root, 'shard-h1', 'phase32h-matrix.jsonl')],
           writersAlreadyStopped: true,
-        }),
-      (err) => err.code === FREEZE_INTEGRITY_BLOCKED,
-    );
+        });
+      } catch (err) {
+        blocked = err.code === FREEZE_INTEGRITY_BLOCKED;
+      }
+    }
+    assert.equal(blocked, true);
     killRootProcs(root);
   });
 
@@ -197,15 +213,19 @@ describe('phase32h smoke freeze order', () => {
   });
 
   it('SIGTERM is attempted before SIGKILL in stop ledger', () => {
+    // Perl reliably ignores SIGTERM; short argv keeps dumpcap + outRoot visible in `ps`.
     const child = spawn(
-      'bash',
-      ['-c', `trap "" TERM; while true; do sleep 1; done # ${root}`],
+      'perl',
+      ['-e', '$SIG{TERM}="IGNORE"; sleep 1 while 1', '--', 'dumpcap', '-w', `${root}/pcap/ring.pcap`],
       { detached: true, stdio: 'ignore' },
     );
     child.unref();
-    const ledger = stopWritersForRoot(root, { gracefulMs: 300 });
-    const kill = ledger.find((e) => e.signal === 'SIGKILL');
-    assert.ok(ledger.length > 0);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    const ledger = stopWritersForRoot(root, { gracefulMs: 400 });
+    const term = ledger.find((e) => e.signal === 'SIGTERM' && e.pid === child.pid);
+    const kill = ledger.find((e) => e.signal === 'SIGKILL' && e.pid === child.pid);
+    assert.ok(term, 'SIGTERM must be attempted first');
+    assert.ok(kill, 'ignoring SIGTERM should escalate to SIGKILL');
     try {
       process.kill(-child.pid, 'SIGKILL');
     } catch {

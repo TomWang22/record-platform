@@ -6,6 +6,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { gitSha } from './phase22-full-replay-common.mjs';
 import { R1_FORBIDDEN_BASELINE_ROOTS } from './phase32h-r1-config.mjs';
+import {
+  countJsonlRowsStreamingSync,
+  detectTruncatedJsonlStreaming,
+} from './phase32h-jsonl-stream.mjs';
 
 export const RUN_STATE_DIR = 'run-state';
 export const BLOCKED_MARKER = 'COLLECTOR_COVERAGE_BLOCKED';
@@ -60,6 +64,8 @@ export function runStatePaths(outRoot) {
     h3Lock: path.join(base, 'h3.lock'),
     supervisor: path.join(base, 'collector-supervisor.json'),
     probeIndex: path.join(base, 'completed-probes.json'),
+    completedProbeIds: path.join(base, 'completed-probe-ids.jsonl'),
+    completedCoordinates: path.join(base, 'completed-coordinates.jsonl'),
     staleRecoveryLedger: path.join(base, 'stale-lock-recovery.jsonl'),
     blockedMarker: path.join(outRoot, BLOCKED_MARKER),
   };
@@ -90,11 +96,104 @@ export function initRunState(outRoot, { runId, launchHead, evidenceLabel, manife
   if (!fs.existsSync(paths.probeIndex)) {
     fs.writeFileSync(
       paths.probeIndex,
-      `${JSON.stringify({ probe_ids: [], coordinates: [], evidence_label: evidenceLabel }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          evidence_label: evidenceLabel,
+          probe_count: 0,
+          coordinate_count: 0,
+          last_probe_id: null,
+          last_completed_at: null,
+        },
+        null,
+        2,
+      )}\n`,
       'utf8',
     );
   }
   return paths;
+}
+
+/** @type {Map<string, { probeIds: Set<number|string>, coordinates: Set<string>, loaded: boolean }>} */
+const probeIndexCache = new Map();
+
+function streamJsonlValues(filePath, onValue) {
+  if (!fs.existsSync(filePath)) return;
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    let carry = '';
+    const buf = Buffer.alloc(64 * 1024);
+    let bytes;
+    while ((bytes = fs.readSync(fd, buf, 0, buf.length, null)) > 0) {
+      carry += buf.toString('utf8', 0, bytes);
+      let idx;
+      while ((idx = carry.indexOf('\n')) >= 0) {
+        const line = carry.slice(0, idx);
+        carry = carry.slice(idx + 1);
+        if (!line.trim()) continue;
+        onValue(JSON.parse(line));
+      }
+    }
+    if (carry.trim()) onValue(JSON.parse(carry));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function migrateLegacyProbeIndex(outRoot, paths) {
+  const raw = JSON.parse(fs.readFileSync(paths.probeIndex, 'utf8'));
+  if (!Array.isArray(raw.probe_ids) && !Array.isArray(raw.coordinates)) return raw;
+  fs.mkdirSync(paths.base, { recursive: true });
+  for (const probeId of raw.probe_ids || []) {
+    fs.appendFileSync(paths.completedProbeIds, `${JSON.stringify({ probe_id: probeId })}\n`, 'utf8');
+  }
+  for (const coord of raw.coordinates || []) {
+    fs.appendFileSync(paths.completedCoordinates, `${JSON.stringify({ coordinate: coord })}\n`, 'utf8');
+  }
+  const metadata = {
+    evidence_label: raw.evidence_label ?? null,
+    probe_count: (raw.probe_ids || []).length,
+    coordinate_count: (raw.coordinates || []).length,
+    last_probe_id: raw.last_probe_id ?? null,
+    last_completed_at: raw.last_completed_at ?? null,
+  };
+  const tmp = `${paths.probeIndex}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
+  fs.renameSync(tmp, paths.probeIndex);
+  return metadata;
+}
+
+export function clearProbeIndexCache(outRoot = null) {
+  if (outRoot == null) {
+    probeIndexCache.clear();
+    return;
+  }
+  probeIndexCache.delete(outRoot);
+}
+
+export function ensureProbeIndexCache(outRoot) {
+  let cache = probeIndexCache.get(outRoot);
+  if (cache?.loaded) return cache;
+  const paths = runStatePaths(outRoot);
+  let metadata = fs.existsSync(paths.probeIndex)
+    ? JSON.parse(fs.readFileSync(paths.probeIndex, 'utf8'))
+    : { evidence_label: null, probe_count: 0, coordinate_count: 0 };
+  if (Array.isArray(metadata.probe_ids) || Array.isArray(metadata.coordinates)) {
+    metadata = migrateLegacyProbeIndex(outRoot, paths);
+  }
+  cache = {
+    probeIds: new Set(),
+    coordinates: new Set(),
+    loaded: true,
+    metadata,
+  };
+  streamJsonlValues(paths.completedProbeIds, (row) => {
+    if (row.probe_id != null) cache.probeIds.add(row.probe_id);
+  });
+  streamJsonlValues(paths.completedCoordinates, (row) => {
+    if (row.coordinate != null) cache.coordinates.add(row.coordinate);
+  });
+  probeIndexCache.set(outRoot, cache);
+  return cache;
 }
 
 function readLockOwner(lockPath) {
@@ -181,16 +280,32 @@ export function acquireShardLock(outRoot, protocolKey, owner) {
 export function loadProbeIndex(outRoot) {
   const paths = runStatePaths(outRoot);
   if (!fs.existsSync(paths.probeIndex)) {
-    return { probe_ids: [], coordinates: [] };
+    return { probe_ids: [], coordinates: [], probe_count: 0, coordinate_count: 0 };
   }
-  return JSON.parse(fs.readFileSync(paths.probeIndex, 'utf8'));
+  const cache = ensureProbeIndexCache(outRoot);
+  return {
+    ...cache.metadata,
+    probe_ids: [...cache.probeIds],
+    coordinates: [...cache.coordinates],
+    probe_count: cache.probeIds.size,
+    coordinate_count: cache.coordinates.size,
+  };
 }
 
 export function saveProbeIndex(outRoot, index) {
   const paths = runStatePaths(outRoot);
+  const metadata = {
+    evidence_label: index.evidence_label ?? null,
+    probe_count: index.probe_count ?? (index.probe_ids?.length || 0),
+    coordinate_count: index.coordinate_count ?? (index.coordinates?.length || 0),
+    last_probe_id: index.last_probe_id ?? null,
+    last_completed_at: index.last_completed_at ?? null,
+  };
   const tmp = `${paths.probeIndex}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(index, null, 2)}\n`, 'utf8');
+  fs.writeFileSync(tmp, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
   fs.renameSync(tmp, paths.probeIndex);
+  const cache = probeIndexCache.get(outRoot);
+  if (cache) cache.metadata = metadata;
 }
 
 export function readLaunchHead(outRoot) {
@@ -235,23 +350,11 @@ export function assertManifestUnchanged(outRoot, manifestPath) {
 }
 
 export function detectTruncatedJsonl(jsonlPath) {
-  if (!fs.existsSync(jsonlPath)) return false;
-  const content = fs.readFileSync(jsonlPath, 'utf8');
-  if (!content) return false;
-  const lines = content.split('\n');
-  const last = lines[lines.length - 1] === '' ? lines[lines.length - 2] : lines[lines.length - 1];
-  if (!last) return false;
-  try {
-    JSON.parse(last);
-    return false;
-  } catch {
-    return true;
-  }
+  return detectTruncatedJsonlStreaming(jsonlPath);
 }
 
 export function countJsonlRows(jsonlPath) {
-  if (!fs.existsSync(jsonlPath)) return 0;
-  return fs.readFileSync(jsonlPath, 'utf8').split('\n').filter(Boolean).length;
+  return countJsonlRowsStreamingSync(jsonlPath);
 }
 
 export function isCoverageBlocked(outRoot) {
@@ -316,9 +419,9 @@ export function assertAppendAllowed(outRoot, probe, row, ctx = {}) {
     throw error;
   }
 
-  const index = loadProbeIndex(outRoot);
-  const probeIds = new Set(index.probe_ids);
-  const coordinates = new Set(index.coordinates);
+  const cache = ensureProbeIndexCache(outRoot);
+  const probeIds = cache.probeIds;
+  const coordinates = cache.coordinates;
   const coord = matrixCoordinateKey(probe);
 
   if (probeIds.has(probe.probe_id)) {
@@ -335,13 +438,25 @@ export function assertAppendAllowed(outRoot, probe, row, ctx = {}) {
 }
 
 export function recordCompletedProbe(outRoot, probe, row) {
-  const index = loadProbeIndex(outRoot);
+  const paths = runStatePaths(outRoot);
+  const cache = ensureProbeIndexCache(outRoot);
   const coord = matrixCoordinateKey(probe);
-  if (!index.probe_ids.includes(probe.probe_id)) index.probe_ids.push(probe.probe_id);
-  if (!index.coordinates.includes(coord)) index.coordinates.push(coord);
-  index.last_probe_id = probe.probe_id;
-  index.last_completed_at = row.timing?.probe_finished_at || new Date().toISOString();
-  saveProbeIndex(outRoot, index);
+  fs.mkdirSync(paths.base, { recursive: true });
+  if (!cache.probeIds.has(probe.probe_id)) {
+    cache.probeIds.add(probe.probe_id);
+    fs.appendFileSync(paths.completedProbeIds, `${JSON.stringify({ probe_id: probe.probe_id })}\n`, 'utf8');
+  }
+  if (!cache.coordinates.has(coord)) {
+    cache.coordinates.add(coord);
+    fs.appendFileSync(paths.completedCoordinates, `${JSON.stringify({ coordinate: coord })}\n`, 'utf8');
+  }
+  saveProbeIndex(outRoot, {
+    ...cache.metadata,
+    probe_count: cache.probeIds.size,
+    coordinate_count: cache.coordinates.size,
+    last_probe_id: probe.probe_id,
+    last_completed_at: row.timing?.probe_finished_at || new Date().toISOString(),
+  });
 }
 
 export function shardLockIsActive(outRoot, protocolKey) {

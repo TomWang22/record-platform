@@ -3,8 +3,9 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Worker } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
+import { login } from './phase22-full-replay-common.mjs';
+import { executeProbe } from '../phase31-controlled-observability-matrix-runner.mjs';
 import {
   batchTimingStatus,
   buildBatchRecord,
@@ -25,9 +26,64 @@ import {
   readCorrelationQueueSnapshot,
   serviceCorrelationQueueBeforeBatch,
 } from './phase32h-correlation-queue.mjs';
+import { BoundedWorkerPool } from './phase32h-worker-pool.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKER_PATH = path.join(__dirname, 'phase32h-triplet-probe-worker.mjs');
+
+/** @type {BoundedWorkerPool | null} */
+let tripletWorkerPool = null;
+
+export function setTripletWorkerPool(pool) {
+  tripletWorkerPool = pool;
+}
+
+export function getTripletWorkerPool() {
+  return tripletWorkerPool;
+}
+
+export async function closeTripletWorkerPool() {
+  if (!tripletWorkerPool) return;
+  await tripletWorkerPool.close();
+  tripletWorkerPool = null;
+}
+
+function ensureTripletWorkerPool() {
+  if (!tripletWorkerPool) {
+    tripletWorkerPool = new BoundedWorkerPool({ workerScript: WORKER_PATH, size: 3 });
+  }
+  return tripletWorkerPool;
+}
+
+function waitUntilRelease(releaseAtMs) {
+  while (Date.now() < releaseAtMs) {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1);
+  }
+}
+
+async function runProbeSync(probe, cfg, releaseAtMs, probeContext) {
+  waitUntilRelease(releaseAtMs);
+  const started_at = new Date().toISOString();
+  const token = login(probe.user_email, cfg);
+  const getToken = () => token;
+  const { row, probeFail, failureClass } = executeProbe(probe, cfg, getToken, probeContext || {});
+  return {
+    ok: true,
+    protocol: probe.matrix_protocol,
+    started_at,
+    row,
+    probeFail,
+    failureClass,
+  };
+}
+
+function runProbeWorker(probe, cfg, releaseAtMs, probeContext) {
+  if (process.env.PHASE32H_SYNC_TRIPLET_PROBES === '1') {
+    return runProbeSync(probe, cfg, releaseAtMs, probeContext);
+  }
+  const pool = ensureTripletWorkerPool();
+  return pool.runJob({ probe, cfg, releaseAtMs, probeContext });
+}
 
 export { CORRELATION_BACKLOG_LIMIT, correlationBacklogBlocksLaunch };
 
@@ -40,22 +96,6 @@ export function writeTripletOrchestratorMarker(outRoot, payload) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
   return file;
-}
-
-function runProbeWorker(probe, cfg, releaseAtMs, probeContext) {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(WORKER_PATH, {
-      workerData: { probe, cfg, releaseAtMs, probeContext },
-    });
-    worker.on('message', (msg) => {
-      if (msg.ok) resolve(msg);
-      else reject(new Error(msg.error || 'probe worker failed'));
-    });
-    worker.on('error', reject);
-    worker.on('exit', (code) => {
-      if (code !== 0) reject(new Error(`probe worker exited ${code}`));
-    });
-  });
 }
 
 /**

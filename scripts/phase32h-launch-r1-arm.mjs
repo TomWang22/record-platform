@@ -26,12 +26,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
 
 function parseArgs(argv) {
-  const opts = { arm: 'baseline', out: null, skipPreflight: false, canary: false };
+  const opts = { arm: 'baseline', out: null, skipPreflight: false, canary: false, limit: null };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--arm') opts.arm = argv[++i];
     if (argv[i] === '--out') opts.out = argv[++i];
     if (argv[i] === '--skip-preflight') opts.skipPreflight = true;
     if (argv[i] === '--canary') opts.canary = true;
+    if (argv[i] === '--limit') opts.limit = Number(argv[++i]);
   }
   opts.out = opts.out || rootForArm(opts.arm, { canary: opts.canary });
   return opts;
@@ -74,6 +75,9 @@ function launchTripletRunner(opts, env) {
     opts.arm,
   ];
   if (opts.canary) args.push('--canary');
+  if (opts.limit != null && Number.isFinite(opts.limit)) {
+    args.push('--limit', String(opts.limit));
+  }
   const child = spawn(process.execPath, args, {
     cwd: REPO_ROOT,
     env,
@@ -103,6 +107,10 @@ function main() {
   const preflight = runBaselineLaunchPreflight(opts, {
     repoRoot: REPO_ROOT,
     skipPreflight: opts.skipPreflight,
+    skipSourceDirtyCheck: opts.skipPreflight || process.env.PHASE32H_ALLOW_DIRTY_LAUNCHER === '1',
+    skipDiskPreflight:
+      process.env.PHASE32H_SKIP_DISK_PREFLIGHT === '1' ||
+      (opts.limit != null && Number(opts.limit) > 0 && Number(opts.limit) <= 1000),
   });
 
   const runId = generateRunId();
@@ -120,6 +128,12 @@ function main() {
     ...process.env,
     PHASE32H_MATRIX_ROOT: opts.out,
     T20_EVAL_RAG_PAUSE_SEC: '0.15',
+    // Prefer primary-repo CA when scratch clones omit gitignored cert material.
+    CA_CERT:
+      process.env.CA_CERT ||
+      (fs.existsSync(path.join(REPO_ROOT, 'certs/dev-chain.pem'))
+        ? path.join(REPO_ROOT, 'certs/dev-chain.pem')
+        : '/Users/tom/record-platform/certs/dev-chain.pem'),
   };
 
   spawnSync('bash', [path.join(REPO_ROOT, 'scripts/phase32h-start-pcap-capture.sh'), opts.out], {

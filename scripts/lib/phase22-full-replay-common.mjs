@@ -350,26 +350,34 @@ export function curlRequest({
 }
 
 export function login(email, cfg) {
-  const resp = curlRequest({
-    method: 'POST',
-    urlPath: '/api/auth/login',
-    body: { email, password: cfg.password },
-    baseUrl: cfg.baseUrl,
-    caCert: cfg.caCert,
-    curlResolve: cfg.curlResolve,
-    protocolFlag: cfg.mgmtProto?.flag || '--http1.1',
-    expectedVersion: cfg.mgmtProto?.expected || '1.1',
-  });
-  const token =
-    resp.body.token ||
-    resp.body.accessToken ||
-    resp.body.access_token ||
-    resp.body.jwt ||
-    resp.body.session?.accessToken;
-  if (resp.http_status !== 200 || !token) {
-    throw new Error(`login failed for ${email}: status=${resp.http_status}`);
+  const maxAttempts = Number(process.env.PHASE32H_LOGIN_RETRIES || 4);
+  const retryStatuses = new Set([502, 503, 504, 0]);
+  let lastStatus = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const resp = curlRequest({
+      method: 'POST',
+      urlPath: '/api/auth/login',
+      body: { email, password: cfg.password },
+      baseUrl: cfg.baseUrl,
+      caCert: cfg.caCert,
+      curlResolve: cfg.curlResolve,
+      protocolFlag: cfg.mgmtProto?.flag || '--http1.1',
+      expectedVersion: cfg.mgmtProto?.expected || '1.1',
+    });
+    lastStatus = resp.http_status;
+    const token =
+      resp.body.token ||
+      resp.body.accessToken ||
+      resp.body.access_token ||
+      resp.body.jwt ||
+      resp.body.session?.accessToken;
+    if (resp.http_status === 200 && token) return token;
+    if (!retryStatuses.has(Number(resp.http_status)) || attempt === maxAttempts) {
+      throw new Error(`login failed for ${email}: status=${resp.http_status}`);
+    }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250 * attempt);
   }
-  return token;
+  throw new Error(`login failed for ${email}: status=${lastStatus}`);
 }
 
 export function jwtSub(token) {

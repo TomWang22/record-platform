@@ -10,6 +10,7 @@ import {
   FREEZE_INTEGRITY_BLOCKED,
   assertWritableEvidenceRoot,
   buildHistoricalFreezeMismatchReport,
+  classifyProcessForFreeze,
   diffSnapshots,
   executeFreezeIntegrity,
   isFrozenRoot,
@@ -54,7 +55,31 @@ describe('phase32h freeze integrity', () => {
 
   it('classifies matrix monitor bash loop as matrix_monitor', () => {
     const cmd = `bash -c 'exec >>"${root}/phase32h-monitor.log" 2>&1; while true; do scripts/phase32h-monitor-targeted-reproduction.sh; sleep 5; done'`;
-    assert.equal(roleForCommand(cmd, root), 'matrix_monitor');
+    assert.equal(roleForCommand(cmd), 'matrix_monitor');
+  });
+
+  it('freeze CLI argv containing root is not a writer', () => {
+    const cmd = `node scripts/phase32h-freeze-baseline-r7-blocked.mjs --out ${root}`;
+    assert.equal(roleForCommand(cmd), null);
+    assert.equal(classifyProcessForFreeze(root, { pid: 1, command: cmd }).is_known_writer, false);
+  });
+
+  it('shell echo with root path is not a writer', () => {
+    const cmd = `bash -c 'echo hello ${root}/shard-h1/phase32h-matrix.jsonl'`;
+    assert.equal(roleForCommand(cmd), null);
+    assert.equal(listRootScopedProcesses(root).length, 0);
+  });
+
+  it('node status CLI with root is not a writer', () => {
+    const cmd = `node scripts/phase32h-runtime-status-readonly.mjs --out ${root}`;
+    assert.equal(roleForCommand(cmd), null);
+    assert.equal(classifyProcessForFreeze(root, { pid: 2, command: cmd }).is_known_writer, false);
+  });
+
+  it('dumpcap command is classified as pcap_collector writer', () => {
+    const cmd = `dumpcap -i en0 -w ${root}/pcap/segment-001.pcapng`;
+    assert.equal(roleForCommand(cmd), 'pcap_collector');
+    assert.equal(classifyProcessForFreeze(root, { pid: 3, command: cmd }).is_known_writer, true);
   });
 
   it('monitor still writing blocks freeze via quiet period', async () => {
@@ -92,17 +117,23 @@ describe('phase32h freeze integrity', () => {
     }
   });
 
-  it('checkpoint loop mutation during quiet period blocks freeze', () => {
+  it('checkpoint loop mutation during quiet period blocks freeze', async () => {
     const checkpoint = path.join(root, 'run-state', 'checkpoint.json');
     fs.mkdirSync(path.dirname(checkpoint), { recursive: true });
     fs.writeFileSync(checkpoint, '{}\n', 'utf8');
-    const child = spawn('bash', ['-c', `while true; do date >> "${checkpoint}"; sleep 0.05; done`], {
+    const child = spawn('bash', ['-c', `while true; do date >> "${checkpoint}"; sleep 0.01; done`], {
       detached: true,
       stdio: 'ignore',
     });
     child.unref();
     try {
-      const quiet = waitQuietPeriod(root, { quietPeriodMs: 250 });
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      let quiet = waitQuietPeriod(root, { quietPeriodMs: 400 });
+      if (quiet.pass) {
+        // Retry once under load — writer must still be mutating.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        quiet = waitQuietPeriod(root, { quietPeriodMs: 400 });
+      }
       assert.equal(quiet.pass, false);
       assert.ok(quiet.files_changed_during_quiet_period.length > 0);
     } finally {
@@ -120,7 +151,7 @@ describe('phase32h freeze integrity', () => {
 
   it('launcher processes are not treated as stoppable writers', () => {
     const cmd = `node scripts/phase32h-r1-collector-exclusivity-smoke.mjs --out ${root}`;
-    assert.equal(roleForCommand(cmd, root), null);
+    assert.equal(roleForCommand(cmd), null);
   });
 
   it('waitForOpenFilesQuiescence passes when no handles remain', () => {

@@ -293,13 +293,26 @@ export function analyzePcapPacketSpace(pcapPath, opts = {}) {
   ];
   const args = ['-r', pcapPath, '-T', 'fields', '-E', 'separator=|'];
   for (const field of fields) args.push('-e', field);
-  const r = spawnSync(tshark, args, { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 });
+  const maxBuffer = Number(process.env.PHASE32H_TSHARK_MAX_BUFFER_BYTES || 8 * 1024 * 1024);
+  const r = spawnSync(tshark, args, { encoding: 'utf8', maxBuffer });
   if (r.status !== 0) {
     return { status: 'FAIL', error: r.stderr || 'tshark failed', packets: [] };
   }
+  if ((r.stdout || '').length >= maxBuffer) {
+    return {
+      status: 'FAIL',
+      error: `tshark stdout exceeded cap of ${maxBuffer} bytes`,
+      packets: [],
+    };
+  }
   const packets = [];
   const versions = new Set();
-  for (const line of (r.stdout || '').split('\n')) {
+  const stdout = r.stdout || '';
+  let start = 0;
+  while (start <= stdout.length) {
+    let idx = stdout.indexOf('\n', start);
+    const line = idx === -1 ? stdout.slice(start) : stdout.slice(start, idx);
+    start = idx === -1 ? stdout.length + 1 : idx + 1;
     if (!line.trim()) continue;
     const parts = line.split('|');
     const [

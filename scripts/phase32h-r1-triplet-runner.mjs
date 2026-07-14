@@ -34,8 +34,15 @@ import { groupManifestIntoTriplets } from './lib/phase32h-triplet-manifest.mjs';
 import {
   executeTripletBatch,
   writeTripletOrchestratorMarker,
+  closeTripletWorkerPool,
+  getTripletWorkerPool,
 } from './lib/phase32h-triplet-orchestrator.mjs';
-import { serviceCorrelationQueueBeforeBatch } from './lib/phase32h-correlation-queue.mjs';
+import { serviceCorrelationQueueBeforeBatch, readCorrelationQueueSnapshot } from './lib/phase32h-correlation-queue.mjs';
+import {
+  appendMemoryTelemetry,
+  sampleMemoryTelemetry,
+  shouldSampleMemoryTelemetry,
+} from './lib/phase32h-memory-telemetry.mjs';
 import {
   evidenceLabelForArm,
   R1_CANARY_PER_PROTOCOL,
@@ -73,6 +80,7 @@ export async function runTripletMatrix(opts) {
   if (!opts.out.startsWith('/tmp/')) throw new Error('triplet runner out must be under /tmp');
   const outRoot = opts.out;
   const manifestPath = path.join(outRoot, 'phase32h-r1-manifest.jsonl');
+  // Manifest is fixed-size for a run; load once then group (matrix JSONL shards use append-only growth).
   const manifest = loadJsonl(manifestPath);
   const evidenceLabel = opts.evidenceLabel || evidenceLabelForArm(opts.arm, { canary: opts.canary });
   const expectedTotal = opts.expectedTotal ?? (opts.canary ? R1_CANARY_TOTAL : R1_TOTAL);
@@ -135,6 +143,37 @@ export async function runTripletMatrix(opts) {
   });
 
   let completedBatches = completedBatchIds.size;
+  let lastMemorySampleAtMs = 0;
+  const emitMemorySample = (force = false) => {
+    if (
+      !shouldSampleMemoryTelemetry(completedBatches, {
+        lastSampleAtMs: lastMemorySampleAtMs,
+        force,
+      })
+    ) {
+      return;
+    }
+    const pool = getTripletWorkerPool();
+    const queueSnap = readCorrelationQueueSnapshot(outRoot);
+    appendMemoryTelemetry(
+      outRoot,
+      sampleMemoryTelemetry({
+        completed_batch: completedBatches,
+        batch_complete: completedBatches,
+        probe_total: completedBatches * 3,
+        worker_count: pool?.workerCount ?? 0,
+        worker_queue_depth: pool?.queueDepth ?? 0,
+        correlation_pending: queueSnap.pending_count ?? 0,
+        correlation_running: queueSnap.running_count ?? 0,
+        correlation_complete_total: queueSnap.complete_count ?? 0,
+      }),
+    );
+    lastMemorySampleAtMs = Date.now();
+    if (completedBatches % 10 === 0 || force) {
+      process.stderr.write(`phase32h-r1 triplet progress: ${completedBatches}/${batches.length}\n`);
+    }
+  };
+
   for (const batch of batches) {
     if (isCoverageBlocked(outRoot)) {
       throw new Error('collector coverage blocked; stopping triplet matrix');
@@ -174,12 +213,11 @@ export async function runTripletMatrix(opts) {
     });
 
     completedBatches += 1;
-    if (completedBatches % 10 === 0) {
-      process.stderr.write(`phase32h-r1 triplet progress: ${completedBatches}/${batches.length}\n`);
-    }
+    emitMemorySample(false);
 
     if (results.batchRecord.batch_timing_status === 'REJECTED') break;
   }
+  emitMemorySample(true);
 
   writeTripletOrchestratorMarker(outRoot, {
     status: 'COMPLETE',
@@ -189,13 +227,15 @@ export async function runTripletMatrix(opts) {
     finished_at: new Date().toISOString(),
   });
 
-  if (completedBatches === batches.length) {
+  if (completedBatches === batches.length && batches.length > 0) {
     assertPacketIndexCoverage(outRoot, {
-      expectedProbeIndexes: manifest.length,
+      expectedProbeIndexes: batches.length * 3,
       expectedBatchCorrelations: batches.length,
       requirePerProbeIndexes: true,
     });
   }
+
+  await closeTripletWorkerPool();
 
   return { completedBatches, totalBatches: batches.length };
 }

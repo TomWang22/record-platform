@@ -34,9 +34,9 @@ while true; do
     fi
   done
 
-  json="$(node "$REPO/scripts/phase30-summarize-controlled-matrix.mjs" --in "$OUT" --json 2>/dev/null || echo '{}')"
+  json="$(node "$REPO/scripts/phase30-summarize-controlled-matrix.mjs" --in "$OUT" --json >"$OUT/current-summary.json" 2>/dev/null && cat "$OUT/current-summary.json" || echo '{}')"
   read -r total status wrong_gate leakage response <<EOF
-$(node -e 'const j=JSON.parse(process.argv[1]||"{}"); console.log([j.total||0,j.status||"IN_PROGRESS",j.wrong_gate||0,j.leakage_failures||0,j.response_pass_rate||0].join(" "));' "$json")
+$(node "$REPO/scripts/phase32h-parse-summary-json.mjs" --file "$OUT/current-summary.json" --fields total,status,wrong_gate,leakage_failures,response_pass_rate 2>/dev/null | node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8")); console.log([j.total||0,j.status||"IN_PROGRESS",j.wrong_gate||0,j.leakage_failures||0,j.response_pass_rate||0].join(" "));' || echo "0 IN_PROGRESS 0 0 0")
 EOF
 
   echo "monitor tick: total=$total status=$status wrong_gate=$wrong_gate leakage=$leakage response=$response"

@@ -17,6 +17,11 @@ import {
 import { assertRedactedProbePacketIndex } from './phase32h-packet-index-coverage.mjs';
 
 const pcapSpaceCache = new Map();
+const PCAP_SPACE_CACHE_LIMIT = 1;
+
+export function clearPcapSpaceCache() {
+  pcapSpaceCache.clear();
+}
 
 export function latestPcapFile(outRoot) {
   const pcapDir = path.join(outRoot, 'pcap');
@@ -34,12 +39,18 @@ function loadPcapSpace(outRoot, pcapPath, { zeroRttAttempted = false, clientUnsu
   const mtimeMs = fs.statSync(pcapPath).mtimeMs;
   const cacheKey = `${pcapPath}:${mtimeMs}:${zeroRttAttempted}:${clientUnsupported}`;
   if (pcapSpaceCache.has(cacheKey)) return pcapSpaceCache.get(cacheKey);
+  // Evict all prior analyses — ring segments rewrite/mtime and must not accumulate.
+  pcapSpaceCache.clear();
   const space = analyzePcapPacketSpace(pcapPath, {
     zeroRttAttempted,
     clientUnsupported,
     connectionMode: 'triplet',
   });
   pcapSpaceCache.set(cacheKey, space);
+  while (pcapSpaceCache.size > PCAP_SPACE_CACHE_LIMIT) {
+    const oldest = pcapSpaceCache.keys().next().value;
+    pcapSpaceCache.delete(oldest);
+  }
   return space;
 }
 
@@ -181,5 +192,8 @@ export function writeTripletProbePacketIndexes({
     writeProbePacketIndex(outRoot, probe.probe_id, record);
     written.push({ probe_id: probe.probe_id, protocol: protoKey, batch_id: batch.batch_id });
   }
+  // Release packet bodies after indexes are on disk; keep cache slot count bounded.
+  if (space?.packets) space.packets.length = 0;
+  clearPcapSpaceCache();
   return written;
 }

@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/scenario-row.schema.json",
+  "title": "CapabilityScenarioRow",
+  "description": "Phase 33A scenario-row contract. Preview inventory only; gauntlet not launched.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "capability_id",
+    "participant_side",
+    "experience_level",
+    "turns",
+    "authorized_context",
+    "prohibited_context",
+    "expected_schema",
+    "expected_evidence",
+    "expected_abstention",
+    "expected_gate",
+    "expected_safety_outcome",
+    "retrieval_labels",
+    "recall_requirements",
+    "protocol",
+    "seed",
+    "acceptance_criteria",
+    "scenario_class"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capability_id": {
+      "type": "string",
+      "enum": [
+        "scarcity",
+        "valuation",
+        "auction_intelligence",
+        "embeddings",
+        "semantic_search",
+        "negotiation_assistance",
+        "recommendations",
+        "market_analytics"
+      ]
+    },
+    "participant_side": {
+      "type": "string",
+      "enum": [
+        "buyer",
+        "seller",
+        "neutral"
+      ]
+    },
+    "experience_level": {
+      "type": "string",
+      "enum": [
+        "novice",
+        "experienced"
+      ]
+    },
+    "turns": {
+      "type": "string",
+      "enum": [
+        "single_turn",
+        "multi_turn"
+      ]
+    },
+    "authorized_context": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "prohibited_context": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expected_schema": {
+      "type": "string"
+    },
+    "expected_evidence": {
+      "type": "string"
+    },
+    "expected_abstention": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "expected_gate": {
+      "type": "string"
+    },
+    "expected_safety_outcome": {
+      "type": "string"
+    },
+    "retrieval_labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "recall_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "protocol": {
+      "type": "string",
+      "enum": [
+        "http1",
+        "http2",
+        "http3"
+      ]
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "scenario_class": {
+      "type": "string"
+    }
+  }
+}

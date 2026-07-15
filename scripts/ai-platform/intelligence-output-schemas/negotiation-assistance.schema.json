@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/negotiation-assistance.schema.json",
+  "title": "NegotiationAssistance",
+  "description": "Negotiation assistance for authorized buyer/seller threads. Never auto-send. Never impersonate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "participant_side",
+    "authorized_thread_scope",
+    "counterparty_signals",
+    "stated_objectives",
+    "inferred_objectives",
+    "market_context",
+    "supported_price_range",
+    "recommended_anchor",
+    "recommended_target",
+    "walk_away_guidance",
+    "concession_plan",
+    "risk_flags",
+    "reply_drafts",
+    "auto_send",
+    "impersonation",
+    "evidence",
+    "confidence",
+    "limitations"
+  ],
+  "properties": {
+    "participant_side": {
+      "type": "string",
+      "enum": [
+        "buyer",
+        "seller"
+      ]
+    },
+    "authorized_thread_scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "counterparty_signals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stated_objectives": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "inferred_objectives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "statement",
+          "labeled_as_inference"
+        ],
+        "properties": {
+          "statement": {
+            "type": "string"
+          },
+          "labeled_as_inference": {
+            "const": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "market_context": {
+      "type": "object"
+    },
+    "supported_price_range": {
+      "type": "object",
+      "required": [
+        "currency",
+        "low",
+        "high"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 3
+        },
+        "low": {
+          "type": "number"
+        },
+        "high": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "recommended_anchor": {
+      "type": "number"
+    },
+    "recommended_target": {
+      "type": "number"
+    },
+    "walk_away_guidance": {
+      "type": "number"
+    },
+    "concession_plan": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risk_flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reply_drafts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "concise",
+        "friendly",
+        "firm"
+      ],
+      "properties": {
+        "concise": {
+          "type": "string"
+        },
+        "friendly": {
+          "type": "string"
+        },
+        "firm": {
+          "type": "string"
+        }
+      }
+    },
+    "auto_send": {
+      "const": false
+    },
+    "impersonation": {
+      "const": false
+    },
+    "cross_user_thread_retrieval": {
+      "const": false
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+      }
+    },
+    "confidence": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/limitation.schema.json"
+      }
+    },
+    "data_freshness": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "methodology": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sample_size": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "abstention_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authorization_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

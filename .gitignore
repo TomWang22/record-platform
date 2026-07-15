@@ -32,6 +32,11 @@ tmp/
 !docs/bundles/INTEGRITY_*.json
 !scripts/protocol/fixtures/**/*.json
 !scripts/coverage/*.json
+!scripts/ai-platform/intelligence-capability-matrix.json
+!scripts/ai-platform/intelligence-output-schemas/
+!scripts/ai-platform/intelligence-output-schemas/**/*.schema.json
+!scripts/ai-platform/fixtures/
+!scripts/ai-platform/fixtures/**/*.json
 *.ndjson
 *.csv
 

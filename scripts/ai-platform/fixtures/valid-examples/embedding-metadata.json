@@ -1,0 +1,32 @@
+{
+  "embedding_model_version": "embed-v0-contract",
+  "chunking_strategy_version": "chunk-v0",
+  "content_hash": "deadbeefcafebabe",
+  "dimension": 8,
+  "normalization": "l2",
+  "owner_scope": "public_catalog",
+  "source_lineage": {
+    "content_hash": "deadbeefcafebabe",
+    "source_system": "catalog",
+    "transform_version": "v0",
+    "owner_scope": "public_catalog"
+  },
+  "deletion_propagation": "required",
+  "reembedding_policy": "on_source_change",
+  "evidence": [
+    {
+      "evidence_id": "ev-1",
+      "source_type": "sale",
+      "source_id": "sale-public-001",
+      "retrieved_at": "2026-07-15T12:00:00Z",
+      "summary": "Public sold comparable within 90 days"
+    }
+  ],
+  "confidence": 1.0,
+  "limitations": [],
+  "data_freshness": "2026-07-15T12:00:00Z",
+  "methodology": "deterministic_hash_lineage",
+  "sample_size": 1,
+  "abstention_reason": null,
+  "authorization_scope": "public_catalog"
+}

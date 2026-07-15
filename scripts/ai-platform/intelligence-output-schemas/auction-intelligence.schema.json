@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/auction-intelligence.schema.json",
+  "title": "AuctionIntelligence",
+  "description": "Single-auction or watchlist-batch market-temperature analysis. No bidder-identity/collusion claims without direct evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "analysis_mode",
+    "temperature_score",
+    "temperature_label",
+    "auction_count",
+    "bidder_density",
+    "bid_velocity",
+    "late_bid_pressure",
+    "price_acceleration",
+    "closing_time_concentration",
+    "similar_lot_clusters",
+    "price_dispersion",
+    "estimated_competition",
+    "buyer_pressure",
+    "seller_opportunity",
+    "risk_flags",
+    "notable_auctions",
+    "evidence",
+    "confidence",
+    "limitations"
+  ],
+  "properties": {
+    "analysis_mode": {
+      "type": "string",
+      "enum": [
+        "single_auction",
+        "watchlist_batch"
+      ]
+    },
+    "temperature_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "temperature_label": {
+      "type": "string",
+      "enum": [
+        "cold",
+        "neutral",
+        "warm",
+        "hot",
+        "overheated"
+      ]
+    },
+    "auction_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bidder_density": {
+      "type": "number"
+    },
+    "bid_velocity": {
+      "type": "number"
+    },
+    "late_bid_pressure": {
+      "type": "number"
+    },
+    "price_acceleration": {
+      "type": "number"
+    },
+    "closing_time_concentration": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "similar_lot_clusters": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "price_dispersion": {
+      "type": "number"
+    },
+    "estimated_competition": {
+      "type": "number"
+    },
+    "buyer_pressure": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "seller_opportunity": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risk_flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notable_auctions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+      }
+    },
+    "confidence": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/limitation.schema.json"
+      }
+    },
+    "data_freshness": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "methodology": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sample_size": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "abstention_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authorization_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

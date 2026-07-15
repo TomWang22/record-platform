@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json",
+  "title": "EvidenceItem",
+  "description": "Grounding evidence reference for intelligence outputs. No private payloads.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidence_id",
+    "source_type",
+    "source_id",
+    "retrieved_at",
+    "summary"
+  ],
+  "properties": {
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "listing",
+        "sale",
+        "auction",
+        "release",
+        "pressing",
+        "market_report",
+        "authorized_thread_summary",
+        "public_metadata",
+        "derived_aggregate"
+      ]
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retrieved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "uri": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "lineage": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/source-lineage.schema.json"
+    }
+  }
+}

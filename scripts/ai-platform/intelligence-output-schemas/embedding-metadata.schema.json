@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/embedding-metadata.schema.json",
+  "title": "EmbeddingMetadata",
+  "description": "Versioned embedding metadata. Embedding generation is not foundation-model training.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "embedding_model_version",
+    "chunking_strategy_version",
+    "content_hash",
+    "dimension",
+    "normalization",
+    "owner_scope",
+    "source_lineage",
+    "deletion_propagation",
+    "evidence",
+    "confidence",
+    "limitations"
+  ],
+  "properties": {
+    "embedding_model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "chunking_strategy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_hash": {
+      "type": "string",
+      "minLength": 8
+    },
+    "dimension": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "normalization": {
+      "type": "string",
+      "enum": [
+        "none",
+        "l2",
+        "unit"
+      ]
+    },
+    "owner_scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_lineage": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/source-lineage.schema.json"
+    },
+    "deletion_propagation": {
+      "type": "string",
+      "enum": [
+        "required",
+        "pending",
+        "verified"
+      ]
+    },
+    "reembedding_policy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+      }
+    },
+    "confidence": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/limitation.schema.json"
+      }
+    },
+    "data_freshness": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "methodology": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sample_size": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "abstention_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authorization_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "participant_side": "buyer",
+  "authorized_thread_scope": "thread-authorized-demo",
+  "counterparty_signals": [
+    "price_sensitivity"
+  ],
+  "stated_objectives": [
+    "buy_under_30"
+  ],
+  "inferred_objectives": [
+    {
+      "statement": "May accept near 28",
+      "labeled_as_inference": true
+    }
+  ],
+  "market_context": {
+    "fair_value_hint": 28
+  },
+  "supported_price_range": {
+    "currency": "USD",
+    "low": 20,
+    "high": 32
+  },
+  "recommended_anchor": 24,
+  "recommended_target": 28,
+  "walk_away_guidance": 34,
+  "concession_plan": [
+    "offer_24",
+    "counter_to_28"
+  ],
+  "risk_flags": [
+    "weak_comparables"
+  ],
+  "reply_drafts": {
+    "concise": "Would you consider 24?",
+    "friendly": "Thanks \u2014 would 24 work?",
+    "firm": "My max is near 28."
+  },
+  "auto_send": false,
+  "impersonation": false,
+  "cross_user_thread_retrieval": false,
+  "evidence": [
+    {
+      "evidence_id": "ev-1",
+      "source_type": "sale",
+      "source_id": "sale-public-001",
+      "retrieved_at": "2026-07-15T12:00:00Z",
+      "summary": "Public sold comparable within 90 days"
+    }
+  ],
+  "confidence": 0.45,
+  "limitations": [
+    {
+      "code": "WEAK_COMPARABLES",
+      "message": "Few exact-pressing sales available",
+      "severity": "warning"
+    }
+  ],
+  "data_freshness": "2026-07-15T12:00:00Z",
+  "methodology": "authorized_thread_plus_public_comps",
+  "sample_size": 3,
+  "abstention_reason": null,
+  "authorization_scope": "thread-authorized-demo"
+}

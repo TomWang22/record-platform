@@ -1,0 +1,55 @@
+{
+  "scope": {
+    "genre": "demo"
+  },
+  "time_range": {
+    "start": "2026-01-01T00:00:00Z",
+    "end": "2026-07-01T00:00:00Z",
+    "timezone": "UTC"
+  },
+  "supply": {
+    "active_listings": 10
+  },
+  "demand": {
+    "watchers": 4
+  },
+  "pricing": {
+    "median": 25
+  },
+  "liquidity": {
+    "sell_through": 0.3
+  },
+  "auction_activity": {
+    "completed": 2
+  },
+  "scarcity_changes": [],
+  "segments": [],
+  "anomalies": [],
+  "opportunities": [],
+  "risks": [],
+  "currency": "USD",
+  "population": "public_listings_demo",
+  "aggregation_method": "median",
+  "evidence": [
+    {
+      "evidence_id": "ev-1",
+      "source_type": "sale",
+      "source_id": "sale-public-001",
+      "retrieved_at": "2026-07-15T12:00:00Z",
+      "summary": "Public sold comparable within 90 days"
+    }
+  ],
+  "confidence": 0.5,
+  "limitations": [
+    {
+      "code": "WEAK_COMPARABLES",
+      "message": "Few exact-pressing sales available",
+      "severity": "warning"
+    }
+  ],
+  "data_freshness": "2026-07-15T12:00:00Z",
+  "methodology": "public_aggregate_v0",
+  "sample_size": 10,
+  "abstention_reason": null,
+  "authorization_scope": "public_market"
+}

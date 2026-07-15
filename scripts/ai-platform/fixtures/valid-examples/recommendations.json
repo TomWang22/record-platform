@@ -1,0 +1,49 @@
+{
+  "recommendations": [
+    {
+      "entity_id": "listing-public-001",
+      "rank": 1,
+      "score": 0.8,
+      "reason_codes": [
+        "collection_gap"
+      ],
+      "explanation": "Fits a gap in similar releases",
+      "supporting_evidence": [
+        {
+          "evidence_id": "ev-1",
+          "source_type": "sale",
+          "source_id": "sale-public-001",
+          "retrieved_at": "2026-07-15T12:00:00Z",
+          "summary": "Public sold comparable within 90 days"
+        }
+      ],
+      "confidence": 0.5
+    }
+  ],
+  "diversity_summary": {
+    "unique_artists": 1
+  },
+  "excluded_candidates": [],
+  "evidence": [
+    {
+      "evidence_id": "ev-1",
+      "source_type": "sale",
+      "source_id": "sale-public-001",
+      "retrieved_at": "2026-07-15T12:00:00Z",
+      "summary": "Public sold comparable within 90 days"
+    }
+  ],
+  "confidence": 0.5,
+  "limitations": [
+    {
+      "code": "WEAK_COMPARABLES",
+      "message": "Few exact-pressing sales available",
+      "severity": "warning"
+    }
+  ],
+  "data_freshness": "2026-07-15T12:00:00Z",
+  "methodology": "explainable_rank_v0",
+  "sample_size": 1,
+  "abstention_reason": null,
+  "authorization_scope": "user_scoped"
+}

@@ -303,6 +303,22 @@ jobs:
       - name: Phase 32G infrastructure verifier (CI-safe)
         run: make ai-platform-verify-phase32g-infra
 
+  ai-platform-phase33a-contracts:
+    name: Phase 33A capability contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Phase 33A contract verifier (CI-safe, no live matrix)
+        run: make ai-platform-verify-phase33a-contracts
+
   git-no-cursor-trailers:
     name: Git no-Cursor trailer guard
     runs-on: ubuntu-latest

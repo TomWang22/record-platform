@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/recommendations.schema.json",
+  "title": "Recommendations",
+  "description": "Ranked recommendations with explainable reason codes. No hidden pay-to-rank.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "recommendations",
+    "diversity_summary",
+    "excluded_candidates",
+    "evidence",
+    "confidence",
+    "limitations"
+  ],
+  "properties": {
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity_id",
+          "rank",
+          "score",
+          "reason_codes",
+          "explanation",
+          "supporting_evidence",
+          "confidence"
+        ],
+        "properties": {
+          "entity_id": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "score": {
+            "type": "number"
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "explanation": {
+            "type": "string"
+          },
+          "supporting_evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+            }
+          },
+          "confidence": {
+            "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+          }
+        }
+      }
+    },
+    "diversity_summary": {
+      "type": "object"
+    },
+    "excluded_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+      }
+    },
+    "confidence": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/limitation.schema.json"
+      }
+    },
+    "data_freshness": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "methodology": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sample_size": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "abstention_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authorization_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

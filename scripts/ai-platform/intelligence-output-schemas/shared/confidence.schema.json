@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json",
+  "title": "Confidence",
+  "description": "Calibrated confidence in [0,1].",
+  "type": "number",
+  "minimum": 0,
+  "maximum": 1
+}

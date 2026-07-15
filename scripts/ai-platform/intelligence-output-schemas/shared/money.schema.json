@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/shared/money.schema.json",
+  "title": "Money",
+  "description": "Currency-tagged amount.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "currency",
+    "amount"
+  ],
+  "properties": {
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 3
+    },
+    "amount": {
+      "type": "number"
+    }
+  }
+}

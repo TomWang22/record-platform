@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/semantic-search.schema.json",
+  "title": "SemanticSearchResult",
+  "description": "Semantic/hybrid search result contract. Keyword remains production default until separately approved.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "query_id",
+    "results",
+    "retrieval_metrics",
+    "evidence",
+    "confidence",
+    "limitations"
+  ],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "keyword",
+        "semantic",
+        "hybrid",
+        "metadata_filtered_semantic",
+        "release_pressing_aware",
+        "watchlist_scoped",
+        "seller_inventory_scoped",
+        "market_history"
+      ]
+    },
+    "query_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "entity_id",
+          "rank",
+          "score"
+        ],
+        "properties": {
+          "entity_id": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "score": {
+            "type": "number"
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "retrieval_metrics": {
+      "type": "object"
+    },
+    "owner_scope_isolation": {
+      "type": "boolean"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+      }
+    },
+    "confidence": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/limitation.schema.json"
+      }
+    },
+    "data_freshness": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "methodology": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sample_size": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "abstention_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authorization_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

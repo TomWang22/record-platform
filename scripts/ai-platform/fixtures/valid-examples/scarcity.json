@@ -1,0 +1,35 @@
+{
+  "scarcity_score": 0.4,
+  "scarcity_label": "limited",
+  "active_supply_count": 3,
+  "recent_sale_count": 2,
+  "days_since_comparable_sale": 40,
+  "supply_velocity": 0.1,
+  "market_depth": 2,
+  "comparable_scope": [
+    "exact_pressing"
+  ],
+  "scope": "pressing",
+  "evidence": [
+    {
+      "evidence_id": "ev-1",
+      "source_type": "sale",
+      "source_id": "sale-public-001",
+      "retrieved_at": "2026-07-15T12:00:00Z",
+      "summary": "Public sold comparable within 90 days"
+    }
+  ],
+  "confidence": 0.55,
+  "limitations": [
+    {
+      "code": "WEAK_COMPARABLES",
+      "message": "Few exact-pressing sales available",
+      "severity": "warning"
+    }
+  ],
+  "data_freshness": "2026-07-15T12:00:00Z",
+  "methodology": "supply_and_recent_sales",
+  "sample_size": 5,
+  "abstention_reason": null,
+  "authorization_scope": "public_market"
+}

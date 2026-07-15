@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/shared/time-range.schema.json",
+  "title": "TimeRange",
+  "description": "Inclusive/exclusive analysis window.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "start",
+    "end"
+  ],
+  "properties": {
+    "start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "end": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "timezone": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

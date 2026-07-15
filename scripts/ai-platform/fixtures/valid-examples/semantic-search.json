@@ -1,0 +1,34 @@
+{
+  "mode": "keyword",
+  "query_id": "q-demo-1",
+  "results": [
+    {
+      "entity_id": "release-1",
+      "rank": 1,
+      "score": 0.9,
+      "reason_codes": [
+        "keyword_match"
+      ]
+    }
+  ],
+  "retrieval_metrics": {
+    "note": "contract_example_only"
+  },
+  "owner_scope_isolation": true,
+  "evidence": [
+    {
+      "evidence_id": "ev-1",
+      "source_type": "sale",
+      "source_id": "sale-public-001",
+      "retrieved_at": "2026-07-15T12:00:00Z",
+      "summary": "Public sold comparable within 90 days"
+    }
+  ],
+  "confidence": 0.7,
+  "limitations": [],
+  "data_freshness": "2026-07-15T12:00:00Z",
+  "methodology": "keyword_default",
+  "sample_size": 1,
+  "abstention_reason": null,
+  "authorization_scope": "public_market"
+}

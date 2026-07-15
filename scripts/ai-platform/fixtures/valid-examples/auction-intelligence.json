@@ -1,0 +1,44 @@
+{
+  "analysis_mode": "watchlist_batch",
+  "temperature_score": 0.62,
+  "temperature_label": "warm",
+  "auction_count": 5,
+  "bidder_density": 0.4,
+  "bid_velocity": 0.3,
+  "late_bid_pressure": 0.2,
+  "price_acceleration": 0.1,
+  "closing_time_concentration": [],
+  "similar_lot_clusters": [],
+  "price_dispersion": 0.25,
+  "estimated_competition": 0.4,
+  "buyer_pressure": [
+    "ending_cluster"
+  ],
+  "seller_opportunity": [
+    "off_peak_close"
+  ],
+  "risk_flags": [],
+  "notable_auctions": [],
+  "evidence": [
+    {
+      "evidence_id": "ev-1",
+      "source_type": "sale",
+      "source_id": "sale-public-001",
+      "retrieved_at": "2026-07-15T12:00:00Z",
+      "summary": "Public sold comparable within 90 days"
+    }
+  ],
+  "confidence": 0.6,
+  "limitations": [
+    {
+      "code": "WEAK_COMPARABLES",
+      "message": "Few exact-pressing sales available",
+      "severity": "warning"
+    }
+  ],
+  "data_freshness": "2026-07-15T12:00:00Z",
+  "methodology": "watchlist_temperature_v1",
+  "sample_size": 5,
+  "abstention_reason": null,
+  "authorization_scope": "watchlist_owner"
+}

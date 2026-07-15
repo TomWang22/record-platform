@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/market-analytics.schema.json",
+  "title": "MarketAnalyticsReport",
+  "description": "Structured market report with explicit methodology and sample honesty.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scope",
+    "time_range",
+    "supply",
+    "demand",
+    "pricing",
+    "liquidity",
+    "auction_activity",
+    "scarcity_changes",
+    "segments",
+    "anomalies",
+    "opportunities",
+    "risks",
+    "evidence",
+    "confidence",
+    "limitations"
+  ],
+  "properties": {
+    "scope": {
+      "type": "object"
+    },
+    "time_range": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/time-range.schema.json"
+    },
+    "supply": {
+      "type": "object"
+    },
+    "demand": {
+      "type": "object"
+    },
+    "pricing": {
+      "type": "object"
+    },
+    "liquidity": {
+      "type": "object"
+    },
+    "auction_activity": {
+      "type": "object"
+    },
+    "scarcity_changes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "anomalies": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "opportunities": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "currency": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 3,
+      "maxLength": 3
+    },
+    "population": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "aggregation_method": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+      }
+    },
+    "confidence": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/limitation.schema.json"
+      }
+    },
+    "data_freshness": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "methodology": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sample_size": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "abstention_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authorization_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

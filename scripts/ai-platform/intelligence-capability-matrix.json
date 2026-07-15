@@ -1,0 +1,658 @@
+{
+  "title": "Record-market AI intelligence capability matrix",
+  "status": "PHASE_33A_CONTRACT_ONLY_NOT_LAUNCHED",
+  "schema_version": 1,
+  "north_star": "complete_record_market_ai_intelligence_platform",
+  "chat_is": "one_presentation_surface_only",
+  "phase32h_role": "transport_runtime_validation_not_product_acceptance",
+  "phase32h_closeout": {
+    "status": "COMPLETE",
+    "transport_runtime_result": "PASS_BOTH_ARMS",
+    "causal_verdict": "NO_CAUSAL_SEPARATION",
+    "underlying_historical_ge60s_cause": "UNRESOLVED",
+    "secondary": "FULL_SOAK_OR_ADDITIONAL_TARGETED_REPRO_REQUIRED",
+    "baseline_root": "/tmp/phase32h-r1-baseline-r9",
+    "protected_root": "/tmp/phase32h-r1-caffeinate-r1",
+    "canonical_workload_hash": "2d68a90c946b385f1403f357e8d69b588627b16d53bc1d80ca84f6d5c898e7ab",
+    "note": "tmp evidence roots are historical freeze locations, not committed source dependencies"
+  },
+  "production_posture": {
+    "enablement": "NOT_APPROVED",
+    "default": "keyword",
+    "PERCENT": 0,
+    "ALLOW_PROD_PERCENT": 0,
+    "hybrid_vector_production_default": "NOT_ENABLED"
+  },
+  "training_terminology_policy": {
+    "forbidden_without_artifacts": [
+      "the model was trained",
+      "we trained the model",
+      "model training completed"
+    ],
+    "allowed_without_weight_updates": [
+      "prompt design",
+      "few-shot configuration",
+      "retrieval tuning",
+      "chunking tuning",
+      "embedding generation",
+      "reranker tuning",
+      "threshold calibration",
+      "schema enforcement",
+      "evaluation",
+      "grounding improvement"
+    ]
+  },
+  "sequencing": [
+    "33A",
+    "33B",
+    "33C",
+    "33D",
+    "33E",
+    "33F",
+    "33G"
+  ],
+  "implementation_status_enum": [
+    "implemented",
+    "partial",
+    "planned",
+    "unsupported",
+    "blocked"
+  ],
+  "acceptance_status": "NOT_ACCEPTED",
+  "capabilities": [
+    {
+      "capability_id": "scarcity",
+      "display_name": "Scarcity Intelligence",
+      "phase": "33C",
+      "status": "partial",
+      "product_surfaces": [
+        "listing",
+        "record_detail",
+        "search",
+        "API",
+        "watchlist"
+      ],
+      "input_contracts": [
+        "authorized_context_only",
+        "no_private_cross_user"
+      ],
+      "output_schema": "intelligence-output-schemas/scarcity.schema.json",
+      "data_sources": [
+        "release_pressing_metadata",
+        "active_listings",
+        "sold_history"
+      ],
+      "privacy_classes": [
+        "public_market"
+      ],
+      "authorization_scope": "owner_or_participant_scoped",
+      "grounding_requirements": [
+        "evidence_required",
+        "limitations_required",
+        "confidence_required"
+      ],
+      "abstention_conditions": [
+        "insufficient_evidence",
+        "unauthorized_scope",
+        "stale_critical_inputs"
+      ],
+      "safety_requirements": [
+        "no_unsupported_claims",
+        "no_private_leakage",
+        "no_cross_user_retrieval"
+      ],
+      "retrieval_metrics": [],
+      "recall_metrics": [
+        "relevant_recall",
+        "stale_fact_suppression",
+        "correction_precedence",
+        "deletion_propagation"
+      ],
+      "quality_metrics": [
+        "groundedness",
+        "schema_validity",
+        "usefulness",
+        "calibration",
+        "abstention_quality"
+      ],
+      "protocols": [
+        "http1",
+        "http2",
+        "http3"
+      ],
+      "latency_class": "interactive",
+      "current_implementation_status": "partial",
+      "current_test_status": "missing",
+      "known_gaps": [
+        "no_strict_output_schema_enforcement",
+        "false_rarity_risk"
+      ],
+      "owner_decisions_required": [
+        "approve_phase_33a_contracts"
+      ]
+    },
+    {
+      "capability_id": "valuation",
+      "display_name": "Valuation",
+      "phase": "33C",
+      "status": "partial",
+      "product_surfaces": [
+        "listing",
+        "record_detail",
+        "offer_thread",
+        "API",
+        "seller_inventory"
+      ],
+      "input_contracts": [
+        "authorized_context_only",
+        "no_private_cross_user"
+      ],
+      "output_schema": "intelligence-output-schemas/valuation.schema.json",
+      "data_sources": [
+        "sold_history",
+        "active_listings",
+        "auction_results"
+      ],
+      "privacy_classes": [
+        "public_market"
+      ],
+      "authorization_scope": "owner_or_participant_scoped",
+      "grounding_requirements": [
+        "evidence_required",
+        "limitations_required",
+        "confidence_required"
+      ],
+      "abstention_conditions": [
+        "insufficient_evidence",
+        "unauthorized_scope",
+        "stale_critical_inputs"
+      ],
+      "safety_requirements": [
+        "no_unsupported_claims",
+        "no_private_leakage",
+        "no_cross_user_retrieval"
+      ],
+      "retrieval_metrics": [],
+      "recall_metrics": [
+        "relevant_recall",
+        "stale_fact_suppression",
+        "correction_precedence",
+        "deletion_propagation"
+      ],
+      "quality_metrics": [
+        "groundedness",
+        "schema_validity",
+        "usefulness",
+        "calibration",
+        "abstention_quality"
+      ],
+      "protocols": [
+        "http1",
+        "http2",
+        "http3"
+      ],
+      "latency_class": "interactive",
+      "current_implementation_status": "partial",
+      "current_test_status": "missing",
+      "known_gaps": [
+        "no_range_contract_enforcement",
+        "weak_comparable_handling"
+      ],
+      "owner_decisions_required": [
+        "approve_phase_33a_contracts"
+      ]
+    },
+    {
+      "capability_id": "auction_intelligence",
+      "display_name": "Auction Intelligence",
+      "phase": "33C",
+      "status": "partial",
+      "product_surfaces": [
+        "auction_dashboard",
+        "watchlist",
+        "API",
+        "background_reports"
+      ],
+      "input_contracts": [
+        "authorized_context_only",
+        "no_private_cross_user"
+      ],
+      "output_schema": "intelligence-output-schemas/auction-intelligence.schema.json",
+      "data_sources": [
+        "auction_state",
+        "watchlists",
+        "bid_activity_aggregates"
+      ],
+      "privacy_classes": [
+        "public_market",
+        "user_watchlist_scoped"
+      ],
+      "authorization_scope": "owner_or_participant_scoped",
+      "grounding_requirements": [
+        "evidence_required",
+        "limitations_required",
+        "confidence_required"
+      ],
+      "abstention_conditions": [
+        "insufficient_evidence",
+        "unauthorized_scope",
+        "stale_critical_inputs"
+      ],
+      "safety_requirements": [
+        "no_unsupported_claims",
+        "no_private_leakage",
+        "no_cross_user_retrieval",
+        "no_bidder_identity_or_collusion_without_direct_evidence"
+      ],
+      "retrieval_metrics": [],
+      "recall_metrics": [
+        "relevant_recall",
+        "stale_fact_suppression",
+        "correction_precedence",
+        "deletion_propagation"
+      ],
+      "quality_metrics": [
+        "groundedness",
+        "schema_validity",
+        "usefulness",
+        "calibration",
+        "abstention_quality"
+      ],
+      "protocols": [
+        "http1",
+        "http2",
+        "http3"
+      ],
+      "latency_class": "interactive",
+      "current_implementation_status": "partial",
+      "current_test_status": "missing",
+      "known_gaps": [
+        "watchlist_batch_temperature_not_productized"
+      ],
+      "owner_decisions_required": [
+        "approve_phase_33a_contracts"
+      ]
+    },
+    {
+      "capability_id": "embeddings",
+      "display_name": "Embeddings",
+      "phase": "33B",
+      "status": "partial",
+      "product_surfaces": [
+        "retrieval",
+        "recommendations",
+        "semantic_search",
+        "API"
+      ],
+      "input_contracts": [
+        "authorized_context_only",
+        "no_private_cross_user"
+      ],
+      "output_schema": "intelligence-output-schemas/embedding-metadata.schema.json",
+      "data_sources": [
+        "listing_text",
+        "release_metadata",
+        "authorized_summaries"
+      ],
+      "privacy_classes": [
+        "scope_dependent"
+      ],
+      "authorization_scope": "owner_or_participant_scoped",
+      "grounding_requirements": [
+        "evidence_required",
+        "limitations_required",
+        "confidence_required"
+      ],
+      "abstention_conditions": [
+        "insufficient_evidence",
+        "unauthorized_scope",
+        "stale_critical_inputs"
+      ],
+      "safety_requirements": [
+        "no_unsupported_claims",
+        "no_private_leakage",
+        "no_cross_user_retrieval"
+      ],
+      "retrieval_metrics": [
+        "Recall@K",
+        "Precision@K",
+        "MRR",
+        "nDCG@K"
+      ],
+      "recall_metrics": [
+        "relevant_recall",
+        "stale_fact_suppression",
+        "correction_precedence",
+        "deletion_propagation"
+      ],
+      "quality_metrics": [
+        "groundedness",
+        "schema_validity",
+        "usefulness",
+        "calibration",
+        "abstention_quality"
+      ],
+      "protocols": [
+        "http1",
+        "http2",
+        "http3"
+      ],
+      "latency_class": "interactive",
+      "current_implementation_status": "partial",
+      "current_test_status": "missing",
+      "known_gaps": [
+        "not_production_default",
+        "deletion_propagation_productization"
+      ],
+      "owner_decisions_required": [
+        "approve_phase_33a_contracts"
+      ],
+      "notes": "embedding_generation_is_not_model_training"
+    },
+    {
+      "capability_id": "semantic_search",
+      "display_name": "Semantic and Hybrid Search",
+      "phase": "33B",
+      "status": "partial",
+      "product_surfaces": [
+        "search",
+        "API",
+        "watchlist_scoped",
+        "inventory_scoped"
+      ],
+      "input_contracts": [
+        "authorized_context_only",
+        "no_private_cross_user"
+      ],
+      "output_schema": "intelligence-output-schemas/semantic-search.schema.json",
+      "data_sources": [
+        "keyword_index",
+        "vector_index_optional"
+      ],
+      "privacy_classes": [
+        "public_market",
+        "owner_scoped"
+      ],
+      "authorization_scope": "owner_or_participant_scoped",
+      "grounding_requirements": [
+        "evidence_required",
+        "limitations_required",
+        "confidence_required"
+      ],
+      "abstention_conditions": [
+        "insufficient_evidence",
+        "unauthorized_scope",
+        "stale_critical_inputs"
+      ],
+      "safety_requirements": [
+        "no_unsupported_claims",
+        "no_private_leakage",
+        "no_cross_user_retrieval"
+      ],
+      "retrieval_metrics": [
+        "Recall@K",
+        "Precision@K",
+        "MRR",
+        "nDCG@K"
+      ],
+      "recall_metrics": [
+        "relevant_recall",
+        "stale_fact_suppression",
+        "correction_precedence",
+        "deletion_propagation"
+      ],
+      "quality_metrics": [
+        "groundedness",
+        "schema_validity",
+        "usefulness",
+        "calibration",
+        "abstention_quality"
+      ],
+      "protocols": [
+        "http1",
+        "http2",
+        "http3"
+      ],
+      "latency_class": "interactive",
+      "current_implementation_status": "partial",
+      "current_test_status": "missing",
+      "known_gaps": [
+        "hybrid_not_production_default",
+        "evaluation_corpus_not_built"
+      ],
+      "owner_decisions_required": [
+        "approve_phase_33a_contracts"
+      ],
+      "production_search_default": "keyword"
+    },
+    {
+      "capability_id": "negotiation_assistance",
+      "display_name": "Negotiation Assistance",
+      "phase": "33D",
+      "status": "planned",
+      "product_surfaces": [
+        "offer_thread",
+        "message_thread",
+        "API"
+      ],
+      "input_contracts": [
+        "authorized_context_only",
+        "no_private_cross_user"
+      ],
+      "output_schema": "intelligence-output-schemas/negotiation-assistance.schema.json",
+      "data_sources": [
+        "authorized_messages",
+        "listing_state",
+        "sale_history"
+      ],
+      "privacy_classes": [
+        "private_authorized_thread"
+      ],
+      "authorization_scope": "owner_or_participant_scoped",
+      "grounding_requirements": [
+        "evidence_required",
+        "limitations_required",
+        "confidence_required"
+      ],
+      "abstention_conditions": [
+        "insufficient_evidence",
+        "unauthorized_scope",
+        "stale_critical_inputs"
+      ],
+      "safety_requirements": [
+        "never_auto_send",
+        "never_impersonate",
+        "never_fabricate_leverage",
+        "never_claim_counterparty_intent_as_fact",
+        "label_inferred_intent",
+        "no_discriminatory_tactics",
+        "no_coercive_tactics",
+        "no_cross_user_thread_retrieval",
+        "no_secret_private_field_telemetry"
+      ],
+      "retrieval_metrics": [],
+      "recall_metrics": [
+        "relevant_recall",
+        "stale_fact_suppression",
+        "correction_precedence",
+        "deletion_propagation"
+      ],
+      "quality_metrics": [
+        "groundedness",
+        "schema_validity",
+        "usefulness",
+        "calibration",
+        "abstention_quality"
+      ],
+      "protocols": [
+        "http1",
+        "http2",
+        "http3"
+      ],
+      "latency_class": "interactive",
+      "current_implementation_status": "planned",
+      "current_test_status": "missing",
+      "known_gaps": [
+        "not_productized_structured_service"
+      ],
+      "owner_decisions_required": [
+        "approve_phase_33a_contracts"
+      ],
+      "never_auto_send": true
+    },
+    {
+      "capability_id": "recommendations",
+      "display_name": "Recommendations",
+      "phase": "33D",
+      "status": "partial",
+      "product_surfaces": [
+        "feeds",
+        "collection_tools",
+        "watchlist",
+        "API"
+      ],
+      "input_contracts": [
+        "authorized_context_only",
+        "no_private_cross_user"
+      ],
+      "output_schema": "intelligence-output-schemas/recommendations.schema.json",
+      "data_sources": [
+        "catalog",
+        "user_authorized_preferences",
+        "market_signals"
+      ],
+      "privacy_classes": [
+        "user_scoped"
+      ],
+      "authorization_scope": "owner_or_participant_scoped",
+      "grounding_requirements": [
+        "evidence_required",
+        "limitations_required",
+        "confidence_required"
+      ],
+      "abstention_conditions": [
+        "insufficient_evidence",
+        "unauthorized_scope",
+        "stale_critical_inputs"
+      ],
+      "safety_requirements": [
+        "no_unsupported_claims",
+        "no_private_leakage",
+        "no_cross_user_retrieval"
+      ],
+      "retrieval_metrics": [
+        "Recall@K",
+        "Precision@K",
+        "MRR",
+        "nDCG@K"
+      ],
+      "recall_metrics": [
+        "relevant_recall",
+        "stale_fact_suppression",
+        "correction_precedence",
+        "deletion_propagation"
+      ],
+      "quality_metrics": [
+        "groundedness",
+        "schema_validity",
+        "usefulness",
+        "calibration",
+        "abstention_quality"
+      ],
+      "protocols": [
+        "http1",
+        "http2",
+        "http3"
+      ],
+      "latency_class": "interactive",
+      "current_implementation_status": "partial",
+      "current_test_status": "missing",
+      "known_gaps": [
+        "reason_code_contract_not_enforced",
+        "diversity_gates_missing"
+      ],
+      "owner_decisions_required": [
+        "approve_phase_33a_contracts"
+      ]
+    },
+    {
+      "capability_id": "market_analytics",
+      "display_name": "Market Analytics",
+      "phase": "33E",
+      "status": "partial",
+      "product_surfaces": [
+        "dashboards",
+        "background_reports",
+        "API",
+        "collection_tools"
+      ],
+      "input_contracts": [
+        "authorized_context_only",
+        "no_private_cross_user"
+      ],
+      "output_schema": "intelligence-output-schemas/market-analytics.schema.json",
+      "data_sources": [
+        "listings",
+        "sales",
+        "auctions",
+        "watchlist_aggregates"
+      ],
+      "privacy_classes": [
+        "public_market",
+        "user_scoped_aggregates"
+      ],
+      "authorization_scope": "owner_or_participant_scoped",
+      "grounding_requirements": [
+        "evidence_required",
+        "limitations_required",
+        "confidence_required"
+      ],
+      "abstention_conditions": [
+        "insufficient_evidence",
+        "unauthorized_scope",
+        "stale_critical_inputs"
+      ],
+      "safety_requirements": [
+        "no_unsupported_claims",
+        "no_private_leakage",
+        "no_cross_user_retrieval"
+      ],
+      "retrieval_metrics": [],
+      "recall_metrics": [
+        "relevant_recall",
+        "stale_fact_suppression",
+        "correction_precedence",
+        "deletion_propagation"
+      ],
+      "quality_metrics": [
+        "groundedness",
+        "schema_validity",
+        "usefulness",
+        "calibration",
+        "abstention_quality"
+      ],
+      "protocols": [
+        "http1",
+        "http2",
+        "http3"
+      ],
+      "latency_class": "interactive",
+      "current_implementation_status": "partial",
+      "current_test_status": "missing",
+      "known_gaps": [
+        "methodology_fields_not_enforced"
+      ],
+      "owner_decisions_required": [
+        "approve_phase_33a_contracts"
+      ]
+    }
+  ],
+  "multi_turn_recall": {
+    "role": "platform_wide_evaluation_dimension",
+    "contract": "intelligence-output-schemas/memory-contract.schema.json"
+  },
+  "scenario_row_schema": "intelligence-output-schemas/scenario-row.schema.json",
+  "scenario_preview_path": "fixtures/scenario-preview/scenario-preview.json",
+  "canonical_matrix_path": "scripts/ai-platform/intelligence-capability-matrix.json",
+  "launch": "NOT_APPROVED"
+}

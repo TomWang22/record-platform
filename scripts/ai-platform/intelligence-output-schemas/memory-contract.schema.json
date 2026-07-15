@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/memory-contract.schema.json",
+  "title": "MultiTurnMemoryContract",
+  "description": "Platform-wide multi-turn recall contract labels and gates.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "memory_label",
+    "authorization_scope",
+    "evidence",
+    "confidence",
+    "limitations"
+  ],
+  "properties": {
+    "memory_label": {
+      "type": "string",
+      "enum": [
+        "conversation-only",
+        "session",
+        "user-authorized_durable_memory",
+        "derived_market_state",
+        "external_source_evidence"
+      ]
+    },
+    "authorization_scope": {
+      "type": "string"
+    },
+    "correction_precedence": {
+      "type": "boolean"
+    },
+    "deletion_propagation": {
+      "type": "string",
+      "enum": [
+        "required",
+        "pending",
+        "verified"
+      ]
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+      }
+    },
+    "confidence": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/limitation.schema.json"
+      }
+    }
+  }
+}

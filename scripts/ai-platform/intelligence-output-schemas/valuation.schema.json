@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/valuation.schema.json",
+  "title": "ValuationIntelligence",
+  "description": "Evidence-backed value ranges rather than a single invented price.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "currency",
+    "low_estimate",
+    "fair_value",
+    "high_estimate",
+    "quick_sale_estimate",
+    "patient_sale_estimate",
+    "comparable_sales",
+    "active_comparables",
+    "condition_adjustments",
+    "scarcity_adjustment",
+    "liquidity_adjustment",
+    "evidence",
+    "confidence",
+    "limitations"
+  ],
+  "properties": {
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 3
+    },
+    "low_estimate": {
+      "type": "number"
+    },
+    "fair_value": {
+      "type": "number"
+    },
+    "high_estimate": {
+      "type": "number"
+    },
+    "quick_sale_estimate": {
+      "type": "number"
+    },
+    "patient_sale_estimate": {
+      "type": "number"
+    },
+    "comparable_sales": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "active_comparables": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "condition_adjustments": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "scarcity_adjustment": {
+      "type": "number"
+    },
+    "liquidity_adjustment": {
+      "type": "number"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+      }
+    },
+    "confidence": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/limitation.schema.json"
+      }
+    },
+    "data_freshness": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "methodology": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sample_size": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "abstention_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authorization_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

@@ -128,9 +128,12 @@ Phase 32D: PASS — timing attribution micro-soak 3888/3888; 17-minute outlier N
 Phase 32E: PASS — slow KPI write durability 1296/1296 × 3 modes; KPI write path fail-open under injected delay/failure
 Phase 32F: PASS — RCA narrowed; stall-capture instrumentation + analyzer ready for 32G long soak
 Phase 32G: PASS — controlled staging soak 51840/51840; latency readiness BLOCKED pending Phase 32H; REPRODUCED_AND_TRANSPORT_WAIT_LOCALIZED (underlying cause unresolved); production enablement NOT APPROVED
-Phase 32H: IN PROGRESS — extreme-row correlation complete (32H-B/C); remediation blocked until confirmed cause
+Phase 32H: COMPLETE — transport/runtime PASS for baseline-r9 and protected caffeinate-r1 (8640/8640 each); causal verdict NO_CAUSAL_SEPARATION; underlying historical >=60s cause UNRESOLVED; secondary FULL_SOAK_OR_ADDITIONAL_TARGETED_REPRO_REQUIRED; production enablement NOT APPROVED
+Phase 32H closeout: docs/ai-platform/PHASE_32H_R1_CLOSEOUT.md
+Phase 33A: CONTRACT PACKAGE — schemas/matrix/fixtures/validator only; gauntlet NOT LAUNCHED
+Phase 33B–33G: NOT LAUNCHED
 Phase 31 evidence label: Phase 31D-R2 repaired staging long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
-Production enablement: NOT APPROVED — latency max outlier ~1,037,645 ms requires RCA before production KPI enablement
+Production enablement: NOT APPROVED — latency max outlier ~1,037,645 ms requires RCA before production KPI enablement; Phase 32H did not resolve root cause
 
 Live eval run: NOT RUN
 Controlled real inference: RUN (Phase 32G timing-attributed long soak PASS — 51840/51840)
@@ -216,4 +219,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Phase 30 CLOSED PASS. Phase 31 CLOSED PASS — STAGING CONTINUE. Phase 32G controlled soak PASS published. Phase 32H-E3 targeted reproduction BLOCKED (frozen at `/tmp/phase32h-targeted-reproduction`). Phase 32H-R1 IN PROGRESS — evidence repair + host-suspension A/B validation (baseline vs caffeinate, 8640 probes/arm, H1/H2/H3 together). Production enablement NOT APPROVED.
+Phase 32H-R1 COMPLETE with NO_CAUSAL_SEPARATION (do not claim host-suspension remediation). Phase 33A contract package is the current source-owned product path — verify with `make ai-platform-verify-phase33a-contracts`. Do not launch Phase 33B–33G or any capability gauntlet without separate owner approval. Production enablement NOT APPROVED; default keyword; PERCENT=0; ALLOW_PROD_PERCENT=0; hybrid/vector default NOT ENABLED. Canonical matrix: `scripts/ai-platform/intelligence-capability-matrix.json`.

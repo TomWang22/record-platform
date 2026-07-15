@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/shared/source-lineage.schema.json",
+  "title": "SourceLineage",
+  "description": "Traceability metadata for derived intelligence inputs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "content_hash",
+    "source_system"
+  ],
+  "properties": {
+    "content_hash": {
+      "type": "string",
+      "minLength": 8
+    },
+    "source_system": {
+      "type": "string",
+      "minLength": 1
+    },
+    "transform_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "owner_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

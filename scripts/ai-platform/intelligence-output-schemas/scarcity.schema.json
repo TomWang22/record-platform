@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/scarcity.schema.json",
+  "title": "ScarcityIntelligence",
+  "description": "Estimate how scarce a record/pressing/comparable group is in the current market.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scarcity_score",
+    "scarcity_label",
+    "active_supply_count",
+    "recent_sale_count",
+    "days_since_comparable_sale",
+    "supply_velocity",
+    "market_depth",
+    "comparable_scope",
+    "scope",
+    "evidence",
+    "confidence",
+    "limitations"
+  ],
+  "properties": {
+    "scarcity_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "scarcity_label": {
+      "type": "string",
+      "enum": [
+        "common",
+        "limited",
+        "scarce",
+        "rare",
+        "exceptional"
+      ]
+    },
+    "active_supply_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "recent_sale_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "days_since_comparable_sale": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "supply_velocity": {
+      "type": "number"
+    },
+    "market_depth": {
+      "type": "number"
+    },
+    "comparable_scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "release",
+        "pressing",
+        "comparable_group"
+      ]
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+      }
+    },
+    "confidence": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/limitation.schema.json"
+      }
+    },
+    "data_freshness": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "methodology": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sample_size": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "abstention_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authorization_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

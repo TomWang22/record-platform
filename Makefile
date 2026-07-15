@@ -357,6 +357,10 @@ ai-platform-verify-phase32g-long-soak: ## Operator Phase 32G long soak verifier 
 
 PHASE32H_MATRIX_ROOT ?= /tmp/phase32h-targeted-reproduction
 
+ai-platform-verify-phase33a-contracts: ## Phase 33A capability contracts/schemas/fixtures (no live matrix)
+	node scripts/ai-platform/verify-intelligence-capability-contracts.mjs
+	node --test tests/phase33a-intelligence-capability-contracts.test.mjs
+
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
 	$(MAKE) ai-platform-verify-phase32h-runner-memory
@@ -364,6 +368,7 @@ ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction in
 	$(MAKE) ai-platform-verify-phase32h-collector-registry
 	$(MAKE) ai-platform-verify-phase32h-manifest-contract
 	$(MAKE) ai-platform-verify-phase32h-packet-index-lifecycle
+	$(MAKE) ai-platform-verify-phase33a-contracts
 	node --test tests/phase32h-targeted-manifest.test.mjs
 	node --test tests/phase32h-inflight-probe-registry.test.mjs
 	node --test tests/phase32h-extreme-watchdog.test.mjs

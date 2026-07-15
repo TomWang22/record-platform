@@ -1,0 +1,43 @@
+{
+  "currency": "USD",
+  "low_estimate": 20,
+  "fair_value": 28,
+  "high_estimate": 40,
+  "quick_sale_estimate": 22,
+  "patient_sale_estimate": 35,
+  "comparable_sales": [
+    {
+      "source_id": "sale-public-001"
+    }
+  ],
+  "active_comparables": [
+    {
+      "source_id": "listing-public-001"
+    }
+  ],
+  "condition_adjustments": [],
+  "scarcity_adjustment": 0.05,
+  "liquidity_adjustment": -0.02,
+  "evidence": [
+    {
+      "evidence_id": "ev-1",
+      "source_type": "sale",
+      "source_id": "sale-public-001",
+      "retrieved_at": "2026-07-15T12:00:00Z",
+      "summary": "Public sold comparable within 90 days"
+    }
+  ],
+  "confidence": 0.5,
+  "limitations": [
+    {
+      "code": "WEAK_COMPARABLES",
+      "message": "Few exact-pressing sales available",
+      "severity": "warning"
+    }
+  ],
+  "data_freshness": "2026-07-15T12:00:00Z",
+  "methodology": "sold_vs_asking_separated",
+  "sample_size": 4,
+  "abstention_reason": null,
+  "authorization_scope": "public_market"
+}

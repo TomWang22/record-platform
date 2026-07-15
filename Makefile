@@ -361,6 +361,22 @@ ai-platform-verify-phase33a-contracts: ## Phase 33A capability contracts/schemas
 	node scripts/ai-platform/verify-intelligence-capability-contracts.mjs
 	node --test tests/phase33a-intelligence-capability-contracts.test.mjs
 
+ai-platform-verify-phase33b-data-lineage: ## Phase 33B data-source lineage / privacy / auth scopes (offline)
+	node scripts/ai-platform/verify-phase33b-data-lineage.mjs
+	node --test tests/phase33b-data-lineage.test.mjs
+
+ai-platform-verify-phase33b-retrieval-corpus: ## Phase 33B retrieval corpus contracts (offline, no live embeddings)
+	node scripts/ai-platform/verify-phase33b-retrieval-corpus.mjs
+	node --test tests/phase33b-retrieval-corpus.test.mjs
+	node --test tests/phase33b-retrieval-metrics.test.mjs
+
+ai-platform-evaluate-phase33b-retrieval-fixtures: ## Phase 33B offline keyword/semantic/hybrid fixture evaluation (/tmp reports)
+	node scripts/ai-platform/evaluate-retrieval-corpus.mjs
+
+ai-platform-verify-phase33b: ## Phase 33B aggregate offline lineage+corpus verification (no live gauntlet)
+	$(MAKE) ai-platform-verify-phase33b-data-lineage
+	$(MAKE) ai-platform-verify-phase33b-retrieval-corpus
+
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
 	$(MAKE) ai-platform-verify-phase32h-runner-memory
@@ -369,6 +385,7 @@ ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction in
 	$(MAKE) ai-platform-verify-phase32h-manifest-contract
 	$(MAKE) ai-platform-verify-phase32h-packet-index-lifecycle
 	$(MAKE) ai-platform-verify-phase33a-contracts
+	$(MAKE) ai-platform-verify-phase33b
 	node --test tests/phase32h-targeted-manifest.test.mjs
 	node --test tests/phase32h-inflight-probe-registry.test.mjs
 	node --test tests/phase32h-extreme-watchdog.test.mjs

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "phase": "33B",
+  "band": "development",
+  "status": "SANITIZED_FIXTURE_CORPUS_OFFLINE_ONLY",
+  "generated_by": "scripts/ai-platform/generate-phase33b-retrieval-corpus.mjs",
+  "generation_note": "Deterministic sanitized fixtures. Not runtime evidence. Embedding generation is not model training.",
+  "counts": {
+    "queries": 468,
+    "documents": 1500,
+    "judgments": 5000,
+    "hard_negatives": 945,
+    "embedding_records": 40,
+    "negotiation_thread_fixtures": 8,
+    "auction_watchlist_batches": 10,
+    "query_classes": 26
+  },
+  "production_posture": {
+    "default": "keyword",
+    "PERCENT": 0,
+    "ALLOW_PROD_PERCENT": 0,
+    "hybrid_vector_production_default": "NOT_ENABLED",
+    "production_embedding_writes": false
+  }
+}

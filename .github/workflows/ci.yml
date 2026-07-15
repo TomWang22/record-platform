@@ -319,6 +319,22 @@ jobs:
       - name: Phase 33A contract verifier (CI-safe, no live matrix)
         run: make ai-platform-verify-phase33a-contracts
 
+  ai-platform-phase33b-retrieval:
+    name: Phase 33B lineage and retrieval corpus
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Phase 33B offline lineage/corpus verifier (no live embeddings/gauntlet)
+        run: make ai-platform-verify-phase33b
+
   git-no-cursor-trailers:
     name: Git no-Cursor trailer guard
     runs-on: ubuntu-latest

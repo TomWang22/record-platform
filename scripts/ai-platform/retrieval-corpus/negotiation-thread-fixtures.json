@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "fixtures": [
+    {
+      "fixture_id": "neg_thread_1",
+      "case_class": "buyer_opening_offer",
+      "participant_side": "buyer",
+      "authorized_thread_id_fixture": "thread_fixture_1",
+      "market_evidence_query": "comparable sold evidence for Miles Davis",
+      "expected_visible_messages": [
+        "doc_msg_00001"
+      ],
+      "expected_hidden_messages": [
+        "doc_msg_00002",
+        "doc_msg_00003"
+      ],
+      "expected_comparable_evidence": [
+        "doc_release_00001"
+      ],
+      "prohibited_inferences": [
+        "counterparty_intent_as_fact",
+        "cross_user_thread_retrieval",
+        "auto_send",
+        "fabricated_leverage"
+      ],
+      "never_auto_send": true
+    },
+    {
+      "fixture_id": "neg_thread_2",
+      "case_class": "seller_counteroffer",
+      "participant_side": "seller",
+      "authorized_thread_id_fixture": "thread_fixture_2",
+      "market_evidence_query": "comparable sold evidence for John Coltrane",
+      "expected_visible_messages": [
+        "doc_msg_00003"
+      ],
+      "expected_hidden_messages": [
+        "doc_msg_00001",
+        "doc_msg_00003"
+      ],
+      "expected_comparable_evidence": [
+        "doc_release_00002"
+      ],
+      "prohibited_inferences": [
+        "counterparty_intent_as_fact",
+        "cross_user_thread_retrieval",
+        "auto_send",
+        "fabricated_leverage"
+      ],
+      "never_auto_send": true
+    },
+    {
+      "fixture_id": "neg_thread_3",
+      "case_class": "condition_disagreement",
+      "participant_side": "buyer",
+      "authorized_thread_id_fixture": "thread_fixture_3",
+      "market_evidence_query": "comparable sold evidence for The Beatles",
+      "expected_visible_messages": [
+        "doc_msg_00005"
+      ],
+      "expected_hidden_messages": [
+        "doc_msg_00001",
+        "doc_msg_00002"
+      ],
+      "expected_comparable_evidence": [
+        "doc_release_00003"
+      ],
+      "prohibited_inferences": [
+        "counterparty_intent_as_fact",
+        "cross_user_thread_retrieval",
+        "auto_send",
+        "fabricated_leverage"
+      ],
+      "never_auto_send": true
+    },
+    {
+      "fixture_id": "neg_thread_4",
+      "case_class": "shipping_cost_discussion",
+      "participant_side": "seller",
+      "authorized_thread_id_fixture": "thread_fixture_4",
+      "market_evidence_query": "comparable sold evidence for Pink Floyd",
+      "expected_visible_messages": [
+        "doc_msg_00007"
+      ],
+      "expected_hidden_messages": [
+        "doc_msg_00001",
+        "doc_msg_00002"
+      ],
+      "expected_comparable_evidence": [
+        "doc_release_00004"
+      ],
+      "prohibited_inferences": [
+        "counterparty_intent_as_fact",
+        "cross_user_thread_retrieval",
+        "auto_send",
+        "fabricated_leverage"
+      ],
+      "never_auto_send": true
+    },
+    {
+      "fixture_id": "neg_thread_5",
+      "case_class": "bundle_offer",
+      "participant_side": "buyer",
+      "authorized_thread_id_fixture": "thread_fixture_5",
+      "market_evidence_query": "comparable sold evidence for Kraftwerk",
+      "expected_visible_messages": [
+        "doc_msg_00009"
+      ],
+      "expected_hidden_messages": [
+        "doc_msg_00001",
+        "doc_msg_00002"
+      ],
+      "expected_comparable_evidence": [
+        "doc_release_00005"
+      ],
+      "prohibited_inferences": [
+        "counterparty_intent_as_fact",
+        "cross_user_thread_retrieval",
+        "auto_send",
+        "fabricated_leverage"
+      ],
+      "never_auto_send": true
+    },
+    {
+      "fixture_id": "neg_thread_6",
+      "case_class": "delayed_reply",
+      "participant_side": "seller",
+      "authorized_thread_id_fixture": "thread_fixture_6",
+      "market_evidence_query": "comparable sold evidence for Nina Simone",
+      "expected_visible_messages": [
+        "doc_msg_00011"
+      ],
+      "expected_hidden_messages": [
+        "doc_msg_00001",
+        "doc_msg_00002"
+      ],
+      "expected_comparable_evidence": [
+        "doc_release_00006"
+      ],
+      "prohibited_inferences": [
+        "counterparty_intent_as_fact",
+        "cross_user_thread_retrieval",
+        "auto_send",
+        "fabricated_leverage"
+      ],
+      "never_auto_send": true
+    },
+    {
+      "fixture_id": "neg_thread_7",
+      "case_class": "walk_away_threshold",
+      "participant_side": "buyer",
+      "authorized_thread_id_fixture": "thread_fixture_7",
+      "market_evidence_query": "comparable sold evidence for Fela Kuti",
+      "expected_visible_messages": [
+        "doc_msg_00013"
+      ],
+      "expected_hidden_messages": [
+        "doc_msg_00001",
+        "doc_msg_00002"
+      ],
+      "expected_comparable_evidence": [
+        "doc_release_00007"
+      ],
+      "prohibited_inferences": [
+        "counterparty_intent_as_fact",
+        "cross_user_thread_retrieval",
+        "auto_send",
+        "fabricated_leverage"
+      ],
+      "never_auto_send": true
+    },
+    {
+      "fixture_id": "neg_thread_8",
+      "case_class": "auction_versus_direct_sale",
+      "participant_side": "seller",
+      "authorized_thread_id_fixture": "thread_fixture_8",
+      "market_evidence_query": "comparable sold evidence for Brian Eno",
+      "expected_visible_messages": [
+        "doc_msg_00015"
+      ],
+      "expected_hidden_messages": [
+        "doc_msg_00001",
+        "doc_msg_00002"
+      ],
+      "expected_comparable_evidence": [
+        "doc_release_00008"
+      ],
+      "prohibited_inferences": [
+        "counterparty_intent_as_fact",
+        "cross_user_thread_retrieval",
+        "auto_send",
+        "fabricated_leverage"
+      ],
+      "never_auto_send": true
+    }
+  ]
+}

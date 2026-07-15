@@ -1,9 +1,9 @@
 # Phase 33 — Intelligence Capability Gauntlet
 
 ```text
-Status: PHASE 33A CONTRACT PACKAGE — GAUNTLET NOT LAUNCHED
-Phase 33B–33G: NOT LAUNCHED
-Requires: separate owner approval before any executable sub-phase
+Status: PHASE 33A + 33B PACKAGES COMPLETE — LIVE GAUNTLET NOT LAUNCHED
+Phase 33C–33G: NOT LAUNCHED
+Requires: separate owner approval before any executable product sub-phase
 ```
 
 ## Purpose
@@ -22,57 +22,43 @@ causal verdict `NO_CAUSAL_SEPARATION`; underlying historical ≥60s cause
   `scripts/ai-platform/intelligence-capability-matrix.json`
 - Output schemas:
   `scripts/ai-platform/intelligence-output-schemas/`
+- Data-source lineage:
+  `scripts/ai-platform/data-source-lineage.json`
+- Retrieval corpus:
+  `scripts/ai-platform/retrieval-corpus/`
+- Retrieval acceptance policy:
+  `scripts/ai-platform/retrieval-acceptance-policy.json`
 - Scenario preview (inventory only):
   `scripts/ai-platform/fixtures/scenario-preview/scenario-preview.json`
 - Verify:
-  `make ai-platform-verify-phase33a-contracts`
+  - `make ai-platform-verify-phase33a-contracts`
+  - `make ai-platform-verify-phase33b`
+  - `make ai-platform-evaluate-phase33b-retrieval-fixtures` (writes `/tmp` only)
 
 ## Program phases
 
 | Phase | Focus | Status |
 | --- | --- | --- |
-| 33A | Capability contracts and output schemas | CONTRACT PACKAGE |
-| 33B | Data lineage, embeddings, retrieval evaluation corpus | NOT LAUNCHED |
+| 33A | Capability contracts and output schemas | COMPLETE |
+| 33B | Data lineage, embeddings, retrieval evaluation corpus | COMPLETE (offline) |
 | 33C | Scarcity, valuation, auction intelligence | NOT LAUNCHED |
 | 33D | Negotiation assistance and recommendations | NOT LAUNCHED |
 | 33E | Market analytics and multi-turn recall | NOT LAUNCHED |
 | 33F | Cross-protocol capability gauntlet | NOT LAUNCHED |
 | 33G | Targeted remediation and staging decision | NOT LAUNCHED |
 
-## Phase 33A deliverables
+## Phase 33B deliverables
 
-- Eight capability entries with implementation/test status (`partial`/`planned`,
-  never falsely `accepted`)
-- Draft 2020-12 schemas with `$id`, evidence/confidence/limitations
-- Shared definitions (evidence-item, confidence, limitation, lineage, money,
-  time-range)
-- Embedding metadata + semantic-search contracts
-- Negotiation hard safety (never auto-send)
-- Auction watchlist-batch temperature fields
-- Scenario-row schema + required scenario-class preview inventory
-- Offline validator, Node tests, Make/CI wiring
-- Training-terminology policy guard
+- Machine-readable data-source inventory with privacy/auth/deletion lineage
+- Embedding lineage record schema + tiny synthetic fixture vectors
+- Development-band sanitized retrieval corpus (queries/documents/judgments/hard negatives)
+- Negotiation-thread and auction-watchlist support fixtures (synthetic)
+- Offline keyword / semantic_fixture / hybrid_fixture evaluator and metrics
+- Deletion/freshness/privacy isolation hard stops
+- Reports under `/tmp/phase33b-*` only (never committed)
 
-## Prompting sessions
-
-Phase 33A defines the scenario-row contract and a preview inventory. It does
-**not** launch the gauntlet and does not commit generated transcripts as evidence.
-
-Required scenario classes include buyer/seller, novice/experienced, common/rare,
-exact/ambiguous pressing, strong/weak comparables, single/multi-turn, corrections,
-contradictions, stale/missing/malformed data, overclaim and unsupported-valuation
-traps, privacy and cross-user memory attempts, negotiation manipulation,
-recommendation diversity, and auction-watchlist market-temperature cases.
-
-## Projected matrix bands (planning only)
-
-| Band | Approx probes | Est. runtime @ ~0.8 qps | Est. storage |
-| --- | ---: | ---: | ---: |
-| Low | ~5,760 | ~2 h | ~8 GiB |
-| Target | ~17,280 | ~6 h | ~25 GiB |
-| Soak | ~34,560 | ~12 h | ~45 GiB |
-
-Exact size is an owner decision before any launch.
+Phase 33B is **not** product acceptance and does not authorize production
+embedding writes, DB migrations, nonzero canary percents, or the live gauntlet.
 
 ## Hard stops
 
@@ -80,9 +66,10 @@ Exact size is an owner decision before any launch.
 - Hybrid/vector production default remains NOT ENABLED
 - No live product matrix in CI
 - No `/tmp` generated reports committed
+- Embedding generation is not model training
 - No unsupported “model was trained” claims without weight-update artifacts
 
 ## Next action
 
-Owner review of Phase 33A contracts and explicit approval for the next executable
-sub-phase (likely 33B).
+Owner review of Phase 33B corpus and metrics, then explicit approval for
+Phase 33C scarcity, valuation, and auction-intelligence implementation.

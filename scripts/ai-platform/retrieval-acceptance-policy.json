@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "phase": "33B",
+  "band": "development",
+  "status": "FIXTURE_OFFLINE_ONLY_NOT_PRODUCTION_APPROVAL",
+  "corpus_bands": {
+    "development": {
+      "queries_min": 300,
+      "documents_min": 1500,
+      "judgments_min": 5000
+    },
+    "target_evaluation": {
+      "queries_min": 1200,
+      "documents_min": 6000,
+      "judgments_min": 20000,
+      "requires_separate_owner_approval": true
+    },
+    "extended_soak": {
+      "queries_min": 3000,
+      "documents_min": 15000,
+      "judgments_min": 50000,
+      "requires_separate_owner_approval": true
+    }
+  },
+  "hard_failures": {
+    "prohibited_result_rate_max": 0,
+    "owner_scope_leakage_rate_max": 0,
+    "cross_user_leakage_rate_max": 0,
+    "deleted_source_retrieval_rate_max": 0,
+    "wrong_pressing_as_exact_rate_max": 0,
+    "asking_as_sold_rate_max": 0,
+    "stale_result_without_stale_label_rate_max": 0,
+    "schema_invalid_result_rate_max": 0
+  },
+  "quality_thresholds_development": {
+    "note": "Conservative fixture-band reporting thresholds; not production enablement criteria.",
+    "Recall@5_min": 0.35,
+    "Recall@10_min": 0.45,
+    "MRR_min": 0.25,
+    "nDCG@5_min": 0.3,
+    "nDCG@10_min": 0.35,
+    "exact_pressing_accuracy_min": 0.5,
+    "abstention_precision_min": 0.7
+  },
+  "production_hard_stops": {
+    "default": "keyword",
+    "PERCENT": 0,
+    "ALLOW_PROD_PERCENT": 0,
+    "hybrid_vector_production_default": "NOT_ENABLED",
+    "production_embedding_writes": false,
+    "production_db_migration": false
+  },
+  "modes": ["keyword", "semantic_fixture", "hybrid_fixture"],
+  "silent_mode_fallback_forbidden": true
+}

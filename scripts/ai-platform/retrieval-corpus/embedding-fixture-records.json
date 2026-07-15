@@ -1,0 +1,2085 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "embedding_id": "emb_fixture_0001",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:d33998645ffab503313e1b637155ffbf53ccbbc054e82cf48a71114c41f05cc1",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_1",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:d33998645ffab503313e1b637155ffbf53ccbbc054e82cf48a71114c41f05cc1",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_1",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0,
+        0.2886751345948129,
+        0.5773502691896258,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0002",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:abb7de38313741d4fee68937b3aae7c54230faec8e335b945adc3d8ca70c38f2",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_2",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:abb7de38313741d4fee68937b3aae7c54230faec8e335b945adc3d8ca70c38f2",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_2",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0,
+        0.5773502691896258,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0003",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:1f401dab2fcf90d0dd37cc57cbf63f010d55664c2cf1ae0b08c4a13acc1524c8",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_3",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:1f401dab2fcf90d0dd37cc57cbf63f010d55664c2cf1ae0b08c4a13acc1524c8",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_3",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.6324555320336759,
+        0,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0004",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:9e4b5507da8b8ab149b93821ba6785f78fcb0485a78fc046606eafe0ab663e55",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_4",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:9e4b5507da8b8ab149b93821ba6785f78fcb0485a78fc046606eafe0ab663e55",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_4",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.6324555320336759,
+        0,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0005",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:fab58a1ab1a195499e29c9d377e8a8fb22a16adb3cfedbecfd9d5a032d70c2a4",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_5",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:fab58a1ab1a195499e29c9d377e8a8fb22a16adb3cfedbecfd9d5a032d70c2a4",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_5",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5345224838248488,
+        0,
+        0,
+        0.5345224838248488,
+        0,
+        0.5345224838248488,
+        0.2672612419124244,
+        0.2672612419124244
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0006",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:c1b7c8d1dfe96badf746149900dbd8f235fbdb87a9e52cd33ae48b454ed22219",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_6",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:c1b7c8d1dfe96badf746149900dbd8f235fbdb87a9e52cd33ae48b454ed22219",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_6",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0,
+        0.5773502691896258,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0007",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:9df7ced348d65af75a193af99aacdeb9012f100d89f03f6be51f83e1e06e03ef",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_7",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:9df7ced348d65af75a193af99aacdeb9012f100d89f03f6be51f83e1e06e03ef",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_7",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0,
+        0.5773502691896258,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0008",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:03c982046ec8e4874981756a65d1abc504dd8143ec4d19e8da01e5780277529b",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_8",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:03c982046ec8e4874981756a65d1abc504dd8143ec4d19e8da01e5780277529b",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_8",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.5773502691896258,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0009",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:93976341d2eaa271fd8011512b3b3d52abcf6619ed2913b32c5dee9ef32da372",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_9",
+      "source_version": "v3",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:93976341d2eaa271fd8011512b3b3d52abcf6619ed2913b32c5dee9ef32da372",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_9",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0.5773502691896258,
+        0.2886751345948129,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0010",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:623415e91e6a376ae9a8e4cb709dafe606915fa97722c309c350572485eab662",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_10",
+      "source_version": "v3",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:623415e91e6a376ae9a8e4cb709dafe606915fa97722c309c350572485eab662",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_10",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0.5773502691896258,
+        0.2886751345948129,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0011",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:24624357f0f7bc45f91926ed76cd9e416cade647213121799dc2dcafa6a4514e",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_11",
+      "source_version": "v3",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:24624357f0f7bc45f91926ed76cd9e416cade647213121799dc2dcafa6a4514e",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_11",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.6324555320336759,
+        0,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0012",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:80e0fa26dd1225b9fd1c2741254564b866417f8e8fe1710c496a101dc38658e2",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_12",
+      "source_version": "v3",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:80e0fa26dd1225b9fd1c2741254564b866417f8e8fe1710c496a101dc38658e2",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_12",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.6324555320336759,
+        0,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0013",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:92341c06cc8ac2e310f1dd30bbb474822e50c5748204133104ed4a89bab7d55d",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_13",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:92341c06cc8ac2e310f1dd30bbb474822e50c5748204133104ed4a89bab7d55d",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_13",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0.2886751345948129,
+        0.5773502691896258,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0014",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:7765eaf20d8d6ab106b4b45efc8967e5048512e4906ec3046599259706c21631",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_14",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:7765eaf20d8d6ab106b4b45efc8967e5048512e4906ec3046599259706c21631",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_14",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0,
+        0.5773502691896258,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0015",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:508096e405c6bf46be1e8c9918ab493d1cdd36d0210cc35428ba5a274e984c28",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_15",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:508096e405c6bf46be1e8c9918ab493d1cdd36d0210cc35428ba5a274e984c28",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_15",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0,
+        0.5773502691896258,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0016",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:a8a0a019062cd044a943b515f1a309603a6fa1edef7c3121557ee10499049f66",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_16",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:a8a0a019062cd044a943b515f1a309603a6fa1edef7c3121557ee10499049f66",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_16",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0,
+        0.5773502691896258,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0017",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:7fe476d311938a1b2782281e2b66c6ae241f7083861aa682a23f993824b68623",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_17",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:7fe476d311938a1b2782281e2b66c6ae241f7083861aa682a23f993824b68623",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_17",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.8017837257372732,
+        0,
+        0,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.2672612419124244
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0018",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:011a5e05e4eda87d196b4e6d395d12308020b2f7d27a1d71a5fb2f7d5ed574d7",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_18",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:011a5e05e4eda87d196b4e6d395d12308020b2f7d27a1d71a5fb2f7d5ed574d7",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_18",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.8017837257372732,
+        0,
+        0,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.2672612419124244
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0019",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:f51a1c689371a773c6ac3235936ac6ff55e368932a9c3e2bb571cbb5bbc4944f",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_19",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:f51a1c689371a773c6ac3235936ac6ff55e368932a9c3e2bb571cbb5bbc4944f",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_19",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.8017837257372732,
+        0,
+        0,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.2672612419124244
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0020",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:f444a777287c1b48ea43348888671da2149f23f2030521b0e991b8d5538a1b6b",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_20",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:f444a777287c1b48ea43348888671da2149f23f2030521b0e991b8d5538a1b6b",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_20",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.75,
+        0,
+        0,
+        0.5,
+        0,
+        0.25,
+        0.25,
+        0.25
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0021",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:807ca33ba07370ea291f797adfc6da1b7478481c4b3cf02d9b75edb404261bcd",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_21",
+      "source_version": "v3",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:807ca33ba07370ea291f797adfc6da1b7478481c4b3cf02d9b75edb404261bcd",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_21",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.6324555320336759,
+        0.31622776601683794,
+        0,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0022",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:6872446d667427047cc39c9c9668777d072a25c41bb3640ca61ce435b135bfc7",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_22",
+      "source_version": "v3",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:6872446d667427047cc39c9c9668777d072a25c41bb3640ca61ce435b135bfc7",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_22",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.6324555320336759,
+        0.31622776601683794,
+        0,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0023",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:7f129d6d348824b523d44ee6e85f2172a49d12def0b47eb4e1e84ef51c51427f",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_23",
+      "source_version": "v3",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:7f129d6d348824b523d44ee6e85f2172a49d12def0b47eb4e1e84ef51c51427f",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_23",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0.2886751345948129,
+        0,
+        0.5773502691896258,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0024",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:20e413ea7ea2a85da3b205bc0fb2ec07f2e8ea043d85701e40eac578dd7da623",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_24",
+      "source_version": "v3",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:20e413ea7ea2a85da3b205bc0fb2ec07f2e8ea043d85701e40eac578dd7da623",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_24",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.6324555320336759,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794,
+        0,
+        0.31622776601683794,
+        0.31622776601683794,
+        0.31622776601683794
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0025",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:e18de135ec5f7ba5530d0b06dbd61af0c103d2d7e49a6db2c7f1e694e437f3c6",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_25",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:e18de135ec5f7ba5530d0b06dbd61af0c103d2d7e49a6db2c7f1e694e437f3c6",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_25",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.5773502691896258,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0026",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:008569373851df3bb13acb2085e59d0f6464439366b39c116ab896592976b39a",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_26",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:008569373851df3bb13acb2085e59d0f6464439366b39c116ab896592976b39a",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_26",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5345224838248488,
+        0,
+        0,
+        0.5345224838248488,
+        0,
+        0.2672612419124244,
+        0.5345224838248488,
+        0.2672612419124244
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0027",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:31475c259ac9f274fe099251e5c13671b7bf2f94e3112abd7f525b00685cc2e3",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_27",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:31475c259ac9f274fe099251e5c13671b7bf2f94e3112abd7f525b00685cc2e3",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_27",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0,
+        0.2886751345948129,
+        0.5773502691896258,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0028",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:3ec439c1083150f32465bcdf23a5565261f96e93566eab21501b62560981d3b6",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_28",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:3ec439c1083150f32465bcdf23a5565261f96e93566eab21501b62560981d3b6",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_28",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0,
+        0.2886751345948129,
+        0.5773502691896258,
+        0.2886751345948129
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0029",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:de15eb243749fa40068d6040cee26e68f0bc791b97b320e9763776ef63d35b9e",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_29",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:de15eb243749fa40068d6040cee26e68f0bc791b97b320e9763776ef63d35b9e",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_29",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5345224838248488,
+        0,
+        0,
+        0.5345224838248488,
+        0,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.5345224838248488
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0030",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:697669106587f3189450c140c6c702d3a289ef621d814d87129535e1beaecd30",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_30",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:697669106587f3189450c140c6c702d3a289ef621d814d87129535e1beaecd30",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_30",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.5773502691896258
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0031",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:6cbe897d5bb2193cf5599d5ca4a969f05332015031c4624fa52232488eb4618b",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_31",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:6cbe897d5bb2193cf5599d5ca4a969f05332015031c4624fa52232488eb4618b",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_31",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.5773502691896258
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0032",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:a3c77740a31bfa2886a3492d0fa4a901980747419bbe1045c13fc13064853b50",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_32",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:a3c77740a31bfa2886a3492d0fa4a901980747419bbe1045c13fc13064853b50",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_32",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0.5773502691896258,
+        0,
+        0,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.2886751345948129,
+        0.5773502691896258
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0033",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:2dbed1bc16d781367c0340bcfe454b42ea0ff18f48e8577ff1191e23e037a64b",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_33",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:2dbed1bc16d781367c0340bcfe454b42ea0ff18f48e8577ff1191e23e037a64b",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_33",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0,
+        0.1889822365046136,
+        0,
+        0.1889822365046136,
+        0.944911182523068,
+        0,
+        0,
+        0.1889822365046136
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0034",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:2e984733ef532cc84e8f73464653700aa45d72b5218faec4067047b6d254b1af",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_34",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:2e984733ef532cc84e8f73464653700aa45d72b5218faec4067047b6d254b1af",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_34",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0,
+        0.21320071635561041,
+        0,
+        0.42640143271122083,
+        0.8528028654224417,
+        0,
+        0,
+        0.21320071635561041
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0035",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:d6c40b406e69bb9449f5713570ce0054935884a5ada4ad9cccb5eacfd702b636",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_35",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:d6c40b406e69bb9449f5713570ce0054935884a5ada4ad9cccb5eacfd702b636",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_35",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0,
+        0.22360679774997896,
+        0.22360679774997896,
+        0.22360679774997896,
+        0.8944271909999159,
+        0,
+        0,
+        0.22360679774997896
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0036",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:a8a8304ee91e8dcddd41363ff58b63b23879c20650a23849de21eb6f401bf8f8",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_36",
+      "source_version": "v1",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:a8a8304ee91e8dcddd41363ff58b63b23879c20650a23849de21eb6f401bf8f8",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_36",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0,
+        0.22360679774997896,
+        0.22360679774997896,
+        0.22360679774997896,
+        0.8944271909999159,
+        0,
+        0,
+        0.22360679774997896
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0037",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:f0a7cef315f969a7345ef4535b6ce3599d1eae35b0eba1aec691f8af28401564",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_37",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:f0a7cef315f969a7345ef4535b6ce3599d1eae35b0eba1aec691f8af28401564",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_37",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0,
+        0.25,
+        0,
+        0.5,
+        0.75,
+        0.25,
+        0,
+        0.25
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0038",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:51f18343f1722fe21d3de8ea38ad290b3ff0a4de9e05fb6917527bde1403f0eb",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_38",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:51f18343f1722fe21d3de8ea38ad290b3ff0a4de9e05fb6917527bde1403f0eb",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_38",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.8017837257372732,
+        0.2672612419124244,
+        0,
+        0.2672612419124244
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0039",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:647b58b447836a1340f8fba1622fab36d79f245b49c7b29136c711d18ad96803",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_39",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:647b58b447836a1340f8fba1622fab36d79f245b49c7b29136c711d18ad96803",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_39",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.2672612419124244,
+        0.8017837257372732,
+        0.2672612419124244,
+        0,
+        0.2672612419124244
+      ]
+    },
+    {
+      "embedding_id": "emb_fixture_0040",
+      "model_id": "fixture-hash-embed",
+      "model_version": "phase33b-dev-1",
+      "dimension": 8,
+      "normalization": "unit",
+      "chunking_strategy": "whitespace_fixture",
+      "chunking_version": "v1",
+      "content_hash": "sha256:799c0adc079bd50a9eb5f30081213b0608f88de737f4b5d5c561d3b7a5874790",
+      "source_id": "src_pressing_variant_metadata",
+      "source_entity_id": "ent_pressing_40",
+      "source_version": "v2",
+      "privacy_class": "PUBLIC",
+      "authorization_scope": "public_market",
+      "created_at": "2026-06-20T12:00:00.000Z",
+      "source_updated_at": "2026-06-01T12:00:00.000Z",
+      "deletion_state": "ACTIVE",
+      "reembedding_reason": null,
+      "lineage": {
+        "content_hash": "sha256:799c0adc079bd50a9eb5f30081213b0608f88de737f4b5d5c561d3b7a5874790",
+        "source_system": "phase33b-fixture-generator",
+        "transform_version": "phase33b-1",
+        "owner_scope": "public_market"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_emb_40",
+          "source_type": "public_metadata",
+          "source_id": "src_pressing_variant_metadata",
+          "retrieved_at": "2026-06-20T12:00:00.000Z",
+          "observed_at": "2026-06-01T12:00:00.000Z",
+          "summary": "Fixture embedding metadata only; not a production write"
+        }
+      ],
+      "confidence": 0.5,
+      "limitations": [
+        {
+          "code": "fixture_only",
+          "message": "Synthetic vector for offline evaluation; embedding generation is not model training"
+        }
+      ],
+      "synthetic_vector": [
+        0,
+        0.22360679774997896,
+        0,
+        0.22360679774997896,
+        0.8944271909999159,
+        0.22360679774997896,
+        0,
+        0.22360679774997896
+      ]
+    }
+  ]
+}

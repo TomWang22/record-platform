@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "batches": [
+    {
+      "batch_id": "watch_batch_1",
+      "owner_principal_fixture": "principal_fixture_buyer_a",
+      "auction_document_ids": [
+        "doc_auction_00001",
+        "doc_auction_00002",
+        "doc_auction_00003",
+        "doc_auction_00004",
+        "doc_auction_00005"
+      ],
+      "labels_support": {
+        "bid_velocity": true,
+        "late_bid_pressure": true,
+        "price_acceleration": true,
+        "closing_time_concentration": true,
+        "similar_lot_clusters": true,
+        "price_dispersion": true,
+        "buyer_pressure": true,
+        "seller_opportunity": true
+      },
+      "notes": "Synthetic aggregates only; no bidder identity or collusion inference"
+    },
+    {
+      "batch_id": "watch_batch_2",
+      "owner_principal_fixture": "principal_fixture_buyer_a",
+      "auction_document_ids": [
+        "doc_auction_00006",
+        "doc_auction_00007",
+        "doc_auction_00008",
+        "doc_auction_00009",
+        "doc_auction_00010"
+      ],
+      "labels_support": {
+        "bid_velocity": true,
+        "late_bid_pressure": true,
+        "price_acceleration": true,
+        "closing_time_concentration": true,
+        "similar_lot_clusters": true,
+        "price_dispersion": true,
+        "buyer_pressure": true,
+        "seller_opportunity": true
+      },
+      "notes": "Synthetic aggregates only; no bidder identity or collusion inference"
+    },
+    {
+      "batch_id": "watch_batch_3",
+      "owner_principal_fixture": "principal_fixture_buyer_a",
+      "auction_document_ids": [
+        "doc_auction_00011",
+        "doc_auction_00012",
+        "doc_auction_00013",
+        "doc_auction_00014",
+        "doc_auction_00015"
+      ],
+      "labels_support": {
+        "bid_velocity": true,
+        "late_bid_pressure": true,
+        "price_acceleration": true,
+        "closing_time_concentration": true,
+        "similar_lot_clusters": true,
+        "price_dispersion": true,
+        "buyer_pressure": true,
+        "seller_opportunity": true
+      },
+      "notes": "Synthetic aggregates only; no bidder identity or collusion inference"
+    },
+    {
+      "batch_id": "watch_batch_4",
+      "owner_principal_fixture": "principal_fixture_buyer_a",
+      "auction_document_ids": [
+        "doc_auction_00016",
+        "doc_auction_00017",
+        "doc_auction_00018",
+        "doc_auction_00019",
+        "doc_auction_00020"
+      ],
+      "labels_support": {
+        "bid_velocity": true,
+        "late_bid_pressure": true,
+        "price_acceleration": true,
+        "closing_time_concentration": true,
+        "similar_lot_clusters": true,
+        "price_dispersion": true,
+        "buyer_pressure": true,
+        "seller_opportunity": true
+      },
+      "notes": "Synthetic aggregates only; no bidder identity or collusion inference"
+    },
+    {
+      "batch_id": "watch_batch_5",
+      "owner_principal_fixture": "principal_fixture_buyer_a",
+      "auction_document_ids": [
+        "doc_auction_00021",
+        "doc_auction_00022",
+        "doc_auction_00023",
+        "doc_auction_00024",
+        "doc_auction_00025"
+      ],
+      "labels_support": {
+        "bid_velocity": true,
+        "late_bid_pressure": true,
+        "price_acceleration": true,
+        "closing_time_concentration": true,
+        "similar_lot_clusters": true,
+        "price_dispersion": true,
+        "buyer_pressure": true,
+        "seller_opportunity": true
+      },
+      "notes": "Synthetic aggregates only; no bidder identity or collusion inference"
+    },
+    {
+      "batch_id": "watch_batch_6",
+      "owner_principal_fixture": "principal_fixture_buyer_a",
+      "auction_document_ids": [
+        "doc_auction_00026",
+        "doc_auction_00027",
+        "doc_auction_00028",
+        "doc_auction_00029",
+        "doc_auction_00030"
+      ],
+      "labels_support": {
+        "bid_velocity": true,
+        "late_bid_pressure": true,
+        "price_acceleration": true,
+        "closing_time_concentration": true,
+        "similar_lot_clusters": true,
+        "price_dispersion": true,
+        "buyer_pressure": true,
+        "seller_opportunity": true
+      },
+      "notes": "Synthetic aggregates only; no bidder identity or collusion inference"
+    },
+    {
+      "batch_id": "watch_batch_7",
+      "owner_principal_fixture": "principal_fixture_buyer_a",
+      "auction_document_ids": [
+        "doc_auction_00031",
+        "doc_auction_00032",
+        "doc_auction_00033",
+        "doc_auction_00034",
+        "doc_auction_00035"
+      ],
+      "labels_support": {
+        "bid_velocity": true,
+        "late_bid_pressure": true,
+        "price_acceleration": true,
+        "closing_time_concentration": true,
+        "similar_lot_clusters": true,
+        "price_dispersion": true,
+        "buyer_pressure": true,
+        "seller_opportunity": true
+      },
+      "notes": "Synthetic aggregates only; no bidder identity or collusion inference"
+    },
+    {
+      "batch_id": "watch_batch_8",
+      "owner_principal_fixture": "principal_fixture_buyer_a",
+      "auction_document_ids": [
+        "doc_auction_00036",
+        "doc_auction_00037",
+        "doc_auction_00038",
+        "doc_auction_00039",
+        "doc_auction_00040"
+      ],
+      "labels_support": {
+        "bid_velocity": true,
+        "late_bid_pressure": true,
+        "price_acceleration": true,
+        "closing_time_concentration": true,
+        "similar_lot_clusters": true,
+        "price_dispersion": true,
+        "buyer_pressure": true,
+        "seller_opportunity": true
+      },
+      "notes": "Synthetic aggregates only; no bidder identity or collusion inference"
+    },
+    {
+      "batch_id": "watch_batch_9",
+      "owner_principal_fixture": "principal_fixture_buyer_a",
+      "auction_document_ids": [
+        "doc_auction_00041",
+        "doc_auction_00042",
+        "doc_auction_00043",
+        "doc_auction_00044",
+        "doc_auction_00045"
+      ],
+      "labels_support": {
+        "bid_velocity": true,
+        "late_bid_pressure": true,
+        "price_acceleration": true,
+        "closing_time_concentration": true,
+        "similar_lot_clusters": true,
+        "price_dispersion": true,
+        "buyer_pressure": true,
+        "seller_opportunity": true
+      },
+      "notes": "Synthetic aggregates only; no bidder identity or collusion inference"
+    },
+    {
+      "batch_id": "watch_batch_10",
+      "owner_principal_fixture": "principal_fixture_buyer_a",
+      "auction_document_ids": [
+        "doc_auction_00046",
+        "doc_auction_00047",
+        "doc_auction_00048",
+        "doc_auction_00049",
+        "doc_auction_00050"
+      ],
+      "labels_support": {
+        "bid_velocity": true,
+        "late_bid_pressure": true,
+        "price_acceleration": true,
+        "closing_time_concentration": true,
+        "similar_lot_clusters": true,
+        "price_dispersion": true,
+        "buyer_pressure": true,
+        "seller_opportunity": true
+      },
+      "notes": "Synthetic aggregates only; no bidder identity or collusion inference"
+    }
+  ]
+}

@@ -37,6 +37,10 @@ tmp/
 !scripts/ai-platform/intelligence-output-schemas/**/*.schema.json
 !scripts/ai-platform/fixtures/
 !scripts/ai-platform/fixtures/**/*.json
+!scripts/ai-platform/data-source-lineage.json
+!scripts/ai-platform/retrieval-acceptance-policy.json
+!scripts/ai-platform/retrieval-corpus/
+!scripts/ai-platform/retrieval-corpus/**/*.json
 *.ndjson
 *.csv
 

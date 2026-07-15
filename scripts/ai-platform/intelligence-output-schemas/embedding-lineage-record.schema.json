@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/embedding-lineage-record.schema.json",
+  "title": "EmbeddingLineageRecord",
+  "description": "Phase 33B offline embedding lineage record. Supersets Phase 33A embedding metadata for fixture/evaluation use. Embedding generation is not foundation-model training. No production writes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "embedding_id",
+    "model_id",
+    "model_version",
+    "dimension",
+    "normalization",
+    "chunking_strategy",
+    "chunking_version",
+    "content_hash",
+    "source_id",
+    "source_entity_id",
+    "source_version",
+    "privacy_class",
+    "authorization_scope",
+    "created_at",
+    "source_updated_at",
+    "deletion_state",
+    "reembedding_reason",
+    "lineage",
+    "evidence",
+    "confidence",
+    "limitations"
+  ],
+  "properties": {
+    "embedding_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dimension": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096
+    },
+    "normalization": {
+      "type": "string",
+      "enum": ["none", "l2", "unit"]
+    },
+    "chunking_strategy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "chunking_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_entity_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "privacy_class": {
+      "type": "string",
+      "enum": [
+        "PUBLIC",
+        "MARKETPLACE_SHARED",
+        "OWNER_PRIVATE",
+        "THREAD_PRIVATE",
+        "DERIVED_PRIVATE",
+        "SENSITIVE",
+        "PROHIBITED"
+      ]
+    },
+    "authorization_scope": {
+      "type": "string",
+      "enum": [
+        "public_market",
+        "authenticated_market",
+        "owner_inventory",
+        "owner_collection",
+        "owner_watchlist",
+        "authorized_thread",
+        "authorized_session_memory"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deletion_state": {
+      "type": "string",
+      "enum": ["ACTIVE", "STALE", "REEMBED_REQUIRED", "DELETE_PENDING", "DELETED"]
+    },
+    "reembedding_reason": {
+      "type": ["string", "null"]
+    },
+    "lineage": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/source-lineage.schema.json"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+      }
+    },
+    "confidence": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/limitation.schema.json"
+      }
+    },
+    "synthetic_vector": {
+      "type": "array",
+      "description": "Optional tiny synthetic non-private test vector; never production embeddings.",
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 16
+    }
+  }
+}

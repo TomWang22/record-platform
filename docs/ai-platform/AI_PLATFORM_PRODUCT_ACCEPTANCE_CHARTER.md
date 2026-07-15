@@ -1,9 +1,11 @@
 # AI Platform Product Acceptance Charter
 
 ```text
-Status: OWNER REVIEW — PHASE 33A CONTRACTS ONLY
+Status: OWNER REVIEW — PHASE 33B LINEAGE/RETRIEVAL PACKAGE
 Phase 32H: COMPLETE (transport/runtime PASS; causal NO_CAUSAL_SEPARATION)
-Phase 33: PLAN/CONTRACT WORK ONLY — NOT LAUNCHED
+Phase 33A: COMPLETE
+Phase 33B: COMPLETE (offline lineage + retrieval corpus; no production writes)
+Phase 33C–33G: NOT LAUNCHED
 Production enablement: NOT APPROVED
 Production default: keyword
 PERCENT: 0
@@ -43,8 +45,11 @@ protocol behavior.
 | Output schemas | `scripts/ai-platform/intelligence-output-schemas/` |
 | Scenario-row schema | `scripts/ai-platform/intelligence-output-schemas/scenario-row.schema.json` |
 | Scenario preview inventory | `scripts/ai-platform/fixtures/scenario-preview/scenario-preview.json` |
-| Validator | `scripts/ai-platform/verify-intelligence-capability-contracts.mjs` |
-| Make target | `make ai-platform-verify-phase33a-contracts` |
+| Data-source lineage | `scripts/ai-platform/data-source-lineage.json` |
+| Retrieval corpus | `scripts/ai-platform/retrieval-corpus/` |
+| Retrieval acceptance policy | `scripts/ai-platform/retrieval-acceptance-policy.json` |
+| Phase 33A validator | `scripts/ai-platform/verify-intelligence-capability-contracts.mjs` |
+| Phase 33B validators | `make ai-platform-verify-phase33b` |
 
 Do not maintain a second capability matrix under `docs/`. Documentation links to
 the canonical matrix above.
@@ -111,8 +116,8 @@ ranking/retrieval, and abstention — not byte-identical prose.
 
 | Phase | Focus | Launched |
 | --- | --- | --- |
-| 33A | Capability contracts and output schemas | contracts only |
-| 33B | Data lineage, embeddings, retrieval corpus | NOT LAUNCHED |
+| 33A | Capability contracts and output schemas | COMPLETE (contracts only) |
+| 33B | Data lineage, embeddings, retrieval corpus | COMPLETE (offline fixtures only) |
 | 33C | Scarcity, valuation, auction intelligence | NOT LAUNCHED |
 | 33D | Negotiation assistance and recommendations | NOT LAUNCHED |
 | 33E | Market analytics and multi-turn recall | NOT LAUNCHED |
@@ -121,8 +126,9 @@ ranking/retrieval, and abstention — not byte-identical prose.
 
 ## Hard stops
 
-- No production enablement from Phase 32H or Phase 33A alone
-- No Phase 33B–33G workload without separate owner approval
+- No production enablement from Phase 32H, 33A, or 33B alone
+- No production embedding writes or DB migrations from Phase 33B
+- No Phase 33C–33G workload without separate owner approval
 - No automatic negotiation-message sending
 - No private-message cross-user retrieval
 - No unsupported market or valuation claims

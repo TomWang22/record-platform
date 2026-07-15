@@ -50,9 +50,12 @@ Both arms were clean for this synchronized workload. A clean protected arm does 
 Phase 32H is **transport/runtime validation** for a broader record-market AI
 intelligence platform. It does not accept product capabilities.
 
-Phase 33 continues as contract/planning work only until separately approved.
-See:
+Phase 33A (contracts) and Phase 33B (offline lineage/retrieval corpus) are
+source packages only. Phase 33C–33G and any live gauntlet remain NOT LAUNCHED
+until separately approved. See:
 
 - `docs/ai-platform/AI_PLATFORM_PRODUCT_ACCEPTANCE_CHARTER.md`
 - `docs/ai-platform/PHASE_33_INTELLIGENCE_CAPABILITY_GAUNTLET.md`
 - canonical matrix: `scripts/ai-platform/intelligence-capability-matrix.json`
+- lineage: `scripts/ai-platform/data-source-lineage.json`
+- corpus: `scripts/ai-platform/retrieval-corpus/`

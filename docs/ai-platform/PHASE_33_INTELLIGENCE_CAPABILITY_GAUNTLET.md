@@ -1,8 +1,8 @@
 # Phase 33 — Intelligence Capability Gauntlet
 
 ```text
-Status: PHASE 33A + 33B PACKAGES COMPLETE — LIVE GAUNTLET NOT LAUNCHED
-Phase 33C–33G: NOT LAUNCHED
+Status: PHASE 33A–33C PACKAGES COMPLETE — LIVE GAUNTLET NOT LAUNCHED
+Phase 33D–33G: NOT LAUNCHED
 Requires: separate owner approval before any executable product sub-phase
 ```
 
@@ -18,22 +18,28 @@ causal verdict `NO_CAUSAL_SEPARATION`; underlying historical ≥60s cause
 
 ## Canonical sources
 
-- Capability matrix:
-  `scripts/ai-platform/intelligence-capability-matrix.json`
-- Output schemas:
-  `scripts/ai-platform/intelligence-output-schemas/`
-- Data-source lineage:
-  `scripts/ai-platform/data-source-lineage.json`
-- Retrieval corpus:
-  `scripts/ai-platform/retrieval-corpus/`
-- Retrieval acceptance policy:
-  `scripts/ai-platform/retrieval-acceptance-policy.json`
-- Scenario preview (inventory only):
-  `scripts/ai-platform/fixtures/scenario-preview/scenario-preview.json`
+- Capability matrix: `scripts/ai-platform/intelligence-capability-matrix.json`
+- Data-source lineage: `scripts/ai-platform/data-source-lineage.json`
+- Retrieval corpus: `scripts/ai-platform/retrieval-corpus/`
+- Phase 33C scenarios: `scripts/ai-platform/phase33c-scenarios/`
+- Phase 33C policy: `scripts/ai-platform/phase33c-acceptance-policy.json`
 - Verify:
   - `make ai-platform-verify-phase33a-contracts`
   - `make ai-platform-verify-phase33b`
-  - `make ai-platform-evaluate-phase33b-retrieval-fixtures` (writes `/tmp` only)
+  - `make ai-platform-verify-phase33c`
+  - `make ai-platform-evaluate-phase33c-fixtures` (`/tmp` only)
+
+## Selected Phase 33C routes
+
+| Route | Module |
+| --- | --- |
+| `POST /ai/intelligence/scarcity` | `app.ai.market_intelligence` |
+| `POST /ai/intelligence/valuation` | `app.ai.market_intelligence` |
+| `POST /ai/intelligence/auction` | `app.ai.market_intelligence` |
+| `POST /ai/intelligence/auction/watchlist-temperature` | `app.ai.market_intelligence` |
+
+Legacy RAG routes (`/ai/records/valuation`, `/ai/auctions/risk`, etc.) remain
+and are not replaced.
 
 ## Program phases
 
@@ -41,24 +47,31 @@ causal verdict `NO_CAUSAL_SEPARATION`; underlying historical ≥60s cause
 | --- | --- | --- |
 | 33A | Capability contracts and output schemas | COMPLETE |
 | 33B | Data lineage, embeddings, retrieval evaluation corpus | COMPLETE (offline) |
-| 33C | Scarcity, valuation, auction intelligence | NOT LAUNCHED |
+| 33C | Scarcity, valuation, auction intelligence | COMPLETE (offline/fixture) |
 | 33D | Negotiation assistance and recommendations | NOT LAUNCHED |
 | 33E | Market analytics and multi-turn recall | NOT LAUNCHED |
 | 33F | Cross-protocol capability gauntlet | NOT LAUNCHED |
 | 33G | Targeted remediation and staging decision | NOT LAUNCHED |
 
-## Phase 33B deliverables
+## Phase 33B metric interpretation (not acceptance)
 
-- Machine-readable data-source inventory with privacy/auth/deletion lineage
-- Embedding lineage record schema + tiny synthetic fixture vectors
-- Development-band sanitized retrieval corpus (queries/documents/judgments/hard negatives)
-- Negotiation-thread and auction-watchlist support fixtures (synthetic)
-- Offline keyword / semantic_fixture / hybrid_fixture evaluator and metrics
-- Deletion/freshness/privacy isolation hard stops
-- Reports under `/tmp/phase33b-*` only (never committed)
+| Mode | Recall@5 | MRR | nDCG@5 |
+| --- | ---: | ---: | ---: |
+| keyword | 0.532 | 0.413 | 0.419 |
+| semantic_fixture | 0.137 | 0.079 | 0.083 |
+| hybrid_fixture | 0.564 | 0.401 | 0.389 |
 
-Phase 33B is **not** product acceptance and does not authorize production
-embedding writes, DB migrations, nonzero canary percents, or the live gauntlet.
+These are development baselines. They are **not** production acceptance.
+`semantic_fixture` is materially below an acceptable product-retrieval level.
+Hybrid does **not** justify a production-default change. Phase 33C defaults to
+deterministic metadata/keyword evidence selection.
+
+## Phase 33C notes
+
+- Structured envelope with evidence, confidence, limitations, abstention
+- Deterministic scoring / authorization / currency math in code
+- Model may only summarize after structured facts are validated
+- Embedding generation and prompt tuning are not model-weight training
 
 ## Hard stops
 
@@ -66,10 +79,8 @@ embedding writes, DB migrations, nonzero canary percents, or the live gauntlet.
 - Hybrid/vector production default remains NOT ENABLED
 - No live product matrix in CI
 - No `/tmp` generated reports committed
-- Embedding generation is not model training
-- No unsupported “model was trained” claims without weight-update artifacts
 
 ## Next action
 
-Owner review of Phase 33B corpus and metrics, then explicit approval for
-Phase 33C scarcity, valuation, and auction-intelligence implementation.
+Owner review of Phase 33C implementation and evidence-grounding behavior, then
+explicit approval for Phase 33D negotiation assistance and recommendations.

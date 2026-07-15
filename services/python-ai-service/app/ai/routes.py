@@ -10,6 +10,12 @@ from pydantic import BaseModel, Field
 from app.ai import insights
 from app.ai.config import AI_RAG_SHADOW_VECTOR
 from app.ai.kpi_query_observations import emit_rag_query_observation_safe
+from app.ai.market_intelligence import (
+    analyze_auction,
+    analyze_scarcity,
+    analyze_valuation,
+    analyze_watchlist_temperature,
+)
 from app.ai.server_timing import inject_redacted_rag_timing_details
 
 router = APIRouter(prefix="/ai", tags=["ai-platform"])
@@ -275,3 +281,77 @@ async def get_offer_insights(
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
 ):
     return await insights.offer_insights(user_id=_user_id(x_user_id, None), listing_id=listing_id)
+
+
+class IntelligenceBody(BaseModel):
+    """Phase 33C structured intelligence request (fixture-backed deterministic engines)."""
+
+    subject: Optional[dict] = None
+    candidates: Optional[list] = None
+    authorized_scopes: Optional[List[str]] = None
+    requesting_principal_fixture: Optional[str] = None
+    principal_id: Optional[str] = None
+    currency: Optional[str] = None
+    analysis_mode: Optional[str] = None
+    auction: Optional[dict] = None
+    watchlist_auctions: Optional[list] = None
+    watchlist_owner_principal_fixture: Optional[str] = None
+    unauthorized_watchlist: Optional[bool] = None
+    request_bidder_identity: Optional[bool] = None
+    claim_collusion: Optional[bool] = None
+    comparable_auctions: Optional[list] = None
+    active_supply_count: Optional[int] = None
+    recent_sale_count: Optional[int] = None
+    require_exact_pressing: Optional[bool] = None
+    claim_rarity_from_zero_results: Optional[bool] = None
+    unidentified_pressing: Optional[bool] = None
+    min_sold_comps: Optional[int] = None
+    scarcity_adjustment: Optional[float] = None
+    liquidity_adjustment: Optional[float] = None
+    condition_confidence: Optional[float] = None
+
+
+def _intelligence_payload(body: IntelligenceBody, x_user_id: Optional[str]) -> dict:
+    data = body.model_dump(exclude_none=True)
+    uid = _user_id(x_user_id, None)
+    if uid and "requesting_principal_fixture" not in data and "principal_id" not in data:
+        data["principal_id"] = uid
+    return data
+
+
+@router.post("/intelligence/scarcity")
+async def post_intelligence_scarcity(
+    body: IntelligenceBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Phase 33C scarcity — deterministic evidence engine (keyword/metadata default)."""
+    return analyze_scarcity(_intelligence_payload(body, x_user_id))
+
+
+@router.post("/intelligence/valuation")
+async def post_intelligence_valuation(
+    body: IntelligenceBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Phase 33C valuation — sold-vs-asking separated ranges (not legacy RAG valuation)."""
+    return analyze_valuation(_intelligence_payload(body, x_user_id))
+
+
+@router.post("/intelligence/auction")
+async def post_intelligence_auction(
+    body: IntelligenceBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Phase 33C single-auction intelligence (aggregates only; no bidder identity)."""
+    payload = _intelligence_payload(body, x_user_id)
+    payload["analysis_mode"] = "single_auction"
+    return analyze_auction(payload)
+
+
+@router.post("/intelligence/auction/watchlist-temperature")
+async def post_intelligence_watchlist_temperature(
+    body: IntelligenceBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Phase 33C authorized watchlist-batch market temperature."""
+    return analyze_watchlist_temperature(_intelligence_payload(body, x_user_id))

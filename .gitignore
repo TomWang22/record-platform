@@ -41,6 +41,9 @@ tmp/
 !scripts/ai-platform/retrieval-acceptance-policy.json
 !scripts/ai-platform/retrieval-corpus/
 !scripts/ai-platform/retrieval-corpus/**/*.json
+!scripts/ai-platform/phase33c-acceptance-policy.json
+!scripts/ai-platform/phase33c-scenarios/
+!scripts/ai-platform/phase33c-scenarios/**/*.json
 *.ndjson
 *.csv
 

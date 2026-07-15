@@ -377,6 +377,23 @@ ai-platform-verify-phase33b: ## Phase 33B aggregate offline lineage+corpus verif
 	$(MAKE) ai-platform-verify-phase33b-data-lineage
 	$(MAKE) ai-platform-verify-phase33b-retrieval-corpus
 
+ai-platform-verify-phase33c-scarcity: ## Phase 33C scarcity offline scenario verification
+	node scripts/ai-platform/verify-phase33c-scarcity.mjs
+
+ai-platform-verify-phase33c-valuation: ## Phase 33C valuation offline scenario verification
+	node scripts/ai-platform/verify-phase33c-valuation.mjs
+
+ai-platform-verify-phase33c-auction-intelligence: ## Phase 33C auction intelligence offline scenario verification
+	node scripts/ai-platform/verify-phase33c-auction-intelligence.mjs
+
+ai-platform-evaluate-phase33c-fixtures: ## Phase 33C offline intelligence evaluation (/tmp reports only)
+	node scripts/ai-platform/evaluate-phase33c-intelligence.mjs
+
+ai-platform-verify-phase33c: ## Phase 33C aggregate offline market-intelligence verification (no live gauntlet)
+	node scripts/ai-platform/verify-phase33c.mjs
+	node --test tests/phase33c-market-intelligence.test.mjs
+	cd services/python-ai-service && .venv/bin/pytest tests/test_phase33c_market_intelligence.py -q
+
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
 	$(MAKE) ai-platform-verify-phase32h-runner-memory
@@ -386,6 +403,7 @@ ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction in
 	$(MAKE) ai-platform-verify-phase32h-packet-index-lifecycle
 	$(MAKE) ai-platform-verify-phase33a-contracts
 	$(MAKE) ai-platform-verify-phase33b
+	$(MAKE) ai-platform-verify-phase33c
 	node --test tests/phase32h-targeted-manifest.test.mjs
 	node --test tests/phase32h-inflight-probe-registry.test.mjs
 	node --test tests/phase32h-extreme-watchdog.test.mjs

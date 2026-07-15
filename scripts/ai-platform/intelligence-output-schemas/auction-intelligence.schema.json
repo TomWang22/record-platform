@@ -46,7 +46,8 @@
         "neutral",
         "warm",
         "hot",
-        "overheated"
+        "overheated",
+        "insufficient_data"
       ]
     },
     "auction_count": {

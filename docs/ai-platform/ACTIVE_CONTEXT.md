@@ -132,7 +132,8 @@ Phase 32H: COMPLETE — transport/runtime PASS for baseline-r9 and protected caf
 Phase 32H closeout: docs/ai-platform/PHASE_32H_R1_CLOSEOUT.md
 Phase 33A: COMPLETE — schemas/matrix/fixtures/validator only; gauntlet NOT LAUNCHED
 Phase 33B: COMPLETE — data lineage, embedding lineage records, sanitized retrieval corpus, offline evaluator; live gauntlet NOT LAUNCHED; no production embedding writes
-Phase 33C–33G: NOT LAUNCHED
+Phase 33C: COMPLETE — scarcity/valuation/auction intelligence deterministic engines + routes + 550 scenarios; live gauntlet NOT LAUNCHED; retrieval default remains keyword
+Phase 33D–33G: NOT LAUNCHED
 Phase 31 evidence label: Phase 31D-R2 repaired staging long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
 Production enablement: NOT APPROVED — latency max outlier ~1,037,645 ms requires RCA before production KPI enablement; Phase 32H did not resolve root cause
 
@@ -220,4 +221,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Phase 32H-R1 COMPLETE with NO_CAUSAL_SEPARATION (do not claim host-suspension remediation). Phase 33A COMPLETE; Phase 33B COMPLETE (offline lineage + retrieval corpus). Verify with `make ai-platform-verify-phase33a-contracts` and `make ai-platform-verify-phase33b`. Do not launch Phase 33C–33G, production embedding writes, or any live capability gauntlet without separate owner approval. Production enablement NOT APPROVED; default keyword; PERCENT=0; ALLOW_PROD_PERCENT=0; hybrid/vector default NOT ENABLED. Canonical matrix: `scripts/ai-platform/intelligence-capability-matrix.json`. Lineage: `scripts/ai-platform/data-source-lineage.json`. Corpus: `scripts/ai-platform/retrieval-corpus/`.
+Phase 32H-R1 COMPLETE with NO_CAUSAL_SEPARATION (do not claim host-suspension remediation). Phase 33A–33C COMPLETE (contracts, offline lineage/retrieval, market intelligence). Verify with `make ai-platform-verify-phase33a-contracts`, `make ai-platform-verify-phase33b`, `make ai-platform-verify-phase33c`. Do not launch Phase 33D–33G, production embedding writes, semantic/hybrid defaults, or any live capability gauntlet without separate owner approval. Production enablement NOT APPROVED; default keyword; PERCENT=0; ALLOW_PROD_PERCENT=0; hybrid/vector default NOT ENABLED. Canonical matrix: `scripts/ai-platform/intelligence-capability-matrix.json`.

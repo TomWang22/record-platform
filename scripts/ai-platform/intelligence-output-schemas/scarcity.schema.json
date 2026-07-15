@@ -32,7 +32,8 @@
         "limited",
         "scarce",
         "rare",
-        "exceptional"
+        "exceptional",
+        "insufficient_data"
       ]
     },
     "active_supply_count": {

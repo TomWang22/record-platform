@@ -1,11 +1,12 @@
 # AI Platform Product Acceptance Charter
 
 ```text
-Status: OWNER REVIEW — PHASE 33B LINEAGE/RETRIEVAL PACKAGE
+Status: OWNER REVIEW — PHASE 33C MARKET INTELLIGENCE PACKAGE
 Phase 32H: COMPLETE (transport/runtime PASS; causal NO_CAUSAL_SEPARATION)
 Phase 33A: COMPLETE
 Phase 33B: COMPLETE (offline lineage + retrieval corpus; no production writes)
-Phase 33C–33G: NOT LAUNCHED
+Phase 33C: COMPLETE (scarcity/valuation/auction engines; fixture-only)
+Phase 33D–33G: NOT LAUNCHED
 Production enablement: NOT APPROVED
 Production default: keyword
 PERCENT: 0
@@ -118,7 +119,7 @@ ranking/retrieval, and abstention — not byte-identical prose.
 | --- | --- | --- |
 | 33A | Capability contracts and output schemas | COMPLETE (contracts only) |
 | 33B | Data lineage, embeddings, retrieval corpus | COMPLETE (offline fixtures only) |
-| 33C | Scarcity, valuation, auction intelligence | NOT LAUNCHED |
+| 33C | Scarcity, valuation, auction intelligence | COMPLETE (offline/fixture engines) |
 | 33D | Negotiation assistance and recommendations | NOT LAUNCHED |
 | 33E | Market analytics and multi-turn recall | NOT LAUNCHED |
 | 33F | Cross-protocol capability gauntlet | NOT LAUNCHED |
@@ -126,9 +127,10 @@ ranking/retrieval, and abstention — not byte-identical prose.
 
 ## Hard stops
 
-- No production enablement from Phase 32H, 33A, or 33B alone
-- No production embedding writes or DB migrations from Phase 33B
-- No Phase 33C–33G workload without separate owner approval
+- No production enablement from Phase 32H or Phase 33A–33C alone
+- No production embedding writes or DB migrations from Phase 33B/33C
+- No Phase 33D–33G workload without separate owner approval
+- Semantic/hybrid retrieval remain non-default (Phase 33B baselines are not acceptance)
 - No automatic negotiation-message sending
 - No private-message cross-user retrieval
 - No unsupported market or valuation claims

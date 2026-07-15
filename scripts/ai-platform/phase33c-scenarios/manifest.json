@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "phase": "33C",
+  "status": "SANITIZED_SCENARIO_INVENTORY_OFFLINE_ONLY",
+  "counts": {
+    "scarcity": 150,
+    "valuation": 200,
+    "auction_intelligence": 200,
+    "total": 550,
+    "scenario_classes": 32
+  },
+  "note": "Development scenarios for deterministic engines. Not live gauntlet. Embedding generation is not model training.",
+  "production_posture": {
+    "default": "keyword",
+    "PERCENT": 0,
+    "ALLOW_PROD_PERCENT": 0,
+    "hybrid_vector_production_default": "NOT_ENABLED"
+  }
+}

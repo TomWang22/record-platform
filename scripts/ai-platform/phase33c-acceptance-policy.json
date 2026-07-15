@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "phase": "33C",
+  "status": "FIXTURE_OFFLINE_ONLY_NOT_PRODUCTION_APPROVAL",
+  "phase33b_metric_interpretation": {
+    "keyword": { "Recall@5": 0.532, "MRR": 0.413, "nDCG@5": 0.419 },
+    "semantic_fixture": { "Recall@5": 0.137, "MRR": 0.079, "nDCG@5": 0.083 },
+    "hybrid_fixture": { "Recall@5": 0.564, "MRR": 0.401, "nDCG@5": 0.389 },
+    "notes": [
+      "Development measurements only; not production acceptance",
+      "semantic_fixture is materially below acceptable product-retrieval level",
+      "hybrid_fixture does not justify production-default change",
+      "Phase 33C uses deterministic metadata/keyword evidence as safe default",
+      "semantic/hybrid remain fixture-only or explicitly gated"
+    ],
+    "reclassified_as_pass": false
+  },
+  "hard_stops": {
+    "privacy_leakage": 0,
+    "cross_user_leakage": 0,
+    "deleted_source_retrieval": 0,
+    "wrong_pressing_exact_claims": 0,
+    "asking_as_sold_violations": 0,
+    "bidder_identity_exposure": 0,
+    "unsupported_manipulation_claims": 0,
+    "schema_invalid_outputs": 0,
+    "false_rarity_violations": 0,
+    "unsupported_rarity_claims": 0,
+    "unsupported_valuation_claims": 0
+  },
+  "development_quality_thresholds": {
+    "note": "Explicit conservative fixture thresholds; not silently lowered; not production enablement.",
+    "scarcity_abstention_precision_min": 0.85,
+    "valuation_abstention_precision_min": 0.85,
+    "auction_watchlist_auth_accuracy_min": 1.0,
+    "schema_valid_rate_min": 1.0
+  },
+  "scenario_minimums": {
+    "scarcity": 150,
+    "valuation": 200,
+    "auction_intelligence": 200,
+    "total": 550
+  },
+  "production_hard_stops": {
+    "default": "keyword",
+    "PERCENT": 0,
+    "ALLOW_PROD_PERCENT": 0,
+    "hybrid_vector_production_default": "NOT_ENABLED",
+    "production_embedding_writes": false,
+    "production_db_migration": false,
+    "semantic_retrieval_default": "NOT_ENABLED"
+  },
+  "selected_routes": [
+    "POST /ai/intelligence/scarcity",
+    "POST /ai/intelligence/valuation",
+    "POST /ai/intelligence/auction",
+    "POST /ai/intelligence/auction/watchlist-temperature"
+  ],
+  "legacy_routes_not_replaced": [
+    "POST /ai/records/valuation",
+    "POST /ai/auctions/risk",
+    "POST /ai/listings/pricing-advice"
+  ]
+}

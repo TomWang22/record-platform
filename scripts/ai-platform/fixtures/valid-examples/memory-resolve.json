@@ -1,0 +1,53 @@
+{
+  "operation": "resolve",
+  "authorization_scope": "owner_scoped_session",
+  "memory_classes_used": [
+    "conversation_only",
+    "session"
+  ],
+  "recalled_items": [
+    {
+      "memory_id": "mem_budget_1",
+      "memory_class": "session",
+      "classification": "recalled_fact",
+      "content_summary": "budget_max_32",
+      "confidence": 0.8,
+      "deletion_state": "ACTIVE",
+      "source_turn_ids": [
+        "turn_2"
+      ],
+      "reason_codes": [
+        "SESSION_MEMORY",
+        "CORRECTION_PRECEDENCE"
+      ]
+    }
+  ],
+  "excluded_items": [],
+  "current_facts": {
+    "budget": 32
+  },
+  "evidence": [
+    {
+      "evidence_id": "ev-mem-1",
+      "source_type": "authorized_thread_summary",
+      "source_id": "mem_budget_1",
+      "retrieved_at": "2026-07-15T12:00:00Z",
+      "summary": "Authorized session budget correction"
+    }
+  ],
+  "confidence": 0.7,
+  "limitations": [
+    {
+      "code": "FIXTURE_SESSION_ONLY",
+      "message": "Phase 33E uses fixture/session memory only",
+      "severity": "info"
+    }
+  ],
+  "false_memory_claims": 0,
+  "unauthorized_durable_write": false,
+  "forget_applied": null,
+  "abstention_reason": null,
+  "data_freshness": "2026-07-15T12:00:00Z",
+  "methodology": "phase33e_memory_resolve_v1",
+  "sample_size": 1
+}

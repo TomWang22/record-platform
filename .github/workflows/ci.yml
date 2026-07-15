@@ -367,6 +367,22 @@ jobs:
       - name: Phase 33D offline negotiation/recommendations verifier (no live gauntlet)
         run: make ai-platform-verify-phase33d
 
+  ai-platform-phase33e-intelligence:
+    name: Phase 33E market analytics and memory
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Phase 33E offline analytics/memory verifier (no live gauntlet)
+        run: make ai-platform-verify-phase33e
+
   git-no-cursor-trailers:
     name: Git no-Cursor trailer guard
     runs-on: ubuntu-latest

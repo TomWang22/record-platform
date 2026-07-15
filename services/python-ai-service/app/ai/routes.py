@@ -20,6 +20,11 @@ from app.ai.negotiation_recommendations import (
     analyze_negotiation,
     analyze_recommendations,
 )
+from app.ai.analytics_memory import (
+    analyze_market_analytics,
+    forget_memory,
+    resolve_memory,
+)
 from app.ai.server_timing import inject_redacted_rag_timing_details
 
 router = APIRouter(prefix="/ai", tags=["ai-platform"])
@@ -337,6 +342,27 @@ class IntelligenceBody(BaseModel):
     request_guaranteed_appreciation: Optional[bool] = None
     cross_user_collection_attempt: Optional[bool] = None
     cross_user_watchlist_attempt: Optional[bool] = None
+    # Phase 33E market analytics / memory
+    analytics_mode: Optional[str] = None
+    events: Optional[list] = None
+    time_range: Optional[dict] = None
+    population_size: Optional[int] = None
+    min_sample: Optional[int] = None
+    owner_principal_fixture: Optional[str] = None
+    unauthorized_scope: Optional[bool] = None
+    cross_user_attempt: Optional[bool] = None
+    request_causal_claim: Optional[bool] = None
+    request_future_price_prediction: Optional[bool] = None
+    operation: Optional[str] = None
+    memory_items: Optional[list] = None
+    thread_id: Optional[str] = None
+    forget_memory_ids: Optional[list] = None
+    forget_fact_keys: Optional[list] = None
+    max_recall: Optional[int] = None
+    allow_authorized_durable: Optional[bool] = None
+    request_fabricated_memory: Optional[bool] = None
+    claim_durable_without_record: Optional[bool] = None
+    request_unauthorized_durable_write: Optional[bool] = None
 
 
 def _intelligence_payload(body: IntelligenceBody, x_user_id: Optional[str]) -> dict:
@@ -401,3 +427,30 @@ async def post_intelligence_recommendations(
 ):
     """Phase 33D explainable recommendations — no pay-to-rank; keyword/metadata default."""
     return analyze_recommendations(_intelligence_payload(body, x_user_id))
+
+
+@router.post("/intelligence/market-analytics")
+async def post_intelligence_market_analytics(
+    body: IntelligenceBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Phase 33E market analytics — deterministic aggregates; no causal/prediction claims."""
+    return analyze_market_analytics(_intelligence_payload(body, x_user_id))
+
+
+@router.post("/intelligence/memory/resolve")
+async def post_intelligence_memory_resolve(
+    body: IntelligenceBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Phase 33E authorized memory resolve — fixture/session only; no durable private prod writes."""
+    return resolve_memory(_intelligence_payload(body, x_user_id))
+
+
+@router.post("/intelligence/memory/forget")
+async def post_intelligence_memory_forget(
+    body: IntelligenceBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Phase 33E forget/delete propagation for authorized fixture/session memory."""
+    return forget_memory(_intelligence_payload(body, x_user_id))

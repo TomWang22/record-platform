@@ -6,6 +6,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "analytics_mode",
     "scope",
     "time_range",
     "supply",
@@ -18,16 +19,59 @@
     "anomalies",
     "opportunities",
     "risks",
+    "population_size",
+    "sample_size",
     "evidence",
     "confidence",
     "limitations"
   ],
   "properties": {
+    "analytics_mode": {
+      "type": "string",
+      "enum": [
+        "release_market_summary",
+        "pressing_market_summary",
+        "price_distribution",
+        "liquidity_report",
+        "auction_trend",
+        "watchlist_market_report",
+        "seller_inventory_report",
+        "collection_report",
+        "market_temperature_history",
+        "comparable_market_movement"
+      ]
+    },
     "scope": {
       "type": "object"
     },
     "time_range": {
       "$ref": "https://record-platform.local/schemas/ai-platform/shared/time-range.schema.json"
+    },
+    "population_size": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "population_definition": {
+      "type": "object"
+    },
+    "methodology_contract": {
+      "type": "object"
+    },
+    "price_min": { "type": ["number", "null"] },
+    "price_max": { "type": ["number", "null"] },
+    "price_median": { "type": ["number", "null"] },
+    "price_mean": { "type": ["number", "null"] },
+    "sold_count": { "type": ["integer", "null"], "minimum": 0 },
+    "active_count": { "type": ["integer", "null"], "minimum": 0 },
+    "unsold_count": { "type": ["integer", "null"], "minimum": 0 },
+    "sell_through_rate": { "type": ["number", "null"] },
+    "median_time_to_sale": { "type": ["number", "null"] },
+    "liquidity_score": { "type": ["number", "null"] },
+    "price_trend": { "type": ["string", "null"] },
+    "volume_trend": { "type": ["string", "null"] },
+    "excluded_events": {
+      "type": "array",
+      "items": { "type": "object" }
     },
     "supply": {
       "type": "object"

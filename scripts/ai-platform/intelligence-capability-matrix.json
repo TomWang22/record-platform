@@ -1,6 +1,6 @@
 {
   "title": "Record-market AI intelligence capability matrix",
-  "status": "PHASE_33A_33B_33C_33D_OFFLINE_PACKAGES_LIVE_GAUNTLET_NOT_LAUNCHED",
+  "status": "PHASE_33A_33B_33C_33D_33E_OFFLINE_PACKAGES_LIVE_GAUNTLET_NOT_LAUNCHED",
   "schema_version": 1,
   "north_star": "complete_record_market_ai_intelligence_platform",
   "chat_is": "one_presentation_surface_only",
@@ -579,7 +579,7 @@
       "capability_id": "market_analytics",
       "display_name": "Market Analytics",
       "phase": "33E",
-      "status": "partial",
+      "status": "implemented",
       "product_surfaces": [
         "dashboards",
         "background_reports",
@@ -637,19 +637,28 @@
         "http3"
       ],
       "latency_class": "interactive",
-      "current_implementation_status": "partial",
-      "current_test_status": "missing",
+      "current_implementation_status": "implemented",
+      "current_test_status": "unit_and_scenario",
       "known_gaps": [
-        "methodology_fields_not_enforced"
+        "production_enablement_not_authorized",
+        "live_capability_gauntlet_not_launched",
+        "durable_private_memory_not_authorized"
       ],
       "owner_decisions_required": [
-        "approve_phase_33a_contracts"
+        "approve_phase_33f_live_gauntlet"
       ]
     }
   ],
   "multi_turn_recall": {
     "role": "platform_wide_evaluation_dimension",
-    "contract": "intelligence-output-schemas/memory-contract.schema.json"
+    "contract": "intelligence-output-schemas/memory-contract.schema.json",
+    "resolve_schema": "intelligence-output-schemas/memory-resolve.schema.json",
+    "phase_33e_status": "fixture_complete_session_and_authorized_durable_fixtures_only",
+    "durable_private_memory_authorized": false,
+    "routes": [
+      "POST /ai/intelligence/memory/resolve",
+      "POST /ai/intelligence/memory/forget"
+    ]
   },
   "scenario_row_schema": "intelligence-output-schemas/scenario-row.schema.json",
   "scenario_preview_path": "fixtures/scenario-preview/scenario-preview.json",

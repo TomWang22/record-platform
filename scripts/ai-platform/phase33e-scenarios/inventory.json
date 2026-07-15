@@ -1,0 +1,8 @@
+{
+  "phase": "33E",
+  "market_analytics": 320,
+  "multi_turn_memory": 320,
+  "total": 640,
+  "multi_turn_sessions": 48,
+  "privacy_adversarial": 95
+}

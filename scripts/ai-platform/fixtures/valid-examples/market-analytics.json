@@ -1,7 +1,9 @@
 {
   "scope": {
-    "genre": "demo"
+    "genre": "demo",
+    "release_id": "release_demo_1"
   },
+  "analytics_mode": "release_market_summary",
   "time_range": {
     "start": "2026-01-01T00:00:00Z",
     "end": "2026-07-01T00:00:00Z",
@@ -29,7 +31,29 @@
   "risks": [],
   "currency": "USD",
   "population": "public_listings_demo",
+  "population_size": 100,
+  "population_definition": {
+    "source_types": ["sale", "listing"],
+    "exact_pressing_required": false
+  },
   "aggregation_method": "median",
+  "methodology_contract": {
+    "version": "phase33e-methodology-v1",
+    "min_sample": 1
+  },
+  "price_min": 10,
+  "price_max": 40,
+  "price_median": 25,
+  "price_mean": 26,
+  "sold_count": 8,
+  "active_count": 10,
+  "unsold_count": 1,
+  "sell_through_rate": 0.3,
+  "median_time_to_sale": 12,
+  "liquidity_score": 0.4,
+  "price_trend": "stable",
+  "volume_trend": "stable",
+  "excluded_events": [],
   "evidence": [
     {
       "evidence_id": "ev-1",
@@ -48,7 +72,7 @@
     }
   ],
   "data_freshness": "2026-07-15T12:00:00Z",
-  "methodology": "public_aggregate_v0",
+  "methodology": "phase33e_deterministic_analytics_v1",
   "sample_size": 10,
   "abstention_reason": null,
   "authorization_scope": "public_market"

@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://record-platform.local/schemas/ai-platform/memory-resolve.schema.json",
+  "title": "MemoryResolveResult",
+  "description": "Authorized multi-turn memory resolve/forget result. No auto durable writes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operation",
+    "authorization_scope",
+    "memory_classes_used",
+    "recalled_items",
+    "excluded_items",
+    "current_facts",
+    "evidence",
+    "confidence",
+    "limitations",
+    "false_memory_claims",
+    "unauthorized_durable_write"
+  ],
+  "properties": {
+    "operation": {
+      "type": "string",
+      "enum": ["resolve", "forget"]
+    },
+    "authorization_scope": {
+      "type": "string"
+    },
+    "memory_classes_used": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "conversation_only",
+          "session",
+          "authorized_durable",
+          "derived_market_state",
+          "external_source_evidence"
+        ]
+      }
+    },
+    "recalled_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "memory_id",
+          "memory_class",
+          "classification",
+          "content_summary",
+          "confidence",
+          "deletion_state"
+        ],
+        "properties": {
+          "memory_id": { "type": "string" },
+          "memory_class": { "type": "string" },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "recalled_fact",
+              "current_turn_fact",
+              "derived_inference",
+              "external_evidence",
+              "unknown"
+            ]
+          },
+          "content_summary": { "type": "string" },
+          "confidence": { "type": "number" },
+          "deletion_state": {
+            "type": "string",
+            "enum": ["ACTIVE", "STALE", "SUPERSEDED", "DELETE_PENDING", "DELETED"]
+          },
+          "source_turn_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "excluded_items": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "current_facts": {
+      "type": "object"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/evidence-item.schema.json"
+      }
+    },
+    "confidence": {
+      "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://record-platform.local/schemas/ai-platform/shared/limitation.schema.json"
+      }
+    },
+    "false_memory_claims": {
+      "const": 0
+    },
+    "unauthorized_durable_write": {
+      "const": false
+    },
+    "forget_applied": {
+      "type": ["boolean", "null"]
+    },
+    "abstention_reason": {
+      "type": ["string", "null"]
+    },
+    "data_freshness": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "methodology": {
+      "type": ["string", "null"]
+    },
+    "sample_size": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    }
+  }
+}

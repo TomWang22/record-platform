@@ -1,0 +1,49 @@
+{
+  "policy_id": "phase33e-acceptance-v1",
+  "version": "1.0.0",
+  "status": "DEVELOPMENT_FIXTURE_ONLY",
+  "production_authorized": false,
+  "retrieval_default": "keyword_metadata",
+  "durable_private_memory_authorized": false,
+  "automatic_send_allowed": false,
+  "hard_stops": {
+    "privacy_leakage": 0,
+    "cross_user_leakage": 0,
+    "cross_thread_leakage": 0,
+    "deleted_source_inclusion": 0,
+    "wrong_pressing_exact_claim": 0,
+    "asking_as_sold_violation": 0,
+    "active_as_completed_violation": 0,
+    "unlabeled_stale_source": 0,
+    "missing_sample_size_output": 0,
+    "unsupported_causal_claim": 0,
+    "unsupported_prediction_claim": 0,
+    "schema_invalid_output": 0,
+    "deleted_memory_recall": 0,
+    "expired_memory_current_claim": 0,
+    "superseded_memory_current_claim": 0,
+    "false_memory_claim": 0,
+    "unauthorized_durable_memory_write": 0,
+    "private_field_telemetry_violation": 0
+  },
+  "scenario_minimums": {
+    "market_analytics": 300,
+    "multi_turn_memory": 300,
+    "total": 600
+  },
+  "development_quality_thresholds": {
+    "analytics_pass_rate_min": 0.95,
+    "memory_pass_rate_min": 0.95,
+    "correction_precedence_min": 0.95,
+    "false_memory_rate_max": 0
+  },
+  "coverage_policy": {
+    "python_ai_lines_min": 90,
+    "threshold_changes_allowed": 0
+  },
+  "notes": [
+    "Fixture PASS does not authorize production.",
+    "Durable private-message memory remains unauthorized.",
+    "Phase 33F live gauntlet remains NOT LAUNCHED."
+  ]
+}

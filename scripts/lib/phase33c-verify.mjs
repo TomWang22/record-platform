@@ -1,5 +1,6 @@
 /**
  * Phase 33C package validators (offline).
+ * Node-first CI verification; optional python-ai-service pytest when .venv exists.
  */
 import fs from 'node:fs';
 import path from 'node:path';

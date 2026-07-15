@@ -13,8 +13,10 @@ export const CORE_REQUIRED_WORKFLOW_NAMES = [
   'docker-build',
   'Protocol validation (static + fixtures)',
   'RP Namespace Lint',
-  'Git no-Cursor trailer guard',
 ];
+
+/** Required jobs within the `ci` workflow (not standalone workflows). */
+export const CORE_REQUIRED_CI_JOB_NAMES = ['Git no-Cursor trailer guard'];
 
 /** Required only when a run exists for the exact SHA (path-triggered). */
 export const CONDITIONAL_REQUIRED_WORKFLOW_NAMES = [
@@ -103,17 +105,30 @@ export function evaluateWorkflowRow(row) {
   if (row.required_status !== 'required') {
     return { ok: true, violations: [] };
   }
-  if (!row.run_id) {
+  const isCiJob = row.path_filter_classification === 'ci_job';
+  if (!isCiJob && !row.run_id) {
     violations.push(`missing required workflow run: ${row.name}`);
     return { ok: false, violations };
   }
+  if (row.status === 'missing') {
+    violations.push(
+      isCiJob ? `missing required CI job: ${row.name}` : `missing required workflow run: ${row.name}`,
+    );
+    return { ok: false, violations };
+  }
   if (row.status !== 'completed') {
-    violations.push(`workflow not completed: ${row.name} (${row.status})`);
+    violations.push(
+      `${isCiJob ? 'CI job' : 'workflow'} not completed: ${row.name} (${row.status})`,
+    );
   }
   if (BLOCKING_CONCLUSIONS.has(row.conclusion)) {
-    violations.push(`workflow not success: ${row.name} (${row.conclusion})`);
+    violations.push(
+      `${isCiJob ? 'CI job' : 'workflow'} not success: ${row.name} (${row.conclusion})`,
+    );
   } else if (row.conclusion !== 'success') {
-    violations.push(`workflow not success: ${row.name} (${row.conclusion ?? 'null'})`);
+    violations.push(
+      `${isCiJob ? 'CI job' : 'workflow'} not success: ${row.name} (${row.conclusion ?? 'null'})`,
+    );
   }
   if (row.path_filter_classification === 'unexpectedly_missing') {
     violations.push(`triggered workflow missing from approval input: ${row.name}`);
@@ -234,7 +249,11 @@ export function writeCiApprovalArtifact(sha, {
 } = {}) {
   const rows = workflowRows || [];
   const requiredRows = rows.filter((r) => r.required_status === 'required');
+  const corePresent = CORE_REQUIRED_WORKFLOW_NAMES.every((name) =>
+    rows.some((r) => r.name === name),
+  );
   const allGreen =
+    corePresent &&
     requiredRows.length > 0 &&
     requiredRows.every((row) => {
       const evalRow = evaluateWorkflowRow(row);
@@ -297,6 +316,58 @@ export function fetchWorkflowRunsForSha(sha, { repoRoot = process.cwd() } = {}) 
   return runs;
 }
 
+export function fetchCiJobSummaries(ciRunId, { repoRoot = process.cwd() } = {}) {
+  if (!ciRunId) return [];
+  const result = spawnSync(
+    'gh',
+    ['run', 'view', String(ciRunId), '--json', 'jobs'],
+    { cwd: repoRoot, encoding: 'utf8' },
+  );
+  if (result.status !== 0) {
+    throw new Error(`gh run view jobs failed: ${result.stderr || result.stdout}`);
+  }
+  const body = JSON.parse(result.stdout || '{}');
+  return (body.jobs || []).map((job) => ({
+    name: job.name,
+    status: job.status,
+    conclusion: job.conclusion ?? null,
+  }));
+}
+
+export function evaluateRequiredCiJobs(ciJobs = []) {
+  const violations = [];
+  const rows = [];
+  for (const name of CORE_REQUIRED_CI_JOB_NAMES) {
+    const job = ciJobs.find((j) => j.name === name);
+    if (!job) {
+      violations.push(`missing required CI job: ${name}`);
+      rows.push({
+        name,
+        status: 'missing',
+        conclusion: null,
+        required_status: 'required',
+        path_filter_classification: 'ci_job',
+        violation_reason: `missing required CI job: ${name}`,
+      });
+      continue;
+    }
+    const row = {
+      name,
+      status: job.status,
+      conclusion: job.conclusion,
+      required_status: 'required',
+      path_filter_classification: 'ci_job',
+      violation_reason: null,
+    };
+    if (job.status !== 'completed' || job.conclusion !== 'success') {
+      row.violation_reason = `CI job not success: ${name} (${job.status}/${job.conclusion})`;
+      violations.push(row.violation_reason);
+    }
+    rows.push(row);
+  }
+  return { violations, rows };
+}
+
 export function generateCiApprovalForHead({
   headSha,
   originMainSha,
@@ -306,11 +377,20 @@ export function generateCiApprovalForHead({
   const discovered = fetchWorkflowRunsForSha(headSha, { repoRoot });
   const files = changedFiles ?? listChangedFilesForSha(headSha, { repoRoot });
   const workflowRows = buildWorkflowApprovalRows(discovered, { changedFiles: files });
-  return writeCiApprovalArtifact(headSha, {
+  const ciRow = workflowRows.find((r) => r.name === 'ci');
+  const ciJobs = fetchCiJobSummaries(ciRow?.run_id, { repoRoot });
+  const jobEval = evaluateRequiredCiJobs(ciJobs);
+  workflowRows.push(...jobEval.rows);
+  const record = writeCiApprovalArtifact(headSha, {
     originMainSha,
     workflowRows,
     changedFiles: files,
   });
+  if (jobEval.violations.length) {
+    record.all_required_terminal_green = false;
+    fs.writeFileSync(approvalPathForSha(headSha), `${JSON.stringify(record, null, 2)}\n`, 'utf8');
+  }
+  return record;
 }
 
 export function assertCiApproval({ headSha, originMainSha, approvalRecord = null } = {}) {

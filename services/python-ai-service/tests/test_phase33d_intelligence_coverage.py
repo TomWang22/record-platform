@@ -1,4 +1,7 @@
-"""Phase 33D service/route coverage — behavior tests for uncovered branches."""
+"""Phase 33D service/route coverage — behavior tests for uncovered branches.
+
+These tests restore the python-ai-service lines gate without lowering thresholds.
+"""
 
 from __future__ import annotations
 

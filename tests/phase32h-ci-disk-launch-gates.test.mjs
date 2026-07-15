@@ -48,6 +48,15 @@ function goodWorkflows(sha) {
       required_status: 'required',
       path_filter_classification: 'triggered',
     },
+    {
+      name: 'Git no-Cursor trailer guard',
+      run_id: 0,
+      status: 'completed',
+      conclusion: 'success',
+      head_sha: sha,
+      required_status: 'required',
+      path_filter_classification: 'ci_job',
+    },
   ];
 }
 

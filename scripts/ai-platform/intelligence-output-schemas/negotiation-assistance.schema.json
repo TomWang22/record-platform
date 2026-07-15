@@ -20,6 +20,7 @@
     "risk_flags",
     "reply_drafts",
     "auto_send",
+    "automatic_send_allowed",
     "impersonation",
     "evidence",
     "confidence",
@@ -137,11 +138,30 @@
     "auto_send": {
       "const": false
     },
+    "automatic_send_allowed": {
+      "const": false
+    },
     "impersonation": {
       "const": false
     },
     "cross_user_thread_retrieval": {
       "const": false
+    },
+    "thread_scope": {
+      "type": "object"
+    },
+    "memory_labels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "conversation_only",
+          "session",
+          "authorized_durable",
+          "external_market_evidence",
+          "derived_negotiation_state"
+        ]
+      }
     },
     "evidence": {
       "type": "array",

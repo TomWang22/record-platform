@@ -120,18 +120,19 @@ ranking/retrieval, and abstention — not byte-identical prose.
 | 33A | Capability contracts and output schemas | COMPLETE (contracts only) |
 | 33B | Data lineage, embeddings, retrieval corpus | COMPLETE (offline fixtures only) |
 | 33C | Scarcity, valuation, auction intelligence | COMPLETE (offline/fixture engines) |
-| 33D | Negotiation assistance and recommendations | NOT LAUNCHED |
+| 33D | Negotiation assistance and recommendations | COMPLETE (offline/fixture engines) |
 | 33E | Market analytics and multi-turn recall | NOT LAUNCHED |
 | 33F | Cross-protocol capability gauntlet | NOT LAUNCHED |
 | 33G | Remediation and staging decision | NOT LAUNCHED |
 
 ## Hard stops
 
-- No production enablement from Phase 32H or Phase 33A–33C alone
-- No production embedding writes or DB migrations from Phase 33B/33C
-- No Phase 33D–33G workload without separate owner approval
+- No production enablement from Phase 32H or Phase 33A–33D alone
+- No production embedding writes or DB migrations from Phase 33B/33C/33D
+- No Phase 33E–33G workload without separate owner approval
 - Semantic/hybrid retrieval remain non-default (Phase 33B baselines are not acceptance)
 - No automatic negotiation-message sending
 - No private-message cross-user retrieval
 - No unsupported market or valuation claims
+- No hidden pay-to-rank recommendations
 - No committing `/tmp` generated capability-plan reports

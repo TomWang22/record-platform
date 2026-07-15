@@ -33,12 +33,22 @@
   ],
   "reply_drafts": {
     "concise": "Would you consider 24?",
-    "friendly": "Thanks \u2014 would 24 work?",
+    "friendly": "Thanks — would 24 work?",
     "firm": "My max is near 28."
   },
   "auto_send": false,
+  "automatic_send_allowed": false,
   "impersonation": false,
   "cross_user_thread_retrieval": false,
+  "thread_scope": {
+    "thread_id": "thread-authorized-demo",
+    "participant_side": "buyer"
+  },
+  "memory_labels": [
+    "conversation_only",
+    "session",
+    "external_market_evidence"
+  ],
   "evidence": [
     {
       "evidence_id": "ev-1",

@@ -1,7 +1,17 @@
 {
+  "recommendation_mode": "collection_gap",
+  "recommendation_scope": {
+    "principal": "principal_fixture_buyer_a",
+    "authorized_scopes": ["owner_collection", "authenticated_market"]
+  },
+  "candidate_summary": {
+    "considered": 12,
+    "returned": 1
+  },
   "recommendations": [
     {
       "entity_id": "listing-public-001",
+      "entity_type": "listing",
       "rank": 1,
       "score": 0.8,
       "reason_codes": [
@@ -17,13 +27,26 @@
           "summary": "Public sold comparable within 90 days"
         }
       ],
-      "confidence": 0.5
+      "confidence": 0.5,
+      "budget_fit": {
+        "within_budget": true
+      },
+      "availability": {
+        "status": "available"
+      },
+      "risk_flags": [],
+      "factor_contributions": {
+        "collection_gap": 0.4,
+        "budget_fit": 0.2
+      }
     }
   ],
   "diversity_summary": {
     "unique_artists": 1
   },
   "excluded_candidates": [],
+  "pay_to_rank": false,
+  "automatic_send_allowed": false,
   "evidence": [
     {
       "evidence_id": "ev-1",

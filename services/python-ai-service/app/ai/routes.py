@@ -16,6 +16,10 @@ from app.ai.market_intelligence import (
     analyze_valuation,
     analyze_watchlist_temperature,
 )
+from app.ai.negotiation_recommendations import (
+    analyze_negotiation,
+    analyze_recommendations,
+)
 from app.ai.server_timing import inject_redacted_rag_timing_details
 
 router = APIRouter(prefix="/ai", tags=["ai-platform"])
@@ -284,7 +288,7 @@ async def get_offer_insights(
 
 
 class IntelligenceBody(BaseModel):
-    """Phase 33C structured intelligence request (fixture-backed deterministic engines)."""
+    """Phase 33C/33D structured intelligence request (fixture-backed deterministic engines)."""
 
     subject: Optional[dict] = None
     candidates: Optional[list] = None
@@ -309,6 +313,30 @@ class IntelligenceBody(BaseModel):
     scarcity_adjustment: Optional[float] = None
     liquidity_adjustment: Optional[float] = None
     condition_confidence: Optional[float] = None
+    # Phase 33D negotiation / recommendations
+    participant_side: Optional[str] = None
+    authorized_thread_id: Optional[str] = None
+    thread: Optional[dict] = None
+    messages: Optional[list] = None
+    offers: Optional[list] = None
+    market_candidates: Optional[list] = None
+    asking_price: Optional[float] = None
+    budget: Optional[float] = None
+    seller_minimum: Optional[float] = None
+    recommendation_mode: Optional[str] = None
+    owned_entity_ids: Optional[list] = None
+    negative_preferences: Optional[list] = None
+    allow_public_cold_start: Optional[bool] = None
+    max_results: Optional[int] = None
+    max_per_artist: Optional[int] = None
+    required_format: Optional[str] = None
+    unauthorized_thread: Optional[bool] = None
+    request_auto_send: Optional[bool] = None
+    request_impersonation: Optional[bool] = None
+    request_fabricated_leverage: Optional[bool] = None
+    request_guaranteed_appreciation: Optional[bool] = None
+    cross_user_collection_attempt: Optional[bool] = None
+    cross_user_watchlist_attempt: Optional[bool] = None
 
 
 def _intelligence_payload(body: IntelligenceBody, x_user_id: Optional[str]) -> dict:
@@ -355,3 +383,21 @@ async def post_intelligence_watchlist_temperature(
 ):
     """Phase 33C authorized watchlist-batch market temperature."""
     return analyze_watchlist_temperature(_intelligence_payload(body, x_user_id))
+
+
+@router.post("/intelligence/negotiation")
+async def post_intelligence_negotiation(
+    body: IntelligenceBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Phase 33D negotiation assistance — advisory only; automatic_send_allowed=false."""
+    return analyze_negotiation(_intelligence_payload(body, x_user_id))
+
+
+@router.post("/intelligence/recommendations")
+async def post_intelligence_recommendations(
+    body: IntelligenceBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Phase 33D explainable recommendations — no pay-to-rank; keyword/metadata default."""
+    return analyze_recommendations(_intelligence_payload(body, x_user_id))

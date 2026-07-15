@@ -50,7 +50,7 @@ Both arms were clean for this synchronized workload. A clean protected arm does 
 Phase 32H is **transport/runtime validation** for a broader record-market AI
 intelligence platform. It does not accept product capabilities.
 
-Phase 33A–33C source packages are offline contracts/engines only. Phase 33D–33G
+Phase 33A–33D source packages are offline contracts/engines only. Phase 33E–33G
 and any live gauntlet remain NOT LAUNCHED until separately approved. See:
 
 - `docs/ai-platform/AI_PLATFORM_PRODUCT_ACCEPTANCE_CHARTER.md`

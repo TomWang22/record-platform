@@ -6,14 +6,38 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "recommendation_mode",
+    "recommendation_scope",
     "recommendations",
     "diversity_summary",
+    "candidate_summary",
     "excluded_candidates",
+    "pay_to_rank",
     "evidence",
     "confidence",
     "limitations"
   ],
   "properties": {
+    "recommendation_mode": {
+      "type": "string",
+      "enum": [
+        "similar_release",
+        "collection_gap",
+        "budget_opportunity",
+        "auction_watch",
+        "condition_upgrade",
+        "seller_restock",
+        "sell_hold_watch",
+        "portfolio_diversification",
+        "market_opportunity"
+      ]
+    },
+    "recommendation_scope": {
+      "type": "object"
+    },
+    "candidate_summary": {
+      "type": "object"
+    },
     "recommendations": {
       "type": "array",
       "items": {
@@ -21,6 +45,7 @@
         "additionalProperties": false,
         "required": [
           "entity_id",
+          "entity_type",
           "rank",
           "score",
           "reason_codes",
@@ -31,6 +56,16 @@
         "properties": {
           "entity_id": {
             "type": "string"
+          },
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "release",
+              "listing",
+              "auction",
+              "pressing",
+              "market_action"
+            ]
           },
           "rank": {
             "type": "integer",
@@ -57,6 +92,21 @@
           },
           "confidence": {
             "$ref": "https://record-platform.local/schemas/ai-platform/shared/confidence.schema.json"
+          },
+          "budget_fit": {
+            "type": "object"
+          },
+          "availability": {
+            "type": "object"
+          },
+          "risk_flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "factor_contributions": {
+            "type": "object"
           }
         }
       }
@@ -69,6 +119,12 @@
       "items": {
         "type": "object"
       }
+    },
+    "pay_to_rank": {
+      "const": false
+    },
+    "automatic_send_allowed": {
+      "const": false
     },
     "evidence": {
       "type": "array",

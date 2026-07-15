@@ -398,6 +398,24 @@ ai-platform-verify-phase33c: ## Phase 33C aggregate offline market-intelligence 
 	  echo "phase33c: skipping python service tests (no services/python-ai-service/.venv); Node deterministic engines verified"; \
 	fi
 
+ai-platform-verify-phase33d-negotiation: ## Phase 33D negotiation offline scenario verification
+	node scripts/ai-platform/verify-phase33d-negotiation.mjs
+
+ai-platform-verify-phase33d-recommendations: ## Phase 33D recommendations offline scenario verification
+	node scripts/ai-platform/verify-phase33d-recommendations.mjs
+
+ai-platform-evaluate-phase33d-fixtures: ## Phase 33D offline negotiation/recommendation evaluation (/tmp reports only)
+	node scripts/ai-platform/evaluate-phase33d-intelligence.mjs
+
+ai-platform-verify-phase33d: ## Phase 33D aggregate offline negotiation+recommendations verification (no live gauntlet)
+	node scripts/ai-platform/verify-phase33d.mjs
+	node --test tests/phase33d-negotiation-recommendations.test.mjs
+	@if [ -x services/python-ai-service/.venv/bin/pytest ]; then \
+	  cd services/python-ai-service && .venv/bin/pytest tests/test_phase33d_negotiation_recommendations.py -q; \
+	else \
+	  echo "phase33d: skipping python service tests (no services/python-ai-service/.venv); Node deterministic engines verified"; \
+	fi
+
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
 	$(MAKE) ai-platform-verify-phase32h-runner-memory
@@ -408,6 +426,7 @@ ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction in
 	$(MAKE) ai-platform-verify-phase33a-contracts
 	$(MAKE) ai-platform-verify-phase33b
 	$(MAKE) ai-platform-verify-phase33c
+	$(MAKE) ai-platform-verify-phase33d
 	node --test tests/phase32h-targeted-manifest.test.mjs
 	node --test tests/phase32h-inflight-probe-registry.test.mjs
 	node --test tests/phase32h-extreme-watchdog.test.mjs

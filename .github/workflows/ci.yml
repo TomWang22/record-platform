@@ -351,6 +351,22 @@ jobs:
       - name: Phase 33C offline intelligence verifier (no live gauntlet)
         run: make ai-platform-verify-phase33c
 
+  ai-platform-phase33d-intelligence:
+    name: Phase 33D negotiation and recommendations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Phase 33D offline negotiation/recommendations verifier (no live gauntlet)
+        run: make ai-platform-verify-phase33d
+
   git-no-cursor-trailers:
     name: Git no-Cursor trailer guard
     runs-on: ubuntu-latest

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import {
@@ -8,7 +7,10 @@ import {
   writeCiApprovalArtifact,
   approvalPathForSha,
   CI_APPROVAL_DIR,
-  REQUIRED_WORKFLOW_NAMES,
+  CORE_REQUIRED_WORKFLOW_NAMES,
+  buildWorkflowApprovalRows,
+  classifyWorkflowRequirement,
+  commitTouchesCoveragePaths,
 } from '../scripts/lib/phase32h-ci-approval.mjs';
 import {
   DISK_EXECUTION_SAFETY_MARGIN_BYTES,
@@ -27,27 +29,40 @@ const SHA_A = 'a'.repeat(40);
 const SHA_B = 'b'.repeat(40);
 
 function goodWorkflows(sha) {
-  return REQUIRED_WORKFLOW_NAMES.map((name, idx) => ({
-    name,
-    run_id: 1000 + idx,
-    status: 'completed',
-    conclusion: 'success',
-    head_sha: sha,
-  }));
+  return [
+    ...CORE_REQUIRED_WORKFLOW_NAMES.map((name, idx) => ({
+      name,
+      run_id: 1000 + idx,
+      status: 'completed',
+      conclusion: 'success',
+      head_sha: sha,
+      required_status: 'required',
+      path_filter_classification: 'core_required',
+    })),
+    {
+      name: 'coverage',
+      run_id: 2000,
+      status: 'completed',
+      conclusion: 'success',
+      head_sha: sha,
+      required_status: 'required',
+      path_filter_classification: 'triggered',
+    },
+  ];
 }
 
 function writeApproval(sha, workflows, originSha = sha) {
   fs.mkdirSync(CI_APPROVAL_DIR, { recursive: true });
   return writeCiApprovalArtifact(sha, {
     originMainSha: originSha,
-    requiredWorkflows: workflows,
+    workflowRows: workflows,
   });
 }
 
 describe('phase32h CI approval gate', () => {
   it('CI queued blocks launch', () => {
     const record = writeApproval(SHA_A, [
-      { name: 'ci', run_id: 1, status: 'queued', conclusion: null, head_sha: SHA_A },
+      { name: 'ci', run_id: 1, status: 'queued', conclusion: null, head_sha: SHA_A, required_status: 'required', path_filter_classification: 'core_required' },
       ...goodWorkflows(SHA_A).slice(1),
     ]);
     const report = evaluateCiApprovalRecord(record, { headSha: SHA_A, originMainSha: SHA_A });
@@ -104,6 +119,67 @@ describe('phase32h CI approval gate', () => {
     const report = evaluateCiApprovalRecord(record, { headSha: SHA_A, originMainSha: SHA_A });
     assert.equal(report.status, 'PASS');
     assert.equal(report.all_required_terminal_green, true);
+  });
+});
+
+describe('phase33d coverage approval hardening', () => {
+  it('coverage failed blocks approval', () => {
+    const rows = goodWorkflows(SHA_A).map((w) =>
+      w.name === 'coverage' ? { ...w, status: 'completed', conclusion: 'failure' } : w,
+    );
+    const record = writeApproval(SHA_A, rows);
+    const report = evaluateCiApprovalRecord(record, { headSha: SHA_A, originMainSha: SHA_A });
+    assert.equal(report.status, 'BLOCKED');
+    assert.ok(report.violations.some((v) => v.includes('coverage')));
+  });
+
+  it('coverage still running blocks approval', () => {
+    const rows = goodWorkflows(SHA_A).map((w) =>
+      w.name === 'coverage' ? { ...w, status: 'in_progress', conclusion: null } : w,
+    );
+    const record = writeApproval(SHA_A, rows);
+    const report = evaluateCiApprovalRecord(record, { headSha: SHA_A, originMainSha: SHA_A });
+    assert.equal(report.status, 'BLOCKED');
+  });
+
+  it('triggered coverage missing from approval input blocks', () => {
+    const changed = ['services/python-ai-service/app/ai/routes.py'];
+    const discovered = goodWorkflows(SHA_A)
+      .filter((w) => w.name !== 'coverage')
+      .map(({ required_status, path_filter_classification, ...rest }) => rest);
+    const rows = buildWorkflowApprovalRows(discovered, { changedFiles: changed });
+    const record = writeApproval(SHA_A, rows);
+    const report = evaluateCiApprovalRecord(record, { headSha: SHA_A, originMainSha: SHA_A });
+    assert.equal(report.status, 'BLOCKED');
+    assert.ok(rows.some((r) => r.name === 'coverage' && r.path_filter_classification === 'unexpectedly_missing'));
+  });
+
+  it('coverage legitimately path-filtered is documented skip', () => {
+    const changed = ['docs/README.md'];
+    const discovered = goodWorkflows(SHA_A)
+      .filter((w) => w.name !== 'coverage')
+      .map(({ required_status, path_filter_classification, ...rest }) => rest);
+    const rows = buildWorkflowApprovalRows(discovered, { changedFiles: changed });
+    const coverageRow = rows.find((r) => r.name === 'coverage');
+    assert.equal(coverageRow.path_filter_classification, 'not_triggered');
+    assert.equal(coverageRow.required_status, 'optional');
+  });
+
+  it('all required workflows successful passes with triggered coverage', () => {
+    const record = writeApproval(SHA_A, goodWorkflows(SHA_A));
+    const report = evaluateCiApprovalRecord(record, { headSha: SHA_A, originMainSha: SHA_A });
+    assert.equal(report.status, 'PASS');
+  });
+
+  it('empty workflow discovery blocks approval', () => {
+    const record = writeApproval(SHA_A, []);
+    const report = evaluateCiApprovalRecord(record, { headSha: SHA_A, originMainSha: SHA_A });
+    assert.equal(report.status, 'BLOCKED');
+  });
+
+  it('commitTouchesCoveragePaths detects services changes', () => {
+    assert.equal(commitTouchesCoveragePaths(['services/python-ai-service/app/ai/routes.py']), true);
+    assert.equal(classifyWorkflowRequirement('coverage', { changedFiles: ['services/x'] }).path_filter_classification, 'unexpectedly_missing');
   });
 });
 

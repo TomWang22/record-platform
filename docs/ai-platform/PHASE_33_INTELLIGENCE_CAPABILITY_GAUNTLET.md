@@ -53,7 +53,7 @@ etc.) remain and are not replaced.
 | 33A | Capability contracts and output schemas | COMPLETE |
 | 33B | Data lineage, embeddings, retrieval evaluation corpus | COMPLETE (offline) |
 | 33C | Scarcity, valuation, auction intelligence | COMPLETE (offline/fixture) |
-| 33D | Negotiation assistance and recommendations | COMPLETE (offline/fixture) |
+| 33D | Negotiation assistance and recommendations | COVERAGE REPAIR (prior SHA approval invalidated; terminal COMPLETE after exact-SHA coverage green) |
 | 33E | Market analytics and multi-turn recall | NOT LAUNCHED |
 | 33F | Cross-protocol capability gauntlet | NOT LAUNCHED |
 | 33G | Targeted remediation and staging decision | NOT LAUNCHED |

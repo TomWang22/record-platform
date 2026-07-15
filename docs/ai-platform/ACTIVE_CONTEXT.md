@@ -135,7 +135,8 @@ Phase 33B: COMPLETE — data lineage, embedding lineage records, sanitized retri
 Phase 33C: COMPLETE — scarcity/valuation/auction intelligence deterministic engines + routes + 550 scenarios; live gauntlet NOT LAUNCHED; retrieval default remains keyword
 Phase 33D: COMPLETE — negotiation/recommendations + coverage/approval hardening; automatic send DISABLED; live gauntlet NOT LAUNCHED
 Phase 33E: COMPLETE — market analytics + multi-turn memory (fixture/session only); durable private memory NOT AUTHORIZED; live gauntlet NOT LAUNCHED
-Phase 33F–33G: NOT LAUNCHED
+Phase 33F: READINESS PACKAGE COMPLETE — canary BLOCKED on semantic_fixture Recall@5 (<0.35); 720-probe canary NOT LAUNCHED; 17280 target NOT LAUNCHED
+Phase 33G: NOT LAUNCHED
 Phase 31 evidence label: Phase 31D-R2 repaired staging long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
 Production enablement: NOT APPROVED — latency max outlier ~1,037,645 ms requires RCA before production KPI enablement; Phase 32H did not resolve root cause
 
@@ -223,4 +224,4 @@ Explainer docs (Phase 26H) + supersession guard (26J):
 - docs/ai-platform/PHASE_26J_ARCHIVE_SUPERSESSION_GUARD.md
 
 Next allowed step:
-Phase 32H-R1 COMPLETE with NO_CAUSAL_SEPARATION (do not claim host-suspension remediation). Phase 33A–33E COMPLETE (contracts, offline lineage/retrieval, market intelligence, negotiation/recommendations, market analytics + fixture/session memory). Verify with `make ai-platform-verify-phase33a-contracts`, `make ai-platform-verify-phase33b`, `make ai-platform-verify-phase33c`, `make ai-platform-verify-phase33d`, `make ai-platform-verify-phase33e`. Do not launch Phase 33F–33G, production embedding writes, semantic/hybrid defaults, automatic negotiation sending, durable private-message memory, or any live capability gauntlet without separate owner approval. Production enablement NOT APPROVED; default keyword; PERCENT=0; ALLOW_PROD_PERCENT=0; hybrid/vector default NOT ENABLED; automatic negotiation sending DISABLED. Canonical matrix: `scripts/ai-platform/intelligence-capability-matrix.json`.
+Phase 32H-R1 COMPLETE with NO_CAUSAL_SEPARATION (do not claim host-suspension remediation). Phase 33A–33E COMPLETE; Phase 33F readiness package present but canary FAIL-CLOSED on semantic_fixture Recall@5 (0.137 < 0.35). Verify with `make ai-platform-verify-phase33a-contracts` … `make ai-platform-verify-phase33f`. Do not create the 720-probe canary root while readiness is BLOCKED; do not launch the 17280 target or Phase 33G without separate owner approval. Production enablement NOT APPROVED; default keyword; PERCENT=0; ALLOW_PROD_PERCENT=0; hybrid/vector default NOT ENABLED; automatic negotiation sending DISABLED. Canonical matrix: `scripts/ai-platform/intelligence-capability-matrix.json`.

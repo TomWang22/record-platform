@@ -122,14 +122,15 @@ ranking/retrieval, and abstention — not byte-identical prose.
 | 33C | Scarcity, valuation, auction intelligence | COMPLETE (offline/fixture engines) |
 | 33D | Negotiation assistance and recommendations | COMPLETE (offline/fixture engines) |
 | 33E | Market analytics and multi-turn recall | COMPLETE (fixture offline; durable private memory NOT AUTHORIZED) |
-| 33F | Cross-protocol capability gauntlet | NOT LAUNCHED |
+| 33F | Cross-protocol capability gauntlet | READINESS PACKAGE; CANARY BLOCKED pending semantic retrieval quality |
 | 33G | Remediation and staging decision | NOT LAUNCHED |
 
 ## Hard stops
 
 - No production enablement from Phase 32H or Phase 33A–33D alone
 - No production embedding writes or DB migrations from Phase 33B/33C/33D
-- No Phase 33F–33G workload without separate owner approval
+- Phase 33F canary requires offline quality READY (including semantic_fixture development floors); target 17280 requires a further separate approval
+- No Phase 33G workload without separate owner approval
 - No durable private-message memory or production analytics enablement without separate owner approval
 - Semantic/hybrid retrieval remain non-default (Phase 33B baselines are not acceptance)
 - No automatic negotiation-message sending

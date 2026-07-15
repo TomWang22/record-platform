@@ -434,6 +434,25 @@ ai-platform-verify-phase33e: ## Phase 33E aggregate offline analytics+memory ver
 	  echo "phase33e: skipping python service tests (no services/python-ai-service/.venv); Node deterministic engines verified"; \
 	fi
 
+ai-platform-verify-phase33f-manifest: ## Phase 33F canonical 720-probe manifest validation (offline)
+	node scripts/ai-platform/verify-phase33f-manifest.mjs
+
+ai-platform-verify-phase33f-readiness: ## Phase 33F offline quality readiness (exit 3 when BLOCKED)
+	node scripts/ai-platform/verify-phase33f-readiness.mjs
+
+ai-platform-verify-phase33f-protocol-parity: ## Phase 33F normalized protocol-parity evaluator (offline demo fixtures)
+	node scripts/ai-platform/verify-phase33f-protocol-parity.mjs
+
+ai-platform-verify-phase33f-collectors: ## Phase 33F collector contract stub (no live PCAP)
+	node scripts/ai-platform/verify-phase33f-collectors.mjs
+
+ai-platform-verify-phase33f-canary: ## Phase 33F canary gate — refuses launch when readiness BLOCKED
+	node scripts/ai-platform/verify-phase33f-canary.mjs
+
+ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readiness); no live 720 canary
+	node scripts/ai-platform/verify-phase33f.mjs
+	node --test tests/phase33f-capability-gauntlet.test.mjs
+
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
 	$(MAKE) ai-platform-verify-phase32h-runner-memory
@@ -446,6 +465,7 @@ ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction in
 	$(MAKE) ai-platform-verify-phase33c
 	$(MAKE) ai-platform-verify-phase33d
 	$(MAKE) ai-platform-verify-phase33e
+	$(MAKE) ai-platform-verify-phase33f
 	node --test tests/phase32h-targeted-manifest.test.mjs
 	node --test tests/phase32h-inflight-probe-registry.test.mjs
 	node --test tests/phase32h-extreme-watchdog.test.mjs

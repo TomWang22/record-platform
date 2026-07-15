@@ -3,7 +3,8 @@
 ```text
 Status: PHASE 33A–33D PACKAGES COMPLETE — LIVE GAUNTLET NOT LAUNCHED
 Phase 33E: COMPLETE (fixture offline only)
-Phase 33F–33G: NOT LAUNCHED
+Phase 33F: READINESS/CANARY AUTHORIZED — currently BLOCKED on offline quality (semantic Recall@5); live canary NOT LAUNCHED
+Phase 33G: NOT LAUNCHED
 Requires: separate owner approval before any executable product sub-phase
 ```
 
@@ -56,7 +57,7 @@ etc.) remain and are not replaced.
 | 33C | Scarcity, valuation, auction intelligence | COMPLETE (offline/fixture) |
 | 33D | Negotiation assistance and recommendations | COMPLETE (offline/fixture; coverage gate restored) |
 | 33E | Market analytics and multi-turn recall | COMPLETE (fixture offline; durable private memory NOT AUTHORIZED) |
-| 33F | Cross-protocol capability gauntlet | NOT LAUNCHED |
+| 33F | Cross-protocol capability gauntlet | READINESS PACKAGE COMPLETE; CANARY BLOCKED / NOT LAUNCHED |
 | 33G | Targeted remediation and staging decision | NOT LAUNCHED |
 
 ## Phase 33B metric interpretation (not acceptance)
@@ -90,5 +91,6 @@ deterministic metadata/keyword evidence selection.
 
 ## Next action
 
-Owner review of Phase 33E analytics methodology, recall, deletion and privacy
-behavior before any Phase 33F synchronized H1/H2/H3 capability-gauntlet approval.
+Remediate semantic_fixture retrieval quality (Recall@5 >= development floor 0.35)
+before creating `/tmp/phase33f-capability-gauntlet-canary-v1`. Do not launch the
+17,280-probe target without a separate exact owner approval after a frozen canary PASS.

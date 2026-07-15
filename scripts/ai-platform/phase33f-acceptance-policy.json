@@ -1,0 +1,71 @@
+{
+  "policy_id": "phase33f-acceptance-v1",
+  "version": "1.0.0",
+  "status": "READINESS_AND_CANARY_ONLY",
+  "production_authorized": false,
+  "target_gauntlet_authorized": false,
+  "canary_authorized_when_ready": true,
+  "retrieval_default": "keyword_metadata",
+  "semantic_default_enabled": false,
+  "hybrid_default_enabled": false,
+  "automatic_send_allowed": false,
+  "durable_private_memory_authorized": false,
+  "threshold_changes_allowed": 0,
+  "capabilities": [
+    "scarcity",
+    "valuation",
+    "auction_intelligence",
+    "embeddings",
+    "semantic_search",
+    "negotiation_assistance",
+    "recommendations",
+    "market_analytics"
+  ],
+  "canary": {
+    "root": "/tmp/phase33f-capability-gauntlet-canary-v1",
+    "total_probes": 720,
+    "protocols": { "h1": 240, "h2": 240, "h3": 240 },
+    "triplet_batches": 240,
+    "batches_per_capability": 30,
+    "max_start_spread_ms": 100
+  },
+  "target_prepare_only": {
+    "root": "/tmp/phase33f-capability-gauntlet-target-v1",
+    "total_probes": 17280,
+    "requires_separate_owner_approval": true
+  },
+  "offline_quality_gates": {
+    "note": "Protocol parity cannot substitute for offline quality. Fail closed before canary root creation.",
+    "retrieval_policy": "retrieval-acceptance-policy.json",
+    "require_all_retrieval_modes_meet_development_thresholds": true,
+    "mandatory_retrieval_modes": ["keyword", "semantic_fixture", "hybrid_fixture"],
+    "recommendation_policy": "phase33d-acceptance-policy.json",
+    "enforce_recommendation_ranking_thresholds": true
+  },
+  "hard_stops": {
+    "cross_user_leakage": 0,
+    "cross_thread_leakage": 0,
+    "deleted_memory_recall": 0,
+    "false_memory_claim": 0,
+    "unauthorized_durable_memory_write": 0,
+    "material_parity_mismatch": 0,
+    "schema_invalid_output": 0,
+    "production_mutation": 0,
+    "automatic_send_enabled": 0,
+    "http2_fallback_on_h3": 0,
+    "silent_retrieval_mode_fallback": 0
+  },
+  "production_hard_stops": {
+    "default": "keyword",
+    "PERCENT": 0,
+    "ALLOW_PROD_PERCENT": 0,
+    "hybrid_vector_production_default": "NOT_ENABLED",
+    "production_embedding_writes": false,
+    "production_db_migration": false
+  },
+  "notes": [
+    "Fixture readiness PASS does not authorize the 17280-probe target.",
+    "Canary root must not be created while any mandatory offline quality gate is BLOCKED.",
+    "Semantic fixture Recall@5 must meet retrieval-acceptance-policy development floor."
+  ]
+}

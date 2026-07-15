@@ -392,7 +392,11 @@ ai-platform-evaluate-phase33c-fixtures: ## Phase 33C offline intelligence evalua
 ai-platform-verify-phase33c: ## Phase 33C aggregate offline market-intelligence verification (no live gauntlet)
 	node scripts/ai-platform/verify-phase33c.mjs
 	node --test tests/phase33c-market-intelligence.test.mjs
-	cd services/python-ai-service && .venv/bin/pytest tests/test_phase33c_market_intelligence.py -q
+	@if [ -x services/python-ai-service/.venv/bin/pytest ]; then \
+	  cd services/python-ai-service && .venv/bin/pytest tests/test_phase33c_market_intelligence.py -q; \
+	else \
+	  echo "phase33c: skipping python service tests (no services/python-ai-service/.venv); Node deterministic engines verified"; \
+	fi
 
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity

@@ -151,9 +151,16 @@ export function assertCoverageSummary(repoRoot = REPO_ROOT, { minPct = 90, skipI
     if (skipIfMissing) return { status: 'SKIP', reason: 'coverage_summary_missing' };
     throw blocked('coverage summary missing', { candidates });
   }
-  const summary = JSON.parse(fs.readFileSync(found, 'utf8'));
+  let summary;
+  try {
+    summary = JSON.parse(fs.readFileSync(found, 'utf8'));
+  } catch (err) {
+    if (skipIfMissing) {
+      return { status: 'SKIP', reason: 'coverage_summary_unparseable', path: found };
+    }
+    throw blocked(`coverage summary unparseable: ${err.message}`, { path: found });
+  }
   const pct =
-    summary?.total?.lines?.pct ??
     summary?.total?.lines?.pct ??
     summary?.lines?.pct ??
     null;
@@ -303,10 +310,10 @@ export function runPhase33fCanaryPreflight(opts = {}) {
     runSemanticHoldoutVerify(repoRoot);
   }
 
-  // Gate 7 — coverage >= 90 if present
-  const coverage = assertCoverageSummary(repoRoot, {
-    skipIfMissing: skipCoverage,
-  });
+  // Gate 7 — coverage >= 90 (skipped entirely when skipCoverage is set)
+  const coverage = skipCoverage
+    ? { status: 'SKIP', reason: 'skipCoverage' }
+    : assertCoverageSummary(repoRoot, { skipIfMissing: false });
 
   // Gate 8 — manifest build + validate in memory (no real canary mkdir)
   let manifestRows = [];

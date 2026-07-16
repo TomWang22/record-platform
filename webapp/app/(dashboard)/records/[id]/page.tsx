@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 
 import { RecordRevisionTimeline } from '@/components/records/record-revision-timeline'
 import { RecordThumbnail } from '@/components/records/record-thumbnail'
+import { ScarcityIntelligencePanel } from '@/components/ai/intelligence/scarcity-intelligence-panel'
 import { AuthRequiredCard } from '@/components/auth/auth-required-card'
 import { ApiErrorAlert } from '@/components/ui/api-error-alert'
 import { Badge } from '@/components/ui/badge'
@@ -201,6 +202,9 @@ export default function RecordDetailPage() {
               <Detail label="Source" value={record.purchaseSource} />
             </dl>
           </Card>
+          <div className="lg:col-span-2">
+            <ScarcityIntelligencePanel record={record} />
+          </div>
         </div>
       )}
 

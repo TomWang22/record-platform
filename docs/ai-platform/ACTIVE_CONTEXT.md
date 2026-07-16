@@ -135,8 +135,11 @@ Phase 33B: COMPLETE — data lineage, embedding lineage records, sanitized retri
 Phase 33C: COMPLETE — scarcity/valuation/auction intelligence deterministic engines + routes + 550 scenarios; live gauntlet NOT LAUNCHED; retrieval default remains keyword
 Phase 33D: COMPLETE — negotiation/recommendations + coverage/approval hardening; automatic send DISABLED; live gauntlet NOT LAUNCHED
 Phase 33E: COMPLETE — market analytics + multi-turn memory (fixture/session only); durable private memory NOT AUTHORIZED; live gauntlet NOT LAUNCHED
-Phase 33F: LAUNCHER COMMITTED — canary NOT LAUNCHED; real roots ABSENT; live 720 requires new exact-SHA CI + owner approval
+Phase 33F: TARGET LAUNCHER COMMITTED (SHA 52f56b07…) — canary-v3 FROZEN_PASS; target root ABSENT / NOT LAUNCHED (infra-ready only; not product-accepted)
 Phase 33G: NOT LAUNCHED
+Phase 34A: COMPLETE — client intelligence inventory + UX contracts; zero client consumers of /api/ai/intelligence/*; see docs/ai-platform/PHASE_34A_CLIENT_INTELLIGENCE_INVENTORY.md
+Phase 34B–34H: NOT COMPLETE — productization, large eval, Playwright gauntlet, regenerated target package pending
+Phase 34 target launch: FORBIDDEN until 34A–34G pass and new owner approval
 Phase 31 evidence label: Phase 31D-R2 repaired staging long-soak matrix: 51840/51840 target (NOT merged into 57105/171315 or Phase 30 25920)
 Production enablement: NOT APPROVED — latency max outlier ~1,037,645 ms requires RCA before production KPI enablement; Phase 32H did not resolve root cause
 

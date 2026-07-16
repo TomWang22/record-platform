@@ -272,6 +272,54 @@ function parseCurlWriteOut(stdout) {
   };
 }
 
+function parseCurlHeaderDump(headerText) {
+  const headers = {};
+  const lines = String(headerText || '').split(/\r?\n/);
+  for (const line of lines) {
+    if (!line || line.toLowerCase().startsWith('http/')) continue;
+    const idx = line.indexOf(':');
+    if (idx <= 0) continue;
+    const name = line.slice(0, idx).trim().toLowerCase();
+    const value = line.slice(idx + 1).trim();
+    if (!name) continue;
+    if (headers[name]) headers[name] = `${headers[name]}, ${value}`;
+    else headers[name] = value;
+  }
+  return headers;
+}
+
+function parseResponseBody(raw) {
+  const text = String(raw || '');
+  if (!text.trim()) {
+    return {
+      body: {},
+      body_format: 'EMPTY',
+      json_parse_status: 'EMPTY',
+      body_raw_prefix: '',
+      body_sha256: null,
+    };
+  }
+  const body_sha256 = createHash('sha256').update(text).digest('hex');
+  const body_raw_prefix = text.slice(0, 200);
+  try {
+    return {
+      body: JSON.parse(text),
+      body_format: 'JSON',
+      json_parse_status: 'OK',
+      body_raw_prefix,
+      body_sha256,
+    };
+  } catch {
+    return {
+      body: { _non_json: true, _body_prefix: body_raw_prefix },
+      body_format: 'PLAINTEXT',
+      json_parse_status: 'NOT_JSON',
+      body_raw_prefix,
+      body_sha256,
+    };
+  }
+}
+
 export function curlRequest({
   method = 'GET',
   urlPath,
@@ -286,67 +334,83 @@ export function curlRequest({
 }) {
   const tmpBody = fs.mkdtempSync(path.join('/tmp', 'p22r-'));
   const outFile = path.join(tmpBody, 'body.json');
-  const args = [
-    '--silent',
-    '--show-error',
-    '--cacert',
-    caCert,
-    protocolFlag,
-    '--request',
-    method,
-    '--write-out',
-    '%{http_code}|%{http_version}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_pretransfer}|%{time_starttransfer}|%{time_total}|%{exitcode}',
-    '--output',
-    outFile,
-  ];
-  if (curlResolve) args.push('--resolve', curlResolve);
-  args.push('-H', 'content-type: application/json');
-  if (token) args.push('-H', `authorization: Bearer ${token}`);
-  if (userId) args.push('-H', `x-user-id: ${userId}`);
-  if (method === 'POST' && urlPath.includes('/auth/login')) {
-    args.push('-H', 'X-RP-E2E-Contract: 1');
-  }
-  if (body !== undefined) args.push('--data', JSON.stringify(body));
-  args.push(`${baseUrl.replace(/\/$/, '')}${urlPath}`);
+  const hdrFile = path.join(tmpBody, 'headers.txt');
+  try {
+    const args = [
+      '--silent',
+      '--show-error',
+      '--cacert',
+      caCert,
+      protocolFlag,
+      '--request',
+      method,
+      '--write-out',
+      '%{http_code}|%{http_version}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_pretransfer}|%{time_starttransfer}|%{time_total}|%{exitcode}',
+      '--dump-header',
+      hdrFile,
+      '--output',
+      outFile,
+    ];
+    if (curlResolve) args.push('--resolve', curlResolve);
+    args.push('-H', 'content-type: application/json');
+    if (token) args.push('-H', `authorization: Bearer ${token}`);
+    if (userId) args.push('-H', `x-user-id: ${userId}`);
+    if (method === 'POST' && urlPath.includes('/auth/login')) {
+      args.push('-H', 'X-RP-E2E-Contract: 1');
+    }
+    if (body !== undefined) args.push('--data', JSON.stringify(body));
+    args.push(`${baseUrl.replace(/\/$/, '')}${urlPath}`);
 
-  const env = { ...process.env, NGTCP2_ENABLE_GSO: '0' };
-  const result = spawnSync(DEFAULTS.curlBin, args, { encoding: 'utf8', env, maxBuffer: 20 * 1024 * 1024 });
-  const parsedOut = parseCurlWriteOut(result.stdout);
-  const curlExitCode = result.status !== 0 ? result.status : (parsedOut.curl_exit_code ?? 0);
-  const curlErrorClass = classifyCurlError(
-    curlExitCode,
-    result.stderr || result.stdout,
-    parsedOut.http_status,
-  );
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    const err = new Error(`curl failed: ${result.stderr || result.stdout}`);
-    err.curl_exit_code = curlExitCode;
-    err.curl_error_class = curlErrorClass;
-    throw err;
+    const env = { ...process.env, NGTCP2_ENABLE_GSO: '0' };
+    const result = spawnSync(DEFAULTS.curlBin, args, { encoding: 'utf8', env, maxBuffer: 20 * 1024 * 1024 });
+    const parsedOut = parseCurlWriteOut(result.stdout);
+    const curlExitCode = result.status !== 0 ? result.status : (parsedOut.curl_exit_code ?? 0);
+    const curlErrorClass = classifyCurlError(
+      curlExitCode,
+      result.stderr || result.stdout,
+      parsedOut.http_status,
+    );
+    const headerText = fs.existsSync(hdrFile) ? fs.readFileSync(hdrFile, 'utf8') : '';
+    const headers = parseCurlHeaderDump(headerText);
+    const raw = fs.existsSync(outFile) ? fs.readFileSync(outFile, 'utf8') : '';
+    const parsedBody = parseResponseBody(raw);
+    if (result.error) throw result.error;
+    if (result.status !== 0) {
+      const err = new Error(`curl failed: ${result.stderr || result.stdout}`);
+      err.curl_exit_code = curlExitCode;
+      err.curl_error_class = curlErrorClass;
+      err.http_status = parsedOut.http_status;
+      err.http_version = parsedOut.http_version;
+      err.headers = headers;
+      err.body_format = parsedBody.body_format;
+      err.json_parse_status = parsedBody.json_parse_status;
+      err.body_raw_prefix = parsedBody.body_raw_prefix;
+      throw err;
+    }
+    const curlMs = parsedOut.curl_time_total_ms;
+    return {
+      http_status: parsedOut.http_status,
+      http_version: parsedOut.http_version,
+      curl_time_total_ms: curlMs,
+      rag_total_ms: curlMs,
+      curl_exit_code: curlExitCode,
+      curl_error_class: curlErrorClass,
+      curl_time_namelookup_ms: parsedOut.curl_time_namelookup_ms,
+      curl_time_connect_ms: parsedOut.curl_time_connect_ms,
+      curl_time_appconnect_ms: parsedOut.curl_time_appconnect_ms,
+      curl_time_pretransfer_ms: parsedOut.curl_time_pretransfer_ms,
+      curl_time_starttransfer_ms: parsedOut.curl_time_starttransfer_ms,
+      headers,
+      body: parsedBody.body,
+      body_format: parsedBody.body_format,
+      json_parse_status: parsedBody.json_parse_status,
+      body_raw_prefix: parsedBody.body_raw_prefix,
+      body_sha256: parsedBody.body_sha256,
+      version_ok: parsedOut.http_version === expectedVersion,
+    };
+  } finally {
+    fs.rmSync(tmpBody, { recursive: true, force: true });
   }
-  let parsed = {};
-  if (fs.existsSync(outFile)) {
-    const raw = fs.readFileSync(outFile, 'utf8');
-    if (raw.trim()) parsed = JSON.parse(raw);
-  }
-  fs.rmSync(tmpBody, { recursive: true, force: true });
-  const curlMs = parsedOut.curl_time_total_ms;
-  return {
-    http_status: parsedOut.http_status,
-    http_version: parsedOut.http_version,
-    curl_time_total_ms: curlMs,
-    rag_total_ms: curlMs,
-    curl_exit_code: curlExitCode,
-    curl_error_class: curlErrorClass,
-    curl_time_namelookup_ms: parsedOut.curl_time_namelookup_ms,
-    curl_time_connect_ms: parsedOut.curl_time_connect_ms,
-    curl_time_appconnect_ms: parsedOut.curl_time_appconnect_ms,
-    curl_time_pretransfer_ms: parsedOut.curl_time_pretransfer_ms,
-    curl_time_starttransfer_ms: parsedOut.curl_time_starttransfer_ms,
-    body: parsed,
-    version_ok: parsedOut.http_version === expectedVersion,
-  };
 }
 
 export function login(email, cfg) {

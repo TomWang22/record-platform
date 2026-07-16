@@ -7,6 +7,7 @@ import {
   DEFAULTS,
 } from './phase22-full-replay-common.mjs';
 import { CAPABILITY_ROUTE_PATHS } from './phase33f-canary-config.mjs';
+import { classifyHttpError, EDGE_RATE_LIMITED } from './phase33f-rate-limit.mjs';
 
 export function capabilityRoutePath(capability) {
   const route = CAPABILITY_ROUTE_PATHS[capability];
@@ -102,6 +103,12 @@ export function issueCapabilityProbe(row, {
       curlResolve,
     });
   } catch (err) {
+    const status = err.http_status != null ? Number(err.http_status) : null;
+    const rate = classifyHttpError({
+      http_status: status,
+      body_format: err.body_format,
+      headers: err.headers || {},
+    });
     return {
       probe_id: row.probe_id,
       batch_id: row.batch_id,
@@ -109,17 +116,58 @@ export function issueCapabilityProbe(row, {
       protocol: row.protocol,
       started_at,
       finished_at: new Date().toISOString(),
-      http_status: null,
-      http_version: null,
+      http_status: status,
+      http_version: err.http_version ?? null,
+      headers: err.headers || null,
+      body_format: err.body_format || null,
+      json_parse_status: err.json_parse_status || null,
+      body_raw_prefix: err.body_raw_prefix || null,
       curl_exit_code: err.curl_exit_code ?? 1,
       curl_error_class: err.curl_error_class || 'curl_failed',
       error: String(err.message || err),
+      error_class: rate?.error_class || err.curl_error_class || 'curl_failed',
+      error_code: rate?.error_code || null,
+      retry_after_ms: rate?.retry_after_ms ?? null,
       retries: 0,
       expected_4xx: adversarial,
       ok: false,
     };
   }
   const status = Number(result.http_status);
+  const rate = classifyHttpError({
+    http_status: status,
+    body_format: result.body_format,
+    headers: result.headers || {},
+  });
+  if (rate?.error_class === EDGE_RATE_LIMITED) {
+    return {
+      probe_id: row.probe_id,
+      batch_id: row.batch_id,
+      capability: row.capability,
+      protocol: row.protocol,
+      started_at,
+      finished_at: new Date().toISOString(),
+      http_status: 429,
+      http_version: result.http_version,
+      curl_time_total_ms: result.curl_time_total_ms,
+      version_ok: result.version_ok,
+      headers: result.headers || null,
+      body: result.body,
+      body_format: result.body_format,
+      json_parse_status: result.json_parse_status,
+      body_raw_prefix: result.body_raw_prefix,
+      body_sha256: result.body_sha256,
+      error_class: EDGE_RATE_LIMITED,
+      error_code: EDGE_RATE_LIMITED,
+      limiter_scope: rate.limiter_scope,
+      retry_after_ms: rate.retry_after_ms,
+      retries: 0,
+      retry_count: 0,
+      expected_4xx: adversarial,
+      zero_retries: true,
+      ok: false,
+    };
+  }
   const expectOk = expectedHttpOk(row);
   const is4xx = status >= 400 && status < 500;
   const ok = expectOk ? status === 200 && result.version_ok : is4xx;
@@ -134,7 +182,12 @@ export function issueCapabilityProbe(row, {
     http_version: result.http_version,
     curl_time_total_ms: result.curl_time_total_ms,
     version_ok: result.version_ok,
+    headers: result.headers || null,
     body: result.body,
+    body_format: result.body_format || null,
+    json_parse_status: result.json_parse_status || null,
+    body_raw_prefix: result.body_raw_prefix || null,
+    body_sha256: result.body_sha256 || null,
     retries: 0,
     expected_4xx: adversarial,
     zero_retries: true,

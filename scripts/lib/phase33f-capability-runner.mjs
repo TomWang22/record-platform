@@ -31,6 +31,12 @@ import {
 } from './phase32h-probe-packet-index.mjs';
 import { writeBatchPacketIndex } from './phase32h-batch-packet-index.mjs';
 import { capabilityRoutePath, issueCapabilityProbe } from './phase33f-capability-probe.mjs';
+import {
+  INTER_BATCH_INTERVAL_MS,
+  assertInterBatchInterval,
+  sleepMs,
+  EDGE_RATE_LIMITED,
+} from './phase33f-rate-limit.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -258,6 +264,7 @@ export async function runCapabilityMatrix({
   token = null,
   userId = null,
   skipLogin = false,
+  interBatchIntervalMs = mode === 'canary' ? INTER_BATCH_INTERVAL_MS : 0,
 } = {}) {
   let authToken = token;
   let authUserId = userId;
@@ -296,27 +303,51 @@ export async function runCapabilityMatrix({
     userId: authUserId,
   };
 
+  const pacedInterval =
+    interBatchIntervalMs > 0 ? assertInterBatchInterval(interBatchIntervalMs) : 0;
+
   try {
-    const batchResults =
-      mode === 'smoke'
-        ? await mapPool(triplets, concurrency, (t) => runTripletBatch(t, ctx))
-        : await (async () => {
-            const out = [];
-            for (const t of triplets) {
-              out.push(await runTripletBatch(t, ctx));
-            }
-            return out;
-          })();
+    const batchResults = [];
+    let stoppedForRateLimit = false;
+
+    if (mode === 'smoke' && concurrency > 1) {
+      // Smoke concurrency path: no fail-closed stop mid-pool (tests/smoke only).
+      const pooled = await mapPool(triplets, concurrency, (t) => runTripletBatch(t, ctx));
+      batchResults.push(...pooled);
+      stoppedForRateLimit = pooled.some((br) =>
+        Object.values(br.results || {}).some(
+          (r) => Number(r.http_status) === 429 || r.error_class === EDGE_RATE_LIMITED,
+        ),
+      );
+    } else {
+      for (let i = 0; i < triplets.length; i += 1) {
+        const br = await runTripletBatch(triplets[i], ctx);
+        batchResults.push(br);
+        const hit429 = Object.values(br.results || {}).some(
+          (r) => Number(r.http_status) === 429 || r.error_class === EDGE_RATE_LIMITED,
+        );
+        if (hit429) {
+          stoppedForRateLimit = true;
+          break;
+        }
+        if (pacedInterval > 0 && i + 1 < triplets.length) {
+          await sleepMs(pacedInterval);
+        }
+      }
+    }
 
     const probeResults = batchResults.flatMap((b) => Object.values(b.results));
     const queue = outRoot ? readCorrelationQueueSnapshot(outRoot) : null;
     return {
-      status: probeResults.every((p) => p.ok) ? 'PASS' : 'FAIL',
+      status: !stoppedForRateLimit && probeResults.every((p) => p.ok) ? 'PASS' : 'FAIL',
       mode,
       batches: batchResults.length,
       probes: probeResults.length,
       ok_count: probeResults.filter((p) => p.ok).length,
       fail_count: probeResults.filter((p) => !p.ok).length,
+      stopped_for_rate_limit: stoppedForRateLimit,
+      failure_class: stoppedForRateLimit ? EDGE_RATE_LIMITED : null,
+      inter_batch_interval_ms: pacedInterval,
       queue,
       batch_results: batchResults,
     };

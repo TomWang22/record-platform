@@ -22,8 +22,10 @@ const REQUIRED = [
   'scripts/lib/phase33f-capability-probe-worker.mjs',
   'scripts/lib/phase33f-terminal-verdict.mjs',
   'scripts/lib/phase33f-run-finalize.mjs',
+  'scripts/lib/phase33f-rate-limit.mjs',
   'tests/phase33f-canary-launcher.test.mjs',
   'tests/phase33f-blocked-freeze.test.mjs',
+  'tests/phase33f-rate-limit-observability.test.mjs',
 ];
 
 const violations = [];

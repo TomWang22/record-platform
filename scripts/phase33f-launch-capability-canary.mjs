@@ -217,9 +217,10 @@ async function main() {
   const pass = runnerResult.status === 'PASS' && verdict.status === 'PASS';
   const failureClass = pass
     ? null
-    : verdict.flags?.matrix_complete === false
-      ? 'UNEXPECTED_PROBE_FAILURE'
-      : 'TERMINAL_VERDICT_FAIL';
+    : runnerResult.failure_class ||
+      (verdict.flags?.matrix_complete === false
+        ? 'UNEXPECTED_PROBE_FAILURE'
+        : 'TERMINAL_VERDICT_FAIL');
   const freeze = finalizePhase33fRun({
     outRoot: opts.out,
     repoRoot: REPO_ROOT,

@@ -16,6 +16,10 @@ export const CANARY = Object.freeze({
   batchesPerCapability: 30,
   probesPerCapability: 90,
   perProtocol: 240,
+  // phase33f-rate-v1: pace below api-gateway express-rate-limit 300/min IP bucket
+  rate_policy_version: 'phase33f-rate-v1',
+  inter_batch_interval_ms: 1000,
+  triplet_start_spread_limit_ms: 100,
 });
 
 export const SMOKE = Object.freeze({
@@ -42,12 +46,15 @@ export const LAUNCHER_SOURCE_GLOBS = Object.freeze([
   'scripts/lib/phase33f-capability-probe-worker.mjs',
   'scripts/lib/phase33f-terminal-verdict.mjs',
   'scripts/lib/phase33f-run-finalize.mjs',
+  'scripts/lib/phase33f-rate-limit.mjs',
   'scripts/lib/phase33f-manifest.mjs',
   'scripts/ai-platform/verify-phase33f-canary-manifest.mjs',
   'scripts/ai-platform/verify-phase33f-canary-launcher.mjs',
   'scripts/ai-platform/verify-phase33f-canary-preflight.mjs',
+  'scripts/ai-platform/verify-phase33f-rate-capacity.mjs',
   'tests/phase33f-canary-launcher.test.mjs',
   'tests/phase33f-blocked-freeze.test.mjs',
+  'tests/phase33f-rate-limit-observability.test.mjs',
   'Makefile',
 ]);
 

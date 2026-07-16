@@ -374,7 +374,7 @@ export function verifyCorrelationJobOutputs(outRoot, job) {
   }
   for (const [proto, probeId] of Object.entries(job.expected_probe_ids || {})) {
     const probeRecord = JSON.parse(fs.readFileSync(outputPaths.probe[proto], 'utf8'));
-    if (Number(probeRecord.probe_id) !== Number(probeId)) {
+    if (String(probeRecord.probe_id) !== String(probeId)) {
       throw new Error(`probe index probe_id mismatch for ${proto}`);
     }
     if (probeRecord.batch_id !== job.batch_id) {

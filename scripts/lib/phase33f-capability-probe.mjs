@@ -1,0 +1,127 @@
+/**
+ * Phase 33F single-probe issuance (shared by runner + worker threads).
+ */
+import {
+  curlRequest,
+  PROTOCOLS as CURL_PROTOCOLS,
+  DEFAULTS,
+} from './phase22-full-replay-common.mjs';
+import { CAPABILITY_ROUTE_PATHS } from './phase33f-canary-config.mjs';
+
+export function capabilityRoutePath(capability) {
+  const route = CAPABILITY_ROUTE_PATHS[capability];
+  if (!route) {
+    const _exhaustive = capability;
+    throw new Error(`unknown capability route: ${_exhaustive}`);
+  }
+  return route;
+}
+
+function expectedHttpOk(row) {
+  const behavior = String(row.expected_behavior || '');
+  if (
+    behavior === 'refuse' ||
+    behavior === 'deterministic_4xx' ||
+    behavior === 'unauthorized_refusal'
+  ) {
+    return false;
+  }
+  const request = row.request || {};
+  if (
+    request.unauthorized_scope ||
+    request.cross_user_attempt ||
+    request.deleted_source ||
+    request.unauthorized_watchlist ||
+    request.unauthorized_thread
+  ) {
+    return false;
+  }
+  // privacy_adversarial alone means "assert no leakage", not "expect HTTP 4xx".
+  return true;
+}
+
+function buildRequestBody(row) {
+  return {
+    ...row.request,
+    capability: row.capability,
+    capability_mode: row.capability_mode,
+    schema_version: row.schema_version,
+    principal_fixture: row.principal_fixture,
+    authorization_scopes: row.authorization_scopes,
+    prohibited_scopes: row.prohibited_scopes,
+    conversation_or_session_id: row.conversation_or_session_id,
+    turns: row.turns,
+    memory_classes: row.memory_classes,
+    seed: row.seed,
+    production_mutation_allowed: false,
+  };
+}
+
+export function issueCapabilityProbe(row, {
+  baseUrl = DEFAULTS.baseUrl,
+  caCert = DEFAULTS.caCert,
+  curlResolve = process.env.CURL_RESOLVE || null,
+  executeCurl = curlRequest,
+  token = null,
+  userId = null,
+} = {}) {
+  const protocol = CURL_PROTOCOLS[row.protocol];
+  if (!protocol) throw new Error(`unknown protocol: ${row.protocol}`);
+  const adversarial = Boolean(row.tags?.privacy_adversarial);
+  const urlPath = capabilityRoutePath(row.capability);
+  const body = buildRequestBody(row);
+  const started_at = new Date().toISOString();
+  let result;
+  try {
+    result = executeCurl({
+      method: 'POST',
+      urlPath,
+      token,
+      userId: userId || row.principal_fixture,
+      body,
+      protocolFlag: protocol.flag,
+      expectedVersion: protocol.expected,
+      baseUrl,
+      caCert,
+      curlResolve,
+    });
+  } catch (err) {
+    return {
+      probe_id: row.probe_id,
+      batch_id: row.batch_id,
+      capability: row.capability,
+      protocol: row.protocol,
+      started_at,
+      finished_at: new Date().toISOString(),
+      http_status: null,
+      http_version: null,
+      curl_exit_code: err.curl_exit_code ?? 1,
+      curl_error_class: err.curl_error_class || 'curl_failed',
+      error: String(err.message || err),
+      retries: 0,
+      expected_4xx: adversarial,
+      ok: false,
+    };
+  }
+  const status = Number(result.http_status);
+  const expectOk = expectedHttpOk(row);
+  const is4xx = status >= 400 && status < 500;
+  const ok = expectOk ? status === 200 && result.version_ok : is4xx;
+  return {
+    probe_id: row.probe_id,
+    batch_id: row.batch_id,
+    capability: row.capability,
+    protocol: row.protocol,
+    started_at,
+    finished_at: new Date().toISOString(),
+    http_status: status,
+    http_version: result.http_version,
+    curl_time_total_ms: result.curl_time_total_ms,
+    version_ok: result.version_ok,
+    body: result.body,
+    retries: 0,
+    expected_4xx: adversarial,
+    zero_retries: true,
+    ok,
+  };
+}

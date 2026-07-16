@@ -86,6 +86,29 @@ RUN chmod 755 /usr/local/bin/grpc-health-probe \
  && /usr/local/bin/grpc-health-probe -version >/dev/null 2>&1 \
  && ls -la /usr/local/bin/grpc-health-probe
 
+# Phase 33C–E deterministic engines shell out to Node runners (fail-closed if absent).
+COPY --from=node:20-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY scripts/ai-platform/run-phase33c-capability.mjs \
+     scripts/ai-platform/run-phase33d-capability.mjs \
+     scripts/ai-platform/run-phase33e-capability.mjs \
+     /app/scripts/ai-platform/
+COPY scripts/lib/phase33a-intelligence-capability-contracts.mjs \
+     scripts/lib/phase33c-auction.mjs \
+     scripts/lib/phase33c-confidence.mjs \
+     scripts/lib/phase33c-evidence.mjs \
+     scripts/lib/phase33c-intelligence.mjs \
+     scripts/lib/phase33c-scarcity.mjs \
+     scripts/lib/phase33c-valuation.mjs \
+     scripts/lib/phase33d-intelligence.mjs \
+     scripts/lib/phase33d-negotiation.mjs \
+     scripts/lib/phase33d-recommendations.mjs \
+     scripts/lib/phase33e-analytics.mjs \
+     scripts/lib/phase33e-intelligence.mjs \
+     scripts/lib/phase33e-memory.mjs \
+     /app/scripts/lib/
+RUN chown -R python:python /app/scripts \
+ && node --version >/dev/null
+
 # Remove unnecessary files (cache only - keep .dist-info for package metadata)
 RUN find /usr/local/lib/python3.11/site-packages -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
     && find /usr/local/lib/python3.11/site-packages -type f -name "*.pyc" -delete 2>/dev/null || true \

@@ -459,10 +459,29 @@ ai-platform-verify-phase33f-collectors: ## Phase 33F collector contract stub (no
 ai-platform-verify-phase33f-canary: ## Phase 33F canary gate — refuses launch when readiness BLOCKED
 	node scripts/ai-platform/verify-phase33f-canary.mjs
 
-ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readiness/semantic); no live 720 canary
+ai-platform-verify-phase33f-canary-manifest: ## Phase 33F canary+smoke manifest validation (offline)
+	node scripts/ai-platform/verify-phase33f-canary-manifest.mjs
+
+ai-platform-verify-phase33f-canary-launcher: ## Phase 33F committed launcher static import checks
+	node scripts/ai-platform/verify-phase33f-canary-launcher.mjs
+
+ai-platform-verify-phase33f-canary-preflight: ## Phase 33F preflight offline failure-path checks (no real canary root)
+	PHASE33F_PREFLIGHT_OFFLINE=1 node scripts/ai-platform/verify-phase33f-canary-preflight.mjs
+
+ai-platform-verify-phase33f-canary-smoke: ## Phase 33F launcher smoke (optional; skips when edge down)
+	@if curl -sk --max-time 3 --cacert certs/dev-chain.pem https://record-platform.test/api/health >/dev/null 2>&1; then \
+	  PHASE33F_ALLOW_DIRTY_LAUNCHER=1 PHASE33F_SKIP_OFFLINE_VERIFY=1 PHASE33F_SKIP_SEMANTIC=1 PHASE33F_SKIP_COVERAGE=1 PHASE33F_SKIP_ATTRIBUTION=1 PHASE33F_SKIP_EXCLUSIVITY=1 PHASE33F_VERDICT_DELAY_MS=100 node scripts/phase33f-launch-capability-canary.mjs --mode smoke --out /tmp/phase33f-canary-launcher-smoke-v1; \
+	else \
+	  echo "ai-platform-verify-phase33f-canary-smoke: skipping — edge record-platform.test unreachable"; \
+	fi
+
+ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readiness/semantic/launcher); no live 720 canary
 	node scripts/ai-platform/verify-phase33f-semantic.mjs
 	node scripts/ai-platform/verify-phase33f.mjs
-	node --test tests/phase33f-capability-gauntlet.test.mjs tests/phase33f-semantic-retrieval.test.mjs
+	node scripts/ai-platform/verify-phase33f-canary-manifest.mjs
+	node scripts/ai-platform/verify-phase33f-canary-launcher.mjs
+	PHASE33F_PREFLIGHT_OFFLINE=1 node scripts/ai-platform/verify-phase33f-canary-preflight.mjs
+	node --test tests/phase33f-capability-gauntlet.test.mjs tests/phase33f-semantic-retrieval.test.mjs tests/phase33f-canary-launcher.test.mjs
 
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity

@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import time
-from typing import List, Optional
+from typing import Any, List, Optional, Union
 
-from fastapi import APIRouter, Header, Query, Request
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from app.ai import insights
@@ -24,6 +24,10 @@ from app.ai.analytics_memory import (
     analyze_market_analytics,
     forget_memory,
     resolve_memory,
+)
+from app.ai.embedding_semantic_fixtures import (
+    analyze_embedding_metadata,
+    analyze_semantic_search,
 )
 from app.ai.server_timing import inject_redacted_rag_timing_details
 
@@ -363,6 +367,18 @@ class IntelligenceBody(BaseModel):
     request_fabricated_memory: Optional[bool] = None
     claim_durable_without_record: Optional[bool] = None
     request_unauthorized_durable_write: Optional[bool] = None
+    # Phase 33F embedding / semantic fixture + auth-smoke flags
+    retrieval_mode: Optional[str] = None
+    mode: Optional[str] = None
+    capability_mode: Optional[str] = None
+    query_id: Optional[str] = None
+    seed: Optional[Union[str, int]] = None
+    principal_fixture: Optional[str] = None
+    authorization_scopes: Optional[List[str]] = None
+    production_mutation_allowed: Optional[bool] = None
+    deleted_source: Optional[bool] = None
+    source_state: Optional[str] = None
+    fixture_band: Optional[str] = None
 
 
 def _intelligence_payload(body: IntelligenceBody, x_user_id: Optional[str]) -> dict:
@@ -373,13 +389,31 @@ def _intelligence_payload(body: IntelligenceBody, x_user_id: Optional[str]) -> d
     return data
 
 
+def _enforce_intelligence_auth_gates(payload: dict) -> None:
+    """Fail-closed fixture auth gates used by Phase 33F authorization smoke."""
+    if payload.get("unauthorized_scope") or payload.get("unauthorized_thread") or payload.get(
+        "unauthorized_watchlist"
+    ):
+        raise HTTPException(status_code=403, detail="unauthorized_scope")
+    if (
+        payload.get("cross_user_attempt")
+        or payload.get("cross_user_collection_attempt")
+        or payload.get("cross_user_watchlist_attempt")
+    ):
+        raise HTTPException(status_code=403, detail="cross_user_refused")
+    if payload.get("deleted_source") or str(payload.get("source_state") or "").lower() == "deleted":
+        raise HTTPException(status_code=410, detail="deleted_source_refused")
+
+
 @router.post("/intelligence/scarcity")
 async def post_intelligence_scarcity(
     body: IntelligenceBody,
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
 ):
     """Phase 33C scarcity — deterministic evidence engine (keyword/metadata default)."""
-    return analyze_scarcity(_intelligence_payload(body, x_user_id))
+    payload = _intelligence_payload(body, x_user_id)
+    _enforce_intelligence_auth_gates(payload)
+    return analyze_scarcity(payload)
 
 
 @router.post("/intelligence/valuation")
@@ -388,7 +422,9 @@ async def post_intelligence_valuation(
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
 ):
     """Phase 33C valuation — sold-vs-asking separated ranges (not legacy RAG valuation)."""
-    return analyze_valuation(_intelligence_payload(body, x_user_id))
+    payload = _intelligence_payload(body, x_user_id)
+    _enforce_intelligence_auth_gates(payload)
+    return analyze_valuation(payload)
 
 
 @router.post("/intelligence/auction")
@@ -398,6 +434,7 @@ async def post_intelligence_auction(
 ):
     """Phase 33C single-auction intelligence (aggregates only; no bidder identity)."""
     payload = _intelligence_payload(body, x_user_id)
+    _enforce_intelligence_auth_gates(payload)
     payload["analysis_mode"] = "single_auction"
     return analyze_auction(payload)
 
@@ -408,7 +445,9 @@ async def post_intelligence_watchlist_temperature(
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
 ):
     """Phase 33C authorized watchlist-batch market temperature."""
-    return analyze_watchlist_temperature(_intelligence_payload(body, x_user_id))
+    payload = _intelligence_payload(body, x_user_id)
+    _enforce_intelligence_auth_gates(payload)
+    return analyze_watchlist_temperature(payload)
 
 
 @router.post("/intelligence/negotiation")
@@ -417,7 +456,9 @@ async def post_intelligence_negotiation(
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
 ):
     """Phase 33D negotiation assistance — advisory only; automatic_send_allowed=false."""
-    return analyze_negotiation(_intelligence_payload(body, x_user_id))
+    payload = _intelligence_payload(body, x_user_id)
+    _enforce_intelligence_auth_gates(payload)
+    return analyze_negotiation(payload)
 
 
 @router.post("/intelligence/recommendations")
@@ -426,7 +467,9 @@ async def post_intelligence_recommendations(
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
 ):
     """Phase 33D explainable recommendations — no pay-to-rank; keyword/metadata default."""
-    return analyze_recommendations(_intelligence_payload(body, x_user_id))
+    payload = _intelligence_payload(body, x_user_id)
+    _enforce_intelligence_auth_gates(payload)
+    return analyze_recommendations(payload)
 
 
 @router.post("/intelligence/market-analytics")
@@ -435,7 +478,31 @@ async def post_intelligence_market_analytics(
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
 ):
     """Phase 33E market analytics — deterministic aggregates; no causal/prediction claims."""
-    return analyze_market_analytics(_intelligence_payload(body, x_user_id))
+    payload = _intelligence_payload(body, x_user_id)
+    _enforce_intelligence_auth_gates(payload)
+    return analyze_market_analytics(payload)
+
+
+@router.post("/intelligence/embeddings/metadata")
+async def post_intelligence_embeddings_metadata(
+    body: IntelligenceBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Phase 33F embedding metadata fixture — no production embedding writes."""
+    payload = _intelligence_payload(body, x_user_id)
+    _enforce_intelligence_auth_gates(payload)
+    return analyze_embedding_metadata(payload)
+
+
+@router.post("/intelligence/semantic-search")
+async def post_intelligence_semantic_search(
+    body: IntelligenceBody,
+    x_user_id: Optional[str] = Header(None, alias="x-user-id"),
+):
+    """Phase 33F semantic/hybrid search fixture — keyword remains production default."""
+    payload = _intelligence_payload(body, x_user_id)
+    _enforce_intelligence_auth_gates(payload)
+    return analyze_semantic_search(payload)
 
 
 @router.post("/intelligence/memory/resolve")
@@ -444,7 +511,9 @@ async def post_intelligence_memory_resolve(
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
 ):
     """Phase 33E authorized memory resolve — fixture/session only; no durable private prod writes."""
-    return resolve_memory(_intelligence_payload(body, x_user_id))
+    payload = _intelligence_payload(body, x_user_id)
+    _enforce_intelligence_auth_gates(payload)
+    return resolve_memory(payload)
 
 
 @router.post("/intelligence/memory/forget")
@@ -453,4 +522,6 @@ async def post_intelligence_memory_forget(
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
 ):
     """Phase 33E forget/delete propagation for authorized fixture/session memory."""
-    return forget_memory(_intelligence_payload(body, x_user_id))
+    payload = _intelligence_payload(body, x_user_id)
+    _enforce_intelligence_auth_gates(payload)
+    return forget_memory(payload)

@@ -5,14 +5,15 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import HTTPException
 
+from app.ai.repo_paths import resolve_repo_root
+
 from .prompts import PROMPT_TEMPLATES
 
-REPO_ROOT = Path(__file__).resolve().parents[5]
+REPO_ROOT = resolve_repo_root()
 RUNNER = REPO_ROOT / "scripts" / "ai-platform" / "run-phase33c-capability.mjs"
 
 

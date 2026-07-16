@@ -8,24 +8,28 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseDumpcapSemantic } from './phase32h-collector-launch-spec.mjs';
 
+export function isPhaseCaptureEvidenceRoot(root = '') {
+  return typeof root === 'string' && (root.startsWith('/tmp/phase32h') || root.startsWith('/tmp/phase33f'));
+}
+
 export function resolveEvidenceRootFromCommand(command = '') {
   const outFlag = command.match(/--out\s+(\S+)/);
   if (outFlag) return outFlag[1];
   const wMatch = command.match(/(?:^|\s)-w\s+(\S+)/);
   if (wMatch) {
     const matched = wMatch[1].replace(/^["']|["']$/g, '');
-    if (/\.pcap/i.test(matched) || matched.startsWith('/tmp/phase32h')) {
+    if (/\.pcap/i.test(matched) || matched.startsWith('/tmp/phase32h') || matched.startsWith('/tmp/phase33f')) {
       const parts = matched.split('/');
-      const rootIdx = parts.findIndex((part) => part.startsWith('phase32h'));
+      const rootIdx = parts.findIndex((part) => part.startsWith('phase32h') || part.startsWith('phase33f'));
       if (rootIdx >= 0) return parts.slice(0, rootIdx + 1).join('/');
     }
   }
-  const tmpMatch = command.match(/(\/tmp\/phase32h[^\s'"]+)/);
+  const tmpMatch = command.match(/(\/tmp\/phase(?:32h|33f)[^\s'"]+)/);
   if (!tmpMatch) return null;
   const matched = tmpMatch[1];
   if (/\.pcap/i.test(matched)) {
     const parts = matched.split('/');
-    const rootIdx = parts.findIndex((part) => part.startsWith('phase32h'));
+    const rootIdx = parts.findIndex((part) => part.startsWith('phase32h') || part.startsWith('phase33f'));
     if (rootIdx >= 0) return parts.slice(0, rootIdx + 1).join('/');
   }
   return matched;
@@ -205,7 +209,7 @@ export function parseStructuredCaptureArgv(proc = {}) {
   const iface = parsed.semantic.interface || resolveCaptureInterface(proc.command || '');
   const evidenceRoot = parsed.semantic.evidence_root || resolveEvidenceRootFromCommand(proc.command || '');
   if (!outputPath) return { ok: false, reason: 'missing_output_path', basename, parsed };
-  if (!evidenceRoot?.startsWith('/tmp/phase32h')) {
+  if (!isPhaseCaptureEvidenceRoot(evidenceRoot)) {
     return { ok: false, reason: 'output_outside_phase32h_roots', basename, outputPath, evidenceRoot };
   }
   return {
@@ -233,7 +237,7 @@ export function openOutputPathsForPid(pid, { timeoutMs = 2000 } = {}) {
     if (!trimmed || trimmed.startsWith('COMMAND')) continue;
     const parts = trimmed.split(/\s+/);
     const name = parts[parts.length - 1];
-    if (/\.pcap/i.test(name) || /phase32h/i.test(name)) paths.push(name);
+    if (/\.pcap/i.test(name) || /phase32h/i.test(name) || /phase33f/i.test(name)) paths.push(name);
   }
   return paths;
 }
@@ -396,7 +400,7 @@ export function evaluateForeignCollectorDecision({ candidate, activeRoot, regist
     }
     return { foreign: false, reason: 'registered_collector' };
   }
-  if (!candidate.evidence_root?.startsWith('/tmp/phase32h')) {
+  if (!isPhaseCaptureEvidenceRoot(candidate.evidence_root)) {
     return { foreign: false, reason: 'outside_phase32h_roots' };
   }
   if (candidate.evidence_root !== activeRoot) {

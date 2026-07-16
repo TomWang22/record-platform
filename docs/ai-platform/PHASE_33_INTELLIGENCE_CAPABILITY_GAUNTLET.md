@@ -1,11 +1,11 @@
 # Phase 33 — Intelligence Capability Gauntlet
 
 ```text
-Status: PHASE 33A–33D PACKAGES COMPLETE — LIVE GAUNTLET NOT LAUNCHED
+Status: PHASE 33A–33E PACKAGES COMPLETE — LIVE GAUNTLET NOT LAUNCHED
 Phase 33E: COMPLETE (fixture offline only)
-Phase 33F: READINESS/CANARY AUTHORIZED — currently BLOCKED on offline quality (semantic Recall@5); live canary NOT LAUNCHED
+Phase 33F: LAUNCHER COMMITTED — offline readiness/verify PASS; live 720-probe canary NOT LAUNCHED; real canary/target roots ABSENT
 Phase 33G: NOT LAUNCHED
-Requires: separate owner approval before any executable product sub-phase
+Requires: new exact-SHA CI approval + explicit owner launch approval before creating /tmp/phase33f-capability-gauntlet-canary-v1
 ```
 
 ## Purpose
@@ -57,7 +57,7 @@ etc.) remain and are not replaced.
 | 33C | Scarcity, valuation, auction intelligence | COMPLETE (offline/fixture) |
 | 33D | Negotiation assistance and recommendations | COMPLETE (offline/fixture; coverage gate restored) |
 | 33E | Market analytics and multi-turn recall | COMPLETE (fixture offline; durable private memory NOT AUTHORIZED) |
-| 33F | Cross-protocol capability gauntlet | READINESS PACKAGE COMPLETE; CANARY BLOCKED / NOT LAUNCHED |
+| 33F | Cross-protocol capability gauntlet | LAUNCHER COMMITTED; CANARY NOT LAUNCHED |
 | 33G | Targeted remediation and staging decision | NOT LAUNCHED |
 
 ## Phase 33B metric interpretation (not acceptance)
@@ -89,8 +89,34 @@ deterministic metadata/keyword evidence selection.
 - No live product matrix in CI
 - No `/tmp` generated reports committed
 
+## Phase 33F committed launcher
+
+Committed path (only supported live canary entrypoint):
+
+- `scripts/phase33f-launch-capability-canary.mjs`
+- `scripts/lib/phase33f-canary-preflight.mjs`
+- `scripts/lib/phase33f-canary-manifest.mjs`
+- `scripts/lib/phase33f-capability-runner.mjs`
+- `scripts/lib/phase33f-terminal-verdict.mjs`
+- `scripts/phase33f-runtime-status-readonly.mjs`
+
+Verify (offline / no real canary root):
+
+- `make ai-platform-verify-phase33f-canary-manifest`
+- `make ai-platform-verify-phase33f-canary-launcher`
+- `make ai-platform-verify-phase33f-canary-preflight`
+- `make ai-platform-verify-phase33f`
+
+Smoke root (optional, distinct from real canary): `/tmp/phase33f-canary-launcher-smoke-v1`
+
+Real canary root remains ABSENT until a new exact-SHA CI approval and an explicit
+owner launch statement set `PHASE33F_OWNER_LAUNCH_APPROVED_SHA` to HEAD.
+
 ## Next action
 
-Remediate semantic_fixture retrieval quality (Recall@5 >= development floor 0.35)
-before creating `/tmp/phase33f-capability-gauntlet-canary-v1`. Do not launch the
-17,280-probe target without a separate exact owner approval after a frozen canary PASS.
+Owner review of the committed launcher, live edge proof (currently blocked by
+`caddy-with-tcpdump:dev` ImagePullBackOff — see `/tmp/phase33f-edge-preflight-repair/`),
+and optional launcher smoke. Then require a **new** exact-SHA CI approval and a
+**new** explicit owner statement before creating `/tmp/phase33f-capability-gauntlet-canary-v1`.
+Do not launch the 17,280-probe target without a separate exact owner approval after a
+frozen canary PASS.

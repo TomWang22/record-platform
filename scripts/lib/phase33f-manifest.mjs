@@ -202,9 +202,15 @@ export function buildCanaryManifest({ batchesPerCapability = 30 } = {}) {
   return rows;
 }
 
-export function validateManifestRows(rows) {
+export function validateManifestRows(rows, options = {}) {
   const violations = [];
   if (!Array.isArray(rows) || rows.length === 0) return ['empty_manifest'];
+
+  const batchesPerCapability = options.batchesPerCapability ?? 30;
+  const expectedBatches = options.expectedBatches ?? batchesPerCapability * CAPABILITIES.length;
+  const expectedProbes = options.expectedProbes ?? expectedBatches * PROTOCOLS.length;
+  const expectedPerCapability = batchesPerCapability * PROTOCOLS.length;
+  const expectedPerProtocol = expectedBatches;
 
   const probeIds = new Set();
   const coords = new Set();
@@ -253,13 +259,21 @@ export function validateManifestRows(rows) {
   }
 
   const batches = rows.length / 3;
-  if (rows.length !== 720) violations.push(`probe_count:${rows.length}:expected_720`);
-  if (batches !== 240) violations.push(`batch_count:${batches}:expected_240`);
+  if (rows.length !== expectedProbes) {
+    violations.push(`probe_count:${rows.length}:expected_${expectedProbes}`);
+  }
+  if (batches !== expectedBatches) {
+    violations.push(`batch_count:${batches}:expected_${expectedBatches}`);
+  }
   for (const c of CAPABILITIES) {
-    if (perCap[c] !== 90) violations.push(`capability_probe_allocation:${c}:${perCap[c]}`);
+    if (perCap[c] !== expectedPerCapability) {
+      violations.push(`capability_probe_allocation:${c}:${perCap[c]}`);
+    }
   }
   for (const p of PROTOCOLS) {
-    if (perProto[p] !== 240) violations.push(`protocol_allocation:${p}:${perProto[p]}`);
+    if (perProto[p] !== expectedPerProtocol) {
+      violations.push(`protocol_allocation:${p}:${perProto[p]}`);
+    }
   }
 
   const batchCount = new Set(rows.map((r) => r.batch_id)).size;
@@ -284,6 +298,9 @@ export function validateManifestRows(rows) {
       adversarial_share: advShare,
       weak_data_share: weakShare,
       exact_pressing_share: exactShare,
+      expected_probes: expectedProbes,
+      expected_batches: expectedBatches,
+      batches_per_capability: batchesPerCapability,
     },
   };
 }
@@ -299,14 +316,14 @@ export function loadManifest(filePath) {
   return { raw, rows };
 }
 
-export function writeManifest(filePath, rows) {
+export function writeManifest(filePath, rows, { batchesPerCapability = 30 } = {}) {
   const manifest_sha = hashManifest(rows);
   const body = {
     phase: '33F',
     kind: 'capability_gauntlet_canary_manifest',
     total_probes: rows.length,
     triplet_batches: rows.length / 3,
-    batches_per_capability: 30,
+    batches_per_capability: batchesPerCapability,
     protocols: PROTOCOLS,
     capabilities: CAPABILITIES,
     production_mutation_allowed: false,

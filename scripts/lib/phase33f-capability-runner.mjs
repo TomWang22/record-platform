@@ -37,6 +37,12 @@ import {
   sleepMs,
   EDGE_RATE_LIMITED,
 } from './phase33f-rate-limit.mjs';
+import {
+  sampleRunnerResourceTelemetry,
+  appendRunnerResourceTelemetry,
+  evaluateResourcePolicy,
+  RESOURCE_HARD_LIMITS,
+} from './phase33f-runner-resource-telemetry.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -44,6 +50,11 @@ const WORKER_PATH = path.join(__dirname, 'phase33f-capability-probe-worker.mjs')
 
 /** @type {BoundedWorkerPool | null} */
 let capabilityWorkerPool = null;
+
+/** @type {ReturnType<typeof sampleRunnerResourceTelemetry>['peaks'] | null} */
+let resourcePeaks = null;
+/** @type {{ listeners: number, active_handles: number } | null} */
+let resourceBaseline = null;
 
 export { capabilityRoutePath, issueCapabilityProbe };
 
@@ -84,6 +95,28 @@ export async function closeCapabilityWorkerPool() {
   if (!capabilityWorkerPool) return;
   await capabilityWorkerPool.close();
   capabilityWorkerPool = null;
+}
+
+function emitResourceSample(outRoot, { completedBatch, probeTotal, queue }) {
+  const sample = sampleRunnerResourceTelemetry({
+    completedBatch,
+    probeTotal,
+    workerPool: capabilityWorkerPool,
+    queue,
+    peaks: resourcePeaks,
+    baseline: resourceBaseline,
+  });
+  resourcePeaks = sample.peaks;
+  if (outRoot) {
+    appendRunnerResourceTelemetry(outRoot, sample);
+  }
+  if (sample.worker_active > RESOURCE_HARD_LIMITS.worker_active_max) {
+    const err = new Error(`worker_active ${sample.worker_active} exceeds configured limit`);
+    err.code = 'RESOURCE_POLICY_BLOCKED';
+    err.details = { sample };
+    throw err;
+  }
+  return sample;
 }
 
 async function runTripletBatch(triplet, ctx) {
@@ -306,9 +339,31 @@ export async function runCapabilityMatrix({
   const pacedInterval =
     interBatchIntervalMs > 0 ? assertInterBatchInterval(interBatchIntervalMs) : 0;
 
+  resourcePeaks = null;
+  resourceBaseline = null;
+  let resourcePolicy = null;
+  let stoppedForResource = false;
+  let resourceFailureClass = null;
+
   try {
+    // Ensure pool exists before baseline so configured workers are visible.
+    if (process.env.PHASE33F_SYNC_TRIPLET_PROBES !== '1') {
+      ensureCapabilityWorkerPool();
+    }
+    const baselineSample = emitResourceSample(outRoot, {
+      completedBatch: 0,
+      probeTotal: 0,
+      queue: outRoot ? readCorrelationQueueSnapshot(outRoot) : null,
+    });
+    resourceBaseline = {
+      listeners: baselineSample.listener_current,
+      active_handles: baselineSample.active_handle_current,
+      message_ports: baselineSample.message_port_current,
+    };
+
     const batchResults = [];
     let stoppedForRateLimit = false;
+    const telemetryRows = [baselineSample];
 
     if (mode === 'smoke' && concurrency > 1) {
       // Smoke concurrency path: no fail-closed stop mid-pool (tests/smoke only).
@@ -318,6 +373,14 @@ export async function runCapabilityMatrix({
         Object.values(br.results || {}).some(
           (r) => Number(r.http_status) === 429 || r.error_class === EDGE_RATE_LIMITED,
         ),
+      );
+      const queue = outRoot ? readCorrelationQueueSnapshot(outRoot) : null;
+      telemetryRows.push(
+        emitResourceSample(outRoot, {
+          completedBatch: batchResults.length,
+          probeTotal: batchResults.length * 3,
+          queue,
+        }),
       );
     } else {
       for (let i = 0; i < triplets.length; i += 1) {
@@ -330,6 +393,20 @@ export async function runCapabilityMatrix({
           stoppedForRateLimit = true;
           break;
         }
+        const queue = outRoot ? readCorrelationQueueSnapshot(outRoot) : null;
+        try {
+          telemetryRows.push(
+            emitResourceSample(outRoot, {
+              completedBatch: i + 1,
+              probeTotal: (i + 1) * 3,
+              queue,
+            }),
+          );
+        } catch (err) {
+          stoppedForResource = true;
+          resourceFailureClass = err.code || 'RUNNER_TELEMETRY_WRITE_FAIL';
+          break;
+        }
         if (pacedInterval > 0 && i + 1 < triplets.length) {
           await sleepMs(pacedInterval);
         }
@@ -338,19 +415,81 @@ export async function runCapabilityMatrix({
 
     const probeResults = batchResults.flatMap((b) => Object.values(b.results));
     const queue = outRoot ? readCorrelationQueueSnapshot(outRoot) : null;
+
+    await closeCapabilityWorkerPool();
+    const finalSample = emitResourceSample(outRoot, {
+      completedBatch: batchResults.length,
+      probeTotal: probeResults.length,
+      queue,
+    });
+    telemetryRows.push(finalSample);
+
+    resourcePolicy = evaluateResourcePolicy(telemetryRows, {
+      workerFinal: finalSample.worker_active,
+      messagePortFinal: finalSample.message_port_current,
+      listenerFinal: finalSample.listener_current,
+      activeHandleFinal: finalSample.active_handle_current,
+      baseline: resourceBaseline,
+    });
+    if (resourcePolicy.status !== 'PASS') {
+      stoppedForResource = true;
+      resourceFailureClass = resourcePolicy.code;
+    }
+
+    const pass =
+      !stoppedForRateLimit &&
+      !stoppedForResource &&
+      resourcePolicy.status === 'PASS' &&
+      probeResults.every((p) => p.ok);
+
     return {
-      status: !stoppedForRateLimit && probeResults.every((p) => p.ok) ? 'PASS' : 'FAIL',
+      status: pass ? 'PASS' : 'FAIL',
       mode,
       batches: batchResults.length,
       probes: probeResults.length,
       ok_count: probeResults.filter((p) => p.ok).length,
       fail_count: probeResults.filter((p) => !p.ok).length,
       stopped_for_rate_limit: stoppedForRateLimit,
-      failure_class: stoppedForRateLimit ? EDGE_RATE_LIMITED : null,
+      stopped_for_resource: stoppedForResource,
+      failure_class: stoppedForRateLimit
+        ? EDGE_RATE_LIMITED
+        : stoppedForResource
+          ? resourceFailureClass
+          : null,
       inter_batch_interval_ms: pacedInterval,
       queue,
       batch_results: batchResults,
+      resource_policy: resourcePolicy,
+      resource_baseline: resourceBaseline,
+      resource_peaks: resourcePeaks,
+      resource_final: {
+        workers: finalSample.worker_active,
+        message_ports: finalSample.message_port_current,
+        listeners: finalSample.listener_current,
+        active_handles: finalSample.active_handle_current,
+        heap_used_mb: finalSample.heap_used_mb,
+        rss_mb: finalSample.rss_mb,
+      },
     };
+  } catch (err) {
+    if (err.code === 'RUNNER_TELEMETRY_WRITE_FAIL' || err.code === 'RESOURCE_POLICY_BLOCKED') {
+      return {
+        status: 'FAIL',
+        mode,
+        batches: 0,
+        probes: 0,
+        ok_count: 0,
+        fail_count: 0,
+        stopped_for_rate_limit: false,
+        stopped_for_resource: true,
+        failure_class: err.code,
+        inter_batch_interval_ms: pacedInterval,
+        queue: outRoot ? readCorrelationQueueSnapshot(outRoot) : null,
+        batch_results: [],
+        resource_error: err.message,
+      };
+    }
+    throw err;
   } finally {
     await closeCapabilityWorkerPool();
   }

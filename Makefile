@@ -479,6 +479,10 @@ ai-platform-verify-phase33f-rate-capacity: ## Phase 33F rate-capacity packaging 
 	node scripts/ai-platform/verify-phase33f-rate-capacity.mjs
 	node --test tests/phase33f-rate-limit-observability.test.mjs
 
+ai-platform-verify-phase33f-target-readiness: ## Phase 33F target readiness (workload hash + resource telemetry); no target launch
+	node scripts/ai-platform/verify-phase33f-target-readiness.mjs
+	node --test tests/phase33f-target-readiness.test.mjs
+
 ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readiness/semantic/launcher); no live 720 canary
 	node scripts/ai-platform/verify-phase33f-semantic.mjs
 	node scripts/ai-platform/verify-phase33f.mjs
@@ -486,6 +490,7 @@ ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readi
 	node scripts/ai-platform/verify-phase33f-canary-launcher.mjs
 	PHASE33F_PREFLIGHT_OFFLINE=1 node scripts/ai-platform/verify-phase33f-canary-preflight.mjs
 	$(MAKE) ai-platform-verify-phase33f-rate-capacity
+	$(MAKE) ai-platform-verify-phase33f-target-readiness
 	node --test tests/phase33f-capability-gauntlet.test.mjs tests/phase33f-semantic-retrieval.test.mjs tests/phase33f-canary-launcher.test.mjs tests/phase33f-blocked-freeze.test.mjs
 
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier

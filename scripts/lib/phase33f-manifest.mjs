@@ -129,27 +129,36 @@ const REQUIRED_FIELDS = [
 export function buildCanaryManifest({ batchesPerCapability = 30 } = {}) {
   const rows = [];
   let batchOrdinal = 0;
+  // Tag/mode pattern unit matches the 30-batch canary so N=k*30 preserves shares.
+  const PATTERN_UNIT = 30;
   for (const capability of CAPABILITIES) {
     const modes = CAPABILITY_MODES[capability];
     for (let i = 0; i < batchesPerCapability; i += 1) {
       batchOrdinal += 1;
-      const mode = modes[i % modes.length];
+      const patternIndex = i % PATTERN_UNIT;
+      const mode = modes[patternIndex % modes.length];
       const batch_id = `batch_${String(batchOrdinal).padStart(4, '0')}_${capability}`;
-      const multiTurn = i % 4 === 0;
-      const adversarial = i % 5 === 0;
-      const weakData = i % 5 === 1;
-      const exactPressing = i % 5 === 2;
+      const multiTurn = patternIndex % 4 === 0;
+      const adversarial = patternIndex % 5 === 0;
+      const weakData = patternIndex % 5 === 1;
+      const exactPressing = patternIndex % 5 === 2;
+      const tile = Math.floor(i / PATTERN_UNIT);
       for (const protocol of PROTOCOLS) {
         const seed = 33000 + batchOrdinal * 10 + PROTOCOLS.indexOf(protocol);
         const probe_id = `${batch_id}_${protocol}`;
+        // Keep tile-0 scenario_id identical to the frozen 30-batch canary contract.
+        const scenario_id =
+          tile === 0
+            ? `${capability}_${mode}_${String(patternIndex).padStart(2, '0')}`
+            : `${capability}_${mode}_${String(patternIndex).padStart(2, '0')}_t${tile}`;
         rows.push({
-          scenario_id: `${capability}_${mode}_${String(i).padStart(2, '0')}`,
+          scenario_id,
           probe_id,
           batch_id,
           capability,
           capability_mode: mode,
           schema_version: `phase33f-${capability}-1`,
-          participant_side: capability === 'negotiation_assistance' ? (i % 2 ? 'seller' : 'buyer') : 'owner',
+          participant_side: capability === 'negotiation_assistance' ? (patternIndex % 2 ? 'seller' : 'buyer') : 'owner',
           principal_fixture: adversarial ? 'principal_a' : 'principal_a',
           authorization_scopes: adversarial
             ? ['authenticated_market']

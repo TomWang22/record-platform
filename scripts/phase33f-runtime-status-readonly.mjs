@@ -12,6 +12,7 @@ import { listProcessesWide } from './lib/phase32h-process-list.mjs';
 import { buildProcessInspection, listCaptureCollectorCandidates } from './lib/phase32h-process-identity.mjs';
 import { isCoverageBlocked } from './lib/phase32h-run-integrity.mjs';
 import { REAL_CANARY_ROOT, REAL_TARGET_ROOT } from './lib/phase33f-canary-config.mjs';
+import { readRunnerResourceTelemetryTail } from './lib/phase33f-runner-resource-telemetry.mjs';
 
 function parseArgs(argv) {
   const opts = { out: process.env.PHASE33F_MATRIX_ROOT || '/tmp/phase33f-canary-launcher-smoke-v1' };
@@ -50,7 +51,7 @@ function diskSnapshot() {
   return { avail_kib: availKib, avail_bytes: availKib * 1024, avail_gib: (availKib * 1024) / 1073741824 };
 }
 
-export function buildPhase33fRuntimeStatus(outRoot) {
+export async function buildPhase33fRuntimeStatus(outRoot) {
   const processes = listProcessesWide();
   const rootProcesses = processes.filter((p) => (p.command || '').includes(outRoot));
   const inspections = rootProcesses.map((p) => buildProcessInspection(p));
@@ -58,6 +59,9 @@ export function buildPhase33fRuntimeStatus(outRoot) {
   const identity = evaluatePcapCollectorIdentity(outRoot, processes, registry, { probesActive: true });
   const queue = readCorrelationQueueSnapshot(outRoot);
   const matrix = matrixCounts(outRoot);
+  // Bounded tail read — never load the full telemetry history into memory.
+  const resourceTelemetry = await readRunnerResourceTelemetryTail(outRoot, { limit: 32 });
+  const latest = resourceTelemetry.latest;
   const blockedMarkers = [
     'PHASE32H_FOREIGN_COLLECTOR_BLOCKED',
     'PHASE32H_DUPLICATE_COLLECTOR_BLOCKED',
@@ -84,6 +88,36 @@ export function buildPhase33fRuntimeStatus(outRoot) {
       evidence_root: c.evidence_root,
       output_path: c.output_path,
     })),
+    resource_telemetry: {
+      status: resourceTelemetry.status,
+      malformed: resourceTelemetry.malformed || 0,
+      lines_seen: resourceTelemetry.lines_seen || 0,
+      tail_rows: resourceTelemetry.rows.length,
+      peaks: resourceTelemetry.peaks,
+      latest: latest
+        ? {
+            timestamp: latest.timestamp,
+            completed_batch: latest.completed_batch,
+            probe_total: latest.probe_total,
+            rss_mb: latest.rss_mb,
+            heap_used_mb: latest.heap_used_mb,
+            worker_configured: latest.worker_configured,
+            worker_active: latest.worker_active,
+            worker_peak: latest.worker_peak,
+            message_port_current: latest.message_port_current,
+            message_port_peak: latest.message_port_peak,
+            listener_current: latest.listener_current,
+            listener_peak: latest.listener_peak,
+            active_handle_current: latest.active_handle_current,
+            active_handle_peak: latest.active_handle_peak,
+            worker_queue_depth: latest.worker_queue_depth,
+            queue_pending: latest.queue_pending,
+            queue_running: latest.queue_running,
+            queue_complete: latest.queue_complete,
+            queue_failed: latest.queue_failed,
+          }
+        : null,
+    },
     real_canary_exists: fs.existsSync(REAL_CANARY_ROOT),
     real_target_exists: fs.existsSync(REAL_TARGET_ROOT),
     frozen_pass: fs.existsSync(path.join(outRoot, 'FROZEN_PASS_EVIDENCE')),
@@ -91,9 +125,9 @@ export function buildPhase33fRuntimeStatus(outRoot) {
   };
 }
 
-function main() {
+async function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const status = buildPhase33fRuntimeStatus(opts.out);
+  const status = await buildPhase33fRuntimeStatus(opts.out);
   status.disk = diskSnapshot();
   console.log(JSON.stringify(status, null, 2));
 }

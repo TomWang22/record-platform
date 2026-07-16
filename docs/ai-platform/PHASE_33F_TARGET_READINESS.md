@@ -18,7 +18,13 @@ The capability runner emits bounded JSONL at
 threads, listeners, active handles, heap/RSS). The read-only status CLI streams
 a tail only — it does not load full history.
 
+## Target launcher
+
+See [PHASE_33F_TARGET_LAUNCHER.md](./PHASE_33F_TARGET_LAUNCHER.md). The committed
+target launcher is separate from the canary launcher and uses dedicated approval
+env vars. This package still does not auto-launch the 17,280-probe target.
+
 ## Target root
 
 `/tmp/phase33f-capability-gauntlet-target-v1` requires a separate exact-SHA owner
-approval after target-readiness PASS. This package does not launch it.
+approval after target-launcher READY. This package does not launch it.

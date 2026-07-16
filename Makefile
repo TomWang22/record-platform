@@ -483,6 +483,16 @@ ai-platform-verify-phase33f-target-readiness: ## Phase 33F target readiness (wor
 	node scripts/ai-platform/verify-phase33f-target-readiness.mjs
 	node --test tests/phase33f-target-readiness.test.mjs
 
+ai-platform-verify-phase33f-target-manifest: ## Phase 33F target 17280 manifest + pin gates (offline; no target launch)
+	node scripts/ai-platform/verify-phase33f-target-manifest.mjs
+
+ai-platform-verify-phase33f-target-launcher: ## Phase 33F committed target launcher packaging + unit gates
+	node scripts/ai-platform/verify-phase33f-target-launcher.mjs
+	node --test tests/phase33f-target-launcher.test.mjs
+
+ai-platform-verify-phase33f-target-preflight: ## Phase 33F target preflight offline failure paths (no real target root)
+	PHASE33F_PREFLIGHT_OFFLINE=1 node scripts/ai-platform/verify-phase33f-target-preflight.mjs
+
 ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readiness/semantic/launcher); no live 720 canary
 	node scripts/ai-platform/verify-phase33f-semantic.mjs
 	node scripts/ai-platform/verify-phase33f.mjs
@@ -491,6 +501,9 @@ ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readi
 	PHASE33F_PREFLIGHT_OFFLINE=1 node scripts/ai-platform/verify-phase33f-canary-preflight.mjs
 	$(MAKE) ai-platform-verify-phase33f-rate-capacity
 	$(MAKE) ai-platform-verify-phase33f-target-readiness
+	$(MAKE) ai-platform-verify-phase33f-target-manifest
+	$(MAKE) ai-platform-verify-phase33f-target-launcher
+	$(MAKE) ai-platform-verify-phase33f-target-preflight
 	node --test tests/phase33f-capability-gauntlet.test.mjs tests/phase33f-semantic-retrieval.test.mjs tests/phase33f-canary-launcher.test.mjs tests/phase33f-blocked-freeze.test.mjs
 
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier

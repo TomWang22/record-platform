@@ -60,16 +60,29 @@ if (!launcherText.includes('runPhase33fCanaryPreflight')) {
 if (!launcherText.includes('PHASE33F_OWNER_LAUNCH_APPROVED_SHA')) {
   violations.push('launcher_missing_owner_approval_gate');
 }
-if (
-  !launcherText.includes('finalizePhase33fRun') &&
-  !launcherText.includes('finalizeSmokeWithFreeze')
-) {
+const usesLaunchCore = launcherText.includes('runPhase33fCapabilityLaunch');
+const usesInlineFinalize =
+  launcherText.includes('finalizePhase33fRun') || launcherText.includes('finalizeSmokeWithFreeze');
+if (!usesLaunchCore && !usesInlineFinalize) {
   violations.push('launcher_missing_freeze_wire');
 }
-if (!launcherText.includes('finalizePhase33fRun')) {
+if (!usesLaunchCore && !launcherText.includes('finalizePhase33fRun')) {
   violations.push('launcher_missing_phase33f_finalize_helper');
 }
-if (!launcherText.includes('FROZEN_BLOCKED_EVIDENCE') && !fs.existsSync(path.join(REPO_ROOT, 'scripts/lib/phase33f-run-finalize.mjs'))) {
+if (usesLaunchCore) {
+  const corePath = path.join(REPO_ROOT, 'scripts/lib/phase33f-capability-launch-core.mjs');
+  if (!fs.existsSync(corePath)) {
+    violations.push('launcher_missing_launch_core_module');
+  } else {
+    const coreText = fs.readFileSync(corePath, 'utf8');
+    if (!coreText.includes('finalizePhase33fRun')) {
+      violations.push('launch_core_missing_phase33f_finalize_helper');
+    }
+    if (!coreText.includes('FROZEN_BLOCKED_EVIDENCE') && !fs.existsSync(path.join(REPO_ROOT, 'scripts/lib/phase33f-run-finalize.mjs'))) {
+      violations.push('launcher_missing_blocked_freeze_path');
+    }
+  }
+} else if (!launcherText.includes('FROZEN_BLOCKED_EVIDENCE') && !fs.existsSync(path.join(REPO_ROOT, 'scripts/lib/phase33f-run-finalize.mjs'))) {
   violations.push('launcher_missing_blocked_freeze_path');
 }
 

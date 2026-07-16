@@ -59,6 +59,19 @@ export function assertInterBatchInterval(intervalMs) {
   return n;
 }
 
+/** Target / target-smoke require the full phase33f-rate-v1 floor (1000 ms), not the 750 ms floor. */
+export function assertTargetInterBatchInterval(intervalMs) {
+  const n = Number(intervalMs);
+  if (!Number.isFinite(n) || n < INTER_BATCH_INTERVAL_MS) {
+    const err = new Error(
+      `target inter_batch_interval_ms ${intervalMs} below required ${INTER_BATCH_INTERVAL_MS}`,
+    );
+    err.code = 'PHASE33F_TARGET_RATE_PACING_INVALID';
+    throw err;
+  }
+  return n;
+}
+
 export function projectedCanaryRuntimeMs({
   batches = 240,
   interBatchIntervalMs = INTER_BATCH_INTERVAL_MS,

@@ -19,7 +19,7 @@ import {
   RESOURCE_POLICY_VERSION,
   RESOURCE_HARD_LIMITS,
 } from '../lib/phase33f-runner-resource-telemetry.mjs';
-import { REAL_TARGET_ROOT, CANARY } from '../lib/phase33f-canary-config.mjs';
+import { REAL_TARGET_ROOT, CANARY, TARGET, TARGET_MANIFEST_SHA_PIN, TARGET_WORKLOAD_HASH_PIN } from '../lib/phase33f-canary-config.mjs';
 import { INTER_BATCH_INTERVAL_MS, RATE_POLICY_VERSION } from '../lib/phase33f-rate-limit.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -28,9 +28,14 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 const REQUIRED = [
   'scripts/lib/phase33f-workload-hash.mjs',
   'scripts/lib/phase33f-runner-resource-telemetry.mjs',
+  'scripts/lib/phase33f-capability-launch-core.mjs',
+  'scripts/lib/phase33f-target-preflight.mjs',
+  'scripts/phase33f-launch-capability-target.mjs',
+  'scripts/phase33f-target-launcher-smoke.mjs',
   'scripts/phase33f-runtime-status-readonly.mjs',
   'scripts/phase33f-target-telemetry-smoke.mjs',
   'tests/phase33f-target-readiness.test.mjs',
+  'tests/phase33f-target-launcher.test.mjs',
 ];
 
 const violations = [];
@@ -43,7 +48,7 @@ if (fs.existsSync(REAL_TARGET_ROOT)) {
 }
 
 const canaryRows = buildCanaryManifest({ batchesPerCapability: CANARY.batchesPerCapability });
-const targetRows = buildCanaryManifest({ batchesPerCapability: 720 });
+const targetRows = buildCanaryManifest({ batchesPerCapability: TARGET.batchesPerCapability });
 const canaryHash = hashCanonicalWorkload(canaryRows);
 const targetHash = hashCanonicalWorkload(targetRows);
 const canaryManifestSha = computeManifestShaFromRows(canaryRows);
@@ -52,7 +57,12 @@ const legacy = legacyProbeIdWorkloadHash(canaryRows);
 
 if (canaryRows.length !== 720) violations.push(`canary_probe_count:${canaryRows.length}`);
 if (targetRows.length !== 17280) violations.push(`target_probe_count:${targetRows.length}`);
-if (canaryHash.duplicate_coordinate_keys !== 0) violations.push('canary_duplicate_coordinates');
+if (targetManifestSha !== TARGET_MANIFEST_SHA_PIN) {
+  violations.push(`target_manifest_pin:${targetManifestSha}`);
+}
+if (targetHash.canonical_workload_hash !== TARGET_WORKLOAD_HASH_PIN) {
+  violations.push(`target_workload_pin:${targetHash.canonical_workload_hash}`);
+}if (canaryHash.duplicate_coordinate_keys !== 0) violations.push('canary_duplicate_coordinates');
 if (targetHash.duplicate_coordinate_keys !== 0) violations.push('target_duplicate_coordinates');
 if (canaryManifestSha === canaryHash.canonical_workload_hash) {
   violations.push('workload_hash_must_differ_from_manifest_sha');

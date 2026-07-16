@@ -1,9 +1,20 @@
 /**
  * Phase 33B offline retrieval metrics (keyword / semantic_fixture / hybrid_fixture).
  * No production embedding writes. No silent mode fallback.
+ *
+ * semantic_fixture uses Phase 33F structured fixture embedding + metadata eligibility
+ * (scripts/lib/phase33f-semantic-retrieval.mjs). It must not call keywordScore.
  */
+import {
+  SEMANTIC_EMBEDDING,
+  scoreSemanticFixture,
+  structuredFixtureEmbed,
+  buildDocumentEmbedText,
+  documentVector,
+} from './phase33f-semantic-retrieval.mjs';
 
 export const SUPPORTED_MODES = ['keyword', 'semantic_fixture', 'hybrid_fixture'];
+export { SEMANTIC_EMBEDDING };
 
 export function tokenize(text) {
   return String(text || '')
@@ -44,45 +55,32 @@ export function cosine(a, b) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
-/** Deterministic tiny synthetic vector from text (fixture-only). */
-export function fixtureEmbed(text, dim = 8) {
-  const vec = new Array(dim).fill(0);
-  const tokens = tokenize(text);
-  for (const tok of tokens) {
-    let h = 2166136261;
-    for (let i = 0; i < tok.length; i += 1) {
-      h ^= tok.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    const idx = Math.abs(h) % dim;
-    vec[idx] += 1;
-  }
-  const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0)) || 1;
-  return vec.map((v) => v / norm);
+/** Legacy dim-8 hash embed retained for keyword-era fixture compatibility helpers. */
+export function fixtureEmbed(text, dim = SEMANTIC_EMBEDDING.dimension) {
+  return structuredFixtureEmbed(text, {}, dim);
 }
 
-export function semanticFixtureScore(queryText, doc) {
-  const qv = Array.isArray(doc.query_vector_override)
-    ? doc.query_vector_override
-    : fixtureEmbed(queryText);
-  const dv = Array.isArray(doc.synthetic_vector) ? doc.synthetic_vector : fixtureEmbed(
-    [doc.title, doc.text, doc.artist, doc.release_title, doc.catalog_number].filter(Boolean).join(' '),
-  );
-  return cosine(qv, dv);
+/** Semantic cosine (+ metadata eligibility handled in scoreSemanticFixture). No keywordScore. */
+export function semanticFixtureScore(queryText, doc, query = null) {
+  const q = query && typeof query === 'object' ? query : { text: queryText };
+  if (!q.text) q.text = queryText;
+  const out = scoreSemanticFixture(q, doc);
+  return out.rejected ? 0 : out.score;
 }
 
-export function hybridFixtureScore(queryText, doc) {
-  return 0.55 * keywordScore(queryText, doc) + 0.45 * semanticFixtureScore(queryText, doc);
+export function hybridFixtureScore(queryText, doc, query = null) {
+  // Explicit hybrid: lexical + semantic (honest mode label).
+  return 0.55 * keywordScore(queryText, doc) + 0.45 * semanticFixtureScore(queryText, doc, query);
 }
 
-export function scoreDocument(mode, queryText, doc) {
+export function scoreDocument(mode, queryText, doc, query = null) {
   switch (mode) {
     case 'keyword':
       return keywordScore(queryText, doc);
     case 'semantic_fixture':
-      return semanticFixtureScore(queryText, doc);
+      return semanticFixtureScore(queryText, doc, query);
     case 'hybrid_fixture':
-      return hybridFixtureScore(queryText, doc);
+      return hybridFixtureScore(queryText, doc, query);
     default: {
       const _exhaustive = mode;
       throw new Error(`unsupported_mode:${_exhaustive}`);
@@ -141,11 +139,23 @@ export function rankForQuery({ mode, query, documents, principalId }) {
     ) {
       continue;
     }
-    const score = scoreDocument(mode, query.text, doc);
+    if (mode === 'semantic_fixture') {
+      const detail = scoreSemanticFixture(query, doc);
+      if (detail.rejected || detail.score <= 0) continue;
+      scored.push({ doc, score: detail.score, diagnostics: detail });
+      continue;
+    }
+    const score = scoreDocument(mode, query.text, doc, query);
     if (score <= 0) continue;
     scored.push({ doc, score });
   }
-  scored.sort((a, b) => b.score - a.score || a.doc.document_id.localeCompare(b.doc.document_id));
+  // Higher composite score first; prefer higher structured metadata_bonus, then id.
+  scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const mb = (b.diagnostics?.factors?.metadata_bonus || 0) - (a.diagnostics?.factors?.metadata_bonus || 0);
+    if (mb !== 0) return mb;
+    return a.doc.document_id.localeCompare(b.doc.document_id);
+  });
   return scored;
 }
 

@@ -21,5 +21,13 @@
     "ALLOW_PROD_PERCENT": 0,
     "hybrid_vector_production_default": "NOT_ENABLED",
     "production_embedding_writes": false
-  }
+  },
+  "embedding_fixture": {
+    "embedding_version": "phase33f-semantic-v3",
+    "model_or_fixture_id": "fixture-structured-hash-embed",
+    "dimension": 96,
+    "distance_metric": "cosine_similarity",
+    "normalization": "unit"
+  },
+  "phase33f_semantic_reembed": true
 }

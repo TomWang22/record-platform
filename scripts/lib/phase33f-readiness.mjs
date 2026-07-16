@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadCorpus } from './phase33b-retrieval-corpus.mjs';
 import { SUPPORTED_MODES, evaluateMode, evaluateHardFailures } from './phase33b-retrieval-metrics.mjs';
+import { loadCommittedSplits } from './phase33f-retrieval-splits.mjs';
 import { CAPABILITIES, loadManifest, validateManifestRows, hashManifest } from './phase33f-manifest.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -30,23 +31,92 @@ function metricKeyToPolicy(key) {
   return key;
 }
 
+function filterCorpusByQueryIds(corpus, ids) {
+  const idSet = new Set(ids);
+  const queries = corpus.queries.filter((q) => idSet.has(q.query_id));
+  const qids = new Set(queries.map((q) => q.query_id));
+  return {
+    queries,
+    documents: corpus.documents,
+    judgments: corpus.judgments.filter((j) => qids.has(j.query_id)),
+    hardNegatives: corpus.hardNegatives.filter((h) => qids.has(h.query_id)),
+  };
+}
+
+function collectModeFailures(mode, global, thresholds, policy, failing) {
+  const hard = evaluateHardFailures(global, policy);
+  for (const h of hard) {
+    failing.push({ mode, metric: h, measured: null, threshold: 0, delta: null, class: 'hard_failure' });
+  }
+  const checks = [
+    ['Recall_at_5', 'Recall@5_min'],
+    ['Recall_at_10', 'Recall@10_min'],
+    ['MRR', 'MRR_min'],
+    ['nDCG_at_5', 'nDCG@5_min'],
+    ['nDCG_at_10', 'nDCG@10_min'],
+    ['exact_pressing_accuracy', 'exact_pressing_accuracy_min'],
+    ['abstention_precision', 'abstention_precision_min'],
+  ];
+  for (const [measuredKey, threshKey] of checks) {
+    const measured = global[measuredKey];
+    const threshold = thresholds[threshKey];
+    if (typeof threshold === 'number' && typeof measured === 'number' && measured < threshold) {
+      failing.push({
+        mode,
+        metric: threshKey.replace(/_min$/, ''),
+        measured,
+        threshold,
+        delta: measured - threshold,
+        class: 'quality_threshold',
+      });
+    }
+  }
+}
+
 export function evaluateRetrievalQualityGates({ packageRoot = AI } = {}) {
   const policy = readJson(path.join(packageRoot, 'retrieval-acceptance-policy.json'));
   const corpus = loadCorpus(packageRoot);
   const thresholds = policy.quality_thresholds_development || {};
   const failing = [];
   const modes = {};
+  const splits = loadCommittedSplits(packageRoot);
+  if (!splits?.holdout_ids?.length) {
+    failing.push({
+      mode: 'semantic_fixture',
+      metric: 'frozen_holdout_split',
+      measured: 'missing',
+      threshold: 'required',
+      delta: null,
+      class: 'quality_threshold',
+    });
+  }
+  const holdoutCorpus = splits?.holdout_ids?.length
+    ? filterCorpusByQueryIds(corpus, splits.holdout_ids)
+    : null;
 
   for (const mode of SUPPORTED_MODES) {
+    // Semantic readiness is gated on the frozen holdout only.
+    // Keyword/hybrid remain full-corpus regressions so production default stays honest.
+    const evalCorpus =
+      mode === 'semantic_fixture' && holdoutCorpus
+        ? holdoutCorpus
+        : {
+            queries: corpus.queries,
+            documents: corpus.documents,
+            judgments: corpus.judgments,
+            hardNegatives: corpus.hardNegatives,
+          };
     const report = evaluateMode({
       mode,
-      queries: corpus.queries,
-      documents: corpus.documents,
-      judgments: corpus.judgments,
-      hardNegatives: corpus.hardNegatives,
+      queries: evalCorpus.queries,
+      documents: evalCorpus.documents,
+      judgments: evalCorpus.judgments,
+      hardNegatives: evalCorpus.hardNegatives,
     });
     const g = report.global;
     modes[mode] = {
+      evaluation_split: mode === 'semantic_fixture' ? 'holdout' : 'full_corpus',
+      query_count: g.query_count,
       Recall_at_5: g.Recall_at_5,
       Recall_at_10: g.Recall_at_10,
       MRR: g.MRR,
@@ -55,32 +125,7 @@ export function evaluateRetrievalQualityGates({ packageRoot = AI } = {}) {
       exact_pressing_accuracy: g.exact_pressing_accuracy,
       abstention_precision: g.abstention_precision,
     };
-    const hard = evaluateHardFailures(g, policy);
-    for (const h of hard) failing.push({ mode, metric: h, measured: null, threshold: 0, delta: null, class: 'hard_failure' });
-
-    const checks = [
-      ['Recall_at_5', 'Recall@5_min'],
-      ['Recall_at_10', 'Recall@10_min'],
-      ['MRR', 'MRR_min'],
-      ['nDCG_at_5', 'nDCG@5_min'],
-      ['nDCG_at_10', 'nDCG@10_min'],
-      ['exact_pressing_accuracy', 'exact_pressing_accuracy_min'],
-      ['abstention_precision', 'abstention_precision_min'],
-    ];
-    for (const [measuredKey, threshKey] of checks) {
-      const measured = g[measuredKey];
-      const threshold = thresholds[threshKey];
-      if (typeof threshold === 'number' && typeof measured === 'number' && measured < threshold) {
-        failing.push({
-          mode,
-          metric: threshKey.replace(/_min$/, ''),
-          measured,
-          threshold,
-          delta: measured - threshold,
-          class: 'quality_threshold',
-        });
-      }
-    }
+    collectModeFailures(mode, g, thresholds, policy, failing);
   }
 
   return {
@@ -88,6 +133,8 @@ export function evaluateRetrievalQualityGates({ packageRoot = AI } = {}) {
     modes,
     failing_policy_metrics: failing,
     thresholds,
+    holdout_query_count: holdoutCorpus?.queries?.length || 0,
+    split_leakage: splits?.leakage_checks?.cross_split_duplicates ?? null,
   };
 }
 
@@ -268,7 +315,9 @@ export function evaluatePhase33fReadiness({
     status,
     banner: ready
       ? 'PHASE 33F CANARY READY — NOT LAUNCHED'
-      : 'PHASE 33F BLOCKED — OFFLINE CAPABILITY QUALITY GATE',
+      : blockedCaps.includes('semantic_search')
+        ? 'PHASE 33F BLOCKED — SEMANTIC RETRIEVAL QUALITY GATE'
+        : 'PHASE 33F BLOCKED — OFFLINE CAPABILITY QUALITY GATE',
     capabilities: caps,
     failing_policy_metrics: failing,
     threshold_changes: 0,
@@ -337,13 +386,14 @@ export function evaluatePhase33fReadiness({
     '## Remediation',
     status === 'BLOCKED'
       ? [
-          '- Improve semantic_fixture retrieval quality above retrieval-acceptance-policy development floors (Recall@5_min=0.35).',
+          '- Improve semantic_fixture holdout quality above retrieval-acceptance-policy floors (Recall@5_min=0.35).',
+          '- Tune only on development; select on validation; accept only on frozen holdout.',
           '- Do not reinterpret protocol parity as semantic correctness.',
-          '- Do not lower thresholds.',
-          '- Re-run make ai-platform-verify-phase33f-readiness after remediation.',
+          '- Do not lower thresholds or silently fall back to keyword/hybrid.',
+          '- Re-run make ai-platform-verify-phase33f-semantic and make ai-platform-verify-phase33f-readiness after remediation.',
           '- Do not create /tmp/phase33f-capability-gauntlet-canary-v1 until READY.',
         ].join('\n')
-      : '- Readiness PASS; canary still requires explicit launch step and remains NOT LAUNCHED until executed.',
+      : '- Readiness PASS on frozen holdout; canary still requires separate owner approval and remains NOT LAUNCHED.',
     '',
     'Production: NOT APPROVED',
     'Phase 33G: NOT LAUNCHED',

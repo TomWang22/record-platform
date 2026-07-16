@@ -52,6 +52,8 @@ tmp/
 !scripts/ai-platform/phase33e-scenarios/**/*.json
 !scripts/ai-platform/phase33f-acceptance-policy.json
 !scripts/ai-platform/phase33f-capability-gauntlet-manifest.json
+!scripts/ai-platform/retrieval-splits/
+!scripts/ai-platform/retrieval-splits/**/*.json
 *.ndjson
 *.csv
 

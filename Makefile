@@ -434,6 +434,16 @@ ai-platform-verify-phase33e: ## Phase 33E aggregate offline analytics+memory ver
 	  echo "phase33e: skipping python service tests (no services/python-ai-service/.venv); Node deterministic engines verified"; \
 	fi
 
+ai-platform-diagnose-phase33f-semantic: ## Phase 33F semantic diagnosis + freeze split artifacts under /tmp (no canary)
+	node scripts/ai-platform/diagnose-phase33f-semantic.mjs
+
+ai-platform-evaluate-phase33f-semantic: ## Phase 33F semantic/keyword/hybrid eval on frozen splits (holdout gated)
+	node scripts/ai-platform/evaluate-phase33f-semantic.mjs
+
+ai-platform-verify-phase33f-semantic: ## Phase 33F semantic holdout acceptance (no live canary)
+	node scripts/ai-platform/verify-phase33f-semantic.mjs
+	node --test tests/phase33f-semantic-retrieval.test.mjs
+
 ai-platform-verify-phase33f-manifest: ## Phase 33F canonical 720-probe manifest validation (offline)
 	node scripts/ai-platform/verify-phase33f-manifest.mjs
 
@@ -449,9 +459,10 @@ ai-platform-verify-phase33f-collectors: ## Phase 33F collector contract stub (no
 ai-platform-verify-phase33f-canary: ## Phase 33F canary gate — refuses launch when readiness BLOCKED
 	node scripts/ai-platform/verify-phase33f-canary.mjs
 
-ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readiness); no live 720 canary
+ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readiness/semantic); no live 720 canary
+	node scripts/ai-platform/verify-phase33f-semantic.mjs
 	node scripts/ai-platform/verify-phase33f.mjs
-	node --test tests/phase33f-capability-gauntlet.test.mjs
+	node --test tests/phase33f-capability-gauntlet.test.mjs tests/phase33f-semantic-retrieval.test.mjs
 
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity

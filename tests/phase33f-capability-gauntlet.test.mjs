@@ -82,12 +82,11 @@ test('material parity mismatch is fail', () => {
   assert.ok(r.material_mismatch_count >= 1);
 });
 
-test('retrieval quality gates block semantic_fixture below policy floor', () => {
+test('retrieval quality gates use frozen holdout for semantic_fixture', () => {
   const gates = evaluateRetrievalQualityGates();
-  assert.equal(gates.status, 'BLOCKED');
-  const semantic = gates.failing_policy_metrics.filter((f) => f.mode === 'semantic_fixture');
-  assert.ok(semantic.length >= 1);
-  const recall = semantic.find((f) => String(f.metric).includes('Recall@5'));
-  assert.ok(recall);
-  assert.ok(recall.measured < recall.threshold);
+  assert.equal(gates.modes.semantic_fixture.evaluation_split, 'holdout');
+  assert.equal(gates.split_leakage, 0);
+  assert.equal(gates.status, 'READY', JSON.stringify(gates.failing_policy_metrics.slice(0, 8)));
+  assert.ok(gates.modes.semantic_fixture.Recall_at_5 >= 0.35);
+  assert.ok(gates.modes.semantic_fixture.exact_pressing_accuracy >= 0.5);
 });

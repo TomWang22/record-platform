@@ -27,6 +27,16 @@ function expectedHttpOk(row) {
     return false;
   }
   const request = row.request || {};
+  // Negotiation Contract A: unauthorized_thread → structured HTTP 200 refusal.
+  if (
+    row.capability === 'negotiation_assistance' &&
+    (behavior === 'abstain_or_limit' ||
+      request.mode === 'unauthorized_thread' ||
+      row.capability_mode === 'unauthorized_thread' ||
+      request.unauthorized_thread === true)
+  ) {
+    return true;
+  }
   if (
     request.unauthorized_scope ||
     request.cross_user_attempt ||
@@ -41,7 +51,7 @@ function expectedHttpOk(row) {
 }
 
 function buildRequestBody(row) {
-  return {
+  const body = {
     ...row.request,
     capability: row.capability,
     capability_mode: row.capability_mode,
@@ -55,6 +65,12 @@ function buildRequestBody(row) {
     seed: row.seed,
     production_mutation_allowed: false,
   };
+  // Carry side/mode into the engine path without flipping expected HTTP via
+  // unauthorized_thread boolean (Contract A expects structured HTTP 200).
+  if (row.participant_side && body.participant_side == null) {
+    body.participant_side = row.participant_side;
+  }
+  return body;
 }
 
 export function issueCapabilityProbe(row, {

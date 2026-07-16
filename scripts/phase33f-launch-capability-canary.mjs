@@ -16,7 +16,6 @@ import {
   sha256File,
 } from './lib/phase32h-run-integrity.mjs';
 import { registerPcapCollector } from './lib/phase32h-collector-registry.mjs';
-import { finalizeSmokeWithFreeze } from './lib/phase32h-smoke-collector-cleanup.mjs';
 import {
   REAL_CANARY_ROOT,
   REAL_TARGET_ROOT,
@@ -35,6 +34,7 @@ import {
 import { liveAuthSmoke } from './lib/phase33f-auth-smoke.mjs';
 import { liveQuicPcapPreflight } from './lib/phase33f-quic-pcap-preflight.mjs';
 import { runCapabilityMatrix } from './lib/phase33f-capability-runner.mjs';
+import { finalizePhase33fRun } from './lib/phase33f-run-finalize.mjs';
 import { evaluateTerminalVerdictWithDelay } from './lib/phase33f-terminal-verdict.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -193,11 +193,17 @@ async function main() {
       caCert: env.CA_CERT,
     });
   } catch (err) {
-    finalizeSmokeWithFreeze(opts.out, {
+    finalizePhase33fRun({
+      outRoot: opts.out,
       repoRoot: REPO_ROOT,
-      pass: false,
-      markerName: 'FROZEN_BLOCKED_EVIDENCE',
-      hashManifestName: 'phase33f-hash-manifest.json',
+      status: 'BLOCKED',
+      failureClass: err.code || 'RUNNER_EXCEPTION',
+      failureDetails: { message: err.message },
+      mode: opts.mode,
+      launchHead: preflight.headSha,
+      manifestSha,
+      supervisorPid,
+      telemetryPid,
     });
     throw err;
   }
@@ -209,29 +215,30 @@ async function main() {
   });
 
   const pass = runnerResult.status === 'PASS' && verdict.status === 'PASS';
-  const freeze = finalizeSmokeWithFreeze(opts.out, {
+  const failureClass = pass
+    ? null
+    : verdict.flags?.matrix_complete === false
+      ? 'UNEXPECTED_PROBE_FAILURE'
+      : 'TERMINAL_VERDICT_FAIL';
+  const freeze = finalizePhase33fRun({
+    outRoot: opts.out,
     repoRoot: REPO_ROOT,
-    pass,
-    markerName: pass ? 'FROZEN_PASS_EVIDENCE' : 'FROZEN_BLOCKED_EVIDENCE',
-    hashManifestName: 'phase33f-hash-manifest.json',
-    markerContent: `${JSON.stringify(
-      {
-        status: pass ? 'PASS' : 'FAIL',
-        phase: '33F',
-        mode: opts.mode,
-        run_id: readRunId(opts.out),
-        launch_head: preflight.headSha,
-        manifest_sha: manifestSha,
-        runner: runnerResult,
-        verdict,
-        supervisor_pid: supervisorPid,
-        telemetry_pid: telemetryPid,
-        frozen_at: new Date().toISOString(),
-      },
-      null,
-      2,
-    )}\n`,
-  });
+    status: pass ? 'PASS' : 'BLOCKED',
+    failureClass,
+    failureDetails: pass
+      ? null
+      : {
+          runner: runnerResult,
+          verdict,
+        },
+    mode: opts.mode,
+    launchHead: preflight.headSha,
+    manifestSha,
+    runner: runnerResult,
+    verdict,
+    supervisorPid,
+    telemetryPid,
+  }).freeze;
 
   const launchRecord = {
     status: pass ? 'PASS' : 'FAIL',

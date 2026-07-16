@@ -21,7 +21,9 @@ const REQUIRED = [
   'scripts/lib/phase33f-capability-probe.mjs',
   'scripts/lib/phase33f-capability-probe-worker.mjs',
   'scripts/lib/phase33f-terminal-verdict.mjs',
+  'scripts/lib/phase33f-run-finalize.mjs',
   'tests/phase33f-canary-launcher.test.mjs',
+  'tests/phase33f-blocked-freeze.test.mjs',
 ];
 
 const violations = [];
@@ -56,8 +58,17 @@ if (!launcherText.includes('runPhase33fCanaryPreflight')) {
 if (!launcherText.includes('PHASE33F_OWNER_LAUNCH_APPROVED_SHA')) {
   violations.push('launcher_missing_owner_approval_gate');
 }
-if (!launcherText.includes('finalizeSmokeWithFreeze')) {
+if (
+  !launcherText.includes('finalizePhase33fRun') &&
+  !launcherText.includes('finalizeSmokeWithFreeze')
+) {
   violations.push('launcher_missing_freeze_wire');
+}
+if (!launcherText.includes('finalizePhase33fRun')) {
+  violations.push('launcher_missing_phase33f_finalize_helper');
+}
+if (!launcherText.includes('FROZEN_BLOCKED_EVIDENCE') && !fs.existsSync(path.join(REPO_ROOT, 'scripts/lib/phase33f-run-finalize.mjs'))) {
+  violations.push('launcher_missing_blocked_freeze_path');
 }
 
 const out = {

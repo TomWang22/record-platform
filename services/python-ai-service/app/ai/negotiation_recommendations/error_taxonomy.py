@@ -1,0 +1,20 @@
+"""Stable public error classes for Phase 33D negotiation / recommendations."""
+
+from __future__ import annotations
+
+# Public codes (safe for clients). Internal diagnostics stay in logs only.
+UNAUTHORIZED_THREAD = "UNAUTHORIZED_THREAD"
+REQUEST_SCHEMA_INVALID = "REQUEST_SCHEMA_INVALID"
+THREAD_NOT_FOUND = "THREAD_NOT_FOUND"
+ENGINE_INTERNAL_FAILURE = "ENGINE_INTERNAL_FAILURE"
+ENGINE_TEMPORARILY_UNAVAILABLE = "ENGINE_TEMPORARILY_UNAVAILABLE"
+SCHEMA_INVALID_RESPONSE = "SCHEMA_INVALID_RESPONSE"
+
+# HTTP mapping (negotiation Contract A uses structured 200 for unauthorized).
+HTTP_BY_CODE = {
+    REQUEST_SCHEMA_INVALID: 422,
+    SCHEMA_INVALID_RESPONSE: 422,
+    THREAD_NOT_FOUND: 404,
+    ENGINE_INTERNAL_FAILURE: 500,
+    ENGINE_TEMPORARILY_UNAVAILABLE: 503,
+}

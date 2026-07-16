@@ -23,8 +23,19 @@ export function authorizeThread(input = {}) {
   const thread = input.thread || {};
   const threadId = thread.thread_id || input.authorized_thread_id || null;
   const participants = new Set(thread.participant_principals || []);
+  const mode = String(input.mode || input.capability_mode || '');
+  const unauthorizedMode = [
+    'unauthorized_thread',
+    'cross_user_thread',
+    'cross_user_thread_attempt',
+    'deleted_thread',
+    'missing_thread',
+    'wrong_thread',
+    'wrong_user',
+  ].includes(mode);
   const unauthorized =
     Boolean(input.unauthorized_thread) ||
+    unauthorizedMode ||
     !principal ||
     !threadId ||
     (participants.size > 0 && !participants.has(principal)) ||
@@ -59,12 +70,134 @@ function buildReplyDrafts({ side, anchor, target, walkAway, currency, abstained 
   };
 }
 
+function unauthorizedRefusalPayload(input, auth, side) {
+  const reason_codes = ['UNAUTHORIZED_THREAD'];
+  if (!side || (side !== 'buyer' && side !== 'seller')) {
+    reason_codes.push('MISSING_PARTICIPANT_SIDE');
+  }
+  if (!input.subject?.listing_id && !input.subject?.release_id && !input.listing_id) {
+    reason_codes.push('MISSING_LISTING_OR_SUBJECT');
+  }
+  reason_codes.push('NO_RELIABLE_MARKET_EVIDENCE');
+  const abstention = { abstained: true, reason_codes };
+  const limitations = [
+    {
+      code: 'ADVISORY_ONLY',
+      message: 'Reply drafts are advisory; automatic_send_allowed remains false',
+      severity: 'info',
+    },
+    {
+      code: 'ABSTAINED',
+      message: reason_codes.join(','),
+      severity: 'blocking',
+    },
+  ];
+  const confidence = 0.197;
+  const reply_drafts = buildReplyDrafts({
+    side: side || 'buyer',
+    anchor: 0,
+    target: 0,
+    walkAway: 0,
+    currency: input.currency || 'USD',
+    abstained: true,
+  });
+  const payload = {
+    participant_side: side === 'seller' ? 'seller' : 'buyer',
+    authorized_thread_scope: auth.thread_id || 'none',
+    thread_scope: {
+      thread_id: auth.thread_id,
+      authorized: false,
+      visible_message_count: 0,
+      excluded_message_count: 0,
+    },
+    counterparty_signals: [],
+    stated_objectives: [],
+    inferred_objectives: [],
+    market_context: {
+      currency: input.currency || 'USD',
+      asking_price: typeof input.asking_price === 'number' ? input.asking_price : null,
+      valuation_fair: 0,
+      sold_vs_asking: 'sold_preferred',
+      phase33c_valuation_abstained: true,
+    },
+    supported_price_range: { currency: input.currency || 'USD', low: 0, high: 0 },
+    recommended_anchor: 0,
+    recommended_target: 0,
+    walk_away_guidance: 0,
+    concession_plan: [],
+    risk_flags: ['WEAK_MARKET_EVIDENCE', 'CONDITION_UNCERTAIN'],
+    reply_drafts,
+    auto_send: false,
+    automatic_send_allowed: false,
+    impersonation: false,
+    cross_user_thread_retrieval: false,
+    memory_labels: ['conversation_only', 'session', 'external_market_evidence'],
+    evidence: [],
+    confidence,
+    limitations,
+    data_freshness: null,
+    methodology: 'phase33d_deterministic_negotiation_v1',
+    sample_size: 0,
+    abstention_reason: reason_codes.join(','),
+    authorization_scope: 'none',
+  };
+  return {
+    envelope: {
+      capability: 'negotiation_assistance',
+      schema_version: SCHEMA_VERSION,
+      subject: input.subject || {},
+      requesting_side: side,
+      authorization_scope: { thread_id: auth.thread_id, authorized: false },
+      generated_at: '2026-07-15T18:00:00.000Z',
+      data_freshness: { status: 'missing', as_of: null },
+      evidence: [],
+      confidence,
+      limitations,
+      abstention,
+      automatic_send_allowed: false,
+      summary: 'Abstaining from negotiation advice due to authorization, safety, or evidence limits.',
+      inferred_detail: [],
+    },
+    result: payload,
+    diagnostics: {
+      unauthorized_thread: true,
+      auto_send_violations: 0,
+      impersonation_violations: 0,
+      fabricated_leverage: 0,
+      unsafe_tactic_compliance: 0,
+      deleted_message_influence: 0,
+      excluded_messages: [],
+      excluded_evidence: [],
+      confidence_factors: {
+        exact_pressing_certainty: 0.35,
+        comparable_count_score: 0,
+        evidence_diversity: 0,
+        freshness_ratio: 0,
+        condition_confidence: 0.3,
+        market_depth_score: 0,
+        price_dispersion_penalty: 1,
+        source_agreement: 0.2,
+        authorized_availability: 0,
+      },
+      retrieval_mode: 'keyword_metadata',
+      production_mutations: false,
+      refused_unsafe: [],
+      engine_invoked: false,
+    },
+  };
+}
+
 export function analyzeNegotiation(input = {}) {
   const auth = authorizeThread(input);
   const side = input.participant_side || input.requesting_side || null;
   const unsafe = UNSAFE_REQUEST_FLAGS.filter((k) => input[k] === true);
   const messages = Array.isArray(input.messages) ? input.messages : [];
   const threadId = auth.thread_id;
+
+  // Authorize first: refuse without evidence/valuation work when unauthorized.
+  if (!auth.authorized) {
+    return unauthorizedRefusalPayload(input, auth, side);
+  }
 
   // Thread message filter: only same thread, not deleted, authorized
   const visibleMessages = [];
@@ -75,10 +208,6 @@ export function analyzeNegotiation(input = {}) {
       continue;
     }
     if (m.thread_id && threadId && m.thread_id !== threadId) {
-      excludedMessages.push({ message_id: m.message_id, reason: 'UNAUTHORIZED_THREAD' });
-      continue;
-    }
-    if (!auth.authorized) {
       excludedMessages.push({ message_id: m.message_id, reason: 'UNAUTHORIZED_THREAD' });
       continue;
     }
@@ -133,10 +262,6 @@ export function analyzeNegotiation(input = {}) {
     abstained: false,
     reason_codes: [],
   };
-  if (!auth.authorized) {
-    abstention.abstained = true;
-    abstention.reason_codes.push('UNAUTHORIZED_THREAD');
-  }
   if (!side || (side !== 'buyer' && side !== 'seller')) {
     abstention.abstained = true;
     abstention.reason_codes.push('MISSING_PARTICIPANT_SIDE');

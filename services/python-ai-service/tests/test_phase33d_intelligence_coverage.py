@@ -95,19 +95,32 @@ class TestPhase33dServiceAdapter(unittest.TestCase):
             assert exc.value.status_code == 500
             assert exc.value.detail == "phase33d_invalid_engine_output"
 
-    def test_unauthorized_thread_maps_to_403(self):
-        body = {
-            "status": "FAIL",
-            "diagnostics": {"unauthorized_thread": True},
-            "error": "unauthorized",
-        }
-        proc = MagicMock(returncode=1, stdout=json.dumps(body), stderr="")
+    def test_unauthorized_thread_short_circuits_without_engine(self):
+        """Contract A: unauthorized returns structured 200-shaped PASS without Node."""
         with patch.object(negrec_service, "subprocess") as mock_sub:
-            mock_sub.run.return_value = proc
-            with pytest.raises(HTTPException) as exc:
-                negrec_service.analyze_negotiation(_negotiation_body(unauthorized_thread=True))
-            assert exc.value.status_code == 403
-            assert exc.value.detail == "unauthorized_thread"
+            out = negrec_service.analyze_negotiation(
+                _negotiation_body(unauthorized_thread=True)
+            )
+            mock_sub.run.assert_not_called()
+        assert out["status"] == "PASS"
+        assert out["diagnostics"]["unauthorized_thread"] is True
+        assert out["diagnostics"]["engine_invoked"] is False
+        assert out["envelope"]["authorization_scope"]["authorized"] is False
+        assert out["result"]["automatic_send_allowed"] is False
+        assert "UNAUTHORIZED_THREAD" in out["envelope"]["abstention"]["reason_codes"]
+
+    def test_unauthorized_mode_short_circuits_without_engine(self):
+        with patch.object(negrec_service, "subprocess") as mock_sub:
+            out = negrec_service.analyze_negotiation(
+                {
+                    "principal_id": "buyer_a",
+                    "mode": "unauthorized_thread",
+                    "capability_mode": "unauthorized_thread",
+                }
+            )
+            mock_sub.run.assert_not_called()
+        assert out["diagnostics"]["unauthorized_thread"] is True
+        assert out["diagnostics"]["engine_invoked"] is False
 
     def test_schema_violation_maps_to_422(self):
         body = {"status": "FAIL", "schema_violations": ["x"], "error": "bad"}
@@ -123,16 +136,17 @@ class TestPhase33dServiceAdapter(unittest.TestCase):
                     }
                 )
             assert exc.value.status_code == 422
-            assert exc.value.detail == "schema_invalid_response"
+            assert exc.value.detail == "SCHEMA_INVALID_RESPONSE"
 
-    def test_engine_failure_maps_to_422(self):
+    def test_engine_failure_maps_to_500(self):
         body = {"status": "FAIL", "error": "engine_failed"}
         proc = MagicMock(returncode=1, stdout=json.dumps(body), stderr="stderr-line")
         with patch.object(negrec_service, "subprocess") as mock_sub:
             mock_sub.run.return_value = proc
             with pytest.raises(HTTPException) as exc:
                 negrec_service.analyze_negotiation(_negotiation_body())
-            assert exc.value.status_code == 422
+            assert exc.value.status_code == 500
+            assert exc.value.detail == "ENGINE_INTERNAL_FAILURE"
 
     def test_buyer_negotiation_happy_path(self):
         out = negrec_service.analyze_negotiation(_negotiation_body())

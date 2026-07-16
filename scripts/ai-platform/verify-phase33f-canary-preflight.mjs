@@ -2,8 +2,10 @@
 /**
  * Phase 33F canary preflight verifier.
  * With PHASE33F_PREFLIGHT_OFFLINE=1, skips live edge and proves root remains absent on forced failures.
+ * Frozen canary-v1 evidence is allowed to remain present (immutable; never resumed).
  */
 import fs from 'node:fs';
+import path from 'node:path';
 import {
   runPhase33fCanaryPreflight,
   assertRealGauntletRootsAbsent,
@@ -14,8 +16,17 @@ import { REAL_CANARY_ROOT, SMOKE_ROOT } from '../lib/phase33f-canary-config.mjs'
 const offline = process.env.PHASE33F_PREFLIGHT_OFFLINE === '1';
 const violations = [];
 
-function rootAbsent() {
-  return !fs.existsSync(REAL_CANARY_ROOT);
+function isFrozen(root) {
+  return (
+    fs.existsSync(path.join(root, 'FROZEN_BLOCKED_EVIDENCE')) ||
+    fs.existsSync(path.join(root, 'FROZEN_PASS_EVIDENCE'))
+  );
+}
+
+/** Live (non-frozen) canary root must not appear; frozen canary-v1 evidence is allowed. */
+function liveCanaryRootAbsent() {
+  if (!fs.existsSync(REAL_CANARY_ROOT)) return true;
+  return isFrozen(REAL_CANARY_ROOT);
 }
 
 try {
@@ -24,7 +35,7 @@ try {
   violations.push(`real_roots_present:${err.message}`);
 }
 
-// Forced failure: HEAD drift — root must remain absent
+// Forced failure: HEAD drift — must not create/unfreeze a live canary root
 try {
   runPhase33fCanaryPreflight({
     out: REAL_CANARY_ROOT,
@@ -50,7 +61,7 @@ try {
   if (err.code !== PRELAUNCH_BLOCKED_CODE) {
     violations.push(`head_drift_wrong_code:${err.code}`);
   }
-  if (!rootAbsent()) violations.push('canary_root_created_on_head_drift');
+  if (!liveCanaryRootAbsent()) violations.push('canary_root_created_on_head_drift');
 }
 
 // Forced failure: missing CI approval
@@ -86,7 +97,7 @@ try {
   if (err.code !== PRELAUNCH_BLOCKED_CODE) {
     violations.push(`ci_approval_wrong_code:${err.code}`);
   }
-  if (!rootAbsent()) violations.push('canary_root_created_on_missing_approval');
+  if (!liveCanaryRootAbsent()) violations.push('canary_root_created_on_missing_approval');
 }
 
 // Offline happy-path smoke preflight (no real root)
@@ -111,7 +122,7 @@ if (offline) {
       runQuicPcapPreflight: () => ({ status: 'PASS' }),
     });
     if (pass.status !== 'PASS') violations.push('offline_smoke_preflight_not_pass');
-    if (fs.existsSync(REAL_CANARY_ROOT)) violations.push('canary_root_created_during_offline_pass');
+    if (!liveCanaryRootAbsent()) violations.push('canary_root_created_during_offline_pass');
     if (pass.real_canary_root_created) violations.push('flag_real_canary_created');
   } catch (err) {
     violations.push(`offline_smoke_preflight:${err.message}`);
@@ -122,6 +133,7 @@ const out = {
   status: violations.length ? 'FAIL' : 'PASS',
   offline,
   canary_root_exists: fs.existsSync(REAL_CANARY_ROOT),
+  canary_root_frozen: fs.existsSync(REAL_CANARY_ROOT) && isFrozen(REAL_CANARY_ROOT),
   violations,
 };
 process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);

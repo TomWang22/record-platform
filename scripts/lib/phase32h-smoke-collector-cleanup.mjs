@@ -52,7 +52,13 @@ export function finalizeSmokeWithFreeze(outRoot, {
   const cleanup = stopSmokeCollectors(outRoot, { repoRoot, gracefulMs });
   const queueTerminal =
     queue.pending_count === 0 && queue.running_count === 0 && queue.failed_count === 0;
-  const freezeReady = Boolean(pass && cleanup.zero_root_scoped && queueTerminal);
+  // Freeze both PASS and BLOCKED terminal outcomes once writers are stopped.
+  // Marker is derived solely from pass — never FROZEN_PASS for a failed run.
+  const resolvedMarker = pass ? 'FROZEN_PASS_EVIDENCE' : 'FROZEN_BLOCKED_EVIDENCE';
+  if (markerName && markerName !== resolvedMarker) {
+    // Prefer pass-derived marker; caller mismatch is ignored for fail-closed safety.
+  }
+  const freezeReady = Boolean(cleanup.zero_root_scoped && queueTerminal);
   let freeze = null;
   if (freezeReady) {
     freeze = executeFreezeIntegrity({
@@ -62,7 +68,7 @@ export function finalizeSmokeWithFreeze(outRoot, {
       gracefulMs,
       hashManifestName,
       hashExcludeSuffixes,
-      markerName,
+      markerName: resolvedMarker,
       markerContent,
       jsonlPaths,
       writersAlreadyStopped: true,
@@ -75,6 +81,8 @@ export function finalizeSmokeWithFreeze(outRoot, {
     queue_terminal: queueTerminal,
     collector_registry_present: Boolean(registry?.collectors?.pcap_collector),
     post_smoke_processes: cleanup.remaining_processes.length,
+    marker_name: freezeReady ? resolvedMarker : null,
+    status: pass ? 'PASS' : 'BLOCKED',
   };
 }
 

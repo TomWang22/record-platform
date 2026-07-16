@@ -46,6 +46,25 @@ function baseOpts(overrides = {}) {
   };
 }
 
+function isFrozenGauntletRoot(root) {
+  return (
+    fs.existsSync(path.join(root, 'FROZEN_BLOCKED_EVIDENCE')) ||
+    fs.existsSync(path.join(root, 'FROZEN_PASS_EVIDENCE'))
+  );
+}
+
+/** Frozen canary-v1 may remain; unfrozen canary or any target must stay absent. */
+function assertRealCanaryAllowedState() {
+  assert.equal(fs.existsSync(REAL_TARGET_ROOT), false);
+  if (!fs.existsSync(REAL_CANARY_ROOT)) return { canary_absent: true, canary_frozen_ok: false };
+  assert.equal(
+    isFrozenGauntletRoot(REAL_CANARY_ROOT),
+    true,
+    'existing canary-v1 must remain frozen (immutable); do not resume or recreate',
+  );
+  return { canary_absent: false, canary_frozen_ok: true };
+}
+
 function assertBlocked(fn) {
   let err;
   try {
@@ -55,15 +74,21 @@ function assertBlocked(fn) {
   }
   assert.ok(err, 'expected throw');
   assert.equal(err.code, PRELAUNCH_BLOCKED_CODE);
-  assert.equal(fs.existsSync(REAL_CANARY_ROOT), false);
+  assertRealCanaryAllowedState();
   return err;
 }
 
-test('real gauntlet roots remain absent', () => {
-  assert.equal(fs.existsSync(REAL_CANARY_ROOT), false);
+test('real gauntlet roots remain absent or frozen canary-v1 only', () => {
   assert.equal(fs.existsSync(REAL_TARGET_ROOT), false);
+  const allowed = assertRealCanaryAllowedState();
   const proof = assertRealGauntletRootsAbsent();
-  assert.equal(proof.canary_absent, true);
+  assert.equal(proof.target_absent, true);
+  if (allowed.canary_absent) {
+    assert.equal(proof.canary_absent, true);
+  } else {
+    assert.equal(proof.canary_frozen_ok, true);
+    assert.equal(proof.canary_absent, false);
+  }
 });
 
 test('canary and smoke manifests validate with mode-aware counts', () => {
@@ -141,7 +166,7 @@ test('production mutation row fails audit', () => {
   rows[0].production_mutation_allowed = true;
   const audit = auditProductionMutationRows(rows);
   assert.equal(audit.status, 'FAIL');
-  assert.equal(fs.existsSync(REAL_CANARY_ROOT), false);
+  assertRealCanaryAllowedState();
 });
 
 test('foreign collector mock blocks before root creation', () => {
@@ -215,7 +240,7 @@ test('successful mocked preflight does not create real canary root', () => {
   );
   assert.equal(result.status, 'PASS');
   assert.equal(result.real_canary_root_created, false);
-  assert.equal(fs.existsSync(REAL_CANARY_ROOT), false);
+  assertRealCanaryAllowedState();
   assert.equal(fs.existsSync(tmpOut), false, 'preflight must not mkdir out');
 });
 
@@ -270,5 +295,6 @@ test('terminal verdict requires matching snapshots for PASS', () => {
 
 test('target root existence does not authorize launch path', () => {
   assert.equal(REAL_TARGET_ROOT.includes('target'), true);
-  assert.equal(fs.existsSync(REAL_CANARY_ROOT), false);
+  assert.equal(fs.existsSync(REAL_TARGET_ROOT), false);
+  assertRealCanaryAllowedState();
 });

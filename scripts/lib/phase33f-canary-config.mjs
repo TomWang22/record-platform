@@ -41,11 +41,13 @@ export const LAUNCHER_SOURCE_GLOBS = Object.freeze([
   'scripts/lib/phase33f-capability-probe.mjs',
   'scripts/lib/phase33f-capability-probe-worker.mjs',
   'scripts/lib/phase33f-terminal-verdict.mjs',
+  'scripts/lib/phase33f-run-finalize.mjs',
   'scripts/lib/phase33f-manifest.mjs',
   'scripts/ai-platform/verify-phase33f-canary-manifest.mjs',
   'scripts/ai-platform/verify-phase33f-canary-launcher.mjs',
   'scripts/ai-platform/verify-phase33f-canary-preflight.mjs',
   'tests/phase33f-canary-launcher.test.mjs',
+  'tests/phase33f-blocked-freeze.test.mjs',
   'Makefile',
 ]);
 

@@ -62,6 +62,9 @@ def test_negotiation_unauthorized_thread_abstains():
         }
     )
     assert out["envelope"]["abstention"]["abstained"] is True
+    assert out["diagnostics"]["unauthorized_thread"] is True
+    assert out["diagnostics"].get("engine_invoked") is False
+    assert out["result"]["automatic_send_allowed"] is False
 
 
 def test_recommendations_mode_and_no_pay_to_rank():

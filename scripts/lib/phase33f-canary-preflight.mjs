@@ -42,16 +42,33 @@ function blocked(message, details = {}) {
   return err;
 }
 
+function isFrozenGauntletRoot(root) {
+  return (
+    fs.existsSync(path.join(root, 'FROZEN_BLOCKED_EVIDENCE')) ||
+    fs.existsSync(path.join(root, 'FROZEN_PASS_EVIDENCE'))
+  );
+}
+
 export function assertRealGauntletRootsAbsent() {
   const present = [];
-  if (fs.existsSync(REAL_CANARY_ROOT)) present.push(REAL_CANARY_ROOT);
+  const frozenPresent = [];
+  if (fs.existsSync(REAL_CANARY_ROOT)) {
+    if (isFrozenGauntletRoot(REAL_CANARY_ROOT)) frozenPresent.push(REAL_CANARY_ROOT);
+    else present.push(REAL_CANARY_ROOT);
+  }
+  // Target must remain absent until a separate owner approval after canary PASS.
   if (fs.existsSync(REAL_TARGET_ROOT)) present.push(REAL_TARGET_ROOT);
   if (present.length) {
     throw blocked(`real gauntlet roots must remain absent: ${present.join(', ')}`, {
       present,
+      frozen_present: frozenPresent,
     });
   }
-  return { canary_absent: true, target_absent: true };
+  return {
+    canary_absent: !fs.existsSync(REAL_CANARY_ROOT),
+    canary_frozen_ok: frozenPresent.includes(REAL_CANARY_ROOT),
+    target_absent: true,
+  };
 }
 
 export function assertEvidenceRootAbsent(outRoot) {

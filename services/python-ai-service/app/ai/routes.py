@@ -389,11 +389,19 @@ def _intelligence_payload(body: IntelligenceBody, x_user_id: Optional[str]) -> d
     return data
 
 
-def _enforce_intelligence_auth_gates(payload: dict) -> None:
-    """Fail-closed fixture auth gates used by Phase 33F authorization smoke."""
-    if payload.get("unauthorized_scope") or payload.get("unauthorized_thread") or payload.get(
-        "unauthorized_watchlist"
-    ):
+def _enforce_intelligence_auth_gates(
+    payload: dict,
+    *,
+    skip_unauthorized_thread: bool = False,
+) -> None:
+    """Fail-closed fixture auth gates used by Phase 33F authorization smoke.
+
+    Negotiation uses Contract A (structured HTTP 200 refusal) for unauthorized
+    threads, so that endpoint skips the raw unauthorized_thread → 403 gate.
+    """
+    if payload.get("unauthorized_scope") or payload.get("unauthorized_watchlist"):
+        raise HTTPException(status_code=403, detail="unauthorized_scope")
+    if not skip_unauthorized_thread and payload.get("unauthorized_thread"):
         raise HTTPException(status_code=403, detail="unauthorized_scope")
     if (
         payload.get("cross_user_attempt")
@@ -455,9 +463,13 @@ async def post_intelligence_negotiation(
     body: IntelligenceBody,
     x_user_id: Optional[str] = Header(None, alias="x-user-id"),
 ):
-    """Phase 33D negotiation assistance — advisory only; automatic_send_allowed=false."""
+    """Phase 33D negotiation assistance — advisory only; automatic_send_allowed=false.
+
+    Unauthorized-thread Contract A: structured HTTP 200 refusal (not 403/422).
+    Authorization is evaluated inside analyze_negotiation before any engine spawn.
+    """
     payload = _intelligence_payload(body, x_user_id)
-    _enforce_intelligence_auth_gates(payload)
+    _enforce_intelligence_auth_gates(payload, skip_unauthorized_thread=True)
     return analyze_negotiation(payload)
 
 

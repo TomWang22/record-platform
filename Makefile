@@ -481,7 +481,7 @@ ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readi
 	node scripts/ai-platform/verify-phase33f-canary-manifest.mjs
 	node scripts/ai-platform/verify-phase33f-canary-launcher.mjs
 	PHASE33F_PREFLIGHT_OFFLINE=1 node scripts/ai-platform/verify-phase33f-canary-preflight.mjs
-	node --test tests/phase33f-capability-gauntlet.test.mjs tests/phase33f-semantic-retrieval.test.mjs tests/phase33f-canary-launcher.test.mjs
+	node --test tests/phase33f-capability-gauntlet.test.mjs tests/phase33f-semantic-retrieval.test.mjs tests/phase33f-canary-launcher.test.mjs tests/phase33f-blocked-freeze.test.mjs
 
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity

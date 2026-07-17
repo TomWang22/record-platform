@@ -4,21 +4,31 @@
  *
  * Prerequisites:
  *   - PKI gate PASS (scripts/security/verify-rp-pki-chain.mjs)
- *   - Canary FROZEN_PASS at /tmp/phase34-live-inference-canary-v1
+ *   - Explicit frozen canary via --canary-root (e.g. /tmp/phase34-live-inference-canary-v3)
  *   - Phase 33F target root ABSENT
  *
  * Never launches /tmp/phase33f-capability-gauntlet-target-v1.
+ * Never silently selects a historical canary (v1/v2); --canary-root is required.
+ *
+ * Example:
+ *   node scripts/phase34-launch-live-inference-gauntlet.mjs \
+ *     --canary-root /tmp/phase34-live-inference-canary-v3 \
+ *     --out /tmp/phase34-live-inference-gauntlet-v2
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   PHASE34_LIVE_GAUNTLET,
   PHASE34_LIVE_GAUNTLET_ROOT,
-  PHASE34_LIVE_CANARY_ROOT,
   PHASE33F_TARGET_ROOT_FORBIDDEN,
 } from './lib/phase34-live-gauntlet-config.mjs';
+import {
+  parseLiveGauntletArgs,
+  assertGauntletOutEligible,
+  assertCanaryRootEligible,
+  assertCanaryPinsMatch,
+} from './lib/phase34-live-gauntlet-canary-gate.mjs';
 import {
   buildCanaryManifest,
   hashManifest,
@@ -34,71 +44,28 @@ import { INTER_BATCH_INTERVAL_MS } from './lib/phase33f-rate-limit.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
 
-function blocked(message, details = {}) {
-  const err = new Error(message);
-  err.code = 'PHASE34_LIVE_GAUNTLET_BLOCKED';
-  err.details = details;
-  return err;
-}
-
-function parseArgs(argv) {
-  const opts = { out: PHASE34_LIVE_GAUNTLET_ROOT, skipCanaryGate: false };
-  for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === '--out') opts.out = argv[++i];
-    else if (argv[i] === '--skip-canary-gate') opts.skipCanaryGate = true;
-  }
-  return opts;
-}
-
-function assertPinsUnchanged(canaryRoot) {
-  const launch = path.join(canaryRoot, 'phase33f-launch.json');
-  if (!fs.existsSync(launch)) {
-    throw blocked('canary launch pin missing', { launch });
-  }
-  const doc = JSON.parse(fs.readFileSync(launch, 'utf8'));
-  const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' }).stdout.trim();
-  if (doc.launch_head && doc.launch_head !== head) {
-    throw blocked(`source SHA changed since canary (${doc.launch_head} → ${head})`);
-  }
-  return { head, canary_launch_head: doc.launch_head || head };
-}
-
 async function main() {
-  const opts = parseArgs(process.argv.slice(2));
-  if (!opts.out.startsWith('/tmp/')) {
-    throw blocked('out must be under /tmp');
-  }
-  if (opts.out === PHASE33F_TARGET_ROOT_FORBIDDEN) {
-    throw blocked('Phase 33F target root is forbidden');
-  }
-  if (fs.existsSync(PHASE33F_TARGET_ROOT_FORBIDDEN)) {
-    throw blocked('Phase 33F target root must remain ABSENT', {
-      path: PHASE33F_TARGET_ROOT_FORBIDDEN,
-    });
-  }
-  if (fs.existsSync(opts.out)) {
-    throw blocked(`gauntlet evidence root must be absent: ${opts.out}`);
-  }
+  const opts = parseLiveGauntletArgs(process.argv.slice(2), {
+    defaultOut: PHASE34_LIVE_GAUNTLET_ROOT,
+  });
+  assertGauntletOutEligible(opts.out);
 
   if (!opts.skipCanaryGate) {
-    const pass = path.join(PHASE34_LIVE_CANARY_ROOT, 'FROZEN_PASS_EVIDENCE');
-    const blockedMarker = path.join(PHASE34_LIVE_CANARY_ROOT, 'FROZEN_BLOCKED_EVIDENCE');
-    if (fs.existsSync(blockedMarker)) {
-      throw blocked('canary is FROZEN_BLOCKED — cannot continue');
-    }
-    if (!fs.existsSync(pass)) {
-      throw blocked('canary FROZEN_PASS_EVIDENCE required before full gauntlet', {
-        expected: pass,
-      });
-    }
+    assertCanaryRootEligible(opts.canaryRoot);
   }
 
   const { headSha, originMainSha } = assertSourceReconciliation(REPO_ROOT);
   if (headSha !== originMainSha) {
-    throw blocked(`HEAD ${headSha} != origin/main ${originMainSha}`);
+    const err = new Error(`HEAD ${headSha} != origin/main ${originMainSha}`);
+    err.code = 'PHASE34_LIVE_GAUNTLET_BLOCKED';
+    throw err;
   }
   assertCiApproval({ headSha, originMainSha });
-  const pins = assertPinsUnchanged(PHASE34_LIVE_CANARY_ROOT);
+  const pins = assertCanaryPinsMatch({
+    canaryRoot: opts.canaryRoot,
+    headSha,
+    expectedInterBatchIntervalMs: INTER_BATCH_INTERVAL_MS,
+  });
 
   const rows = buildCanaryManifest({
     batchesPerCapability: PHASE34_LIVE_GAUNTLET.batchesPerCapability,
@@ -109,11 +76,17 @@ async function main() {
     batchesPerCapability: PHASE34_LIVE_GAUNTLET.batchesPerCapability,
   });
   if (validation.status !== 'PASS') {
-    throw blocked('manifest validation failed', { violations: validation.violations?.slice?.(0, 20) });
+    const err = new Error('manifest validation failed');
+    err.code = 'PHASE34_LIVE_GAUNTLET_BLOCKED';
+    err.details = { violations: validation.violations?.slice?.(0, 20) };
+    throw err;
   }
   const audit = auditProductionMutationRows(rows);
   if (audit.status !== 'PASS') {
-    throw blocked('production mutation audit failed', audit);
+    const err = new Error('production mutation audit failed');
+    err.code = 'PHASE34_LIVE_GAUNTLET_BLOCKED';
+    err.details = audit;
+    throw err;
   }
   const manifestSha = hashManifest(rows);
 
@@ -142,6 +115,7 @@ async function main() {
         phase: '34',
         mode: 'live-gauntlet',
         out: opts.out,
+        canary_root: opts.canaryRoot,
         logical_sessions: PHASE34_LIVE_GAUNTLET.batches,
         protocol_probes: PHASE34_LIVE_GAUNTLET.probes,
         batches_per_capability: PHASE34_LIVE_GAUNTLET.batchesPerCapability,

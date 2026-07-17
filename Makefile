@@ -510,10 +510,10 @@ ai-platform-verify-phase34-gauntlet-finalization: ## Phase 34 bounded finalizati
 	NODE_OPTIONS=--max-old-space-size=512 node scripts/ai-platform/verify-phase34-gauntlet-finalization.mjs
 
 ai-platform-verify-phase34-live-gauntlet: ## Phase 34 live gauntlet packaging + finalization (no live launch)
-	node --test tests/phase34-bounded-finalization.test.mjs tests/phase33f-runner-checkpoints.test.mjs
-	node -e "import('./scripts/phase34-launch-live-inference-gauntlet.mjs').catch(()=>{})" >/dev/null 2>&1 || true
+	node --test tests/phase34-bounded-finalization.test.mjs tests/phase33f-runner-checkpoints.test.mjs tests/phase34-live-gauntlet-launcher.test.mjs
 	test -f scripts/phase34-launch-live-inference-gauntlet.mjs
 	test -f scripts/lib/phase34-live-gauntlet-config.mjs
+	test -f scripts/lib/phase34-live-gauntlet-canary-gate.mjs
 	test -f scripts/lib/phase34-bounded-finalization.mjs
 	test -f scripts/security/verify-rp-pki-chain.mjs
 	$(MAKE) ai-platform-verify-phase34-gauntlet-finalization

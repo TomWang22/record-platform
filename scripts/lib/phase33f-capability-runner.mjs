@@ -43,6 +43,10 @@ import {
   evaluateResourcePolicy,
   RESOURCE_HARD_LIMITS,
 } from './phase33f-runner-resource-telemetry.mjs';
+import {
+  formatHumanCheckpointLine,
+  shouldEmitHumanCheckpoint,
+} from './phase33f-human-checkpoint.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -364,6 +368,10 @@ export async function runCapabilityMatrix({
     const batchResults = [];
     let stoppedForRateLimit = false;
     const telemetryRows = [baselineSample];
+    const checkpointTarget = triplets.length;
+    const checkpointStartedAtMs = Date.now();
+    let lastCheckpointBatch = 0;
+    let lastCheckpointAtMs = checkpointStartedAtMs;
 
     if (mode === 'smoke' && concurrency > 1) {
       // Smoke concurrency path: no fail-closed stop mid-pool (tests/smoke only).
@@ -406,6 +414,31 @@ export async function runCapabilityMatrix({
           stoppedForResource = true;
           resourceFailureClass = err.code || 'RUNNER_TELEMETRY_WRITE_FAIL';
           break;
+        }
+        const checkpointNowMs = Date.now();
+        if (
+          shouldEmitHumanCheckpoint({
+            completed: i + 1,
+            lastCompleted: lastCheckpointBatch,
+            nowMs: checkpointNowMs,
+            lastAtMs: lastCheckpointAtMs,
+          })
+        ) {
+          console.log(
+            formatHumanCheckpointLine({
+              status: 'ADVANCING',
+              completed: i + 1,
+              target: checkpointTarget,
+              failed: queue?.failed_count || 0,
+              startedAtMs: checkpointStartedAtMs,
+              nowMs: checkpointNowMs,
+              previousCompleted: lastCheckpointBatch,
+              previousAtMs: lastCheckpointAtMs,
+              queue,
+            }),
+          );
+          lastCheckpointBatch = i + 1;
+          lastCheckpointAtMs = checkpointNowMs;
         }
         if (pacedInterval > 0 && i + 1 < triplets.length) {
           await sleepMs(pacedInterval);

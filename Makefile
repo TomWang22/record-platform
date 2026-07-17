@@ -506,6 +506,18 @@ ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readi
 	$(MAKE) ai-platform-verify-phase33f-target-preflight
 	node --test tests/phase33f-capability-gauntlet.test.mjs tests/phase33f-semantic-retrieval.test.mjs tests/phase33f-canary-launcher.test.mjs tests/phase33f-blocked-freeze.test.mjs
 
+ai-platform-verify-phase34-gauntlet-finalization: ## Phase 34 bounded finalization + protocol-vs-queue acceptance (offline; 60k soak)
+	NODE_OPTIONS=--max-old-space-size=512 node scripts/ai-platform/verify-phase34-gauntlet-finalization.mjs
+
+ai-platform-verify-phase34-live-gauntlet: ## Phase 34 live gauntlet packaging + finalization (no live launch)
+	node --test tests/phase34-bounded-finalization.test.mjs tests/phase33f-runner-checkpoints.test.mjs
+	node -e "import('./scripts/phase34-launch-live-inference-gauntlet.mjs').catch(()=>{})" >/dev/null 2>&1 || true
+	test -f scripts/phase34-launch-live-inference-gauntlet.mjs
+	test -f scripts/lib/phase34-live-gauntlet-config.mjs
+	test -f scripts/lib/phase34-bounded-finalization.mjs
+	test -f scripts/security/verify-rp-pki-chain.mjs
+	$(MAKE) ai-platform-verify-phase34-gauntlet-finalization
+
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity
 	$(MAKE) ai-platform-verify-phase32h-runner-memory

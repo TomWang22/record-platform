@@ -24,9 +24,20 @@ import {
   INTER_BATCH_INTERVAL_MS,
   assertTargetInterBatchInterval,
 } from './phase33f-rate-limit.mjs';
+import {
+  formatHumanCheckpointLine,
+  shouldEmitHumanCheckpoint,
+  summarizeRunnerResult,
+} from './phase33f-human-checkpoint.mjs';
+import {
+  buildBoundedFinalization,
+  writeBoundedFinalizationReports,
+} from './phase34-bounded-finalization.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
+
+export { formatHumanCheckpointLine, shouldEmitHumanCheckpoint, summarizeRunnerResult };
 
 export function startDetached(cmd, args, env = process.env, { cwd = REPO_ROOT } = {}) {
   const child = spawn(cmd, args, { cwd, env, detached: true, stdio: 'ignore' });
@@ -51,6 +62,8 @@ export async function runPhase33fCapabilityLaunch({
   caCert = null,
   evidenceLabel = null,
   skipCollectors = false,
+  /** Optional override for Phase 34 live gauntlet (20k logical / 2,500 per capability). */
+  batchesPerCapabilityOverride = null,
   verdictDelayMs = Number(process.env.PHASE33F_VERDICT_DELAY_MS || 5000),
 } = {}) {
   if (!out?.startsWith('/tmp/')) {
@@ -81,11 +94,13 @@ export async function runPhase33fCapabilityLaunch({
 
   fs.mkdirSync(out, { recursive: true });
   const batchesPerCapability =
-    mode === 'target'
-      ? dims.batchesPerCapability
-      : mode === 'target-smoke'
-        ? 3
-        : dims.batchesPerCapability;
+    batchesPerCapabilityOverride != null
+      ? Number(batchesPerCapabilityOverride)
+      : mode === 'target'
+        ? dims.batchesPerCapability
+        : mode === 'target-smoke'
+          ? 3
+          : dims.batchesPerCapability;
   const manifestPath = path.join(out, 'phase33f-capability-manifest.json');
   writeManifest(manifestPath, rows, { batchesPerCapability });
   const runId = generateRunId();
@@ -180,13 +195,40 @@ export async function runPhase33fCapabilityLaunch({
     delayMs: verdictDelayMs,
   });
 
-  const pass = runnerResult.status === 'PASS' && verdict.status === 'PASS';
+  const runnerSummary = summarizeRunnerResult(runnerResult);
+  const bounded = buildBoundedFinalization(out, {
+    expectedLogicalSessions: expectedBatches,
+    expectedProtocolRows: expectedProbes,
+    runnerSummary,
+  });
+  const written = writeBoundedFinalizationReports(out, bounded);
+
+  // Protocol-row acceptance is authoritative; queue COMPLETE alone cannot PASS.
+  const pass =
+    runnerResult.status === 'PASS' &&
+    verdict.status === 'PASS' &&
+    bounded.acceptance.status === 'PASS' &&
+    bounded.acceptance.protocol_rows_fail === 0 &&
+    bounded.acceptance.logical_sessions_fail === 0;
+
   const failureClass = pass
     ? null
     : runnerResult.failure_class ||
-      (verdict.flags?.matrix_complete === false
-        ? 'UNEXPECTED_PROBE_FAILURE'
-        : 'TERMINAL_VERDICT_FAIL');
+      (bounded.acceptance.protocol_rows_fail > 0
+        ? 'PROTOCOL_ROW_FAILURE'
+        : verdict.flags?.matrix_complete === false
+          ? 'UNEXPECTED_PROBE_FAILURE'
+          : 'TERMINAL_VERDICT_FAIL');
+
+  const boundedVerdict = {
+    status: verdict.status,
+    matching_snapshots: verdict.matching_snapshots,
+    acceptance: bounded.acceptance,
+    summary_path: path.relative(out, written.summaryPath),
+    failure_index_path: path.relative(out, written.failureIndexPath),
+    summary_bytes: written.summaryBytes,
+  };
+
   const freeze = finalizePhase33fRun({
     outRoot: out,
     repoRoot,
@@ -195,14 +237,15 @@ export async function runPhase33fCapabilityLaunch({
     failureDetails: pass
       ? null
       : {
-          runner: runnerResult,
-          verdict,
+          runner: runnerSummary,
+          verdict: boundedVerdict,
+          protocol_failures: bounded.failures.slice(0, 50),
         },
     mode,
     launchHead: headSha,
     manifestSha,
-    runner: runnerResult,
-    verdict,
+    runner: runnerSummary,
+    verdict: boundedVerdict,
     supervisorPid,
     telemetryPid,
   }).freeze;
@@ -225,8 +268,9 @@ export async function runPhase33fCapabilityLaunch({
       failure_class: runnerResult.failure_class || null,
       http_429: runnerResult.http_429 ?? null,
     },
-    verdict: { status: verdict.status },
+    verdict: boundedVerdict,
+    acceptance: bounded.acceptance,
   };
   fs.writeFileSync(path.join(out, 'phase33f-launch.json'), `${JSON.stringify(launchRecord, null, 2)}\n`, 'utf8');
-  return { pass, launchRecord, runnerResult, verdict, freeze, runId };
+  return { pass, launchRecord, runnerResult: runnerSummary, verdict: boundedVerdict, freeze, runId, acceptance: bounded.acceptance };
 }

@@ -23,7 +23,7 @@ export const PRODUCT_JOURNEY_ADAPTER_VERSION = 'phase34-product-journey-adapter-
 /** Actual Next.js routes + mounted panel testids per capability. */
 export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
   scarcity: {
-    routes: ['/records/[id]', '/listings/[id]', '/watchlist'],
+    routes: ['/listings/[id]', '/records/[id]', '/watchlist'],
     panels: ['intelligence-scarcity-panel'],
     components: [
       'webapp/components/ai/intelligence/scarcity-intelligence-panel.tsx',
@@ -34,7 +34,7 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     trigger: 'auto',
   },
   valuation: {
-    routes: ['/records/[id]', '/sell', '/listings/[id]', '/listings/[id]/edit'],
+    routes: ['/listings/[id]', '/records/[id]', '/sell', '/listings/[id]/edit'],
     panels: ['intelligence-valuation-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.valuation,
@@ -78,7 +78,7 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     runTestId: 'intelligence-negotiation-run',
   },
   recommendations: {
-    routes: ['/records/[id]', '/dashboard', '/watchlist'],
+    routes: ['/dashboard', '/records/[id]', '/watchlist'],
     panels: ['intelligence-recommendations-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.recommendations,

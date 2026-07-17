@@ -166,6 +166,12 @@ export function subjectForCapability(subjects, capability) {
   switch (capability) {
     case 'scarcity':
     case 'valuation':
+      // Prefer listing routes so buyer and seller sessions share public marketplace subjects.
+      return {
+        id: subjects.listing_id,
+        record_id: subjects.record_id,
+        listing_id: subjects.listing_id,
+      };
     case 'recommendations':
       return {
         id: subjects.record_id,

@@ -273,19 +273,18 @@ export class BaseProductJourneyAdapter {
     }
 
     if (trigger === 'semantic_search') {
-      // Prefer the desktop filter input; the mobile "Search marketplace" field is lg:hidden
-      // and Playwright fill() can hang when the matched node is not actionable.
+      // Desktop filter input is display:none below lg; filling it with force does not
+      // update the shared React query state. Always target a visible marketplace input.
       const desktop = page.locator('input[placeholder*="Search artist" i]');
       const mobile = page.locator('input[placeholder*="Search marketplace" i]');
-      const searchInput = (await desktop.count()) > 0 ? desktop.first() : mobile.first();
+      const useDesktop =
+        (await desktop.count()) > 0 && (await desktop.first().isVisible().catch(() => false));
+      const searchInput = useDesktop ? desktop.first() : mobile.first();
+      await searchInput.waitFor({ state: 'visible', timeout: 15_000 });
       await searchInput.fill(prepared.requestSeed?.query || 'Miles Davis Kind of Blue', {
-        force: true,
         timeout: 15_000,
       });
-      await page
-        .getByRole('radiogroup', { name: /intelligence search mode/i })
-        .getByText('semantic', { exact: true })
-        .click();
+      await page.getByTestId('intelligence-search-mode-semantic').check({ force: true });
       await page.getByTestId(this.registry.runTestId).click();
       return;
     }

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { NegotiationIntelligencePanel } from '@/components/ai/intelligence/negotiation-intelligence-panel'
 import { formatMoneyFromCents, saleTypeLabel } from '@/lib/listing-format'
 import { getUserIdFromToken } from '@/lib/jwt-user'
 import {
@@ -684,6 +685,17 @@ export function MessagingProductView() {
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            {activeThreadId && threadDetail ? (
+              <NegotiationIntelligencePanel
+                threadId={activeThreadId}
+                thread={threadDetail}
+                currentUserId={currentUserId}
+                askingPrice={
+                  listingCard?.priceCents != null ? listingCard.priceCents / 100 : null
+                }
+                onApplyDraft={(text) => setComposeBody(text)}
+              />
+            ) : null}
             {loadingThread && (
               <p className="text-sm text-slate-500">Loading conversation…</p>
             )}

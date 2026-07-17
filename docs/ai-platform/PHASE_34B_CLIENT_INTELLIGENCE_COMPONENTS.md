@@ -1,33 +1,37 @@
 # Phase 34B — Client intelligence components (in progress)
 
 ```text
-Status: IN PROGRESS — NOT PRODUCT ACCEPTANCE READY
+Status: LIVE EVIDENCE SLICE IN PROGRESS — NOT PRODUCT ACCEPTANCE READY
 Target: /tmp/phase33f-capability-gauntlet-target-v1 — ABSENT / NOT LAUNCHED
 Production: NOT APPROVED
+Fine-tuning: NO
 ```
 
-## Landed in this slice
+## Matrix
 
-1. Typed Phase 33 intelligence client: `webapp/lib/ai-intelligence-client.ts`
-2. Shared contracts: `webapp/lib/ai-intelligence-types.ts`
-3. Evidence / confidence / abstention / rate-limit shell:
-   `webapp/components/ai/intelligence/intelligence-panel-shell.tsx`
-4. First real product surface — scarcity on collection record detail:
-   `webapp/components/ai/intelligence/scarcity-intelligence-panel.tsx`
-   wired into `webapp/app/(dashboard)/records/[id]/page.tsx`
+Machine-readable status: `scripts/ai-platform/phase34-client-surface-matrix.json`
 
-## Honest behavior note
+Allowed statuses: `MISSING` | `PLUMBING_ONLY` | `LIVE_EVIDENCE_CONNECTED` | `TESTED` | `PRODUCT_SLICE_ACCEPTED`
 
-Live sold/asking comparable assembly is **not** complete yet. The scarcity panel
-calls `/api/ai/intelligence/scarcity` with an explicit empty candidate set and
-`claim_rarity_from_zero_results=false`, so the deterministic engine **abstains**
-instead of inventing rarity from empty inventory. That is the correct fail-closed
-product behavior until market-evidence assembly lands.
+No surface is `PRODUCT_SLICE_ACCEPTED` yet (Playwright journeys and full checklist remain).
 
-## Still missing for 34B
+## Landed
 
-- Valuation / auction / search / negotiation / recommendations / analytics panels
-  on their required surfaces
-- Live comparable / listing context assemblers
-- Negotiation draft UX on `/messages` and `/offers/*`
-- Accessibility + Playwright journeys for new panels
+1. Typed Phase 33 intelligence client + shared panel shell
+2. **Live scarcity evidence assembler** (`ai-market-evidence-assembler.ts` + live gather)
+   - Active asking: listings search
+   - Owner sold/asking: `/api/listings/mine`
+   - Auction sold: auction-monitor results (release-level)
+   - Separates exact-pressing vs release-level; `claim_rarity_from_zero_results=false`
+   - Excludes deleted; flags stale; bootleg warning; wrong pressing excluded
+3. Scarcity + valuation panels on `/records/[id]`
+4. Valuation on `/sell` + `/market` (advisory only — never auto-fills price) and `/listings/[id]`
+5. Explicit search mode chrome on `/listings` and `/market|/sell` (keyword default; no silent fallback)
+6. Negotiation assistance on `/messages` (AI-generated draft; insert ≠ send; `automatic_send_allowed=false`)
+
+## Still missing for 34B product acceptance
+
+- Offers inbox/sent negotiation surface
+- Auction / recommendations / market analytics / embedding lineage / memory surfaces
+- Accessibility + mobile + Playwright gauntlet for all panels
+- Phase 34C+ prompt registry / large unique-session programs (blocked until surfaces+assemblers sufficient)

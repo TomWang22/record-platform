@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Phase 33F — read-only runtime status (no evidence mutation, no collector control).
+ * Phase 33F/34 — read-only runtime status (no evidence mutation, no collector control).
+ * Matrix counters are streamed; process identity uses registry/PID, not argv includes.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,6 +14,11 @@ import { buildProcessInspection, listCaptureCollectorCandidates } from './lib/ph
 import { isCoverageBlocked } from './lib/phase32h-run-integrity.mjs';
 import { REAL_CANARY_ROOT, REAL_TARGET_ROOT } from './lib/phase33f-canary-config.mjs';
 import { readRunnerResourceTelemetryTail } from './lib/phase33f-runner-resource-telemetry.mjs';
+import {
+  streamMatrixCounters,
+  classifyRuntimeAcceptance,
+} from './lib/phase34-runtime-status-bounded.mjs';
+import { PHASE34_LIVE_BLOCK_MARKER } from './lib/phase34-live-fail-closed.mjs';
 
 function parseArgs(argv) {
   const opts = { out: process.env.PHASE33F_MATRIX_ROOT || '/tmp/phase33f-canary-launcher-smoke-v1' };
@@ -20,27 +26,6 @@ function parseArgs(argv) {
     if (argv[i] === '--out') opts.out = argv[++i];
   }
   return opts;
-}
-
-function matrixCounts(outRoot) {
-  const counts = { h1: 0, h2: 0, h3: 0, ok: 0, fail: 0 };
-  for (const shard of ['h1', 'h2', 'h3']) {
-    const file = path.join(outRoot, `shard-${shard}`, 'phase33f-matrix.jsonl');
-    if (!fs.existsSync(file)) continue;
-    const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
-    counts[shard] = lines.length;
-    for (const line of lines) {
-      try {
-        const row = JSON.parse(line);
-        if (row.ok) counts.ok += 1;
-        else counts.fail += 1;
-      } catch {
-        counts.fail += 1;
-      }
-    }
-  }
-  counts.total = counts.h1 + counts.h2 + counts.h3;
-  return counts;
 }
 
 function diskSnapshot() {
@@ -51,43 +36,105 @@ function diskSnapshot() {
   return { avail_kib: availKib, avail_bytes: availKib * 1024, avail_gib: (availKib * 1024) / 1073741824 };
 }
 
+function registeredRootProcesses(outRoot, processes, registry) {
+  const byPid = new Map();
+  for (const role of Object.keys(registry?.collectors || {})) {
+    const entry = registry.collectors[role];
+    if (!entry?.pid) continue;
+    const proc = processes.find((p) => Number(p.pid) === Number(entry.pid));
+    if (proc) byPid.set(Number(entry.pid), { ...proc, role });
+  }
+  // Include capture candidates whose resolved evidence_root matches (phase32h/33f/34).
+  for (const cand of listCaptureCollectorCandidates(processes)) {
+    if (cand.evidence_root === outRoot) {
+      byPid.set(Number(cand.pid), { ...cand, role: cand.role || 'pcap_collector' });
+    }
+  }
+  return [...byPid.values()];
+}
+
 export async function buildPhase33fRuntimeStatus(outRoot) {
   const processes = listProcessesWide();
-  const rootProcesses = processes.filter((p) => (p.command || '').includes(outRoot));
-  const inspections = rootProcesses.map((p) => buildProcessInspection(p));
   const registry = readCollectorRegistry(outRoot);
+  const rootProcesses = registeredRootProcesses(outRoot, processes, registry);
+  const inspections = rootProcesses.map((p) => buildProcessInspection(p));
   const identity = evaluatePcapCollectorIdentity(outRoot, processes, registry, { probesActive: true });
   const queue = readCorrelationQueueSnapshot(outRoot);
-  const matrix = matrixCounts(outRoot);
+  const matrix = await streamMatrixCounters(outRoot);
   // Bounded tail read — never load the full telemetry history into memory.
   const resourceTelemetry = await readRunnerResourceTelemetryTail(outRoot, { limit: 32 });
   const latest = resourceTelemetry.latest;
+  const liveBlock = fs.existsSync(path.join(outRoot, PHASE34_LIVE_BLOCK_MARKER));
+  const frozenPass = fs.existsSync(path.join(outRoot, 'FROZEN_PASS_EVIDENCE'));
+  const frozenBlocked = fs.existsSync(path.join(outRoot, 'FROZEN_BLOCKED_EVIDENCE'));
   const blockedMarkers = [
     'PHASE32H_FOREIGN_COLLECTOR_BLOCKED',
     'PHASE32H_DUPLICATE_COLLECTOR_BLOCKED',
     'COLLECTOR_COVERAGE_BLOCKED',
     'PHASE33F_CANARY_PRELAUNCH_BLOCKED',
+    PHASE34_LIVE_BLOCK_MARKER,
   ]
     .filter((name) => fs.existsSync(path.join(outRoot, name)))
     .map((name) => ({ name, path: path.join(outRoot, name) }));
 
+  const runnerAlive = Boolean(
+    latest?.timestamp &&
+      Date.now() - Date.parse(latest.timestamp) < 120_000 &&
+      !frozenPass &&
+      !frozenBlocked,
+  );
+  const classification = classifyRuntimeAcceptance({
+    frozenPass,
+    frozenBlocked,
+    protocolFail: matrix.fail,
+    logicalFail: matrix.logical_fail,
+    liveBlockMarker: liveBlock,
+    queueCompleteIncreasing: false,
+    runnerAlive,
+  });
+
   return {
     at: new Date().toISOString(),
     out: outRoot,
-    blocked: isCoverageBlocked(outRoot),
+    blocked: isCoverageBlocked(outRoot) || liveBlock,
     blocked_markers: blockedMarkers,
-    matrix,
+    matrix: {
+      h1: matrix.h1,
+      h2: matrix.h2,
+      h3: matrix.h3,
+      ok: matrix.ok,
+      fail: matrix.fail,
+      total: matrix.total,
+    },
+    logical: {
+      complete: matrix.logical_complete,
+      pass: matrix.logical_pass,
+      fail: matrix.logical_fail,
+      capability: matrix.capability_logical,
+    },
+    http: {
+      http_0: matrix.http_0,
+      http_422: matrix.http_422,
+      http_429: matrix.http_429,
+      http_5xx: matrix.http_5xx,
+      curl_failures: matrix.curl_failures,
+    },
+    execution_state: classification.execution_state,
+    acceptance_state: classification.acceptance_state,
+    cooperative_termination_required: classification.cooperative_termination_required,
     queue,
     registry,
     collector_identity: identity,
     registered_processes: inspections,
-    capture_candidates: listCaptureCollectorCandidates(processes).map((c) => ({
-      pid: c.pid,
-      comm: c.comm,
-      executable_basename: c.executable_basename,
-      evidence_root: c.evidence_root,
-      output_path: c.output_path,
-    })),
+    capture_candidates: listCaptureCollectorCandidates(processes)
+      .filter((c) => c.evidence_root === outRoot)
+      .map((c) => ({
+        pid: c.pid,
+        comm: c.comm,
+        executable_basename: c.executable_basename,
+        evidence_root: c.evidence_root,
+        output_path: c.output_path,
+      })),
     resource_telemetry: {
       status: resourceTelemetry.status,
       malformed: resourceTelemetry.malformed || 0,
@@ -120,8 +167,8 @@ export async function buildPhase33fRuntimeStatus(outRoot) {
     },
     real_canary_exists: fs.existsSync(REAL_CANARY_ROOT),
     real_target_exists: fs.existsSync(REAL_TARGET_ROOT),
-    frozen_pass: fs.existsSync(path.join(outRoot, 'FROZEN_PASS_EVIDENCE')),
-    frozen_blocked: fs.existsSync(path.join(outRoot, 'FROZEN_BLOCKED_EVIDENCE')),
+    frozen_pass: frozenPass,
+    frozen_blocked: frozenBlocked,
   };
 }
 

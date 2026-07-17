@@ -47,3 +47,16 @@ node scripts/phase34-launch-live-inference-gauntlet.mjs \
 ```
 
 Foreground progress uses bounded `PHASE34_CHECKPOINT ...` lines every 500 sessions or 10 minutes.
+
+## Live fail-closed
+
+Any hard protocol failure (HTTP 0/422/429/5xx, curl, wrong gate/protocol, fallback,
+parity/schema/privacy/safety/production mutation) must:
+
+1. finish recording the active H1/H2/H3 triplet;
+2. write `PHASE34_LIVE_PROTOCOL_BLOCKED`;
+3. stop releasing the next logical session;
+4. cooperative teardown + bounded `FROZEN_BLOCKED_EVIDENCE`.
+
+Read-only status separates `execution_state` from `acceptance_state`. Matrix polls
+stream JSONL; they must not `readFileSync`+`split` the full history each minute.

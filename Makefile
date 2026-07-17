@@ -510,13 +510,21 @@ ai-platform-verify-phase34-gauntlet-finalization: ## Phase 34 bounded finalizati
 	NODE_OPTIONS=--max-old-space-size=512 node scripts/ai-platform/verify-phase34-gauntlet-finalization.mjs
 
 ai-platform-verify-phase34-live-gauntlet: ## Phase 34 live gauntlet packaging + finalization (no live launch)
-	node --test tests/phase34-bounded-finalization.test.mjs tests/phase33f-runner-checkpoints.test.mjs tests/phase34-live-gauntlet-launcher.test.mjs
+	node --test tests/phase34-bounded-finalization.test.mjs tests/phase33f-runner-checkpoints.test.mjs tests/phase34-live-gauntlet-launcher.test.mjs tests/phase34-live-fail-closed.test.mjs
 	test -f scripts/phase34-launch-live-inference-gauntlet.mjs
 	test -f scripts/lib/phase34-live-gauntlet-config.mjs
 	test -f scripts/lib/phase34-live-gauntlet-canary-gate.mjs
+	test -f scripts/lib/phase34-live-fail-closed.mjs
+	test -f scripts/lib/phase34-runtime-status-bounded.mjs
 	test -f scripts/lib/phase34-bounded-finalization.mjs
 	test -f scripts/security/verify-rp-pki-chain.mjs
 	$(MAKE) ai-platform-verify-phase34-gauntlet-finalization
+
+ai-platform-verify-phase34-runtime-status: ## Phase 34 bounded read-only status + fail-closed classification
+	node --test tests/phase34-live-fail-closed.test.mjs
+	test -f scripts/phase33f-runtime-status-readonly.mjs
+	test -f scripts/lib/phase34-runtime-status-bounded.mjs
+	node -e "import('./scripts/lib/phase34-runtime-status-bounded.mjs').then(m=>m.computeSessionsPerMinute({previousComplete:0,currentComplete:40,previousAtMs:0,currentAtMs:60000})).then(r=>{if(r.sessions_per_minute!==40)process.exit(1)})"
 
 ai-platform-verify-phase32h-infra: ## CI-safe Phase 32H targeted reproduction infrastructure verifier
 	$(MAKE) ai-platform-verify-phase32h-freeze-integrity

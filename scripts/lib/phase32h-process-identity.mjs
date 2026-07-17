@@ -9,7 +9,12 @@ import { spawnSync } from 'node:child_process';
 import { parseDumpcapSemantic } from './phase32h-collector-launch-spec.mjs';
 
 export function isPhaseCaptureEvidenceRoot(root = '') {
-  return typeof root === 'string' && (root.startsWith('/tmp/phase32h') || root.startsWith('/tmp/phase33f'));
+  return (
+    typeof root === 'string' &&
+    (root.startsWith('/tmp/phase32h') ||
+      root.startsWith('/tmp/phase33f') ||
+      root.startsWith('/tmp/phase34'))
+  );
 }
 
 export function resolveEvidenceRootFromCommand(command = '') {
@@ -18,18 +23,27 @@ export function resolveEvidenceRootFromCommand(command = '') {
   const wMatch = command.match(/(?:^|\s)-w\s+(\S+)/);
   if (wMatch) {
     const matched = wMatch[1].replace(/^["']|["']$/g, '');
-    if (/\.pcap/i.test(matched) || matched.startsWith('/tmp/phase32h') || matched.startsWith('/tmp/phase33f')) {
+    if (
+      /\.pcap/i.test(matched) ||
+      matched.startsWith('/tmp/phase32h') ||
+      matched.startsWith('/tmp/phase33f') ||
+      matched.startsWith('/tmp/phase34')
+    ) {
       const parts = matched.split('/');
-      const rootIdx = parts.findIndex((part) => part.startsWith('phase32h') || part.startsWith('phase33f'));
+      const rootIdx = parts.findIndex(
+        (part) => part.startsWith('phase32h') || part.startsWith('phase33f') || part.startsWith('phase34'),
+      );
       if (rootIdx >= 0) return parts.slice(0, rootIdx + 1).join('/');
     }
   }
-  const tmpMatch = command.match(/(\/tmp\/phase(?:32h|33f)[^\s'"]+)/);
+  const tmpMatch = command.match(/(\/tmp\/phase(?:32h|33f|34)[^\s'"]+)/);
   if (!tmpMatch) return null;
   const matched = tmpMatch[1];
   if (/\.pcap/i.test(matched)) {
     const parts = matched.split('/');
-    const rootIdx = parts.findIndex((part) => part.startsWith('phase32h') || part.startsWith('phase33f'));
+    const rootIdx = parts.findIndex(
+      (part) => part.startsWith('phase32h') || part.startsWith('phase33f') || part.startsWith('phase34'),
+    );
     if (rootIdx >= 0) return parts.slice(0, rootIdx + 1).join('/');
   }
   return matched;

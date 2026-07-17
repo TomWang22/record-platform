@@ -47,6 +47,31 @@ import {
   formatHumanCheckpointLine,
   shouldEmitHumanCheckpoint,
 } from './phase33f-human-checkpoint.mjs';
+import {
+  evaluateLiveTripletFailClosed,
+  PHASE34_PROTOCOL_ACCEPTANCE_FAILURE,
+  PHASE34_LIVE_BLOCK_MARKER,
+} from './phase34-live-fail-closed.mjs';
+
+function writeLiveProtocolBlockMarker(outRoot, details) {
+  if (!outRoot) return null;
+  const marker = path.join(outRoot, PHASE34_LIVE_BLOCK_MARKER);
+  if (fs.existsSync(marker)) return marker;
+  fs.writeFileSync(
+    marker,
+    `${JSON.stringify(
+      {
+        blocked_at: new Date().toISOString(),
+        code: PHASE34_PROTOCOL_ACCEPTANCE_FAILURE,
+        details,
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+  return marker;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -367,6 +392,9 @@ export async function runCapabilityMatrix({
 
     const batchResults = [];
     let stoppedForRateLimit = false;
+    let stoppedForProtocol = false;
+    let protocolFailureClass = null;
+    let protocolFailureDetails = null;
     const telemetryRows = [baselineSample];
     const checkpointTarget = triplets.length;
     const checkpointStartedAtMs = Date.now();
@@ -382,6 +410,16 @@ export async function runCapabilityMatrix({
           (r) => Number(r.http_status) === 429 || r.error_class === EDGE_RATE_LIMITED,
         ),
       );
+      for (const br of pooled) {
+        const gate = evaluateLiveTripletFailClosed(br.results || {});
+        if (gate.stop) {
+          stoppedForProtocol = true;
+          protocolFailureClass = gate.code || PHASE34_PROTOCOL_ACCEPTANCE_FAILURE;
+          protocolFailureDetails = gate;
+          if (outRoot) writeLiveProtocolBlockMarker(outRoot, gate);
+          break;
+        }
+      }
       const queue = outRoot ? readCorrelationQueueSnapshot(outRoot) : null;
       telemetryRows.push(
         emitResourceSample(outRoot, {
@@ -399,6 +437,15 @@ export async function runCapabilityMatrix({
         );
         if (hit429) {
           stoppedForRateLimit = true;
+          break;
+        }
+        const gate = evaluateLiveTripletFailClosed(br.results || {});
+        if (gate.stop) {
+          // Record the full synchronized triplet, then stop releasing the next session.
+          stoppedForProtocol = true;
+          protocolFailureClass = gate.code || PHASE34_PROTOCOL_ACCEPTANCE_FAILURE;
+          protocolFailureDetails = gate;
+          if (outRoot) writeLiveProtocolBlockMarker(outRoot, gate);
           break;
         }
         const queue = outRoot ? readCorrelationQueueSnapshot(outRoot) : null;
@@ -472,6 +519,7 @@ export async function runCapabilityMatrix({
     const pass =
       !stoppedForRateLimit &&
       !stoppedForResource &&
+      !stoppedForProtocol &&
       resourcePolicy.status === 'PASS' &&
       probeResults.every((p) => p.ok);
 
@@ -484,11 +532,15 @@ export async function runCapabilityMatrix({
       fail_count: probeResults.filter((p) => !p.ok).length,
       stopped_for_rate_limit: stoppedForRateLimit,
       stopped_for_resource: stoppedForResource,
+      stopped_for_protocol: stoppedForProtocol,
       failure_class: stoppedForRateLimit
         ? EDGE_RATE_LIMITED
-        : stoppedForResource
-          ? resourceFailureClass
-          : null,
+        : stoppedForProtocol
+          ? protocolFailureClass
+          : stoppedForResource
+            ? resourceFailureClass
+            : null,
+      protocol_failure_details: protocolFailureDetails,
       inter_batch_interval_ms: pacedInterval,
       queue,
       batch_results: batchResults,

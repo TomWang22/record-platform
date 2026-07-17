@@ -375,6 +375,9 @@ export async function runProductSession(scheduleRow, opts = {}) {
         journey_id,
         browser_route: t.browserResult.browser_route,
         journey_outcome: t.browserResult.journey_outcome,
+        journey_fail_reasons: t.browserResult.journey_fail_reasons || [],
+        console_errors: t.browserResult.console_errors || [],
+        failed_requests: t.browserResult.failed_requests || [],
         canonical_request_hash: t.turnRow.canonical_request_hash,
         screenshot_ids: t.turnRow.screenshot_manifest_entry_ids,
       });

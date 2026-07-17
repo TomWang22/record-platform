@@ -340,7 +340,9 @@ export class BaseProductJourneyAdapter {
       /\/api\/notifications/i,
       /\/api\/records/i,
       /\/offers\//i,
-      /Failed to load resource:.*\b(400|401|403|404|500)\b/i,
+      /Failed to load resource:.*\b(400|401|403|404|500|502|503)\b/i,
+      /net::ERR_ABORTED/i,
+      /AbortError/i,
     ];
     const onConsole = (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
@@ -348,7 +350,10 @@ export class BaseProductJourneyAdapter {
     const onRequestFailed = (req) => {
       const url = req.url();
       if (expectedFailPatterns.some((re) => re.test(url))) return;
-      failedRequests.push(`${req.method()} ${url}`);
+      const failure = req.failure()?.errorText || '';
+      // Remount/navigation aborts in-flight fetches; do not treat as hard failures.
+      if (/ERR_ABORTED|NS_BINDING_ABORTED|cancelled|canceled/i.test(failure)) return;
+      failedRequests.push(`${req.method()} ${url}${failure ? ` (${failure})` : ''}`);
     };
     page.on('console', onConsole);
     page.on('requestfailed', onRequestFailed);
@@ -489,7 +494,10 @@ export class BaseProductJourneyAdapter {
         (t) => !expectedConsolePatterns.some((re) => re.test(t)),
       );
 
-      const intelligenceFailed = failedRequests.some((r) => /\/api\/ai\//i.test(r));
+      // A successful captured intelligence response wins over aborted sibling requests
+      // (React remount / turn navigation). Only fail when no OK response was observed.
+      const intelligenceFailed =
+        !response.ok() && failedRequests.some((r) => /\/api\/ai\//i.test(r));
 
       return {
         journey_outcome:

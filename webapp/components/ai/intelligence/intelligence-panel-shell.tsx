@@ -43,7 +43,7 @@ export function IntelligencePanelShell({
 
   return (
     <section
-      className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+      className="min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
       data-testid={testId}
       aria-busy={loading ? true : undefined}
     >
@@ -112,9 +112,9 @@ export function IntelligencePanelShell({
             </dd>
           </div>
           {freshnessLabel ? (
-            <div>
+            <div className="min-w-0 max-w-full">
               <dt className="inline">Freshness: </dt>
-              <dd className="inline" data-testid={`${testId}-freshness`}>
+              <dd className="inline break-all" data-testid={`${testId}-freshness`}>
                 {freshnessLabel}
               </dd>
             </div>

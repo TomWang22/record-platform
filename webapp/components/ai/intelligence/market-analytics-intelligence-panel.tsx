@@ -27,9 +27,36 @@ export function MarketAnalyticsIntelligencePanel({ principalId, currency, events
     }
   }
   return <IntelligencePanelShell title="Market analytics" description="Descriptive aggregates only; this panel does not make causal or future-price claims." testId="intelligence-market-analytics-panel" loading={state.loading} errorMessage={state.error} rateLimited={state.rateLimited} limitations={(state.result?.limitations as never) || []} evidence={(state.result?.evidence as never) || []} freshnessLabel={meta(state.result, 'data_freshness')}>
-    <div className="space-y-2 text-sm">
+    <div className="min-w-0 space-y-2 overflow-x-auto text-sm">
       <button type="button" onClick={() => void run()} disabled={!principalId || state.loading} className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">Run descriptive report</button>
-      {state.result ? <dl className="grid grid-cols-2 gap-2 text-xs"><div><dt>Time range</dt><dd>{meta(state.result, 'time_range')}</dd></div><div><dt>Population</dt><dd>{meta(state.result, 'population')}</dd></div><div><dt>Sample size</dt><dd>{meta(state.result, 'sample_size')}</dd></div><div><dt>Currency</dt><dd>{meta(state.result, 'currency')}</dd></div><div><dt>Methodology</dt><dd>{meta(state.result, 'methodology')}</dd></div><div><dt>Freshness</dt><dd>{meta(state.result, 'data_freshness')}</dd></div></dl> : null}
+      {state.result ? (
+        <dl className="grid min-w-0 grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+          <div className="min-w-0">
+            <dt className="font-medium text-slate-500">Time range</dt>
+            <dd className="break-words">{meta(state.result, 'time_range')}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="font-medium text-slate-500">Population</dt>
+            <dd className="break-words">{meta(state.result, 'population')}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="font-medium text-slate-500">Sample size</dt>
+            <dd className="break-words">{meta(state.result, 'sample_size')}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="font-medium text-slate-500">Currency</dt>
+            <dd className="break-words">{meta(state.result, 'currency')}</dd>
+          </div>
+          <div className="min-w-0 sm:col-span-2">
+            <dt className="font-medium text-slate-500">Methodology</dt>
+            <dd className="break-all">{meta(state.result, 'methodology')}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="font-medium text-slate-500">Freshness</dt>
+            <dd className="break-words">{meta(state.result, 'data_freshness')}</dd>
+          </div>
+        </dl>
+      ) : null}
     </div>
   </IntelligencePanelShell>
 }

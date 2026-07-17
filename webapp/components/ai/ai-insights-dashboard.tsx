@@ -67,7 +67,11 @@ function signalCodesFromMonitor(signals: AuctionMonitorSignal[]): string[] {
 export function AiInsightsDashboard() {
   const searchParams = useSearchParams()
   const focusPanel = searchParams.get('panel')
-  const principalId = getUserIdFromToken(getClientSessionToken())
+  const [principalId, setPrincipalId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setPrincipalId(getUserIdFromToken(getClientSessionToken()))
+  }, [])
 
   const [recordId, setRecordId] = useState('')
   const [listingId, setListingId] = useState('')

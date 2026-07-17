@@ -18,6 +18,7 @@ import {
   ProductFailClosedGate,
   classifyProductHardFailure,
 } from './phase34-product-execution.mjs';
+import { INTER_BATCH_INTERVAL_MS } from './phase33f-rate-limit.mjs';
 import {
   ProductLedgerWriter,
   createSessionId,
@@ -41,6 +42,17 @@ import {
 } from './phase34-product-screenshots.mjs';
 
 export const PRODUCT_SESSION_RUNNER_VERSION = 'phase34-product-session-runner-v2';
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Live product turns share the gateway IP bucket with H1/H2/H3; pace to avoid HTTP 429. */
+export function productLiveInterTurnMs() {
+  const raw = Number(process.env.PHASE34_PRODUCT_INTER_TURN_MS);
+  if (Number.isFinite(raw) && raw >= 0) return raw;
+  return Math.max(INTER_BATCH_INTERVAL_MS, 1500);
+}
 
 const MULTI_TURN_SCENARIOS = Object.freeze([
   'budget_correction',
@@ -284,6 +296,10 @@ export async function runProductSession(scheduleRow, opts = {}) {
     if (hard) {
       gate.noteSessionResult(lastResult);
       break;
+    }
+
+    if (live && turn_index + 1 < turnCount) {
+      await sleep(productLiveInterTurnMs());
     }
   }
 

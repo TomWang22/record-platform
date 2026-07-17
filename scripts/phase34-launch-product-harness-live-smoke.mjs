@@ -46,6 +46,17 @@ import {
   resolveLiveSubjects,
   subjectForCapability,
 } from './lib/phase34-product-live-subjects.mjs';
+import { INTER_BATCH_INTERVAL_MS } from './lib/phase33f-rate-limit.mjs';
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function productLiveInterSessionMs() {
+  const raw = Number(process.env.PHASE34_PRODUCT_INTER_SESSION_MS);
+  if (Number.isFinite(raw) && raw >= 0) return raw;
+  return Math.max(INTER_BATCH_INTERVAL_MS * 2, 2500);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -457,7 +468,11 @@ async function main() {
         });
         break;
       } finally {
-        await context.close();
+        await context.close().catch(() => null);
+      }
+
+      if (gate.canStartSession()) {
+        await sleep(productLiveInterSessionMs());
       }
     }
   } finally {

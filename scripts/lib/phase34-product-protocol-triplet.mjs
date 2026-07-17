@@ -3,8 +3,10 @@
  * No protocol-specific payload mutation.
  */
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { curlRequest, PROTOCOLS as CURL_PROTOCOLS, DEFAULTS } from './phase22-full-replay-common.mjs';
 import { evaluateTripletParity } from './phase33f-protocol-parity.mjs';
+import { INTER_BATCH_INTERVAL_MS } from './phase33f-rate-limit.mjs';
 
 export const PRODUCT_PROTOCOL_TRIPLET_VERSION = 'phase34-product-protocol-triplet-v1';
 /** Product journeys replay H1→H2→H3 sequentially; allow wall spread beyond canary 100ms. */
@@ -98,6 +100,21 @@ export function executeProtocolTriplet(canonical, opts = {}) {
           ok: false,
           fallback: false,
         };
+      }
+      // Pace live H1→H2→H3 so the shared gateway IP bucket is not burst-exhausted.
+      if (protocol !== 'h3') {
+        const paceMs = Number(process.env.PHASE34_PRODUCT_PROTOCOL_PACE_MS);
+        const waitMs = Number.isFinite(paceMs) && paceMs >= 0 ? paceMs : Math.min(400, INTER_BATCH_INTERVAL_MS);
+        if (waitMs > 0) {
+          try {
+            execFileSync('sleep', [String(waitMs / 1000)], { stdio: 'ignore' });
+          } catch {
+            const end = Date.now() + waitMs;
+            while (Date.now() < end) {
+              /* sync pace fallback */
+            }
+          }
+        }
       }
     } else {
       // Default offline path: deterministic fixture triplet (same payload hash)

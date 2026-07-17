@@ -13,44 +13,48 @@ import {
   type IntelligencePanelState,
   type ScarcityResult,
 } from '@/lib/ai-intelligence-types'
+import { gatherLiveMarketEvidenceForRecord } from '@/lib/ai-market-evidence'
+import type { ScarcityAssemblyResult } from '@/lib/ai-market-evidence-assembler'
 import type { CollectionRecord } from '@/lib/records-types'
 
 type ScarcityIntelligencePanelProps = {
   record: CollectionRecord
+  /** Test-only: inject a prebuilt assembly (skips live fetch). */
+  assemblyOverride?: ScarcityAssemblyResult
 }
 
-function subjectFromRecord(record: CollectionRecord) {
-  const pressingHint =
-    record.catalogNumber ||
-    [record.artist, record.name, record.pressingYear].filter(Boolean).join('|') ||
-    record.id
-  return {
-    release_id: `release:${record.artist}:${record.name}`,
-    pressing_id: `pressing:${pressingHint}`,
-    condition: record.recordGrade || null,
-    artist: record.artist,
-    title: record.name,
-    catalog_number: record.catalogNumber || null,
-  }
-}
-
-export function ScarcityIntelligencePanel({ record }: ScarcityIntelligencePanelProps) {
+export function ScarcityIntelligencePanel({
+  record,
+  assemblyOverride,
+}: ScarcityIntelligencePanelProps) {
   const [state, setState] = useState<IntelligencePanelState<ScarcityResult>>({ status: 'idle' })
+  const [assemblyMeta, setAssemblyMeta] = useState<ScarcityAssemblyResult | null>(null)
 
   useEffect(() => {
     let cancelled = false
     async function run() {
       setState({ status: 'loading' })
       try {
+        const assembly =
+          assemblyOverride ?? (await gatherLiveMarketEvidenceForRecord(record))
+        if (cancelled) return
+        setAssemblyMeta(assembly)
+
         const response = await fetchScarcityIntelligence({
-          subject: subjectFromRecord(record),
-          authorized_scopes: ['public_market', 'authenticated_market', 'owner_private'],
-          // Live comparable assembly lands in later 34B/C work. Until then we
-          // intentionally send no fabricated sold comps — engine must abstain
-          // rather than invent rarity from zero inventory.
-          candidates: [],
+          subject: {
+            release_id: assembly.subject.release_id,
+            pressing_id: assembly.subject.pressing_id,
+            condition: assembly.subject.condition,
+            artist: assembly.subject.artist,
+            title: assembly.subject.title,
+            catalog_number: assembly.subject.catalog_number,
+          },
+          candidates: assembly.candidates,
+          authorized_scopes: assembly.authorized_scopes,
           claim_rarity_from_zero_results: false,
-          require_exact_pressing: true,
+          require_exact_pressing: assembly.require_exact_pressing,
+          active_supply_count: assembly.active_supply_count,
+          recent_sale_count: assembly.recent_sale_count,
         })
         if (cancelled) return
         const result = response.result
@@ -65,7 +69,10 @@ export function ScarcityIntelligencePanel({ record }: ScarcityIntelligencePanelP
           setState({
             status: 'abstained',
             result,
-            reasons: limitationMessages(result.limitations),
+            reasons: [
+              ...limitationMessages(result.limitations),
+              ...assembly.limitations,
+            ],
           })
           return
         }
@@ -91,7 +98,7 @@ export function ScarcityIntelligencePanel({ record }: ScarcityIntelligencePanelP
     return () => {
       cancelled = true
     }
-  }, [record])
+  }, [record, assemblyOverride])
 
   const result =
     state.status === 'ready' || state.status === 'abstained' ? state.result : null
@@ -99,7 +106,7 @@ export function ScarcityIntelligencePanel({ record }: ScarcityIntelligencePanelP
   return (
     <IntelligencePanelShell
       title="Scarcity intelligence"
-      description="Exact-pressing vs release-level scarcity from market evidence. Never labels rare solely from empty inventory."
+      description="Exact-pressing vs release-level scarcity from live authorized market evidence. Zero inventory alone never means rare."
       testId="intelligence-scarcity-panel"
       loading={state.status === 'loading' || state.status === 'idle'}
       errorMessage={state.status === 'error' ? state.message : null}
@@ -110,13 +117,16 @@ export function ScarcityIntelligencePanel({ record }: ScarcityIntelligencePanelP
       limitations={result?.limitations}
       evidence={result?.evidence}
       freshnessLabel={
-        result
-          ? `scope=${result.scope}; sold=${result.recent_sale_count}; supply=${result.active_supply_count}`
+        assemblyMeta
+          ? `assembler=${assemblyMeta.assembler_version}; pressing=${assemblyMeta.subject.pressing_identity_confidence}; asking=${assemblyMeta.asking_count}; sold=${assemblyMeta.sold_count}; sources=${assemblyMeta.evidence_sources.join(',') || 'none'}`
           : null
       }
     >
       {state.status === 'ready' && result ? (
-        <div className="space-y-2 text-sm text-slate-800 dark:text-slate-100" data-testid="intelligence-scarcity-ready">
+        <div
+          className="space-y-2 text-sm text-slate-800 dark:text-slate-100"
+          data-testid="intelligence-scarcity-ready"
+        >
           <p>
             Label:{' '}
             <span className="font-semibold capitalize" data-testid="intelligence-scarcity-label">
@@ -125,9 +135,17 @@ export function ScarcityIntelligencePanel({ record }: ScarcityIntelligencePanelP
             <span className="text-xs text-slate-500">({result.scope})</span>
           </p>
           <p className="text-xs text-slate-500">
-            Score {result.scarcity_score.toFixed(2)} · comparable scope:{' '}
+            Score {result.scarcity_score.toFixed(2)} · supply {result.active_supply_count} · sold{' '}
+            {result.recent_sale_count} · comparable scope:{' '}
             {(result.comparable_scope || []).join(', ') || '—'}
           </p>
+          {assemblyMeta ? (
+            <p className="text-xs text-slate-500" data-testid="intelligence-scarcity-assembly">
+              Live evidence: {assemblyMeta.pressing_candidates.length} exact-pressing ·{' '}
+              {assemblyMeta.release_candidates.length} release-level · claim_rarity_from_zero=
+              {String(assemblyMeta.claim_rarity_from_zero_results)}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </IntelligencePanelShell>

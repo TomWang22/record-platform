@@ -5,10 +5,12 @@
 import crypto from 'node:crypto';
 import { curlRequest, PROTOCOLS as CURL_PROTOCOLS, DEFAULTS } from './phase22-full-replay-common.mjs';
 import { evaluateTripletParity } from './phase33f-protocol-parity.mjs';
-import { CANARY } from './phase33f-canary-config.mjs';
 
 export const PRODUCT_PROTOCOL_TRIPLET_VERSION = 'phase34-product-protocol-triplet-v1';
-export const TRIPLET_START_SPREAD_LIMIT_MS = CANARY.triplet_start_spread_limit_ms;
+/** Product journeys replay H1→H2→H3 sequentially; allow wall spread beyond canary 100ms. */
+export const TRIPLET_START_SPREAD_LIMIT_MS = Number(
+  process.env.PHASE34_PRODUCT_TRIPLET_SPREAD_LIMIT_MS || 60_000,
+);
 
 export function hashCanonicalRequest(body) {
   const normalized = JSON.stringify(sortKeys(body));

@@ -342,14 +342,26 @@ export class BaseProductJourneyAdapter {
       /\/offers\//i,
       /Failed to load resource:.*\b(400|401|403|404|500)\b/i,
     ];
-    page.on('console', (msg) => {
+    const onConsole = (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
-    });
-    page.on('requestfailed', (req) => {
+    };
+    const onRequestFailed = (req) => {
       const url = req.url();
       if (expectedFailPatterns.some((re) => re.test(url))) return;
       failedRequests.push(`${req.method()} ${url}`);
-    });
+    };
+    page.on('console', onConsole);
+    page.on('requestfailed', onRequestFailed);
+    const detachListeners = () => {
+      page.off?.('console', onConsole);
+      page.off?.('requestfailed', onRequestFailed);
+      try {
+        page.removeListener?.('console', onConsole);
+        page.removeListener?.('requestfailed', onRequestFailed);
+      } catch {
+        /* ignore */
+      }
+    };
 
     const apiPath = prepared.apiPath;
     // Attach waiter before navigation/trigger; swallow late rejection if we abort early.
@@ -370,7 +382,14 @@ export class BaseProductJourneyAdapter {
 
     const actionStart = Date.now();
     try {
-      await page.goto(prepared.route, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      const alreadyOnRoute =
+        prepared.turn_index > 0 &&
+        String(page.url() || '').includes(String(prepared.route).split('?')[0]);
+      if (!alreadyOnRoute) {
+        await page.goto(prepared.route, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      } else {
+        await new Promise((r) => setTimeout(r, 150));
+      }
 
       const shotBase = {
         capability: this.capability,
@@ -480,6 +499,13 @@ export class BaseProductJourneyAdapter {
           a11y.horizontal_overflow === false
             ? 'PASS'
             : 'FAIL',
+        journey_fail_reasons: [
+          !response.ok() ? `http_${response.status()}` : null,
+          unexpectedConsole.length ? `console:${unexpectedConsole[0]?.slice?.(0, 120)}` : null,
+          intelligenceFailed ? 'intelligence_request_failed' : null,
+          a11y.accessibility_result !== 'PASS' ? `a11y:${a11y.accessibility_result}` : null,
+          a11y.horizontal_overflow ? 'horizontal_overflow' : null,
+        ].filter(Boolean),
         browser_route: prepared.route,
         viewport: await page.viewportSize(),
         viewport_class: viewportLabel(await page.viewportSize()),
@@ -521,6 +547,8 @@ export class BaseProductJourneyAdapter {
         responsePromise.catch(() => null);
       }
       throw err;
+    } finally {
+      detachListeners();
     }
   }
 

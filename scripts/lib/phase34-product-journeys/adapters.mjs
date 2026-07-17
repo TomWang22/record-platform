@@ -301,18 +301,27 @@ export class BaseProductJourneyAdapter {
         this.registry.runButtonName instanceof RegExp
           ? this.registry.runButtonName.source
           : String(this.registry.runButtonName);
-      await page
-        .waitForFunction(
-          (src) => {
-            const re = new RegExp(src, 'i');
-            const buttons = [...document.querySelectorAll('button')];
-            const match = buttons.find((b) => re.test((b.textContent || '').trim()));
-            return Boolean(match && !match.disabled);
-          },
-          nameSource,
-          { timeout: 30_000 },
-        )
-        .catch(() => null);
+      let enabled = false;
+      for (let attempt = 0; attempt < 2 && !enabled; attempt += 1) {
+        enabled = await page
+          .waitForFunction(
+            (src) => {
+              const re = new RegExp(src, 'i');
+              const buttons = [...document.querySelectorAll('button')];
+              const match = buttons.find((b) => re.test((b.textContent || '').trim()));
+              return Boolean(match && !match.disabled);
+            },
+            nameSource,
+            { timeout: 20_000 },
+          )
+          .then(() => true)
+          .catch(() => false);
+        if (!enabled && attempt === 0) {
+          await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+          await page.getByTestId(prepared.panelTestId).first().waitFor({ state: 'visible', timeout: 60_000 });
+          await btn.waitFor({ state: 'visible', timeout: 30_000 });
+        }
+      }
       await btn.click({ timeout: 30_000, force: true });
     }
   }

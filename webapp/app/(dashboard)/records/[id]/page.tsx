@@ -48,7 +48,11 @@ export default function RecordDetailPage() {
   const [revisions, setRevisions] = useState<RecordRevision[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<unknown>(null)
-  const principalId = getUserIdFromToken(getClientSessionToken())
+  const [principalId, setPrincipalId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setPrincipalId(getUserIdFromToken(getClientSessionToken()))
+  }, [])
 
   useEffect(() => {
     if (tabParam) setTab(tabParam)

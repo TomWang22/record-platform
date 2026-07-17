@@ -21,7 +21,7 @@ type RecordStats = {
 
 export default function DashboardHome() {
   const { authRequired, onApiError } = useRequireAuth()
-  const principalId = getUserIdFromToken(getClientSessionToken())
+  const [principalId, setPrincipalId] = useState<string | null>(null)
   const [stats, setStats] = useState<RecordStats>({
     total: 0,
     formats: {},
@@ -33,6 +33,10 @@ export default function DashboardHome() {
   const [recCandidates, setRecCandidates] = useState<
     Array<{ id: string; title: string; price?: number | null; currency?: string | null }>
   >([])
+
+  useEffect(() => {
+    setPrincipalId(getUserIdFromToken(getClientSessionToken()))
+  }, [])
 
   useEffect(() => {
     void fetchStats()

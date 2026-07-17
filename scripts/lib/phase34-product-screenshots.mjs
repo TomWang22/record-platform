@@ -341,6 +341,7 @@ export function assertScreenshotsBeforePass(screenshotRows, { requireFinal = tru
   }
   if (requireFinal) {
     const finals = new Set([
+      'final',
       'success',
       'abstention',
       'unauthorized_refusal',

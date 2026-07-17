@@ -6,10 +6,14 @@ export const PRODUCT_A11Y_VERSION = 'phase34-product-accessibility-v1';
 
 const DOM_A11Y_SOURCE = `
   const issues = [];
+  const root = panelTestId
+    ? document.querySelector('[data-testid="' + panelTestId + '"]') || document
+    : document;
+
   const headings = [...document.querySelectorAll('h1,h2,h3')].map((h) => h.tagName);
   if (headings.length === 0) issues.push('no_semantic_headings');
 
-  const images = [...document.querySelectorAll('img')];
+  const images = [...root.querySelectorAll('img')];
   for (const img of images) {
     if (!img.getAttribute('alt') && img.getAttribute('role') !== 'presentation') {
       issues.push('img_missing_alt');
@@ -17,7 +21,7 @@ const DOM_A11Y_SOURCE = `
     }
   }
 
-  const buttons = [...document.querySelectorAll('button,[role=button]')];
+  const buttons = [...root.querySelectorAll('button,[role=button]')];
   for (const b of buttons.slice(0, 40)) {
     const label =
       b.getAttribute('aria-label') ||

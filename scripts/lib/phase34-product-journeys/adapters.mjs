@@ -30,34 +30,43 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     ],
     apiPath: CAPABILITY_ROUTE_PATHS.scarcity,
     clientFn: 'fetchScarcityIntelligence',
+    /** Auto-fetches on mount when record subject is present. */
+    trigger: 'auto',
   },
   valuation: {
-    routes: ['/records/[id]', '/sell', '/listings/[id]', '/listings/[id]/edit', '/offers'],
+    routes: ['/records/[id]', '/sell', '/listings/[id]', '/listings/[id]/edit'],
     panels: ['intelligence-valuation-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.valuation,
     clientFn: 'fetchValuationIntelligence',
+    trigger: 'auto',
   },
   auction_intelligence: {
-    routes: ['/auctions/[id]', '/watchlist', '/seller/auctions'],
+    routes: ['/listings/[id]', '/watchlist'],
     panels: ['intelligence-auction-panel', 'intelligence-watchlist-temperature'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.auction_intelligence,
     clientFn: 'fetchAuctionIntelligence',
+    trigger: 'click',
+    runTestId: 'intelligence-auction-run',
   },
   embeddings: {
-    routes: ['/admin/embeddings', '/records/[id]'],
-    panels: ['intelligence-embeddings-panel'],
+    routes: ['/insights'],
+    panels: ['intelligence-embedding-lineage-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.embeddings,
     clientFn: 'fetchEmbeddingMetadata',
+    trigger: 'click',
+    runButtonName: /inspect metadata/i,
   },
   semantic_search: {
-    routes: ['/market', '/listings', '/collection'],
+    routes: ['/listings', '/market'],
     panels: ['intelligence-search-chrome'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.semantic_search,
     clientFn: 'fetchSemanticSearchIntelligence',
+    trigger: 'semantic_search',
+    runTestId: 'intelligence-search-run',
   },
   negotiation_assistance: {
     routes: ['/messages', '/offers'],
@@ -65,6 +74,8 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.negotiation_assistance,
     clientFn: 'fetchNegotiationAssistance',
+    trigger: 'click',
+    runTestId: 'intelligence-negotiation-run',
   },
   recommendations: {
     routes: ['/dashboard', '/records/[id]', '/watchlist'],
@@ -72,13 +83,17 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.recommendations,
     clientFn: 'fetchRecommendationsIntelligence',
+    trigger: 'click',
+    runButtonName: /get recommendations/i,
   },
   market_analytics: {
-    routes: ['/analytics', '/collection/stats', '/seller/analytics'],
+    routes: ['/insights', '/profile/collection-stats'],
     panels: ['intelligence-market-analytics-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.market_analytics,
     clientFn: 'fetchMarketAnalyticsIntelligence',
+    trigger: 'click',
+    runButtonName: /run descriptive report/i,
   },
 });
 
@@ -113,9 +128,14 @@ export function assertCapabilitySurfacesMounted(capability) {
 }
 
 export function resolveConcreteRoute(template, subject) {
-  return template
-    .replace('[id]', subject.id || subject.record_id || 'fixture-subject')
-    .replace('*', subject.id || '');
+  const listingId = subject.listing_id || subject.id;
+  const recordId = subject.record_id || subject.id;
+  const idForPath = template.includes('/listings/')
+    ? listingId
+    : template.includes('/records/')
+      ? recordId
+      : subject.id || recordId || listingId || 'fixture-subject';
+  return template.replace('[id]', idForPath).replace('*', idForPath || '');
 }
 
 /**
@@ -242,26 +262,64 @@ export class BaseProductJourneyAdapter {
     return this.executeLivePlaywright(page, prepared);
   }
 
+  async triggerLiveAction(page, prepared) {
+    const trigger = this.registry.trigger || 'auto';
+    if (trigger === 'auto') return;
+
+    if (this.capability === 'negotiation_assistance') {
+      const thread = page.locator('[data-testid*="thread"], a[href*="/messages"]').first();
+      if (await thread.count()) await thread.click().catch(() => null);
+    }
+
+    if (trigger === 'semantic_search') {
+      const searchInput = page
+        .locator(
+          'input[placeholder*="Search artist" i], input[placeholder*="Search marketplace" i], input[type="search"], input[name="q"]',
+        )
+        .first();
+      if (await searchInput.count()) {
+        await searchInput.fill(prepared.requestSeed?.query || 'Miles Davis Kind of Blue');
+      }
+      await page.getByTestId('intelligence-search-mode-semantic').click();
+      await page.getByTestId(this.registry.runTestId).click();
+      return;
+    }
+
+    if (this.registry.runTestId) {
+      await page.getByTestId(this.registry.runTestId).click();
+      return;
+    }
+    if (this.registry.runButtonName) {
+      await page.getByRole('button', { name: this.registry.runButtonName }).click();
+    }
+  }
+
   async executeLivePlaywright(page, prepared) {
     const consoleErrors = [];
     const failedRequests = [];
     const captures = [];
     const screenshots = [];
+    const expectedFailPatterns = [
+      /favicon\.ico/i,
+      /\/api\/auth\/refresh/i,
+    ];
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
     });
     page.on('requestfailed', (req) => {
-      failedRequests.push(`${req.method()} ${req.url()}`);
+      const url = req.url();
+      if (expectedFailPatterns.some((re) => re.test(url))) return;
+      failedRequests.push(`${req.method()} ${url}`);
     });
 
     const apiPath = prepared.apiPath;
     const responsePromise = page.waitForResponse(
       (res) => res.url().includes(apiPath) && res.request().method() === 'POST',
-      { timeout: 60_000 },
+      { timeout: 120_000 },
     );
 
     const actionStart = Date.now();
-    await page.goto(prepared.route, { waitUntil: 'domcontentloaded' });
+    await page.goto(prepared.route, { waitUntil: 'domcontentloaded', timeout: 60_000 });
 
     const shotBase = {
       capability: this.capability,
@@ -277,16 +335,16 @@ export class BaseProductJourneyAdapter {
       authClass: 'authenticated',
     };
 
+    const panel = page.getByTestId(prepared.panelTestId);
+    await panel.first().waitFor({ state: 'visible', timeout: 60_000 });
     screenshots.push(await captureProductScreenshot(page, { ...shotBase, state: 'before_action' }));
 
-    const panel = page.getByTestId(prepared.panelTestId);
-    if ((await panel.count()) === 0) {
-      const link = page.locator(`a[href*="${prepared.route.split('/')[1]}"]`).first();
-      if (await link.count()) await link.click();
-    }
+    const loadingLocator = page.getByTestId(`${prepared.panelTestId}-loading`);
+    await this.triggerLiveAction(page, prepared);
 
-    screenshots.push(await captureProductScreenshot(page, { ...shotBase, state: 'loading' }));
-    await panel.first().waitFor({ state: 'visible', timeout: 60_000 }).catch(() => null);
+    if ((await loadingLocator.count()) > 0) {
+      screenshots.push(await captureProductScreenshot(page, { ...shotBase, state: 'loading' }));
+    }
 
     const response = await responsePromise;
     const request = response.request();
@@ -314,6 +372,11 @@ export class BaseProductJourneyAdapter {
       finished_at: new Date(actionEnd).toISOString(),
     });
 
+    await page
+      .getByTestId(`${prepared.panelTestId}-loading`)
+      .waitFor({ state: 'hidden', timeout: 30_000 })
+      .catch(() => null);
+
     const rendered = await this.extractRendered(page, prepared, responseJson);
     const a11y = await executeAccessibilityChecks(page, { panelTestId: prepared.panelTestId });
     const clientProtocol = await observeClientProtocol(page);
@@ -321,7 +384,7 @@ export class BaseProductJourneyAdapter {
     screenshots.push(
       await captureProductScreenshot(page, {
         ...shotBase,
-        state: finalState,
+        state: finalState === 'success' ? 'final' : finalState,
         browser_console_error_count: consoleErrors.length,
         failed_request_count: failedRequests.length,
         accessibility_status: a11y.accessibility_result,
@@ -329,17 +392,19 @@ export class BaseProductJourneyAdapter {
       }),
     );
 
-    for (const [testid, state] of [
-      ['intelligence-evidence-expand', 'evidence_expanded'],
-      ['intelligence-limitations-expand', 'limitations_expanded'],
-    ]) {
-      const btn = page.getByTestId(testid);
-      if ((await btn.count()) > 0) {
-        await btn.first().click().catch(() => null);
+    for (const suffix of ['evidence', 'limitations']) {
+      const details = page.getByTestId(`${prepared.panelTestId}-${suffix}`);
+      if ((await details.count()) > 0) {
+        const first = details.first();
+        if (typeof first.locator === 'function') {
+          await first.locator('summary').click().catch(() => null);
+        } else if (typeof first.click === 'function') {
+          await first.click().catch(() => null);
+        }
         screenshots.push(
           await captureProductScreenshot(page, {
             ...shotBase,
-            state,
+            state: suffix === 'evidence' ? 'evidence_expanded' : 'limitations_expanded',
             accessibility_status: a11y.accessibility_result,
             horizontal_overflow: a11y.horizontal_overflow,
           }),
@@ -349,9 +414,17 @@ export class BaseProductJourneyAdapter {
 
     assertScreenshotsBeforePass(screenshots);
 
+    const unexpectedConsole = consoleErrors.filter(
+      (t) => !/Download the React DevTools/i.test(t) && !/favicon/i.test(t),
+    );
+
     return {
       journey_outcome:
-        response.ok() && consoleErrors.length === 0 && a11y.accessibility_result !== 'FAIL'
+        response.ok() &&
+        unexpectedConsole.length === 0 &&
+        failedRequests.length === 0 &&
+        a11y.accessibility_result === 'PASS' &&
+        a11y.horizontal_overflow === false
           ? 'PASS'
           : 'FAIL',
       browser_route: prepared.route,
@@ -360,9 +433,10 @@ export class BaseProductJourneyAdapter {
       authenticated_participant_role: prepared.participant_side,
       action_sequence: [
         'goto',
-        'screenshot_before_action',
-        'screenshot_loading',
         'wait_panel',
+        'screenshot_before_action',
+        'trigger_action',
+        'screenshot_loading_if_observed',
         'capture_intelligence_post',
         'accessibility_checks',
         'screenshot_final',
@@ -372,7 +446,7 @@ export class BaseProductJourneyAdapter {
       panel_ready_state: 'ready',
       rendered,
       api_response: responseJson,
-      console_errors: consoleErrors,
+      console_errors: unexpectedConsole,
       failed_requests: failedRequests,
       accessibility_result: a11y.accessibility_result,
       accessibility: a11y,

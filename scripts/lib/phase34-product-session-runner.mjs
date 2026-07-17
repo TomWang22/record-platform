@@ -133,6 +133,7 @@ export async function runProductSession(scheduleRow, opts = {}) {
       turn_scenario: turnScenario,
       prior_state_hash,
       screenshot_pack: opts.screenshotPack || 'gauntlet',
+      subject: opts.subject || null,
     };
 
     const prepared = await adapter.prepare(context);
@@ -161,6 +162,11 @@ export async function runProductSession(scheduleRow, opts = {}) {
       acceptedStructured: browserResult.rendered?.structured,
       fixtureResponses: opts.fixtureResponses,
       pcapCorrelation: opts.pcapCorrelation || null,
+      baseUrl: opts.protocolBaseUrl || opts.baseUrl || null,
+      caCert: opts.caCert || null,
+      token: opts.protocolToken || opts.token || null,
+      userId: opts.userId || null,
+      curlResolve: opts.curlResolve || null,
     });
     assertSameCanonicalPayload(triplet);
 

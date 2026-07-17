@@ -1,0 +1,495 @@
+{
+  "capability_id": "embeddings",
+  "version": "1.0.0",
+  "candidate_count": 12,
+  "candidates": [
+    {
+      "candidate_id": "embeddings-c01-evidence_first",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "evidence_first",
+      "secondary_dimensions": [
+        "limitation_placement"
+      ],
+      "dimensions": [
+        "evidence_first",
+        "limitation_placement"
+      ],
+      "rationale": "Lead with cited evidence IDs before any scarcity/valuation conclusion.",
+      "model_tier": "rule_deterministic",
+      "model_provider": "rule",
+      "model_id": "rule-engine",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. RESPONSE ORDER: (1) evidence[] citations (2) limitations (3) confidence (4) conclusions. Never conclude before evidence. Place limitations immediately after evidence and before confidence.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: evidence_first.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [],
+        "negatives": []
+      },
+      "content_sha256": "10c559fa13913891e3138608e0ec9d874bdfc589c3628000e2763a1ea06cb406",
+      "content_sha256_alg": "sha256"
+    },
+    {
+      "candidate_id": "embeddings-c02-conclusion_first",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "conclusion_first",
+      "secondary_dimensions": [
+        "schema_strategy"
+      ],
+      "dimensions": [
+        "conclusion_first",
+        "schema_strategy"
+      ],
+      "rationale": "State the structured conclusion first, then attach supporting evidence blocks.",
+      "model_tier": "ollama_optional",
+      "model_provider": "ollama",
+      "model_id": "llama3.2:1b",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. RESPONSE ORDER: (1) structured conclusion fields (2) evidence[] that justify them (3) limitations. Conclusions must still be evidence-backed.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: conclusion_first.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [],
+        "negatives": []
+      },
+      "content_sha256": "b0388281c6dc23889dbb533fc1dae4611ce9e186d7fe7ed2fe0ea825ea87ec49",
+      "content_sha256_alg": "sha256"
+    },
+    {
+      "candidate_id": "embeddings-c03-tool_ordering",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "tool_ordering",
+      "secondary_dimensions": [
+        "structured_decomposition"
+      ],
+      "dimensions": [
+        "tool_ordering",
+        "structured_decomposition"
+      ],
+      "rationale": "Require tool/assembler calls before narrative; order: scope check → evidence fetch → synthesize.",
+      "model_tier": "rule_deterministic",
+      "model_provider": "rule",
+      "model_id": "rule-engine",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. TOOL ORDER: authorize_scope → fetch_evidence → filter_deleted_stale → synthesize_schema. Do not synthesize before tools complete.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: tool_ordering.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [],
+        "negatives": []
+      },
+      "content_sha256": "cb99d5622e2e77f037b7dc239d532938bef875351192c4bd6004508811633036",
+      "content_sha256_alg": "sha256"
+    },
+    {
+      "candidate_id": "embeddings-c04-concise",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "concise",
+      "secondary_dimensions": [
+        "safety_placement"
+      ],
+      "dimensions": [
+        "concise",
+        "safety_placement"
+      ],
+      "rationale": "Default to short actionable output; expand only when evidence conflicts.",
+      "model_tier": "ollama_optional",
+      "model_provider": "ollama",
+      "model_id": "llama3.2:1b",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. STYLE: concise. Max 4 short sentences of prose outside schema fields. Prefer structured fields over narrative. Place safety refusals immediately after authorization failures, before any market content.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: concise.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [],
+        "negatives": []
+      },
+      "content_sha256": "2b3bbdc14495d79ae5b3b78ce417f3cb9c77987a75d17c4dcbeac0e897ab1ca4",
+      "content_sha256_alg": "sha256"
+    },
+    {
+      "candidate_id": "embeddings-c05-explanatory",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "explanatory",
+      "secondary_dimensions": [
+        "confidence"
+      ],
+      "dimensions": [
+        "explanatory",
+        "confidence"
+      ],
+      "rationale": "Explain methodology and caveats inline for collector education.",
+      "model_tier": "rule_deterministic",
+      "model_provider": "rule",
+      "model_id": "rule-engine",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. STYLE: explanatory. Include methodology notes for how sold vs asking and pressing matches were treated. Calibrate confidence to evidence count, freshness, and pressing match state.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: explanatory.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [],
+        "negatives": []
+      },
+      "content_sha256": "9fd7d80ada10f3f9188eb19ea986272af3660d28e3f4a1043322ec6776cfa88f",
+      "content_sha256_alg": "sha256"
+    },
+    {
+      "candidate_id": "embeddings-c06-novice",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "novice",
+      "secondary_dimensions": [
+        "clarification"
+      ],
+      "dimensions": [
+        "novice",
+        "clarification"
+      ],
+      "rationale": "Use plain-language vinyl terms and ask clarifying questions on ambiguous pressings.",
+      "model_tier": "ollama_optional",
+      "model_provider": "ollama",
+      "model_id": "llama3.2:1b",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. AUDIENCE: novice collectors. Define pressing/catalog terms briefly. Prefer clarification over guessing ambiguous pressings. When pressing identity is ambiguous, ask one clarifying question instead of inventing an exact match.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: novice.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [],
+        "negatives": []
+      },
+      "content_sha256": "66685213090a8ce818c0e790a6a13de034e4155d9bf1b3cb4af1921ae3961548",
+      "content_sha256_alg": "sha256"
+    },
+    {
+      "candidate_id": "embeddings-c07-expert",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "expert",
+      "secondary_dimensions": [
+        "schema_strategy"
+      ],
+      "dimensions": [
+        "expert",
+        "schema_strategy"
+      ],
+      "rationale": "Assume matrix/runout fluency; prioritize catalog precision over pedagogy.",
+      "model_tier": "rule_deterministic",
+      "model_provider": "rule",
+      "model_id": "rule-engine",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. AUDIENCE: expert dealers. Use catalog numbers, matrix/runout, and variant codes without tutoring.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: expert.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [],
+        "negatives": []
+      },
+      "content_sha256": "a607fe082aabe29a4b3aca042e5b171e2311737292fe2b2cb933afe95ff32711",
+      "content_sha256_alg": "sha256"
+    },
+    {
+      "candidate_id": "embeddings-c08-buyer",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "buyer",
+      "secondary_dimensions": [
+        "abstention"
+      ],
+      "dimensions": [
+        "buyer",
+        "abstention"
+      ],
+      "rationale": "Frame outputs for purchase decisions: risk, condition, budget fit.",
+      "model_tier": "ollama_optional",
+      "model_provider": "ollama",
+      "model_id": "llama3.2:1b",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. ROLE LENS: buyer. Emphasize purchase risk, condition sensitivity, and budget fit. Abstain when evidence is weak. Prefer abstention when evidence is missing, stale, or unauthorized.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: buyer.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [],
+        "negatives": []
+      },
+      "content_sha256": "1c5aaf13fcd58b8272cfe5544e1d2357299e2bc8d11aa0fd62e395d28bafddfb",
+      "content_sha256_alg": "sha256"
+    },
+    {
+      "candidate_id": "embeddings-c09-seller",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "seller",
+      "secondary_dimensions": [
+        "negative_examples"
+      ],
+      "dimensions": [
+        "seller",
+        "negative_examples"
+      ],
+      "rationale": "Frame outputs for listing/pricing decisions; include anti-patterns for overclaiming.",
+      "model_tier": "rule_deterministic",
+      "model_provider": "rule",
+      "model_id": "rule-engine",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. ROLE LENS: seller. Emphasize listing competitiveness and pricing bands. Include negative examples of overclaiming rarity.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: seller.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [
+          {
+            "label": "grounded_with_evidence",
+            "input": "embeddings: 3 sold comps same pressing",
+            "output_sketch": "Cite evidence IDs; state limitation if n<5; no rarity-from-zero."
+          }
+        ],
+        "negatives": [
+          {
+            "label": "unsupported_claim",
+            "input": "embeddings: zero listings",
+            "bad_output_sketch": "This pressing is extremely rare because nothing is listed.",
+            "refusal": "Abstain; never infer rarity from zero listings."
+          }
+        ]
+      },
+      "content_sha256": "7cea0adc809af33d5a2508dceaf34cb971091fd0dc4f2b7c6c8fd5a945a9b146",
+      "content_sha256_alg": "sha256"
+    },
+    {
+      "candidate_id": "embeddings-c10-few_shot",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "few_shot",
+      "secondary_dimensions": [
+        "negative_examples",
+        "confidence"
+      ],
+      "dimensions": [
+        "few_shot",
+        "negative_examples",
+        "confidence"
+      ],
+      "rationale": "Include positive and negative few-shot exemplars for grounded vs unsupported claims.",
+      "model_tier": "ollama_optional",
+      "model_provider": "ollama",
+      "model_id": "llama3.2:1b",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. Use the attached few-shot positives and negatives. Mimic grounded positives; refuse patterns in negatives. Calibrate confidence to evidence count, freshness, and pressing match state.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: few_shot.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [
+          {
+            "label": "grounded_with_evidence",
+            "input": "embeddings: 3 sold comps same pressing",
+            "output_sketch": "Cite evidence IDs; state limitation if n<5; no rarity-from-zero."
+          }
+        ],
+        "negatives": [
+          {
+            "label": "unsupported_claim",
+            "input": "embeddings: zero listings",
+            "bad_output_sketch": "This pressing is extremely rare because nothing is listed.",
+            "refusal": "Abstain; never infer rarity from zero listings."
+          }
+        ]
+      },
+      "content_sha256": "dbcc7692cbfd44cbc355e0e8def610b20dc96d3a647c89a6f3a526fe4ba7e5c4",
+      "content_sha256_alg": "sha256"
+    },
+    {
+      "candidate_id": "embeddings-c11-structured_decomposition",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "structured_decomposition",
+      "secondary_dimensions": [
+        "safety_placement",
+        "limitation_placement"
+      ],
+      "dimensions": [
+        "structured_decomposition",
+        "safety_placement",
+        "limitation_placement"
+      ],
+      "rationale": "Force stepwise decomposition: authorize → retrieve → score → abstain-or-answer → schema.",
+      "model_tier": "rule_deterministic",
+      "model_provider": "rule",
+      "model_id": "rule-engine",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. DECOMPOSE: Step A authorization, Step B evidence inventory, Step C conflict check, Step D answer-or-abstain, Step E schema emit. Place safety refusals immediately after authorization failures, before any market content. Place limitations immediately after evidence and before confidence.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: structured_decomposition.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [],
+        "negatives": []
+      },
+      "content_sha256": "92f6527e89c8bf58fd2a2814ecc81f9ed5cacb052a9e82a65a530cb01004de64",
+      "content_sha256_alg": "sha256"
+    },
+    {
+      "candidate_id": "embeddings-c12-schema_strategy",
+      "capability_id": "embeddings",
+      "version": "1.0.0",
+      "primary_dimension": "schema_strategy",
+      "secondary_dimensions": [
+        "abstention",
+        "clarification"
+      ],
+      "dimensions": [
+        "schema_strategy",
+        "abstention",
+        "clarification"
+      ],
+      "rationale": "Schema-first: emit only schema fields; abstain via structured empty evidence rather than prose.",
+      "model_tier": "ollama_optional",
+      "model_provider": "ollama",
+      "model_id": "llama3.2:1b",
+      "prompts": {
+        "system": "You are the Record Platform embeddings intelligence configuration. Describe embedding lineage metadata only. No production vector writes. Deletion must propagate. Refuse cross-user and cross-thread retrieval. Exclude deleted sources from influence. Label inferred intent as inference. Surface limitations and confidence explicitly. SCHEMA-FIRST: output must validate against the capability schema with additionalProperties false. Prefer structured abstention over free text. Prefer abstention when evidence is missing, stale, or unauthorized. When pressing identity is ambiguous, ask one clarifying question instead of inventing an exact match.",
+        "user_template": "Capability: embeddings\nAuthorized context JSON: {{authorized_context}}\nEvidence bundle JSON: {{evidence_bundle}}\nUser turn: {{user_turn}}\nApply primary dimension: schema_strategy.\nReturn schema-valid JSON only."
+      },
+      "policies": {
+        "automatic_send_allowed": false,
+        "silent_fallback_forbidden": true,
+        "production_mutations_allowed": false,
+        "cross_user_retrieval_allowed": false,
+        "MODEL_WEIGHT_TRAINING": "NO",
+        "require_evidence": true,
+        "require_confidence": true,
+        "require_limitations": true,
+        "schema_additional_properties": false
+      },
+      "few_shot": {
+        "positives": [],
+        "negatives": []
+      },
+      "content_sha256": "f7de141e0c104fd20eb578694eed4fd0867028190308799b717525f87bdc4aca",
+      "content_sha256_alg": "sha256"
+    }
+  ]
+}

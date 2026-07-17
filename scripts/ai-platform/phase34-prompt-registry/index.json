@@ -1,0 +1,110 @@
+{
+  "registry_id": "phase34-prompt-registry-v1",
+  "version": "1.0.0",
+  "status": "SCAFFOLDING",
+  "MODEL_WEIGHT_TRAINING": "NO",
+  "OPTIMIZATION": "PROMPT_RETRIEVAL_RERANKER_TOOL_CALIBRATION_AND_MODEL_SELECTION",
+  "generated_at": "2026-07-17T02:30:01.735Z",
+  "capability_count": 8,
+  "candidates_per_capability": 12,
+  "total_candidates": 96,
+  "available_model_tiers": {
+    "tier_count": 2,
+    "three_tier_comparison": "NOT_AVAILABLE",
+    "tiers": [
+      {
+        "tier_id": "rule_deterministic",
+        "provider": "rule",
+        "model_id": "rule-engine"
+      },
+      {
+        "tier_id": "ollama_optional",
+        "provider": "ollama",
+        "model_id": "llama3.2:1b"
+      }
+    ]
+  },
+  "required_dimension_coverage": [
+    "evidence_first",
+    "conclusion_first",
+    "tool_ordering",
+    "concise",
+    "explanatory",
+    "novice",
+    "expert",
+    "buyer",
+    "seller",
+    "clarification",
+    "confidence",
+    "abstention",
+    "few_shot",
+    "negative_examples",
+    "structured_decomposition",
+    "safety_placement",
+    "limitation_placement",
+    "schema_strategy"
+  ],
+  "dimension_coverage_present": [
+    "abstention",
+    "buyer",
+    "clarification",
+    "concise",
+    "conclusion_first",
+    "confidence",
+    "evidence_first",
+    "expert",
+    "explanatory",
+    "few_shot",
+    "limitation_placement",
+    "negative_examples",
+    "novice",
+    "safety_placement",
+    "schema_strategy",
+    "seller",
+    "structured_decomposition",
+    "tool_ordering"
+  ],
+  "capabilities": [
+    {
+      "capability_id": "scarcity",
+      "file": "scarcity.json",
+      "candidate_count": 12
+    },
+    {
+      "capability_id": "valuation",
+      "file": "valuation.json",
+      "candidate_count": 12
+    },
+    {
+      "capability_id": "auction_intelligence",
+      "file": "auction_intelligence.json",
+      "candidate_count": 12
+    },
+    {
+      "capability_id": "embeddings",
+      "file": "embeddings.json",
+      "candidate_count": 12
+    },
+    {
+      "capability_id": "semantic_search",
+      "file": "semantic_search.json",
+      "candidate_count": 12
+    },
+    {
+      "capability_id": "negotiation_assistance",
+      "file": "negotiation_assistance.json",
+      "candidate_count": 12
+    },
+    {
+      "capability_id": "recommendations",
+      "file": "recommendations.json",
+      "candidate_count": 12
+    },
+    {
+      "capability_id": "market_analytics",
+      "file": "market_analytics.json",
+      "candidate_count": 12
+    }
+  ],
+  "content_manifest_sha256": "7733eef29b6aea0c1143a524345b89b792ec25c8c5f1f245a6d055f324ca5af2"
+}

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useRef } from 'react'
 
+import { WatchlistTemperaturePanel } from '@/components/ai/intelligence/watchlist-temperature-panel'
 import { FeedbackStarChart } from '@/components/feedback/feedback-star-chart'
 import {
   ProfileD3BarChart,
@@ -59,6 +60,7 @@ export function SellerAnalyticsDashboard({ data, statusTab = 'all' }: Props) {
             No seller activity yet. Create a listing to start tracking sales, offers, and auctions.
           </p>
         </Card>
+        <WatchlistTemperaturePanel mode="seller" />
         <Link href="/sell" className="text-sm text-brand">
           Create listing →
         </Link>
@@ -88,6 +90,8 @@ export function SellerAnalyticsDashboard({ data, statusTab = 'all' }: Props) {
           </Card>
         ))}
       </div>
+
+      <WatchlistTemperaturePanel mode="seller" />
 
       <div className="grid gap-6 lg:grid-cols-2" data-testid="seller-analytics-d3-ready">
         <ProfileD3BarChart

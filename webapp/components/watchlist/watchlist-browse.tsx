@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { WatchlistTemperaturePanel } from '@/components/ai/intelligence/watchlist-temperature-panel'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ApiErrorAlert } from '@/components/ui/api-error-alert'
@@ -214,6 +215,8 @@ export function WatchlistBrowse() {
           <Link href="/listings">Browse listings</Link>
         </Button>
       </div>
+
+      <WatchlistTemperaturePanel mode="watchlist" />
 
       <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-slate-950">
         <div className="flex flex-wrap items-center gap-2">

@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { AuctionIntelligencePanel } from '@/components/ai/intelligence/auction-intelligence-panel'
+import { ScarcityIntelligencePanel } from '@/components/ai/intelligence/scarcity-intelligence-panel'
 import { ListingAuctionPanel } from '@/components/listings/listing-auction-panel'
 import { ListingMakeOfferPanel } from '@/components/listings/listing-make-offer-panel'
 import { ValuationIntelligencePanel } from '@/components/ai/intelligence/valuation-intelligence-panel'
@@ -151,7 +153,10 @@ export default function ListingDetailPage() {
         <div className="space-y-4">
           <ListingShippingCard listing={listing} />
           {signedIn && listingIsAuction(listing) && (
-            <ListingAuctionPanel listingId={id} canClose={canEdit} />
+            <>
+              <ListingAuctionPanel listingId={id} canClose={canEdit} />
+              <AuctionIntelligencePanel listingId={id} />
+            </>
           )}
           {signedIn && !canEdit && listingAcceptsOffers(listing) && (
             <ListingMakeOfferPanel
@@ -175,6 +180,7 @@ export default function ListingDetailPage() {
           </p>
         </Card>
         {signedIn ? <ValuationIntelligencePanel record={valuationSubject} advisoryOnly /> : null}
+        {signedIn ? <ScarcityIntelligencePanel record={valuationSubject} /> : null}
         <ListingRevisionPanel listingId={id} />
       </div>
 

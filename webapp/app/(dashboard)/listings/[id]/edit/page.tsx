@@ -10,11 +10,13 @@ import {
   listingToFormValues,
   type ListingFormValues,
 } from '@/components/listings/listing-edit-form'
+import { ValuationIntelligencePanel } from '@/components/ai/intelligence/valuation-intelligence-panel'
 import { AuthRequiredCard } from '@/components/auth/auth-required-card'
 import { ApiErrorAlert } from '@/components/ui/api-error-alert'
 import { Button } from '@/components/ui/button'
 import { apiFetch } from '@/lib/api-client'
 import { fetchListing, patchListing } from '@/lib/listings-api'
+import type { CollectionRecord } from '@/lib/records-types'
 import { syncListingMedia } from '@/lib/listings-media-sync'
 import { useRequireAuth } from '@/lib/use-require-auth'
 
@@ -25,6 +27,7 @@ export default function ListingEditPage() {
   const { authRequired, onApiError, isReady, isSignedIn } = useRequireAuth()
 
   const [values, setValues] = useState<ListingFormValues | null>(null)
+  const [valuationSubject, setValuationSubject] = useState<CollectionRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<unknown>(null)
@@ -46,6 +49,17 @@ export default function ListingEditPage() {
     try {
       const listing = await fetchListing(id, true)
       setValues(listingToFormValues(listing))
+      setValuationSubject({
+        id: String(
+          (listing as { source_record_id?: string }).source_record_id || listing.id,
+        ),
+        artist: listing.artist || 'Unknown',
+        name: listing.title || 'Untitled',
+        format: listing.format || 'LP',
+        catalogNumber: listing.catalogNumber ?? listing.catalog_number ?? null,
+        label: listing.label ?? null,
+        recordGrade: listing.mediaCondition ?? listing.grade ?? null,
+      })
     } catch (err) {
       if (onApiError(err)) return
       setError(err)
@@ -113,6 +127,9 @@ export default function ListingEditPage() {
         </Link>
       </div>
       <ListingEditForm values={values} onChange={setValues} />
+      {valuationSubject ? (
+        <ValuationIntelligencePanel record={valuationSubject} advisoryOnly />
+      ) : null}
       {saveState === 'saving' && (
         <p className="text-sm text-slate-600" data-testid="listing-edit-saving">
           Saving…

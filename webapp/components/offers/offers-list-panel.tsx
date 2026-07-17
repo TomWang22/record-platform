@@ -5,6 +5,7 @@ import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { OfferNegotiationAssist } from '@/components/ai/intelligence/offer-negotiation-assist'
 import {
   acceptOffer,
   counterOffer,
@@ -13,6 +14,8 @@ import {
   withdrawOffer,
   type PublicOffer,
 } from '@/lib/offers-api'
+import { getUserIdFromToken } from '@/lib/jwt-user'
+import { getClientSessionToken } from '@/lib/session'
 
 type Props = {
   items: PublicOffer[]
@@ -25,6 +28,7 @@ export function OffersListPanel({ items, mode, onRefresh }: Props) {
   const [counterFor, setCounterFor] = useState<string | null>(null)
   const [counterAmount, setCounterAmount] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const currentUserId = getUserIdFromToken(getClientSessionToken())
 
   async function runAction(offer: PublicOffer, fn: () => Promise<unknown>) {
     setBusyId(offer.id)
@@ -171,6 +175,13 @@ export function OffersListPanel({ items, mode, onRefresh }: Props) {
               </Button>
             </div>
           )}
+          <div className="w-full border-t border-slate-100 pt-3 dark:border-white/10">
+            <OfferNegotiationAssist
+              offer={offer}
+              role={mode === 'inbox' ? 'seller' : 'buyer'}
+              currentUserId={currentUserId}
+            />
+          </div>
         </Card>
       ))}
     </div>

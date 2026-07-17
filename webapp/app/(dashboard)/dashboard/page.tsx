@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AuthRequiredCard } from '@/components/auth/auth-required-card'
+import { RecommendationsIntelligencePanel } from '@/components/ai/intelligence/recommendations-intelligence-panel'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { apiFetch } from '@/lib/api-client'
+import { getUserIdFromToken } from '@/lib/jwt-user'
+import { getClientSessionToken } from '@/lib/session'
 import { useRequireAuth } from '@/lib/use-require-auth'
 
 type RecordStats = {
@@ -18,6 +21,7 @@ type RecordStats = {
 
 export default function DashboardHome() {
   const { authRequired, onApiError } = useRequireAuth()
+  const principalId = getUserIdFromToken(getClientSessionToken())
   const [stats, setStats] = useState<RecordStats>({
     total: 0,
     formats: {},
@@ -26,6 +30,9 @@ export default function DashboardHome() {
     inAuctions: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [recCandidates, setRecCandidates] = useState<
+    Array<{ id: string; title: string; price?: number | null; currency?: string | null }>
+  >([])
 
   useEffect(() => {
     void fetchStats()
@@ -61,6 +68,13 @@ export default function DashboardHome() {
         forSale: 0, // TODO: integrate with listings service
         inAuctions: 0, // TODO: integrate with auction-monitor
       })
+      setRecCandidates(
+        records.slice(0, 12).map((record) => ({
+          id: String(record.id),
+          title: `${record.artist || 'Unknown'} — ${record.name || record.title || 'Untitled'}`,
+          currency: 'USD',
+        })),
+      )
     } catch (error) {
       if (onApiError(error)) return
       console.error('Failed to fetch stats:', error)
@@ -97,6 +111,7 @@ export default function DashboardHome() {
 
       {!authRequired && (
       <>
+      <RecommendationsIntelligencePanel principalId={principalId} candidates={recCandidates} />
       {/* Main Stats Grid */}
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Link href="/records" className="block rounded-2xl focus-visible:outline focus-visible:ring-2 focus-visible:ring-brand">

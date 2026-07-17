@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 
 import { RecordRevisionTimeline } from '@/components/records/record-revision-timeline'
 import { RecordThumbnail } from '@/components/records/record-thumbnail'
+import { RecommendationsIntelligencePanel } from '@/components/ai/intelligence/recommendations-intelligence-panel'
 import { ScarcityIntelligencePanel } from '@/components/ai/intelligence/scarcity-intelligence-panel'
 import { ValuationIntelligencePanel } from '@/components/ai/intelligence/valuation-intelligence-panel'
 import { AuthRequiredCard } from '@/components/auth/auth-required-card'
@@ -22,6 +23,8 @@ import {
   recordSubtitle,
 } from '@/lib/records-format'
 import type { CollectionRecord, RecordRevision } from '@/lib/records-types'
+import { getUserIdFromToken } from '@/lib/jwt-user'
+import { getClientSessionToken } from '@/lib/session'
 import { useRequireAuth } from '@/lib/use-require-auth'
 
 type Tab = 'overview' | 'purchase' | 'media' | 'revisions' | 'listing'
@@ -45,6 +48,7 @@ export default function RecordDetailPage() {
   const [revisions, setRevisions] = useState<RecordRevision[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<unknown>(null)
+  const principalId = getUserIdFromToken(getClientSessionToken())
 
   useEffect(() => {
     if (tabParam) setTab(tabParam)
@@ -206,6 +210,20 @@ export default function RecordDetailPage() {
           <div className="space-y-4 lg:col-span-2">
             <ScarcityIntelligencePanel record={record} />
             <ValuationIntelligencePanel record={record} advisoryOnly />
+            <RecommendationsIntelligencePanel
+              principalId={principalId}
+              candidates={[
+                {
+                  id: record.id,
+                  title: `${record.artist} — ${record.name}`,
+                  price:
+                    record.purchasePriceCents != null
+                      ? record.purchasePriceCents / 100
+                      : null,
+                  currency: record.purchaseCurrency ?? 'USD',
+                },
+              ]}
+            />
           </div>
         </div>
       )}

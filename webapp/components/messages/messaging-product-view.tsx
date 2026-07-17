@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { MemoryIntelligencePanel } from '@/components/ai/intelligence/memory-intelligence-panel'
 import { NegotiationIntelligencePanel } from '@/components/ai/intelligence/negotiation-intelligence-panel'
 import { formatMoneyFromCents, saleTypeLabel } from '@/lib/listing-format'
 import { getUserIdFromToken } from '@/lib/jwt-user'
@@ -685,6 +686,9 @@ export function MessagingProductView() {
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            {activeThreadId && threadDetail ? (
+              <MemoryIntelligencePanel principalId={currentUserId} threadId={activeThreadId} />
+            ) : null}
             {activeThreadId && threadDetail ? (
               <NegotiationIntelligencePanel
                 threadId={activeThreadId}

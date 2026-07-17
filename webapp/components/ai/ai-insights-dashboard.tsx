@@ -7,6 +7,8 @@ import { AiSourceEvidenceList } from '@/components/ai/ai-source-evidence-list'
 import { OptInHybridPreviewCard } from '@/components/ai/opt-in-hybrid-preview-card'
 import { AiInsightMeta } from '@/components/ai/ai-insight-meta'
 import { AiSourceRefsList } from '@/components/ai/ai-source-refs'
+import { EmbeddingLineagePanel } from '@/components/ai/intelligence/embedding-lineage-panel'
+import { MarketAnalyticsIntelligencePanel } from '@/components/ai/intelligence/market-analytics-intelligence-panel'
 import { SellerIntelligencePanels } from '@/components/ai/seller-intelligence-panels'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -24,6 +26,8 @@ import {
 import type { AiEnvelope, AuctionMonitorSignal } from '@/lib/ai-insights-types'
 import { fetchAuctionState, type AuctionState } from '@/lib/auctions-api'
 import { apiFetch } from '@/lib/api-client'
+import { getUserIdFromToken } from '@/lib/jwt-user'
+import { getClientSessionToken } from '@/lib/session'
 
 type PanelState = {
   envelope: AiEnvelope | null
@@ -63,6 +67,7 @@ function signalCodesFromMonitor(signals: AuctionMonitorSignal[]): string[] {
 export function AiInsightsDashboard() {
   const searchParams = useSearchParams()
   const focusPanel = searchParams.get('panel')
+  const principalId = getUserIdFromToken(getClientSessionToken())
 
   const [recordId, setRecordId] = useState('')
   const [listingId, setListingId] = useState('')
@@ -322,6 +327,11 @@ export function AiInsightsDashboard() {
       )}
 
       <SellerIntelligencePanels />
+
+      <section className="grid gap-5 lg:grid-cols-2">
+        <MarketAnalyticsIntelligencePanel principalId={principalId} currency="USD" events={[]} />
+        <EmbeddingLineagePanel principalId={principalId} />
+      </section>
 
       <OptInHybridPreviewCard ragGateReason={ragGateReason} />
 

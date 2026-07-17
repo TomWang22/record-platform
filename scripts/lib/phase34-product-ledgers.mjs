@@ -190,6 +190,7 @@ export class ProductLedgerWriter {
 
   /** @param {string} relKey @param {object} row */
   append(relKey, row) {
+    this.ensure();
     const fp = this.paths[relKey];
     if (!fp) throw new Error(`unknown ledger ${relKey}`);
     fs.appendFileSync(fp, `${JSON.stringify(row)}\n`);

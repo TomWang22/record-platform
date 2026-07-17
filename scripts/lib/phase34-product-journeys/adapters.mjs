@@ -382,14 +382,15 @@ export class BaseProductJourneyAdapter {
 
     const actionStart = Date.now();
     try {
-      const alreadyOnRoute =
-        prepared.turn_index > 0 &&
-        String(page.url() || '').includes(String(prepared.route).split('?')[0]);
-      if (!alreadyOnRoute) {
-        await page.goto(prepared.route, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-      } else {
-        await new Promise((r) => setTimeout(r, 150));
-      }
+      // Every turn must produce a fresh browser intelligence POST. Auto-trigger
+      // panels only fetch on mount, so later turns remount via a turn-scoped URL
+      // rather than skipping navigation on an already-loaded route.
+      const routeBase = String(prepared.route || '/');
+      const turnNav =
+        Number(prepared.turn_index) > 0
+          ? `${routeBase}${routeBase.includes('?') ? '&' : '?'}phase34_turn=${prepared.turn_index}`
+          : routeBase;
+      await page.goto(turnNav, { waitUntil: 'domcontentloaded', timeout: 60_000 });
 
       const shotBase = {
         capability: this.capability,

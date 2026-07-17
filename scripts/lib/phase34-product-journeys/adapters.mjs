@@ -219,18 +219,7 @@ export class BaseProductJourneyAdapter {
     if (this.capability === 'negotiation_assistance' && context.subject?.thread_id) {
       return `/messages?thread=${encodeURIComponent(context.subject.thread_id)}`;
     }
-    if (context.scenario_class?.includes('watchlist')) {
-      const w = routes.find((r) => r.includes('watchlist'));
-      if (w) return w;
-    }
-    if (context.scenario_class?.includes('edit') || context.scenario_class?.includes('listing_edit')) {
-      const e = routes.find((r) => r.includes('edit'));
-      if (e) return e;
-    }
-    if (context.participant_side === 'seller') {
-      const s = routes.find((r) => r.includes('sell') || r.includes('seller') || r.includes('listings'));
-      if (s) return s;
-    }
+    // Always use the primary mounted surface for live evidence.
     return routes[0];
   }
 

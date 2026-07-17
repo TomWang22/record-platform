@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 
 import { ListingAuctionPanel } from '@/components/listings/listing-auction-panel'
 import { ListingMakeOfferPanel } from '@/components/listings/listing-make-offer-panel'
+import { ValuationIntelligencePanel } from '@/components/ai/intelligence/valuation-intelligence-panel'
 import {
   ListingRevisionPanel,
   ListingSellerCard,
@@ -23,6 +24,7 @@ import { fetchListing } from '@/lib/listings-api'
 import { listingIsAuction } from '@/lib/auctions-api'
 import { listingAcceptsOffers } from '@/lib/offers-api'
 import { listingToStoredRef, type MarketplaceListing } from '@/lib/listings-types'
+import type { CollectionRecord } from '@/lib/records-types'
 import { addRecentlyViewedOnApi } from '@/lib/marketplace-shopping-api'
 import { getClientSessionToken } from '@/lib/session'
 import { useRequireAuth } from '@/lib/use-require-auth'
@@ -101,6 +103,16 @@ export default function ListingDetailPage() {
         : [listing.primaryImageUrl]
   ).filter(Boolean) as string[]
 
+  const valuationSubject: CollectionRecord = {
+    id: String((listing as MarketplaceListing & { source_record_id?: string }).source_record_id || listing.id),
+    artist: listing.artist || 'Unknown',
+    name: listing.title || 'Untitled',
+    format: listing.format || 'LP',
+    catalogNumber: listing.catalogNumber ?? listing.catalog_number ?? null,
+    label: listing.label ?? null,
+    recordGrade: listing.mediaCondition ?? listing.grade ?? null,
+  }
+
   return (
     <div className="space-y-6" data-testid="listing-detail-ready">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -162,6 +174,7 @@ export default function ListingDetailPage() {
             {listing.description?.trim() || 'No description provided for this listing.'}
           </p>
         </Card>
+        {signedIn ? <ValuationIntelligencePanel record={valuationSubject} advisoryOnly /> : null}
         <ListingRevisionPanel listingId={id} />
       </div>
 

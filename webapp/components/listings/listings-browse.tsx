@@ -17,6 +17,7 @@ import {
 
 import { ListingCard } from './listing-card'
 import { ListingListRow } from './listing-list-row'
+import { SearchIntelligenceChrome } from '@/components/ai/intelligence/search-intelligence-chrome'
 
 const VIEW_KEY = 'rp.listings.view'
 const PAGE_SIZE_KEY = 'rp.listings.pageSize'
@@ -245,6 +246,15 @@ export function ListingsBrowse() {
         <h1 className="text-2xl font-semibold">Marketplace</h1>
         <p className="text-sm text-slate-500">Browse vinyl and media listings from collectors.</p>
       </header>
+
+      <SearchIntelligenceChrome
+        query={query}
+        keywordLoading={loading}
+        onKeywordSearch={async () => {
+          setOffset(0)
+          await load()
+        }}
+      />
 
       <div className="flex gap-2 lg:hidden">
         <input

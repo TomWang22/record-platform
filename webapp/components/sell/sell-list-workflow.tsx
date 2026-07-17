@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 
 import { AuthRequiredCard } from '@/components/auth/auth-required-card'
+import { ValuationIntelligencePanel } from '@/components/ai/intelligence/valuation-intelligence-panel'
+import { SearchIntelligenceChrome } from '@/components/ai/intelligence/search-intelligence-chrome'
 import { RecordMediaUpload, type RecordMediaDraft } from '@/components/records/record-media-upload'
 import { ApiErrorAlert } from '@/components/ui/api-error-alert'
 import { Button } from '@/components/ui/button'
@@ -260,9 +262,12 @@ export function SellListWorkflow({ returnTo = '/sell' }: { returnTo?: string }) 
               )}
             </ul>
             {selectedRecord && (
-              <div className="mt-3 rounded-lg border border-brand/30 bg-brand/5 p-3 text-sm">
-                <p className="font-medium">{selectedRecord.artist} — {selectedRecord.name}</p>
-                <p className="text-slate-500">{selectedRecord.format} · {selectedRecord.label ?? '—'}</p>
+              <div className="mt-3 space-y-3">
+                <div className="rounded-lg border border-brand/30 bg-brand/5 p-3 text-sm">
+                  <p className="font-medium">{selectedRecord.artist} — {selectedRecord.name}</p>
+                  <p className="text-slate-500">{selectedRecord.format} · {selectedRecord.label ?? '—'}</p>
+                </div>
+                <ValuationIntelligencePanel record={selectedRecord} advisoryOnly />
               </div>
             )}
           </Card>
@@ -374,11 +379,25 @@ export function SellListWorkflow({ returnTo = '/sell' }: { returnTo?: string }) 
         </div>
 
         <aside className="space-y-4">
+          <SearchIntelligenceChrome
+            query={query}
+            keywordLoading={loading}
+            onKeywordSearch={async () => {
+              await searchMarketplace()
+            }}
+            onOwnerScopedSearch={async () => {
+              // Owner-scoped: filter collection by current query (already local).
+              setRecordSearch(query)
+            }}
+          />
           <Card title="Comparables (helper)">
             <form onSubmit={(e: FormEvent) => { e.preventDefault(); void searchMarketplace() }} className="space-y-2">
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Artist / release" className="w-full rounded-xl border px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" />
               <Button type="submit" disabled={loading} className="w-full">{loading ? 'Searching…' : 'Research comparables'}</Button>
             </form>
+            <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
+              Clicking a comparable price applies it only after your explicit click — valuation intelligence never auto-fills.
+            </p>
             {!results && <p className="mt-3 text-sm text-slate-400">Run a search to see platform, Discogs, and eBay comps.</p>}
             {results && results.length === 0 && <p className="mt-3 text-sm text-slate-500">No comps for this query.</p>}
             {results && results.length > 0 && (

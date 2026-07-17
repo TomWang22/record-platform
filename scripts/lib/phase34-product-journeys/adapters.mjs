@@ -78,7 +78,7 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     runTestId: 'intelligence-negotiation-run',
   },
   recommendations: {
-    routes: ['/dashboard', '/records/[id]', '/watchlist'],
+    routes: ['/records/[id]', '/dashboard', '/watchlist'],
     panels: ['intelligence-recommendations-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.recommendations,
@@ -216,6 +216,9 @@ export class BaseProductJourneyAdapter {
 
   pickRoute(context) {
     const routes = this.registry.routes;
+    if (this.capability === 'negotiation_assistance' && context.subject?.thread_id) {
+      return `/messages?thread=${encodeURIComponent(context.subject.thread_id)}`;
+    }
     if (context.scenario_class?.includes('watchlist')) {
       const w = routes.find((r) => r.includes('watchlist'));
       if (w) return w;
@@ -267,20 +270,33 @@ export class BaseProductJourneyAdapter {
     if (trigger === 'auto') return;
 
     if (this.capability === 'negotiation_assistance') {
-      const thread = page.locator('[data-testid*="thread"], a[href*="/messages"]').first();
-      if (await thread.count()) await thread.click().catch(() => null);
+      const threadId = prepared.subject?.thread_id;
+      if (threadId) {
+        await page.goto(`/messages?thread=${encodeURIComponent(threadId)}`, {
+          waitUntil: 'domcontentloaded',
+          timeout: 60_000,
+        });
+        await page.getByTestId(prepared.panelTestId).first().waitFor({ state: 'visible', timeout: 60_000 });
+      } else {
+        const thread = page.locator('[data-testid*="thread"], button:has-text("Inquiry"), a[href*="thread="]').first();
+        if (await thread.count()) await thread.click().catch(() => null);
+      }
     }
 
     if (trigger === 'semantic_search') {
-      const searchInput = page
-        .locator(
-          'input[placeholder*="Search artist" i], input[placeholder*="Search marketplace" i], input[type="search"], input[name="q"]',
-        )
-        .first();
-      if (await searchInput.count()) {
-        await searchInput.fill(prepared.requestSeed?.query || 'Miles Davis Kind of Blue');
-      }
-      await page.getByTestId('intelligence-search-mode-semantic').click();
+      // Prefer the desktop filter input; the mobile "Search marketplace" field is lg:hidden
+      // and Playwright fill() can hang when the matched node is not actionable.
+      const desktop = page.locator('input[placeholder*="Search artist" i]');
+      const mobile = page.locator('input[placeholder*="Search marketplace" i]');
+      const searchInput = (await desktop.count()) > 0 ? desktop.first() : mobile.first();
+      await searchInput.fill(prepared.requestSeed?.query || 'Miles Davis Kind of Blue', {
+        force: true,
+        timeout: 15_000,
+      });
+      await page
+        .getByRole('radiogroup', { name: /intelligence search mode/i })
+        .getByText('semantic', { exact: true })
+        .click();
       await page.getByTestId(this.registry.runTestId).click();
       return;
     }
@@ -290,7 +306,26 @@ export class BaseProductJourneyAdapter {
       return;
     }
     if (this.registry.runButtonName) {
-      await page.getByRole('button', { name: this.registry.runButtonName }).click();
+      const btn = page.getByRole('button', { name: this.registry.runButtonName });
+      await btn.waitFor({ state: 'visible', timeout: 30_000 });
+      // Recommendations disables until principalId hydrates from the session token.
+      const nameSource =
+        this.registry.runButtonName instanceof RegExp
+          ? this.registry.runButtonName.source
+          : String(this.registry.runButtonName);
+      await page
+        .waitForFunction(
+          (src) => {
+            const re = new RegExp(src, 'i');
+            const buttons = [...document.querySelectorAll('button')];
+            const match = buttons.find((b) => re.test((b.textContent || '').trim()));
+            return Boolean(match && !match.disabled);
+          },
+          nameSource,
+          { timeout: 30_000 },
+        )
+        .catch(() => null);
+      await btn.click({ timeout: 30_000, force: true });
     }
   }
 
@@ -328,157 +363,176 @@ export class BaseProductJourneyAdapter {
     });
 
     const apiPath = prepared.apiPath;
-    const responsePromise = page.waitForResponse(
-      (res) => res.url().includes(apiPath) && res.request().method() === 'POST',
-      { timeout: 120_000 },
-    );
+    // Attach waiter before navigation/trigger; swallow late rejection if we abort early.
+    let responseSettled = false;
+    const responsePromise = page
+      .waitForResponse(
+        (res) => res.url().includes(apiPath) && res.request().method() === 'POST',
+        { timeout: 120_000 },
+      )
+      .then((res) => {
+        responseSettled = true;
+        return res;
+      })
+      .catch((err) => {
+        responseSettled = true;
+        throw err;
+      });
 
     const actionStart = Date.now();
-    await page.goto(prepared.route, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-
-    const shotBase = {
-      capability: this.capability,
-      scenario_id: prepared.scenario_id,
-      participant_side: prepared.participant_side,
-      viewport: await page.viewportSize(),
-      session_id: prepared.session_id,
-      turn_id: prepared.turn_id,
-      journey_id: prepared.journey_id,
-      turn_index: prepared.turn_index,
-      browser_route: prepared.route,
-      pack: prepared.screenshot_pack || 'gauntlet',
-      authClass: 'authenticated',
-    };
-
-    const panel = page.getByTestId(prepared.panelTestId);
-    await panel.first().waitFor({ state: 'visible', timeout: 60_000 });
-    screenshots.push(await captureProductScreenshot(page, { ...shotBase, state: 'before_action' }));
-
-    const loadingLocator = page.getByTestId(`${prepared.panelTestId}-loading`);
-    await this.triggerLiveAction(page, prepared);
-
-    if ((await loadingLocator.count()) > 0) {
-      screenshots.push(await captureProductScreenshot(page, { ...shotBase, state: 'loading' }));
-    }
-
-    const response = await responsePromise;
-    const request = response.request();
-    let postData = null;
     try {
-      postData = request.postDataJSON();
-    } catch {
+      await page.goto(prepared.route, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+
+      const shotBase = {
+        capability: this.capability,
+        scenario_id: prepared.scenario_id,
+        participant_side: prepared.participant_side,
+        viewport: await page.viewportSize(),
+        session_id: prepared.session_id,
+        turn_id: prepared.turn_id,
+        journey_id: prepared.journey_id,
+        turn_index: prepared.turn_index,
+        browser_route: prepared.route,
+        pack: prepared.screenshot_pack || 'gauntlet',
+        authClass: 'authenticated',
+      };
+
+      const panel = page.getByTestId(prepared.panelTestId);
+      await panel.first().waitFor({ state: 'visible', timeout: 60_000 });
+      screenshots.push(await captureProductScreenshot(page, { ...shotBase, state: 'before_action' }));
+
+      const loadingLocator = page.getByTestId(`${prepared.panelTestId}-loading`);
+      await this.triggerLiveAction(page, prepared);
+
+      if ((await loadingLocator.count()) > 0) {
+        screenshots.push(await captureProductScreenshot(page, { ...shotBase, state: 'loading' }));
+      }
+
+      const response = await responsePromise;
+      const request = response.request();
+      let postData = null;
       try {
-        postData = JSON.parse(request.postData() || '{}');
+        postData = request.postDataJSON();
       } catch {
-        postData = {};
-      }
-    }
-    const responseJson = await response.json().catch(() => null);
-    const actionEnd = Date.now();
-
-    captures.push({
-      browser_request_id: request.headers()['x-request-id'] || `br_${actionStart}`,
-      route: prepared.route,
-      method: 'POST',
-      endpoint: apiPath,
-      body: postData,
-      status: response.status(),
-      started_at: new Date(actionStart).toISOString(),
-      finished_at: new Date(actionEnd).toISOString(),
-    });
-
-    await page
-      .getByTestId(`${prepared.panelTestId}-loading`)
-      .waitFor({ state: 'hidden', timeout: 30_000 })
-      .catch(() => null);
-
-    const rendered = await this.extractRendered(page, prepared, responseJson);
-    const a11y = await executeAccessibilityChecks(page, { panelTestId: prepared.panelTestId });
-    const clientProtocol = await observeClientProtocol(page);
-    const finalState = this.classifyVisualState(prepared, responseJson, rendered);
-    screenshots.push(
-      await captureProductScreenshot(page, {
-        ...shotBase,
-        state: finalState === 'success' ? 'final' : finalState,
-        browser_console_error_count: consoleErrors.length,
-        failed_request_count: failedRequests.length,
-        accessibility_status: a11y.accessibility_result,
-        horizontal_overflow: a11y.horizontal_overflow,
-      }),
-    );
-
-    for (const suffix of ['evidence', 'limitations']) {
-      const details = page.getByTestId(`${prepared.panelTestId}-${suffix}`);
-      if ((await details.count()) > 0) {
-        const first = details.first();
-        if (typeof first.locator === 'function') {
-          await first.locator('summary').click().catch(() => null);
-        } else if (typeof first.click === 'function') {
-          await first.click().catch(() => null);
+        try {
+          postData = JSON.parse(request.postData() || '{}');
+        } catch {
+          postData = {};
         }
-        screenshots.push(
-          await captureProductScreenshot(page, {
-            ...shotBase,
-            state: suffix === 'evidence' ? 'evidence_expanded' : 'limitations_expanded',
-            accessibility_status: a11y.accessibility_result,
-            horizontal_overflow: a11y.horizontal_overflow,
-          }),
-        );
       }
+      const responseJson = await response.json().catch(() => null);
+      const actionEnd = Date.now();
+
+      captures.push({
+        browser_request_id: request.headers()['x-request-id'] || `br_${actionStart}`,
+        route: prepared.route,
+        method: 'POST',
+        endpoint: apiPath,
+        body: postData,
+        status: response.status(),
+        started_at: new Date(actionStart).toISOString(),
+        finished_at: new Date(actionEnd).toISOString(),
+      });
+
+      await page
+        .getByTestId(`${prepared.panelTestId}-loading`)
+        .waitFor({ state: 'hidden', timeout: 30_000 })
+        .catch(() => null);
+
+      const rendered = await this.extractRendered(page, prepared, responseJson);
+      const a11y = await executeAccessibilityChecks(page, { panelTestId: prepared.panelTestId });
+      const clientProtocol = await observeClientProtocol(page);
+      const finalState = this.classifyVisualState(prepared, responseJson, rendered);
+      screenshots.push(
+        await captureProductScreenshot(page, {
+          ...shotBase,
+          state: finalState === 'success' ? 'final' : finalState,
+          browser_console_error_count: consoleErrors.length,
+          failed_request_count: failedRequests.length,
+          accessibility_status: a11y.accessibility_result,
+          horizontal_overflow: a11y.horizontal_overflow,
+        }),
+      );
+
+      for (const suffix of ['evidence', 'limitations']) {
+        const details = page.getByTestId(`${prepared.panelTestId}-${suffix}`);
+        if ((await details.count()) > 0) {
+          const first = details.first();
+          if (typeof first.locator === 'function') {
+            await first.locator('summary').click().catch(() => null);
+          } else if (typeof first.click === 'function') {
+            await first.click().catch(() => null);
+          }
+          screenshots.push(
+            await captureProductScreenshot(page, {
+              ...shotBase,
+              state: suffix === 'evidence' ? 'evidence_expanded' : 'limitations_expanded',
+              accessibility_status: a11y.accessibility_result,
+              horizontal_overflow: a11y.horizontal_overflow,
+            }),
+          );
+        }
+      }
+
+      assertScreenshotsBeforePass(screenshots);
+
+      const unexpectedConsole = consoleErrors.filter(
+        (t) => !expectedConsolePatterns.some((re) => re.test(t)),
+      );
+
+      const intelligenceFailed = failedRequests.some((r) => /\/api\/ai\//i.test(r));
+
+      return {
+        journey_outcome:
+          response.ok() &&
+          unexpectedConsole.length === 0 &&
+          !intelligenceFailed &&
+          a11y.accessibility_result === 'PASS' &&
+          a11y.horizontal_overflow === false
+            ? 'PASS'
+            : 'FAIL',
+        browser_route: prepared.route,
+        viewport: await page.viewportSize(),
+        viewport_class: viewportLabel(await page.viewportSize()),
+        authenticated_participant_role: prepared.participant_side,
+        action_sequence: [
+          'goto',
+          'wait_panel',
+          'screenshot_before_action',
+          'trigger_action',
+          'screenshot_loading_if_observed',
+          'capture_intelligence_post',
+          'accessibility_checks',
+          'screenshot_final',
+        ],
+        network_captures: captures,
+        panel_loading_state: 'ready',
+        panel_ready_state: 'ready',
+        rendered,
+        api_response: responseJson,
+        console_errors: unexpectedConsole,
+        failed_requests: failedRequests,
+        accessibility_result: a11y.accessibility_result,
+        accessibility: a11y,
+        horizontal_overflow: a11y.horizontal_overflow,
+        client_protocol_observed: clientProtocol,
+        automatic_send_allowed: false,
+        production_mutation: false,
+        screenshots,
+        screenshot_manifest_entry_ids: screenshots.map((s) => s.screenshot_id),
+        timings: {
+          browser_action_to_request_us: null,
+          browser_action_to_panel_ready_us: (actionEnd - actionStart) * 1000,
+          measurement_status: 'PARTIAL',
+        },
+      };
+    } catch (err) {
+      if (!responseSettled) {
+        // Prevent unhandled rejection when navigation/trigger fails before the POST.
+        responsePromise.catch(() => null);
+      }
+      throw err;
     }
-
-    assertScreenshotsBeforePass(screenshots);
-
-    const unexpectedConsole = consoleErrors.filter(
-      (t) => !expectedConsolePatterns.some((re) => re.test(t)),
-    );
-
-    const intelligenceFailed = failedRequests.some((r) => /\/api\/ai\//i.test(r));
-
-    return {
-      journey_outcome:
-        response.ok() &&
-        unexpectedConsole.length === 0 &&
-        !intelligenceFailed &&
-        a11y.accessibility_result === 'PASS' &&
-        a11y.horizontal_overflow === false
-          ? 'PASS'
-          : 'FAIL',
-      browser_route: prepared.route,
-      viewport: await page.viewportSize(),
-      viewport_class: viewportLabel(await page.viewportSize()),
-      authenticated_participant_role: prepared.participant_side,
-      action_sequence: [
-        'goto',
-        'wait_panel',
-        'screenshot_before_action',
-        'trigger_action',
-        'screenshot_loading_if_observed',
-        'capture_intelligence_post',
-        'accessibility_checks',
-        'screenshot_final',
-      ],
-      network_captures: captures,
-      panel_loading_state: 'ready',
-      panel_ready_state: 'ready',
-      rendered,
-      api_response: responseJson,
-      console_errors: unexpectedConsole,
-      failed_requests: failedRequests,
-      accessibility_result: a11y.accessibility_result,
-      accessibility: a11y,
-      horizontal_overflow: a11y.horizontal_overflow,
-      client_protocol_observed: clientProtocol,
-      automatic_send_allowed: false,
-      production_mutation: false,
-      screenshots,
-      screenshot_manifest_entry_ids: screenshots.map((s) => s.screenshot_id),
-      timings: {
-        browser_action_to_request_us: null,
-        browser_action_to_panel_ready_us: (actionEnd - actionStart) * 1000,
-        measurement_status: 'PARTIAL',
-      },
-    };
   }
 
   classifyVisualState(prepared, responseJson, rendered) {

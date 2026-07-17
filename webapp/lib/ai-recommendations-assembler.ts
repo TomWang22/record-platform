@@ -70,10 +70,9 @@ export function assembleRecommendationsRequest(input: RecommendationsAssemblyInp
     requesting_principal_fixture: input.principalId,
     principal_id: input.principalId,
     candidates,
-    budget: {
-      max: Number.isFinite(budgetMax) && budgetMax >= 0 ? budgetMax : null,
-      currency: budgetCurrency ?? null,
-    },
+    // API schema expects Optional[float], not an object.
+    budget: Number.isFinite(budgetMax) && budgetMax >= 0 ? budgetMax : null,
+    budget_currency: budgetCurrency ?? null,
     negative_preferences: negativePreferences,
     no_pay_to_rank: true,
     sponsored_ranking_allowed: false,
@@ -82,5 +81,6 @@ export function assembleRecommendationsRequest(input: RecommendationsAssemblyInp
     authorized_scopes: ['authenticated_market', 'owner_private'],
     limitations,
     assembler_version: RECOMMENDATIONS_ASSEMBLER_VERSION,
+    production_mutation_allowed: false,
   }
 }

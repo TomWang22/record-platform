@@ -95,3 +95,13 @@ test('auction watchlist surface pins watchlist-temperature apiPath', async () =>
   assert.equal(prepared.apiPath, '/api/ai/intelligence/auction/watchlist-temperature');
   assert.equal(prepared.panelTestId, 'intelligence-watchlist-temperature-panel');
 });
+
+test('product PCAP window analyzer returns packets for a bounded epoch window', async () => {
+  const { analyzePcapPacketSpaceWindow } = await import('../scripts/lib/phase34-product-pcap.mjs');
+  // Synthetic: missing file path should fail closed without throwing.
+  const missing = analyzePcapPacketSpaceWindow('/tmp/phase34-does-not-exist.pcapng', 1, 2, {
+    connectionMode: 'triplet',
+  });
+  assert.equal(missing.status, 'FAIL');
+  assert.equal(missing.packets.length, 0);
+});

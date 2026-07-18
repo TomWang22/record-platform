@@ -148,6 +148,8 @@ export async function runProductSession(scheduleRow, opts = {}) {
       participant_side: scheduleRow.participant_side,
       authorization_state: scheduleRow.authorization_state,
       evidence_strength: scheduleRow.evidence_strength,
+      multi_turn_class: scheduleRow.multi_turn_class,
+      user_intent: scheduleRow.user_intent || null,
       turn_scenario: turnScenario,
       prior_state_hash,
       screenshot_pack: opts.screenshotPack || 'gauntlet',

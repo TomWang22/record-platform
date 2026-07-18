@@ -17,10 +17,12 @@ import {
   validateSeedManifestAgainstScenarios,
   OWNER_PROOF_REHEARSAL_ROOT,
 } from './lib/phase34-owner-proof-scenarios.mjs';
-import { createOwnerProofLedger, summarizeLatency } from './lib/phase34-owner-proof-ledger.mjs';
-import { generateOwnerProofReviewPage } from './lib/phase34-owner-proof-review-page.mjs';
 import { assertSourceReconciliation, assertCiApproval } from './lib/phase32h-ci-approval.mjs';
-import { assertScreenshotDistinctness } from './lib/phase34-product-screenshot-distinctness.mjs';
+import {
+  buildOwnerProofSchedule,
+  assertSeedFloors,
+  executeOwnerProofLiveRehearsal,
+} from './lib/phase34-owner-proof-live-runner.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -29,37 +31,26 @@ function parseArgs(argv) {
   const opts = {
     out: process.env.PHASE34_OWNER_PROOF_REHEARSAL_OUT || OWNER_PROOF_REHEARSAL_ROOT,
     execute: false,
+    upstreamUrl: process.env.E2E_UPSTREAM_URL || 'https://record-platform.test',
+    headless: true,
+    proxyPort: Number(process.env.PHASE34_BROWSER_PROXY_PORT || 8443),
   };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--out') opts.out = argv[++i];
     else if (a === '--execute') opts.execute = true;
+    else if (a === '--base-url' || a === '--upstream-url') opts.upstreamUrl = argv[++i];
+    else if (a === '--headed') opts.headless = false;
+    else if (a === '--proxy-port') opts.proxyPort = Number(argv[++i]);
   }
   return opts;
 }
 
 export function buildRehearsalPlan(doc = loadOwnerProofScenarios()) {
-  const scenarios = doc.scenarios;
-  let turns = 0;
-  for (const s of scenarios) {
-    turns += s.scenario_id === 'negotiation-four-turn-live' ? 4 : 1;
-  }
-  return {
-    logical_scenarios: scenarios.length,
-    total_turns: turns,
-    protocol_rows: turns * 3,
-    scenarios: scenarios.map((s) => ({
-      scenario_id: s.scenario_id,
-      capability: s.capability,
-      turns: s.scenario_id === 'negotiation-four-turn-live' ? 4 : 1,
-      canonical_route: s.canonical_route,
-      expected_endpoint: s.expected_endpoint,
-      user_intent: s.user_intent,
-    })),
-  };
+  return buildOwnerProofSchedule(doc);
 }
 
-function main() {
+async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const doc = loadOwnerProofScenarios();
   const seeds = loadOwnerProofSeedManifest();
@@ -81,10 +72,23 @@ function main() {
           protocol_rows: plan.protocol_rows,
           rehearsal_root_absent: !fs.existsSync(opts.out),
           smoke_v6_root_absent: !fs.existsSync('/tmp/phase34-product-harness-live-smoke-v6'),
-          plan,
+          plan: {
+            logical_scenarios: plan.logical_scenarios,
+            total_turns: plan.total_turns,
+            protocol_rows: plan.protocol_rows,
+            scenarios: plan.rows.map((r) => ({
+              scenario_id: r.scenario_id,
+              capability: r.capability,
+              turns: r.smoke_turns,
+              canonical_route: r.owner_proof_canonical_route,
+              expected_endpoint: r.owner_proof_endpoint,
+              user_intent: r.user_intent,
+            })),
+          },
           classification: [
             'OWNER_PROOF_REGISTRY_PRESENT',
             'OWNER_PROOF_EXECUTABLE_CONTRACT_PRESENT',
+            'OWNER_PROOF_LIVE_RUNNER_PRESENT',
             'OWNER_PROOF_EXECUTION_NOT_PROVEN',
             'SMOKE_V6_NOT_AUTHORIZED',
           ],
@@ -97,14 +101,17 @@ function main() {
     return;
   }
 
-  const { headSha } = assertSourceReconciliation(REPO_ROOT);
-  assertCiApproval(REPO_ROOT, headSha);
+  const { headSha, originMainSha } = assertSourceReconciliation(REPO_ROOT);
+  assertCiApproval({ headSha, originMainSha });
   const approved = process.env.PHASE34_OWNER_PROOF_REHEARSAL_APPROVED_SHA;
   if (approved !== headSha) {
     throw new Error(
       `rehearsal_not_approved: set PHASE34_OWNER_PROOF_REHEARSAL_APPROVED_SHA=${headSha}`,
     );
   }
+
+  // Seed floors before creating the evidence root
+  assertSeedFloors(seeds);
 
   if (fs.existsSync(opts.out)) {
     throw new Error(`rehearsal_root_exists:${opts.out}`);
@@ -113,7 +120,6 @@ function main() {
   fs.mkdirSync(path.join(opts.out, 'screenshots'), { recursive: true });
   fs.mkdirSync(path.join(opts.out, 'review'), { recursive: true });
 
-  const ledger = createOwnerProofLedger(opts.out);
   fs.writeFileSync(path.join(opts.out, 'rehearsal-plan.json'), JSON.stringify(plan, null, 2) + '\n');
   fs.writeFileSync(
     path.join(opts.out, 'owner-proof-scenarios.json'),
@@ -124,34 +130,40 @@ function main() {
     JSON.stringify(seeds, null, 2) + '\n',
   );
 
-  // Live browser execution is intentionally gated: this commit ships the
-  // executable contract + launcher. Full Chromium journey wiring reuses the
-  // product harness adapters and must be authorized separately via --execute
-  // with live stack. Placeholder freeze marker is NOT written here without
-  // real PASS evidence.
-  const err = new Error(
-    'OWNER_PROOF_LIVE_BROWSER_EXECUTION_REQUIRES_STACK: launcher armed; wire live sessions via product harness adapters under explicit approval.',
-  );
-  err.code = 'OWNER_PROOF_LIVE_BROWSER_EXECUTION_REQUIRES_STACK';
-  // Still emit an empty review scaffold so the path is verified.
-  generateOwnerProofReviewPage({
+  const { summary, exportMeta } = await executeOwnerProofLiveRehearsal({
     outRoot: opts.out,
-    scenarios: doc.scenarios,
-    ledgerRows: ledger.readAll(),
-    screenshotsByScenario: {},
+    headSha,
+    upstreamUrl: opts.upstreamUrl,
+    headless: opts.headless,
+    proxyPort: opts.proxyPort,
   });
-  fs.writeFileSync(
-    path.join(opts.out, 'latency-summary.json'),
-    JSON.stringify(summarizeLatency([]), null, 2) + '\n',
+
+  console.log(
+    JSON.stringify(
+      {
+        status: summary.freeze === 'FROZEN_PASS_EVIDENCE' ? 'PASS' : 'BLOCKED',
+        ...summary,
+        export: exportMeta,
+      },
+      null,
+      2,
+    ),
   );
-  throw err;
+
+  if (summary.freeze !== 'FROZEN_PASS_EVIDENCE') {
+    process.exit(1);
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    main();
-  } catch (err) {
-    console.error(JSON.stringify({ status: 'FAIL', error: String(err.message || err), code: err.code || null }));
+  main().catch((err) => {
+    console.error(
+      JSON.stringify({
+        status: 'FAIL',
+        error: String(err.message || err),
+        code: err.code || null,
+      }),
+    );
     process.exit(2);
-  }
+  });
 }

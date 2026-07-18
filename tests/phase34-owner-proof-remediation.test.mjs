@@ -138,6 +138,7 @@ test('owner-proof rehearsal launcher is armed but not launched', () => {
   );
   assert.match(src, /READY_NOT_LAUNCHED/);
   assert.match(src, /phase34-owner-proof-live-rehearsal-v1/);
-  assert.match(src, /OWNER_PROOF_LIVE_BROWSER_EXECUTION_REQUIRES_STACK/);
+  assert.match(src, /executeOwnerProofLiveRehearsal/);
+  assert.match(src, /assertCiApproval\(\{ headSha, originMainSha \}\)/);
   assert.equal(fs.existsSync('/tmp/phase34-owner-proof-live-rehearsal-v1'), false);
 });

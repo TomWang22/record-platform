@@ -373,6 +373,8 @@ export class BaseProductJourneyAdapter {
       authorization_state: context.authorization_state,
       production_mutation_allowed: false,
       schema_version: 'phase34-intelligence-v1',
+      user_intent: context.user_intent || null,
+      owner_proof_prompt: context.user_intent || null,
     };
   }
 
@@ -1195,15 +1197,23 @@ export class SemanticSearchJourneyAdapter extends BaseProductJourneyAdapter {
     super('semantic_search');
   }
   buildRequestSeed(context, subject) {
-    const mode = context.scenario_class?.includes('hybrid')
+    const id = String(context.scenario_id || '');
+    const mode = id.includes('hybrid')
       ? 'hybrid'
-      : context.scenario_class?.includes('semantic')
+      : id.includes('semantic') || id.includes('search-success')
         ? 'semantic'
-        : 'keyword';
+        : context.scenario_class?.includes('hybrid')
+          ? 'hybrid'
+          : 'keyword';
+    const query =
+      context.user_intent ||
+      (mode === 'keyword' ? 'Miles Davis' : 'Find first US mono pressings similar to this record under $80.');
     return {
       ...super.buildRequestSeed(context, subject),
       retrieval_mode_requested: mode,
-      query: context.scenario_class || 'test query',
+      query,
+      user_intent: query,
+      owner_proof_prompt: query,
     };
   }
   materialFields() {
@@ -1231,17 +1241,19 @@ export class NegotiationJourneyAdapter extends BaseProductJourneyAdapter {
       'Draft the reply.',
     ];
     const turnIndex = Number(context.turn_index || 0);
-    const user_intent = FOUR_TURN[turnIndex % FOUR_TURN.length];
+    const multi =
+      context.multi_turn_class === 'multi_4_12' ||
+      context.scenario_id === 'negotiation-four-turn-live';
+    const user_intent = multi
+      ? FOUR_TURN[turnIndex % FOUR_TURN.length]
+      : context.user_intent || FOUR_TURN[0];
     return {
       ...super.buildRequestSeed(context, subject),
       automatic_send_allowed: false,
       unauthorized_thread: context.authorization_state === 'unauthorized',
       user_intent,
       owner_proof_prompt: user_intent,
-      owner_proof_scenario_id:
-        context.multi_turn_class === 'multi_4_12'
-          ? 'negotiation-four-turn-live'
-          : 'negotiation-success-strategy',
+      owner_proof_scenario_id: context.scenario_id || null,
     };
   }
   materialFields() {

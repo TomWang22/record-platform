@@ -1,8 +1,9 @@
 import type { APIRequestContext } from '@playwright/test'
 
 import { getJsonWith429Retry, with429Retry } from './http-retry'
+import { COVER_KENNY } from './vinyl-cover-fixtures'
 
-const PLACEHOLDER = 'https://picsum.photos/seed/rp-lean-contract/400/400'
+const PLACEHOLDER = COVER_KENNY
 
 export async function timed<T>(
   label: string,

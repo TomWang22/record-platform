@@ -2,8 +2,9 @@ import type { APIRequestContext } from '@playwright/test'
 
 import { getJsonWith429Retry } from './http-retry'
 import { ensureTestCollection } from './seed-collection'
+import { COVER_KENNY } from './vinyl-cover-fixtures'
 
-const PLACEHOLDER_IMAGE = 'https://picsum.photos/seed/rp-vinyl-catalog/400/400'
+const PLACEHOLDER_IMAGE = COVER_KENNY
 
 export type MarketplaceSeedResult = {
   recordIds: string[]
@@ -114,8 +115,9 @@ export async function ensureMarketplaceSeed(
   }
 
   if (!result.soldListingId) {
+    // Never put [SOLD] in an Active title — status and title must agree.
     const soldId = await createListing(
-      listingPayload('Kenny Dorham — Quiet Kenny [SOLD]', 4100, 'fixed', {
+      listingPayload('Kenny Dorham — Quiet Kenny (completed sale seed)', 4100, 'fixed', {
         initial_status: 'active',
       }),
     )
@@ -131,8 +133,23 @@ export async function ensureMarketplaceSeed(
 
   const mineAfter = await request.get('/api/listings/mine', { headers })
   const itemsAfter = mineAfter.ok()
-    ? ((await mineAfter.json()) as { items?: { id: string; status?: string }[] }).items ?? []
+    ? ((await mineAfter.json()) as { items?: { id: string; status?: string; title?: string }[] }).items ?? []
     : []
+  // Repair historical seed contradiction: "[SOLD]" must not appear on Active listings.
+  for (const item of itemsAfter) {
+    const title = String(item.title || '')
+    const status = String(item.status || '').toLowerCase()
+    if (/\[sold\]/i.test(title) && (status === 'active' || status === 'published')) {
+      await request
+        .patch(`/api/listings/${item.id}`, {
+          headers,
+          data: {
+            title: title.replace(/\s*\[sold\]\s*/gi, ' ').trim() + ' (sale history seed)',
+          },
+        })
+        .catch(() => {})
+    }
+  }
   const activeIds = itemsAfter
     .filter((m) => String(m.status ?? '').toLowerCase() === 'active')
     .map((m) => m.id)

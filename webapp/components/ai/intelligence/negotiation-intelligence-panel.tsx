@@ -43,6 +43,15 @@ type NegotiationIntelligencePanelProps = {
   onApplyDraft?: (draft: string) => void
 }
 
+const DEFAULT_INTENT = 'They offered $35 for my $41 listing. What should I do?'
+
+const TURN_INTENTS = [
+  'They offered $35 for my $41 listing. What should I do?',
+  'The sleeve has a seam split, and shipping will cost me $6.',
+  'I would accept $37, but I do not want to sound desperate.',
+  'Draft the reply.',
+] as const
+
 function asLines(value: string[] | string | undefined): string[] {
   if (!value) return []
   if (Array.isArray(value)) return value.map(String).filter(Boolean)
@@ -57,15 +66,11 @@ function participantSide(
   currentUserId: string | null,
 ): 'buyer' | 'seller' | 'unknown' {
   if (!thread || !currentUserId) return 'unknown'
-  // Listing-attached threads: if current user is not listing owner semantics are
-  // unknown without seller id — treat as buyer when listing context exists.
   if (thread.listing?.id) return 'buyer'
   return 'unknown'
 }
 
 function activeMessages(messages: MessagingThreadMessage[]): MessagingThreadMessage[] {
-  // Deleted messages must have no influence — API already omits hard-deleted;
-  // filter empty bodies defensively.
   return messages.filter((m) => Boolean(m.body?.trim()))
 }
 
@@ -78,6 +83,7 @@ export function NegotiationIntelligencePanel({
 }: NegotiationIntelligencePanelProps) {
   const [state, setState] = useState<IntelligencePanelState<NegotiationResult>>({ status: 'idle' })
   const [draft, setDraft] = useState('')
+  const [userIntent, setUserIntent] = useState(DEFAULT_INTENT)
   const [engineInvoked, setEngineInvoked] = useState<boolean | null>(null)
 
   const run = useCallback(async () => {
@@ -85,7 +91,7 @@ export function NegotiationIntelligencePanel({
       setState({
         status: 'abstained',
         result: { automatic_send_allowed: false, engine_invoked: false },
-        reasons: ['No authorized thread selected.'],
+        reasons: ['Select an authorized message thread before asking for negotiation help.'],
       })
       setEngineInvoked(false)
       return
@@ -124,11 +130,13 @@ export function NegotiationIntelligencePanel({
         market_candidates: [],
         automatic_send_allowed: false,
         request_auto_send: false,
+        user_intent: userIntent.trim(),
+        owner_proof_prompt: userIntent.trim(),
       })
 
       const envelope = response as Record<string, unknown>
       const diagnostics = (envelope.diagnostics || {}) as Record<string, unknown>
-      const result = ((envelope.result || response.result || {}) as NegotiationResult)
+      const result = (envelope.result || response.result || {}) as NegotiationResult
       const invoked = diagnostics.engine_invoked !== false && diagnostics.unauthorized_thread !== true
       setEngineInvoked(Boolean(diagnostics.engine_invoked ?? invoked))
 
@@ -138,7 +146,7 @@ export function NegotiationIntelligencePanel({
           result: { ...result, automatic_send_allowed: false, engine_invoked: false },
           reasons: [
             ...limitationMessages(result.limitations),
-            'Unauthorized or incomplete thread — engine_invoked=false.',
+            'This thread is not authorized for negotiation assistance, so no draft was generated.',
           ],
         })
         setDraft('')
@@ -163,7 +171,7 @@ export function NegotiationIntelligencePanel({
         message: err instanceof Error ? err.message : 'Negotiation assistance failed',
       })
     }
-  }, [askingPrice, currentUserId, thread, threadId])
+  }, [askingPrice, currentUserId, thread, threadId, userIntent])
 
   useEffect(() => {
     setState({ status: 'idle' })
@@ -179,6 +187,7 @@ export function NegotiationIntelligencePanel({
       title="Negotiation assistance"
       description="Advisory only. Drafts are never auto-sent. You must copy/edit and send yourself."
       testId="intelligence-negotiation-panel"
+      capability="negotiation_assistance"
       loading={state.status === 'loading'}
       errorMessage={state.status === 'error' ? state.message : null}
       rateLimited={state.status === 'error' ? state.rateLimited : false}
@@ -190,10 +199,36 @@ export function NegotiationIntelligencePanel({
       freshnessLabel={
         engineInvoked == null
           ? null
-          : `engine_invoked=${String(engineInvoked)}; automatic_send_allowed=false`
+          : engineInvoked
+            ? 'Analysis completed · drafts are never sent automatically'
+            : 'Analysis was not run for this thread'
       }
     >
       <div className="space-y-3 text-sm">
+        <label className="block space-y-1">
+          <span className="text-xs font-medium text-slate-500">Your question</span>
+          <textarea
+            value={userIntent}
+            onChange={(e) => setUserIntent(e.target.value)}
+            rows={2}
+            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-950"
+            data-testid="intelligence-negotiation-user-intent"
+            aria-label="Negotiation question"
+          />
+        </label>
+        <div className="flex flex-wrap gap-1" data-testid="intelligence-negotiation-turn-presets">
+          {TURN_INTENTS.map((intent, idx) => (
+            <button
+              key={intent}
+              type="button"
+              className="rounded border border-slate-200 px-2 py-0.5 text-[10px] dark:border-white/10"
+              data-testid={`intelligence-negotiation-turn-preset-${idx + 1}`}
+              onClick={() => setUserIntent(intent)}
+            >
+              Turn {idx + 1}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={() => void run()}
@@ -206,6 +241,9 @@ export function NegotiationIntelligencePanel({
 
         {state.status === 'ready' && result ? (
           <div className="space-y-2" data-testid="intelligence-negotiation-ready">
+            <p className="text-xs text-slate-500" data-testid="intelligence-negotiation-intent-echo">
+              Answering: {userIntent}
+            </p>
             {result.summary ? (
               <div>
                 <p className="text-xs font-medium text-slate-500">Summary</p>
@@ -243,7 +281,7 @@ export function NegotiationIntelligencePanel({
             {result.strategy ? (
               <div>
                 <p className="text-xs font-medium text-slate-500">Strategy</p>
-                <p>{result.strategy}</p>
+                <p data-testid="intelligence-negotiation-strategy">{result.strategy}</p>
               </div>
             ) : null}
             {result.suggested_range ? (
@@ -279,11 +317,11 @@ export function NegotiationIntelligencePanel({
                   }}
                   disabled={!draft.trim() || !onApplyDraft}
                 >
-                  Insert draft into composer (does not send)
+                  Insert into composer (does not send)
                 </button>
               </div>
               <p className="mt-1 text-[11px] text-slate-500">
-                Sending requires your separate Send action. automatic_send_allowed=false.
+                Sending requires your separate Send action. Drafts are never sent automatically.
               </p>
             </div>
           </div>

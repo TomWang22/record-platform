@@ -1,8 +1,9 @@
 import type { APIRequestContext } from '@playwright/test'
 
 import { createListingWithShipping } from './listing-contract'
+import { COVER_KENNY } from './vinyl-cover-fixtures'
 
-const PLACEHOLDER = 'https://picsum.photos/seed/rp-collection-contract/400/400'
+const PLACEHOLDER = COVER_KENNY
 
 const SEED_RECORDS = [
   {

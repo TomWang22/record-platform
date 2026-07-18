@@ -485,6 +485,16 @@ export class BaseProductJourneyAdapter {
         .getByTestId(prepared.panelTestId)
         .first()
         .waitFor({ state: 'visible', timeout: 30_000 });
+      const turnPrompt =
+        prepared.requestSeed?.user_intent ||
+        prepared.requestSeed?.owner_proof_prompt ||
+        null;
+      if (turnPrompt) {
+        const intent = page.getByTestId('intelligence-negotiation-user-intent').first();
+        if ((await intent.count()) > 0) {
+          await intent.fill(String(turnPrompt), { timeout: 15_000 });
+        }
+      }
     }
 
     if (trigger === 'semantic_search') {
@@ -1186,10 +1196,24 @@ export class NegotiationJourneyAdapter extends BaseProductJourneyAdapter {
     super('negotiation_assistance');
   }
   buildRequestSeed(context, subject) {
+    const FOUR_TURN = [
+      'They offered $35 for my $41 listing. What should I do?',
+      'The sleeve has a seam split, and shipping will cost me $6.',
+      'I would accept $37, but I do not want to sound desperate.',
+      'Draft the reply.',
+    ];
+    const turnIndex = Number(context.turn_index || 0);
+    const user_intent = FOUR_TURN[turnIndex % FOUR_TURN.length];
     return {
       ...super.buildRequestSeed(context, subject),
       automatic_send_allowed: false,
       unauthorized_thread: context.authorization_state === 'unauthorized',
+      user_intent,
+      owner_proof_prompt: user_intent,
+      owner_proof_scenario_id:
+        context.multi_turn_class === 'multi_4_12'
+          ? 'negotiation-four-turn-live'
+          : 'negotiation-success-strategy',
     };
   }
   materialFields() {
@@ -1201,6 +1225,7 @@ export class NegotiationJourneyAdapter extends BaseProductJourneyAdapter {
       'suggested_range',
       'draft',
       'automatic_send_allowed',
+      'user_intent',
     ];
   }
 }

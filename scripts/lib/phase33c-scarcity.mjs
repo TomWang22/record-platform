@@ -104,7 +104,7 @@ export function analyzeScarcity(input = {}) {
   if (abstention.abstained) {
     limitations.push({
       code: 'ABSTAINED',
-      message: `Insufficient evidence for scarcity claim: ${abstention.reason_codes.join(',')}`,
+      message: 'We found too few comparable sales to make a reliable rarity claim.',
       severity: 'blocking',
     });
   }

@@ -308,6 +308,8 @@ export const PRODUCT_GAUNTLET_ROOT = '/tmp/phase34-product-gauntlet-v1';
 export const PRODUCT_LIVE_SMOKE_ROOT = '/tmp/phase34-product-harness-live-smoke-v2';
 export const PRODUCT_LIVE_SMOKE_ROOT_V3_BLOCKED = '/tmp/phase34-product-harness-live-smoke-v3';
 export const PRODUCT_LIVE_SMOKE_ROOT_V4 = '/tmp/phase34-product-harness-live-smoke-v4';
+export const PRODUCT_LIVE_SMOKE_ROOT_V5_SUPERSEDED = '/tmp/phase34-product-harness-live-smoke-v5';
+export const PRODUCT_LIVE_SMOKE_ROOT_V6 = '/tmp/phase34-product-harness-live-smoke-v6';
 export const PRODUCT_LIVE_SMOKE_ROOT_V1_FROZEN = '/tmp/phase34-product-harness-live-smoke-v1';
 export const PHASE33F_TARGET_FORBIDDEN = '/tmp/phase33f-capability-gauntlet-target-v1';
 

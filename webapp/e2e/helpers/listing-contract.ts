@@ -1,6 +1,7 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test'
 
 import { with429Retry } from './http-retry'
+import { COVER_BLAKEY, COVER_KENNY, COVER_MILES } from './vinyl-cover-fixtures'
 
 export type ListingPersistExpectation = {
   imageCount?: number
@@ -57,9 +58,10 @@ export async function saveListingAndOpenDetail(
   await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 60_000 })
 }
 
-const PLACEHOLDER_A = 'https://picsum.photos/seed/rp-contract-a/400/400'
-const PLACEHOLDER_B = 'https://picsum.photos/seed/rp-contract-b/400/400'
-const PLACEHOLDER_C = 'https://picsum.photos/seed/rp-contract-c/400/400'
+/** Local vinyl sleeve fixtures — never picsum/stock photography. */
+const PLACEHOLDER_A = COVER_KENNY
+const PLACEHOLDER_B = COVER_BLAKEY
+const PLACEHOLDER_C = COVER_MILES
 
 export type FullShippingSeed = {
   domestic_shipping_cents: number

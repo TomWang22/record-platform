@@ -6,6 +6,11 @@ import type {
   IntelligenceLimitation,
 } from '@/lib/ai-intelligence-types'
 import { confidenceScore } from '@/lib/ai-intelligence-types'
+import {
+  evidenceCountLabel,
+  limitationCustomerMessage,
+  sanitizeCustomerFacingText,
+} from '@/lib/ai-customer-copy'
 
 type IntelligencePanelShellProps = {
   title: string
@@ -43,6 +48,13 @@ export function IntelligencePanelShell({
 }: IntelligencePanelShellProps) {
   const score = confidenceScore(confidence ?? undefined)
   const evidenceCount = evidence?.length ?? 0
+  const evidenceSummary = evidenceCountLabel(evidenceCount)
+  const safeAbstentionReasons = (abstentionReasons?.length
+    ? abstentionReasons
+    : ['We do not have enough marketplace evidence to support a confident claim.']
+  ).map((reason) => sanitizeCustomerFacingText(reason))
+  const safeFreshness = freshnessLabel ? sanitizeCustomerFacingText(freshnessLabel) : null
+  const safeError = errorMessage ? sanitizeCustomerFacingText(errorMessage) : null
 
   return (
     <section
@@ -76,32 +88,32 @@ export function IntelligencePanelShell({
         </p>
       ) : null}
 
-      {!loading && errorMessage && !rateLimited ? (
+      {!loading && safeError && !rateLimited ? (
         <p className="text-sm text-rose-600 dark:text-rose-400" data-testid={`${testId}-error`}>
-          {errorMessage}
+          {safeError}
         </p>
       ) : null}
 
-      {!loading && !errorMessage && !rateLimited && abstained ? (
+      {!loading && !safeError && !rateLimited && abstained ? (
         <div
           className="space-y-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
           data-testid={`${testId}-abstention`}
           role="status"
         >
-          <p className="font-medium">Insufficient market evidence — abstaining from a scarcity/rarity claim.</p>
-          {(abstentionReasons?.length ? abstentionReasons : ['Weak or missing sold/auction evidence.']).map(
-            (reason) => (
-              <p key={reason} className="text-xs opacity-90">
-                {reason}
-              </p>
-            ),
-          )}
+          <p className="font-medium">
+            Not enough market evidence yet — we are holding back a scarcity or rarity claim.
+          </p>
+          {safeAbstentionReasons.map((reason) => (
+            <p key={reason} className="text-xs opacity-90">
+              {reason}
+            </p>
+          ))}
         </div>
       ) : null}
 
-      {!loading && !errorMessage && !rateLimited && !abstained ? children : null}
+      {!loading && !safeError && !rateLimited && !abstained ? children : null}
 
-      {!loading && !errorMessage && !rateLimited ? (
+      {!loading && !safeError && !rateLimited ? (
         <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
           <div>
             <dt className="inline">Confidence: </dt>
@@ -109,17 +121,17 @@ export function IntelligencePanelShell({
               {score == null ? '—' : `${Math.round(score * 100)}%`}
             </dd>
           </div>
-          <div>
-            <dt className="inline">Evidence: </dt>
+          <div className="min-w-0 max-w-full">
+            <dt className="inline">Supporting evidence: </dt>
             <dd className="inline" data-testid={`${testId}-evidence-count`}>
-              {evidenceCount}
+              {evidenceSummary}
             </dd>
           </div>
-          {freshnessLabel ? (
+          {safeFreshness ? (
             <div className="min-w-0 max-w-full">
               <dt className="inline">Freshness: </dt>
-              <dd className="inline break-all" data-testid={`${testId}-freshness`}>
-                {freshnessLabel}
+              <dd className="inline break-words" data-testid={`${testId}-freshness`}>
+                {safeFreshness}
               </dd>
             </div>
           ) : null}
@@ -128,15 +140,25 @@ export function IntelligencePanelShell({
 
       {!loading && limitations && limitations.length > 0 ? (
         <details className="mt-2 text-xs text-slate-600 dark:text-slate-300" data-testid={`${testId}-limitations`}>
-          <summary className="cursor-pointer font-medium">Limitations</summary>
+          <summary className="cursor-pointer font-medium">What this means for you</summary>
           <ul className="mt-1 list-disc space-y-1 pl-4">
             {limitations.map((l) => (
-              <li key={`${l.code}-${l.message}`}>
-                <span className="font-mono text-[10px] uppercase tracking-wide text-slate-400">{l.code}</span>{' '}
-                {l.message}
-              </li>
+              <li key={`${l.code}-${l.message}`}>{limitationCustomerMessage(l)}</li>
             ))}
           </ul>
+          <details className="mt-2" data-testid={`${testId}-limitations-developer`}>
+            <summary className="cursor-pointer text-[10px] uppercase tracking-wide text-slate-400">
+              Developer details
+            </summary>
+            <ul className="mt-1 list-disc space-y-1 pl-4 font-mono text-[10px] text-slate-400">
+              {limitations.map((l) => (
+                <li key={`dev-${l.code}-${l.message}`}>
+                  {l.code}
+                  {l.message ? ` — ${l.message}` : ''}
+                </li>
+              ))}
+            </ul>
+          </details>
         </details>
       ) : null}
 
@@ -149,7 +171,7 @@ export function IntelligencePanelShell({
                 key={String(item.evidence_id || item.source_id || idx)}
                 className="rounded border border-slate-100 p-2 dark:border-slate-800"
               >
-                <p>{item.summary || item.source_type || 'Evidence item'}</p>
+                <p>{sanitizeCustomerFacingText(item.summary || item.source_type || 'Evidence item')}</p>
                 <p className="text-[10px] text-slate-400">
                   {[item.source_type, item.authorization_scope, item.deletion_state]
                     .filter(Boolean)

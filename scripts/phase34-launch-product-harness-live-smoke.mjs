@@ -2,9 +2,10 @@
 /**
  * Phase 34 — 64-session LIVE product-harness smoke.
  *
- * Default (smoke-v4): /tmp/phase34-product-harness-live-smoke-v4
+ * Default (smoke-v6): /tmp/phase34-product-harness-live-smoke-v6
  * Override with PHASE34_PRODUCT_SMOKE_OUT / PHASE34_PRODUCT_SMOKE_PACK.
- * Preserves frozen smoke-v1/v2/v3 roots (do not mutate).
+ * Preserves frozen smoke-v1/v2/v3/v4 roots (do not mutate).
+ * smoke-v5 readiness on e28f90aa is superseded — do not launch v5.
  *
  * Requires:
  *   - committed HEAD == origin/main
@@ -55,6 +56,8 @@ import {
   stopProductPcapCapture,
 } from './lib/phase34-product-pcap.mjs';
 import { validateAllProductScreenshots } from './lib/phase34-product-png-validation.mjs';
+import { assertScreenshotDistinctness } from './lib/phase34-product-screenshot-distinctness.mjs';
+import { loadOwnerProofScenarios } from './lib/phase34-owner-proof-scenarios.mjs';
 import { CAPABILITY_SURFACE_REGISTRY } from './lib/phase34-product-journeys/adapters.mjs';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -110,25 +113,29 @@ const VIEWPORTS = {
   mobile: { width: 390, height: 844 },
 };
 
-const SMOKE_PACK = process.env.PHASE34_PRODUCT_SMOKE_PACK || 'smoke-v5';
+const SMOKE_PACK = process.env.PHASE34_PRODUCT_SMOKE_PACK || 'smoke-v6';
 const SMOKE_KIND =
   process.env.PHASE34_PRODUCT_SMOKE_KIND ||
-  (SMOKE_PACK === 'smoke-v5'
-    ? 'PRODUCT_HARNESS_LIVE_SMOKE_V5'
-    : SMOKE_PACK === 'smoke-v4'
-      ? 'PRODUCT_HARNESS_LIVE_SMOKE_V4'
-      : SMOKE_PACK === 'smoke-v3'
-        ? 'PRODUCT_HARNESS_LIVE_SMOKE_V3'
-        : 'PRODUCT_HARNESS_LIVE_SMOKE_V2');
+  (SMOKE_PACK === 'smoke-v6'
+    ? 'PRODUCT_HARNESS_LIVE_SMOKE_V6'
+    : SMOKE_PACK === 'smoke-v5'
+      ? 'PRODUCT_HARNESS_LIVE_SMOKE_V5'
+      : SMOKE_PACK === 'smoke-v4'
+        ? 'PRODUCT_HARNESS_LIVE_SMOKE_V4'
+        : SMOKE_PACK === 'smoke-v3'
+          ? 'PRODUCT_HARNESS_LIVE_SMOKE_V3'
+          : 'PRODUCT_HARNESS_LIVE_SMOKE_V2');
 const DEFAULT_SMOKE_OUT =
   process.env.PHASE34_PRODUCT_SMOKE_OUT ||
-  (SMOKE_PACK === 'smoke-v5'
-    ? '/tmp/phase34-product-harness-live-smoke-v5'
-    : SMOKE_PACK === 'smoke-v4'
-      ? '/tmp/phase34-product-harness-live-smoke-v4'
-      : SMOKE_PACK === 'smoke-v3'
-        ? '/tmp/phase34-product-harness-live-smoke-v3'
-        : PRODUCT_LIVE_SMOKE_ROOT);
+  (SMOKE_PACK === 'smoke-v6'
+    ? '/tmp/phase34-product-harness-live-smoke-v6'
+    : SMOKE_PACK === 'smoke-v5'
+      ? '/tmp/phase34-product-harness-live-smoke-v5'
+      : SMOKE_PACK === 'smoke-v4'
+        ? '/tmp/phase34-product-harness-live-smoke-v4'
+        : SMOKE_PACK === 'smoke-v3'
+          ? '/tmp/phase34-product-harness-live-smoke-v3'
+          : PRODUCT_LIVE_SMOKE_ROOT);
 
 function parseArgs(argv) {
   const opts = {
@@ -653,6 +660,49 @@ async function main() {
     JSON.stringify(pngValidation, null, 2) + '\n',
   );
 
+  let distinctness = { ok: true, unique_sha256: 0, rows: 0 };
+  try {
+    // Multi-turn sessions: screenshots within a session must not be byte-identical.
+    const bySession = new Map();
+    for (const row of manifest.rows || []) {
+      const sid = row.session_id || row.session || 'unknown';
+      if (!bySession.has(sid)) bySession.set(sid, []);
+      bySession.get(sid).push({
+        path: row.path || row.file_path || row.absolute_path,
+        label: `${row.capability || 'cap'}:${row.state || row.capture_state || 'state'}:turn${row.turn_index ?? 0}`,
+        turn_index: row.turn_index,
+      });
+    }
+    for (const [, rows] of bySession) {
+      if (rows.length < 2) continue;
+      assertScreenshotDistinctness(rows.filter((r) => r.path), { maxExactDuplicates: 0 });
+    }
+    distinctness = assertScreenshotDistinctness(
+      (manifest.rows || [])
+        .filter((r) => r.path || r.file_path || r.absolute_path)
+        .map((r) => ({
+          path: r.path || r.file_path || r.absolute_path,
+          label: r.filename || r.path,
+          allow_duplicate: false,
+        })),
+      { maxExactDuplicates: 1 },
+    );
+  } catch (err) {
+    distinctness = {
+      ok: false,
+      error: err.code || err.message,
+      message: String(err.message || err),
+    };
+  }
+  fs.writeFileSync(
+    path.join(opts.out, 'screenshot-distinctness.json'),
+    JSON.stringify(distinctness, null, 2) + '\n',
+  );
+  fs.writeFileSync(
+    path.join(opts.out, 'owner-proof-scenarios.json'),
+    JSON.stringify(loadOwnerProofScenarios(), null, 2) + '\n',
+  );
+
   const sheetsDir = path.join(opts.out, 'contact-sheets');
   generateContactSheets(manifest.rows || [], sheetsDir);
   writeRouteCapabilityMatrix(opts.out, results);
@@ -666,6 +716,7 @@ async function main() {
     turns === 112 &&
     gate.next_session_started_after_hard_failure === 0 &&
     pngValidation.pass &&
+    distinctness.ok !== false &&
     traceIndex.length === 64;
 
   const summary = {

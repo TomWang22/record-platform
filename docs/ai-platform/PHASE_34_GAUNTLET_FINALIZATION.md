@@ -1,5 +1,14 @@
 # Phase 34 gauntlet finalization
 
+## Owner-proof vs plumbing
+
+Smoke-v5 readiness on `e28f90aa` is **superseded before launch**. Interaction-first
+owner proof (golden 24 scenarios, customer-facing copy, entity/media consistency,
+distinct screenshots, genuine four-turn negotiation) is required for smoke-v6.
+
+Diagnostic screenshot packs may prove `SCREENSHOT_PIPELINE_WORKING` while still
+leaving `AI_PRODUCT_PROOF_INCOMPLETE`.
+
 ## Queue vs protocol acceptance
 
 `queue_complete` means synchronized H1/H2/H3 probes executed and evidence was recorded.

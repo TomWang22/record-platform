@@ -3,6 +3,8 @@
  * These map to /api/ai/intelligence/* — not legacy /api/ai/records/* or RAG.
  */
 
+import { limitationCustomerMessage } from '@/lib/ai-customer-copy'
+
 export type IntelligenceEvidenceItem = {
   evidence_id?: string
   source_type?: string
@@ -95,7 +97,7 @@ export function confidenceScore(confidence: IntelligenceConfidence | undefined):
 
 export function limitationMessages(limitations: IntelligenceLimitation[] | undefined): string[] {
   if (!Array.isArray(limitations)) return []
-  return limitations.map((l) => l.message || l.code).filter(Boolean)
+  return limitations.map((l) => limitationCustomerMessage(l)).filter(Boolean)
 }
 
 export function isAbstentionResult(result: { scarcity_label?: string; limitations?: IntelligenceLimitation[] } | null | undefined): boolean {

@@ -27,23 +27,25 @@ export function contractScreenshotDate(now = new Date()) {
 /**
  * Dated output roots under webapp/e2e/screenshots.
  * @param {'authenticated'|'guest'} authClass
- * @param {'gauntlet'|'canary'|'smoke'|'smoke-v2'|'smoke-v3'|'smoke-v4'|'smoke-v5'} pack
+ * @param {'gauntlet'|'canary'|'smoke'|'smoke-v2'|'smoke-v3'|'smoke-v4'|'smoke-v5'|'smoke-v6'} pack
  */
 export function productScreenshotDir(authClass = 'authenticated', pack = 'gauntlet', date = contractScreenshotDate()) {
   const leaf =
     pack === 'canary'
       ? 'phase34-product-canary'
-      : pack === 'smoke-v5'
-        ? 'phase34-product-smoke-v5'
-        : pack === 'smoke-v4'
-          ? 'phase34-product-smoke-v4'
-          : pack === 'smoke-v3'
-            ? 'phase34-product-smoke-v3'
-            : pack === 'smoke-v2'
-              ? 'phase34-product-smoke-v2'
-              : pack === 'smoke'
-                ? 'phase34-product-smoke'
-                : 'phase34-product-gauntlet';
+      : pack === 'smoke-v6'
+        ? 'phase34-product-smoke-v6'
+        : pack === 'smoke-v5'
+          ? 'phase34-product-smoke-v5'
+          : pack === 'smoke-v4'
+            ? 'phase34-product-smoke-v4'
+            : pack === 'smoke-v3'
+              ? 'phase34-product-smoke-v3'
+              : pack === 'smoke-v2'
+                ? 'phase34-product-smoke-v2'
+                : pack === 'smoke'
+                  ? 'phase34-product-smoke'
+                  : 'phase34-product-gauntlet';
   return path.join(REPO_ROOT, 'webapp/e2e/screenshots', authClass, date, leaf);
 }
 

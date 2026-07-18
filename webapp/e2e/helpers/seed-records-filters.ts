@@ -2,8 +2,9 @@ import type { APIRequestContext } from '@playwright/test'
 
 import { with429Retry } from './http-retry'
 import { createListingWithShipping } from './listing-contract'
+import { COVER_MILES } from './vinyl-cover-fixtures'
 
-const PLACEHOLDER = 'https://picsum.photos/seed/rp-record-filter/400/400'
+const PLACEHOLDER = COVER_MILES
 
 /** Records with distinct purchased/received dates for toolbar filter E2E. */
 export async function seedRecordsForToolbarFilters(

@@ -54,6 +54,7 @@ tmp/
 !scripts/ai-platform/phase33f-capability-gauntlet-manifest.json
 !scripts/ai-platform/phase34-client-surface-matrix.json
 !scripts/ai-platform/phase34-eval-policy.json
+!scripts/ai-platform/phase34-owner-proof-scenarios.json
 !scripts/ai-platform/phase34-prompt-registry/
 !scripts/ai-platform/phase34-prompt-registry/**/*.json
 !scripts/ai-platform/retrieval-splits/

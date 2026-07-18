@@ -150,7 +150,7 @@ export function SellListWorkflow({ returnTo = '/sell' }: { returnTo?: string }) 
       const images =
         imageUrls.length > 0
           ? imageUrls
-          : ['https://picsum.photos/seed/rp-sell-list-flow/400/400']
+          : ['/e2e-fixtures/covers/kenny-dorham.svg']
       const pricing_mode =
         form.listingType === 'auction' ? 'auction' : form.listingType === 'obo' ? 'obo' : 'fixed'
       const amenities: string[] = [

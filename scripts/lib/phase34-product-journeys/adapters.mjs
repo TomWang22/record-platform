@@ -383,17 +383,31 @@ export class BaseProductJourneyAdapter {
     }
 
     if (trigger === 'semantic_search') {
-      // Desktop filter input is display:none below lg; filling it with force does not
-      // update the shared React query state. Always target a visible marketplace input.
-      const desktop = page.locator('input[placeholder*="Search artist" i]');
-      const mobile = page.locator('input[placeholder*="Search marketplace" i]');
-      const useDesktop =
-        (await desktop.count()) > 0 && (await desktop.first().isVisible().catch(() => false));
-      const searchInput = useDesktop ? desktop.first() : mobile.first();
+      // Listings browse: desktop "Search artist…" / mobile "Search marketplace…".
+      // Sell surface: parent-owned "Artist / release" feeds SearchIntelligenceChrome.query.
+      const queryText = prepared.requestSeed?.query || 'Miles Davis Kind of Blue';
+      const candidates = [
+        page.getByTestId('sell-comparable-query'),
+        page.locator('input[placeholder*="Search artist" i]'),
+        page.locator('input[placeholder*="Search marketplace" i]'),
+        page.locator('input[placeholder*="Artist / release" i]'),
+      ];
+      let searchInput = null;
+      for (const loc of candidates) {
+        if ((await loc.count()) > 0 && (await loc.first().isVisible().catch(() => false))) {
+          searchInput = loc.first();
+          break;
+        }
+      }
+      if (!searchInput) {
+        searchInput = page
+          .locator(
+            '[data-testid="sell-comparable-query"], input[placeholder*="Search artist" i], input[placeholder*="Search marketplace" i], input[placeholder*="Artist / release" i]',
+          )
+          .first();
+      }
       await searchInput.waitFor({ state: 'visible', timeout: 15_000 });
-      await searchInput.fill(prepared.requestSeed?.query || 'Miles Davis Kind of Blue', {
-        timeout: 15_000,
-      });
+      await searchInput.fill(queryText, { timeout: 15_000 });
       await page.getByTestId('intelligence-search-mode-semantic').check({ force: true });
       await page.getByTestId(this.registry.runTestId).click();
       return;

@@ -394,7 +394,13 @@ export function SellListWorkflow({ returnTo = '/sell' }: { returnTo?: string }) 
           />
           <Card title="Comparables (helper)">
             <form onSubmit={(e: FormEvent) => { e.preventDefault(); void searchMarketplace() }} className="space-y-2">
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Artist / release" className="w-full rounded-xl border px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Artist / release"
+                data-testid="sell-comparable-query"
+                className="w-full rounded-xl border px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950"
+              />
               <Button type="submit" disabled={loading} className="w-full">{loading ? 'Searching…' : 'Research comparables'}</Button>
             </form>
             <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">

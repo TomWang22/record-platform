@@ -4,16 +4,17 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-/** Minimal valid 1x1 PNG */
-const TINY_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-  'base64',
+const FIXTURE_PNG = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'fixtures/min-viewport-320x240.png',
 );
 
 export function createMockPlaywrightPage(opts = {}) {
   const screenshotCalls = [];
   const consoleHandlers = [];
+  const pngBytes = fs.readFileSync(FIXTURE_PNG);
   const body = {
     postData: JSON.stringify(
       opts.requestBody || {
@@ -52,7 +53,27 @@ export function createMockPlaywrightPage(opts = {}) {
     first: () => locator,
     waitFor: async () => {},
     click: async () => {},
-    innerText: async () => 'Scarcity: scarce\nConfidence: 0.8',
+    innerText: async () => {
+      const cap = opts.capability || 'scarcity';
+      const titles = {
+        scarcity: 'Scarcity intelligence',
+        valuation: 'Valuation intelligence',
+        auction_intelligence: 'Auction intelligence',
+        embeddings: 'Embedding lineage (diagnostic)',
+        semantic_search: 'Semantic search',
+        negotiation_assistance: 'Negotiation assistance',
+        recommendations: 'Recommendations',
+        market_analytics: 'Market analytics',
+      };
+      return `${titles[cap] || 'Intelligence'}\nconfidence evidence ready`;
+    },
+    getAttribute: async (name) => {
+      if (name === 'data-capability') return opts.capability || 'scarcity';
+      return null;
+    },
+    locator() {
+      return locator;
+    },
   };
 
   const page = {
@@ -141,8 +162,8 @@ export function createMockPlaywrightPage(opts = {}) {
         at: new Date().toISOString(),
       });
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      fs.writeFileSync(filePath, TINY_PNG);
-      return TINY_PNG;
+      fs.writeFileSync(filePath, pngBytes);
+      return pngBytes;
     },
   };
 

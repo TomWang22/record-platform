@@ -17,6 +17,7 @@ import {
 } from '../phase34-product-accessibility.mjs';
 import { awaitTerminalPanelReady } from '../phase34-product-terminal-readiness.mjs';
 import { derivePipelineObservationFromResponse } from '../phase34-product-pipeline-observation.mjs';
+import { assertCapabilityCaptureIdentity } from '../phase34-product-capability-identity.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -55,8 +56,8 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
         route: '/listings/[id]/edit',
         panel: 'intelligence-valuation-panel',
         status: 'MOUNTED',
-        // Edit only mounts for the listing owner; buyer-token listing_id is usually not editable.
-        smoke_eligible: false,
+        // Edit mounts for the listing owner — seller smoke only.
+        smoke_eligible_sides: ['seller'],
       },
       {
         route: '/offers/inbox',
@@ -298,6 +299,22 @@ export class BaseProductJourneyAdapter {
     let surfaces = (this.registry.mounted_surfaces || []).filter(
       (s) => s.status === 'MOUNTED' && s.smoke_eligible !== false,
     );
+    const side = context.participant_side;
+    surfaces = surfaces.filter((s) => {
+      if (Array.isArray(s.smoke_eligible_sides) && s.smoke_eligible_sides.length) {
+        if (!s.smoke_eligible_sides.includes(side)) return false;
+      }
+      // Do not schedule offer-context valuation until an offer subject exists;
+      // empty inbox renders a non-fetching placeholder and waitForResponse times out.
+      if (s.requires_offer_context) {
+        const hasOffer =
+          Boolean(context.subject?.offer_id) ||
+          Boolean(context.subject?.has_offers) ||
+          Boolean(context.live_subjects?.offer_id);
+        if (!hasOffer) return false;
+      }
+      return true;
+    });
     // Seller has an empty private collection in the contract fixture — /records/[id]
     // requires ownership and will not mount intelligence panels for the buyer record id.
     if (context.participant_side === 'seller') {
@@ -380,6 +397,40 @@ export class BaseProductJourneyAdapter {
       const row = page.locator('ul button').filter({ hasText: /\s—\s/ }).first();
       await row.waitFor({ state: 'visible', timeout: 45_000 });
       await row.click();
+      return;
+    }
+
+    if (
+      this.capability === 'valuation' &&
+      (template === '/listings/[id]/edit' || String(prepared.route || '').includes('/edit'))
+    ) {
+      await page
+        .getByTestId('listing-edit-ready')
+        .waitFor({ state: 'visible', timeout: 60_000 })
+        .catch(() => null);
+      // Real valuation panel must be present — never the empty-offer placeholder.
+      const panel = page.getByTestId('intelligence-valuation-panel');
+      await panel.first().waitFor({ state: 'visible', timeout: 60_000 });
+      const missing = page.getByTestId('intelligence-valuation-panel-missing');
+      if ((await missing.count()) > 0 && (await missing.first().isVisible().catch(() => false))) {
+        const err = new Error('listing-edit valuation panel missing — UI never initiates valuation POST');
+        err.code = 'VALUATION_REQUEST_NOT_INITIATED';
+        throw err;
+      }
+      return;
+    }
+
+    if (this.capability === 'valuation' && String(prepared.route || '').startsWith('/offers')) {
+      const missing = page.getByTestId('intelligence-valuation-panel-missing');
+      if ((await missing.count()) > 0 && (await missing.first().isVisible().catch(() => false))) {
+        const err = new Error('offers inbox has no offer context — valuation POST will not fire');
+        err.code = 'VALUATION_REQUEST_NOT_INITIATED';
+        throw err;
+      }
+      await page.getByTestId('intelligence-valuation-panel').first().waitFor({
+        state: 'visible',
+        timeout: 60_000,
+      });
       return;
     }
 
@@ -667,15 +718,29 @@ export class BaseProductJourneyAdapter {
       });
 
       const rendered = await this.extractRendered(page, prepared, responseJson);
+      const panelEl = page.getByTestId(prepared.panelTestId).first();
+      const panelDataCapability =
+        (await panelEl.getAttribute('data-capability').catch(() => null)) || null;
+      const panelTitle =
+        (await panelEl.locator('h3').first().innerText().catch(() => '')) ||
+        (await panelEl.innerText().catch(() => ''));
+      const capabilityIdentity = assertCapabilityCaptureIdentity({
+        expected_capability: this.capability,
+        mounted_component: prepared.panelTestId,
+        endpoint: capturedEndpoint,
+        response_schema_hint: responseJson?.result || responseJson,
+        rendered_capability: panelDataCapability,
+        panel_data_capability: panelDataCapability,
+        panel_title: panelTitle,
+      });
+
       const a11y = await executeAccessibilityChecks(page, { panelTestId: prepared.panelTestId });
       const clientProtocol = await observeClientProtocol(page);
       const finalState = this.classifyVisualState(prepared, responseJson, rendered);
       const terminalShotState = finalState === 'success' ? 'final' : finalState;
-      const preferLocator =
-        this.capability === 'negotiation_assistance' ||
-        String(prepared.route || '').startsWith('/offers') ||
-        String(prepared.route || '').startsWith('/messages');
-      const panelLocator = preferLocator ? page.getByTestId(prepared.panelTestId).first() : null;
+      // Always locator-capture the expected capability panel so sibling panels
+      // (e.g. scarcity on listing detail) cannot become the valuation evidence.
+      const panelLocator = page.getByTestId(prepared.panelTestId).first();
       screenshots.push(
         await captureProductScreenshot(page, {
           ...shotBase,
@@ -689,8 +754,9 @@ export class BaseProductJourneyAdapter {
           accessibility_status: a11y.accessibility_result,
           horizontal_overflow: a11y.horizontal_overflow,
           fullPage: false,
-          capture_mode: preferLocator ? 'locator' : 'viewport',
+          capture_mode: 'locator',
           locator: panelLocator,
+          capability_identity: capabilityIdentity,
         }),
       );
 
@@ -726,8 +792,8 @@ export class BaseProductJourneyAdapter {
               accessibility_status: expandA11y.accessibility_result,
               horizontal_overflow: expandA11y.horizontal_overflow,
               fullPage: false,
-              capture_mode: preferLocator ? 'locator' : 'viewport',
-              locator: preferLocator ? page.getByTestId(prepared.panelTestId).first() : null,
+              capture_mode: 'locator',
+              locator: page.getByTestId(prepared.panelTestId).first(),
             }),
           );
         }

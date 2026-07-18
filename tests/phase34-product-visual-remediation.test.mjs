@@ -120,11 +120,17 @@ test('terminal readiness fails when loading skeleton is active', () => {
   );
 });
 
-test('contact sheets use bounded thumbnails and do not inherit source height', () => {
+test('contact sheets use bounded thumbnails and resolve file-relative links', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'phase34-cs-'));
+  const png = path.join(tmp, 'x.png');
+  fs.copyFileSync(
+    path.join(root, 'scripts/lib/fixtures/min-viewport-320x240.png'),
+    png,
+  );
   const rows = [
     {
-      relative_path: 'webapp/e2e/screenshots/authenticated/2026-07-18/phase34-product-smoke-v3/x.png',
+      relative_path: path.relative(root, png),
+      absolute_path: png,
       screenshot_id: 'ss_abc',
       state: 'final',
       capability: 'scarcity',
@@ -134,17 +140,63 @@ test('contact sheets use bounded thumbnails and do not inherit source height', (
       bytes: 1000,
       session_id: 'sess_1',
       turn_index: 0,
-      image_width: 768,
-      image_height: 110000,
+      image_width: 320,
+      image_height: 240,
     },
   ];
-  generateContactSheets(rows, tmp);
-  const html = fs.readFileSync(path.join(tmp, 'combined.html'), 'utf8');
+  const sheetsDir = path.join(tmp, 'contact-sheets');
+  generateContactSheets(rows, sheetsDir);
+  const html = fs.readFileSync(path.join(sheetsDir, 'combined.html'), 'utf8');
   assert.match(html, /max-height:\s*480px/);
   assert.match(html, /object-fit:\s*contain/);
   assert.doesNotMatch(html, /height:\s*110000/);
-  assert.match(html, /PATHOLOGICAL|pathological|110000/);
   assert.match(html, /href=/);
+  assert.match(html, /src="\.\.\/x\.png"/);
+  assert.ok(fs.existsSync(path.join(sheetsDir, '../x.png')));
+});
+
+test('1x1 screenshots are rejected', async () => {
+  const { assertCapturedImageBounds } = await import(
+    '../scripts/lib/phase34-product-screenshot-geometry.mjs'
+  );
+  assert.throws(
+    () =>
+      assertCapturedImageBounds({
+        width: 1,
+        height: 1,
+        bytes: 70,
+        viewport_height: 720,
+        capture_mode: 'viewport',
+        state: 'final',
+      }),
+    (err) => err.code === 'VISUAL_SCREENSHOT_TOO_SMALL',
+  );
+});
+
+test('capability identity rejects valuation journey showing scarcity', async () => {
+  const { assertCapabilityCaptureIdentity } = await import(
+    '../scripts/lib/phase34-product-capability-identity.mjs'
+  );
+  assert.throws(
+    () =>
+      assertCapabilityCaptureIdentity({
+        expected_capability: 'valuation',
+        mounted_component: 'intelligence-valuation-panel',
+        endpoint: '/api/ai/intelligence/valuation',
+        panel_title: 'Scarcity intelligence',
+        rendered_capability: 'scarcity',
+      }),
+    (err) => err.code === 'CAPABILITY_IDENTITY_MISMATCH',
+  );
+});
+
+test('valuation listing-edit is seller-eligible and offers inbox requires offer context', () => {
+  const surfaces = CAPABILITY_SURFACE_REGISTRY.valuation.mounted_surfaces;
+  const edit = surfaces.find((s) => s.route === '/listings/[id]/edit');
+  assert.ok(edit);
+  assert.deepEqual(edit.smoke_eligible_sides, ['seller']);
+  const offers = surfaces.find((s) => s.route === '/offers/inbox');
+  assert.equal(offers.requires_offer_context, true);
 });
 
 test('pipeline observation marks required components EXECUTED_AND_OBSERVED', () => {

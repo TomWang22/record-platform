@@ -134,6 +134,7 @@ export function ValuationIntelligencePanel({
           : 'Evidence-backed valuation ranges with sold vs asking separation.'
       }
       testId="intelligence-valuation-panel"
+      capability="valuation"
       loading={state.status === 'loading' || state.status === 'idle'}
       errorMessage={state.status === 'error' ? state.message : null}
       rateLimited={state.status === 'error' ? state.rateLimited : false}

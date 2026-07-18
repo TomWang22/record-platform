@@ -11,6 +11,8 @@ type IntelligencePanelShellProps = {
   title: string
   description?: string
   testId: string
+  /** Canonical capability id for harness identity checks (e.g. valuation). */
+  capability?: string
   loading?: boolean
   errorMessage?: string | null
   rateLimited?: boolean
@@ -27,6 +29,7 @@ export function IntelligencePanelShell({
   title,
   description,
   testId,
+  capability,
   loading,
   errorMessage,
   rateLimited,
@@ -45,6 +48,7 @@ export function IntelligencePanelShell({
     <section
       className="min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
       data-testid={testId}
+      data-capability={capability || undefined}
       aria-busy={loading ? true : undefined}
     >
       <header className="mb-3 space-y-1">

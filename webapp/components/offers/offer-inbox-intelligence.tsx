@@ -52,7 +52,7 @@ export function OfferInboxIntelligence({ offers }: OfferInboxIntelligenceProps) 
         <ValuationIntelligencePanel record={valuationSubject} advisoryOnly />
       ) : (
         <div
-          data-testid="intelligence-valuation-panel"
+          data-testid="intelligence-valuation-panel-missing"
           className="rounded border border-dashed p-3 text-sm text-slate-500"
         >
           No offer selected for valuation context.

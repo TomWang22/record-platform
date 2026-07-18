@@ -108,6 +108,7 @@ export function ScarcityIntelligencePanel({
       title="Scarcity intelligence"
       description="Exact-pressing vs release-level scarcity from live authorized market evidence. Zero inventory alone never means rare."
       testId="intelligence-scarcity-panel"
+      capability="scarcity"
       loading={state.status === 'loading' || state.status === 'idle'}
       errorMessage={state.status === 'error' ? state.message : null}
       rateLimited={state.status === 'error' ? state.rateLimited : false}

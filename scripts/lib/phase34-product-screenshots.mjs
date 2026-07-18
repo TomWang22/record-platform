@@ -27,19 +27,21 @@ export function contractScreenshotDate(now = new Date()) {
 /**
  * Dated output roots under webapp/e2e/screenshots.
  * @param {'authenticated'|'guest'} authClass
- * @param {'gauntlet'|'canary'|'smoke'|'smoke-v2'|'smoke-v3'} pack
+ * @param {'gauntlet'|'canary'|'smoke'|'smoke-v2'|'smoke-v3'|'smoke-v4'} pack
  */
 export function productScreenshotDir(authClass = 'authenticated', pack = 'gauntlet', date = contractScreenshotDate()) {
   const leaf =
     pack === 'canary'
       ? 'phase34-product-canary'
-      : pack === 'smoke-v3'
-        ? 'phase34-product-smoke-v3'
-        : pack === 'smoke-v2'
-          ? 'phase34-product-smoke-v2'
-          : pack === 'smoke'
-            ? 'phase34-product-smoke'
-            : 'phase34-product-gauntlet';
+      : pack === 'smoke-v4'
+        ? 'phase34-product-smoke-v4'
+        : pack === 'smoke-v3'
+          ? 'phase34-product-smoke-v3'
+          : pack === 'smoke-v2'
+            ? 'phase34-product-smoke-v2'
+            : pack === 'smoke'
+              ? 'phase34-product-smoke'
+              : 'phase34-product-gauntlet';
   return path.join(REPO_ROOT, 'webapp/e2e/screenshots', authClass, date, leaf);
 }
 
@@ -167,6 +169,8 @@ export async function captureProductScreenshot(page, meta) {
     bytes: buf.length,
     viewport_height: geometry.viewport_height || vpEarly?.height,
     capture_mode,
+    allow_small_component_crop: meta.allow_small_component_crop === true,
+    state: meta.state || meta.capture_phase || null,
   });
   const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
   const screenshot_id = `ss_${sha256.slice(0, 16)}`;
@@ -381,7 +385,7 @@ export function generateContactSheets(manifestRows, outDir) {
   const caps = [...new Set(manifestRows.map((r) => r.capability).filter(Boolean))];
   const files = [];
   for (const [name, rows] of Object.entries(by)) {
-    const html = renderContactSheet(name, rows);
+    const html = renderContactSheet(name, rows, outDir);
     const fp = path.join(outDir, `${name}.html`);
     fs.writeFileSync(fp, html);
     files.push(fp);
@@ -389,7 +393,7 @@ export function generateContactSheets(manifestRows, outDir) {
   for (const cap of caps) {
     const rows = manifestRows.filter((r) => r.capability === cap);
     const fp = path.join(outDir, `capability-${cap}.html`);
-    fs.writeFileSync(fp, renderContactSheet(cap, rows));
+    fs.writeFileSync(fp, renderContactSheet(cap, rows, outDir));
     files.push(fp);
   }
   const gaps = [
@@ -401,14 +405,62 @@ export function generateContactSheets(manifestRows, outDir) {
     '',
   ].join('\n');
   fs.writeFileSync(path.join(outDir, 'visual-gaps.md'), gaps);
-  return { files, visual_review_status: VISUAL_REVIEW_STATUS_DEFAULT };
+  const linkValidation = validateContactSheetLinks(outDir, files);
+  const hasOnDisk = manifestRows.some(
+    (r) => (r.absolute_path && fs.existsSync(r.absolute_path)) || (r.relative_path && fs.existsSync(path.resolve(REPO_ROOT, r.relative_path))),
+  );
+  if (hasOnDisk && linkValidation.missing.length) {
+    const err = new Error(
+      `contact-sheet link validation failed: ${linkValidation.missing.slice(0, 5).map((m) => m.ref).join(', ')}`,
+    );
+    err.code = 'CONTACT_SHEET_BROKEN_LINKS';
+    err.linkValidation = linkValidation;
+    throw err;
+  }
+  return { files, visual_review_status: VISUAL_REVIEW_STATUS_DEFAULT, linkValidation };
 }
 
-function renderContactSheet(title, rows) {
+/**
+ * Resolve a screenshot path that is valid from the contact-sheet HTML directory.
+ */
+export function contactSheetHrefForRow(row, outDir) {
+  const abs =
+    row.absolute_path && fs.existsSync(row.absolute_path)
+      ? row.absolute_path
+      : row.relative_path
+        ? path.resolve(REPO_ROOT, row.relative_path)
+        : null;
+  if (!abs || !fs.existsSync(abs)) {
+    return null;
+  }
+  return path.relative(outDir, abs).split(path.sep).join('/');
+}
+
+/**
+ * Open every local src/href in generated contact-sheet HTML and ensure targets exist.
+ */
+export function validateContactSheetLinks(outDir, htmlFiles) {
+  const missing = [];
+  const checked = [];
+  for (const fp of htmlFiles) {
+    if (!fp.endsWith('.html') || !fs.existsSync(fp)) continue;
+    const html = fs.readFileSync(fp, 'utf8');
+    const refs = [...html.matchAll(/\b(?:src|href)="([^"]+)"/g)].map((m) => m[1]);
+    for (const ref of refs) {
+      if (!ref || ref.startsWith('http') || ref.startsWith('mailto:') || ref.startsWith('#')) continue;
+      const target = path.resolve(path.dirname(fp), ref);
+      checked.push(target);
+      if (!fs.existsSync(target)) missing.push({ from: fp, ref, target });
+    }
+  }
+  return { checked: checked.length, missing };
+}
+
+function renderContactSheet(title, rows, outDir) {
   const cards = rows
     .map((r) => {
-      const rel = String(r.relative_path || '').replace(/^webapp\//, '');
-      const href = escapeAttr(`../../${rel}`);
+      const hrefRaw = contactSheetHrefForRow(r, outDir) || String(r.relative_path || '');
+      const href = escapeAttr(hrefRaw);
       const src = href;
       const w = r.image_width || r.viewport_width || '?';
       const h = r.image_height || r.viewport_height || '?';

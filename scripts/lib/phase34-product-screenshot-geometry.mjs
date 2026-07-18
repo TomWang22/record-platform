@@ -4,6 +4,12 @@
 export const MAX_NORMAL_PAGE_HEIGHT_RATIO = 4;
 export const MAX_SCREENSHOT_PIXEL_COUNT = 1280 * 720 * 8; // ~7.4M px bound
 export const MAX_SCREENSHOT_BYTES = 8 * 1024 * 1024; // 8 MiB
+/** Terminal/product screenshots must be reviewable; 1×1 captures are hard failures. */
+export const MIN_PRODUCT_SCREENSHOT_WIDTH = 320;
+export const MIN_PRODUCT_SCREENSHOT_HEIGHT = 240;
+/** Documented smaller bound for intentional component/locator crops. */
+export const MIN_LOCATOR_SCREENSHOT_WIDTH = 200;
+export const MIN_LOCATOR_SCREENSHOT_HEIGHT = 120;
 
 /**
  * @param {import('playwright').Page} page
@@ -116,7 +122,15 @@ export function assertScreenshotGeometryAllowed(geometry, meta = {}) {
   return true;
 }
 
-export function assertCapturedImageBounds({ width, height, bytes, viewport_height, capture_mode }) {
+export function assertCapturedImageBounds({
+  width,
+  height,
+  bytes,
+  viewport_height,
+  capture_mode,
+  allow_small_component_crop = false,
+  state = null,
+}) {
   const w = Number(width) || 0;
   const h = Number(height) || 0;
   const px = w * h;
@@ -129,6 +143,20 @@ export function assertCapturedImageBounds({ width, height, bytes, viewport_heigh
     const err = new Error(`screenshot bytes ${bytes} exceed bound ${MAX_SCREENSHOT_BYTES}`);
     err.code = 'VISUAL_SCREENSHOT_BYTE_BOUND';
     throw err;
+  }
+  if (!allow_small_component_crop) {
+    const minW =
+      capture_mode === 'locator' ? MIN_LOCATOR_SCREENSHOT_WIDTH : MIN_PRODUCT_SCREENSHOT_WIDTH;
+    const minH =
+      capture_mode === 'locator' ? MIN_LOCATOR_SCREENSHOT_HEIGHT : MIN_PRODUCT_SCREENSHOT_HEIGHT;
+    if (w < minW || h < minH) {
+      const err = new Error(
+        `screenshot dimensions ${w}×${h} below minimum ${minW}×${minH}` +
+          (capture_mode === 'locator' ? ' (locator crop)' : ' (terminal/product capture may never be 1×1)'),
+      );
+      err.code = 'VISUAL_SCREENSHOT_TOO_SMALL';
+      throw err;
+    }
   }
   if (capture_mode === 'viewport' && viewport_height > 0 && h > viewport_height * MAX_NORMAL_PAGE_HEIGHT_RATIO) {
     const err = new Error(`viewport capture height ${h} exceeds ${MAX_NORMAL_PAGE_HEIGHT_RATIO}× viewport`);

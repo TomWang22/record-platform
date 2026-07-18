@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Phase 34 — 64-session LIVE product-harness smoke-v2.
+ * Phase 34 — 64-session LIVE product-harness smoke.
  *
- * Root: /tmp/phase34-product-harness-live-smoke-v2
- * Preserves frozen smoke-v1 at /tmp/phase34-product-harness-live-smoke-v1
+ * Default (smoke-v4): /tmp/phase34-product-harness-live-smoke-v4
+ * Override with PHASE34_PRODUCT_SMOKE_OUT / PHASE34_PRODUCT_SMOKE_PACK.
+ * Preserves frozen smoke-v1/v2/v3 roots (do not mutate).
  *
  * Requires:
  *   - committed HEAD == origin/main
@@ -28,6 +29,7 @@ import {
   PHASE33F_TARGET_FORBIDDEN,
   ProductLedgerWriter,
   PRODUCT_LIVE_SMOKE_ROOT,
+  PRODUCT_LIVE_SMOKE_ROOT_V4,
 } from './lib/phase34-product-ledgers.mjs';
 import {
   runProductSession,
@@ -108,13 +110,30 @@ const VIEWPORTS = {
   mobile: { width: 390, height: 844 },
 };
 
+const SMOKE_PACK = process.env.PHASE34_PRODUCT_SMOKE_PACK || 'smoke-v4';
+const SMOKE_KIND =
+  process.env.PHASE34_PRODUCT_SMOKE_KIND ||
+  (SMOKE_PACK === 'smoke-v4'
+    ? 'PRODUCT_HARNESS_LIVE_SMOKE_V4'
+    : SMOKE_PACK === 'smoke-v3'
+      ? 'PRODUCT_HARNESS_LIVE_SMOKE_V3'
+      : 'PRODUCT_HARNESS_LIVE_SMOKE_V2');
+const DEFAULT_SMOKE_OUT =
+  process.env.PHASE34_PRODUCT_SMOKE_OUT ||
+  (SMOKE_PACK === 'smoke-v4'
+    ? PRODUCT_LIVE_SMOKE_ROOT_V4
+    : SMOKE_PACK === 'smoke-v3'
+      ? '/tmp/phase34-product-harness-live-smoke-v3'
+      : PRODUCT_LIVE_SMOKE_ROOT);
+
 function parseArgs(argv) {
   const opts = {
-    out: PRODUCT_LIVE_SMOKE_ROOT,
+    out: DEFAULT_SMOKE_OUT,
     execute: false,
     upstreamUrl: process.env.E2E_UPSTREAM_URL || 'https://record-platform.test',
     headless: true,
     proxyPort: Number(process.env.PHASE34_BROWSER_PROXY_PORT || 8443),
+    screenshotPack: SMOKE_PACK,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -129,10 +148,10 @@ function parseArgs(argv) {
 }
 
 /**
- * Build the exact 64-session smoke-v2 schedule.
+ * Build the exact 64-session smoke schedule.
  * 8 per capability; 2 multi-turn per capability; viewport mix 32/16/16.
  */
-export function buildLiveSmokeSchedule(seed = 'phase34-product-live-smoke-v2') {
+export function buildLiveSmokeSchedule(seed = `phase34-product-live-${SMOKE_PACK}`) {
   const full = buildInterleavedProductSchedule({ scale: 'canary', seed });
   const selected = [];
   for (const cap of PRODUCT_CAPABILITIES) {
@@ -387,7 +406,7 @@ async function main() {
     console.log(
       JSON.stringify(
         {
-          kind: 'PRODUCT_HARNESS_LIVE_SMOKE_V2',
+          kind: SMOKE_KIND,
           execution: 'NOT_EXECUTED',
           out: opts.out,
           schedule: {
@@ -548,7 +567,7 @@ async function main() {
           gate,
           ledger,
           screenshotManifest,
-          screenshotPack: 'smoke-v2',
+          screenshotPack: opts.screenshotPack || SMOKE_PACK,
           turnCount: row.smoke_turns,
           subject: subjectForCapability(subjects, row.capability),
           protocolBaseUrl: opts.upstreamUrl,
@@ -646,7 +665,7 @@ async function main() {
     traceIndex.length === 64;
 
   const summary = {
-    kind: 'PRODUCT_HARNESS_LIVE_SMOKE_V2',
+    kind: SMOKE_KIND,
     execution: 'LIVE',
     out: opts.out,
     head_sha: headSha,

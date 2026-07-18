@@ -350,18 +350,46 @@ export class BaseProductJourneyAdapter {
     const needsSelection =
       prepared.selected_surface?.requires_collection_selection ||
       (this.capability === 'valuation' && (template === '/sell' || prepared.route === '/sell'));
-    if (!needsSelection) return;
-
-    const byTestId = page.getByTestId('sell-collection-record');
-    if ((await byTestId.count()) > 0) {
-      await byTestId.first().waitFor({ state: 'visible', timeout: 45_000 });
-      await byTestId.first().click();
+    if (needsSelection) {
+      const byTestId = page.getByTestId('sell-collection-record');
+      if ((await byTestId.count()) > 0) {
+        await byTestId.first().waitFor({ state: 'visible', timeout: 45_000 });
+        await byTestId.first().click();
+        return;
+      }
+      // Pre-testid images: collection rows render as "Artist — Title (format)".
+      const row = page.locator('ul button').filter({ hasText: /\s—\s/ }).first();
+      await row.waitFor({ state: 'visible', timeout: 45_000 });
+      await row.click();
       return;
     }
-    // Pre-testid images: collection rows render as "Artist — Title (format)".
-    const row = page.locator('ul button').filter({ hasText: /\s—\s/ }).first();
-    await row.waitFor({ state: 'visible', timeout: 45_000 });
-    await row.click();
+
+    if (this.capability === 'negotiation_assistance') {
+      const panel = page.getByTestId(prepared.panelTestId);
+      await page
+        .getByTestId('messages-ready')
+        .waitFor({ state: 'attached', timeout: 45_000 })
+        .catch(() => null);
+      const visible = async () =>
+        (await panel.count()) > 0 && (await panel.first().isVisible().catch(() => false));
+      if (!(await visible())) {
+        const threadId = prepared.subject?.thread_id;
+        const byId = threadId
+          ? page.locator(`[data-testid="messages-inbox-item"][data-thread-id="${threadId}"]`)
+          : null;
+        if (byId && (await byId.count()) > 0) {
+          await byId.first().click();
+        } else if ((await page.getByTestId('messages-inbox-item').count()) > 0) {
+          await page.getByTestId('messages-inbox-item').first().click();
+        } else if (threadId) {
+          await page.goto(`/messages?thread=${encodeURIComponent(threadId)}`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 60_000,
+          });
+        }
+      }
+      await panel.first().waitFor({ state: 'visible', timeout: 90_000 });
+    }
   }
 
   async triggerLiveAction(page, prepared) {
@@ -369,17 +397,12 @@ export class BaseProductJourneyAdapter {
     if (trigger === 'auto') return;
 
     if (this.capability === 'negotiation_assistance') {
-      const threadId = prepared.subject?.thread_id;
-      if (threadId) {
-        await page.goto(`/messages?thread=${encodeURIComponent(threadId)}`, {
-          waitUntil: 'domcontentloaded',
-          timeout: 60_000,
-        });
-        await page.getByTestId(prepared.panelTestId).first().waitFor({ state: 'visible', timeout: 60_000 });
-      } else {
-        const thread = page.locator('[data-testid*="thread"], button:has-text("Inquiry"), a[href*="thread="]').first();
-        if (await thread.count()) await thread.click().catch(() => null);
-      }
+      // Thread selection happens in prepareLiveSurface / initial goto; do not re-navigate
+      // here (double goto races inbox hydration on tablet).
+      await page
+        .getByTestId(prepared.panelTestId)
+        .first()
+        .waitFor({ state: 'visible', timeout: 30_000 });
     }
 
     if (trigger === 'semantic_search') {
@@ -547,7 +570,8 @@ export class BaseProductJourneyAdapter {
       };
 
       const panel = page.getByTestId(prepared.panelTestId);
-      await panel.first().waitFor({ state: 'visible', timeout: 60_000 });
+      const panelWaitMs = this.capability === 'negotiation_assistance' ? 90_000 : 60_000;
+      await panel.first().waitFor({ state: 'visible', timeout: panelWaitMs });
       screenshots.push(
         await captureProductScreenshot(page, {
           ...shotBase,

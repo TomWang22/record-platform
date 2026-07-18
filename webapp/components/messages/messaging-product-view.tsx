@@ -563,6 +563,7 @@ export function MessagingProductView() {
                 <button
                   type="button"
                   data-testid="messages-inbox-item"
+                  data-thread-id={thread.id}
                   onClick={() => selectThread(thread.id)}
                   className={`w-full border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/5 ${
                     activeThreadId === thread.id ? 'bg-brand/5' : ''

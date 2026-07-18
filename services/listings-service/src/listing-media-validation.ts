@@ -17,11 +17,28 @@ function isRpContractPlaceholderUrl(raw: string): boolean {
   }
 }
 
+/** Deterministic vinyl sleeve fixtures served by the webapp (contract seeds). */
+function isE2eVinylCoverFixtureUrl(raw: string): boolean {
+  const s = String(raw).trim();
+  if (s.startsWith("data:image/svg+xml") || s.startsWith("data:image/png")) return true;
+  if (s.startsWith("/e2e-fixtures/covers/") && s.endsWith(".svg")) return true;
+  try {
+    const u = new URL(s);
+    return (
+      (u.protocol === "https:" || u.protocol === "http:") &&
+      u.pathname.startsWith("/e2e-fixtures/covers/") &&
+      u.pathname.endsWith(".svg")
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Same-origin paths proxied to media-service (inline signed URLs, etc.). */
 function isOchMediaGatewayPath(raw: string): boolean {
   const s = String(raw).trim();
   if (!s.startsWith("/")) return false;
-  return s.startsWith("/api/media/") || s.startsWith("/media/");
+  return s.startsWith("/api/media/") || s.startsWith("/media/") || isE2eVinylCoverFixtureUrl(s);
 }
 
 export function validateListingImageUrlShape(url: string): ListingImageUrlValidation {
@@ -29,7 +46,7 @@ export function validateListingImageUrlShape(url: string): ListingImageUrlValida
   if (!raw) {
     return { ok: false, message: "empty image URL" };
   }
-  if (isOchMediaGatewayPath(raw)) {
+  if (isE2eVinylCoverFixtureUrl(raw) || isOchMediaGatewayPath(raw)) {
     return { ok: true };
   }
   try {
@@ -61,7 +78,7 @@ export async function validateListingImageUrlHead(
   const shape = validateListingImageUrlShape(url);
   if (!shape.ok) return shape;
   const raw = String(url).trim();
-  if (isOchMediaGatewayPath(raw) || isRpContractPlaceholderUrl(raw)) {
+  if (isOchMediaGatewayPath(raw) || isRpContractPlaceholderUrl(raw) || isE2eVinylCoverFixtureUrl(raw)) {
     return { ok: true };
   }
   if (

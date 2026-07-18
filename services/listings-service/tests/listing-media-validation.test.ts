@@ -18,6 +18,16 @@ describe("listing-media-validation", () => {
     expect(validateListingImageUrlShape("/media/public/x").ok).toBe(true);
   });
 
+  it("accepts e2e vinyl cover fixtures and data URIs", () => {
+    expect(
+      validateListingImageUrlShape(
+        "https://record-platform.test/e2e-fixtures/covers/kenny-dorham.svg",
+      ).ok,
+    ).toBe(true);
+    expect(validateListingImageUrlShape("/e2e-fixtures/covers/kenny-dorham.svg").ok).toBe(true);
+    expect(validateListingImageUrlShape("data:image/svg+xml;base64,PHN2Zy4uLg==").ok).toBe(true);
+  });
+
   it("rejects arbitrary relative paths", () => {
     expect(validateListingImageUrlShape("/api/other/x").ok).toBe(false);
     expect(validateListingImageUrlShape("/not-media/x").ok).toBe(false);

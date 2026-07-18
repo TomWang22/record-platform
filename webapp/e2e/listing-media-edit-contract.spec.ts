@@ -40,7 +40,7 @@ test.describe.serial('Listing media edit persistence (7.5R)', () => {
     await media.locator('input[type="radio"]').nth(2).check()
     await media
       .locator('div.flex.gap-2.rounded-xl', {
-        has: page.locator('img[src*="kenny-dorham"]'),
+        has: page.locator('img[src*="Kenny+Dorham"]'),
       })
       .getByRole('button', { name: 'Remove' })
       .click()
@@ -64,22 +64,22 @@ test.describe.serial('Listing media edit persistence (7.5R)', () => {
 
     await pollListingUntil(request, token, listingId, {
       imageCount: 2,
-      primaryIncludes: 'miles-davis',
+      primaryIncludes: 'Miles+Davis',
     })
 
     const api = await fetchListingApi(request, token, listingId)
     const images = (api.images as string[]) ?? []
     expect(images).toHaveLength(2)
-    expect(String(api.primaryImageUrl ?? images[0])).toContain('miles-davis')
-    expect(images.some((u) => u.includes('art-blakey'))).toBeTruthy()
-    expect(images.some((u) => u.includes('miles-davis'))).toBeTruthy()
-    expect(images.some((u) => u.includes('kenny-dorham'))).toBeFalsy()
+    expect(String(api.primaryImageUrl ?? images[0])).toContain('Miles+Davis')
+    expect(images.some((u) => u.includes('Art+Blakey'))).toBeTruthy()
+    expect(images.some((u) => u.includes('Miles+Davis'))).toBeTruthy()
+    expect(images.some((u) => u.includes('Kenny+Dorham'))).toBeFalsy()
 
     await page.goto(`/listings/${listingId}`, { waitUntil: 'domcontentloaded' })
     await expect(page.getByTestId('listing-detail-ready')).toBeVisible({ timeout: 60_000 })
     await expect(page.getByTestId('listing-primary-image')).toBeVisible({ timeout: 30_000 })
     const primarySrc = await page.getByTestId('listing-primary-image').getAttribute('src')
-    expect(primarySrc ?? '').toContain('miles-davis')
+    expect(primarySrc ?? '').toContain('Miles+Davis')
     await expect(page.getByTestId('listing-gallery-thumbnails').locator('button')).toHaveCount(2)
 
     await capturePageContentScreenshot(
@@ -91,7 +91,7 @@ test.describe.serial('Listing media edit persistence (7.5R)', () => {
     await expect(page.getByTestId('listing-edit-ready')).toBeVisible({ timeout: 60_000 })
     await pollListingUntil(request, token, listingId, {
       imageCount: 2,
-      primaryIncludes: 'miles-davis',
+      primaryIncludes: 'Miles+Davis',
     })
     await capturePageContentScreenshot(
       page,

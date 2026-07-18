@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card'
 import { apiFetch } from '@/lib/api-client'
 import type { CollectionRecord } from '@/lib/records-types'
 import { useRequireAuth } from '@/lib/use-require-auth'
+import { VINYL_COVER_PLACEHOLDER } from '@/lib/vinyl-cover-placeholder'
 
 type MarketplaceItem = {
   title: string
@@ -150,7 +151,7 @@ export function SellListWorkflow({ returnTo = '/sell' }: { returnTo?: string }) 
       const images =
         imageUrls.length > 0
           ? imageUrls
-          : ['/e2e-fixtures/covers/kenny-dorham.svg']
+          : [VINYL_COVER_PLACEHOLDER]
       const pricing_mode =
         form.listingType === 'auction' ? 'auction' : form.listingType === 'obo' ? 'obo' : 'fixed'
       const amenities: string[] = [

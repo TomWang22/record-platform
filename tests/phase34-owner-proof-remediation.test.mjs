@@ -50,7 +50,7 @@ test('entity consistency rejects picsum and SOLD+Active', () => {
   const ok = assertEntityConsistency({
     title: 'Kenny Dorham — Quiet Kenny',
     status: 'active',
-    images: ['/e2e-fixtures/covers/kenny-dorham.svg'],
+    images: ['https://placehold.co/800x800/1a2744/c4a35a/png?text=Kenny+Dorham'],
   });
   assert.equal(ok.ok, true);
 });
@@ -102,6 +102,10 @@ test('vinyl cover fixtures exist and seeds no longer reference picsum', () => {
     const text = fs.readFileSync(path.join(REPO, rel), 'utf8');
     assert.doesNotMatch(text, /picsum\.photos/);
   }
+  assert.match(
+    fs.readFileSync(path.join(REPO, 'webapp/e2e/helpers/vinyl-cover-fixtures.ts'), 'utf8'),
+    /placehold\.co|data:image\/svg\+xml|e2e-fixtures\/covers/,
+  );
 });
 
 test('smoke launcher defaults to smoke-v6 root', () => {

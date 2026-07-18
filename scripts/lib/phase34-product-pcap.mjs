@@ -25,6 +25,7 @@ import {
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PRODUCT_PCAP_SLACK_SEC = Number(process.env.PHASE34_PRODUCT_PCAP_SLACK_SEC || 5);
+/** Extra slack keeps late probes correlated while dumpcap flushes. */
 
 function toEpoch(iso) {
   const t = Date.parse(iso);

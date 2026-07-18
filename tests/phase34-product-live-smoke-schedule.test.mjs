@@ -1,26 +1,70 @@
 /**
- * Live smoke schedule builder tests (offline).
+ * Live smoke-v2 schedule builder tests (offline).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildLiveSmokeSchedule } from '../scripts/phase34-launch-product-harness-live-smoke.mjs';
 import { PRODUCT_CAPABILITIES } from '../scripts/lib/phase34-product-schedule.mjs';
+import {
+  reconcileTerminalScreenshots,
+  assertScreenshotChronology,
+  isTerminalScreenshotState,
+} from '../scripts/lib/phase34-product-terminal-screenshots.mjs';
 
-test('live smoke schedule is 32 sessions with 8 multi-turn and viewport mix', () => {
+test('live smoke-v2 schedule is 64 sessions with 16 multi-turn and viewport mix', () => {
   const s = buildLiveSmokeSchedule();
-  assert.equal(s.logical_sessions, 32);
-  assert.equal(s.rows.length, 32);
-  assert.equal(s.multi_turn_sessions, 8);
-  assert.equal(s.turns_expected, 56);
-  assert.equal(s.protocol_rows_expected, 168);
+  assert.equal(s.logical_sessions, 64);
+  assert.equal(s.rows.length, 64);
+  assert.equal(s.multi_turn_sessions, 16);
+  assert.equal(s.turns_expected, 112);
+  assert.equal(s.protocol_rows_expected, 336);
   for (const cap of PRODUCT_CAPABILITIES) {
-    assert.equal(s.rows.filter((r) => r.capability === cap).length, 4);
+    assert.equal(s.rows.filter((r) => r.capability === cap).length, 8);
     assert.equal(
       s.rows.filter((r) => r.capability === cap && r.multi_turn_class === 'multi_4_12').length,
-      1,
+      2,
     );
   }
-  assert.equal(s.rows.filter((r) => r.smoke_viewport === 'desktop').length, 16);
-  assert.equal(s.rows.filter((r) => r.smoke_viewport === 'tablet').length, 8);
-  assert.equal(s.rows.filter((r) => r.smoke_viewport === 'mobile').length, 8);
+  assert.equal(s.rows.filter((r) => r.smoke_viewport === 'desktop').length, 32);
+  assert.equal(s.rows.filter((r) => r.smoke_viewport === 'tablet').length, 16);
+  assert.equal(s.rows.filter((r) => r.smoke_viewport === 'mobile').length, 16);
+});
+
+test('limitations_expanded is not a terminal screenshot state', () => {
+  assert.equal(isTerminalScreenshotState('limitations_expanded'), false);
+  assert.equal(isTerminalScreenshotState('evidence_expanded'), false);
+  assert.equal(isTerminalScreenshotState('final'), true);
+  assert.equal(isTerminalScreenshotState('stale_data'), true);
+});
+
+test('terminal reconciliation requires exactly one terminal shot per turn', () => {
+  const turns = ['t1', 't2'];
+  const rows = [
+    { turn_id: 't1', state: 'before_action', screenshot_id: 'a' },
+    { turn_id: 't1', state: 'final', screenshot_id: 'b' },
+    { turn_id: 't1', state: 'limitations_expanded', screenshot_id: 'c' },
+    { turn_id: 't2', state: 'before_action', screenshot_id: 'd' },
+  ];
+  const r = reconcileTerminalScreenshots(rows, turns);
+  assert.equal(r.terminal_screenshot_turns, 1);
+  assert.equal(r.turns_missing_terminal_screenshot, 1);
+  assert.equal(r.pass, false);
+});
+
+test('chronology rejects before_action claiming response available', () => {
+  const r = assertScreenshotChronology([
+    {
+      turn_id: 't1',
+      state: 'before_action',
+      captured_at: '2026-07-18T00:00:01.000Z',
+      response_available_at_capture: true,
+    },
+    {
+      turn_id: 't1',
+      state: 'final',
+      captured_at: '2026-07-18T00:00:02.000Z',
+      response_available_at_capture: true,
+    },
+  ]);
+  assert.ok(r.chronology_violations >= 1);
 });

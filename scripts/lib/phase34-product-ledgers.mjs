@@ -305,7 +305,8 @@ export const FORBIDDEN_API_SOAK_ROOTS = Object.freeze([
 
 export const PRODUCT_CANARY_ROOT = '/tmp/phase34-product-gauntlet-canary-v1';
 export const PRODUCT_GAUNTLET_ROOT = '/tmp/phase34-product-gauntlet-v1';
-export const PRODUCT_LIVE_SMOKE_ROOT = '/tmp/phase34-product-harness-live-smoke-v1';
+export const PRODUCT_LIVE_SMOKE_ROOT = '/tmp/phase34-product-harness-live-smoke-v2';
+export const PRODUCT_LIVE_SMOKE_ROOT_V1_FROZEN = '/tmp/phase34-product-harness-live-smoke-v1';
 export const PHASE33F_TARGET_FORBIDDEN = '/tmp/phase33f-capability-gauntlet-target-v1';
 
 export function assertProductOutEligible(out) {

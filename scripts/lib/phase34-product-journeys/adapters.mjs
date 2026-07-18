@@ -23,7 +23,12 @@ export const PRODUCT_JOURNEY_ADAPTER_VERSION = 'phase34-product-journey-adapter-
 /** Actual Next.js routes + mounted panel testids per capability. */
 export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
   scarcity: {
-    routes: ['/listings/[id]', '/records/[id]', '/watchlist'],
+    routes: ['/listings/[id]', '/records/[id]'],
+    mounted_surfaces: [
+      { route: '/listings/[id]', panel: 'intelligence-scarcity-panel', status: 'MOUNTED' },
+      { route: '/records/[id]', panel: 'intelligence-scarcity-panel', status: 'MOUNTED' },
+      { route: '/watchlist', panel: 'intelligence-scarcity-panel', status: 'PRODUCT_SURFACE_MISSING' },
+    ],
     panels: ['intelligence-scarcity-panel'],
     components: [
       'webapp/components/ai/intelligence/scarcity-intelligence-panel.tsx',
@@ -35,6 +40,12 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
   },
   valuation: {
     routes: ['/listings/[id]', '/records/[id]', '/sell', '/listings/[id]/edit'],
+    mounted_surfaces: [
+      { route: '/listings/[id]', panel: 'intelligence-valuation-panel', status: 'MOUNTED' },
+      { route: '/records/[id]', panel: 'intelligence-valuation-panel', status: 'MOUNTED' },
+      { route: '/sell', panel: 'intelligence-valuation-panel', status: 'MOUNTED' },
+      { route: '/listings/[id]/edit', panel: 'intelligence-valuation-panel', status: 'MOUNTED' },
+    ],
     panels: ['intelligence-valuation-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.valuation,
@@ -43,7 +54,16 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
   },
   auction_intelligence: {
     routes: ['/listings/[id]', '/watchlist'],
-    panels: ['intelligence-auction-panel', 'intelligence-watchlist-temperature'],
+    mounted_surfaces: [
+      { route: '/listings/[id]', panel: 'intelligence-auction-panel', status: 'MOUNTED' },
+      {
+        route: '/watchlist',
+        panel: 'intelligence-watchlist-temperature-panel',
+        status: 'MOUNTED',
+        runTestId: 'intelligence-watchlist-temperature-run',
+      },
+    ],
+    panels: ['intelligence-auction-panel', 'intelligence-watchlist-temperature-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.auction_intelligence,
     clientFn: 'fetchAuctionIntelligence',
@@ -52,6 +72,9 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
   },
   embeddings: {
     routes: ['/insights'],
+    mounted_surfaces: [
+      { route: '/insights', panel: 'intelligence-embedding-lineage-panel', status: 'MOUNTED' },
+    ],
     panels: ['intelligence-embedding-lineage-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.embeddings,
@@ -60,7 +83,12 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     runButtonName: /inspect metadata/i,
   },
   semantic_search: {
-    routes: ['/listings', '/market'],
+    routes: ['/listings', '/sell'],
+    mounted_surfaces: [
+      { route: '/listings', panel: 'intelligence-search-chrome', status: 'MOUNTED' },
+      { route: '/sell', panel: 'intelligence-search-chrome', status: 'MOUNTED' },
+      { route: '/market', panel: 'intelligence-search-chrome', status: 'PRODUCT_SURFACE_MISSING' },
+    ],
     panels: ['intelligence-search-chrome'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.semantic_search,
@@ -69,7 +97,11 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     runTestId: 'intelligence-search-run',
   },
   negotiation_assistance: {
-    routes: ['/messages', '/offers'],
+    routes: ['/messages'],
+    mounted_surfaces: [
+      { route: '/messages', panel: 'intelligence-negotiation-panel', status: 'MOUNTED' },
+      { route: '/offers/inbox', panel: 'intelligence-negotiation-panel', status: 'PRODUCT_SURFACE_MISSING' },
+    ],
     panels: ['intelligence-negotiation-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.negotiation_assistance,
@@ -78,7 +110,12 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     runTestId: 'intelligence-negotiation-run',
   },
   recommendations: {
-    routes: ['/dashboard', '/records/[id]', '/watchlist'],
+    routes: ['/dashboard', '/records/[id]'],
+    mounted_surfaces: [
+      { route: '/dashboard', panel: 'intelligence-recommendations-panel', status: 'MOUNTED' },
+      { route: '/records/[id]', panel: 'intelligence-recommendations-panel', status: 'MOUNTED' },
+      { route: '/watchlist', panel: 'intelligence-recommendations-panel', status: 'PRODUCT_SURFACE_MISSING' },
+    ],
     panels: ['intelligence-recommendations-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.recommendations,
@@ -87,7 +124,15 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     runButtonName: /get recommendations/i,
   },
   market_analytics: {
-    routes: ['/insights', '/profile/collection-stats'],
+    routes: ['/insights'],
+    mounted_surfaces: [
+      { route: '/insights', panel: 'intelligence-market-analytics-panel', status: 'MOUNTED' },
+      {
+        route: '/profile/collection-stats',
+        panel: 'intelligence-market-analytics-panel',
+        status: 'PRODUCT_SURFACE_MISSING',
+      },
+    ],
     panels: ['intelligence-market-analytics-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.market_analytics,
@@ -193,12 +238,16 @@ export class BaseProductJourneyAdapter {
     const routeTemplate = this.pickRoute(context);
     const route = resolveConcreteRoute(routeTemplate, subject);
     const requestSeed = this.buildRequestSeed(context, subject);
+    const panelTestId = this.resolvePanelTestId(context);
+    const selectedSurface = context.selected_surface || null;
     return {
       capability: this.capability,
       route,
       routeTemplate,
-      panelTestId: this.registry.panels[0],
+      selected_surface: selectedSurface,
+      panelTestId,
       apiPath: this.registry.apiPath,
+      runTestId: selectedSurface?.runTestId || this.registry.runTestId || null,
       subject,
       requestSeed,
       scenario_id: context.scenario_id,
@@ -215,12 +264,24 @@ export class BaseProductJourneyAdapter {
   }
 
   pickRoute(context) {
-    const routes = this.registry.routes;
+    const surfaces = (this.registry.mounted_surfaces || []).filter((s) => s.status === 'MOUNTED');
+    const mountedRoutes = surfaces.length
+      ? surfaces.map((s) => s.route)
+      : this.registry.routes || [];
     if (this.capability === 'negotiation_assistance' && context.subject?.thread_id) {
       return `/messages?thread=${encodeURIComponent(context.subject.thread_id)}`;
     }
-    // Always use the primary mounted surface for live evidence.
-    return routes[0];
+    const idx = Number(context.surface_route_index ?? context.smoke_index ?? 0);
+    const template = mountedRoutes[Math.abs(idx) % Math.max(mountedRoutes.length, 1)] || mountedRoutes[0];
+    // Stash selected surface for panel override (e.g. watchlist temperature).
+    const surface = surfaces[Math.abs(idx) % Math.max(surfaces.length, 1)] || null;
+    context.selected_surface = surface;
+    return template;
+  }
+
+  resolvePanelTestId(context) {
+    if (context.selected_surface?.panel) return context.selected_surface.panel;
+    return this.registry.panels?.[0] || `intelligence-${this.capability}-panel`;
   }
 
   buildRequestSeed(context, subject) {
@@ -289,8 +350,8 @@ export class BaseProductJourneyAdapter {
       return;
     }
 
-    if (this.registry.runTestId) {
-      await page.getByTestId(this.registry.runTestId).click();
+    if (this.registry.runTestId || prepared.runTestId) {
+      await page.getByTestId(prepared.runTestId || this.registry.runTestId).click();
       return;
     }
     if (this.registry.runButtonName) {
@@ -417,17 +478,37 @@ export class BaseProductJourneyAdapter {
         browser_route: prepared.route,
         pack: prepared.screenshot_pack || 'gauntlet',
         authClass: 'authenticated',
+        expected_locator: `[data-testid="${prepared.panelTestId}"]`,
+        browser_name: 'chromium',
       };
 
       const panel = page.getByTestId(prepared.panelTestId);
       await panel.first().waitFor({ state: 'visible', timeout: 60_000 });
-      screenshots.push(await captureProductScreenshot(page, { ...shotBase, state: 'before_action' }));
+      screenshots.push(
+        await captureProductScreenshot(page, {
+          ...shotBase,
+          state: 'before_action',
+          capture_phase: 'before_action',
+          response_available_at_capture: false,
+          expected_locator_visible: true,
+          terminal_state: null,
+        }),
+      );
 
       const loadingLocator = page.getByTestId(`${prepared.panelTestId}-loading`);
       await this.triggerLiveAction(page, prepared);
 
       if ((await loadingLocator.count()) > 0) {
-        screenshots.push(await captureProductScreenshot(page, { ...shotBase, state: 'loading' }));
+        screenshots.push(
+          await captureProductScreenshot(page, {
+            ...shotBase,
+            state: 'loading',
+            capture_phase: 'loading',
+            response_available_at_capture: false,
+            expected_locator_visible: true,
+            terminal_state: null,
+          }),
+        );
       }
 
       const response = await responsePromise;
@@ -465,10 +546,15 @@ export class BaseProductJourneyAdapter {
       const a11y = await executeAccessibilityChecks(page, { panelTestId: prepared.panelTestId });
       const clientProtocol = await observeClientProtocol(page);
       const finalState = this.classifyVisualState(prepared, responseJson, rendered);
+      const terminalShotState = finalState === 'success' ? 'final' : finalState;
       screenshots.push(
         await captureProductScreenshot(page, {
           ...shotBase,
-          state: finalState === 'success' ? 'final' : finalState,
+          state: terminalShotState,
+          capture_phase: 'terminal',
+          terminal_state: finalState === 'success' ? 'final_success' : finalState,
+          response_available_at_capture: true,
+          expected_locator_visible: true,
           browser_console_error_count: consoleErrors.length,
           failed_request_count: failedRequests.length,
           accessibility_status: a11y.accessibility_result,
@@ -485,12 +571,20 @@ export class BaseProductJourneyAdapter {
           } else if (typeof first.click === 'function') {
             await first.click().catch(() => null);
           }
+          // Re-run a11y on expanded terminal-adjacent state for turn-specific evidence
+          const expandA11y = await executeAccessibilityChecks(page, {
+            panelTestId: prepared.panelTestId,
+          });
           screenshots.push(
             await captureProductScreenshot(page, {
               ...shotBase,
               state: suffix === 'evidence' ? 'evidence_expanded' : 'limitations_expanded',
-              accessibility_status: a11y.accessibility_result,
-              horizontal_overflow: a11y.horizontal_overflow,
+              capture_phase: 'expanded',
+              terminal_state: null,
+              response_available_at_capture: true,
+              expected_locator_visible: true,
+              accessibility_status: expandA11y.accessibility_result,
+              horizontal_overflow: expandA11y.horizontal_overflow,
             }),
           );
         }

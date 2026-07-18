@@ -40,6 +40,11 @@ import {
   ScreenshotManifestWriter,
   PLAYWRIGHT_TRACE_POLICY,
 } from './phase34-product-screenshots.mjs';
+import {
+  reconcileTerminalScreenshots,
+  assertScreenshotChronology,
+} from './phase34-product-terminal-screenshots.mjs';
+import { correlateProductTriplet } from './phase34-product-pcap.mjs';
 
 export const PRODUCT_SESSION_RUNNER_VERSION = 'phase34-product-session-runner-v2';
 
@@ -146,6 +151,8 @@ export async function runProductSession(scheduleRow, opts = {}) {
       prior_state_hash,
       screenshot_pack: opts.screenshotPack || 'gauntlet',
       subject: opts.subject || null,
+      surface_route_index: scheduleRow.surface_route_index ?? scheduleRow.smoke_index ?? 0,
+      smoke_index: scheduleRow.smoke_index ?? 0,
     };
 
     const prepared = await adapter.prepare(context);
@@ -182,6 +189,24 @@ export async function runProductSession(scheduleRow, opts = {}) {
     });
     assertSameCanonicalPayload(triplet);
 
+    let pcapCorrelation = opts.pcapCorrelation || null;
+    let pcap_gap = false;
+    if (opts.liveProtocol === true && opts.pcapOutRoot) {
+      const corr = correlateProductTriplet(opts.pcapOutRoot, triplet);
+      pcapCorrelation = corr.pcap_correlation;
+      pcap_gap = !corr.pass;
+      triplet.h1.pcap_correlation = corr.H1;
+      triplet.h2.pcap_correlation = corr.H2;
+      triplet.h3.pcap_correlation = corr.H3;
+      if (pcap_gap) {
+        const err = new Error(
+          `PCAP correlation failed for turn ${turn_id}: uncorrelated=${corr.uncorrelated_probes}`,
+        );
+        err.code = 'PHASE34_PRODUCT_PCAP_GAP';
+        throw err;
+      }
+    }
+
     const reconciliation = await adapter.reconcileRenderedResult(browserResult, triplet.accepted);
 
     const rendered_result_hash = crypto
@@ -209,6 +234,20 @@ export async function runProductSession(scheduleRow, opts = {}) {
 
     if (live) {
       assertScreenshotsBeforePass(shotRows);
+      const term = reconcileTerminalScreenshots(shotRows, [turn_id]);
+      if (!term.pass) {
+        const err = new Error(
+          `terminal screenshot requirement failed for ${turn_id}: missing=${term.turns_missing_terminal_screenshot} multi=${term.turns_with_multiple_terminal_screenshots}`,
+        );
+        err.code = 'PHASE34_PRODUCT_TERMINAL_SCREENSHOT_REQUIRED';
+        throw err;
+      }
+      const chrono = assertScreenshotChronology(shotRows);
+      if (chrono.chronology_violations > 0) {
+        const err = new Error(`screenshot chronology violations: ${chrono.chronology_violations}`);
+        err.code = 'PHASE34_PRODUCT_SCREENSHOT_CHRONOLOGY';
+        throw err;
+      }
       for (const row of shotRows) screenshotManifest?.append(row);
     }
     allScreenshots.push(...shotRows);
@@ -310,11 +349,24 @@ export async function runProductSession(scheduleRow, opts = {}) {
     turns: turns.map((t) => t.turnRow),
   });
 
+  const a11yResults = turns.map((t) => t.browserResult?.accessibility_result || 'NOT_EXECUTED');
+  const accessibility_result = a11yResults.every((r) => r === 'PASS')
+    ? 'PASS'
+    : a11yResults.some((r) => r === 'FAIL')
+      ? 'FAIL'
+      : a11yResults[0] || 'NOT_EXECUTED';
+  const sessionTerminal = reconcileTerminalScreenshots(
+    allScreenshots,
+    turns.map((t) => t.turnRow.turn_id),
+  );
+
   const sessionPass =
     turns.length > 0 &&
     turns.every((t) => t.turnRow.turn_outcome === 'PASS') &&
     !gate.blocked &&
-    (!live || allScreenshots.length > 0);
+    (!live || allScreenshots.length > 0) &&
+    (!live || sessionTerminal.pass) &&
+    (!live || accessibility_result === 'PASS');
 
   const sessionRecord = {
     schema_version: PRODUCT_SESSION_RUNNER_VERSION,
@@ -338,7 +390,9 @@ export async function runProductSession(scheduleRow, opts = {}) {
     session_outcome: sessionPass ? 'PASS' : 'FAIL',
     screenshot_count: allScreenshots.length,
     screenshot_manifest_entry_ids: allScreenshots.map((s) => s.screenshot_id),
-    accessibility_result: turns[0]?.browserResult?.accessibility_result || 'NOT_EXECUTED',
+    accessibility_result,
+    accessibility_by_turn: a11yResults,
+    terminal_screenshot_coverage: sessionTerminal,
     visual_review_status: 'OWNER_VISUAL_REVIEW_REQUIRED',
     playwright_trace_policy: PLAYWRIGHT_TRACE_POLICY,
     evidence_class: live ? 'LIVE_BROWSER' : 'FIXTURE_UNIT',

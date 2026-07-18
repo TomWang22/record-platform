@@ -21,15 +21,17 @@ export function contractScreenshotDate(now = new Date()) {
 /**
  * Dated output roots under webapp/e2e/screenshots.
  * @param {'authenticated'|'guest'} authClass
- * @param {'gauntlet'|'canary'|'smoke'} pack
+ * @param {'gauntlet'|'canary'|'smoke'|'smoke-v2'} pack
  */
 export function productScreenshotDir(authClass = 'authenticated', pack = 'gauntlet', date = contractScreenshotDate()) {
   const leaf =
     pack === 'canary'
       ? 'phase34-product-canary'
-      : pack === 'smoke'
-        ? 'phase34-product-smoke'
-        : 'phase34-product-gauntlet';
+      : pack === 'smoke-v2'
+        ? 'phase34-product-smoke-v2'
+        : pack === 'smoke'
+          ? 'phase34-product-smoke'
+          : 'phase34-product-gauntlet';
   return path.join(REPO_ROOT, 'webapp/e2e/screenshots', authClass, date, leaf);
 }
 
@@ -123,6 +125,31 @@ export async function captureProductScreenshot(page, meta) {
   const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
   const screenshot_id = `ss_${sha256.slice(0, 16)}`;
 
+  const vp = meta.viewport && typeof meta.viewport === 'object' ? meta.viewport : null;
+  const viewport_name = viewportLabel(meta.viewport || meta.viewport_name);
+  const viewport_width = Number(meta.viewport_width ?? vp?.width ?? 0) || 0;
+  const viewport_height = Number(meta.viewport_height ?? vp?.height ?? 0) || 0;
+  const state = meta.state || 'success';
+  const capture_phase = meta.capture_phase || state;
+  const response_available_at_capture =
+    meta.response_available_at_capture != null
+      ? Boolean(meta.response_available_at_capture)
+      : state !== 'before_action' && state !== 'loading';
+
+  let page_url = meta.page_url || null;
+  let page_title_hash = meta.page_title_hash || null;
+  if (page && typeof page.url === 'function') {
+    try {
+      page_url = page_url || page.url();
+      const title = typeof page.title === 'function' ? await page.title() : '';
+      page_title_hash =
+        page_title_hash ||
+        crypto.createHash('sha256').update(String(title || '')).digest('hex');
+    } catch {
+      /* ignore */
+    }
+  }
+
   const row = {
     schema_version: PRODUCT_SCREENSHOT_SCHEMA_VERSION,
     screenshot_id,
@@ -133,14 +160,31 @@ export async function captureProductScreenshot(page, meta) {
     captured_at: new Date().toISOString(),
     session_id: meta.session_id || null,
     turn_id: meta.turn_id || null,
+    turn_index: meta.turn_index ?? null,
     journey_id: meta.journey_id || null,
     triplet_id: meta.triplet_id || null,
     capability: meta.capability || null,
     scenario_id: meta.scenario_id || null,
     participant_side: meta.participant_side || null,
     browser_route: meta.browser_route || null,
-    viewport: viewportLabel(meta.viewport),
-    state: meta.state || 'success',
+    viewport: viewport_name,
+    viewport_name,
+    viewport_width,
+    viewport_height,
+    device_scale_factor: meta.device_scale_factor ?? 1,
+    color_scheme: meta.color_scheme || 'light',
+    browser_name: meta.browser_name || 'chromium',
+    browser_version: meta.browser_version || null,
+    trace_path: meta.trace_path || null,
+    trace_sha256: meta.trace_sha256 || null,
+    state,
+    terminal_state: meta.terminal_state ?? null,
+    capture_phase,
+    expected_locator: meta.expected_locator || null,
+    expected_locator_visible: meta.expected_locator_visible ?? null,
+    page_url,
+    page_title_hash,
+    response_available_at_capture,
     canonical_request_hash: meta.canonical_request_hash || null,
     accepted_response_hash: meta.accepted_response_hash || null,
     rendered_result_hash: meta.rendered_result_hash || null,
@@ -340,21 +384,23 @@ export function assertScreenshotsBeforePass(screenshotRows, { requireFinal = tru
     throw err;
   }
   if (requireFinal) {
-    const finals = new Set([
+    // Expanded/limitations are NOT terminal — require a true terminal state.
+    const terminals = new Set([
       'final',
+      'final_success',
       'success',
       'abstention',
+      'refusal',
       'unauthorized_refusal',
       'weak_data',
       'stale_data',
       'dense_evidence',
       'service_failure',
       'rate_limit',
-      'evidence_expanded',
-      'limitations_expanded',
+      'terminal_error',
     ]);
-    if (!screenshotRows.some((r) => finals.has(r.state))) {
-      const err = new Error('final-state screenshot missing');
+    if (!screenshotRows.some((r) => terminals.has(r.state))) {
+      const err = new Error('terminal-state screenshot missing');
       err.code = 'PHASE34_PRODUCT_SCREENSHOT_FINAL_MISSING';
       throw err;
     }
@@ -363,6 +409,11 @@ export function assertScreenshotsBeforePass(screenshotRows, { requireFinal = tru
     if (!r.sha256 || !r.relative_path) {
       const err = new Error('screenshot manifest incomplete');
       err.code = 'PHASE34_PRODUCT_SCREENSHOT_MANIFEST_INCOMPLETE';
+      throw err;
+    }
+    if (!(r.viewport_width > 0 && r.viewport_height > 0)) {
+      const err = new Error('screenshot missing viewport_width/viewport_height');
+      err.code = 'PHASE34_PRODUCT_SCREENSHOT_VIEWPORT_MISSING';
       throw err;
     }
   }

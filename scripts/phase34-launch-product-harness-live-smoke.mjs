@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
- * Phase 34 — 32-session LIVE product-harness smoke.
+ * Phase 34 — 64-session LIVE product-harness smoke-v2.
  *
- * Root: /tmp/phase34-product-harness-live-smoke-v1
+ * Root: /tmp/phase34-product-harness-live-smoke-v2
+ * Preserves frozen smoke-v1 at /tmp/phase34-product-harness-live-smoke-v1
  *
  * Requires:
  *   - committed HEAD == origin/main
  *   - exact-SHA CI approval
  *   - PHASE34_PRODUCT_SMOKE_APPROVED_SHA=<head>
- *   - live stack (Next.js + gateway + python-ai) + Chromium
+ *   - live stack + Chromium + PCAP (ChmodBPF dumpcap)
  *   - mkcert (browser front) + certs/dev-chain.pem (strict upstream)
  *
  * Does NOT create canary/full product roots.
@@ -47,6 +48,14 @@ import {
   subjectForCapability,
 } from './lib/phase34-product-live-subjects.mjs';
 import { INTER_BATCH_INTERVAL_MS } from './lib/phase33f-rate-limit.mjs';
+import {
+  startProductPcapCapture,
+  stopProductPcapCapture,
+} from './lib/phase34-product-pcap.mjs';
+import { validateAllProductScreenshots } from './lib/phase34-product-png-validation.mjs';
+import { CAPABILITY_SURFACE_REGISTRY } from './lib/phase34-product-journeys/adapters.mjs';
+import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -120,49 +129,135 @@ function parseArgs(argv) {
 }
 
 /**
- * Build the exact 32-session smoke schedule from the interleaved canary pool.
- * 4 per capability; 1 multi-turn per capability; viewport mix 16/8/8.
+ * Build the exact 64-session smoke-v2 schedule.
+ * 8 per capability; 2 multi-turn per capability; viewport mix 32/16/16.
  */
-export function buildLiveSmokeSchedule(seed = 'phase34-product-live-smoke-v1') {
+export function buildLiveSmokeSchedule(seed = 'phase34-product-live-smoke-v2') {
   const full = buildInterleavedProductSchedule({ scale: 'canary', seed });
   const selected = [];
-  const multiTaken = new Set();
   for (const cap of PRODUCT_CAPABILITIES) {
     const rows = full.rows.filter((r) => r.capability === cap);
-    const multi = rows.find((r) => r.multi_turn_class === 'multi_4_12');
+    const multis = rows.filter((r) => r.multi_turn_class === 'multi_4_12');
     const singles = rows.filter((r) => r.multi_turn_class === 'single');
-    if (multi) {
-      selected.push({ ...multi, multi_turn_class: 'multi_4_12', smoke_turns: 4 });
-      multiTaken.add(cap);
+    for (let m = 0; m < 2; m += 1) {
+      const multi = multis[m] || multis[0];
+      if (multi) {
+        selected.push({
+          ...multi,
+          multi_turn_class: 'multi_4_12',
+          smoke_turns: 4,
+          surface_route_index: selected.filter((r) => r.capability === cap).length,
+        });
+      }
     }
-    while (selected.filter((r) => r.capability === cap).length < 4) {
+    while (selected.filter((r) => r.capability === cap).length < 8) {
       const next = singles.shift();
       if (!next) break;
-      selected.push({ ...next, multi_turn_class: 'single', smoke_turns: 1 });
+      selected.push({
+        ...next,
+        multi_turn_class: 'single',
+        smoke_turns: 1,
+        surface_route_index: selected.filter((r) => r.capability === cap).length,
+      });
     }
   }
   selected.forEach((row, i) => {
-    row.smoke_viewport = i < 16 ? 'desktop' : i < 24 ? 'tablet' : 'mobile';
+    row.smoke_viewport = i < 32 ? 'desktop' : i < 48 ? 'tablet' : 'mobile';
     row.smoke_index = i;
   });
-  if (selected.length !== 32) {
-    const err = new Error(`smoke schedule size ${selected.length} != 32`);
+  if (selected.length !== 64) {
+    const err = new Error(`smoke schedule size ${selected.length} != 64`);
     err.code = 'PHASE34_PRODUCT_SMOKE_SCHEDULE_INVALID';
     throw err;
   }
-  if (multiTaken.size !== 8) {
-    const err = new Error('need one multi-turn session per capability');
+  const multiCount = selected.filter((r) => r.multi_turn_class === 'multi_4_12').length;
+  if (multiCount !== 16) {
+    const err = new Error(`need 16 multi-turn sessions, got ${multiCount}`);
     err.code = 'PHASE34_PRODUCT_SMOKE_MULTITURN_INVALID';
     throw err;
   }
   return {
     seed,
-    logical_sessions: 32,
-    multi_turn_sessions: 8,
-    turns_expected: 24 * 1 + 8 * 4,
-    protocol_rows_expected: (24 * 1 + 8 * 4) * 3,
+    logical_sessions: 64,
+    multi_turn_sessions: 16,
+    turns_expected: 48 * 1 + 16 * 4,
+    protocol_rows_expected: (48 * 1 + 16 * 4) * 3,
     rows: selected,
   };
+}
+
+function resolveRuntimePins() {
+  let runtime_image_digest = process.env.PHASE34_RUNTIME_IMAGE_DIGEST || null;
+  if (!runtime_image_digest) {
+    const img = spawnSync(
+      'kubectl',
+      [
+        '-n',
+        'record-platform',
+        'get',
+        'deploy',
+        'webapp',
+        '-o',
+        'jsonpath={.spec.template.spec.containers[0].image}',
+      ],
+      { encoding: 'utf8' },
+    );
+    if (img.status === 0 && img.stdout?.trim()) {
+      runtime_image_digest = `image:${img.stdout.trim()}`;
+    }
+  }
+  let certificate_fingerprint = process.env.PHASE34_CERT_FINGERPRINT || null;
+  if (!certificate_fingerprint) {
+    const chain = path.join(REPO_ROOT, 'certs/dev-chain.pem');
+    if (fs.existsSync(chain)) {
+      certificate_fingerprint = crypto
+        .createHash('sha256')
+        .update(fs.readFileSync(chain))
+        .digest('hex');
+    }
+  }
+  return { runtime_image_digest, certificate_fingerprint };
+}
+
+function writeRouteCapabilityMatrix(outRoot, results) {
+  const matrix = [];
+  for (const [capability, reg] of Object.entries(CAPABILITY_SURFACE_REGISTRY)) {
+    const sessions = results.filter((r) => r.session?.capability === capability);
+    const routes = [
+      ...new Set(
+        sessions.flatMap((s) =>
+          (s.turns || [])
+            .map((t) => t.browserResult?.browser_route)
+            .filter(Boolean)
+            .concat(s.session?.link ? [] : []),
+        ),
+      ),
+    ];
+    // Also from journey ledger if present later — use session screenshots routes
+    matrix.push({
+      capability,
+      required_product_surfaces: (reg.mounted_surfaces || []).map((s) => ({
+        route: s.route,
+        panel: s.panel,
+        status: s.status,
+      })),
+      actual_routes_visited: routes,
+      session_count: sessions.length,
+      status: sessions.length > 0 ? 'EXERCISED' : 'MISSING',
+    });
+  }
+  fs.writeFileSync(
+    path.join(outRoot, 'route-capability-matrix.json'),
+    JSON.stringify({ matrix }, null, 2) + '\n',
+  );
+  return matrix;
+}
+
+function hashTraceFile(tracePath) {
+  if (!tracePath || !fs.existsSync(tracePath)) return null;
+  const hash = crypto.createHash('sha256');
+  hash.update(fs.readFileSync(tracePath));
+  return hash.digest('hex');
 }
 
 function assertSmokeApproval(headSha) {
@@ -276,10 +371,10 @@ async function main() {
     path.join(opts.out, 'screenshot-disk-projection.json'),
     JSON.stringify(
       projectScreenshotDiskUsage({
-        canarySessions: 32,
-        multiTurnSessions: 8,
+        canarySessions: 64,
+        multiTurnSessions: 16,
         avgMultiTurns: 4,
-        statesPerCanaryTurn: 3,
+        statesPerCanaryTurn: 4,
       }),
       null,
       2,
@@ -290,7 +385,7 @@ async function main() {
     console.log(
       JSON.stringify(
         {
-          kind: 'PRODUCT_HARNESS_LIVE_SMOKE',
+          kind: 'PRODUCT_HARNESS_LIVE_SMOKE_V2',
           execution: 'NOT_EXECUTED',
           out: opts.out,
           schedule: {
@@ -325,11 +420,28 @@ async function main() {
   process.env.BASE_URL = opts.upstreamUrl;
   process.env.E2E_API_BASE = opts.upstreamUrl;
 
+  const runtimePins = resolveRuntimePins();
+  fs.writeFileSync(
+    path.join(opts.out, 'runtime-pins-resolved.json'),
+    JSON.stringify(
+      {
+        ...runtimePins,
+        browser_tls_mode: 'BROWSER_TLS_PROXY_WITH_STRICT_UPSTREAM',
+        direct_chromium_client_cert_mtls: 'NOT_CONFIGURED',
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+
   const proxy = await ensureMkcertProxy({
     proxyPort: opts.proxyPort,
     outRoot: opts.out,
     caCert,
   });
+
+  const pcapStatus = startProductPcapCapture(opts.out);
+  fs.writeFileSync(path.join(opts.out, 'pcap-start.json'), JSON.stringify(pcapStatus, null, 2) + '\n');
 
   const buyer = await loginContractUser({
     baseUrl: opts.upstreamUrl,
@@ -356,7 +468,6 @@ async function main() {
         listing_id_present: Boolean(subjects.listing_id),
         auction_listing_id_present: Boolean(subjects.auction_listing_id),
         thread_id_present: Boolean(subjects.thread_id),
-        // hashed presence only — no raw UUIDs in this summary for privacy-safe logs
       },
       null,
       2,
@@ -371,6 +482,8 @@ async function main() {
         upstream: opts.upstreamUrl,
         browser_base_url: proxy.browserBaseUrl,
         insecure_curl_flags: 0,
+        service_mtls: 'SEPARATE_MATRIX — see PKI gate',
+        direct_chromium_client_cert_mtls: 'NOT_CONFIGURED',
       },
       null,
       2,
@@ -383,11 +496,13 @@ async function main() {
   const results = [];
   const tracesDir = path.join(opts.out, 'playwright-traces');
   fs.mkdirSync(tracesDir, { recursive: true });
+  const traceIndex = [];
 
   const browser = await loadChromium().launch({
     headless: opts.headless,
     ignoreHTTPSErrors: false,
   });
+  const browserVersion = browser.version?.() || null;
 
   try {
     for (const row of schedule.rows) {
@@ -407,13 +522,15 @@ async function main() {
       });
       const page = await context.newPage();
       const tracePath = path.join(tracesDir, `${row.capability}-${row.smoke_index}.zip`);
-      const shouldTrace =
-        row.multi_turn_class === 'multi_4_12' ||
-        row.smoke_index % 4 === 0 ||
-        PLAYWRIGHT_TRACE_POLICY.retain_on.includes('multi_turn_boundary');
-      if (shouldTrace) {
-        await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
-      }
+      // Every smoke-v2 session retains a trace (policy: all sessions for evidence completeness).
+      const shouldTrace = true;
+      const tracePolicyReason =
+        row.multi_turn_class === 'multi_4_12'
+          ? 'multi_turn_boundary'
+          : row.smoke_index % 8 === 0
+            ? 'capability_sample'
+            : 'smoke_v2_all_sessions';
+      await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
 
       try {
         await signInWithToken(page, proxy.browserBaseUrl, {
@@ -429,7 +546,7 @@ async function main() {
           gate,
           ledger,
           screenshotManifest,
-          screenshotPack: 'smoke',
+          screenshotPack: 'smoke-v2',
           turnCount: row.smoke_turns,
           subject: subjectForCapability(subjects, row.capability),
           protocolBaseUrl: opts.upstreamUrl,
@@ -437,25 +554,37 @@ async function main() {
           caCert,
           protocolToken: auth.token,
           token: auth.token,
-          runtimeImagePin: process.env.PHASE34_RUNTIME_IMAGE_DIGEST || null,
-          certificatePin: process.env.PHASE34_CERT_FINGERPRINT || null,
+          runtimeImagePin: runtimePins.runtime_image_digest,
+          certificatePin: runtimePins.certificate_fingerprint,
+          pcapOutRoot: opts.out,
         });
         if (result.session.pin_source === PIN_SOURCE.FIXTURE_SYNTHETIC_PIN) {
           assertLivePinsNotSynthetic(result.session.config_pins);
         }
         results.push(result);
-        if (shouldTrace) {
-          await context.tracing.stop({ path: tracePath });
-          result.session.trace_path = tracePath;
-        }
+        await context.tracing.stop({ path: tracePath });
+        const trace_sha256 = hashTraceFile(tracePath);
+        result.session.trace_path = tracePath;
+        result.session.trace_sha256 = trace_sha256;
+        result.session.trace_policy_reason = tracePolicyReason;
+        result.session.browser_version = browserVersion;
+        traceIndex.push({
+          trace_path: tracePath,
+          trace_sha256,
+          trace_session_id: result.session.session_id,
+          trace_turn_ids: (result.turns || []).map((t) => t.turnRow?.turn_id).filter(Boolean),
+          trace_policy_reason: tracePolicyReason,
+          capability: row.capability,
+          smoke_index: row.smoke_index,
+        });
       } catch (err) {
-        if (shouldTrace) {
-          await context.tracing.stop({ path: tracePath }).catch(() => null);
-        }
+        await context.tracing.stop({ path: tracePath }).catch(() => null);
+        const trace_sha256 = hashTraceFile(tracePath);
         gate.noteSessionResult({
           browser_journey_status: 'FAIL',
           ui_api_reconciliation_status: 'FAIL',
           protocol_status: 'FAIL',
+          pcap_gap: String(err.code || '').includes('PCAP'),
         });
         results.push({
           session: {
@@ -464,6 +593,8 @@ async function main() {
             code: err.code || null,
             capability: row.capability,
             smoke_index: row.smoke_index,
+            trace_path: fs.existsSync(tracePath) ? tracePath : null,
+            trace_sha256,
           },
         });
         break;
@@ -482,43 +613,67 @@ async function main() {
     } catch {
       /* ignore */
     }
+    stopProductPcapCapture(opts.out);
   }
 
+  fs.writeFileSync(
+    path.join(tracesDir, 'trace-index.json'),
+    JSON.stringify({ count: traceIndex.length, traces: traceIndex }, null, 2) + '\n',
+  );
+
   const manifest = screenshotManifest.finalize();
+  const pngValidation = validateAllProductScreenshots(manifest.rows || []);
+  fs.writeFileSync(
+    path.join(opts.out, 'screenshot-png-validation.json'),
+    JSON.stringify(pngValidation, null, 2) + '\n',
+  );
+
   const sheetsDir = path.join(opts.out, 'contact-sheets');
   generateContactSheets(manifest.rows || [], sheetsDir);
+  writeRouteCapabilityMatrix(opts.out, results);
 
   const pass = results.filter((r) => r.session?.session_outcome === 'PASS').length;
   const fail = results.length - pass;
-  const frozen =
-    pass === 32 && fail === 0 && gate.next_session_started_after_hard_failure === 0
-      ? 'FROZEN_PASS_EVIDENCE'
-      : 'FROZEN_BLOCKED_EVIDENCE';
-  fs.writeFileSync(path.join(opts.out, frozen), `${new Date().toISOString()}\n`);
+  const turns = results.reduce((n, r) => n + (r.session?.executed_turn_count || 0), 0);
+  const frozenReady =
+    pass === 64 &&
+    fail === 0 &&
+    turns === 112 &&
+    gate.next_session_started_after_hard_failure === 0 &&
+    pngValidation.pass &&
+    traceIndex.length === 64;
 
   const summary = {
-    kind: 'PRODUCT_HARNESS_LIVE_SMOKE',
+    kind: 'PRODUCT_HARNESS_LIVE_SMOKE_V2',
     execution: 'LIVE',
     out: opts.out,
     head_sha: headSha,
     logical_sessions: results.length,
     logical_pass: pass,
     logical_fail: fail,
-    turns: results.reduce((n, r) => n + (r.session?.executed_turn_count || 0), 0),
+    turns,
+    protocol_rows_expected: 336,
     screenshots: manifest.count,
+    screenshot_png_validation: pngValidation.screenshots_validated,
+    traces: traceIndex.length,
     gate: gate.snapshot(),
-    freeze: frozen,
+    freeze: frozenReady ? 'FROZEN_PASS_EVIDENCE' : 'FROZEN_BLOCKED_EVIDENCE',
     contact_sheets: sheetsDir,
     CONTRACT_SCREENSHOT_DATE: process.env.CONTRACT_SCREENSHOT_DATE,
     browser_tls_mode: proxy.tls_mode,
     ignoreHTTPSErrors: false,
+    direct_chromium_client_cert_mtls: 'NOT_CONFIGURED',
     production: 'NOT APPROVED',
     phase33f_target: 'ABSENT',
     product_canary_root: 'ABSENT',
     product_gauntlet_root: 'ABSENT',
+    smoke_v1_frozen_root: '/tmp/phase34-product-harness-live-smoke-v1',
     first_failure: results.find((r) => r.session?.session_outcome !== 'PASS')?.session || null,
   };
+  // Write summary BEFORE freeze marker so FROZEN_* is last.
   fs.writeFileSync(path.join(opts.out, 'smoke-summary.json'), JSON.stringify(summary, null, 2) + '\n');
+  const frozen = summary.freeze;
+  fs.writeFileSync(path.join(opts.out, frozen), `${new Date().toISOString()}\n`);
   console.log(JSON.stringify(summary, null, 2));
   if (frozen !== 'FROZEN_PASS_EVIDENCE') process.exit(1);
 }

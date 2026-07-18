@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+import { OwnerProofIntentControl } from '@/components/ai/intelligence/owner-proof-intent-control'
 import { IntelligencePanelShell } from '@/components/ai/intelligence/intelligence-panel-shell'
 import { fetchRecommendationsIntelligence, IntelligenceHttpError } from '@/lib/ai-intelligence-client'
 import { assembleRecommendationsRequest, type RecommendationCandidateInput } from '@/lib/ai-recommendations-assembler'
@@ -31,13 +32,20 @@ export function RecommendationsIntelligencePanel({
     result: Record<string, unknown> | null
   }>({ loading: false, error: null, rateLimited: false, result: null })
 
-  async function run() {
+  const [lastIntent, setLastIntent] = useState(
+    'Keep it under $60, exclude picture discs, and diversify artists.',
+  )
+
+  async function run(intent: string) {
     if (!principalId) return
+    setLastIntent(intent)
     setState({ loading: true, error: null, rateLimited: false, result: null })
     try {
-      const response = await fetchRecommendationsIntelligence(
-        assembleRecommendationsRequest({ principalId, candidates }),
-      )
+      const response = await fetchRecommendationsIntelligence({
+        ...assembleRecommendationsRequest({ principalId, candidates }),
+        user_intent: intent,
+        owner_proof_prompt: intent,
+      })
       setState({
         loading: false,
         error: null,
@@ -71,15 +79,17 @@ export function RecommendationsIntelligencePanel({
       freshnessLabel="Paid placement never changes rank · appreciation is not predicted"
     >
       <div className="space-y-2 text-sm">
-        <button
-          type="button"
-          data-testid="intelligence-recommendations-run"
-          onClick={() => void run()}
+        <OwnerProofIntentControl
+          capability="recommendations"
+          defaultIntent={lastIntent}
+          runLabel="Get recommendations"
+          runTestId="intelligence-recommendations-run"
           disabled={!principalId || state.loading}
-          className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-        >
-          Get recommendations
-        </button>
+          onRun={run}
+        />
+        {recommendations.length > 0 ? (
+          <p className="text-xs text-slate-500">Answering: {lastIntent}</p>
+        ) : null}
         {recommendations.map((item, index) => (
           <div
             key={String(item.entity_id || index)}

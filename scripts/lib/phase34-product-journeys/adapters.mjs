@@ -42,8 +42,9 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     ],
     apiPath: CAPABILITY_ROUTE_PATHS.scarcity,
     clientFn: 'fetchScarcityIntelligence',
-    /** Auto-fetches on mount when record subject is present. */
-    trigger: 'auto',
+    /** Owner-proof: visible intent + Analyze click initiates the POST. */
+    trigger: 'click',
+    runTestId: 'intelligence-owner-proof-run',
   },
   valuation: {
     routes: ['/listings/[id]', '/records/[id]', '/sell', '/listings/[id]/edit', '/offers/inbox'],
@@ -74,7 +75,9 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.valuation,
     clientFn: 'fetchValuationIntelligence',
-    trigger: 'auto',
+    /** Owner-proof: visible intent + Analyze click initiates the POST. */
+    trigger: 'click',
+    runTestId: 'intelligence-owner-proof-run',
   },
   auction_intelligence: {
     routes: ['/listings/[id]', '/watchlist', '/auctions'],
@@ -117,6 +120,7 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     clientFn: 'fetchEmbeddingMetadata',
     trigger: 'click',
     runButtonName: /inspect metadata/i,
+    runTestId: 'intelligence-embedding-lineage-run',
   },
   semantic_search: {
     routes: ['/listings', '/sell', '/market'],
@@ -183,6 +187,7 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     clientFn: 'fetchMarketAnalyticsIntelligence',
     trigger: 'click',
     runButtonName: /run descriptive report/i,
+    runTestId: 'intelligence-market-analytics-run',
   },
 });
 
@@ -500,7 +505,16 @@ export class BaseProductJourneyAdapter {
     if (trigger === 'semantic_search') {
       // Listings browse: desktop "Search artist…" / mobile "Search marketplace…".
       // Sell surface: parent-owned "Artist / release" feeds SearchIntelligenceChrome.query.
-      const queryText = prepared.requestSeed?.query || 'Miles Davis Kind of Blue';
+      // Owner-proof also exposes a visible intent textarea on the chrome itself.
+      const queryText =
+        prepared.requestSeed?.user_intent ||
+        prepared.requestSeed?.owner_proof_prompt ||
+        prepared.requestSeed?.query ||
+        'Find first US mono pressings similar to this record under $80.';
+      const ownerIntent = page.getByTestId('intelligence-owner-proof-intent').first();
+      if ((await ownerIntent.count()) > 0 && (await ownerIntent.isVisible().catch(() => false))) {
+        await ownerIntent.fill(String(queryText), { timeout: 15_000 });
+      }
       const candidates = [
         page.getByTestId('sell-comparable-query'),
         page.locator('input[placeholder*="Search artist" i]'),
@@ -521,14 +535,28 @@ export class BaseProductJourneyAdapter {
           )
           .first();
       }
-      await searchInput.waitFor({ state: 'visible', timeout: 15_000 });
-      await searchInput.fill(queryText, { timeout: 15_000 });
+      if ((await searchInput.count()) > 0) {
+        await searchInput.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => null);
+        if (await searchInput.isVisible().catch(() => false)) {
+          await searchInput.fill(String(queryText), { timeout: 15_000 });
+        }
+      }
       await page.getByTestId('intelligence-search-mode-semantic').check({ force: true });
       await page.getByTestId(this.registry.runTestId).click();
       return;
     }
 
     if (this.registry.runTestId || prepared.runTestId) {
+      const intentText =
+        prepared.requestSeed?.user_intent ||
+        prepared.requestSeed?.owner_proof_prompt ||
+        null;
+      if (intentText) {
+        const intent = page.getByTestId('intelligence-owner-proof-intent').first();
+        if ((await intent.count()) > 0 && (await intent.isVisible().catch(() => false))) {
+          await intent.fill(String(intentText), { timeout: 15_000 });
+        }
+      }
       const testId = prepared.runTestId || this.registry.runTestId;
       const btn = page.getByTestId(testId).first();
       await btn.waitFor({ state: 'visible', timeout: 45_000 });

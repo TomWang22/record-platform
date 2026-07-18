@@ -32,7 +32,7 @@ test('owner-proof registry has exactly 24 scenarios (3×8)', () => {
   const raw = loadOwnerProofScenarios();
   assert.equal(raw.scenarios.length, 24);
   validateOwnerProofRegistry(raw);
-  const nego = raw.scenarios.find((s) => s.id === 'negotiation-four-turn-live');
+  const nego = raw.scenarios.find((s) => s.scenario_id === 'negotiation-four-turn-live');
   assert.equal(nego.turns.length, 4);
 });
 
@@ -126,5 +126,18 @@ test('negotiation panel exposes visible user intent and four turn presets', () =
   assert.match(src, /intelligence-negotiation-user-intent/);
   assert.match(src, /They offered \$35/);
   assert.match(src, /Draft the reply/);
+  assert.match(src, /intelligence-negotiation-session-id/);
+  assert.match(src, /intelligence-negotiation-turn-history/);
   assert.doesNotMatch(src, /engine_invoked=/);
+});
+
+test('owner-proof rehearsal launcher is armed but not launched', () => {
+  const src = fs.readFileSync(
+    path.join(REPO, 'scripts/phase34-launch-owner-proof-rehearsal.mjs'),
+    'utf8',
+  );
+  assert.match(src, /READY_NOT_LAUNCHED/);
+  assert.match(src, /phase34-owner-proof-live-rehearsal-v1/);
+  assert.match(src, /OWNER_PROOF_LIVE_BROWSER_EXECUTION_REQUIRES_STACK/);
+  assert.equal(fs.existsSync('/tmp/phase34-owner-proof-live-rehearsal-v1'), false);
 });

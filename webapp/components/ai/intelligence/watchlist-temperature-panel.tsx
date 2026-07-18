@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react'
 
 import { IntelligencePanelShell } from '@/components/ai/intelligence/intelligence-panel-shell'
+import { OwnerProofIntentControl } from '@/components/ai/intelligence/owner-proof-intent-control'
 import {
   gatherLiveSellerAuctionTemperatureEvidence,
   gatherLiveWatchlistTemperatureEvidence,
@@ -73,79 +74,92 @@ export function WatchlistTemperaturePanel({
     overheated: number
     endingBuckets: number
   } | null>(null)
+  const [lastIntent, setLastIntent] = useState(
+    'Which watched lots look underpriced, and which are overheating?',
+  )
 
-  const run = useCallback(async () => {
-    const principalId = getUserIdFromToken(getClientSessionToken())
-    if (!principalId) {
-      setState({
-        status: 'abstained',
-        result: { temperature_label: 'insufficient_data' },
-        reasons: ['Sign in required for authorized watchlist temperature.'],
-      })
-      return
-    }
-
-    setState({ status: 'loading' })
-    try {
-      const assembly =
-        mode === 'seller'
-          ? await gatherLiveSellerAuctionTemperatureEvidence({ principalId })
-          : await gatherLiveWatchlistTemperatureEvidence({ principalId })
-
-      setMeta({
-        asking: assembly.asking_count,
-        sold: assembly.sold_or_completed_count,
-        underpriced: assembly.underpriced_candidates.length,
-        overheated: assembly.overheated_candidates.length,
-        endingBuckets: assembly.ending_concentration.length,
-      })
-
-      const response = await fetchWatchlistTemperature({
-        analysis_mode: 'watchlist_batch',
-        requesting_principal_fixture: assembly.requesting_principal_fixture,
-        principal_id: assembly.principal_id,
-        watchlist_owner_principal_fixture: assembly.watchlist_owner_principal_fixture,
-        unauthorized_watchlist: assembly.unauthorized_watchlist,
-        authorized_scopes: assembly.authorized_scopes,
-        watchlist_auctions: assembly.watchlist_auctions,
-        candidates: assembly.candidates,
-        request_bidder_identity: false,
-        claim_collusion: false,
-        claim_shill_bidding: false,
-      })
-
-      const result = (response.result || {}) as WatchlistTemperatureResult
-      if (assembly.unauthorized_watchlist || isAbstention(result)) {
+  const run = useCallback(
+    async (intent: string) => {
+      const principalId = getUserIdFromToken(getClientSessionToken())
+      if (!principalId) {
         setState({
           status: 'abstained',
-          result,
-          reasons: [...limitationMessages(result.limitations), ...assembly.limitations],
+          result: { temperature_label: 'insufficient_data' },
+          reasons: ['Sign in required for authorized watchlist temperature.'],
         })
         return
       }
-      setState({ status: 'ready', result })
-    } catch (err) {
-      if (err instanceof IntelligenceHttpError) {
+
+      setLastIntent(intent)
+      setState({ status: 'loading' })
+      try {
+        const assembly =
+          mode === 'seller'
+            ? await gatherLiveSellerAuctionTemperatureEvidence({ principalId })
+            : await gatherLiveWatchlistTemperatureEvidence({ principalId })
+
+        setMeta({
+          asking: assembly.asking_count,
+          sold: assembly.sold_or_completed_count,
+          underpriced: assembly.underpriced_candidates.length,
+          overheated: assembly.overheated_candidates.length,
+          endingBuckets: assembly.ending_concentration.length,
+        })
+
+        const response = await fetchWatchlistTemperature({
+          analysis_mode: 'watchlist_batch',
+          requesting_principal_fixture: assembly.requesting_principal_fixture,
+          principal_id: assembly.principal_id,
+          watchlist_owner_principal_fixture: assembly.watchlist_owner_principal_fixture,
+          unauthorized_watchlist: assembly.unauthorized_watchlist,
+          authorized_scopes: assembly.authorized_scopes,
+          watchlist_auctions: assembly.watchlist_auctions,
+          candidates: assembly.candidates,
+          request_bidder_identity: false,
+          claim_collusion: false,
+          claim_shill_bidding: false,
+          user_intent: intent,
+          owner_proof_prompt: intent,
+        })
+
+        const result = (response.result || {}) as WatchlistTemperatureResult
+        if (assembly.unauthorized_watchlist || isAbstention(result)) {
+          setState({
+            status: 'abstained',
+            result,
+            reasons: [...limitationMessages(result.limitations), ...assembly.limitations],
+          })
+          return
+        }
+        setState({ status: 'ready', result })
+      } catch (err) {
+        if (err instanceof IntelligenceHttpError) {
+          setState({
+            status: 'error',
+            httpStatus: err.httpStatus,
+            message: err.message,
+            rateLimited: err.rateLimited,
+          })
+          return
+        }
         setState({
           status: 'error',
-          httpStatus: err.httpStatus,
-          message: err.message,
-          rateLimited: err.rateLimited,
+          message: err instanceof Error ? err.message : 'Watchlist temperature request failed',
         })
-        return
       }
-      setState({
-        status: 'error',
-        message: err instanceof Error ? err.message : 'Watchlist temperature request failed',
-      })
-    }
-  }, [mode])
+    },
+    [mode],
+  )
 
   const result =
     state.status === 'ready' || state.status === 'abstained' ? state.result : null
   const title =
     mode === 'seller' ? 'Seller auction temperature' : 'Watchlist auction temperature'
   const buttonLabel = mode === 'seller' ? 'Analyze seller auctions' : 'Analyze watchlist'
+  const defaultIntent =
+    mode === 'seller'
+      ? 'Which of my ending auctions look underpriced or overheating?'
+      : 'Which watched lots look underpriced, and which are overheating?'
 
   return (
     <IntelligencePanelShell
@@ -171,18 +185,18 @@ export function WatchlistTemperaturePanel({
       }
     >
       <div className="space-y-3 text-sm">
-        <button
-          type="button"
-          onClick={() => void run()}
-          className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-          data-testid={
+        <OwnerProofIntentControl
+          capability="auction_intelligence"
+          defaultIntent={defaultIntent}
+          runLabel={buttonLabel}
+          runTestId={
             mode === 'seller'
               ? 'intelligence-seller-auction-temperature-run'
               : 'intelligence-watchlist-temperature-run'
           }
-        >
-          {buttonLabel}
-        </button>
+          disabled={state.status === 'loading'}
+          onRun={run}
+        />
 
         {state.status === 'ready' && result ? (
           <div
@@ -193,6 +207,9 @@ export function WatchlistTemperaturePanel({
                 : 'intelligence-watchlist-temperature-ready'
             }
           >
+            <p className="text-xs text-slate-500" data-testid="intelligence-watchlist-intent-echo">
+              Answering: {lastIntent}
+            </p>
             <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <dt className="text-xs text-slate-500">Market temperature</dt>

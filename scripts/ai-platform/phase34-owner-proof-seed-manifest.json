@@ -1,0 +1,200 @@
+{
+  "schema_version": "phase34-owner-proof-seed-manifest-v1",
+  "label": "Deterministic entities for the 24 owner-proof scenarios",
+  "product_acceptance": false,
+  "forbidden_media": ["picsum.photos", "loremflickr", "unsplash.com", "placekitten"],
+  "evidence_floors": {
+    "scarcity_success": { "min_observations": 5, "min_visible_evidence_rows": 3 },
+    "valuation_success": { "min_sold_comparables": 3, "min_asking_comparables": 3 },
+    "auction_success": { "min_watched_lots": 5 },
+    "search_success": { "min_results": 5 },
+    "recommendations_success": { "min_candidates": 8, "min_rendered_cards": 5 },
+    "analytics_success": { "min_population": 20 }
+  },
+  "fixtures": [
+    {
+      "seed_fixture_id": "seed-miles-cl1355-exact",
+      "content_hash": "sha256:owner-proof-miles-cl1355-v1",
+      "record": {
+        "artist": "Miles Davis",
+        "title": "Kind of Blue",
+        "catalog_number": "CL 1355",
+        "pressing": "US mono first",
+        "format": "LP",
+        "label": "Columbia",
+        "condition_media": "VG+",
+        "condition_sleeve": "VG",
+        "cover_image": "https://placehold.co/800x800/0d2137/7eb8da/png?text=Miles+Davis",
+        "owner_scope": "contract-buyer"
+      },
+      "listing": {
+        "status": "active",
+        "sold": false,
+        "price_cents": 8500,
+        "currency": "USD",
+        "auction_state": null
+      },
+      "evidence": {
+        "scarcity_observations": 6,
+        "release_level_count": 40,
+        "exact_pressing_count": 6
+      }
+    },
+    {
+      "seed_fixture_id": "seed-miles-cl1355-exact-weak",
+      "content_hash": "sha256:owner-proof-miles-weak-v1",
+      "record": {
+        "artist": "Unknown Private Press",
+        "title": "Untitled Demo",
+        "catalog_number": "",
+        "pressing": "ambiguous",
+        "format": "LP",
+        "label": "Private",
+        "condition_media": "G",
+        "condition_sleeve": "G",
+        "cover_image": "https://placehold.co/800x800/333333/aaaaaa/png?text=Weak+Evidence",
+        "owner_scope": "contract-buyer"
+      },
+      "listing": { "status": "active", "sold": false, "price_cents": 1200, "currency": "USD", "auction_state": null },
+      "evidence": { "scarcity_observations": 0, "release_level_count": 0, "exact_pressing_count": 0 }
+    },
+    {
+      "seed_fixture_id": "seed-kenny-quiet-vgplus",
+      "content_hash": "sha256:owner-proof-kenny-vgplus-v1",
+      "record": {
+        "artist": "Kenny Dorham",
+        "title": "Quiet Kenny",
+        "catalog_number": "BLP 1569",
+        "pressing": "US mono",
+        "format": "LP",
+        "label": "Blue Note",
+        "condition_media": "VG+",
+        "condition_sleeve": "VG",
+        "cover_image": "https://placehold.co/800x800/1a2744/c4a35a/png?text=Kenny+Dorham",
+        "owner_scope": "contract-seller"
+      },
+      "listing": {
+        "status": "active",
+        "sold": false,
+        "price_cents": 4100,
+        "currency": "USD",
+        "auction_state": null,
+        "title": "Kenny Dorham — Quiet Kenny"
+      },
+      "evidence": {
+        "sold_comparables": 4,
+        "asking_comparables": 5
+      }
+    },
+    {
+      "seed_fixture_id": "seed-kenny-quiet-vgplus-weak",
+      "content_hash": "sha256:owner-proof-kenny-weak-v1",
+      "record": {
+        "artist": "Kenny Dorham",
+        "title": "Quiet Kenny (sparse comps)",
+        "catalog_number": "BLP 1569",
+        "pressing": "unknown variant",
+        "format": "LP",
+        "label": "Blue Note",
+        "condition_media": "G+",
+        "condition_sleeve": "G",
+        "cover_image": "https://placehold.co/800x800/1a2744/c4a35a/png?text=Kenny+Sparse",
+        "owner_scope": "contract-seller"
+      },
+      "listing": { "status": "active", "sold": false, "price_cents": 4100, "currency": "USD", "auction_state": null },
+      "evidence": { "sold_comparables": 0, "asking_comparables": 1 }
+    },
+    {
+      "seed_fixture_id": "seed-watchlist-auction-5plus",
+      "content_hash": "sha256:owner-proof-watchlist-5-v1",
+      "watchlist": {
+        "min_lots": 5,
+        "require_auction": true,
+        "ending_windows": ["<6h", "6-24h", "1-3d", "3-7d"],
+        "cover_image_policy": "labelled_sleeve_placeholder"
+      },
+      "evidence": { "bid_event_summaries": true, "bidder_identity_claims": false }
+    },
+    {
+      "seed_fixture_id": "seed-watchlist-auction-5plus-weak",
+      "content_hash": "sha256:owner-proof-watchlist-weak-v1",
+      "watchlist": { "min_lots": 0, "require_auction": false, "intentional_empty": true }
+    },
+    {
+      "seed_fixture_id": "seed-embedding-lineage-current",
+      "content_hash": "sha256:owner-proof-embed-current-v1",
+      "embedding": {
+        "state": "current",
+        "version": "embed-v1",
+        "owner_scope": "contract-buyer",
+        "has_content_hash": true,
+        "has_source_lineage": true
+      }
+    },
+    {
+      "seed_fixture_id": "seed-embedding-lineage-current-weak",
+      "content_hash": "sha256:owner-proof-embed-deleted-v1",
+      "embedding": { "state": "deleted_source", "version": "embed-v1", "owner_scope": "contract-buyer" }
+    },
+    {
+      "seed_fixture_id": "seed-search-us-mono-catalog",
+      "content_hash": "sha256:owner-proof-search-catalog-v1",
+      "search_corpus": { "min_results": 5, "pressing_metadata": true, "modes": ["semantic", "hybrid", "keyword"] }
+    },
+    {
+      "seed_fixture_id": "seed-search-us-mono-catalog-weak",
+      "content_hash": "sha256:owner-proof-search-empty-v1",
+      "search_corpus": { "min_results": 0, "intentional_empty_or_visible_fallback": true }
+    },
+    {
+      "seed_fixture_id": "seed-negotiation-thread-41-offer-35",
+      "content_hash": "sha256:owner-proof-nego-41-35-v1",
+      "thread": {
+        "listing_price_cents": 4100,
+        "offer_cents": 3500,
+        "authorized": true,
+        "automatic_send_allowed": false,
+        "has_composer": true
+      },
+      "evidence": { "sold_asking_valuation": true, "condition": "VG+", "shipping_cents": 600 }
+    },
+    {
+      "seed_fixture_id": "seed-negotiation-thread-41-offer-35-weak",
+      "content_hash": "sha256:owner-proof-nego-refusal-v1",
+      "thread": { "authorized": true, "refuse_unsafe_tactic": true, "automatic_send_allowed": false }
+    },
+    {
+      "seed_fixture_id": "seed-recommendations-candidate-pool-8plus",
+      "content_hash": "sha256:owner-proof-recs-8-v1",
+      "recommendations": {
+        "min_candidates": 8,
+        "min_rendered_cards": 5,
+        "budget_cents_max": 6000,
+        "exclude": ["picture_disc"],
+        "diversity_artists": true
+      }
+    },
+    {
+      "seed_fixture_id": "seed-recommendations-candidate-pool-8plus-weak",
+      "content_hash": "sha256:owner-proof-recs-cold-v1",
+      "recommendations": { "cold_start": true, "min_candidates": 0 }
+    },
+    {
+      "seed_fixture_id": "seed-analytics-bluenote-90d",
+      "content_hash": "sha256:owner-proof-analytics-90d-v1",
+      "analytics": {
+        "label": "Blue Note",
+        "format": "LP",
+        "time_range_days": 90,
+        "min_population": 20,
+        "currency": "USD",
+        "aggregation_method": "completed_sales_descriptive"
+      }
+    },
+    {
+      "seed_fixture_id": "seed-analytics-bluenote-90d-weak",
+      "content_hash": "sha256:owner-proof-analytics-sparse-v1",
+      "analytics": { "time_range_days": 90, "min_population": 0, "intentional_below_policy": true }
+    }
+  ]
+}

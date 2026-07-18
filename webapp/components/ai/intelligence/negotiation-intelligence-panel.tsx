@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { IntelligencePanelShell } from '@/components/ai/intelligence/intelligence-panel-shell'
 import {
@@ -32,6 +32,14 @@ type NegotiationResult = {
   automatic_send_allowed?: boolean
   engine_invoked?: boolean
   [key: string]: unknown
+}
+
+type NegotiationTurnRecord = {
+  turn_index: number
+  turn_id: string
+  intent: string
+  summary: string
+  result_hash: string
 }
 
 type NegotiationIntelligencePanelProps = {
@@ -74,6 +82,19 @@ function activeMessages(messages: MessagingThreadMessage[]): MessagingThreadMess
   return messages.filter((m) => Boolean(m.body?.trim()))
 }
 
+function newId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function hashSummary(text: string): string {
+  let h = 0
+  for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) >>> 0
+  return `h${h.toString(16)}`
+}
+
 export function NegotiationIntelligencePanel({
   threadId,
   thread,
@@ -85,6 +106,8 @@ export function NegotiationIntelligencePanel({
   const [draft, setDraft] = useState('')
   const [userIntent, setUserIntent] = useState(DEFAULT_INTENT)
   const [engineInvoked, setEngineInvoked] = useState<boolean | null>(null)
+  const [sessionId] = useState(() => newId('nego-session'))
+  const [turnHistory, setTurnHistory] = useState<NegotiationTurnRecord[]>([])
 
   const run = useCallback(async () => {
     if (!threadId || !thread || !currentUserId) {
@@ -111,6 +134,15 @@ export function NegotiationIntelligencePanel({
       principals.push(currentUserId)
     }
 
+    const turnIndex = turnHistory.length
+    const turnId = newId(`turn-${turnIndex + 1}`)
+    const priorContext = turnHistory.map((t) => ({
+      turn_index: t.turn_index,
+      turn_id: t.turn_id,
+      intent: t.intent,
+      summary: t.summary,
+    }))
+
     try {
       const response = await fetchNegotiationAssistance({
         requesting_principal_fixture: currentUserId,
@@ -132,6 +164,11 @@ export function NegotiationIntelligencePanel({
         request_auto_send: false,
         user_intent: userIntent.trim(),
         owner_proof_prompt: userIntent.trim(),
+        session_id: sessionId,
+        turn_id: turnId,
+        turn_index: turnIndex,
+        prior_turns: priorContext,
+        correction_precedence: priorContext.length > 0,
       })
 
       const envelope = response as Record<string, unknown>
@@ -155,6 +192,17 @@ export function NegotiationIntelligencePanel({
 
       const draftText = String(result.draft_reply || result.reply_draft || '').trim()
       setDraft(draftText)
+      const summary = String(result.summary || result.strategy || draftText || 'completed').trim()
+      setTurnHistory((prev) => [
+        ...prev,
+        {
+          turn_index: turnIndex,
+          turn_id: turnId,
+          intent: userIntent.trim(),
+          summary,
+          result_hash: hashSummary(`${turnId}:${summary}:${draftText}`),
+        },
+      ])
       setState({ status: 'ready', result: { ...result, automatic_send_allowed: false } })
     } catch (err) {
       if (err instanceof IntelligenceHttpError) {
@@ -171,16 +219,20 @@ export function NegotiationIntelligencePanel({
         message: err instanceof Error ? err.message : 'Negotiation assistance failed',
       })
     }
-  }, [askingPrice, currentUserId, thread, threadId, userIntent])
+  }, [askingPrice, currentUserId, sessionId, thread, threadId, turnHistory, userIntent])
 
   useEffect(() => {
     setState({ status: 'idle' })
     setDraft('')
     setEngineInvoked(null)
+    setTurnHistory([])
+    setUserIntent(DEFAULT_INTENT)
   }, [threadId])
 
   const result =
     state.status === 'ready' || state.status === 'abstained' ? state.result : null
+
+  const sessionLabel = useMemo(() => `session ${sessionId.slice(-8)}`, [sessionId])
 
   return (
     <IntelligencePanelShell
@@ -200,11 +252,27 @@ export function NegotiationIntelligencePanel({
         engineInvoked == null
           ? null
           : engineInvoked
-            ? 'Analysis completed · drafts are never sent automatically'
+            ? `Analysis completed · ${sessionLabel} · drafts are never sent automatically`
             : 'Analysis was not run for this thread'
       }
     >
       <div className="space-y-3 text-sm">
+        <p className="text-[11px] text-slate-500" data-testid="intelligence-negotiation-session-id">
+          Stable session: {sessionId} · turns completed: {turnHistory.length}
+        </p>
+        {turnHistory.length > 0 ? (
+          <ol
+            className="space-y-1 rounded-md border border-slate-200 p-2 text-xs dark:border-white/10"
+            data-testid="intelligence-negotiation-turn-history"
+          >
+            {turnHistory.map((t) => (
+              <li key={t.turn_id} data-testid={`intelligence-negotiation-prior-turn-${t.turn_index + 1}`}>
+                <strong>Turn {t.turn_index + 1}:</strong> {t.intent}
+                <span className="block text-slate-500">{t.summary}</span>
+              </li>
+            ))}
+          </ol>
+        ) : null}
         <label className="block space-y-1">
           <span className="text-xs font-medium text-slate-500">Your question</span>
           <textarea

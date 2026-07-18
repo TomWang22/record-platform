@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { IntelligencePanelShell } from '@/components/ai/intelligence/intelligence-panel-shell'
+import { OwnerProofIntentControl } from '@/components/ai/intelligence/owner-proof-intent-control'
 import {
   fetchValuationIntelligence,
   IntelligenceHttpError,
@@ -57,20 +58,23 @@ type ValuationIntelligencePanelProps = {
   advisoryOnly?: boolean
 }
 
+const DEFAULT_INTENT =
+  'What is a quick-sale price versus a patient-sale price for this VG+ copy?'
+
 export function ValuationIntelligencePanel({
   record,
   advisoryOnly = true,
 }: ValuationIntelligencePanelProps) {
   const [state, setState] = useState<IntelligencePanelState<ValuationResult>>({ status: 'idle' })
   const [soldAsking, setSoldAsking] = useState<{ sold: number; asking: number } | null>(null)
+  const [lastIntent, setLastIntent] = useState(DEFAULT_INTENT)
 
-  useEffect(() => {
-    let cancelled = false
-    async function run() {
+  const run = useCallback(
+    async (intent: string) => {
+      setLastIntent(intent)
       setState({ status: 'loading' })
       try {
         const assembly = await gatherLiveValuationEvidenceForRecord(record)
-        if (cancelled) return
         setSoldAsking({ sold: assembly.sold_count, asking: assembly.asking_count })
 
         const response = await fetchValuationIntelligence({
@@ -86,8 +90,9 @@ export function ValuationIntelligencePanel({
           authorized_scopes: assembly.authorized_scopes,
           currency: 'USD',
           min_sold_comps: 2,
+          user_intent: intent,
+          owner_proof_prompt: intent,
         })
-        if (cancelled) return
         const result = (response.result || {}) as ValuationResult
         if (isValuationAbstention(result)) {
           setState({
@@ -99,7 +104,6 @@ export function ValuationIntelligencePanel({
         }
         setState({ status: 'ready', result })
       } catch (err) {
-        if (cancelled) return
         if (err instanceof IntelligenceHttpError) {
           setState({
             status: 'error',
@@ -114,12 +118,9 @@ export function ValuationIntelligencePanel({
           message: err instanceof Error ? err.message : 'Valuation request failed',
         })
       }
-    }
-    void run()
-    return () => {
-      cancelled = true
-    }
-  }, [record])
+    },
+    [record],
+  )
 
   const result =
     state.status === 'ready' || state.status === 'abstained' ? state.result : null
@@ -135,7 +136,7 @@ export function ValuationIntelligencePanel({
       }
       testId="intelligence-valuation-panel"
       capability="valuation"
-      loading={state.status === 'loading' || state.status === 'idle'}
+      loading={state.status === 'loading'}
       errorMessage={state.status === 'error' ? state.message : null}
       rateLimited={state.status === 'error' ? state.rateLimited : false}
       abstained={state.status === 'abstained'}
@@ -145,41 +146,53 @@ export function ValuationIntelligencePanel({
       evidence={result?.evidence as never}
       freshnessLabel={
         soldAsking
-          ? `sold_comps=${soldAsking.sold}; asking=${soldAsking.asking}; advisory_only=${String(advisoryOnly)}`
+          ? `${soldAsking.sold} sold comps · ${soldAsking.asking} asking · advisory only`
           : null
       }
     >
-      {state.status === 'ready' && result ? (
-        <div className="space-y-2 text-sm" data-testid="intelligence-valuation-ready">
-          <dl className="grid gap-2 sm:grid-cols-3">
-            <div>
-              <dt className="text-xs text-slate-500">Quick sale</dt>
-              <dd data-testid="intelligence-valuation-quick">
-                {formatRange(result.quick_sale_range, currency)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-500">Fair market</dt>
-              <dd data-testid="intelligence-valuation-fair">
-                {formatRange(result.fair_market_range, currency)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-500">Patient sale</dt>
-              <dd data-testid="intelligence-valuation-patient">
-                {formatRange(result.patient_sale_range, currency)}
-              </dd>
-            </div>
-          </dl>
-          <p className="text-xs text-slate-500">
-            Sold count: {result.sold_comparable_count ?? soldAsking?.sold ?? '—'} · Asking count:{' '}
-            {result.asking_price_count ?? soldAsking?.asking ?? '—'}
-          </p>
-          <p className="text-xs text-amber-700 dark:text-amber-300">
-            Ranges are not a single exact price. You must choose any listing price yourself.
-          </p>
-        </div>
-      ) : null}
+      <div className="space-y-3 text-sm">
+        <OwnerProofIntentControl
+          capability="valuation"
+          defaultIntent={DEFAULT_INTENT}
+          runLabel="Analyze valuation"
+          disabled={state.status === 'loading'}
+          onRun={run}
+        />
+        {state.status === 'ready' && result ? (
+          <div className="space-y-2" data-testid="intelligence-valuation-ready">
+            <p className="text-xs text-slate-500" data-testid="intelligence-valuation-intent-echo">
+              Answering: {lastIntent}
+            </p>
+            <dl className="grid gap-2 sm:grid-cols-3">
+              <div>
+                <dt className="text-xs text-slate-500">Quick sale</dt>
+                <dd data-testid="intelligence-valuation-quick">
+                  {formatRange(result.quick_sale_range, currency)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Fair market</dt>
+                <dd data-testid="intelligence-valuation-fair">
+                  {formatRange(result.fair_market_range, currency)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Patient sale</dt>
+                <dd data-testid="intelligence-valuation-patient">
+                  {formatRange(result.patient_sale_range, currency)}
+                </dd>
+              </div>
+            </dl>
+            <p className="text-xs text-slate-500">
+              Sold count: {result.sold_comparable_count ?? soldAsking?.sold ?? '—'} · Asking count:{' '}
+              {result.asking_price_count ?? soldAsking?.asking ?? '—'}
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Ranges are not a single exact price. You must choose any listing price yourself.
+            </p>
+          </div>
+        ) : null}
+      </div>
     </IntelligencePanelShell>
   )
 }

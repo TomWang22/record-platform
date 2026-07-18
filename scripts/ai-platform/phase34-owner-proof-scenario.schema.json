@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "phase34-owner-proof-scenario.schema.json",
+  "title": "Phase 34 executable owner-proof scenario",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "count",
+    "scenarios",
+    "rehearsal"
+  ],
+  "properties": {
+    "schema_version": { "const": "phase34-owner-proof-scenarios-v2" },
+    "count": { "const": 24 },
+    "rehearsal": {
+      "type": "object",
+      "required": ["logical_scenarios", "total_turns", "protocol_rows", "root"],
+      "properties": {
+        "logical_scenarios": { "const": 24 },
+        "single_turn": { "const": 23 },
+        "multi_turn_scenarios": { "const": 1 },
+        "multi_turn_length": { "const": 4 },
+        "total_turns": { "const": 27 },
+        "protocol_rows": { "const": 81 },
+        "root": { "type": "string" }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": { "$ref": "#/$defs/scenario" }
+    }
+  },
+  "$defs": {
+    "scenario": {
+      "type": "object",
+      "required": [
+        "scenario_id",
+        "capability",
+        "scenario_class",
+        "participant_side",
+        "authentication_role",
+        "viewport",
+        "canonical_route",
+        "fallback_route_forbidden",
+        "seed_fixture_id",
+        "subject_entity_id",
+        "user_intent",
+        "input_control_selector",
+        "input_value",
+        "initiating_action_selector",
+        "initiating_action",
+        "expected_endpoint",
+        "expected_method",
+        "expected_request_capability",
+        "request_body_required_fields",
+        "terminal_panel_selector",
+        "loading_selectors",
+        "required_visible_customer_fields",
+        "required_hidden_internal_fields",
+        "minimum_evidence",
+        "expected_terminal_state",
+        "expected_invocation_components",
+        "required_screenshot_states",
+        "required_protocols",
+        "material_parity_fields",
+        "latency_measurement_points",
+        "accessibility_checks",
+        "privacy_checks",
+        "safety_checks",
+        "human_review_question",
+        "executability"
+      ],
+      "properties": {
+        "scenario_id": { "type": "string", "minLength": 3 },
+        "capability": {
+          "enum": [
+            "scarcity",
+            "valuation",
+            "auction_intelligence",
+            "embeddings",
+            "semantic_search",
+            "negotiation_assistance",
+            "recommendations",
+            "market_analytics"
+          ]
+        },
+        "scenario_class": { "enum": ["A_success", "B_correction", "C_honest_limit"] },
+        "participant_side": { "enum": ["buyer", "seller"] },
+        "authentication_role": { "type": "string" },
+        "viewport": { "enum": ["desktop", "tablet", "mobile"] },
+        "canonical_route": { "type": "string", "minLength": 1 },
+        "fallback_route_forbidden": { "type": "array", "items": { "type": "string" } },
+        "seed_fixture_id": { "type": "string" },
+        "subject_entity_id": { "type": "string" },
+        "subject_listing_id": { "type": ["string", "null"] },
+        "subject_thread_id": { "type": ["string", "null"] },
+        "subject_watchlist_id": { "type": ["string", "null"] },
+        "user_intent": { "type": "string", "minLength": 8 },
+        "input_control_selector": { "type": "string" },
+        "input_value": { "type": "string" },
+        "pre_action_selector": { "type": ["string", "null"] },
+        "initiating_action_selector": { "type": "string" },
+        "initiating_action": { "type": "string" },
+        "expected_endpoint": { "type": "string", "pattern": "^/api/ai/intelligence/" },
+        "expected_method": { "const": "POST" },
+        "expected_request_capability": { "type": "string" },
+        "request_body_required_fields": { "type": "array", "items": { "type": "string" } },
+        "terminal_panel_selector": { "type": "string" },
+        "loading_selectors": { "type": "array", "items": { "type": "string" } },
+        "required_visible_customer_fields": { "type": "array", "items": { "type": "string" } },
+        "required_hidden_internal_fields": { "type": "array", "items": { "type": "string" } },
+        "minimum_evidence": { "type": "integer", "minimum": 0 },
+        "minimum_results": { "type": "integer", "minimum": 0 },
+        "minimum_watchlist_lots": { "type": "integer", "minimum": 0 },
+        "minimum_recommendation_cards": { "type": "integer", "minimum": 0 },
+        "allow_empty_evidence": { "type": "boolean" },
+        "expected_terminal_state": { "type": "string" },
+        "expected_invocation_components": { "type": "array", "items": { "type": "string" } },
+        "expected_not_invoked_by_policy": { "type": "array" },
+        "required_screenshot_states": { "type": "array", "minItems": 1 },
+        "required_protocols": {
+          "type": "array",
+          "items": { "enum": ["H1", "H2", "H3"] }
+        },
+        "material_parity_fields": { "type": "array", "items": { "type": "string" } },
+        "latency_measurement_points": { "type": "array", "items": { "type": "string" } },
+        "accessibility_checks": { "type": "array", "items": { "type": "string" } },
+        "privacy_checks": { "type": "array", "items": { "type": "string" } },
+        "safety_checks": { "type": "array", "items": { "type": "string" } },
+        "human_review_question": { "type": "string" },
+        "turns": { "type": "array", "items": { "type": "string" } },
+        "executability": { "const": "FULLY_EXECUTABLE" }
+      }
+    }
+  }
+}

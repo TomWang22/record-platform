@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react'
 
 import { IntelligencePanelShell } from '@/components/ai/intelligence/intelligence-panel-shell'
+import { OwnerProofIntentControl } from '@/components/ai/intelligence/owner-proof-intent-control'
 import { gatherLiveAuctionDetailEvidence } from '@/lib/ai-auction-evidence'
 import {
   fetchAuctionIntelligence,
@@ -56,68 +57,78 @@ function formatMetric(value: number | undefined | null, digits = 2): string {
   return String(Math.round(value * 10 ** digits) / 10 ** digits)
 }
 
+const DEFAULT_AUCTION_INTENT =
+  'Is this auction underpriced relative to recent comps, or overheating near close?'
+
 export function AuctionIntelligencePanel({ listingId }: AuctionIntelligencePanelProps) {
   const [state, setState] = useState<IntelligencePanelState<AuctionResult>>({ status: 'idle' })
   const [freshness, setFreshness] = useState<string | null>(null)
+  const [lastIntent, setLastIntent] = useState(DEFAULT_AUCTION_INTENT)
 
-  const run = useCallback(async () => {
-    const principalId = getUserIdFromToken(getClientSessionToken())
-    if (!principalId) {
-      setState({
-        status: 'abstained',
-        result: { temperature_label: 'insufficient_data' },
-        reasons: ['Sign in required for authorized auction intelligence.'],
-      })
-      return
-    }
-
-    setState({ status: 'loading' })
-    try {
-      const assembly = await gatherLiveAuctionDetailEvidence({ listingId, principalId })
-      setFreshness(
-        `asking=${assembly.asking_count}; sold_or_completed=${assembly.sold_or_completed_count}; stale=${String(assembly.auction.stale)}`,
-      )
-
-      const response = await fetchAuctionIntelligence({
-        analysis_mode: 'single_auction',
-        requesting_principal_fixture: assembly.requesting_principal_fixture,
-        principal_id: assembly.principal_id,
-        authorized_scopes: assembly.authorized_scopes,
-        subject: assembly.subject,
-        auction: assembly.auction,
-        candidates: assembly.candidates,
-        comparable_auctions: assembly.comparable_auctions,
-        request_bidder_identity: false,
-        claim_collusion: false,
-        claim_shill_bidding: false,
-      })
-
-      const result = (response.result || {}) as AuctionResult
-      if (isAuctionAbstention(result)) {
+  const run = useCallback(
+    async (intent: string) => {
+      const principalId = getUserIdFromToken(getClientSessionToken())
+      if (!principalId) {
         setState({
           status: 'abstained',
-          result,
-          reasons: [...limitationMessages(result.limitations), ...assembly.limitations],
+          result: { temperature_label: 'insufficient_data' },
+          reasons: ['Sign in required for authorized auction intelligence.'],
         })
         return
       }
-      setState({ status: 'ready', result })
-    } catch (err) {
-      if (err instanceof IntelligenceHttpError) {
+
+      setLastIntent(intent)
+      setState({ status: 'loading' })
+      try {
+        const assembly = await gatherLiveAuctionDetailEvidence({ listingId, principalId })
+        setFreshness(
+          `asking=${assembly.asking_count}; sold_or_completed=${assembly.sold_or_completed_count}; stale=${String(assembly.auction.stale)}`,
+        )
+
+        const response = await fetchAuctionIntelligence({
+          analysis_mode: 'single_auction',
+          requesting_principal_fixture: assembly.requesting_principal_fixture,
+          principal_id: assembly.principal_id,
+          authorized_scopes: assembly.authorized_scopes,
+          subject: assembly.subject,
+          auction: assembly.auction,
+          candidates: assembly.candidates,
+          comparable_auctions: assembly.comparable_auctions,
+          request_bidder_identity: false,
+          claim_collusion: false,
+          claim_shill_bidding: false,
+          user_intent: intent,
+          owner_proof_prompt: intent,
+        })
+
+        const result = (response.result || {}) as AuctionResult
+        if (isAuctionAbstention(result)) {
+          setState({
+            status: 'abstained',
+            result,
+            reasons: [...limitationMessages(result.limitations), ...assembly.limitations],
+          })
+          return
+        }
+        setState({ status: 'ready', result })
+      } catch (err) {
+        if (err instanceof IntelligenceHttpError) {
+          setState({
+            status: 'error',
+            httpStatus: err.httpStatus,
+            message: err.message,
+            rateLimited: err.rateLimited,
+          })
+          return
+        }
         setState({
           status: 'error',
-          httpStatus: err.httpStatus,
-          message: err.message,
-          rateLimited: err.rateLimited,
+          message: err instanceof Error ? err.message : 'Auction intelligence request failed',
         })
-        return
       }
-      setState({
-        status: 'error',
-        message: err instanceof Error ? err.message : 'Auction intelligence request failed',
-      })
-    }
-  }, [listingId])
+    },
+    [listingId],
+  )
 
   const result =
     state.status === 'ready' || state.status === 'abstained' ? state.result : null
@@ -138,18 +149,20 @@ export function AuctionIntelligencePanel({ listingId }: AuctionIntelligencePanel
       freshnessLabel={freshness}
     >
       <div className="space-y-3 text-sm">
-        <button
-          type="button"
-          onClick={() => void run()}
-          disabled={!listingId}
-          className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-          data-testid="intelligence-auction-run"
-        >
-          Analyze auction
-        </button>
+        <OwnerProofIntentControl
+          capability="auction_intelligence"
+          defaultIntent={DEFAULT_AUCTION_INTENT}
+          runLabel="Analyze auction"
+          runTestId="intelligence-auction-run"
+          disabled={!listingId || state.status === 'loading'}
+          onRun={run}
+        />
 
         {state.status === 'ready' && result ? (
           <div className="space-y-2" data-testid="intelligence-auction-ready">
+            <p className="text-xs text-slate-500" data-testid="intelligence-auction-intent-echo">
+              Answering: {lastIntent}
+            </p>
             <dl className="grid gap-2 sm:grid-cols-2">
               <div>
                 <dt className="text-xs text-slate-500">Market temperature</dt>

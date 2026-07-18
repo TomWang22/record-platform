@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { IntelligencePanelShell } from '@/components/ai/intelligence/intelligence-panel-shell'
+import { OwnerProofIntentControl } from '@/components/ai/intelligence/owner-proof-intent-control'
 import {
   fetchScarcityIntelligence,
   IntelligenceHttpError,
@@ -23,21 +24,23 @@ type ScarcityIntelligencePanelProps = {
   assemblyOverride?: ScarcityAssemblyResult
 }
 
+const DEFAULT_INTENT =
+  'Is this exact CL 1355 pressing scarce, or only the release generally?'
+
 export function ScarcityIntelligencePanel({
   record,
   assemblyOverride,
 }: ScarcityIntelligencePanelProps) {
   const [state, setState] = useState<IntelligencePanelState<ScarcityResult>>({ status: 'idle' })
   const [assemblyMeta, setAssemblyMeta] = useState<ScarcityAssemblyResult | null>(null)
+  const [lastIntent, setLastIntent] = useState(DEFAULT_INTENT)
 
-  useEffect(() => {
-    let cancelled = false
-    async function run() {
+  const run = useCallback(
+    async (intent: string) => {
+      setLastIntent(intent)
       setState({ status: 'loading' })
       try {
-        const assembly =
-          assemblyOverride ?? (await gatherLiveMarketEvidenceForRecord(record))
-        if (cancelled) return
+        const assembly = assemblyOverride ?? (await gatherLiveMarketEvidenceForRecord(record))
         setAssemblyMeta(assembly)
 
         const response = await fetchScarcityIntelligence({
@@ -55,8 +58,9 @@ export function ScarcityIntelligencePanel({
           require_exact_pressing: assembly.require_exact_pressing,
           active_supply_count: assembly.active_supply_count,
           recent_sale_count: assembly.recent_sale_count,
+          user_intent: intent,
+          owner_proof_prompt: intent,
         })
-        if (cancelled) return
         const result = response.result
         if (!result) {
           setState({
@@ -69,16 +73,12 @@ export function ScarcityIntelligencePanel({
           setState({
             status: 'abstained',
             result,
-            reasons: [
-              ...limitationMessages(result.limitations),
-              ...assembly.limitations,
-            ],
+            reasons: [...limitationMessages(result.limitations), ...assembly.limitations],
           })
           return
         }
         setState({ status: 'ready', result })
       } catch (err) {
-        if (cancelled) return
         if (err instanceof IntelligenceHttpError) {
           setState({
             status: 'error',
@@ -93,12 +93,9 @@ export function ScarcityIntelligencePanel({
           message: err instanceof Error ? err.message : 'Scarcity request failed',
         })
       }
-    }
-    void run()
-    return () => {
-      cancelled = true
-    }
-  }, [record, assemblyOverride])
+    },
+    [assemblyOverride, record],
+  )
 
   const result =
     state.status === 'ready' || state.status === 'abstained' ? state.result : null
@@ -109,7 +106,7 @@ export function ScarcityIntelligencePanel({
       description="Exact-pressing vs release-level scarcity from live authorized market evidence. Zero inventory alone never means rare."
       testId="intelligence-scarcity-panel"
       capability="scarcity"
-      loading={state.status === 'loading' || state.status === 'idle'}
+      loading={state.status === 'loading'}
       errorMessage={state.status === 'error' ? state.message : null}
       rateLimited={state.status === 'error' ? state.rateLimited : false}
       abstained={state.status === 'abstained'}
@@ -119,36 +116,43 @@ export function ScarcityIntelligencePanel({
       evidence={result?.evidence}
       freshnessLabel={
         assemblyMeta
-          ? `assembler=${assemblyMeta.assembler_version}; pressing=${assemblyMeta.subject.pressing_identity_confidence}; asking=${assemblyMeta.asking_count}; sold=${assemblyMeta.sold_count}; sources=${assemblyMeta.evidence_sources.join(',') || 'none'}`
+          ? `Pressing confidence ${assemblyMeta.subject.pressing_identity_confidence} · ${assemblyMeta.asking_count} asking · ${assemblyMeta.sold_count} sold`
           : null
       }
     >
-      {state.status === 'ready' && result ? (
-        <div
-          className="space-y-2 text-sm text-slate-800 dark:text-slate-100"
-          data-testid="intelligence-scarcity-ready"
-        >
-          <p>
-            Label:{' '}
-            <span className="font-semibold capitalize" data-testid="intelligence-scarcity-label">
-              {result.scarcity_label}
-            </span>{' '}
-            <span className="text-xs text-slate-500">({result.scope})</span>
-          </p>
-          <p className="text-xs text-slate-500">
-            Score {result.scarcity_score.toFixed(2)} · supply {result.active_supply_count} · sold{' '}
-            {result.recent_sale_count} · comparable scope:{' '}
-            {(result.comparable_scope || []).join(', ') || '—'}
-          </p>
-          {assemblyMeta ? (
-            <p className="text-xs text-slate-500" data-testid="intelligence-scarcity-assembly">
-              Live evidence: {assemblyMeta.pressing_candidates.length} exact-pressing ·{' '}
-              {assemblyMeta.release_candidates.length} release-level · claim_rarity_from_zero=
-              {String(assemblyMeta.claim_rarity_from_zero_results)}
+      <div className="space-y-3 text-sm">
+        <OwnerProofIntentControl
+          capability="scarcity"
+          defaultIntent={DEFAULT_INTENT}
+          runLabel="Analyze scarcity"
+          disabled={state.status === 'loading'}
+          onRun={run}
+        />
+        {state.status === 'ready' && result ? (
+          <div
+            className="space-y-2 text-slate-800 dark:text-slate-100"
+            data-testid="intelligence-scarcity-ready"
+          >
+            <p className="text-xs text-slate-500" data-testid="intelligence-scarcity-intent-echo">
+              Answering: {lastIntent}
             </p>
-          ) : null}
-        </div>
-      ) : null}
+            <p>
+              Label:{' '}
+              <span className="font-semibold capitalize" data-testid="intelligence-scarcity-label">
+                {result.scarcity_label}
+              </span>{' '}
+              <span className="text-xs text-slate-500">({result.scope})</span>
+            </p>
+            <p className="text-xs text-slate-500">
+              Score {result.scarcity_score.toFixed(2)} · supply {result.active_supply_count} · sold{' '}
+              {result.recent_sale_count}
+            </p>
+            <p className="text-xs text-slate-600">
+              Next: refine the pressing identity, or open valuation for price ranges on this copy.
+            </p>
+          </div>
+        ) : null}
+      </div>
     </IntelligencePanelShell>
   )
 }

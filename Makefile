@@ -506,6 +506,15 @@ ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readi
 	$(MAKE) ai-platform-verify-phase33f-target-preflight
 	node --test tests/phase33f-capability-gauntlet.test.mjs tests/phase33f-semantic-retrieval.test.mjs tests/phase33f-canary-launcher.test.mjs tests/phase33f-blocked-freeze.test.mjs
 
+ai-platform-verify-phase34-owner-proof-scenarios: ## Validate executable 24-scenario owner-proof registry + seed manifest
+	node scripts/ai-platform/verify-phase34-owner-proof-scenarios.mjs
+	node --test tests/phase34-owner-proof-remediation.test.mjs tests/phase34-owner-proof-executable.test.mjs
+	test -f scripts/ai-platform/phase34-owner-proof-scenario.schema.json
+	test -f scripts/ai-platform/phase34-owner-proof-scenarios.json
+	test -f scripts/ai-platform/phase34-owner-proof-seed-manifest.json
+	test -f scripts/phase34-launch-owner-proof-rehearsal.mjs
+	node scripts/phase34-launch-owner-proof-rehearsal.mjs | grep -q READY_NOT_LAUNCHED
+
 ai-platform-verify-phase34-gauntlet-finalization: ## Phase 34 bounded finalization + protocol-vs-queue acceptance (offline; 60k soak)
 	NODE_OPTIONS=--max-old-space-size=512 node scripts/ai-platform/verify-phase34-gauntlet-finalization.mjs
 

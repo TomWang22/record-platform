@@ -31,6 +31,9 @@ type SemanticPayload = {
   [key: string]: unknown
 }
 
+const DEFAULT_SEARCH_INTENT =
+  'Find first US mono pressings similar to this record under $80.'
+
 /**
  * Explicit search-mode chrome. Keyword is the production default.
  * Semantic/hybrid failures must never be presented as success after a silent
@@ -45,11 +48,12 @@ export function SearchIntelligenceChrome({
   const [selectedMode, setSelectedMode] = useState<IntelligenceSearchMode>('keyword')
   const [executedMode, setExecutedMode] = useState<IntelligenceSearchMode | null>(null)
   const [fallbackVisible, setFallbackVisible] = useState(false)
+  const [ownerProofIntent, setOwnerProofIntent] = useState(DEFAULT_SEARCH_INTENT)
   const [state, setState] = useState<IntelligencePanelState<SemanticPayload>>({ status: 'idle' })
 
   const run = useCallback(async () => {
     setFallbackVisible(false)
-    const q = query.trim()
+    const q = ownerProofIntent.trim() || query.trim()
     if (!q) {
       setState({ status: 'error', message: 'Enter a query before searching.' })
       return
@@ -120,6 +124,8 @@ export function SearchIntelligenceChrome({
         retrieval_mode: selectedMode,
         mode: selectedMode,
         production_mutation_allowed: false,
+        user_intent: q,
+        owner_proof_prompt: q,
       })
       const result = (response.result || response) as SemanticPayload
       const actual = String(result.mode || result.retrieval_metrics?.mode || selectedMode)
@@ -156,7 +162,7 @@ export function SearchIntelligenceChrome({
         message: err instanceof Error ? err.message : 'Semantic search failed',
       })
     }
-  }, [onKeywordSearch, onOwnerScopedSearch, query, selectedMode])
+  }, [onKeywordSearch, onOwnerScopedSearch, ownerProofIntent, query, selectedMode])
 
   const result =
     state.status === 'ready' || state.status === 'abstained' ? state.result : null
@@ -180,6 +186,17 @@ export function SearchIntelligenceChrome({
       }
     >
       <div className="space-y-3 text-sm" data-testid="intelligence-search-controls">
+        <label className="block space-y-1">
+          <span className="text-xs font-medium text-slate-500">Your search question</span>
+          <textarea
+            value={ownerProofIntent}
+            onChange={(e) => setOwnerProofIntent(e.target.value)}
+            rows={2}
+            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-950"
+            data-testid="intelligence-owner-proof-intent"
+            aria-label="Owner-proof search question"
+          />
+        </label>
         <fieldset>
           <legend className="mb-1 text-xs font-medium text-slate-600 dark:text-slate-300">
             Search mode

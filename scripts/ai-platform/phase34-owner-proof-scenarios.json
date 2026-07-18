@@ -1,218 +1,2149 @@
 {
-  "schema_version": "phase34-owner-proof-scenarios-v1",
-  "label": "Golden owner-proof scenarios — 3 per capability × 8",
+  "schema_version": "phase34-owner-proof-scenarios-v2",
+  "label": "Executable owner-proof scenarios — 3 per capability × 8",
   "product_acceptance": false,
   "count": 24,
+  "rehearsal": {
+    "logical_scenarios": 24,
+    "single_turn": 23,
+    "multi_turn_scenarios": 1,
+    "multi_turn_length": 4,
+    "total_turns": 27,
+    "protocol_rows": 81,
+    "root": "/tmp/phase34-owner-proof-live-rehearsal-v1"
+  },
   "scenarios": [
     {
-      "id": "scarcity-success-exact-pressing",
+      "scenario_id": "scarcity-success-exact-pressing",
       "capability": "scarcity",
-      "class": "A_success",
+      "scenario_class": "A_success",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/records/[id]",
+      "fallback_route_forbidden": [
+        "/insights"
+      ],
+      "seed_fixture_id": "seed-miles-cl1355-exact",
+      "subject_entity_id": "fixture:seed-miles-cl1355-exact:record",
+      "subject_listing_id": "fixture:seed-miles-cl1355-exact:listing",
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Is this exact CL 1355 pressing scarce, or only the release generally?",
-      "required_visible": ["typed_or_selected_intent", "exact_pressing", "evidence_links", "completed_result"],
-      "min_evidence": 5,
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Is this exact CL 1355 pressing scarce, or only the release generally?",
+      "pre_action_selector": "[data-testid=\"intelligence-scarcity-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action": "click_analyze",
+      "expected_endpoint": "/api/ai/intelligence/scarcity",
+      "expected_method": "POST",
+      "expected_request_capability": "scarcity",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-scarcity-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-scarcity-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "typed_or_selected_intent",
+        "exact_pressing",
+        "evidence_links",
+        "completed_result"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 5,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this scarcity scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "scarcity-correction-pressing-disambiguation",
+      "scenario_id": "scarcity-correction-pressing-disambiguation",
       "capability": "scarcity",
-      "class": "B_correction",
+      "scenario_class": "B_correction",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/records/[id]",
+      "fallback_route_forbidden": [
+        "/insights"
+      ],
+      "seed_fixture_id": "seed-miles-cl1355-exact",
+      "subject_entity_id": "fixture:seed-miles-cl1355-exact:record",
+      "subject_listing_id": "fixture:seed-miles-cl1355-exact:listing",
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "I meant the Japanese pressing, not the US mono.",
-      "required_visible": ["correction", "updated_result", "pressing_identity"],
-      "min_evidence": 1,
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "I meant the Japanese pressing, not the US mono.",
+      "pre_action_selector": "[data-testid=\"intelligence-scarcity-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action": "click_analyze",
+      "expected_endpoint": "/api/ai/intelligence/scarcity",
+      "expected_method": "POST",
+      "expected_request_capability": "scarcity",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-scarcity-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-scarcity-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "correction",
+        "updated_result",
+        "pressing_identity"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 1,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "before_or_intent",
+        "after_correction"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this scarcity scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "scarcity-weak-data-abstention",
+      "scenario_id": "scarcity-weak-data-abstention",
       "capability": "scarcity",
-      "class": "C_honest_limit",
+      "scenario_class": "C_honest_limit",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/records/[id]",
+      "fallback_route_forbidden": [
+        "/insights"
+      ],
+      "seed_fixture_id": "seed-miles-cl1355-exact-weak",
+      "subject_entity_id": "fixture:seed-miles-cl1355-exact-weak:record",
+      "subject_listing_id": "fixture:seed-miles-cl1355-exact:listing",
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "How scarce is this obscure private-press copy?",
-      "required_visible": ["customer_facing_abstention", "no_internal_codes"],
-      "min_evidence": 0,
-      "allow_empty_evidence": true
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "How scarce is this obscure private-press copy?",
+      "pre_action_selector": "[data-testid=\"intelligence-scarcity-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action": "click_analyze",
+      "expected_endpoint": "/api/ai/intelligence/scarcity",
+      "expected_method": "POST",
+      "expected_request_capability": "scarcity",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-scarcity-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-scarcity-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "customer_facing_abstention",
+        "no_internal_codes"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": true,
+      "expected_terminal_state": "abstained_or_limited",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this scarcity scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "valuation-success-ranges",
+      "scenario_id": "valuation-success-ranges",
       "capability": "valuation",
-      "class": "A_success",
+      "scenario_class": "A_success",
+      "participant_side": "seller",
+      "authentication_role": "seller-contract",
+      "viewport": "desktop",
+      "canonical_route": "/listings/[id]/edit",
+      "fallback_route_forbidden": [
+        "/offers/inbox"
+      ],
+      "seed_fixture_id": "seed-kenny-quiet-vgplus",
+      "subject_entity_id": "fixture:seed-kenny-quiet-vgplus:record",
+      "subject_listing_id": "fixture:seed-kenny-quiet-vgplus:listing",
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "What is a quick-sale price versus a patient-sale price for this VG+ copy?",
-      "required_visible": ["comparables", "quick_fair_patient_ranges", "completed_result"],
-      "min_evidence": 3,
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "What is a quick-sale price versus a patient-sale price for this VG+ copy?",
+      "pre_action_selector": "[data-testid=\"intelligence-valuation-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action": "click_analyze",
+      "expected_endpoint": "/api/ai/intelligence/valuation",
+      "expected_method": "POST",
+      "expected_request_capability": "valuation",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-valuation-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-valuation-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "comparables",
+        "quick_fair_patient_ranges",
+        "completed_result"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 3,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this valuation scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "valuation-correction-condition",
+      "scenario_id": "valuation-correction-condition",
       "capability": "valuation",
-      "class": "B_correction",
+      "scenario_class": "B_correction",
+      "participant_side": "seller",
+      "authentication_role": "seller-contract",
+      "viewport": "desktop",
+      "canonical_route": "/listings/[id]/edit",
+      "fallback_route_forbidden": [
+        "/offers/inbox"
+      ],
+      "seed_fixture_id": "seed-kenny-quiet-vgplus",
+      "subject_entity_id": "fixture:seed-kenny-quiet-vgplus:record",
+      "subject_listing_id": "fixture:seed-kenny-quiet-vgplus:listing",
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Sleeve has a seam split; media is closer to VG.",
-      "required_visible": ["condition_adjustment", "updated_ranges"],
-      "min_evidence": 1,
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Sleeve has a seam split; media is closer to VG.",
+      "pre_action_selector": "[data-testid=\"intelligence-valuation-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action": "click_analyze",
+      "expected_endpoint": "/api/ai/intelligence/valuation",
+      "expected_method": "POST",
+      "expected_request_capability": "valuation",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-valuation-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-valuation-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "condition_adjustment",
+        "updated_ranges"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 1,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "before_or_intent",
+        "after_correction"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this valuation scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "valuation-weak-comparables",
+      "scenario_id": "valuation-weak-comparables",
       "capability": "valuation",
-      "class": "C_honest_limit",
+      "scenario_class": "C_honest_limit",
+      "participant_side": "seller",
+      "authentication_role": "seller-contract",
+      "viewport": "desktop",
+      "canonical_route": "/listings/[id]/edit",
+      "fallback_route_forbidden": [
+        "/offers/inbox"
+      ],
+      "seed_fixture_id": "seed-kenny-quiet-vgplus-weak",
+      "subject_entity_id": "fixture:seed-kenny-quiet-vgplus-weak:record",
+      "subject_listing_id": "fixture:seed-kenny-quiet-vgplus:listing",
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Value this with almost no sold comps.",
-      "required_visible": ["customer_facing_limit", "no_internal_codes"],
-      "min_evidence": 0,
-      "allow_empty_evidence": true
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Value this with almost no sold comps.",
+      "pre_action_selector": "[data-testid=\"intelligence-valuation-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action": "click_analyze",
+      "expected_endpoint": "/api/ai/intelligence/valuation",
+      "expected_method": "POST",
+      "expected_request_capability": "valuation",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-valuation-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-valuation-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "customer_facing_limit",
+        "no_internal_codes"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": true,
+      "expected_terminal_state": "abstained_or_limited",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this valuation scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "auction-success-watchlist-temperature",
+      "scenario_id": "auction-success-watchlist-temperature",
       "capability": "auction_intelligence",
-      "class": "A_success",
+      "scenario_class": "A_success",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/watchlist",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-watchlist-auction-5plus",
+      "subject_entity_id": "fixture:seed-watchlist-auction-5plus:record",
+      "subject_listing_id": "fixture:seed-watchlist-auction-5plus:listing",
+      "subject_thread_id": null,
+      "subject_watchlist_id": "fixture:seed-watchlist-auction-5plus:watchlist",
       "user_intent": "Which watched lots look underpriced, and which are overheating?",
-      "required_visible": ["populated_watchlist", "temperature_report", "limitations"],
-      "min_watchlist_lots": 5,
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Which watched lots look underpriced, and which are overheating?",
+      "pre_action_selector": "[data-testid=\"intelligence-watchlist-temperature-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-watchlist-temperature-run\"]",
+      "initiating_action": "click_run_temperature",
+      "expected_endpoint": "/api/ai/intelligence/auction/watchlist-temperature",
+      "expected_method": "POST",
+      "expected_request_capability": "auction_intelligence",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-watchlist-temperature-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-watchlist-temperature-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "populated_watchlist",
+        "temperature_report",
+        "limitations"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 3,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 5,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this auction_intelligence scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "auction-correction-ending-window",
+      "scenario_id": "auction-correction-ending-window",
       "capability": "auction_intelligence",
-      "class": "B_correction",
+      "scenario_class": "B_correction",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/watchlist",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-watchlist-auction-5plus",
+      "subject_entity_id": "fixture:seed-watchlist-auction-5plus:record",
+      "subject_listing_id": "fixture:seed-watchlist-auction-5plus:listing",
+      "subject_thread_id": null,
+      "subject_watchlist_id": "fixture:seed-watchlist-auction-5plus:watchlist",
       "user_intent": "Focus on lots ending in the next 24 hours.",
-      "required_visible": ["constraint", "updated_report"],
-      "min_watchlist_lots": 5,
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Focus on lots ending in the next 24 hours.",
+      "pre_action_selector": "[data-testid=\"intelligence-watchlist-temperature-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-watchlist-temperature-run\"]",
+      "initiating_action": "click_run_temperature",
+      "expected_endpoint": "/api/ai/intelligence/auction/watchlist-temperature",
+      "expected_method": "POST",
+      "expected_request_capability": "auction_intelligence",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-watchlist-temperature-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-watchlist-temperature-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "constraint",
+        "updated_report"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 5,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "before_or_intent",
+        "after_correction"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this auction_intelligence scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "auction-weak-proxy-data",
+      "scenario_id": "auction-weak-proxy-data",
       "capability": "auction_intelligence",
-      "class": "C_honest_limit",
+      "scenario_class": "C_honest_limit",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/watchlist",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-watchlist-auction-5plus-weak",
+      "subject_entity_id": "fixture:seed-watchlist-auction-5plus-weak:record",
+      "subject_listing_id": "fixture:seed-watchlist-auction-5plus:listing",
+      "subject_thread_id": null,
+      "subject_watchlist_id": "fixture:seed-watchlist-auction-5plus:watchlist",
       "user_intent": "Temperature for a nearly empty watchlist.",
-      "required_visible": ["customer_facing_limit"],
-      "allow_empty_evidence": true
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Temperature for a nearly empty watchlist.",
+      "pre_action_selector": "[data-testid=\"intelligence-watchlist-temperature-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-watchlist-temperature-run\"]",
+      "initiating_action": "click_run_temperature",
+      "expected_endpoint": "/api/ai/intelligence/auction/watchlist-temperature",
+      "expected_method": "POST",
+      "expected_request_capability": "auction_intelligence",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-watchlist-temperature-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-watchlist-temperature-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "customer_facing_limit"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": true,
+      "expected_terminal_state": "abstained_or_limited",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this auction_intelligence scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "embeddings-success-current-lineage",
+      "scenario_id": "embeddings-success-current-lineage",
       "capability": "embeddings",
-      "class": "A_success",
+      "scenario_class": "A_success",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/insights",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-embedding-lineage-current",
+      "subject_entity_id": "fixture:seed-embedding-lineage-current:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Show lineage for this record's current embedding.",
-      "required_visible": ["entity", "content_hash", "freshness", "version"],
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Show lineage for this record's current embedding.",
+      "pre_action_selector": "[data-testid=\"intelligence-embedding-lineage-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-embedding-lineage-run\"]",
+      "initiating_action": "click_inspect_metadata",
+      "expected_endpoint": "/api/ai/intelligence/embeddings/metadata",
+      "expected_method": "POST",
+      "expected_request_capability": "embeddings",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-embedding-lineage-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-embedding-lineage-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "entity",
+        "content_hash",
+        "freshness",
+        "version"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 3,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this embeddings scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "embeddings-stale-reembed",
+      "scenario_id": "embeddings-stale-reembed",
       "capability": "embeddings",
-      "class": "B_correction",
+      "scenario_class": "B_correction",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/insights",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-embedding-lineage-current",
+      "subject_entity_id": "fixture:seed-embedding-lineage-current:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Mark stale and show re-embed required state.",
-      "required_visible": ["stale_state", "reembed_status"],
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Mark stale and show re-embed required state.",
+      "pre_action_selector": "[data-testid=\"intelligence-embedding-lineage-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-embedding-lineage-run\"]",
+      "initiating_action": "click_inspect_metadata",
+      "expected_endpoint": "/api/ai/intelligence/embeddings/metadata",
+      "expected_method": "POST",
+      "expected_request_capability": "embeddings",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-embedding-lineage-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-embedding-lineage-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "stale_state",
+        "reembed_status"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "before_or_intent",
+        "after_correction"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this embeddings scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "embeddings-deleted-source",
+      "scenario_id": "embeddings-deleted-source",
       "capability": "embeddings",
-      "class": "C_honest_limit",
+      "scenario_class": "C_honest_limit",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/insights",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-embedding-lineage-current-weak",
+      "subject_entity_id": "fixture:seed-embedding-lineage-current-weak:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Lineage after source deletion.",
-      "required_visible": ["deletion_state", "customer_facing_limit"],
-      "allow_empty_evidence": true
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Lineage after source deletion.",
+      "pre_action_selector": "[data-testid=\"intelligence-embedding-lineage-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-embedding-lineage-run\"]",
+      "initiating_action": "click_inspect_metadata",
+      "expected_endpoint": "/api/ai/intelligence/embeddings/metadata",
+      "expected_method": "POST",
+      "expected_request_capability": "embeddings",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-embedding-lineage-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-embedding-lineage-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "deletion_state",
+        "customer_facing_limit"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": true,
+      "expected_terminal_state": "abstained_or_limited",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this embeddings scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "search-success-semantic",
+      "scenario_id": "search-success-semantic",
       "capability": "semantic_search",
-      "class": "A_success",
+      "scenario_class": "A_success",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/listings",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-search-us-mono-catalog",
+      "subject_entity_id": "fixture:seed-search-us-mono-catalog:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Find first US mono pressings similar to this record under $80.",
-      "required_visible": ["query", "mode", "results", "why_matched"],
-      "min_results": 5,
-      "allow_empty_evidence": false
+      "input_control_selector": "input[placeholder*=\"Search artist\" i], [data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Find first US mono pressings similar to this record under $80.",
+      "pre_action_selector": "[data-testid=\"intelligence-search-chrome\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-search-run\"]",
+      "initiating_action": "fill_query_select_mode_click_run",
+      "expected_endpoint": "/api/ai/intelligence/semantic-search",
+      "expected_method": "POST",
+      "expected_request_capability": "semantic_search",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-search-chrome\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-search-chrome-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "query",
+        "mode",
+        "results",
+        "why_matched"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 3,
+      "minimum_results": 5,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this semantic_search scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "search-hybrid-refinement",
+      "scenario_id": "search-hybrid-refinement",
       "capability": "semantic_search",
-      "class": "B_correction",
+      "scenario_class": "B_correction",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/listings",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-search-us-mono-catalog",
+      "subject_entity_id": "fixture:seed-search-us-mono-catalog:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Switch to hybrid and exclude picture discs.",
-      "required_visible": ["mode_change", "constraint", "updated_results"],
-      "min_results": 1,
-      "allow_empty_evidence": false
+      "input_control_selector": "input[placeholder*=\"Search artist\" i], [data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Switch to hybrid and exclude picture discs.",
+      "pre_action_selector": "[data-testid=\"intelligence-search-chrome\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-search-run\"]",
+      "initiating_action": "fill_query_select_mode_click_run",
+      "expected_endpoint": "/api/ai/intelligence/semantic-search",
+      "expected_method": "POST",
+      "expected_request_capability": "semantic_search",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-search-chrome\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-search-chrome-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "mode_change",
+        "constraint",
+        "updated_results"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 1,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "before_or_intent",
+        "after_correction"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this semantic_search scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "search-visible-fallback-or-empty",
+      "scenario_id": "search-visible-fallback-or-empty",
       "capability": "semantic_search",
-      "class": "C_honest_limit",
+      "scenario_class": "C_honest_limit",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/listings",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-search-us-mono-catalog-weak",
+      "subject_entity_id": "fixture:seed-search-us-mono-catalog-weak:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Query that should abstain or show visible empty — never silent fallback.",
-      "required_visible": ["visible_empty_or_fallback", "no_silent_fallback"],
-      "allow_empty_evidence": true
+      "input_control_selector": "input[placeholder*=\"Search artist\" i], [data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Query that should abstain or show visible empty — never silent fallback.",
+      "pre_action_selector": "[data-testid=\"intelligence-search-chrome\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-search-run\"]",
+      "initiating_action": "fill_query_select_mode_click_run",
+      "expected_endpoint": "/api/ai/intelligence/semantic-search",
+      "expected_method": "POST",
+      "expected_request_capability": "semantic_search",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-search-chrome\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-search-chrome-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "visible_empty_or_fallback",
+        "no_silent_fallback"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": true,
+      "expected_terminal_state": "abstained_or_limited",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this semantic_search scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "negotiation-success-strategy",
+      "scenario_id": "negotiation-success-strategy",
       "capability": "negotiation_assistance",
-      "class": "A_success",
+      "scenario_class": "A_success",
+      "participant_side": "seller",
+      "authentication_role": "seller-contract",
+      "viewport": "desktop",
+      "canonical_route": "/messages",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-negotiation-thread-41-offer-35",
+      "subject_entity_id": "fixture:seed-negotiation-thread-41-offer-35:record",
+      "subject_listing_id": "fixture:seed-negotiation-thread-41-offer-35:listing",
+      "subject_thread_id": "fixture:seed-negotiation-thread-41-offer-35:thread",
+      "subject_watchlist_id": null,
       "user_intent": "They offered $35 for my $41 listing. What should I do?",
-      "required_visible": ["thread_summary", "strategy", "valuation_evidence", "insert_not_send"],
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-negotiation-user-intent\"]",
+      "input_value": "They offered $35 for my $41 listing. What should I do?",
+      "pre_action_selector": "[data-testid=\"intelligence-negotiation-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-negotiation-run\"]",
+      "initiating_action": "fill_intent_click_analyze",
+      "expected_endpoint": "/api/ai/intelligence/negotiation",
+      "expected_method": "POST",
+      "expected_request_capability": "negotiation_assistance",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-negotiation-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-negotiation-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "thread_summary",
+        "strategy",
+        "valuation_evidence",
+        "insert_not_send"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 3,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [
+        "automatic_send_allowed=false"
+      ],
+      "human_review_question": "Does this negotiation_assistance scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "negotiation-four-turn-live",
+      "scenario_id": "negotiation-four-turn-live",
       "capability": "negotiation_assistance",
-      "class": "B_correction",
+      "scenario_class": "B_correction",
+      "participant_side": "seller",
+      "authentication_role": "seller-contract",
+      "viewport": "desktop",
+      "canonical_route": "/messages",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-negotiation-thread-41-offer-35",
+      "subject_entity_id": "fixture:seed-negotiation-thread-41-offer-35:record",
+      "subject_listing_id": "fixture:seed-negotiation-thread-41-offer-35:listing",
+      "subject_thread_id": "fixture:seed-negotiation-thread-41-offer-35:thread",
+      "subject_watchlist_id": null,
       "user_intent": "Four-turn live: offer → sleeve/shipping correction → accept floor → draft reply",
-      "required_visible": ["four_turns", "distinct_screenshots", "editable_draft", "automatic_send_disabled"],
+      "input_control_selector": "[data-testid=\"intelligence-negotiation-user-intent\"]",
+      "input_value": "Four-turn live: offer → sleeve/shipping correction → accept floor → draft reply",
+      "pre_action_selector": "[data-testid=\"intelligence-negotiation-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-negotiation-run\"]",
+      "initiating_action": "fill_intent_click_analyze",
+      "expected_endpoint": "/api/ai/intelligence/negotiation",
+      "expected_method": "POST",
+      "expected_request_capability": "negotiation_assistance",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-negotiation-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-negotiation-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "four_turns",
+        "distinct_screenshots",
+        "editable_draft",
+        "automatic_send_disabled"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "multi_turn_completed",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "turn_1_strategy",
+        "turn_2_correction",
+        "turn_3_floor",
+        "turn_4_draft",
+        "insert_not_send"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [
+        "automatic_send_allowed=false"
+      ],
+      "human_review_question": "Does this negotiation_assistance scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
       "turns": [
         "They offered $35 for my $41 listing. What should I do?",
         "The sleeve has a seam split, and shipping will cost me $6.",
         "I would accept $37, but I do not want to sound desperate.",
         "Draft the reply."
       ],
-      "allow_empty_evidence": false
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "negotiation-privacy-or-safety-refusal",
+      "scenario_id": "negotiation-privacy-or-safety-refusal",
       "capability": "negotiation_assistance",
-      "class": "C_honest_limit",
+      "scenario_class": "C_honest_limit",
+      "participant_side": "seller",
+      "authentication_role": "seller-contract",
+      "viewport": "desktop",
+      "canonical_route": "/messages",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-negotiation-thread-41-offer-35-weak",
+      "subject_entity_id": "fixture:seed-negotiation-thread-41-offer-35-weak:record",
+      "subject_listing_id": "fixture:seed-negotiation-thread-41-offer-35:listing",
+      "subject_thread_id": "fixture:seed-negotiation-thread-41-offer-35:thread",
+      "subject_watchlist_id": null,
       "user_intent": "Refuse fabricated leverage / unsafe tactic in customer language.",
-      "required_visible": ["refusal", "no_internal_codes", "automatic_send_disabled"],
-      "allow_empty_evidence": true
+      "input_control_selector": "[data-testid=\"intelligence-negotiation-user-intent\"]",
+      "input_value": "Refuse fabricated leverage / unsafe tactic in customer language.",
+      "pre_action_selector": "[data-testid=\"intelligence-negotiation-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-negotiation-run\"]",
+      "initiating_action": "fill_intent_click_analyze",
+      "expected_endpoint": "/api/ai/intelligence/negotiation",
+      "expected_method": "POST",
+      "expected_request_capability": "negotiation_assistance",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-negotiation-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-negotiation-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "refusal",
+        "no_internal_codes",
+        "automatic_send_disabled"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": true,
+      "expected_terminal_state": "abstained_or_limited",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [
+        "automatic_send_allowed=false"
+      ],
+      "human_review_question": "Does this negotiation_assistance scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "recommendations-success-cards",
+      "scenario_id": "recommendations-success-cards",
       "capability": "recommendations",
-      "class": "A_success",
+      "scenario_class": "A_success",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/dashboard",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-recommendations-candidate-pool-8plus",
+      "subject_entity_id": "fixture:seed-recommendations-candidate-pool-8plus:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Keep it under $60, exclude picture discs, and diversify artists.",
-      "required_visible": ["constraints", "recommendation_cards", "reason_codes_customer"],
-      "min_cards": 5,
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Keep it under $60, exclude picture discs, and diversify artists.",
+      "pre_action_selector": "[data-testid=\"intelligence-recommendations-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-recommendations-run\"]",
+      "initiating_action": "fill_constraints_click_get_recommendations",
+      "expected_endpoint": "/api/ai/intelligence/recommendations",
+      "expected_method": "POST",
+      "expected_request_capability": "recommendations",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-recommendations-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-recommendations-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "constraints",
+        "recommendation_cards",
+        "reason_codes_customer"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 3,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 5,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this recommendations scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "recommendations-negative-preference",
+      "scenario_id": "recommendations-negative-preference",
       "capability": "recommendations",
-      "class": "B_correction",
+      "scenario_class": "B_correction",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/dashboard",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-recommendations-candidate-pool-8plus",
+      "subject_entity_id": "fixture:seed-recommendations-candidate-pool-8plus:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Forget picture discs and keep Blue Note preference.",
-      "required_visible": ["preference_update", "updated_cards"],
-      "min_cards": 1,
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Forget picture discs and keep Blue Note preference.",
+      "pre_action_selector": "[data-testid=\"intelligence-recommendations-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-recommendations-run\"]",
+      "initiating_action": "fill_constraints_click_get_recommendations",
+      "expected_endpoint": "/api/ai/intelligence/recommendations",
+      "expected_method": "POST",
+      "expected_request_capability": "recommendations",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-recommendations-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-recommendations-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "preference_update",
+        "updated_cards"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 1,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "before_or_intent",
+        "after_correction"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this recommendations scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "recommendations-cold-start-honesty",
+      "scenario_id": "recommendations-cold-start-honesty",
       "capability": "recommendations",
-      "class": "C_honest_limit",
+      "scenario_class": "C_honest_limit",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/dashboard",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-recommendations-candidate-pool-8plus-weak",
+      "subject_entity_id": "fixture:seed-recommendations-candidate-pool-8plus-weak:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Cold-start with almost no preferences.",
-      "required_visible": ["customer_facing_limit_or_generic_safe_picks"],
-      "allow_empty_evidence": true
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Cold-start with almost no preferences.",
+      "pre_action_selector": "[data-testid=\"intelligence-recommendations-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-recommendations-run\"]",
+      "initiating_action": "fill_constraints_click_get_recommendations",
+      "expected_endpoint": "/api/ai/intelligence/recommendations",
+      "expected_method": "POST",
+      "expected_request_capability": "recommendations",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-recommendations-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-recommendations-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "customer_facing_limit_or_generic_safe_picks"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": true,
+      "expected_terminal_state": "abstained_or_limited",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this recommendations scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "analytics-success-report",
+      "scenario_id": "analytics-success-report",
       "capability": "market_analytics",
-      "class": "A_success",
+      "scenario_class": "A_success",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/insights",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-analytics-bluenote-90d",
+      "subject_entity_id": "fixture:seed-analytics-bluenote-90d:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "How did completed Blue Note LP sales change over the last 90 days?",
-      "required_visible": ["report_values", "time_range", "sample_size", "methodology", "freshness"],
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "How did completed Blue Note LP sales change over the last 90 days?",
+      "pre_action_selector": "[data-testid=\"intelligence-market-analytics-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-market-analytics-run\"]",
+      "initiating_action": "fill_question_click_run_report",
+      "expected_endpoint": "/api/ai/intelligence/market-analytics",
+      "expected_method": "POST",
+      "expected_request_capability": "market_analytics",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-market-analytics-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-market-analytics-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "report_values",
+        "time_range",
+        "sample_size",
+        "methodology",
+        "freshness"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 3,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this market_analytics scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "analytics-constraint-population",
+      "scenario_id": "analytics-constraint-population",
       "capability": "market_analytics",
-      "class": "B_correction",
+      "scenario_class": "B_correction",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/insights",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-analytics-bluenote-90d",
+      "subject_entity_id": "fixture:seed-analytics-bluenote-90d:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Limit to US sellers and VG+ or better.",
-      "required_visible": ["constraint", "updated_report"],
-      "allow_empty_evidence": false
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Limit to US sellers and VG+ or better.",
+      "pre_action_selector": "[data-testid=\"intelligence-market-analytics-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-market-analytics-run\"]",
+      "initiating_action": "fill_question_click_run_report",
+      "expected_endpoint": "/api/ai/intelligence/market-analytics",
+      "expected_method": "POST",
+      "expected_request_capability": "market_analytics",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-market-analytics-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-market-analytics-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "constraint",
+        "updated_report"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": false,
+      "expected_terminal_state": "ready_with_evidence",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "before_or_intent",
+        "after_correction"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this market_analytics scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     },
     {
-      "id": "analytics-sample-below-policy-customer",
+      "scenario_id": "analytics-sample-below-policy-customer",
       "capability": "market_analytics",
-      "class": "C_honest_limit",
+      "scenario_class": "C_honest_limit",
+      "participant_side": "buyer",
+      "authentication_role": "buyer-contract",
+      "viewport": "desktop",
+      "canonical_route": "/insights",
+      "fallback_route_forbidden": [],
+      "seed_fixture_id": "seed-analytics-bluenote-90d-weak",
+      "subject_entity_id": "fixture:seed-analytics-bluenote-90d-weak:record",
+      "subject_listing_id": null,
+      "subject_thread_id": null,
+      "subject_watchlist_id": null,
       "user_intent": "Report for a tiny population — customer language only.",
-      "required_visible": ["customer_facing_limit", "no_SAMPLE_SIZE_BELOW_POLICY_raw"],
-      "allow_empty_evidence": true
+      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_value": "Report for a tiny population — customer language only.",
+      "pre_action_selector": "[data-testid=\"intelligence-market-analytics-panel\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-market-analytics-run\"]",
+      "initiating_action": "fill_question_click_run_report",
+      "expected_endpoint": "/api/ai/intelligence/market-analytics",
+      "expected_method": "POST",
+      "expected_request_capability": "market_analytics",
+      "request_body_required_fields": [
+        "capability",
+        "production_mutation_allowed"
+      ],
+      "terminal_panel_selector": "[data-testid=\"intelligence-market-analytics-panel\"]",
+      "loading_selectors": [
+        "[data-testid=\"intelligence-market-analytics-panel-loading\"]"
+      ],
+      "required_visible_customer_fields": [
+        "customer_facing_limit",
+        "no_SAMPLE_SIZE_BELOW_POLICY_raw"
+      ],
+      "required_hidden_internal_fields": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "AGGREGATED_ONLY",
+        "NOT_INVOKED_BY_POLICY",
+        "engine_invoked="
+      ],
+      "minimum_evidence": 0,
+      "minimum_results": 0,
+      "minimum_watchlist_lots": 0,
+      "minimum_recommendation_cards": 0,
+      "allow_empty_evidence": true,
+      "expected_terminal_state": "abstained_or_limited",
+      "expected_invocation_components": [
+        "gateway",
+        "authorization",
+        "service",
+        "schema_validation"
+      ],
+      "expected_not_invoked_by_policy": [],
+      "required_screenshot_states": [
+        "intent_visible",
+        "completed_result"
+      ],
+      "required_protocols": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "material_parity_fields": [
+        "capability",
+        "status"
+      ],
+      "latency_measurement_points": [
+        "browser_action_to_request",
+        "browser_request_total",
+        "browser_action_to_panel_ready",
+        "H1_total",
+        "H2_total",
+        "H3_total"
+      ],
+      "accessibility_checks": [
+        "terminal_panel_visible",
+        "no_aria_busy_at_terminal"
+      ],
+      "privacy_checks": [
+        "no_auth_material_in_screenshots",
+        "no_private_message_bodies_in_ledger"
+      ],
+      "safety_checks": [],
+      "human_review_question": "Does this market_analytics scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
+      "executability": "FULLY_EXECUTABLE"
     }
   ]
 }

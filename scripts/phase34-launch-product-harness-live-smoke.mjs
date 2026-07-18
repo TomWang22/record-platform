@@ -6,6 +6,8 @@
  * Override with PHASE34_PRODUCT_SMOKE_OUT / PHASE34_PRODUCT_SMOKE_PACK.
  * Preserves frozen smoke-v1/v2/v3/v4 roots (do not mutate).
  * smoke-v5 readiness on e28f90aa is superseded — do not launch v5.
+ * smoke-v6 readiness on 2d64c943 is superseded before launch — require the
+ * 24-scenario owner-proof live rehearsal FROZEN_PASS_EVIDENCE first.
  *
  * Requires:
  *   - committed HEAD == origin/main

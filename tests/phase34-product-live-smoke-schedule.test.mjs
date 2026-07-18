@@ -81,3 +81,17 @@ test('valuation smoke rotation skips non-eligible edit and selects /sell for buy
   const seller = { participant_side: 'seller', surface_route_index: 2 };
   assert.equal(adapter.pickRoute(seller), '/listings/[id]');
 });
+
+test('auction watchlist surface pins watchlist-temperature apiPath', async () => {
+  const { AuctionJourneyAdapter } = await import('../scripts/lib/phase34-product-journeys/adapters.mjs');
+  const adapter = new AuctionJourneyAdapter();
+  const prepared = await adapter.prepare({
+    participant_side: 'buyer',
+    surface_route_index: 1,
+    scenario_id: 'auction_intelligence__individual_auction__0',
+    subject: { listing_id: 'listing-1', record_id: 'rec-1', id: 'listing-1' },
+  });
+  assert.equal(prepared.routeTemplate, '/watchlist');
+  assert.equal(prepared.apiPath, '/api/ai/intelligence/auction/watchlist-temperature');
+  assert.equal(prepared.panelTestId, 'intelligence-watchlist-temperature-panel');
+});

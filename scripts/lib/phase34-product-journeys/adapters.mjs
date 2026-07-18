@@ -72,6 +72,7 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
         panel: 'intelligence-watchlist-temperature-panel',
         status: 'MOUNTED',
         runTestId: 'intelligence-watchlist-temperature-run',
+        apiPath: '/api/ai/intelligence/auction/watchlist-temperature',
       },
     ],
     panels: ['intelligence-auction-panel', 'intelligence-watchlist-temperature-panel'],
@@ -257,7 +258,7 @@ export class BaseProductJourneyAdapter {
       routeTemplate,
       selected_surface: selectedSurface,
       panelTestId,
-      apiPath: this.registry.apiPath,
+      apiPath: selectedSurface?.apiPath || this.registry.apiPath,
       runTestId: selectedSurface?.runTestId || this.registry.runTestId || null,
       subject,
       requestSeed,
@@ -574,12 +575,20 @@ export class BaseProductJourneyAdapter {
       }
       const responseJson = await response.json().catch(() => null);
       const actionEnd = Date.now();
+      let capturedEndpoint = apiPath;
+      try {
+        capturedEndpoint = new URL(response.url()).pathname || apiPath;
+      } catch {
+        const raw = String(response.url() || '');
+        const idx = raw.indexOf('/api/');
+        if (idx >= 0) capturedEndpoint = raw.slice(idx).split('?')[0] || apiPath;
+      }
 
       captures.push({
         browser_request_id: request.headers()['x-request-id'] || `br_${actionStart}`,
         route: prepared.route,
         method: 'POST',
-        endpoint: apiPath,
+        endpoint: capturedEndpoint,
         body: postData,
         status: response.status(),
         started_at: new Date(actionStart).toISOString(),

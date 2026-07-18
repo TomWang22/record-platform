@@ -248,6 +248,8 @@ export function SellListWorkflow({ returnTo = '/sell' }: { returnTo?: string }) 
                 <li key={rec.id}>
                   <button
                     type="button"
+                    data-testid="sell-collection-record"
+                    data-record-id={rec.id}
                     onClick={() => applyRecord(rec)}
                     className={`w-full rounded-lg px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-white/5 ${
                       selectedRecordId === rec.id ? 'bg-brand/10 font-medium' : ''

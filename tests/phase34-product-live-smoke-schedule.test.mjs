@@ -68,3 +68,16 @@ test('chronology rejects before_action claiming response available', () => {
   ]);
   assert.ok(r.chronology_violations >= 1);
 });
+
+test('valuation smoke rotation skips non-eligible edit and selects /sell for buyers', async () => {
+  const { ValuationJourneyAdapter } = await import('../scripts/lib/phase34-product-journeys/adapters.mjs');
+  const adapter = new ValuationJourneyAdapter();
+  const sellCtx = { participant_side: 'buyer', surface_route_index: 2 };
+  assert.equal(adapter.pickRoute(sellCtx), '/sell');
+  assert.equal(sellCtx.selected_surface?.requires_collection_selection, true);
+  const editWouldBeIdx3 = { participant_side: 'buyer', surface_route_index: 3 };
+  // edit is smoke_eligible:false so index 3 wraps within [listings, records, sell]
+  assert.notEqual(adapter.pickRoute(editWouldBeIdx3), '/listings/[id]/edit');
+  const seller = { participant_side: 'seller', surface_route_index: 2 };
+  assert.equal(adapter.pickRoute(seller), '/listings/[id]');
+});

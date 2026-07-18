@@ -43,8 +43,19 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     mounted_surfaces: [
       { route: '/listings/[id]', panel: 'intelligence-valuation-panel', status: 'MOUNTED' },
       { route: '/records/[id]', panel: 'intelligence-valuation-panel', status: 'MOUNTED' },
-      { route: '/sell', panel: 'intelligence-valuation-panel', status: 'MOUNTED' },
-      { route: '/listings/[id]/edit', panel: 'intelligence-valuation-panel', status: 'MOUNTED' },
+      {
+        route: '/sell',
+        panel: 'intelligence-valuation-panel',
+        status: 'MOUNTED',
+        requires_collection_selection: true,
+      },
+      {
+        route: '/listings/[id]/edit',
+        panel: 'intelligence-valuation-panel',
+        status: 'MOUNTED',
+        // Edit only mounts for the listing owner; buyer-token listing_id is usually not editable.
+        smoke_eligible: false,
+      },
     ],
     panels: ['intelligence-valuation-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
@@ -264,7 +275,9 @@ export class BaseProductJourneyAdapter {
   }
 
   pickRoute(context) {
-    let surfaces = (this.registry.mounted_surfaces || []).filter((s) => s.status === 'MOUNTED');
+    let surfaces = (this.registry.mounted_surfaces || []).filter(
+      (s) => s.status === 'MOUNTED' && s.smoke_eligible !== false,
+    );
     // Seller has an empty private collection in the contract fixture — /records/[id]
     // requires ownership and will not mount intelligence panels for the buyer record id.
     if (context.participant_side === 'seller') {
@@ -272,7 +285,7 @@ export class BaseProductJourneyAdapter {
     }
     // /sell valuation panel needs a selected owned record; skip for seller-empty collection.
     if (context.participant_side === 'seller' && this.capability === 'valuation') {
-      surfaces = surfaces.filter((s) => !['/sell', '/listings/[id]/edit'].includes(s.route));
+      surfaces = surfaces.filter((s) => s.route !== '/sell');
     }
     const mountedRoutes = surfaces.length
       ? surfaces.map((s) => s.route)
@@ -325,6 +338,29 @@ export class BaseProductJourneyAdapter {
       throw err;
     }
     return this.executeLivePlaywright(page, prepared);
+  }
+
+  /**
+   * Surfaces that mount the panel only after an in-page selection (e.g. /sell).
+   * Must run after goto and before waiting on panelTestId.
+   */
+  async prepareLiveSurface(page, prepared) {
+    const template = prepared.routeTemplate || '';
+    const needsSelection =
+      prepared.selected_surface?.requires_collection_selection ||
+      (this.capability === 'valuation' && (template === '/sell' || prepared.route === '/sell'));
+    if (!needsSelection) return;
+
+    const byTestId = page.getByTestId('sell-collection-record');
+    if ((await byTestId.count()) > 0) {
+      await byTestId.first().waitFor({ state: 'visible', timeout: 45_000 });
+      await byTestId.first().click();
+      return;
+    }
+    // Pre-testid images: collection rows render as "Artist — Title (format)".
+    const row = page.locator('ul button').filter({ hasText: /\s—\s/ }).first();
+    await row.waitFor({ state: 'visible', timeout: 45_000 });
+    await row.click();
   }
 
   async triggerLiveAction(page, prepared) {
@@ -477,6 +513,7 @@ export class BaseProductJourneyAdapter {
           ? `${routeBase}${routeBase.includes('?') ? '&' : '?'}phase34_turn=${prepared.turn_index}`
           : routeBase;
       await page.goto(turnNav, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      await this.prepareLiveSurface(page, prepared);
 
       const shotBase = {
         capability: this.capability,

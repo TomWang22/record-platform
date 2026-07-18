@@ -316,7 +316,7 @@ export function AiInsightsDashboard() {
       : null
 
   return (
-    <div className="space-y-6" data-testid="ai-insights-dashboard">
+    <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden" data-testid="ai-insights-dashboard">
       <header>
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">AI Insights</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">

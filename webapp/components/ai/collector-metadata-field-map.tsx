@@ -65,7 +65,7 @@ export function CollectorMetadataFieldMap({ details }: CollectorMetadataFieldMap
   }
 
   return (
-    <div className="space-y-3 border-t border-slate-200/80 pt-3 dark:border-white/10">
+    <div className="min-w-0 max-w-full space-y-3 overflow-x-hidden border-t border-slate-200/80 pt-3 dark:border-white/10">
       {completeness != null && (
         <p
           className="text-xs font-medium text-slate-600 dark:text-slate-300"
@@ -109,10 +109,10 @@ export function CollectorMetadataFieldMap({ details }: CollectorMetadataFieldMap
 
       {fieldMap.length > 0 && (
         <div
-          className="overflow-x-auto rounded-lg border border-slate-200/80 dark:border-white/10"
+          className="min-w-0 max-w-full overflow-x-auto rounded-lg border border-slate-200/80 dark:border-white/10"
           data-testid="collector-metadata-field-map"
         >
-          <table className="min-w-full text-left text-[11px]">
+          <table className="w-max min-w-full text-left text-[11px]">
             <thead className="bg-slate-50/80 text-slate-500 dark:bg-slate-900/60">
               <tr>
                 <th className="px-2 py-1.5 font-medium">Field</th>

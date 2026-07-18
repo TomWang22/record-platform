@@ -96,8 +96,8 @@ export function AppShell({ children }: AppShellProps) {
   const isSignedIn = isSessionAuthenticated(session)
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <aside className="hidden w-64 flex-col border-r border-slate-200/70 bg-white/80 px-6 py-6 text-sm dark:border-white/10 dark:bg-slate-950/40 lg:flex">
+    <div className="flex min-h-screen min-w-0 overflow-x-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200/70 bg-white/80 px-6 py-6 text-sm dark:border-white/10 dark:bg-slate-950/40 lg:flex">
         <Link href="/dashboard" className="mb-8 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand text-white font-semibold">RP</div>
           <div>
@@ -117,16 +117,16 @@ export function AppShell({ children }: AppShellProps) {
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-transparent p-6 backdrop-blur-sm">
-          <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+        <header className="sticky top-0 z-10 flex min-w-0 items-center justify-between gap-2 border-b border-transparent p-4 backdrop-blur-sm sm:p-6">
+          <div className="flex min-w-0 items-center gap-3">
             <Image src="/favicon.ico" width={32} height={32} alt="" className="rounded-xl lg:hidden" />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-slate-500">Dashboard</p>
-              <p className="font-semibold text-slate-900 dark:text-white">Welcome back</p>
+              <p className="truncate font-semibold text-slate-900 dark:text-white">Welcome back</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Button variant="secondary" className="hidden text-xs uppercase tracking-wide text-slate-500 lg:inline-flex">
               {isSignedIn ? 'Live mode' : 'Guest'}
             </Button>
@@ -138,7 +138,7 @@ export function AppShell({ children }: AppShellProps) {
         </header>
 
         <main
-          className="flex-1 px-4 py-6 sm:px-6 lg:px-10"
+          className="min-w-0 flex-1 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-10"
           data-testid="page-content"
         >
           {children}

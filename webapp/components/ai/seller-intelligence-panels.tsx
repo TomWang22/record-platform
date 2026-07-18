@@ -92,9 +92,9 @@ function SellerIntelligenceCard({
   const caveats = state.envelope ? extractCaveats(state.envelope) : []
 
   return (
-    <div data-testid={cardTestId}>
+    <div className="min-w-0 max-w-full" data-testid={cardTestId}>
       <Card title={title} description={description}>
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3 overflow-x-auto">
           <AiInsightMeta envelope={state.envelope} />
           {state.loading && <p className="text-sm text-slate-400">Loading…</p>}
           {state.error && (
@@ -200,7 +200,7 @@ export function SellerIntelligencePanels() {
     !collectorMetadata.loading
 
   return (
-    <section className="space-y-4" data-testid="seller-intelligence-panel">
+    <section className="min-w-0 max-w-full space-y-4 overflow-x-hidden" data-testid="seller-intelligence-panel">
       <div>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
           Seller intelligence
@@ -216,7 +216,7 @@ export function SellerIntelligencePanels() {
         </span>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-2">
         <SellerIntelligenceCard
           title="Listing advice"
           description="Catalog health, weak listings, buyer interest gaps, and metadata edits."

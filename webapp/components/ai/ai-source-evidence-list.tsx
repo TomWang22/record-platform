@@ -77,8 +77,8 @@ export function AiSourceEvidenceList({
                 >
                   {expanded ? 'Collapse' : 'Expand'}
                 </button>
-                <div className="min-w-0 flex-1">
-                  <p className="font-mono text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <p className="break-all font-mono text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
                     {collapsedLabel}
                     {ref.field ? ` · ${ref.field}` : ''}
                   </p>

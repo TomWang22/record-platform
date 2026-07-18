@@ -11,7 +11,7 @@ type CardProps = {
 
 export function Card({ title, description, children, className, actions }: CardProps) {
   return (
-    <section className={cn('rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card dark:border-white/10 dark:bg-slate-900', className)}>
+    <section className={cn('min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card dark:border-white/10 dark:bg-slate-900', className)}>
       {(title || description || actions) && (
         <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>

@@ -12,7 +12,18 @@ type MarketAnalyticsIntelligencePanelProps = {
   events: MarketAnalyticsEventInput[]
 }
 
-const meta = (result: Record<string, unknown> | null, key: string) => String(result?.[key] ?? '—')
+const meta = (result: Record<string, unknown> | null, key: string) => {
+  const value = result?.[key]
+  if (value == null) return '—'
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return '—'
+    }
+  }
+  return String(value)
+}
 
 export function MarketAnalyticsIntelligencePanel({ principalId, currency, events }: MarketAnalyticsIntelligencePanelProps) {
   const [state, setState] = useState<{ loading: boolean; error: string | null; rateLimited: boolean; result: Record<string, unknown> | null }>({ loading: false, error: null, rateLimited: false, result: null })

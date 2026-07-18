@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement, MouseEvent } from 'react'
 import { AuthRequiredCard } from '@/components/auth/auth-required-card'
+import { SellerAuctionDashboardPanel } from '@/components/ai/intelligence/seller-auction-dashboard-panel'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ApiError, apiFetch } from '@/lib/api-client'
@@ -148,6 +149,8 @@ export default function AuctionsPage(): ReactElement {
           returnTo="/auctions"
         />
       )}
+
+      {!authRequired && <SellerAuctionDashboardPanel listingIds={auctions.map((a) => a.id)} />}
 
       {!authRequired && status && (
         <Card>

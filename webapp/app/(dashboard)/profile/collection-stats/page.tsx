@@ -4,9 +4,13 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { AuthRequiredCard } from '@/components/auth/auth-required-card'
 import { CollectionStatsCharts } from '@/components/collection/collection-stats-charts'
+import { MarketAnalyticsIntelligencePanel } from '@/components/ai/intelligence/market-analytics-intelligence-panel'
 import { Card } from '@/components/ui/card'
 import { apiFetch } from '@/lib/api-client'
+import { getClientSessionToken } from '@/lib/session'
+import { getUserIdFromToken } from '@/lib/jwt-user'
 import type { CollectionRecord } from '@/lib/records-types'
+import { isSessionAuthenticated, useSession } from '@/lib/use-session'
 import { useRequireAuth } from '@/lib/use-require-auth'
 
 function filterRecords(
@@ -33,6 +37,9 @@ function filterRecords(
 
 export default function ProfileCollectionStatsPage() {
   const { authRequired } = useRequireAuth()
+  const session = useSession()
+  const token = isSessionAuthenticated(session) ? session.token : getClientSessionToken()
+  const principalId = getUserIdFromToken(token)
   const [records, setRecords] = useState<CollectionRecord[]>([])
   const [loaded, setLoaded] = useState(false)
   const [purchasedFrom, setPurchasedFrom] = useState('')
@@ -117,6 +124,7 @@ export default function ProfileCollectionStatsPage() {
       </div>
 
       <CollectionStatsCharts records={filtered} />
+      <MarketAnalyticsIntelligencePanel principalId={principalId} currency="USD" events={[]} />
     </div>
   )
 }

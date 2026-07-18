@@ -77,9 +77,19 @@ export function createMockPlaywrightPage(opts = {}) {
     waitForResponse: async () => response,
     async evaluate(fn, arg) {
       if (typeof fn === 'function') {
-        // Prefer executing the function against a minimal DOM stub when possible.
         try {
           const src = Function.prototype.toString.call(fn);
+          if (src.includes('scrollHeight') && src.includes('documentElement')) {
+            const h = opts.documentHeight || 2000;
+            return {
+              document_scroll_height: h,
+              document_client_height: (opts.viewport || { height: 720 }).height || 720,
+              body_scroll_height: h,
+              largest_dom_element: 'DIV#mock',
+              largest_element_height: h,
+              scroll_container_candidates: [],
+            };
+          }
           if (src.includes('scrollWidth') || (fn.name === '' && String(fn).includes('scrollWidth'))) {
             return {
               horizontal_overflow: false,
@@ -91,7 +101,16 @@ export function createMockPlaywrightPage(opts = {}) {
           }
           if (src.includes('activeElement')) return true;
           if (src.includes('nextHopProtocol')) return 'h2';
-          // new Function bodies from accessibility module
+          if (src.includes('aria-busy') || src.includes('skeleton')) {
+            return {
+              loadingVisible: false,
+              spinnerVisible: false,
+              ariaBusy: false,
+              skeletonVisible: false,
+              terminalContentVisible: true,
+              text: 'Scarcity intelligence confidence evidence ready',
+            };
+          }
           if (src.includes('panelTestId') || src.includes('no_semantic_headings') || String(fn).includes('no_semantic_headings')) {
             return {
               issues: [],
@@ -100,7 +119,6 @@ export function createMockPlaywrightPage(opts = {}) {
               document_title: 'Record Platform',
             };
           }
-          // Try invoke with panelTestId arg
           const result = fn(arg);
           if (result && typeof result === 'object') return result;
         } catch {
@@ -115,13 +133,25 @@ export function createMockPlaywrightPage(opts = {}) {
       }
       return arg;
     },
-    async screenshot({ path: filePath }) {
-      screenshotCalls.push({ path: filePath, at: new Date().toISOString() });
+    async screenshot(optsShot = {}) {
+      const filePath = optsShot.path;
+      screenshotCalls.push({
+        path: filePath,
+        fullPage: Boolean(optsShot.fullPage),
+        at: new Date().toISOString(),
+      });
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
       fs.writeFileSync(filePath, TINY_PNG);
       return TINY_PNG;
     },
   };
+
+  const locatorWithShot = {
+    ...locator,
+    screenshot: async (optsShot = {}) => page.screenshot(optsShot),
+  };
+  page.getByTestId = () => locatorWithShot;
+  page.locator = () => locatorWithShot;
 
   return page;
 }

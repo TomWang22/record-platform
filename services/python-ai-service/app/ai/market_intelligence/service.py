@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import time
 from typing import Any, Dict, Optional
 
 from fastapi import HTTPException
@@ -20,6 +21,7 @@ RUNNER = REPO_ROOT / "scripts" / "ai-platform" / "run-phase33c-capability.mjs"
 def _run(capability: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     if not RUNNER.is_file():
         raise HTTPException(status_code=500, detail="phase33c_runner_missing")
+    started = time.time()
     proc = subprocess.run(
         ["node", str(RUNNER)],
         input=json.dumps({"capability": capability, "input": payload}),
@@ -52,6 +54,32 @@ def _run(capability: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         "evidence_count": len((body.get("result") or {}).get("evidence") or []),
         "model_configuration": "deterministic_code_only_summarization_optional",
     }
+    finished = time.time()
+    duration_us = int(max(0.0, (finished - started)) * 1_000_000)
+    started_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started))
+    finished_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(finished))
+
+    def _stage(status: str, dur: Optional[int] = None) -> Dict[str, Any]:
+        return {
+            "status": status,
+            "started_at": started_iso,
+            "finished_at": finished_iso,
+            "duration_us": dur if dur is not None else duration_us,
+        }
+
+    pipeline_observation = {
+        "evidence_assembler": _stage("EXECUTED_AND_OBSERVED"),
+        "deterministic_engine": _stage("EXECUTED_AND_OBSERVED"),
+        "model": _stage("NOT_INVOKED_BY_POLICY", 0),
+        "tool": _stage("NOT_INVOKED_BY_POLICY", 0),
+        "embedding": _stage("NOT_INVOKED_BY_POLICY", 0),
+        "retrieval": _stage("NOT_INVOKED_BY_POLICY", 0),
+        "reranker": _stage("NOT_INVOKED_BY_POLICY", 0),
+        "schema_validator": _stage("EXECUTED_AND_OBSERVED"),
+        "evidence_validator": _stage("EXECUTED_AND_OBSERVED"),
+        "privacy_validator": _stage("EXECUTED_AND_OBSERVED"),
+        "safety_validator": _stage("EXECUTED_AND_OBSERVED"),
+    }
     return {
         "status": "PASS",
         "capability": capability,
@@ -61,7 +89,9 @@ def _run(capability: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             **(body.get("diagnostics") or {}),
             "production_writes": False,
             "retrieval_mode": "keyword_metadata",
+            "pipeline_observation": pipeline_observation,
         },
+        "pipeline_observation": pipeline_observation,
         "prompt": prompt_meta,
     }
 

@@ -6,6 +6,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  measurePageHeightGeometry,
+  assertScreenshotGeometryAllowed,
+  assertCapturedImageBounds,
+  readPngDimensions,
+} from './phase34-product-screenshot-geometry.mjs';
 
 export const PRODUCT_SCREENSHOT_SCHEMA_VERSION = 'phase34-product-screenshot-manifest-v1';
 export const VISUAL_REVIEW_STATUS_DEFAULT = 'OWNER_VISUAL_REVIEW_REQUIRED';
@@ -21,17 +27,19 @@ export function contractScreenshotDate(now = new Date()) {
 /**
  * Dated output roots under webapp/e2e/screenshots.
  * @param {'authenticated'|'guest'} authClass
- * @param {'gauntlet'|'canary'|'smoke'|'smoke-v2'} pack
+ * @param {'gauntlet'|'canary'|'smoke'|'smoke-v2'|'smoke-v3'} pack
  */
 export function productScreenshotDir(authClass = 'authenticated', pack = 'gauntlet', date = contractScreenshotDate()) {
   const leaf =
     pack === 'canary'
       ? 'phase34-product-canary'
-      : pack === 'smoke-v2'
-        ? 'phase34-product-smoke-v2'
-        : pack === 'smoke'
-          ? 'phase34-product-smoke'
-          : 'phase34-product-gauntlet';
+      : pack === 'smoke-v3'
+        ? 'phase34-product-smoke-v3'
+        : pack === 'smoke-v2'
+          ? 'phase34-product-smoke-v2'
+          : pack === 'smoke'
+            ? 'phase34-product-smoke'
+            : 'phase34-product-gauntlet';
   return path.join(REPO_ROOT, 'webapp/e2e/screenshots', authClass, date, leaf);
 }
 
@@ -91,7 +99,8 @@ export const REQUIRED_SCREENSHOT_STATES = Object.freeze([
 ]);
 
 /**
- * Call real page.screenshot(). Returns absolute path + sha256.
+ * Call real page.screenshot() or locator.screenshot().
+ * Defaults to viewport capture. Unbounded fullPage is gated by height ratio ≤ 4.
  * @param {import('playwright').Page} page
  * @param {object} meta
  */
@@ -110,11 +119,40 @@ export async function captureProductScreenshot(page, meta) {
   const absPath = path.join(dir, filename);
   const relative_path = path.relative(REPO_ROOT, absPath).split(path.sep).join('/');
 
-  await page.screenshot({
-    path: absPath,
-    fullPage: meta.fullPage !== false,
-    type: 'png',
-  });
+  const vpEarly = meta.viewport && typeof meta.viewport === 'object' ? meta.viewport : await page.viewportSize?.();
+  const geometry = await measurePageHeightGeometry(page);
+  const wantFullPage = meta.fullPage === true;
+  const capture_mode =
+    meta.capture_mode ||
+    (meta.locator ? 'locator' : wantFullPage ? 'full_page' : 'viewport');
+
+  if (capture_mode === 'full_page' || wantFullPage) {
+    assertScreenshotGeometryAllowed(geometry, {
+      route: meta.browser_route || meta.route,
+      session_id: meta.session_id,
+      turn_id: meta.turn_id,
+      viewport: vpEarly,
+    });
+  } else if (capture_mode === 'viewport' && geometry.height_ratio > 4 && !meta.locator) {
+    // Prefer viewport clip; still record geometry but do not capture full pathological page.
+  }
+
+  if (meta.locator && typeof meta.locator.screenshot === 'function') {
+    await meta.locator.screenshot({
+      path: absPath,
+      animations: 'disabled',
+      caret: 'hide',
+      type: 'png',
+    });
+  } else {
+    await page.screenshot({
+      path: absPath,
+      fullPage: wantFullPage,
+      animations: 'disabled',
+      caret: 'hide',
+      type: 'png',
+    });
+  }
 
   if (!fs.existsSync(absPath)) {
     const err = new Error(`screenshot file missing after page.screenshot: ${absPath}`);
@@ -122,13 +160,21 @@ export async function captureProductScreenshot(page, meta) {
     throw err;
   }
   const buf = fs.readFileSync(absPath);
+  const dims = readPngDimensions(buf);
+  assertCapturedImageBounds({
+    width: dims.width,
+    height: dims.height,
+    bytes: buf.length,
+    viewport_height: geometry.viewport_height || vpEarly?.height,
+    capture_mode,
+  });
   const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
   const screenshot_id = `ss_${sha256.slice(0, 16)}`;
 
   const vp = meta.viewport && typeof meta.viewport === 'object' ? meta.viewport : null;
   const viewport_name = viewportLabel(meta.viewport || meta.viewport_name);
-  const viewport_width = Number(meta.viewport_width ?? vp?.width ?? 0) || 0;
-  const viewport_height = Number(meta.viewport_height ?? vp?.height ?? 0) || 0;
+  const viewport_width = Number(meta.viewport_width ?? vp?.width ?? geometry.viewport_width ?? 0) || 0;
+  const viewport_height = Number(meta.viewport_height ?? vp?.height ?? geometry.viewport_height ?? 0) || 0;
   const state = meta.state || 'success';
   const capture_phase = meta.capture_phase || state;
   const response_available_at_capture =
@@ -157,6 +203,10 @@ export async function captureProductScreenshot(page, meta) {
     absolute_path: absPath,
     sha256,
     bytes: buf.length,
+    image_width: dims.width,
+    image_height: dims.height,
+    capture_mode,
+    page_height_geometry: geometry,
     captured_at: new Date().toISOString(),
     session_id: meta.session_id || null,
     turn_id: meta.turn_id || null,
@@ -358,13 +408,44 @@ function renderContactSheet(title, rows) {
   const cards = rows
     .map((r) => {
       const rel = String(r.relative_path || '').replace(/^webapp\//, '');
-      const src = escapeAttr(`../../${rel}`);
-      return `<figure><img src="${src}" alt="${escapeAttr(r.state)}" width="240"/><figcaption>${escapeAttr(r.screenshot_id)} · ${escapeAttr(r.state)} · ${escapeAttr(r.capability)}</figcaption></figure>`;
+      const href = escapeAttr(`../../${rel}`);
+      const src = href;
+      const w = r.image_width || r.viewport_width || '?';
+      const h = r.image_height || r.viewport_height || '?';
+      const pathological =
+        Number(r.image_height) > (Number(r.viewport_height) || 1024) * 4 ||
+        Number(r.image_height) > 5000;
+      const flag = pathological
+        ? `<span class="pathology">PATHOLOGICAL ${w}×${h}</span>`
+        : `<span class="dims">${w}×${h}</span>`;
+      return `<article class="card">
+  <a href="${href}" target="_blank" rel="noopener">
+    <div class="thumb"><img src="${src}" alt="${escapeAttr(r.state)}" loading="lazy"/></div>
+  </a>
+  <figcaption>
+    <strong>${escapeAttr(r.capability)}</strong> · ${escapeAttr(r.state)}<br/>
+    ${escapeAttr(r.viewport || r.viewport_name)} ${escapeAttr(String(r.viewport_width || ''))}×${escapeAttr(String(r.viewport_height || ''))}<br/>
+    sess ${escapeAttr(String(r.session_id || '').slice(-8))} turn${String(r.turn_index ?? '').padStart(2, '0')}<br/>
+    ${flag} · ${(Number(r.bytes) / 1024).toFixed(0)} KB<br/>
+    <code>${escapeAttr(r.screenshot_id)}</code>
+  </figcaption>
+</article>`;
     })
     .join('\n');
   return `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeAttr(title)}</title>
-<style>body{font-family:system-ui;margin:1rem}figure{display:inline-block;margin:.5rem;vertical-align:top}figcaption{font-size:11px;max-width:240px}</style>
-</head><body><h1>${escapeAttr(title)}</h1><p>OWNER_VISUAL_REVIEW_REQUIRED — ${rows.length} shots</p>${cards}</body></html>\n`;
+<style>
+body{font-family:system-ui,sans-serif;margin:1rem;background:#f6f7f9;color:#111}
+h1{font-size:1.25rem}
+.grid{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.card{width:280px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:8px;box-sizing:border-box}
+.thumb{width:100%;height:480px;max-height:480px;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;background:#111}
+.thumb img{max-width:100%;max-height:480px;width:auto;height:auto;object-fit:contain}
+figcaption{font-size:11px;line-height:1.35;margin-top:6px}
+.pathology{color:#b00020;font-weight:700}
+.dims{color:#444}
+code{font-size:10px}
+</style>
+</head><body><h1>${escapeAttr(title)}</h1><p>OWNER_VISUAL_REVIEW_REQUIRED — ${rows.length} shots — click thumbnail for original</p><div class="grid">${cards}</div></body></html>\n`;
 }
 
 function escapeAttr(s) {

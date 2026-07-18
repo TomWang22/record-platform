@@ -4,10 +4,12 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { WatchlistTemperaturePanel } from '@/components/ai/intelligence/watchlist-temperature-panel'
+import { RecommendationsIntelligencePanel } from '@/components/ai/intelligence/recommendations-intelligence-panel'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ApiErrorAlert } from '@/components/ui/api-error-alert'
 import { formatMoneyFromCents, saleTypeLabel } from '@/lib/listing-format'
+import { getUserIdFromToken } from '@/lib/jwt-user'
 import { fetchListing } from '@/lib/listings-api'
 import { listingToStoredRef } from '@/lib/listings-types'
 import type { StoredListingRef } from '@/lib/local-marketplace-storage'
@@ -15,6 +17,8 @@ import {
   fetchWatchlistFromApi,
   removeWatchlistOnApi,
 } from '@/lib/marketplace-shopping-api'
+import { getClientSessionToken } from '@/lib/session'
+import { isSessionAuthenticated, useSession } from '@/lib/use-session'
 
 const PAGE_SIZES = [24, 48, 72, 120] as const
 type ViewMode = 'grid' | 'list' | 'compact'
@@ -149,6 +153,9 @@ async function enrichWatchlistRow(row: StoredListingRef): Promise<StoredListingR
 }
 
 export function WatchlistBrowse() {
+  const session = useSession()
+  const token = isSessionAuthenticated(session) ? session.token : getClientSessionToken()
+  const principalId = getUserIdFromToken(token)
   const [items, setItems] = useState<StoredListingRef[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<unknown>(null)
@@ -217,6 +224,7 @@ export function WatchlistBrowse() {
       </div>
 
       <WatchlistTemperaturePanel mode="watchlist" />
+      <RecommendationsIntelligencePanel principalId={principalId} candidates={[]} />
 
       <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-slate-950">
         <div className="flex flex-wrap items-center gap-2">

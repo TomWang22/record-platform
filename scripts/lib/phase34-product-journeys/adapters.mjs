@@ -15,6 +15,8 @@ import {
   executeAccessibilityChecks,
   observeClientProtocol,
 } from '../phase34-product-accessibility.mjs';
+import { awaitTerminalPanelReady } from '../phase34-product-terminal-readiness.mjs';
+import { derivePipelineObservationFromResponse } from '../phase34-product-pipeline-observation.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -39,7 +41,7 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     trigger: 'auto',
   },
   valuation: {
-    routes: ['/listings/[id]', '/records/[id]', '/sell', '/listings/[id]/edit'],
+    routes: ['/listings/[id]', '/records/[id]', '/sell', '/listings/[id]/edit', '/offers/inbox'],
     mounted_surfaces: [
       { route: '/listings/[id]', panel: 'intelligence-valuation-panel', status: 'MOUNTED' },
       { route: '/records/[id]', panel: 'intelligence-valuation-panel', status: 'MOUNTED' },
@@ -56,6 +58,12 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
         // Edit only mounts for the listing owner; buyer-token listing_id is usually not editable.
         smoke_eligible: false,
       },
+      {
+        route: '/offers/inbox',
+        panel: 'intelligence-valuation-panel',
+        status: 'MOUNTED',
+        requires_offer_context: true,
+      },
     ],
     panels: ['intelligence-valuation-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
@@ -64,7 +72,7 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     trigger: 'auto',
   },
   auction_intelligence: {
-    routes: ['/listings/[id]', '/watchlist'],
+    routes: ['/listings/[id]', '/watchlist', '/auctions'],
     mounted_surfaces: [
       { route: '/listings/[id]', panel: 'intelligence-auction-panel', status: 'MOUNTED' },
       {
@@ -74,8 +82,19 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
         runTestId: 'intelligence-watchlist-temperature-run',
         apiPath: '/api/ai/intelligence/auction/watchlist-temperature',
       },
+      {
+        route: '/auctions',
+        panel: 'intelligence-seller-auction-dashboard',
+        status: 'MOUNTED',
+        runTestId: 'intelligence-seller-auction-dashboard-run',
+        apiPath: '/api/ai/intelligence/auction/watchlist-temperature',
+      },
     ],
-    panels: ['intelligence-auction-panel', 'intelligence-watchlist-temperature-panel'],
+    panels: [
+      'intelligence-auction-panel',
+      'intelligence-watchlist-temperature-panel',
+      'intelligence-seller-auction-dashboard',
+    ],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.auction_intelligence,
     clientFn: 'fetchAuctionIntelligence',
@@ -95,11 +114,11 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     runButtonName: /inspect metadata/i,
   },
   semantic_search: {
-    routes: ['/listings', '/sell'],
+    routes: ['/listings', '/sell', '/market'],
     mounted_surfaces: [
       { route: '/listings', panel: 'intelligence-search-chrome', status: 'MOUNTED' },
       { route: '/sell', panel: 'intelligence-search-chrome', status: 'MOUNTED' },
-      { route: '/market', panel: 'intelligence-search-chrome', status: 'PRODUCT_SURFACE_MISSING' },
+      { route: '/market', panel: 'intelligence-search-chrome', status: 'MOUNTED' },
     ],
     panels: ['intelligence-search-chrome'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
@@ -109,10 +128,10 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     runTestId: 'intelligence-search-run',
   },
   negotiation_assistance: {
-    routes: ['/messages'],
+    routes: ['/messages', '/offers/inbox'],
     mounted_surfaces: [
       { route: '/messages', panel: 'intelligence-negotiation-panel', status: 'MOUNTED' },
-      { route: '/offers/inbox', panel: 'intelligence-negotiation-panel', status: 'PRODUCT_SURFACE_MISSING' },
+      { route: '/offers/inbox', panel: 'intelligence-negotiation-panel', status: 'MOUNTED' },
     ],
     panels: ['intelligence-negotiation-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
@@ -122,11 +141,11 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     runTestId: 'intelligence-negotiation-run',
   },
   recommendations: {
-    routes: ['/dashboard', '/records/[id]'],
+    routes: ['/dashboard', '/records/[id]', '/watchlist'],
     mounted_surfaces: [
       { route: '/dashboard', panel: 'intelligence-recommendations-panel', status: 'MOUNTED' },
       { route: '/records/[id]', panel: 'intelligence-recommendations-panel', status: 'MOUNTED' },
-      { route: '/watchlist', panel: 'intelligence-recommendations-panel', status: 'PRODUCT_SURFACE_MISSING' },
+      { route: '/watchlist', panel: 'intelligence-recommendations-panel', status: 'MOUNTED' },
     ],
     panels: ['intelligence-recommendations-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
@@ -136,13 +155,13 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     runButtonName: /get recommendations/i,
   },
   market_analytics: {
-    routes: ['/insights'],
+    routes: ['/insights', '/profile/collection-stats'],
     mounted_surfaces: [
       { route: '/insights', panel: 'intelligence-market-analytics-panel', status: 'MOUNTED' },
       {
         route: '/profile/collection-stats',
         panel: 'intelligence-market-analytics-panel',
-        status: 'PRODUCT_SURFACE_MISSING',
+        status: 'MOUNTED',
       },
     ],
     panels: ['intelligence-market-analytics-panel'],
@@ -580,6 +599,8 @@ export class BaseProductJourneyAdapter {
           response_available_at_capture: false,
           expected_locator_visible: true,
           terminal_state: null,
+          fullPage: false,
+          capture_mode: 'viewport',
         }),
       );
 
@@ -595,6 +616,8 @@ export class BaseProductJourneyAdapter {
             response_available_at_capture: false,
             expected_locator_visible: true,
             terminal_state: null,
+            fullPage: false,
+            capture_mode: 'viewport',
           }),
         );
       }
@@ -638,11 +661,21 @@ export class BaseProductJourneyAdapter {
         .waitFor({ state: 'hidden', timeout: 30_000 })
         .catch(() => null);
 
+      await awaitTerminalPanelReady(page, {
+        capability: this.capability,
+        panelTestId: prepared.panelTestId,
+      });
+
       const rendered = await this.extractRendered(page, prepared, responseJson);
       const a11y = await executeAccessibilityChecks(page, { panelTestId: prepared.panelTestId });
       const clientProtocol = await observeClientProtocol(page);
       const finalState = this.classifyVisualState(prepared, responseJson, rendered);
       const terminalShotState = finalState === 'success' ? 'final' : finalState;
+      const preferLocator =
+        this.capability === 'negotiation_assistance' ||
+        String(prepared.route || '').startsWith('/offers') ||
+        String(prepared.route || '').startsWith('/messages');
+      const panelLocator = preferLocator ? page.getByTestId(prepared.panelTestId).first() : null;
       screenshots.push(
         await captureProductScreenshot(page, {
           ...shotBase,
@@ -655,8 +688,19 @@ export class BaseProductJourneyAdapter {
           failed_request_count: failedRequests.length,
           accessibility_status: a11y.accessibility_result,
           horizontal_overflow: a11y.horizontal_overflow,
+          fullPage: false,
+          capture_mode: preferLocator ? 'locator' : 'viewport',
+          locator: panelLocator,
         }),
       );
+
+      const pipelineObservation = derivePipelineObservationFromResponse({
+        capability: this.capability,
+        responseJson,
+        requestStartedAt: new Date(actionStart).toISOString(),
+        requestFinishedAt: new Date(actionEnd).toISOString(),
+        browser_request_id: captures[0]?.browser_request_id || null,
+      });
 
       for (const suffix of ['evidence', 'limitations']) {
         const details = page.getByTestId(`${prepared.panelTestId}-${suffix}`);
@@ -681,6 +725,9 @@ export class BaseProductJourneyAdapter {
               expected_locator_visible: true,
               accessibility_status: expandA11y.accessibility_result,
               horizontal_overflow: expandA11y.horizontal_overflow,
+              fullPage: false,
+              capture_mode: preferLocator ? 'locator' : 'viewport',
+              locator: preferLocator ? page.getByTestId(prepared.panelTestId).first() : null,
             }),
           );
         }
@@ -742,6 +789,7 @@ export class BaseProductJourneyAdapter {
         production_mutation: false,
         screenshots,
         screenshot_manifest_entry_ids: screenshots.map((s) => s.screenshot_id),
+        pipelineObservation,
         timings: {
           browser_action_to_request_us: null,
           browser_action_to_panel_ready_us: (actionEnd - actionStart) * 1000,

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { OffersListPanel } from '@/components/offers/offers-list-panel'
+import { OfferInboxIntelligence } from '@/components/offers/offer-inbox-intelligence'
 import { ApiErrorAlert } from '@/components/ui/api-error-alert'
 import { fetchOffersInbox, type PublicOffer } from '@/lib/offers-api'
 import { useRequireAuth } from '@/lib/use-require-auth'
@@ -52,6 +53,7 @@ export default function OffersInboxPage() {
         <h1 className="text-2xl font-semibold">Offer inbox</h1>
         <p className="text-sm text-slate-500">Pending and countered offers on your listings.</p>
       </div>
+      <OfferInboxIntelligence offers={items} />
       <OffersListPanel items={items} mode="inbox" onRefresh={load} />
     </div>
   )

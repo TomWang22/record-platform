@@ -35,6 +35,7 @@ import {
   assertLivePinsNotSynthetic,
   PIN_SOURCE,
 } from './phase34-product-runtime-pins.mjs';
+import { assertRequiredComponentsObserved } from './phase34-product-pipeline-observation.mjs';
 import {
   assertScreenshotsBeforePass,
   ScreenshotManifestWriter,
@@ -256,8 +257,11 @@ export async function runProductSession(scheduleRow, opts = {}) {
       session_id,
       turn_id,
       pins,
-      pipelineObservation: opts.pipelineObservation || {},
+      pipelineObservation: browserResult.pipelineObservation || opts.pipelineObservation || {},
     });
+    if (opts.strictPipelineObservation !== false && browserResult.pipelineObservation) {
+      assertRequiredComponentsObserved(invocations, scheduleRow.capability || pins.capability);
+    }
 
     const latency = emptyLatencyRow({
       session_id,

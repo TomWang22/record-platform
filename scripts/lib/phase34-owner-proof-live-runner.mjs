@@ -213,6 +213,7 @@ async function signInWithToken(page, browserBaseUrl, { token, email, name, initi
 export function buildOwnerProofSchedule(doc = loadOwnerProofScenarios()) {
   const rows = doc.scenarios.map((s, i) => {
     const multi = s.scenario_id === 'negotiation-four-turn-live';
+    const prompt_slot = (i % 12) + 1;
     return {
       coordinate: `owner-proof/${s.capability}/${s.scenario_id}`,
       schedule_index: i,
@@ -238,9 +239,9 @@ export function buildOwnerProofSchedule(doc = loadOwnerProofScenarios()) {
       user_intent: s.user_intent,
       owner_proof_canonical_route: s.canonical_route,
       owner_proof_endpoint: s.expected_endpoint,
-      prompt_slot: `${s.capability}:owner-proof`,
-      prompt_configuration_id: `owner-proof-${s.capability}-v1`,
-      model_tier: 'default',
+      prompt_slot,
+      prompt_configuration_id: `${s.capability}-c${String(prompt_slot).padStart(2, '0')}`,
+      model_tier: prompt_slot <= 4 ? 'deterministic' : prompt_slot <= 8 ? 'local' : 'frontier',
     };
   });
   const turns = rows.reduce((n, r) => n + r.smoke_turns, 0);

@@ -361,6 +361,8 @@ async function main() {
           smoke_viewport: r.smoke_viewport,
           smoke_turns: r.smoke_turns,
           participant_side: r.participant_side,
+          surface_route_index: r.surface_route_index,
+          smoke_index: r.smoke_index,
         })),
       },
       null,

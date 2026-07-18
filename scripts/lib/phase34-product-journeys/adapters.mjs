@@ -264,10 +264,22 @@ export class BaseProductJourneyAdapter {
   }
 
   pickRoute(context) {
-    const surfaces = (this.registry.mounted_surfaces || []).filter((s) => s.status === 'MOUNTED');
+    let surfaces = (this.registry.mounted_surfaces || []).filter((s) => s.status === 'MOUNTED');
+    // Seller has an empty private collection in the contract fixture — /records/[id]
+    // requires ownership and will not mount intelligence panels for the buyer record id.
+    if (context.participant_side === 'seller') {
+      surfaces = surfaces.filter((s) => !String(s.route).includes('/records/'));
+    }
+    // /sell valuation panel needs a selected owned record; skip for seller-empty collection.
+    if (context.participant_side === 'seller' && this.capability === 'valuation') {
+      surfaces = surfaces.filter((s) => !['/sell', '/listings/[id]/edit'].includes(s.route));
+    }
     const mountedRoutes = surfaces.length
       ? surfaces.map((s) => s.route)
-      : this.registry.routes || [];
+      : (this.registry.routes || []).filter((r) => {
+          if (context.participant_side === 'seller' && String(r).includes('/records/')) return false;
+          return true;
+        });
     if (this.capability === 'negotiation_assistance' && context.subject?.thread_id) {
       return `/messages?thread=${encodeURIComponent(context.subject.thread_id)}`;
     }

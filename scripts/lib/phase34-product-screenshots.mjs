@@ -27,21 +27,23 @@ export function contractScreenshotDate(now = new Date()) {
 /**
  * Dated output roots under webapp/e2e/screenshots.
  * @param {'authenticated'|'guest'} authClass
- * @param {'gauntlet'|'canary'|'smoke'|'smoke-v2'|'smoke-v3'|'smoke-v4'} pack
+ * @param {'gauntlet'|'canary'|'smoke'|'smoke-v2'|'smoke-v3'|'smoke-v4'|'smoke-v5'} pack
  */
 export function productScreenshotDir(authClass = 'authenticated', pack = 'gauntlet', date = contractScreenshotDate()) {
   const leaf =
     pack === 'canary'
       ? 'phase34-product-canary'
-      : pack === 'smoke-v4'
-        ? 'phase34-product-smoke-v4'
-        : pack === 'smoke-v3'
-          ? 'phase34-product-smoke-v3'
-          : pack === 'smoke-v2'
-            ? 'phase34-product-smoke-v2'
-            : pack === 'smoke'
-              ? 'phase34-product-smoke'
-              : 'phase34-product-gauntlet';
+      : pack === 'smoke-v5'
+        ? 'phase34-product-smoke-v5'
+        : pack === 'smoke-v4'
+          ? 'phase34-product-smoke-v4'
+          : pack === 'smoke-v3'
+            ? 'phase34-product-smoke-v3'
+            : pack === 'smoke-v2'
+              ? 'phase34-product-smoke-v2'
+              : pack === 'smoke'
+                ? 'phase34-product-smoke'
+                : 'phase34-product-gauntlet';
   return path.join(REPO_ROOT, 'webapp/e2e/screenshots', authClass, date, leaf);
 }
 
@@ -127,6 +129,24 @@ export async function captureProductScreenshot(page, meta) {
   const capture_mode =
     meta.capture_mode ||
     (meta.locator ? 'locator' : wantFullPage ? 'full_page' : 'viewport');
+  const capture_kind =
+    meta.capture_kind ||
+    (capture_mode === 'locator'
+      ? 'LOCATOR'
+      : capture_mode === 'full_page'
+        ? 'FULL_PAGE'
+        : meta.clip_rectangle
+          ? 'BOUNDED_REGION'
+          : 'VIEWPORT');
+
+  let locator_bounding_box = meta.locator_bounding_box || null;
+  if (meta.locator && typeof meta.locator.boundingBox === 'function' && !locator_bounding_box) {
+    try {
+      locator_bounding_box = await meta.locator.boundingBox();
+    } catch {
+      locator_bounding_box = null;
+    }
+  }
 
   if (capture_mode === 'full_page' || wantFullPage) {
     assertScreenshotGeometryAllowed(geometry, {
@@ -210,6 +230,13 @@ export async function captureProductScreenshot(page, meta) {
     image_width: dims.width,
     image_height: dims.height,
     capture_mode,
+    capture_kind,
+    locator_bounding_box,
+    clip_rectangle: meta.clip_rectangle || null,
+    dimension_validation_policy:
+      capture_kind === 'LOCATOR' || capture_kind === 'BOUNDED_REGION'
+        ? 'LOCATOR_OR_BOUNDED_MATCH'
+        : 'VIEWPORT_MATCH',
     page_height_geometry: geometry,
     captured_at: new Date().toISOString(),
     session_id: meta.session_id || null,
@@ -366,34 +393,63 @@ export const PLAYWRIGHT_TRACE_POLICY = Object.freeze({
 });
 
 /**
- * Generate contact-sheet HTML stubs linking to captured screenshots.
- * Full visual index tooling may refine these after freeze.
+ * Generate contact-sheet HTML with images copied beside the HTML (no /tmp↔repo traversal).
  */
 export function generateContactSheets(manifestRows, outDir) {
   fs.mkdirSync(outDir, { recursive: true });
+  const imagesDir = path.join(outDir, 'images');
+  fs.mkdirSync(imagesDir, { recursive: true });
+
+  const localRows = [];
+  for (const r of manifestRows) {
+    const abs =
+      r.absolute_path && fs.existsSync(r.absolute_path)
+        ? r.absolute_path
+        : r.relative_path
+          ? path.resolve(REPO_ROOT, r.relative_path)
+          : null;
+    if (!abs || !fs.existsSync(abs)) {
+      localRows.push({ ...r, _local_href: null });
+      continue;
+    }
+    const base = `${r.screenshot_id || path.basename(abs, path.extname(abs))}${path.extname(abs) || '.png'}`;
+    const dest = path.join(imagesDir, base);
+    if (!fs.existsSync(dest)) {
+      fs.copyFileSync(abs, dest);
+    }
+    // Reject accidental symlinks in the pack.
+    const st = fs.lstatSync(dest);
+    if (st.isSymbolicLink()) {
+      const err = new Error(`contact-sheet image must not be a symlink: ${dest}`);
+      err.code = 'CONTACT_SHEET_SYMLINK';
+      throw err;
+    }
+    localRows.push({ ...r, _local_href: `images/${base}` });
+  }
+
   const by = {
-    combined: manifestRows,
-    authenticated: manifestRows.filter((r) => r.relative_path.includes('/authenticated/')),
-    guest: manifestRows.filter((r) => r.relative_path.includes('/guest/')),
-    mobile: manifestRows.filter((r) => r.viewport === 'mobile'),
-    tablet: manifestRows.filter((r) => r.viewport === 'tablet'),
-    desktop: manifestRows.filter((r) => r.viewport === 'desktop'),
-    abstentions: manifestRows.filter((r) => r.state === 'abstention'),
-    refusals: manifestRows.filter((r) => r.state === 'unauthorized_refusal'),
-    failures: manifestRows.filter((r) => String(r.state).includes('failure') || r.state === 'rate_limit'),
+    combined: localRows,
+    authenticated: localRows.filter((r) => String(r.relative_path || '').includes('/authenticated/')),
+    guest: localRows.filter((r) => String(r.relative_path || '').includes('/guest/')),
+    mobile: localRows.filter((r) => r.viewport === 'mobile'),
+    tablet: localRows.filter((r) => r.viewport === 'tablet'),
+    desktop: localRows.filter((r) => r.viewport === 'desktop'),
+    abstentions: localRows.filter((r) => r.state === 'abstention'),
+    refusals: localRows.filter((r) => r.state === 'unauthorized_refusal'),
+    failures: localRows.filter((r) => String(r.state).includes('failure') || r.state === 'rate_limit'),
   };
-  const caps = [...new Set(manifestRows.map((r) => r.capability).filter(Boolean))];
+  const caps = [...new Set(localRows.map((r) => r.capability).filter(Boolean))];
   const files = [];
   for (const [name, rows] of Object.entries(by)) {
-    const html = renderContactSheet(name, rows, outDir);
+    const html = renderContactSheet(name, rows);
     const fp = path.join(outDir, `${name}.html`);
     fs.writeFileSync(fp, html);
     files.push(fp);
   }
   for (const cap of caps) {
-    const rows = manifestRows.filter((r) => r.capability === cap);
+    const rows = localRows.filter((r) => r.capability === cap);
     const fp = path.join(outDir, `capability-${cap}.html`);
-    fs.writeFileSync(fp, renderContactSheet(cap, rows, outDir));
+    fs.writeFileSync(fp, renderContactSheet(cap, rows));
     files.push(fp);
   }
   const gaps = [
@@ -406,12 +462,9 @@ export function generateContactSheets(manifestRows, outDir) {
   ].join('\n');
   fs.writeFileSync(path.join(outDir, 'visual-gaps.md'), gaps);
   const linkValidation = validateContactSheetLinks(outDir, files);
-  const hasOnDisk = manifestRows.some(
-    (r) => (r.absolute_path && fs.existsSync(r.absolute_path)) || (r.relative_path && fs.existsSync(path.resolve(REPO_ROOT, r.relative_path))),
-  );
-  if (hasOnDisk && linkValidation.missing.length) {
+  if (linkValidation.missing.length || linkValidation.traversal.length || linkValidation.symlinks.length) {
     const err = new Error(
-      `contact-sheet link validation failed: ${linkValidation.missing.slice(0, 5).map((m) => m.ref).join(', ')}`,
+      `contact-sheet link validation failed: missing=${linkValidation.missing.length} traversal=${linkValidation.traversal.length} symlinks=${linkValidation.symlinks.length}`,
     );
     err.code = 'CONTACT_SHEET_BROKEN_LINKS';
     err.linkValidation = linkValidation;
@@ -421,45 +474,64 @@ export function generateContactSheets(manifestRows, outDir) {
 }
 
 /**
- * Resolve a screenshot path that is valid from the contact-sheet HTML directory.
+ * @deprecated Prefer pack-local images/ copies. Kept for tests that only need path math.
  */
 export function contactSheetHrefForRow(row, outDir) {
+  if (row._local_href) return row._local_href;
   const abs =
     row.absolute_path && fs.existsSync(row.absolute_path)
       ? row.absolute_path
       : row.relative_path
         ? path.resolve(REPO_ROOT, row.relative_path)
         : null;
-  if (!abs || !fs.existsSync(abs)) {
-    return null;
-  }
-  return path.relative(outDir, abs).split(path.sep).join('/');
+  if (!abs || !fs.existsSync(abs)) return null;
+  const from = fs.realpathSync(outDir);
+  const to = fs.realpathSync(abs);
+  return path.relative(from, to).split(path.sep).join('/');
 }
 
 /**
- * Open every local src/href in generated contact-sheet HTML and ensure targets exist.
+ * Open every local src/href in generated contact-sheet HTML and ensure targets exist
+ * inside the pack directory (no traversal, no symlinks).
  */
 export function validateContactSheetLinks(outDir, htmlFiles) {
   const missing = [];
   const checked = [];
+  const traversal = [];
+  const symlinks = [];
+  const rootReal = fs.realpathSync(outDir);
   for (const fp of htmlFiles) {
     if (!fp.endsWith('.html') || !fs.existsSync(fp)) continue;
     const html = fs.readFileSync(fp, 'utf8');
     const refs = [...html.matchAll(/\b(?:src|href)="([^"]+)"/g)].map((m) => m[1]);
     for (const ref of refs) {
       if (!ref || ref.startsWith('http') || ref.startsWith('mailto:') || ref.startsWith('#')) continue;
+      if (ref.includes('..')) {
+        traversal.push({ from: fp, ref });
+        continue;
+      }
       const target = path.resolve(path.dirname(fp), ref);
       checked.push(target);
-      if (!fs.existsSync(target)) missing.push({ from: fp, ref, target });
+      if (!fs.existsSync(target)) {
+        missing.push({ from: fp, ref, target });
+        continue;
+      }
+      const real = fs.realpathSync(target);
+      if (!real.startsWith(rootReal + path.sep) && real !== rootReal) {
+        traversal.push({ from: fp, ref, target: real });
+      }
+      if (fs.lstatSync(target).isSymbolicLink()) {
+        symlinks.push({ from: fp, ref, target });
+      }
     }
   }
-  return { checked: checked.length, missing };
+  return { checked: checked.length, missing, traversal, symlinks };
 }
 
-function renderContactSheet(title, rows, outDir) {
+function renderContactSheet(title, rows) {
   const cards = rows
     .map((r) => {
-      const hrefRaw = contactSheetHrefForRow(r, outDir) || String(r.relative_path || '');
+      const hrefRaw = r._local_href || '';
       const href = escapeAttr(hrefRaw);
       const src = href;
       const w = r.image_width || r.viewport_width || '?';

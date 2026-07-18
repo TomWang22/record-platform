@@ -18,6 +18,10 @@ import {
 import { awaitTerminalPanelReady } from '../phase34-product-terminal-readiness.mjs';
 import { derivePipelineObservationFromResponse } from '../phase34-product-pipeline-observation.mjs';
 import { assertCapabilityCaptureIdentity } from '../phase34-product-capability-identity.mjs';
+import {
+  assertIntelligenceRequestInitiated,
+  EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST,
+} from '../phase34-product-request-initiation.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -145,14 +149,22 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     routes: ['/dashboard', '/records/[id]', '/watchlist'],
     mounted_surfaces: [
       { route: '/dashboard', panel: 'intelligence-recommendations-panel', status: 'MOUNTED' },
-      { route: '/records/[id]', panel: 'intelligence-recommendations-panel', status: 'MOUNTED' },
+      {
+        route: '/records/[id]',
+        panel: 'intelligence-recommendations-panel',
+        status: 'MOUNTED',
+        // Record detail is owner-scoped; seller journeys use dashboard/watchlist.
+        smoke_eligible_sides: ['buyer'],
+      },
       { route: '/watchlist', panel: 'intelligence-recommendations-panel', status: 'MOUNTED' },
     ],
     panels: ['intelligence-recommendations-panel'],
     components: ['webapp/lib/ai-intelligence-client.ts'],
     apiPath: CAPABILITY_ROUTE_PATHS.recommendations,
     clientFn: 'fetchRecommendationsIntelligence',
+    /** Explicit click — panel does not auto-fetch on mount. */
     trigger: 'click',
+    runTestId: 'intelligence-recommendations-run',
     runButtonName: /get recommendations/i,
   },
   market_analytics: {
@@ -507,7 +519,40 @@ export class BaseProductJourneyAdapter {
     }
 
     if (this.registry.runTestId || prepared.runTestId) {
-      await page.getByTestId(prepared.runTestId || this.registry.runTestId).click();
+      const testId = prepared.runTestId || this.registry.runTestId;
+      const btn = page.getByTestId(testId).first();
+      await btn.waitFor({ state: 'visible', timeout: 45_000 });
+      await btn.scrollIntoViewIfNeeded?.().catch(() => null);
+      // Click-triggered panels (recommendations, analytics, auction) must be enabled
+      // before we claim the initiating action exists.
+      const enabled = await page
+        .waitForFunction(
+          (id) => {
+            const el = document.querySelector(`[data-testid="${id}"]`);
+            return Boolean(el && !el.disabled && el.getClientRects().length > 0);
+          },
+          testId,
+          { timeout: 45_000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+      if (!enabled) {
+        const err = new Error(
+          `${EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST}: ` +
+            `run control ${testId} never became enabled on ${prepared.route}`,
+        );
+        err.code = EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST;
+        err.meta = {
+          route: prepared.route,
+          component: prepared.panelTestId,
+          participant_side: prepared.participant_side,
+          viewport: await page.viewportSize(),
+          action: `click[data-testid=${testId}]`,
+          expected_endpoint: prepared.apiPath,
+        };
+        throw err;
+      }
+      await btn.click({ timeout: 30_000 });
       return;
     }
     if (this.registry.runButtonName) {
@@ -656,7 +701,34 @@ export class BaseProductJourneyAdapter {
       );
 
       const loadingLocator = page.getByTestId(`${prepared.panelTestId}-loading`);
-      await this.triggerLiveAction(page, prepared);
+      let initiatingAction = 'auto_mount_fetch';
+      if ((this.registry.trigger || 'auto') !== 'auto') {
+        initiatingAction =
+          prepared.runTestId || this.registry.runTestId
+            ? `click[data-testid=${prepared.runTestId || this.registry.runTestId}]`
+            : this.registry.runButtonName
+              ? `click[role=button name=${this.registry.runButtonName}]`
+              : `trigger:${this.registry.trigger}`;
+      }
+      try {
+        await this.triggerLiveAction(page, prepared);
+      } catch (err) {
+        if (err?.code === EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST) throw err;
+        const wrap = new Error(
+          `${EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST}: ${err?.message || err}`,
+        );
+        wrap.code = EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST;
+        wrap.meta = {
+          route: prepared.route,
+          component: prepared.panelTestId,
+          participant_side: prepared.participant_side,
+          viewport: await page.viewportSize(),
+          action: initiatingAction,
+          expected_endpoint: apiPath,
+        };
+        wrap.cause = err;
+        throw wrap;
+      }
 
       if ((await loadingLocator.count()) > 0) {
         screenshots.push(
@@ -673,7 +745,26 @@ export class BaseProductJourneyAdapter {
         );
       }
 
-      const response = await responsePromise;
+      let response;
+      try {
+        response = await responsePromise;
+      } catch (err) {
+        const wrap = new Error(
+          `${EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST}: ` +
+            `no POST ${apiPath} after ${initiatingAction} on ${prepared.route} (${err?.message || err})`,
+        );
+        wrap.code = EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST;
+        wrap.meta = {
+          route: prepared.route,
+          component: prepared.panelTestId,
+          participant_side: prepared.participant_side,
+          viewport: await page.viewportSize(),
+          action: initiatingAction,
+          expected_endpoint: apiPath,
+        };
+        wrap.cause = err;
+        throw wrap;
+      }
       const request = response.request();
       let postData = null;
       try {
@@ -685,6 +776,19 @@ export class BaseProductJourneyAdapter {
           postData = {};
         }
       }
+      assertIntelligenceRequestInitiated({
+        route: prepared.route,
+        component: prepared.panelTestId,
+        participant_side: prepared.participant_side,
+        viewport: await page.viewportSize(),
+        action: initiatingAction,
+        expected_endpoint: apiPath,
+        mounted: true,
+        visible: true,
+        browser_request_observed: true,
+        request_body_captured: postData != null && typeof postData === 'object',
+        response_observed: true,
+      });
       const responseJson = await response.json().catch(() => null);
       const actionEnd = Date.now();
       let capturedEndpoint = apiPath;
@@ -705,6 +809,7 @@ export class BaseProductJourneyAdapter {
         status: response.status(),
         started_at: new Date(actionStart).toISOString(),
         finished_at: new Date(actionEnd).toISOString(),
+        initiating_action: initiatingAction,
       });
 
       await page

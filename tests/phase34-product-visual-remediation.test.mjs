@@ -120,7 +120,7 @@ test('terminal readiness fails when loading skeleton is active', () => {
   );
 });
 
-test('contact sheets use bounded thumbnails and resolve file-relative links', () => {
+test('contact sheets use bounded thumbnails and resolve pack-local image links', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'phase34-cs-'));
   const png = path.join(tmp, 'x.png');
   fs.copyFileSync(
@@ -149,10 +149,9 @@ test('contact sheets use bounded thumbnails and resolve file-relative links', ()
   const html = fs.readFileSync(path.join(sheetsDir, 'combined.html'), 'utf8');
   assert.match(html, /max-height:\s*480px/);
   assert.match(html, /object-fit:\s*contain/);
-  assert.doesNotMatch(html, /height:\s*110000/);
-  assert.match(html, /href=/);
-  assert.match(html, /src="\.\.\/x\.png"/);
-  assert.ok(fs.existsSync(path.join(sheetsDir, '../x.png')));
+  assert.match(html, /src="images\/ss_abc\.png"/);
+  assert.ok(fs.existsSync(path.join(sheetsDir, 'images/ss_abc.png')));
+  assert.equal(fs.lstatSync(path.join(sheetsDir, 'images/ss_abc.png')).isSymbolicLink(), false);
 });
 
 test('1x1 screenshots are rejected', async () => {
@@ -197,6 +196,51 @@ test('valuation listing-edit is seller-eligible and offers inbox requires offer 
   assert.deepEqual(edit.smoke_eligible_sides, ['seller']);
   const offers = surfaces.find((s) => s.route === '/offers/inbox');
   assert.equal(offers.requires_offer_context, true);
+});
+
+test('recommendations requires explicit run control and buyer-only record detail', () => {
+  const reg = CAPABILITY_SURFACE_REGISTRY.recommendations;
+  assert.equal(reg.trigger, 'click');
+  assert.equal(reg.runTestId, 'intelligence-recommendations-run');
+  const record = reg.mounted_surfaces.find((s) => s.route === '/records/[id]');
+  assert.deepEqual(record.smoke_eligible_sides, ['buyer']);
+});
+
+test('request initiation guard fails closed when POST never fires', async () => {
+  const {
+    assertIntelligenceRequestInitiated,
+    EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST,
+  } = await import('../scripts/lib/phase34-product-request-initiation.mjs');
+  assert.throws(
+    () =>
+      assertIntelligenceRequestInitiated({
+        route: '/dashboard',
+        component: 'intelligence-recommendations-panel',
+        participant_side: 'seller',
+        viewport: { width: 390, height: 844 },
+        action: 'click[data-testid=intelligence-recommendations-run]',
+        expected_endpoint: '/api/ai/intelligence/recommendations',
+        mounted: true,
+        visible: true,
+        browser_request_observed: false,
+        request_body_captured: false,
+        response_observed: false,
+      }),
+    (err) => err.code === EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST,
+  );
+});
+
+test('locator PNG validation does not require viewport width equality', async () => {
+  const { validatePngFile } = await import('../scripts/lib/phase34-product-png-validation.mjs');
+  const png = path.join(root, 'scripts/lib/fixtures/min-viewport-320x240.png');
+  const v = validatePngFile(png, {
+    viewport_width: 1280,
+    viewport_height: 720,
+    capture_kind: 'LOCATOR',
+    locator_bounding_box: { x: 0, y: 0, width: 320, height: 240 },
+  });
+  assert.equal(v.ok, true);
+  assert.equal(v.dimension_validation_policy, 'LOCATOR_OR_BOUNDED_MATCH');
 });
 
 test('pipeline observation marks required components EXECUTED_AND_OBSERVED', () => {

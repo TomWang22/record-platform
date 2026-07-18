@@ -110,21 +110,25 @@ const VIEWPORTS = {
   mobile: { width: 390, height: 844 },
 };
 
-const SMOKE_PACK = process.env.PHASE34_PRODUCT_SMOKE_PACK || 'smoke-v4';
+const SMOKE_PACK = process.env.PHASE34_PRODUCT_SMOKE_PACK || 'smoke-v5';
 const SMOKE_KIND =
   process.env.PHASE34_PRODUCT_SMOKE_KIND ||
-  (SMOKE_PACK === 'smoke-v4'
-    ? 'PRODUCT_HARNESS_LIVE_SMOKE_V4'
-    : SMOKE_PACK === 'smoke-v3'
-      ? 'PRODUCT_HARNESS_LIVE_SMOKE_V3'
-      : 'PRODUCT_HARNESS_LIVE_SMOKE_V2');
+  (SMOKE_PACK === 'smoke-v5'
+    ? 'PRODUCT_HARNESS_LIVE_SMOKE_V5'
+    : SMOKE_PACK === 'smoke-v4'
+      ? 'PRODUCT_HARNESS_LIVE_SMOKE_V4'
+      : SMOKE_PACK === 'smoke-v3'
+        ? 'PRODUCT_HARNESS_LIVE_SMOKE_V3'
+        : 'PRODUCT_HARNESS_LIVE_SMOKE_V2');
 const DEFAULT_SMOKE_OUT =
   process.env.PHASE34_PRODUCT_SMOKE_OUT ||
-  (SMOKE_PACK === 'smoke-v4'
-    ? PRODUCT_LIVE_SMOKE_ROOT_V4
-    : SMOKE_PACK === 'smoke-v3'
-      ? '/tmp/phase34-product-harness-live-smoke-v3'
-      : PRODUCT_LIVE_SMOKE_ROOT);
+  (SMOKE_PACK === 'smoke-v5'
+    ? '/tmp/phase34-product-harness-live-smoke-v5'
+    : SMOKE_PACK === 'smoke-v4'
+      ? '/tmp/phase34-product-harness-live-smoke-v4'
+      : SMOKE_PACK === 'smoke-v3'
+        ? '/tmp/phase34-product-harness-live-smoke-v3'
+        : PRODUCT_LIVE_SMOKE_ROOT);
 
 function parseArgs(argv) {
   const opts = {

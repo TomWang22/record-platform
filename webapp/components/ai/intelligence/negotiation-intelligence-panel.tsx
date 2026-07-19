@@ -31,6 +31,12 @@ type NegotiationResult = {
   confidence?: number | { score?: number }
   automatic_send_allowed?: boolean
   engine_invoked?: boolean
+  correction_change?: {
+    what_changed?: string[]
+    previous_result?: string | null
+    updated_result?: string
+    reason_for_update?: string
+  } | null
   [key: string]: unknown
 }
 
@@ -326,15 +332,29 @@ export function NegotiationIntelligencePanel({
 
         {state.status === 'ready' && result ? (
           <div className="space-y-2" data-testid="intelligence-negotiation-ready">
-            <p className="text-xs text-slate-500" data-testid="intelligence-negotiation-intent-echo">
-              Answering: {userIntent}
-            </p>
-            {result.summary ? (
-              <div>
-                <p className="text-xs font-medium text-slate-500">Summary</p>
-                <p data-testid="intelligence-negotiation-summary">{result.summary}</p>
+            <div data-testid="intelligence-result-question">
+              <p className="text-xs font-medium text-slate-500">Question</p>
+              <p data-testid="intelligence-negotiation-intent-echo">{userIntent}</p>
+            </div>
+            <div data-testid="intelligence-result-answer">
+              <p className="text-xs font-medium text-slate-500">Answer</p>
+              <p data-testid="intelligence-negotiation-summary">
+                {String(result.summary || result.strategy || '')}
+              </p>
+            </div>
+            {result.correction_change ? (
+              <div
+                className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs dark:border-amber-900 dark:bg-amber-950/40"
+                data-testid="intelligence-negotiation-correction"
+              >
+                <p className="font-medium">What changed</p>
+                <p>Previous: {String(result.correction_change.previous_result || '—')}</p>
+                <p>Updated: {String(result.correction_change.updated_result || '—')}</p>
+                <p>Reason: {String(result.correction_change.reason_for_update || '—')}</p>
               </div>
             ) : null}
+            <div data-testid="intelligence-result-key-values" className="space-y-2">
+              <p className="text-xs font-medium text-slate-500">Key values</p>
             {result.counterpart_intent ? (
               <div>
                 <p className="text-xs font-medium text-slate-500">
@@ -356,7 +376,7 @@ export function NegotiationIntelligencePanel({
             {asLines(result.risks).length > 0 ? (
               <div>
                 <p className="text-xs font-medium text-slate-500">Risks</p>
-                <ul className="list-disc pl-4">
+                <ul className="list-disc pl-4" data-testid="intelligence-negotiation-risks">
                   {asLines(result.risks).map((line) => (
                     <li key={line}>{line}</li>
                   ))}
@@ -379,10 +399,11 @@ export function NegotiationIntelligencePanel({
                 </p>
               </div>
             ) : null}
+            </div>
 
-            <div>
+            <div data-testid="intelligence-result-next-action">
               <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                AI-generated draft — editable, not sent
+                Suggested next action — editable draft (not sent)
               </p>
               <textarea
                 value={draft}
@@ -404,9 +425,22 @@ export function NegotiationIntelligencePanel({
                 >
                   Insert into composer (does not send)
                 </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-300 px-2 py-1 text-xs opacity-60 dark:border-white/20"
+                  data-testid="intelligence-negotiation-send-separate"
+                  disabled
+                  title="Send remains a separate messaging action"
+                >
+                  Send (separate action)
+                </button>
               </div>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Sending requires your separate Send action. Drafts are never sent automatically.
+              <p
+                className="mt-1 text-[11px] text-slate-500"
+                data-testid="intelligence-negotiation-send-guards"
+              >
+                message_sent=false · automatic_send_allowed=false · Sending requires your separate Send
+                action.
               </p>
             </div>
           </div>

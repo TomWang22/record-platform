@@ -162,26 +162,73 @@ export function ValuationIntelligencePanel({
         />
         {state.status === 'ready' && result ? (
           <div className="space-y-2" data-testid="intelligence-valuation-ready">
-            <p className="text-xs text-slate-500" data-testid="intelligence-valuation-intent-echo">
-              Answering: {lastIntent}
-            </p>
-            <dl className="grid gap-2 sm:grid-cols-3">
+            <div data-testid="intelligence-result-question">
+              <p className="text-xs font-medium text-slate-500">Question</p>
+              <p data-testid="intelligence-valuation-intent-echo">Answering: {lastIntent}</p>
+            </div>
+            {result.correction_change ? (
+              <div
+                className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs dark:border-amber-900 dark:bg-amber-950/40"
+                data-testid="intelligence-valuation-correction"
+              >
+                <p className="font-medium">What changed</p>
+                <p>
+                  Previous: {String((result.correction_change as { previous_value?: string }).previous_value || '—')}
+                </p>
+                <p>
+                  Updated: {String((result.correction_change as { updated_value?: string }).updated_value || '—')}
+                </p>
+                <p>
+                  Reason:{' '}
+                  {String((result.correction_change as { reason_for_update?: string }).reason_for_update || '—')}
+                </p>
+              </div>
+            ) : null}
+            <div data-testid="intelligence-result-answer">
+              <p className="text-xs font-medium text-slate-500">Answer</p>
+              <p>{String(result.summary || 'Evidence-backed quick, fair, and patient sale ranges.')}</p>
+            </div>
+            <dl className="grid gap-2 sm:grid-cols-3" data-testid="intelligence-result-key-values">
               <div>
                 <dt className="text-xs text-slate-500">Quick sale</dt>
                 <dd data-testid="intelligence-valuation-quick">
-                  {formatRange(result.quick_sale_range, currency)}
+                  {formatRange(
+                    result.quick_sale_range ||
+                      (typeof result.quick_sale_estimate === 'number'
+                        ? {
+                            low: Number(result.quick_sale_estimate) * 0.95,
+                            high: Number(result.quick_sale_estimate) * 1.05,
+                          }
+                        : null),
+                    currency,
+                  )}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs text-slate-500">Fair market</dt>
                 <dd data-testid="intelligence-valuation-fair">
-                  {formatRange(result.fair_market_range, currency)}
+                  {formatRange(
+                    result.fair_market_range ||
+                      (result.low_estimate != null && result.high_estimate != null
+                        ? { low: Number(result.low_estimate), high: Number(result.high_estimate) }
+                        : null),
+                    currency,
+                  )}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs text-slate-500">Patient sale</dt>
                 <dd data-testid="intelligence-valuation-patient">
-                  {formatRange(result.patient_sale_range, currency)}
+                  {formatRange(
+                    result.patient_sale_range ||
+                      (typeof result.patient_sale_estimate === 'number'
+                        ? {
+                            low: Number(result.patient_sale_estimate) * 0.95,
+                            high: Number(result.patient_sale_estimate) * 1.08,
+                          }
+                        : null),
+                    currency,
+                  )}
                 </dd>
               </div>
             </dl>
@@ -189,7 +236,7 @@ export function ValuationIntelligencePanel({
               Sold count: {result.sold_comparable_count ?? soldAsking?.sold ?? '—'} · Asking count:{' '}
               {result.asking_price_count ?? soldAsking?.asking ?? '—'}
             </p>
-            <p className="text-xs text-amber-700 dark:text-amber-300">
+            <p className="text-xs text-amber-700 dark:text-amber-300" data-testid="intelligence-result-next-action">
               Ranges are not a single exact price. You must choose any listing price yourself.
             </p>
           </div>

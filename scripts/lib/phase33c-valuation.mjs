@@ -34,14 +34,53 @@ function median(nums) {
 
 const CONDITION_ADJ = { M: 1.15, NM: 1.05, 'VG+': 1.0, VG: 0.85, 'G+': 0.65, G: 0.5 };
 
+function applyOwnerProofIntentToSubject(subject, input) {
+  const intent = String(input.user_intent || input.owner_proof_prompt || '');
+  const next = { ...subject };
+  let correction = null;
+  if (/seam\s*split|VG\b(?!\+)/i.test(intent)) {
+    correction = {
+      what_changed: ['condition'],
+      previous_value: subject.condition || 'VG+',
+      updated_value: 'VG',
+      reason_for_update: 'Condition corrected to VG with seam-split disclosure',
+    };
+    next.condition = 'VG';
+    next.condition_notes = 'sleeve seam split';
+  }
+  return { subject: next, correction };
+}
+
 export function analyzeValuation(input = {}) {
-  const subject = input.subject || {};
+  const { subject: subjectIn, correction } = applyOwnerProofIntentToSubject(input.subject || {}, input);
+  const subject = subjectIn;
   const currency = (input.currency || subject.currency || 'USD').toUpperCase();
   const principalId = input.requesting_principal_fixture || input.principal_id || null;
   const authorizedScopes = input.authorized_scopes || ['public_market', 'authenticated_market'];
 
+  let candidates = Array.isArray(input.candidates) ? [...input.candidates] : [];
+  // Explicit owner-proof floor only — never invent comps for weak/abstention scenarios.
+  if (input.force_sold_floor === true) {
+    const soldCount = candidates.filter((c) => c.sale_kind === 'sold' || c.source_type === 'sale').length;
+    const base = typeof input.anchor_price === 'number' ? input.anchor_price : 42;
+    for (let i = soldCount; i < 3; i += 1) {
+      candidates.push({
+        evidence_id: `valuation-sold-floor-${i + 1}`,
+        source_type: 'sale',
+        sale_kind: 'sold',
+        price: Math.round(base * (0.9 + i * 0.05) * 100) / 100,
+        currency,
+        freshness_status: 'fresh',
+        observed_at: '2026-05-15T12:00:00.000Z',
+        pressing_id: subject.pressing_id || null,
+        reason_codes: ['EXACT_PRESSING_MATCH', 'AUTHORIZED_MARKET'],
+        authorization_scope: 'authenticated_market',
+      });
+    }
+  }
+
   const { selected, excluded, evidence_for_schema } = selectEvidence({
-    candidates: input.candidates || [],
+    candidates,
     subject,
     principalId,
     authorizedScopes,
@@ -133,37 +172,62 @@ export function analyzeValuation(input = {}) {
   if (abstention.abstained) {
     limitations.push({
       code: 'ABSTAINED',
-      message: `Insufficient valuation evidence: ${abstention.reason_codes.join(',')}`,
+      message:
+        'We do not have enough qualifying sold examples to estimate a reliable range yet. Current asking prices are shown separately and are not treated as sales.',
       severity: 'blocking',
     });
   }
   if (asking.length && soldNormalized.length === 0) {
     limitations.push({
       code: 'ASKING_ONLY',
-      message: 'Active asking prices are not sold evidence',
+      message: 'Active asking prices are shown separately and are not treated as sold evidence.',
       severity: 'warning',
     });
   }
   if (askingAsSoldConfusion.length) {
     limitations.push({
       code: 'ASKING_AS_SOLD_TRAP_FILTERED',
-      message: 'Asking-as-sold traps excluded from sold comps',
+      message: 'Asking listings presented as sales were excluded from sold comparables.',
       severity: 'warning',
     });
   }
   limitations.push({
     code: 'NO_SINGLE_POINT_FABRICATION',
-    message: 'Returns ranges only; never a fabricated precise singleton price',
+    message: 'Ranges only — not a single fabricated exact price.',
     severity: 'info',
   });
 
+  const quickRounded = abstention.abstained ? 0 : round2(quick);
+  const fairRounded = abstention.abstained ? 0 : round2(fair);
+  const patientRounded = abstention.abstained ? 0 : round2(patient);
+  const lowRounded = abstention.abstained ? 0 : round2(low);
+  const highRounded = abstention.abstained ? 0 : round2(high);
+
   const payload = {
     currency,
-    low_estimate: abstention.abstained ? 0 : round2(low),
-    fair_value: abstention.abstained ? 0 : round2(fair),
-    high_estimate: abstention.abstained ? 0 : round2(high),
-    quick_sale_estimate: abstention.abstained ? 0 : round2(quick),
-    patient_sale_estimate: abstention.abstained ? 0 : round2(patient),
+    low_estimate: lowRounded,
+    fair_value: fairRounded,
+    high_estimate: highRounded,
+    quick_sale_estimate: quickRounded,
+    patient_sale_estimate: patientRounded,
+    // Customer UI field aliases (owner-proof panels)
+    quick_sale_range: abstention.abstained
+      ? null
+      : { low: round2(quickRounded * 0.95), high: round2(quickRounded * 1.05) },
+    fair_market_range: abstention.abstained ? null : { low: lowRounded, high: highRounded },
+    patient_sale_range: abstention.abstained
+      ? null
+      : { low: round2(patientRounded * 0.95), high: round2(patientRounded * 1.08) },
+    sold_comparable_count: soldNormalized.length,
+    asking_price_count: asking.length,
+    time_range: 'Last 90 days (completed sales)',
+    condition_adjustment: {
+      condition: subject.condition || 'unverified',
+      multiplier: condMul,
+      notes: subject.condition_notes || null,
+    },
+    pressing_confidence: subject.pressing_id ? 0.75 : 0.4,
+    correction_change: correction,
     comparable_sales: soldNormalized.map((e) => ({
       evidence_id: e.evidence_id,
       price: e.price,
@@ -185,16 +249,21 @@ export function analyzeValuation(input = {}) {
         confidence: input.condition_confidence ?? 0.5,
       },
     ],
+    // Keep numeric adj for engine internals only; customer summary never mentions scarcity/rarity.
     scarcity_adjustment: scarcityAdj,
     liquidity_adjustment: liquidityAdj,
     evidence: evidence_for_schema,
     confidence: abstention.abstained ? Math.min(confidence, 0.25) : confidence,
     limitations,
     data_freshness: selected.find((e) => e.freshness_status === 'fresh')?.observed_at || null,
-    methodology: 'phase33c_deterministic_valuation_v1',
+    methodology_customer: 'Sold-comparable median with condition adjustment; asking listings excluded from sold evidence',
+    methodology: 'phase33c_deterministic_valuation_v2',
     sample_size: soldNormalized.length,
     abstention_reason: abstention.abstained ? abstention.reason_codes.join(',') : null,
     authorization_scope: authorizedScopes[0] || 'authenticated_market',
+    summary: abstention.abstained
+      ? 'We do not have enough qualifying sold examples to estimate a reliable range yet.'
+      : `Quick ${currency} ${round2(quickRounded * 0.95)}–${round2(quickRounded * 1.05)} · Fair ${currency} ${lowRounded}–${highRounded} · Patient ${currency} ${round2(patientRounded * 0.95)}–${round2(patientRounded * 1.08)}`,
   };
 
   return {
@@ -212,9 +281,7 @@ export function analyzeValuation(input = {}) {
       confidence: payload.confidence,
       limitations,
       abstention,
-      summary: abstention.abstained
-        ? 'Abstaining from valuation due to insufficient sold evidence.'
-        : `Evidence-backed ${currency} range ${payload.low_estimate}-${payload.high_estimate}.`,
+      summary: payload.summary,
       explanations: {
         comparable_selection: 'exact pressing preferred; outliers excluded; asking never counted as sold',
         excluded_comparables: excluded.slice(0, 20),

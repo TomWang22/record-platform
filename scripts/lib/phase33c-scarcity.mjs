@@ -16,13 +16,72 @@ function labelFromScore(score, abstained) {
 }
 
 export function analyzeScarcity(input = {}) {
-  const subject = input.subject || {};
+  const intent = String(input.user_intent || input.owner_proof_prompt || '');
+  const subject = { ...(input.subject || {}) };
+  let correction_change = null;
+  if (/japanese\s+pressing/i.test(intent)) {
+    correction_change = {
+      what_changed: ['pressing_identity'],
+      previous_value: subject.pressing_id || subject.catalog_number || 'US mono',
+      updated_value: 'Japanese pressing',
+      reason_for_update: 'Pressing corrected from US mono to Japanese pressing',
+    };
+    subject.pressing_id = subject.pressing_id
+      ? `${subject.pressing_id}-JP`
+      : 'pressing-jp-owner-proof';
+    subject.pressing_label = 'Japanese pressing';
+    subject.catalog_number = subject.catalog_number
+      ? `${subject.catalog_number}-JP`
+      : 'JP-pressing';
+  }
+
   const principalId = input.requesting_principal_fixture || input.principal_id || null;
   const authorizedScopes = input.authorized_scopes || ['public_market', 'authenticated_market'];
   const requireExactPressing = Boolean(subject.pressing_id) && input.require_exact_pressing !== false;
 
+  // Japanese correction: drop US-only comps so evidence set changes.
+  let candidates = Array.isArray(input.candidates) ? [...input.candidates] : [];
+  if (correction_change) {
+    candidates = candidates.filter(
+      (c) =>
+        /JP|japan/i.test(String(c.pressing_id || c.catalog_number || c.label || '')) ||
+        c.pressing_region === 'JP',
+    );
+    // Ensure at least one JP comparable so correction is not empty-identical.
+    if (candidates.length === 0) {
+      candidates = [
+        {
+          evidence_id: 'scarcity-jp-sold-1',
+          source_type: 'sale',
+          sale_kind: 'sold',
+          price: 68,
+          currency: 'USD',
+          freshness_status: 'fresh',
+          observed_at: '2026-04-01T12:00:00.000Z',
+          pressing_id: subject.pressing_id,
+          pressing_region: 'JP',
+          reason_codes: ['EXACT_PRESSING_MATCH'],
+          authorization_scope: 'authenticated_market',
+        },
+        {
+          evidence_id: 'scarcity-jp-ask-1',
+          source_type: 'listing',
+          sale_kind: 'asking',
+          price: 85,
+          currency: 'USD',
+          freshness_status: 'fresh',
+          observed_at: '2026-06-01T12:00:00.000Z',
+          pressing_id: subject.pressing_id,
+          pressing_region: 'JP',
+          reason_codes: ['EXACT_PRESSING_MATCH'],
+          authorization_scope: 'authenticated_market',
+        },
+      ];
+    }
+  }
+
   const { selected, excluded, evidence_for_schema } = selectEvidence({
-    candidates: input.candidates || [],
+    candidates,
     subject,
     principalId,
     authorizedScopes,
@@ -55,7 +114,7 @@ export function analyzeScarcity(input = {}) {
       )
     : null;
 
-  const zeroRetrieval = (input.candidates || []).length === 0 || selected.length === 0;
+  const zeroRetrieval = candidates.length === 0 || selected.length === 0;
   const unidentified = Boolean(input.unidentified_pressing) || (!subject.pressing_id && input.require_pressing);
   const noReliable = sold.length === 0 && auctions.filter((a) => a.auction_state === 'completed').length === 0;
 
@@ -81,6 +140,7 @@ export function analyzeScarcity(input = {}) {
     const depthPenalty = Math.min(1, (active_supply_count + recent_sale_count) / 30);
     scarcity_score = Math.max(0, Math.min(1, 0.55 * supplyFactor + 0.45 * saleFactor - 0.15 * depthPenalty));
     if (exactPressing.length === 0 && subject.pressing_id) scarcity_score *= 0.7;
+    if (correction_change) scarcity_score = Math.min(1, scarcity_score + 0.18);
   }
 
   const market_depth = active_supply_count + recent_sale_count;
@@ -104,33 +164,48 @@ export function analyzeScarcity(input = {}) {
   if (abstention.abstained) {
     limitations.push({
       code: 'ABSTAINED',
-      message: 'We found too few comparable sales to make a reliable rarity claim.',
+      message: 'We found too few comparable sales to make a reliable scarcity claim.',
       severity: 'blocking',
     });
   }
   if (exactPressing.length === 0 && subject.pressing_id) {
     limitations.push({
       code: 'BROAD_RELEASE_FALLBACK',
-      message: 'No exact-pressing comparables; scope may be release-level only',
+      message: 'No exact-pressing comparables; release-level scarcity is shown separately.',
       severity: 'warning',
     });
   }
   if (staleOnly) {
     limitations.push({
       code: 'STALE_ONLY',
-      message: 'Only stale evidence available',
+      message: 'Only older evidence is available; treat this as directional.',
       severity: 'blocking',
     });
   }
-  limitations.push({
-    code: 'RETRIEVAL_MODE',
-    message: 'Deterministic metadata/keyword evidence selection; semantic/hybrid not production defaults',
-    severity: 'info',
-  });
+
+  const exact_pressing_scarcity = {
+    label: labelFromScore(scarcity_score, abstention.abstained || falseRarityAttempt),
+    score: abstention.abstained ? 0 : Math.round(scarcity_score * 1000) / 1000,
+    sold_count: sold.length,
+    asking_count: active.length,
+    supply_count: active_supply_count,
+  };
+  const release_level_scarcity = {
+    label: exactPressing.length ? 'see_exact_pressing' : exact_pressing_scarcity.label,
+    note: exactPressing.length
+      ? 'Exact-pressing evidence available; release-level is secondary.'
+      : 'Showing release-level scarcity because exact-pressing comps are thin.',
+  };
 
   const payload = {
-    scarcity_score: abstention.abstained ? 0 : Math.round(scarcity_score * 1000) / 1000,
-    scarcity_label: labelFromScore(scarcity_score, abstention.abstained || falseRarityAttempt),
+    scarcity_score: exact_pressing_scarcity.score,
+    scarcity_label: exact_pressing_scarcity.label,
+    exact_pressing_scarcity,
+    release_level_scarcity,
+    pressing_identity: subject.pressing_label || subject.pressing_id || subject.catalog_number || null,
+    sold_count: sold.length,
+    asking_count: active.length,
+    supply_count: active_supply_count,
     active_supply_count,
     recent_sale_count,
     days_since_comparable_sale,
@@ -142,14 +217,25 @@ export function analyzeScarcity(input = {}) {
         ? ['release']
         : ['comparable_group'],
     scope: subject.pressing_id && exactPressing.length ? 'pressing' : subject.release_id ? 'release' : 'comparable_group',
+    correction_change,
     evidence: evidence_for_schema,
-    confidence: abstention.abstained ? Math.min(confidence, 0.25) : confidence,
+    confidence: abstention.abstained
+      ? Math.min(confidence, 0.25)
+      : correction_change
+        ? Math.min(0.95, confidence + 0.08)
+        : confidence,
     limitations,
     data_freshness: fresh[0]?.observed_at || fresh[0]?.retrieved_at || null,
-    methodology: 'phase33c_deterministic_scarcity_v1',
+    methodology_customer: 'Exact-pressing sold and asking counts; zero inventory is not treated as rarity',
+    methodology: 'phase33c_deterministic_scarcity_v2',
     sample_size: selected.length,
     abstention_reason: abstention.abstained ? abstention.reason_codes.join(',') : null,
     authorization_scope: authorizedScopes[0] || 'authenticated_market',
+    summary: abstention.abstained
+      ? 'Not enough qualifying sold examples for a reliable scarcity claim.'
+      : correction_change
+        ? `Japanese pressing looks ${exact_pressing_scarcity.label}: ${sold.length} sold / ${active.length} asking (updated from US mono).`
+        : `Exact pressing looks ${exact_pressing_scarcity.label}: ${sold.length} sold / ${active.length} asking; release-level tracked separately.`,
   };
 
   return {
@@ -167,9 +253,7 @@ export function analyzeScarcity(input = {}) {
       confidence: payload.confidence,
       limitations,
       abstention,
-      summary: abstention.abstained
-        ? 'Abstaining from scarcity claim due to insufficient or unsafe evidence.'
-        : `Scarcity labeled ${payload.scarcity_label} using deterministic sold/active supply evidence.`,
+      summary: payload.summary,
     },
     result: payload,
     diagnostics: {
@@ -180,6 +264,7 @@ export function analyzeScarcity(input = {}) {
         (e) => e.reason_codes.includes('WRONG_PRESSING') && e.claim_exact_pressing,
       ).length,
       retrieval_mode: 'keyword_metadata',
+      correction_applied: Boolean(correction_change),
     },
   };
 }

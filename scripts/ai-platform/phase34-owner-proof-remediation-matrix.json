@@ -1,0 +1,615 @@
+{
+  "schema_version": "phase34-owner-proof-remediation-matrix-v1",
+  "label": "Owner-proof product-output remediation tracking \u2014 24 scenarios",
+  "classification": {
+    "SCREENSHOT_PIPELINE_WORKING": true,
+    "CLIENT_ACTION_PATH_WORKING": true,
+    "AI_PRODUCT_OUTPUT_ACCEPTANCE_BLOCKED": true,
+    "MULTI_TURN_NEGOTIATION_BLOCKED": true,
+    "CORRECTION_BEHAVIOR_BLOCKED": true
+  },
+  "immutable_failure_evidence": "owner-review-artifacts/phase34/live-action-preflight-24-to-20-v1",
+  "model_weight_training": "NO",
+  "count": 24,
+  "rows": [
+    {
+      "scenario_id": "scarcity-success-exact-pressing",
+      "capability": "scarcity",
+      "current_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "required_visible_result": "Exact-pressing scarcity separated from release-level; sold/asking/supply counts; confidence; freshness; customer conclusion",
+      "required_state_change": null,
+      "required_evidence_floor": 5,
+      "required_customer_copy": "Exact CL 1355 pressing scarcity with sold vs asking separation",
+      "forbidden_visible_strings": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "engine_invoked=",
+        "fixture-"
+      ],
+      "required_distinct_from_scenario": "scarcity-correction-pressing-disambiguation",
+      "implementation_files": [
+        "scripts/lib/phase33c-scarcity.mjs",
+        "webapp/components/ai/intelligence/scarcity-intelligence-panel.tsx",
+        "scripts/lib/phase34-owner-proof-market-seed.mjs"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs",
+        "tests/phase34-owner-proof-source-verification.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "scarcity-correction-pressing-disambiguation",
+      "capability": "scarcity",
+      "current_failure_classes": [
+        "SCARCITY_CORRECTION_DID_NOT_CHANGE_PRESSING",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "required_visible_result": "Japanese pressing identity, changed evidence, changed conclusion, correction summary",
+      "required_state_change": "pressing identity + eligible evidence + confidence/result hash differ from success",
+      "required_evidence_floor": 1,
+      "required_customer_copy": "Updated because pressing changed from US mono to Japanese",
+      "forbidden_visible_strings": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "engine_invoked="
+      ],
+      "required_distinct_from_scenario": "scarcity-success-exact-pressing",
+      "implementation_files": [
+        "scripts/lib/phase33c-scarcity.mjs",
+        "webapp/components/ai/intelligence/scarcity-intelligence-panel.tsx"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "scarcity-weak-data-abstention",
+      "capability": "scarcity",
+      "current_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "required_visible_result": "Honest abstention without rarity-from-zero; customer language",
+      "required_state_change": null,
+      "required_evidence_floor": 0,
+      "required_customer_copy": "Not enough qualifying sold examples for a reliable scarcity claim",
+      "forbidden_visible_strings": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "claim_rarity_from_zero"
+      ],
+      "required_distinct_from_scenario": "scarcity-success-exact-pressing",
+      "implementation_files": [
+        "scripts/lib/phase33c-scarcity.mjs",
+        "webapp/lib/ai-customer-copy.ts"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "valuation-success-ranges",
+      "capability": "valuation",
+      "current_failure_classes": [
+        "VALUATION_RANGES_MISSING",
+        "VALUATION_WRONG_CAPABILITY_COPY",
+        "VALUATION_INTERNAL_CODE_VISIBLE",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "required_visible_result": "Quick/fair/patient ranges; >=3 sold comps; sold vs asking separated",
+      "required_state_change": null,
+      "required_evidence_floor": 3,
+      "required_customer_copy": "Evidence-backed quick, fair, and patient sale ranges",
+      "forbidden_visible_strings": [
+        "NO_RELIABLE_SOLD_OR_AUCTION",
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "scarcity",
+        "rarity"
+      ],
+      "required_distinct_from_scenario": "valuation-correction-condition",
+      "implementation_files": [
+        "scripts/lib/phase33c-valuation.mjs",
+        "webapp/components/ai/intelligence/valuation-intelligence-panel.tsx",
+        "webapp/lib/ai-market-evidence.ts"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "valuation-correction-condition",
+      "capability": "valuation",
+      "current_failure_classes": [
+        "VALUATION_RANGES_MISSING",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "required_visible_result": "Seam-split/VG correction changes ranges and shows previous vs updated",
+      "required_state_change": "condition adjustment + range hashes differ from success",
+      "required_evidence_floor": 3,
+      "required_customer_copy": "Updated because condition changed to VG with seam split",
+      "forbidden_visible_strings": [
+        "NO_RELIABLE_SOLD_OR_AUCTION",
+        "scarcity",
+        "rarity"
+      ],
+      "required_distinct_from_scenario": "valuation-success-ranges",
+      "implementation_files": [
+        "scripts/lib/phase33c-valuation.mjs",
+        "webapp/components/ai/intelligence/valuation-intelligence-panel.tsx"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "valuation-weak-comparables",
+      "capability": "valuation",
+      "current_failure_classes": [
+        "VALUATION_INTERNAL_CODE_VISIBLE",
+        "VALUATION_WRONG_CAPABILITY_COPY",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "required_visible_result": "Customer abstention; asking shown separately; no scarcity copy",
+      "required_state_change": null,
+      "required_evidence_floor": 0,
+      "required_customer_copy": "Not enough qualifying sold examples to estimate a reliable range yet",
+      "forbidden_visible_strings": [
+        "NO_RELIABLE_SOLD_OR_AUCTION",
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "scarcity"
+      ],
+      "required_distinct_from_scenario": "valuation-success-ranges",
+      "implementation_files": [
+        "scripts/lib/phase33c-valuation.mjs",
+        "webapp/lib/ai-customer-copy.ts"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "auction-success-watchlist-temperature",
+      "capability": "auction_intelligence",
+      "current_failure_classes": [
+        "AUCTION_TEMPERATURE_REPORT_MISSING",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "required_visible_result": ">=5 lots; temperature; underpriced; overheated; velocity; clustering",
+      "required_state_change": null,
+      "required_evidence_floor": 5,
+      "required_customer_copy": "Watchlist market temperature with underpriced and overheated lots",
+      "forbidden_visible_strings": [
+        "scarcity",
+        "NO_RELIABLE_SOLD_OR_AUCTION",
+        "fixture-"
+      ],
+      "required_distinct_from_scenario": "auction-correction-ending-window",
+      "implementation_files": [
+        "scripts/lib/phase33c-auction.mjs",
+        "webapp/components/ai/intelligence/watchlist-temperature-panel.tsx",
+        "scripts/lib/phase34-owner-proof-market-seed.mjs"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "auction-correction-ending-window",
+      "capability": "auction_intelligence",
+      "current_failure_classes": [
+        "AUCTION_CORRECTION_DID_NOT_CHANGE_WINDOW",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "required_visible_result": "24-hour window filters lots/metrics/conclusion",
+      "required_state_change": "report membership or metrics change vs success",
+      "required_evidence_floor": 1,
+      "required_customer_copy": "Updated because ending window narrowed to 24 hours",
+      "forbidden_visible_strings": [
+        "scarcity",
+        "rarity"
+      ],
+      "required_distinct_from_scenario": "auction-success-watchlist-temperature",
+      "implementation_files": [
+        "scripts/lib/phase33c-auction.mjs"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "auction-weak-proxy-data",
+      "capability": "auction_intelligence",
+      "current_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "required_visible_result": "Honest limit without bidder-identity or scarcity copy",
+      "required_state_change": null,
+      "required_evidence_floor": 0,
+      "required_customer_copy": "Not enough authorized auction density to score temperature reliably",
+      "forbidden_visible_strings": [
+        "shill",
+        "collusion",
+        "scarcity"
+      ],
+      "required_distinct_from_scenario": "auction-success-watchlist-temperature",
+      "implementation_files": [
+        "scripts/lib/phase33c-auction.mjs",
+        "webapp/lib/ai-customer-copy.ts"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "embeddings-success-current-lineage",
+      "capability": "embeddings",
+      "current_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "required_visible_result": "Real entity lineage: version, model, hash, scope, freshness, deletion, re-embed",
+      "required_state_change": null,
+      "required_evidence_floor": 1,
+      "required_customer_copy": "Current embedding lineage for this record",
+      "forbidden_visible_strings": [
+        "fixture-embed-v1",
+        "deadbeef",
+        "fixture-"
+      ],
+      "required_distinct_from_scenario": "embeddings-stale-reembed",
+      "implementation_files": [
+        "services/python-ai-service/app/ai/embedding_semantic_fixtures.py",
+        "webapp/components/ai/intelligence/embedding-lineage-panel.tsx"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "embeddings-stale-reembed",
+      "capability": "embeddings",
+      "current_failure_classes": [
+        "EMBEDDING_STALE_STATE_NOT_APPLIED"
+      ],
+      "required_visible_result": "freshness=STALE; reembed_required=true; reembed_status=REQUIRED",
+      "required_state_change": "stale/re-embed flags flip vs success",
+      "required_evidence_floor": 1,
+      "required_customer_copy": "Embedding marked stale; re-embed required before reuse",
+      "forbidden_visible_strings": [
+        "fixture-embed-v1",
+        "deadbeef"
+      ],
+      "required_distinct_from_scenario": "embeddings-success-current-lineage",
+      "implementation_files": [
+        "services/python-ai-service/app/ai/embedding_semantic_fixtures.py",
+        "webapp/components/ai/intelligence/embedding-lineage-panel.tsx"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "embeddings-deleted-source",
+      "capability": "embeddings",
+      "current_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "required_visible_result": "Deletion state visible; no production write",
+      "required_state_change": null,
+      "required_evidence_floor": 0,
+      "required_customer_copy": "Source embedding deleted; lineage retained for audit only",
+      "forbidden_visible_strings": [
+        "fixture-embed-v1",
+        "deadbeef"
+      ],
+      "required_distinct_from_scenario": "embeddings-success-current-lineage",
+      "implementation_files": [
+        "services/python-ai-service/app/ai/embedding_semantic_fixtures.py"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "search-success-semantic",
+      "capability": "semantic_search",
+      "current_failure_classes": [
+        "SEARCH_RESULTS_BELOW_FLOOR"
+      ],
+      "required_visible_result": ">=5 result cards with artist/title, pressing, price, why matched, mode, confidence",
+      "required_state_change": null,
+      "required_evidence_floor": 5,
+      "required_customer_copy": "Semantic matches for your query",
+      "forbidden_visible_strings": [
+        "fixture-release-1",
+        "silent fallback"
+      ],
+      "required_distinct_from_scenario": "search-hybrid-refinement",
+      "implementation_files": [
+        "services/python-ai-service/app/ai/embedding_semantic_fixtures.py",
+        "webapp/components/ai/intelligence/search-intelligence-chrome.tsx"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "search-hybrid-refinement",
+      "capability": "semantic_search",
+      "current_failure_classes": [
+        "SEARCH_HYBRID_MODE_NOT_APPLIED"
+      ],
+      "required_visible_result": "selected+executed mode hybrid; picture discs excluded; ranking changed",
+      "required_state_change": "mode semantic\u2192hybrid and result set/rank change",
+      "required_evidence_floor": 1,
+      "required_customer_copy": "Updated to hybrid mode; picture discs excluded",
+      "forbidden_visible_strings": [
+        "fixture-release-1"
+      ],
+      "required_distinct_from_scenario": "search-success-semantic",
+      "implementation_files": [
+        "services/python-ai-service/app/ai/embedding_semantic_fixtures.py",
+        "webapp/components/ai/intelligence/search-intelligence-chrome.tsx"
+      ],
+      "test_files": [
+        "tests/phase34-search-mode-chrome.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "search-visible-fallback-or-empty",
+      "capability": "semantic_search",
+      "current_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "required_visible_result": "Visible fallback or empty \u2014 not silent semantic success",
+      "required_state_change": null,
+      "required_evidence_floor": 0,
+      "required_customer_copy": "No strong semantic matches; showing explicit fallback",
+      "forbidden_visible_strings": [
+        "fixture-release-1"
+      ],
+      "required_distinct_from_scenario": "search-success-semantic",
+      "implementation_files": [
+        "webapp/components/ai/intelligence/search-intelligence-chrome.tsx"
+      ],
+      "test_files": [
+        "tests/phase34-search-mode-chrome.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "negotiation-success-strategy",
+      "capability": "negotiation_assistance",
+      "current_failure_classes": [
+        "NEGOTIATION_DRAFT_EMPTY",
+        "NEGOTIATION_STRATEGY_MISSING"
+      ],
+      "required_visible_result": "Strategy, range, non-empty draft, Insert\u2260Send, message_sent=false",
+      "required_state_change": null,
+      "required_evidence_floor": 0,
+      "required_customer_copy": "Advisory strategy for $35 offer on $41 listing",
+      "forbidden_visible_strings": [
+        "phase33d_deterministic",
+        "engine_invoked="
+      ],
+      "required_distinct_from_scenario": "negotiation-four-turn-live",
+      "implementation_files": [
+        "scripts/lib/phase33d-negotiation.mjs",
+        "webapp/components/ai/intelligence/negotiation-intelligence-panel.tsx"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs",
+        "tests/phase34-negotiation-draft-guards.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "negotiation-four-turn-live",
+      "capability": "negotiation_assistance",
+      "current_failure_classes": [
+        "NEGOTIATION_TURNS_MISSING",
+        "NEGOTIATION_DRAFT_EMPTY",
+        "NEGOTIATION_STRATEGY_MISSING"
+      ],
+      "required_visible_result": "Same session_id; 4 turn_ids; correction precedence; non-empty draft; Insert\u2260Send",
+      "required_state_change": "Each turn materially changes strategy/facts/draft; condition VG/seam; shipping $6; floor $37",
+      "required_evidence_floor": 0,
+      "required_customer_copy": "Four-turn thread with editable unsent draft",
+      "forbidden_visible_strings": [
+        "phase33d_deterministic",
+        "automatic_send_allowed=true"
+      ],
+      "required_distinct_from_scenario": "negotiation-success-strategy",
+      "implementation_files": [
+        "scripts/lib/phase33d-negotiation.mjs",
+        "scripts/lib/phase34-negotiation-context.mjs",
+        "webapp/components/ai/intelligence/negotiation-intelligence-panel.tsx",
+        "scripts/lib/phase34-product-journeys/adapters.mjs"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs",
+        "tests/phase34-negotiation-context-depth.test.mjs",
+        "tests/phase34-owner-proof-source-verification.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "negotiation-privacy-or-safety-refusal",
+      "capability": "negotiation_assistance",
+      "current_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "required_visible_result": "Visible refusal of fabricated leverage with safe alternative",
+      "required_state_change": null,
+      "required_evidence_floor": 0,
+      "required_customer_copy": "We cannot help with fabricated leverage; here is a safe alternative",
+      "forbidden_visible_strings": [
+        "FABRICATED_LEVERAGE_REFUSED",
+        "UNSAFE_TACTIC_REFUSED"
+      ],
+      "required_distinct_from_scenario": "negotiation-success-strategy",
+      "implementation_files": [
+        "scripts/lib/phase33d-negotiation.mjs",
+        "webapp/lib/ai-customer-copy.ts"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "recommendations-success-cards",
+      "capability": "recommendations",
+      "current_failure_classes": [
+        "RECOMMENDATION_CARDS_MISSING"
+      ],
+      "required_visible_result": ">=5 cards; budget<=60; no picture discs; diversity; customer reasons",
+      "required_state_change": null,
+      "required_evidence_floor": 5,
+      "required_customer_copy": "Personalized picks within your budget",
+      "forbidden_visible_strings": [
+        "comparable sales",
+        "fixture-"
+      ],
+      "required_distinct_from_scenario": "recommendations-negative-preference",
+      "implementation_files": [
+        "scripts/lib/phase33d-recommendations.mjs",
+        "webapp/components/ai/intelligence/recommendations-intelligence-panel.tsx"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "recommendations-negative-preference",
+      "capability": "recommendations",
+      "current_failure_classes": [
+        "RECOMMENDATION_CORRECTION_NOT_APPLIED"
+      ],
+      "required_visible_result": "Blue Note retained; picture discs forgotten; rank/result changes",
+      "required_state_change": "preference update + at least one card/rank change",
+      "required_evidence_floor": 1,
+      "required_customer_copy": "Updated preferences: keep Blue Note, exclude picture discs",
+      "forbidden_visible_strings": [
+        "comparable sales"
+      ],
+      "required_distinct_from_scenario": "recommendations-success-cards",
+      "implementation_files": [
+        "scripts/lib/phase33d-recommendations.mjs"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "recommendations-cold-start-honesty",
+      "capability": "recommendations",
+      "current_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "required_visible_result": "Honest cold-start limit without unrelated comps language",
+      "required_state_change": null,
+      "required_evidence_floor": 0,
+      "required_customer_copy": "Not enough preference history yet for personalized picks",
+      "forbidden_visible_strings": [
+        "comparable sales",
+        "fixture-"
+      ],
+      "required_distinct_from_scenario": "recommendations-success-cards",
+      "implementation_files": [
+        "scripts/lib/phase33d-recommendations.mjs"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "analytics-success-report",
+      "capability": "market_analytics",
+      "current_failure_classes": [
+        "ANALYTICS_SAMPLE_EMPTY",
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "required_visible_result": "Nonzero population/sample; readable 90-day range; sales values; plain methodology",
+      "required_state_change": null,
+      "required_evidence_floor": 1,
+      "required_customer_copy": "90-day completed-sale market summary",
+      "forbidden_visible_strings": [
+        "phase33e_deterministic_analytics_v1",
+        "fixture_authorized_market_events",
+        "{"
+      ],
+      "required_distinct_from_scenario": "analytics-constraint-population",
+      "implementation_files": [
+        "scripts/lib/phase33e-analytics.mjs",
+        "webapp/components/ai/intelligence/market-analytics-intelligence-panel.tsx"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "analytics-constraint-population",
+      "capability": "market_analytics",
+      "current_failure_classes": [
+        "ANALYTICS_CONSTRAINT_NOT_APPLIED"
+      ],
+      "required_visible_result": "US + VG+ constraints change population/sample/values",
+      "required_state_change": "population or sample or values differ from unconstrained success",
+      "required_evidence_floor": 1,
+      "required_customer_copy": "Updated because country=US and condition\u2265VG+",
+      "forbidden_visible_strings": [
+        "phase33e_deterministic_analytics_v1",
+        "{"
+      ],
+      "required_distinct_from_scenario": "analytics-success-report",
+      "implementation_files": [
+        "scripts/lib/phase33e-analytics.mjs"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    },
+    {
+      "scenario_id": "analytics-sample-below-policy-customer",
+      "capability": "market_analytics",
+      "current_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "required_visible_result": "Customer abstention; no raw policy codes",
+      "required_state_change": null,
+      "required_evidence_floor": 0,
+      "required_customer_copy": "Sample is too small for a reliable market report yet",
+      "forbidden_visible_strings": [
+        "SAMPLE_SIZE_BELOW_POLICY",
+        "phase33e_deterministic"
+      ],
+      "required_distinct_from_scenario": "analytics-success-report",
+      "implementation_files": [
+        "scripts/lib/phase33e-analytics.mjs",
+        "webapp/lib/ai-customer-copy.ts"
+      ],
+      "test_files": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "status": "SOURCE_REMEDIATED_PENDING_CI"
+    }
+  ]
+}

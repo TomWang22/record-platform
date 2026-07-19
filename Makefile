@@ -540,6 +540,13 @@ ai-platform-verify-phase34-owner-proof-output-remediation: ## Matrix + engine re
 	node --test tests/phase34-owner-proof-output-remediation.test.mjs tests/phase34-negotiation-context-depth.test.mjs tests/phase34-material-correction-gates.test.mjs
 	test -f scripts/ai-platform/phase34-owner-proof-remediation-matrix.json
 
+ai-platform-verify-phase34-owner-proof-product-remediation: ## Visual defects ledger + product contracts + customer-copy/scarcity honesty fixes (no live owner-proof)
+	node scripts/ai-platform/verify-phase34-owner-proof-product-remediation.mjs
+	node --test tests/phase34-owner-proof-product-remediation.test.mjs
+	test -f scripts/ai-platform/phase34-owner-proof-v3-visual-defects.json
+	test -f scripts/lib/phase34-owner-proof-product-contracts.mjs
+	node scripts/phase34-owner-proof-product-remediation-status.mjs | grep -q 'RECAPTURE-V4 READY FOR EXPLICIT APPROVAL — NOT LAUNCHED'
+
 ai-platform-verify-phase34-owner-proof-source-browser: ## Real Chromium four-turn negotiation + linked H1/H2/H3 (local edge required)
 	node scripts/phase34-owner-proof-source-verification.mjs
 

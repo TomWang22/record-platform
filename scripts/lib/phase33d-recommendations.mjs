@@ -75,9 +75,9 @@ export function analyzeRecommendations(input = {}) {
       (Boolean(input.owner_proof_prompt) || Boolean(input.user_intent)));
   if (candidatesIn.length < 5 && forceFloor) {
     const seed = [
-      ['rec-bn-1', 'Blue Note All-Stars', 'Blue Note Jam', 42, 'Blue Note'],
-      ['rec-bn-2', 'Art Blakey', "Moanin'", 48, 'Blue Note'],
-      ['rec-bn-3', 'Lee Morgan', 'The Sidewinder', 54, 'Blue Note'],
+      ['bn-all-stars-jam', 'Blue Note All-Stars', 'Blue Note Jam', 42, 'Blue Note'],
+      ['art-blakey-moanin', 'Art Blakey', "Moanin'", 48, 'Blue Note'],
+      ['lee-morgan-sidewinder', 'Lee Morgan', 'The Sidewinder', 54, 'Blue Note'],
       ['rec-prs-1', 'Prestige Quartet', 'Evening Session', 35, 'Prestige'],
       ['rec-rvg-1', 'Kenny Dorham', 'Quiet Kenny', 55, 'New Jazz'],
       ['rec-imp-1', 'Cannonball Adderley', "Somethin' Else", 58, 'Blue Note'],

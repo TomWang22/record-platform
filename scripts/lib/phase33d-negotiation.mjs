@@ -52,9 +52,18 @@ export function authorizeThread(input = {}) {
   };
 }
 
+function moneyFmt(amount, currency = 'USD') {
+  if (amount == null || Number.isNaN(Number(amount))) return '';
+  const n = Math.round(Number(amount) * 100) / 100;
+  if (String(currency).toUpperCase() === 'USD') {
+    return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
+  }
+  return `${n} ${currency}`;
+}
+
 function buildReplyDrafts({ side, anchor, target, walkAway, currency, abstained, facts, safetyRefused }) {
   if (safetyRefused) {
-    const safe = `Thanks for the interest — I can continue on the numbers we both see. My listing is firm near ${target || walkAway || ''} ${currency} with condition disclosed.`;
+    const safe = `Thanks for the interest — I can continue on the numbers we both see. My listing is firm near ${moneyFmt(target || walkAway, currency)} with condition disclosed.`;
     return { concise: safe, friendly: safe, firm: safe, primary: safe };
   }
   if (abstained) {
@@ -73,27 +82,27 @@ function buildReplyDrafts({ side, anchor, target, walkAway, currency, abstained,
       ? ' Keeping the tone calm and matter-of-fact.'
       : '';
   if (side === 'buyer') {
-    const primary = `Would you consider ${anchor} ${currency}? I am aiming near ${target} ${currency}.${conditionNote}${tone}`;
+    const primary = `Would you consider ${moneyFmt(anchor, currency)}? I am aiming near ${moneyFmt(target, currency)}.${conditionNote}${tone}`;
     return {
-      concise: `Would you consider ${anchor} ${currency}?`,
+      concise: `Would you consider ${moneyFmt(anchor, currency)}?`,
       friendly: primary,
-      firm: `My supported range tops near ${walkAway} ${currency}; ${target} is my preferred landing zone.`,
+      firm: `My supported range tops near ${moneyFmt(walkAway, currency)}; ${moneyFmt(target, currency)} is my preferred landing zone.`,
       primary,
     };
   }
   const netHint =
     shipping != null
-      ? ` After ~$${shipping} shipping, net proceeds matter to me.`
+      ? ` After roughly ${moneyFmt(shipping, currency)} shipping, net proceeds matter to me.`
       : '';
   const floorHint =
     facts?.seller_floor_usd != null
-      ? ` I need to stay at or above $${facts.seller_floor_usd}.`
+      ? ` I need to stay at or above ${moneyFmt(facts.seller_floor_usd, currency)}.`
       : '';
-  const primary = `Appreciate the offer — I can work toward ${target} ${currency}.${conditionNote}${netHint}${floorHint}${tone}`.trim();
+  const primary = `Appreciate the offer — I can work toward ${moneyFmt(target, currency)}.${conditionNote}${netHint}${floorHint}${tone}`.trim();
   return {
-    concise: `I can meet near ${target} ${currency}.`,
+    concise: `I can meet near ${moneyFmt(target, currency)}.`,
     friendly: primary,
-    firm: `My walk-away is ${walkAway} ${currency}; ${target} is a fair target based on sold evidence.`,
+    firm: `My walk-away is ${moneyFmt(walkAway, currency)}; ${moneyFmt(target, currency)} is a fair target based on sold evidence.`,
     primary,
   };
 }
@@ -101,7 +110,7 @@ function buildReplyDrafts({ side, anchor, target, walkAway, currency, abstained,
 function ownerProofMarketCandidates(asking, currency = 'USD') {
   const base = typeof asking === 'number' && asking > 0 ? asking : 41;
   return [0.92, 0.98, 1.05].map((mul, i) => ({
-    evidence_id: `nego-sold-comp-${i + 1}`,
+    evidence_id: `completed-sale-comp-${i + 1}`,
     source_type: 'sale',
     sale_kind: 'sold',
     price: Math.round(base * mul * 100) / 100,
@@ -567,8 +576,8 @@ export function analyzeNegotiation(input = {}) {
     thread_summary: `Authorized ${side || 'seller'} thread · offer $${offerAmt} on $${asking} listing · turn ${turnIndex + 1}`,
     counterpart_intent,
     leverage: [
-      `Sold-evidence band approximately ${low}-${high} ${currency}`,
-      `Asking price ${asking} ${currency}`,
+      `Sold-evidence band approximately ${moneyFmt(low, currency)}–${moneyFmt(high, currency)}`,
+      `Asking price ${moneyFmt(asking, currency)}`,
     ],
     risks,
     strategy,

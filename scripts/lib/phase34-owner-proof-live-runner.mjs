@@ -267,7 +267,18 @@ export function assertSeedFloors(seedManifest) {
   if (!scarcity?.evidence || scarcity.evidence.scarcity_observations < (floors.scarcity_success?.min_observations || 5)) {
     fail('SUCCESS_SCENARIO_DATA_FLOOR_NOT_MET', 'scarcity observations');
   }
-  checks.push({ capability: 'scarcity', ok: true, observations: scarcity.evidence.scarcity_observations });
+  if (
+    !scarcity?.evidence ||
+    (scarcity.evidence.sold_observations ?? 0) < (floors.scarcity_success?.min_sold_observations ?? 2)
+  ) {
+    fail('SUCCESS_SCENARIO_DATA_FLOOR_NOT_MET', 'scarcity sold observations');
+  }
+  checks.push({
+    capability: 'scarcity',
+    ok: true,
+    observations: scarcity.evidence.scarcity_observations,
+    sold_observations: scarcity.evidence.sold_observations,
+  });
 
   const valuation = byId.get('seed-kenny-quiet-vgplus');
   if (

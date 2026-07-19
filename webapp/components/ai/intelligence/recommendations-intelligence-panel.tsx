@@ -108,7 +108,23 @@ export function RecommendationsIntelligencePanel({
             className="rounded border border-slate-200 p-2 dark:border-slate-700"
             data-testid="intelligence-recommendation-card"
           >
-            <p className="font-medium">{String(item.title || item.entity_id || 'Recommendation')}</p>
+            <p className="font-medium">
+              {[item.artist, item.title].filter(Boolean).join(' — ') ||
+                String(item.title || 'Recommendation')}
+            </p>
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              {[
+                item.pressing || item.format,
+                typeof item.price === 'number'
+                  ? `$${item.price}`
+                  : typeof item.price_cents === 'number'
+                    ? `$${(Number(item.price_cents) / 100).toFixed(0)}`
+                    : null,
+                item.availability || item.status || (item.in_stock === false ? 'Unavailable' : 'Available'),
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
             <p className="text-xs text-slate-500">Why: {reasonLabels(item)}</p>
           </div>
         ))}

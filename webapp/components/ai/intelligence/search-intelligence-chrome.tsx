@@ -7,6 +7,7 @@ import {
   fetchSemanticSearchIntelligence,
   IntelligenceHttpError,
 } from '@/lib/ai-intelligence-client'
+import { sanitizeCustomerFacingText } from '@/lib/ai-customer-copy'
 import type { IntelligencePanelState } from '@/lib/ai-intelligence-types'
 
 export type IntelligenceSearchMode = 'keyword' | 'semantic' | 'hybrid' | 'owner-scoped'
@@ -240,13 +241,44 @@ export function SearchIntelligenceChrome({
           </p>
         ) : null}
         {state.status === 'ready' && result?.results && result.results.length > 0 ? (
-          <ul className="space-y-1 text-xs" data-testid="intelligence-search-why">
-            {result.results.map((row, idx) => (
-              <li key={row.entity_id || idx}>
-                {row.entity_id || `result-${idx}`}: {(row.reason_codes || []).join(', ') || 'matched'}
-                {row.score != null ? ` (score ${row.score})` : ''}
-              </li>
-            ))}
+          <ul className="space-y-2 text-xs" data-testid="intelligence-search-why">
+            {result.results.map((row, idx) => {
+              const r = row as Record<string, unknown>
+              const price =
+                typeof r.price === 'number'
+                  ? `$${r.price}`
+                  : typeof r.price_cents === 'number'
+                    ? `$${(Number(r.price_cents) / 100).toFixed(0)}`
+                    : null
+              const title = String(r.title || r.artist || r.entity_id || `Result ${idx + 1}`)
+              const artist = r.artist ? String(r.artist) : null
+              const catalog = [r.label, r.catalog_number].filter(Boolean).join(' ')
+              const condition = r.condition || r.media_condition
+              const pressing = r.pressing || r.pressing_label
+              const why = sanitizeCustomerFacingText(
+                String(
+                  r.match_reason ||
+                    r.why_matched ||
+                    (Array.isArray(r.reason_codes) ? (r.reason_codes as string[]).join(', ') : '') ||
+                    'Matched your search',
+                ),
+              )
+              return (
+                <li
+                  key={String(r.entity_id || idx)}
+                  className="rounded border border-slate-200 p-2 dark:border-slate-700"
+                  data-testid="intelligence-search-result-card"
+                >
+                  <p className="font-medium text-slate-900 dark:text-slate-100">
+                    {artist ? `${artist} — ${title}` : title}
+                  </p>
+                  <p className="text-slate-500">
+                    {[catalog, pressing, condition, price, r.availability].filter(Boolean).join(' · ')}
+                  </p>
+                  <p className="text-slate-600 dark:text-slate-300">Why it matched: {why}</p>
+                </li>
+              )
+            })}
           </ul>
         ) : null}
       </div>

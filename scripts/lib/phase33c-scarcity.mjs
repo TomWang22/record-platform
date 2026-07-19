@@ -117,11 +117,17 @@ export function analyzeScarcity(input = {}) {
   const zeroRetrieval = candidates.length === 0 || selected.length === 0;
   const unidentified = Boolean(input.unidentified_pressing) || (!subject.pressing_id && input.require_pressing);
   const noReliable = sold.length === 0 && auctions.filter((a) => a.auction_state === 'completed').length === 0;
+  // Asking/active supply alone must never be enough to call something Limited,
+  // Scarce, or Rare — that requires completed sales. Callers may pass
+  // `force_success_floor: false` only to intentionally exercise the pre-fix
+  // asking-only path in tests; production callers must never set this.
+  const preferAbstentionOnZeroSold = noReliable && input.force_success_floor !== false;
 
-  // Hard rule: zero-result query is NOT proof of scarcity.
+  // Hard rule: zero-result query is NOT proof of scarcity, and neither is
+  // asking-only supply with zero completed sales.
   const abstention = decideAbstention({
     unidentifiedPressing: unidentified,
-    noReliableSoldOrAuction: noReliable && (zeroRetrieval || input.force_insufficient),
+    noReliableSoldOrAuction: noReliable && (zeroRetrieval || input.force_insufficient || preferAbstentionOnZeroSold),
     onlyStaleEvidence: staleOnly,
     contradictoryCondition: Boolean(input.contradictory_condition),
     sampleSize: sold.length + active.length + auctions.length,
@@ -164,7 +170,10 @@ export function analyzeScarcity(input = {}) {
   if (abstention.abstained) {
     limitations.push({
       code: 'ABSTAINED',
-      message: 'We found too few comparable sales to make a reliable scarcity claim.',
+      message:
+        sold.length === 0
+          ? 'No completed sales yet — asking prices alone are not proof of scarcity. We need at least one completed sale before making a scarcity claim.'
+          : 'We found too few comparable sales to make a reliable scarcity claim.',
       severity: 'blocking',
     });
   }

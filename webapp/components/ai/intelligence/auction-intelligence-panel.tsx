@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react'
 import { IntelligencePanelShell } from '@/components/ai/intelligence/intelligence-panel-shell'
 import { OwnerProofIntentControl } from '@/components/ai/intelligence/owner-proof-intent-control'
 import { gatherLiveAuctionDetailEvidence } from '@/lib/ai-auction-evidence'
+import { customerCopyForCode } from '@/lib/ai-customer-copy'
 import {
   fetchAuctionIntelligence,
   IntelligenceHttpError,
@@ -193,7 +194,7 @@ export function AuctionIntelligencePanel({ listingId }: AuctionIntelligencePanel
                 <p className="text-xs font-medium text-slate-500">Risk flags (non-identity)</p>
                 <ul className="list-disc pl-4" data-testid="intelligence-auction-risk-flags">
                   {result.risk_flags.map((flag) => (
-                    <li key={flag}>{flag}</li>
+                    <li key={flag}>{customerCopyForCode(flag)}</li>
                   ))}
                 </ul>
               </div>

@@ -1,0 +1,1466 @@
+{
+  "schema_version": "phase34-owner-proof-v3-visual-defects-v1",
+  "label": "Phase 34 owner-proof live-v3 selected-20 visual defects + full 24-scenario product defect ledger",
+  "source_evidence_root": "/tmp/phase34-owner-proof-live-recapture-v3",
+  "source_export": "owner-review-artifacts/phase34/owner-proof-live-v3",
+  "note": "Tracking-only ledger. Does not mutate or re-derive frozen v3 evidence. required_repairs lists the defect codes that must be fixed in product code before any recapture-v4 evidence could be considered for owner review.",
+  "image_row_count": 20,
+  "scenario_row_count": 24,
+  "count": 44,
+  "all_required_defect_codes": [
+    "SCARCITY_SUCCESS_WITH_ZERO_SOLD",
+    "SCARCITY_EXACT_VS_RELEASE_NOT_ANSWERED",
+    "SCARCITY_ASKING_INVENTORY_OVERWEIGHTED",
+    "VALUATION_SUCCESS_RETURNED_ABSTENTION",
+    "VALUATION_ZERO_SOLD_COMPARABLES",
+    "VALUATION_WRONG_SCARCITY_RARITY_COPY",
+    "VALUATION_RANGES_ABSENT",
+    "AUCTION_SUCCESS_DATA_FLOOR_NOT_MET",
+    "AUCTION_WATCHLIST_REPORT_ABSENT",
+    "AUCTION_INTERNAL_CODES_VISIBLE",
+    "AUCTION_SINGLE_LOT_MASQUERADING_AS_WATCHLIST_ANALYSIS",
+    "EMBEDDING_STALE_FIELDS_DID_NOT_CHANGE",
+    "EMBEDDING_CORRECTION_TEXT_ONLY",
+    "SEARCH_PRICE_CONSTRAINT_NOT_PROVEN",
+    "SEARCH_PRESSING_MATCH_REASON_ABSENT",
+    "SEARCH_RESULT_CARDS_ABSENT",
+    "NEGOTIATION_SYNTHETIC_EVIDENCE_IDS_VISIBLE",
+    "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+    "NEGOTIATION_CURRENCY_COPY_UNNATURAL",
+    "RECOMMENDATION_PRICE_FIELDS_ABSENT",
+    "RECOMMENDATION_ARTIST_FIELDS_ABSENT",
+    "RECOMMENDATION_AVAILABILITY_ABSENT",
+    "RECOMMENDATION_INTERNAL_REASON_CODES_VISIBLE",
+    "RECOMMENDATION_DIVERSITY_NOT_PROVEN",
+    "ANALYTICS_QUESTION_NOT_ANSWERED",
+    "ANALYTICS_RAW_VALUES_WITHOUT_ANALYSIS",
+    "ANALYTICS_TREND_METRICS_ABSENT",
+    "ANALYTICS_VISUALIZATION_ABSENT",
+    "OWNER_FACING_E2E_IDENTIFIER_VISIBLE",
+    "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+    "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+    "OWNER_FACING_PLACEHOLDER_ARTWORK",
+    "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION",
+    "DUPLICATE_EVIDENCE_LIMITATIONS_SCREENSHOT"
+  ],
+  "rows": [
+    {
+      "image_name": "01-scarcity-intent.png",
+      "scenario_id": "scarcity-success-exact-pressing",
+      "capability": "scarcity",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Is this exact CL 1355 pressing scarce, or only the release generally?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "SCARCITY_EXACT_VS_RELEASE_NOT_ANSWERED"
+      ],
+      "incorrect_material_fields": [
+        "SCARCITY_SUCCESS_WITH_ZERO_SOLD",
+        "SCARCITY_ASKING_INVENTORY_OVERWEIGHTED"
+      ],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "SCARCITY_SUCCESS_WITH_ZERO_SOLD",
+        "SCARCITY_EXACT_VS_RELEASE_NOT_ANSWERED",
+        "SCARCITY_ASKING_INVENTORY_OVERWEIGHTED",
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_PLACEHOLDER_ARTWORK",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "intent_visible"
+    },
+    {
+      "image_name": "02-scarcity-result.png",
+      "scenario_id": "scarcity-success-exact-pressing",
+      "capability": "scarcity",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Is this exact CL 1355 pressing scarce, or only the release generally?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "SCARCITY_EXACT_VS_RELEASE_NOT_ANSWERED"
+      ],
+      "incorrect_material_fields": [
+        "SCARCITY_SUCCESS_WITH_ZERO_SOLD",
+        "SCARCITY_ASKING_INVENTORY_OVERWEIGHTED"
+      ],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "SCARCITY_SUCCESS_WITH_ZERO_SOLD",
+        "SCARCITY_EXACT_VS_RELEASE_NOT_ANSWERED",
+        "SCARCITY_ASKING_INVENTORY_OVERWEIGHTED",
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_PLACEHOLDER_ARTWORK",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "completed_result"
+    },
+    {
+      "image_name": "03-valuation-intent.png",
+      "scenario_id": "valuation-success-ranges",
+      "capability": "valuation",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"What is a quick-sale price versus a patient-sale price for this VG+ copy?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "VALUATION_RANGES_ABSENT"
+      ],
+      "incorrect_material_fields": [
+        "VALUATION_ZERO_SOLD_COMPARABLES",
+        "VALUATION_WRONG_SCARCITY_RARITY_COPY"
+      ],
+      "duplicate_state_group": [
+        "evidence_expanded",
+        "limitations_expanded"
+      ],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "VALUATION_SUCCESS_RETURNED_ABSTENTION",
+        "VALUATION_ZERO_SOLD_COMPARABLES",
+        "VALUATION_WRONG_SCARCITY_RARITY_COPY",
+        "VALUATION_RANGES_ABSENT",
+        "DUPLICATE_EVIDENCE_LIMITATIONS_SCREENSHOT",
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_PLACEHOLDER_ARTWORK",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "intent_visible"
+    },
+    {
+      "image_name": "04-valuation-result.png",
+      "scenario_id": "valuation-success-ranges",
+      "capability": "valuation",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"What is a quick-sale price versus a patient-sale price for this VG+ copy?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "VALUATION_RANGES_ABSENT"
+      ],
+      "incorrect_material_fields": [
+        "VALUATION_ZERO_SOLD_COMPARABLES",
+        "VALUATION_WRONG_SCARCITY_RARITY_COPY"
+      ],
+      "duplicate_state_group": [
+        "evidence_expanded",
+        "limitations_expanded"
+      ],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "VALUATION_SUCCESS_RETURNED_ABSTENTION",
+        "VALUATION_ZERO_SOLD_COMPARABLES",
+        "VALUATION_WRONG_SCARCITY_RARITY_COPY",
+        "VALUATION_RANGES_ABSENT",
+        "DUPLICATE_EVIDENCE_LIMITATIONS_SCREENSHOT",
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_PLACEHOLDER_ARTWORK",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "completed_result"
+    },
+    {
+      "image_name": "05-auction-intent.png",
+      "scenario_id": "auction-success-watchlist-temperature",
+      "capability": "auction_intelligence",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Which watched lots look underpriced, and which are overheating?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "AUCTION_INTERNAL_CODES_VISIBLE"
+      ],
+      "missing_material_fields": [
+        "AUCTION_SUCCESS_DATA_FLOOR_NOT_MET",
+        "AUCTION_WATCHLIST_REPORT_ABSENT"
+      ],
+      "incorrect_material_fields": [
+        "AUCTION_SINGLE_LOT_MASQUERADING_AS_WATCHLIST_ANALYSIS"
+      ],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "AUCTION_SUCCESS_DATA_FLOOR_NOT_MET",
+        "AUCTION_WATCHLIST_REPORT_ABSENT",
+        "AUCTION_INTERNAL_CODES_VISIBLE",
+        "AUCTION_SINGLE_LOT_MASQUERADING_AS_WATCHLIST_ANALYSIS",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "intent_visible"
+    },
+    {
+      "image_name": "06-auction-result.png",
+      "scenario_id": "auction-success-watchlist-temperature",
+      "capability": "auction_intelligence",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Which watched lots look underpriced, and which are overheating?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "AUCTION_INTERNAL_CODES_VISIBLE"
+      ],
+      "missing_material_fields": [
+        "AUCTION_SUCCESS_DATA_FLOOR_NOT_MET",
+        "AUCTION_WATCHLIST_REPORT_ABSENT"
+      ],
+      "incorrect_material_fields": [
+        "AUCTION_SINGLE_LOT_MASQUERADING_AS_WATCHLIST_ANALYSIS"
+      ],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "AUCTION_SUCCESS_DATA_FLOOR_NOT_MET",
+        "AUCTION_WATCHLIST_REPORT_ABSENT",
+        "AUCTION_INTERNAL_CODES_VISIBLE",
+        "AUCTION_SINGLE_LOT_MASQUERADING_AS_WATCHLIST_ANALYSIS",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "completed_result"
+    },
+    {
+      "image_name": "07-embed-current.png",
+      "scenario_id": "embeddings-success-current-lineage",
+      "capability": "embeddings",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Show lineage for this record's current embedding.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION"
+      ],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "completed_result"
+    },
+    {
+      "image_name": "08-embed-stale.png",
+      "scenario_id": "embeddings-stale-reembed",
+      "capability": "embeddings",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Mark stale and show re-embed required state.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION"
+      ],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [
+        "EMBEDDING_STALE_FIELDS_DID_NOT_CHANGE",
+        "EMBEDDING_CORRECTION_TEXT_ONLY"
+      ],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "EMBEDDING_STALE_FIELDS_DID_NOT_CHANGE",
+        "EMBEDDING_CORRECTION_TEXT_ONLY",
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "completed_result"
+    },
+    {
+      "image_name": "09-search-intent.png",
+      "scenario_id": "search-success-semantic",
+      "capability": "semantic_search",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Find first US mono pressings similar to this record under $80.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "SEARCH_PRICE_CONSTRAINT_NOT_PROVEN",
+        "SEARCH_PRESSING_MATCH_REASON_ABSENT",
+        "SEARCH_RESULT_CARDS_ABSENT"
+      ],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "SEARCH_PRICE_CONSTRAINT_NOT_PROVEN",
+        "SEARCH_PRESSING_MATCH_REASON_ABSENT",
+        "SEARCH_RESULT_CARDS_ABSENT",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "intent_visible"
+    },
+    {
+      "image_name": "10-search-result.png",
+      "scenario_id": "search-success-semantic",
+      "capability": "semantic_search",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Find first US mono pressings similar to this record under $80.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "SEARCH_PRICE_CONSTRAINT_NOT_PROVEN",
+        "SEARCH_PRESSING_MATCH_REASON_ABSENT",
+        "SEARCH_RESULT_CARDS_ABSENT"
+      ],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "SEARCH_PRICE_CONSTRAINT_NOT_PROVEN",
+        "SEARCH_PRESSING_MATCH_REASON_ABSENT",
+        "SEARCH_RESULT_CARDS_ABSENT",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "completed_result"
+    },
+    {
+      "image_name": "11-nego-t1.png",
+      "scenario_id": "negotiation-four-turn-live",
+      "capability": "negotiation_assistance",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Four-turn live: offer → sleeve/shipping correction → accept floor → draft reply\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL"
+      ],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "NEGOTIATION_SYNTHETIC_EVIDENCE_IDS_VISIBLE",
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "turn_1_strategy"
+    },
+    {
+      "image_name": "12-nego-t2.png",
+      "scenario_id": "negotiation-four-turn-live",
+      "capability": "negotiation_assistance",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Four-turn live: offer → sleeve/shipping correction → accept floor → draft reply\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL"
+      ],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "NEGOTIATION_SYNTHETIC_EVIDENCE_IDS_VISIBLE",
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "turn_2_correction"
+    },
+    {
+      "image_name": "13-nego-t3.png",
+      "scenario_id": "negotiation-four-turn-live",
+      "capability": "negotiation_assistance",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Four-turn live: offer → sleeve/shipping correction → accept floor → draft reply\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL"
+      ],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "NEGOTIATION_SYNTHETIC_EVIDENCE_IDS_VISIBLE",
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "turn_3_floor"
+    },
+    {
+      "image_name": "14-nego-t4.png",
+      "scenario_id": "negotiation-four-turn-live",
+      "capability": "negotiation_assistance",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Four-turn live: offer → sleeve/shipping correction → accept floor → draft reply\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL"
+      ],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "NEGOTIATION_SYNTHETIC_EVIDENCE_IDS_VISIBLE",
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "turn_4_draft"
+    },
+    {
+      "image_name": "15-nego-draft.png",
+      "scenario_id": "negotiation-four-turn-live",
+      "capability": "negotiation_assistance",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Four-turn live: offer → sleeve/shipping correction → accept floor → draft reply\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL"
+      ],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "NEGOTIATION_SYNTHETIC_EVIDENCE_IDS_VISIBLE",
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "insert_not_send"
+    },
+    {
+      "image_name": "16-recs-intent.png",
+      "scenario_id": "recommendations-success-cards",
+      "capability": "recommendations",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Keep it under $60, exclude picture discs, and diversify artists.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "RECOMMENDATION_PRICE_FIELDS_ABSENT",
+        "RECOMMENDATION_ARTIST_FIELDS_ABSENT",
+        "RECOMMENDATION_AVAILABILITY_ABSENT",
+        "RECOMMENDATION_DIVERSITY_NOT_PROVEN"
+      ],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "RECOMMENDATION_PRICE_FIELDS_ABSENT",
+        "RECOMMENDATION_ARTIST_FIELDS_ABSENT",
+        "RECOMMENDATION_AVAILABILITY_ABSENT",
+        "RECOMMENDATION_INTERNAL_REASON_CODES_VISIBLE",
+        "RECOMMENDATION_DIVERSITY_NOT_PROVEN",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "intent_visible"
+    },
+    {
+      "image_name": "17-recs-result.png",
+      "scenario_id": "recommendations-success-cards",
+      "capability": "recommendations",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Keep it under $60, exclude picture discs, and diversify artists.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "RECOMMENDATION_PRICE_FIELDS_ABSENT",
+        "RECOMMENDATION_ARTIST_FIELDS_ABSENT",
+        "RECOMMENDATION_AVAILABILITY_ABSENT",
+        "RECOMMENDATION_DIVERSITY_NOT_PROVEN"
+      ],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "RECOMMENDATION_PRICE_FIELDS_ABSENT",
+        "RECOMMENDATION_ARTIST_FIELDS_ABSENT",
+        "RECOMMENDATION_AVAILABILITY_ABSENT",
+        "RECOMMENDATION_INTERNAL_REASON_CODES_VISIBLE",
+        "RECOMMENDATION_DIVERSITY_NOT_PROVEN",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "completed_result"
+    },
+    {
+      "image_name": "18-analytics-intent.png",
+      "scenario_id": "analytics-success-report",
+      "capability": "market_analytics",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"How did completed Blue Note LP sales change over the last 90 days?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION"
+      ],
+      "missing_material_fields": [
+        "ANALYTICS_QUESTION_NOT_ANSWERED",
+        "ANALYTICS_TREND_METRICS_ABSENT",
+        "ANALYTICS_VISUALIZATION_ABSENT"
+      ],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "ANALYTICS_QUESTION_NOT_ANSWERED",
+        "ANALYTICS_RAW_VALUES_WITHOUT_ANALYSIS",
+        "ANALYTICS_TREND_METRICS_ABSENT",
+        "ANALYTICS_VISUALIZATION_ABSENT",
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "intent_visible"
+    },
+    {
+      "image_name": "19-analytics-result.png",
+      "scenario_id": "analytics-success-report",
+      "capability": "market_analytics",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"How did completed Blue Note LP sales change over the last 90 days?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION"
+      ],
+      "missing_material_fields": [
+        "ANALYTICS_QUESTION_NOT_ANSWERED",
+        "ANALYTICS_TREND_METRICS_ABSENT",
+        "ANALYTICS_VISUALIZATION_ABSENT"
+      ],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "ANALYTICS_QUESTION_NOT_ANSWERED",
+        "ANALYTICS_RAW_VALUES_WITHOUT_ANALYSIS",
+        "ANALYTICS_TREND_METRICS_ABSENT",
+        "ANALYTICS_VISUALIZATION_ABSENT",
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": "completed_result"
+    },
+    {
+      "image_name": "20-abstention.png",
+      "scenario_id": "negotiation-privacy-or-safety-refusal",
+      "capability": "negotiation_assistance",
+      "scenario_class": "C_honest_limit",
+      "expected_product_result": "Customer-facing answer to: \"Refuse fabricated leverage / unsafe tactic in customer language.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Honest limitation shown, but still requires an owner visual pass before acceptance.",
+      "data_floor_status": "INTENTIONALLY_BELOW_FLOOR",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "CAPTURED_NOT_ACCEPTED",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "PARTIAL",
+      "screenshot_state": "abstained_or_limited"
+    },
+    {
+      "image_name": null,
+      "scenario_id": "scarcity-success-exact-pressing",
+      "capability": "scarcity",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Is this exact CL 1355 pressing scarce, or only the release generally?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "SCARCITY_EXACT_VS_RELEASE_NOT_ANSWERED"
+      ],
+      "incorrect_material_fields": [
+        "SCARCITY_SUCCESS_WITH_ZERO_SOLD",
+        "SCARCITY_ASKING_INVENTORY_OVERWEIGHTED"
+      ],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "SCARCITY_SUCCESS_WITH_ZERO_SOLD",
+        "SCARCITY_EXACT_VS_RELEASE_NOT_ANSWERED",
+        "SCARCITY_ASKING_INVENTORY_OVERWEIGHTED",
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_PLACEHOLDER_ARTWORK",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "scarcity-correction-pressing-disambiguation",
+      "capability": "scarcity",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"I meant the Japanese pressing, not the US mono.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "SCARCITY_EXACT_VS_RELEASE_NOT_ANSWERED"
+      ],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "SCARCITY_EXACT_VS_RELEASE_NOT_ANSWERED",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "scarcity-weak-data-abstention",
+      "capability": "scarcity",
+      "scenario_class": "C_honest_limit",
+      "expected_product_result": "Customer-facing answer to: \"How scarce is this obscure private-press copy?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Honest limitation shown, but still requires an owner visual pass before acceptance.",
+      "data_floor_status": "INTENTIONALLY_BELOW_FLOOR",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "PARTIAL",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "valuation-success-ranges",
+      "capability": "valuation",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"What is a quick-sale price versus a patient-sale price for this VG+ copy?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "VALUATION_RANGES_ABSENT"
+      ],
+      "incorrect_material_fields": [
+        "VALUATION_ZERO_SOLD_COMPARABLES",
+        "VALUATION_WRONG_SCARCITY_RARITY_COPY"
+      ],
+      "duplicate_state_group": [
+        "evidence_expanded",
+        "limitations_expanded"
+      ],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "VALUATION_SUCCESS_RETURNED_ABSTENTION",
+        "VALUATION_ZERO_SOLD_COMPARABLES",
+        "VALUATION_WRONG_SCARCITY_RARITY_COPY",
+        "VALUATION_RANGES_ABSENT",
+        "DUPLICATE_EVIDENCE_LIMITATIONS_SCREENSHOT",
+        "OWNER_FACING_SEED_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_PLACEHOLDER_ARTWORK",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "valuation-correction-condition",
+      "capability": "valuation",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Sleeve has a seam split; media is closer to VG.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [
+        "VALUATION_WRONG_SCARCITY_RARITY_COPY"
+      ],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "VALUATION_WRONG_SCARCITY_RARITY_COPY",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "valuation-weak-comparables",
+      "capability": "valuation",
+      "scenario_class": "C_honest_limit",
+      "expected_product_result": "Customer-facing answer to: \"Value this with almost no sold comps.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Honest limitation shown, but still requires an owner visual pass before acceptance.",
+      "data_floor_status": "INTENTIONALLY_BELOW_FLOOR",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [
+        "VALUATION_WRONG_SCARCITY_RARITY_COPY"
+      ],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "VALUATION_WRONG_SCARCITY_RARITY_COPY",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "PARTIAL",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "auction-success-watchlist-temperature",
+      "capability": "auction_intelligence",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Which watched lots look underpriced, and which are overheating?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "AUCTION_INTERNAL_CODES_VISIBLE"
+      ],
+      "missing_material_fields": [
+        "AUCTION_SUCCESS_DATA_FLOOR_NOT_MET",
+        "AUCTION_WATCHLIST_REPORT_ABSENT"
+      ],
+      "incorrect_material_fields": [
+        "AUCTION_SINGLE_LOT_MASQUERADING_AS_WATCHLIST_ANALYSIS"
+      ],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "AUCTION_SUCCESS_DATA_FLOOR_NOT_MET",
+        "AUCTION_WATCHLIST_REPORT_ABSENT",
+        "AUCTION_INTERNAL_CODES_VISIBLE",
+        "AUCTION_SINGLE_LOT_MASQUERADING_AS_WATCHLIST_ANALYSIS",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "auction-correction-ending-window",
+      "capability": "auction_intelligence",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Focus on lots ending in the next 24 hours.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "AUCTION_INTERNAL_CODES_VISIBLE"
+      ],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "AUCTION_INTERNAL_CODES_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "auction-weak-proxy-data",
+      "capability": "auction_intelligence",
+      "scenario_class": "C_honest_limit",
+      "expected_product_result": "Customer-facing answer to: \"Temperature for a nearly empty watchlist.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Honest limitation shown, but still requires an owner visual pass before acceptance.",
+      "data_floor_status": "INTENTIONALLY_BELOW_FLOOR",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "AUCTION_INTERNAL_CODES_VISIBLE"
+      ],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "AUCTION_INTERNAL_CODES_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "PARTIAL",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "embeddings-success-current-lineage",
+      "capability": "embeddings",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Show lineage for this record's current embedding.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION"
+      ],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "embeddings-stale-reembed",
+      "capability": "embeddings",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Mark stale and show re-embed required state.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION"
+      ],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [
+        "EMBEDDING_STALE_FIELDS_DID_NOT_CHANGE",
+        "EMBEDDING_CORRECTION_TEXT_ONLY"
+      ],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "EMBEDDING_STALE_FIELDS_DID_NOT_CHANGE",
+        "EMBEDDING_CORRECTION_TEXT_ONLY",
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "embeddings-deleted-source",
+      "capability": "embeddings",
+      "scenario_class": "C_honest_limit",
+      "expected_product_result": "Customer-facing answer to: \"Lineage after source deletion.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Honest limitation shown, but still requires an owner visual pass before acceptance.",
+      "data_floor_status": "INTENTIONALLY_BELOW_FLOOR",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION"
+      ],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "PARTIAL",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "search-success-semantic",
+      "capability": "semantic_search",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Find first US mono pressings similar to this record under $80.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "SEARCH_PRICE_CONSTRAINT_NOT_PROVEN",
+        "SEARCH_PRESSING_MATCH_REASON_ABSENT",
+        "SEARCH_RESULT_CARDS_ABSENT"
+      ],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "SEARCH_PRICE_CONSTRAINT_NOT_PROVEN",
+        "SEARCH_PRESSING_MATCH_REASON_ABSENT",
+        "SEARCH_RESULT_CARDS_ABSENT",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "search-hybrid-refinement",
+      "capability": "semantic_search",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Switch to hybrid and exclude picture discs.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "SEARCH_PRESSING_MATCH_REASON_ABSENT"
+      ],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "SEARCH_PRESSING_MATCH_REASON_ABSENT",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "search-visible-fallback-or-empty",
+      "capability": "semantic_search",
+      "scenario_class": "C_honest_limit",
+      "expected_product_result": "Customer-facing answer to: \"Query that should abstain or show visible empty — never silent fallback.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Honest limitation shown, but still requires an owner visual pass before acceptance.",
+      "data_floor_status": "INTENTIONALLY_BELOW_FLOOR",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "PARTIAL",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "negotiation-success-strategy",
+      "capability": "negotiation_assistance",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"They offered $35 for my $41 listing. What should I do?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "NEGOTIATION_SYNTHETIC_EVIDENCE_IDS_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "negotiation-four-turn-live",
+      "capability": "negotiation_assistance",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Four-turn live: offer → sleeve/shipping correction → accept floor → draft reply\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL"
+      ],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "NEGOTIATION_SYNTHETIC_EVIDENCE_IDS_VISIBLE",
+        "NEGOTIATION_DRAFT_COPY_TOO_MECHANICAL",
+        "NEGOTIATION_CURRENCY_COPY_UNNATURAL",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "negotiation-privacy-or-safety-refusal",
+      "capability": "negotiation_assistance",
+      "scenario_class": "C_honest_limit",
+      "expected_product_result": "Customer-facing answer to: \"Refuse fabricated leverage / unsafe tactic in customer language.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Honest limitation shown, but still requires an owner visual pass before acceptance.",
+      "data_floor_status": "INTENTIONALLY_BELOW_FLOOR",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "PARTIAL",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "recommendations-success-cards",
+      "capability": "recommendations",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"Keep it under $60, exclude picture discs, and diversify artists.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [
+        "RECOMMENDATION_PRICE_FIELDS_ABSENT",
+        "RECOMMENDATION_ARTIST_FIELDS_ABSENT",
+        "RECOMMENDATION_AVAILABILITY_ABSENT",
+        "RECOMMENDATION_DIVERSITY_NOT_PROVEN"
+      ],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "RECOMMENDATION_PRICE_FIELDS_ABSENT",
+        "RECOMMENDATION_ARTIST_FIELDS_ABSENT",
+        "RECOMMENDATION_AVAILABILITY_ABSENT",
+        "RECOMMENDATION_INTERNAL_REASON_CODES_VISIBLE",
+        "RECOMMENDATION_DIVERSITY_NOT_PROVEN",
+        "OWNER_FACING_FIXTURE_IDENTIFIER_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "recommendations-negative-preference",
+      "capability": "recommendations",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Forget picture discs and keep Blue Note preference.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "RECOMMENDATION_INTERNAL_REASON_CODES_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "recommendations-cold-start-honesty",
+      "capability": "recommendations",
+      "scenario_class": "C_honest_limit",
+      "expected_product_result": "Customer-facing answer to: \"Cold-start with almost no preferences.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Honest limitation shown, but still requires an owner visual pass before acceptance.",
+      "data_floor_status": "INTENTIONALLY_BELOW_FLOOR",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "RECOMMENDATION_INTERNAL_REASON_CODES_VISIBLE",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "PARTIAL",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "analytics-success-report",
+      "capability": "market_analytics",
+      "scenario_class": "A_success",
+      "expected_product_result": "Customer-facing answer to: \"How did completed Blue Note LP sales change over the last 90 days?\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION"
+      ],
+      "missing_material_fields": [
+        "ANALYTICS_QUESTION_NOT_ANSWERED",
+        "ANALYTICS_TREND_METRICS_ABSENT",
+        "ANALYTICS_VISUALIZATION_ABSENT"
+      ],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "CRITICAL",
+      "required_repairs": [
+        "ANALYTICS_QUESTION_NOT_ANSWERED",
+        "ANALYTICS_RAW_VALUES_WITHOUT_ANALYSIS",
+        "ANALYTICS_TREND_METRICS_ABSENT",
+        "ANALYTICS_VISUALIZATION_ABSENT",
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "analytics-constraint-population",
+      "capability": "market_analytics",
+      "scenario_class": "B_correction",
+      "expected_product_result": "Customer-facing answer to: \"Limit to US sellers and VG+ or better.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Live capture blocked before owner visual review; product-output defects open against this scenario.",
+      "data_floor_status": "NOT_YET_PROVEN_LIVE",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "ANALYTICS_RAW_VALUES_WITHOUT_ANALYSIS",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "BLOCKED",
+      "screenshot_state": null
+    },
+    {
+      "image_name": null,
+      "scenario_id": "analytics-sample-below-policy-customer",
+      "capability": "market_analytics",
+      "scenario_class": "C_honest_limit",
+      "expected_product_result": "Customer-facing answer to: \"Report for a tiny population — customer language only.\" with grounded evidence and a safe next action.",
+      "observed_product_result": "Honest limitation shown, but still requires an owner visual pass before acceptance.",
+      "data_floor_status": "INTENTIONALLY_BELOW_FLOOR",
+      "response_quality_status": "NEEDS_REMEDIATION",
+      "visual_status": "NOT_IN_SELECTED_20",
+      "customer_copy_status": "NEEDS_REMEDIATION",
+      "synthetic_identifier_leaks": [
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "internal_code_leaks": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION"
+      ],
+      "missing_material_fields": [],
+      "incorrect_material_fields": [],
+      "duplicate_state_group": [],
+      "severity": "HIGH",
+      "required_repairs": [
+        "GENERIC_DIAGNOSTIC_PANEL_PRESENTATION",
+        "OWNER_FACING_E2E_IDENTIFIER_VISIBLE"
+      ],
+      "acceptance_status": "PARTIAL",
+      "screenshot_state": null
+    }
+  ]
+}

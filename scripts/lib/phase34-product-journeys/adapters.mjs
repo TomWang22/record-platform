@@ -24,6 +24,10 @@ import {
   EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST,
   OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER,
 } from '../phase34-product-request-initiation.mjs';
+import { DUPLICATE_SCREENSHOT_MASQUERADING_AS_DISTINCT_STATE } from '../phase34-product-screenshot-distinctness.mjs';
+
+/** A disclosure's aria-expanded attribute did not flip after clicking its summary. */
+export const DISCLOSURE_DID_NOT_EXPAND = 'DISCLOSURE_DID_NOT_EXPAND';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -1012,35 +1016,104 @@ export class BaseProductJourneyAdapter {
         browser_request_id: captures[0]?.browser_request_id || null,
       });
 
-      for (const suffix of ['evidence', 'limitations']) {
-        const details = page.getByTestId(`${prepared.panelTestId}-${suffix}`);
-        if ((await details.count()) > 0) {
-          const first = details.first();
-          if (typeof first.locator === 'function') {
-            await first.locator('summary').click().catch(() => null);
-          } else if (typeof first.click === 'function') {
-            await first.click().catch(() => null);
+      const disclosureSuffixes = ['evidence', 'limitations'];
+      const screenshotStateRecords = [];
+      let previousDisclosureSha256 = null;
+      let previousDisclosureSuffix = null;
+      for (const suffix of disclosureSuffixes) {
+        // Scope to the active panel's own subtree so a sibling panel's
+        // identically-named testid can never be captured instead.
+        const details = panelLocator.locator(`[data-testid="${prepared.panelTestId}-${suffix}"]`);
+        if ((await details.count()) === 0) continue;
+        const first = details.first();
+
+        // Collapse any other disclosure that is already open before opening
+        // this one, so an evidence screenshot can never be captured while
+        // limitations is also expanded (and vice versa).
+        for (const otherSuffix of disclosureSuffixes) {
+          if (otherSuffix === suffix) continue;
+          const other = panelLocator
+            .locator(`[data-testid="${prepared.panelTestId}-${otherSuffix}"]`)
+            .first();
+          if ((await other.count()) === 0) continue;
+          if ((await other.getAttribute('aria-expanded').catch(() => null)) === 'true') {
+            await other
+              .locator('> summary')
+              .first()
+              .click()
+              .catch(() => null);
           }
-          // Re-run a11y on expanded terminal-adjacent state for turn-specific evidence
-          const expandA11y = await executeAccessibilityChecks(page, {
-            panelTestId: prepared.panelTestId,
-          });
-          screenshots.push(
-            await captureProductScreenshot(page, {
-              ...shotBase,
-              state: suffix === 'evidence' ? 'evidence_expanded' : 'limitations_expanded',
-              capture_phase: 'expanded',
-              terminal_state: null,
-              response_available_at_capture: true,
-              expected_locator_visible: true,
-              accessibility_status: expandA11y.accessibility_result,
-              horizontal_overflow: expandA11y.horizontal_overflow,
-              fullPage: false,
-              capture_mode: 'locator',
-              locator: page.getByTestId(prepared.panelTestId).first(),
-            }),
-          );
         }
+
+        const ariaBefore = await first.getAttribute('aria-expanded').catch(() => null);
+        await first.locator('> summary').first().click();
+        // Wait for aria-expanded to actually flip rather than assuming the click landed.
+        await page
+          .waitForFunction(
+            ({ testId, before }) => {
+              const el = document.querySelector(`[data-testid="${testId}"]`);
+              return Boolean(el) && el.getAttribute('aria-expanded') !== before;
+            },
+            { testId: `${prepared.panelTestId}-${suffix}`, before: ariaBefore },
+            { timeout: 5_000 },
+          )
+          .catch(() => null);
+        const ariaAfter = await first.getAttribute('aria-expanded').catch(() => null);
+        const contentVisible = await first
+          .locator('ul')
+          .first()
+          .isVisible()
+          .catch(() => false);
+
+        if (ariaAfter !== 'true' || !contentVisible) {
+          const err = new Error(
+            `${DISCLOSURE_DID_NOT_EXPAND}: ${prepared.panelTestId}-${suffix} aria-expanded stayed ` +
+              `"${ariaAfter}" (before="${ariaBefore}"), content_visible=${contentVisible}`,
+          );
+          err.code = DISCLOSURE_DID_NOT_EXPAND;
+          throw err;
+        }
+
+        // Re-run a11y on expanded terminal-adjacent state for turn-specific evidence
+        const expandA11y = await executeAccessibilityChecks(page, {
+          panelTestId: prepared.panelTestId,
+        });
+        const requestedState = suffix === 'evidence' ? 'evidence_expanded' : 'limitations_expanded';
+        const shotRow = await captureProductScreenshot(page, {
+          ...shotBase,
+          state: requestedState,
+          capture_phase: 'expanded',
+          terminal_state: null,
+          response_available_at_capture: true,
+          expected_locator_visible: true,
+          accessibility_status: expandA11y.accessibility_result,
+          horizontal_overflow: expandA11y.horizontal_overflow,
+          fullPage: false,
+          capture_mode: 'locator',
+          locator: panelLocator,
+        });
+
+        if (previousDisclosureSha256 && shotRow.sha256 === previousDisclosureSha256) {
+          const err = new Error(
+            `${DUPLICATE_SCREENSHOT_MASQUERADING_AS_DISTINCT_STATE}: ${previousDisclosureSuffix}_expanded ` +
+              `and ${suffix}_expanded produced identical screenshots for ${prepared.panelTestId}`,
+          );
+          err.code = DUPLICATE_SCREENSHOT_MASQUERADING_AS_DISTINCT_STATE;
+          throw err;
+        }
+        previousDisclosureSha256 = shotRow.sha256;
+        previousDisclosureSuffix = suffix;
+
+        const screenshotStateRecord = {
+          requested_state: requestedState,
+          control_test_id: `${prepared.panelTestId}-${suffix}`,
+          aria_expanded_before: ariaBefore,
+          aria_expanded_after: ariaAfter,
+          content_visible: contentVisible,
+        };
+        shotRow.screenshot_state_record = screenshotStateRecord;
+        screenshotStateRecords.push(screenshotStateRecord);
+        screenshots.push(shotRow);
       }
 
       assertScreenshotsBeforePass(screenshots);
@@ -1099,6 +1172,7 @@ export class BaseProductJourneyAdapter {
         production_mutation: false,
         screenshots,
         screenshot_manifest_entry_ids: screenshots.map((s) => s.screenshot_id),
+        screenshot_state_records: screenshotStateRecords,
         pipelineObservation,
         timings: {
           browser_action_to_request_us: null,

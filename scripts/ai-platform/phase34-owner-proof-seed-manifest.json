@@ -4,7 +4,7 @@
   "product_acceptance": false,
   "forbidden_media": ["picsum.photos", "loremflickr", "unsplash.com", "placekitten"],
   "evidence_floors": {
-    "scarcity_success": { "min_observations": 5, "min_visible_evidence_rows": 3 },
+    "scarcity_success": { "min_observations": 5, "min_visible_evidence_rows": 3, "min_sold_observations": 2 },
     "valuation_success": { "min_sold_comparables": 3, "min_asking_comparables": 3 },
     "auction_success": { "min_watched_lots": 5 },
     "search_success": { "min_results": 5 },
@@ -37,7 +37,8 @@
       "evidence": {
         "scarcity_observations": 6,
         "release_level_count": 40,
-        "exact_pressing_count": 6
+        "exact_pressing_count": 6,
+        "sold_observations": 3
       }
     },
     {

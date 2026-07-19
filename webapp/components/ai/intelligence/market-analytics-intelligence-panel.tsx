@@ -139,11 +139,71 @@ export function MarketAnalyticsIntelligencePanel({
                 <dt className="font-medium text-slate-500">Currency</dt>
                 <dd className="break-words">{meta(state.result, 'currency')}</dd>
               </div>
+              <div className="min-w-0" data-testid="intelligence-analytics-current-median">
+                <dt className="font-medium text-slate-500">Current median (completed sales)</dt>
+                <dd className="break-words">
+                  {String(
+                    state.result.price_median ??
+                      (state.result.descriptive as Record<string, unknown> | undefined)
+                        ?.sold_median ??
+                      '—',
+                  )}
+                </dd>
+              </div>
+              <div className="min-w-0" data-testid="intelligence-analytics-prior-median">
+                <dt className="font-medium text-slate-500">Prior-period median</dt>
+                <dd className="break-words">
+                  {String(
+                    state.result.prior_period_median ??
+                      state.result.prior_median ??
+                      'Not enough prior-bucket data yet',
+                  )}
+                </dd>
+              </div>
+              <div className="min-w-0" data-testid="intelligence-analytics-change">
+                <dt className="font-medium text-slate-500">Change</dt>
+                <dd className="break-words">
+                  {String(
+                    state.result.percentage_change ??
+                      state.result.absolute_change ??
+                      state.result.summary ??
+                      'See methodology — asking prices are excluded from sold totals.',
+                  )}
+                </dd>
+              </div>
               <div className="min-w-0 sm:col-span-2">
                 <dt className="font-medium text-slate-500">Methodology</dt>
                 <dd className="break-words">{meta(state.result, 'methodology')}</dd>
               </div>
             </dl>
+            {Array.isArray(state.result.time_buckets) &&
+            (state.result.time_buckets as unknown[]).length > 0 ? (
+              <table
+                className="mt-2 w-full border-collapse text-xs"
+                data-testid="intelligence-analytics-trend-table"
+              >
+                <thead>
+                  <tr className="border-b border-slate-200 text-left dark:border-slate-700">
+                    <th className="py-1 pr-2">Period</th>
+                    <th className="py-1 pr-2">Completed sales</th>
+                    <th className="py-1">Median</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(state.result.time_buckets as Array<Record<string, unknown>>).map((b, i) => (
+                    <tr key={i} className="border-b border-slate-100 dark:border-slate-800">
+                      <td className="py-1 pr-2">{String(b.label || b.period || `Bucket ${i + 1}`)}</td>
+                      <td className="py-1 pr-2">{String(b.count ?? b.sold_count ?? '—')}</td>
+                      <td className="py-1">{String(b.median ?? b.price_median ?? '—')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-xs text-slate-500" data-testid="intelligence-analytics-trend-note">
+                Trend table appears when comparable time buckets are present in the report.
+              </p>
+            )}
           </>
         ) : null}
       </div>

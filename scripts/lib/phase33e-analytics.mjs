@@ -220,10 +220,29 @@ export function analyzeMarketAnalytics(input = {}) {
   const liquidity_score = sell_through_rate == null ? null : Math.round(sell_through_rate * Math.min(1, sold.length / 5) * 1000) / 1000;
 
   let price_trend = 'insufficient_data';
+  let prior_period_median = null;
+  let absolute_change = null;
+  let percentage_change = null;
+  const time_buckets = [];
   if (sold.length >= 2) {
     const mid = Math.floor(sold.length / 2);
-    const early = mean(sold.slice(0, mid).map((e) => e._price).filter((p) => p != null));
-    const late = mean(sold.slice(mid).map((e) => e._price).filter((p) => p != null));
+    const earlySlice = sold.slice(0, mid);
+    const lateSlice = sold.slice(mid);
+    const earlyPrices = earlySlice.map((e) => e._price).filter((p) => p != null);
+    const latePrices = lateSlice.map((e) => e._price).filter((p) => p != null);
+    const early = mean(earlyPrices);
+    const late = mean(latePrices);
+    prior_period_median = median(earlyPrices);
+    const currentBucketMedian = median(latePrices);
+    time_buckets.push(
+      { label: 'Prior half of window', period: 'prior', count: earlySlice.length, median: prior_period_median },
+      { label: 'Current half of window', period: 'current', count: lateSlice.length, median: currentBucketMedian },
+    );
+    if (prior_period_median != null && currentBucketMedian != null && prior_period_median !== 0) {
+      absolute_change = Math.round((currentBucketMedian - prior_period_median) * 100) / 100;
+      percentage_change =
+        Math.round(((currentBucketMedian - prior_period_median) / Math.abs(prior_period_median)) * 1000) / 10;
+    }
     if (early != null && late != null) {
       if (late > early * 1.05) price_trend = 'up';
       else if (late < early * 0.95) price_trend = 'down';
@@ -373,6 +392,12 @@ export function analyzeMarketAnalytics(input = {}) {
     price_min: sortedSold.length ? sortedSold[0] : null,
     price_max: sortedSold.length ? sortedSold[sortedSold.length - 1] : null,
     price_median: median(soldPrices),
+    prior_period_median,
+    prior_median: prior_period_median,
+    absolute_change,
+    percentage_change:
+      percentage_change == null ? null : `${percentage_change > 0 ? '+' : ''}${percentage_change}%`,
+    time_buckets,
     price_mean: mean(soldPrices),
     price_percentiles: {
       p25: percentile(sortedSold, 25),
@@ -401,7 +426,9 @@ export function analyzeMarketAnalytics(input = {}) {
       ? 'Sample is too small for a reliable market report yet.'
       : correction_change
         ? `Constrained report (${correction_change.updated_value}): ${sold.length} completed sales, sample ${sample_size}.`
-        : `90-day market summary: ${sold.length} completed sales, sample ${sample_size}, median ${median(soldPrices) ?? '—'} ${currency}.`,
+        : percentage_change != null
+          ? `Completed Blue Note–style sales over the last 90 days: ${sold.length} sales, median ${median(soldPrices) ?? '—'} ${currency} (${percentage_change > 0 ? '+' : ''}${percentage_change}% vs prior half-window).`
+          : `90-day market summary: ${sold.length} completed sales, sample ${sample_size}, median ${median(soldPrices) ?? '—'} ${currency}.`,
   };
 
   return {

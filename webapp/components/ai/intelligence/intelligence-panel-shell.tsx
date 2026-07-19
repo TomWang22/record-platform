@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type {
   IntelligenceConfidence,
   IntelligenceEvidenceItem,
@@ -11,6 +12,22 @@ import {
   limitationCustomerMessage,
   sanitizeCustomerFacingText,
 } from '@/lib/ai-customer-copy'
+
+/**
+ * Capability-aware abstention headline. `valuation` must never use
+ * scarcity/rarity wording — a valuation abstention is about not having
+ * enough sold comparables, not about how rare the item is.
+ */
+function abstentionHeadlineForCapability(capability?: string): string {
+  switch (capability) {
+    case 'valuation':
+      return 'Not enough sold comparables yet — we are holding back a price range.'
+    case 'scarcity':
+      return 'Not enough market evidence yet — we are holding back a scarcity claim.'
+    default:
+      return 'Not enough market evidence yet — we are holding back a confident claim.'
+  }
+}
 
 type IntelligencePanelShellProps = {
   title: string
@@ -46,6 +63,12 @@ export function IntelligencePanelShell({
   freshnessLabel,
   children,
 }: IntelligencePanelShellProps) {
+  // Controlled open state so the disclosure's `open` attribute always agrees
+  // with an explicit `aria-expanded` string the visual-evidence harness can
+  // poll — native `<details>` alone only exposes a boolean `open` attribute,
+  // which is easy to read inconsistently across capture tooling.
+  const [evidenceOpen, setEvidenceOpen] = useState(false)
+  const [limitationsOpen, setLimitationsOpen] = useState(false)
   const score = confidenceScore(confidence ?? undefined)
   const evidenceCount = evidence?.length ?? 0
   const evidenceSummary = evidenceCountLabel(evidenceCount)
@@ -55,6 +78,7 @@ export function IntelligencePanelShell({
   ).map((reason) => sanitizeCustomerFacingText(reason))
   const safeFreshness = freshnessLabel ? sanitizeCustomerFacingText(freshnessLabel) : null
   const safeError = errorMessage ? sanitizeCustomerFacingText(errorMessage) : null
+  const abstentionHeadline = abstentionHeadlineForCapability(capability)
 
   return (
     <section
@@ -100,9 +124,7 @@ export function IntelligencePanelShell({
           data-testid={`${testId}-abstention`}
           role="status"
         >
-          <p className="font-medium">
-            Not enough market evidence yet — we are holding back a scarcity or rarity claim.
-          </p>
+          <p className="font-medium">{abstentionHeadline}</p>
           {safeAbstentionReasons.map((reason) => (
             <p key={reason} className="text-xs opacity-90">
               {reason}
@@ -139,7 +161,13 @@ export function IntelligencePanelShell({
       ) : null}
 
       {!loading && limitations && limitations.length > 0 ? (
-        <details className="mt-2 text-xs text-slate-600 dark:text-slate-300" data-testid={`${testId}-limitations`}>
+        <details
+          className="mt-2 text-xs text-slate-600 dark:text-slate-300"
+          data-testid={`${testId}-limitations`}
+          open={limitationsOpen}
+          aria-expanded={limitationsOpen}
+          onToggle={(event) => setLimitationsOpen((event.target as HTMLDetailsElement).open)}
+        >
           <summary className="cursor-pointer font-medium">What this means for you</summary>
           <ul className="mt-1 list-disc space-y-1 pl-4">
             {limitations.map((l) => (
@@ -163,7 +191,13 @@ export function IntelligencePanelShell({
       ) : null}
 
       {!loading && evidence && evidence.length > 0 ? (
-        <details className="mt-2 text-xs text-slate-600 dark:text-slate-300" data-testid={`${testId}-evidence`}>
+        <details
+          className="mt-2 text-xs text-slate-600 dark:text-slate-300"
+          data-testid={`${testId}-evidence`}
+          open={evidenceOpen}
+          aria-expanded={evidenceOpen}
+          onToggle={(event) => setEvidenceOpen((event.target as HTMLDetailsElement).open)}
+        >
           <summary className="cursor-pointer font-medium">Evidence</summary>
           <ul className="mt-1 space-y-2">
             {evidence.map((item, idx) => (

@@ -390,7 +390,7 @@ async function main() {
       const asking = typeof body.asking_price === 'number' && body.asking_price > 0 ? body.asking_price : 41;
       if (!Array.isArray(body.market_candidates) || body.market_candidates.length === 0) {
         body.market_candidates = [0.92, 0.98, 1.05].map((mul, i) => ({
-          evidence_id: `nego-sold-comp-${i + 1}`,
+          evidence_id: `completed-sale-comp-${i + 1}`,
           source_type: 'sale',
           sale_kind: 'sold',
           price: Math.round(asking * mul * 100) / 100,

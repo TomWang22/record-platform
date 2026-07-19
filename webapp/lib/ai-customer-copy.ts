@@ -35,10 +35,24 @@ const CODE_COPY: Record<string, string> = {
   SCHEMA_STRATEGY: 'Analysis used the standard structured strategy path.',
   RERANKER_CONFIGURATION: 'Results were ordered for marketplace relevance.',
   ENGINE_INVOCATION_STATUS: 'Analysis status is shown in plain language below.',
+  NO_BIDS: 'No bids yet — treat the current asking price as a starting point, not a market price.',
+  SMALL_COMPARABLE_SAMPLE: 'Only a small number of comparable lots were available for this comparison.',
+  BUDGET_FIT: 'Fits within your stated budget.',
+  PICTURE_DISC_EXCLUDED: 'Picture discs were excluded per your preference.',
+  PORTFOLIO_DIVERSIFICATION: 'Chosen to diversify your collection across artists and labels.',
+  DIVERSIFICATION: 'Chosen to diversify your collection across artists and labels.',
+  COLLECTION_GAP: 'Fills a gap in your existing collection.',
+  LATE_BID_PRESSURE: 'Bidding activity is concentrated near the auction close.',
 }
 
 const CODE_PATTERN =
-  /\b(SAMPLE_SIZE_BELOW_POLICY|NO_RELIABLE_SOLD_OR_AUCTION|AGGREGATED_ONLY|NOT_INVOKED_BY_POLICY|INSUFFICIENT_EVIDENCE|WEAK_EVIDENCE|STALE_EVIDENCE|UNAUTHORIZED|PRIVACY_REFUSAL|SAFETY_REFUSAL|FABRICATED_LEVERAGE_REFUSED|UNSAFE_TACTIC_REFUSED|ZERO_RESULTS|SCHEMA_STRATEGY|RERANKER_CONFIGURATION|ENGINE_INVOCATION_STATUS|ABSTAIN(?:_[A-Z0-9_]+)?)\b/gi
+  /\b(SAMPLE_SIZE_BELOW_POLICY|NO_RELIABLE_SOLD_OR_AUCTION|AGGREGATED_ONLY|NOT_INVOKED_BY_POLICY|INSUFFICIENT_EVIDENCE|WEAK_EVIDENCE|STALE_EVIDENCE|UNAUTHORIZED|PRIVACY_REFUSAL|SAFETY_REFUSAL|FABRICATED_LEVERAGE_REFUSED|UNSAFE_TACTIC_REFUSED|ZERO_RESULTS|SCHEMA_STRATEGY|RERANKER_CONFIGURATION|ENGINE_INVOCATION_STATUS|NO_BIDS|SMALL_COMPARABLE_SAMPLE|BUDGET_FIT|PICTURE_DISC_EXCLUDED|PORTFOLIO_DIVERSIFICATION|DIVERSIFICATION|COLLECTION_GAP|LATE_BID_PRESSURE|ABSTAIN(?:_[A-Z0-9_]+)?)\b/gi
+
+// Synthetic/internal identifier fragments that must never reach a customer,
+// even when embedded inside otherwise-normal sentences (e.g. seed titles,
+// harness identifiers, or fixture ids leaking into rendered copy).
+const STRIP_PATTERN =
+  /\(\s*owner-proof seed(?:\s*\d+)?\s*\)|\bowner-proof seed(?:\s*\d+)?\b|\bE2E Browse\b|\bnego-sold-comp-[a-z0-9-]*\b|\brec-bn-\d+\b|\bfixture-[a-z0-9-]*\b/gi
 
 export function customerCopyForCode(code: string | null | undefined): string {
   if (!code) return ''
@@ -55,6 +69,7 @@ export function sanitizeCustomerFacingText(text: string | null | undefined): str
   if (!text) return ''
   let out = String(text)
   out = out.replace(CODE_PATTERN, (match) => customerCopyForCode(match))
+  out = out.replace(STRIP_PATTERN, '').replace(/\(\s*\)/g, '').replace(/\s{2,}/g, ' ')
   // Common harness leakage patterns
   out = out.replace(/\bengine_invoked\s*=\s*\w+/gi, 'Analysis completed')
   out = out.replace(/\bschema strategy\b/gi, 'structured analysis')

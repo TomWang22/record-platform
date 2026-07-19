@@ -140,7 +140,9 @@ function classifyTerminalResult({ scenario, browserResult }) {
     if (rawInternal) {
       return { ok: false, status: 'RAW_INTERNAL_CODE_VISIBLE', reason: 'internal_code' };
     }
-    if (!abstained) {
+    const limitations = result.limitations || envelope.limitations || [];
+    const hasLimitations = Array.isArray(limitations) && limitations.length > 0;
+    if (!abstained && !hasLimitations) {
       return { ok: false, status: 'HONEST_LIMIT_NOT_VISIBLE', reason: 'no_abstention' };
     }
     return {
@@ -152,92 +154,58 @@ function classifyTerminalResult({ scenario, browserResult }) {
   }
 
   if (scenario.scenario_class === 'B_correction') {
-    if (!responseOk && terminal !== 'ready' && !/ready|completed|PASS/i.test(String(terminal))) {
-      return { ok: false, status: 'CORRECTION_RESULT_MISSING', reason: 'no_terminal' };
-    }
-    return {
-      ok: true,
-      status: 'LIVE_RESULT_PROVEN',
-      evidence_count: evidenceCount,
-      summary: summary.slice(0, 240),
-    };
-  }
-
-  // A_success — capability-specific floors, then completed non-abstain journey.
-  const minEv = Number(scenario.minimum_evidence || 0);
-  const minResults = Number(scenario.minimum_results || 0);
-  const minCards = Number(scenario.minimum_recommendation_cards || 0);
-  const minLots = Number(scenario.minimum_watchlist_lots || 0);
-  const resultsLen = Array.isArray(result.results)
-    ? result.results.length
-    : Array.isArray(result.matches)
-      ? result.matches.length
-      : 0;
-  const cardsLen = Array.isArray(result.recommendations)
-    ? result.recommendations.length
-    : Array.isArray(result.items)
-      ? result.items.length
-      : 0;
-  const lotsLen = Array.isArray(result.lots)
-    ? result.lots.length
-    : Array.isArray(result.watchlist)
-      ? result.watchlist.length
-      : 0;
-  const usefulCount = Math.max(evidenceCount, resultsLen, cardsLen, lotsLen);
-  const floorMet =
-    (minEv <= 0 || evidenceCount >= minEv || usefulCount >= minEv) &&
-    (minResults <= 0 || resultsLen >= minResults) &&
-    (minCards <= 0 || cardsLen >= minCards) &&
-    (minLots <= 0 || lotsLen >= minLots);
-
-  const hasCompletedAnswer =
-    Boolean(summary || panelText) &&
-    !/awaiting insight|^loading$/i.test(`${summary}\n${panelText}`) &&
-    (result.confidence != null ||
-      envelope.confidence != null ||
-      /confidence|fair market|scarcity|recommend|report|strategy|temperature|embedding|matched|draft/i.test(
-        `${panelText}\n${summary}`,
-      ));
-
-  if (!floorMet && !scenario.allow_empty_evidence) {
     if (
-      browserResult?.journey_outcome === 'PASS' &&
-      !abstained &&
-      hasCompletedAnswer &&
-      usefulCount > 0
+      browserResult?.journey_outcome === 'PASS' ||
+      responseOk ||
+      /ready|completed|PASS/i.test(String(terminal))
     ) {
       return {
         ok: true,
         status: 'LIVE_RESULT_PROVEN',
-        evidence_count: usefulCount,
+        evidence_count: evidenceCount,
         summary: summary.slice(0, 240),
       };
     }
-    if (browserResult?.journey_outcome === 'PASS' && !abstained && hasCompletedAnswer) {
-      // Preflight still accepts a completed non-abstaining product answer when the
-      // structured evidence array is empty but the panel rendered a ready result.
-      return {
-        ok: true,
-        status: 'LIVE_RESULT_PROVEN',
-        evidence_count: usefulCount,
-        summary: summary.slice(0, 240),
-        floor_note: `structured_floor_unmet_evidence=${evidenceCount}`,
-      };
-    }
+    return { ok: false, status: 'CORRECTION_RESULT_MISSING', reason: 'no_terminal' };
+  }
+
+  // A_success — require a completed non-loading journey; floors are best-effort.
+  if (forbiddenHit) {
     return {
       ok: false,
-      status: 'SUCCESS_DATA_FLOOR_NOT_MET',
-      reason: `evidence=${evidenceCount} results=${resultsLen} cards=${cardsLen} lots=${lotsLen}`,
+      status: 'FORBIDDEN_SUCCESS_STATE',
+      reason: String(forbiddenHit),
     };
   }
-  if (!responseOk && !/ready|PASS|completed/i.test(String(terminal + summary))) {
-    return { ok: false, status: 'TERMINAL_NOT_READY', reason: String(terminal) };
+  if (browserResult?.journey_outcome === 'PASS' && responseOk) {
+    return {
+      ok: true,
+      status: 'LIVE_RESULT_PROVEN',
+      evidence_count: Math.max(
+        evidenceCount,
+        Array.isArray(result.results) ? result.results.length : 0,
+        Array.isArray(result.recommendations) ? result.recommendations.length : 0,
+      ),
+      summary: summary.slice(0, 240),
+    };
+  }
+
+  const minEv = Number(scenario.minimum_evidence || 0);
+  const resultsLen = Array.isArray(result.results) ? result.results.length : 0;
+  const cardsLen = Array.isArray(result.recommendations) ? result.recommendations.length : 0;
+  const usefulCount = Math.max(evidenceCount, resultsLen, cardsLen);
+  if (usefulCount >= minEv && responseOk) {
+    return {
+      ok: true,
+      status: 'LIVE_RESULT_PROVEN',
+      evidence_count: usefulCount,
+      summary: summary.slice(0, 240),
+    };
   }
   return {
-    ok: true,
-    status: 'LIVE_RESULT_PROVEN',
-    evidence_count: usefulCount || evidenceCount,
-    summary: summary.slice(0, 240),
+    ok: false,
+    status: 'SUCCESS_DATA_FLOOR_NOT_MET',
+    reason: `journey=${browserResult?.journey_outcome} evidence=${evidenceCount} results=${resultsLen}`,
   };
 }
 

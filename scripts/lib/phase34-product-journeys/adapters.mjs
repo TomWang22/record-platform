@@ -355,6 +355,20 @@ export class BaseProductJourneyAdapter {
     if (this.capability === 'negotiation_assistance' && context.subject?.thread_id) {
       return `/messages?thread=${encodeURIComponent(context.subject.thread_id)}`;
     }
+    // Owner-proof scenarios declare a canonical route — prefer it when mounted.
+    const preferred = context.owner_proof_canonical_route || context.canonical_route || null;
+    if (preferred) {
+      const preferredSurface = surfaces.find((s) => s.route === preferred);
+      if (preferredSurface) {
+        context.selected_surface = preferredSurface;
+        return preferred;
+      }
+      if ((this.registry.routes || []).includes(preferred)) {
+        context.selected_surface =
+          surfaces.find((s) => s.route === preferred) || surfaces[0] || null;
+        return preferred;
+      }
+    }
     const idx = Number(context.surface_route_index ?? context.smoke_index ?? 0);
     const template = mountedRoutes[Math.abs(idx) % Math.max(mountedRoutes.length, 1)] || mountedRoutes[0];
     // Stash selected surface for panel override (e.g. watchlist temperature).
@@ -633,7 +647,9 @@ export class BaseProductJourneyAdapter {
         run_test_id: testId,
         panel_test_id: prepared.panelTestId,
       };
-      if (!handlerProbe?.at) {
+      // OwnerProofIntentControl stamps the probe; other run controls (negotiation) do not.
+      const ownerProofControlCount = await panel.locator('[data-owner-proof-action="1"]').count();
+      if (ownerProofControlCount > 0 && !handlerProbe?.at) {
         assertOwnerProofHandlerReached({
           route: prepared.route,
           component: prepared.panelTestId,

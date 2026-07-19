@@ -72,10 +72,32 @@ function sleep(ms) {
 
 function classifyTerminalResult({ scenario, browserResult }) {
   const structured = browserResult?.rendered?.structured || {};
-  const summary = String(browserResult?.rendered?.summary || '');
-  const evidence = Array.isArray(structured.evidence) ? structured.evidence : [];
+  const api = browserResult?.api_response || {};
+  const envelope = api.envelope || {};
+  const result = api.result || structured || {};
+  const panelText = String(
+    browserResult?.rendered?.raw_text_hash_input ||
+      browserResult?.rendered?.visible_text ||
+      '',
+  );
+  const summary = String(
+    envelope.summary ||
+      result.summary ||
+      browserResult?.rendered?.summary ||
+      '',
+  );
+  const evidence = Array.isArray(result.evidence)
+    ? result.evidence
+    : Array.isArray(envelope.evidence)
+      ? envelope.evidence
+      : Array.isArray(structured.evidence)
+        ? structured.evidence
+        : [];
+  const evidenceCount =
+    evidence.length ||
+    (typeof result.evidence_count === 'number' ? result.evidence_count : 0) ||
+    (typeof envelope.evidence_count === 'number' ? envelope.evidence_count : 0);
   const terminal = browserResult?.terminal_state || browserResult?.journey_outcome || '';
-  const panelText = String(browserResult?.rendered?.visible_text || summary || '');
 
   const forbiddenHit = FORBIDDEN_SUCCESS.find((re) => re.test(panelText) || re.test(summary));
   if (forbiddenHit && scenario.scenario_class === 'A_success') {
@@ -100,51 +122,71 @@ function classifyTerminalResult({ scenario, browserResult }) {
     return { ok: false, status: 'LIVE_ACTION_FAILED', reason: 'request_not_observed' };
   }
 
-  // Handler reached + request started ⇒ LIVE_ACTION_PROVEN at minimum
-  let proof = 'LIVE_ACTION_PROVEN';
+  const abstained = Boolean(
+    envelope?.abstention?.abstained === true ||
+      result?.abstention_reason ||
+      structured?.abstention === true ||
+      browserResult?.rendered?.abstained === true ||
+      /abstain|insufficient|not enough|cannot|unable|privacy|refus|too few|missing evidence|do not have enough/i.test(
+        `${summary}\n${panelText}\n${JSON.stringify(result?.limitations || envelope?.limitations || [])}`,
+      ),
+  );
 
   if (scenario.scenario_class === 'C_honest_limit') {
-    const abstained =
-      structured.abstention === true ||
-      /abstain|cannot|not enough|privacy|refus/i.test(summary + panelText);
     const rawInternal = /SAMPLE_SIZE_BELOW_POLICY|NOT_INVOKED_BY_POLICY|engine_invoked=/i.test(
       panelText,
     );
     if (rawInternal) {
       return { ok: false, status: 'RAW_INTERNAL_CODE_VISIBLE', reason: 'internal_code' };
     }
-    if (!abstained && !/limit|missing|prohibit|cannot|unable|refus/i.test(summary + panelText)) {
+    if (!abstained) {
       return { ok: false, status: 'HONEST_LIMIT_NOT_VISIBLE', reason: 'no_abstention' };
     }
-    proof = 'LIVE_RESULT_PROVEN';
-  } else if (scenario.scenario_class === 'B_correction') {
+    return {
+      ok: true,
+      status: 'LIVE_RESULT_PROVEN',
+      evidence_count: evidenceCount,
+      summary: summary.slice(0, 240),
+    };
+  }
+
+  if (scenario.scenario_class === 'B_correction') {
     if (!responseOk && terminal !== 'ready' && !/ready|completed|PASS/i.test(String(terminal))) {
       return { ok: false, status: 'CORRECTION_RESULT_MISSING', reason: 'no_terminal' };
     }
-    proof = 'LIVE_RESULT_PROVEN';
-  } else {
-    // A_success
-    const minEv = Number(scenario.minimum_evidence || 0);
-    if (minEv > 0 && evidence.length < minEv && !scenario.allow_empty_evidence) {
-      // Some panels put evidence only on the shell; still require non-empty terminal.
-      if (!summary || /awaiting insight|loading/i.test(summary)) {
-        return {
-          ok: false,
-          status: 'SUCCESS_DATA_FLOOR_NOT_MET',
-          reason: `evidence=${evidence.length}<${minEv}`,
-        };
-      }
-    }
-    if (!responseOk && !/ready|PASS|completed/i.test(String(terminal + summary))) {
-      return { ok: false, status: 'TERMINAL_NOT_READY', reason: String(terminal) };
-    }
-    proof = 'LIVE_RESULT_PROVEN';
+    return {
+      ok: true,
+      status: 'LIVE_RESULT_PROVEN',
+      evidence_count: evidenceCount,
+      summary: summary.slice(0, 240),
+    };
   }
 
+  // A_success
+  const minEv = Number(scenario.minimum_evidence || 0);
+  if (minEv > 0 && evidenceCount < minEv && !scenario.allow_empty_evidence) {
+    // Still accept when the panel shows a completed non-loading answer with confidence/limitations.
+    const hasCompletedAnswer =
+      Boolean(summary) &&
+      !/awaiting insight|loading/i.test(summary + panelText) &&
+      (result.confidence != null ||
+        envelope.confidence != null ||
+        /confidence|fair market|scarcity|recommend|report|strategy/i.test(panelText + summary));
+    if (!hasCompletedAnswer || abstained) {
+      return {
+        ok: false,
+        status: 'SUCCESS_DATA_FLOOR_NOT_MET',
+        reason: `evidence=${evidenceCount}<${minEv}`,
+      };
+    }
+  }
+  if (!responseOk && !/ready|PASS|completed/i.test(String(terminal + summary))) {
+    return { ok: false, status: 'TERMINAL_NOT_READY', reason: String(terminal) };
+  }
   return {
     ok: true,
-    status: proof,
-    evidence_count: evidence.length,
+    status: 'LIVE_RESULT_PROVEN',
+    evidence_count: evidenceCount,
     summary: summary.slice(0, 240),
   };
 }
@@ -322,6 +364,8 @@ export async function executeOwnerProofLiveActionPreflight(opts = {}) {
           surface_route_index: 0,
           smoke_index: row.smoke_index,
           screenshot_pack: 'owner-proof-live-action-preflight',
+          owner_proof_canonical_route: row.owner_proof_canonical_route || scenario?.canonical_route,
+          canonical_route: scenario?.canonical_route,
         });
         prepared.requestSeed = {
           ...prepared.requestSeed,

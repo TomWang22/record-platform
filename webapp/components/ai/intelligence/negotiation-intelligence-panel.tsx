@@ -299,10 +299,27 @@ export function NegotiationIntelligencePanel({
         </div>
         <button
           type="button"
-          onClick={() => void run()}
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              const w = window as Window & {
+                __OWNER_PROOF_HANDLER_REACHED__?: {
+                  capability: string
+                  runTestId: string
+                  at: number
+                }
+              }
+              w.__OWNER_PROOF_HANDLER_REACHED__ = {
+                capability: 'negotiation_assistance',
+                runTestId: 'intelligence-negotiation-run',
+                at: Date.now(),
+              }
+            }
+            void run()
+          }}
           disabled={!threadId}
           className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
           data-testid="intelligence-negotiation-run"
+          data-owner-proof-action="1"
         >
           Analyze thread
         </button>

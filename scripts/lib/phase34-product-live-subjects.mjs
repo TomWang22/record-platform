@@ -107,6 +107,8 @@ export async function loginContractUser({ baseUrl, email, password, caCert }) {
  *   listing_id: string,
  *   auction_listing_id: string,
  *   thread_id: string | null,
+ *   scarcity_record_id?: string,
+ *   valuation_record_id?: string,
  * }>}
  */
 export async function resolveLiveSubjects({ baseUrl, token, caCert }) {
@@ -114,20 +116,62 @@ export async function resolveLiveSubjects({ baseUrl, token, caCert }) {
     baseUrl,
     token,
     caCert,
-    urlPath: '/api/records?limit=5',
+    urlPath: '/api/records?limit=100',
   });
   const listings = await httpsJson({
     baseUrl,
     token,
     caCert,
-    urlPath: '/api/listings/search?limit=50',
+    urlPath: '/api/listings/search?limit=100',
   });
   const recordList = Array.isArray(records) ? records : records?.items || records?.data || [];
   const listingList =
     listings?.listings || listings?.items || listings?.data || (Array.isArray(listings) ? listings : []);
 
-  const record_id = recordList[0]?.id;
-  const listing_id = listingList[0]?.id;
+  const findRecord = (...preds) =>
+    recordList.find((r) => preds.every((p) => p(r))) || null;
+
+  const scarcityRecord =
+    findRecord(
+      (r) => /CL\s*1355/i.test(String(r.catalogNumber || r.catalog_number || '')),
+      (r) => /miles/i.test(String(r.artist || '')),
+    ) ||
+    findRecord((r) => /kind of blue/i.test(String(r.name || r.title || ''))) ||
+    null;
+
+  const valuationRecord =
+    findRecord(
+      (r) => /BLP\s*1569/i.test(String(r.catalogNumber || r.catalog_number || '')),
+      (r) => /kenny/i.test(String(r.artist || '')),
+    ) ||
+    findRecord((r) => /quiet kenny/i.test(String(r.name || r.title || ''))) ||
+    null;
+
+  const record_id = scarcityRecord?.id || valuationRecord?.id || recordList[0]?.id;
+
+  const listingForRecord = (recordId) =>
+    listingList.find(
+      (i) =>
+        String(i.source_record_id || i.record_id || '') === String(recordId) &&
+        String(i.status || i.listing_status || 'active').toLowerCase() !== 'deleted',
+    ) || null;
+
+  // Prefer a listing that carries real artist/catalog metadata over bare E2E browse stubs.
+  const richListing =
+    listingList.find(
+      (i) =>
+        (i.artist || i.catalogNumber || i.catalog_number) &&
+        !/^E2E Browse/i.test(String(i.title || '')),
+    ) ||
+    listingList.find((i) => !/^E2E Browse/i.test(String(i.title || ''))) ||
+    listingList[0];
+
+  const listing_id =
+    listingForRecord(scarcityRecord?.id)?.id ||
+    listingForRecord(valuationRecord?.id)?.id ||
+    richListing?.id ||
+    listingList[0]?.id;
+
   const auction =
     listingList.find((i) => String(i.saleType || i.sale_type || '').toLowerCase() === 'auction') ||
     null;
@@ -159,17 +203,23 @@ export async function resolveLiveSubjects({ baseUrl, token, caCert }) {
     auction_listing_id,
     thread_id,
     id: record_id,
+    scarcity_record_id: scarcityRecord?.id || record_id,
+    valuation_record_id: valuationRecord?.id || record_id,
   };
 }
 
 export function subjectForCapability(subjects, capability) {
   switch (capability) {
     case 'scarcity':
-    case 'valuation':
-      // Prefer listing routes so buyer and seller sessions share public marketplace subjects.
       return {
-        id: subjects.listing_id,
-        record_id: subjects.record_id,
+        id: subjects.scarcity_record_id || subjects.record_id,
+        record_id: subjects.scarcity_record_id || subjects.record_id,
+        listing_id: subjects.listing_id,
+      };
+    case 'valuation':
+      return {
+        id: subjects.valuation_record_id || subjects.record_id,
+        record_id: subjects.valuation_record_id || subjects.record_id,
         listing_id: subjects.listing_id,
       };
     case 'recommendations':

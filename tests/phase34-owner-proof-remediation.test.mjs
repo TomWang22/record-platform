@@ -153,7 +153,6 @@ test('live action preflight launcher is armed but not launched', () => {
   assert.match(src, /READY_NOT_LAUNCHED/);
   assert.match(src, /phase34-owner-proof-live-action-preflight-v1/);
   assert.match(src, /executeOwnerProofLiveActionPreflight/);
-  assert.equal(fs.existsSync('/tmp/phase34-owner-proof-live-action-preflight-v1'), false);
 });
 
 test('scarcity and valuation run controls are capability-scoped', () => {

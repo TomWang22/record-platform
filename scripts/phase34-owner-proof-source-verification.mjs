@@ -124,6 +124,7 @@ async function main() {
       participant_side: 'seller',
       authorized_thread_id: 'thread-src-verify',
       asking_price: 41,
+      force_negotiation_market_floor: true,
       subject: { listing_id: 'listing-src-verify', title: 'Quiet Kenny' },
       thread: {
         thread_id: 'thread-src-verify',

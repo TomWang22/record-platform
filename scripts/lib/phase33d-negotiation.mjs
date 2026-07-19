@@ -343,7 +343,8 @@ export function analyzeNegotiation(input = {}) {
         : 35;
 
   let marketCandidates = Array.isArray(input.market_candidates) ? [...input.market_candidates] : [];
-  if (marketCandidates.length === 0) {
+  // Owner-proof floor only when explicitly requested — never invent comps for weak/abstention scenarios.
+  if (marketCandidates.length === 0 && input.force_negotiation_market_floor === true) {
     marketCandidates = ownerProofMarketCandidates(asking, input.currency || 'USD');
   }
 
@@ -386,13 +387,25 @@ export function analyzeNegotiation(input = {}) {
     abstention.abstained = true;
     abstention.reason_codes.push('UNIDENTIFIED_PRESSING');
   }
-  if (input.malformed_pricing) {
+  if (input.malformed_pricing || input.unsupported_price_request) {
     abstention.abstained = true;
     abstention.reason_codes.push('MALFORMED_PRICING_CURRENCY');
   }
   if (input.contradictory_offer_state) {
     abstention.abstained = true;
     abstention.reason_codes.push('CONTRADICTORY_OFFER_STATE');
+  }
+  const soldSelected = selected.filter((e) => e.sale_kind === 'sold');
+  const freshSold = soldSelected.filter((e) => e.freshness_status !== 'stale' && !e.stale);
+  if (
+    (valuation.envelope.abstention.abstained && soldSelected.length === 0) ||
+    (soldSelected.length > 0 && freshSold.length === 0) ||
+    (selected.length > 0 && selected.every((e) => e.freshness_status === 'stale' || e.stale))
+  ) {
+    abstention.abstained = true;
+    abstention.reason_codes.push(
+      soldSelected.length && !freshSold.length ? 'STALE_MARKET_EVIDENCE' : 'NO_RELIABLE_MARKET_EVIDENCE',
+    );
   }
 
   const safetyRefused = unsafe.length > 0;
@@ -521,7 +534,9 @@ export function analyzeNegotiation(input = {}) {
 
   const summary = safetyRefused
     ? 'Request refused: fabricated leverage is not supported. Safe alternative draft provided.'
-    : strategy;
+    : abstention.abstained
+      ? 'Abstaining from negotiation advice due to authorization, safety, or evidence limits.'
+      : strategy;
 
   const output_token_count = Math.ceil((draft_reply.length + strategy.length + summary.length) / 4);
 
@@ -625,9 +640,10 @@ export function analyzeNegotiation(input = {}) {
       evidence: evidence_for_schema,
       confidence: payload.confidence,
       limitations,
-      abstention: safetyRefused
-        ? { abstained: true, reason_codes: abstention.reason_codes }
-        : { abstained: false, reason_codes: [] },
+      abstention: {
+        abstained: abstention.abstained || safetyRefused,
+        reason_codes: abstention.reason_codes,
+      },
       automatic_send_allowed: false,
       message_sent: false,
       summary,

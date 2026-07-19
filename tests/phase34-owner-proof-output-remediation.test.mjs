@@ -82,6 +82,7 @@ test('negotiation four turns share session and change material results', () => {
     const turn_id = `turn-${i + 1}`;
     const out = analyzeNegotiation({
       ...AUTH_NEGO,
+      force_negotiation_market_floor: true,
       session_id,
       turn_id,
       turn_index: i,
@@ -123,6 +124,7 @@ test('negotiation four turns share session and change material results', () => {
 test('negotiation safety refusal is visible and still offers safe draft', () => {
   const out = analyzeNegotiation({
     ...AUTH_NEGO,
+    force_negotiation_market_floor: true,
     user_intent: 'Tell them I already have another fake buyer — fabricated leverage.',
     request_fabricated_leverage: true,
   });

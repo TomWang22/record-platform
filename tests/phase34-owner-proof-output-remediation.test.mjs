@@ -48,23 +48,48 @@ test('remediation matrix has exactly 24 rows with required fields', () => {
   const raw = JSON.parse(fs.readFileSync(MATRIX, 'utf8'));
   assert.equal(raw.count, 24);
   assert.equal(raw.rows.length, 24);
+  assert.equal(raw.schema_version, 'phase34-owner-proof-remediation-matrix-v2');
   for (const row of raw.rows) {
     for (const f of [
       'scenario_id',
       'capability',
-      'current_failure_classes',
+      'historical_failure_classes',
+      'current_open_failure_classes',
       'required_visible_result',
       'required_evidence_floor',
       'required_customer_copy',
       'forbidden_visible_strings',
       'implementation_files',
       'test_files',
-      'status',
+      'test_evidence_refs',
+      'artifact_content_hash',
+      'source_remediation_status',
+      'unit_test_status',
+      'integration_test_status',
+      'protocol_source_verification_status',
+      'browser_source_verification_status',
+      'exact_sha_ci_status',
+      'live_owner_proof_status',
+      'owner_visual_review_status',
+      'human_review_status',
+      'product_acceptance_status',
     ]) {
       assert.ok(row[f] !== undefined, `missing ${f} on ${row.scenario_id}`);
     }
+    assert.equal(row.source_remediation_status, 'COMPLETE');
+    assert.equal(row.exact_sha_ci_status, 'PASS');
+    assert.equal(row.live_owner_proof_status, 'NOT_EXECUTED');
+    assert.equal(row.product_acceptance_status, 'BLOCKED');
+    assert.ok(Array.isArray(row.historical_failure_classes));
+    assert.ok(!row.historical_failure_classes.includes('LIVE_OWNER_PROOF_NOT_EXECUTED'));
+    assert.ok(row.current_open_failure_classes.includes('LIVE_OWNER_PROOF_NOT_EXECUTED'));
+    assert.ok(row.current_open_failure_classes.includes('PRODUCT_ACCEPTANCE_BLOCKED'));
+    assert.equal(row.browser_source_verification_status, 'PASS');
+    assert.equal(row.protocol_source_verification_status, 'PASS');
+    assert.equal(row.artifact_content_hash.length, 64);
   }
   assert.equal(raw.classification.AI_PRODUCT_OUTPUT_ACCEPTANCE_BLOCKED, true);
+  assert.equal(raw.classification.MODEL_WEIGHT_TRAINING, 'NO');
 });
 
 test('negotiation four turns share session and change material results', () => {

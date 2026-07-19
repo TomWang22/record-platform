@@ -87,7 +87,12 @@ function parseListingFromMessages(messages: RawMessage[]): {
 async function fetchListingSummary(
   listingId: string,
   authHeader: string,
-): Promise<{ title: string; priceCents: number | null; thumbnailUrl: string | null } | null> {
+): Promise<{
+  title: string
+  priceCents: number | null
+  thumbnailUrl: string | null
+  sellerId: string | null
+} | null> {
   try {
     const url = `${getApiGatewayUrl()}/api/listings/${listingId}`
     const res = await fetch(url, {
@@ -122,7 +127,17 @@ async function fetchListingSummary(
     } else if (typeof j.primary_image_url === 'string') {
       thumbnailUrl = j.primary_image_url
     }
-    return { title, priceCents: Number.isFinite(priceCents) ? priceCents : null, thumbnailUrl }
+    const sellerRaw =
+      j.seller_id ?? j.sellerId ?? (j.seller && typeof j.seller === 'object'
+        ? (j.seller as Record<string, unknown>).id
+        : null)
+    const sellerId = sellerRaw != null && String(sellerRaw).trim() ? String(sellerRaw) : null
+    return {
+      title,
+      priceCents: Number.isFinite(priceCents) ? priceCents : null,
+      thumbnailUrl,
+      sellerId,
+    }
   } catch {
     return null
   }
@@ -162,6 +177,7 @@ export async function GET(
       title: string
       priceCents: number | null
       thumbnailUrl: string | null
+      sellerId: string | null
     } | null = null
 
     if (listingId) {
@@ -171,6 +187,7 @@ export async function GET(
         title: summary?.title ?? listingTitle ?? 'Listing',
         priceCents: summary?.priceCents ?? null,
         thumbnailUrl: summary?.thumbnailUrl ?? null,
+        sellerId: summary?.sellerId ?? null,
       }
     }
 

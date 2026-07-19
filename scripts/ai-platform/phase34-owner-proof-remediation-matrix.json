@@ -1,12 +1,21 @@
 {
-  "schema_version": "phase34-owner-proof-remediation-matrix-v1",
-  "label": "Owner-proof product-output remediation tracking \u2014 24 scenarios",
+  "schema_version": "phase34-owner-proof-remediation-matrix-v2",
+  "label": "Owner-proof product-output remediation tracking — 24 scenarios",
   "classification": {
     "SCREENSHOT_PIPELINE_WORKING": true,
     "CLIENT_ACTION_PATH_WORKING": true,
     "AI_PRODUCT_OUTPUT_ACCEPTANCE_BLOCKED": true,
     "MULTI_TURN_NEGOTIATION_BLOCKED": true,
-    "CORRECTION_BEHAVIOR_BLOCKED": true
+    "CORRECTION_BEHAVIOR_BLOCKED": true,
+    "SOURCE_REMEDIATION_COMPLETE": true,
+    "EXACT_SHA_CI_PASS": true,
+    "BROWSER_FOUR_TURN_SOURCE_VERIFICATION_INCOMPLETE": false,
+    "LIVE_OWNER_PROOF_NOT_EXECUTED": true,
+    "PRODUCT_ACCEPTANCE_BLOCKED": true,
+    "MODEL_WEIGHT_TRAINING": "NO",
+    "OPTIMIZATION": "PROMPT_RETRIEVAL_RERANKER_TOOL_CALIBRATION_AND_MODEL_SELECTION",
+    "BROWSER_FOUR_TURN_SOURCE_VERIFICATION_PASS": true,
+    "PROTOCOL_SOURCE_VERIFICATION_PASS": true
   },
   "immutable_failure_evidence": "owner-review-artifacts/phase34/live-action-preflight-24-to-20-v1",
   "model_weight_training": "NO",
@@ -15,9 +24,6 @@
     {
       "scenario_id": "scarcity-success-exact-pressing",
       "capability": "scarcity",
-      "current_failure_classes": [
-        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
-      ],
       "required_visible_result": "Exact-pressing scarcity separated from release-level; sold/asking/supply counts; confidence; freshness; customer conclusion",
       "required_state_change": null,
       "required_evidence_floor": 5,
@@ -37,15 +43,32 @@
         "tests/phase34-owner-proof-output-remediation.test.mjs",
         "tests/phase34-owner-proof-source-verification.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs",
+        "tests/phase34-owner-proof-source-verification.test.mjs"
+      ],
+      "artifact_content_hash": "4c7b3a543e83330189cc918a12ffeeeedf1c19e69033b107cd9096ea046d03f2"
     },
     {
       "scenario_id": "scarcity-correction-pressing-disambiguation",
       "capability": "scarcity",
-      "current_failure_classes": [
-        "SCARCITY_CORRECTION_DID_NOT_CHANGE_PRESSING",
-        "DUPLICATE_SCENARIO_SCREENSHOT"
-      ],
       "required_visible_result": "Japanese pressing identity, changed evidence, changed conclusion, correction summary",
       "required_state_change": "pressing identity + eligible evidence + confidence/result hash differ from success",
       "required_evidence_floor": 1,
@@ -62,14 +85,32 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "SCARCITY_CORRECTION_DID_NOT_CHANGE_PRESSING",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "c51f930a7a3931b9a756a7099163bca509757753b92854870e4781bbf180ce59"
     },
     {
       "scenario_id": "scarcity-weak-data-abstention",
       "capability": "scarcity",
-      "current_failure_classes": [
-        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
-      ],
       "required_visible_result": "Honest abstention without rarity-from-zero; customer language",
       "required_state_change": null,
       "required_evidence_floor": 0,
@@ -86,17 +127,31 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "024db82e4db28d4e3e7b0b72e8be22252c7cd41e0acf90506bb7a1d1a7a7c805"
     },
     {
       "scenario_id": "valuation-success-ranges",
       "capability": "valuation",
-      "current_failure_classes": [
-        "VALUATION_RANGES_MISSING",
-        "VALUATION_WRONG_CAPABILITY_COPY",
-        "VALUATION_INTERNAL_CODE_VISIBLE",
-        "DUPLICATE_SCENARIO_SCREENSHOT"
-      ],
       "required_visible_result": "Quick/fair/patient ranges; >=3 sold comps; sold vs asking separated",
       "required_state_change": null,
       "required_evidence_floor": 3,
@@ -116,15 +171,34 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "VALUATION_RANGES_MISSING",
+        "VALUATION_WRONG_CAPABILITY_COPY",
+        "VALUATION_INTERNAL_CODE_VISIBLE",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "9d7362fd672ef015774a86aef8774a8c17a76593e88b051f34b597ab7bb4c78e"
     },
     {
       "scenario_id": "valuation-correction-condition",
       "capability": "valuation",
-      "current_failure_classes": [
-        "VALUATION_RANGES_MISSING",
-        "DUPLICATE_SCENARIO_SCREENSHOT"
-      ],
       "required_visible_result": "Seam-split/VG correction changes ranges and shows previous vs updated",
       "required_state_change": "condition adjustment + range hashes differ from success",
       "required_evidence_floor": 3,
@@ -142,16 +216,32 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "VALUATION_RANGES_MISSING",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "5dc9b20f6de93775160b15cc0dd60a0f99809bb0f0d7c86b3bea1e193f67099c"
     },
     {
       "scenario_id": "valuation-weak-comparables",
       "capability": "valuation",
-      "current_failure_classes": [
-        "VALUATION_INTERNAL_CODE_VISIBLE",
-        "VALUATION_WRONG_CAPABILITY_COPY",
-        "DUPLICATE_SCENARIO_SCREENSHOT"
-      ],
       "required_visible_result": "Customer abstention; asking shown separately; no scarcity copy",
       "required_state_change": null,
       "required_evidence_floor": 0,
@@ -169,15 +259,33 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "VALUATION_INTERNAL_CODE_VISIBLE",
+        "VALUATION_WRONG_CAPABILITY_COPY",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "2918b1993ba197e39869948e015e8027e387f1904562a3caf3dce1e7dc7e3cd3"
     },
     {
       "scenario_id": "auction-success-watchlist-temperature",
       "capability": "auction_intelligence",
-      "current_failure_classes": [
-        "AUCTION_TEMPERATURE_REPORT_MISSING",
-        "DUPLICATE_SCENARIO_SCREENSHOT"
-      ],
       "required_visible_result": ">=5 lots; temperature; underpriced; overheated; velocity; clustering",
       "required_state_change": null,
       "required_evidence_floor": 5,
@@ -196,15 +304,32 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "AUCTION_TEMPERATURE_REPORT_MISSING",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "6e5be6d0845c849c92def8f5169df02e4ceefceacc2ee45b2176d90566e46dd6"
     },
     {
       "scenario_id": "auction-correction-ending-window",
       "capability": "auction_intelligence",
-      "current_failure_classes": [
-        "AUCTION_CORRECTION_DID_NOT_CHANGE_WINDOW",
-        "DUPLICATE_SCENARIO_SCREENSHOT"
-      ],
       "required_visible_result": "24-hour window filters lots/metrics/conclusion",
       "required_state_change": "report membership or metrics change vs success",
       "required_evidence_floor": 1,
@@ -220,15 +345,32 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "AUCTION_CORRECTION_DID_NOT_CHANGE_WINDOW",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "3ba25720b94feffa275a4d883bc0b43a2b2d92e0613ec792a69919871675c3d8"
     },
     {
       "scenario_id": "auction-weak-proxy-data",
       "capability": "auction_intelligence",
-      "current_failure_classes": [
-        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE",
-        "DUPLICATE_SCENARIO_SCREENSHOT"
-      ],
       "required_visible_result": "Honest limit without bidder-identity or scarcity copy",
       "required_state_change": null,
       "required_evidence_floor": 0,
@@ -246,14 +388,32 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE",
+        "DUPLICATE_SCENARIO_SCREENSHOT"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "d45e0d6b4246a626853a9d7b112da3f7a1a4657592a98351e34889b51c7f9278"
     },
     {
       "scenario_id": "embeddings-success-current-lineage",
       "capability": "embeddings",
-      "current_failure_classes": [
-        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
-      ],
       "required_visible_result": "Real entity lineage: version, model, hash, scope, freshness, deletion, re-embed",
       "required_state_change": null,
       "required_evidence_floor": 1,
@@ -271,14 +431,31 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "70c7b737249273d7122e81d6908d78db31541b244aa985254b5e5aec7e197048"
     },
     {
       "scenario_id": "embeddings-stale-reembed",
       "capability": "embeddings",
-      "current_failure_classes": [
-        "EMBEDDING_STALE_STATE_NOT_APPLIED"
-      ],
       "required_visible_result": "freshness=STALE; reembed_required=true; reembed_status=REQUIRED",
       "required_state_change": "stale/re-embed flags flip vs success",
       "required_evidence_floor": 1,
@@ -295,14 +472,31 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "EMBEDDING_STALE_STATE_NOT_APPLIED"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "6eb8a087126303557af256c3bef58764cc860b7ac3ad8e24b775234976161593"
     },
     {
       "scenario_id": "embeddings-deleted-source",
       "capability": "embeddings",
-      "current_failure_classes": [
-        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
-      ],
       "required_visible_result": "Deletion state visible; no production write",
       "required_state_change": null,
       "required_evidence_floor": 0,
@@ -318,14 +512,31 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "ade7984ee76fe0b5239c457c8077d63003199e681de8fef872301b69117be75a"
     },
     {
       "scenario_id": "search-success-semantic",
       "capability": "semantic_search",
-      "current_failure_classes": [
-        "SEARCH_RESULTS_BELOW_FLOOR"
-      ],
       "required_visible_result": ">=5 result cards with artist/title, pressing, price, why matched, mode, confidence",
       "required_state_change": null,
       "required_evidence_floor": 5,
@@ -342,16 +553,33 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "SEARCH_RESULTS_BELOW_FLOOR"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "7f1d88bba72cc9cdbc8091e9decb43d29713d311a36495fbcba8980a191bcef6"
     },
     {
       "scenario_id": "search-hybrid-refinement",
       "capability": "semantic_search",
-      "current_failure_classes": [
-        "SEARCH_HYBRID_MODE_NOT_APPLIED"
-      ],
       "required_visible_result": "selected+executed mode hybrid; picture discs excluded; ranking changed",
-      "required_state_change": "mode semantic\u2192hybrid and result set/rank change",
+      "required_state_change": "mode semantic→hybrid and result set/rank change",
       "required_evidence_floor": 1,
       "required_customer_copy": "Updated to hybrid mode; picture discs excluded",
       "forbidden_visible_strings": [
@@ -365,15 +593,32 @@
       "test_files": [
         "tests/phase34-search-mode-chrome.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "SEARCH_HYBRID_MODE_NOT_APPLIED"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-search-mode-chrome.test.mjs"
+      ],
+      "artifact_content_hash": "9e9784db98c330fb71a7b556456527ffeea504a5cd4a203548b6867fb7872d34"
     },
     {
       "scenario_id": "search-visible-fallback-or-empty",
       "capability": "semantic_search",
-      "current_failure_classes": [
-        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
-      ],
-      "required_visible_result": "Visible fallback or empty \u2014 not silent semantic success",
+      "required_visible_result": "Visible fallback or empty — not silent semantic success",
       "required_state_change": null,
       "required_evidence_floor": 0,
       "required_customer_copy": "No strong semantic matches; showing explicit fallback",
@@ -387,16 +632,32 @@
       "test_files": [
         "tests/phase34-search-mode-chrome.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-search-mode-chrome.test.mjs"
+      ],
+      "artifact_content_hash": "e20f615329ebbc4b97d2eef00fad70a8f76ebf46eb388a4b57363866b1a5d982"
     },
     {
       "scenario_id": "negotiation-success-strategy",
       "capability": "negotiation_assistance",
-      "current_failure_classes": [
-        "NEGOTIATION_DRAFT_EMPTY",
-        "NEGOTIATION_STRATEGY_MISSING"
-      ],
-      "required_visible_result": "Strategy, range, non-empty draft, Insert\u2260Send, message_sent=false",
+      "required_visible_result": "Strategy, range, non-empty draft, Insert≠Send, message_sent=false",
       "required_state_change": null,
       "required_evidence_floor": 0,
       "required_customer_copy": "Advisory strategy for $35 offer on $41 listing",
@@ -413,17 +674,34 @@
         "tests/phase34-owner-proof-output-remediation.test.mjs",
         "tests/phase34-negotiation-draft-guards.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "NEGOTIATION_DRAFT_EMPTY",
+        "NEGOTIATION_STRATEGY_MISSING"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs",
+        "tests/phase34-negotiation-draft-guards.test.mjs"
+      ],
+      "artifact_content_hash": "82f6ca9f8b587bfedd1aa574a25c4d4481c65aaadeff82ff1de6d8ecbe702dd1"
     },
     {
       "scenario_id": "negotiation-four-turn-live",
       "capability": "negotiation_assistance",
-      "current_failure_classes": [
-        "NEGOTIATION_TURNS_MISSING",
-        "NEGOTIATION_DRAFT_EMPTY",
-        "NEGOTIATION_STRATEGY_MISSING"
-      ],
-      "required_visible_result": "Same session_id; 4 turn_ids; correction precedence; non-empty draft; Insert\u2260Send",
+      "required_visible_result": "Same session_id; 4 turn_ids; correction precedence; non-empty draft; Insert≠Send",
       "required_state_change": "Each turn materially changes strategy/facts/draft; condition VG/seam; shipping $6; floor $37",
       "required_evidence_floor": 0,
       "required_customer_copy": "Four-turn thread with editable unsent draft",
@@ -443,14 +721,35 @@
         "tests/phase34-negotiation-context-depth.test.mjs",
         "tests/phase34-owner-proof-source-verification.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "NEGOTIATION_TURNS_MISSING",
+        "NEGOTIATION_DRAFT_EMPTY",
+        "NEGOTIATION_STRATEGY_MISSING"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs",
+        "tests/phase34-negotiation-context-depth.test.mjs",
+        "tests/phase34-owner-proof-source-verification.test.mjs"
+      ],
+      "artifact_content_hash": "4eb366a99cf8f75a77f3de72a12bbd6b791afe58c9dbc17530fbdb85db09d29f"
     },
     {
       "scenario_id": "negotiation-privacy-or-safety-refusal",
       "capability": "negotiation_assistance",
-      "current_failure_classes": [
-        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
-      ],
       "required_visible_result": "Visible refusal of fabricated leverage with safe alternative",
       "required_state_change": null,
       "required_evidence_floor": 0,
@@ -467,14 +766,31 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "c5ac18e15af7e2dfdf7347dc8599aa989fe8e3d57a9fda7e93c809c7dad93e13"
     },
     {
       "scenario_id": "recommendations-success-cards",
       "capability": "recommendations",
-      "current_failure_classes": [
-        "RECOMMENDATION_CARDS_MISSING"
-      ],
       "required_visible_result": ">=5 cards; budget<=60; no picture discs; diversity; customer reasons",
       "required_state_change": null,
       "required_evidence_floor": 5,
@@ -491,14 +807,31 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "RECOMMENDATION_CARDS_MISSING"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "ceac2bcc99db75a28d1e6a887f6dbcb782f1ec830bd391eafdba0e89d2044c14"
     },
     {
       "scenario_id": "recommendations-negative-preference",
       "capability": "recommendations",
-      "current_failure_classes": [
-        "RECOMMENDATION_CORRECTION_NOT_APPLIED"
-      ],
       "required_visible_result": "Blue Note retained; picture discs forgotten; rank/result changes",
       "required_state_change": "preference update + at least one card/rank change",
       "required_evidence_floor": 1,
@@ -513,14 +846,31 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "RECOMMENDATION_CORRECTION_NOT_APPLIED"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "3731226c1bcc0f8db449bc2e84591ce18c9b8a5d8f184dfc345bdf93cd43ea89"
     },
     {
       "scenario_id": "recommendations-cold-start-honesty",
       "capability": "recommendations",
-      "current_failure_classes": [
-        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
-      ],
       "required_visible_result": "Honest cold-start limit without unrelated comps language",
       "required_state_change": null,
       "required_evidence_floor": 0,
@@ -536,15 +886,31 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "4ac2576341db19ab2a6be2649e8f63d18b926b686be839488e5f7cfec3554c5c"
     },
     {
       "scenario_id": "analytics-success-report",
       "capability": "market_analytics",
-      "current_failure_classes": [
-        "ANALYTICS_SAMPLE_EMPTY",
-        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
-      ],
       "required_visible_result": "Nonzero population/sample; readable 90-day range; sales values; plain methodology",
       "required_state_change": null,
       "required_evidence_floor": 1,
@@ -562,18 +928,36 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "ANALYTICS_SAMPLE_EMPTY",
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "72931eeb0d05ecb9a64920808c1f91408f7659d8ad8a523aac3ac5d9b48e5930"
     },
     {
       "scenario_id": "analytics-constraint-population",
       "capability": "market_analytics",
-      "current_failure_classes": [
-        "ANALYTICS_CONSTRAINT_NOT_APPLIED"
-      ],
       "required_visible_result": "US + VG+ constraints change population/sample/values",
       "required_state_change": "population or sample or values differ from unconstrained success",
       "required_evidence_floor": 1,
-      "required_customer_copy": "Updated because country=US and condition\u2265VG+",
+      "required_customer_copy": "Updated because country=US and condition≥VG+",
       "forbidden_visible_strings": [
         "phase33e_deterministic_analytics_v1",
         "{"
@@ -585,14 +969,31 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "ANALYTICS_CONSTRAINT_NOT_APPLIED"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "c87f7acd6b43d099cb9b825a9fd91f4a57f4a0462c394897c841be752596fba1"
     },
     {
       "scenario_id": "analytics-sample-below-policy-customer",
       "capability": "market_analytics",
-      "current_failure_classes": [
-        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
-      ],
       "required_visible_result": "Customer abstention; no raw policy codes",
       "required_state_change": null,
       "required_evidence_floor": 0,
@@ -609,7 +1010,45 @@
       "test_files": [
         "tests/phase34-owner-proof-output-remediation.test.mjs"
       ],
-      "status": "SOURCE_REMEDIATED_PENDING_CI"
+      "historical_failure_classes": [
+        "CUSTOMER_INTERNAL_TERMINOLOGY_VISIBLE"
+      ],
+      "current_open_failure_classes": [
+        "LIVE_OWNER_PROOF_NOT_EXECUTED",
+        "PRODUCT_ACCEPTANCE_BLOCKED"
+      ],
+      "source_remediation_status": "COMPLETE",
+      "unit_test_status": "PASS",
+      "integration_test_status": "PASS",
+      "protocol_source_verification_status": "PASS",
+      "browser_source_verification_status": "PASS",
+      "exact_sha_ci_status": "PASS",
+      "live_owner_proof_status": "NOT_EXECUTED",
+      "owner_visual_review_status": "NOT_EXECUTED",
+      "human_review_status": "NOT_EXECUTED",
+      "product_acceptance_status": "BLOCKED",
+      "test_evidence_refs": [
+        "tests/phase34-owner-proof-output-remediation.test.mjs"
+      ],
+      "artifact_content_hash": "8f42b62f9886f2b8b07578235d866ad507412fe8a60b57279cf5e62a6bca9a85"
     }
-  ]
+  ],
+  "pinned_source_sha": "7b8745b244b60f0ec14cd1f7b3c8d6665f2e94bd",
+  "status_model": [
+    "source_remediation_status",
+    "unit_test_status",
+    "integration_test_status",
+    "protocol_source_verification_status",
+    "browser_source_verification_status",
+    "exact_sha_ci_status",
+    "live_owner_proof_status",
+    "owner_visual_review_status",
+    "human_review_status",
+    "product_acceptance_status"
+  ],
+  "latest_source_verification": {
+    "status": "SOURCE_VERIFICATION_PASS",
+    "out_root": ".cache/phase34-owner-proof-source-verification",
+    "note": "Committed runner; diagnostic screenshots only; not owner-proof evidence"
+  }
 }

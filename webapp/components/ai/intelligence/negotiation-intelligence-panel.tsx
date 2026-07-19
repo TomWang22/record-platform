@@ -80,7 +80,16 @@ function participantSide(
   currentUserId: string | null,
 ): 'buyer' | 'seller' | 'unknown' {
   if (!thread || !currentUserId) return 'unknown'
-  if (thread.listing?.id) return 'buyer'
+  const sellerId = thread.listing?.sellerId
+  if (sellerId && sellerId === currentUserId) return 'seller'
+  if (sellerId && sellerId !== currentUserId) return 'buyer'
+  if (thread.listing?.id) {
+    const messages = thread.messages || []
+    const first = messages.find((m) => Boolean(m.body?.trim()))
+    // Buyer contacts seller first on listing threads — if first message is not mine, I am seller.
+    if (first && first.senderId && first.senderId !== currentUserId) return 'seller'
+    return 'buyer'
+  }
   return 'unknown'
 }
 
@@ -159,10 +168,13 @@ export function NegotiationIntelligencePanel({
         subject: {
           listing_id: thread.listing?.id || undefined,
           title: thread.listing?.title || undefined,
+          user_intent: userIntent.trim(),
         },
         thread: {
           thread_id: threadId,
           participant_principals: principals,
+          latest_user_intent: userIntent.trim(),
+          prior_turns: priorContext,
         },
         messages,
         market_candidates: [],
@@ -196,9 +208,24 @@ export function NegotiationIntelligencePanel({
         return
       }
 
-      const draftText = String(result.draft_reply || result.reply_draft || '').trim()
+      const draftText = String(
+        result.draft_reply ||
+          result.reply_draft ||
+          (result.reply_drafts &&
+            typeof result.reply_drafts === 'object' &&
+            ((result.reply_drafts as Record<string, unknown>).primary ||
+              (result.reply_drafts as Record<string, unknown>).friendly ||
+              (result.reply_drafts as Record<string, unknown>).concise)) ||
+          '',
+      ).trim()
       setDraft(draftText)
-      const summary = String(result.summary || result.strategy || draftText || 'completed').trim()
+      const summary = String(
+        result.summary ||
+          result.strategy ||
+          (Array.isArray(result.concession_plan) ? result.concession_plan[0] : '') ||
+          draftText ||
+          'completed',
+      ).trim()
       setTurnHistory((prev) => [
         ...prev,
         {
@@ -209,7 +236,19 @@ export function NegotiationIntelligencePanel({
           result_hash: hashSummary(`${turnId}:${summary}:${draftText}`),
         },
       ])
-      setState({ status: 'ready', result: { ...result, automatic_send_allowed: false } })
+      setState({
+        status: 'ready',
+        result: {
+          ...result,
+          draft_reply: draftText || result.draft_reply,
+          reply_draft: draftText || result.reply_draft,
+          strategy:
+            result.strategy ||
+            (Array.isArray(result.concession_plan) ? String(result.concession_plan[0] || '') : '') ||
+            summary,
+          automatic_send_allowed: false,
+        },
+      })
     } catch (err) {
       if (err instanceof IntelligenceHttpError) {
         setState({

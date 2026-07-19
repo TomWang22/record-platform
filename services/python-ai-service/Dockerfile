@@ -105,6 +105,7 @@ COPY scripts/lib/phase33a-intelligence-capability-contracts.mjs \
      scripts/lib/phase33e-analytics.mjs \
      scripts/lib/phase33e-intelligence.mjs \
      scripts/lib/phase33e-memory.mjs \
+     scripts/lib/phase34-negotiation-context.mjs \
      /app/scripts/lib/
 RUN chown -R python:python /app/scripts \
  && node --version >/dev/null

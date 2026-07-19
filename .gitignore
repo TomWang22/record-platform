@@ -23,6 +23,7 @@ __pycache__/
 *.pyc
 .venv/
 tmp/
+.cache/
 *.json
 !package.json
 !package-lock.json
@@ -59,6 +60,11 @@ tmp/
 !scripts/ai-platform/phase34-owner-proof-seed-manifest.json
 !scripts/ai-platform/phase34-owner-proof-client-action-contracts.json
 !scripts/ai-platform/phase34-owner-proof-remediation-matrix.json
+!scripts/ai-platform/phase34-intelligence-pipeline-contract.json
+!scripts/ai-platform/phase34-intelligence-pipeline-contract.schema.json
+!scripts/ai-platform/phase34-adversarial-pipeline-fixtures.json
+!scripts/ai-platform/phase34-response-quality-contract.json
+!scripts/ai-platform/phase34-response-quality-contract.schema.json
 !scripts/ai-platform/phase34-prompt-registry/
 !scripts/ai-platform/phase34-prompt-registry/**/*.json
 !scripts/ai-platform/retrieval-splits/

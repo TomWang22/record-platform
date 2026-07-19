@@ -1,0 +1,173 @@
+{
+  "schema_version": "phase34-adversarial-pipeline-fixtures-v1",
+  "fixtures": [
+    {
+      "id": "duplicate_sold_events",
+      "expected_behavior": "duplicate_suppression",
+      "events": [
+        {
+          "source_event_id": "sold-1",
+          "source_type": "sold",
+          "price": 40,
+          "currency": "USD",
+          "source_event_time": "2026-06-01T12:00:00Z"
+        },
+        {
+          "source_event_id": "sold-1",
+          "source_type": "sold",
+          "price": 40,
+          "currency": "USD",
+          "source_event_time": "2026-06-01T12:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "asking_marked_sold",
+      "expected_behavior": "sold_versus_asking_separation",
+      "events": [
+        {
+          "source_event_id": "ask-1",
+          "source_type": "asking",
+          "listed_as": "sold",
+          "price": 55,
+          "currency": "USD",
+          "source_event_time": "2026-06-02T12:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "stale_auction_status",
+      "expected_behavior": "stale_source_rejection",
+      "events": [
+        {
+          "source_event_id": "auc-1",
+          "source_type": "auction",
+          "status": "active",
+          "ended_at": "2026-01-01T00:00:00Z",
+          "source_event_time": "2026-01-01T00:00:00Z",
+          "staleness_status": "STALE"
+        }
+      ]
+    },
+    {
+      "id": "deleted_listing",
+      "expected_behavior": "deletion_propagation",
+      "events": [
+        {
+          "source_event_id": "lst-del",
+          "source_type": "listing",
+          "deletion_status": "DELETED",
+          "source_event_time": "2026-05-01T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "currency_mismatch",
+      "expected_behavior": "currency_normalization",
+      "events": [
+        {
+          "source_event_id": "cur-1",
+          "source_type": "sold",
+          "price": 30,
+          "currency": "EUR",
+          "source_event_time": "2026-06-03T12:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "pressing_mismatch",
+      "expected_behavior": "exact_pressing_versus_release_level_separation",
+      "events": [
+        {
+          "source_event_id": "pr-1",
+          "source_type": "sold",
+          "pressing_identity": "JP",
+          "requested_pressing_identity": "US-mono",
+          "source_event_time": "2026-06-04T12:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "out_of_order_correction",
+      "expected_behavior": "correction_precedence",
+      "events": [
+        {
+          "source_event_id": "corr-2",
+          "source_type": "correction",
+          "correction_seq": 2,
+          "source_event_time": "2026-06-05T13:00:00Z"
+        },
+        {
+          "source_event_id": "corr-1",
+          "source_type": "correction",
+          "correction_seq": 1,
+          "source_event_time": "2026-06-05T12:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "duplicate_catalog_across_releases",
+      "expected_behavior": "entity_and_pressing_identity_resolution",
+      "events": [
+        {
+          "source_event_id": "cat-a",
+          "catalog_number": "CL 1355",
+          "release_id": "rel-a",
+          "source_event_time": "2026-06-06T12:00:00Z"
+        },
+        {
+          "source_event_id": "cat-b",
+          "catalog_number": "CL 1355",
+          "release_id": "rel-b",
+          "source_event_time": "2026-06-06T12:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "unauthorized_owner_data",
+      "expected_behavior": "cross_user_and_cross_thread_isolation",
+      "events": [
+        {
+          "source_event_id": "unauth-1",
+          "source_owner_scope": "other-user",
+          "authorization_scope": "denied",
+          "source_event_time": "2026-06-07T12:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "expired_memory",
+      "expected_behavior": "expiry_enforcement",
+      "events": [
+        {
+          "source_event_id": "mem-1",
+          "expiry_status": "EXPIRED",
+          "source_event_time": "2025-01-01T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "malformed_condition",
+      "expected_behavior": "no_silent_drop_of_malformed_records",
+      "events": [
+        {
+          "source_event_id": "cond-1",
+          "condition": "!!!",
+          "source_event_time": "2026-06-08T12:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "missing_event_timestamp",
+      "expected_behavior": "no_silent_drop_of_malformed_records",
+      "events": [
+        {
+          "source_event_id": "ts-missing",
+          "source_type": "sold",
+          "price": 22,
+          "currency": "USD"
+        }
+      ]
+    }
+  ]
+}

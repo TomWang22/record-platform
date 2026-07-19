@@ -6,6 +6,8 @@ export type MessagingListingContext = {
   priceCents: number | null
   thumbnailUrl: string | null
   saleMode?: string | null
+  /** Listing owner principal when known — used for seller/buyer negotiation side. */
+  sellerId?: string | null
 }
 
 export type MessagingParticipant = {

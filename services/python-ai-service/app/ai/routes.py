@@ -5,7 +5,7 @@ import time
 from typing import Any, List, Optional, Union
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.ai import insights
 from app.ai.config import AI_RAG_SHADOW_VECTOR
@@ -299,6 +299,8 @@ async def get_offer_insights(
 class IntelligenceBody(BaseModel):
     """Phase 33C/33D structured intelligence request (fixture-backed deterministic engines)."""
 
+    model_config = ConfigDict(extra="allow")
+
     subject: Optional[dict] = None
     candidates: Optional[list] = None
     authorized_scopes: Optional[List[str]] = None
@@ -346,6 +348,15 @@ class IntelligenceBody(BaseModel):
     request_guaranteed_appreciation: Optional[bool] = None
     cross_user_collection_attempt: Optional[bool] = None
     cross_user_watchlist_attempt: Optional[bool] = None
+    force_negotiation_market_floor: Optional[bool] = None
+    user_intent: Optional[str] = None
+    owner_proof_prompt: Optional[str] = None
+    session_id: Optional[str] = None
+    turn_id: Optional[str] = None
+    turn_index: Optional[int] = None
+    prior_turns: Optional[list] = None
+    correction_precedence: Optional[bool] = None
+    automatic_send_allowed: Optional[bool] = None
     # Phase 33E market analytics / memory
     analytics_mode: Optional[str] = None
     events: Optional[list] = None

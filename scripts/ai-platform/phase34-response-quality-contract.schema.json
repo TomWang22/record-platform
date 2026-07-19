@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "phase34-response-quality-contract.schema.json",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "customer_response_fields",
+    "customer_visible_ordering",
+    "rubric_dimensions",
+    "golden_acceptance",
+    "model_weight_training",
+    "optimization"
+  ],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "label": { "type": "string" },
+    "model_weight_training": { "const": "NO" },
+    "optimization": {
+      "const": "PROMPT_RETRIEVAL_RERANKER_TOOL_CALIBRATION_AND_MODEL_SELECTION"
+    },
+    "customer_response_fields": {
+      "type": "array",
+      "minItems": 11,
+      "items": { "type": "string" }
+    },
+    "customer_visible_ordering": {
+      "type": "array",
+      "minItems": 7,
+      "items": { "type": "string" }
+    },
+    "direct_answer_rule": { "type": "string" },
+    "forbidden_generic_phrases_unless_capability_true": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "rubric_dimensions": {
+      "type": "array",
+      "minItems": 13,
+      "items": { "type": "string" }
+    },
+    "score_range": {
+      "type": "object",
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "type": "integer", "const": 0 },
+        "max": { "type": "integer", "const": 4 }
+      }
+    },
+    "golden_acceptance": {
+      "type": "object",
+      "required": [
+        "min_dimension",
+        "grounded_factuality",
+        "privacy",
+        "safety",
+        "average_min"
+      ]
+    },
+    "duplicate_language_detection": { "type": "object" }
+  },
+  "additionalProperties": true
+}

@@ -266,8 +266,18 @@ export function analyzeNegotiation(input = {}) {
   const unsafe = detectUnsafeFromIntent(input);
   const messages = Array.isArray(input.messages) ? input.messages : [];
   const threadId = auth.thread_id;
-  const priorTurns = Array.isArray(input.prior_turns) ? input.prior_turns : [];
-  const userIntent = String(input.user_intent || input.owner_proof_prompt || '').trim();
+  const priorTurns = Array.isArray(input.prior_turns)
+    ? input.prior_turns
+    : Array.isArray(input.thread?.prior_turns)
+      ? input.thread.prior_turns
+      : [];
+  const userIntent = String(
+    input.user_intent ||
+      input.owner_proof_prompt ||
+      input.thread?.latest_user_intent ||
+      input.subject?.user_intent ||
+      '',
+  ).trim();
   const turnIndex = typeof input.turn_index === 'number' ? input.turn_index : priorTurns.length;
   const sessionId = input.session_id || null;
   const turnId = input.turn_id || `turn-${turnIndex + 1}`;

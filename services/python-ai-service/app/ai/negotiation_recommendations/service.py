@@ -277,11 +277,38 @@ def _run(capability: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _normalize_negotiation_result(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure customer UI fields exist (draft_reply/strategy) without inventing numbers."""
+    out = dict(result or {})
+    drafts = out.get("reply_drafts") if isinstance(out.get("reply_drafts"), dict) else {}
+    draft = (
+        out.get("draft_reply")
+        or out.get("reply_draft")
+        or drafts.get("primary")
+        or drafts.get("friendly")
+        or drafts.get("concise")
+        or ""
+    )
+    out["draft_reply"] = draft
+    out["reply_draft"] = draft
+    if not out.get("strategy"):
+        plan = out.get("concession_plan")
+        if isinstance(plan, list) and plan:
+            out["strategy"] = str(plan[0])
+        elif out.get("summary"):
+            out["strategy"] = str(out["summary"])
+    return out
+
+
 def analyze_negotiation(body: Dict[str, Any]) -> Dict[str, Any]:
     """Authorize first; invoke engine only for authorized negotiation requests."""
     if _negotiation_is_unauthorized(body):
-        return _structured_unauthorized_negotiation(body)
-    return _run("negotiation_assistance", body)
+        unauthorized = _structured_unauthorized_negotiation(body)
+        unauthorized["result"] = _normalize_negotiation_result(unauthorized.get("result") or {})
+        return unauthorized
+    out = _run("negotiation_assistance", body)
+    out["result"] = _normalize_negotiation_result(out.get("result") or {})
+    return out
 
 
 def analyze_recommendations(body: Dict[str, Any]) -> Dict[str, Any]:

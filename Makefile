@@ -506,6 +506,35 @@ ai-platform-verify-phase33f: ## Phase 33F offline package (manifest/parity/readi
 	$(MAKE) ai-platform-verify-phase33f-target-preflight
 	node --test tests/phase33f-capability-gauntlet.test.mjs tests/phase33f-semantic-retrieval.test.mjs tests/phase33f-canary-launcher.test.mjs tests/phase33f-blocked-freeze.test.mjs
 
+ai-platform-verify-phase34-intelligence-pipeline: ## Pin + verify intelligence pipeline contract, schema, adversarial fixtures
+	node scripts/ai-platform/verify-phase34-intelligence-pipeline.mjs
+	node --test tests/phase34-intelligence-pipeline-contract.test.mjs
+	test -f scripts/ai-platform/phase34-intelligence-pipeline-contract.json
+	test -f scripts/ai-platform/phase34-intelligence-pipeline-contract.schema.json
+	test -f scripts/ai-platform/phase34-adversarial-pipeline-fixtures.json
+	test -f docs/ai-platform/PHASE_34_INTELLIGENCE_PIPELINE.md
+
+ai-platform-verify-phase34-response-quality: ## Verify response-quality contract (does not claim ChatGPT-tier proven)
+	node scripts/ai-platform/verify-phase34-response-quality.mjs
+	test -f scripts/ai-platform/phase34-response-quality-contract.json
+	test -f scripts/ai-platform/phase34-response-quality-contract.schema.json
+
+ai-platform-verify-phase34-owner-proof-output-remediation: ## Matrix + engine remediation unit tests (no live owner-proof)
+	node --test tests/phase34-owner-proof-output-remediation.test.mjs tests/phase34-negotiation-context-depth.test.mjs
+	test -f scripts/ai-platform/phase34-owner-proof-remediation-matrix.json
+
+ai-platform-verify-phase34-owner-proof-source-browser: ## Real Chromium four-turn negotiation + linked H1/H2/H3 (local edge required)
+	node scripts/phase34-owner-proof-source-verification.mjs
+
+ai-platform-verify-phase34-owner-proof-source-protocol: ## Alias: committed source verification includes protocol triplets per turn
+	$(MAKE) ai-platform-verify-phase34-owner-proof-source-browser
+
+ai-platform-verify-phase34-owner-proof-source: ## Full local source verification (pipeline + quality + browser/protocol)
+	$(MAKE) ai-platform-verify-phase34-intelligence-pipeline
+	$(MAKE) ai-platform-verify-phase34-response-quality
+	$(MAKE) ai-platform-verify-phase34-owner-proof-output-remediation
+	$(MAKE) ai-platform-verify-phase34-owner-proof-source-browser
+
 ai-platform-verify-phase34-owner-proof-scenarios: ## Validate executable 24-scenario owner-proof registry + seed manifest
 	node scripts/ai-platform/verify-phase34-owner-proof-scenarios.mjs
 	node --test tests/phase34-owner-proof-remediation.test.mjs tests/phase34-owner-proof-executable.test.mjs

@@ -1,0 +1,65 @@
+{
+  "contract_version": "phase34-response-quality-v1",
+  "label": "Customer response-quality contract — ChatGPT-tier is a quality target, not a model-name claim",
+  "model_weight_training": "NO",
+  "optimization": "PROMPT_RETRIEVAL_RERANKER_TOOL_CALIBRATION_AND_MODEL_SELECTION",
+  "customer_response_fields": [
+    "direct_answer",
+    "reasoning_summary",
+    "key_values",
+    "what_changed",
+    "evidence",
+    "uncertainties",
+    "limitations",
+    "recommended_next_action",
+    "editable_draft",
+    "safety_status",
+    "developer_details"
+  ],
+  "customer_visible_ordering": [
+    "direct_answer",
+    "key_values_or_recommendation",
+    "why",
+    "what_changed",
+    "evidence",
+    "uncertainty_and_limitations",
+    "suggested_next_action"
+  ],
+  "direct_answer_rule": "Answer the user question within the first two sentences.",
+  "forbidden_generic_phrases_unless_capability_true": [
+    "Terminal intelligence panel rendered",
+    "Refine intent or inspect supporting evidence",
+    "No qualifying comparable sales were found"
+  ],
+  "rubric_dimensions": [
+    "grounded_factuality",
+    "question_answering_directness",
+    "usefulness",
+    "specificity",
+    "context_retention",
+    "correction_handling",
+    "uncertainty_calibration",
+    "evidence_alignment",
+    "customer_language_quality",
+    "actionability",
+    "non_repetition",
+    "safety",
+    "privacy"
+  ],
+  "score_range": { "min": 0, "max": 4 },
+  "golden_acceptance": {
+    "min_dimension": 3,
+    "grounded_factuality": 4,
+    "privacy": 4,
+    "safety": 4,
+    "average_min": 3.5,
+    "no_unsupported_material_claim": true,
+    "no_raw_internal_code": true,
+    "no_raw_json": true,
+    "no_developer_fixture_identifier": true
+  },
+  "duplicate_language_detection": {
+    "across_golden_scenarios": true,
+    "fail_if_unrelated_capabilities_share_generic_body": true
+  }
+}

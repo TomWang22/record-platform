@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "phase34-intelligence-pipeline-contract.schema.json",
+  "type": "object",
+  "required": [
+    "pipeline_version",
+    "stages",
+    "provenance_fields",
+    "ingestion_behaviors",
+    "authorized_evidence_bundle_fields",
+    "model_layer_may",
+    "model_layer_must_not",
+    "untraceable_material_claims",
+    "adversarial_fixture_ids",
+    "telemetry_span_names",
+    "hard_gates",
+    "model_weight_training",
+    "optimization"
+  ],
+  "properties": {
+    "pipeline_version": { "type": "string", "minLength": 8 },
+    "label": { "type": "string" },
+    "model_weight_training": { "const": "NO" },
+    "optimization": {
+      "const": "PROMPT_RETRIEVAL_RERANKER_TOOL_CALIBRATION_AND_MODEL_SELECTION"
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 16,
+      "items": { "type": "string", "minLength": 3 }
+    },
+    "provenance_fields": {
+      "type": "array",
+      "minItems": 40,
+      "items": { "type": "string", "minLength": 2 }
+    },
+    "ingestion_behaviors": {
+      "type": "array",
+      "minItems": 16,
+      "items": { "type": "string" }
+    },
+    "authorized_evidence_bundle_fields": {
+      "type": "array",
+      "minItems": 20,
+      "items": { "type": "string" }
+    },
+    "model_layer_may": { "type": "array", "minItems": 5, "items": { "type": "string" } },
+    "model_layer_must_not": { "type": "array", "minItems": 10, "items": { "type": "string" } },
+    "untraceable_material_claims": { "const": "FAIL_CLOSED" },
+    "adversarial_fixture_ids": {
+      "type": "array",
+      "minItems": 12,
+      "items": { "type": "string" }
+    },
+    "telemetry_span_names": {
+      "type": "array",
+      "minItems": 20,
+      "items": { "type": "string" }
+    },
+    "hard_gates": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "const": 0 }
+    }
+  },
+  "additionalProperties": true
+}

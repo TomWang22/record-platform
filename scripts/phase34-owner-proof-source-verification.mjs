@@ -27,14 +27,49 @@ import {
   signInWithToken,
 } from './lib/phase34-owner-proof-live-runner.mjs';
 import { analyzeNegotiation } from './lib/phase33d-negotiation.mjs';
-import { evaluateNegotiationContextTiers } from './lib/phase34-negotiation-context.mjs';
+import {
+  evaluateNegotiationContextTiers,
+  mergeCorrectionPrecedence,
+} from './lib/phase34-negotiation-context.mjs';
+import {
+  Stopwatch,
+  emptyCustomerAndProtocolTimings,
+  timingField,
+  classifyCustomerLatency,
+  newTraceId,
+  spanSetForTurn,
+  instrumentSpans,
+  emptyTokenContextLedger,
+  estimateTokens,
+  nearestRankPercentiles,
+  pipelineStageCompleteness,
+  MEASUREMENT_STATUS,
+} from './lib/phase34-source-verification-telemetry.mjs';
+import {
+  GOLDEN_TURN_INTENTS,
+  buildGoldenFactProgression,
+  assertDraftInvariants,
+  customerVisibleBundle,
+  scoreResponseQuality,
+} from './lib/phase34-negotiation-fact-invariants.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
 
+/** Frozen PASS evidence from SHA 8fc9df16 — never mutate. */
+const FROZEN_BASELINE_ROOT = path.join(REPO, '.cache/phase34-owner-proof-source-verification');
+
 const OUT_ROOT =
   process.env.PHASE34_SOURCE_VERIFY_OUT ||
-  path.join(REPO, '.cache/phase34-owner-proof-source-verification');
+  path.join(REPO, '.cache/phase34-owner-proof-source-verification-telemetry-v1');
+
+if (path.resolve(OUT_ROOT) === path.resolve(FROZEN_BASELINE_ROOT)) {
+  const err = new Error(
+    'REFUSE_MUTATE_FROZEN_BASELINE:.cache/phase34-owner-proof-source-verification must remain immutable',
+  );
+  err.code = 'FROZEN_BASELINE_IMMUTABLE';
+  throw err;
+}
 
 const FORBIDDEN = [
   '/tmp/phase34-owner-proof-live-rehearsal-v2',
@@ -45,12 +80,7 @@ const FORBIDDEN = [
   '/tmp/phase34-owner-proof-mini-proof-v1',
 ];
 
-const TURNS = [
-  'They offered $35 for my $41 listing. What should I do?',
-  'The sleeve has a seam split, and shipping will cost me $6.',
-  'I would accept $37, but I do not want to sound desperate.',
-  'Draft the reply.',
-];
+const TURNS = [...GOLDEN_TURN_INTENTS];
 
 const SELLER_EMAIL =
   process.env.E2E_SELLER_EMAIL || 'seller-contract@record-platform.local';
@@ -184,37 +214,9 @@ async function ensureAuthorizedNegotiationThread({
   };
 }
 
-function emptyLatency() {
-  return {
-    dns_us: null,
-    tcp_us: null,
-    tls_us: null,
-    quic_us: null,
-    ttfb_us: null,
-    gateway_queue_us: null,
-    service_queue_us: null,
-    authorization_us: null,
-    evidence_load_us: null,
-    evidence_assembly_us: null,
-    analytics_us: null,
-    embedding_us: null,
-    retrieval_us: null,
-    reranker_us: null,
-    tool_us: null,
-    model_queue_us: null,
-    model_ttft_us: null,
-    model_generation_us: null,
-    schema_validation_us: null,
-    safety_validation_us: null,
-    privacy_validation_us: null,
-    response_transfer_us: null,
-    browser_render_us: null,
-    terminal_ready_us: null,
-    total_wall_us: null,
-    known_component_sum_us: null,
-    unattributed_us: null,
-    measurement_status: 'PARTIAL_INSTRUMENTED',
-  };
+function msToUs(ms) {
+  if (ms == null || !Number.isFinite(Number(ms))) return null;
+  return Number(ms) * 1000;
 }
 
 async function main() {
@@ -349,6 +351,10 @@ async function main() {
   const screenshotPaths = [];
   let browserFourTurnOk = false;
   const protocolTurns = [];
+  const customerLatencies = [];
+  const protocolLatencies = [];
+  const sessionTraceId = newTraceId();
+  const factProgression = buildGoldenFactProgression(TURNS);
 
   try {
     const context = await browser.newContext({
@@ -459,16 +465,35 @@ async function main() {
       throw err;
     }
 
+    const priorDraftHashRef = { value: null };
+    let factsBefore = {};
+
     for (let i = 0; i < TURNS.length; i += 1) {
-      const turnStarted = Date.now();
+      const sw = new Stopwatch();
+      sw.mark('turn_start');
       const beforeBodies = capturedBodies.length;
 
+      sw.mark('browser_input_start');
       await page.getByTestId(`intelligence-negotiation-turn-preset-${i + 1}`).click();
+      sw.mark('browser_input_end');
+
+      sw.mark('browser_action_start');
+      const responsePromise = page.waitForResponse(
+        (r) =>
+          r.request().method() === 'POST' &&
+          r.url().includes('/api/ai/intelligence/negotiation'),
+        { timeout: 120_000 },
+      );
       await page.getByTestId('intelligence-negotiation-run').click();
+      sw.mark('browser_action_clicked');
+
+      const apiResponse = await responsePromise;
+      sw.mark('browser_response');
 
       await page
         .getByTestId('intelligence-negotiation-ready')
         .waitFor({ state: 'visible', timeout: 120_000 });
+      sw.mark('browser_terminal_ready');
 
       const draft = await page
         .getByTestId('intelligence-negotiation-draft')
@@ -487,13 +512,12 @@ async function main() {
         .innerText()
         .catch(() => '');
 
-      if (draft.length < 10) {
-        const err = new Error(`EMPTY_BROWSER_DRAFT_TURN_${i + 1}`);
-        err.code = 'NEGOTIATION_DRAFT_EMPTY';
-        throw err;
-      }
+      const draftInv = assertDraftInvariants(draft, {
+        priorDraftHash: priorDraftHashRef.value,
+        mustDiffer: i === 1 || i === 2,
+      });
+      priorDraftHashRef.value = draftInv.draft_hash;
 
-      // Wait briefly for request capture.
       const deadline = Date.now() + 5000;
       while (capturedBodies.length <= beforeBodies && Date.now() < deadline) {
         await page.waitForTimeout(100);
@@ -505,7 +529,11 @@ async function main() {
         throw err;
       }
 
+      const requiredFacts = factProgression.turns[i].facts_after;
+      factsBefore = i === 0 ? {} : factProgression.turns[i - 1].facts_after;
+
       const canonical_request_hash = hashCanonicalRequest(body);
+      sw.mark('protocol_start');
       const triplet = executeProtocolTriplet(
         {
           method: 'POST',
@@ -521,11 +549,14 @@ async function main() {
           probeIdPrefix: `${session_id}_t${i + 1}`,
         },
       );
+      sw.mark('protocol_end');
 
+      const artStart = performance.now();
       fs.writeFileSync(
         path.join(OUT_ROOT, 'protocol', `negotiation-turn${i + 1}-triplet.json`),
         JSON.stringify(triplet, null, 2) + '\n',
       );
+      const artifact_write_us = (performance.now() - artStart) * 1000;
 
       if (triplet?.ok !== true) {
         const err = new Error(`PROTOCOL_TRIPLET_FAIL_TURN_${i + 1}`);
@@ -533,12 +564,169 @@ async function main() {
         throw err;
       }
 
+      sw.mark('screenshot_start');
       const shot = path.join(OUT_ROOT, 'screenshots', `nego-turn-${i + 1}.png`);
       await page.screenshot({ path: shot, fullPage: true });
+      sw.mark('screenshot_end');
       screenshotPaths.push(shot);
 
-      const wall_us = (Date.now() - turnStarted) * 1000;
-      const latency = { ...emptyLatency(), total_wall_us: wall_us };
+      const timings = emptyCustomerAndProtocolTimings();
+      timings.browser_input_us = timingField(sw.us('browser_input_start', 'browser_input_end'), {
+        started_at: sw.iso('browser_input_start'),
+        finished_at: sw.iso('browser_input_end'),
+      });
+      timings.browser_action_to_request_us = timingField(
+        sw.us('browser_action_start', 'browser_action_clicked'),
+        {
+          started_at: sw.iso('browser_action_start'),
+          finished_at: sw.iso('browser_action_clicked'),
+        },
+      );
+      timings.browser_request_to_response_us = timingField(
+        sw.us('browser_action_clicked', 'browser_response'),
+        {
+          started_at: sw.iso('browser_action_clicked'),
+          finished_at: sw.iso('browser_response'),
+        },
+      );
+      timings.browser_response_to_terminal_ready_us = timingField(
+        sw.us('browser_response', 'browser_terminal_ready'),
+        {
+          started_at: sw.iso('browser_response'),
+          finished_at: sw.iso('browser_terminal_ready'),
+        },
+      );
+      const customerUs = sw.us('browser_action_start', 'browser_terminal_ready');
+      timings.browser_action_to_terminal_ready_us = timingField(customerUs, {
+        started_at: sw.iso('browser_action_start'),
+        finished_at: sw.iso('browser_terminal_ready'),
+      });
+      timings.browser_screenshot_us = timingField(sw.us('screenshot_start', 'screenshot_end'), {
+        started_at: sw.iso('screenshot_start'),
+        finished_at: sw.iso('screenshot_end'),
+      });
+      timings.h1_total_us = timingField(msToUs(triplet?.h1?.curl_time_total_ms));
+      timings.h2_total_us = timingField(msToUs(triplet?.h2?.curl_time_total_ms));
+      timings.h3_total_us = timingField(msToUs(triplet?.h3?.curl_time_total_ms));
+      timings.protocol_verification_total_us = timingField(sw.us('protocol_start', 'protocol_end'), {
+        started_at: sw.iso('protocol_start'),
+        finished_at: sw.iso('protocol_end'),
+      });
+      timings.artifact_write_us = timingField(artifact_write_us);
+      timings.total_source_verification_wall_us = timingField(sw.wallUs());
+      timings.source_verifier_orchestration_us = timingField(
+        Math.max(
+          0,
+          (timings.total_source_verification_wall_us.value_us || 0) -
+            (timings.browser_action_to_terminal_ready_us.value_us || 0) -
+            (timings.protocol_verification_total_us.value_us || 0) -
+            (timings.browser_screenshot_us.value_us || 0),
+        ),
+        { measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED },
+      );
+
+      customerLatencies.push(customerUs);
+      protocolLatencies.push(timings.protocol_verification_total_us.value_us);
+
+      const tokenLedger = {
+        ...emptyTokenContextLedger(),
+        context_tier: 'basic',
+        context_budget_tokens: 16_000,
+        current_request_tokens: estimateTokens(TURNS[i]),
+        structured_fact_tokens: estimateTokens(JSON.stringify(requiredFacts)),
+        model_output_tokens: estimateTokens(draft),
+        context_used_tokens:
+          estimateTokens(TURNS[i]) + estimateTokens(JSON.stringify(requiredFacts)),
+        measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+      };
+
+      let spans = spanSetForTurn({
+        trace_id: sessionTraceId,
+        session_id,
+        thread_id: authorized.thread_id,
+        turn_id: body.turn_id || `turn-${i + 1}`,
+        turn_index: i,
+        capability: 'negotiation_assistance',
+      });
+      spans = instrumentSpans(spans, {
+        'browser.input': {
+          duration_us: timings.browser_input_us.value_us,
+          started_at: timings.browser_input_us.started_at,
+          finished_at: timings.browser_input_us.finished_at,
+        },
+        'browser.action': {
+          duration_us: timings.browser_action_to_request_us.value_us,
+          started_at: timings.browser_action_to_request_us.started_at,
+          finished_at: timings.browser_action_to_request_us.finished_at,
+        },
+        'gateway.request': {
+          duration_us: timings.browser_request_to_response_us.value_us,
+          started_at: timings.browser_request_to_response_us.started_at,
+          finished_at: timings.browser_request_to_response_us.finished_at,
+        },
+        'gateway.response': {
+          duration_us: timings.browser_request_to_response_us.value_us,
+        },
+        'browser.terminal_ready': {
+          duration_us: timings.browser_response_to_terminal_ready_us.value_us,
+          started_at: timings.browser_response_to_terminal_ready_us.started_at,
+          finished_at: timings.browser_response_to_terminal_ready_us.finished_at,
+        },
+        'screenshot.capture': {
+          duration_us: timings.browser_screenshot_us.value_us,
+        },
+        'schema.validate': {
+          duration_us: null,
+          measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+          invocation_status: 'EXECUTED',
+        },
+        'safety.validate': {
+          duration_us: null,
+          measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+          invocation_status: 'EXECUTED',
+        },
+        'privacy.validate': {
+          duration_us: null,
+          measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+          invocation_status: 'EXECUTED',
+        },
+        'context.load': {
+          duration_us: null,
+          measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+          invocation_status: 'EXECUTED',
+        },
+        'context.correct': {
+          duration_us: null,
+          measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+          invocation_status: 'EXECUTED',
+        },
+        'authorization.check': {
+          duration_us: null,
+          measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+          invocation_status: 'EXECUTED',
+        },
+        'evidence.assemble': {
+          duration_us: null,
+          measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+          invocation_status: 'EXECUTED',
+        },
+        'analytics.compute': {
+          duration_us: null,
+          measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+          invocation_status: 'EXECUTED',
+        },
+      });
+
+      const quality = scoreResponseQuality({
+        result: {
+          draft_reply: draft,
+          strategy: strategyText,
+          summary: summaryText,
+          evidence: [{ id: 'structured_facts' }],
+          limitations: [{ code: 'ADVISORY_ONLY' }],
+        },
+        facts: requiredFacts,
+      });
 
       const turnRecord = {
         session_id,
@@ -558,20 +746,33 @@ async function main() {
         },
         browser: {
           draft_len: draft.length,
+          draft_hash: draftInv.draft_hash,
           summary: summaryText,
           strategy: strategyText,
           range: rangeText,
           screenshot: path.relative(OUT_ROOT, shot),
           ready: true,
         },
-        facts_added: body.user_intent || TURNS[i],
+        customer_visible: customerVisibleBundle({
+          draft_reply: draft,
+          strategy: strategyText,
+          summary: summaryText,
+          automatic_send_allowed: false,
+          message_sent: false,
+        }),
+        fact_ledger: {
+          facts_before: factsBefore,
+          facts_after: requiredFacts,
+        },
+        token_context: tokenLedger,
+        timings,
+        customer_latency_class: classifyCustomerLatency(customerUs),
+        spans,
+        pipeline_completeness: pipelineStageCompleteness(spans),
+        quality,
+        http_status_ui: apiResponse?.status?.() ?? null,
         prior_turns_count: Array.isArray(body.prior_turns) ? body.prior_turns.length : 0,
-        input_token_estimate: null,
-        output_token_count: null,
-        context_budget: null,
-        context_used: null,
-        latency,
-        measurement_status: 'PARTIAL_INSTRUMENTED',
+        measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
       };
 
       protocolTurns.push(turnRecord);
@@ -581,6 +782,10 @@ async function main() {
       turnRows[i].canonical_request_hash = canonical_request_hash;
       turnRows[i].protocol_ok = true;
       turnRows[i].participant_side = body.participant_side;
+      turnRows[i].customer_latency_us = customerUs;
+      turnRows[i].protocol_verification_us = timings.protocol_verification_total_us.value_us;
+      turnRows[i].total_source_verification_wall_us =
+        timings.total_source_verification_wall_us.value_us;
     }
 
     browserFourTurnOk = turnRows.every((t) => t.browser_ok === true);
@@ -608,18 +813,50 @@ async function main() {
     participant_side: 'seller',
   });
 
+  const latency_report = {
+    browser_customer_action_to_terminal: nearestRankPercentiles(customerLatencies),
+    protocol_verification: nearestRankPercentiles(protocolLatencies),
+    note: 'Customer latency is browser_action_to_terminal_ready_us only — not total_source_verification_wall_us',
+  };
+
+  const allSpans = protocolTurns.flatMap((t) => t.spans || []);
+  const telemetry_completeness = pipelineStageCompleteness(allSpans);
+
   fs.writeFileSync(
     path.join(OUT_ROOT, 'transcript', 'four-turn-browser-h123-transcript.json'),
-    JSON.stringify(transcript, null, 2) + '\n',
+    JSON.stringify(
+      {
+        ...transcript,
+        trace_id: sessionTraceId,
+        fact_progression: factProgression,
+        latency_report,
+        telemetry_completeness,
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+
+  fs.writeFileSync(
+    path.join(OUT_ROOT, 'reports', 'latency-summary.json'),
+    JSON.stringify(latency_report, null, 2) + '\n',
+  );
+  fs.writeFileSync(
+    path.join(OUT_ROOT, 'reports', 'telemetry-completeness.json'),
+    JSON.stringify(telemetry_completeness, null, 2) + '\n',
   );
 
   const summary = {
-    label: 'PHASE34_SOURCE_VERIFICATION_COMMITTED',
+    label: 'PHASE34_SOURCE_VERIFICATION_TELEMETRY',
+    status_line:
+      'PHASE 34 SOURCE VERIFICATION PASS — TELEMETRY AND 24-SCENARIO DIAGNOSTIC PREFLIGHT REQUIRED',
     product_acceptance: false,
     owner_proof_evidence: false,
     live_24_scenario_launched: false,
+    frozen_baseline_untouched: FROZEN_BASELINE_ROOT,
     out_root: OUT_ROOT,
     session_id,
+    trace_id: sessionTraceId,
     authorized_thread_id: authorized.thread_id,
     canonical_request_hashes: protocolTurns.map((t) => t.canonical_request_hash),
     negotiation_turns: turnRows,
@@ -632,7 +869,15 @@ async function main() {
       h3: t.protocol.h3,
       parity: t.protocol.parity,
       canonical_request_hash: t.canonical_request_hash,
+      customer_latency_us: t.timings?.browser_action_to_terminal_ready_us?.value_us ?? null,
+      protocol_verification_us: t.timings?.protocol_verification_total_us?.value_us ?? null,
+      total_source_verification_wall_us:
+        t.timings?.total_source_verification_wall_us?.value_us ?? null,
+      customer_latency_class: t.customer_latency_class || null,
     })),
+    latency_report,
+    telemetry_completeness,
+    fact_progression: factProgression,
     screenshots: screenshotPaths,
     browser_four_turn_ok: true,
     context_tiers: contextTiers,

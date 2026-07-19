@@ -105,7 +105,7 @@ export function caCertPath() {
   return fs.existsSync(chain) ? chain : path.join(REPO_ROOT, 'certs/dev-root.pem');
 }
 
-function resolveRuntimePins() {
+export function resolveRuntimePins() {
   let runtime_image_digest = process.env.PHASE34_RUNTIME_IMAGE_DIGEST || null;
   if (!runtime_image_digest) {
     const img = spawnSyncSafe('kubectl', [

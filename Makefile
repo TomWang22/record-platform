@@ -529,11 +529,15 @@ ai-platform-verify-phase34-owner-proof-source-browser: ## Real Chromium four-tur
 ai-platform-verify-phase34-owner-proof-source-protocol: ## Alias: committed source verification includes protocol triplets per turn
 	$(MAKE) ai-platform-verify-phase34-owner-proof-source-browser
 
-ai-platform-verify-phase34-owner-proof-source: ## Full local source verification (pipeline + quality + browser/protocol)
+ai-platform-verify-phase34-owner-proof-source-24: ## Diagnostic 24-scenario Chromium + H1/H2/H3 source preflight (not owner-proof)
+	node scripts/phase34-owner-proof-24-source-preflight.mjs
+
+ai-platform-verify-phase34-owner-proof-source: ## Full local source verification (pipeline + quality + browser/protocol + 24 preflight)
 	$(MAKE) ai-platform-verify-phase34-intelligence-pipeline
 	$(MAKE) ai-platform-verify-phase34-response-quality
 	$(MAKE) ai-platform-verify-phase34-owner-proof-output-remediation
 	$(MAKE) ai-platform-verify-phase34-owner-proof-source-browser
+	$(MAKE) ai-platform-verify-phase34-owner-proof-source-24
 
 ai-platform-verify-phase34-owner-proof-scenarios: ## Validate executable 24-scenario owner-proof registry + seed manifest
 	node scripts/ai-platform/verify-phase34-owner-proof-scenarios.mjs

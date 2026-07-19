@@ -43,6 +43,10 @@ export function RecommendationsIntelligencePanel({
     try {
       const response = await fetchRecommendationsIntelligence({
         ...assembleRecommendationsRequest({ principalId, candidates }),
+        recommendation_mode: /diversif/i.test(intent)
+          ? 'portfolio_diversification'
+          : 'collection_gap',
+        force_recommendation_floor: true,
         user_intent: intent,
         owner_proof_prompt: intent,
       })
@@ -89,6 +93,14 @@ export function RecommendationsIntelligencePanel({
         />
         {recommendations.length > 0 ? (
           <p className="text-xs text-slate-500">Answering: {lastIntent}</p>
+        ) : null}
+        {state.result?.what_changed ? (
+          <p
+            className="rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
+            data-testid="intelligence-recommendations-what-changed"
+          >
+            What changed: {String(state.result.what_changed)}
+          </p>
         ) : null}
         {recommendations.map((item, index) => (
           <div

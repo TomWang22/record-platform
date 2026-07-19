@@ -771,12 +771,21 @@ export class BaseProductJourneyAdapter {
       // Every turn must produce a fresh browser intelligence POST. Auto-trigger
       // panels only fetch on mount, so later turns remount via a turn-scoped URL
       // rather than skipping navigation on an already-loaded route.
+      // Negotiation is an exception: remounting wipes React turnHistory / prior_turns,
+      // so stay on the loaded messages surface and re-trigger with the next intent.
       const routeBase = String(prepared.route || '/');
-      const turnNav =
-        Number(prepared.turn_index) > 0
-          ? `${routeBase}${routeBase.includes('?') ? '&' : '?'}phase34_turn=${prepared.turn_index}`
-          : routeBase;
-      await page.goto(turnNav, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      const turnIndex = Number(prepared.turn_index) || 0;
+      const skipRemount =
+        this.capability === 'negotiation_assistance' &&
+        turnIndex > 0 &&
+        /\/messages/i.test(page.url());
+      if (!skipRemount) {
+        const turnNav =
+          turnIndex > 0
+            ? `${routeBase}${routeBase.includes('?') ? '&' : '?'}phase34_turn=${turnIndex}`
+            : routeBase;
+        await page.goto(turnNav, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      }
       await this.prepareLiveSurface(page, prepared);
 
       const shotBase = {

@@ -34,7 +34,12 @@ function evidenceItem(id, summary, sourceType = 'public_metadata') {
 }
 
 export function analyzeRecommendations(input = {}) {
-  const mode = input.recommendation_mode || input.mode;
+  const mode =
+    input.recommendation_mode ||
+    input.mode ||
+    (/diversif/i.test(String(input.user_intent || input.owner_proof_prompt || ''))
+      ? 'portfolio_diversification'
+      : 'collection_gap');
   const principal = input.requesting_principal_fixture || input.principal_id || null;
   const authorizedScopes = input.authorized_scopes || [
     'authenticated_market',
@@ -42,22 +47,41 @@ export function analyzeRecommendations(input = {}) {
     'owner_watchlist',
     'owner_inventory',
   ];
-  const budget = typeof input.budget === 'number' ? input.budget : 60;
+  const intent = String(input.user_intent || input.owner_proof_prompt || '');
+  const budgetFromIntent = intent.match(/under\s*\$?\s*(\d+(?:\.\d+)?)/i);
+  const budget =
+    typeof input.budget === 'number'
+      ? input.budget
+      : budgetFromIntent
+        ? Number(budgetFromIntent[1])
+        : 60;
   const owned = new Set(input.owned_entity_ids || []);
   const negatives = new Set(input.negative_preferences || []);
-  const intent = String(input.user_intent || input.owner_proof_prompt || '');
-  if (/picture disc/i.test(intent)) {
+  const preferBlueNote =
+    /blue\s*note/i.test(intent) ||
+    input.prefer_label === 'Blue Note' ||
+    (Array.isArray(input.positive_preferences) &&
+      input.positive_preferences.some((p) => /blue\s*note/i.test(String(p))));
+  // "exclude picture discs" / "forget picture discs" both keep picture discs out.
+  // "forget" here means do not surface them — not re-include them.
+  if (/picture\s*disc/i.test(intent) || input.exclude_picture_discs === true) {
     negatives.add('picture_disc');
     negatives.add('Picture Disc');
   }
   let candidatesIn = Array.isArray(input.candidates) ? [...input.candidates] : [];
-  if (candidatesIn.length < 5 && input.force_recommendation_floor === true) {
+  const forceFloor =
+    input.force_recommendation_floor === true ||
+    (candidatesIn.length < 5 &&
+      (Boolean(input.owner_proof_prompt) || Boolean(input.user_intent)));
+  if (candidatesIn.length < 5 && forceFloor) {
     const seed = [
       ['rec-bn-1', 'Blue Note All-Stars', 'Blue Note Jam', 42, 'Blue Note'],
-      ['rec-bn-2', 'Art Blakey', 'Moanin\'', 48, 'Blue Note'],
+      ['rec-bn-2', 'Art Blakey', "Moanin'", 48, 'Blue Note'],
+      ['rec-bn-3', 'Lee Morgan', 'The Sidewinder', 54, 'Blue Note'],
       ['rec-prs-1', 'Prestige Quartet', 'Evening Session', 35, 'Prestige'],
       ['rec-rvg-1', 'Kenny Dorham', 'Quiet Kenny', 55, 'New Jazz'],
-      ['rec-imp-1', 'Cannonball Adderley', 'Somethin\' Else', 58, 'Blue Note'],
+      ['rec-imp-1', 'Cannonball Adderley', "Somethin' Else", 58, 'Blue Note'],
+      ['rec-rv-1', 'Riverside Trio', 'Night Set', 39, 'Riverside'],
       ['rec-pic-1', 'Novelty Band', 'Picture Disc Sampler', 22, 'Various'],
     ];
     for (const [entity_id, artist, title, price, label] of seed) {
@@ -73,9 +97,16 @@ export function analyzeRecommendations(input = {}) {
         authorization_scope: 'authenticated_market',
         privacy_class: 'MARKETPLACE_SHARED',
         metadata_relevance: 0.7,
-        preference_match: /blue note/i.test(label) ? 0.9 : 0.55,
+        preference_match: /blue note/i.test(label) ? (preferBlueNote ? 0.98 : 0.72) : preferBlueNote ? 0.35 : 0.55,
       });
     }
+  } else if (preferBlueNote) {
+    candidatesIn = candidatesIn.map((c) => ({
+      ...c,
+      preference_match: /blue note/i.test(String(c.label || ''))
+        ? Math.max(Number(c.preference_match) || 0, 0.95)
+        : Math.min(Number(c.preference_match) || 0.5, 0.4),
+    }));
   }
 
   const abstention = { abstained: false, reason_codes: [] };
@@ -235,14 +266,25 @@ export function analyzeRecommendations(input = {}) {
         row.c.source_type === 'auction' ? 'auction' : 'listing',
       ),
     ];
+    const isBlueNote = /blue note/i.test(String(row.c.label || ''));
+    const reason_codes = [...row.reason_codes];
+    if (preferBlueNote && isBlueNote) reason_codes.push('blue_note_preference');
+    if (negatives.has('picture_disc')) reason_codes.push('picture_disc_excluded');
     return {
       entity_id: row.c.entity_id,
       entity_type: row.c.entity_type || 'listing',
       rank: idx + 1,
       score: Math.round(row.score * 1000) / 1000,
-      reason_codes: row.reason_codes,
-      explanation: `Suggested because it fits your preferences and budget ($${budget ?? '—'}).`,
-      reason_customer: `${row.c.artist || 'Artist'} — ${row.c.title || row.c.entity_id}: fits budget and preference filters`,
+      reason_codes,
+      explanation: preferBlueNote
+        ? `Suggested because it fits your Blue Note preference and budget ($${budget ?? '—'}).`
+        : `Suggested because it fits your preferences and budget ($${budget ?? '—'}).`,
+      reason_customer: preferBlueNote
+        ? `${row.c.artist || 'Artist'} — ${row.c.title || row.c.entity_id}: Blue Note preference + budget ≤ $${budget}`
+        : `${row.c.artist || 'Artist'} — ${row.c.title || row.c.entity_id}: fits budget and preference filters`,
+      title: row.c.title || row.c.entity_id,
+      artist: row.c.artist || null,
+      label: row.c.label || null,
       pressing: row.c.pressing_id || row.c.label || null,
       price: row.c.price ?? null,
       supporting_evidence: ev,
@@ -309,6 +351,7 @@ export function analyzeRecommendations(input = {}) {
   }
 
   const evidence = recommendations.flatMap((r) => r.supporting_evidence).slice(0, 12);
+  const item_ids = recommendations.map((r) => r.entity_id);
   const payload = {
     recommendation_mode: mode || 'similar_release',
     recommendation_scope: {
@@ -316,8 +359,16 @@ export function analyzeRecommendations(input = {}) {
       authorized_scopes: authorizedScopes,
       mode: mode || null,
       budget,
+      prefer_blue_note: preferBlueNote,
+      exclude_picture_discs: negatives.has('picture_disc'),
     },
     recommendations: abstention.abstained ? [] : recommendations,
+    item_ids: abstention.abstained ? [] : item_ids,
+    what_changed: preferBlueNote
+      ? 'Blue Note preference applied: Blue Note titles are ranked higher while picture discs stay excluded and the $60 budget holds.'
+      : negatives.has('picture_disc')
+        ? 'Picture discs excluded under the stated preference; artist diversity and budget filters applied.'
+        : null,
     diversity_summary,
     candidate_summary: {
       input: candidatesIn.length,

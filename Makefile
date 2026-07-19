@@ -520,7 +520,7 @@ ai-platform-verify-phase34-response-quality: ## Verify response-quality contract
 	test -f scripts/ai-platform/phase34-response-quality-contract.schema.json
 
 ai-platform-verify-phase34-owner-proof-output-remediation: ## Matrix + engine remediation unit tests (no live owner-proof)
-	node --test tests/phase34-owner-proof-output-remediation.test.mjs tests/phase34-negotiation-context-depth.test.mjs
+	node --test tests/phase34-owner-proof-output-remediation.test.mjs tests/phase34-negotiation-context-depth.test.mjs tests/phase34-material-correction-gates.test.mjs
 	test -f scripts/ai-platform/phase34-owner-proof-remediation-matrix.json
 
 ai-platform-verify-phase34-owner-proof-source-browser: ## Real Chromium four-turn negotiation + linked H1/H2/H3 (local edge required)

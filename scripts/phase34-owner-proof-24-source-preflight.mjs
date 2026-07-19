@@ -12,15 +12,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 async function main() {
   const summary = await executeOwnerProof24SourcePreflight({});
   console.log(JSON.stringify(summary, null, 2));
-  if (summary.status !== 'SOURCE_24_PREFLIGHT_PASS' &&
-      summary.status !== 'SOURCE_24_PREFLIGHT_EXECUTED_WITH_GATE_FINDINGS') {
+  if (summary.status !== 'SOURCE_24_PREFLIGHT_PASS') {
+    console.error(summary.status_line || summary.status);
     process.exit(2);
-  }
-  // Gate findings still exit 0 for diagnostic tooling readiness; print status clearly.
-  if (summary.status === 'SOURCE_24_PREFLIGHT_EXECUTED_WITH_GATE_FINDINGS') {
-    console.error(
-      'DIAGNOSTIC_NOTE: scenarios/protocol passed; some material-correction or quality gates still open',
-    );
   }
 }
 

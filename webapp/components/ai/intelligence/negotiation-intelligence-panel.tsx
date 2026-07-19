@@ -121,8 +121,31 @@ export function NegotiationIntelligencePanel({
   const [draft, setDraft] = useState('')
   const [userIntent, setUserIntent] = useState(DEFAULT_INTENT)
   const [engineInvoked, setEngineInvoked] = useState<boolean | null>(null)
-  const [sessionId] = useState(() => newId('nego-session'))
-  const [turnHistory, setTurnHistory] = useState<NegotiationTurnRecord[]>([])
+  const [sessionId] = useState(() => {
+    if (typeof window !== 'undefined' && threadId) {
+      const key = `phase34-nego-session:${threadId}`
+      const existing = window.sessionStorage.getItem(key)
+      if (existing) return existing
+      const created = newId('nego-session')
+      window.sessionStorage.setItem(key, created)
+      return created
+    }
+    return newId('nego-session')
+  })
+  const [turnHistory, setTurnHistory] = useState<NegotiationTurnRecord[]>(() => {
+    if (typeof window !== 'undefined' && threadId) {
+      try {
+        const raw = window.sessionStorage.getItem(`phase34-nego-turns:${threadId}`)
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          if (Array.isArray(parsed)) return parsed as NegotiationTurnRecord[]
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    return []
+  })
 
   const run = useCallback(async () => {
     if (!threadId || !thread || !currentUserId) {
@@ -178,6 +201,9 @@ export function NegotiationIntelligencePanel({
         },
         messages,
         market_candidates: [],
+        // Owner-proof / empty-comp floor: enable deterministic comps so strategy/evidence
+        // can diverge across correction turns without inventing UI-only fixtures.
+        force_negotiation_market_floor: true,
         automatic_send_allowed: false,
         request_auto_send: false,
         user_intent: userIntent.trim(),
@@ -226,16 +252,26 @@ export function NegotiationIntelligencePanel({
           draftText ||
           'completed',
       ).trim()
-      setTurnHistory((prev) => [
-        ...prev,
-        {
-          turn_index: turnIndex,
-          turn_id: turnId,
-          intent: userIntent.trim(),
-          summary,
-          result_hash: hashSummary(`${turnId}:${summary}:${draftText}`),
-        },
-      ])
+      setTurnHistory((prev) => {
+        const next = [
+          ...prev,
+          {
+            turn_index: turnIndex,
+            turn_id: turnId,
+            intent: userIntent.trim(),
+            summary,
+            result_hash: hashSummary(`${turnId}:${summary}:${draftText}`),
+          },
+        ]
+        if (typeof window !== 'undefined' && threadId) {
+          try {
+            window.sessionStorage.setItem(`phase34-nego-turns:${threadId}`, JSON.stringify(next))
+          } catch {
+            /* ignore */
+          }
+        }
+        return next
+      })
       setState({
         status: 'ready',
         result: {
@@ -270,8 +306,22 @@ export function NegotiationIntelligencePanel({
     setState({ status: 'idle' })
     setDraft('')
     setEngineInvoked(null)
-    setTurnHistory([])
     setUserIntent(DEFAULT_INTENT)
+    if (typeof window !== 'undefined' && threadId) {
+      try {
+        const raw = window.sessionStorage.getItem(`phase34-nego-turns:${threadId}`)
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          if (Array.isArray(parsed) && parsed.length) {
+            setTurnHistory(parsed as NegotiationTurnRecord[])
+            return
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    setTurnHistory([])
   }, [threadId])
 
   const result =

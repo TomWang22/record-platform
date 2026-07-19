@@ -25,6 +25,7 @@ export const REQUIRED_SPAN_NAMES = Object.freeze([
   'context.summarize',
   'evidence.snapshot.load',
   'evidence.assemble',
+  'engine.execute',
   'identity.resolve',
   'analytics.compute',
   'embedding.compute',
@@ -45,6 +46,25 @@ export const REQUIRED_SPAN_NAMES = Object.freeze([
   'screenshot.capture',
   'accessibility.check',
   'pcap.correlate',
+]);
+
+/** Stages that must be INSTRUMENTED (or accepted PARTIAL) when a customer turn executes. */
+export const REQUIRED_EXECUTED_CUSTOMER_STAGES = Object.freeze([
+  'browser.action',
+  'gateway.request',
+  'authorization.check',
+  'context.load',
+  'context.correct',
+  'evidence.snapshot.load',
+  'evidence.assemble',
+  'engine.execute',
+  'schema.validate',
+  'grounding.validate',
+  'safety.validate',
+  'privacy.validate',
+  'gateway.response',
+  'browser.render',
+  'browser.terminal_ready',
 ]);
 
 export const CUSTOMER_LATENCY_FIELD = 'browser_action_to_terminal_ready_us';
@@ -101,6 +121,109 @@ export function classifyCustomerLatency(valueUs) {
   if (sec <= 12) return { class: 'DEGRADED', measurement_status: MEASUREMENT_STATUS.INSTRUMENTED };
   if (sec <= 20) return { class: 'POOR', measurement_status: MEASUREMENT_STATUS.INSTRUMENTED };
   return { class: 'BLOCKING', measurement_status: MEASUREMENT_STATUS.INSTRUMENTED };
+}
+
+export function classifyLatencyOutlier(valueUs) {
+  if (valueUs == null) return 'UNATTRIBUTED';
+  const sec = valueUs / 1_000_000;
+  if (sec > 12) return 'BLOCKING_OUTLIER';
+  if (sec > 5) return 'DEGRADED';
+  return 'WITHIN_POLICY';
+}
+
+export function buildSlowestTurnAttribution(turnRows = [], limit = 5) {
+  const ranked = [...turnRows]
+    .map((t) => {
+      const customer =
+        t.timings?.browser_action_to_terminal_ready_us?.value_us ??
+        t.customer_latency_us ??
+        null;
+      const actionToRequest =
+        t.timings?.browser_action_to_request_us?.value_us ?? null;
+      const requestToResponse =
+        t.timings?.browser_request_to_response_us?.value_us ?? null;
+      const responseToReady =
+        t.timings?.browser_response_to_terminal_ready_us?.value_us ?? null;
+      const attributed =
+        (actionToRequest || 0) + (requestToResponse || 0) + (responseToReady || 0);
+      const unattributed =
+        customer != null ? Math.max(0, customer - attributed) : null;
+      const unattributed_ratio =
+        customer && customer > 0 && unattributed != null ? unattributed / customer : null;
+      let class_label = 'UNATTRIBUTED';
+      if (requestToResponse != null && requestToResponse / Math.max(customer || 1, 1) > 0.5) {
+        class_label = 'SERVICE_LATENCY';
+      } else if (responseToReady != null && responseToReady / Math.max(customer || 1, 1) > 0.4) {
+        class_label = 'BROWSER_READINESS_LATENCY';
+      } else if (actionToRequest != null && actionToRequest / Math.max(customer || 1, 1) > 0.4) {
+        class_label = 'ORCHESTRATION_OVERHEAD';
+      } else if (customer != null && customer / 1e6 > 5) {
+        class_label = 'EXPECTED_HEAVY_PIPELINE';
+      }
+      return {
+        scenario_id: t.scenario_id,
+        capability: t.capability,
+        turn_index: t.turn_index,
+        browser_action_to_request_us: actionToRequest,
+        browser_request_to_response_us: requestToResponse,
+        browser_response_to_terminal_ready_us: responseToReady,
+        browser_action_to_terminal_ready_us: customer,
+        gateway_us: requestToResponse,
+        authorization_us: null,
+        context_us: null,
+        evidence_assembly_us: null,
+        retrieval_us: null,
+        model_us: null,
+        validation_us: null,
+        render_us: responseToReady,
+        unattributed_us: unattributed,
+        unattributed_ratio,
+        class: class_label,
+        customer_class: classifyCustomerLatency(customer),
+      };
+    })
+    .filter((t) => t.browser_action_to_terminal_ready_us != null)
+    .sort(
+      (a, b) =>
+        (b.browser_action_to_terminal_ready_us || 0) -
+        (a.browser_action_to_terminal_ready_us || 0),
+    );
+  return ranked.slice(0, limit);
+}
+
+export function assertExecutedStageInstrumentation(spans = [], required = REQUIRED_EXECUTED_CUSTOMER_STAGES) {
+  const byName = new Map(spans.map((s) => [s.name, s]));
+  const gaps = [];
+  const accepted_partial = [];
+  for (const name of required) {
+    const s = byName.get(name);
+    const status = s?.measurement_status || MEASUREMENT_STATUS.NOT_INSTRUMENTED;
+    if (status === MEASUREMENT_STATUS.NOT_INSTRUMENTED) {
+      gaps.push({
+        stage: name,
+        measurement_status: status,
+        exemption_reason: null,
+      });
+    } else if (status === MEASUREMENT_STATUS.NOT_INVOKED_BY_POLICY && s?.invocation_status === 'EXECUTED') {
+      gaps.push({
+        stage: name,
+        measurement_status: status,
+        exemption_reason: 'executed_marked_not_invoked',
+      });
+    } else if (status === MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED) {
+      accepted_partial.push({
+        stage: name,
+        measurement_status: status,
+        exemption_reason: s?.exemption_reason || 'partial_timing_fields_missing',
+      });
+    }
+  }
+  return {
+    ok: gaps.length === 0,
+    gaps,
+    accepted_partial,
+    required: required.length,
+  };
 }
 
 export function newTraceId() {

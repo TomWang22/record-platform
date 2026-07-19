@@ -48,6 +48,9 @@ import {
   MEASUREMENT_STATUS,
   estimateTokens,
   emptyTokenContextLedger,
+  buildSlowestTurnAttribution,
+  assertExecutedStageInstrumentation,
+  REQUIRED_EXECUTED_CUSTOMER_STAGES,
 } from './phase34-source-verification-telemetry.mjs';
 import { scoreResponseQuality } from './phase34-negotiation-fact-invariants.mjs';
 import { evaluateNegotiationContextTiers } from './phase34-negotiation-context.mjs';
@@ -57,10 +60,11 @@ const REPO = path.resolve(__dirname, '../..');
 
 export const SOURCE_24_PREFLIGHT_ROOT = path.join(
   REPO,
-  '.cache/phase34-owner-proof-24-source-preflight-v1',
+  '.cache/phase34-owner-proof-24-source-preflight-v2',
 );
 
 const FROZEN_BASELINE = path.join(REPO, '.cache/phase34-owner-proof-source-verification');
+const FROZEN_PREFLIGHT_V1 = path.join(REPO, '.cache/phase34-owner-proof-24-source-preflight-v1');
 
 const FORBIDDEN = [
   '/tmp/phase34-owner-proof-live-rehearsal-v2',
@@ -121,9 +125,21 @@ function materialResultHash(apiOrStructured, triplet = null) {
         strategy: result.strategy,
         draft: result.draft_reply || result.reply_draft || result.draft,
         suggested_range: result.suggested_range || result.supported_price_range,
-        item_ids: result.item_ids,
+        structured_facts: result.structured_facts,
+        item_ids: result.item_ids || (result.recommendations || []).map((r) => r.entity_id),
+        recommendations: (result.recommendations || []).map((r) => ({
+          id: r.entity_id,
+          rank: r.rank,
+          reason: r.reason_customer || r.explanation,
+        })),
+        what_changed: result.what_changed,
         sample_size: result.sample_size,
+        population_size: result.population_size,
         population: result.population,
+        constraints_applied: result.constraints_applied,
+        correction_change: result.correction_change,
+        included_event_ids: result.included_event_ids,
+        price_median: result.price_median,
         embedding_status: result.embedding_status || result.lineage_status,
         results_len: Array.isArray(result.results) ? result.results.length : null,
         evidence_ids: (result.evidence || []).map((e) => e.evidence_id || e.id),
@@ -156,6 +172,11 @@ export async function executeOwnerProof24SourcePreflight(opts = {}) {
   if (path.resolve(outRoot) === path.resolve(FROZEN_BASELINE)) {
     const err = new Error('REFUSE_MUTATE_FROZEN_BASELINE');
     err.code = 'FROZEN_BASELINE_IMMUTABLE';
+    throw err;
+  }
+  if (path.resolve(outRoot) === path.resolve(FROZEN_PREFLIGHT_V1)) {
+    const err = new Error('REFUSE_MUTATE_FROZEN_PREFLIGHT_V1');
+    err.code = 'FROZEN_PREFLIGHT_IMMUTABLE';
     throw err;
   }
   for (const p of FORBIDDEN) {
@@ -407,9 +428,82 @@ export async function executeOwnerProof24SourcePreflight(opts = {}) {
                   : MEASUREMENT_STATUS.NOT_INSTRUMENTED,
             },
             'gateway.request': {
+              duration_us: br.timings?.browser_action_to_panel_ready_us ?? customerUs,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'wall_includes_server_pipeline_not_split',
+            },
+            'authorization.check': {
               duration_us: null,
               measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
               invocation_status: 'EXECUTED',
+              exemption_reason: 'invoked_observed_duration_missing',
+            },
+            'context.load': {
+              duration_us: null,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'invoked_observed_duration_missing',
+            },
+            'context.correct': {
+              duration_us: null,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'invoked_observed_duration_missing',
+            },
+            'evidence.snapshot.load': {
+              duration_us: null,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'invoked_observed_duration_missing',
+            },
+            'evidence.assemble': {
+              duration_us: null,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'invoked_observed_duration_missing',
+            },
+            'engine.execute': {
+              duration_us: null,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'invoked_inside_gateway_wall_not_split',
+            },
+            'schema.validate': {
+              duration_us: null,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'invoked_observed_duration_missing',
+            },
+            'grounding.validate': {
+              duration_us: null,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'invoked_observed_duration_missing',
+            },
+            'safety.validate': {
+              duration_us: null,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'invoked_observed_duration_missing',
+            },
+            'privacy.validate': {
+              duration_us: null,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'invoked_observed_duration_missing',
+            },
+            'gateway.response': {
+              duration_us: null,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'bundled_in_browser_request_to_response',
+            },
+            'browser.render': {
+              duration_us: null,
+              measurement_status: MEASUREMENT_STATUS.PARTIAL_INSTRUMENTED,
+              invocation_status: 'EXECUTED',
+              exemption_reason: 'bundled_in_response_to_terminal_ready',
             },
             'screenshot.capture': {
               duration_us: null,
@@ -551,11 +645,28 @@ export async function executeOwnerProof24SourcePreflight(opts = {}) {
   const latency_report = {
     browser_customer_action_to_terminal: nearestRankPercentiles(customerLatencies),
     protocol_verification: nearestRankPercentiles(protocolLatencies),
+    p95_class:
+      (nearestRankPercentiles(customerLatencies).p95 || 0) > 5_000_000
+        ? 'DEGRADED'
+        : 'GOOD',
+    blocking_turns_over_12s: turnRows.filter(
+      (t) => (t.timings?.browser_action_to_terminal_ready_us?.value_us || 0) > 12_000_000,
+    ).length,
     note:
       'Customer latency is browser_action_to_terminal_ready_us only — excludes H1/H2/H3 verification wall time',
   };
+  const slowest_turns = buildSlowestTurnAttribution(turnRows, 5);
   const allSpans = turnRows.flatMap((t) => t.spans || []);
   const telemetry_completeness = pipelineStageCompleteness(allSpans);
+  const executed_stage_check = assertExecutedStageInstrumentation(
+    // Evaluate per-turn and aggregate unique gaps
+    turnRows.length ? turnRows[0].spans || [] : [],
+    REQUIRED_EXECUTED_CUSTOMER_STAGES,
+  );
+  const telemetry_partial =
+    telemetry_completeness.not_instrumented > 0 ||
+    telemetry_completeness.partial_instrumented > 0 ||
+    !executed_stage_check.ok;
   const quality_summary = {
     turns_scored: turnRows.length,
     average:
@@ -611,7 +722,12 @@ export async function executeOwnerProof24SourcePreflight(opts = {}) {
     negotiation_four_turn,
     context_tiers,
     latency_report,
+    slowest_turns,
     telemetry_completeness,
+    executed_stage_check,
+    telemetry_status: telemetry_partial
+      ? 'PIPELINE_TELEMETRY_PARTIAL'
+      : 'PIPELINE_TELEMETRY_COMPLETE',
     quality_summary,
     h123: {
       ok: turnRows.every((t) => t.protocol?.ok),
@@ -619,17 +735,29 @@ export async function executeOwnerProof24SourcePreflight(opts = {}) {
     },
     forbidden_roots_absent: true,
     frozen_baseline_untouched: FROZEN_BASELINE,
+    frozen_preflight_v1_untouched: FROZEN_PREFLIGHT_V1,
+    status_line:
+      failed.length === 0 &&
+      countsOk &&
+      turnRows.every((t) => t.protocol?.ok) &&
+      negotiation_four_turn.ok &&
+      quality_summary.average >= 3.5 &&
+      quality_summary.all_ok &&
+      correction_gates_pass &&
+      latency_report.blocking_turns_over_12s === 0
+        ? 'PHASE 34 MATERIAL CORRECTION GATES 8/8 AND SOURCE PREFLIGHT-V2 PASS — LIVE OWNER-PROOF RECAPTURE READY — NOT LAUNCHED'
+        : 'PHASE 34 24-SCENARIO SOURCE PREFLIGHT EXECUTED — BLOCKED ON MATERIAL CORRECTION BEHAVIOR — PIPELINE TELEMETRY PARTIAL — LIVE OWNER-PROOF RECAPTURE NOT AUTHORIZED',
     status:
       failed.length === 0 &&
       countsOk &&
       turnRows.every((t) => t.protocol?.ok) &&
       negotiation_four_turn.ok &&
       quality_summary.average >= 3.5 &&
-      correction_gates_pass
+      quality_summary.all_ok &&
+      correction_gates_pass &&
+      latency_report.blocking_turns_over_12s === 0
         ? 'SOURCE_24_PREFLIGHT_PASS'
-        : failed.length === 0 &&
-            countsOk &&
-            turnRows.every((t) => t.protocol?.ok)
+        : failed.length === 0 && countsOk && turnRows.every((t) => t.protocol?.ok)
           ? 'SOURCE_24_PREFLIGHT_EXECUTED_WITH_GATE_FINDINGS'
           : 'SOURCE_24_PREFLIGHT_PARTIAL',
   };
@@ -650,6 +778,14 @@ export async function executeOwnerProof24SourcePreflight(opts = {}) {
   fs.writeFileSync(
     path.join(outRoot, 'reports', 'correction-gates.json'),
     JSON.stringify(correction_gates, null, 2) + '\n',
+  );
+  fs.writeFileSync(
+    path.join(outRoot, 'reports', 'slowest-turns.json'),
+    JSON.stringify(slowest_turns, null, 2) + '\n',
+  );
+  fs.writeFileSync(
+    path.join(outRoot, 'reports', 'executed-stage-check.json'),
+    JSON.stringify(executed_stage_check, null, 2) + '\n',
   );
   fs.writeFileSync(
     path.join(outRoot, 'transcript', 'turns.json'),

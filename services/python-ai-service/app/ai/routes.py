@@ -349,6 +349,8 @@ class IntelligenceBody(BaseModel):
     cross_user_collection_attempt: Optional[bool] = None
     cross_user_watchlist_attempt: Optional[bool] = None
     force_negotiation_market_floor: Optional[bool] = None
+    force_recommendation_floor: Optional[bool] = None
+    force_analytics_floor: Optional[bool] = None
     user_intent: Optional[str] = None
     owner_proof_prompt: Optional[str] = None
     session_id: Optional[str] = None

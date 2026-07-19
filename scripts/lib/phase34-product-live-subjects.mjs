@@ -218,9 +218,9 @@ export function subjectForCapability(subjects, capability) {
       };
     case 'valuation':
       return {
-        id: subjects.valuation_record_id || subjects.record_id,
+        id: subjects.valuation_listing_id || subjects.valuation_record_id || subjects.record_id,
         record_id: subjects.valuation_record_id || subjects.record_id,
-        listing_id: subjects.listing_id,
+        listing_id: subjects.valuation_listing_id || subjects.listing_id,
       };
     case 'recommendations':
       return {

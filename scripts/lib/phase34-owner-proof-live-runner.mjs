@@ -87,7 +87,7 @@ function productLiveInterSessionMs() {
   return Math.max(INTER_BATCH_INTERVAL_MS * 2, 2500);
 }
 
-function loadChromium() {
+export function loadChromium() {
   const requireFromWebapp = createRequire(path.join(REPO_ROOT, 'webapp/package.json'));
   try {
     return requireFromWebapp('playwright').chromium;
@@ -100,7 +100,7 @@ function loadChromium() {
   }
 }
 
-function caCertPath() {
+export function caCertPath() {
   const chain = path.join(REPO_ROOT, 'certs/dev-chain.pem');
   return fs.existsSync(chain) ? chain : path.join(REPO_ROOT, 'certs/dev-root.pem');
 }
@@ -138,7 +138,7 @@ function spawnSyncSafe(cmd, args) {
   return (r.stdout || '').trim() || null;
 }
 
-async function ensureMkcertProxy({ proxyPort, outRoot, caCert }) {
+export async function ensureMkcertProxy({ proxyPort, outRoot, caCert }) {
   const proxyRoot = path.join(outRoot, 'browser-tls-proxy');
   const certDir = path.join(proxyRoot, 'certs');
   fs.mkdirSync(certDir, { recursive: true });
@@ -195,7 +195,7 @@ async function ensureMkcertProxy({ proxyPort, outRoot, caCert }) {
   };
 }
 
-async function signInWithToken(page, browserBaseUrl, { token, email, name, initials }) {
+export async function signInWithToken(page, browserBaseUrl, { token, email, name, initials }) {
   await page.goto(`${browserBaseUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await page.evaluate(
     ({ t, em, nm, ini }) => {

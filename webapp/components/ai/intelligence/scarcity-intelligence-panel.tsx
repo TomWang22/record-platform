@@ -125,6 +125,8 @@ export function ScarcityIntelligencePanel({
           capability="scarcity"
           defaultIntent={DEFAULT_INTENT}
           runLabel="Analyze scarcity"
+          runTestId="intelligence-scarcity-run"
+          intentTestId="intelligence-scarcity-intent"
           disabled={state.status === 'loading'}
           onRun={run}
         />

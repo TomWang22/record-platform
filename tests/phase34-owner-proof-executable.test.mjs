@@ -27,8 +27,27 @@ test('all 24 scenarios validate against executable schema', () => {
   assert.equal(doc.scenarios.length, 24);
   validateOwnerProofExecutableRegistry(doc);
   for (const scenario of doc.scenarios) {
-    assert.equal(scenario.executability, 'FULLY_EXECUTABLE');
+    assert.equal(scenario.action_proof_status, 'STATICALLY_VALIDATED');
   }
+});
+
+test('scarcity and valuation use capability-scoped action selectors', () => {
+  for (const scenario of loadOwnerProofScenarios().scenarios) {
+    if (scenario.capability === 'scarcity') {
+      assert.match(scenario.initiating_action_selector, /intelligence-scarcity-run/);
+      assert.match(scenario.input_control_selector, /intelligence-scarcity-intent/);
+    }
+    if (scenario.capability === 'valuation') {
+      assert.match(scenario.initiating_action_selector, /intelligence-valuation-run/);
+      assert.match(scenario.input_control_selector, /intelligence-valuation-intent/);
+    }
+  }
+  assert.equal(CAPABILITY_SURFACE_REGISTRY.scarcity.runTestId, 'intelligence-scarcity-run');
+  assert.equal(CAPABILITY_SURFACE_REGISTRY.valuation.runTestId, 'intelligence-valuation-run');
+  assert.notEqual(
+    CAPABILITY_SURFACE_REGISTRY.scarcity.runTestId,
+    CAPABILITY_SURFACE_REGISTRY.valuation.runTestId,
+  );
 });
 
 test('every success scenario has deterministic evidence requirements', () => {
@@ -176,7 +195,7 @@ test('rehearsal launcher dry-run reports READY_NOT_LAUNCHED', async () => {
   assert.equal(payload.total_turns, 27);
   assert.equal(payload.protocol_rows, 81);
   assert.equal(payload.rehearsal_root_absent, true);
-  assert.equal(existsSync('/tmp/phase34-owner-proof-live-rehearsal-v1'), false);
+  assert.equal(existsSync('/tmp/phase34-owner-proof-live-rehearsal-v2'), false);
 });
 
 test('visible intent controls exist for all eight capabilities', () => {
@@ -194,7 +213,7 @@ test('visible intent controls exist for all eight capabilities', () => {
     const src = readFileSync(join(root, rel), 'utf8');
     assert.match(
       src,
-      /OwnerProofIntentControl|intelligence-owner-proof-intent|intelligence-negotiation-user-intent/,
+      /OwnerProofIntentControl|intelligence-.*-intent|intelligence-negotiation-user-intent|data-owner-proof-intent/,
       rel,
     );
   }
@@ -202,7 +221,9 @@ test('visible intent controls exist for all eight capabilities', () => {
     join(root, 'webapp/components/ai/intelligence/owner-proof-intent-control.tsx'),
     'utf8',
   );
-  assert.match(shared, /intelligence-owner-proof-intent/);
+  assert.match(shared, /resolvedIntentTestId|intelligence-\$\{slug\}-intent|data-owner-proof-intent/);
+  assert.match(shared, /__OWNER_PROOF_HANDLER_REACHED__/);
+  assert.match(shared, /OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER|resolvedRunTestId/);
 });
 
 test('customer UI keeps internal codes out of primary copy path', () => {

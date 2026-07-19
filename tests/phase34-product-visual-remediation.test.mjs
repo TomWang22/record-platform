@@ -209,7 +209,9 @@ test('recommendations requires explicit run control and buyer-only record detail
 test('request initiation guard fails closed when POST never fires', async () => {
   const {
     assertIntelligenceRequestInitiated,
+    assertOwnerProofHandlerReached,
     EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST,
+    OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER,
   } = await import('../scripts/lib/phase34-product-request-initiation.mjs');
   assert.throws(
     () =>
@@ -227,6 +229,20 @@ test('request initiation guard fails closed when POST never fires', async () => 
         response_observed: false,
       }),
     (err) => err.code === EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST,
+  );
+  assert.throws(
+    () =>
+      assertOwnerProofHandlerReached({
+        route: '/listings/x',
+        component: 'intelligence-scarcity-panel',
+        capability: 'scarcity',
+        action: 'click[data-testid=intelligence-scarcity-run]',
+        expected_endpoint: '/api/ai/intelligence/scarcity',
+        handler_reached: false,
+        button_enabled: true,
+        hydration_ready: true,
+      }),
+    (err) => err.code === OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER,
   );
 });
 

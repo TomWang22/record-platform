@@ -57,6 +57,7 @@ tmp/
 !scripts/ai-platform/phase34-owner-proof-scenarios.json
 !scripts/ai-platform/phase34-owner-proof-scenario.schema.json
 !scripts/ai-platform/phase34-owner-proof-seed-manifest.json
+!scripts/ai-platform/phase34-owner-proof-client-action-contracts.json
 !scripts/ai-platform/phase34-prompt-registry/
 !scripts/ai-platform/phase34-prompt-registry/**/*.json
 !scripts/ai-platform/retrieval-splits/

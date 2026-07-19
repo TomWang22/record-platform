@@ -10,7 +10,8 @@
     "multi_turn_length": 4,
     "total_turns": 27,
     "protocol_rows": 81,
-    "root": "/tmp/phase34-owner-proof-live-rehearsal-v1"
+    "root": "/tmp/phase34-owner-proof-live-rehearsal-v2",
+    "action_proof_gate": "LIVE_RESULT_PROVEN_REQUIRED"
   },
   "scenarios": [
     {
@@ -30,10 +31,10 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Is this exact CL 1355 pressing scarce, or only the release generally?",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-scarcity-intent\"]",
       "input_value": "Is this exact CL 1355 pressing scarce, or only the release generally?",
       "pre_action_selector": "[data-testid=\"intelligence-scarcity-panel\"]",
-      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-scarcity-run\"]",
       "initiating_action": "click_analyze",
       "expected_endpoint": "/api/ai/intelligence/scarcity",
       "expected_method": "POST",
@@ -102,7 +103,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this scarcity scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "scarcity-correction-pressing-disambiguation",
@@ -121,10 +122,10 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "I meant the Japanese pressing, not the US mono.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-scarcity-intent\"]",
       "input_value": "I meant the Japanese pressing, not the US mono.",
       "pre_action_selector": "[data-testid=\"intelligence-scarcity-panel\"]",
-      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-scarcity-run\"]",
       "initiating_action": "click_analyze",
       "expected_endpoint": "/api/ai/intelligence/scarcity",
       "expected_method": "POST",
@@ -192,7 +193,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this scarcity scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "scarcity-weak-data-abstention",
@@ -211,10 +212,10 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "How scarce is this obscure private-press copy?",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-scarcity-intent\"]",
       "input_value": "How scarce is this obscure private-press copy?",
       "pre_action_selector": "[data-testid=\"intelligence-scarcity-panel\"]",
-      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-scarcity-run\"]",
       "initiating_action": "click_analyze",
       "expected_endpoint": "/api/ai/intelligence/scarcity",
       "expected_method": "POST",
@@ -281,7 +282,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this scarcity scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "valuation-success-ranges",
@@ -300,10 +301,10 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "What is a quick-sale price versus a patient-sale price for this VG+ copy?",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-valuation-intent\"]",
       "input_value": "What is a quick-sale price versus a patient-sale price for this VG+ copy?",
       "pre_action_selector": "[data-testid=\"intelligence-valuation-panel\"]",
-      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-valuation-run\"]",
       "initiating_action": "click_analyze",
       "expected_endpoint": "/api/ai/intelligence/valuation",
       "expected_method": "POST",
@@ -371,7 +372,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this valuation scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "valuation-correction-condition",
@@ -390,10 +391,10 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Sleeve has a seam split; media is closer to VG.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-valuation-intent\"]",
       "input_value": "Sleeve has a seam split; media is closer to VG.",
       "pre_action_selector": "[data-testid=\"intelligence-valuation-panel\"]",
-      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-valuation-run\"]",
       "initiating_action": "click_analyze",
       "expected_endpoint": "/api/ai/intelligence/valuation",
       "expected_method": "POST",
@@ -460,7 +461,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this valuation scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "valuation-weak-comparables",
@@ -479,10 +480,10 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Value this with almost no sold comps.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-valuation-intent\"]",
       "input_value": "Value this with almost no sold comps.",
       "pre_action_selector": "[data-testid=\"intelligence-valuation-panel\"]",
-      "initiating_action_selector": "[data-testid=\"intelligence-owner-proof-run\"]",
+      "initiating_action_selector": "[data-testid=\"intelligence-valuation-run\"]",
       "initiating_action": "click_analyze",
       "expected_endpoint": "/api/ai/intelligence/valuation",
       "expected_method": "POST",
@@ -549,7 +550,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this valuation scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "auction-success-watchlist-temperature",
@@ -566,7 +567,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": "fixture:seed-watchlist-auction-5plus:watchlist",
       "user_intent": "Which watched lots look underpriced, and which are overheating?",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-auction-intelligence-intent\"]",
       "input_value": "Which watched lots look underpriced, and which are overheating?",
       "pre_action_selector": "[data-testid=\"intelligence-watchlist-temperature-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-watchlist-temperature-run\"]",
@@ -637,7 +638,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this auction_intelligence scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "auction-correction-ending-window",
@@ -654,7 +655,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": "fixture:seed-watchlist-auction-5plus:watchlist",
       "user_intent": "Focus on lots ending in the next 24 hours.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-auction-intelligence-intent\"]",
       "input_value": "Focus on lots ending in the next 24 hours.",
       "pre_action_selector": "[data-testid=\"intelligence-watchlist-temperature-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-watchlist-temperature-run\"]",
@@ -724,7 +725,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this auction_intelligence scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "auction-weak-proxy-data",
@@ -741,7 +742,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": "fixture:seed-watchlist-auction-5plus:watchlist",
       "user_intent": "Temperature for a nearly empty watchlist.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-auction-intelligence-intent\"]",
       "input_value": "Temperature for a nearly empty watchlist.",
       "pre_action_selector": "[data-testid=\"intelligence-watchlist-temperature-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-watchlist-temperature-run\"]",
@@ -810,7 +811,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this auction_intelligence scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "embeddings-success-current-lineage",
@@ -827,7 +828,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Show lineage for this record's current embedding.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-embeddings-intent\"]",
       "input_value": "Show lineage for this record's current embedding.",
       "pre_action_selector": "[data-testid=\"intelligence-embedding-lineage-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-embedding-lineage-run\"]",
@@ -899,7 +900,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this embeddings scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "embeddings-stale-reembed",
@@ -916,7 +917,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Mark stale and show re-embed required state.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-embeddings-intent\"]",
       "input_value": "Mark stale and show re-embed required state.",
       "pre_action_selector": "[data-testid=\"intelligence-embedding-lineage-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-embedding-lineage-run\"]",
@@ -986,7 +987,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this embeddings scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "embeddings-deleted-source",
@@ -1003,7 +1004,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Lineage after source deletion.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-embeddings-intent\"]",
       "input_value": "Lineage after source deletion.",
       "pre_action_selector": "[data-testid=\"intelligence-embedding-lineage-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-embedding-lineage-run\"]",
@@ -1073,7 +1074,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this embeddings scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "search-success-semantic",
@@ -1090,7 +1091,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Find first US mono pressings similar to this record under $80.",
-      "input_control_selector": "input[placeholder*=\"Search artist\" i], [data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "input[placeholder*=\"Search artist\" i], [data-testid=\"intelligence-semantic-search-intent\"], [data-testid=\"intelligence-owner-proof-intent\"]",
       "input_value": "Find first US mono pressings similar to this record under $80.",
       "pre_action_selector": "[data-testid=\"intelligence-search-chrome\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-search-run\"]",
@@ -1162,7 +1163,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this semantic_search scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "search-hybrid-refinement",
@@ -1179,7 +1180,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Switch to hybrid and exclude picture discs.",
-      "input_control_selector": "input[placeholder*=\"Search artist\" i], [data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "input[placeholder*=\"Search artist\" i], [data-testid=\"intelligence-semantic-search-intent\"], [data-testid=\"intelligence-owner-proof-intent\"]",
       "input_value": "Switch to hybrid and exclude picture discs.",
       "pre_action_selector": "[data-testid=\"intelligence-search-chrome\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-search-run\"]",
@@ -1250,7 +1251,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this semantic_search scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "search-visible-fallback-or-empty",
@@ -1267,7 +1268,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Query that should abstain or show visible empty — never silent fallback.",
-      "input_control_selector": "input[placeholder*=\"Search artist\" i], [data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "input[placeholder*=\"Search artist\" i], [data-testid=\"intelligence-semantic-search-intent\"], [data-testid=\"intelligence-owner-proof-intent\"]",
       "input_value": "Query that should abstain or show visible empty — never silent fallback.",
       "pre_action_selector": "[data-testid=\"intelligence-search-chrome\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-search-run\"]",
@@ -1337,7 +1338,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this semantic_search scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "negotiation-success-strategy",
@@ -1428,7 +1429,7 @@
         "automatic_send_allowed=false"
       ],
       "human_review_question": "Does this negotiation_assistance scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "negotiation-four-turn-live",
@@ -1528,7 +1529,7 @@
         "I would accept $37, but I do not want to sound desperate.",
         "Draft the reply."
       ],
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "negotiation-privacy-or-safety-refusal",
@@ -1618,7 +1619,7 @@
         "automatic_send_allowed=false"
       ],
       "human_review_question": "Does this negotiation_assistance scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "recommendations-success-cards",
@@ -1635,7 +1636,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Keep it under $60, exclude picture discs, and diversify artists.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-recommendations-intent\"]",
       "input_value": "Keep it under $60, exclude picture discs, and diversify artists.",
       "pre_action_selector": "[data-testid=\"intelligence-recommendations-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-recommendations-run\"]",
@@ -1706,7 +1707,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this recommendations scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "recommendations-negative-preference",
@@ -1723,7 +1724,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Forget picture discs and keep Blue Note preference.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-recommendations-intent\"]",
       "input_value": "Forget picture discs and keep Blue Note preference.",
       "pre_action_selector": "[data-testid=\"intelligence-recommendations-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-recommendations-run\"]",
@@ -1793,7 +1794,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this recommendations scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "recommendations-cold-start-honesty",
@@ -1810,7 +1811,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Cold-start with almost no preferences.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-recommendations-intent\"]",
       "input_value": "Cold-start with almost no preferences.",
       "pre_action_selector": "[data-testid=\"intelligence-recommendations-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-recommendations-run\"]",
@@ -1879,7 +1880,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this recommendations scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "analytics-success-report",
@@ -1896,7 +1897,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "How did completed Blue Note LP sales change over the last 90 days?",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-market-analytics-intent\"]",
       "input_value": "How did completed Blue Note LP sales change over the last 90 days?",
       "pre_action_selector": "[data-testid=\"intelligence-market-analytics-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-market-analytics-run\"]",
@@ -1969,7 +1970,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this market_analytics scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "analytics-constraint-population",
@@ -1986,7 +1987,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Limit to US sellers and VG+ or better.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-market-analytics-intent\"]",
       "input_value": "Limit to US sellers and VG+ or better.",
       "pre_action_selector": "[data-testid=\"intelligence-market-analytics-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-market-analytics-run\"]",
@@ -2056,7 +2057,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this market_analytics scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     },
     {
       "scenario_id": "analytics-sample-below-policy-customer",
@@ -2073,7 +2074,7 @@
       "subject_thread_id": null,
       "subject_watchlist_id": null,
       "user_intent": "Report for a tiny population — customer language only.",
-      "input_control_selector": "[data-testid=\"intelligence-owner-proof-intent\"]",
+      "input_control_selector": "[data-testid=\"intelligence-market-analytics-intent\"]",
       "input_value": "Report for a tiny population — customer language only.",
       "pre_action_selector": "[data-testid=\"intelligence-market-analytics-panel\"]",
       "initiating_action_selector": "[data-testid=\"intelligence-market-analytics-run\"]",
@@ -2143,7 +2144,7 @@
       ],
       "safety_checks": [],
       "human_review_question": "Does this market_analytics scenario clearly show the user intent, grounded evidence, the AI conclusion, and a safe next action?",
-      "executability": "FULLY_EXECUTABLE"
+      "action_proof_status": "STATICALLY_VALIDATED"
     }
   ]
 }

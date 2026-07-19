@@ -155,6 +155,8 @@ export function ValuationIntelligencePanel({
           capability="valuation"
           defaultIntent={DEFAULT_INTENT}
           runLabel="Analyze valuation"
+          runTestId="intelligence-valuation-run"
+          intentTestId="intelligence-valuation-intent"
           disabled={state.status === 'loading'}
           onRun={run}
         />

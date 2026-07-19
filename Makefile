@@ -512,8 +512,17 @@ ai-platform-verify-phase34-owner-proof-scenarios: ## Validate executable 24-scen
 	test -f scripts/ai-platform/phase34-owner-proof-scenario.schema.json
 	test -f scripts/ai-platform/phase34-owner-proof-scenarios.json
 	test -f scripts/ai-platform/phase34-owner-proof-seed-manifest.json
+	test -f scripts/ai-platform/phase34-owner-proof-client-action-contracts.json
 	test -f scripts/phase34-launch-owner-proof-rehearsal.mjs
+	test -f scripts/phase34-verify-owner-proof-live-actions.mjs
 	node scripts/phase34-launch-owner-proof-rehearsal.mjs | grep -q READY_NOT_LAUNCHED
+	node scripts/phase34-verify-owner-proof-live-actions.mjs | grep -q READY_NOT_LAUNCHED
+	node -e "import('./scripts/lib/phase34-owner-proof-client-action-contracts.mjs').then(m=>{m.writeClientActionContracts();m.assertContractsMatchScenarios();})"
+
+ai-platform-verify-phase34-owner-proof-live-actions: ## Dry-run the 24-action live preflight launcher (does not execute browser)
+	node scripts/phase34-verify-owner-proof-live-actions.mjs | grep -q READY_NOT_LAUNCHED
+	test -f scripts/lib/phase34-owner-proof-live-action-preflight.mjs
+	test -f scripts/lib/phase34-owner-proof-client-action-contracts.mjs
 
 ai-platform-verify-phase34-gauntlet-finalization: ## Phase 34 bounded finalization + protocol-vs-queue acceptance (offline; 60k soak)
 	NODE_OPTIONS=--max-old-space-size=512 node scripts/ai-platform/verify-phase34-gauntlet-finalization.mjs

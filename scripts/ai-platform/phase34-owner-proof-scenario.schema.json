@@ -70,7 +70,7 @@
         "privacy_checks",
         "safety_checks",
         "human_review_question",
-        "executability"
+        "action_proof_status"
       ],
       "properties": {
         "scenario_id": { "type": "string", "minLength": 3 },
@@ -131,7 +131,15 @@
         "safety_checks": { "type": "array", "items": { "type": "string" } },
         "human_review_question": { "type": "string" },
         "turns": { "type": "array", "items": { "type": "string" } },
-        "executability": { "const": "FULLY_EXECUTABLE" }
+        "action_proof_status": {
+          "type": "string",
+          "enum": [
+            "DECLARED",
+            "STATICALLY_VALIDATED",
+            "LIVE_ACTION_PROVEN",
+            "LIVE_RESULT_PROVEN"
+          ]
+        }
       }
     }
   }

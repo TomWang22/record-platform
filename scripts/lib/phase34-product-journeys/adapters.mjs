@@ -20,7 +20,9 @@ import { derivePipelineObservationFromResponse } from '../phase34-product-pipeli
 import { assertCapabilityCaptureIdentity } from '../phase34-product-capability-identity.mjs';
 import {
   assertIntelligenceRequestInitiated,
+  assertOwnerProofHandlerReached,
   EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST,
+  OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER,
 } from '../phase34-product-request-initiation.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -44,7 +46,8 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     clientFn: 'fetchScarcityIntelligence',
     /** Owner-proof: visible intent + Analyze click initiates the POST. */
     trigger: 'click',
-    runTestId: 'intelligence-owner-proof-run',
+    runTestId: 'intelligence-scarcity-run',
+    intentTestId: 'intelligence-scarcity-intent',
   },
   valuation: {
     routes: ['/listings/[id]', '/records/[id]', '/sell', '/listings/[id]/edit', '/offers/inbox'],
@@ -77,7 +80,8 @@ export const CAPABILITY_SURFACE_REGISTRY = Object.freeze({
     clientFn: 'fetchValuationIntelligence',
     /** Owner-proof: visible intent + Analyze click initiates the POST. */
     trigger: 'click',
-    runTestId: 'intelligence-owner-proof-run',
+    runTestId: 'intelligence-valuation-run',
+    intentTestId: 'intelligence-valuation-intent',
   },
   auction_intelligence: {
     routes: ['/listings/[id]', '/watchlist', '/auctions'],
@@ -297,6 +301,7 @@ export class BaseProductJourneyAdapter {
       panelTestId,
       apiPath: selectedSurface?.apiPath || this.registry.apiPath,
       runTestId: selectedSurface?.runTestId || this.registry.runTestId || null,
+      intentTestId: selectedSurface?.intentTestId || this.registry.intentTestId || null,
       subject,
       requestSeed,
       scenario_id: context.scenario_id,
@@ -513,7 +518,12 @@ export class BaseProductJourneyAdapter {
         prepared.requestSeed?.owner_proof_prompt ||
         prepared.requestSeed?.query ||
         'Find first US mono pressings similar to this record under $80.';
-      const ownerIntent = page.getByTestId('intelligence-owner-proof-intent').first();
+      const searchPanel = page.getByTestId(prepared.panelTestId).first();
+      const ownerIntent = searchPanel
+        .locator(
+          '[data-testid="intelligence-semantic-search-intent"], [data-testid="intelligence-owner-proof-intent"], [data-owner-proof-intent="1"]',
+        )
+        .first();
       if ((await ownerIntent.count()) > 0 && (await ownerIntent.isVisible().catch(() => false))) {
         await ownerIntent.fill(String(queryText), { timeout: 15_000 });
       }
@@ -553,25 +563,37 @@ export class BaseProductJourneyAdapter {
         prepared.requestSeed?.user_intent ||
         prepared.requestSeed?.owner_proof_prompt ||
         null;
+      // Scope to the mounted capability panel — listing pages co-mount valuation + scarcity.
+      const panel = page.getByTestId(prepared.panelTestId).first();
+      await panel.waitFor({ state: 'visible', timeout: 45_000 });
       if (intentText) {
-        const intent = page.getByTestId('intelligence-owner-proof-intent').first();
+        const intentTestId =
+          prepared.intentTestId ||
+          this.registry.intentTestId ||
+          'intelligence-owner-proof-intent';
+        const intent = panel
+          .locator(
+            `[data-testid="${intentTestId}"], [data-testid="intelligence-owner-proof-intent"], [data-owner-proof-intent="1"]`,
+          )
+          .first();
         if ((await intent.count()) > 0 && (await intent.isVisible().catch(() => false))) {
           await intent.fill(String(intentText), { timeout: 15_000 });
         }
       }
       const testId = prepared.runTestId || this.registry.runTestId;
-      const btn = page.getByTestId(testId).first();
+      const btn = panel.getByTestId(testId).first();
       await btn.waitFor({ state: 'visible', timeout: 45_000 });
       await btn.scrollIntoViewIfNeeded?.().catch(() => null);
       // Click-triggered panels (recommendations, analytics, auction) must be enabled
       // before we claim the initiating action exists.
       const enabled = await page
         .waitForFunction(
-          (id) => {
-            const el = document.querySelector(`[data-testid="${id}"]`);
+          ({ panelId, id }) => {
+            const root = document.querySelector(`[data-testid="${panelId}"]`);
+            const el = root?.querySelector(`[data-testid="${id}"]`) || null;
             return Boolean(el && !el.disabled && el.getClientRects().length > 0);
           },
-          testId,
+          { panelId: prepared.panelTestId, id: testId },
           { timeout: 45_000 },
         )
         .then(() => true)
@@ -579,7 +601,7 @@ export class BaseProductJourneyAdapter {
       if (!enabled) {
         const err = new Error(
           `${EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST}: ` +
-            `run control ${testId} never became enabled on ${prepared.route}`,
+            `run control ${testId} never became enabled on ${prepared.route} panel=${prepared.panelTestId}`,
         );
         err.code = EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST;
         err.meta = {
@@ -592,7 +614,40 @@ export class BaseProductJourneyAdapter {
         };
         throw err;
       }
+      await page.evaluate(() => {
+        const w = window;
+        w.__OWNER_PROOF_HANDLER_REACHED__ = null;
+      });
+      const clickTimestamp = Date.now();
       await btn.click({ timeout: 30_000 });
+      await new Promise((r) => setTimeout(r, 50));
+      const handlerProbe = await page
+        .evaluate(() => window.__OWNER_PROOF_HANDLER_REACHED__ || null)
+        .catch(() => null);
+      prepared._owner_proof_click_diag = {
+        click_timestamp: clickTimestamp,
+        button_enabled: true,
+        hydration_ready: true,
+        handler_reached: Boolean(handlerProbe?.at),
+        handler_capability: handlerProbe?.capability || null,
+        run_test_id: testId,
+        panel_test_id: prepared.panelTestId,
+      };
+      if (!handlerProbe?.at) {
+        assertOwnerProofHandlerReached({
+          route: prepared.route,
+          component: prepared.panelTestId,
+          capability: this.capability,
+          action: `click[data-testid=${testId}]`,
+          expected_endpoint: prepared.apiPath,
+          handler_reached: false,
+          handler_capability: null,
+          click_timestamp: clickTimestamp,
+          hydration_ready: true,
+          button_enabled: true,
+          request_candidates: [],
+        });
+      }
       return;
     }
     if (this.registry.runButtonName) {
@@ -753,7 +808,12 @@ export class BaseProductJourneyAdapter {
       try {
         await this.triggerLiveAction(page, prepared);
       } catch (err) {
-        if (err?.code === EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST) throw err;
+        if (
+          err?.code === EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST ||
+          err?.code === OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER
+        ) {
+          throw err;
+        }
         const wrap = new Error(
           `${EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST}: ${err?.message || err}`,
         );
@@ -789,9 +849,21 @@ export class BaseProductJourneyAdapter {
       try {
         response = await responsePromise;
       } catch (err) {
+        const requestCandidates = await page
+          .evaluate(() => {
+            const perf = performance.getEntriesByType?.('resource') || [];
+            return perf
+              .filter((e) => String(e.name || '').includes('/api/ai/'))
+              .slice(-20)
+              .map((e) => e.name);
+          })
+          .catch(() => []);
+        const diag = prepared._owner_proof_click_diag || {};
         const wrap = new Error(
           `${EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST}: ` +
-            `no POST ${apiPath} after ${initiatingAction} on ${prepared.route} (${err?.message || err})`,
+            `no POST ${apiPath} after ${initiatingAction} on ${prepared.route} ` +
+            `handler_reached=${diag.handler_reached} handler_capability=${diag.handler_capability} ` +
+            `candidates=${JSON.stringify(requestCandidates)} (${err?.message || err})`,
         );
         wrap.code = EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST;
         wrap.meta = {
@@ -801,6 +873,8 @@ export class BaseProductJourneyAdapter {
           viewport: await page.viewportSize(),
           action: initiatingAction,
           expected_endpoint: apiPath,
+          ...diag,
+          request_candidates: requestCandidates,
         };
         wrap.cause = err;
         throw wrap;

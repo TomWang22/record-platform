@@ -1,0 +1,630 @@
+{
+  "schema_version": "phase34-owner-proof-client-action-contracts-v1",
+  "count": 24,
+  "official_rehearsal_requires": "LIVE_RESULT_PROVEN",
+  "statuses": [
+    "DECLARED",
+    "STATICALLY_VALIDATED",
+    "LIVE_ACTION_PROVEN",
+    "LIVE_RESULT_PROVEN"
+  ],
+  "contracts": [
+    {
+      "scenario_id": "scarcity-success-exact-pressing",
+      "route": "/records/[id]",
+      "capability": "scarcity",
+      "component_test_id": "intelligence-scarcity-panel",
+      "intent_control_test_id": "intelligence-scarcity-intent",
+      "action_test_id": "intelligence-scarcity-run",
+      "expected_endpoint": "/api/ai/intelligence/scarcity",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-scarcity-panel",
+      "required_terminal_fields": [
+        "typed_or_selected_intent",
+        "exact_pressing",
+        "evidence_links",
+        "completed_result"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 5,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "A_success"
+    },
+    {
+      "scenario_id": "scarcity-correction-pressing-disambiguation",
+      "route": "/records/[id]",
+      "capability": "scarcity",
+      "component_test_id": "intelligence-scarcity-panel",
+      "intent_control_test_id": "intelligence-scarcity-intent",
+      "action_test_id": "intelligence-scarcity-run",
+      "expected_endpoint": "/api/ai/intelligence/scarcity",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-scarcity-panel",
+      "required_terminal_fields": [
+        "correction",
+        "updated_result",
+        "pressing_identity"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 1,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "B_correction"
+    },
+    {
+      "scenario_id": "scarcity-weak-data-abstention",
+      "route": "/records/[id]",
+      "capability": "scarcity",
+      "component_test_id": "intelligence-scarcity-panel",
+      "intent_control_test_id": "intelligence-scarcity-intent",
+      "action_test_id": "intelligence-scarcity-run",
+      "expected_endpoint": "/api/ai/intelligence/scarcity",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-scarcity-panel",
+      "required_terminal_fields": [
+        "customer_facing_abstention",
+        "no_internal_codes"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": true,
+        "expected_terminal_state": "abstained_or_limited"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "C_honest_limit"
+    },
+    {
+      "scenario_id": "valuation-success-ranges",
+      "route": "/listings/[id]/edit",
+      "capability": "valuation",
+      "component_test_id": "intelligence-valuation-panel",
+      "intent_control_test_id": "intelligence-valuation-intent",
+      "action_test_id": "intelligence-valuation-run",
+      "expected_endpoint": "/api/ai/intelligence/valuation",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-valuation-panel",
+      "required_terminal_fields": [
+        "comparables",
+        "quick_fair_patient_ranges",
+        "completed_result"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 3,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "A_success"
+    },
+    {
+      "scenario_id": "valuation-correction-condition",
+      "route": "/listings/[id]/edit",
+      "capability": "valuation",
+      "component_test_id": "intelligence-valuation-panel",
+      "intent_control_test_id": "intelligence-valuation-intent",
+      "action_test_id": "intelligence-valuation-run",
+      "expected_endpoint": "/api/ai/intelligence/valuation",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-valuation-panel",
+      "required_terminal_fields": [
+        "condition_adjustment",
+        "updated_ranges"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 1,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "B_correction"
+    },
+    {
+      "scenario_id": "valuation-weak-comparables",
+      "route": "/listings/[id]/edit",
+      "capability": "valuation",
+      "component_test_id": "intelligence-valuation-panel",
+      "intent_control_test_id": "intelligence-valuation-intent",
+      "action_test_id": "intelligence-valuation-run",
+      "expected_endpoint": "/api/ai/intelligence/valuation",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-valuation-panel",
+      "required_terminal_fields": [
+        "customer_facing_limit",
+        "no_internal_codes"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": true,
+        "expected_terminal_state": "abstained_or_limited"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "C_honest_limit"
+    },
+    {
+      "scenario_id": "auction-success-watchlist-temperature",
+      "route": "/watchlist",
+      "capability": "auction_intelligence",
+      "component_test_id": "intelligence-watchlist-temperature-panel",
+      "intent_control_test_id": "intelligence-auction-intelligence-intent",
+      "action_test_id": "intelligence-watchlist-temperature-run",
+      "expected_endpoint": "/api/ai/intelligence/auction/watchlist-temperature",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-watchlist-temperature-panel",
+      "required_terminal_fields": [
+        "populated_watchlist",
+        "temperature_report",
+        "limitations"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 3,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 5,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "A_success"
+    },
+    {
+      "scenario_id": "auction-correction-ending-window",
+      "route": "/watchlist",
+      "capability": "auction_intelligence",
+      "component_test_id": "intelligence-watchlist-temperature-panel",
+      "intent_control_test_id": "intelligence-auction-intelligence-intent",
+      "action_test_id": "intelligence-watchlist-temperature-run",
+      "expected_endpoint": "/api/ai/intelligence/auction/watchlist-temperature",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-watchlist-temperature-panel",
+      "required_terminal_fields": [
+        "constraint",
+        "updated_report"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 5,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "B_correction"
+    },
+    {
+      "scenario_id": "auction-weak-proxy-data",
+      "route": "/watchlist",
+      "capability": "auction_intelligence",
+      "component_test_id": "intelligence-watchlist-temperature-panel",
+      "intent_control_test_id": "intelligence-auction-intelligence-intent",
+      "action_test_id": "intelligence-watchlist-temperature-run",
+      "expected_endpoint": "/api/ai/intelligence/auction/watchlist-temperature",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-watchlist-temperature-panel",
+      "required_terminal_fields": [
+        "customer_facing_limit"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": true,
+        "expected_terminal_state": "abstained_or_limited"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "C_honest_limit"
+    },
+    {
+      "scenario_id": "embeddings-success-current-lineage",
+      "route": "/insights",
+      "capability": "embeddings",
+      "component_test_id": "intelligence-embedding-lineage-panel",
+      "intent_control_test_id": "intelligence-embeddings-intent",
+      "action_test_id": "intelligence-embedding-lineage-run",
+      "expected_endpoint": "/api/ai/intelligence/embeddings/metadata",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-embedding-lineage-panel",
+      "required_terminal_fields": [
+        "entity",
+        "content_hash",
+        "freshness",
+        "version"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 3,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "A_success"
+    },
+    {
+      "scenario_id": "embeddings-stale-reembed",
+      "route": "/insights",
+      "capability": "embeddings",
+      "component_test_id": "intelligence-embedding-lineage-panel",
+      "intent_control_test_id": "intelligence-embeddings-intent",
+      "action_test_id": "intelligence-embedding-lineage-run",
+      "expected_endpoint": "/api/ai/intelligence/embeddings/metadata",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-embedding-lineage-panel",
+      "required_terminal_fields": [
+        "stale_state",
+        "reembed_status"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "B_correction"
+    },
+    {
+      "scenario_id": "embeddings-deleted-source",
+      "route": "/insights",
+      "capability": "embeddings",
+      "component_test_id": "intelligence-embedding-lineage-panel",
+      "intent_control_test_id": "intelligence-embeddings-intent",
+      "action_test_id": "intelligence-embedding-lineage-run",
+      "expected_endpoint": "/api/ai/intelligence/embeddings/metadata",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-embedding-lineage-panel",
+      "required_terminal_fields": [
+        "deletion_state",
+        "customer_facing_limit"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": true,
+        "expected_terminal_state": "abstained_or_limited"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "C_honest_limit"
+    },
+    {
+      "scenario_id": "search-success-semantic",
+      "route": "/listings",
+      "capability": "semantic_search",
+      "component_test_id": "intelligence-search-chrome",
+      "intent_control_test_id": "intelligence-semantic-search-intent",
+      "action_test_id": "intelligence-search-run",
+      "expected_endpoint": "/api/ai/intelligence/semantic-search",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-search-chrome",
+      "required_terminal_fields": [
+        "query",
+        "mode",
+        "results",
+        "why_matched"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 3,
+        "minimum_results": 5,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "A_success"
+    },
+    {
+      "scenario_id": "search-hybrid-refinement",
+      "route": "/listings",
+      "capability": "semantic_search",
+      "component_test_id": "intelligence-search-chrome",
+      "intent_control_test_id": "intelligence-semantic-search-intent",
+      "action_test_id": "intelligence-search-run",
+      "expected_endpoint": "/api/ai/intelligence/semantic-search",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-search-chrome",
+      "required_terminal_fields": [
+        "mode_change",
+        "constraint",
+        "updated_results"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 1,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "B_correction"
+    },
+    {
+      "scenario_id": "search-visible-fallback-or-empty",
+      "route": "/listings",
+      "capability": "semantic_search",
+      "component_test_id": "intelligence-search-chrome",
+      "intent_control_test_id": "intelligence-semantic-search-intent",
+      "action_test_id": "intelligence-search-run",
+      "expected_endpoint": "/api/ai/intelligence/semantic-search",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-search-chrome",
+      "required_terminal_fields": [
+        "visible_empty_or_fallback",
+        "no_silent_fallback"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": true,
+        "expected_terminal_state": "abstained_or_limited"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "C_honest_limit"
+    },
+    {
+      "scenario_id": "negotiation-success-strategy",
+      "route": "/messages",
+      "capability": "negotiation_assistance",
+      "component_test_id": "intelligence-negotiation-panel",
+      "intent_control_test_id": "intelligence-negotiation-user-intent",
+      "action_test_id": "intelligence-negotiation-run",
+      "expected_endpoint": "/api/ai/intelligence/negotiation",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-negotiation-panel",
+      "required_terminal_fields": [
+        "thread_summary",
+        "strategy",
+        "valuation_evidence",
+        "insert_not_send"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 3,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "A_success"
+    },
+    {
+      "scenario_id": "negotiation-four-turn-live",
+      "route": "/messages",
+      "capability": "negotiation_assistance",
+      "component_test_id": "intelligence-negotiation-panel",
+      "intent_control_test_id": "intelligence-negotiation-user-intent",
+      "action_test_id": "intelligence-negotiation-run",
+      "expected_endpoint": "/api/ai/intelligence/negotiation",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-negotiation-panel",
+      "required_terminal_fields": [
+        "four_turns",
+        "distinct_screenshots",
+        "editable_draft",
+        "automatic_send_disabled"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "multi_turn_completed"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "B_correction"
+    },
+    {
+      "scenario_id": "negotiation-privacy-or-safety-refusal",
+      "route": "/messages",
+      "capability": "negotiation_assistance",
+      "component_test_id": "intelligence-negotiation-panel",
+      "intent_control_test_id": "intelligence-negotiation-user-intent",
+      "action_test_id": "intelligence-negotiation-run",
+      "expected_endpoint": "/api/ai/intelligence/negotiation",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-negotiation-panel",
+      "required_terminal_fields": [
+        "refusal",
+        "no_internal_codes",
+        "automatic_send_disabled"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": true,
+        "expected_terminal_state": "abstained_or_limited"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "C_honest_limit"
+    },
+    {
+      "scenario_id": "recommendations-success-cards",
+      "route": "/dashboard",
+      "capability": "recommendations",
+      "component_test_id": "intelligence-recommendations-panel",
+      "intent_control_test_id": "intelligence-recommendations-intent",
+      "action_test_id": "intelligence-recommendations-run",
+      "expected_endpoint": "/api/ai/intelligence/recommendations",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-recommendations-panel",
+      "required_terminal_fields": [
+        "constraints",
+        "recommendation_cards",
+        "reason_codes_customer"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 3,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 5,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "A_success"
+    },
+    {
+      "scenario_id": "recommendations-negative-preference",
+      "route": "/dashboard",
+      "capability": "recommendations",
+      "component_test_id": "intelligence-recommendations-panel",
+      "intent_control_test_id": "intelligence-recommendations-intent",
+      "action_test_id": "intelligence-recommendations-run",
+      "expected_endpoint": "/api/ai/intelligence/recommendations",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-recommendations-panel",
+      "required_terminal_fields": [
+        "preference_update",
+        "updated_cards"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 1,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "B_correction"
+    },
+    {
+      "scenario_id": "recommendations-cold-start-honesty",
+      "route": "/dashboard",
+      "capability": "recommendations",
+      "component_test_id": "intelligence-recommendations-panel",
+      "intent_control_test_id": "intelligence-recommendations-intent",
+      "action_test_id": "intelligence-recommendations-run",
+      "expected_endpoint": "/api/ai/intelligence/recommendations",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-recommendations-panel",
+      "required_terminal_fields": [
+        "customer_facing_limit_or_generic_safe_picks"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": true,
+        "expected_terminal_state": "abstained_or_limited"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "C_honest_limit"
+    },
+    {
+      "scenario_id": "analytics-success-report",
+      "route": "/insights",
+      "capability": "market_analytics",
+      "component_test_id": "intelligence-market-analytics-panel",
+      "intent_control_test_id": "intelligence-market-analytics-intent",
+      "action_test_id": "intelligence-market-analytics-run",
+      "expected_endpoint": "/api/ai/intelligence/market-analytics",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-market-analytics-panel",
+      "required_terminal_fields": [
+        "report_values",
+        "time_range",
+        "sample_size",
+        "methodology",
+        "freshness"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 3,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "A_success"
+    },
+    {
+      "scenario_id": "analytics-constraint-population",
+      "route": "/insights",
+      "capability": "market_analytics",
+      "component_test_id": "intelligence-market-analytics-panel",
+      "intent_control_test_id": "intelligence-market-analytics-intent",
+      "action_test_id": "intelligence-market-analytics-run",
+      "expected_endpoint": "/api/ai/intelligence/market-analytics",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-market-analytics-panel",
+      "required_terminal_fields": [
+        "constraint",
+        "updated_report"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": false,
+        "expected_terminal_state": "ready_with_evidence"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "B_correction"
+    },
+    {
+      "scenario_id": "analytics-sample-below-policy-customer",
+      "route": "/insights",
+      "capability": "market_analytics",
+      "component_test_id": "intelligence-market-analytics-panel",
+      "intent_control_test_id": "intelligence-market-analytics-intent",
+      "action_test_id": "intelligence-market-analytics-run",
+      "expected_endpoint": "/api/ai/intelligence/market-analytics",
+      "expected_method": "POST",
+      "terminal_panel_test_id": "intelligence-market-analytics-panel",
+      "required_terminal_fields": [
+        "customer_facing_limit",
+        "no_SAMPLE_SIZE_BELOW_POLICY_raw"
+      ],
+      "success_data_floor": {
+        "minimum_evidence": 0,
+        "minimum_results": 0,
+        "minimum_watchlist_lots": 0,
+        "minimum_recommendation_cards": 0,
+        "allow_empty_evidence": true,
+        "expected_terminal_state": "abstained_or_limited"
+      },
+      "action_proof_status": "STATICALLY_VALIDATED",
+      "scenario_class": "C_honest_limit"
+    }
+  ]
+}

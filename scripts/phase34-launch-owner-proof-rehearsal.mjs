@@ -2,9 +2,10 @@
 /**
  * Phase 34 — 24-scenario LIVE owner-proof rehearsal launcher.
  *
- * Root: /tmp/phase34-owner-proof-live-rehearsal-v1
+ * Root: /tmp/phase34-owner-proof-live-rehearsal-v2
  * Scale: 24 scenarios / 27 turns / 81 protocol rows
  *
+ * Requires prior 24/24 LIVE_RESULT_PROVEN from live-action preflight.
  * Does NOT launch smoke-v6, canary, or full gauntlet.
  * Requires explicit PHASE34_OWNER_PROOF_REHEARSAL_APPROVED_SHA=<head>.
  */
@@ -112,6 +113,24 @@ async function main() {
 
   // Seed floors before creating the evidence root
   assertSeedFloors(seeds);
+
+  const preflightRoot =
+    process.env.PHASE34_OWNER_PROOF_LIVE_ACTION_PREFLIGHT_OUT ||
+    '/tmp/phase34-owner-proof-live-action-preflight-v1';
+  const preflightStatus = path.join(preflightRoot, 'LIVE_ACTION_PREFLIGHT_STATUS');
+  if (!fs.existsSync(preflightStatus) || fs.readFileSync(preflightStatus, 'utf8').trim() !== 'PASS') {
+    throw new Error(
+      `rehearsal_requires_live_action_preflight_pass:${preflightRoot} ` +
+        `(run scripts/phase34-verify-owner-proof-live-actions.mjs --execute first)`,
+    );
+  }
+  const preflightSummaryPath = path.join(preflightRoot, 'reports', 'preflight-summary.json');
+  if (fs.existsSync(preflightSummaryPath)) {
+    const pf = JSON.parse(fs.readFileSync(preflightSummaryPath, 'utf8'));
+    if (pf.live_result_proven !== 24) {
+      throw new Error(`rehearsal_requires_24_live_result_proven_got_${pf.live_result_proven}`);
+    }
+  }
 
   if (fs.existsSync(opts.out)) {
     throw new Error(`rehearsal_root_exists:${opts.out}`);

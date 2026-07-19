@@ -193,7 +193,8 @@ export function SearchIntelligenceChrome({
             onChange={(e) => setOwnerProofIntent(e.target.value)}
             rows={2}
             className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-950"
-            data-testid="intelligence-owner-proof-intent"
+            data-testid="intelligence-semantic-search-intent"
+            data-owner-proof-intent="1"
             aria-label="Owner-proof search question"
           />
         </label>

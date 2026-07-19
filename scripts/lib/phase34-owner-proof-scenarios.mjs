@@ -15,7 +15,10 @@ export const OWNER_PROOF_SEED_MANIFEST_PATH = path.join(
   '../ai-platform/phase34-owner-proof-seed-manifest.json',
 );
 
-export const OWNER_PROOF_REHEARSAL_ROOT = '/tmp/phase34-owner-proof-live-rehearsal-v1';
+export const OWNER_PROOF_REHEARSAL_ROOT = '/tmp/phase34-owner-proof-live-rehearsal-v2';
+export const OWNER_PROOF_LIVE_ACTION_PREFLIGHT_ROOT =
+  '/tmp/phase34-owner-proof-live-action-preflight-v1';
+export const OWNER_PROOF_MINI_PROOF_ROOT = '/tmp/phase34-owner-proof-mini-proof-v1';
 
 const REQUIRED_FIELDS = Object.freeze([
   'scenario_id',
@@ -43,8 +46,17 @@ const REQUIRED_FIELDS = Object.freeze([
   'required_screenshot_states',
   'required_protocols',
   'human_review_question',
-  'executability',
+  'action_proof_status',
 ]);
+
+export const ACTION_PROOF_STATUSES = Object.freeze([
+  'DECLARED',
+  'STATICALLY_VALIDATED',
+  'LIVE_ACTION_PROVEN',
+  'LIVE_RESULT_PROVEN',
+]);
+
+export const OFFICIAL_REHEARSAL_MIN_ACTION_PROOF = 'LIVE_RESULT_PROVEN';
 
 export function loadOwnerProofScenarios() {
   const raw = JSON.parse(fs.readFileSync(OWNER_PROOF_SCENARIOS_PATH, 'utf8'));
@@ -78,8 +90,12 @@ export function validateOwnerProofExecutableRegistry(raw) {
         throw new Error(`owner_proof_missing_field:${s.scenario_id || '?'}:${f}`);
       }
     }
-    if (s.executability !== 'FULLY_EXECUTABLE') {
-      throw new Error(`owner_proof_not_fully_executable:${s.scenario_id}`);
+    if (!ACTION_PROOF_STATUSES.includes(s.action_proof_status)) {
+      throw new Error(`owner_proof_invalid_action_proof_status:${s.scenario_id}:${s.action_proof_status}`);
+    }
+    // Committed registry may be STATICALLY_VALIDATED; live preflight promotes to LIVE_RESULT_PROVEN.
+    if (s.action_proof_status === 'DECLARED') {
+      throw new Error(`owner_proof_still_declared:${s.scenario_id}`);
     }
     if (s.expected_request_capability !== s.capability) {
       throw new Error(`owner_proof_capability_mismatch:${s.scenario_id}`);

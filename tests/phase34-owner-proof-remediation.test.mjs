@@ -137,8 +137,36 @@ test('owner-proof rehearsal launcher is armed but not launched', () => {
     'utf8',
   );
   assert.match(src, /READY_NOT_LAUNCHED/);
-  assert.match(src, /phase34-owner-proof-live-rehearsal-v1/);
+  assert.match(src, /phase34-owner-proof-live-rehearsal-v2/);
   assert.match(src, /executeOwnerProofLiveRehearsal/);
   assert.match(src, /assertCiApproval\(\{ headSha, originMainSha \}\)/);
-  assert.equal(fs.existsSync('/tmp/phase34-owner-proof-live-rehearsal-v1'), false);
+  assert.match(src, /rehearsal_requires_live_action_preflight_pass/);
+  assert.equal(fs.existsSync('/tmp/phase34-owner-proof-live-rehearsal-v2'), false);
+  assert.equal(fs.existsSync('/tmp/phase34-owner-proof-mini-proof-v1'), false);
+});
+
+test('live action preflight launcher is armed but not launched', () => {
+  const src = fs.readFileSync(
+    path.join(REPO, 'scripts/phase34-verify-owner-proof-live-actions.mjs'),
+    'utf8',
+  );
+  assert.match(src, /READY_NOT_LAUNCHED/);
+  assert.match(src, /phase34-owner-proof-live-action-preflight-v1/);
+  assert.match(src, /executeOwnerProofLiveActionPreflight/);
+  assert.equal(fs.existsSync('/tmp/phase34-owner-proof-live-action-preflight-v1'), false);
+});
+
+test('scarcity and valuation run controls are capability-scoped', () => {
+  const scarcity = fs.readFileSync(
+    path.join(REPO, 'webapp/components/ai/intelligence/scarcity-intelligence-panel.tsx'),
+    'utf8',
+  );
+  const valuation = fs.readFileSync(
+    path.join(REPO, 'webapp/components/ai/intelligence/valuation-intelligence-panel.tsx'),
+    'utf8',
+  );
+  assert.match(scarcity, /intelligence-scarcity-run/);
+  assert.match(valuation, /intelligence-valuation-run/);
+  assert.doesNotMatch(scarcity, /runTestId="intelligence-owner-proof-run"/);
+  assert.doesNotMatch(valuation, /runTestId="intelligence-owner-proof-run"/);
 });

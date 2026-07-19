@@ -5,6 +5,52 @@
 export const EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST =
   'EXPECTED_CLIENT_ACTION_DID_NOT_INITIATE_INTELLIGENCE_REQUEST';
 
+/** Click occurred but the capability onRun handler never ran (wrong control / no attach). */
+export const OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER =
+  'OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER';
+
+/**
+ * @param {object} input
+ */
+export function assertOwnerProofHandlerReached(input) {
+  const {
+    route,
+    component,
+    capability,
+    action,
+    expected_endpoint,
+    handler_reached,
+    handler_capability,
+    click_timestamp,
+    hydration_ready,
+    button_enabled,
+    request_candidates,
+  } = input;
+  if (handler_reached === true) {
+    if (capability && handler_capability && capability !== handler_capability) {
+      const err = new Error(
+        `${OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER}: ` +
+          `expected capability=${capability} got=${handler_capability} ` +
+          `route=${route || ''} component=${component || ''} action=${action || ''}`,
+      );
+      err.code = OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER;
+      err.meta = { ...input, mismatch: true };
+      throw err;
+    }
+    return true;
+  }
+  const err = new Error(
+    `${OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER}: ` +
+      `route=${route || ''} component=${component || ''} capability=${capability || ''} ` +
+      `action=${action || ''} endpoint=${expected_endpoint || ''} ` +
+      `hydration_ready=${hydration_ready} button_enabled=${button_enabled} ` +
+      `click_at=${click_timestamp || ''} candidates=${JSON.stringify(request_candidates || [])}`,
+  );
+  err.code = OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER;
+  err.meta = { ...input };
+  throw err;
+}
+
 /**
  * @param {object} input
  */

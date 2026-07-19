@@ -1,0 +1,91 @@
+{
+  "contract_version": "phase34-response-depth-v1",
+  "label": "ChatGPT-tier response-depth contract — ranges are product targets, not padding requirements",
+  "model_weight_training": "NO",
+  "current_optimization": "PROMPT_RETRIEVAL_RERANKER_TOOL_CALIBRATION_AND_MODEL_SELECTION",
+  "answer_modes": [
+    "COMPACT",
+    "STANDARD",
+    "DEEP",
+    "CONVERSATIONAL"
+  ],
+  "every_response_records": [
+    "answer_mode",
+    "word_count",
+    "character_count",
+    "estimated_input_tokens",
+    "estimated_output_tokens",
+    "section_count",
+    "evidence_count",
+    "material_claim_count",
+    "citation_count",
+    "sentence_count",
+    "reading_time_seconds",
+    "truncation_status",
+    "requested_detail_level"
+  ],
+  "general_requirements": [
+    "answer the user’s question directly in the first two sentences",
+    "do not pad answers merely to hit length",
+    "do not omit reasoning and evidence merely to stay short",
+    "use headings for longer answers",
+    "distinguish facts, inference, and advice",
+    "show uncertainty",
+    "finish with a useful next action",
+    "do not repeat the prompt",
+    "do not repeat generic limitations across unrelated capabilities"
+  ],
+  "length_targets_are_ranges_not_padding": true,
+  "suggested_product_targets": {
+    "scarcity": {
+      "STANDARD": { "min_words": 250, "max_words": 550 },
+      "DEEP": { "min_words": 550, "max_words": 1100 }
+    },
+    "valuation": {
+      "STANDARD": { "min_words": 300, "max_words": 700 },
+      "DEEP": { "min_words": 650, "max_words": 1300 }
+    },
+    "auction": {
+      "STANDARD": { "min_words": 350, "max_words": 800 },
+      "DEEP": { "min_words": 700, "max_words": 1400 }
+    },
+    "embeddings": {
+      "STANDARD": {
+        "min_words": 150,
+        "max_words": 400,
+        "notes": "plus structured lineage fields"
+      }
+    },
+    "semantic_search": {
+      "narrative": { "min_words": 120, "max_words": 300 },
+      "min_structured_result_cards": 5
+    },
+    "negotiation": {
+      "strategy": { "min_words": 250, "max_words": 650 },
+      "draft": { "min_words": 50, "max_words": 140 },
+      "long_thread_summary": { "min_words": 150, "max_words": 400 }
+    },
+    "recommendations": {
+      "narrative": { "min_words": 150, "max_words": 350 },
+      "min_structured_cards": 5
+    },
+    "market_analytics": {
+      "STANDARD": { "min_words": 350, "max_words": 850 },
+      "DEEP": {
+        "min_words": 750,
+        "max_words": 1500,
+        "notes": "plus charts/tables"
+      }
+    },
+    "honest_limit": {
+      "min_words": 80,
+      "max_words": 250,
+      "must_explain": [
+        "why the answer is limited",
+        "what evidence is missing",
+        "what the user can provide next",
+        "what unsafe or unsupported action was refused"
+      ]
+    }
+  }
+}

@@ -65,6 +65,14 @@ tmp/
 !scripts/ai-platform/phase34-adversarial-pipeline-fixtures.json
 !scripts/ai-platform/phase34-response-quality-contract.json
 !scripts/ai-platform/phase34-response-quality-contract.schema.json
+!scripts/ai-platform/phase34-market-data-source-registry.json
+!scripts/ai-platform/phase34-market-data-source-registry.schema.json
+!scripts/ai-platform/phase34-market-event.schema.json
+!scripts/ai-platform/phase34-response-depth-contract.json
+!scripts/ai-platform/phase34-response-depth-contract.schema.json
+!scripts/ai-platform/phase34-retrieval-corpus-registry.json
+!scripts/ai-platform/phase34-evaluation-corpus-registry.json
+!scripts/ai-platform/phase34-finetuning-corpus-registry.json
 !scripts/ai-platform/phase34-prompt-registry/
 !scripts/ai-platform/phase34-prompt-registry/**/*.json
 !scripts/ai-platform/retrieval-splits/

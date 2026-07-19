@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "phase34-response-depth-contract.schema.json",
+  "title": "Phase 34 ChatGPT-tier response-depth contract",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "model_weight_training",
+    "current_optimization",
+    "answer_modes",
+    "every_response_records",
+    "general_requirements",
+    "suggested_product_targets",
+    "length_targets_are_ranges_not_padding"
+  ],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "label": { "type": "string" },
+    "model_weight_training": { "const": "NO" },
+    "current_optimization": {
+      "const": "PROMPT_RETRIEVAL_RERANKER_TOOL_CALIBRATION_AND_MODEL_SELECTION"
+    },
+    "answer_modes": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "enum": ["COMPACT", "STANDARD", "DEEP", "CONVERSATIONAL"]
+      }
+    },
+    "every_response_records": {
+      "type": "array",
+      "minItems": 13,
+      "items": { "type": "string" }
+    },
+    "general_requirements": {
+      "type": "array",
+      "minItems": 9,
+      "items": { "type": "string" }
+    },
+    "length_targets_are_ranges_not_padding": { "const": true },
+    "suggested_product_targets": {
+      "type": "object",
+      "required": [
+        "scarcity",
+        "valuation",
+        "auction",
+        "embeddings",
+        "semantic_search",
+        "negotiation",
+        "recommendations",
+        "market_analytics",
+        "honest_limit"
+      ]
+    }
+  },
+  "additionalProperties": true
+}

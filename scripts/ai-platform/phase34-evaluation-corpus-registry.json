@@ -1,0 +1,16 @@
+{
+  "registry_version": "phase34-evaluation-corpus-v1",
+  "label": "Evaluation corpus registry — synthetic, consented, golden, adversarial",
+  "model_weight_training": "NO",
+  "current_optimization": "PROMPT_RETRIEVAL_RERANKER_TOOL_CALIBRATION_AND_MODEL_SELECTION",
+  "status": "ACTIVE_INVENTORY",
+  "auto_copy_to_finetuning": false,
+  "permitted_source_classes": [
+    "synthetic_scenarios",
+    "consented_redacted_first_party_examples",
+    "authorized_historical_examples",
+    "frozen_human_authored_golden_responses",
+    "adversarial_cases"
+  ],
+  "entries": []
+}

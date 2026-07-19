@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "phase34-market-data-source-registry.schema.json",
+  "title": "Phase 34 rights-aware market-data source registry",
+  "type": "object",
+  "required": [
+    "registry_version",
+    "model_weight_training",
+    "current_optimization",
+    "label",
+    "generated_at",
+    "sources"
+  ],
+  "properties": {
+    "registry_version": {
+      "type": "string",
+      "const": "phase34-market-data-source-v1"
+    },
+    "model_weight_training": { "const": "NO" },
+    "current_optimization": {
+      "const": "PROMPT_RETRIEVAL_RERANKER_TOOL_CALIBRATION_AND_MODEL_SELECTION"
+    },
+    "label": { "type": "string", "minLength": 8 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/source" }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "useStatus": {
+      "type": "string",
+      "enum": [
+        "ALLOWED",
+        "ALLOWED_SCOPED",
+        "NOT_AUTHORIZED",
+        "NOT_AUTHORIZED_FOR_WEIGHT_TRAINING",
+        "DISABLED",
+        "DISABLED_PENDING_PERMISSION",
+        "RESTRICTED",
+        "PROHIBITED"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "source_id",
+        "source_name",
+        "source_owner",
+        "source_type",
+        "access_method",
+        "credentials_reference",
+        "rights_status",
+        "license",
+        "terms_verified_at",
+        "allowed_uses",
+        "prohibited_uses",
+        "allowed_fields",
+        "prohibited_fields",
+        "retention_policy",
+        "cache_policy",
+        "refresh_policy",
+        "attribution_requirement",
+        "commercial_use_status",
+        "model_training_status",
+        "retrieval_use_status",
+        "analytics_use_status",
+        "display_use_status",
+        "connector_status",
+        "approval_reference",
+        "contact_reference",
+        "notes"
+      ],
+      "properties": {
+        "source_id": { "type": "string", "minLength": 2, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "source_name": { "type": "string", "minLength": 2 },
+        "source_owner": { "type": "string", "minLength": 2 },
+        "source_type": { "type": "string", "minLength": 2 },
+        "access_method": { "type": "string", "minLength": 2 },
+        "credentials_reference": { "type": "string" },
+        "rights_status": {
+          "type": "string",
+          "enum": [
+            "FIRST_PARTY",
+            "USER_AUTHORIZED",
+            "CC0",
+            "PUBLIC_DOMAIN",
+            "LICENSED",
+            "RESTRICTED",
+            "UNKNOWN",
+            "PROHIBITED"
+          ]
+        },
+        "license": { "type": "string", "minLength": 1 },
+        "terms_verified_at": { "type": "string", "minLength": 4 },
+        "allowed_uses": { "$ref": "#/$defs/stringList" },
+        "prohibited_uses": { "$ref": "#/$defs/stringList" },
+        "allowed_fields": { "$ref": "#/$defs/stringList" },
+        "prohibited_fields": { "$ref": "#/$defs/stringList" },
+        "retention_policy": { "type": "string", "minLength": 2 },
+        "cache_policy": { "type": "string", "minLength": 2 },
+        "refresh_policy": { "type": "string", "minLength": 2 },
+        "attribution_requirement": { "type": "string", "minLength": 1 },
+        "commercial_use_status": { "$ref": "#/$defs/useStatus" },
+        "model_training_status": { "$ref": "#/$defs/useStatus" },
+        "retrieval_use_status": { "$ref": "#/$defs/useStatus" },
+        "analytics_use_status": { "$ref": "#/$defs/useStatus" },
+        "display_use_status": { "$ref": "#/$defs/useStatus" },
+        "connector_status": {
+          "type": "string",
+          "enum": [
+            "ENABLED",
+            "DISABLED",
+            "DISABLED_PENDING_WRITTEN_PERMISSION",
+            "DISABLED_BY_POLICY"
+          ]
+        },
+        "approval_reference": { "type": "string" },
+        "contact_reference": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

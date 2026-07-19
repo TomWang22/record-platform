@@ -519,6 +519,23 @@ ai-platform-verify-phase34-response-quality: ## Verify response-quality contract
 	test -f scripts/ai-platform/phase34-response-quality-contract.json
 	test -f scripts/ai-platform/phase34-response-quality-contract.schema.json
 
+ai-platform-verify-phase34-market-data-foundation: ## Rights-aware registry, market events, pressing, depth, dossiers (no live recapture)
+	node scripts/ai-platform/verify-phase34-market-data-source-registry.mjs
+	node scripts/ai-platform/verify-phase34-response-depth.mjs
+	node scripts/ai-platform/verify-phase34-response-dossier.mjs
+	node scripts/ai-platform/verify-phase34-corpus-registries.mjs
+	node --test tests/phase34-market-event-normalization.test.mjs tests/phase34-response-depth-dossier.test.mjs
+	test -f scripts/ai-platform/phase34-market-data-source-registry.json
+	test -f scripts/ai-platform/phase34-market-data-source-registry.schema.json
+	test -f scripts/ai-platform/phase34-market-event.schema.json
+	test -f scripts/ai-platform/phase34-response-depth-contract.json
+	test -f scripts/ai-platform/phase34-retrieval-corpus-registry.json
+	test -f scripts/ai-platform/phase34-evaluation-corpus-registry.json
+	test -f scripts/ai-platform/phase34-finetuning-corpus-registry.json
+	test ! -e /tmp/phase34-owner-proof-live-recapture-v3
+	test ! -e owner-review-artifacts/phase34/owner-proof-live-v3
+	node scripts/phase34-market-data-foundation-status.mjs | grep -q 'LIVE OWNER-PROOF RECAPTURE NOT LAUNCHED'
+
 ai-platform-verify-phase34-owner-proof-output-remediation: ## Matrix + engine remediation unit tests (no live owner-proof)
 	node --test tests/phase34-owner-proof-output-remediation.test.mjs tests/phase34-negotiation-context-depth.test.mjs tests/phase34-material-correction-gates.test.mjs
 	test -f scripts/ai-platform/phase34-owner-proof-remediation-matrix.json

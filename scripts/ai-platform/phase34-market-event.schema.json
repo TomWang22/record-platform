@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "phase34-market-event.schema.json",
+  "title": "Phase 34 canonical market event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "market_event_id",
+    "source_id",
+    "source_event_id",
+    "event_type",
+    "event_status",
+    "content_hash",
+    "normalization_version"
+  ],
+  "properties": {
+    "market_event_id": { "type": "string", "minLength": 1 },
+    "source_id": { "type": "string", "minLength": 1 },
+    "source_event_id": { "type": "string", "minLength": 1 },
+    "source_url": { "type": ["string", "null"] },
+    "source_timestamp": { "type": ["string", "null"], "format": "date-time" },
+    "ingested_at": { "type": ["string", "null"], "format": "date-time" },
+    "observed_at": { "type": ["string", "null"], "format": "date-time" },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "ASKING_LISTING",
+        "COMPLETED_SALE",
+        "AUCTION_STARTED",
+        "AUCTION_BID",
+        "AUCTION_COMPLETED",
+        "OFFER_CREATED",
+        "OFFER_ACCEPTED",
+        "OFFER_REJECTED",
+        "WATCHLIST_ADDED",
+        "WATCHLIST_REMOVED",
+        "COLLECTION_ADDED",
+        "COLLECTION_UPDATED",
+        "LISTING_DELETED",
+        "SALE_CORRECTED",
+        "SOURCE_EXPIRED"
+      ]
+    },
+    "event_status": {
+      "type": "string",
+      "enum": ["ACTIVE", "COMPLETED", "DELETED", "EXPIRED", "CORRECTED", "UNKNOWN"]
+    },
+    "artist": { "type": ["string", "null"] },
+    "title": { "type": ["string", "null"] },
+    "release_id": { "type": ["string", "null"] },
+    "master_release_id": { "type": ["string", "null"] },
+    "pressing_id": { "type": ["string", "null"] },
+    "catalog_number": { "type": ["string", "null"] },
+    "barcode": { "type": ["string", "null"] },
+    "label": { "type": ["string", "null"] },
+    "country": { "type": ["string", "null"] },
+    "release_year": { "type": ["integer", "null"] },
+    "format": { "type": ["string", "null"] },
+    "speed": { "type": ["string", "null"] },
+    "size": { "type": ["string", "null"] },
+    "vinyl_color": { "type": ["string", "null"] },
+    "edition": { "type": ["string", "null"] },
+    "matrix_runout": { "type": ["string", "null"] },
+    "media_condition": { "type": ["string", "null"] },
+    "sleeve_condition": { "type": ["string", "null"] },
+    "condition_notes": { "type": ["string", "null"] },
+    "currency_original": { "type": ["string", "null"] },
+    "price_original": { "type": ["number", "null"] },
+    "currency_normalized": { "type": ["string", "null"] },
+    "price_normalized": { "type": ["number", "null"] },
+    "shipping_price": { "type": ["number", "null"] },
+    "buyer_premium": { "type": ["number", "null"] },
+    "tax": { "type": ["number", "null"] },
+    "total_price": { "type": ["number", "null"] },
+    "quantity": { "type": ["integer", "null"] },
+    "bid_count": { "type": ["integer", "null"] },
+    "watcher_count": { "type": ["integer", "null"] },
+    "offer_count": { "type": ["integer", "null"] },
+    "sale_type": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "FIXED_PRICE",
+        "AUCTION",
+        "BEST_OFFER",
+        "ACCEPTED_BEST_OFFER_WITH_UNKNOWN_PRICE",
+        "OTHER"
+      ]
+    },
+    "seller_country": { "type": ["string", "null"] },
+    "buyer_country": { "type": ["string", "null"] },
+    "listing_started_at": { "type": ["string", "null"], "format": "date-time" },
+    "listing_ended_at": { "type": ["string", "null"], "format": "date-time" },
+    "sold_at": { "type": ["string", "null"], "format": "date-time" },
+    "evidence_quality": {
+      "type": ["string", "null"],
+      "enum": [null, "HIGH", "MEDIUM", "LOW", "UNKNOWN"]
+    },
+    "pressing_match_confidence": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "EXACT_PRESSING_MATCH",
+        "RELEASE_LEVEL_MATCH",
+        "PROBABLE",
+        "AMBIGUOUS",
+        "UNRESOLVED",
+        "CONTRADICTED"
+      ]
+    },
+    "identity_resolution_status": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "EXACT",
+        "PROBABLE",
+        "RELEASE_LEVEL_ONLY",
+        "AMBIGUOUS",
+        "CONTRADICTED",
+        "UNRESOLVED"
+      ]
+    },
+    "authorization_scope": { "type": ["string", "null"] },
+    "privacy_class": {
+      "type": ["string", "null"],
+      "enum": [null, "PUBLIC", "AUTHENTICATED", "OWNER_PRIVATE", "THREAD_PRIVATE", "PROHIBITED"]
+    },
+    "deletion_status": {
+      "type": ["string", "null"],
+      "enum": [null, "ACTIVE", "DELETED", "PENDING"]
+    },
+    "staleness_status": {
+      "type": ["string", "null"],
+      "enum": [null, "FRESH", "STALE", "UNKNOWN"]
+    },
+    "rights_status": {
+      "type": ["string", "null"],
+      "enum": [null, "AVAILABLE", "UNAVAILABLE", "RESTRICTED", "UNKNOWN"]
+    },
+    "content_hash": { "type": "string", "minLength": 16 },
+    "normalization_version": { "type": "string", "minLength": 1 }
+  }
+}

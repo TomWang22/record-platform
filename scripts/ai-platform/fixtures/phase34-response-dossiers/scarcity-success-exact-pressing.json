@@ -1,0 +1,68 @@
+{
+  "scenario_id": "scarcity-success-exact-pressing",
+  "session_id": "sess-fixture-scarcity-001",
+  "turn_id": "turn-1",
+  "participant_side": "buyer",
+  "capability": "scarcity",
+  "scenario_class": "A_success",
+  "visible_user_prompt": "Is this exact CL 1355 pressing scarce, or only the release generally?",
+  "context_summary": "Authorized listing L-1001; subject pressing Columbia CL 1355 US mono.",
+  "subject_identity": {
+    "listing_id": "L-1001",
+    "pressing": "Columbia CL 1355 US mono"
+  },
+  "evidence_snapshot_id": "ev-scarcity-001",
+  "evidence_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "full_response_text": "This exact Columbia CL 1355 US mono pressing is moderately scarce in VG+ or better. The broader release is common, but clean original mono copies with intact covers turn up less often in first-party solds. Evidence from three authorized sold comparables supports a scarce-but-findable call for the pressing, not the release as a whole.\n\n## Facts\n- Catalog: CL 1355 US mono\n- Sold comps observed: 3\n\n## Inference\nPressing-level scarcity is higher than release-level scarcity.\n\n## Advice\nTreat the asking price as pressing-specific, not release-average.\n\nUncertainty: sample size is small (n=3).\nNext: compare your sleeve condition notes to the sold comps before bidding.",
+  "direct_answer": "This exact Columbia CL 1355 US mono pressing is moderately scarce in VG+ or better. The broader release is common, but clean original mono copies turn up less often.",
+  "reasoning_summary": "Pressing identity matched CL 1355 US mono; sold comps show fewer clean mono copies than stereo reissues.",
+  "key_values": {
+    "scarcity_level": "moderate",
+    "scope": "exact_pressing",
+    "sold_comp_count": 3
+  },
+  "what_changed": "",
+  "evidence_items": [
+    { "id": "ev-sold-1", "summary": "Sold $42 VG+ mono, 2025-11" },
+    { "id": "ev-sold-2", "summary": "Sold $38 VG mono, 2026-01" },
+    { "id": "ev-sold-3", "summary": "Sold $55 NM mono, 2026-03" }
+  ],
+  "claim_evidence_map": {
+    "moderately scarce exact pressing": ["ev-sold-1", "ev-sold-2", "ev-sold-3"]
+  },
+  "uncertainties": ["Only three authorized sold comparables available."],
+  "limitations": ["No licensed external archive sales included."],
+  "next_action": "Compare sleeve condition to the three sold comps before bidding.",
+  "editable_draft": "",
+  "word_count": 118,
+  "character_count": 720,
+  "input_token_estimate": 410,
+  "output_token_estimate": 190,
+  "response_mode": "STANDARD",
+  "browser_latency": 1200,
+  "pipeline_latency": 340,
+  "H1_status": "PASS",
+  "H2_status": "PASS",
+  "H3_status": "PASS",
+  "protocol_parity": true,
+  "quality_scores": {
+    "question_directness": 4,
+    "grounded_factuality": 4,
+    "record_market_specificity": 4,
+    "pressing_correctness": 4,
+    "evidence_alignment": 4,
+    "explanation_quality": 4,
+    "usefulness": 4,
+    "uncertainty_calibration": 4,
+    "correction_handling": 4,
+    "context_retention": 4,
+    "actionability": 4,
+    "customer_language": 4,
+    "safety": 4,
+    "privacy": 4,
+    "non_repetition": 4
+  },
+  "human_review_status": "pending",
+  "authorized_evidence_ids": ["ev-sold-1", "ev-sold-2", "ev-sold-3"],
+  "unauthorized_evidence_ids": ["ev-other-user-99"]
+}

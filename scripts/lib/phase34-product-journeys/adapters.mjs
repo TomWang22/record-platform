@@ -755,21 +755,13 @@ export class BaseProductJourneyAdapter {
     };
 
     const apiPath = prepared.apiPath;
-    // Attach waiter before navigation/trigger; swallow late rejection if we abort early.
-    let responseSettled = false;
-    const responsePromise = page
-      .waitForResponse(
-        (res) => res.url().includes(apiPath) && res.request().method() === 'POST',
-        { timeout: 120_000 },
-      )
-      .then((res) => {
-        responseSettled = true;
-        return res;
-      })
-      .catch((err) => {
-        responseSettled = true;
-        throw err;
-      });
+    // Attach waiter before navigation/trigger. Do not rethrow in an intermediate
+    // .catch — a timeout during prepare/trigger would become an unhandled
+    // rejection before the later await. Let the await site handle failures.
+    const responsePromise = page.waitForResponse(
+      (res) => res.url().includes(apiPath) && res.request().method() === 'POST',
+      { timeout: 120_000 },
+    );
 
     const actionStart = Date.now();
     try {
@@ -1265,10 +1257,8 @@ export class BaseProductJourneyAdapter {
         },
       };
     } catch (err) {
-      if (!responseSettled) {
-        // Prevent unhandled rejection when navigation/trigger fails before the POST.
-        responsePromise.catch(() => null);
-      }
+      // Prevent unhandled rejection when navigation/trigger fails before the POST.
+      responsePromise.catch(() => null);
       throw err;
     } finally {
       detachListeners();

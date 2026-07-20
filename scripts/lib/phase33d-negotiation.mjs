@@ -388,17 +388,8 @@ export function analyzeNegotiation(input = {}) {
         : 35;
 
   let marketCandidates = Array.isArray(input.market_candidates) ? [...input.market_candidates] : [];
-  // Owner-proof advisory path: when offer + ask are present and the caller did not
-  // force a weak/abstention scenario, seed a small sold floor so advice is possible.
-  const forceWeak =
-    input.force_abstention === true ||
-    input.force_weak_market === true ||
-    /weak|abstain|insufficient|honest.?limit/i.test(String(input.scenario_class || ''));
-  if (
-    marketCandidates.length === 0 &&
-    (input.force_negotiation_market_floor === true ||
-      (!forceWeak && asking && offerAmt != null && auth.authorized))
-  ) {
+  // Owner-proof floor only when explicitly requested — never invent comps for weak/abstention scenarios.
+  if (marketCandidates.length === 0 && input.force_negotiation_market_floor === true) {
     marketCandidates = ownerProofMarketCandidates(asking, input.currency || 'USD');
   }
 
@@ -551,9 +542,10 @@ export function analyzeNegotiation(input = {}) {
     facts,
     safetyRefused,
   });
-  const draft_reply = abstention.abstained && !safetyRefused
-    ? ''
-    : reply_drafts.primary || reply_drafts.friendly || reply_drafts.concise;
+  const draft_reply =
+    abstention.abstained && !safetyRefused
+      ? ''
+      : reply_drafts.primary || reply_drafts.friendly || reply_drafts.concise;
 
   const strategy =
     abstention.abstained && !safetyRefused
@@ -675,7 +667,7 @@ export function analyzeNegotiation(input = {}) {
       ...(safetyRefused ? ['UNSAFE_REQUEST'] : []),
       ...(condition ? [] : ['CONDITION_UNCERTAIN']),
     ],
-    reply_drafts: abstention.abstained && !safetyRefused ? {} : reply_drafts,
+    reply_drafts,
     auto_send: false,
     automatic_send_allowed: false,
     message_sent: false,

@@ -1507,6 +1507,8 @@ export class NegotiationJourneyAdapter extends BaseProductJourneyAdapter {
       user_intent,
       owner_proof_prompt: user_intent,
       owner_proof_scenario_id: context.scenario_id || null,
+      force_negotiation_market_floor:
+        multi || context.scenario_class === 'A_success' || context.scenario_class === 'B_correction',
     };
   }
   materialFields() {

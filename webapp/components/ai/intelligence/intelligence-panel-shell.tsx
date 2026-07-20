@@ -82,7 +82,7 @@ export function IntelligencePanelShell({
 
   return (
     <section
-      className="min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+      className="min-h-[140px] min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
       data-testid={testId}
       data-capability={capability || undefined}
       aria-busy={loading ? true : undefined}

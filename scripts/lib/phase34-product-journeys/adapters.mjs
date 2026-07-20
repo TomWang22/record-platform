@@ -1098,22 +1098,31 @@ export class BaseProductJourneyAdapter {
         const ariaBefore = preState.aria_expanded;
         const preDomHash = preState.dom_hash;
 
-        await first.locator('> summary').first().click();
-        // Wait for aria-expanded to actually flip rather than assuming the click landed.
-        await page
-          .waitForFunction(
-            ({ testId, before }) => {
-              const el = document.querySelector(`[data-testid="${testId}"]`);
-              if (!el) return false;
-              const aria = el.getAttribute('aria-expanded');
-              if (aria != null && aria !== before) return aria === 'true';
-              // Fallback for older builds that only expose native details.open.
-              return el instanceof HTMLDetailsElement && el.open === true;
-            },
-            { testId: controlTestId, before: ariaBefore },
-            { timeout: 5_000 },
-          )
-          .catch(() => null);
+        // If the disclosure is already expanded (e.g. prior turn left it open),
+        // do not click — the summary toggles closed and the harness would fail.
+        const alreadyOpen =
+          ariaBefore === 'true' ||
+          (preState.open === true && ariaBefore !== 'false') ||
+          preState.content_visible === true;
+
+        if (!alreadyOpen) {
+          await first.locator('> summary').first().click();
+          // Wait for aria-expanded to actually flip rather than assuming the click landed.
+          await page
+            .waitForFunction(
+              ({ testId, before }) => {
+                const el = document.querySelector(`[data-testid="${testId}"]`);
+                if (!el) return false;
+                const aria = el.getAttribute('aria-expanded');
+                if (aria != null && aria !== before) return aria === 'true';
+                // Fallback for older builds that only expose native details.open.
+                return el instanceof HTMLDetailsElement && el.open === true;
+              },
+              { testId: controlTestId, before: ariaBefore },
+              { timeout: 5_000 },
+            )
+            .catch(() => null);
+        }
 
         const postState = (await readDisclosureState(controlTestId)) || {
           aria_expanded: null,

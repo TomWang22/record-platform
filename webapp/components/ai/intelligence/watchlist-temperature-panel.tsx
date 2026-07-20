@@ -210,6 +210,33 @@ export function WatchlistTemperaturePanel({
             <p className="text-xs text-slate-500" data-testid="intelligence-watchlist-intent-echo">
               Answering: {lastIntent}
             </p>
+            {result.correction_change && typeof result.correction_change === 'object' ? (
+              <div
+                className="rounded-md border border-amber-200/80 bg-amber-50/80 p-3 text-xs dark:border-amber-900/50 dark:bg-amber-950/30"
+                data-testid="intelligence-watchlist-what-changed"
+              >
+                <p className="font-medium text-amber-900 dark:text-amber-100">What changed</p>
+                <p>
+                  Previous:{' '}
+                  {String(
+                    (result.correction_change as { previous_value?: string }).previous_value || '—',
+                  )}
+                </p>
+                <p>
+                  Updated:{' '}
+                  {String(
+                    (result.correction_change as { updated_value?: string }).updated_value || '—',
+                  )}
+                </p>
+                <p>
+                  Reason:{' '}
+                  {String(
+                    (result.correction_change as { reason_for_update?: string }).reason_for_update ||
+                      '—',
+                  )}
+                </p>
+              </div>
+            ) : null}
             <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <dt className="text-xs text-slate-500">Market temperature</dt>
@@ -220,7 +247,9 @@ export function WatchlistTemperaturePanel({
               </div>
               <div>
                 <dt className="text-xs text-slate-500">Auction count</dt>
-                <dd>{result.auction_count ?? meta?.asking ?? '—'}</dd>
+                <dd data-testid="intelligence-watchlist-auction-count">
+                  {result.auction_count ?? meta?.asking ?? '—'}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-slate-500">Bid velocity (proxy)</dt>

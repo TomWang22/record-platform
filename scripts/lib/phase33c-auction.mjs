@@ -273,8 +273,9 @@ function analyzeWatchlistBatch(input) {
 
   let auctions = Array.isArray(input.watchlist_auctions) ? [...input.watchlist_auctions] : [];
   if (auctions.length < 5 && input.force_watchlist_floor === true && !unauthorized) {
-    const now = Date.parse('2026-07-15T12:00:00.000Z');
+    const now = Date.now();
     for (let i = auctions.length; i < 5; i += 1) {
+      const hoursOut = i < 3 ? 6 : 48;
       auctions.push({
         lot_id: `watch-lot-${i + 1}`,
         current_price: 20 + i * 7,
@@ -283,8 +284,9 @@ function analyzeWatchlistBatch(input) {
         late_bid_pressure: i % 2 === 0 ? 0.8 : 0.3,
         price_acceleration: i * 0.05,
         watchers: 3 + i,
-        end_at: new Date(now + (i < 3 ? 6 : 48) * 3600_000).toISOString(),
-        observed_at: '2026-07-15T12:00:00.000Z',
+        end_at: new Date(now + hoursOut * 3600_000).toISOString(),
+        time_left_ms: hoursOut * 3600_000,
+        observed_at: new Date(now).toISOString(),
         auction_state: 'active',
         deletion_state: 'ACTIVE',
         release_id: `release-${(i % 3) + 1}`,
@@ -301,11 +303,17 @@ function analyzeWatchlistBatch(input) {
 
   let correction_change = null;
   if (windowHours != null) {
-    const now = Date.parse('2026-07-15T12:00:00.000Z');
+    // Live runs must use wall-clock now (or time_left_ms). A frozen fixture
+    // timestamp makes every real watchlist lot look outside the 24h window
+    // or collapse to an identical filtered set, so correction gates fail.
+    const nowMs = Date.now();
     const before = clean.length;
     clean = clean.filter((a) => {
+      if (a.time_left_ms != null && Number.isFinite(Number(a.time_left_ms))) {
+        return Number(a.time_left_ms) <= windowHours * 3600_000;
+      }
       const end = Date.parse(a.end_at || '');
-      return Number.isFinite(end) && end - now <= windowHours * 3600_000;
+      return Number.isFinite(end) && end - nowMs <= windowHours * 3600_000 && end >= nowMs;
     });
     correction_change = {
       what_changed: ['ending_window'],

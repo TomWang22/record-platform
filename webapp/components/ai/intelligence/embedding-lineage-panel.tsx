@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { IntelligencePanelShell } from '@/components/ai/intelligence/intelligence-panel-shell'
 import { OwnerProofIntentControl } from '@/components/ai/intelligence/owner-proof-intent-control'
 import { fetchEmbeddingMetadata, IntelligenceHttpError } from '@/lib/ai-intelligence-client'
+import { sanitizeCustomerFacingText } from '@/lib/ai-customer-copy'
 
 const DEFAULT_INTENT = "Show lineage for this record's current embedding."
 
@@ -46,6 +47,26 @@ export function EmbeddingLineagePanel({ principalId }: { principalId: string | n
   }
 
   const field = (key: string) => String(state.result?.[key] ?? '—')
+  const human = (key: string) => {
+    const raw = String(state.result?.[key] ?? '')
+    const map: Record<string, string> = {
+      CURRENT: 'Current',
+      STALE: 'Stale',
+      DELETED: 'Source deleted',
+      REQUIRED: 'Re-embed required',
+      NOT_REQUIRED: 'Not required',
+      NOT_APPLICABLE: 'Not applicable',
+      SOURCE_DELETED: 'Source deleted',
+      not_required: 'Not required',
+      verified: 'Verified',
+      DISABLED: 'Disabled',
+      ALLOWED: 'Allowed',
+      BLOCKED_UNTIL_REEMBED: 'Blocked until re-embed',
+      AUDIT_ONLY: 'Audit only',
+      ACTIVE: 'Active',
+    }
+    return map[raw] || (raw ? sanitizeCustomerFacingText(raw) : '—')
+  }
   return (
     <IntelligencePanelShell
       title="Embedding lineage (diagnostic)"
@@ -89,13 +110,33 @@ export function EmbeddingLineagePanel({ principalId }: { principalId: string | n
                 <dd>{field('owner_scope')}</dd>
               </div>
               <div>
+                <dt>Freshness</dt>
+                <dd>{human('freshness')}</dd>
+              </div>
+              <div>
                 <dt>Deletion status</dt>
-                <dd>{field('deletion_propagation')}</dd>
+                <dd>{human('deletion_propagation')}</dd>
+              </div>
+              <div>
+                <dt>Re-embed required</dt>
+                <dd>{String(state.result.reembed_required) === 'true' ? 'Yes' : 'No'}</dd>
               </div>
               <div>
                 <dt>Re-embed status</dt>
-                <dd>{field('reembedding_policy')}</dd>
+                <dd>{human('reembed_status')}</dd>
               </div>
+              {state.result.stale_reason ? (
+                <div className="col-span-2">
+                  <dt>Stale reason</dt>
+                  <dd>{sanitizeCustomerFacingText(String(state.result.stale_reason))}</dd>
+                </div>
+              ) : null}
+              {state.result.recommended_action ? (
+                <div className="col-span-2">
+                  <dt>Recommended action</dt>
+                  <dd>{sanitizeCustomerFacingText(String(state.result.recommended_action))}</dd>
+                </div>
+              ) : null}
             </dl>
             <p className="text-xs text-slate-500">Production embedding writes remain disabled.</p>
           </>

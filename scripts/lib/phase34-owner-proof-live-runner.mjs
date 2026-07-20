@@ -45,12 +45,14 @@ import {
   stopProductPcapCapture,
 } from './phase34-product-pcap.mjs';
 import { validateAllProductScreenshots } from './phase34-product-png-validation.mjs';
-import { assertScreenshotDistinctness } from './phase34-product-screenshot-distinctness.mjs';
+import { assertScreenshotDistinctness, isLoadingScreenshotRow } from './phase34-product-screenshot-distinctness.mjs';
+import { stitchPngsVertically } from './phase34-png-composite.mjs';
 import { INTER_BATCH_INTERVAL_MS } from './phase33f-rate-limit.mjs';
 import { ensureOwnerProofMarketEvidence } from './phase34-owner-proof-market-seed.mjs';
 import {
   OWNER_PROOF_RECAPTURE_V4_EXPORT,
   OWNER_PROOF_RECAPTURE_V5_EXPORT,
+  OWNER_PROOF_RECAPTURE_V5_BLOCKED_EXPORT,
 } from './phase34-owner-proof-scenarios.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -416,9 +418,12 @@ function exportOwnerReviewPack({
   latency,
   recaptureV4 = false,
   recaptureV5 = false,
+  ownerAcceptancePass = false,
 }) {
   const exportRoot = recaptureV5
-    ? OWNER_PROOF_RECAPTURE_V5_EXPORT
+    ? ownerAcceptancePass
+      ? OWNER_PROOF_RECAPTURE_V5_EXPORT
+      : OWNER_PROOF_RECAPTURE_V5_BLOCKED_EXPORT
     : recaptureV4
       ? OWNER_PROOF_RECAPTURE_V4_EXPORT
       : OWNER_REVIEW_EXPORT;
@@ -445,7 +450,7 @@ function exportOwnerReviewPack({
   }
 
   const selected = ownerPack
-    ? pickRecaptureUpload20(copied, ledgerRows, uploadManifest)
+    ? pickRecaptureUpload20(copied, ledgerRows, uploadManifest, exportRoot)
     : pickSelected20(copied, ledgerRows);
   const selectedMeta = [];
   selected.forEach((item, idx) => {
@@ -579,9 +584,98 @@ function exportOwnerReviewPack({
         ].join('\n') + '\n',
   );
 
+  // Root index for owner package browsing
+  const rootIndex = path.join(exportRoot, 'index.html');
+  const reviewIndexRel = fs.existsSync(path.join(exportRoot, 'review', 'index.html'))
+    ? 'review/index.html'
+    : null;
+  fs.writeFileSync(
+    rootIndex,
+    `<!doctype html><html><head><meta charset="utf-8"/><title>Phase 34 owner-proof package</title></head><body>
+      <h1>Phase 34 owner-proof package</h1>
+      <ul>
+        <li><a href="upload-20/">upload-20 (exact 20 PNGs)</a></li>
+        <li><a href="source-screenshots/">source-screenshots</a></li>
+        <li><a href="transcripts/">transcripts</a></li>
+        <li><a href="dossiers/">dossiers</a></li>
+        <li><a href="reports/">reports</a></li>
+        ${reviewIndexRel ? `<li><a href="${reviewIndexRel}">review index</a></li>` : ''}
+        <li><a href="manifest.json">manifest.json</a></li>
+        <li><a href="SHA256SUMS">SHA256SUMS</a></li>
+      </ul>
+    </body></html>\n`,
+  );
+
+  const transcriptsDir = path.join(exportRoot, 'transcripts');
+  const dossiersDir = path.join(exportRoot, 'dossiers');
+  fs.mkdirSync(transcriptsDir, { recursive: true });
+  fs.mkdirSync(dossiersDir, { recursive: true });
+  for (const row of ledgerRows) {
+    const sid = row.owner_proof_scenario_id || row.scenario_id || row.session_id || 'session';
+    const safe = String(sid).replace(/[^a-zA-Z0-9._-]+/g, '_');
+    const transcript = {
+      scenario_id: sid,
+      session_id: row.session_id || null,
+      turns: row.turns || row.turn_records || [],
+      visible_user_intent: row.visible_user_intent || row.user_intent || null,
+      outcome: row.session_outcome || row.H1_status || null,
+    };
+    fs.writeFileSync(
+      path.join(transcriptsDir, `${safe}.json`),
+      JSON.stringify(transcript, null, 2) + '\n',
+    );
+    fs.writeFileSync(
+      path.join(transcriptsDir, `${safe}.txt`),
+      [
+        `Scenario: ${sid}`,
+        `Session: ${transcript.session_id || 'n/a'}`,
+        `Intent: ${transcript.visible_user_intent || ''}`,
+        `Outcome: ${transcript.outcome || ''}`,
+        '',
+        ...(Array.isArray(transcript.turns)
+          ? transcript.turns.map(
+              (t, i) =>
+                `Turn ${i + 1}: ${t.intent || t.user_intent || ''}\n  → ${t.summary || t.result_summary || ''}`,
+            )
+          : []),
+        '',
+      ].join('\n'),
+    );
+    fs.writeFileSync(
+      path.join(dossiersDir, `${safe}.json`),
+      JSON.stringify(
+        {
+          scenario_id: sid,
+          capability: row.capability || null,
+          scenario_class: row.scenario_class || null,
+          protocol: {
+            H1: row.H1_status,
+            H2: row.H2_status,
+            H3: row.H3_status,
+          },
+          latency_ms: row.browser_action_to_panel_ready_ms ?? null,
+          ledger: row,
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+  }
+
   if (ownerPack) {
+    assertExactUpload20Package({
+      selectedDir,
+      selectedMeta,
+      uploadManifest,
+      exportRoot,
+      transcriptsDir,
+      dossiersDir,
+      rootIndex,
+    });
     const zipName = recaptureV5
-      ? 'phase34-owner-proof-live-v5.zip'
+      ? ownerAcceptancePass
+        ? 'phase34-owner-proof-live-v5-pass.zip'
+        : 'phase34-owner-proof-live-v5.zip'
       : 'phase34-owner-proof-live-v4.zip';
     const zipPath = path.join(REPO_ROOT, 'owner-review-artifacts/phase34', zipName);
     if (fs.existsSync(zipPath)) fs.rmSync(zipPath);
@@ -597,6 +691,59 @@ function exportOwnerReviewPack({
   walkNoSymlinks(exportRoot);
 
   return { exportRoot, selected_20: selectedMeta.length, full: copied.length };
+}
+
+function assertExactUpload20Package({
+  selectedDir,
+  selectedMeta,
+  uploadManifest,
+  exportRoot,
+  transcriptsDir,
+  dossiersDir,
+  rootIndex,
+}) {
+  const pngs = fs.readdirSync(selectedDir).filter((n) => n.endsWith('.png')).sort();
+  const required = uploadManifest.map((s) => s.file);
+  const missing = required.filter((f) => !pngs.includes(f));
+  const unexpected = pngs.filter((f) => !required.includes(f));
+  const fileCounts = new Map();
+  for (const f of pngs) fileCounts.set(f, (fileCounts.get(f) || 0) + 1);
+  const dupFiles = [...fileCounts.entries()].filter(([, n]) => n > 1).map(([f]) => f);
+  const shaCounts = new Map();
+  for (const meta of selectedMeta) {
+    shaCounts.set(meta.sha256, (shaCounts.get(meta.sha256) || 0) + 1);
+  }
+  const dupSha = [...shaCounts.entries()].filter(([, n]) => n > 1).map(([s]) => s.slice(0, 12));
+  const slotIds = selectedMeta.map((m) => m.upload_file || m.file);
+  const slotDup = slotIds.filter((f, i) => slotIds.indexOf(f) !== i);
+  const issues = [];
+  if (pngs.length !== 20) issues.push(`png_count_${pngs.length}`);
+  if (selectedMeta.length !== 20) issues.push(`manifest_count_${selectedMeta.length}`);
+  if (missing.length) issues.push(`missing:${missing.join(',')}`);
+  if (unexpected.length) issues.push(`unexpected:${unexpected.join(',')}`);
+  if (dupFiles.length) issues.push(`dup_filenames:${dupFiles.join(',')}`);
+  if (slotDup.length) issues.push(`dup_slots:${slotDup.join(',')}`);
+  if (dupSha.length) issues.push(`dup_sha:${dupSha.join(',')}`);
+  if (!fs.existsSync(rootIndex)) issues.push('missing_index_html');
+  if (!fs.existsSync(transcriptsDir) || fs.readdirSync(transcriptsDir).length === 0) {
+    issues.push('missing_transcripts');
+  }
+  if (!fs.existsSync(dossiersDir) || fs.readdirSync(dossiersDir).length === 0) {
+    issues.push('missing_dossiers');
+  }
+  if (!pngs.includes('18-honest-limits-scarcity-valuation.png')) {
+    issues.push('missing_image_18');
+  }
+  if ((fileCounts.get('20-honest-limits-negotiation-recommendations-analytics.png') || 0) !== 1) {
+    issues.push('image_20_not_once');
+  }
+  if (issues.length) {
+    const err = new Error(`OWNER_PROOF_UPLOAD20_INCOMPLETE:${issues.join('|')}`);
+    err.code = 'OWNER_PROOF_UPLOAD20_INCOMPLETE';
+    err.issues = issues;
+    err.exportRoot = exportRoot;
+    throw err;
+  }
 }
 
 function walkNoSymlinks(root) {
@@ -616,22 +763,43 @@ function walkNoSymlinks(root) {
   }
 }
 
-function pickRecaptureUpload20(copied, ledgerRows, uploadManifest = RECAPTURE_V5_UPLOAD_MANIFEST) {
+function pickRecaptureUpload20(
+  copied,
+  ledgerRows,
+  uploadManifest = RECAPTURE_V5_UPLOAD_MANIFEST,
+  exportRoot = null,
+) {
   const byScenario = new Map();
   for (const c of copied) {
     const sid = c.scenario_id || guessScenario(c);
     if (!byScenario.has(sid)) byScenario.set(sid, []);
     byScenario.get(sid).push(c);
   }
+  const materialRows = (rows) => (rows || []).filter((r) => !isLoadingScreenshotRow(r));
+  const resolvePath = (row) => {
+    if (!row) return null;
+    const candidates = [
+      row.path,
+      row.file_path,
+      row.absolute_path,
+      exportRoot && row.export_rel ? path.join(exportRoot, row.export_rel) : null,
+    ].filter(Boolean);
+    for (const c of candidates) {
+      if (fs.existsSync(c)) return c;
+    }
+    return null;
+  };
   const pickTerminal = (scenarioId) => {
-    const rows = byScenario.get(scenarioId) || [];
+    const rows = materialRows(byScenario.get(scenarioId) || []);
     if (!rows.length) return null;
     const term = rows.find((r) =>
-      /ready|terminal|completed|result/i.test(String(r.state || r.capture_state || r.label || '')),
+      /ready|terminal|completed|result|success|correction|abstention/i.test(
+        String(r.state || r.capture_state || r.label || ''),
+      ),
     );
     return term || rows[rows.length - 1];
   };
-  const nego = byScenario.get('negotiation-four-turn-live') || [];
+  const nego = materialRows(byScenario.get('negotiation-four-turn-live') || []);
   const negoByTurn = new Map();
   for (const r of nego) {
     const ti = r.turn_index ?? 0;
@@ -640,82 +808,119 @@ function pickRecaptureUpload20(copied, ledgerRows, uploadManifest = RECAPTURE_V5
   const usedSha = new Set();
   const take = (row, upload_file) => {
     if (!row) return null;
-    let pick = row;
-    if (usedSha.has(pick.sha256)) {
-      const alt = copied.find((c) => !usedSha.has(c.sha256));
-      if (alt) pick = alt;
+    if (usedSha.has(row.sha256)) {
+      const err = new Error(
+        `OWNER_PROOF_UPLOAD20_DUPLICATE_SOURCE:${upload_file}:${row.scenario_id || row.path}`,
+      );
+      err.code = 'OWNER_PROOF_UPLOAD20_DUPLICATE_SOURCE';
+      throw err;
     }
-    if (!pick) return null;
-    usedSha.add(pick.sha256);
-    return { ...pick, upload_file };
+    usedSha.add(row.sha256);
+    return { ...row, upload_file };
   };
 
-  const honest = (prefix) =>
-    copied.find(
-      (c) =>
-        c.scenario_id &&
-        String(c.scenario_id).includes('honest') &&
-        String(c.scenario_id).includes(prefix) &&
-        !usedSha.has(c.sha256),
-    ) || null;
+  const compositeDir = path.join(
+    exportRoot || path.join(REPO_ROOT, 'owner-review-artifacts/phase34'),
+    '.composites-tmp',
+  );
+  fs.mkdirSync(compositeDir, { recursive: true });
+
+  const buildHonestComposite = (upload_file, scenarioIds, labels) => {
+    const sources = [];
+    for (const sid of scenarioIds) {
+      const row = pickTerminal(sid);
+      if (row) sources.push(row);
+    }
+    if (sources.length < 2) {
+      const err = new Error(
+        `OWNER_PROOF_UPLOAD20_COMPOSITE_SOURCES:${upload_file}:${scenarioIds.join(',')}`,
+      );
+      err.code = 'OWNER_PROOF_UPLOAD20_COMPOSITE_SOURCES';
+      throw err;
+    }
+    const uniquePaths = [...new Set(sources.map(resolvePath).filter(Boolean))];
+    if (uniquePaths.length < 2) {
+      const err = new Error(`OWNER_PROOF_UPLOAD20_COMPOSITE_UNREADABLE:${upload_file}`);
+      err.code = 'OWNER_PROOF_UPLOAD20_COMPOSITE_UNREADABLE';
+      throw err;
+    }
+    const outPath = path.join(compositeDir, upload_file);
+    const stitched = stitchPngsVertically(uniquePaths.slice(0, 3), outPath, {
+      labels: labels.slice(0, Math.min(3, uniquePaths.length)),
+    });
+    return {
+      path: stitched.path,
+      absolute_path: stitched.path,
+      file_path: stitched.path,
+      sha256: stitched.sha256,
+      scenario_id: `__composite__:${scenarioIds.join('+')}`,
+      state: 'terminal_composite',
+      upload_file,
+      label: upload_file,
+    };
+  };
 
   const out = [];
   for (const slot of uploadManifest) {
     let row = null;
     if (slot.scenario === '__overview__') {
       row =
-        copied.find(
-          (c) =>
-            (c.scenario_id === '__overview__' || c.scenario_id === 'ai-platform-overview') &&
-            !usedSha.has(c.sha256),
-        ) ||
+        materialRows(
+          (byScenario.get('__overview__') || []).concat(
+            byScenario.get('ai-platform-overview') || [],
+          ),
+        ).find((c) => !usedSha.has(c.sha256)) ||
         copied.find(
           (c) =>
             /insights/i.test(String(c.browser_route || c.page_url || '')) &&
             /ready|terminal|success|overview/i.test(String(c.state || c.capture_state || '')) &&
+            !isLoadingScreenshotRow(c) &&
             !usedSha.has(c.sha256),
-        ) ||
-        byScenario.get('embeddings-success-current-lineage')?.[0] ||
-        copied.find((c) => !usedSha.has(c.sha256)) ||
-        copied[0];
+        );
     } else if (slot.scenario === '__honest_scarcity_valuation__') {
-      row =
-        honest('scarcity') ||
-        honest('valuation') ||
-        byScenario.get('scarcity-weak-evidence-customer')?.[0] ||
-        byScenario.get('valuation-weak-comps-customer')?.[0];
+      row = buildHonestComposite(
+        slot.file,
+        ['scarcity-weak-data-abstention', 'valuation-weak-comparables'],
+        ['Honest limit — scarcity', 'Honest limit — valuation'],
+      );
     } else if (slot.scenario === '__honest_auction_embed_search__') {
-      row =
-        honest('auction') ||
-        honest('embed') ||
-        honest('search') ||
-        copied.find((c) => !usedSha.has(c.sha256));
+      row = buildHonestComposite(
+        slot.file,
+        ['auction-weak-proxy-data', 'embeddings-deleted-source', 'search-visible-fallback-or-empty'],
+        ['Honest limit — auction', 'Honest limit — embeddings', 'Honest limit — search'],
+      );
     } else if (slot.scenario === '__honest_nego_recs_analytics__') {
-      row =
-        honest('negotiation') ||
-        honest('recommendation') ||
-        honest('analytics') ||
-        copied.find((c) => !usedSha.has(c.sha256));
+      row = buildHonestComposite(
+        slot.file,
+        [
+          'negotiation-privacy-or-safety-refusal',
+          'recommendations-cold-start-honesty',
+          'analytics-sample-below-policy-customer',
+        ],
+        ['Honest limit — negotiation', 'Honest limit — recommendations', 'Honest limit — analytics'],
+      );
     } else if (slot.scenario === 'negotiation-four-turn-live') {
       if (slot.turn === 0) row = negoByTurn.get(0) || nego[0];
-      else if (slot.turn === 'draft') row = nego[nego.length - 1] || negoByTurn.get(3);
-      else row = negoByTurn.get(1) || nego[Math.min(1, nego.length - 1)];
+      else if (slot.turn === 'draft') row = negoByTurn.get(3) || nego[nego.length - 1];
+      else row = negoByTurn.get(1) || negoByTurn.get(2) || nego[Math.min(1, nego.length - 1)];
     } else {
       row = pickTerminal(slot.scenario);
     }
     const picked = take(row, slot.file);
-    if (picked) out.push(picked);
+    if (!picked) {
+      const err = new Error(`OWNER_PROOF_UPLOAD20_MISSING_SLOT:${slot.file}:${slot.scenario}`);
+      err.code = 'OWNER_PROOF_UPLOAD20_MISSING_SLOT';
+      throw err;
+    }
+    out.push(picked);
   }
-  while (out.length < 20 && copied.length) {
-    const next = copied.find((c) => !usedSha.has(c.sha256));
-    if (!next) break;
-    usedSha.add(next.sha256);
-    out.push({
-      ...next,
-      upload_file: uploadManifest[out.length]?.file || `extra-${out.length + 1}.png`,
-    });
+
+  if (out.length !== uploadManifest.length) {
+    const err = new Error(`OWNER_PROOF_UPLOAD20_COUNT:${out.length}`);
+    err.code = 'OWNER_PROOF_UPLOAD20_COUNT';
+    throw err;
   }
-  return out.slice(0, 20);
+  return out;
 }
 
 function pickSelected20(copied, ledgerRows) {
@@ -1208,18 +1413,21 @@ export async function executeOwnerProofLiveRehearsal({
   try {
     const bySession = new Map();
     for (const row of manifest.rows || []) {
+      if (isLoadingScreenshotRow(row)) continue;
       const sid = row.session_id || 'unknown';
       if (!bySession.has(sid)) bySession.set(sid, []);
       bySession.get(sid).push({
         path: row.path || row.file_path || row.absolute_path,
         label: `${row.capability}:${row.state || 'state'}:turn${row.turn_index ?? 0}`,
+        state: row.state,
+        capture_state: row.capture_state,
       });
     }
     for (const [, rows] of bySession) {
       if (rows.length < 2) continue;
       assertScreenshotDistinctness(
         rows.filter((r) => r.path),
-        { maxExactDuplicates: 0 },
+        { maxExactDuplicates: 0, includeLoading: false },
       );
     }
   } catch (err) {
@@ -1239,14 +1447,16 @@ export async function executeOwnerProofLiveRehearsal({
   const h3 = ledgerRows.filter((r) => r.H3_status === 'PASS').length;
   const nego = results.find((r) => r.session?.owner_proof_scenario_id === 'negotiation-four-turn-live');
 
-  const frozenReady =
+  const scheduleComplete =
     pass === 24 &&
     fail === 0 &&
     turns === 27 &&
     h1 === 27 &&
     h2 === 27 &&
     h3 === 27 &&
-    gate.next_session_started_after_hard_failure === 0 &&
+    gate.next_session_started_after_hard_failure === 0;
+  const frozenReady =
+    scheduleComplete &&
     pngValidation.pass &&
     distinctness.ok !== false;
 
@@ -1256,8 +1466,21 @@ export async function executeOwnerProofLiveRehearsal({
     })),
     {
       plannedTurns: 27,
-      runCompleted: frozenReady,
-      runAborted: !frozenReady,
+      runCompleted: scheduleComplete && latencySamples.length === 27,
+      runAborted: !scheduleComplete,
+      ownerProofSchedule: true,
+      acceptanceStatus: frozenReady
+        ? 'PASS'
+        : scheduleComplete
+          ? 'BLOCKED_POST_EXECUTION'
+          : 'NOT_APPLICABLE',
+      acceptanceFailureClass: frozenReady
+        ? null
+        : !distinctness.ok
+          ? 'SCREENSHOT_AND_PACKAGE_GATES'
+          : scheduleComplete
+            ? 'SCREENSHOT_AND_PACKAGE_GATES'
+            : null,
       metricName: 'browser_action_to_terminal_ready_ms',
       runId: recaptureV5
         ? 'phase34-owner-proof-live-recapture-v5'
@@ -1295,6 +1518,16 @@ export async function executeOwnerProofLiveRehearsal({
     screenshots: manifest.count,
     screenshot_png_validation: pngValidation.screenshots_validated,
     gate: gate.snapshot(),
+    execution_state: scheduleComplete ? 'COMPLETE' : 'INCOMPLETE',
+    schedule_state: scheduleComplete ? 'COMPLETE' : 'INCOMPLETE',
+    measurement_state: scheduleComplete
+      ? 'COMPLETE_FOR_OWNER_PROOF_SCHEDULE'
+      : 'PARTIAL',
+    protocol_state: h1 === 27 && h2 === 27 && h3 === 27 ? 'PASS' : 'FAIL',
+    browser_state: pass === 24 && fail === 0 ? 'PASS' : 'FAIL',
+    owner_acceptance_state: frozenReady ? 'PASS' : 'BLOCKED',
+    package_state: frozenReady ? 'COMPLETE' : 'INCOMPLETE',
+    production_state: 'NOT_APPROVED',
     freeze: frozenReady ? 'FROZEN_PASS_EVIDENCE' : 'FROZEN_BLOCKED_EVIDENCE',
     negotiation_session_id: nego?.session?.session_id || null,
     browser_tls_mode: proxy.tls_mode,
@@ -1338,6 +1571,7 @@ export async function executeOwnerProofLiveRehearsal({
       latency,
       recaptureV4,
       recaptureV5,
+      ownerAcceptancePass: frozenReady,
     });
   } catch (err) {
     summary.export_error = String(err.message || err);

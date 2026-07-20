@@ -114,12 +114,25 @@ export function summarizeLatency(rowsOrSamples, options = {}) {
     ? options.plannedTurns
     : 27;
 
+  const runCompleted = options.runCompleted === true;
+  let runAborted = options.runAborted === true;
+  // Legacy callers that omit both flags: incomplete samples imply abort.
+  if (
+    options.runCompleted == null &&
+    options.runAborted == null &&
+    samples.length > 0 &&
+    samples.length < plannedTurns
+  ) {
+    runAborted = true;
+  }
+
   return summarizeLatencyV2(samples, {
     plannedTurns,
-    runCompleted: options.runCompleted === true,
-    runAborted:
-      options.runAborted === true ||
-      (options.runCompleted !== true && samples.length < plannedTurns),
+    runCompleted,
+    runAborted,
+    ownerProofSchedule: options.ownerProofSchedule !== false,
+    acceptanceStatus: options.acceptanceStatus ?? null,
+    acceptanceFailureClass: options.acceptanceFailureClass ?? null,
     metricName: options.metricName || 'browser_action_to_terminal_ready_ms',
     runId: options.runId ?? null,
   });

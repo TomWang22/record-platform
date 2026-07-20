@@ -8,9 +8,22 @@
 
 export const LATENCY_MEASUREMENT_STATUS = Object.freeze({
   COMPLETE: 'COMPLETE_RUN',
+  COMPLETE_OWNER_PROOF_SCHEDULE: 'COMPLETE_OWNER_PROOF_SCHEDULE',
   PARTIAL: 'PARTIAL_RUN',
   PARTIAL_ABORTED: 'PARTIAL_ABORTED_RUN',
   EMPTY: 'NO_MEASUREMENTS',
+});
+
+export const LATENCY_REPRESENTATIVE_STATUS = Object.freeze({
+  THIS_RUN: 'REPRESENTATIVE_OF_THIS_RUN',
+  OWNER_PROOF_ONLY: 'OWNER_PROOF_ONLY_NOT_PLATFORM_PERFORMANCE',
+  NOT_FULL_RUN: 'NOT_REPRESENTATIVE_OF_FULL_RUN',
+});
+
+export const LATENCY_ACCEPTANCE_STATUS = Object.freeze({
+  PASS: 'PASS',
+  BLOCKED_POST_EXECUTION: 'BLOCKED_POST_EXECUTION',
+  N_A: 'NOT_APPLICABLE',
 });
 
 export const PERCENTILE_SUPPORT = Object.freeze({
@@ -177,11 +190,15 @@ function deriveMeasurementStatus({
   plannedCount,
   runCompleted,
   runAborted,
+  ownerProofSchedule = false,
 }) {
   if (actualCount === 0) return LATENCY_MEASUREMENT_STATUS.EMPTY;
   if (runAborted) return LATENCY_MEASUREMENT_STATUS.PARTIAL_ABORTED;
   if (!runCompleted || actualCount < plannedCount) {
     return LATENCY_MEASUREMENT_STATUS.PARTIAL;
+  }
+  if (ownerProofSchedule) {
+    return LATENCY_MEASUREMENT_STATUS.COMPLETE_OWNER_PROOF_SCHEDULE;
   }
   return LATENCY_MEASUREMENT_STATUS.COMPLETE;
 }
@@ -228,6 +245,9 @@ function buildPercentileEntry(sortedSamples, percentileKey) {
  *   plannedTurns: number,
  *   runCompleted?: boolean,
  *   runAborted?: boolean,
+ *   ownerProofSchedule?: boolean,
+ *   acceptanceStatus?: string | null,
+ *   acceptanceFailureClass?: string | null,
  *   metricName?: string,
  *   runId?: string | null,
  *   percentileKeys?: string[],
@@ -246,6 +266,9 @@ export function summarizeLatency(samplesMs, options) {
     plannedTurns,
     runCompleted = false,
     runAborted = false,
+    ownerProofSchedule = false,
+    acceptanceStatus = null,
+    acceptanceFailureClass = null,
     metricName = 'browser_action_to_terminal_ready_ms',
     runId = null,
     percentileKeys = DEFAULT_PERCENTILE_KEYS,
@@ -281,6 +304,7 @@ export function summarizeLatency(samplesMs, options) {
     plannedCount: plannedTurns,
     runCompleted,
     runAborted,
+    ownerProofSchedule,
   });
 
   const percentileResults = {};
@@ -288,31 +312,51 @@ export function summarizeLatency(samplesMs, options) {
     percentileResults[key] = buildPercentileEntry(sorted, key);
   }
 
-  const representative =
-    measurementStatus === LATENCY_MEASUREMENT_STATUS.COMPLETE
-      ? 'REPRESENTATIVE_OF_THIS_RUN'
-      : 'NOT_REPRESENTATIVE_OF_FULL_RUN';
+  const scheduleComplete =
+    runCompleted &&
+    !runAborted &&
+    actualCount === plannedTurns;
+
+  let representative;
+  if (!scheduleComplete) {
+    representative = LATENCY_REPRESENTATIVE_STATUS.NOT_FULL_RUN;
+  } else if (ownerProofSchedule) {
+    representative = LATENCY_REPRESENTATIVE_STATUS.OWNER_PROOF_ONLY;
+  } else {
+    representative = LATENCY_REPRESENTATIVE_STATUS.THIS_RUN;
+  }
 
   const observedMedian =
     actualCount > 0 ? nearestRankPercentile(sorted, 'p50') : null;
   const observedMax =
     actualCount > 0 ? sorted[actualCount - 1] : null;
 
+  const resolvedAcceptance =
+    acceptanceStatus ||
+    (scheduleComplete
+      ? LATENCY_ACCEPTANCE_STATUS.N_A
+      : LATENCY_ACCEPTANCE_STATUS.N_A);
+
   const note =
     actualCount === 0
       ? `No ${metricName} observations were recorded.`
-      : measurementStatus === LATENCY_MEASUREMENT_STATUS.COMPLETE
-        ? `${actualCount}/${plannedTurns} planned turns were measured for ${metricName}. Tail percentile support is reported per percentile. High percentiles remain NOT_ESTIMABLE until larger performance tiers run.`
-        : `${actualCount}/${plannedTurns} planned turns were measured before the run ended. This schedule-biased partial sample must not be presented as platform-wide performance. Unsupported tail percentiles are suppressed. Coverage ${actualCount}/${plannedTurns}.`;
+      : scheduleComplete && ownerProofSchedule
+        ? `${actualCount}/${plannedTurns} planned turns were measured for this owner-proof schedule (${metricName}). Descriptive statistics are SUPPORTED for this schedule only and are not platform-wide performance claims. High percentiles remain NOT_ESTIMABLE until larger performance tiers run.`
+        : scheduleComplete
+          ? `${actualCount}/${plannedTurns} planned turns were measured for ${metricName}. Tail percentile support is reported per percentile. High percentiles remain NOT_ESTIMABLE until larger performance tiers run.`
+          : `${actualCount}/${plannedTurns} planned turns were measured before the run ended. This schedule-biased partial sample must not be presented as platform-wide performance. Unsupported tail percentiles are suppressed. Coverage ${actualCount}/${plannedTurns}.`;
 
   return {
-    schema_version: 'phase34-latency-summary-v3',
+    schema_version: 'phase34-latency-summary-v4',
     run_id: runId,
     metric_name: metricName,
     unit: 'milliseconds',
     measurement_status: measurementStatus,
     run_completed: runCompleted,
     run_aborted: runAborted,
+    schedule_state: scheduleComplete ? 'COMPLETE' : runAborted ? 'ABORTED' : 'PARTIAL',
+    acceptance_status: resolvedAcceptance,
+    acceptance_failure_class: acceptanceFailureClass,
     representative_status: representative,
     actual_sample_count: actualCount,
     planned_turn_count: plannedTurns,

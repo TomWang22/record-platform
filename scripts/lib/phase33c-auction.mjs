@@ -163,7 +163,9 @@ function analyzeSingleAuction(input) {
     })),
     price_dispersion: 0,
     estimated_competition: Math.min(1, bid_count / 15),
-    buyer_pressure: late_bid_pressure >= 0.5 ? ['elevated_late_bidding'] : ['limited'],
+    buyer_pressure: late_bid_pressure >= 0.5
+      ? ['Late bidding is elevated.']
+      : ['Pressure signals are limited.'],
     seller_opportunity: bid_velocity >= 2 ? ['strong_momentum'] : ['monitor'],
     risk_flags,
     notable_auctions: deleted
@@ -482,13 +484,13 @@ function analyzeWatchlistBatch(input) {
     buyer_pressure: abstention.abstained
       ? []
       : late_bid_pressure >= 0.5
-        ? ['buyer_competition_elevated']
-        : ['buyer_competition_limited'],
+        ? ['Buyer competition looks elevated near closing.']
+        : ['Buyer competition looks limited on these lots.'],
     seller_opportunity: abstention.abstained
       ? []
       : closing_time_concentration.some((b) => b.count >= 2)
-        ? ['clustered_closings_timing_edge']
-        : ['standard_timing'],
+        ? ['Several lots close in a tight window — timing matters.']
+        : ['Closing times are spread out.'],
     risk_flags,
     notable_auctions: abstention.abstained
       ? []

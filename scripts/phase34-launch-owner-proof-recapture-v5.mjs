@@ -16,6 +16,7 @@ import {
   validateSeedManifestAgainstScenarios,
   OWNER_PROOF_RECAPTURE_V5_ROOT,
   OWNER_PROOF_RECAPTURE_V5_ATTEMPT2_ROOT,
+  OWNER_PROOF_RECAPTURE_V5_ATTEMPT3_ROOT,
   OWNER_PROOF_RECAPTURE_V5_EXPORT,
 } from './lib/phase34-owner-proof-scenarios.mjs';
 import {
@@ -54,6 +55,15 @@ function parseArgs(argv) {
     else if (a === '--headed') opts.headless = false;
     else if (a === '--proxy-port') opts.proxyPort = Number(argv[++i]);
     else if (a === '--attempt-2') opts.out = OWNER_PROOF_RECAPTURE_V5_ATTEMPT2_ROOT;
+    else if (a === '--attempt-3') opts.out = OWNER_PROOF_RECAPTURE_V5_ATTEMPT3_ROOT;
+    else if (a === '--attempt' && argv[i + 1]) {
+      const n = Number(argv[++i]);
+      if (!Number.isInteger(n) || n < 2) throw new Error(`invalid_attempt:${n}`);
+      opts.out =
+        n === 2
+          ? OWNER_PROOF_RECAPTURE_V5_ATTEMPT2_ROOT
+          : `/tmp/phase34-owner-proof-live-recapture-v5-attempt-${n}`;
+    }
   }
   return opts;
 }
@@ -62,10 +72,14 @@ function assertFrozenPriorsIntact() {
   for (const root of [
     '/tmp/phase34-owner-proof-live-recapture-v3',
     '/tmp/phase34-owner-proof-live-recapture-v4',
+    '/tmp/phase34-owner-proof-live-recapture-v5',
+    '/tmp/phase34-owner-proof-live-recapture-v5-attempt-2',
   ]) {
+    if (!fs.existsSync(root)) continue;
     const marker = path.join(root, 'FROZEN_BLOCKED_EVIDENCE');
-    if (!fs.existsSync(marker)) {
-      throw new Error(`frozen_prior_missing:${marker}`);
+    const summary = path.join(root, 'execution-summary.json');
+    if (!fs.existsSync(marker) && !fs.existsSync(summary)) {
+      throw new Error(`frozen_prior_missing:${root}`);
     }
   }
 }

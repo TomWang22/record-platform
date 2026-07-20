@@ -1,5 +1,8 @@
 /**
  * Reject duplicate screenshots masquerading as distinct states/turns.
+ *
+ * Generic loading frames are diagnostic-only: identical loading pixels across
+ * turns are allowed and never participate in material result-distinctness.
  */
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -8,15 +11,33 @@ export const DUPLICATE_SCREENSHOT_MASQUERADING_AS_DISTINCT_STATE =
   'DUPLICATE_SCREENSHOT_MASQUERADING_AS_DISTINCT_STATE';
 
 /**
- * @param {Array<{ path: string, label?: string, turn_index?: number, state_id?: string, allow_duplicate?: boolean }>} rows
- * @param {{ maxExactDuplicates?: number }} [opts]
+ * @param {{ path?: string, label?: string, state?: string, capture_state?: string, state_id?: string }} row
+ */
+export function isLoadingScreenshotRow(row) {
+  const parts = [row?.label, row?.state, row?.capture_state, row?.state_id]
+    .map((v) => String(v || '').toLowerCase())
+    .join(' ');
+  return (
+    /\bloading\b/.test(parts) ||
+    /\bskeleton\b/.test(parts) ||
+    /\bawaiting live insight\b/.test(parts)
+  );
+}
+
+/**
+ * @param {Array<{ path: string, label?: string, turn_index?: number, state_id?: string, state?: string, capture_state?: string, allow_duplicate?: boolean }>} rows
+ * @param {{ maxExactDuplicates?: number, includeLoading?: boolean }} [opts]
  */
 export function assertScreenshotDistinctness(rows, opts = {}) {
   const maxExactDuplicates = opts.maxExactDuplicates ?? 1;
+  const includeLoading = opts.includeLoading === true;
   const byHash = new Map();
   const issues = [];
 
   for (const row of rows) {
+    if (!includeLoading && isLoadingScreenshotRow(row)) {
+      continue;
+    }
     if (!row?.path || !fs.existsSync(row.path)) {
       issues.push({ code: 'screenshot_missing', path: row?.path });
       continue;

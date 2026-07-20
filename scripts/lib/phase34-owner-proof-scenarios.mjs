@@ -24,7 +24,13 @@ export const OWNER_PROOF_RECAPTURE_V4_EXPORT = path.join(
 export const OWNER_PROOF_RECAPTURE_V5_ROOT = '/tmp/phase34-owner-proof-live-recapture-v5';
 export const OWNER_PROOF_RECAPTURE_V5_ATTEMPT2_ROOT =
   '/tmp/phase34-owner-proof-live-recapture-v5-attempt-2';
+export const OWNER_PROOF_RECAPTURE_V5_ATTEMPT3_ROOT =
+  '/tmp/phase34-owner-proof-live-recapture-v5-attempt-3';
 export const OWNER_PROOF_RECAPTURE_V5_EXPORT = path.join(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'),
+  'owner-review-artifacts/phase34/owner-proof-live-v5-pass',
+);
+export const OWNER_PROOF_RECAPTURE_V5_BLOCKED_EXPORT = path.join(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'),
   'owner-review-artifacts/phase34/owner-proof-live-v5',
 );

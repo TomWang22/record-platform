@@ -6,7 +6,7 @@ import { OwnerProofIntentControl } from '@/components/ai/intelligence/owner-proo
 import { IntelligencePanelShell } from '@/components/ai/intelligence/intelligence-panel-shell'
 import { fetchRecommendationsIntelligence, IntelligenceHttpError } from '@/lib/ai-intelligence-client'
 import { assembleRecommendationsRequest, type RecommendationCandidateInput } from '@/lib/ai-recommendations-assembler'
-import { sanitizeCustomerFacingText } from '@/lib/ai-customer-copy'
+import { customerCopyForCode, sanitizeCustomerFacingText } from '@/lib/ai-customer-copy'
 
 type RecommendationsIntelligencePanelProps = {
   principalId: string | null
@@ -14,11 +14,45 @@ type RecommendationsIntelligencePanelProps = {
 }
 
 function reasonLabels(item: Record<string, unknown>): string {
+  const REASON_COPY: Record<string, string> = {
+    blue_note_preference: 'Matches your Blue Note preference.',
+    collection_gap: 'Adds an artist or style missing from your collection.',
+    budget_fit: 'Fits your $60 budget.',
+    picture_disc_excluded: 'Not a picture disc.',
+    diversification: 'Chosen to diversify your collection.',
+    portfolio_diversification: 'Chosen to diversify your collection.',
+    exact_pressing_fit: 'Matches the pressing you care about.',
+    metadata_relevance: 'Aligned with your collection metadata.',
+    similar_release: 'Similar to releases you already collect.',
+    market_opportunity: 'Priced attractively relative to recent sales.',
+  }
   const codes = Array.isArray(item.reason_codes) ? item.reason_codes.map(String) : []
   if (codes.length === 0) {
-    return String(item.reason || item.explanation || 'Matched from your collection and market signals')
+    const raw = item.reason || item.explanation
+    if (raw && typeof raw === 'object') {
+      return 'Matched from your collection and market signals'
+    }
+    return String(raw || 'Matched from your collection and market signals')
   }
-  return codes.map((c) => sanitizeCustomerFacingText(c)).join(' · ')
+  return codes
+    .map((c) => REASON_COPY[c] || sanitizeCustomerFacingText(c) || customerCopyForCode(c))
+    .filter(Boolean)
+    .join(' · ')
+}
+
+function availabilityLabel(item: Record<string, unknown>): string {
+  const raw = item.availability
+  if (raw && typeof raw === 'object') {
+    const status = String((raw as { status?: string }).status || '').toLowerCase()
+    if (status === 'available') return 'Available'
+    if (status === 'unavailable') return 'Unavailable'
+    if (status === 'deleted') return 'Unavailable'
+    return 'Availability unknown'
+  }
+  if (typeof raw === 'string' && raw.trim()) return raw
+  if (item.status) return String(item.status)
+  if (item.in_stock === false) return 'Unavailable'
+  return 'Available'
 }
 
 export function RecommendationsIntelligencePanel({
@@ -119,7 +153,7 @@ export function RecommendationsIntelligencePanel({
                   : typeof item.price_cents === 'number'
                     ? `$${(Number(item.price_cents) / 100).toFixed(0)}`
                     : null,
-                item.availability || item.status || (item.in_stock === false ? 'Unavailable' : 'Available'),
+                availabilityLabel(item),
               ]
                 .filter(Boolean)
                 .join(' · ')}

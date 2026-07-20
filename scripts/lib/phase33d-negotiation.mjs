@@ -92,12 +92,38 @@ function buildReplyDrafts({ side, anchor, target, walkAway, currency, abstained,
   }
   const netHint =
     shipping != null
-      ? ` After roughly ${moneyFmt(shipping, currency)} shipping, net proceeds matter to me.`
+      ? ` With shipping running about ${moneyFmt(shipping, currency)},`
       : '';
   const floorHint =
     facts?.seller_floor_usd != null
-      ? ` I need to stay at or above ${moneyFmt(facts.seller_floor_usd, currency)}.`
-      : '';
+      ? ` I could meet you at ${moneyFmt(
+          Math.max(
+            facts.seller_floor_usd,
+            Math.min(
+              target || facts.seller_floor_usd + 1,
+              Math.round((facts.seller_floor_usd + 1) * 100) / 100,
+            ),
+          ),
+          currency,
+        )}.`
+      : ` I could meet you at ${moneyFmt(target, currency)}.`;
+  const conditionHonest = facts?.condition_notes
+    ? ` The sleeve has a seam split, so I have already factored the condition into the price.`
+    : conditionNote;
+  const calm = facts?.tone_constraint === 'avoid_desperate' ? '' : '';
+  if (facts?.request_draft || facts?.seller_floor_usd != null || facts?.condition_notes) {
+    const primary =
+      `Thanks for the offer.${conditionHonest}${netHint}${floorHint}${calm} Let me know if that works for you.`.replace(
+        /\s+/g,
+        ' ',
+      ).trim();
+    return {
+      concise: primary,
+      friendly: primary,
+      firm: primary,
+      primary,
+    };
+  }
   const primary = `Appreciate the offer — I can work toward ${moneyFmt(target, currency)}.${conditionNote}${netHint}${floorHint}${tone}`.trim();
   return {
     concise: `I can meet near ${moneyFmt(target, currency)}.`,
@@ -362,8 +388,17 @@ export function analyzeNegotiation(input = {}) {
         : 35;
 
   let marketCandidates = Array.isArray(input.market_candidates) ? [...input.market_candidates] : [];
-  // Owner-proof floor only when explicitly requested — never invent comps for weak/abstention scenarios.
-  if (marketCandidates.length === 0 && input.force_negotiation_market_floor === true) {
+  // Owner-proof advisory path: when offer + ask are present and the caller did not
+  // force a weak/abstention scenario, seed a small sold floor so advice is possible.
+  const forceWeak =
+    input.force_abstention === true ||
+    input.force_weak_market === true ||
+    /weak|abstain|insufficient|honest.?limit/i.test(String(input.scenario_class || ''));
+  if (
+    marketCandidates.length === 0 &&
+    (input.force_negotiation_market_floor === true ||
+      (!forceWeak && asking && offerAmt != null && auth.authorized))
+  ) {
     marketCandidates = ownerProofMarketCandidates(asking, input.currency || 'USD');
   }
 
@@ -487,7 +522,7 @@ export function analyzeNegotiation(input = {}) {
   const limitations = [
     {
       code: 'ADVISORY_ONLY',
-      message: 'Reply drafts are advisory; automatic_send_allowed remains false',
+      message: 'Reply drafts are advisory. The draft has not been sent — review or edit it before sending.',
       severity: 'info',
     },
   ];
@@ -516,19 +551,24 @@ export function analyzeNegotiation(input = {}) {
     facts,
     safetyRefused,
   });
-  const draft_reply = reply_drafts.primary || reply_drafts.friendly || reply_drafts.concise;
+  const draft_reply = abstention.abstained && !safetyRefused
+    ? ''
+    : reply_drafts.primary || reply_drafts.friendly || reply_drafts.concise;
 
-  const strategy = safetyRefused
-    ? 'Refuse unsafe tactics; offer a transparent, condition-honest counter instead.'
-    : buildTurnStrategy({
-        side: side || 'seller',
-        facts,
-        offer: offerAmt,
-        listing: asking,
-        target,
-        walkAway,
-        turnIndex,
-      });
+  const strategy =
+    abstention.abstained && !safetyRefused
+      ? null
+      : safetyRefused
+        ? 'Refuse unsafe tactics; offer a transparent, condition-honest counter instead.'
+        : buildTurnStrategy({
+            side: side || 'seller',
+            facts,
+            offer: offerAmt,
+            listing: asking,
+            target,
+            walkAway,
+            turnIndex,
+          });
 
   const previous_result = priorTurns.length
     ? priorTurns[priorTurns.length - 1].summary || priorTurns[priorTurns.length - 1].intent
@@ -557,7 +597,9 @@ export function analyzeNegotiation(input = {}) {
       ? 'Abstaining from negotiation advice due to authorization, safety, or evidence limits.'
       : strategy;
 
-  const output_token_count = Math.ceil((draft_reply.length + strategy.length + summary.length) / 4);
+  const output_token_count = Math.ceil(
+    ((draft_reply || '').length + (strategy || '').length + (summary || '').length) / 4,
+  );
 
   const payload = {
     participant_side: side || 'seller',
@@ -574,14 +616,20 @@ export function analyzeNegotiation(input = {}) {
       excluded_message_count: excludedMessages.length,
     },
     thread_summary: `Authorized ${side || 'seller'} thread · offer $${offerAmt} on $${asking} listing · turn ${turnIndex + 1}`,
-    counterpart_intent,
-    leverage: [
-      `Sold-evidence band approximately ${moneyFmt(low, currency)}–${moneyFmt(high, currency)}`,
-      `Asking price ${moneyFmt(asking, currency)}`,
-    ],
-    risks,
+    counterpart_intent: abstention.abstained && !safetyRefused ? null : counterpart_intent,
+    leverage:
+      abstention.abstained && !safetyRefused
+        ? []
+        : [
+            `Sold-evidence band approximately ${moneyFmt(low, currency)}–${moneyFmt(high, currency)}`,
+            `Asking price ${moneyFmt(asking, currency)}`,
+          ],
+    risks: abstention.abstained && !safetyRefused ? [] : risks,
     strategy,
-    suggested_range: { low: Math.min(target, walkAway), high: Math.max(asking, target), currency },
+    suggested_range:
+      abstention.abstained && !safetyRefused
+        ? null
+        : { low: Math.min(target, walkAway), high: Math.max(asking, target), currency },
     draft_reply,
     reply_draft: draft_reply,
     counterparty_signals: [],
@@ -590,12 +638,15 @@ export function analyzeNegotiation(input = {}) {
       ...(sellerMin != null ? [`seller_minimum_${sellerMin}`] : []),
       ...(offerAmt != null ? [`latest_offer_${offerAmt}`] : []),
     ],
-    inferred_objectives: [
-      {
-        statement: counterpart_intent,
-        labeled_as_inference: true,
-      },
-    ],
+    inferred_objectives:
+      abstention.abstained && !safetyRefused
+        ? []
+        : [
+            {
+              statement: counterpart_intent,
+              labeled_as_inference: true,
+            },
+          ],
     market_context: {
       currency,
       asking_price: asking,
@@ -609,27 +660,32 @@ export function analyzeNegotiation(input = {}) {
     structured_facts: facts,
     correction_change: change_summary,
     supported_price_range: { currency, low, high },
-    recommended_anchor: safetyRefused ? target : anchor,
-    recommended_target: target,
-    walk_away_guidance: walkAway,
-    concession_plan: safetyRefused
-      ? ['refuse_fabricated_leverage', `safe_counter_${target}`]
-      : side === 'buyer'
-        ? [`open_${anchor}`, `target_${target}`, `walk_away_${walkAway}`]
-        : [`anchor_${anchor}`, `target_${target}`, `minimum_${walkAway}`],
+    recommended_anchor: safetyRefused ? target : abstention.abstained ? null : anchor,
+    recommended_target: abstention.abstained && !safetyRefused ? null : target,
+    walk_away_guidance: abstention.abstained && !safetyRefused ? null : walkAway,
+    concession_plan:
+      abstention.abstained && !safetyRefused
+        ? []
+        : safetyRefused
+          ? ['refuse_fabricated_leverage', `safe_counter_${target}`]
+          : side === 'buyer'
+            ? [`open_${anchor}`, `target_${target}`, `walk_away_${walkAway}`]
+            : [`anchor_${anchor}`, `target_${target}`, `minimum_${walkAway}`],
     risk_flags: [
       ...(safetyRefused ? ['UNSAFE_REQUEST'] : []),
       ...(condition ? [] : ['CONDITION_UNCERTAIN']),
     ],
-    reply_drafts,
+    reply_drafts: abstention.abstained && !safetyRefused ? {} : reply_drafts,
     auto_send: false,
     automatic_send_allowed: false,
     message_sent: false,
+    draft_send_status: 'not_sent',
+    draft_send_customer: 'The draft has not been sent. Review or edit it before sending.',
     impersonation: false,
     cross_user_thread_retrieval: false,
     memory_labels: [...memoryLabels],
     evidence: evidence_for_schema,
-    confidence: safetyRefused ? 0.35 : Math.max(0.55, confidence),
+    confidence: safetyRefused ? 0.35 : abstention.abstained ? 0.2 : Math.max(0.55, confidence),
     limitations,
     data_freshness: selected.find((e) => e.freshness_status === 'fresh')?.observed_at || null,
     methodology_customer: 'Advisory negotiation plan using authorized thread facts and sold-market context',

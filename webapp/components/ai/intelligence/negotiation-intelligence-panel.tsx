@@ -201,6 +201,7 @@ export function NegotiationIntelligencePanel({
         },
         messages,
         market_candidates: [],
+        force_negotiation_market_floor: true,
         automatic_send_allowed: false,
         request_auto_send: false,
         user_intent: userIntent.trim(),
@@ -226,6 +227,23 @@ export function NegotiationIntelligencePanel({
             ...limitationMessages(result.limitations),
             'This thread is not authorized for negotiation assistance, so no draft was generated.',
           ],
+        })
+        setDraft('')
+        return
+      }
+
+      const abstained =
+        Boolean(result.abstention_reason) ||
+        (Array.isArray(result.limitations) &&
+          result.limitations.some(
+            (l) => String(l?.code || '').toUpperCase() === 'ABSTAINED',
+          ))
+
+      if (abstained) {
+        setState({
+          status: 'abstained',
+          result: { ...result, automatic_send_allowed: false, engine_invoked: true },
+          reasons: limitationMessages(result.limitations),
         })
         setDraft('')
         return

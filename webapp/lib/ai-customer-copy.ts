@@ -43,16 +43,23 @@ const CODE_COPY: Record<string, string> = {
   DIVERSIFICATION: 'Chosen to diversify your collection across artists and labels.',
   COLLECTION_GAP: 'Fills a gap in your existing collection.',
   LATE_BID_PRESSURE: 'Bidding activity is concentrated near the auction close.',
+  BUYER_COMPETITION_LIMITED: 'Buyer competition looks limited on these lots.',
+  BUYER_COMPETITION_ELEVATED: 'Buyer competition looks elevated near closing.',
+  CLUSTERED_CLOSINGS_TIMING_EDGE: 'Several lots close in a tight window — timing matters.',
+  STANDARD_TIMING: 'Closing times are spread out.',
+  ELEVATED_LATE_BIDDING: 'Late bidding is elevated.',
+  LIMITED: 'Pressure signals are limited.',
+  BLUE_NOTE_PREFERENCE: 'Matches your Blue Note preference.',
 }
 
 const CODE_PATTERN =
-  /\b(SAMPLE_SIZE_BELOW_POLICY|NO_RELIABLE_SOLD_OR_AUCTION|AGGREGATED_ONLY|NOT_INVOKED_BY_POLICY|INSUFFICIENT_EVIDENCE|WEAK_EVIDENCE|STALE_EVIDENCE|UNAUTHORIZED|PRIVACY_REFUSAL|SAFETY_REFUSAL|FABRICATED_LEVERAGE_REFUSED|UNSAFE_TACTIC_REFUSED|ZERO_RESULTS|SCHEMA_STRATEGY|RERANKER_CONFIGURATION|ENGINE_INVOCATION_STATUS|NO_BIDS|SMALL_COMPARABLE_SAMPLE|BUDGET_FIT|PICTURE_DISC_EXCLUDED|PORTFOLIO_DIVERSIFICATION|DIVERSIFICATION|COLLECTION_GAP|LATE_BID_PRESSURE|ABSTAIN(?:_[A-Z0-9_]+)?)\b/gi
+  /\b(SAMPLE_SIZE_BELOW_POLICY|NO_RELIABLE_SOLD_OR_AUCTION|AGGREGATED_ONLY|NOT_INVOKED_BY_POLICY|INSUFFICIENT_EVIDENCE|WEAK_EVIDENCE|STALE_EVIDENCE|UNAUTHORIZED|PRIVACY_REFUSAL|SAFETY_REFUSAL|FABRICATED_LEVERAGE_REFUSED|UNSAFE_TACTIC_REFUSED|ZERO_RESULTS|SCHEMA_STRATEGY|RERANKER_CONFIGURATION|ENGINE_INVOCATION_STATUS|NO_BIDS|SMALL_COMPARABLE_SAMPLE|BUDGET_FIT|PICTURE_DISC_EXCLUDED|PORTFOLIO_DIVERSIFICATION|DIVERSIFICATION|COLLECTION_GAP|LATE_BID_PRESSURE|BUYER_COMPETITION_LIMITED|BUYER_COMPETITION_ELEVATED|CLUSTERED_CLOSINGS_TIMING_EDGE|STANDARD_TIMING|ELEVATED_LATE_BIDDING|BLUE_NOTE_PREFERENCE|ABSTAIN(?:_[A-Z0-9_]+)?)\b/gi
 
 // Synthetic/internal identifier fragments that must never reach a customer,
 // even when embedded inside otherwise-normal sentences (e.g. seed titles,
 // harness identifiers, or fixture ids leaking into rendered copy).
 const STRIP_PATTERN =
-  /\(\s*owner-proof seed(?:\s*\d+)?\s*\)|\bowner-proof seed(?:\s*\d+)?\b|\bE2E Browse\b|\/e2e-fixtures\/[^\s)]+|\be2e-fixtures\b|\bscarcity-jp-[a-z0-9-]*\b|\bscarcity-sold-floor-\d+\b|\bvaluation-sold-floor-\d+\b|\bforce_sold_floor\b|\bforce_success_floor\b|\bnego-sold-comp-[a-z0-9-]*\b|\brec-bn-\d+\b|\bfixture-[a-z0-9-]*\b|\bphase34-fixture-[a-z0-9-]*\b/gi
+  /\(\s*owner-proof seed(?:\s*\d+)?\s*\)|\bowner-proof seed(?:\s*\d+)?\b|\bauthorized owner-proof retrieval\b|\bowner-proof\b|\bauthorized_catalog\b|\bpublic_metadata\b|\bE2E Browse\b|\/e2e-fixtures\/[^\s)]+|\be2e-fixtures\b|\bscarcity-jp-[a-z0-9-]*\b|\bscarcity-sold-floor-\d+\b|\bvaluation-sold-floor-\d+\b|\bforce_sold_floor\b|\bforce_success_floor\b|\bnego-sold-comp-[a-z0-9-]*\b|\brec-bn-\d+\b|\bfixture-[a-z0-9-]*\b|\bphase34-fixture-[a-z0-9-]*\b|\bautomatic_send_allowed\s*=\s*\w+\b|\bmessage_sent\s*=\s*\w+\b|\bmodel:\s*rule-engine\b|\bsource-verify\b/gi
 
 export function customerCopyForCode(code: string | null | undefined): string {
   if (!code) return ''

@@ -18,6 +18,7 @@ import {
 } from '@/lib/ai-intelligence-types'
 import { getUserIdFromToken } from '@/lib/jwt-user'
 import { getClientSessionToken } from '@/lib/session'
+import { customerCopyForCode, sanitizeCustomerFacingText } from '@/lib/ai-customer-copy'
 
 type WatchlistTemperatureResult = {
   analysis_mode?: string
@@ -301,7 +302,11 @@ export function WatchlistTemperaturePanel({
                 <p className="text-xs font-medium text-slate-500">Buyer pressure signals</p>
                 <ul className="list-disc pl-4">
                   {result.buyer_pressure.map((line) => (
-                    <li key={line}>{line}</li>
+                    <li key={line}>
+                      {/^[a-z0-9_]+$/i.test(String(line))
+                        ? customerCopyForCode(line)
+                        : sanitizeCustomerFacingText(line)}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -312,7 +317,11 @@ export function WatchlistTemperaturePanel({
                 <p className="text-xs font-medium text-slate-500">Seller opportunity signals</p>
                 <ul className="list-disc pl-4">
                   {result.seller_opportunity.map((line) => (
-                    <li key={line}>{line}</li>
+                    <li key={line}>
+                      {/^[a-z0-9_]+$/i.test(String(line))
+                        ? customerCopyForCode(line)
+                        : sanitizeCustomerFacingText(line)}
+                    </li>
                   ))}
                 </ul>
               </div>

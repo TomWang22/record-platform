@@ -49,7 +49,7 @@ def analyze_embedding_metadata(body: Dict[str, Any]) -> Dict[str, Any]:
 
     freshness = "STALE" if stale else ("DELETED" if deleted else "CURRENT")
     reembed_required = bool(stale)
-    reembed_status = "REQUIRED" if stale else ("NOT_APPLICABLE" if deleted else "CURRENT")
+    reembed_status = "REQUIRED" if stale else ("NOT_APPLICABLE" if deleted else "NOT_REQUIRED")
     deletion_state = "DELETED" if deleted else "ACTIVE"
 
     correction = None
@@ -95,8 +95,12 @@ def analyze_embedding_metadata(body: Dict[str, Any]) -> Dict[str, Any]:
             "owner_scope": principal,
             "entity_id": entity_id,
         },
-        "deletion_propagation": "verified" if deleted else "not_required",
+        "deletion_propagation": "SOURCE_DELETED" if deleted else "not_required",
         "reembedding_policy": "manual_owner_review_only",
+        "embedding_use": "DISABLED" if deleted else ("BLOCKED_UNTIL_REEMBED" if stale else "ALLOWED"),
+        "lineage_retention": "AUDIT_ONLY" if deleted else "ACTIVE",
+        "stale_reason": "source content changed or explicit test reason" if stale else None,
+        "recommended_action": "re-embed" if stale else ("audit only" if deleted else "none"),
         "production_writes": False,
         "evidence": [
             {
@@ -328,12 +332,12 @@ def analyze_semantic_search(body: Dict[str, Any]) -> Dict[str, Any]:
         "limitations": [
             {
                 "code": "STAGING_VECTOR_PATH",
-                "message": "Keyword remains the production default; this path is authorized owner-proof retrieval.",
+                "message": "Keyword remains the production default; this path is catalog semantic retrieval for authenticated market search.",
                 "severity": "info",
             }
         ],
         "data_freshness": _now(),
-        "methodology_customer": "Authorized catalog semantic/hybrid ranking with visible mode",
+        "methodology_customer": "Catalog semantic/hybrid ranking with visible mode",
         "methodology": "deterministic_search_v2",
         "sample_size": len(cards),
         "abstention_reason": None,

@@ -141,6 +141,9 @@ function materialResultHash(apiOrStructured, triplet = null) {
         correction_change: result.correction_change,
         included_event_ids: result.included_event_ids,
         price_median: result.price_median,
+        auction_count: result.auction_count,
+        ending_window_hours: result.ending_window_hours,
+        market_temperature: result.market_temperature,
         embedding_status: result.embedding_status || result.lineage_status,
         results_len: Array.isArray(result.results) ? result.results.length : null,
         evidence_ids: (result.evidence || []).map((e) => e.evidence_id || e.id),
@@ -160,7 +163,18 @@ function evidenceHash(apiOrStructured, triplet = null) {
     apiOrStructured ||
     {};
   const ev = result.evidence || [];
-  return crypto.createHash('sha256').update(JSON.stringify(ev)).digest('hex');
+  const auctionLots = result.watchlist_auctions || result.auctions || [];
+  return crypto
+    .createHash('sha256')
+    .update(
+      JSON.stringify({
+        evidence: ev,
+        auction_lot_ids: auctionLots.map((a) => a.lot_id || a.listing_id || a.id).filter(Boolean),
+        auction_count: result.auction_count ?? auctionLots.length,
+        ending_window_hours: result.ending_window_hours ?? null,
+      }),
+    )
+    .digest('hex');
 }
 
 function msToUs(ms) {

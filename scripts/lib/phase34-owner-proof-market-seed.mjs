@@ -140,6 +140,171 @@ async function createListing(baseUrl, token, overrides) {
   return res.body.id;
 }
 
+/** Human-readable auction titles — no harness/seed vocabulary. */
+const AUCTION_WATCHLIST_LOTS = [
+  {
+    title: 'Horace Silver — Song for My Father BLP 4185',
+    artist: 'Horace Silver',
+    catalog_number: 'BLP 4185',
+    label: 'Blue Note',
+    hours_until_end: 6,
+    starting_bid_cents: 1200,
+    cover: 'kenny-dorham',
+  },
+  {
+    title: 'Art Blakey — Moanin\' BLP 4003',
+    artist: 'Art Blakey',
+    catalog_number: 'BLP 4003',
+    label: 'Blue Note',
+    hours_until_end: 12,
+    starting_bid_cents: 1800,
+    cover: 'kenny-dorham',
+  },
+  {
+    title: 'Lee Morgan — The Sidewinder BLP 4157',
+    artist: 'Lee Morgan',
+    catalog_number: 'BLP 4157',
+    label: 'Blue Note',
+    hours_until_end: 18,
+    starting_bid_cents: 2100,
+    cover: 'kenny-dorham',
+  },
+  {
+    title: 'Wayne Shorter — Speak No Evil BST 84194',
+    artist: 'Wayne Shorter',
+    catalog_number: 'BST 84194',
+    label: 'Blue Note',
+    hours_until_end: 36,
+    starting_bid_cents: 1600,
+    cover: 'miles-davis',
+  },
+  {
+    title: 'Herbie Hancock — Maiden Voyage BST 84195',
+    artist: 'Herbie Hancock',
+    catalog_number: 'BST 84195',
+    label: 'Blue Note',
+    hours_until_end: 48,
+    starting_bid_cents: 1950,
+    cover: 'miles-davis',
+  },
+  {
+    title: 'Dexter Gordon — Go! BLP 4112',
+    artist: 'Dexter Gordon',
+    catalog_number: 'BLP 4112',
+    label: 'Blue Note',
+    hours_until_end: 72,
+    starting_bid_cents: 1400,
+    cover: 'miles-davis',
+  },
+];
+
+async function fetchWatchlistListingIds(baseUrl, token) {
+  const res = await httpsJson({
+    baseUrl,
+    token,
+    urlPath: '/api/shopping/watchlist',
+  });
+  const items = res.body?.items || res.body?.watchlist || (Array.isArray(res.body) ? res.body : []);
+  return items
+    .map((i) => i.listingId || i.listing_id || i.item_id || i.id)
+    .filter(Boolean)
+    .map(String);
+}
+
+async function addWatchlistListing(baseUrl, token, listingId, metadata = {}) {
+  const existing = await fetchWatchlistListingIds(baseUrl, token);
+  if (existing.includes(String(listingId))) return { status: 200, already: true };
+  const res = await httpsJson({
+    baseUrl,
+    token,
+    method: 'POST',
+    urlPath: '/api/shopping/watchlist',
+    body: {
+      item_type: 'listing',
+      item_id: listingId,
+      listing_id: listingId,
+      metadata: {
+        title: metadata.title || 'Auction lot',
+        imageUrl: metadata.imageUrl || localCoverUrl(baseUrl, 'kenny-dorham'),
+        saleType: 'auction',
+        saleTypeDisplay: 'Auction',
+      },
+    },
+  });
+  if (res.status >= 400 && res.status !== 409) {
+    throw new Error(`watchlist_add_failed:${res.status}:${JSON.stringify(res.body).slice(0, 200)}`);
+  }
+  return { status: res.status, already: false };
+}
+
+/**
+ * Ensure the buyer watchlist has ≥5 active auction lots with mixed end times
+ * (inside and outside 24h) so ending-window correction changes membership.
+ */
+async function ensureBuyerAuctionWatchlist({ baseUrl, buyerToken, sellerToken }) {
+  const created = [];
+  const lotIds = [];
+  const seller = sellerToken || buyerToken;
+  for (let i = 0; i < AUCTION_WATCHLIST_LOTS.length; i += 1) {
+    const spec = AUCTION_WATCHLIST_LOTS[i];
+    const endsAt = new Date(Date.now() + spec.hours_until_end * 3600_000).toISOString();
+    const id = await createListing(baseUrl, seller, {
+      title: spec.title,
+      artist: spec.artist,
+      catalog_number: spec.catalog_number,
+      label: spec.label,
+      description: 'Active auction lot used for watchlist temperature analysis.',
+      price_cents: spec.starting_bid_cents,
+      pricing_mode: 'auction',
+      images: [localCoverUrl(baseUrl, spec.cover)],
+      amenities: [
+        'sale_type:auction',
+        `starting_bid_cents:${spec.starting_bid_cents}`,
+        `reserve_price_cents:${Math.round(spec.starting_bid_cents * 2)}`,
+        `auction_ends_at:${endsAt}`,
+      ],
+    });
+    created.push({
+      capability: 'auction_watchlist',
+      id,
+      hours_until_end: spec.hours_until_end,
+      ends_at: endsAt,
+    });
+    lotIds.push(id);
+    await addWatchlistListing(baseUrl, buyerToken, id, {
+      title: spec.title,
+      imageUrl: localCoverUrl(baseUrl, spec.cover),
+    });
+  }
+
+  // Poll briefly until shopping-service reflects the adds.
+  let watchlistIds = [];
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    watchlistIds = await fetchWatchlistListingIds(baseUrl, buyerToken);
+    if (lotIds.every((id) => watchlistIds.includes(String(id)))) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  const within24h = created.filter((c) => c.hours_until_end <= 24).length;
+  const outside24h = created.filter((c) => c.hours_until_end > 24).length;
+  if (lotIds.length < 5 || within24h < 2 || outside24h < 2) {
+    throw new Error(
+      `auction_watchlist_seed_insufficient:lots=${lotIds.length} within24h=${within24h} outside24h=${outside24h}`,
+    );
+  }
+
+  return {
+    ok: true,
+    min_lots: lotIds.length,
+    listing_ids: lotIds,
+    within_24h: within24h,
+    outside_24h: outside24h,
+    watchlist_ids_after: watchlistIds,
+    created,
+  };
+}
+
 /**
  * Build a normalized COMPLETED_SALE market event linked to a source listing.
  * Event type stays sale (never listing). Used by the live assembler / API seed.
@@ -351,11 +516,22 @@ export async function ensureOwnerProofMarketEvidence({
     }
   }
 
+  // Buyer watchlist auctions: ≥5 lots with mixed end windows so the 24h
+  // correction changes membership, evidence, and the visible temperature panel.
+  // Never use force_watchlist_floor — real first-party auction listings only.
+  const auctionSeed = await ensureBuyerAuctionWatchlist({
+    baseUrl,
+    buyerToken,
+    sellerToken: sellerToken || buyerToken,
+  });
+  created.push(...auctionSeed.created);
+
   return {
     ok: true,
     created_count: created.length,
     created,
     seller_kenny_listing_id: sellerKennyListingId,
+    auction_watchlist: auctionSeed,
     miles_title_hits_after: await countTitleHits(baseUrl, buyerToken, 'Kind of Blue'),
     kenny_title_hits_after: await countTitleHits(
       baseUrl,

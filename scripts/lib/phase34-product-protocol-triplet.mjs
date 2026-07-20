@@ -74,29 +74,69 @@ export function executeProtocolTriplet(canonical, opts = {}) {
         fallback: false,
       };
     } else if (opts.live === true) {
-      try {
-        result = executeCurl({
-          method: canonical.method || 'POST',
-          urlPath: endpoint,
-          body,
-          protocolFlag: proto.flag,
-          expectedVersion: proto.expected,
-          baseUrl: opts.baseUrl || DEFAULTS.baseUrl,
-          caCert: opts.caCert || DEFAULTS.caCert,
-          curlResolve: opts.curlResolve || process.env.CURL_RESOLVE || null,
-          token: opts.token || null,
-          userId: opts.userId || null,
-        });
-        result.alpn = protocol === 'h1' ? 'http/1.1' : protocol === 'h2' ? 'h2' : 'h3';
-        result.quic_version = protocol === 'h3' ? 'v1' : null;
-        result.fallback = false;
-        result.curl_exit_code = result.curl_exit_code ?? 0;
-      } catch (err) {
+      const maxAttempts =
+        protocol === 'h3'
+          ? Math.max(1, Number(process.env.PHASE34_PRODUCT_H3_RETRIES || 3))
+          : 1;
+      let lastErr = null;
+      result = null;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          result = executeCurl({
+            method: canonical.method || 'POST',
+            urlPath: endpoint,
+            body,
+            protocolFlag: proto.flag,
+            expectedVersion: proto.expected,
+            baseUrl: opts.baseUrl || DEFAULTS.baseUrl,
+            caCert: opts.caCert || DEFAULTS.caCert,
+            curlResolve: opts.curlResolve || process.env.CURL_RESOLVE || null,
+            token: opts.token || null,
+            userId: opts.userId || null,
+          });
+          result.alpn = protocol === 'h1' ? 'http/1.1' : protocol === 'h2' ? 'h2' : 'h3';
+          result.quic_version = protocol === 'h3' ? 'v1' : null;
+          result.fallback = false;
+          result.curl_exit_code = result.curl_exit_code ?? 0;
+          result.h3_retry_attempt = protocol === 'h3' ? attempt : undefined;
+          // Transient QUIC/H3 transport failures return status 0 — retry before failing the triplet.
+          if (Number(result.http_status) === 200 && result.curl_exit_code === 0) {
+            lastErr = null;
+            break;
+          }
+          lastErr = new Error(
+            `protocol_${protocol}_status_${result.http_status}_exit_${result.curl_exit_code}`,
+          );
+        } catch (err) {
+          lastErr = err;
+          result = {
+            http_status: err.http_status ?? 0,
+            http_version: err.http_version ?? null,
+            curl_exit_code: err.curl_exit_code ?? 1,
+            error: String(err.message || err),
+            ok: false,
+            fallback: false,
+            h3_retry_attempt: protocol === 'h3' ? attempt : undefined,
+          };
+        }
+        if (attempt < maxAttempts) {
+          const backoffMs = Math.min(1500, 250 * attempt);
+          try {
+            execFileSync('sleep', [String(backoffMs / 1000)], { stdio: 'ignore' });
+          } catch {
+            const end = Date.now() + backoffMs;
+            while (Date.now() < end) {
+              /* sync backoff */
+            }
+          }
+        }
+      }
+      if (!result) {
         result = {
-          http_status: err.http_status ?? 0,
-          http_version: err.http_version ?? null,
-          curl_exit_code: err.curl_exit_code ?? 1,
-          error: String(err.message || err),
+          http_status: lastErr?.http_status ?? 0,
+          http_version: null,
+          curl_exit_code: lastErr?.curl_exit_code ?? 1,
+          error: String(lastErr?.message || lastErr || 'protocol_probe_failed'),
           ok: false,
           fallback: false,
         };

@@ -165,19 +165,29 @@ export async function gatherLiveWatchlistTemperatureEvidence(input: {
   principalId: string
 }) {
   const rows = await fetchWatchlistFromApi()
-  const auctionRefs = rows.filter(refLooksLikeAuction)
+  // Prefer sale-type hints, but always enrich every watchlist row — shopping
+  // cards sometimes omit saleTypeDisplay even when the listing is an auction.
+  const preferred = rows.filter(refLooksLikeAuction)
+  const remainder = rows.filter((r) => !refLooksLikeAuction(r))
+  const ordered = [...preferred, ...remainder]
   const lots: AuctionLotInput[] = []
+  const seen = new Set<string>()
 
   // Bound concurrent enrichment; assembler also caps final batch size.
-  const slice = auctionRefs.slice(0, 30)
+  const slice = ordered.slice(0, 30)
   await Promise.all(
     slice.map(async (ref) => {
       const { lot } = await loadAuctionLot(ref.id)
       if (lot) {
-        lots.push(lot)
+        if (!seen.has(lot.lot_id)) {
+          seen.add(lot.lot_id)
+          lots.push(lot)
+        }
         return
       }
-      // Fallback metadata-only row when auction state is unavailable.
+      // Only keep metadata fallback when the card itself claims auction —
+      // otherwise fixed-price watchlist rows would pollute temperature.
+      if (!refLooksLikeAuction(ref)) return
       lots.push({
         lot_id: ref.id,
         listing_id: ref.id,

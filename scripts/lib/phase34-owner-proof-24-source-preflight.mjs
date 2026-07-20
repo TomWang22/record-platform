@@ -54,6 +54,7 @@ import {
 } from './phase34-source-verification-telemetry.mjs';
 import { scoreResponseQuality } from './phase34-negotiation-fact-invariants.mjs';
 import { evaluateNegotiationContextTiers } from './phase34-negotiation-context.mjs';
+import { assertSuccessScenarioDataFloor } from './phase34-owner-proof-product-contracts.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '../..');
@@ -238,6 +239,15 @@ export async function executeOwnerProof24SourcePreflight(opts = {}) {
   if (seedReport.seller_kenny_listing_id) {
     subjects.valuation_listing_id = seedReport.seller_kenny_listing_id;
   }
+  // Live sold floors must clear before any browser success scenario runs.
+  assertSuccessScenarioDataFloor('scarcity', {
+    sold_observations: seedReport.sold_observation_count?.scarcity ?? 0,
+    observations: seedReport.miles_title_hits_after ?? 0,
+  });
+  assertSuccessScenarioDataFloor('valuation', {
+    sold_comparables: seedReport.sold_observation_count?.valuation ?? 0,
+    asking_comparables: seedReport.kenny_title_hits_after ?? 0,
+  });
   fs.writeFileSync(
     path.join(outRoot, 'market-seed-report.json'),
     JSON.stringify(seedReport, null, 2) + '\n',

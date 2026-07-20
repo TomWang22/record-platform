@@ -156,6 +156,12 @@ export async function runProductSession(scheduleRow, opts = {}) {
       subject: opts.subject || null,
       surface_route_index: scheduleRow.surface_route_index ?? scheduleRow.smoke_index ?? 0,
       smoke_index: scheduleRow.smoke_index ?? 0,
+      // Owner-proof schedules declare the mounted surface (e.g. auction → /watchlist).
+      // Without this, auction success defaults to /listings/[id] + intelligence-auction-panel
+      // and times out waiting for a panel that is not on that route.
+      owner_proof_canonical_route:
+        scheduleRow.owner_proof_canonical_route || scheduleRow.canonical_route || null,
+      canonical_route: scheduleRow.canonical_route || scheduleRow.owner_proof_canonical_route || null,
     };
 
     const prepared = await adapter.prepare(context);

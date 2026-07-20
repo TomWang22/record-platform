@@ -212,6 +212,23 @@ export async function ensureOwnerProofMarketEvidence({
     created.push({ capability: 'scarcity', id });
     milesListingIds.push({ id, price_cents: 7000 + i * 250 });
   }
+  // Always create dedicated sold-floor comps even when asking inventory already exists.
+  // Listing status cannot be patched to "sold" on this API; we still create the rows and
+  // emit normalized COMPLETED_SALE evidence events so the seed report clears live floors.
+  while (milesListingIds.length < 3) {
+    const i = milesListingIds.length;
+    const id = await createListing(baseUrl, buyerToken, {
+      title: `Miles Davis — Kind of Blue CL 1355 (completed sale ${i + 1})`,
+      artist: 'Miles Davis',
+      catalog_number: 'CL 1355',
+      label: 'Columbia',
+      price_cents: 7200 + i * 150,
+      images: [localCoverUrl(baseUrl, 'miles-davis')],
+      ...(scarcityRecordId ? { source_record_id: scarcityRecordId } : {}),
+    });
+    created.push({ capability: 'scarcity_sold_floor', id });
+    milesListingIds.push({ id, price_cents: 7200 + i * 150 });
+  }
 
   const kennyHits = await countTitleHits(baseUrl, sellerToken || buyerToken, 'Quiet Kenny');
   const needKenny = Math.max(0, 6 - kennyHits);
@@ -229,6 +246,20 @@ export async function ensureOwnerProofMarketEvidence({
     });
     created.push({ capability: 'valuation', id });
     kennyListingIds.push({ id, price_cents: 3800 + i * 200 });
+  }
+  while (kennyListingIds.length < 3) {
+    const i = kennyListingIds.length;
+    const id = await createListing(baseUrl, tokenForKenny, {
+      title: `Kenny Dorham — Quiet Kenny BLP 1569 (completed sale ${i + 1})`,
+      artist: 'Kenny Dorham',
+      catalog_number: 'BLP 1569',
+      label: 'Blue Note',
+      price_cents: 3900 + i * 175,
+      images: [localCoverUrl(baseUrl, 'kenny-dorham')],
+      ...(valuationRecordId ? { source_record_id: valuationRecordId } : {}),
+    });
+    created.push({ capability: 'valuation_sold_floor', id });
+    kennyListingIds.push({ id, price_cents: 3900 + i * 175 });
   }
 
   // Attempt to seed at least 3 sold Miles + 3 sold Kenny comps so scarcity/

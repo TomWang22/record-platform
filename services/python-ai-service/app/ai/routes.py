@@ -351,6 +351,9 @@ class IntelligenceBody(BaseModel):
     force_negotiation_market_floor: Optional[bool] = None
     force_recommendation_floor: Optional[bool] = None
     force_analytics_floor: Optional[bool] = None
+    force_sold_floor: Optional[bool] = None
+    force_watchlist_floor: Optional[bool] = None
+    force_success_floor: Optional[bool] = None
     user_intent: Optional[str] = None
     owner_proof_prompt: Optional[str] = None
     session_id: Optional[str] = None

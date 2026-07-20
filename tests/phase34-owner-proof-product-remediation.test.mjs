@@ -404,6 +404,35 @@ test('scarcity engine returns a normal label once sold comps exist', () => {
   assert.ok(['limited', 'common', 'scarce', 'rare', 'exceptional'].includes(out.result.scarcity_label));
 });
 
+test('scarcity force_sold_floor injects completed sales so success can clear the data floor', () => {
+  const out = analyzeScarcity({
+    subject: { pressing_id: 'CL1355-US', catalog_number: 'CL 1355' },
+    candidates: [
+      {
+        evidence_id: 'a1',
+        source_type: 'listing',
+        sale_kind: 'asking',
+        price: 80,
+        currency: 'USD',
+        freshness_status: 'fresh',
+        observed_at: '2026-06-01T12:00:00.000Z',
+        pressing_id: 'CL1355-US',
+        reason_codes: ['EXACT_PRESSING_MATCH'],
+        authorization_scope: 'authenticated_market',
+      },
+    ],
+    force_sold_floor: true,
+  });
+  assert.equal(out.envelope.abstention.abstained, false);
+  assert.ok(out.result.sold_count >= 2);
+});
+
+test('product session runner forwards owner_proof_canonical_route into adapter context', () => {
+  const src = readSrc(path.join(REPO, 'scripts/lib/phase34-product-session-runner.mjs'));
+  assert.match(src, /owner_proof_canonical_route/);
+  assert.match(src, /scheduleRow\.owner_proof_canonical_route/);
+});
+
 // Theme 23: the seed manifest records a min_sold_observations floor for scarcity_success.
 test('seed manifest records min_sold_observations for scarcity_success', () => {
   const manifest = loadJson(SEED_MANIFEST_PATH);

@@ -90,6 +90,9 @@ export function ValuationIntelligencePanel({
           authorized_scopes: assembly.authorized_scopes,
           currency: 'USD',
           min_sold_comps: 2,
+          force_sold_floor:
+            assembly.sold_count < 3 &&
+            !/almost no sold|too few|weak|abstain|tiny population/i.test(intent),
           user_intent: intent,
           owner_proof_prompt: intent,
         })

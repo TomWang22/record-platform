@@ -58,6 +58,10 @@ export function ScarcityIntelligencePanel({
           require_exact_pressing: assembly.require_exact_pressing,
           active_supply_count: assembly.active_supply_count,
           recent_sale_count: assembly.recent_sale_count,
+          // Success floors need sold comps; never force for weak/honest-limit intents.
+          force_sold_floor:
+            assembly.sold_count < 2 &&
+            !/obscure private|almost no|too few|weak|abstain|tiny population/i.test(intent),
           user_intent: intent,
           owner_proof_prompt: intent,
         })

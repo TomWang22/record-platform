@@ -165,11 +165,24 @@ export function IntelligencePanelShell({
           className="mt-2 text-xs text-slate-600 dark:text-slate-300"
           data-testid={`${testId}-limitations`}
           open={limitationsOpen}
-          aria-expanded={limitationsOpen}
-          onToggle={(event) => setLimitationsOpen((event.target as HTMLDetailsElement).open)}
+          // Always emit the string form — React omits boolean false attributes,
+          // which makes harness polls see `null` instead of `"false"`.
+          aria-expanded={limitationsOpen ? 'true' : 'false'}
         >
-          <summary className="cursor-pointer font-medium">What this means for you</summary>
-          <ul className="mt-1 list-disc space-y-1 pl-4">
+          <summary
+            className="cursor-pointer font-medium"
+            onClick={(event) => {
+              event.preventDefault()
+              setLimitationsOpen((open) => !open)
+            }}
+          >
+            What this means for you
+          </summary>
+          <ul
+            className="mt-1 list-disc space-y-1 pl-4"
+            data-testid={`${testId}-limitations-content`}
+            hidden={!limitationsOpen}
+          >
             {limitations.map((l) => (
               <li key={`${l.code}-${l.message}`}>{limitationCustomerMessage(l)}</li>
             ))}
@@ -195,11 +208,22 @@ export function IntelligencePanelShell({
           className="mt-2 text-xs text-slate-600 dark:text-slate-300"
           data-testid={`${testId}-evidence`}
           open={evidenceOpen}
-          aria-expanded={evidenceOpen}
-          onToggle={(event) => setEvidenceOpen((event.target as HTMLDetailsElement).open)}
+          aria-expanded={evidenceOpen ? 'true' : 'false'}
         >
-          <summary className="cursor-pointer font-medium">Evidence</summary>
-          <ul className="mt-1 space-y-2">
+          <summary
+            className="cursor-pointer font-medium"
+            onClick={(event) => {
+              event.preventDefault()
+              setEvidenceOpen((open) => !open)
+            }}
+          >
+            Evidence
+          </summary>
+          <ul
+            className="mt-1 space-y-2"
+            data-testid={`${testId}-evidence-content`}
+            hidden={!evidenceOpen}
+          >
             {evidence.map((item, idx) => (
               <li
                 key={String(item.evidence_id || item.source_id || idx)}

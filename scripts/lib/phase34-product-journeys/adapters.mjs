@@ -1020,54 +1020,114 @@ export class BaseProductJourneyAdapter {
       const screenshotStateRecords = [];
       let previousDisclosureSha256 = null;
       let previousDisclosureSuffix = null;
+      let previousDisclosureDomHash = null;
+
+      const readDisclosureState = async (testId) =>
+        page.evaluate((id) => {
+          const el = document.querySelector(`[data-testid="${id}"]`);
+          if (!el) return null;
+          const content = document.querySelector(`[data-testid="${id}-content"]`) || el.querySelector(':scope > ul');
+          const style = content ? window.getComputedStyle(content) : null;
+          const contentVisible = Boolean(
+            content &&
+              style &&
+              style.display !== 'none' &&
+              style.visibility !== 'hidden' &&
+              !content.hasAttribute('hidden'),
+          );
+          // Stable DOM fingerprint of the active panel subtree for state distinctness.
+          const panel = el.closest('[data-testid]')?.parentElement || el.parentElement || el;
+          const text = (panel.textContent || '').replace(/\s+/g, ' ').trim();
+          const openAttr = el.hasAttribute('open') ? '1' : '0';
+          const aria = el.getAttribute('aria-expanded');
+          const fingerprint = `${id}|aria=${aria}|open=${openAttr}|visible=${contentVisible}|${text}`;
+          let h = 0;
+          for (let i = 0; i < fingerprint.length; i += 1) {
+            h = (Math.imul(31, h) + fingerprint.charCodeAt(i)) | 0;
+          }
+          return {
+            aria_expanded: aria,
+            open: el instanceof HTMLDetailsElement ? el.open : openAttr === '1',
+            content_visible: contentVisible,
+            dom_hash: `dom_${(h >>> 0).toString(16)}`,
+          };
+        }, testId);
+
       for (const suffix of disclosureSuffixes) {
         // Scope to the active panel's own subtree so a sibling panel's
         // identically-named testid can never be captured instead.
         const details = panelLocator.locator(`[data-testid="${prepared.panelTestId}-${suffix}"]`);
         if ((await details.count()) === 0) continue;
         const first = details.first();
+        const controlTestId = `${prepared.panelTestId}-${suffix}`;
 
         // Collapse any other disclosure that is already open before opening
         // this one, so an evidence screenshot can never be captured while
         // limitations is also expanded (and vice versa).
         for (const otherSuffix of disclosureSuffixes) {
           if (otherSuffix === suffix) continue;
-          const other = panelLocator
-            .locator(`[data-testid="${prepared.panelTestId}-${otherSuffix}"]`)
-            .first();
+          const otherTestId = `${prepared.panelTestId}-${otherSuffix}`;
+          const other = panelLocator.locator(`[data-testid="${otherTestId}"]`).first();
           if ((await other.count()) === 0) continue;
-          if ((await other.getAttribute('aria-expanded').catch(() => null)) === 'true') {
-            await other
-              .locator('> summary')
-              .first()
-              .click()
+          const otherState = await readDisclosureState(otherTestId);
+          if (otherState && (otherState.aria_expanded === 'true' || otherState.open || otherState.content_visible)) {
+            await other.locator('> summary').first().click().catch(() => null);
+            await page
+              .waitForFunction(
+                (id) => {
+                  const el = document.querySelector(`[data-testid="${id}"]`);
+                  if (!el) return true;
+                  const aria = el.getAttribute('aria-expanded');
+                  const open = el instanceof HTMLDetailsElement ? el.open : el.hasAttribute('open');
+                  return aria === 'false' || (!open && aria !== 'true');
+                },
+                otherTestId,
+                { timeout: 5_000 },
+              )
               .catch(() => null);
           }
         }
 
-        const ariaBefore = await first.getAttribute('aria-expanded').catch(() => null);
+        const preState = (await readDisclosureState(controlTestId)) || {
+          aria_expanded: null,
+          open: false,
+          content_visible: false,
+          dom_hash: null,
+        };
+        const ariaBefore = preState.aria_expanded;
+        const preDomHash = preState.dom_hash;
+
         await first.locator('> summary').first().click();
         // Wait for aria-expanded to actually flip rather than assuming the click landed.
         await page
           .waitForFunction(
             ({ testId, before }) => {
               const el = document.querySelector(`[data-testid="${testId}"]`);
-              return Boolean(el) && el.getAttribute('aria-expanded') !== before;
+              if (!el) return false;
+              const aria = el.getAttribute('aria-expanded');
+              if (aria != null && aria !== before) return aria === 'true';
+              // Fallback for older builds that only expose native details.open.
+              return el instanceof HTMLDetailsElement && el.open === true;
             },
-            { testId: `${prepared.panelTestId}-${suffix}`, before: ariaBefore },
+            { testId: controlTestId, before: ariaBefore },
             { timeout: 5_000 },
           )
           .catch(() => null);
-        const ariaAfter = await first.getAttribute('aria-expanded').catch(() => null);
-        const contentVisible = await first
-          .locator('ul')
-          .first()
-          .isVisible()
-          .catch(() => false);
 
-        if (ariaAfter !== 'true' || !contentVisible) {
+        const postState = (await readDisclosureState(controlTestId)) || {
+          aria_expanded: null,
+          open: false,
+          content_visible: false,
+          dom_hash: null,
+        };
+        const ariaAfter = postState.aria_expanded;
+        const contentVisible = postState.content_visible;
+        const expandedOk =
+          (ariaAfter === 'true' || (ariaAfter == null && postState.open === true)) && contentVisible;
+
+        if (!expandedOk) {
           const err = new Error(
-            `${DISCLOSURE_DID_NOT_EXPAND}: ${prepared.panelTestId}-${suffix} aria-expanded stayed ` +
+            `${DISCLOSURE_DID_NOT_EXPAND}: ${controlTestId} aria-expanded stayed ` +
               `"${ariaAfter}" (before="${ariaBefore}"), content_visible=${contentVisible}`,
           );
           err.code = DISCLOSURE_DID_NOT_EXPAND;
@@ -1101,14 +1161,28 @@ export class BaseProductJourneyAdapter {
           err.code = DUPLICATE_SCREENSHOT_MASQUERADING_AS_DISTINCT_STATE;
           throw err;
         }
+        if (previousDisclosureDomHash && postState.dom_hash === previousDisclosureDomHash) {
+          const err = new Error(
+            `${DUPLICATE_SCREENSHOT_MASQUERADING_AS_DISTINCT_STATE}: ${previousDisclosureSuffix}_expanded ` +
+              `and ${suffix}_expanded produced identical DOM hashes for ${prepared.panelTestId}`,
+          );
+          err.code = DUPLICATE_SCREENSHOT_MASQUERADING_AS_DISTINCT_STATE;
+          throw err;
+        }
         previousDisclosureSha256 = shotRow.sha256;
         previousDisclosureSuffix = suffix;
+        previousDisclosureDomHash = postState.dom_hash;
 
         const screenshotStateRecord = {
           requested_state: requestedState,
-          control_test_id: `${prepared.panelTestId}-${suffix}`,
-          aria_expanded_before: ariaBefore,
-          aria_expanded_after: ariaAfter,
+          control_test_id: controlTestId,
+          pre_aria_expanded: ariaBefore,
+          post_aria_expanded: ariaAfter,
+          visible_section_test_id: `${controlTestId}-content`,
+          pre_dom_hash: preDomHash,
+          post_dom_hash: postState.dom_hash,
+          screenshot_sha256: shotRow.sha256,
+          measurement_status: ariaAfter === 'true' ? 'ARIA_EXPANDED_CONFIRMED' : 'NATIVE_OPEN_FALLBACK',
           content_visible: contentVisible,
         };
         shotRow.screenshot_state_record = screenshotStateRecord;

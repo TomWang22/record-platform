@@ -426,10 +426,14 @@ test('journey adapters export the disclosure-capture error codes', () => {
 // boolean `open` attribute), and collapse/expand independently.
 test('intelligence-panel-shell.tsx wires aria-expanded onto both disclosures', () => {
   const src = readSrc(PANEL_SHELL_TSX_PATH);
-  assert.match(src, /aria-expanded=\{evidenceOpen\}/);
-  assert.match(src, /aria-expanded=\{limitationsOpen\}/);
-  assert.match(src, /onToggle=\{[^}]*setEvidenceOpen/);
-  assert.match(src, /onToggle=\{[^}]*setLimitationsOpen/);
+  // String form is required — React omits boolean `false` attributes.
+  assert.match(src, /aria-expanded=\{evidenceOpen \? 'true' : 'false'\}/);
+  assert.match(src, /aria-expanded=\{limitationsOpen \? 'true' : 'false'\}/);
+  assert.match(src, /setEvidenceOpen/);
+  assert.match(src, /setLimitationsOpen/);
+  assert.match(src, /event\.preventDefault\(\)/);
+  assert.match(src, /data-testid=\{`\$\{testId\}-evidence-content`\}/);
+  assert.match(src, /data-testid=\{`\$\{testId\}-limitations-content`\}/);
 });
 
 // Theme 26: journey adapters scope disclosure capture to the panel locator and
@@ -442,6 +446,11 @@ test('journey adapters collapse sibling disclosures and reject duplicate expande
   assert.match(src, /DUPLICATE_SCREENSHOT_MASQUERADING_AS_DISTINCT_STATE/);
   assert.match(src, /DISCLOSURE_DID_NOT_EXPAND/);
   assert.match(src, /screenshot_state_record/);
+  assert.match(src, /pre_dom_hash/);
+  assert.match(src, /post_dom_hash/);
+  assert.match(src, /pre_aria_expanded/);
+  assert.match(src, /post_aria_expanded/);
+  assert.match(src, /measurement_status/);
 });
 
 // Theme 27: the auction panel translates risk_flags through customerCopyForCode

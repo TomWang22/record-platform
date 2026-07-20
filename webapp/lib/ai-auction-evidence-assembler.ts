@@ -95,6 +95,7 @@ export type AssembledAuctionLotPayload = {
   late_bid_pressure: number
   price_acceleration: number
   end_at: string | null
+  time_left_ms?: number | null
   time_remaining: string | null
   observed_at: string | null
   deletion_state: 'ACTIVE' | 'DELETED'
@@ -348,6 +349,7 @@ function toLotPayload(
     late_bid_pressure: c.late_bid_pressure,
     price_acceleration: c.price_acceleration,
     end_at: c.end_at,
+    time_left_ms: lot?.time_left_ms ?? null,
     time_remaining: timeRemainingIso(lot?.time_left_ms),
     observed_at: c.observed_at,
     deletion_state: c.deletion_state,

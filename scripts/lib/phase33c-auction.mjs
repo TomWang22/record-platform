@@ -309,11 +309,16 @@ function analyzeWatchlistBatch(input) {
     const nowMs = Date.now();
     const before = clean.length;
     clean = clean.filter((a) => {
+      // Prefer wall-clock end_at when present — assembled payloads historically
+      // omitted time_left_ms and some clients only send public endsAt.
+      const end = Date.parse(a.end_at || '');
+      if (Number.isFinite(end)) {
+        return end - nowMs <= windowHours * 3600_000 && end >= nowMs;
+      }
       if (a.time_left_ms != null && Number.isFinite(Number(a.time_left_ms))) {
         return Number(a.time_left_ms) <= windowHours * 3600_000;
       }
-      const end = Date.parse(a.end_at || '');
-      return Number.isFinite(end) && end - nowMs <= windowHours * 3600_000 && end >= nowMs;
+      return false;
     });
     correction_change = {
       what_changed: ['ending_window'],

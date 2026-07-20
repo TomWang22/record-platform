@@ -168,20 +168,46 @@ export function parseOboFromRow(row: Record<string, unknown>): ListingOboSetting
 
 export function parseAuctionFromRow(row: Record<string, unknown>): ListingAuctionSettings {
   const map = amenityMapFromRaw(row.amenities)
+  const nestedAuction =
+    row.auction && typeof row.auction === 'object'
+      ? (row.auction as Record<string, unknown>)
+      : null
+  const endsAt =
+    row.endsAt != null
+      ? String(row.endsAt)
+      : row.auction_ends_at != null
+        ? String(row.auction_ends_at)
+        : nestedAuction?.endsAt != null
+          ? String(nestedAuction.endsAt)
+          : map.auction_ends_at ?? map.auction_end_at
+  const startsAt =
+    row.auction_starts_at != null
+      ? String(row.auction_starts_at)
+      : nestedAuction?.startsAt != null
+        ? String(nestedAuction.startsAt)
+        : map.auction_starts_at ?? map.auction_start_at
   return {
-    startingBidCents: parseCents(row.starting_bid_cents ?? map.starting_bid_cents ?? map.auction_start_cents),
-    reserveCents: parseCents(row.reserve_price_cents ?? map.reserve_price_cents ?? map.auction_reserve_cents),
-    buyItNowCents: parseCents(row.buy_it_now_cents ?? map.buy_it_now_cents),
-    startsAt:
-      row.auction_starts_at != null
-        ? String(row.auction_starts_at)
-        : map.auction_starts_at ?? map.auction_start_at,
-    endsAt:
-      row.auction_ends_at != null ? String(row.auction_ends_at) : map.auction_ends_at ?? map.auction_end_at,
+    startingBidCents: parseCents(
+      row.starting_bid_cents ??
+        nestedAuction?.startingBidCents ??
+        map.starting_bid_cents ??
+        map.auction_start_cents,
+    ),
+    reserveCents: parseCents(
+      row.reserve_price_cents ??
+        nestedAuction?.reserveCents ??
+        map.reserve_price_cents ??
+        map.auction_reserve_cents,
+    ),
+    buyItNowCents: parseCents(row.buy_it_now_cents ?? nestedAuction?.buyItNowCents ?? map.buy_it_now_cents),
+    startsAt,
+    endsAt,
     rolloverMode:
       row.auction_rollover != null
         ? String(row.auction_rollover)
-        : map.auction_rollover ?? map.auction_relist_mode,
+        : nestedAuction?.rolloverMode != null
+          ? String(nestedAuction.rolloverMode)
+          : map.auction_rollover ?? map.auction_relist_mode,
   }
 }
 

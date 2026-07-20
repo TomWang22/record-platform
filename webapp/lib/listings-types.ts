@@ -171,6 +171,13 @@ export function normalizeListing(row: Record<string, unknown>): MarketplaceListi
   const listing_type: ListingSaleType = saleMode
   const st = String(row.status ?? row.listing_status ?? 'active').toLowerCase()
   const rp = parseRpFieldsFromRow(row)
+  const auction = parseAuctionFromRow(row)
+  const endsAt =
+    row.endsAt != null
+      ? String(row.endsAt)
+      : row.auction_ends_at != null
+        ? String(row.auction_ends_at)
+        : auction.endsAt
   let format =
     row.format != null ? String(row.format) : rp.format ?? resolveRpFormat(row, {})
   if (format && HOUSING_FORMAT_BLOCKLIST.has(format.toLowerCase())) {
@@ -296,6 +303,7 @@ export function normalizeListing(row: Record<string, unknown>): MarketplaceListi
     seller_country: row.seller_country != null ? String(row.seller_country) : undefined,
     shipping: parseShippingFromRow(row),
     obo: parseOboFromRow(row),
-    auction: parseAuctionFromRow(row),
+    auction,
+    endsAt,
   }
 }

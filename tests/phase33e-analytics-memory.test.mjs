@@ -162,6 +162,44 @@ test('methodology contract present with sample size and time range', () => {
   assert.ok(out.result.liquidity);
 });
 
+test('completed_sale_sample_size matches sold rows used in half-window buckets, not asks', () => {
+  const out = analyzeMarketAnalytics({
+    requesting_principal_fixture: 'principal_a',
+    analytics_mode: 'release_market_summary',
+    currency: 'USD',
+    force_analytics_floor: true,
+    user_intent: 'How did completed Blue Note LP sales change over the last 90 days?',
+  });
+  const r = out.result;
+  assert.equal(out.envelope.abstention.abstained, false);
+  assert.equal(r.sold_count, 21);
+  assert.equal(r.completed_sale_sample_size, 21);
+  assert.equal(r.sample_size, 21);
+  assert.equal(r.total_market_events, 22);
+  const bucketTotal = (r.time_buckets || []).reduce((n, b) => n + Number(b.count || 0), 0);
+  assert.equal(bucketTotal, 21);
+  assert.equal(bucketTotal, r.sample_size);
+  assert.match(String(r.summary || ''), /median|rose|fell|steady/i);
+  assert.ok(String(r.change_interpretation || '').length > 20);
+  assert.doesNotMatch(String(r.summary || ''), /tiny population/i);
+});
+
+test('tiny population intent abstains without success data floor', () => {
+  const out = analyzeMarketAnalytics({
+    requesting_principal_fixture: 'principal_a',
+    analytics_mode: 'release_market_summary',
+    currency: 'USD',
+    user_intent: 'Report for a tiny population — customer language only.',
+    owner_proof_prompt: 'Report for a tiny population — customer language only.',
+  });
+  assert.equal(out.envelope.abstention.abstained, true);
+  assert.ok(out.envelope.abstention.reason_codes.includes('SAMPLE_SIZE_BELOW_POLICY'));
+  assert.equal(out.result.sample_size, 0);
+  assert.equal(out.result.completed_sale_sample_size, 0);
+  assert.match(String(out.result.summary || ''), /too small|tiny|reliable/i);
+  assert.equal(out.result.time_buckets?.length || 0, 0);
+});
+
 test('correction precedence prefers newer budget', () => {
   const out = analyzeMemory({
     operation: 'resolve',

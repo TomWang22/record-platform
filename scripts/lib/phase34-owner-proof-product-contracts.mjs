@@ -221,3 +221,36 @@ export function assertCapabilityResponseStructure(capability, result = {}) {
 
   return { ok: true, capability };
 }
+
+export const RUNTIME_FORCE_FLOOR_USED_CODE = 'RUNTIME_FORCE_FLOOR_USED';
+
+const RUNTIME_FORCE_FLOOR_KEYS = Object.freeze([
+  'force_sold_floor',
+  'force_watchlist_floor',
+  'force_search_floor',
+  'force_recommendation_floor',
+  'force_analytics_floor',
+  'force_negotiation_market_floor',
+]);
+
+/**
+ * Live owner-proof recapture-v4 forbids acceptance-only runtime data injection.
+ */
+export function assertNoRuntimeForceFloorsInBody(body, { screenshotPack } = {}) {
+  if (
+    screenshotPack !== 'owner-proof-recapture-v4' &&
+    screenshotPack !== 'owner-proof-recapture-v5'
+  ) {
+    return { ok: true };
+  }
+  if (!body || typeof body !== 'object') return { ok: true };
+  for (const key of RUNTIME_FORCE_FLOOR_KEYS) {
+    if (body[key] === true) {
+      const err = new Error(`${RUNTIME_FORCE_FLOOR_USED_CODE}:${key}`);
+      err.code = RUNTIME_FORCE_FLOOR_USED_CODE;
+      err.field = key;
+      throw err;
+    }
+  }
+  return { ok: true };
+}

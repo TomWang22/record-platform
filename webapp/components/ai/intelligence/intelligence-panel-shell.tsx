@@ -231,7 +231,22 @@ export function IntelligencePanelShell({
               >
                 <p>{sanitizeCustomerFacingText(item.summary || item.source_type || 'Evidence item')}</p>
                 <p className="text-[10px] text-slate-400">
-                  {[item.source_type, item.authorization_scope, item.deletion_state]
+                  {[
+                    item.sale_kind === 'sold'
+                      ? 'Sold'
+                      : item.sale_kind === 'asking'
+                        ? 'Asking'
+                        : item.source_type === 'sale' || item.source_type === 'auction'
+                          ? 'Sold'
+                          : item.source_type === 'listing'
+                            ? 'Asking'
+                            : null,
+                    item.authorization_scope === 'authenticated_market'
+                      ? 'Authorized market'
+                      : item.authorization_scope === 'public_market'
+                        ? 'Public market'
+                        : null,
+                  ]
                     .filter(Boolean)
                     .join(' · ')}
                 </p>

@@ -5,6 +5,7 @@ import { apiFetch } from './api-client'
 import {
   assembleScarcityEvidence,
   assembleValuationEvidence,
+  type CompletedSaleEventInput,
   type ListingEvidenceInput,
   type RecordSubjectInput,
   type ScarcityAssemblyResult,
@@ -88,12 +89,35 @@ async function fetchAuctionResultsSafe(query: string): Promise<
   }
 }
 
+/**
+ * Load authorized COMPLETED_SALE seed events for owner-proof sold floors.
+ * Distinct from listings — never invents sales from archived inventory.
+ */
+async function fetchCompletedSaleEventsSafe(
+  record: CollectionRecord,
+): Promise<CompletedSaleEventInput[]> {
+  try {
+    const qs = new URLSearchParams()
+    const qPrimary = [record.artist, record.name].filter(Boolean).join(' ').trim()
+    if (qPrimary) qs.set('q', qPrimary)
+    if (record.artist) qs.set('artist', record.artist)
+    if (record.catalogNumber) qs.set('catalog', record.catalogNumber)
+    const data = await apiFetch<{ events?: CompletedSaleEventInput[] }>(
+      `/api/marketplace/completed-sales?${qs.toString()}`,
+      { auth: true },
+    )
+    return Array.isArray(data.events) ? data.events : []
+  } catch {
+    return []
+  }
+}
+
 async function loadLiveEvidenceInputs(record: CollectionRecord) {
   const subject = collectionRecordToSubject(record)
   const qPrimary = [record.artist, record.name].filter(Boolean).join(' ').trim()
   const qCatalog = record.catalogNumber?.trim() || ''
 
-  const [searchPrimary, searchCatalog, mine, auctions] = await Promise.all([
+  const [searchPrimary, searchCatalog, mine, auctions, completedSaleEvents] = await Promise.all([
     qPrimary
       ? searchListings({ q: qPrimary, limit: 40, sort_by: 'newly_listed' }).catch(() => ({
           listings: [] as MarketplaceListing[],
@@ -106,6 +130,7 @@ async function loadLiveEvidenceInputs(record: CollectionRecord) {
       : Promise.resolve({ listings: [] as MarketplaceListing[] }),
     fetchMyListings().catch(() => [] as MarketplaceListing[]),
     fetchAuctionResultsSafe(qPrimary),
+    fetchCompletedSaleEventsSafe(record),
   ])
 
   const byId = new Map<string, MarketplaceListing>()
@@ -118,6 +143,7 @@ async function loadLiveEvidenceInputs(record: CollectionRecord) {
     activeListings: [...byId.values()].map(listingToEvidenceInput),
     ownerListings: mine.map(listingToEvidenceInput),
     auctionResults: auctions,
+    completedSaleEvents,
   }
 }
 

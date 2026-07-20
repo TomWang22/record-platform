@@ -58,10 +58,6 @@ export function ScarcityIntelligencePanel({
           require_exact_pressing: assembly.require_exact_pressing,
           active_supply_count: assembly.active_supply_count,
           recent_sale_count: assembly.recent_sale_count,
-          // Success floors need sold comps; never force for weak/honest-limit intents.
-          force_sold_floor:
-            assembly.sold_count < 2 &&
-            !/obscure private|almost no|too few|weak|abstain|tiny population/i.test(intent),
           user_intent: intent,
           owner_proof_prompt: intent,
         })
@@ -73,6 +69,20 @@ export function ScarcityIntelligencePanel({
           })
           return
         }
+        // Prefer engine sold/asking counts (includes authorized completed-sale seed merge).
+        setAssemblyMeta({
+          ...assembly,
+          sold_count:
+            typeof result.sold_count === 'number' ? result.sold_count : assembly.sold_count,
+          asking_count:
+            typeof result.asking_count === 'number' ? result.asking_count : assembly.asking_count,
+          recent_sale_count:
+            typeof result.recent_sale_count === 'number'
+              ? result.recent_sale_count
+              : typeof result.sold_count === 'number'
+                ? result.sold_count
+                : assembly.recent_sale_count,
+        })
         if (isAbstentionResult(result)) {
           setState({
             status: 'abstained',
@@ -151,7 +161,7 @@ export function ScarcityIntelligencePanel({
             </p>
             <p className="text-xs text-slate-500">
               Score {result.scarcity_score.toFixed(2)} · supply {result.active_supply_count} · sold{' '}
-              {result.recent_sale_count}
+              {result.sold_count ?? result.recent_sale_count}
             </p>
             <p className="text-xs text-slate-600">
               Next: refine the pressing identity, or open valuation for price ranges on this copy.

@@ -201,9 +201,6 @@ export function NegotiationIntelligencePanel({
         },
         messages,
         market_candidates: [],
-        // Owner-proof / empty-comp floor: enable deterministic comps so strategy/evidence
-        // can diverge across correction turns without inventing UI-only fixtures.
-        force_negotiation_market_floor: true,
         automatic_send_allowed: false,
         request_auto_send: false,
         user_intent: userIntent.trim(),

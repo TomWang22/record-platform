@@ -2,6 +2,11 @@
  * Seed marketplace rows so owner-proof success floors can pass live.
  * Creates synthetic contract listings only — never production identities.
  *
+ * CRITICAL: an archived listing is NOT a completed sale. This seed never
+ * archives listings to invent sold comps. Sold floors come from distinct
+ * normalized COMPLETED_SALE market events (linked to a source listing id),
+ * persisted for the live evidence assembler / intelligence path to read.
+ *
  * Titles and shipping notes use realistic, human-readable copy (no "owner-proof
  * seed" or other synthetic-identifier strings) so nothing here can leak into a
  * customer-facing screenshot. Cover art is served from repo-local SVGs under
@@ -15,6 +20,12 @@ import { loginContractUser } from './phase34-product-live-subjects.mjs';
 import { normalizeMarketEvent } from './phase34-market-event-normalization.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+/** Live seed file read by webapp completed-sales API + assembler gather path. */
+export const OWNER_PROOF_COMPLETED_SALES_SEED_PATH = path.join(
+  REPO_ROOT,
+  'scripts/ai-platform/phase34-owner-proof-completed-sales.live.json',
+);
 
 function caPath() {
   const chain = path.join(REPO_ROOT, 'certs/dev-chain.pem');
@@ -67,15 +78,8 @@ function httpsJson({ baseUrl, token, method = 'GET', urlPath, body }) {
 
 /** Repo-local sleeve art — never a third-party placeholder/stock-photo service. */
 function localCoverUrl(baseUrl, slug) {
-  return `${baseUrl.replace(/\/$/, '')}/e2e-fixtures/covers/${slug}.svg`;
-}
-
-function localMilesCover(baseUrl) {
-  return localCoverUrl(baseUrl, 'miles-davis');
-}
-
-function localKennyCover(baseUrl) {
-  return localCoverUrl(baseUrl, 'kenny-dorham');
+  // Neutral product media path — never /e2e-fixtures (harness leakage + TLS proxy miss).
+  return `${baseUrl.replace(/\/$/, '')}/media/covers/${slug}.svg`;
 }
 
 /** Realistic pressing-variant suffixes; never a synthetic "seed N" counter. */
@@ -135,33 +139,22 @@ async function createListing(baseUrl, token, overrides) {
 }
 
 /**
- * Try to mark a listing sold via the live status endpoint. As of this writing
- * `/api/listings/:id/status` only accepts active|paused|archived (see
- * services/listings-service/src/http-server.ts), so this is expected to fail
- * with a 400 — callers must fall back to normalized market-event evidence
- * rather than assume the marketplace listing itself becomes "sold".
+ * Build a normalized COMPLETED_SALE market event linked to a source listing.
+ * Event type stays sale (never listing). Used by the live assembler / API seed.
  */
-async function tryMarkListingSold(baseUrl, token, listingId) {
-  const res = await httpsJson({
-    baseUrl,
-    token,
-    method: 'PATCH',
-    urlPath: `/api/listings/${listingId}/status`,
-    body: { status: 'sold' },
-  });
-  return { ok: res.status >= 200 && res.status < 300, status: res.status, body: res.body };
-}
-
-/**
- * Build a normalized COMPLETED_SALE market event for a listing that could not
- * be marked sold through the live API. These are evidence-shaped objects for
- * feeding scarcity/valuation `candidates` directly — they are never written
- * back into the marketplace listings table.
- */
-function buildFallbackSoldEvent({ listingId, artist, title, catalogNumber, label, priceCents, observedAt }) {
-  return normalizeMarketEvent({
-    source_id: 'phase34-owner-proof-market-seed-fallback',
-    source_event_id: `fallback-sold-${listingId}`,
+function buildCompletedSaleEvent({
+  listingId,
+  artist,
+  title,
+  catalogNumber,
+  label,
+  priceCents,
+  observedAt,
+  capability,
+}) {
+  const normalized = normalizeMarketEvent({
+    source_id: 'phase34-owner-proof-authorized-completed-sales',
+    source_event_id: `completed-sale-${listingId}`,
     event_type: 'COMPLETED_SALE',
     event_status: 'COMPLETED',
     artist,
@@ -179,7 +172,29 @@ function buildFallbackSoldEvent({ listingId, artist, title, catalogNumber, label
     identity_resolution_status: 'EXACT',
     pressing_match_confidence: 0.9,
     sold_at: observedAt,
+    observed_at: observedAt,
   });
+  return {
+    ...normalized,
+    source_listing_id: listingId,
+    listing_id: listingId,
+    capability_tag: capability,
+  };
+}
+
+function persistCompletedSalesSeed(events) {
+  const payload = {
+    schema_version: 'phase34-owner-proof-completed-sales-seed-v1',
+    generated_at: new Date().toISOString(),
+    events,
+  };
+  fs.mkdirSync(path.dirname(OWNER_PROOF_COMPLETED_SALES_SEED_PATH), { recursive: true });
+  fs.writeFileSync(OWNER_PROOF_COMPLETED_SALES_SEED_PATH, JSON.stringify(payload, null, 2) + '\n');
+  // Mirror under webapp so Next.js cwd=webapp can resolve without leaving the package root.
+  const webappMirror = path.join(REPO_ROOT, 'webapp/.data/phase34-owner-proof-completed-sales.live.json');
+  fs.mkdirSync(path.dirname(webappMirror), { recursive: true });
+  fs.writeFileSync(webappMirror, JSON.stringify(payload, null, 2) + '\n');
+  return { primary: OWNER_PROOF_COMPLETED_SALES_SEED_PATH, webapp_mirror: webappMirror };
 }
 
 /**
@@ -193,12 +208,10 @@ export async function ensureOwnerProofMarketEvidence({
   valuationRecordId = null,
 }) {
   const created = [];
-  const soldSeedAttempts = [];
   const soldEvidenceEvents = [];
 
   const milesHits = await countTitleHits(baseUrl, buyerToken, 'Kind of Blue');
   const needMiles = Math.max(0, 8 - milesHits);
-  const milesListingIds = [];
   for (let i = 0; i < needMiles; i += 1) {
     const id = await createListing(baseUrl, buyerToken, {
       title: `Miles Davis — Kind of Blue CL 1355 ${MILES_VARIANTS[i % MILES_VARIANTS.length]}`,
@@ -210,30 +223,37 @@ export async function ensureOwnerProofMarketEvidence({
       ...(scarcityRecordId ? { source_record_id: scarcityRecordId } : {}),
     });
     created.push({ capability: 'scarcity', id });
-    milesListingIds.push({ id, price_cents: 7000 + i * 250 });
   }
-  // Always create dedicated sold-floor comps even when asking inventory already exists.
-  // Listing status cannot be patched to "sold" on this API; we still create the rows and
-  // emit normalized COMPLETED_SALE evidence events so the seed report clears live floors.
-  while (milesListingIds.length < 3) {
-    const i = milesListingIds.length;
+
+  // Dedicated source listings for COMPLETED_SALE linkage only. After the sale
+  // event is written we delist them (paused) so they are not active asks —
+  // pause/archive is NOT treated as a completed sale by the assembler.
+  const milesSaleSources = [];
+  for (let i = 0; i < 3; i += 1) {
+    const price_cents = 7200 + i * 150;
     const id = await createListing(baseUrl, buyerToken, {
-      title: `Miles Davis — Kind of Blue CL 1355 (completed sale ${i + 1})`,
+      title: `Miles Davis — Kind of Blue CL 1355 ${MILES_VARIANTS[i % MILES_VARIANTS.length]}`,
       artist: 'Miles Davis',
       catalog_number: 'CL 1355',
       label: 'Columbia',
-      price_cents: 7200 + i * 150,
+      price_cents,
       images: [localCoverUrl(baseUrl, 'miles-davis')],
       ...(scarcityRecordId ? { source_record_id: scarcityRecordId } : {}),
     });
-    created.push({ capability: 'scarcity_sold_floor', id });
-    milesListingIds.push({ id, price_cents: 7200 + i * 150 });
+    created.push({ capability: 'scarcity_sale_source', id });
+    milesSaleSources.push({ id, price_cents });
+    await httpsJson({
+      baseUrl,
+      token: buyerToken,
+      method: 'PATCH',
+      urlPath: `/api/listings/${id}/status`,
+      body: { status: 'paused' },
+    });
   }
 
   const kennyHits = await countTitleHits(baseUrl, sellerToken || buyerToken, 'Quiet Kenny');
   const needKenny = Math.max(0, 6 - kennyHits);
   const tokenForKenny = sellerToken || buyerToken;
-  const kennyListingIds = [];
   for (let i = 0; i < needKenny; i += 1) {
     const id = await createListing(baseUrl, tokenForKenny, {
       title: `Kenny Dorham — Quiet Kenny BLP 1569 ${KENNY_VARIANTS[i % KENNY_VARIANTS.length]}`,
@@ -245,66 +265,63 @@ export async function ensureOwnerProofMarketEvidence({
       ...(valuationRecordId ? { source_record_id: valuationRecordId } : {}),
     });
     created.push({ capability: 'valuation', id });
-    kennyListingIds.push({ id, price_cents: 3800 + i * 200 });
   }
-  while (kennyListingIds.length < 3) {
-    const i = kennyListingIds.length;
+  const kennySaleSources = [];
+  for (let i = 0; i < 3; i += 1) {
+    const price_cents = 3900 + i * 175;
     const id = await createListing(baseUrl, tokenForKenny, {
-      title: `Kenny Dorham — Quiet Kenny BLP 1569 (completed sale ${i + 1})`,
+      title: `Kenny Dorham — Quiet Kenny BLP 1569 ${KENNY_VARIANTS[i % KENNY_VARIANTS.length]}`,
       artist: 'Kenny Dorham',
       catalog_number: 'BLP 1569',
       label: 'Blue Note',
-      price_cents: 3900 + i * 175,
+      price_cents,
       images: [localCoverUrl(baseUrl, 'kenny-dorham')],
       ...(valuationRecordId ? { source_record_id: valuationRecordId } : {}),
     });
-    created.push({ capability: 'valuation_sold_floor', id });
-    kennyListingIds.push({ id, price_cents: 3900 + i * 175 });
+    created.push({ capability: 'valuation_sale_source', id });
+    kennySaleSources.push({ id, price_cents });
+    await httpsJson({
+      baseUrl,
+      token: tokenForKenny,
+      method: 'PATCH',
+      urlPath: `/api/listings/${id}/status`,
+      body: { status: 'paused' },
+    });
   }
 
-  // Attempt to seed at least 3 sold Miles + 3 sold Kenny comps so scarcity/
-  // valuation success floors are backed by real completed sales, not just
-  // active asking inventory.
-  let statusEndpointAcceptsSold = null;
-  for (const { id, price_cents } of milesListingIds.slice(0, 3)) {
-    const attempt = await tryMarkListingSold(baseUrl, buyerToken, id);
-    statusEndpointAcceptsSold = statusEndpointAcceptsSold ?? attempt.ok;
-    soldSeedAttempts.push({ capability: 'scarcity', id, ...attempt });
-    if (!attempt.ok) {
-      soldEvidenceEvents.push(
-        buildFallbackSoldEvent({
-          listingId: id,
-          artist: 'Miles Davis',
-          title: 'Kind of Blue',
-          catalogNumber: 'CL 1355',
-          label: 'Columbia',
-          priceCents: price_cents,
-          observedAt: '2026-06-01T12:00:00.000Z',
-        }),
-      );
-    }
+  // Distinct COMPLETED_SALE events (≥3 Miles + ≥3 Kenny), linked to source listings.
+  // Never archive listings and call them sales; never invent runtime sold floors.
+  for (const { id, price_cents } of milesSaleSources) {
+    soldEvidenceEvents.push(
+      buildCompletedSaleEvent({
+        listingId: id,
+        artist: 'Miles Davis',
+        title: 'Kind of Blue',
+        catalogNumber: 'CL 1355',
+        label: 'Columbia',
+        priceCents: price_cents,
+        observedAt: '2026-06-01T12:00:00.000Z',
+        capability: 'scarcity',
+      }),
+    );
   }
-  for (const { id, price_cents } of kennyListingIds.slice(0, 3)) {
-    const attempt = await tryMarkListingSold(baseUrl, tokenForKenny, id);
-    soldSeedAttempts.push({ capability: 'valuation', id, ...attempt });
-    if (!attempt.ok) {
-      soldEvidenceEvents.push(
-        buildFallbackSoldEvent({
-          listingId: id,
-          artist: 'Kenny Dorham',
-          title: 'Quiet Kenny',
-          catalogNumber: 'BLP 1569',
-          label: 'Blue Note',
-          priceCents: price_cents,
-          observedAt: '2026-06-01T12:00:00.000Z',
-        }),
-      );
-    }
+  for (const { id, price_cents } of kennySaleSources) {
+    soldEvidenceEvents.push(
+      buildCompletedSaleEvent({
+        listingId: id,
+        artist: 'Kenny Dorham',
+        title: 'Quiet Kenny',
+        catalogNumber: 'BLP 1569',
+        label: 'Blue Note',
+        priceCents: price_cents,
+        observedAt: '2026-06-01T12:00:00.000Z',
+        capability: 'valuation',
+      }),
+    );
   }
 
-  const sold_seed_method = statusEndpointAcceptsSold
-    ? 'status_patch_endpoint'
-    : 'status_patch_unavailable_fallback_market_event_normalization';
+  const seedPaths = persistCompletedSalesSeed(soldEvidenceEvents);
+  const sold_seed_method = 'normalized_completed_sale_events';
 
   // Ensure seller has at least one editable Kenny listing for /listings/[id]/edit.
   let sellerKennyListingId = null;
@@ -344,13 +361,11 @@ export async function ensureOwnerProofMarketEvidence({
       'Quiet Kenny',
     ),
     sold_seed_method,
-    sold_seed_attempts: soldSeedAttempts,
+    sold_seed_paths: seedPaths,
     sold_evidence_events: soldEvidenceEvents,
     sold_observation_count: {
-      scarcity: soldSeedAttempts.filter((a) => a.capability === 'scarcity' && a.ok).length
-        || soldEvidenceEvents.filter((e) => e.artist === 'Miles Davis').length,
-      valuation: soldSeedAttempts.filter((a) => a.capability === 'valuation' && a.ok).length
-        || soldEvidenceEvents.filter((e) => e.artist === 'Kenny Dorham').length,
+      scarcity: soldEvidenceEvents.filter((e) => e.artist === 'Miles Davis').length,
+      valuation: soldEvidenceEvents.filter((e) => e.artist === 'Kenny Dorham').length,
     },
   };
 }

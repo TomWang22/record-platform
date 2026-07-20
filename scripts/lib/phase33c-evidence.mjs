@@ -101,9 +101,13 @@ export function selectEvidence({
       }
     }
 
-    if (c.sale_kind === 'sold' || c.source_type === 'sale') codes.push('RECENT_SALE');
+    if (c.sale_kind === 'sold' || (c.sale_kind == null && c.source_type === 'sale')) {
+      codes.push('RECENT_SALE');
+    }
     if (c.source_type === 'auction' && c.auction_state === 'completed') codes.push('COMPLETED_AUCTION');
-    if (c.sale_kind === 'asking' || c.source_type === 'listing') codes.push('ACTIVE_ASKING_ONLY');
+    if (c.sale_kind === 'asking' || (c.sale_kind == null && c.source_type === 'listing')) {
+      codes.push('ACTIVE_ASKING_ONLY');
+    }
     if (c.outlier === true) {
       codes.push('OUTLIER');
       excluded.push({ evidence_id: id, reason_codes: codes });
@@ -117,13 +121,24 @@ export function selectEvidence({
       continue;
     }
 
+    // sale_kind=sold must never render as source_type "listing".
+    let sourceType = c.source_type || 'public_metadata';
+    if (c.sale_kind === 'sold' && sourceType === 'listing') sourceType = 'sale';
+    if (c.sale_kind === 'asking' && sourceType === 'sale') sourceType = 'listing';
+
     selected.push({
       evidence_id: id,
-      source_type: c.source_type || 'public_metadata',
+      source_type: sourceType,
       source_id: c.source_id || id,
       retrieved_at: c.retrieved_at || c.observed_at || new Date(nowMs).toISOString(),
       observed_at: c.observed_at || null,
-      summary: c.summary || `${c.source_type || 'evidence'} ${id}`,
+      summary:
+        c.summary ||
+        (c.sale_kind === 'sold'
+          ? `Sold comparable${typeof c.price === 'number' ? ` for $${c.price}` : ''}`
+          : c.sale_kind === 'asking'
+            ? `Asking comparable${typeof c.price === 'number' ? ` for $${c.price}` : ''}`
+            : 'Marketplace comparable'),
       authorization_scope: c.authorization_scope || 'authenticated_market',
       freshness_status: c.stale ? 'stale' : 'fresh',
       reason_codes: codes,

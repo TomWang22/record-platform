@@ -25,6 +25,7 @@ import {
   OWNER_PROOF_ACTION_DID_NOT_REACH_CAPABILITY_HANDLER,
 } from '../phase34-product-request-initiation.mjs';
 import { DUPLICATE_SCREENSHOT_MASQUERADING_AS_DISTINCT_STATE } from '../phase34-product-screenshot-distinctness.mjs';
+import { assertNoRuntimeForceFloorsInBody } from '../phase34-owner-proof-product-contracts.mjs';
 
 /** A disclosure's aria-expanded attribute did not flip after clicking its summary. */
 export const DISCLOSURE_DID_NOT_EXPAND = 'DISCLOSURE_DID_NOT_EXPAND';
@@ -1276,7 +1277,7 @@ export class BaseProductJourneyAdapter {
     return 'success';
   }
 
-  async captureCanonicalRequest(browserResult) {
+  async captureCanonicalRequest(browserResult, prepared = null) {
     const cap = browserResult.network_captures?.[0];
     if (!cap?.body) {
       const err = new Error('no browser intelligence request captured');
@@ -1284,6 +1285,9 @@ export class BaseProductJourneyAdapter {
       throw err;
     }
     const sanitized = sanitizeCanonicalBody(cap.body, this.capability);
+    assertNoRuntimeForceFloorsInBody(sanitized, {
+      screenshotPack: prepared?.screenshot_pack,
+    });
     return {
       method: 'POST',
       endpoint: cap.endpoint || this.registry.apiPath,

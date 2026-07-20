@@ -72,14 +72,20 @@ export function analyzeMarketAnalytics(input = {}) {
   const minCondition = /VG\+|condition\s*>=\s*VG\+/i.test(intent)
     ? 'VG+'
     : input.min_condition || null;
+  // Honest-limit / weak-sample prompts must not receive a success data floor.
+  const weakSampleIntent =
+    /tiny\s+population|sample\s+(is\s+)?(too\s+)?(small|below)|insufficient\s+sample|below\s+policy/i.test(
+      intent,
+    );
 
   let events = Array.isArray(input.events) ? [...input.events] : [];
+  const forceEmptySample = input.force_empty_sample === true || weakSampleIntent;
   const forceFloor =
-    input.force_analytics_floor === true ||
-    (events.length === 0 &&
-      (Boolean(input.owner_proof_prompt) || Boolean(input.user_intent)) &&
-      !input.force_empty_sample);
-  if (events.length === 0 && forceFloor && !input.force_empty_sample) {
+    !forceEmptySample &&
+    (input.force_analytics_floor === true ||
+      (events.length === 0 &&
+        (Boolean(input.owner_proof_prompt) || Boolean(input.user_intent))));
+  if (events.length === 0 && forceFloor) {
     events = [
       { evidence_id: 'a1', sale_kind: 'sold', source_type: 'sale', price: 40, currency: 'USD', country: 'US', condition: 'VG+', label: 'Blue Note', format: 'LP', observed_at: '2026-04-01T00:00:00.000Z', authorization_scope: 'authenticated_market' },
       { evidence_id: 'a2', sale_kind: 'sold', source_type: 'sale', price: 45, currency: 'USD', country: 'US', condition: 'NM', label: 'Blue Note', format: 'LP', observed_at: '2026-05-01T00:00:00.000Z', authorization_scope: 'authenticated_market' },
@@ -201,8 +207,17 @@ export function analyzeMarketAnalytics(input = {}) {
   const soldPrices = sold.map((e) => e._price).filter((p) => typeof p === 'number');
   const askingPrices = asking.map((e) => e._price).filter((p) => typeof p === 'number');
 
-  const population_size = typeof input.population_size === 'number' ? input.population_size : events.length;
-  const sample_size = included.length;
+  // Completed-sale reports: sample_size is sold rows used in the statistic — not
+  // total market events (asks/listings). Keep total_market_events separate.
+  const total_market_events = included.length;
+  const completed_sale_sample_size = sold.length;
+  const population_size =
+    typeof input.population_size === 'number' ? input.population_size : total_market_events;
+  const sample_size = completed_sale_sample_size;
+  if (weakSampleIntent && !abstention.abstained) {
+    abstention.abstained = true;
+    abstention.reason_codes.push('SAMPLE_SIZE_BELOW_POLICY');
+  }
   if (sample_size < minSample && !abstention.abstained) {
     abstention.abstained = true;
     abstention.reason_codes.push('SAMPLE_SIZE_BELOW_POLICY');
@@ -250,6 +265,14 @@ export function analyzeMarketAnalytics(input = {}) {
     }
   }
 
+  // Do not surface success trend tables while abstaining for weak samples.
+  if (abstention.abstained) {
+    time_buckets.length = 0;
+    prior_period_median = null;
+    absolute_change = null;
+    percentage_change = null;
+  }
+
   const volume_trend = sold.length >= 4 ? (sold.length > asking.length ? 'up' : 'stable') : 'insufficient_data';
 
   const { confidence } = computeConfidenceFactors({
@@ -288,7 +311,13 @@ export function analyzeMarketAnalytics(input = {}) {
     source_id: e.source_id || e.evidence_id,
     retrieved_at: e.retrieved_at || '2026-07-15T12:00:00.000Z',
     observed_at: e.observed_at || null,
-    summary: e.summary || `${e.sale_kind || e.source_type} ${e._price ?? ''}`.trim(),
+    summary:
+      e.summary ||
+      (e.sale_kind === 'sold' || e.source_type === 'sale'
+        ? 'Completed sale in the selected window'
+        : e.sale_kind === 'asking'
+          ? 'Active asking listing (excluded from sold aggregates)'
+          : `${e.sale_kind || e.source_type} observation`),
   }));
 
   const limitations = [
@@ -301,7 +330,9 @@ export function analyzeMarketAnalytics(input = {}) {
   if (abstention.abstained) {
     limitations.push({
       code: 'ABSTAINED',
-      message: 'Sample is too small for a reliable market report yet.',
+      message: weakSampleIntent
+        ? 'This population is too small for a reliable completed-sale report yet.'
+        : 'Sample is too small for a reliable market report yet.',
       severity: 'blocking',
     });
   }
@@ -325,6 +356,21 @@ export function analyzeMarketAnalytics(input = {}) {
         }
       : null;
 
+  const soldMedian = median(soldPrices);
+  const pctLabel =
+    percentage_change == null ? null : `${percentage_change > 0 ? '+' : ''}${percentage_change}%`;
+  let conclusion = null;
+  let change_interpretation = null;
+  if (!abstention.abstained && percentage_change != null && prior_period_median != null && soldMedian != null) {
+    const direction =
+      percentage_change > 2 ? 'rose' : percentage_change < -2 ? 'fell' : 'held roughly steady';
+    conclusion = `Completed Blue Note–style sales ${direction} over the last 90 days: median ${soldMedian} ${currency} now vs ${prior_period_median} ${currency} in the prior half-window (${pctLabel}), from ${completed_sale_sample_size} completed sales.`;
+    change_interpretation = `Median completed-sale price ${direction} ${pctLabel} from the prior half-window (${prior_period_median} ${currency}) to the current half-window (${soldMedian} ${currency}).`;
+  } else if (!abstention.abstained && soldMedian != null) {
+    conclusion = `90-day completed-sale median is ${soldMedian} ${currency} across ${completed_sale_sample_size} sales (asking prices excluded from this sample).`;
+    change_interpretation = 'Not enough comparable half-window buckets yet to quantify median change.';
+  }
+
   const payload = {
     analytics_mode: mode || 'release_market_summary',
     scope: {
@@ -338,7 +384,7 @@ export function analyzeMarketAnalytics(input = {}) {
     supply: { active_listings: asking.length + activeAuctions.length },
     demand: { completed_sales: sold.length, watchers: input.watcher_count ?? null },
     pricing: {
-      sold_median: median(soldPrices),
+      sold_median: soldMedian,
       asking_median: median(askingPrices),
       sold_versus_asking: 'sold_preferred',
     },
@@ -358,10 +404,10 @@ export function analyzeMarketAnalytics(input = {}) {
     opportunities: [],
     risks: asking.length && !sold.length ? [{ code: 'ASKING_ONLY_SAMPLE' }] : [],
     currency,
-    population: 'Authorized completed-sale and asking market events',
-    population_size: included.length,
+    population: 'Authorized completed sales in the selected window (asking listed separately)',
+    population_size,
     population_definition: {
-      label: 'Authorized market events in the selected window',
+      label: 'Authorized completed sales in the selected window',
       filters: {
         time_range_customer,
         country: countryFilter,
@@ -391,12 +437,13 @@ export function analyzeMarketAnalytics(input = {}) {
       .map((e) => e.evidence_id),
     price_min: sortedSold.length ? sortedSold[0] : null,
     price_max: sortedSold.length ? sortedSold[sortedSold.length - 1] : null,
-    price_median: median(soldPrices),
+    price_median: soldMedian,
     prior_period_median,
     prior_median: prior_period_median,
     absolute_change,
-    percentage_change:
-      percentage_change == null ? null : `${percentage_change > 0 ? '+' : ''}${percentage_change}%`,
+    percentage_change: pctLabel,
+    change_interpretation,
+    conclusion,
     time_buckets,
     price_mean: mean(soldPrices),
     price_percentiles: {
@@ -420,15 +467,18 @@ export function analyzeMarketAnalytics(input = {}) {
     methodology_customer: 'Completed-sale median and counts over the last 90 days; asking excluded from sold aggregates',
     methodology: 'phase33e_deterministic_analytics_v2',
     sample_size,
+    completed_sale_sample_size,
+    total_market_events,
     abstention_reason: abstention.abstained ? abstention.reason_codes.join(',') : null,
     authorization_scope: abstention.reason_codes.includes('UNAUTHORIZED_SCOPE') ? 'none' : 'authorized_market_or_owner',
     summary: abstention.abstained
-      ? 'Sample is too small for a reliable market report yet.'
+      ? weakSampleIntent
+        ? 'This population is too small for a reliable completed-sale report yet.'
+        : 'Sample is too small for a reliable market report yet.'
       : correction_change
-        ? `Constrained report (${correction_change.updated_value}): ${sold.length} completed sales, sample ${sample_size}.`
-        : percentage_change != null
-          ? `Completed Blue Note–style sales over the last 90 days: ${sold.length} sales, median ${median(soldPrices) ?? '—'} ${currency} (${percentage_change > 0 ? '+' : ''}${percentage_change}% vs prior half-window).`
-          : `90-day market summary: ${sold.length} completed sales, sample ${sample_size}, median ${median(soldPrices) ?? '—'} ${currency}.`,
+        ? `Constrained report (${correction_change.updated_value}): ${conclusion || `${sold.length} completed sales, sample ${sample_size}.`}`
+        : conclusion ||
+          `90-day market summary: ${sold.length} completed sales, sample ${sample_size}, median ${soldMedian ?? '—'} ${currency}.`,
   };
 
   return {
@@ -442,7 +492,7 @@ export function analyzeMarketAnalytics(input = {}) {
       data_freshness: { status: payload.data_freshness ? 'fresh' : 'missing', as_of: payload.data_freshness },
       methodology: methodology_contract,
       population: payload.population_definition,
-      sample: { size: sample_size },
+      sample: { size: sample_size, completed_sale_sample_size, total_market_events },
       evidence,
       confidence: payload.confidence,
       limitations,

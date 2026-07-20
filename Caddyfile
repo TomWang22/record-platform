@@ -164,6 +164,7 @@ https://record-platform.test {
 	@webapp_bff {
 		path /api/webapp-version
 		path /api/messages/*
+		path /api/marketplace/*
 	}
 	handle @webapp_bff {
 		reverse_proxy http://webapp.record-platform.svc.cluster.local:3001 {

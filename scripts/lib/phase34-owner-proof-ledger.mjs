@@ -4,6 +4,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {
+  summarizeLatency as summarizeLatencyV2,
+} from './phase34-latency-summary.mjs';
 
 export function createOwnerProofLedger(outRoot) {
   const file = path.join(outRoot, 'reports', 'owner-proof-execution.jsonl');
@@ -79,23 +82,45 @@ export function buildLatencyRow(partial = {}) {
   return row;
 }
 
-export function summarizeLatency(rows) {
-  const values = rows
-    .map((r) => r.browser_action_to_panel_ready_ms)
-    .filter((n) => typeof n === 'number' && Number.isFinite(n))
-    .sort((a, b) => a - b);
-  const pct = (p) => {
-    if (!values.length) return null;
-    const idx = Math.min(values.length - 1, Math.ceil((p / 100) * values.length) - 1);
-    return values[Math.max(0, idx)];
-  };
-  return {
-    n: values.length,
-    p50: pct(50),
-    p95: pct(95),
-    p99: pct(99),
-    p100: values.length ? values[values.length - 1] : null,
-    p99_9: 'NOT_ESTIMABLE',
-    note: 'For 27 turns / 81 protocol rows, p99.9+ is NOT_ESTIMABLE',
-  };
+/**
+ * Owner-proof latency summary.
+ *
+ * Prefer passing an options bag with plannedTurns / runAborted.
+ * Legacy callers may pass only row objects; those are treated as a partial
+ * sample with plannedTurns=27 and no completion claim.
+ *
+ * @param {Array<object|number>} rowsOrSamples
+ * @param {{
+ *   plannedTurns?: number,
+ *   runCompleted?: boolean,
+ *   runAborted?: boolean,
+ *   metricName?: string,
+ *   runId?: string | null,
+ * }=} options
+ */
+export function summarizeLatency(rowsOrSamples, options = {}) {
+  const samples = Array.isArray(rowsOrSamples)
+    ? rowsOrSamples
+        .map((row) =>
+          typeof row === 'number'
+            ? row
+            : row?.browser_action_to_panel_ready_ms ??
+              row?.browser_action_to_terminal_ready_ms,
+        )
+        .filter((n) => typeof n === 'number' && Number.isFinite(n))
+    : [];
+
+  const plannedTurns = Number.isInteger(options.plannedTurns)
+    ? options.plannedTurns
+    : 27;
+
+  return summarizeLatencyV2(samples, {
+    plannedTurns,
+    runCompleted: options.runCompleted === true,
+    runAborted:
+      options.runAborted === true ||
+      (options.runCompleted !== true && samples.length < plannedTurns),
+    metricName: options.metricName || 'browser_action_to_terminal_ready_ms',
+    runId: options.runId ?? null,
+  });
 }

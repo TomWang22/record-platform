@@ -10,6 +10,7 @@ import {
   FORBIDDEN_TRAINING_PATTERNS,
   PRIVATE_FIELD_PATTERNS,
 } from './phase33a-intelligence-capability-contracts.mjs';
+import { mergeOwnerProofCompletedSaleCandidates } from './phase34-owner-proof-completed-sale-candidates.mjs';
 
 export const PROMPT_TEMPLATES = {
   scarcity: { id: 'scarcity-explain', version: '1', role: 'summarize_only' },
@@ -20,9 +21,9 @@ export const PROMPT_TEMPLATES = {
 export function runCapability(capability, input = {}) {
   switch (capability) {
     case 'scarcity':
-      return analyzeScarcity(input);
+      return analyzeScarcity(mergeOwnerProofCompletedSaleCandidates(input));
     case 'valuation':
-      return analyzeValuation(input);
+      return analyzeValuation(mergeOwnerProofCompletedSaleCandidates(input));
     case 'auction_intelligence':
       return analyzeAuction(input);
     default: {

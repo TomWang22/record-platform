@@ -79,6 +79,32 @@ export type AuctionResultInput = {
   created_at?: string | null
 }
 
+/** Pre-seeded / authorized COMPLETED_SALE market events (never archived listings). */
+export type CompletedSaleEventInput = {
+  market_event_id?: string | null
+  source_event_id?: string | null
+  source_listing_id?: string | null
+  listing_id?: string | null
+  event_type?: string | null
+  artist?: string | null
+  title?: string | null
+  catalog_number?: string | null
+  label?: string | null
+  price_normalized?: number | null
+  price_original?: number | null
+  price?: number | null
+  currency_normalized?: string | null
+  currency_original?: string | null
+  currency?: string | null
+  media_condition?: string | null
+  condition?: string | null
+  sold_at?: string | null
+  observed_at?: string | null
+  authorization_scope?: string | null
+  pressing_id?: string | null
+  release_id?: string | null
+}
+
 export type ScarcityAssemblyResult = {
   subject: {
     release_id: string
@@ -175,8 +201,9 @@ function isDeleted(listing: ListingEvidenceInput): boolean {
 }
 
 function isSoldStatus(listing: ListingEvidenceInput): boolean {
+  // Archived/paused are delisted inventory — NOT completed sales.
   const st = statusOf(listing)
-  return st === 'sold' || st === 'closed' || st === 'archived'
+  return st === 'sold' || st === 'closed'
 }
 
 function isActiveAsking(listing: ListingEvidenceInput): boolean {
@@ -314,11 +341,94 @@ export function mapAuctionResultToCandidate(
   }
 }
 
+function completedSaleMatchesRecord(
+  record: RecordSubjectInput,
+  event: CompletedSaleEventInput,
+): EvidenceMatchScope {
+  const recCat = normalizeCatalog(record.catalogNumber)
+  const evCat = normalizeCatalog(event.catalog_number)
+  if (recCat && evCat && recCat === evCat) return 'exact_pressing'
+
+  const artist = record.artist.trim().toLowerCase()
+  const name = record.name.trim().toLowerCase()
+  const hay = [event.artist, event.title, event.label, event.catalog_number]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  if (artist && name && hay.includes(artist) && hay.includes(name)) return 'release'
+  if (artist && hay.includes(artist)) return 'weak'
+  return 'excluded'
+}
+
+/**
+ * Map a normalized COMPLETED_SALE market event into an assembled sold candidate.
+ * Always sale_kind=sold + source_type=sale — never "listing".
+ */
+export function mapCompletedSaleEventToCandidate(
+  record: RecordSubjectInput,
+  event: CompletedSaleEventInput,
+  opts: { nowMs?: number; index?: number } = {},
+): AssembledCandidate | null {
+  const eventType = String(event.event_type || 'COMPLETED_SALE').toUpperCase()
+  if (eventType && eventType !== 'COMPLETED_SALE' && eventType !== 'AUCTION_COMPLETED') {
+    return null
+  }
+  const price = Number(event.price_normalized ?? event.price_original ?? event.price)
+  if (!Number.isFinite(price) || price <= 0) return null
+
+  const match = completedSaleMatchesRecord(record, event)
+  if (match === 'excluded' || match === 'wrong_pressing' || match === 'weak') return null
+
+  const nowMs = opts.nowMs ?? Date.now()
+  const observed = event.sold_at || event.observed_at || null
+  const observedMs = observed ? Date.parse(observed) : NaN
+  const stale = Number.isFinite(observedMs) && nowMs - observedMs > STALE_AFTER_MS
+  const listingId = event.source_listing_id || event.listing_id || null
+  const eventId =
+    event.market_event_id ||
+    event.source_event_id ||
+    listingId ||
+    `completed-sale-${opts.index ?? 0}`
+  const { pressing_id } = pressingIdForRecord(record)
+  const release_id = event.release_id || releaseIdForRecord(record)
+  const currency = event.currency_normalized || event.currency_original || event.currency || 'USD'
+  const title = event.title || record.name
+
+  return {
+    evidence_id: `sale:${eventId}`,
+    source_id: String(listingId || eventId),
+    source_type: 'sale',
+    sale_kind: 'sold',
+    price,
+    currency,
+    pressing_id: match === 'exact_pressing' ? pressing_id : null,
+    release_id,
+    condition: event.media_condition || event.condition || null,
+    observed_at: observed,
+    retrieved_at: new Date(nowMs).toISOString(),
+    summary: `Sold ${title} for ${price} ${currency}`,
+    authorization_scope:
+      event.authorization_scope === 'public_market' ||
+      event.authorization_scope === 'owner_private'
+        ? event.authorization_scope
+        : 'authenticated_market',
+    privacy_class: 'MARKETPLACE_SHARED',
+    deletion_state: 'ACTIVE',
+    match_scope: match,
+    catalog_number: event.catalog_number || null,
+    artist: event.artist || null,
+    title: event.title || null,
+    stale,
+  }
+}
+
 export function assembleScarcityEvidence(input: {
   record: RecordSubjectInput
   activeListings?: ListingEvidenceInput[]
   ownerListings?: ListingEvidenceInput[]
   auctionResults?: AuctionResultInput[]
+  /** Authorized pre-seeded COMPLETED_SALE events (owner-proof / test-data path). */
+  completedSaleEvents?: CompletedSaleEventInput[]
   nowMs?: number
 }): ScarcityAssemblyResult {
   const { record } = input
@@ -372,6 +482,7 @@ export function assembleScarcityEvidence(input: {
         }),
       )
     }
+    // paused/archived without a true sold/closed status: neither asking nor sold
   }
   if ((input.ownerListings || []).length) evidence_sources.push('listings_mine_owner')
 
@@ -380,8 +491,16 @@ export function assembleScarcityEvidence(input: {
   })
   if ((input.auctionResults || []).length) evidence_sources.push('auction_monitor_results')
 
+  ;(input.completedSaleEvents || []).forEach((event, index) => {
+    push(mapCompletedSaleEventToCandidate(record, event, { nowMs, index }))
+  })
+  if ((input.completedSaleEvents || []).length) {
+    evidence_sources.push('authorized_completed_sale_events')
+  }
+
   const pressing_candidates = candidates.filter((c) => c.match_scope === 'exact_pressing')
   const release_candidates = candidates.filter((c) => c.match_scope === 'release')
+  // Hard distinction: asking never contributes to sold_count.
   const asking_count = candidates.filter((c) => c.sale_kind === 'asking').length
   const sold_count = candidates.filter((c) => c.sale_kind === 'sold').length
   const active_supply_count = pressing_candidates.filter((c) => c.sale_kind === 'asking').length
@@ -396,7 +515,7 @@ export function assembleScarcityEvidence(input: {
   }
   if (sold_count === 0) {
     limitations.push(
-      'No platform-wide sold-listing search exists; sold evidence limited to owner listings and auction-monitor matches.',
+      'No platform-wide sold-listing search exists; sold evidence limited to owner listings, auction-monitor matches, and authorized completed-sale events.',
     )
   }
   if (asking_count === 0 && sold_count === 0) {

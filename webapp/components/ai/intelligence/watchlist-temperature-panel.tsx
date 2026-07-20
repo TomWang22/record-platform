@@ -118,9 +118,6 @@ export function WatchlistTemperaturePanel({
           request_bidder_identity: false,
           claim_collusion: false,
           claim_shill_bidding: false,
-          force_watchlist_floor:
-            (assembly.watchlist_auctions?.length || 0) < 5 &&
-            !/nearly empty|almost no|too few|weak|abstain|tiny population/i.test(intent),
           user_intent: intent,
           owner_proof_prompt: intent,
         })

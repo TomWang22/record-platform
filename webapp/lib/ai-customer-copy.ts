@@ -52,7 +52,7 @@ const CODE_PATTERN =
 // even when embedded inside otherwise-normal sentences (e.g. seed titles,
 // harness identifiers, or fixture ids leaking into rendered copy).
 const STRIP_PATTERN =
-  /\(\s*owner-proof seed(?:\s*\d+)?\s*\)|\bowner-proof seed(?:\s*\d+)?\b|\bE2E Browse\b|\bnego-sold-comp-[a-z0-9-]*\b|\brec-bn-\d+\b|\bfixture-[a-z0-9-]*\b/gi
+  /\(\s*owner-proof seed(?:\s*\d+)?\s*\)|\bowner-proof seed(?:\s*\d+)?\b|\bE2E Browse\b|\/e2e-fixtures\/[^\s)]+|\be2e-fixtures\b|\bscarcity-jp-[a-z0-9-]*\b|\bscarcity-sold-floor-\d+\b|\bvaluation-sold-floor-\d+\b|\bforce_sold_floor\b|\bforce_success_floor\b|\bnego-sold-comp-[a-z0-9-]*\b|\brec-bn-\d+\b|\bfixture-[a-z0-9-]*\b|\bphase34-fixture-[a-z0-9-]*\b/gi
 
 export function customerCopyForCode(code: string | null | undefined): string {
   if (!code) return ''

@@ -1,6 +1,7 @@
 node_modules/
 dist/
 webapp/.next/
+webapp/.data/
 .k6-build/
 .xk6-build/
 xk6-http3/

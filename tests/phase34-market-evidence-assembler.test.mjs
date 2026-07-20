@@ -302,6 +302,85 @@ test('no evidence path', () => {
   assert.equal(out.claim_rarity_from_zero_results, false)
 })
 
+test('archived listing is not treated as a completed sale', () => {
+  const out = assembleScarcityEvidence({
+    nowMs: NOW,
+    record: baseRecord,
+    ownerListings: [
+      {
+        id: 'ARCH1',
+        title: 'Art Blakey Moanin BLP-4003',
+        artist: 'Art Blakey',
+        catalogNumber: 'BLP-4003',
+        price: 110,
+        currency: 'USD',
+        status: 'archived',
+        sold_at: '2026-04-01T00:00:00.000Z',
+      },
+    ],
+  })
+  assert.equal(out.sold_count, 0)
+  assert.equal(out.asking_count, 0)
+  assert.equal(out.candidates.length, 0)
+})
+
+test('pre-seeded COMPLETED_SALE events become sold comps with source_type sale', () => {
+  const out = assembleValuationEvidence({
+    nowMs: NOW,
+    record: baseRecord,
+    activeListings: [
+      {
+        id: 'ASK1',
+        title: 'Art Blakey Moanin BLP-4003',
+        artist: 'Art Blakey',
+        catalogNumber: 'BLP-4003',
+        price: 450,
+        status: 'active',
+        listed_at: '2026-07-01T00:00:00.000Z',
+      },
+    ],
+    completedSaleEvents: [
+      {
+        market_event_id: 'me-1',
+        source_listing_id: 'SRC1',
+        event_type: 'COMPLETED_SALE',
+        artist: 'Art Blakey',
+        title: 'Moanin',
+        catalog_number: 'BLP-4003',
+        price_normalized: 380,
+        currency_normalized: 'USD',
+        sold_at: '2026-03-01T00:00:00.000Z',
+      },
+      {
+        market_event_id: 'me-2',
+        source_listing_id: 'SRC2',
+        event_type: 'COMPLETED_SALE',
+        artist: 'Art Blakey',
+        title: 'Moanin',
+        catalog_number: 'BLP-4003',
+        price_normalized: 400,
+        currency_normalized: 'USD',
+        sold_at: '2026-02-01T00:00:00.000Z',
+      },
+      {
+        market_event_id: 'me-3',
+        source_listing_id: 'SRC3',
+        event_type: 'COMPLETED_SALE',
+        artist: 'Art Blakey',
+        title: 'Moanin',
+        catalog_number: 'BLP-4003',
+        price_normalized: 390,
+        currency_normalized: 'USD',
+        sold_at: '2026-01-15T00:00:00.000Z',
+      },
+    ],
+  })
+  assert.equal(out.asking_count, 1)
+  assert.equal(out.sold_count, 3)
+  assert.ok(out.candidates.every((c) => c.sale_kind !== 'sold' || c.source_type === 'sale'))
+  assert.ok(out.evidence_sources.includes('authorized_completed_sale_events'))
+})
+
 test('source_record_id exact pressing and owner_private scope', () => {
   const out = assembleScarcityEvidence({
     nowMs: NOW,

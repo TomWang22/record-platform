@@ -16,6 +16,18 @@ export const OWNER_PROOF_SEED_MANIFEST_PATH = path.join(
 );
 
 export const OWNER_PROOF_REHEARSAL_ROOT = '/tmp/phase34-owner-proof-live-rehearsal-v2';
+export const OWNER_PROOF_RECAPTURE_V4_ROOT = '/tmp/phase34-owner-proof-live-recapture-v4';
+export const OWNER_PROOF_RECAPTURE_V4_EXPORT = path.join(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'),
+  'owner-review-artifacts/phase34/owner-proof-live-v4',
+);
+export const OWNER_PROOF_RECAPTURE_V5_ROOT = '/tmp/phase34-owner-proof-live-recapture-v5';
+export const OWNER_PROOF_RECAPTURE_V5_ATTEMPT2_ROOT =
+  '/tmp/phase34-owner-proof-live-recapture-v5-attempt-2';
+export const OWNER_PROOF_RECAPTURE_V5_EXPORT = path.join(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'),
+  'owner-review-artifacts/phase34/owner-proof-live-v5',
+);
 export const OWNER_PROOF_LIVE_ACTION_PREFLIGHT_ROOT =
   '/tmp/phase34-owner-proof-live-action-preflight-v1';
 export const OWNER_PROOF_MINI_PROOF_ROOT = '/tmp/phase34-owner-proof-mini-proof-v1';

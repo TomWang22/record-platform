@@ -90,13 +90,24 @@ export function ValuationIntelligencePanel({
           authorized_scopes: assembly.authorized_scopes,
           currency: 'USD',
           min_sold_comps: 2,
-          force_sold_floor:
-            assembly.sold_count < 3 &&
-            !/almost no sold|too few|weak|abstain|tiny population/i.test(intent),
           user_intent: intent,
           owner_proof_prompt: intent,
         })
         const result = (response.result || {}) as ValuationResult
+        const soldFromResult =
+          typeof result.sold_comparable_count === 'number'
+            ? result.sold_comparable_count
+            : typeof (result as { sold_count?: number }).sold_count === 'number'
+              ? (result as { sold_count?: number }).sold_count!
+              : assembly.sold_count
+        const askingFromResult =
+          typeof result.asking_price_count === 'number'
+            ? result.asking_price_count
+            : typeof (result as { asking_count?: number }).asking_count === 'number'
+              ? (result as { asking_count?: number }).asking_count!
+              : assembly.asking_count
+        setSoldAsking({ sold: soldFromResult, asking: askingFromResult })
+
         if (isValuationAbstention(result)) {
           setState({
             status: 'abstained',

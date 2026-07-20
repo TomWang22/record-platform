@@ -46,6 +46,11 @@ import {
 import { validateAllProductScreenshots } from './phase34-product-png-validation.mjs';
 import { assertScreenshotDistinctness } from './phase34-product-screenshot-distinctness.mjs';
 import { INTER_BATCH_INTERVAL_MS } from './phase33f-rate-limit.mjs';
+import { ensureOwnerProofMarketEvidence } from './phase34-owner-proof-market-seed.mjs';
+import {
+  OWNER_PROOF_RECAPTURE_V4_EXPORT,
+  OWNER_PROOF_RECAPTURE_V5_EXPORT,
+} from './phase34-owner-proof-scenarios.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -76,6 +81,46 @@ const VIEWPORTS = {
 const OWNER_REVIEW_EXPORT =
   process.env.PHASE34_OWNER_PROOF_EXPORT_DIR ||
   path.join(REPO_ROOT, 'owner-review-artifacts/phase34/owner-proof-rehearsal-v1');
+
+/** Known-first scenario for recapture-v4 (prior H3 502 on honest-limit analytics). */
+export const RECAPTURE_V4_KNOWN_FIRST_SCENARIO_ID = 'analytics-sample-below-policy-customer';
+
+export function reorderRecaptureV4Schedule(schedule) {
+  const rows = [...(schedule.rows || [])];
+  const idx = rows.findIndex((r) => r.scenario_id === RECAPTURE_V4_KNOWN_FIRST_SCENARIO_ID);
+  if (idx <= 0) return schedule;
+  const [first] = rows.splice(idx, 1);
+  return { ...schedule, rows: [first, ...rows] };
+}
+
+const RECAPTURE_V5_UPLOAD_MANIFEST = [
+  { file: '01-ai-platform-overview.png', scenario: '__overview__' },
+  { file: '02-scarcity-success.png', scenario: 'scarcity-success-exact-pressing', terminal: true },
+  { file: '03-scarcity-correction.png', scenario: 'scarcity-correction-pressing-disambiguation', terminal: true },
+  { file: '04-valuation-success.png', scenario: 'valuation-success-ranges', terminal: true },
+  { file: '05-valuation-correction.png', scenario: 'valuation-correction-condition', terminal: true },
+  { file: '06-auction-watchlist-success.png', scenario: 'auction-success-watchlist-temperature', terminal: true },
+  { file: '07-auction-next-24h-correction.png', scenario: 'auction-correction-ending-window', terminal: true },
+  { file: '08-embedding-current-vs-stale.png', scenario: 'embeddings-stale-reembed', terminal: true },
+  { file: '09-search-semantic-results.png', scenario: 'search-success-semantic', terminal: true },
+  { file: '10-search-hybrid-correction.png', scenario: 'search-hybrid-refinement', terminal: true },
+  { file: '11-negotiation-strategy.png', scenario: 'negotiation-four-turn-live', turn: 0 },
+  { file: '12-negotiation-four-turn-timeline.png', scenario: 'negotiation-four-turn-live', turn: 'timeline' },
+  { file: '13-negotiation-final-draft-unsent.png', scenario: 'negotiation-four-turn-live', turn: 'draft' },
+  { file: '14-recommendations-success.png', scenario: 'recommendations-success-cards', terminal: true },
+  { file: '15-recommendations-correction.png', scenario: 'recommendations-negative-preference', terminal: true },
+  { file: '16-analytics-success.png', scenario: 'analytics-success-report', terminal: true },
+  { file: '17-analytics-correction.png', scenario: 'analytics-constraint-population', terminal: true },
+  { file: '18-honest-limits-scarcity-valuation.png', scenario: '__honest_scarcity_valuation__' },
+  { file: '19-honest-limits-auction-embeddings-search.png', scenario: '__honest_auction_embed_search__' },
+  { file: '20-honest-limits-negotiation-recommendations-analytics.png', scenario: '__honest_nego_recs_analytics__' },
+];
+
+const RECAPTURE_V4_UPLOAD_MANIFEST = RECAPTURE_V5_UPLOAD_MANIFEST.map((slot) =>
+  slot.file === '06-auction-watchlist-success.png'
+    ? { ...slot, file: '06-auction-watchlist-temperature.png' }
+    : slot,
+);
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -361,13 +406,28 @@ function sha256File(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
-function exportOwnerReviewPack({ outRoot, doc, ledgerRows, screenshotRows, summary, latency }) {
-  const exportRoot = OWNER_REVIEW_EXPORT;
+function exportOwnerReviewPack({
+  outRoot,
+  doc,
+  ledgerRows,
+  screenshotRows,
+  summary,
+  latency,
+  recaptureV4 = false,
+  recaptureV5 = false,
+}) {
+  const exportRoot = recaptureV5
+    ? OWNER_PROOF_RECAPTURE_V5_EXPORT
+    : recaptureV4
+      ? OWNER_PROOF_RECAPTURE_V4_EXPORT
+      : OWNER_REVIEW_EXPORT;
   if (fs.existsSync(exportRoot)) {
     fs.rmSync(exportRoot, { recursive: true, force: true });
   }
-  const fullDir = path.join(exportRoot, 'full');
-  const selectedDir = path.join(exportRoot, 'selected-20');
+  const ownerPack = recaptureV4 || recaptureV5;
+  const fullDir = path.join(exportRoot, ownerPack ? 'source-screenshots' : 'full');
+  const selectedDir = path.join(exportRoot, ownerPack ? 'upload-20' : 'selected-20');
+  const uploadManifest = recaptureV5 ? RECAPTURE_V5_UPLOAD_MANIFEST : RECAPTURE_V4_UPLOAD_MANIFEST;
   const reviewDir = path.join(exportRoot, 'review');
   const reportsDir = path.join(exportRoot, 'reports');
   for (const d of [fullDir, selectedDir, reviewDir, reportsDir]) fs.mkdirSync(d, { recursive: true });
@@ -379,15 +439,26 @@ function exportOwnerReviewPack({ outRoot, doc, ledgerRows, screenshotRows, summa
     const base = path.basename(src);
     const dest = path.join(fullDir, base);
     copyFileNoSymlink(src, dest);
-    copied.push({ ...row, export_rel: `full/${base}`, sha256: sha256File(dest) });
+    const relPrefix = ownerPack ? 'source-screenshots' : 'full';
+    copied.push({ ...row, export_rel: `${relPrefix}/${base}`, sha256: sha256File(dest) });
   }
 
-  const selected = pickSelected20(copied, ledgerRows);
+  const selected = ownerPack
+    ? pickRecaptureUpload20(copied, ledgerRows, uploadManifest)
+    : pickSelected20(copied, ledgerRows);
   const selectedMeta = [];
   selected.forEach((item, idx) => {
-    const name = `${String(idx + 1).padStart(2, '0')}-${item.slug}.png`;
+    const name = ownerPack
+      ? item.upload_file || `${String(idx + 1).padStart(2, '0')}-${item.slug}.png`
+      : `${String(idx + 1).padStart(2, '0')}-${item.slug}.png`;
     const dest = path.join(selectedDir, name);
-    copyFileNoSymlink(path.join(exportRoot, item.export_rel), dest);
+    const srcPath = item.export_rel
+      ? path.join(exportRoot, item.export_rel)
+      : path.join(exportRoot, 'source-screenshots', path.basename(item.path || item.file_path || ''));
+    const fromDisk = fs.existsSync(srcPath)
+      ? srcPath
+      : item.path || item.file_path || item.absolute_path;
+    copyFileNoSymlink(fromDisk, dest);
     selectedMeta.push({ index: idx + 1, file: name, sha256: sha256File(dest), ...item });
   });
 
@@ -496,14 +567,30 @@ function exportOwnerReviewPack({ outRoot, doc, ledgerRows, screenshotRows, summa
   fs.writeFileSync(path.join(exportRoot, 'SHA256SUMS'), sums.join('\n') + '\n');
   fs.writeFileSync(
     path.join(exportRoot, 'UPLOAD-ORDER.txt'),
-    [
-      '1. review/index.html',
-      '2. selected-20/ (20 PNGs)',
-      '3. reports/execution-summary.json',
-      '4. reports/owner-proof-execution.jsonl',
-      '5. full/ (complete screenshot set)',
-    ].join('\n') + '\n',
+    ownerPack
+      ? uploadManifest.map((s, i) => `${i + 1}. upload-20/${s.file}`).join('\n') + '\n'
+      : [
+          '1. review/index.html',
+          '2. selected-20/ (20 PNGs)',
+          '3. reports/execution-summary.json',
+          '4. reports/owner-proof-execution.jsonl',
+          '5. full/ (complete screenshot set)',
+        ].join('\n') + '\n',
   );
+
+  if (ownerPack) {
+    const zipName = recaptureV5
+      ? 'phase34-owner-proof-live-v5.zip'
+      : 'phase34-owner-proof-live-v4.zip';
+    const zipPath = path.join(REPO_ROOT, 'owner-review-artifacts/phase34', zipName);
+    if (fs.existsSync(zipPath)) fs.rmSync(zipPath);
+    const zip = spawnSync('zip', ['-rq', zipPath, '.'], { cwd: exportRoot, encoding: 'utf8' });
+    if (zip.status !== 0) {
+      const err = new Error(`ZIP_VERIFICATION_FAILURE:zip_exit_${zip.status}`);
+      err.code = 'ZIP_VERIFICATION_FAILURE';
+      throw err;
+    }
+  }
 
   // Fail if any symlink sneaked in
   walkNoSymlinks(exportRoot);
@@ -526,6 +613,94 @@ function walkNoSymlinks(root) {
       if (st.isDirectory()) stack.push(fp);
     }
   }
+}
+
+function pickRecaptureUpload20(copied, ledgerRows, uploadManifest = RECAPTURE_V5_UPLOAD_MANIFEST) {
+  const byScenario = new Map();
+  for (const c of copied) {
+    const sid = c.scenario_id || guessScenario(c);
+    if (!byScenario.has(sid)) byScenario.set(sid, []);
+    byScenario.get(sid).push(c);
+  }
+  const pickTerminal = (scenarioId) => {
+    const rows = byScenario.get(scenarioId) || [];
+    if (!rows.length) return null;
+    const term = rows.find((r) =>
+      /ready|terminal|completed|result/i.test(String(r.state || r.capture_state || r.label || '')),
+    );
+    return term || rows[rows.length - 1];
+  };
+  const nego = byScenario.get('negotiation-four-turn-live') || [];
+  const negoByTurn = new Map();
+  for (const r of nego) {
+    const ti = r.turn_index ?? 0;
+    if (!negoByTurn.has(ti)) negoByTurn.set(ti, r);
+  }
+  const usedSha = new Set();
+  const take = (row, upload_file) => {
+    if (!row) return null;
+    let pick = row;
+    if (usedSha.has(pick.sha256)) {
+      const alt = copied.find((c) => !usedSha.has(c.sha256));
+      if (alt) pick = alt;
+    }
+    if (!pick) return null;
+    usedSha.add(pick.sha256);
+    return { ...pick, upload_file };
+  };
+
+  const honest = (prefix) =>
+    copied.find(
+      (c) =>
+        c.scenario_id &&
+        String(c.scenario_id).includes('honest') &&
+        String(c.scenario_id).includes(prefix) &&
+        !usedSha.has(c.sha256),
+    ) || null;
+
+  const out = [];
+  for (const slot of uploadManifest) {
+    let row = null;
+    if (slot.scenario === '__overview__') {
+      row = copied.find((c) => !usedSha.has(c.sha256)) || copied[0];
+    } else if (slot.scenario === '__honest_scarcity_valuation__') {
+      row =
+        honest('scarcity') ||
+        honest('valuation') ||
+        byScenario.get('scarcity-weak-evidence-customer')?.[0] ||
+        byScenario.get('valuation-weak-comps-customer')?.[0];
+    } else if (slot.scenario === '__honest_auction_embed_search__') {
+      row =
+        honest('auction') ||
+        honest('embed') ||
+        honest('search') ||
+        copied.find((c) => !usedSha.has(c.sha256));
+    } else if (slot.scenario === '__honest_nego_recs_analytics__') {
+      row =
+        honest('negotiation') ||
+        honest('recommendation') ||
+        honest('analytics') ||
+        copied.find((c) => !usedSha.has(c.sha256));
+    } else if (slot.scenario === 'negotiation-four-turn-live') {
+      if (slot.turn === 0) row = negoByTurn.get(0) || nego[0];
+      else if (slot.turn === 'draft') row = nego[nego.length - 1] || negoByTurn.get(3);
+      else row = negoByTurn.get(1) || nego[Math.min(1, nego.length - 1)];
+    } else {
+      row = pickTerminal(slot.scenario);
+    }
+    const picked = take(row, slot.file);
+    if (picked) out.push(picked);
+  }
+  while (out.length < 20 && copied.length) {
+    const next = copied.find((c) => !usedSha.has(c.sha256));
+    if (!next) break;
+    usedSha.add(next.sha256);
+    out.push({
+      ...next,
+      upload_file: uploadManifest[out.length]?.file || `extra-${out.length + 1}.png`,
+    });
+  }
+  return out.slice(0, 20);
 }
 
 function pickSelected20(copied, ledgerRows) {
@@ -630,6 +805,8 @@ export async function executeOwnerProofLiveRehearsal({
   upstreamUrl = process.env.E2E_UPSTREAM_URL || 'https://record-platform.test',
   headless = true,
   proxyPort = Number(process.env.PHASE34_BROWSER_PROXY_PORT || 8443),
+  recaptureV4 = false,
+  recaptureV5 = false,
 }) {
   assertProductOutEligible(outRoot);
   if (fs.existsSync(PHASE33F_TARGET_FORBIDDEN)) {
@@ -653,7 +830,16 @@ export async function executeOwnerProofLiveRehearsal({
   const seeds = loadOwnerProofSeedManifest();
   validateSeedManifestAgainstScenarios(doc, seeds);
   const seedReport = assertSeedFloors(seeds);
-  const schedule = buildOwnerProofSchedule(doc);
+  let schedule = buildOwnerProofSchedule(doc);
+  if (recaptureV4 || recaptureV5) {
+    schedule = reorderRecaptureV4Schedule(schedule);
+  }
+  const screenshotPack = recaptureV5
+    ? 'owner-proof-recapture-v5'
+    : recaptureV4
+      ? 'owner-proof-recapture-v4'
+      : 'owner-proof-rehearsal-v1';
+  const ownerRecapture = recaptureV4 || recaptureV5;
 
   fs.writeFileSync(path.join(outRoot, 'seed-floor-report.json'), JSON.stringify(seedReport, null, 2) + '\n');
   fs.writeFileSync(path.join(outRoot, 'rehearsal-schedule.json'), JSON.stringify(schedule, null, 2) + '\n');
@@ -705,6 +891,23 @@ export async function executeOwnerProofLiveRehearsal({
     const err = new Error('MISSING_OWNER_PROOF_EVIDENCE:live subjects incomplete');
     err.code = 'MISSING_OWNER_PROOF_EVIDENCE';
     throw err;
+  }
+  if (ownerRecapture) {
+    const seedReportLive = await ensureOwnerProofMarketEvidence({
+      baseUrl: upstreamUrl,
+      buyerToken: buyer.token,
+      sellerToken: seller.token,
+      scarcityRecordId: subjects.scarcity_record_id || subjects.record_id,
+      valuationRecordId: subjects.valuation_record_id || subjects.record_id,
+    });
+    fs.writeFileSync(
+      path.join(outRoot, 'market-seed-report.json'),
+      JSON.stringify(seedReportLive, null, 2) + '\n',
+    );
+    if (seedReportLive.seller_kenny_listing_id) {
+      subjects.valuation_listing_id = seedReportLive.seller_kenny_listing_id;
+      subjects.listing_id = subjects.listing_id || seedReportLive.seller_kenny_listing_id;
+    }
   }
   fs.writeFileSync(
     path.join(outRoot, 'live-subjects.json'),
@@ -785,7 +988,7 @@ export async function executeOwnerProofLiveRehearsal({
           gate,
           ledger: productLedger,
           screenshotManifest,
-          screenshotPack: 'owner-proof-rehearsal-v1',
+          screenshotPack,
           turnCount: row.smoke_turns,
           subject: subjectForCapability(subjects, row.capability),
           protocolBaseUrl: upstreamUrl,
@@ -943,18 +1146,6 @@ export async function executeOwnerProofLiveRehearsal({
   generateContactSheets(manifest.rows || [], sheetsDir);
 
   const ledgerRows = ownerLedger.readAll();
-  const latency = summarizeLatency(latencySamples.map((r) => ({
-    browser_action_to_panel_ready_ms: r.browser_action_to_panel_ready_ms,
-  })));
-  fs.writeFileSync(path.join(outRoot, 'latency-summary.json'), JSON.stringify(latency, null, 2) + '\n');
-
-  generateOwnerProofReviewPage({
-    outRoot,
-    scenarios: doc.scenarios,
-    ledgerRows,
-    screenshotsByScenario: groupShotsByScenario(manifest.rows || []),
-  });
-
   const pass = results.filter((r) => r.session?.session_outcome === 'PASS').length;
   const fail = results.length - pass;
   const turns = results.reduce((n, r) => n + (r.session?.executed_turn_count || r.turns?.length || 0), 0);
@@ -974,8 +1165,37 @@ export async function executeOwnerProofLiveRehearsal({
     pngValidation.pass &&
     distinctness.ok !== false;
 
+  const latency = summarizeLatency(
+    latencySamples.map((r) => ({
+      browser_action_to_panel_ready_ms: r.browser_action_to_panel_ready_ms,
+    })),
+    {
+      plannedTurns: 27,
+      runCompleted: frozenReady,
+      runAborted: !frozenReady,
+      metricName: 'browser_action_to_terminal_ready_ms',
+      runId: recaptureV5
+        ? 'phase34-owner-proof-live-recapture-v5'
+        : recaptureV4
+          ? 'phase34-owner-proof-live-recapture-v4'
+          : path.basename(outRoot),
+    },
+  );
+  fs.writeFileSync(path.join(outRoot, 'latency-summary.json'), JSON.stringify(latency, null, 2) + '\n');
+
+  generateOwnerProofReviewPage({
+    outRoot,
+    scenarios: doc.scenarios,
+    ledgerRows,
+    screenshotsByScenario: groupShotsByScenario(manifest.rows || []),
+  });
+
   const summary = {
-    kind: 'OWNER_PROOF_LIVE_REHEARSAL_V1',
+    kind: recaptureV5
+      ? 'OWNER_PROOF_LIVE_RECAPTURE_V5'
+      : recaptureV4
+        ? 'OWNER_PROOF_LIVE_RECAPTURE_V4'
+        : 'OWNER_PROOF_LIVE_REHEARSAL_V1',
     execution: 'LIVE',
     out: outRoot,
     head_sha: headSha,
@@ -1031,6 +1251,8 @@ export async function executeOwnerProofLiveRehearsal({
       })),
       summary,
       latency,
+      recaptureV4,
+      recaptureV5,
     });
   } catch (err) {
     summary.export_error = String(err.message || err);

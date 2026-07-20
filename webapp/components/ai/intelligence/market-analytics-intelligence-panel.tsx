@@ -34,9 +34,20 @@ const meta = (result: Record<string, unknown> | null, key: string) => {
     if (typeof customer === 'string' && customer.trim()) return customer
   }
   if (key === 'population') {
-    const size = result.population_size
+    const completed =
+      result.completed_sale_sample_size ?? result.sample_size ?? result.sold_count
+    const total = result.total_market_events ?? result.population_size
     const label = result.population
-    if (size != null) return `${label || 'Population'} (${size} events)`
+    if (completed != null && total != null && Number(total) !== Number(completed)) {
+      return `${label || 'Completed sales'} (${completed} completed sales; ${total} total market events)`
+    }
+    if (completed != null) return `${label || 'Completed sales'} (${completed} completed sales)`
+    if (total != null) return `${label || 'Population'} (${total} events)`
+  }
+  if (key === 'sample_size') {
+    const completed =
+      result.completed_sale_sample_size ?? result.sample_size ?? result.sold_count
+    return completed == null ? '—' : String(completed)
   }
   const value = result[key]
   if (value == null) return '—'
@@ -45,6 +56,21 @@ const meta = (result: Record<string, unknown> | null, key: string) => {
     return 'See report details'
   }
   return String(value)
+}
+
+function formatChange(result: Record<string, unknown>): string {
+  const interpretation = result.change_interpretation
+  if (typeof interpretation === 'string' && interpretation.trim()) return interpretation
+  const pct = result.percentage_change
+  const abs = result.absolute_change
+  const prior = result.prior_period_median ?? result.prior_median
+  const current = result.price_median
+  if (pct != null && prior != null && current != null) {
+    return `Median completed-sale price moved ${String(pct)} from ${String(prior)} to ${String(current)} across the half-window comparison.`
+  }
+  if (pct != null) return `Median change vs prior half-window: ${String(pct)}`
+  if (abs != null) return `Absolute median change: ${String(abs)}`
+  return 'See methodology — asking prices are excluded from sold totals.'
 }
 
 export function MarketAnalyticsIntelligencePanel({
@@ -67,7 +93,6 @@ export function MarketAnalyticsIntelligencePanel({
     try {
       const response = await fetchMarketAnalyticsIntelligence({
         ...assembleMarketAnalyticsRequest({ principalId, currency, events }),
-        force_analytics_floor: events.length === 0,
         user_intent: intent,
         owner_proof_prompt: intent,
       })
@@ -87,6 +112,12 @@ export function MarketAnalyticsIntelligencePanel({
     }
   }
 
+  const abstained = Boolean(state.result?.abstention_reason)
+  const conclusion =
+    (typeof state.result?.conclusion === 'string' && state.result.conclusion) ||
+    (typeof state.result?.summary === 'string' && state.result.summary) ||
+    null
+
   return (
     <IntelligencePanelShell
       title="Market analytics"
@@ -96,6 +127,12 @@ export function MarketAnalyticsIntelligencePanel({
       loading={state.loading}
       errorMessage={state.error}
       rateLimited={state.rateLimited}
+      abstained={abstained}
+      abstentionReasons={
+        abstained && typeof state.result?.summary === 'string'
+          ? [state.result.summary]
+          : undefined
+      }
       limitations={(state.result?.limitations as never) || []}
       evidence={(state.result?.evidence as never) || []}
       freshnessLabel={meta(state.result, 'data_freshness')}
@@ -109,11 +146,19 @@ export function MarketAnalyticsIntelligencePanel({
           disabled={!principalId || state.loading}
           onRun={run}
         />
-        {state.result ? (
+        {state.result && !abstained ? (
           <>
             <p className="text-xs text-slate-500" data-testid="intelligence-analytics-intent-echo">
               Answering: {lastIntent}
             </p>
+            {conclusion ? (
+              <p
+                className="text-sm text-slate-800 dark:text-slate-100"
+                data-testid="intelligence-analytics-conclusion"
+              >
+                {conclusion}
+              </p>
+            ) : null}
             {state.result.what_changed ? (
               <p
                 className="rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
@@ -132,8 +177,10 @@ export function MarketAnalyticsIntelligencePanel({
                 <dd className="break-words">{meta(state.result, 'population')}</dd>
               </div>
               <div className="min-w-0">
-                <dt className="font-medium text-slate-500">Sample size</dt>
-                <dd className="break-words">{meta(state.result, 'sample_size')}</dd>
+                <dt className="font-medium text-slate-500">Completed-sale sample</dt>
+                <dd className="break-words" data-testid="intelligence-analytics-sample-size">
+                  {meta(state.result, 'sample_size')}
+                </dd>
               </div>
               <div className="min-w-0">
                 <dt className="font-medium text-slate-500">Currency</dt>
@@ -160,16 +207,9 @@ export function MarketAnalyticsIntelligencePanel({
                   )}
                 </dd>
               </div>
-              <div className="min-w-0" data-testid="intelligence-analytics-change">
-                <dt className="font-medium text-slate-500">Change</dt>
-                <dd className="break-words">
-                  {String(
-                    state.result.percentage_change ??
-                      state.result.absolute_change ??
-                      state.result.summary ??
-                      'See methodology — asking prices are excluded from sold totals.',
-                  )}
-                </dd>
+              <div className="min-w-0 sm:col-span-2" data-testid="intelligence-analytics-change">
+                <dt className="font-medium text-slate-500">Median change</dt>
+                <dd className="break-words">{formatChange(state.result)}</dd>
               </div>
               <div className="min-w-0 sm:col-span-2">
                 <dt className="font-medium text-slate-500">Methodology</dt>
@@ -205,6 +245,11 @@ export function MarketAnalyticsIntelligencePanel({
               </p>
             )}
           </>
+        ) : null}
+        {state.result && abstained ? (
+          <p className="text-xs text-slate-500" data-testid="intelligence-analytics-intent-echo">
+            Answering: {lastIntent}
+          </p>
         ) : null}
       </div>
     </IntelligencePanelShell>

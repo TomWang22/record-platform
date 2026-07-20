@@ -181,7 +181,7 @@ export async function runProductSession(scheduleRow, opts = {}) {
       fixtureDriver,
     });
 
-    const canonical = await adapter.captureCanonicalRequest(browserResult);
+    const canonical = await adapter.captureCanonicalRequest(browserResult, prepared);
     const canonical_request_hash = hashCanonicalRequest(canonical.body);
 
     const triplet = executeProtocolTriplet(canonical, {

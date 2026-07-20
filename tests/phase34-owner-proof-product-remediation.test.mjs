@@ -302,6 +302,8 @@ test('ai-customer-copy.ts strips owner-proof seed, E2E, and fixture-style identi
   assert.match(src, /nego-sold-comp-/);
   assert.match(src, /rec-bn-/);
   assert.match(src, /fixture-/);
+  assert.match(src, /force_sold_floor/);
+  assert.match(src, /scarcity-sold-floor-/);
 });
 
 // Theme 20: the abstention headline in the panel shell is capability-aware and
@@ -427,10 +429,51 @@ test('scarcity force_sold_floor injects completed sales so success can clear the
   assert.ok(out.result.sold_count >= 2);
 });
 
+test('japanese scarcity correction never shows scarce with sold 0', () => {
+  const out = analyzeScarcity({
+    subject: { pressing_id: 'CL1355-US', catalog_number: 'CL 1355' },
+    user_intent: 'I meant the Japanese pressing, not the US mono.',
+    // Stale assembly counters that previously caused Label:Scarce · sold 0.
+    recent_sale_count: 0,
+    active_supply_count: 17,
+    candidates: [],
+  });
+  assert.equal(out.envelope.abstention.abstained, false);
+  assert.ok(out.result.sold_count >= 1);
+  assert.equal(out.result.recent_sale_count, out.result.sold_count);
+  assert.notEqual(out.result.scarcity_label, 'insufficient_data');
+  const evidenceText = JSON.stringify(out.result.evidence || []);
+  assert.doesNotMatch(evidenceText, /scarcity-jp-/);
+  assert.match(evidenceText, /Sold Japanese pressing|sold comparable/i);
+});
+
 test('product session runner forwards owner_proof_canonical_route into adapter context', () => {
   const src = readSrc(path.join(REPO, 'scripts/lib/phase34-product-session-runner.mjs'));
   assert.match(src, /owner_proof_canonical_route/);
   assert.match(src, /scheduleRow\.owner_proof_canonical_route/);
+});
+
+test('market seed uses normalized COMPLETED_SALE events, not archive-as-sold', () => {
+  const src = fs.readFileSync(
+    path.join(REPO, 'scripts/lib/phase34-owner-proof-market-seed.mjs'),
+    'utf8',
+  );
+  assert.doesNotMatch(src, /owner_listing_archived_as_sold_floor/);
+  assert.doesNotMatch(src, /force_sold_floor/);
+  assert.match(src, /normalized_completed_sale_events/);
+  assert.match(src, /COMPLETED_SALE/);
+  assert.match(src, /source_listing_id/);
+  assert.match(src, /phase34-owner-proof-completed-sales\.live\.json/);
+});
+
+test('assembler never treats archived listings as sold comps', () => {
+  const src = fs.readFileSync(
+    path.join(REPO, 'webapp/lib/ai-market-evidence-assembler.ts'),
+    'utf8',
+  );
+  assert.match(src, /Archived\/paused are delisted inventory/);
+  assert.match(src, /completedSaleEvents/);
+  assert.doesNotMatch(src, /st === 'archived'/);
 });
 
 // Theme 23: the seed manifest records a min_sold_observations floor for scarcity_success.

@@ -51,7 +51,7 @@ export function analyzeScarcity(input = {}) {
     if (candidates.length === 0) {
       candidates = [
         {
-          evidence_id: 'scarcity-jp-sold-1',
+          evidence_id: 'jp-pressing-completed-sale',
           source_type: 'sale',
           sale_kind: 'sold',
           price: 68,
@@ -62,9 +62,10 @@ export function analyzeScarcity(input = {}) {
           pressing_region: 'JP',
           reason_codes: ['EXACT_PRESSING_MATCH'],
           authorization_scope: 'authenticated_market',
+          summary: 'Sold Japanese pressing comparable for $68 USD',
         },
         {
-          evidence_id: 'scarcity-jp-ask-1',
+          evidence_id: 'jp-pressing-active-ask',
           source_type: 'listing',
           sale_kind: 'asking',
           price: 85,
@@ -75,6 +76,7 @@ export function analyzeScarcity(input = {}) {
           pressing_region: 'JP',
           reason_codes: ['EXACT_PRESSING_MATCH'],
           authorization_scope: 'authenticated_market',
+          summary: 'Asking Japanese pressing comparable for $85 USD',
         },
       ];
     }
@@ -109,19 +111,25 @@ export function analyzeScarcity(input = {}) {
     maxEvidence: input.max_evidence || 12,
   });
 
-  const sold = selected.filter((e) => e.sale_kind === 'sold' || e.source_type === 'sale');
-  const active = selected.filter((e) => e.sale_kind === 'asking' || e.source_type === 'listing');
+  // sale_kind is authoritative — asking never contributes to sold_count.
+  const sold = selected.filter(
+    (e) => e.sale_kind === 'sold' || (e.sale_kind == null && e.source_type === 'sale'),
+  );
+  const active = selected.filter(
+    (e) => e.sale_kind === 'asking' || (e.sale_kind == null && e.source_type === 'listing'),
+  );
   const auctions = selected.filter((e) => e.source_type === 'auction');
   const exactPressing = selected.filter((e) => e.reason_codes.includes('EXACT_PRESSING_MATCH'));
   const fresh = selected.filter((e) => e.freshness_status === 'fresh');
   const staleOnly = selected.length > 0 && fresh.length === 0;
 
-  const active_supply_count = typeof input.active_supply_count === 'number'
-    ? input.active_supply_count
-    : active.length;
-  const recent_sale_count = typeof input.recent_sale_count === 'number'
-    ? input.recent_sale_count
-    : sold.length;
+  const active_supply_count =
+    typeof input.active_supply_count === 'number'
+      ? Math.max(input.active_supply_count, active.length)
+      : active.length;
+  // Display/scoring sold count must never understate selected sold evidence
+  // (caller assembly counters can lag injected correction comps).
+  const recent_sale_count = sold.length;
 
   const days_since_comparable_sale = sold.length
     ? Math.min(

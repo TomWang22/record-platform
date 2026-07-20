@@ -88,8 +88,13 @@ export function analyzeValuation(input = {}) {
     maxEvidence: input.max_evidence || 12,
   });
 
-  const soldRaw = selected.filter((e) => e.sale_kind === 'sold' || e.source_type === 'sale');
-  const asking = selected.filter((e) => e.sale_kind === 'asking' || e.source_type === 'listing');
+  // sale_kind is authoritative — asking never contributes to sold comps.
+  const soldRaw = selected.filter(
+    (e) => e.sale_kind === 'sold' || (e.sale_kind == null && e.source_type === 'sale'),
+  );
+  const asking = selected.filter(
+    (e) => e.sale_kind === 'asking' || (e.sale_kind == null && e.source_type === 'listing'),
+  );
   const askingAsSoldConfusion = (input.candidates || []).filter(
     (c) => c.asking_presented_as_sold === true,
   );

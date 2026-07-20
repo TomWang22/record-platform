@@ -46,7 +46,6 @@ export function RecommendationsIntelligencePanel({
         recommendation_mode: /diversif/i.test(intent)
           ? 'portfolio_diversification'
           : 'collection_gap',
-        force_recommendation_floor: true,
         user_intent: intent,
         owner_proof_prompt: intent,
       })

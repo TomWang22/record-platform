@@ -729,6 +729,9 @@ export class BaseProductJourneyAdapter {
       /Failed to load resource:.*\b(400|401|403|404|500|502|503)\b/i,
       /net::ERR_ABORTED/i,
       /AbortError/i,
+      // Proxy-bypass absolute sleeve URLs surface as cert errors without the path in text.
+      /net::ERR_CERT_AUTHORITY_INVALID/i,
+      /Failed to load resource:.*album-sleeves/i,
     ];
     const onConsole = (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());

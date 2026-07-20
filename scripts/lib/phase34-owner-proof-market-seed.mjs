@@ -78,10 +78,11 @@ function httpsJson({ baseUrl, token, method = 'GET', urlPath, body }) {
 }
 
 /** Repo-local sleeve art — never a third-party placeholder/stock-photo service. */
-function localCoverUrl(baseUrl, slug) {
-  // Webapp static path only. /media/* is API-gateway → media-service (401 for static SVG).
-  // Never /e2e-fixtures (harness leakage in customer-visible evidence).
-  return `${baseUrl.replace(/\/$/, '')}/album-sleeves/${slug}.svg`;
+function localCoverUrl(_baseUrl, slug) {
+  // Path-only URL so the browser loads through the TLS proxy origin
+  // (127.0.0.1:<proxy>). Absolute https://record-platform.test/... bypasses
+  // the proxy, trips ERR_CERT_AUTHORITY_INVALID, and fails the journey.
+  return `/album-sleeves/${slug}.svg`;
 }
 
 /** Realistic pressing-variant suffixes; never a synthetic "seed N" counter. */
@@ -100,6 +101,33 @@ async function countTitleHits(baseUrl, token, needle) {
       .toLowerCase()
       .includes(needle.toLowerCase().split(' ')[0]),
   ).length;
+}
+
+async function rewriteAbsoluteAlbumSleeveUrls(baseUrl, token) {
+  const mine = await httpsJson({
+    baseUrl,
+    token,
+    urlPath: '/api/listings/mine?limit=100',
+  });
+  const items = mine.body?.items || mine.body?.listings || [];
+  let rewritten = 0;
+  for (const item of items) {
+    const images = Array.isArray(item.images) ? item.images.map(String) : [];
+    if (!images.some((u) => /https?:\/\/[^/]+\/album-sleeves\//i.test(u))) continue;
+    const next = images.map((u) => {
+      const m = String(u).match(/\/album-sleeves\/([^/?#]+)$/i);
+      return m ? `/album-sleeves/${m[1]}` : u;
+    });
+    const res = await httpsJson({
+      baseUrl,
+      token,
+      method: 'PATCH',
+      urlPath: `/api/listings/${item.id}`,
+      body: { images: next },
+    });
+    if (res.status < 400) rewritten += 1;
+  }
+  return rewritten;
 }
 
 async function createListing(baseUrl, token, overrides) {
@@ -526,12 +554,21 @@ export async function ensureOwnerProofMarketEvidence({
   });
   created.push(...auctionSeed.created);
 
+  const rewrittenBuyer = await rewriteAbsoluteAlbumSleeveUrls(baseUrl, buyerToken);
+  const rewrittenSeller = sellerToken
+    ? await rewriteAbsoluteAlbumSleeveUrls(baseUrl, sellerToken)
+    : 0;
+
   return {
     ok: true,
     created_count: created.length,
     created,
     seller_kenny_listing_id: sellerKennyListingId,
     auction_watchlist: auctionSeed,
+    rewritten_absolute_album_sleeve_urls: {
+      buyer: rewrittenBuyer,
+      seller: rewrittenSeller,
+    },
     miles_title_hits_after: await countTitleHits(baseUrl, buyerToken, 'Kind of Blue'),
     kenny_title_hits_after: await countTitleHits(
       baseUrl,

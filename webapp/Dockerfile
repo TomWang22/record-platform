@@ -48,7 +48,8 @@ COPY webapp/app ./webapp/app
 COPY webapp/components ./webapp/components
 COPY webapp/lib ./webapp/lib
 COPY webapp/middleware.ts ./webapp/
-RUN mkdir -p webapp/public
+# Static assets (album sleeves, favicon) must ship in the image — never an empty public/
+COPY webapp/public ./webapp/public
 
 # Build from webapp directory so path aliases resolve correctly
 WORKDIR /app/webapp

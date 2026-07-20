@@ -32,6 +32,7 @@ import {
   ScreenshotManifestWriter,
   generateContactSheets,
   contractScreenshotDate,
+  captureProductScreenshot,
 } from './phase34-product-screenshots.mjs';
 import { assertLivePinsNotSynthetic, PIN_SOURCE } from './phase34-product-runtime-pins.mjs';
 import {
@@ -662,7 +663,21 @@ function pickRecaptureUpload20(copied, ledgerRows, uploadManifest = RECAPTURE_V5
   for (const slot of uploadManifest) {
     let row = null;
     if (slot.scenario === '__overview__') {
-      row = copied.find((c) => !usedSha.has(c.sha256)) || copied[0];
+      row =
+        copied.find(
+          (c) =>
+            (c.scenario_id === '__overview__' || c.scenario_id === 'ai-platform-overview') &&
+            !usedSha.has(c.sha256),
+        ) ||
+        copied.find(
+          (c) =>
+            /insights/i.test(String(c.browser_route || c.page_url || '')) &&
+            /ready|terminal|success|overview/i.test(String(c.state || c.capture_state || '')) &&
+            !usedSha.has(c.sha256),
+        ) ||
+        byScenario.get('embeddings-success-current-lineage')?.[0] ||
+        copied.find((c) => !usedSha.has(c.sha256)) ||
+        copied[0];
     } else if (slot.scenario === '__honest_scarcity_valuation__') {
       row =
         honest('scarcity') ||
@@ -954,7 +969,77 @@ export async function executeOwnerProofLiveRehearsal({
   });
   const browserVersion = browser.version?.() || null;
 
+  async function captureAiPlatformOverview() {
+    if (!ownerRecapture) return null;
+    const context = await browser.newContext({
+      ignoreHTTPSErrors: false,
+      viewport: VIEWPORTS.desktop,
+      baseURL: proxy.browserBaseUrl,
+    });
+    const page = await context.newPage();
+    try {
+      await signInWithToken(page, proxy.browserBaseUrl, {
+        token: buyer.token,
+        email: BUYER_EMAIL,
+        name: 'Buyer Contract',
+        initials: 'BC',
+      });
+      const qs = new URLSearchParams();
+      if (subjects.record_id) qs.set('recordId', subjects.record_id);
+      if (subjects.listing_id) qs.set('listingId', subjects.listing_id);
+      await page.goto(`${proxy.browserBaseUrl}/insights?${qs.toString()}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000,
+      });
+      await page.getByTestId('ai-insights-dashboard').waitFor({ state: 'visible', timeout: 60_000 });
+      await page.getByTestId('ai-insights-dashboard-ready').waitFor({ state: 'attached', timeout: 90_000 });
+      await page.getByTestId('seller-dashboard-ready').waitFor({ state: 'attached', timeout: 120_000 }).catch(() => null);
+      // Secondary panels (valuation/pricing/auction/seller/buyer) load after idle callback.
+      await page
+        .getByTestId('ai-insight-record-valuation-ready')
+        .waitFor({ state: 'attached', timeout: 120_000 })
+        .catch(() => null);
+      await page
+        .getByTestId('ai-insight-seller-summary-ready')
+        .waitFor({ state: 'attached', timeout: 60_000 })
+        .catch(() => null);
+      const bodyText = (await page.locator('body').innerText().catch(() => '')) || '';
+      if (/Awaiting live insight/i.test(bodyText) || /Loading RAG insight/i.test(bodyText)) {
+        // Give secondary panels one more beat, then fail closed if still loading.
+        await page.waitForTimeout(8_000);
+      }
+      const finalText = (await page.locator('body').innerText().catch(() => '')) || '';
+      if (/Awaiting live insight…/i.test(finalText) && /Loading…/i.test(finalText)) {
+        const err = new Error('AI_PLATFORM_OVERVIEW_STILL_LOADING');
+        err.code = 'AI_PLATFORM_OVERVIEW_STILL_LOADING';
+        throw err;
+      }
+      const shot = await captureProductScreenshot(page, {
+        pack: screenshotPack,
+        capability: 'ai_platform',
+        scenario_id: '__overview__',
+        participant_side: 'buyer',
+        browser_route: '/insights',
+        state: 'overview_terminal',
+        terminal_state: 'ready',
+        capture_phase: 'overview_terminal',
+        session_id: 'sess_overview',
+        turn_id: 'turn_overview',
+        turn_index: 0,
+        viewport: VIEWPORTS.desktop,
+        fullPage: false,
+        response_available_at_capture: true,
+        browser_version: browserVersion,
+      });
+      screenshotManifest.append(shot);
+      return shot;
+    } finally {
+      await context.close().catch(() => null);
+    }
+  }
+
   try {
+    await captureAiPlatformOverview();
     for (const row of schedule.rows) {
       if (!gate.canStartSession()) break;
       const side = row.participant_side === 'seller' ? 'seller' : 'buyer';

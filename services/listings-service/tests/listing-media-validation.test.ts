@@ -25,6 +25,12 @@ describe("listing-media-validation", () => {
       ).ok,
     ).toBe(true);
     expect(validateListingImageUrlShape("/e2e-fixtures/covers/kenny-dorham.svg").ok).toBe(true);
+    expect(validateListingImageUrlShape("/album-sleeves/kenny-dorham.svg").ok).toBe(true);
+    expect(
+      validateListingImageUrlShape(
+        "https://record-platform.test/album-sleeves/kenny-dorham.svg",
+      ).ok,
+    ).toBe(true);
     expect(validateListingImageUrlShape("data:image/svg+xml;base64,PHN2Zy4uLg==").ok).toBe(true);
   });
 

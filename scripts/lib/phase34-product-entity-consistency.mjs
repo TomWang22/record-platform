@@ -41,11 +41,17 @@ export function assertEntityConsistency(entity, opts = {}) {
   }
 
   if (opts.requireVinylCoverPath) {
-    const ok = mediaUrls.some((u) => String(u).includes('/e2e-fixtures/covers/'));
+    const ok = mediaUrls.some(
+      (u) =>
+        String(u).includes('/album-sleeves/') ||
+        String(u).includes('/test-covers/') ||
+        String(u).includes('/e2e-fixtures/covers/'),
+    );
     if (mediaUrls.length > 0 && !ok) {
       issues.push({
         code: ENTITY_MEDIA_MISMATCH,
-        message: 'Expected vinyl cover fixture path under /e2e-fixtures/covers/',
+        message:
+          'Expected vinyl cover path under /album-sleeves/ (or legacy /test-covers|/e2e-fixtures/covers)',
       });
     }
   }

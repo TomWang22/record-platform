@@ -1,7 +1,8 @@
 /**
  * Deterministic album-sleeve fixtures for contract seeds.
  * Uses solid-color placeholder PNGs labelled with artist/title — never picsum/stock photos.
- * Local SVG sleeves also live under webapp/public/e2e-fixtures/covers/ for post-deploy serving.
+ * Local SVG sleeves live under webapp/public/album-sleeves/ for post-deploy serving
+ * (webapp catch-all; not /media/, which the gateway proxies to media-service).
  */
 
 const SLEEVES = [
@@ -33,7 +34,7 @@ export function vinylCoverForIndex(index: number): string {
 
 export function vinylCoverAbsolute(index: number, origin = 'https://record-platform.test'): string {
   const slug = SLEEVES[Math.abs(index) % SLEEVES.length].slug
-  return `${origin.replace(/\/$/, '')}/e2e-fixtures/covers/${slug}.svg`
+  return `${origin.replace(/\/$/, '')}/album-sleeves/${slug}.svg`
 }
 
 export function isForbiddenStockMediaUrl(url: string | null | undefined): boolean {

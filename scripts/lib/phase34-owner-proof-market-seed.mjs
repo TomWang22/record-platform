@@ -10,7 +10,8 @@
  * Titles and shipping notes use realistic, human-readable copy (no "owner-proof
  * seed" or other synthetic-identifier strings) so nothing here can leak into a
  * customer-facing screenshot. Cover art is served from repo-local SVGs under
- * webapp/public/test-covers/ rather than a third-party placeholder service.
+ * webapp/public/album-sleeves/ (webapp catch-all — never /media/, which the
+ * gateway proxies to media-service).
  */
 import https from 'node:https';
 import fs from 'node:fs';
@@ -78,8 +79,9 @@ function httpsJson({ baseUrl, token, method = 'GET', urlPath, body }) {
 
 /** Repo-local sleeve art — never a third-party placeholder/stock-photo service. */
 function localCoverUrl(baseUrl, slug) {
-  // Neutral product media path — never /e2e-fixtures (harness leakage + TLS proxy miss).
-  return `${baseUrl.replace(/\/$/, '')}/media/covers/${slug}.svg`;
+  // Webapp static path only. /media/* is API-gateway → media-service (401 for static SVG).
+  // Never /e2e-fixtures (harness leakage in customer-visible evidence).
+  return `${baseUrl.replace(/\/$/, '')}/album-sleeves/${slug}.svg`;
 }
 
 /** Realistic pressing-variant suffixes; never a synthetic "seed N" counter. */

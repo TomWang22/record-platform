@@ -91,8 +91,9 @@ test('customer copy source maps SAMPLE_SIZE_BELOW_POLICY', () => {
 });
 
 test('vinyl cover fixtures exist and seeds no longer reference picsum', () => {
-  const covers = path.join(REPO, 'webapp/public/e2e-fixtures/covers');
+  const covers = path.join(REPO, 'webapp/public/album-sleeves');
   assert.ok(fs.existsSync(path.join(covers, 'kenny-dorham.svg')));
+  assert.ok(fs.existsSync(path.join(covers, 'miles-davis.svg')));
   for (const rel of [
     'webapp/e2e/helpers/seed-phase34-dense.ts',
     'webapp/e2e/helpers/seed-marketplace.ts',
@@ -104,7 +105,15 @@ test('vinyl cover fixtures exist and seeds no longer reference picsum', () => {
   }
   assert.match(
     fs.readFileSync(path.join(REPO, 'webapp/e2e/helpers/vinyl-cover-fixtures.ts'), 'utf8'),
-    /placehold\.co|data:image\/svg\+xml|e2e-fixtures\/covers/,
+    /album-sleeves/,
+  );
+  assert.match(
+    fs.readFileSync(path.join(REPO, 'scripts/lib/phase34-owner-proof-market-seed.mjs'), 'utf8'),
+    /album-sleeves/,
+  );
+  assert.doesNotMatch(
+    fs.readFileSync(path.join(REPO, 'scripts/lib/phase34-owner-proof-market-seed.mjs'), 'utf8'),
+    /\/media\/covers\//,
   );
 });
 

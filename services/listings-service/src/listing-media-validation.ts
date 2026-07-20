@@ -22,11 +22,15 @@ function isE2eVinylCoverFixtureUrl(raw: string): boolean {
   const s = String(raw).trim();
   if (s.startsWith("data:image/svg+xml") || s.startsWith("data:image/png")) return true;
   if (s.startsWith("/e2e-fixtures/covers/") && s.endsWith(".svg")) return true;
+  if (s.startsWith("/album-sleeves/") && s.endsWith(".svg")) return true;
+  if (s.startsWith("/test-covers/") && s.endsWith(".svg")) return true;
   try {
     const u = new URL(s);
     return (
       (u.protocol === "https:" || u.protocol === "http:") &&
-      u.pathname.startsWith("/e2e-fixtures/covers/") &&
+      (u.pathname.startsWith("/e2e-fixtures/covers/") ||
+        u.pathname.startsWith("/album-sleeves/") ||
+        u.pathname.startsWith("/test-covers/")) &&
       u.pathname.endsWith(".svg")
     );
   } catch {

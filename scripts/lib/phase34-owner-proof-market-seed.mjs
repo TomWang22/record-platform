@@ -67,7 +67,15 @@ function httpsJson({ baseUrl, token, method = 'GET', urlPath, body }) {
 
 /** Repo-local sleeve art — never a third-party placeholder/stock-photo service. */
 function localCoverUrl(baseUrl, slug) {
-  return `${baseUrl.replace(/\/$/, '')}/test-covers/${slug}.svg`;
+  return `${baseUrl.replace(/\/$/, '')}/e2e-fixtures/covers/${slug}.svg`;
+}
+
+function localMilesCover(baseUrl) {
+  return localCoverUrl(baseUrl, 'miles-davis');
+}
+
+function localKennyCover(baseUrl) {
+  return localCoverUrl(baseUrl, 'kenny-dorham');
 }
 
 /** Realistic pressing-variant suffixes; never a synthetic "seed N" counter. */
@@ -98,7 +106,7 @@ async function createListing(baseUrl, token, overrides) {
     sleeve_condition: 'VG',
     pricing_mode: 'fixed',
     initial_status: 'active',
-    images: [localCoverUrl(baseUrl, 'miles-kind-of-blue')],
+    images: [localCoverUrl(baseUrl, 'miles-davis')],
     domestic_shipping_cents: 500,
     international_shipping_cents: 1500,
     shipping_service: 'Media Mail',
@@ -198,7 +206,7 @@ export async function ensureOwnerProofMarketEvidence({
       catalog_number: 'CL 1355',
       label: 'Columbia',
       price_cents: 7000 + i * 250,
-      images: [localCoverUrl(baseUrl, 'miles-kind-of-blue')],
+      images: [localCoverUrl(baseUrl, 'miles-davis')],
       ...(scarcityRecordId ? { source_record_id: scarcityRecordId } : {}),
     });
     created.push({ capability: 'scarcity', id });
@@ -216,7 +224,7 @@ export async function ensureOwnerProofMarketEvidence({
       catalog_number: 'BLP 1569',
       label: 'Blue Note',
       price_cents: 3800 + i * 200,
-      images: [localCoverUrl(baseUrl, 'kenny-quiet-kenny')],
+      images: [localCoverUrl(baseUrl, 'kenny-dorham')],
       ...(valuationRecordId ? { source_record_id: valuationRecordId } : {}),
     });
     created.push({ capability: 'valuation', id });
@@ -286,7 +294,7 @@ export async function ensureOwnerProofMarketEvidence({
         catalog_number: 'BLP 1569',
         label: 'Blue Note',
         price_cents: 4100,
-        images: [localCoverUrl(baseUrl, 'kenny-quiet-kenny')],
+        images: [localCoverUrl(baseUrl, 'kenny-dorham')],
         ...(valuationRecordId ? { source_record_id: valuationRecordId } : {}),
       });
       created.push({ capability: 'valuation_seller_edit', id: sellerKennyListingId });

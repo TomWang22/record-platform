@@ -401,7 +401,22 @@ export function AiInsightsDashboard() {
                 <p className="text-sm text-slate-700 dark:text-slate-200">{valuation.envelope.summary}</p>
                 {valuation.envelope.details?.valuation_band != null && (
                   <p className="text-xs text-slate-500">
-                    Band: {JSON.stringify(valuation.envelope.details.valuation_band)}
+                    Band:{' '}
+                    {typeof valuation.envelope.details.valuation_band === 'object'
+                      ? (() => {
+                          const band = valuation.envelope.details.valuation_band as Record<
+                            string,
+                            unknown
+                          >
+                          const low = band.low ?? band.min ?? band.quick_sale
+                          const high = band.high ?? band.max ?? band.patient_sale
+                          const currency = String(band.currency || 'USD')
+                          if (low != null && high != null) {
+                            return `${currency} ${low}–${high}`
+                          }
+                          return 'See summary above'
+                        })()
+                      : String(valuation.envelope.details.valuation_band)}
                   </p>
                 )}
                 <AiSourceRefsList refs={valuation.envelope.source_refs} />
@@ -432,7 +447,12 @@ export function AiInsightsDashboard() {
                 <p className="text-sm text-slate-700 dark:text-slate-200">{pricing.envelope.summary}</p>
                 {pricing.envelope.details?.negotiation_guidance != null && (
                   <p className="text-xs text-slate-500">
-                    Guidance: {JSON.stringify(pricing.envelope.details.negotiation_guidance)}
+                    Guidance:{' '}
+                    {typeof pricing.envelope.details.negotiation_guidance === 'string'
+                      ? pricing.envelope.details.negotiation_guidance
+                      : Array.isArray(pricing.envelope.details.negotiation_guidance)
+                        ? pricing.envelope.details.negotiation_guidance.map(String).join(' · ')
+                        : 'See pricing summary above'}
                   </p>
                 )}
                 <AiSourceRefsList refs={pricing.envelope.source_refs} />
@@ -579,7 +599,13 @@ export function AiInsightsDashboard() {
                 <p className="text-sm text-slate-700 dark:text-slate-200">{seller.envelope.summary}</p>
                 {seller.envelope.details?.counts_by_source_type != null && (
                   <p className="text-xs text-slate-500">
-                    {JSON.stringify(seller.envelope.details.counts_by_source_type)}
+                    {typeof seller.envelope.details.counts_by_source_type === 'object'
+                      ? Object.entries(
+                          seller.envelope.details.counts_by_source_type as Record<string, unknown>,
+                        )
+                          .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`)
+                          .join(' · ')
+                      : String(seller.envelope.details.counts_by_source_type)}
                   </p>
                 )}
                 <AiSourceRefsList refs={seller.envelope.source_refs} />

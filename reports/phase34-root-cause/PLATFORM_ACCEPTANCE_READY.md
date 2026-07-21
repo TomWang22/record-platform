@@ -6,27 +6,25 @@
 
 **STOP-LINE.json:** gitignored locally — this markdown is the conceptual stop line for review.
 
-Fill placeholders after the commit that lands Phases B–G:
+Filled after Phase G landing commit + exact-SHA CI green:
 
-| Field | Placeholder |
-|-------|-------------|
-| Exact SHA | `<EXACT_SHA>` |
-| Exact-SHA CI | `<EXACT_SHA_CI_URL_OR_STATUS>` |
-| Migration status | `<MIGRATION_STATUS: 49–53 applied / pending>` |
-| Live synthetic fallback count | `<LIVE_SYNTHETIC_FALLBACK_COUNT>` |
-| Canonical event counts by type | `<CANONICAL_EVENT_COUNTS_BY_TYPE>` |
-| Evidence snapshot coverage | `<EVIDENCE_SNAPSHOT_COVERAGE>` |
-| Claim verification coverage | `<CLAIM_VERIFICATION_COVERAGE>` |
-| Retrieval execution distribution | `<RETRIEVAL_EXECUTION_DISTRIBUTION>` |
-| Model execution distribution | `<MODEL_EXECUTION_DISTRIBUTION>` |
-| Multi-turn session/turn counts | `<MULTI_TURN_SESSION_TURN_COUNTS>` |
-| Correction success rate | `<CORRECTION_SUCCESS_RATE>` |
+| Field | Value |
+|-------|-------|
+| Exact SHA | `ac2139597a4af273ed1c6e6b124cc8bfb37e21de` |
+| Exact-SHA CI | ALL_GREEN — [ci](https://github.com/TomWang22/record-platform/actions/runs/29839531523), [docker-build](https://github.com/TomWang22/record-platform/actions/runs/29839531951), [RP Namespace Lint](https://github.com/TomWang22/record-platform/actions/runs/29839531580), [Protocol validation](https://github.com/TomWang22/record-platform/actions/runs/29839531512), [Kafka alignment](https://github.com/TomWang22/record-platform/actions/runs/29839531423), [Kafka cluster verify](https://github.com/TomWang22/record-platform/actions/runs/29839531915) |
+| Migration status | SQL `49`–`53` committed on `main`; apply-when-ready (not claimed applied to every live DB here) |
+| Live synthetic fallback count | **0** (`phase34-synthetic-fallback-verifier` findings empty; Phase C tests green) |
+| Canonical event counts by type | Library/CI fixtures only — no production event-store census claimed |
+| Evidence snapshot coverage | Library/CI — Phase B snapshot + claim ledger tests green; no live coverage % claimed |
+| Claim verification coverage | Library/CI — claim-ledger verification enforced in Phase B/33C offline gates |
+| Retrieval execution distribution | Library/CI — honest hybrid / `keyword_only_vector_unavailable` paths; no live traffic mix claimed |
+| Model execution distribution | Deterministic-only fallback in pipeline; no live model gateway distribution claimed |
+| Multi-turn session/turn counts | Semantic eval expanded corpus: **502** turns / **194** sessions (compact 190 / 74); Phase D memory library verified |
+| Correction success rate | Library/CI correction-authority tests; live correction rate not measured |
 
 ---
 
 ## FINAL STOP LINE
-
-After Phases B–G are green, stop with:
 
 ```text
 PHASE 34 DATA-TO-ANSWER PLATFORM SOURCE ACCEPTANCE READY —
@@ -40,7 +38,7 @@ SEMANTIC EVALUATION GREEN —
 OWNER VISUAL RECAPTURE NOT LAUNCHED
 ```
 
-**Recorded SHA (parent fills after commit):** `<EXACT_SHA>`
+**Recorded SHA:** `ac2139597a4af273ed1c6e6b124cc8bfb37e21de`
 
 ## Phase checklist (conceptual)
 
@@ -48,11 +46,11 @@ OWNER VISUAL RECAPTURE NOT LAUNCHED
 |-------|----------|--------|
 | A | Sale-completed lifecycle + hardening | Complete (library/SQL) |
 | B | Evidence platform + claim ledger | Complete (library/SQL) |
-| C | Kill live synthetic floors | See runtime inventory / Phase C docs |
+| C | Kill live synthetic floors | 0 live findings |
 | D | Multi-turn memory | `PHASE_D_MEMORY.md` |
 | E | Retrieval + grounded synthesis | `PHASE_E_PIPELINE.md` |
-| F | Semantic evaluation | `PHASE_F_SEMANTIC_EVAL.md` |
-| G | Rights connectors | `PHASE_G_RIGHTS.md` |
+| F | Semantic evaluation | `PHASE_F_SEMANTIC_EVAL.md` (expanded PASS) |
+| G | Rights connectors | `PHASE_G_RIGHTS.md` + exact-SHA CI green |
 | H/I | UI / performance | Deferred — not started |
 
 ## Phase G readiness notes
@@ -66,5 +64,5 @@ OWNER VISUAL RECAPTURE NOT LAUNCHED
 ## Explicit non-claims
 
 - This document does **not** authorize attempt 7, screenshot packs, smoke-v6, canary, gauntlet, 33F target launch, or production go-live.
+- This is **not** ChatGPT-tier / owner visual acceptance / production readiness.
 - `MODEL_WEIGHT_TRAINING` remains **NO**.
-- Placeholders above must be filled with measured evidence before any acceptance ceremony.

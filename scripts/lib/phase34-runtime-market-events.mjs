@@ -2,12 +2,22 @@
  * Load canonical market events from intelligence.market_events for runtime
  * capability responses. Never returns seed/owner-proof fixture arrays.
  */
-import pg from 'pg';
 
 const DEFAULT_URL =
   process.env.POSTGRES_URL_LISTINGS ||
   process.env.LISTINGS_DATABASE_URL ||
   'postgresql://postgres:postgres@127.0.0.1:5435/listings';
+
+async function loadPg() {
+  try {
+    const mod = await import('pg');
+    return mod.default || mod;
+  } catch (err) {
+    const e = new Error(`PG_MODULE_UNAVAILABLE:${err?.message || err}`);
+    e.code = 'PG_MODULE_UNAVAILABLE';
+    throw e;
+  }
+}
 
 /**
  * Map a DB market_events row (+ payload) into an eligibility candidate.
@@ -72,6 +82,7 @@ export async function loadCanonicalMarketEventCandidates(opts = {}) {
   } = opts;
 
   const owned = !pool;
+  const pg = await loadPg();
   const db = pool || new pg.Pool({ connectionString, max: 2 });
   try {
     const params = [eventTypes, limit];

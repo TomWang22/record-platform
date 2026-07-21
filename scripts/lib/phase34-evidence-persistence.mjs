@@ -2,14 +2,25 @@
  * Persist Phase 34 evidence artifacts to intelligence.* (append-only).
  * Used by the live capability response path when PHASE34_RUNTIME_PERSIST != 0.
  */
-import pg from 'pg';
 
 const DEFAULT_URL =
   process.env.POSTGRES_URL_LISTINGS ||
   process.env.LISTINGS_DATABASE_URL ||
   'postgresql://postgres:postgres@127.0.0.1:5435/listings';
 
-export function createListingsPool(connectionString = DEFAULT_URL) {
+async function loadPg() {
+  try {
+    const mod = await import('pg');
+    return mod.default || mod;
+  } catch (err) {
+    const e = new Error(`PG_MODULE_UNAVAILABLE:${err?.message || err}`);
+    e.code = 'PG_MODULE_UNAVAILABLE';
+    throw e;
+  }
+}
+
+export async function createListingsPool(connectionString = DEFAULT_URL) {
+  const pg = await loadPg();
   return new pg.Pool({ connectionString, max: 4 });
 }
 
@@ -40,7 +51,7 @@ export async function persistCapabilityEvidenceArtifacts(
   }
 
   const owned = !pool;
-  const db = pool || createListingsPool(connectionString);
+  const db = pool || (await createListingsPool(connectionString));
   const client = await db.connect();
   const result = {
     evidence_snapshot_id: snapshot.evidence_snapshot_id,

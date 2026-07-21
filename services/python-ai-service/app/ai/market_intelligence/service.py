@@ -23,13 +23,16 @@ def _run(capability: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     if not RUNNER.is_file():
         raise HTTPException(status_code=500, detail="phase33c_runner_missing")
     started = time.time()
-    # Phase 34 runtime: load canonical market events + persist eligibility/snapshots/claims
-    # unless the caller explicitly opts out (offline owner-proof / unit fixtures).
-    runtime_on = os.environ.get("PHASE34_RUNTIME_INTEGRATION", "1")
+    # Phase 34 runtime: only when explicitly enabled (deployed integration sets env=1).
+    # Offline Phase 33C unit/fixture verification must remain deterministic without PG.
+    runtime_on = os.environ.get("PHASE34_RUNTIME_INTEGRATION", "0")
     env = {
         **os.environ,
         "PHASE34_RUNTIME_INTEGRATION": runtime_on,
-        "PHASE34_RUNTIME_PERSIST": os.environ.get("PHASE34_RUNTIME_PERSIST", "1"),
+        "PHASE34_RUNTIME_PERSIST": os.environ.get(
+            "PHASE34_RUNTIME_PERSIST",
+            "1" if runtime_on in ("1", "true") else "0",
+        ),
     }
     input_payload = dict(payload or {})
     if "runtime_integration" not in input_payload and runtime_on in ("1", "true"):

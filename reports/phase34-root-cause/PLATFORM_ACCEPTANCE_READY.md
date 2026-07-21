@@ -6,63 +6,66 @@
 
 **STOP-LINE.json:** gitignored locally — this markdown is the conceptual stop line for review.
 
-Filled after Phase G landing commit + exact-SHA CI green:
+## SHA and reporting hygiene
+
+Parent workflow URLs for the Phase G **implementation** commit must not be described as exact-SHA CI for the documentation **child**.
 
 | Field | Value |
 |-------|-------|
-| Exact SHA | `ac2139597a4af273ed1c6e6b124cc8bfb37e21de` |
-| Exact-SHA CI | ALL_GREEN — [ci](https://github.com/TomWang22/record-platform/actions/runs/29839531523), [docker-build](https://github.com/TomWang22/record-platform/actions/runs/29839531951), [RP Namespace Lint](https://github.com/TomWang22/record-platform/actions/runs/29839531580), [Protocol validation](https://github.com/TomWang22/record-platform/actions/runs/29839531512), [Kafka alignment](https://github.com/TomWang22/record-platform/actions/runs/29839531423), [Kafka cluster verify](https://github.com/TomWang22/record-platform/actions/runs/29839531915) |
-| Migration status | SQL `49`–`53` committed on `main`; apply-when-ready (not claimed applied to every live DB here) |
-| Live synthetic fallback count | **0** (`phase34-synthetic-fallback-verifier` findings empty; Phase C tests green) |
-| Canonical event counts by type | Library/CI fixtures only — no production event-store census claimed |
-| Evidence snapshot coverage | Library/CI — Phase B snapshot + claim ledger tests green; no live coverage % claimed |
-| Claim verification coverage | Library/CI — claim-ledger verification enforced in Phase B/33C offline gates |
-| Retrieval execution distribution | Library/CI — honest hybrid / `keyword_only_vector_unavailable` paths; no live traffic mix claimed |
-| Model execution distribution | Deterministic-only fallback in pipeline; no live model gateway distribution claimed |
-| Multi-turn session/turn counts | Semantic eval expanded corpus: **502** turns / **194** sessions (compact 190 / 74); Phase D memory library verified |
-| Correction success rate | Library/CI correction-authority tests; live correction rate not measured |
+| `implementation_sha` | `ac2139597a4af273ed1c6e6b124cc8bfb37e21de` |
+| `reporting_sha` | `57424e6f74e29f1e6c073f7058691a86605287a7` (docs-only child recording implementation results; this file may move past it) |
+| `implementation_exact_sha_ci` | **GREEN** — [ci](https://github.com/TomWang22/record-platform/actions/runs/29839531523), [docker-build](https://github.com/TomWang22/record-platform/actions/runs/29839531951), [RP Namespace Lint](https://github.com/TomWang22/record-platform/actions/runs/29839531580), [Protocol validation](https://github.com/TomWang22/record-platform/actions/runs/29839531512), [Kafka alignment](https://github.com/TomWang22/record-platform/actions/runs/29839531423), [Kafka cluster verify](https://github.com/TomWang22/record-platform/actions/runs/29839531915) |
+| `reporting_exact_sha_ci` | **PARTIAL** — path-filtered workflows that ran on `57424e6f`: [ci](https://github.com/TomWang22/record-platform/actions/runs/29840295138), [docker-build](https://github.com/TomWang22/record-platform/actions/runs/29840295743), [RP Namespace Lint](https://github.com/TomWang22/record-platform/actions/runs/29840294814) all **success**. Protocol validation / Kafka workflows were **not triggered** for that docs-only commit (do not infer them from `ac213959`). |
 
----
+## What is proven (source / offline)
 
-## FINAL STOP LINE
+| Field | Value |
+|-------|-------|
+| Migration status | SQL `49`–`53` **committed** on `main`; **live DB application not proven** |
+| Live synthetic fallback count (source scan) | **0** known live entries (`phase34-synthetic-fallback-verifier`; Phase C tests green) |
+| Canonical event counts by type | Library/CI fixtures only — **no runtime census** |
+| Evidence snapshot coverage | Library/CI contracts only — **not runtime ACTIVE** |
+| Claim verification coverage | Offline gates only — **not live response coverage** |
+| Retrieval execution distribution | Library paths only — **no live retrieval mix measured** |
+| Model execution distribution | Deterministic-only fallback recorded — **grounded model synthesis not runtime-proven** |
+| Multi-turn session/turn counts | Offline semantic eval: **502** turns / **194** sessions; Phase D library verified — **not deployed runtime evaluation** |
+| Correction success rate | Library/CI only — **live rate unmeasured** |
+
+## Accurate classification (use until runtime integration passes)
 
 ```text
-PHASE 34 DATA-TO-ANSWER PLATFORM SOURCE ACCEPTANCE READY —
-CANONICAL EVENTS ACTIVE —
-SYNTHETIC LIVE FLOORS REMOVED —
-SHARED EVIDENCE SNAPSHOTS ACTIVE —
-CLAIM-TO-EVIDENCE VERIFICATION ACTIVE —
-MULTI-TURN MEMORY AND CORRECTIONS VERIFIED —
-REAL RETRIEVAL AND GROUNDED SYNTHESIS VERIFIED —
-SEMANTIC EVALUATION GREEN —
-OWNER VISUAL RECAPTURE NOT LAUNCHED
+PHASE 34 DATA-TO-ANSWER SOURCE IMPLEMENTATION READY —
+CANONICAL EVENT CONTRACTS IMPLEMENTED —
+LIVE SYNTHETIC FALLBACK INVENTORY ZERO IN SOURCE VERIFICATION —
+EVIDENCE SNAPSHOT AND CLAIM-LEDGER CONTRACTS IMPLEMENTED —
+MULTI-TURN MEMORY AND CORRECTION EVALUATION GREEN OFFLINE —
+RETRIEVAL, RIGHTS, AND GROUNDED-SYNTHESIS CONTRACTS GREEN OFFLINE —
+LIVE DATABASE APPLICATION NOT YET PROVEN —
+END-TO-END RUNTIME DATA-TO-ANSWER PATH NOT YET PROVEN —
+LIVE MODEL AND VECTOR-RETRIEVAL EXECUTION NOT YET PROVEN —
+OWNER VISUAL RECAPTURE NOT LAUNCHED —
+PRODUCTION NOT APPROVED
 ```
 
-**Recorded SHA:** `ac2139597a4af273ed1c6e6b124cc8bfb37e21de`
+**Do not** describe library/CI contracts as `ACTIVE` or as verified through the deployed system.
 
 ## Phase checklist (conceptual)
 
 | Phase | Artifact | Status |
 |-------|----------|--------|
-| A | Sale-completed lifecycle + hardening | Complete (library/SQL) |
-| B | Evidence platform + claim ledger | Complete (library/SQL) |
-| C | Kill live synthetic floors | 0 live findings |
-| D | Multi-turn memory | `PHASE_D_MEMORY.md` |
-| E | Retrieval + grounded synthesis | `PHASE_E_PIPELINE.md` |
-| F | Semantic evaluation | `PHASE_F_SEMANTIC_EVAL.md` (expanded PASS) |
-| G | Rights connectors | `PHASE_G_RIGHTS.md` + exact-SHA CI green |
-| H/I | UI / performance | Deferred — not started |
-
-## Phase G readiness notes
-
-- Connector contracts for preferred first-party + catalog + licensed-archive slot.
-- Popsike / Gripsweat / Discogs marketplace disabled without written license; ordinary `POPSIKE_ENABLED` / `GRIPSWEAT_ENABLED` blocked.
-- Deletion propagation helper excludes retrieval + snapshots.
-- Owner dossier rights/provenance helper present.
-- CI: `verify-phase34-rights-connectors.mjs`.
+| A | Sale-completed lifecycle + hardening | Source/SQL implemented; live apply not proven |
+| B | Evidence platform + claim ledger | Source/SQL implemented; runtime coverage not proven |
+| C | Kill live synthetic floors | Source verifier: 0 known live findings |
+| D | Multi-turn memory | Offline library green |
+| E | Retrieval + grounded synthesis | Offline contracts green; live model/vector not proven |
+| F | Semantic evaluation | Offline corpus green (502/194) |
+| G | Rights connectors | Source + offline tests; `implementation_exact_sha_ci=GREEN` |
+| Runtime integration | Settlement→answer lineage | **Not yet proven** — next milestone |
+| H/I | UI / owner visual | Deferred — not launched |
 
 ## Explicit non-claims
 
-- This document does **not** authorize attempt 7, screenshot packs, smoke-v6, canary, gauntlet, 33F target launch, or production go-live.
-- This is **not** ChatGPT-tier / owner visual acceptance / production readiness.
+- Source milestone only — **not** runtime data-to-answer integration acceptance.
+- Does **not** authorize attempt 7, screenshot packs, smoke-v6, canary, gauntlet, 33F target launch, or production go-live.
+- Not ChatGPT-tier / owner visual acceptance / production readiness.
 - `MODEL_WEIGHT_TRAINING` remains **NO**.

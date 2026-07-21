@@ -10,8 +10,130 @@ import {
   extractNegotiationFactsFromText,
 } from './phase34-negotiation-context.mjs';
 import { assertUnitTestHooksAllowed } from './phase34-synthetic-sales-gate.mjs';
+import {
+  appendConversationTurn,
+  applyCorrection,
+  assembleContext,
+  createDraft,
+  ensureSessionFromNegotiationInput,
+  ingestConversationFacts,
+  recomputeAfterCorrection,
+  resolveActiveFacts,
+  sessionStateVersion,
+  serializeSession,
+} from './phase34-conversation-memory.mjs';
 
 const SCHEMA_VERSION = 'phase33d-negotiation-2';
+
+/**
+ * When session_state / conversation_facts are provided, merge authoritative
+ * memory facts (supersession-aware). Offline callers without memory keep the
+ * regex context-pack path unchanged.
+ */
+function mergeFactsWithConversationMemory(input, contextPackFacts, {
+  sessionId,
+  turnId,
+  userIntent,
+  turnIndex,
+}) {
+  const sessionDoc = ensureSessionFromNegotiationInput(input);
+  if (!sessionDoc) {
+    return {
+      facts: contextPackFacts,
+      sessionDoc: null,
+      session_state_version: null,
+      memory_context: null,
+      recompute: null,
+    };
+  }
+
+  const at = input.now || null;
+  appendConversationTurn(sessionDoc, {
+    turn_id: turnId,
+    actor: input.requesting_principal_fixture || input.principal_id || 'customer',
+    role: 'customer',
+    intent: userIntent || null,
+    created_at: at,
+    metadata: { turn_index: turnIndex },
+  });
+
+  // Ingest pack facts: new keys as statements; changed values as corrections.
+  const activeBefore = resolveActiveFacts(sessionDoc, { at });
+  const toIngest = [];
+  const autoCorrections = [];
+  for (const [key, value] of Object.entries(contextPackFacts || {})) {
+    const prior = activeBefore[key];
+    if (!prior) {
+      toIngest.push({
+        key,
+        value,
+        authority: 'CURRENT_EXPLICIT_CUSTOMER_STATEMENT',
+        source_turn_id: turnId,
+      });
+      continue;
+    }
+    if (prior.value !== value) {
+      autoCorrections.push({ key, value });
+    }
+  }
+  if (toIngest.length) {
+    ingestConversationFacts(sessionDoc, toIngest, {
+      source_turn_id: turnId,
+      source_actor: input.requesting_principal_fixture || input.principal_id,
+      at,
+    });
+  }
+
+  // Explicit corrections from input (e.g. shipping $6 → $5), plus pack deltas.
+  const corrections = [
+    ...autoCorrections,
+    ...(Array.isArray(input.fact_corrections) ? input.fact_corrections : []),
+  ];
+  let lastCorrection = null;
+  for (const c of corrections) {
+    const applied = applyCorrection(sessionDoc, {
+      key: c.key,
+      value: c.value,
+      value_type: c.value_type,
+      source_turn_id: turnId,
+      source_actor: c.source_actor || input.requesting_principal_fixture || input.principal_id,
+      timestamp: c.timestamp || at,
+      confidence: c.confidence ?? 1,
+      authority: c.authority || 'CURRENT_EXPLICIT_CUSTOMER_CORRECTION',
+      privacy_scope: c.privacy_scope,
+      metadata: c.metadata || {},
+    });
+    lastCorrection = applied.fact;
+  }
+
+  const recompute = recomputeAfterCorrection(sessionDoc, {
+    correction_fact: lastCorrection,
+    turn_id: turnId,
+    evidence_snapshot_id: input.evidence_snapshot_id || null,
+    at,
+  });
+
+  const values = { ...contextPackFacts, ...recompute.values };
+  const memory_context = assembleContext(sessionDoc, {
+    budget: input.context_budget || '16k',
+    recent_turn_limit: input.recent_turn_limit || 8,
+    evidence_excerpts: input.valuation_evidence || [],
+    at,
+  });
+
+  if (input.persist_session_state !== false) {
+    // Callers may read serialized state from result.session_state.
+    sessionDoc._export = serializeSession(sessionDoc);
+  }
+
+  return {
+    facts: values,
+    sessionDoc,
+    session_state_version: sessionStateVersion(sessionDoc),
+    memory_context,
+    recompute,
+  };
+}
 
 const UNSAFE_REQUEST_FLAGS = [
   'request_auto_send',
@@ -333,7 +455,14 @@ export function analyzeNegotiation(input = {}) {
     valuation_evidence: input.valuation_evidence || [],
     context_tier: input.context_tier || 'basic',
   });
-  const facts = contextPack.structured_facts;
+  const memoryMerge = mergeFactsWithConversationMemory(input, contextPack.structured_facts, {
+    sessionId,
+    turnId,
+    userIntent,
+    turnIndex,
+  });
+  const facts = memoryMerge.facts;
+  const session_state_version = memoryMerge.session_state_version;
 
   const visibleMessages = [];
   const excludedMessages = [...contextPack.facts_excluded];
@@ -544,10 +673,37 @@ export function analyzeNegotiation(input = {}) {
     facts,
     safetyRefused,
   });
-  const draft_reply =
+  let draft_reply =
     abstention.abstained && !safetyRefused
       ? ''
       : reply_drafts.primary || reply_drafts.friendly || reply_drafts.concise;
+
+  // Material corrections force draft rewrite from recomputed facts/economics.
+  if (memoryMerge.recompute?.must_rewrite_draft && draft_reply) {
+    const rewritten = buildReplyDrafts({
+      side: side || 'seller',
+      anchor,
+      target,
+      walkAway,
+      currency,
+      abstained: abstention.abstained && !safetyRefused,
+      facts,
+      safetyRefused,
+    });
+    Object.assign(reply_drafts, rewritten);
+    draft_reply = rewritten.primary || rewritten.friendly || rewritten.concise;
+  }
+
+  let memory_draft = null;
+  if (memoryMerge.sessionDoc && draft_reply) {
+    memory_draft = createDraft(memoryMerge.sessionDoc, {
+      turn_id: turnId,
+      body: draft_reply,
+      status: 'GENERATED',
+      created_at: input.now || null,
+      metadata: { capability: 'negotiation_assistance' },
+    });
+  }
 
   const strategy =
     abstention.abstained && !safetyRefused
@@ -653,6 +809,20 @@ export function analyzeNegotiation(input = {}) {
     },
     structured_facts: facts,
     correction_change: change_summary,
+    session_state_version: session_state_version || null,
+    session_state: memoryMerge.sessionDoc ? serializeSession(memoryMerge.sessionDoc) : null,
+    memory_context: memoryMerge.memory_context || null,
+    retrieval_checkpoint: memoryMerge.recompute?.retrieval_checkpoint || null,
+    draft_lifecycle: memory_draft
+      ? {
+          draft_id: memory_draft.draft_id,
+          status: memory_draft.status,
+          message_sent: memory_draft.message_sent,
+        }
+      : {
+          status: 'GENERATED',
+          message_sent: false,
+        },
     supported_price_range: { currency, low, high },
     recommended_anchor: safetyRefused ? target : abstention.abstained ? null : anchor,
     recommended_target: abstention.abstained && !safetyRefused ? null : target,
@@ -744,6 +914,8 @@ export function analyzeNegotiation(input = {}) {
       turn_index: turnIndex,
       executed_turn_count: contextPack.executed_turn_count,
       context_truncation_status: contextPack.context_truncation_status,
+      session_state_version: session_state_version || null,
+      memory_recompute: Boolean(memoryMerge.recompute?.material_correction),
     },
   };
 }

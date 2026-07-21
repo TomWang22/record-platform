@@ -9,6 +9,8 @@ export const NORMALIZATION_VERSION = 'phase34-market-event-v1';
 export const EVENT_TYPES = Object.freeze([
   'ASKING_LISTING',
   'COMPLETED_SALE',
+  /** Settlement-grade sold event (Phase A). Distinct from seed COMPLETED_SALE. */
+  'SALE_COMPLETED',
   'AUCTION_STARTED',
   'AUCTION_BID',
   'AUCTION_COMPLETED',
@@ -108,7 +110,7 @@ export const FX_TO_USD = Object.freeze({
 });
 
 const ASKING_TYPES = new Set(['ASKING_LISTING', 'AUCTION_STARTED', 'AUCTION_BID', 'OFFER_CREATED']);
-const COMPLETED_SALE_TYPES = new Set(['COMPLETED_SALE', 'AUCTION_COMPLETED']);
+const COMPLETED_SALE_TYPES = new Set(['COMPLETED_SALE', 'SALE_COMPLETED', 'AUCTION_COMPLETED']);
 const ACTIVE_TYPES = new Set(['ASKING_LISTING', 'AUCTION_STARTED', 'AUCTION_BID', 'OFFER_CREATED']);
 
 function nullish(value) {
@@ -193,6 +195,16 @@ export function computeContentHash(canonicalWithoutHash) {
 function inferEventType(input) {
   if (input.event_type && EVENT_TYPES.includes(input.event_type)) return input.event_type;
   const listedAs = String(input.listed_as || input.sale_kind || input.source_type || '').toLowerCase();
+  // Infer seed-style COMPLETED_SALE only when not explicitly settlement-graded.
+  if (String(input.event_type || '').toUpperCase() === 'SALE_COMPLETED') return 'SALE_COMPLETED';
+  if (
+    String(input.settlement_source || '').length > 0 ||
+    String(input.authorization_scope || '') === 'first_party_settlement'
+  ) {
+    if (listedAs === 'sold' || listedAs === 'sale' || listedAs === 'completed_sale') {
+      return 'SALE_COMPLETED';
+    }
+  }
   if (listedAs === 'sold' || listedAs === 'sale' || listedAs === 'completed_sale') return 'COMPLETED_SALE';
   if (listedAs === 'asking' || listedAs === 'listing' || listedAs === 'active') return 'ASKING_LISTING';
   if (listedAs === 'auction') {

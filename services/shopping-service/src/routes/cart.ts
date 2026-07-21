@@ -4,6 +4,7 @@ import type { AuthedRequest } from '../lib/auth.js'
 import { pool, withRetry } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
 import { cleanupUnavailableItems, removeSoldOutFromCarts, markWatchlistSoldOut, notifyCartItemRemoved } from '../lib/availability.js'
+import { emitSaleCompletedFromCheckout, resolveSettlementSource } from '../lib/sale-completed-emitter.js'
 
 export default function cartRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
   const router: Router = Router()
@@ -174,7 +175,7 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
                    sold_to = CASE WHEN COALESCE(stock_quantity, 1) - $1 <= 0 THEN $2::uuid ELSE sold_to END,
                    is_active = (COALESCE(stock_quantity, 1) - $1) > 0
                WHERE id = $3::uuid AND is_active = TRUE AND COALESCE(stock_quantity, 1) >= $1
-               RETURNING id`,
+               RETURNING id, sold_at`,
               [qty, userId, item.listing_id]
             )
 
@@ -231,6 +232,28 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
                 3,
                 'create purchase history (checkout)'
               )
+
+              // Phase A: emit SALE_COMPLETED only after full settlement (sold_at set).
+              if (listingsDbResult.rows[0]?.sold_at) {
+                try {
+                  const purchaseType =
+                    (item.metadata as { purchase_type?: string } | null)?.purchase_type ?? 'buy_now'
+                  await emitSaleCompletedFromCheckout(listingsPool, {
+                    listingId: item.listing_id,
+                    orderId,
+                    purchaseId: purchaseResult.rows[0].id,
+                    paymentTransactionId,
+                    finalPrice: Number(item.price),
+                    currency: 'USD',
+                    saleMechanism: purchaseType,
+                    settlementSource: resolveSettlementSource(purchaseType),
+                    title: (item.metadata as { title?: string } | null)?.title ?? null,
+                    completedAt: new Date(listingsDbResult.rows[0].sold_at),
+                  })
+                } catch (saleErr: any) {
+                  console.warn('[shopping] SALE_COMPLETED emit skipped:', saleErr?.message)
+                }
+              }
 
               purchaseResults.push({
                 purchase_id: purchaseResult.rows[0].id,

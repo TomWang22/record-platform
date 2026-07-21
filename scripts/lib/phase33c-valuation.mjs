@@ -3,6 +3,7 @@
  */
 import { selectEvidence } from './phase33c-evidence.mjs';
 import { computeConfidenceFactors, decideAbstention } from './phase33c-confidence.mjs';
+import { assertSyntheticSalesAllowed } from './phase34-synthetic-sales-gate.mjs';
 
 const SCHEMA_VERSION = 'phase33c-valuation-1';
 
@@ -81,8 +82,9 @@ export function analyzeValuation(input = {}) {
   const authorizedScopes = input.authorized_scopes || ['public_market', 'authenticated_market'];
 
   let candidates = Array.isArray(input.candidates) ? [...input.candidates] : [];
-  // Explicit owner-proof floor only — never invent comps for weak/abstention scenarios.
+  // Explicit owner-proof floor — unit-test / synthetic hook only (Phase A).
   if (input.force_sold_floor === true) {
+    assertSyntheticSalesAllowed('valuation.force_sold_floor');
     const soldCount = candidates.filter((c) => c.sale_kind === 'sold' || c.source_type === 'sale').length;
     const base = typeof input.anchor_price === 'number' ? input.anchor_price : 42;
     for (let i = soldCount; i < 3; i += 1) {

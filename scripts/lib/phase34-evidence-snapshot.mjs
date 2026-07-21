@@ -79,6 +79,7 @@ export function buildEvidenceSnapshot({
       (e) =>
         e.sale_kind === 'sold' ||
         e.event_type === 'COMPLETED_SALE' ||
+        e.event_type === 'SALE_COMPLETED' ||
         e.event_type === 'AUCTION_COMPLETED',
     );
   const asking =

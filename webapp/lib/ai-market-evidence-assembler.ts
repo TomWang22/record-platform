@@ -370,7 +370,12 @@ export function mapCompletedSaleEventToCandidate(
   opts: { nowMs?: number; index?: number } = {},
 ): AssembledCandidate | null {
   const eventType = String(event.event_type || 'COMPLETED_SALE').toUpperCase()
-  if (eventType && eventType !== 'COMPLETED_SALE' && eventType !== 'AUCTION_COMPLETED') {
+  if (
+    eventType &&
+    eventType !== 'COMPLETED_SALE' &&
+    eventType !== 'SALE_COMPLETED' &&
+    eventType !== 'AUCTION_COMPLETED'
+  ) {
     return null
   }
   const price = Number(event.price_normalized ?? event.price_original ?? event.price)

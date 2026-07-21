@@ -3,6 +3,7 @@
  */
 import { selectEvidence } from './phase33c-evidence.mjs';
 import { computeConfidenceFactors, decideAbstention } from './phase33c-confidence.mjs';
+import { assertSyntheticSalesAllowed } from './phase34-synthetic-sales-gate.mjs';
 
 const SCHEMA_VERSION = 'phase33c-scarcity-1';
 
@@ -82,8 +83,9 @@ export function analyzeScarcity(input = {}) {
     }
   }
 
-  // Explicit owner-proof sold floor — never invent comps for weak/abstention intents.
+  // Explicit owner-proof sold floor — unit-test / synthetic hook only (Phase A).
   if (input.force_sold_floor === true) {
+    assertSyntheticSalesAllowed('scarcity.force_sold_floor');
     const soldCount = candidates.filter((c) => c.sale_kind === 'sold' || c.source_type === 'sale').length;
     const base = typeof input.anchor_price === 'number' ? input.anchor_price : 74;
     for (let i = soldCount; i < 3; i += 1) {

@@ -18,6 +18,9 @@ import {
 import { stitchPngsVertically } from '../scripts/lib/phase34-png-composite.mjs';
 import { analyzeNegotiation } from '../scripts/lib/phase33d-negotiation.mjs';
 
+// Unit-test fixtures intentionally use force_negotiation_market_floor.
+process.env.PHASE34_UNIT_TEST_HOOKS = '1';
+
 const TINY_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64',

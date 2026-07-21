@@ -33,12 +33,15 @@ test('mergeOwnerProofCompletedSaleCandidates source gates seed load', () => {
   assert.match(src, /listSaleCompletedEvents/);
 });
 
-test('assertNoRuntimeForceFloorsInBody always blocks force_sold_floor', () => {
+test('assertNoRuntimeForceFloorsInBody always blocks all force_* floors', () => {
   assert.throws(
     () => assertNoRuntimeForceFloorsInBody({ force_sold_floor: true }),
     /RUNTIME_FORCE_FLOOR_USED/,
   );
-  assert.equal(assertNoRuntimeForceFloorsInBody({ force_watchlist_floor: true }).ok, true);
+  assert.throws(
+    () => assertNoRuntimeForceFloorsInBody({ force_watchlist_floor: true }),
+    /RUNTIME_FORCE_FLOOR_USED/,
+  );
   assert.throws(
     () =>
       assertNoRuntimeForceFloorsInBody(

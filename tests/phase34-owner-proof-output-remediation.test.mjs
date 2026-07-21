@@ -17,6 +17,9 @@ import {
   mergeCorrectionPrecedence,
 } from '../scripts/lib/phase34-negotiation-context.mjs';
 
+// Unit-test fixtures intentionally use force_* floors.
+process.env.PHASE34_UNIT_TEST_HOOKS = '1';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
 const MATRIX = path.join(REPO, 'scripts/ai-platform/phase34-owner-proof-remediation-matrix.json');

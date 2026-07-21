@@ -435,21 +435,26 @@ test('scarcity force_sold_floor injects completed sales so success can clear the
 });
 
 test('japanese scarcity correction never shows scarce with sold 0', () => {
-  const out = analyzeScarcity({
-    subject: { pressing_id: 'CL1355-US', catalog_number: 'CL 1355' },
-    user_intent: 'I meant the Japanese pressing, not the US mono.',
-    // Stale assembly counters that previously caused Label:Scarce · sold 0.
-    recent_sale_count: 0,
-    active_supply_count: 17,
-    candidates: [],
-  });
-  assert.equal(out.envelope.abstention.abstained, false);
-  assert.ok(out.result.sold_count >= 1);
-  assert.equal(out.result.recent_sale_count, out.result.sold_count);
-  assert.notEqual(out.result.scarcity_label, 'insufficient_data');
-  const evidenceText = JSON.stringify(out.result.evidence || []);
-  assert.doesNotMatch(evidenceText, /scarcity-jp-/);
-  assert.match(evidenceText, /Sold Japanese pressing|sold comparable/i);
+  process.env.PHASE34_UNIT_TEST_HOOKS = '1';
+  try {
+    const out = analyzeScarcity({
+      subject: { pressing_id: 'CL1355-US', catalog_number: 'CL 1355' },
+      user_intent: 'I meant the Japanese pressing, not the US mono.',
+      // Stale assembly counters that previously caused Label:Scarce · sold 0.
+      recent_sale_count: 0,
+      active_supply_count: 17,
+      candidates: [],
+    });
+    assert.equal(out.envelope.abstention.abstained, false);
+    assert.ok(out.result.sold_count >= 1);
+    assert.equal(out.result.recent_sale_count, out.result.sold_count);
+    assert.notEqual(out.result.scarcity_label, 'insufficient_data');
+    const evidenceText = JSON.stringify(out.result.evidence || []);
+    assert.doesNotMatch(evidenceText, /scarcity-jp-/);
+    assert.match(evidenceText, /Sold Japanese pressing|sold comparable/i);
+  } finally {
+    delete process.env.PHASE34_UNIT_TEST_HOOKS;
+  }
 });
 
 test('product session runner forwards owner_proof_canonical_route into adapter context', () => {

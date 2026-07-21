@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
@@ -14,6 +15,13 @@ def _now() -> str:
 def _stable_hash(parts: List[str]) -> str:
     h = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
     return f"sha256:{h[:24]}"
+
+
+def _unit_test_hooks_allowed() -> bool:
+    return (
+        os.getenv("PHASE34_UNIT_TEST_HOOKS") == "1"
+        or os.getenv("PHASE34_ALLOW_SYNTHETIC_SALES") == "1"
+    )
 
 
 def analyze_embedding_metadata(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -273,6 +281,36 @@ def analyze_semantic_search(body: Dict[str, Any]) -> Dict[str, Any]:
     if selected not in {"semantic", "hybrid", "keyword"}:
         selected = "semantic"
     executed = selected  # no silent fallback
+
+    # Production must not serve fixture catalog cards — hooks only.
+    if not _unit_test_hooks_allowed():
+        return {
+            "selected_mode": selected,
+            "executed_mode": "visible_fallback",
+            "mode": "visible_fallback",
+            "fallback_visible": True,
+            "silent_fallback": False,
+            "fixture_catalog_blocked": True,
+            "results": [],
+            "result_cards": [],
+            "query_id": str(body.get("query_id") or "owner-proof-query"),
+            "summary": "Semantic catalog fixtures are disabled outside unit-test hooks; no invented result cards.",
+            "evidence": [],
+            "confidence": 0.15,
+            "limitations": [
+                {
+                    "code": "FIXTURE_CATALOG_BLOCKED",
+                    "message": "PHASE34_UNIT_TEST_HOOKS required for fixture catalog cards; live path does not invent matches.",
+                    "severity": "warning",
+                }
+            ],
+            "data_freshness": _now(),
+            "methodology_customer": "Live semantic search requires real index retrieval — fixtures gated",
+            "methodology": "deterministic_search_v2",
+            "sample_size": 0,
+            "abstention_reason": "FIXTURE_CATALOG_BLOCKED",
+            "authorization_scope": "authenticated_market",
+        }
 
     cards = _catalog_cards(executed, exclude_picture_discs=exclude_picture)
     correction = None

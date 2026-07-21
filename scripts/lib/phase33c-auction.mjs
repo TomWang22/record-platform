@@ -3,6 +3,7 @@
  */
 import { selectEvidence } from './phase33c-evidence.mjs';
 import { computeConfidenceFactors, decideAbstention } from './phase33c-confidence.mjs';
+import { assertUnitTestHooksAllowed } from './phase34-synthetic-sales-gate.mjs';
 
 const SCHEMA_VERSION = 'phase33c-auction-1';
 const MIN_BATCH_SAMPLES_WARN = 3;
@@ -275,6 +276,7 @@ function analyzeWatchlistBatch(input) {
 
   let auctions = Array.isArray(input.watchlist_auctions) ? [...input.watchlist_auctions] : [];
   if (auctions.length < 5 && input.force_watchlist_floor === true && !unauthorized) {
+    assertUnitTestHooksAllowed('auction.force_watchlist_floor');
     const now = Date.now();
     for (let i = auctions.length; i < 5; i += 1) {
       const hoursOut = i < 3 ? 6 : 48;

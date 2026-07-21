@@ -4,6 +4,9 @@ import { analyzeMarketAnalytics } from '../scripts/lib/phase33e-analytics.mjs';
 import { analyzeMemory } from '../scripts/lib/phase33e-memory.mjs';
 import { evaluateScenario, runCapability } from '../scripts/lib/phase33e-intelligence.mjs';
 
+// Unit-test fixtures intentionally use force_analytics_floor.
+process.env.PHASE34_UNIT_TEST_HOOKS = '1';
+
 function sold(id, price, extra = {}) {
   return {
     evidence_id: id,

@@ -1520,20 +1520,8 @@ export class NegotiationJourneyAdapter extends BaseProductJourneyAdapter {
       owner_proof_prompt: user_intent,
       owner_proof_scenario_id: context.scenario_id || null,
       force_negotiation_market_floor: false,
-      market_candidates:
-        multi || context.scenario_class === 'A_success' || context.scenario_class === 'B_correction'
-          ? [0.92, 0.98, 1.05].map((mul, i) => ({
-              evidence_id: `completed-sale-comp-${i + 1}`,
-              source_type: 'sale',
-              sale_kind: 'sold',
-              price: Math.round(41 * mul * 100) / 100,
-              currency: 'USD',
-              freshness_status: 'fresh',
-              observed_at: '2026-06-01T12:00:00.000Z',
-              reason_codes: ['EXACT_PRESSING_MATCH', 'AUTHORIZED_MARKET'],
-              authorization_scope: 'authenticated_market',
-            }))
-          : [],
+      // Live adapter never invents synthetic sold comps — assembler/settlement only.
+      market_candidates: [],
     };
   }
   materialFields() {

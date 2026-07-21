@@ -9,6 +9,9 @@
  * Does not launch live 24-scenario owner-proof recapture.
  *
  * Default output: .cache/phase34-owner-proof-source-verification (repo-local).
+ *
+ * Synthetic negotiation comps / force_negotiation_market_floor require
+ * PHASE34_UNIT_TEST_HOOKS=1 (set automatically for this harness).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,6 +58,9 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
+
+// Harness-only: local analyzeNegotiation + route injection use force floors / comps.
+process.env.PHASE34_UNIT_TEST_HOOKS = process.env.PHASE34_UNIT_TEST_HOOKS || '1';
 
 /** Frozen PASS evidence from SHA 8fc9df16 — never mutate. */
 const FROZEN_BASELINE_ROOT = path.join(REPO, '.cache/phase34-owner-proof-source-verification');

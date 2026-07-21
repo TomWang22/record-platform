@@ -9,6 +9,7 @@ import {
   buildNegotiationContextPack,
   extractNegotiationFactsFromText,
 } from './phase34-negotiation-context.mjs';
+import { assertUnitTestHooksAllowed } from './phase34-synthetic-sales-gate.mjs';
 
 const SCHEMA_VERSION = 'phase33d-negotiation-2';
 
@@ -388,8 +389,9 @@ export function analyzeNegotiation(input = {}) {
         : 35;
 
   let marketCandidates = Array.isArray(input.market_candidates) ? [...input.market_candidates] : [];
-  // Owner-proof floor only when explicitly requested — never invent comps for weak/abstention scenarios.
+  // Synthetic comps only behind unit-test hooks — live path never invents comps.
   if (marketCandidates.length === 0 && input.force_negotiation_market_floor === true) {
+    assertUnitTestHooksAllowed('negotiation.force_negotiation_market_floor');
     marketCandidates = ownerProofMarketCandidates(asking, input.currency || 'USD');
   }
 

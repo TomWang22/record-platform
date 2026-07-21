@@ -12,6 +12,7 @@ import logging
 # Import new modules
 from app.data_pipeline import ingest_analytics_data, start_kafka_consumer, shutdown as pipeline_shutdown
 from app.ai.routes import router as ai_platform_router
+from app.ai.phase34_hooks_guard import assert_phase34_hooks_disabled_in_production
 from app.ai_advisor import SellingAdvisor, BuyingAdvisor, NegotiationAdvisor, BiddingAdvisor
 from app.db import close_pool as close_db_pool, get_last_pool_error, get_pool, log_inference
 from app.redis_cache import close_redis
@@ -847,6 +848,9 @@ grpc_server = None
 async def startup_event():
     """Start gRPC server and data pipeline on startup if enabled"""
     global grpc_server
+
+    # Phase C: refuse booting production with unit-test synthetic hooks enabled.
+    assert_phase34_hooks_disabled_in_production()
     
     # Start Kafka consumer for data pipeline
     try:

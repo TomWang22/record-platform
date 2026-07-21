@@ -1,5 +1,7 @@
 """Coverage for Phase 34 embedding lineage + semantic search fixtures."""
 
+import os
+
 from app.ai.embedding_semantic_fixtures import (
     analyze_embedding_metadata,
     analyze_semantic_search,
@@ -52,35 +54,43 @@ def test_embedding_deleted_source_state():
 
 
 def test_semantic_search_success_has_five_cards():
-    out = analyze_semantic_search(
-        {
-            "retrieval_mode": "semantic",
-            "user_intent": "Find Quiet Kenny pressings",
-        }
-    )
-    assert out["selected_mode"] == "semantic"
-    assert out["executed_mode"] == "semantic"
-    assert out["silent_fallback"] is False
-    assert len(out["results"]) >= 5
-    assert "fixture-release-1" not in str(out)
-    card = out["results"][0]
-    assert card["artist"]
-    assert card["pressing_identity"]
-    assert card["why_matched"]
+    os.environ["PHASE34_UNIT_TEST_HOOKS"] = "1"
+    try:
+        out = analyze_semantic_search(
+            {
+                "retrieval_mode": "semantic",
+                "user_intent": "Find Quiet Kenny pressings",
+            }
+        )
+        assert out["selected_mode"] == "semantic"
+        assert out["executed_mode"] == "semantic"
+        assert out["silent_fallback"] is False
+        assert len(out["results"]) >= 5
+        assert "fixture-release-1" not in str(out)
+        card = out["results"][0]
+        assert card["artist"]
+        assert card["pressing_identity"]
+        assert card["why_matched"]
+    finally:
+        os.environ.pop("PHASE34_UNIT_TEST_HOOKS", None)
 
 
 def test_hybrid_correction_changes_mode_and_excludes_picture_discs():
-    out = analyze_semantic_search(
-        {
-            "retrieval_mode": "semantic",
-            "user_intent": "Switch to hybrid and exclude picture discs",
-        }
-    )
-    assert out["selected_mode"] == "hybrid"
-    assert out["executed_mode"] == "hybrid"
-    assert out["picture_discs_excluded"] is True
-    assert out["correction_change"] is not None
-    assert all(not c.get("picture_disc") for c in out["result_cards"])
+    os.environ["PHASE34_UNIT_TEST_HOOKS"] = "1"
+    try:
+        out = analyze_semantic_search(
+            {
+                "retrieval_mode": "semantic",
+                "user_intent": "Switch to hybrid and exclude picture discs",
+            }
+        )
+        assert out["selected_mode"] == "hybrid"
+        assert out["executed_mode"] == "hybrid"
+        assert out["picture_discs_excluded"] is True
+        assert out["correction_change"] is not None
+        assert all(not c.get("picture_disc") for c in out["result_cards"])
+    finally:
+        os.environ.pop("PHASE34_UNIT_TEST_HOOKS", None)
 
 
 def test_visible_fallback_is_not_silent_success():
@@ -95,3 +105,16 @@ def test_visible_fallback_is_not_silent_success():
     assert out["fallback_visible"] is True
     assert out["silent_fallback"] is False
     assert out["results"] == []
+
+
+def test_semantic_search_blocks_catalog_without_hooks():
+    os.environ.pop("PHASE34_UNIT_TEST_HOOKS", None)
+    os.environ.pop("PHASE34_ALLOW_SYNTHETIC_SALES", None)
+    out = analyze_semantic_search(
+        {
+            "retrieval_mode": "semantic",
+            "user_intent": "Find Quiet Kenny pressings",
+        }
+    )
+    assert out["results"] == []
+    assert out.get("fixture_catalog_blocked") is True or out.get("abstention_reason") == "FIXTURE_CATALOG_BLOCKED"

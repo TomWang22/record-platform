@@ -234,26 +234,11 @@ const RUNTIME_FORCE_FLOOR_KEYS = Object.freeze([
 ]);
 
 /**
- * Live runtime forbids acceptance-only force floors.
- * Phase A: force_sold_floor is always blocked (not pack-scoped).
- * Other force_* floors remain blocked for recapture-v4/v5 packs.
+ * Live runtime forbids acceptance-only force floors (Phase C: all force_* always blocked).
  */
-export function assertNoRuntimeForceFloorsInBody(body, { screenshotPack } = {}) {
+export function assertNoRuntimeForceFloorsInBody(body, { screenshotPack: _screenshotPack } = {}) {
   if (!body || typeof body !== 'object') return { ok: true };
 
-  if (body.force_sold_floor === true) {
-    const err = new Error(`${RUNTIME_FORCE_FLOOR_USED_CODE}:force_sold_floor`);
-    err.code = RUNTIME_FORCE_FLOOR_USED_CODE;
-    err.field = 'force_sold_floor';
-    throw err;
-  }
-
-  if (
-    screenshotPack !== 'owner-proof-recapture-v4' &&
-    screenshotPack !== 'owner-proof-recapture-v5'
-  ) {
-    return { ok: true };
-  }
   for (const key of RUNTIME_FORCE_FLOOR_KEYS) {
     if (body[key] === true) {
       const err = new Error(`${RUNTIME_FORCE_FLOOR_USED_CODE}:${key}`);

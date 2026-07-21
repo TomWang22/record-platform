@@ -30,6 +30,10 @@ from app.ai.embedding_semantic_fixtures import (
     analyze_semantic_search,
 )
 from app.ai.server_timing import inject_redacted_rag_timing_details
+from app.ai.phase34_hooks_guard import (
+    FORCE_FLOOR_FIELDS,
+    unit_test_hooks_allowed,
+)
 
 router = APIRouter(prefix="/ai", tags=["ai-platform"])
 
@@ -402,6 +406,20 @@ def _intelligence_payload(body: IntelligenceBody, x_user_id: Optional[str]) -> d
     uid = _user_id(x_user_id, None)
     if uid and "requesting_principal_fixture" not in data and "principal_id" not in data:
         data["principal_id"] = uid
+    # Phase C: public/live schemas reject force_* floors unless unit-test hooks are on.
+    rejected = [k for k in FORCE_FLOOR_FIELDS if k in data and data.get(k) is not None]
+    if rejected and not unit_test_hooks_allowed():
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "FORCE_FLOOR_FIELDS_REJECTED",
+                "fields": rejected,
+                "message": "force_* floor fields are unit-test only; set PHASE34_UNIT_TEST_HOOKS=1",
+            },
+        )
+    if not unit_test_hooks_allowed():
+        for k in FORCE_FLOOR_FIELDS:
+            data.pop(k, None)
     return data
 
 

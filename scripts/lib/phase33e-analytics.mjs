@@ -3,6 +3,10 @@
  * No LLM arithmetic. No unsupported causal/prediction claims.
  */
 import { computeConfidenceFactors } from './phase33c-confidence.mjs';
+import {
+  assertUnitTestHooksAllowed,
+  unitTestHooksAllowed,
+} from './phase34-synthetic-sales-gate.mjs';
 
 const SCHEMA_VERSION = 'phase33e-market-analytics-1';
 
@@ -80,11 +84,17 @@ export function analyzeMarketAnalytics(input = {}) {
 
   let events = Array.isArray(input.events) ? [...input.events] : [];
   const forceEmptySample = input.force_empty_sample === true || weakSampleIntent;
-  const forceFloor =
+  if (input.force_analytics_floor === true) {
+    assertUnitTestHooksAllowed('analytics.force_analytics_floor');
+  }
+  // Auto-floor when owner_proof_prompt/intent + empty events is unit-test only.
+  const autoFloor =
     !forceEmptySample &&
-    (input.force_analytics_floor === true ||
-      (events.length === 0 &&
-        (Boolean(input.owner_proof_prompt) || Boolean(input.user_intent))));
+    events.length === 0 &&
+    (Boolean(input.owner_proof_prompt) || Boolean(input.user_intent)) &&
+    unitTestHooksAllowed();
+  const forceFloor =
+    !forceEmptySample && (input.force_analytics_floor === true || autoFloor);
   if (events.length === 0 && forceFloor) {
     events = [
       { evidence_id: 'a1', sale_kind: 'sold', source_type: 'sale', price: 40, currency: 'USD', country: 'US', condition: 'VG+', label: 'Blue Note', format: 'LP', observed_at: '2026-04-01T00:00:00.000Z', authorization_scope: 'authenticated_market' },

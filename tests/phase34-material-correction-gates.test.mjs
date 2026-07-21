@@ -19,6 +19,9 @@ import {
   timingField,
 } from '../scripts/lib/phase34-source-verification-telemetry.mjs';
 
+// Unit-test fixtures intentionally use force_* floors.
+process.env.PHASE34_UNIT_TEST_HOOKS = '1';
+
 const SELLER = 'seller-contract-fixture';
 const THREAD = 'thread-correction-gate';
 

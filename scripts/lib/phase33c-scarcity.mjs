@@ -3,7 +3,11 @@
  */
 import { selectEvidence } from './phase33c-evidence.mjs';
 import { computeConfidenceFactors, decideAbstention } from './phase33c-confidence.mjs';
-import { assertSyntheticSalesAllowed } from './phase34-synthetic-sales-gate.mjs';
+import {
+  assertSyntheticSalesAllowed,
+  assertUnitTestHooksAllowed,
+  unitTestHooksAllowed,
+} from './phase34-synthetic-sales-gate.mjs';
 
 const SCHEMA_VERSION = 'phase33c-scarcity-1';
 
@@ -48,8 +52,9 @@ export function analyzeScarcity(input = {}) {
         /JP|japan/i.test(String(c.pressing_id || c.catalog_number || c.label || '')) ||
         c.pressing_region === 'JP',
     );
-    // Ensure at least one JP comparable so correction is not empty-identical.
-    if (candidates.length === 0) {
+    // Unit-test-only: invent JP comps when the filtered set is empty.
+    // Live path must abstain / honest-limit without fabricated JP sales.
+    if (candidates.length === 0 && unitTestHooksAllowed()) {
       candidates = [
         {
           evidence_id: 'jp-pressing-completed-sale',
@@ -149,8 +154,11 @@ export function analyzeScarcity(input = {}) {
   const noReliable = sold.length === 0 && auctions.filter((a) => a.auction_state === 'completed').length === 0;
   // Asking/active supply alone must never be enough to call something Limited,
   // Scarce, or Rare — that requires completed sales. Callers may pass
-  // `force_success_floor: false` only to intentionally exercise the pre-fix
-  // asking-only path in tests; production callers must never set this.
+  // `force_success_floor: false` only behind unit-test hooks to exercise the
+  // pre-fix asking-only path; production callers must never set this.
+  if (input.force_success_floor === false) {
+    assertUnitTestHooksAllowed('scarcity.force_success_floor');
+  }
   const preferAbstentionOnZeroSold = noReliable && input.force_success_floor !== false;
 
   // Hard rule: zero-result query is NOT proof of scarcity, and neither is

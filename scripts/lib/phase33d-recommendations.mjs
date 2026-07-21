@@ -3,6 +3,10 @@
  * No pay-to-rank. Authorization before ranking.
  */
 import { computeConfidenceFactors } from './phase33c-confidence.mjs';
+import {
+  assertUnitTestHooksAllowed,
+  unitTestHooksAllowed,
+} from './phase34-synthetic-sales-gate.mjs';
 
 const SCHEMA_VERSION = 'phase33d-recommendations-1';
 
@@ -69,10 +73,15 @@ export function analyzeRecommendations(input = {}) {
     negatives.add('Picture Disc');
   }
   let candidatesIn = Array.isArray(input.candidates) ? [...input.candidates] : [];
-  const forceFloor =
-    input.force_recommendation_floor === true ||
-    (candidatesIn.length < 5 &&
-      (Boolean(input.owner_proof_prompt) || Boolean(input.user_intent)));
+  if (input.force_recommendation_floor === true) {
+    assertUnitTestHooksAllowed('recommendations.force_recommendation_floor');
+  }
+  // Auto-floor when owner_proof_prompt/intent + sparse candidates is unit-test only.
+  const autoFloor =
+    candidatesIn.length < 5 &&
+    (Boolean(input.owner_proof_prompt) || Boolean(input.user_intent)) &&
+    unitTestHooksAllowed();
+  const forceFloor = input.force_recommendation_floor === true || autoFloor;
   if (candidatesIn.length < 5 && forceFloor) {
     const seed = [
       ['bn-all-stars-jam', 'Blue Note All-Stars', 'Blue Note Jam', 42, 'Blue Note'],

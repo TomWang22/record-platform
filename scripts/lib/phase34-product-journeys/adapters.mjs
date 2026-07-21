@@ -758,13 +758,23 @@ export class BaseProductJourneyAdapter {
     };
 
     const apiPath = prepared.apiPath;
-    // Attach waiter before navigation/trigger. Do not rethrow in an intermediate
-    // .catch — a timeout during prepare/trigger would become an unhandled
-    // rejection before the later await. Let the await site handle failures.
-    const responsePromise = page.waitForResponse(
-      (res) => res.url().includes(apiPath) && res.request().method() === 'POST',
-      { timeout: 120_000 },
-    );
+    const triggerMode = this.registry.trigger || 'auto';
+    // Soft-catch from creation so a timeout during goto/prepare cannot become an
+    // unhandled rejection and kill the process before the await site runs.
+    // Click / semantic_search waiters are attached after prepare (just before
+    // trigger) so listing-edit 60s+60s waits do not consume the POST budget.
+    let responseWaitError = null;
+    const attachResponseWaiter = () =>
+      page
+        .waitForResponse(
+          (res) => res.url().includes(apiPath) && res.request().method() === 'POST',
+          { timeout: 120_000 },
+        )
+        .catch((err) => {
+          responseWaitError = err;
+          return null;
+        });
+    let responsePromise = triggerMode === 'auto' ? attachResponseWaiter() : null;
 
     const actionStart = Date.now();
     try {
@@ -822,13 +832,16 @@ export class BaseProductJourneyAdapter {
 
       const loadingLocator = page.getByTestId(`${prepared.panelTestId}-loading`);
       let initiatingAction = 'auto_mount_fetch';
-      if ((this.registry.trigger || 'auto') !== 'auto') {
+      if (triggerMode !== 'auto') {
         initiatingAction =
           prepared.runTestId || this.registry.runTestId
             ? `click[data-testid=${prepared.runTestId || this.registry.runTestId}]`
             : this.registry.runButtonName
               ? `click[role=button name=${this.registry.runButtonName}]`
-              : `trigger:${this.registry.trigger}`;
+              : `trigger:${triggerMode}`;
+      }
+      if (!responsePromise) {
+        responsePromise = attachResponseWaiter();
       }
       try {
         await this.triggerLiveAction(page, prepared);
@@ -870,10 +883,9 @@ export class BaseProductJourneyAdapter {
         );
       }
 
-      let response;
-      try {
-        response = await responsePromise;
-      } catch (err) {
+      const response = await responsePromise;
+      if (!response) {
+        const err = responseWaitError || new Error('intelligence POST wait returned null');
         const requestCandidates = await page
           .evaluate(() => {
             const perf = performance.getEntriesByType?.('resource') || [];
@@ -1260,8 +1272,8 @@ export class BaseProductJourneyAdapter {
         },
       };
     } catch (err) {
-      // Prevent unhandled rejection when navigation/trigger fails before the POST.
-      responsePromise.catch(() => null);
+      // Soft-caught waiters already settle; keep belt-and-suspenders for auto path.
+      if (responsePromise) responsePromise.catch(() => null);
       throw err;
     } finally {
       detachListeners();

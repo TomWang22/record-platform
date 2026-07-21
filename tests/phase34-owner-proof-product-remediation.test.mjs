@@ -525,6 +525,18 @@ test('journey adapters collapse sibling disclosures and reject duplicate expande
   assert.match(src, /measurement_status/);
 });
 
+// Click-triggered capabilities (valuation listing-edit) must not start the
+// waitForResponse clock during goto/prepare — that burned the 120s budget and
+// crashed Node via unhandled rejection before Analyze could fire.
+test('journey adapters soft-catch waitForResponse and defer click-trigger waiters', () => {
+  const src = readSrc(path.join(REPO, 'scripts/lib/phase34-product-journeys/adapters.mjs'));
+  assert.match(src, /attachResponseWaiter/);
+  assert.match(src, /responseWaitError/);
+  assert.match(src, /triggerMode === 'auto' \? attachResponseWaiter\(\) : null/);
+  assert.match(src, /if \(!responsePromise\) \{\s*responsePromise = attachResponseWaiter\(\);\s*\}/s);
+  assert.match(src, /\.catch\(\(err\) => \{\s*responseWaitError = err;\s*return null;\s*\}\)/s);
+});
+
 // Theme 27: the auction panel translates risk_flags through customerCopyForCode
 // instead of rendering raw internal codes.
 test('auction-intelligence-panel.tsx renders risk_flags via customerCopyForCode', () => {

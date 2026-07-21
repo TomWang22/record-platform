@@ -52,6 +52,43 @@ export function finalizeCapabilityResponse({
     throw err;
   }
 
+  // Auto-derive sold_count only from included settlement evidence (never pre-eligibility ids).
+  const derivedClaims = [...claims];
+  if (
+    structured_result &&
+    typeof structured_result.sold_count === 'number' &&
+    !derivedClaims.some((c) => c.claim_type === 'sold_count')
+  ) {
+    const snapshotProbe = buildPlatformEvidenceSnapshot({
+      capability,
+      subject,
+      candidates,
+      requestId: request.request_id || null,
+      sessionId: request.session_id || null,
+      turnId: request.turn_id || null,
+      requestedConstraints: request.constraints || {},
+      requireExactPressing,
+      queryPlan: request.query_plan || null,
+      retrievalExecution: retrieval_execution || {},
+      limitations,
+    });
+    const soldEventIds = snapshotProbe.eligibility.included
+      .filter((e) => e.event_type === 'SALE_COMPLETED' || e.sale_kind === 'sold')
+      .map((e) => e.market_event_id || e.evidence_id)
+      .filter(Boolean);
+    if (soldEventIds.length === structured_result.sold_count) {
+      derivedClaims.push({
+        claim_type: 'sold_count',
+        normalized_claim_value: structured_result.sold_count,
+        expected_count: structured_result.sold_count,
+        supporting_snapshot_item_ids: soldEventIds,
+        synthesis_path: 'structured_result.sold_count',
+        material: true,
+      });
+    }
+  }
+
+  // Rebuild snapshot once for the envelope (same inputs → same hash).
   const snapshot = buildPlatformEvidenceSnapshot({
     capability,
     subject,
@@ -65,32 +102,6 @@ export function finalizeCapabilityResponse({
     retrievalExecution: retrieval_execution || {},
     limitations,
   });
-
-  // Auto-derive sold_count claim when structured result provides it.
-  const derivedClaims = [...claims];
-  if (
-    structured_result &&
-    typeof structured_result.sold_count === 'number' &&
-    !derivedClaims.some((c) => c.claim_type === 'sold_count')
-  ) {
-    const soldIds = snapshot.included_event_ids.filter((id, idx) => {
-      const item = snapshot.eligibility.included[idx];
-      return item && (item.event_type === 'SALE_COMPLETED' || item.sale_kind === 'sold');
-    });
-    // Prefer filtering by type from included list
-    const soldEventIds = snapshot.eligibility.included
-      .filter((e) => e.event_type === 'SALE_COMPLETED' || e.sale_kind === 'sold')
-      .map((e) => e.market_event_id || e.evidence_id)
-      .filter(Boolean);
-    derivedClaims.push({
-      claim_type: 'sold_count',
-      normalized_claim_value: structured_result.sold_count,
-      expected_count: structured_result.sold_count,
-      supporting_snapshot_item_ids: soldEventIds.slice(0, structured_result.sold_count),
-      synthesis_path: 'structured_result.sold_count',
-      material: true,
-    });
-  }
 
   const response_id =
     request.response_id ||

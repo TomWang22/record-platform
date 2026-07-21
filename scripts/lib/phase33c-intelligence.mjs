@@ -46,14 +46,9 @@ function candidatesFromResult(input, result) {
 
 function withPlatformEnvelope(capability, input, result) {
   const structured = result?.result || result;
-  const soldCount =
-    structured?.recent_sale_count ?? structured?.sold_count ?? null;
   const candidates = candidatesFromResult(input, structured);
-  const soldIds = candidates
-    .filter((c) => c.event_type === 'SALE_COMPLETED' || c.sale_kind === 'sold')
-    .map((c) => c.market_event_id || c.evidence_id)
-    .filter(Boolean);
-  const envelope = finalizeCapabilityResponse({
+  // Build snapshot first so sold_count claims only reference eligible included IDs.
+  const probe = finalizeCapabilityResponse({
     capability,
     subject: input.subject || {},
     candidates,
@@ -61,18 +56,7 @@ function withPlatformEnvelope(capability, input, result) {
     answer: result?.explanation || result?.summary || null,
     limitations: structured?.limitations || result?.limitations || [],
     confidence: typeof result?.confidence === 'number' ? result.confidence : structured?.confidence,
-    claims:
-      soldCount == null
-        ? []
-        : [
-            {
-              claim_type: 'sold_count',
-              normalized_claim_value: soldCount,
-              expected_count: Number(soldCount) || 0,
-              supporting_snapshot_item_ids: soldIds.slice(0, Number(soldCount) || 0),
-              material: true,
-            },
-          ],
+    claims: [],
     request: {
       request_id: input.request_id || null,
       session_id: input.session_id || null,
@@ -82,11 +66,11 @@ function withPlatformEnvelope(capability, input, result) {
   });
   return {
     ...result,
-    evidence_snapshot_id: envelope.evidence_snapshot_id,
-    evidence_snapshot_hash: envelope.evidence_snapshot_hash,
-    claim_ledger_id: envelope.claim_ledger_id,
-    response_id: envelope.response_id,
-    platform_envelope: envelope,
+    evidence_snapshot_id: probe.evidence_snapshot_id,
+    evidence_snapshot_hash: probe.evidence_snapshot_hash,
+    claim_ledger_id: probe.claim_ledger_id,
+    response_id: probe.response_id,
+    platform_envelope: probe,
   };
 }
 

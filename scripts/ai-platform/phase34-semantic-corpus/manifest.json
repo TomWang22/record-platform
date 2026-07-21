@@ -1,0 +1,20 @@
+{
+  "corpus_version": "phase34-semantic-corpus-v1",
+  "compact_path": "compact-corpus.json",
+  "seed": "phase34-compact-v1",
+  "session_count": 74,
+  "evaluated_turn_count": 190,
+  "min_compact_turns": 80,
+  "min_expanded_turns": 500,
+  "capabilities": [
+    "scarcity",
+    "valuation",
+    "auction_intelligence",
+    "embeddings",
+    "semantic_search",
+    "negotiation_assistance",
+    "recommendations",
+    "market_analytics"
+  ],
+  "expand": "expandCorpus(seed) in scripts/lib/phase34-semantic-corpus.mjs"
+}

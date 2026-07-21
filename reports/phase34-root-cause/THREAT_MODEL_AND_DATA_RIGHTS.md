@@ -62,7 +62,8 @@
 - [ ] Phase C: zero live synthetic floors
 - [ ] Phase D: memory isolation + forget
 - [ ] Phase E: invention guard + confirmed actions
-- [ ] Phase F: semantic corpus
+- [x] Phase F: semantic corpus
+- [ ] Phase G: connector contracts live wiring (stub: `phase34-rights-connectors.mjs`)
 - [ ] Phase G: connector rights contracts enforced at runtime
 
 ## Stop conditions

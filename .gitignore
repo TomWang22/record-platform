@@ -75,6 +75,8 @@ tmp/
 !scripts/ai-platform/phase34-retrieval-corpus-registry.json
 !scripts/ai-platform/phase34-evaluation-corpus-registry.json
 !scripts/ai-platform/phase34-finetuning-corpus-registry.json
+!scripts/ai-platform/phase34-semantic-corpus/
+!scripts/ai-platform/phase34-semantic-corpus/**/*.json
 !scripts/ai-platform/phase34-prompt-registry/
 !scripts/ai-platform/phase34-prompt-registry/**/*.json
 !scripts/ai-platform/retrieval-splits/

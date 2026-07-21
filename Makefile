@@ -536,6 +536,20 @@ ai-platform-verify-phase34-market-data-foundation: ## Rights-aware registry, mar
 	test ! -e owner-review-artifacts/phase34/owner-proof-live-v3
 	node scripts/phase34-market-data-foundation-status.mjs | grep -q 'LIVE OWNER-PROOF RECAPTURE NOT LAUNCHED'
 
+ai-platform-verify-phase34-rights-connectors: ## Phase G rights connectors / license gates / deletion propagation (no live ingest)
+	node scripts/ai-platform/verify-phase34-rights-connectors.mjs
+	node --test tests/phase34-rights-connectors.test.mjs
+	test -f scripts/lib/phase34-rights-connectors.mjs
+	test -f infra/db/53-intelligence-rights-connectors.sql
+	test -f reports/phase34-root-cause/PHASE_G_RIGHTS.md
+	test -f reports/phase34-root-cause/PLATFORM_ACCEPTANCE_READY.md
+
+ai-platform-verify-phase34-semantic-evaluation: ## Phase F semantic evaluation corpus + gates (no screenshots / attempt 7)
+	node scripts/ai-platform/verify-phase34-semantic-evaluation.mjs
+	node --test tests/phase34-semantic-evaluation.test.mjs
+	test -f scripts/lib/phase34-semantic-evaluation.mjs
+	test -f reports/phase34-root-cause/PHASE_F_SEMANTIC_EVAL.md
+
 ai-platform-verify-phase34-owner-proof-output-remediation: ## Matrix + engine remediation unit tests (no live owner-proof)
 	node --test tests/phase34-owner-proof-output-remediation.test.mjs tests/phase34-negotiation-context-depth.test.mjs tests/phase34-material-correction-gates.test.mjs
 	test -f scripts/ai-platform/phase34-owner-proof-remediation-matrix.json

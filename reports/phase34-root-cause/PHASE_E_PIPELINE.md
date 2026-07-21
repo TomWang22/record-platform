@@ -53,4 +53,4 @@ Static keyword reorder is never reported as hybrid.
 2. **No production vector index** — vector/hybrid paths need an injected `vectorSearch` / `vectorIndex.search`; default is honest stub.
 3. **Action tools are in-memory** — audit/idempotency/runtime are local; not yet wired to shopping-service / Postgres.
 4. **Capability engines not auto-invoked** — callers pass `analyze` or `structured_result` / `candidates`; default analyzer only does median/count over snapshot sold rows.
-5. Phase F semantic evaluation is implemented (`PHASE_F_SEMANTIC_EVAL.md`); Phase G real-data posture has a connector-contract stub.
+5. Phase F semantic evaluation is implemented (`PHASE_F_SEMANTIC_EVAL.md`); Phase G real-data posture is implemented (`PHASE_G_RIGHTS.md`).

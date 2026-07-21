@@ -144,6 +144,7 @@ test('A3: sold_at-only / seed / archive candidates are EXCLUDED_UNSETTLED', () =
         payload_hash: 'p1',
         occurred_at: '2026-07-01T00:00:00.000Z',
         price_normalized: 40,
+        rights_status: 'FIRST_PARTY',
       },
     ],
     {},
@@ -248,6 +249,7 @@ test('B5/B6: snapshot + claim ledger required; unsupported claims fail', () => {
         payload_hash: 'h1',
         price_normalized: 39,
         occurred_at: '2026-07-01T00:00:00.000Z',
+        rights_status: 'FIRST_PARTY',
       },
       {
         market_event_id: 'me-2',
@@ -259,6 +261,7 @@ test('B5/B6: snapshot + claim ledger required; unsupported claims fail', () => {
         payload_hash: 'h2',
         price_normalized: 40.75,
         occurred_at: '2026-07-02T00:00:00.000Z',
+        rights_status: 'FIRST_PARTY',
       },
       {
         market_event_id: 'me-3',
@@ -270,6 +273,7 @@ test('B5/B6: snapshot + claim ledger required; unsupported claims fail', () => {
         payload_hash: 'h3',
         price_normalized: 42.5,
         occurred_at: '2026-07-03T00:00:00.000Z',
+        rights_status: 'FIRST_PARTY',
       },
     ],
   });

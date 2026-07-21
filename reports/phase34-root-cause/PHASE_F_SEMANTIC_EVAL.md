@@ -65,7 +65,7 @@ node scripts/ai-platform/verify-phase34-semantic-evaluation.mjs
 2. Corpus dossiers are **fixtures** grounded to pass semantic gates — not live pipeline recapture.
 3. Expansion clones compact turns with stable identity mutation; it does not simulate full live retrieval diversity.
 4. Correction / session-authority gates SKIP when those fields are absent (non-conversational turns).
-5. Phase G rights connectors are stubbed separately; F does not enable Popsike/Gripsweat.
+5. Phase G rights connectors are implemented (`PHASE_G_RIGHTS.md`); F does not enable Popsike/Gripsweat.
 6. No attempt 7 / screenshot pack / owner visual PASS.
 
 ## Gate statement

@@ -63,8 +63,8 @@
 - [ ] Phase D: memory isolation + forget
 - [ ] Phase E: invention guard + confirmed actions
 - [x] Phase F: semantic corpus
-- [ ] Phase G: connector contracts live wiring (stub: `phase34-rights-connectors.mjs`)
-- [ ] Phase G: connector rights contracts enforced at runtime
+- [x] Phase G: connector contracts live wiring (`phase34-rights-connectors.mjs`)
+- [x] Phase G: connector rights contracts enforced at runtime
 
 ## Stop conditions
 

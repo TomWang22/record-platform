@@ -2,8 +2,10 @@
  * Phase E2 — real retrieval interface over separated stores.
  * Modes: exact filters, keyword/BM25-ish, vector stub, hybrid combine+rerank.
  * Honesty: never label static reorder as hybrid when vector is unavailable.
+ * Phase G: deleted / FORBIDDEN / UNLICENSED / disabled connectors filtered out.
  */
 import crypto from 'node:crypto';
+import { filterRetrievalDocsForRights } from './phase34-rights-connectors.mjs';
 
 export const RETRIEVAL_VERSION = 'phase34-retrieval-v1';
 
@@ -221,6 +223,8 @@ export function retrieve({
   limit = 20,
   vectorIndex = null,
   vectorSearch = null,
+  rightsOptions = {},
+  skipRightsFilter = false,
 } = {}) {
   const requested = REQUESTED_MODES.includes(requested_mode) ? requested_mode : 'keyword';
   const names = (store_names && store_names.length ? store_names : STORE_NAMES).filter((n) =>
@@ -229,12 +233,21 @@ export function retrieve({
   const options = { vectorIndex, vectorSearch };
   const perStore = {};
   const allCandidates = [];
+  const rights_exclusions = [];
   let fallback_reason = null;
   let executed_mode = requested;
   let vector_ran = false;
 
   for (const name of names) {
-    const docs = Array.isArray(stores[name]) ? stores[name] : [];
+    const rawDocs = Array.isArray(stores[name]) ? stores[name] : [];
+    let docs = rawDocs;
+    if (!skipRightsFilter) {
+      const filtered = filterRetrievalDocsForRights(rawDocs, rightsOptions);
+      docs = filtered.kept;
+      for (const ex of filtered.excluded) {
+        rights_exclusions.push({ store: name, ...ex });
+      }
+    }
     let results = [];
 
     if (requested === 'exact') {
@@ -314,6 +327,8 @@ export function retrieve({
     per_store_counts: Object.fromEntries(
       names.map((n) => [n, (perStore[n] || []).length]),
     ),
+    rights_exclusions,
+    rights_exclusions_count: rights_exclusions.length,
     retrieval_id: `ret-${crypto.createHash('sha256').update(JSON.stringify({
       requested, executed_mode, candidate_ids, filters,
     })).digest('hex').slice(0, 16)}`,

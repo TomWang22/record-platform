@@ -1,7 +1,13 @@
 /**
- * Shared eligibility + dedupe engine (Phase B4).
+ * Shared eligibility + dedupe engine (Phase B4 + Phase G rights).
  * sold_at / archive / seed / force floors never become INCLUDED sold evidence.
+ * FORBIDDEN/UNLICENSED and disabled connectors are EXCLUDED_RIGHTS.
  */
+import {
+  evaluateRightsEligibility,
+  assertIncludedEventHasRightsClass,
+} from './phase34-rights-connectors.mjs';
+
 export const ELIGIBILITY_DECISIONS = Object.freeze([
   'INCLUDED',
   'EXCLUDED_WRONG_PRESSING',
@@ -46,8 +52,13 @@ export function decideEligibility(event = {}, context = {}) {
   if (event.deletion_status === 'DELETED' || event.event_status === 'DELETED') {
     return { decision: 'EXCLUDED_DELETED', reason_detail: 'deleted' };
   }
-  if (event.rights_status === 'FORBIDDEN' || event.rights_status === 'UNLICENSED') {
-    return { decision: 'EXCLUDED_RIGHTS', reason_detail: String(event.rights_status) };
+
+  const rightsGate = evaluateRightsEligibility(event, context.rightsOptions || {});
+  if (!rightsGate.ok) {
+    return {
+      decision: rightsGate.exclusion_decision || 'EXCLUDED_RIGHTS',
+      reason_detail: rightsGate.reason_detail,
+    };
   }
 
   // A3: unsettled — sold_at-only, archive, seed COMPLETED_SALE, missing settlement.
@@ -114,6 +125,16 @@ export function decideEligibility(event = {}, context = {}) {
 
   if (event.currency_conversion_failure === true) {
     return { decision: 'EXCLUDED_CURRENCY', reason_detail: 'conversion_failed' };
+  }
+
+  // Phase G: every INCLUDED event must carry a rights class.
+  try {
+    assertIncludedEventHasRightsClass(event);
+  } catch (err) {
+    return {
+      decision: 'EXCLUDED_RIGHTS',
+      reason_detail: err.code || err.message || 'missing_rights_class',
+    };
   }
 
   return { decision: 'INCLUDED', reason_detail: null };

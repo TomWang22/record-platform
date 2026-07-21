@@ -1,43 +1,62 @@
 {
-  "generated_at": "2026-07-21T21:42:32Z",
-  "head_sha": "f63aefbe9c800517659e086074d2b956773ab050",
-  "deployment_mode": "compatible_multi_sha",
+  "generated_at": "2026-07-21T23:14:27Z",
+  "head_sha": "8cc231cbacefea5c62f9de26e8075e8e7a5f33fc",
+  "deployment_mode": "exact_sha_pinned",
   "components": [
     {
       "component": "shopping-service",
-      "image": "shopping-service:runtime-int-0b8ada588ff2",
-      "digest": "sha256:73893ed7610a6049c7ecd783a3f2770a4c72800b4cc2735b3e58fa80fd677935",
-      "source_sha": "0b8ada588ff29464196b17b4aedb0f136e10d41c",
-      "configuration_hash": "unknown",
-      "note": "Ancestor of HEAD; shopping sources unchanged in f63aefbe Dockerfile-only commit."
+      "image": "shopping-service:runtime-int-8cc231cbacef",
+      "digest": "sha256:06c8a7e97884546efecf048ab4205c12e6b5d544bcfbc06f35a84cf616f1b4da",
+      "source_sha": "8cc231cbacefea5c62f9de26e8075e8e7a5f33fc",
+      "configuration_hash": "c243e7e63373b421f9d6cd0d41c4a17ad8247fd12fa89a060da0a35fb2c8a117",
+      "schema_migration_compatibility": "56-phase34-runtime-immutability.sql applied (listings@5435)",
+      "PHASE34_RUNTIME_INTEGRATION": "n/a-api-path",
+      "PHASE34_UNIT_TEST_HOOKS": "0",
+      "synthetic_fallback": "0",
+      "kafka_consumer_normalizer": "embedded in shopping-service sale-completed-outbox-drain"
     },
     {
       "component": "python-ai-service",
-      "image": "python-ai-service:runtime-int-f63aefbe9c80",
-      "digest": "sha256:79c397ff352fda75daa7bf482fa3a54d97d726440aef346a3a5fa36dd0c3e2b4",
-      "source_sha": "f63aefbe9c800517659e086074d2b956773ab050",
-      "configuration_hash": "unknown"
+      "image": "python-ai-service:runtime-int-8cc231cbacef",
+      "digest": "sha256:3ad27b9124f13c896a4152191a54432894394e52fa019e07d78070cd0bce0b06",
+      "source_sha": "8cc231cbacefea5c62f9de26e8075e8e7a5f33fc",
+      "configuration_hash": "df440790bf1de816054f7a04e0d3f8d7a603e0c3f6670d8970cb4109dff7c8a4",
+      "schema_migration_compatibility": "56-phase34-runtime-immutability.sql applied (listings@5435)",
+      "PHASE34_RUNTIME_INTEGRATION": "1",
+      "PHASE34_UNIT_TEST_HOOKS": "0",
+      "synthetic_fallback": "0",
+      "retrieval_note": "embedded retrieval worker in python-ai-service",
+      "model_gateway_note": "AI_MODEL_PROVIDER=rule (local); ollama gateway separate"
     },
     {
       "component": "api-gateway",
-      "image": "api-gateway:dev",
-      "digest": "sha256:336f587c16af5040c320cf5b536f8e5c85a23340fb1f9291dc123a51d77a273b",
-      "source_sha": "unknown",
-      "configuration_hash": "unknown"
+      "image": "api-gateway:runtime-int-8cc231cbacef",
+      "digest": "sha256:b98adae86b16300553a3c5f17a5b84724182d177a2879177980c9f4a4410e3a8",
+      "source_sha": "8cc231cbacefea5c62f9de26e8075e8e7a5f33fc",
+      "configuration_hash": "cf06d573a936ffbab6a06db9aabc7881ff56fc4ce551aadafca44aa807b947c1",
+      "schema_migration_compatibility": "56-phase34-runtime-immutability.sql applied (listings@5435)",
+      "PHASE34_RUNTIME_INTEGRATION": "n/a-api-path",
+      "PHASE34_UNIT_TEST_HOOKS": "0",
+      "synthetic_fallback": "0"
     },
     {
       "component": "listings-service",
-      "image": "listings-service:phase34-v5-a7b7ef1f",
-      "digest": "sha256:bd3c8cb74eee9495e003124d3245e3637f14da58fb27988ad42681cb2de27b52",
-      "source_sha": "a7b7ef1f",
-      "configuration_hash": "unknown"
+      "image": "listings-service:runtime-int-8cc231cbacef",
+      "digest": "sha256:f6d732bf04d10cb365671557f57ac69b51577c69990a029e47a2f50638be1d13",
+      "source_sha": "8cc231cbacefea5c62f9de26e8075e8e7a5f33fc",
+      "configuration_hash": "3c187d4e4f718026dcdf0fff6ca4db92bdd0d16d5c1cc0ad51dd3f8eed19a173",
+      "schema_migration_compatibility": "56-phase34-runtime-immutability.sql applied (listings@5435)",
+      "PHASE34_RUNTIME_INTEGRATION": "n/a-api-path",
+      "PHASE34_UNIT_TEST_HOOKS": "0",
+      "synthetic_fallback": "0"
     },
     {
       "component": "webapp",
       "image": "webapp:phase34-recapture-v5-74cde670",
       "digest": "sha256:f9a4098c14356ca2e70d26b9f58656861fc01468eb4527072c792fb9e6eb4eb7",
       "source_sha": "74cde670",
-      "configuration_hash": "unknown"
+      "configuration_hash": "not_required_for_api_only_checkpoint",
+      "note": "API-only checkpoint; webapp not rebuilt for 8cc231cb \u2014 recorded honestly as deployed."
     }
   ]
 }

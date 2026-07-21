@@ -170,13 +170,17 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
             const { listingsPool } = await import('../lib/availability.js')
             const listingsDbResult = await listingsPool.query(
               `UPDATE listings.listings
-               SET stock_quantity = GREATEST(0, COALESCE(stock_quantity, 1) - $1),
-                   sold_at = CASE WHEN COALESCE(stock_quantity, 1) - $1 <= 0 THEN NOW() ELSE sold_at END,
-                   sold_to = CASE WHEN COALESCE(stock_quantity, 1) - $1 <= 0 THEN $2::uuid ELSE sold_to END,
-                   is_active = (COALESCE(stock_quantity, 1) - $1) > 0
-               WHERE id = $3::uuid AND is_active = TRUE AND COALESCE(stock_quantity, 1) >= $1
-               RETURNING id, sold_at`,
-              [qty, userId, item.listing_id]
+               SET lifecycle_status = 'SOLD',
+                   settlement_evidence_eligible = TRUE,
+                   status = CASE
+                     WHEN status::text = 'active' THEN 'closed'::listings.listing_status
+                     ELSE status
+                   END,
+                   updated_at = NOW()
+               WHERE id = $1::uuid
+                 AND COALESCE(lifecycle_status, 'ACTIVE') NOT IN ('ARCHIVED', 'CANCELLED')
+               RETURNING id, NOW() AS sold_at`,
+              [item.listing_id]
             )
 
             if (listingsDbResult.rowCount && listingsDbResult.rowCount > 0) {
@@ -233,8 +237,9 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
                 'create purchase history (checkout)'
               )
 
-              // Phase A: emit SALE_COMPLETED only after full settlement (sold_at set).
-              if (listingsDbResult.rows[0]?.sold_at) {
+              // Phase A: emit SALE_COMPLETED after checkout settlement (payment + order identity).
+              // Gate on successful lifecycle mark, not legacy sold_at/is_active columns.
+              if (listingsDbResult.rows[0]?.id) {
                 try {
                   const purchaseType =
                     (item.metadata as { purchase_type?: string } | null)?.purchase_type ?? 'buy_now'
@@ -248,12 +253,13 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
                     saleMechanism: purchaseType,
                     settlementSource: resolveSettlementSource(purchaseType),
                     title: (item.metadata as { title?: string } | null)?.title ?? null,
-                    completedAt: new Date(listingsDbResult.rows[0].sold_at),
+                    completedAt: new Date(listingsDbResult.rows[0].sold_at || Date.now()),
                   })
                 } catch (saleErr: any) {
                   console.warn('[shopping] SALE_COMPLETED emit skipped:', saleErr?.message)
                 }
               }
+              void qty
 
               purchaseResults.push({
                 purchase_id: purchaseResult.rows[0].id,
@@ -300,6 +306,25 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
               3,
               'create purchase history (fallback)'
             )
+            try {
+              const { listingsPool } = await import('../lib/availability.js')
+              const purchaseType =
+                (item.metadata as { purchase_type?: string } | null)?.purchase_type ?? 'buy_now'
+              await emitSaleCompletedFromCheckout(listingsPool, {
+                listingId: item.listing_id,
+                orderId,
+                purchaseId: purchaseResult.rows[0].id,
+                paymentTransactionId,
+                finalPrice: Number(item.price),
+                currency: 'USD',
+                saleMechanism: purchaseType,
+                settlementSource: resolveSettlementSource(purchaseType),
+                title: (item.metadata as { title?: string } | null)?.title ?? null,
+                completedAt: new Date(),
+              })
+            } catch (saleErr: any) {
+              console.warn('[shopping] SALE_COMPLETED emit after listing failure skipped:', saleErr?.message)
+            }
             purchaseResults.push({
               purchase_id: purchaseResult.rows[0].id,
               item_id: item.item_id,

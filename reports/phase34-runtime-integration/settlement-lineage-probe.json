@@ -1,0 +1,115 @@
+{
+  "probe": "phase34-runtime-settlement-lineage-probe",
+  "generated_at": "2026-07-21T15:35:03.014Z",
+  "base_url": "https://record-platform.test",
+  "production_claimed": false,
+  "steps": [
+    {
+      "step": "login",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "step": "browse_listings",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "step": "cart_add",
+      "status": 201,
+      "ok": true,
+      "body": {
+        "success": true,
+        "cart_item_id": "c83a457d-c245-42df-92fd-2873efa2231e",
+        "message": "Item added to cart"
+      }
+    },
+    {
+      "step": "cart_get",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "step": "checkout",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "success": true,
+        "order": {
+          "id": "6ae1635b-9c56-4175-b9f3-8ae0eed03adc",
+          "order_number": "ORD-2026-750162",
+          "status": "completed",
+          "payment_status": "paid",
+          "payment_transaction_id": "PAY-SIM-1784648105811-iudseoylo",
+          "subtotal": "14.00",
+          "shipping_cost": "10.00",
+          "tax": "1.12",
+          "total": "25.12",
+          "currency": "USD",
+          "created_at": "2026-07-21T15:35:05.787Z",
+          "completed_at": "2026-07-21T15:35:05.812Z",
+          "tracking_number": "TRK-A67H3CQY0R"
+        },
+        "purchases": [
+          {
+            "purchase_id": "d075e8dd-fd34-4188-ac28-bcce2e387dc6",
+            "item_id": "e9c74581-8020-4898-a0cf-8b75aa2c7b98",
+            "listing_id": "e9c74581-8020-4898-a0cf-8b75aa2c7b98",
+            "quantity": 1,
+            "tracking_number": "TRK-A67H3CQY0R",
+            "removed_from_carts": 0,
+            "marked_in_watchlist": 0
+          }
+        ],
+        "message": "Checkout completed successfully"
+      }
+    }
+  ],
+  "ok": false,
+  "blockers": [
+    "MARKET_EVENT_NORMALIZATION_NOT_OBSERVED",
+    "OUTBOX_SALE_COMPLETED_UNPUBLISHED"
+  ],
+  "listing_id": "e9c74581-8020-4898-a0cf-8b75aa2c7b98",
+  "db": {
+    "sale_completed_events": [
+      {
+        "sale_event_id": "sale-a9c072e5724d6c4bac49e50eb8ac",
+        "market_event_id": "me-sale-a9c072e5724d6c4bac49e50eb8ac",
+        "settlement_source": "CHECKOUT_SETTLEMENT",
+        "final_price": "14.00",
+        "payload_hash": "9c67e97dd5b78651fa65d3f5b15a3151403f0afb1c58267e839f7c1858fde1db",
+        "evidence_snapshot_id": "es-5d97d61c9d161bb6",
+        "evidence_snapshot_hash": "5d97d61c9d161bb635088ec131924d6918e78286adb4569cc2a35bc82d82d5fe",
+        "created_at": "2026-07-21T15:35:06.031Z"
+      }
+    ],
+    "outbox_sale_completed": [
+      {
+        "id": "6497312e-a86d-4ff8-ace8-de151e8ff9c4",
+        "type": "SaleCompleted",
+        "published": false,
+        "created_at": "2026-07-21T15:35:06.031Z",
+        "payload_text": "{\"metadata\":{\"event_id\":\"6497312e-a86d-4ff8-ace8-de151e8ff9c4\",\"event_type\":\"SaleCompleted\",\"aggregate_id\":\"e9c74581-8020-4898-a0cf-8b75aa2c7b98\",\"aggregate_type\":\"listing\",\"occurred_at\":\"2026-07-21T15:35:06.068Z\",\"producer\":\"shopping-service\",\"version\":\"1\"},\"payload\":{\"listing_id\":\"e9c74581-8020-4898-a0cf-8b75aa2c7b98\",\"sale_event_id\":\"sale-a9c072e5724d6c4bac49e50eb8ac\",\"event_type\":\"SALE_COMPLETED\",\"source_listing_id\":\"e9c74581-8020-4898-a0cf-8b75aa2c7b98\",\"order_id\":\"6ae1635b-9c56-4175-b9f3-8ae0eed03adc\",\"purchase_id\":\"d075e8dd-fd34-4188-ac28-bcce2e387dc6\",\"payment_transaction_id\":\"PAY-SIM-1784648105811-iudseoylo\",\"settlement_source\":\"CHECKOUT_SETTLEMENT\",\"sale_mechanism\":\"buy_now\",\"completed_at\":\"2026-07-21T15:35:05.959Z\",\"final_price\":14,\"currency\":\"USD\",\"artist\":null,\"title\":null,\"catalog_number\":null,\"media_condition\":null,\"authorization_scope\":\"first_party_settlement\",\"rights_status\":\"FIRST_PARTY\",\"deletion_status\":\"ACTIVE\",\"lifecycle_after\":\"SOLD\",\"market_event_id\":\"me-sale-a9c072e5724d6c4bac49e50eb8ac\",\"sold_at\":\"2026-07-21T15:35:05.959Z\",\"price_normalized\":14,\"currency_normalized\":\"USD\"}}"
+      }
+    ],
+    "listing_lifecycle": {
+      "lifecycle_status": "SOLD",
+      "settlement_evidence_eligible": true,
+      "status": "closed"
+    },
+    "intelligence_market_events": [],
+    "intelligence_market_events_error": null
+  },
+  "lineage": {
+    "initiating_api": "POST /api/cart/checkout",
+    "sale_completed_persisted": true,
+    "outbox_persisted": true,
+    "outbox_published": false,
+    "kafka_normalized_market_event": false,
+    "notes": [
+      "Kafka normalization is only marked true when intelligence.market_events contains a matching row.",
+      "TEST_INTEGRATION_EVENT / integration tenant rows must not be presented as historical market evidence."
+    ]
+  }
+}

@@ -537,6 +537,63 @@ test('journey adapters soft-catch waitForResponse and defer click-trigger waiter
   assert.match(src, /\.catch\(\(err\) => \{\s*responseWaitError = err;\s*return null;\s*\}\)/s);
 });
 
+test('valuation engine applies condition correction and weak-sold honest-limit intents', async () => {
+  const { runCapability } = await import('../scripts/lib/phase33c-intelligence.mjs');
+  const candidates = [39, 41, 43].map((price, i) => ({
+    evidence_id: `e${i}`,
+    source_type: 'sale',
+    sale_kind: 'sold',
+    price,
+    currency: 'USD',
+    freshness_status: 'fresh',
+    observed_at: '2026-05-15T12:00:00.000Z',
+    pressing_id: 'P1',
+    reason_codes: ['EXACT_PRESSING_MATCH', 'AUTHORIZED_MARKET'],
+    authorization_scope: 'authenticated_market',
+  }));
+  const base = {
+    subject: {
+      release_id: 'R1',
+      pressing_id: 'P1',
+      condition: 'VG+',
+      artist: 'Kenny Dorham',
+      title: 'Quiet Kenny',
+      catalog_number: 'BLP 1569',
+    },
+    currency: 'USD',
+    candidates,
+    authorized_scopes: ['authenticated_market'],
+    min_sold_comps: 2,
+  };
+  const success = runCapability('valuation', {
+    ...base,
+    user_intent: 'What is a quick-sale price versus a patient-sale price for this VG+ copy?',
+  });
+  const corr = runCapability('valuation', {
+    ...base,
+    user_intent: 'Sleeve has a seam split; media is closer to VG.',
+  });
+  const weak = runCapability('valuation', {
+    ...base,
+    user_intent: 'Value this with almost no sold comps.',
+  });
+  assert.equal(success.envelope.abstention.abstained, false);
+  assert.equal(corr.envelope.abstention.abstained, false);
+  assert.ok(corr.result.correction_change);
+  assert.notEqual(success.result.fair_value, corr.result.fair_value);
+  assert.equal(weak.envelope.abstention.abstained, true);
+  assert.equal(weak.result.sold_comparable_count, 0);
+});
+
+test('market seed syncs completed-sales file into cluster /tmp paths', () => {
+  const src = readSrc(path.join(REPO, 'scripts/lib/phase34-owner-proof-market-seed.mjs'));
+  assert.match(src, /syncOwnerProofCompletedSalesSeedIntoCluster/);
+  assert.match(src, /\/tmp\/phase34-owner-proof-completed-sales\.live\.json/);
+  assert.match(src, /kubectl/);
+  const api = readSrc(path.join(REPO, 'webapp/app/api/marketplace/completed-sales/route.ts'));
+  assert.match(api, /\/tmp\/phase34-owner-proof-completed-sales\.live\.json/);
+});
+
 // Theme 27: the auction panel translates risk_flags through customerCopyForCode
 // instead of rendering raw internal codes.
 test('auction-intelligence-panel.tsx renders risk_flags via customerCopyForCode', () => {

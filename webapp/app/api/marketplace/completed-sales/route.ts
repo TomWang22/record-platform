@@ -9,7 +9,9 @@ function seedCandidatePaths(): string[] {
   const explicit = process.env.PHASE34_COMPLETED_SALES_SEED_PATH
   return [
     ...(explicit ? [path.resolve(cwd, explicit)] : []),
+    '/tmp/phase34-owner-proof-completed-sales.live.json',
     path.join(cwd, '.data', 'phase34-owner-proof-completed-sales.live.json'),
+    path.join(cwd, 'webapp', '.data', 'phase34-owner-proof-completed-sales.live.json'),
     path.join(cwd, 'scripts', 'ai-platform', 'phase34-owner-proof-completed-sales.live.json'),
     path.join(cwd, '..', 'scripts', 'ai-platform', 'phase34-owner-proof-completed-sales.live.json'),
     path.join(cwd, '..', 'webapp', '.data', 'phase34-owner-proof-completed-sales.live.json'),

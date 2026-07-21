@@ -16,6 +16,7 @@
 import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loginContractUser } from './phase34-product-live-subjects.mjs';
 import { normalizeMarketEvent } from './phase34-market-event-normalization.mjs';
@@ -393,6 +394,79 @@ function persistCompletedSalesSeed(events) {
 }
 
 /**
+ * Host-written seed files are invisible to containerized webapp / python-ai
+ * unless copied in. Without this, valuation gathers 0 sold comps and success
+ * collapses into the same abstention shell as the weak scenario.
+ */
+export function syncOwnerProofCompletedSalesSeedIntoCluster(seedPath = OWNER_PROOF_COMPLETED_SALES_SEED_PATH) {
+  if (!fs.existsSync(seedPath)) {
+    return { synced: false, reason: 'seed_missing', targets: [] };
+  }
+  const ns = process.env.RECORD_PLATFORM_NAMESPACE || 'record-platform';
+  const targets = [
+    {
+      deploy: 'webapp',
+      remotePaths: ['/tmp/phase34-owner-proof-completed-sales.live.json'],
+    },
+    {
+      deploy: 'python-ai-service',
+      remotePaths: ['/tmp/phase34-owner-proof-completed-sales.live.json'],
+    },
+  ];
+  const results = [];
+  for (const target of targets) {
+    const podProc = spawnSync(
+      'kubectl',
+      [
+        '-n',
+        ns,
+        'get',
+        'pods',
+        '-l',
+        `app=${target.deploy}`,
+        '-o',
+        'jsonpath={.items[0].metadata.name}',
+      ],
+      { encoding: 'utf8' },
+    );
+    const podName = String(podProc.stdout || '').trim();
+    if (!podName) {
+      results.push({
+        deploy: target.deploy,
+        remote: target.remotePaths[0],
+        mkdir_ok: false,
+        copy_ok: false,
+        stderr: podProc.stderr || 'pod_not_found',
+      });
+      continue;
+    }
+    for (const remote of target.remotePaths) {
+      const remoteDir = path.posix.dirname(remote);
+      const mkdir = spawnSync(
+        'kubectl',
+        ['-n', ns, 'exec', podName, '--', 'mkdir', '-p', remoteDir],
+        { encoding: 'utf8' },
+      );
+      const copied = spawnSync(
+        'kubectl',
+        ['-n', ns, 'cp', seedPath, `${ns}/${podName}:${remote}`],
+        { encoding: 'utf8' },
+      );
+      results.push({
+        deploy: target.deploy,
+        pod: podName,
+        remote,
+        mkdir_ok: mkdir.status === 0,
+        copy_ok: copied.status === 0,
+        stderr: String(copied.stderr || mkdir.stderr || '').slice(0, 400),
+      });
+    }
+  }
+  const synced = results.length > 0 && results.every((r) => r.copy_ok);
+  return { synced, reason: synced ? 'ok' : 'partial_or_failed', targets: results };
+}
+
+/**
  * Ensure market rows exist for Miles scarcity + Kenny valuation floors.
  */
 export async function ensureOwnerProofMarketEvidence({
@@ -516,6 +590,7 @@ export async function ensureOwnerProofMarketEvidence({
   }
 
   const seedPaths = persistCompletedSalesSeed(soldEvidenceEvents);
+  const clusterSeedSync = syncOwnerProofCompletedSalesSeedIntoCluster(seedPaths.primary);
   const sold_seed_method = 'normalized_completed_sale_events';
 
   // Ensure seller has at least one editable Kenny listing for /listings/[id]/edit.
@@ -577,6 +652,7 @@ export async function ensureOwnerProofMarketEvidence({
     ),
     sold_seed_method,
     sold_seed_paths: seedPaths,
+    sold_seed_cluster_sync: clusterSeedSync,
     sold_evidence_events: soldEvidenceEvents,
     sold_observation_count: {
       scarcity: soldEvidenceEvents.filter((e) => e.artist === 'Miles Davis').length,

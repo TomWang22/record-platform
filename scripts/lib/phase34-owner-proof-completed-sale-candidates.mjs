@@ -13,6 +13,7 @@ function seedCandidatePaths() {
   const explicit = process.env.PHASE34_COMPLETED_SALES_SEED_PATH;
   return [
     ...(explicit ? [path.resolve(explicit)] : []),
+    '/tmp/phase34-owner-proof-completed-sales.live.json',
     path.join(REPO_ROOT, 'scripts/ai-platform/phase34-owner-proof-completed-sales.live.json'),
     path.join(REPO_ROOT, 'webapp/.data/phase34-owner-proof-completed-sales.live.json'),
   ];

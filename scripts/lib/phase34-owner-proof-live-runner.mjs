@@ -790,10 +790,12 @@ function pickRecaptureUpload20(
     return null;
   };
   const pickTerminal = (scenarioId) => {
-    const rows = materialRows(byScenario.get(scenarioId) || []);
+    const rows = materialRows(byScenario.get(scenarioId) || []).filter(
+      (r) => !/before_action/i.test(String(r.state || r.capture_state || r.capture_phase || '')),
+    );
     if (!rows.length) return null;
     const term = rows.find((r) =>
-      /ready|terminal|completed|result|success|correction|abstention/i.test(
+      /ready|terminal|completed|result|success|correction|abstention|weak_data|final/i.test(
         String(r.state || r.capture_state || r.label || ''),
       ),
     );

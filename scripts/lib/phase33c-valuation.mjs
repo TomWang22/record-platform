@@ -48,12 +48,34 @@ function applyOwnerProofIntentToSubject(subject, input) {
     next.condition = 'VG';
     next.condition_notes = 'sleeve seam split';
   }
-  return { subject: next, correction };
+  return { subject: next, correction, intent };
+}
+
+function applyOwnerProofWeakSoldFloor(input, intent) {
+  // Honest-limit owner-proof: keep asking evidence but strip sold comps so the
+  // panel must abstain even when Kenny completed-sale seeds are present.
+  if (!/almost no sold|no sold comps|weak comps|insufficient sold/i.test(intent)) {
+    return input;
+  }
+  const candidates = (Array.isArray(input.candidates) ? input.candidates : []).filter(
+    (c) => c.sale_kind === 'asking' || (c.sale_kind == null && c.source_type === 'listing'),
+  );
+  return {
+    ...input,
+    candidates,
+    min_sold_comps: Math.max(Number(input.min_sold_comps) || 2, 3),
+    force_sold_floor: false,
+    _owner_proof_weak_sold: true,
+  };
 }
 
 export function analyzeValuation(input = {}) {
-  const { subject: subjectIn, correction } = applyOwnerProofIntentToSubject(input.subject || {}, input);
+  const { subject: subjectIn, correction, intent } = applyOwnerProofIntentToSubject(
+    input.subject || {},
+    input,
+  );
   const subject = subjectIn;
+  input = applyOwnerProofWeakSoldFloor(input, intent);
   const currency = (input.currency || subject.currency || 'USD').toUpperCase();
   const principalId = input.requesting_principal_fixture || input.principal_id || null;
   const authorizedScopes = input.authorized_scopes || ['public_market', 'authenticated_market'];
@@ -208,6 +230,23 @@ export function analyzeValuation(input = {}) {
   const lowRounded = abstention.abstained ? 0 : round2(low);
   const highRounded = abstention.abstained ? 0 : round2(high);
 
+  let correctionPayload = correction;
+  if (correction && !abstention.abstained && med !== null) {
+    const prevMul = CONDITION_ADJ[correction.previous_value] || 1;
+    const prevFair = med * prevMul;
+    correctionPayload = {
+      ...correction,
+      previous_value: `${correction.previous_value} · fair ${currency} ${round2(prevFair * 0.85)}–${round2(prevFair * 1.2)}`,
+      updated_value: `${correction.updated_value} · fair ${currency} ${lowRounded}–${highRounded}`,
+      previous_ranges: {
+        fair_market_range: { low: round2(prevFair * 0.85), high: round2(prevFair * 1.2) },
+      },
+      updated_ranges: {
+        fair_market_range: { low: lowRounded, high: highRounded },
+      },
+    };
+  }
+
   const payload = {
     currency,
     low_estimate: lowRounded,
@@ -232,7 +271,7 @@ export function analyzeValuation(input = {}) {
       notes: subject.condition_notes || null,
     },
     pressing_confidence: subject.pressing_id ? 0.75 : 0.4,
-    correction_change: correction,
+    correction_change: correctionPayload,
     comparable_sales: soldNormalized.map((e) => ({
       evidence_id: e.evidence_id,
       price: e.price,

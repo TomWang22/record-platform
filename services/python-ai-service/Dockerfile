@@ -57,6 +57,12 @@ RUN python -m grpc_tools.protoc \
 # Copy the app from monorepo path (build from repo root)
 COPY services/python-ai-service/app /app/app
 
+# ---------- node deps (pg for Phase 34 evidence persistence) ----------
+FROM node:20-bookworm-slim AS node-deps
+WORKDIR /deps
+RUN npm init -y >/dev/null 2>&1 \
+ && npm install --omit=dev pg@8.12.0
+
 # ---------- runtime ----------
 FROM python:3.11-slim
 ARG RP_SOURCE_SHA=unknown
@@ -88,6 +94,7 @@ RUN chmod 755 /usr/local/bin/grpc-health-probe \
 
 # Phase 33C–E deterministic engines shell out to Node runners (fail-closed if absent).
 COPY --from=node:20-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-deps --chown=python:python /deps/node_modules /app/node_modules
 COPY scripts/ai-platform/run-phase33c-capability.mjs \
      scripts/ai-platform/run-phase33d-capability.mjs \
      scripts/ai-platform/run-phase33e-capability.mjs \
@@ -99,16 +106,17 @@ COPY scripts/lib/phase33a-intelligence-capability-contracts.mjs \
      scripts/lib/phase33c-intelligence.mjs \
      scripts/lib/phase33c-scarcity.mjs \
      scripts/lib/phase33c-valuation.mjs \
+     scripts/lib/phase33c-verify.mjs \
      scripts/lib/phase33d-intelligence.mjs \
      scripts/lib/phase33d-negotiation.mjs \
      scripts/lib/phase33d-recommendations.mjs \
      scripts/lib/phase33e-analytics.mjs \
      scripts/lib/phase33e-intelligence.mjs \
      scripts/lib/phase33e-memory.mjs \
-     scripts/lib/phase34-negotiation-context.mjs \
-     scripts/lib/phase34-owner-proof-completed-sale-candidates.mjs \
      /app/scripts/lib/
-RUN chown -R python:python /app/scripts \
+# Full Phase 34 library surface for runtime evidence/eligibility/claim path.
+COPY scripts/lib/phase34-*.mjs /app/scripts/lib/
+RUN chown -R python:python /app/scripts /app/node_modules \
  && node --version >/dev/null
 
 # Remove unnecessary files (cache only - keep .dist-info for package metadata)

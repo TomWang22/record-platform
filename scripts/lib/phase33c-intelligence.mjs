@@ -11,6 +11,7 @@ import {
   PRIVATE_FIELD_PATTERNS,
 } from './phase33a-intelligence-capability-contracts.mjs';
 import { mergeOwnerProofCompletedSaleCandidates } from './phase34-owner-proof-completed-sale-candidates.mjs';
+import { finalizeCapabilityResponse } from './phase34-capability-response.mjs';
 
 export const PROMPT_TEMPLATES = {
   scarcity: { id: 'scarcity-explain', version: '1', role: 'summarize_only' },
@@ -18,14 +19,93 @@ export const PROMPT_TEMPLATES = {
   auction_intelligence: { id: 'auction-explain', version: '1', role: 'summarize_only' },
 };
 
+function candidatesFromResult(input, result) {
+  const fromInput = Array.isArray(input.candidates) ? input.candidates : [];
+  const fromEvidence = Array.isArray(result?.evidence)
+    ? result.evidence.map((e, i) => ({
+        ...e,
+        market_event_id: e.market_event_id || e.evidence_id || `ev-${i}`,
+        evidence_id: e.evidence_id || e.market_event_id || `ev-${i}`,
+        event_type:
+          e.event_type ||
+          (e.sale_kind === 'sold' || e.source_type === 'sale' ? 'SALE_COMPLETED' : 'LISTING_CREATED'),
+        source_class:
+          e.source_class ||
+          (e.sale_kind === 'sold' || e.source_type === 'sale'
+            ? 'FIRST_PARTY_SETTLEMENT'
+            : 'FIRST_PARTY_LISTING'),
+        settlement_evidence_eligible:
+          e.settlement_evidence_eligible ??
+          (e.sale_kind === 'sold' || e.source_type === 'sale' ? true : undefined),
+        payload_hash: e.payload_hash || e.evidence_id || `ph-${i}`,
+        occurred_at: e.observed_at || e.sold_at || null,
+      }))
+    : [];
+  return fromEvidence.length ? fromEvidence : fromInput;
+}
+
+function withPlatformEnvelope(capability, input, result) {
+  const structured = result?.result || result;
+  const soldCount =
+    structured?.recent_sale_count ?? structured?.sold_count ?? null;
+  const candidates = candidatesFromResult(input, structured);
+  const soldIds = candidates
+    .filter((c) => c.event_type === 'SALE_COMPLETED' || c.sale_kind === 'sold')
+    .map((c) => c.market_event_id || c.evidence_id)
+    .filter(Boolean);
+  const envelope = finalizeCapabilityResponse({
+    capability,
+    subject: input.subject || {},
+    candidates,
+    structured_result: structured,
+    answer: result?.explanation || result?.summary || null,
+    limitations: structured?.limitations || result?.limitations || [],
+    confidence: typeof result?.confidence === 'number' ? result.confidence : structured?.confidence,
+    claims:
+      soldCount == null
+        ? []
+        : [
+            {
+              claim_type: 'sold_count',
+              normalized_claim_value: soldCount,
+              expected_count: Number(soldCount) || 0,
+              supporting_snapshot_item_ids: soldIds.slice(0, Number(soldCount) || 0),
+              material: true,
+            },
+          ],
+    request: {
+      request_id: input.request_id || null,
+      session_id: input.session_id || null,
+      constraints: input.constraints || {},
+    },
+    requireExactPressing: Boolean(input.subject?.pressing_id),
+  });
+  return {
+    ...result,
+    evidence_snapshot_id: envelope.evidence_snapshot_id,
+    evidence_snapshot_hash: envelope.evidence_snapshot_hash,
+    claim_ledger_id: envelope.claim_ledger_id,
+    response_id: envelope.response_id,
+    platform_envelope: envelope,
+  };
+}
+
 export function runCapability(capability, input = {}) {
   switch (capability) {
     case 'scarcity':
-      return analyzeScarcity(mergeOwnerProofCompletedSaleCandidates(input));
+      return withPlatformEnvelope(
+        'scarcity',
+        input,
+        analyzeScarcity(mergeOwnerProofCompletedSaleCandidates(input)),
+      );
     case 'valuation':
-      return analyzeValuation(mergeOwnerProofCompletedSaleCandidates(input));
+      return withPlatformEnvelope(
+        'valuation',
+        input,
+        analyzeValuation(mergeOwnerProofCompletedSaleCandidates(input)),
+      );
     case 'auction_intelligence':
-      return analyzeAuction(input);
+      return withPlatformEnvelope('auction_intelligence', input, analyzeAuction(input));
     default: {
       const _exhaustive = capability;
       throw new Error(`unknown_capability:${_exhaustive}`);

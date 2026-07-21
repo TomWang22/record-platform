@@ -1,30 +1,8 @@
 {
   "generated_at": "2026-07-21T21:42:32Z",
-  "evidence_root": "/tmp/phase34-runtime-data-to-answer-integration-v1",
   "head_sha": "f63aefbe9c800517659e086074d2b956773ab050",
-  "origin_main_sha": "f63aefbe9c800517659e086074d2b956773ab050",
-  "worktree_clean": true,
-  "sha_discrepancy_resolution": {
-    "resolved": true,
-    "outbox_publisher_commit": "8e31744d7e9068d056b1f7f634037afe0ccbc405",
-    "outbox_harden_and_live_eligibility_commit": "0b8ada588ff29464196b17b4aedb0f136e10d41c",
-    "python_ai_image_modules_commit": "f63aefbe9c800517659e086074d2b956773ab050",
-    "checkout_sale_completed_persist_commit": "b2ee0ce3601119afba4ed535dd6d2825a5965e64",
-    "canonical_market_event_consumer_note": "In-process normalizer in shopping-service sale-completed-outbox-drain (landed 8e31744d, hardened 0b8ada58).",
-    "do_not_treat_b2ee0ce_ci_as_evidence_for_later_shas": true,
-    "note": "b2ee0ce was checkout persistence only; Kafka outbox drain is 8e31744d+; current HEAD embeds python-ai Phase 34 modules."
-  },
-  "exact_sha_ci": "BLOCKED",
-  "exact_sha_ci_detail": {
-    "status": "BLOCKED",
-    "violations": null,
-    "approval_path": "/tmp/phase32h-prelaunch-approvals/f63aefbe9c800517659e086074d2b956773ab050.json",
-    "note": "Dockerfile-only SHA; ci/coverage failure + missing Protocol validation \u2014 not exact-SHA GREEN."
-  },
-  "approval_path": "/tmp/phase32h-prelaunch-approvals/f63aefbe9c800517659e086074d2b956773ab050.json",
-  "approval_sha256": "0852a14dc41e58f27f1eafb5a2f1aeeda030ec037edc4d603cbcf836499d46ec",
   "deployment_mode": "compatible_multi_sha",
-  "deployed_components": [
+  "components": [
     {
       "component": "shopping-service",
       "image": "shopping-service:runtime-int-0b8ada588ff2",

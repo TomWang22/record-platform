@@ -1,0 +1,61 @@
+{
+  "ok": true,
+  "environment": "isolated_integration",
+  "database": "listings",
+  "host": "127.0.0.1",
+  "port": 5435,
+  "production_application_claimed": false,
+  "source_sha_at_capture": "de398501e7566780869bf9802c8074989a3f2c0b",
+  "tests": [
+    {
+      "test": "sale_completed_update_forbidden",
+      "ok": true,
+      "detail": "ERROR:  SALE_COMPLETED_APPEND_ONLY: UPDATE on listings.sale_completed_events is forbidden\nCONTEXT:  PL/pgSQL function listings.deny_sale_completed_mutation() line 3 at RAISE\n"
+    },
+    {
+      "test": "sale_completed_delete_forbidden",
+      "ok": true,
+      "detail": "ERROR:  SALE_COMPLETED_APPEND_ONLY: DELETE on listings.sale_completed_events is forbidden\nCONTEXT:  PL/pgSQL function listings.deny_sale_completed_mutation() line 3 at RAISE\n"
+    },
+    {
+      "test": "record_readwrite_cannot_update_or_delete_sale_completed",
+      "ok": true,
+      "detail": "f|f|t\n"
+    },
+    {
+      "test": "archive_or_lifecycle_alone_not_settlement_eligible",
+      "ok": true,
+      "detail": "ARCHIVED|false\n"
+    },
+    {
+      "test": "refund_creates_followup_not_mutation",
+      "ok": true,
+      "detail": "19.99|SALE_REFUNDED\n"
+    },
+    {
+      "test": "duplicate_settlement_delivery_rejected",
+      "ok": true,
+      "detail": "ERROR:  duplicate key value violates unique constraint \"uq_sale_completed_settlement_payment\"\nDETAIL:  Key (settlement_source, payment_transaction_id)=(CHECKOUT_SETTLEMENT, pay-331016b4-3e00-446b-9bb0-3619ed48a1fc) already exists.\n"
+    },
+    {
+      "test": "rollback_leaves_neither_sale_nor_outbox",
+      "ok": true,
+      "detail": "BEGIN\nINSERT 0 1\nINSERT 0 1\nROLLBACK\n0\n0\n"
+    },
+    {
+      "test": "commit_persists_sale_and_outbox_together",
+      "ok": true,
+      "detail": "BEGIN\nINSERT 0 1\nINSERT 0 1\nCOMMIT\n1\n1\n"
+    },
+    {
+      "test": "sale_followup_update_forbidden_or_blocked",
+      "ok": true,
+      "detail": "ERROR:  SALE_FOLLOWUP_APPEND_ONLY: UPDATE on listings.sale_followup_events is forbidden\nCONTEXT:  PL/pgSQL function listings.deny_sale_followup_mutation() line 3 at RAISE\n"
+    }
+  ],
+  "generated_at": "2026-07-21T15:13:33.799322+00:00",
+  "notes": [
+    "Direct SQL used for DB contract probes only; API settlement lineage is a separate runtime step.",
+    "outbox payload is bytea; probes used convert_to/convert_from UTF8 JSON."
+  ]
+}

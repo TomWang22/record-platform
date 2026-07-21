@@ -1,0 +1,397 @@
+{
+  "ok": true,
+  "environment": "isolated_integration",
+  "production_application_claimed": false,
+  "source_sha_at_capture": "de398501e7566780869bf9802c8074989a3f2c0b",
+  "roles_bootstrapped": [
+    "record_owner",
+    "record_readwrite",
+    "record_readonly"
+  ],
+  "roles_bootstrap_note": "Created via infra/db/11-db-roles.sql pattern when missing before GRANT statements",
+  "migration_49_adaptation": "Backfill made sold_at-optional for dumps lacking sold_at column",
+  "migrations": [
+    {
+      "migration_file": "49-listings-sale-completed-lifecycle.sql",
+      "migration_version": "49",
+      "status": "OK",
+      "checksum_sha256": "2e1ec6252657330d4b238608bebfedaa0fbd8861df3e148a6656a81a25bc0288",
+      "applied_at_utc": "2026-07-21T15:10:43Z",
+      "finished_at_utc": "2026-07-21T15:10:46Z",
+      "database": "listings",
+      "host": "127.0.0.1",
+      "port": 5435,
+      "not_production": true
+    },
+    {
+      "migration_file": "50-listings-sale-completed-hardening.sql",
+      "migration_version": "50",
+      "status": "OK",
+      "checksum_sha256": "d92e5c45c5f505e383248be04b2adecc9ba8b89c11c422f328948ca947a5f31a",
+      "applied_at_utc": "2026-07-21T15:10:46Z",
+      "finished_at_utc": "2026-07-21T15:10:46Z",
+      "database": "listings",
+      "host": "127.0.0.1",
+      "port": 5435,
+      "not_production": true
+    },
+    {
+      "migration_file": "51-intelligence-evidence-platform.sql",
+      "migration_version": "51",
+      "status": "OK",
+      "checksum_sha256": "dd7383051e23fdcf8854d4e2780067005340a54d349321299835ad4fac684f51",
+      "applied_at_utc": "2026-07-21T15:10:46Z",
+      "finished_at_utc": "2026-07-21T15:10:47Z",
+      "database": "listings",
+      "host": "127.0.0.1",
+      "port": 5435,
+      "not_production": true
+    },
+    {
+      "migration_file": "52-intelligence-conversation-memory.sql",
+      "migration_version": "52",
+      "status": "OK",
+      "checksum_sha256": "90196248aff094449e251567885247a64ee342f1f3f22ae29f9703c200fde83e",
+      "applied_at_utc": "2026-07-21T15:10:47Z",
+      "finished_at_utc": "2026-07-21T15:10:47Z",
+      "database": "listings",
+      "host": "127.0.0.1",
+      "port": 5435,
+      "not_production": true
+    },
+    {
+      "migration_file": "53-intelligence-rights-connectors.sql",
+      "migration_version": "53",
+      "status": "OK",
+      "checksum_sha256": "4b0cf779bbf0f1e15ccdb39d62d23354d0ba37bf20466e5fb4da7f5c6b06de81",
+      "applied_at_utc": "2026-07-21T15:10:47Z",
+      "finished_at_utc": "2026-07-21T15:10:47Z",
+      "database": "listings",
+      "host": "127.0.0.1",
+      "port": 5435,
+      "not_production": true
+    }
+  ],
+  "schema_object_counts": [
+    {
+      "schema": "intelligence",
+      "relkind": "S",
+      "count": 3
+    },
+    {
+      "schema": "intelligence",
+      "relkind": "i",
+      "count": 51
+    },
+    {
+      "schema": "intelligence",
+      "relkind": "r",
+      "count": 24
+    },
+    {
+      "schema": "listings",
+      "relkind": "S",
+      "count": 1
+    },
+    {
+      "schema": "listings",
+      "relkind": "i",
+      "count": 81
+    },
+    {
+      "schema": "listings",
+      "relkind": "r",
+      "count": 22
+    }
+  ],
+  "append_only_triggers": [
+    {
+      "table": "action_confirmations",
+      "trigger": "trg_action_confirmations_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "action_confirmations",
+      "trigger": "trg_action_confirmations_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "claim_ledger_entries",
+      "trigger": "trg_claim_ledger_entries_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "claim_ledger_entries",
+      "trigger": "trg_claim_ledger_entries_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "claim_ledgers",
+      "trigger": "trg_claim_ledgers_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "claim_ledgers",
+      "trigger": "trg_claim_ledgers_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "conversation_responses",
+      "trigger": "trg_conversation_responses_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "conversation_responses",
+      "trigger": "trg_conversation_responses_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "evidence_snapshot_exclusions",
+      "trigger": "trg_evidence_snapshot_exclusions_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "evidence_snapshot_exclusions",
+      "trigger": "trg_evidence_snapshot_exclusions_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "evidence_snapshot_items",
+      "trigger": "trg_evidence_snapshot_items_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "evidence_snapshot_items",
+      "trigger": "trg_evidence_snapshot_items_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "evidence_snapshot_queries",
+      "trigger": "trg_evidence_snapshot_queries_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "evidence_snapshot_queries",
+      "trigger": "trg_evidence_snapshot_queries_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "evidence_snapshot_subjects",
+      "trigger": "trg_evidence_snapshot_subjects_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "evidence_snapshot_subjects",
+      "trigger": "trg_evidence_snapshot_subjects_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "evidence_snapshots",
+      "trigger": "trg_evidence_snapshots_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "evidence_snapshots",
+      "trigger": "trg_evidence_snapshots_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "fact_revisions",
+      "trigger": "trg_fact_revisions_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "fact_revisions",
+      "trigger": "trg_fact_revisions_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "license_grants",
+      "trigger": "trg_deny_license_grant_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "license_grants",
+      "trigger": "trg_deny_license_grant_update",
+      "enabled": "O"
+    },
+    {
+      "table": "market_events",
+      "trigger": "trg_market_events_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "market_events",
+      "trigger": "trg_market_events_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "raw_observations",
+      "trigger": "trg_raw_observations_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "raw_observations",
+      "trigger": "trg_raw_observations_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "response_envelopes",
+      "trigger": "trg_response_envelopes_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "response_envelopes",
+      "trigger": "trg_response_envelopes_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "retrieval_checkpoints",
+      "trigger": "trg_retrieval_checkpoints_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "retrieval_checkpoints",
+      "trigger": "trg_retrieval_checkpoints_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "sale_completed_events",
+      "trigger": "trg_sale_completed_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "sale_completed_events",
+      "trigger": "trg_sale_completed_deny_update",
+      "enabled": "O"
+    },
+    {
+      "table": "sale_followup_events",
+      "trigger": "trg_sale_followup_deny_delete",
+      "enabled": "O"
+    },
+    {
+      "table": "sale_followup_events",
+      "trigger": "trg_sale_followup_deny_update",
+      "enabled": "O"
+    }
+  ],
+  "service_role_permissions_sample": [
+    {
+      "grantee": "postgres",
+      "table_schema": "intelligence",
+      "table_name": "connector_contracts",
+      "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "grantee": "record_readonly",
+      "table_schema": "intelligence",
+      "table_name": "connector_contracts",
+      "privileges": "SELECT"
+    },
+    {
+      "grantee": "record_readwrite",
+      "table_schema": "intelligence",
+      "table_name": "connector_contracts",
+      "privileges": "INSERT,SELECT,UPDATE"
+    },
+    {
+      "grantee": "postgres",
+      "table_schema": "intelligence",
+      "table_name": "evidence_snapshots",
+      "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "grantee": "record_readonly",
+      "table_schema": "intelligence",
+      "table_name": "evidence_snapshots",
+      "privileges": "SELECT"
+    },
+    {
+      "grantee": "record_readwrite",
+      "table_schema": "intelligence",
+      "table_name": "evidence_snapshots",
+      "privileges": "INSERT,SELECT"
+    },
+    {
+      "grantee": "postgres",
+      "table_schema": "intelligence",
+      "table_name": "license_grants",
+      "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "grantee": "record_readonly",
+      "table_schema": "intelligence",
+      "table_name": "license_grants",
+      "privileges": "SELECT"
+    },
+    {
+      "grantee": "record_readwrite",
+      "table_schema": "intelligence",
+      "table_name": "license_grants",
+      "privileges": "INSERT,SELECT"
+    },
+    {
+      "grantee": "postgres",
+      "table_schema": "intelligence",
+      "table_name": "market_events",
+      "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "grantee": "record_readonly",
+      "table_schema": "intelligence",
+      "table_name": "market_events",
+      "privileges": "SELECT"
+    },
+    {
+      "grantee": "record_readwrite",
+      "table_schema": "intelligence",
+      "table_name": "market_events",
+      "privileges": "INSERT,SELECT"
+    },
+    {
+      "grantee": "postgres",
+      "table_schema": "listings",
+      "table_name": "outbox_events",
+      "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "grantee": "postgres",
+      "table_schema": "listings",
+      "table_name": "sale_completed_events",
+      "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "grantee": "record_readonly",
+      "table_schema": "listings",
+      "table_name": "sale_completed_events",
+      "privileges": "SELECT"
+    },
+    {
+      "grantee": "record_readwrite",
+      "table_schema": "listings",
+      "table_name": "sale_completed_events",
+      "privileges": "INSERT,SELECT"
+    },
+    {
+      "grantee": "postgres",
+      "table_schema": "listings",
+      "table_name": "sale_followup_events",
+      "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "grantee": "record_readonly",
+      "table_schema": "listings",
+      "table_name": "sale_followup_events",
+      "privileges": "SELECT"
+    },
+    {
+      "grantee": "record_readwrite",
+      "table_schema": "listings",
+      "table_name": "sale_followup_events",
+      "privileges": "INSERT,SELECT"
+    }
+  ],
+  "outbox_table": "listings.outbox_events",
+  "generated_at": "2026-07-21T15:12:50.943605+00:00"
+}

@@ -36,17 +36,42 @@ BEGIN
   END IF;
 END $$;
 
--- Backfill from legacy status / sold_at (never treat archived as sold).
-UPDATE listings.listings
-SET lifecycle_status = CASE
-  WHEN sold_at IS NOT NULL THEN 'SOLD'
-  WHEN status::text IN ('paused', 'archived') THEN 'ARCHIVED'
-  WHEN status::text = 'closed' AND sold_at IS NULL THEN 'ENDED_UNSOLD'
-  WHEN status::text = 'flagged' THEN 'ACTIVE'
-  ELSE 'ACTIVE'
-END
-WHERE lifecycle_status = 'ACTIVE'
-  OR lifecycle_status IS NULL;
+-- Backfill from legacy status / sold_at when present (never treat archived as sold).
+-- Some integration dumps omit sold_at; detect columns before referencing them.
+DO $$
+DECLARE
+  has_sold_at BOOLEAN;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'listings' AND table_name = 'listings' AND column_name = 'sold_at'
+  ) INTO has_sold_at;
+
+  IF has_sold_at THEN
+    EXECUTE $sql$
+      UPDATE listings.listings
+      SET lifecycle_status = CASE
+        WHEN sold_at IS NOT NULL THEN 'SOLD'
+        WHEN status::text IN ('paused', 'archived') THEN 'ARCHIVED'
+        WHEN status::text = 'closed' AND sold_at IS NULL THEN 'ENDED_UNSOLD'
+        WHEN status::text = 'flagged' THEN 'ACTIVE'
+        ELSE 'ACTIVE'
+      END
+      WHERE lifecycle_status = 'ACTIVE'
+        OR lifecycle_status IS NULL
+    $sql$;
+  ELSE
+    UPDATE listings.listings
+    SET lifecycle_status = CASE
+      WHEN status::text IN ('paused', 'archived') THEN 'ARCHIVED'
+      WHEN status::text = 'closed' THEN 'ENDED_UNSOLD'
+      WHEN status::text = 'flagged' THEN 'ACTIVE'
+      ELSE 'ACTIVE'
+    END
+    WHERE lifecycle_status = 'ACTIVE'
+      OR lifecycle_status IS NULL;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_listings_lifecycle_status
   ON listings.listings (lifecycle_status);

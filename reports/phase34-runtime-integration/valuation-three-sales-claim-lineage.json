@@ -1,0 +1,114 @@
+{
+  "ok": true,
+  "generated_at": "2026-07-21T20:48:29.594Z",
+  "capability": "valuation",
+  "customer_summary": "3 completed sales support this range",
+  "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
+  "evidence_snapshot_hash": "e53ee144b550bc473a2df56f25d22534d19ed5a21f3cf56d041aee25496eafe2",
+  "claim_ledger_id": "cl-19e8bb62a10426be3d45",
+  "response_id": "resp-valuation-e53ee144b550",
+  "included_event_ids": [
+    "me-sale-1002e3b57f55ff16701074248430",
+    "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+    "me-sale-aab33761d4bb1c490b7836dd3371"
+  ],
+  "sold_count_claim": {
+    "claim_id": "claim-resp-valuation-e53ee144b550-1",
+    "response_id": "resp-valuation-e53ee144b550",
+    "claim_type": "sold_count",
+    "normalized_claim_value": 3,
+    "supporting_snapshot_item_ids": [
+      "me-sale-1002e3b57f55ff16701074248430",
+      "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+      "me-sale-aab33761d4bb1c490b7836dd3371"
+    ],
+    "deterministic_calculation_id": null,
+    "synthesis_path": "structured_result.sold_count",
+    "verification_result": "SUPPORTED"
+  },
+  "persistence": {
+    "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
+    "claim_ledger_id": "cl-19e8bb62a10426be3d45",
+    "eligibility_rows": 3,
+    "snapshot_items": 3,
+    "claim_entries": 1,
+    "envelope_persisted": true
+  },
+  "diagnostics": {
+    "excluded": [],
+    "factors": {
+      "exact_pressing_certainty": 0.35,
+      "comparable_count_score": 0.375,
+      "evidence_diversity": 0.25,
+      "freshness_ratio": 1,
+      "condition_confidence": 0.4,
+      "market_depth_score": 0.15,
+      "price_dispersion_penalty": 0.7435897435897436,
+      "source_agreement": 0.7435897435897436,
+      "authorized_availability": 1
+    },
+    "asking_as_sold_violations": 0,
+    "asking_as_sold_traps_seen": 0,
+    "wrong_pressing_exact_claims": 0,
+    "retrieval_mode": "keyword_metadata",
+    "runtime_integration": true,
+    "runtime_candidates_source": "intelligence.market_events",
+    "runtime_candidate_count": 3,
+    "evidence_persisted": true
+  },
+  "db_verify": {
+    "snapshot_row": {
+      "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
+      "evidence_snapshot_hash": "e53ee144b550bc473a2df56f25d22534d19ed5a21f3cf56d041aee25496eafe2",
+      "capability": "valuation"
+    },
+    "eligibility_decisions": [
+      {
+        "market_event_id": "me-sale-1002e3b57f55ff16701074248430",
+        "decision": "INCLUDED"
+      },
+      {
+        "market_event_id": "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+        "decision": "INCLUDED"
+      },
+      {
+        "market_event_id": "me-sale-aab33761d4bb1c490b7836dd3371",
+        "decision": "INCLUDED"
+      }
+    ],
+    "claim_entries": [
+      {
+        "claim_id": "claim-resp-valuation-e53ee144b550-1",
+        "claim_type": "sold_count",
+        "normalized_claim_value": 3,
+        "supporting_snapshot_item_ids": [
+          "me-sale-1002e3b57f55ff16701074248430",
+          "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "me-sale-aab33761d4bb1c490b7836dd3371"
+        ],
+        "verification_result": "SUPPORTED"
+      }
+    ],
+    "supporting_market_events": [
+      {
+        "market_event_id": "me-sale-1002e3b57f55ff16701074248430",
+        "event_type": "SALE_COMPLETED",
+        "observation_id": "obs-7006d4817d98d77967c0c7e3",
+        "payload_hash": "0ec383dfc8f3d984e900247590d8793fb80c91fecc8850f030747921fd5c5fe6"
+      },
+      {
+        "market_event_id": "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+        "event_type": "SALE_COMPLETED",
+        "observation_id": "obs-d812d2d274fd6fff11d0ef94",
+        "payload_hash": "0e611c71f28e42ad86acbc0e25455124971fd828af793c164d636020c3bbcca0"
+      },
+      {
+        "market_event_id": "me-sale-aab33761d4bb1c490b7836dd3371",
+        "event_type": "SALE_COMPLETED",
+        "observation_id": "obs-5a93907f9fbc7b8eaf31beaf",
+        "payload_hash": "55abb715a99f3666191061cec809d7407bcb79287ed33197067f2c1356efd4a1"
+      }
+    ]
+  },
+  "blockers": []
+}

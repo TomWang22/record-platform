@@ -18,6 +18,7 @@ export const ELIGIBILITY_DECISIONS = Object.freeze([
   'EXCLUDED_RIGHTS',
   'EXCLUDED_ASKING_NOT_SOLD',
   'EXCLUDED_UNSETTLED',
+  'EXCLUDED_REFUNDED',
   'EXCLUDED_CURRENCY',
   'EXCLUDED_CONDITION',
   'EXCLUDED_GEOGRAPHY',
@@ -51,6 +52,17 @@ export function decideEligibility(event = {}, context = {}) {
 
   if (event.deletion_status === 'DELETED' || event.event_status === 'DELETED') {
     return { decision: 'EXCLUDED_DELETED', reason_detail: 'deleted' };
+  }
+
+  if (
+    event.refunded === true ||
+    event.reversed === true ||
+    event.chargeback === true ||
+    String(event.event_type || '').toUpperCase() === 'SALE_REFUNDED' ||
+    String(event.event_type || '').toUpperCase() === 'SALE_REVERSED' ||
+    String(event.eligibility_state || '').toUpperCase() === 'REFUNDED'
+  ) {
+    return { decision: 'EXCLUDED_REFUNDED', reason_detail: 'refunded_or_reversed_policy' };
   }
 
   const rightsGate = evaluateRightsEligibility(event, context.rightsOptions || {});

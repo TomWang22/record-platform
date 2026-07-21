@@ -1,0 +1,12 @@
+{
+  "listing_id": "43255068-f82a-496e-96a4-c587a1b298e2",
+  "probe_ok_at_instant": false,
+  "probe_blockers_at_instant": [
+    "MARKET_EVENT_NORMALIZATION_NOT_OBSERVED",
+    "OUTBOX_SALE_COMPLETED_UNPUBLISHED"
+  ],
+  "outbox_published": true,
+  "market_event_present": true,
+  "settlement_to_market_event_chain_closed": true,
+  "note": "Probe may race 5s drain; post-wait DB census is authoritative for outbox+normalize."
+}

@@ -1,0 +1,82 @@
+{
+  "generated_at": "2026-07-21T20:50:00.000Z",
+  "evidence_root": "/tmp/phase34-runtime-data-to-answer-integration-v1",
+  "head_sha": "8e31744d7e9068d056b1f7f634037afe0ccbc405",
+  "origin_main_sha": "8e31744d7e9068d056b1f7f634037afe0ccbc405",
+  "worktree_clean": false,
+  "worktree_note": "Pending uncommitted outbox harden + eligibility/snapshot/claim live-path writers at capture time; pin refreshed after commit/redeploy.",
+  "sha_discrepancy_resolution": {
+    "outbox_publisher_commit": "8e31744d7e9068d056b1f7f634037afe0ccbc405",
+    "checkout_sale_completed_persist_commit": "b2ee0ce3601119afba4ed535dd6d2825a5965e64",
+    "canonical_market_event_consumer_note": "In-process normalizer lives in shopping-service sale-completed-outbox-drain (same as publisher commit 8e31744d); not a separate consumer service.",
+    "do_not_treat_b2ee0ce_ci_as_evidence_for_8e31744d": true,
+    "deployed_shopping_was": "shopping-service:runtime-int-b2ee0ce36011",
+    "deployed_shopping_source_mismatch": "Deployed shopping image tag references b2ee0ce3 while HEAD/origin/main is 8e31744d (compatible multi-SHA until redeploy)."
+  },
+  "exact_sha_ci": "BLOCKED",
+  "exact_sha_ci_detail": {
+    "status": "BLOCKED",
+    "reason": "Protocol validation (static + fixtures) required workflow missing for 8e31744d (path-filtered).",
+    "approval_path": "/tmp/phase32h-prelaunch-approvals/8e31744d7e9068d056b1f7f634037afe0ccbc405.json",
+    "approval_sha256": "564174362075240d21342f721cefc4041eb427cdca16887a9f6194ca126e48bb",
+    "green_workflow_runs_on_sha": [
+      {
+        "name": "ci",
+        "url": "https://github.com/TomWang22/record-platform/actions/runs/29860460379"
+      },
+      {
+        "name": "docker-build",
+        "url": "https://github.com/TomWang22/record-platform/actions/runs/29860460416"
+      },
+      {
+        "name": "RP Namespace Lint",
+        "url": "https://github.com/TomWang22/record-platform/actions/runs/29860460408"
+      },
+      {
+        "name": "coverage",
+        "url": "https://github.com/TomWang22/record-platform/actions/runs/29860460454"
+      }
+    ],
+    "note": "ci/docker-build/coverage GREEN on 8e31744d is not full exact-SHA approval while Protocol validation is absent."
+  },
+  "deployment_mode": "compatible_multi_sha",
+  "deployed_components": [
+    {
+      "component": "shopping-service",
+      "image": "shopping-service:runtime-int-b2ee0ce36011",
+      "digest": "sha256:5c1aa14cbb95319ccf1a075c7f0c6bac06e16f5a3b0220010e2fe7c95837c0b1",
+      "source_sha": "b2ee0ce3601119afba4ed535dd6d2825a5965e64",
+      "configuration_hash": "unknown",
+      "note": "Contains checkout SALE_COMPLETED emit; outbox drain was first landed at 8e31744d — image predates that commit until redeploy."
+    },
+    {
+      "component": "api-gateway",
+      "image": "api-gateway:dev",
+      "digest": "sha256:336f587c16af5040c320cf5b536f8e5c85a23340fb1f9291dc123a51d77a273b",
+      "source_sha": "unknown",
+      "configuration_hash": "unknown"
+    },
+    {
+      "component": "listings-service",
+      "image": "listings-service:phase34-v5-a7b7ef1f",
+      "digest": "sha256:bd3c8cb74eee9495e003124d3245e3637f14da58fb27988ad42681cb2de27b52",
+      "source_sha": "a7b7ef1f",
+      "configuration_hash": "unknown"
+    },
+    {
+      "component": "python-ai-service",
+      "image": "python-ai-service:phase34-v5-74cde670",
+      "digest": "sha256:45ab86f381d41524260eb8826acf68ae2fa6645a50dc4e7346e4db2da37326bd",
+      "source_sha": "74cde670",
+      "configuration_hash": "unknown",
+      "note": "Will pick up PHASE34_RUNTIME_INTEGRATION persist path after rebuild from post-harden SHA."
+    },
+    {
+      "component": "webapp",
+      "image": "webapp:phase34-recapture-v5-74cde670",
+      "digest": "sha256:f9a4098c14356ca2e70d26b9f58656861fc01468eb4527072c792fb9e6eb4eb7",
+      "source_sha": "74cde670",
+      "configuration_hash": "unknown"
+    }
+  ]
+}

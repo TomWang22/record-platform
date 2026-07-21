@@ -268,6 +268,9 @@ export function buildResponseEnvelope({
     evidence_snapshot_id: snapshot.evidence_snapshot_id,
     evidence_snapshot_hash: snapshot.evidence_snapshot_hash,
     claim_ledger_id: claimLedger.claim_ledger_id,
+    // Full artifacts for append-only persistence on the live response path.
+    evidence_snapshot: snapshot,
+    claim_ledger: claimLedger,
     session_state_version,
     model_execution,
     retrieval_execution,

@@ -70,6 +70,22 @@
       "host": "127.0.0.1",
       "port": 5435,
       "not_production": true
+    },
+    {
+      "file": "54-listings-outbox-reliability.sql",
+      "ok": true,
+      "sha256": "30651f9dcd8783effa1ae03e86a47cad95147d021002275ed3a22f1fb0a4ab07",
+      "database": "listings",
+      "host": "127.0.0.1",
+      "port": 5435
+    },
+    {
+      "file": "55-intelligence-eligibility-enrichment.sql",
+      "ok": true,
+      "sha256": "e008a9b9ef728196ef62a9430922d0338e53129e60f05c3d27765eaac694b347",
+      "database": "listings",
+      "host": "127.0.0.1",
+      "port": 5435
     }
   ],
   "schema_object_counts": [
@@ -393,5 +409,7 @@
     }
   ],
   "outbox_table": "listings.outbox_events",
-  "generated_at": "2026-07-21T15:12:50.943605+00:00"
+  "generated_at": "2026-07-21T15:12:50.943605+00:00",
+  "migrations_applied_through": "55",
+  "source_sha_at_capture_note": "See runtime-pin.json; migrations 54-55 applied during outbox/eligibility harden stretch."
 }

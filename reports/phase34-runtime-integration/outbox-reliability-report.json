@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "generated_at": "2026-07-21T20:50:00.000Z",
+  "scope": "unit_crash_replay_core",
+  "implementation": {
+    "pure_core": "scripts/lib/phase34-outbox-drain-core.mjs",
+    "production_wire": "services/shopping-service/src/lib/sale-completed-outbox-drain.ts",
+    "migration": "infra/db/54-listings-outbox-reliability.sql",
+    "migration_applied_isolated_integration": true
+  },
+  "features": [
+    "transactional_lease_FOR_UPDATE_SKIP_LOCKED",
+    "broker_ack_before_published_at",
+    "retry_count_next_attempt_at_last_error",
+    "bounded_retries_then_dead_letter",
+    "stable_event_headers",
+    "partition_key_listing_or_sale_identity",
+    "consumer_lineage_and_quarantine_tables"
+  ],
+  "tests": {
+    "file": "tests/phase34-sale-completed-outbox-drain.test.mjs",
+    "passed": 10,
+    "failed": 0,
+    "cases": [
+      "crash_before_kafka_ack_retries_not_published",
+      "crash_after_ack_before_mark_published_replay_idempotent",
+      "crash_after_normalize_before_mark_published_no_duplicate_normalize",
+      "duplicate_drain_workers_second_lease_empty",
+      "kafka_temporarily_unavailable_retry",
+      "malformed_event_dead_lettered",
+      "poison_event_dead_lettered_after_limit",
+      "replay_already_published_noop",
+      "happy_path_publish_normalize_mark",
+      "backoff_grows_then_caps"
+    ]
+  },
+  "live_broker_chaos": "NOT_YET_EXECUTED",
+  "note": "Crash/replay proven at drain-core unit level. Live Kafka chaos + multi-worker lease contention still required before outbox reliability gate is complete."
+}

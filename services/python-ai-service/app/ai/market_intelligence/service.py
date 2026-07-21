@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -22,13 +23,25 @@ def _run(capability: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     if not RUNNER.is_file():
         raise HTTPException(status_code=500, detail="phase33c_runner_missing")
     started = time.time()
+    # Phase 34 runtime: load canonical market events + persist eligibility/snapshots/claims
+    # unless the caller explicitly opts out (offline owner-proof / unit fixtures).
+    runtime_on = os.environ.get("PHASE34_RUNTIME_INTEGRATION", "1")
+    env = {
+        **os.environ,
+        "PHASE34_RUNTIME_INTEGRATION": runtime_on,
+        "PHASE34_RUNTIME_PERSIST": os.environ.get("PHASE34_RUNTIME_PERSIST", "1"),
+    }
+    input_payload = dict(payload or {})
+    if "runtime_integration" not in input_payload and runtime_on in ("1", "true"):
+        input_payload["runtime_integration"] = True
     proc = subprocess.run(
         ["node", str(RUNNER)],
-        input=json.dumps({"capability": capability, "input": payload}),
+        input=json.dumps({"capability": capability, "input": input_payload}),
         text=True,
         capture_output=True,
         cwd=str(REPO_ROOT),
         check=False,
+        env=env,
     )
     if proc.stderr:
         # Diagnostics only; never private payloads in logs beyond capability id.

@@ -208,6 +208,33 @@ async function main() {
   });
 
   try {
+    // Allow shopping SaleCompleted outbox drain (Kafka + intelligence normalize) to catch up.
+    const waitMs = Math.max(8000, Number(process.env.PHASE34_OUTBOX_DRAIN_WAIT_MS || 15000) || 15000)
+    const pollEvery = 1000
+    const deadline = Date.now() + waitMs
+    while (Date.now() < deadline) {
+      const saleReady = await pool.query(
+        `SELECT count(*)::int AS n FROM listings.sale_completed_events WHERE listing_id = $1::uuid`,
+        [listingId],
+      )
+      const pub = await pool.query(
+        `SELECT count(*)::int AS n FROM listings.outbox_events
+         WHERE aggregate_id = $1 AND type IN ('SaleCompleted','SALE_COMPLETED') AND published IS TRUE`,
+        [String(listingId)],
+      )
+      const mkt = await pool.query(
+        `SELECT count(*)::int AS n FROM intelligence.market_events
+         WHERE event_type = 'SALE_COMPLETED'
+           AND (payload->>'listing_id' = $1 OR payload->'payload'->>'listing_id' = $1)`,
+        [String(listingId)],
+      )
+      const sn = Number(saleReady.rows[0]?.n || 0)
+      const pn = Number(pub.rows[0]?.n || 0)
+      const mn = Number(mkt.rows[0]?.n || 0)
+      if (sn > 0 && pn > 0 && mn > 0) break
+      await new Promise((r) => setTimeout(r, pollEvery))
+    }
+
     const sale = await pool.query(
       `SELECT sale_event_id, market_event_id, settlement_source, final_price::text, payload_hash, evidence_snapshot_id, evidence_snapshot_hash, created_at
        FROM listings.sale_completed_events
@@ -252,7 +279,7 @@ async function main() {
       initiating_api: 'POST /api/cart/checkout',
       sale_completed_persisted: hasSale,
       outbox_persisted: hasOutbox,
-      outbox_published: outbox.rows.some((r) => r.published === true),
+      outbox_published: outbox.rows.some((r) => r.published === true || r.published === 't' || r.published === 'true'),
       kafka_normalized_market_event: hasMarket,
       notes: [
         'Kafka normalization is only marked true when intelligence.market_events contains a matching row.',

@@ -110,6 +110,10 @@ async function start() {
   const server = app.listen(PORT, () => {
     console.log(`[shopping] HTTP server listening on port ${PORT}`)
   })
+  // Phase 34: publish + normalize SaleCompleted outbox → Kafka + intelligence.*
+  import('./lib/sale-completed-outbox-drain.js')
+    .then(({ startSaleCompletedOutboxDrain }) => startSaleCompletedOutboxDrain())
+    .catch((e) => console.warn('[shopping] SaleCompleted outbox drain not started:', e?.message || e))
   return server
 }
 let server: ReturnType<typeof app.listen> | undefined
@@ -135,6 +139,12 @@ function shutdown(signal: string) {
     ? server.close.bind(server)
     : (cb: () => void) => setImmediate(cb)
   close(async () => {
+    try {
+      const { stopSaleCompletedOutboxDrain } = await import('./lib/sale-completed-outbox-drain.js')
+      await stopSaleCompletedOutboxDrain()
+    } catch {
+      /* ignore */
+    }
     pool.end(() => {
       console.log('[shopping] DB pool closed')
     })

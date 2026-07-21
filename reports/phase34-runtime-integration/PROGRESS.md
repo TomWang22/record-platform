@@ -8,9 +8,8 @@
 PHASE 34 DATA-TO-ANSWER SOURCE IMPLEMENTATION READY —
 RUNTIME INTEGRATION IN PROGRESS —
 LIVE DATABASE APPLICATION PROVEN IN ISOLATED INTEGRATION (migrations 49–53) —
-SETTLEMENT-TO-SALE_COMPLETED PATH PARTIALLY WIRED (shopping redeploy in progress) —
-KAFKA NORMALIZATION / MARKET-EVENT CONSUMER NOT YET OBSERVED —
-END-TO-END DATA-TO-ANSWER PATH NOT YET PROVEN —
+SETTLEMENT → SALE_COMPLETED → OUTBOX → KAFKA → MARKET_EVENT PROVEN FOR CHECKOUT —
+ELIGIBILITY / EVIDENCE SNAPSHOT / CUSTOMER RESPONSE PATH NOT YET PROVEN —
 OWNER VISUAL RECAPTURE NOT LAUNCHED —
 PRODUCTION NOT APPROVED
 ```
@@ -19,18 +18,20 @@ PRODUCTION NOT APPROVED
 
 | Step | Evidence |
 |------|----------|
-| 0 SHA hygiene | `PLATFORM_ACCEPTANCE_READY.md` distinguishes `implementation_sha=ac213959` vs reporting children; ACTIVE wording removed |
-| 1 Migrations 49–53 | Applied to `127.0.0.1:5435` / `listings`; `reports/phase34-runtime-integration/migrations.json` + contract verification **ok** |
-| Shopping image | Built/rolled `shopping-service:runtime-int-49d452085561` with `sale-completed-emitter` present |
+| 0 SHA hygiene | `PLATFORM_ACCEPTANCE_READY.md` — implementation vs reporting SHA |
+| 1 Migrations 49–53 | Applied to `127.0.0.1:5435` / `listings`; contract verification PASS |
+| Checkout → `sale_completed_events` | Live probe + shopping lifecycle fix |
+| Outbox `SaleCompleted` | Inserted at checkout |
+| Outbox drain → Kafka + `intelligence.market_events` | `sale-completed-outbox-drain` in shopping-service; census shows published=1 / market SALE_COMPLETED=1 |
 
-## In progress / blockers
+## Still open
 
 | Gap | Detail |
 |-----|--------|
-| Checkout → SALE_COMPLETED | First live checkout paid (`ORD-2026-750161`) but listing UPDATE used legacy `is_active`/`stock_quantity`/`sold_at` absent on this DB — emit never ran. Cart path patched to Phase 34 `lifecycle_status`; rebuild/redeploy required. |
-| Outbox → Kafka → `intelligence.market_events` | No `SaleCompleted` publisher/consumer observed; outbox rows would stay `published=false` even after emit. |
-| Exact-SHA multi-service deploy | Only shopping rebuilt so far; other services still on older tags. |
-| Steps 4–13 | Census, snapshot coverage, retrieval, model, multi-turn runtime corpus — not started. |
+| Eligibility + evidence snapshot + claim ledger writers | Library/SQL only — not yet on live response path |
+| Offer/auction/refund mechanism matrix | Checkout-only settlement emit; reserves share checkout |
+| Exact-SHA multi-service deploy | Shopping tagged `runtime-int-*`; others still older |
+| Steps 4–13 of runtime directive | Census, 100% snapshot coverage, retrieval/model, 512-turn runtime corpus |
 
 ## Evidence root
 

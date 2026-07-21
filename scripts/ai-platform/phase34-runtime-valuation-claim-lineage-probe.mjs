@@ -78,6 +78,9 @@ async function main() {
     Boolean(out.evidence_snapshot_hash) &&
     Boolean(out.claim_ledger_id) &&
     Boolean(out.persistence?.evidence_snapshot_id) &&
+    Boolean(out.deterministic_calculation_id) &&
+    Boolean(out.persistence?.calculation_persisted) &&
+    Boolean(soldClaim?.deterministic_calculation_id) &&
     included.length >= 3 &&
     soldClaim?.verification_result === 'SUPPORTED' &&
     (soldClaim?.supporting_snapshot_item_ids || []).length >= 3 &&
@@ -92,9 +95,11 @@ async function main() {
     evidence_snapshot_id: out.evidence_snapshot_id,
     evidence_snapshot_hash: out.evidence_snapshot_hash,
     claim_ledger_id: out.claim_ledger_id,
+    deterministic_calculation_id: out.deterministic_calculation_id || null,
     response_id: out.response_id,
     included_event_ids: included,
     sold_count_claim: soldClaim || null,
+    valuation_calculation: out.valuation_calculation || null,
     persistence: out.persistence || null,
     diagnostics: out.diagnostics || null,
     db_verify: dbVerify,
@@ -103,6 +108,7 @@ async function main() {
       : [
           included.length < 3 ? 'fewer_than_three_included_sales' : null,
           !soldClaim ? 'missing_sold_count_claim' : null,
+          !out.deterministic_calculation_id ? 'missing_deterministic_calculation_id' : null,
           soldClaim?.verification_result !== 'SUPPORTED' ? 'sold_count_not_supported' : null,
           (dbVerify.supporting_market_events || []).length < 3
             ? 'supporting_events_missing_in_market_events'

@@ -36,6 +36,7 @@ export async function persistCapabilityEvidenceArtifacts(
     capability,
     subject = {},
     requestedConstraints = {},
+    calculation = null,
   },
   { pool = null, connectionString = DEFAULT_URL } = {},
 ) {
@@ -60,6 +61,7 @@ export async function persistCapabilityEvidenceArtifacts(
     snapshot_items: 0,
     claim_entries: 0,
     envelope_persisted: false,
+    calculation_persisted: false,
   };
 
   try {
@@ -180,13 +182,19 @@ export async function persistCapabilityEvidenceArtifacts(
     for (const d of decisions) {
       const mid = d.market_event_id || d.evidence_id;
       if (!mid) continue;
+      const decisionId =
+        d.eligibility_decision_id ||
+        `ed-${snapshot.evidence_snapshot_id}-${mid}`.slice(0, 120);
       await client.query(
         `INSERT INTO intelligence.eligibility_decisions (
            evidence_snapshot_id, market_event_id, decision, reason_detail,
            eligibility_version, capability, subject, requested_constraints,
-           entity_resolution_version, dedupe_version, decided_at
+           entity_resolution_version, dedupe_version, decided_at,
+           eligibility_decision_id, request_id, session_id, turn_id,
+           previous_decision_id
          ) VALUES (
-           $1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, NOW()
+           $1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, NOW(),
+           $11, $12, $13, $14, $15
          )
          ON CONFLICT (evidence_snapshot_id, market_event_id) DO NOTHING`,
         [
@@ -200,9 +208,54 @@ export async function persistCapabilityEvidenceArtifacts(
           JSON.stringify(requestedConstraints || snapshot.requested_constraints || {}),
           snapshot.subject_resolution?.resolution_version || 'phase34-entity-resolution-v1',
           snapshot.dedupe_version || 'phase34-dedupe-v1',
+          decisionId,
+          snapshot.request_id || null,
+          snapshot.session_id || null,
+          snapshot.turn_id || null,
+          d.previous_decision_id || null,
         ],
       );
       result.eligibility_rows += 1;
+    }
+
+    if (calculation?.calculation_id) {
+      await client.query(
+        `INSERT INTO intelligence.deterministic_calculations (
+           calculation_id, capability, evidence_snapshot_id, algorithm_version,
+           currency, eligible_sale_prices, normalized_prices, time_range,
+           condition_adjustments, outlier_decisions, median, dispersion,
+           quick_sale_range, fair_market_range, patient_sale_range,
+           confidence_inputs, result_hash, payload
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb,
+           $9::jsonb, $10::jsonb, $11, $12,
+           $13::jsonb, $14::jsonb, $15::jsonb,
+           $16::jsonb, $17, $18::jsonb
+         )
+         ON CONFLICT (calculation_id) DO NOTHING`,
+        [
+          calculation.calculation_id,
+          calculation.capability || capability || 'valuation',
+          snapshot.evidence_snapshot_id,
+          calculation.algorithm_version || 'phase34-valuation-calc-v1',
+          calculation.currency || 'USD',
+          JSON.stringify(calculation.eligible_sale_prices || []),
+          JSON.stringify(calculation.normalized_prices || []),
+          JSON.stringify(calculation.time_range || {}),
+          JSON.stringify(calculation.condition_adjustments || {}),
+          JSON.stringify(calculation.outlier_decisions || []),
+          calculation.median,
+          calculation.dispersion,
+          JSON.stringify(calculation.quick_sale_range),
+          JSON.stringify(calculation.fair_market_range),
+          JSON.stringify(calculation.patient_sale_range),
+          JSON.stringify(calculation.confidence_inputs || {}),
+          calculation.result_hash,
+          JSON.stringify(calculation.payload || calculation),
+        ],
+      );
+      result.calculation_persisted = true;
+      result.calculation_id = calculation.calculation_id;
     }
 
     await client.query(

@@ -91,11 +91,28 @@ async function insertSaleOutbox(
       ...input.payload,
     },
   })
+  const payloadBuf = Buffer.from(payloadJson, 'utf8')
+  const payloadHash = crypto.createHash('sha256').update(payloadBuf).digest('hex')
+  const sourceSha =
+    process.env.RP_SOURCE_SHA || process.env.SOURCE_SHA || process.env.GIT_SHA || 'unknown'
   await client.query(
-    `INSERT INTO listings.outbox_events (id, aggregate_id, type, version, payload, published)
-     VALUES ($1::uuid, $2, $3, 1, $4::bytea, false)
+    `INSERT INTO listings.outbox_events (
+       id, aggregate_id, type, version, payload, published,
+       idempotency_key, payload_hash, source_sha
+     ) VALUES (
+       $1::uuid, $2, $3, 1, $4::bytea, false,
+       $5, $6, $7
+     )
      ON CONFLICT (id) DO NOTHING`,
-    [input.eventId, input.listingId, 'SaleCompleted', Buffer.from(payloadJson, 'utf8')],
+    [
+      input.eventId,
+      input.listingId,
+      'SaleCompleted',
+      payloadBuf,
+      input.eventId,
+      payloadHash,
+      sourceSha,
+    ],
   )
 }
 

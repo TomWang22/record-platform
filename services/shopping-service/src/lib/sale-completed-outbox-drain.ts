@@ -260,7 +260,55 @@ export async function normalizeSaleCompleted(
     ],
   )
 
-  // Consumer lineage uniqueness: same source event + payload hash → duplicate OK
+  // Consumer lineage: UNIQUE(source_event_id, normalization_version).
+  // Same hash → DUPLICATE; different hash → IDENTITY_PAYLOAD_CONFLICT + quarantine.
+  const existing = await pool.query(
+    `SELECT lineage_id, payload_hash, market_event_id, result
+     FROM intelligence.kafka_consumer_lineage
+     WHERE source_event_id = $1 AND normalization_version = 'phase34-market-event-v2'
+     LIMIT 1`,
+    [sourceEventId],
+  ).catch(() => ({ rows: [] }))
+
+  if (existing.rows.length) {
+    const prev = existing.rows[0]
+    if (prev.payload_hash === eventPayloadHash) {
+      await pool.query(
+        `UPDATE intelligence.kafka_consumer_lineage
+         SET duplicate_flag = true, result = 'DUPLICATE'
+         WHERE lineage_id = $1`,
+        [prev.lineage_id],
+      ).catch(() => {})
+      return String(prev.market_event_id || marketEventId)
+    }
+
+    const quarantineId = `q-${sha256({ sourceEventId, eventPayloadHash }).slice(0, 24)}`
+    await pool.query(
+      `INSERT INTO intelligence.kafka_event_quarantine (
+         quarantine_id, topic, partition_id, record_offset, source_event_id, payload, reason
+       ) VALUES ($1, $2, 0, 0, $3, $4::jsonb, $5)
+       ON CONFLICT (quarantine_id) DO NOTHING`,
+      [
+        quarantineId,
+        SALE_COMPLETED_EVENTS_TOPIC,
+        sourceEventId,
+        JSON.stringify(eventPayload),
+        'IDENTITY_PAYLOAD_CONFLICT',
+      ],
+    ).catch(() => {})
+    await pool.query(
+      `UPDATE intelligence.kafka_consumer_lineage
+       SET result = 'IDENTITY_PAYLOAD_CONFLICT',
+           rejection_reason = 'IDENTITY_PAYLOAD_CONFLICT',
+           duplicate_flag = false
+       WHERE lineage_id = $1`,
+      [prev.lineage_id],
+    ).catch(() => {})
+    const err = new Error(`IDENTITY_PAYLOAD_CONFLICT:${sourceEventId}`)
+    ;(err as any).code = 'IDENTITY_PAYLOAD_CONFLICT'
+    throw err
+  }
+
   const lineageId = `lin-${sha256({ sourceEventId, eventPayloadHash }).slice(0, 24)}`
   await pool.query(
     `INSERT INTO intelligence.kafka_consumer_lineage (
@@ -269,9 +317,7 @@ export async function normalizeSaleCompleted(
      ) VALUES (
        $1, $2, 0, 0, $3, $4, $5, 'phase34-market-event-v2', 'ACCEPTED', false, $6
      )
-     ON CONFLICT (source_event_id, payload_hash, normalization_version) DO UPDATE
-       SET duplicate_flag = true, result = 'DUPLICATE'
-     WHERE intelligence.kafka_consumer_lineage.result = 'ACCEPTED'`,
+     ON CONFLICT DO NOTHING`,
     [
       lineageId,
       SALE_COMPLETED_EVENTS_TOPIC,
@@ -281,7 +327,7 @@ export async function normalizeSaleCompleted(
       SOURCE_SHA,
     ],
   ).catch(() => {
-    /* table may not exist until migration 54 */
+    /* table may not exist until migration 54/56 */
   })
 
   return marketEventId
@@ -290,48 +336,56 @@ export async function normalizeSaleCompleted(
 function createPgDeps(pool = listingsPool): DrainDeps {
   return {
     async leaseBatch(limit, owner, leaseMs) {
-      const client = await pool.connect()
       try {
-        await client.query('BEGIN')
-        const { rows } = await client.query(
-          `SELECT id::text AS id, aggregate_id, payload, retry_count, payload_hash, idempotency_key
-           FROM listings.outbox_events
-           WHERE published = false
-             AND COALESCE(dead_lettered, false) = false
-             AND type = 'SaleCompleted'
-             AND next_attempt_at <= NOW()
-             AND (leased_until IS NULL OR leased_until < NOW())
-           ORDER BY created_at ASC
-           LIMIT $1
-           FOR UPDATE SKIP LOCKED`,
-          [limit],
-        )
-        if (rows.length) {
-          const ids = rows.map((r: any) => r.id)
-          await client.query(
-            `UPDATE listings.outbox_events
-             SET leased_until = NOW() + ($1::text || ' milliseconds')::interval,
-                 lease_owner = $2
-             WHERE id = ANY($3::uuid[])`,
-            [String(leaseMs), owner, ids],
-          )
-        }
-        await client.query('COMMIT')
-        return rows
-      } catch (err) {
-        await client.query('ROLLBACK')
-        // Fallback for DBs without migration 54 columns
         const { rows } = await pool.query(
-          `SELECT id::text AS id, aggregate_id, payload, 0 AS retry_count, NULL AS payload_hash, id::text AS idempotency_key
-           FROM listings.outbox_events
-           WHERE published = false AND type = 'SaleCompleted'
-           ORDER BY created_at ASC
-           LIMIT $1`,
-          [limit],
+          `SELECT id::text AS id, aggregate_id, payload, retry_count, payload_hash, idempotency_key
+           FROM listings.lease_outbox_batch($1, $2, $3, 'SaleCompleted')`,
+          [limit, owner, leaseMs],
         )
         return rows
-      } finally {
-        client.release()
+      } catch {
+        const client = await pool.connect()
+        try {
+          await client.query('BEGIN')
+          const { rows } = await client.query(
+            `SELECT id::text AS id, aggregate_id, payload, retry_count, payload_hash, idempotency_key
+             FROM listings.outbox_events
+             WHERE published = false
+               AND COALESCE(dead_lettered, false) = false
+               AND type = 'SaleCompleted'
+               AND next_attempt_at <= NOW()
+               AND (leased_until IS NULL OR leased_until < NOW())
+             ORDER BY created_at ASC
+             LIMIT $1
+             FOR UPDATE SKIP LOCKED`,
+            [limit],
+          )
+          if (rows.length) {
+            const ids = rows.map((r: any) => r.id)
+            await client.query(
+              `UPDATE listings.outbox_events
+               SET leased_until = NOW() + ($1::text || ' milliseconds')::interval,
+                   lease_owner = $2
+               WHERE id = ANY($3::uuid[])`,
+              [String(leaseMs), owner, ids],
+            )
+          }
+          await client.query('COMMIT')
+          return rows
+        } catch (err) {
+          await client.query('ROLLBACK')
+          const { rows } = await pool.query(
+            `SELECT id::text AS id, aggregate_id, payload, 0 AS retry_count, NULL AS payload_hash, id::text AS idempotency_key
+             FROM listings.outbox_events
+             WHERE published = false AND type = 'SaleCompleted'
+             ORDER BY created_at ASC
+             LIMIT $1`,
+            [limit],
+          )
+          return rows
+        } finally {
+          client.release()
+        }
       }
     },
     async publish(row, text, headers) {
@@ -359,48 +413,67 @@ function createPgDeps(pool = listingsPool): DrainDeps {
       return normalizeSaleCompleted(parsed, pool)
     },
     async markPublished(row, ack) {
-      await pool.query(
-        `UPDATE listings.outbox_events
-         SET published = true,
-             published_at = NOW(),
-             leased_until = NULL,
-             lease_owner = NULL,
-             last_error = NULL,
-             broker_topic = $2,
-             broker_partition = $3,
-             broker_offset = $4,
-             source_sha = COALESCE(source_sha, $5)
-         WHERE id = $1::uuid`,
-        [row.id, ack.topic, ack.partition, Number(ack.offset) || 0, SOURCE_SHA],
-      ).catch(async () => {
-        await pool.query(`UPDATE listings.outbox_events SET published = true WHERE id = $1::uuid`, [
+      try {
+        await pool.query(`SELECT listings.acknowledge_outbox_publish($1::uuid, $2, $3, $4::bigint)`, [
           row.id,
+          ack.topic,
+          ack.partition,
+          Number(ack.offset) || 0,
         ])
-      })
+      } catch {
+        await pool.query(
+          `UPDATE listings.outbox_events
+           SET published = true,
+               published_at = NOW(),
+               leased_until = NULL,
+               lease_owner = NULL,
+               last_error = NULL,
+               broker_topic = $2,
+               broker_partition = $3,
+               broker_offset = $4
+           WHERE id = $1::uuid`,
+          [row.id, ack.topic, ack.partition, Number(ack.offset) || 0],
+        )
+      }
     },
     async markRetry(row, error, nextAttemptAt) {
-      await pool.query(
-        `UPDATE listings.outbox_events
-         SET retry_count = COALESCE(retry_count, 0) + 1,
-             next_attempt_at = $2,
-             last_error = $3,
-             leased_until = NULL,
-             lease_owner = NULL
-         WHERE id = $1::uuid`,
-        [row.id, nextAttemptAt.toISOString(), error.slice(0, 2000)],
-      ).catch(() => undefined)
+      try {
+        await pool.query(`SELECT listings.reschedule_outbox_event($1::uuid, $2, $3::timestamptz)`, [
+          row.id,
+          error.slice(0, 2000),
+          nextAttemptAt.toISOString(),
+        ])
+      } catch {
+        await pool.query(
+          `UPDATE listings.outbox_events
+           SET retry_count = COALESCE(retry_count, 0) + 1,
+               next_attempt_at = $2,
+               last_error = $3,
+               leased_until = NULL,
+               lease_owner = NULL
+           WHERE id = $1::uuid`,
+          [row.id, nextAttemptAt.toISOString(), error.slice(0, 2000)],
+        ).catch(() => undefined)
+      }
     },
     async markDeadLetter(row, error) {
-      await pool.query(
-        `UPDATE listings.outbox_events
-         SET dead_lettered = true,
-             dead_lettered_at = NOW(),
-             last_error = $2,
-             leased_until = NULL,
-             lease_owner = NULL
-         WHERE id = $1::uuid`,
-        [row.id, error.slice(0, 2000)],
-      ).catch(() => undefined)
+      try {
+        await pool.query(`SELECT listings.dead_letter_outbox_event($1::uuid, $2)`, [
+          row.id,
+          error.slice(0, 2000),
+        ])
+      } catch {
+        await pool.query(
+          `UPDATE listings.outbox_events
+           SET dead_lettered = true,
+               dead_lettered_at = NOW(),
+               last_error = $2,
+               leased_until = NULL,
+               lease_owner = NULL
+           WHERE id = $1::uuid`,
+          [row.id, error.slice(0, 2000)],
+        ).catch(() => undefined)
+      }
     },
   }
 }

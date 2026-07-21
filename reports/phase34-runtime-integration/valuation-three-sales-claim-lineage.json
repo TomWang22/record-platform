@@ -1,20 +1,20 @@
 {
   "ok": true,
-  "generated_at": "2026-07-21T20:48:29.594Z",
+  "generated_at": "2026-07-21T22:29:26.344Z",
   "capability": "valuation",
   "customer_summary": "3 completed sales support this range",
-  "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
-  "evidence_snapshot_hash": "e53ee144b550bc473a2df56f25d22534d19ed5a21f3cf56d041aee25496eafe2",
-  "claim_ledger_id": "cl-19e8bb62a10426be3d45",
-  "response_id": "resp-valuation-e53ee144b550",
+  "evidence_snapshot_id": "es-9273f08f750453f56f88",
+  "evidence_snapshot_hash": "9273f08f750453f56f88310e92952f4f727a1684fedb3bc94bddce6504508743",
+  "claim_ledger_id": "cl-3c190f7b584e436c450b",
+  "response_id": "resp-valuation-9273f08f7504",
   "included_event_ids": [
     "me-sale-1002e3b57f55ff16701074248430",
     "me-sale-4299ba8914dc361e5cafeb0ee0f1",
     "me-sale-aab33761d4bb1c490b7836dd3371"
   ],
   "sold_count_claim": {
-    "claim_id": "claim-resp-valuation-e53ee144b550-1",
-    "response_id": "resp-valuation-e53ee144b550",
+    "claim_id": "claim-resp-valuation-9273f08f7504-1",
+    "response_id": "resp-valuation-9273f08f7504",
     "claim_type": "sold_count",
     "normalized_claim_value": 3,
     "supporting_snapshot_item_ids": [
@@ -22,17 +22,19 @@
       "me-sale-4299ba8914dc361e5cafeb0ee0f1",
       "me-sale-aab33761d4bb1c490b7836dd3371"
     ],
-    "deterministic_calculation_id": null,
+    "deterministic_calculation_id": "calc-val-3c0af2037f9ec02b6116",
     "synthesis_path": "structured_result.sold_count",
     "verification_result": "SUPPORTED"
   },
   "persistence": {
-    "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
-    "claim_ledger_id": "cl-19e8bb62a10426be3d45",
+    "evidence_snapshot_id": "es-9273f08f750453f56f88",
+    "claim_ledger_id": "cl-3c190f7b584e436c450b",
     "eligibility_rows": 3,
     "snapshot_items": 3,
-    "claim_entries": 1,
-    "envelope_persisted": true
+    "claim_entries": 11,
+    "envelope_persisted": true,
+    "calculation_persisted": true,
+    "calculation_id": "calc-val-3c0af2037f9ec02b6116"
   },
   "diagnostics": {
     "excluded": [],
@@ -58,8 +60,8 @@
   },
   "db_verify": {
     "snapshot_row": {
-      "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
-      "evidence_snapshot_hash": "e53ee144b550bc473a2df56f25d22534d19ed5a21f3cf56d041aee25496eafe2",
+      "evidence_snapshot_id": "es-9273f08f750453f56f88",
+      "evidence_snapshot_hash": "9273f08f750453f56f88310e92952f4f727a1684fedb3bc94bddce6504508743",
       "capability": "valuation"
     },
     "eligibility_decisions": [
@@ -78,9 +80,126 @@
     ],
     "claim_entries": [
       {
-        "claim_id": "claim-resp-valuation-e53ee144b550-1",
+        "claim_id": "claim-resp-valuation-9273f08f7504-1",
         "claim_type": "sold_count",
         "normalized_claim_value": 3,
+        "supporting_snapshot_item_ids": [
+          "me-sale-1002e3b57f55ff16701074248430",
+          "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "me-sale-aab33761d4bb1c490b7836dd3371"
+        ],
+        "verification_result": "SUPPORTED"
+      },
+      {
+        "claim_id": "claim-resp-valuation-9273f08f7504-2",
+        "claim_type": "currency",
+        "normalized_claim_value": "USD",
+        "supporting_snapshot_item_ids": [
+          "me-sale-1002e3b57f55ff16701074248430",
+          "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "me-sale-aab33761d4bb1c490b7836dd3371"
+        ],
+        "verification_result": "SUPPORTED"
+      },
+      {
+        "claim_id": "claim-resp-valuation-9273f08f7504-3",
+        "claim_type": "median_sold_price",
+        "normalized_claim_value": 19.5,
+        "supporting_snapshot_item_ids": [
+          "me-sale-1002e3b57f55ff16701074248430",
+          "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "me-sale-aab33761d4bb1c490b7836dd3371"
+        ],
+        "verification_result": "SUPPORTED"
+      },
+      {
+        "claim_id": "claim-resp-valuation-9273f08f7504-4",
+        "claim_type": "fair_market_low",
+        "normalized_claim_value": 16.58,
+        "supporting_snapshot_item_ids": [
+          "me-sale-1002e3b57f55ff16701074248430",
+          "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "me-sale-aab33761d4bb1c490b7836dd3371"
+        ],
+        "verification_result": "SUPPORTED"
+      },
+      {
+        "claim_id": "claim-resp-valuation-9273f08f7504-5",
+        "claim_type": "fair_market_high",
+        "normalized_claim_value": 23.4,
+        "supporting_snapshot_item_ids": [
+          "me-sale-1002e3b57f55ff16701074248430",
+          "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "me-sale-aab33761d4bb1c490b7836dd3371"
+        ],
+        "verification_result": "SUPPORTED"
+      },
+      {
+        "claim_id": "claim-resp-valuation-9273f08f7504-6",
+        "claim_type": "quick_sale_low",
+        "normalized_claim_value": 16.67,
+        "supporting_snapshot_item_ids": [
+          "me-sale-1002e3b57f55ff16701074248430",
+          "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "me-sale-aab33761d4bb1c490b7836dd3371"
+        ],
+        "verification_result": "SUPPORTED"
+      },
+      {
+        "claim_id": "claim-resp-valuation-9273f08f7504-7",
+        "claim_type": "quick_sale_high",
+        "normalized_claim_value": 18.43,
+        "supporting_snapshot_item_ids": [
+          "me-sale-1002e3b57f55ff16701074248430",
+          "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "me-sale-aab33761d4bb1c490b7836dd3371"
+        ],
+        "verification_result": "SUPPORTED"
+      },
+      {
+        "claim_id": "claim-resp-valuation-9273f08f7504-8",
+        "claim_type": "patient_sale_low",
+        "normalized_claim_value": 21.3,
+        "supporting_snapshot_item_ids": [
+          "me-sale-1002e3b57f55ff16701074248430",
+          "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "me-sale-aab33761d4bb1c490b7836dd3371"
+        ],
+        "verification_result": "SUPPORTED"
+      },
+      {
+        "claim_id": "claim-resp-valuation-9273f08f7504-9",
+        "claim_type": "patient_sale_high",
+        "normalized_claim_value": 24.21,
+        "supporting_snapshot_item_ids": [
+          "me-sale-1002e3b57f55ff16701074248430",
+          "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "me-sale-aab33761d4bb1c490b7836dd3371"
+        ],
+        "verification_result": "SUPPORTED"
+      },
+      {
+        "claim_id": "claim-resp-valuation-9273f08f7504-10",
+        "claim_type": "condition_adjustment",
+        "normalized_claim_value": {
+          "notes": null,
+          "condition": "unverified",
+          "multiplier": 1
+        },
+        "supporting_snapshot_item_ids": [
+          "me-sale-1002e3b57f55ff16701074248430",
+          "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "me-sale-aab33761d4bb1c490b7836dd3371"
+        ],
+        "verification_result": "SUPPORTED"
+      },
+      {
+        "claim_id": "claim-resp-valuation-9273f08f7504-11",
+        "claim_type": "time_range",
+        "normalized_claim_value": {
+          "end": "2026-07-21T19:10:58.000Z",
+          "start": "2026-07-21T15:43:42.000Z"
+        },
         "supporting_snapshot_item_ids": [
           "me-sale-1002e3b57f55ff16701074248430",
           "me-sale-4299ba8914dc361e5cafeb0ee0f1",

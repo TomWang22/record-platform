@@ -15,6 +15,11 @@ import { finalizeCapabilityResponse } from './phase34-capability-response.mjs';
 import { buildPlatformEvidenceSnapshot } from './phase34-claim-ledger.mjs';
 import { loadCanonicalMarketEventCandidates } from './phase34-runtime-market-events.mjs';
 import { persistCapabilityEvidenceArtifacts } from './phase34-evidence-persistence.mjs';
+import {
+  buildValuationCalculation,
+  buildValuationMaterialClaims,
+  assertValuationMatchesCalculation,
+} from './phase34-valuation-calculation.mjs';
 
 export const PROMPT_TEMPLATES = {
   scarcity: { id: 'scarcity-explain', version: '1', role: 'summarize_only' },
@@ -94,6 +99,32 @@ function withPlatformEnvelope(capability, input, result) {
     .map((e) => e.market_event_id || e.evidence_id)
     .filter(Boolean);
   const soldCount = soldEventIds.length;
+
+  let valuationCalculation = null;
+  let valuationClaims = [];
+  if (capability === 'valuation') {
+    valuationCalculation = buildValuationCalculation({
+      snapshot: snapshotProbe,
+      structured_result: {
+        ...structured,
+        sold_count: soldCount,
+        sold_comparable_count: structured?.sold_comparable_count ?? soldCount,
+      },
+      subject: input.subject || {},
+    });
+    assertValuationMatchesCalculation(
+      {
+        ...structured,
+        sold_count: soldCount,
+        currency: structured?.currency || valuationCalculation.currency,
+        low_estimate: structured?.low_estimate,
+        high_estimate: structured?.high_estimate,
+      },
+      valuationCalculation,
+    );
+    valuationClaims = buildValuationMaterialClaims(valuationCalculation);
+  }
+
   const probe = finalizeCapabilityResponse({
     capability,
     subject: input.subject || {},
@@ -102,6 +133,7 @@ function withPlatformEnvelope(capability, input, result) {
       ...structured,
       sold_count: soldCount,
       sold_comparable_count: structured?.sold_comparable_count ?? soldCount,
+      deterministic_calculation_id: valuationCalculation?.calculation_id || null,
     },
     answer: result?.explanation || result?.summary || null,
     customer_summary:
@@ -110,7 +142,7 @@ function withPlatformEnvelope(capability, input, result) {
         : result?.explanation || result?.summary || null,
     limitations: structured?.limitations || result?.limitations || [],
     confidence: typeof result?.confidence === 'number' ? result.confidence : structured?.confidence,
-    claims: [],
+    claims: valuationClaims,
     request: {
       request_id: input.request_id || null,
       session_id: input.session_id || null,
@@ -125,7 +157,12 @@ function withPlatformEnvelope(capability, input, result) {
     evidence_snapshot_hash: probe.evidence_snapshot_hash,
     claim_ledger_id: probe.claim_ledger_id,
     response_id: probe.response_id,
-    platform_envelope: probe,
+    deterministic_calculation_id: valuationCalculation?.calculation_id || null,
+    valuation_calculation: valuationCalculation,
+    platform_envelope: {
+      ...probe,
+      valuation_calculation: valuationCalculation,
+    },
   };
 }
 
@@ -210,6 +247,7 @@ export async function runCapabilityAsync(capability, input = {}) {
       capability,
       subject: nextInput.subject || {},
       requestedConstraints: nextInput.constraints || {},
+      calculation: out.valuation_calculation || out.platform_envelope.valuation_calculation || null,
     });
   }
 

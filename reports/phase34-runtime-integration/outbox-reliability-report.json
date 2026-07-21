@@ -1,39 +1,59 @@
 {
   "ok": true,
-  "generated_at": "2026-07-21T20:50:00.000Z",
-  "scope": "unit_crash_replay_core",
-  "implementation": {
-    "pure_core": "scripts/lib/phase34-outbox-drain-core.mjs",
-    "production_wire": "services/shopping-service/src/lib/sale-completed-outbox-drain.ts",
-    "migration": "infra/db/54-listings-outbox-reliability.sql",
-    "migration_applied_isolated_integration": true
-  },
-  "features": [
-    "transactional_lease_FOR_UPDATE_SKIP_LOCKED",
-    "broker_ack_before_published_at",
-    "retry_count_next_attempt_at_last_error",
-    "bounded_retries_then_dead_letter",
-    "stable_event_headers",
-    "partition_key_listing_or_sale_identity",
-    "consumer_lineage_and_quarantine_tables"
-  ],
-  "tests": {
+  "generated_at": "2026-07-21T22:29:26.012Z",
+  "scope": "bounded_integration_smoke_plus_unit_core",
+  "unit_tests": {
     "file": "tests/phase34-sale-completed-outbox-drain.test.mjs",
-    "passed": 10,
-    "failed": 0,
-    "cases": [
-      "crash_before_kafka_ack_retries_not_published",
-      "crash_after_ack_before_mark_published_replay_idempotent",
-      "crash_after_normalize_before_mark_published_no_duplicate_normalize",
-      "duplicate_drain_workers_second_lease_empty",
-      "kafka_temporarily_unavailable_retry",
-      "malformed_event_dead_lettered",
-      "poison_event_dead_lettered_after_limit",
-      "replay_already_published_noop",
-      "happy_path_publish_normalize_mark",
-      "backoff_grows_then_caps"
-    ]
+    "passed": 10
   },
-  "live_broker_chaos": "NOT_YET_EXECUTED",
-  "note": "Crash/replay proven at drain-core unit level. Live Kafka chaos + multi-worker lease contention still required before outbox reliability gate is complete."
+  "live_smoke_cases": [
+    {
+      "name": "kafka_unavailable_reschedule",
+      "ok": true,
+      "row": {
+        "retry_count": 1,
+        "last_error": "KAFKA_UNAVAILABLE_SMOKE",
+        "published": false,
+        "deferred": true
+      }
+    },
+    {
+      "name": "duplicate_drain_workers_skip_locked",
+      "ok": true,
+      "lease1": [
+        "f7c7a490-925d-4bb2-b5fc-9441910750a2"
+      ],
+      "lease2": []
+    },
+    {
+      "name": "broker_ack_then_published_at",
+      "ok": true,
+      "row": {
+        "published": true,
+        "has_published_at": true,
+        "broker_topic": "smoke.listing.events",
+        "broker_offset": "42"
+      }
+    },
+    {
+      "name": "replay_already_published_preserves_first_ack",
+      "ok": true,
+      "row": {
+        "broker_offset": "42"
+      }
+    },
+    {
+      "name": "poison_dead_lettered",
+      "ok": true,
+      "row": {
+        "dead_lettered": true,
+        "published": false
+      }
+    },
+    {
+      "name": "immutable_payload_blocked",
+      "ok": true
+    }
+  ],
+  "note": "DB-level publisher-function smoke on isolated listings@5435. Full broker-down chaos against live Kafka still optional follow-up."
 }

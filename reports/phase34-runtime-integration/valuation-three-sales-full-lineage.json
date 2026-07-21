@@ -1,0 +1,355 @@
+{
+  "ok": true,
+  "generated_at": "2026-07-21T22:28:36.648Z",
+  "market_event_ids": [
+    "me-sale-1002e3b57f55ff16701074248430",
+    "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+    "me-sale-aab33761d4bb1c490b7836dd3371"
+  ],
+  "events": [
+    {
+      "market_event_id": "me-sale-1002e3b57f55ff16701074248430",
+      "settlement_ok": true,
+      "kafka_lineage_present": false,
+      "forbidden_sources_cleared": {
+        "from_seed": false,
+        "synthetic": false,
+        "force_sold_floor": false,
+        "owner_proof_scenario": false,
+        "direct_db_only": false,
+        "seed_completed_sale_json": false,
+        "archived_listing": false,
+        "notes": "Observation source_connector is shopping-service-sale-completed-outbox; sale_completed_events row present with payment/order identity."
+      },
+      "lineage": {
+        "listing_id": "1e10b235-6b9e-4354-a80d-04ba0453abf0",
+        "order_id": "9c031b57-0102-4e87-9817-9e8425a4cce1",
+        "payment_transaction_id": "PAY-SIM-1784660832560-287y83avu",
+        "settlement_source": "CHECKOUT_SETTLEMENT",
+        "sale_mechanism": "buy_now",
+        "sale_event_id": "sale-1002e3b57f55ff16701074248430",
+        "sale_completed_events_row": {
+          "sale_event_id": "sale-1002e3b57f55ff16701074248430",
+          "market_event_id": "me-sale-1002e3b57f55ff16701074248430",
+          "final_price": "16.00",
+          "currency": "USD",
+          "completed_at": "2026-07-21T19:07:12.885Z",
+          "payload_hash": "cbfac915b26bbfa40f5977197d426a4dcc27d7c2b4d4107625dcfcb89cd9d978",
+          "evidence_snapshot_id": "es-0f31da7c539f900e"
+        },
+        "outbox_events": [
+          {
+            "id": "37c4db7d-9f85-4827-a479-afd7d8b67b6e",
+            "type": "SaleCompleted",
+            "aggregate_id": "1e10b235-6b9e-4354-a80d-04ba0453abf0",
+            "published": true,
+            "published_at": null,
+            "payload_hash": "340647d723ecc4496a59f710638843cc0938b8710071d2b294a3de3b0377fe61",
+            "idempotency_key": "37c4db7d-9f85-4827-a479-afd7d8b67b6e",
+            "source_sha": "unknown-pre-migration-56",
+            "broker_topic": null,
+            "broker_partition": null,
+            "broker_offset": null,
+            "created_at": "2026-07-21T19:07:13.093Z"
+          }
+        ],
+        "kafka_consumer_lineage": [],
+        "kafka_gap": true,
+        "raw_observation": {
+          "observation_id": "obs-7006d4817d98d77967c0c7e3",
+          "source_class": "FIRST_PARTY_SETTLEMENT",
+          "source_connector": "shopping-service-sale-completed-outbox",
+          "source_record_id": "sale-1002e3b57f55ff16701074248430",
+          "canonical_payload_hash": "a90500f7e107ff4b74a59349ae78e73e867081ea977789794a3cd7a6839033e0"
+        },
+        "canonical_market_event": {
+          "market_event_id": "me-sale-1002e3b57f55ff16701074248430",
+          "observation_id": "obs-7006d4817d98d77967c0c7e3",
+          "event_type": "SALE_COMPLETED",
+          "price_normalized": "16.00",
+          "payload_hash": "0ec383dfc8f3d984e900247590d8793fb80c91fecc8850f030747921fd5c5fe6",
+          "rights_status": "FIRST_PARTY"
+        },
+        "eligibility_decisions": [
+          {
+            "decision_id": "4",
+            "eligibility_decision_id": "ed-4",
+            "decision": "INCLUDED",
+            "evidence_snapshot_id": "es-e577a4a348c7c1fed604",
+            "capability": "valuation"
+          },
+          {
+            "decision_id": "1",
+            "eligibility_decision_id": "ed-1",
+            "decision": "INCLUDED",
+            "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
+            "capability": "valuation"
+          }
+        ],
+        "evidence_snapshot_items": [
+          {
+            "snapshot_item_id": "1",
+            "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
+            "included": true
+          },
+          {
+            "snapshot_item_id": "4",
+            "evidence_snapshot_id": "es-e577a4a348c7c1fed604",
+            "included": true
+          }
+        ],
+        "claim_ledger_references": [
+          {
+            "claim_id": "claim-resp-valuation-e53ee144b550-1",
+            "claim_ledger_id": "cl-19e8bb62a10426be3d45",
+            "claim_type": "sold_count",
+            "verification_result": "SUPPORTED",
+            "deterministic_calculation_id": null
+          },
+          {
+            "claim_id": "claim-resp-valuation-e577a4a348c7-1",
+            "claim_ledger_id": "cl-183b70e50d2acd7ace50",
+            "claim_type": "sold_count",
+            "verification_result": "SUPPORTED",
+            "deterministic_calculation_id": null
+          }
+        ]
+      }
+    },
+    {
+      "market_event_id": "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+      "settlement_ok": true,
+      "kafka_lineage_present": false,
+      "forbidden_sources_cleared": {
+        "from_seed": false,
+        "synthetic": false,
+        "force_sold_floor": false,
+        "owner_proof_scenario": false,
+        "direct_db_only": false,
+        "seed_completed_sale_json": false,
+        "archived_listing": false,
+        "notes": "Observation source_connector is shopping-service-sale-completed-outbox; sale_completed_events row present with payment/order identity."
+      },
+      "lineage": {
+        "listing_id": "e6c7073b-f0a2-4f8e-8157-c605a5e2d9f9",
+        "order_id": "9cf8210a-6ede-4283-a6fc-2870f7ef77b8",
+        "payment_transaction_id": "PAY-SIM-1784661057026-rx7g1rpf9",
+        "settlement_source": "CHECKOUT_SETTLEMENT",
+        "sale_mechanism": "buy_now",
+        "sale_event_id": "sale-4299ba8914dc361e5cafeb0ee0f1",
+        "sale_completed_events_row": {
+          "sale_event_id": "sale-4299ba8914dc361e5cafeb0ee0f1",
+          "market_event_id": "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "final_price": "21.00",
+          "currency": "USD",
+          "completed_at": "2026-07-21T19:10:58.601Z",
+          "payload_hash": "bac1e2f6c2950da7596aa749fd9f46fa863eb6f89dddcf1f3dab2a0e895cb1b0",
+          "evidence_snapshot_id": "es-bfcef9ff52514a04"
+        },
+        "outbox_events": [
+          {
+            "id": "b833822c-bc0b-41e1-a046-9b3032d911ff",
+            "type": "SaleCompleted",
+            "aggregate_id": "e6c7073b-f0a2-4f8e-8157-c605a5e2d9f9",
+            "published": true,
+            "published_at": null,
+            "payload_hash": "a4e519d5073c853cbbe82d64e765bff37beb75c62a41d43ccbee609a7f494861",
+            "idempotency_key": "b833822c-bc0b-41e1-a046-9b3032d911ff",
+            "source_sha": "unknown-pre-migration-56",
+            "broker_topic": null,
+            "broker_partition": null,
+            "broker_offset": null,
+            "created_at": "2026-07-21T19:10:59.736Z"
+          }
+        ],
+        "kafka_consumer_lineage": [],
+        "kafka_gap": true,
+        "raw_observation": {
+          "observation_id": "obs-d812d2d274fd6fff11d0ef94",
+          "source_class": "FIRST_PARTY_SETTLEMENT",
+          "source_connector": "shopping-service-sale-completed-outbox",
+          "source_record_id": "sale-4299ba8914dc361e5cafeb0ee0f1",
+          "canonical_payload_hash": "93fc1c478b7e4000eb582fcfbeea3d8a25baa52b10b736d81c86ca365b53c39d"
+        },
+        "canonical_market_event": {
+          "market_event_id": "me-sale-4299ba8914dc361e5cafeb0ee0f1",
+          "observation_id": "obs-d812d2d274fd6fff11d0ef94",
+          "event_type": "SALE_COMPLETED",
+          "price_normalized": "21.00",
+          "payload_hash": "0e611c71f28e42ad86acbc0e25455124971fd828af793c164d636020c3bbcca0",
+          "rights_status": "FIRST_PARTY"
+        },
+        "eligibility_decisions": [
+          {
+            "decision_id": "5",
+            "eligibility_decision_id": "ed-5",
+            "decision": "INCLUDED",
+            "evidence_snapshot_id": "es-e577a4a348c7c1fed604",
+            "capability": "valuation"
+          },
+          {
+            "decision_id": "2",
+            "eligibility_decision_id": "ed-2",
+            "decision": "INCLUDED",
+            "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
+            "capability": "valuation"
+          }
+        ],
+        "evidence_snapshot_items": [
+          {
+            "snapshot_item_id": "2",
+            "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
+            "included": true
+          },
+          {
+            "snapshot_item_id": "5",
+            "evidence_snapshot_id": "es-e577a4a348c7c1fed604",
+            "included": true
+          }
+        ],
+        "claim_ledger_references": [
+          {
+            "claim_id": "claim-resp-valuation-e53ee144b550-1",
+            "claim_ledger_id": "cl-19e8bb62a10426be3d45",
+            "claim_type": "sold_count",
+            "verification_result": "SUPPORTED",
+            "deterministic_calculation_id": null
+          },
+          {
+            "claim_id": "claim-resp-valuation-e577a4a348c7-1",
+            "claim_ledger_id": "cl-183b70e50d2acd7ace50",
+            "claim_type": "sold_count",
+            "verification_result": "SUPPORTED",
+            "deterministic_calculation_id": null
+          }
+        ]
+      }
+    },
+    {
+      "market_event_id": "me-sale-aab33761d4bb1c490b7836dd3371",
+      "settlement_ok": true,
+      "kafka_lineage_present": false,
+      "forbidden_sources_cleared": {
+        "from_seed": false,
+        "synthetic": false,
+        "force_sold_floor": false,
+        "owner_proof_scenario": false,
+        "direct_db_only": false,
+        "seed_completed_sale_json": false,
+        "archived_listing": false,
+        "notes": "Observation source_connector is shopping-service-sale-completed-outbox; sale_completed_events row present with payment/order identity."
+      },
+      "lineage": {
+        "listing_id": "43255068-f82a-496e-96a4-c587a1b298e2",
+        "order_id": "fb1c1d75-153b-41c7-92f6-e421fb72b6ff",
+        "payment_transaction_id": "PAY-SIM-1784648622778-h9yczfs4j",
+        "settlement_source": "CHECKOUT_SETTLEMENT",
+        "sale_mechanism": "buy_now",
+        "sale_event_id": "sale-aab33761d4bb1c490b7836dd3371",
+        "sale_completed_events_row": {
+          "sale_event_id": "sale-aab33761d4bb1c490b7836dd3371",
+          "market_event_id": "me-sale-aab33761d4bb1c490b7836dd3371",
+          "final_price": "19.50",
+          "currency": "USD",
+          "completed_at": "2026-07-21T15:43:42.810Z",
+          "payload_hash": "07400741a5c8fbea4aa9e548ea75a073d623ecc0dfd845cccd9af8ebca4d669b",
+          "evidence_snapshot_id": "es-48ac858a83a82dea"
+        },
+        "outbox_events": [
+          {
+            "id": "a0fe8dce-d141-40ab-a643-1f4e2442edae",
+            "type": "SaleCompleted",
+            "aggregate_id": "43255068-f82a-496e-96a4-c587a1b298e2",
+            "published": true,
+            "published_at": null,
+            "payload_hash": "17e4d99dc6226fd172e27898a91921474ff92ea83d59b519de25a72c218bcb33",
+            "idempotency_key": "a0fe8dce-d141-40ab-a643-1f4e2442edae",
+            "source_sha": "unknown-pre-migration-56",
+            "broker_topic": null,
+            "broker_partition": null,
+            "broker_offset": null,
+            "created_at": "2026-07-21T15:43:42.843Z"
+          },
+          {
+            "id": "bf30d175-a3fa-4f05-ae7c-dde01b7040ed",
+            "type": "SaleCompleted",
+            "aggregate_id": "43255068-f82a-496e-96a4-c587a1b298e2",
+            "published": true,
+            "published_at": null,
+            "payload_hash": "a679195bdba1178f683cac56729fc1b2008edf7ea4a27fe57415dc7a27e7c99b",
+            "idempotency_key": "bf30d175-a3fa-4f05-ae7c-dde01b7040ed",
+            "source_sha": "unknown-pre-migration-56",
+            "broker_topic": null,
+            "broker_partition": null,
+            "broker_offset": null,
+            "created_at": "2026-07-21T15:43:13.762Z"
+          }
+        ],
+        "kafka_consumer_lineage": [],
+        "kafka_gap": true,
+        "raw_observation": {
+          "observation_id": "obs-5a93907f9fbc7b8eaf31beaf",
+          "source_class": "FIRST_PARTY_SETTLEMENT",
+          "source_connector": "shopping-service-sale-completed-outbox",
+          "source_record_id": "sale-aab33761d4bb1c490b7836dd3371",
+          "canonical_payload_hash": "7599faf784498ab595fd00a4380d3a734262a4ede1e68b7dd538d03d3a4f5e9d"
+        },
+        "canonical_market_event": {
+          "market_event_id": "me-sale-aab33761d4bb1c490b7836dd3371",
+          "observation_id": "obs-5a93907f9fbc7b8eaf31beaf",
+          "event_type": "SALE_COMPLETED",
+          "price_normalized": "19.50",
+          "payload_hash": "55abb715a99f3666191061cec809d7407bcb79287ed33197067f2c1356efd4a1",
+          "rights_status": "FIRST_PARTY"
+        },
+        "eligibility_decisions": [
+          {
+            "decision_id": "6",
+            "eligibility_decision_id": "ed-6",
+            "decision": "INCLUDED",
+            "evidence_snapshot_id": "es-e577a4a348c7c1fed604",
+            "capability": "valuation"
+          },
+          {
+            "decision_id": "3",
+            "eligibility_decision_id": "ed-3",
+            "decision": "INCLUDED",
+            "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
+            "capability": "valuation"
+          }
+        ],
+        "evidence_snapshot_items": [
+          {
+            "snapshot_item_id": "3",
+            "evidence_snapshot_id": "es-e53ee144b550bc473a2d",
+            "included": true
+          },
+          {
+            "snapshot_item_id": "6",
+            "evidence_snapshot_id": "es-e577a4a348c7c1fed604",
+            "included": true
+          }
+        ],
+        "claim_ledger_references": [
+          {
+            "claim_id": "claim-resp-valuation-e53ee144b550-1",
+            "claim_ledger_id": "cl-19e8bb62a10426be3d45",
+            "claim_type": "sold_count",
+            "verification_result": "SUPPORTED",
+            "deterministic_calculation_id": null
+          },
+          {
+            "claim_id": "claim-resp-valuation-e577a4a348c7-1",
+            "claim_ledger_id": "cl-183b70e50d2acd7ace50",
+            "claim_type": "sold_count",
+            "verification_result": "SUPPORTED",
+            "deterministic_calculation_id": null
+          }
+        ]
+      }
+    }
+  ],
+  "blockers": [],
+  "classification_note": "All three supporting market events have sale_completed_events + FIRST_PARTY_SETTLEMENT observation lineage from shopping-service outbox normalization.",
+  "kafka_lineage_note": "Pre-migration-54 publishes may lack kafka_consumer_lineage rows; settlement provenance is established via sale_completed_events + raw_observations."
+}

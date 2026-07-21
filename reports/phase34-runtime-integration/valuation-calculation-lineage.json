@@ -1,0 +1,105 @@
+{
+  "ok": true,
+  "generated_at": "2026-07-21T22:29:04.769Z",
+  "turn1": {
+    "response_id": "resp-valuation-4b9e14e90570",
+    "evidence_snapshot_id": "es-4b9e14e9057082a3811f",
+    "calculation_id": "calc-val-27505b8c18e736b27bea",
+    "condition": "VG+",
+    "fair_market_range": {
+      "low": 16.58,
+      "high": 23.4
+    },
+    "claim_types": [
+      "sold_count",
+      "currency",
+      "median_sold_price",
+      "fair_market_low",
+      "fair_market_high",
+      "quick_sale_low",
+      "quick_sale_high",
+      "patient_sale_low",
+      "patient_sale_high",
+      "condition_adjustment",
+      "time_range"
+    ]
+  },
+  "turn2": {
+    "response_id": "resp-valuation-8dac8d7ca5d8",
+    "evidence_snapshot_id": "es-8dac8d7ca5d83c169bd3",
+    "calculation_id": "calc-val-d3fd91bfeb713c1e9446",
+    "condition": "VG",
+    "fair_market_range": {
+      "low": 14.09,
+      "high": 19.89
+    },
+    "condition_adjustments": {
+      "condition": "VG",
+      "multiplier": 0.85,
+      "notes": "sleeve seam split"
+    },
+    "claim_types": [
+      "sold_count",
+      "currency",
+      "median_sold_price",
+      "fair_market_low",
+      "fair_market_high",
+      "quick_sale_low",
+      "quick_sale_high",
+      "patient_sale_low",
+      "patient_sale_high",
+      "condition_adjustment",
+      "time_range"
+    ]
+  },
+  "db_calculations": [
+    {
+      "calculation_id": "calc-val-27505b8c18e736b27bea",
+      "evidence_snapshot_id": "es-4b9e14e9057082a3811f",
+      "median": "19.5",
+      "condition_adjustments": {
+        "notes": null,
+        "condition": "VG+",
+        "multiplier": 1
+      },
+      "fair_market_range": {
+        "low": 16.58,
+        "high": 23.4
+      },
+      "quick_sale_range": {
+        "low": 16.67,
+        "high": 18.43
+      },
+      "patient_sale_range": {
+        "low": 21.3,
+        "high": 24.21
+      },
+      "result_hash": "27505b8c18e736b27bea0bcc8dad10cc5f1987e47a08a5fd4495d85d89102fa2"
+    },
+    {
+      "calculation_id": "calc-val-d3fd91bfeb713c1e9446",
+      "evidence_snapshot_id": "es-8dac8d7ca5d83c169bd3",
+      "median": "19.5",
+      "condition_adjustments": {
+        "notes": "sleeve seam split",
+        "condition": "VG",
+        "multiplier": 0.85
+      },
+      "fair_market_range": {
+        "low": 14.09,
+        "high": 19.89
+      },
+      "quick_sale_range": {
+        "low": 14.17,
+        "high": 15.67
+      },
+      "patient_sale_range": {
+        "low": 18.11,
+        "high": 20.58
+      },
+      "result_hash": "d3fd91bfeb713c1e9446b81d2ae4cabbdb97bfca83390a6e3534a92d2c5ceb97"
+    }
+  ],
+  "previous_response_immutable": true,
+  "blockers": []
+}

@@ -1,0 +1,31 @@
+{
+  "ok": true,
+  "generated_at": "2026-07-21T22:30:00.000Z",
+  "algorithm": {
+    "A_no_existing": "ACCEPTED",
+    "B_same_source_same_hash": "DUPLICATE",
+    "C_same_source_different_hash": "IDENTITY_PAYLOAD_CONFLICT + quarantine",
+    "D_same_topic_partition_offset": "DUPLICATE delivery"
+  },
+  "schema": {
+    "unique_source_event_normalization": "uq_kafka_consumer_lineage_source_norm",
+    "weak_unique_dropped": "kafka_consumer_lineage_source_event_id_payload_hash_normali_key",
+    "result_enum_includes": [
+      "ACCEPTED",
+      "DUPLICATE",
+      "REJECTED",
+      "QUARANTINED",
+      "IDENTITY_PAYLOAD_CONFLICT"
+    ]
+  },
+  "unit_tests": {
+    "file": "tests/phase34-kafka-identity.test.mjs",
+    "passed": 5,
+    "failed": 0
+  },
+  "implementation": {
+    "pure_core": "scripts/lib/phase34-kafka-identity.mjs",
+    "production_path": "services/shopping-service/src/lib/sale-completed-outbox-drain.ts#normalizeSaleCompleted"
+  },
+  "note": "Uniqueness is now source_event_id + normalization_version; payload hash compared in application code."
+}

@@ -96,6 +96,7 @@ export function buildValuationCalculation({
   const currency = structured_result.currency || 'USD';
   const payloadCore = {
     algorithm_version,
+    evidence_snapshot_id: snapshot.evidence_snapshot_id,
     currency,
     eligible_sale_prices,
     normalized_prices,
@@ -110,6 +111,8 @@ export function buildValuationCalculation({
     sold_count: included.length,
     included_event_ids: included.map((e) => e.market_event_id || e.evidence_id).filter(Boolean),
     confidence_inputs: structured_result.confidence_factors || {},
+    turn_id: snapshot.turn_id || null,
+    request_id: snapshot.request_id || null,
   };
   const result_hash = sha256(payloadCore);
   const calculation_id = `calc-val-${result_hash.slice(0, 20)}`;

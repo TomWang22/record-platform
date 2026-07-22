@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import { EIGHT_CAPABILITIES } from '../lib/phase34-capability-response.mjs';
 import { synthesizeDeterministic, synthesizeGrounded } from '../lib/phase34-grounded-synthesis.mjs';
 import { createOllamaModelGateway } from '../lib/phase34-ollama-model-gateway.mjs';
-import { guardInvention } from '../lib/phase34-invention-guard.mjs';
+import { guardInvention, guardWithRetry } from '../lib/phase34-invention-guard.mjs';
 import { retrieve, createRetrievalStores } from '../lib/phase34-retrieval.mjs';
 import { createPersistedEmbeddingStore } from '../lib/phase34-persisted-vector-index.mjs';
 import {
@@ -199,33 +199,51 @@ async function main() {
             synthesis = synthesizeDeterministic({ capability, structured_result: structured });
           } else {
             invoked = true;
-            const invention = guardInvention({
+            const claim_ledger = {
+              entries: Object.entries(structured)
+                .filter(([, v]) => typeof v === 'number')
+                .map(([k, v]) => ({
+                  claim_type: k,
+                  normalized_claim_value: v,
+                  verification_result: 'SUPPORTED',
+                })),
+            };
+            const guarded = await guardWithRetry({
               text: synthesis.direct_answer,
               structured_result: structured,
-              claim_ledger: {
-                entries: Object.entries(structured)
-                  .filter(([, v]) => typeof v === 'number')
-                  .map(([k, v]) => ({
-                    claim_type: k,
-                    normalized_claim_value: v,
-                    verification_result: 'SUPPORTED',
-                  })),
+              claim_ledger,
+              synthesisInput: { capability, structured_result: structured },
+              retryOnce: async ({ violations }) => {
+                const banned = violations
+                  .map((v) => v.claim?.raw)
+                  .filter(Boolean)
+                  .slice(0, 8)
+                  .join(', ');
+                const retry = await gateway.complete({
+                  capability,
+                  structured_result: structured,
+                  evidence_summary: `Retry. Forbidden values: ${banned}. Only JSON numbers.`,
+                  snapshot,
+                  inference_id: ids.inference_id,
+                });
+                return retry.direct_answer;
               },
             });
-            if (invention.ok === false) {
+            if (guarded.ok && !guarded.used_fallback) {
+              success = true;
+              fallback_class = FALLBACK_CLASS.NONE;
+              synthesis_label = 'GROUNDED MODEL SYNTHESIS';
+              synthesis = { ...synthesis, direct_answer: guarded.guarded_text };
+              model_by_capability[capability] = (model_by_capability[capability] || 0) + 1;
+            } else {
               fallback_class = FALLBACK_CLASS.MODEL_GUARD_REJECTED;
               hard_failures.push({
                 session_id,
                 reason: 'INVENTION_GUARD',
-                violations: invention.violations,
+                violations: (guarded.prior_violations || guarded.violations || []).slice(0, 3),
               });
-              synthesis = synthesizeDeterministic({ capability, structured_result: structured });
+              synthesis = guarded.fallback_synthesis || synthesizeDeterministic({ capability, structured_result: structured });
               synthesis_label = 'GROUNDED MODEL SYNTHESIS BLOCKED_BY_INVENTION_GUARD';
-            } else {
-              success = true;
-              fallback_class = FALLBACK_CLASS.NONE;
-              synthesis_label = 'GROUNDED MODEL SYNTHESIS';
-              model_by_capability[capability] = (model_by_capability[capability] || 0) + 1;
             }
           }
           process.stdout.write(`model_done ${capability} success=${success}\n`);

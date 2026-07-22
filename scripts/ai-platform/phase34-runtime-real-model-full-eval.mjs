@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 /**
- * Stage C — real-model pilot: 2,000 logical sessions.
+ * Stage D — real-model full evaluation: 20,000 unique logical sessions.
  * All model-eligible turns must invoke the model. H1/H2/H3 share one inference.
- * Evidence: /tmp/phase34-real-model-pilot-v1
+ * Do not launch unless Stages A/B/C froze PASS.
+ * Evidence: /tmp/phase34-real-model-full-eval-v1
  */
 import fs from 'node:fs';
+import { finished } from 'node:stream/promises';
 import crypto from 'node:crypto';
 import { EIGHT_CAPABILITIES } from '../lib/phase34-capability-response.mjs';
 import { synthesizeDeterministic, synthesizeGrounded } from '../lib/phase34-grounded-synthesis.mjs';
 import { createOllamaModelGateway } from '../lib/phase34-ollama-model-gateway.mjs';
-import { guardInvention, guardWithRetry } from '../lib/phase34-invention-guard.mjs';
+import { guardWithRetry } from '../lib/phase34-invention-guard.mjs';
 import { retrieve, createRetrievalStores } from '../lib/phase34-retrieval.mjs';
 import { createPersistedEmbeddingStore } from '../lib/phase34-persisted-vector-index.mjs';
 import {
@@ -34,21 +36,70 @@ import {
   createDraft,
 } from '../lib/phase34-conversation-memory.mjs';
 
-const EVID = process.env.PHASE34_EVIDENCE_ROOT || '/tmp/phase34-real-model-pilot-v1';
-const TOTAL = Number(process.env.PHASE34_PILOT_SESSIONS || 2000);
-const PER_CAP = TOTAL / EIGHT_CAPABILITIES.length; // 250
-const MULTI_FRAC = 0.2;
+const EVID = process.env.PHASE34_EVIDENCE_ROOT || '/tmp/phase34-real-model-full-eval-v1';
+const TOTAL = Number(process.env.PHASE34_FULL_EVAL_SESSIONS || 20000);
+const PER_CAP = TOTAL / EIGHT_CAPABILITIES.length; // 2500
+const MULTI_FRAC = Number(process.env.PHASE34_MULTI_FRAC || 0.27);
 
 function sha(s) {
   return crypto.createHash('sha256').update(String(s)).digest('hex');
 }
 
+/** Balanced success / correction / honest-limit / adversarial within each capability. */
 function classFor(j) {
-  // Within each capability's 250 sessions
-  if (j < 100) return 'success';
-  if (j < 180) return 'correction';
-  if (j < 215) return 'honest_limit';
+  if (j < 1000) return 'success';
+  if (j < 1800) return 'correction';
+  if (j < 2150) return 'honest_limit';
   return 'adversarial';
+}
+
+function nearestRankPercentile(sortedAsc, p) {
+  const n = sortedAsc.length;
+  if (n === 0) return null;
+  if (p <= 0) return sortedAsc[0];
+  if (p >= 100) return sortedAsc[n - 1];
+  const rank = Math.ceil((p / 100) * n);
+  return sortedAsc[Math.min(n - 1, Math.max(0, rank - 1))];
+}
+
+function latencyReport(samplesMs) {
+  const missing = samplesMs.filter((x) => x == null || Number.isNaN(x)).length;
+  const vals = samplesMs.filter((x) => typeof x === 'number' && !Number.isNaN(x)).sort((a, b) => a - b);
+  const n = vals.length;
+  const coverage = samplesMs.length === 0 ? 0 : n / samplesMs.length;
+  const mean = n ? vals.reduce((a, b) => a + b, 0) / n : null;
+  const p = (pct) => {
+    if (n === 0) return { value: null, label: 'NOT_ESTIMABLE' };
+    const expectedTail = n * (1 - pct / 100);
+    let label = 'SUPPORTED';
+    if (expectedTail < 1) label = 'NOT_ESTIMABLE';
+    else if (expectedTail < 10) label = 'LOW_SAMPLE_ESTIMATE';
+    if (label === 'NOT_ESTIMABLE' && pct < 100) {
+      return { value: null, label };
+    }
+    if (pct === 100) {
+      return { value: vals[n - 1], label: 'OBSERVED_MAX_ONLY' };
+    }
+    return { value: nearestRankPercentile(vals, pct), label };
+  };
+  return {
+    sample_count: n,
+    missing_count: missing,
+    coverage_ratio: coverage,
+    minimum: n ? vals[0] : null,
+    median: n ? nearestRankPercentile(vals, 50) : null,
+    arithmetic_mean: mean,
+    maximum: n ? vals[n - 1] : null,
+    p50: p(50),
+    p90: p(90),
+    p95: p(95),
+    p99: p(99),
+    p99_9: p(99.9),
+    p99_99: p(99.99),
+    p99_999: p(99.999),
+    p99_9999: p(99.9999),
+    p100: p(100),
+  };
 }
 
 function structuredFor(capability, klass, values = {}) {
@@ -88,9 +139,43 @@ function structuredFor(capability, klass, values = {}) {
   return base;
 }
 
+function expectedEligiblePreview() {
+  let eligible = 0;
+  let turns = 0;
+  let multi = 0;
+  for (const capability of EIGHT_CAPABILITIES) {
+    for (let j = 0; j < PER_CAP; j += 1) {
+      const klass = classFor(j);
+      const isMulti = j / PER_CAP < MULTI_FRAC && klass !== 'adversarial';
+      const depth = isMulti ? 4 + (j % 9) : 1;
+      if (isMulti) multi += 1;
+      for (let t = 0; t < depth; t += 1) {
+        turns += 1;
+        if (decideModelEligibility({ capability, scenario_class: klass }).eligible) eligible += 1;
+      }
+    }
+  }
+  return { sessions: TOTAL, multi_turn_sessions: multi, total_turns: turns, model_eligible_turns: eligible };
+}
+
 async function main() {
+  if (fs.existsSync(`${EVID}/real-model-full-eval.json`)) {
+    console.error(JSON.stringify({ ok: false, reason: 'EVIDENCE_ROOT_ALREADY_FINALIZED', evid: EVID }));
+    process.exit(3);
+  }
+  if (fs.existsSync(`${EVID}/FROZEN_BLOCKED_EVIDENCE`) || fs.existsSync(`${EVID}/FROZEN_PASS_EVIDENCE`)) {
+    console.error(JSON.stringify({ ok: false, reason: 'EVIDENCE_ROOT_FROZEN', evid: EVID }));
+    process.exit(3);
+  }
+
   clearCanonicalInferenceStore();
   fs.mkdirSync(`${EVID}/ledgers`, { recursive: true });
+
+  const preview = expectedEligiblePreview();
+  process.stdout.write(`model_eligible_turns_denominator_preview=${preview.model_eligible_turns}\n`);
+  process.stdout.write(`sessions=${preview.sessions} multi=${preview.multi_turn_sessions} turns=${preview.total_turns}\n`);
+  fs.writeFileSync(`${EVID}/eligibility-denominator-preview.json`, JSON.stringify(preview, null, 2) + '\n');
+
   const docs = [
     {
       id: 'doc-a',
@@ -130,18 +215,23 @@ async function main() {
 
   const counters = emptyEligibilityCounters();
   const hard_failures = [];
+  const generationLatencies = [];
   let multi_turn_sessions = 0;
-  const sessionStream = fs.createWriteStream(`${EVID}/ledgers/sessions.jsonl`);
+  const sessionStream = fs.createWriteStream(`${EVID}/ledgers/sessions.jsonl`, { flags: 'a' });
+  const modelStream = fs.createWriteStream(`${EVID}/ledgers/model-invocations.jsonl`, { flags: 'a' });
   let sessionIndex = 0;
+  let stopNew = false;
 
   for (const capability of EIGHT_CAPABILITIES) {
+    if (stopNew) break;
     for (let j = 0; j < PER_CAP; j += 1) {
+      if (stopNew) break;
       const klass = classFor(j);
       const isMulti = j / PER_CAP < MULTI_FRAC && klass !== 'adversarial';
-      const depth = isMulti ? 4 + (j % 5) : 1; // 4–8
+      const depth = isMulti ? 4 + (j % 9) : 1; // 4–12
       if (isMulti) multi_turn_sessions += 1;
 
-      const session_id = `rmp-${String(sessionIndex).padStart(5, '0')}`;
+      const session_id = `rmf-${String(sessionIndex).padStart(5, '0')}`;
       sessionIndex += 1;
       const owner = `owner-${sessionIndex % 31}`;
       const sessionDoc = createConversationSession({
@@ -171,7 +261,7 @@ async function main() {
         const turn = appendConversationTurn(sessionDoc, {
           actor: owner,
           role: 'customer',
-          content: `Pilot turn ${t}`,
+          content: `Full-eval turn ${t}`,
           turn_id: crypto.randomUUID(),
         });
         if (klass === 'correction' && t === Math.min(1, depth - 1)) {
@@ -208,7 +298,7 @@ async function main() {
 
         const snapshot = {
           included_event_ids: docs.map((d) => d.market_event_id),
-          evidence_snapshot_hash: sha(`pilot-${session_id}-${t}`),
+          evidence_snapshot_hash: sha(`full-${session_id}-${t}`),
         };
 
         let synthesis;
@@ -293,7 +383,21 @@ async function main() {
                 synthesis = synthesizeDeterministic({ capability, structured_result: structured });
               }
             }
-            if (synthesis.model_ledger) synthesis.model_ledger.inference_id = ids.inference_id;
+            if (synthesis.model_ledger) {
+              synthesis.model_ledger.inference_id = ids.inference_id;
+              generationLatencies.push(synthesis.model_ledger.generation_latency_ms ?? synthesis.model_ledger.total_latency_ms ?? null);
+              modelStream.write(
+                JSON.stringify({
+                  session_id,
+                  turn_index: t,
+                  capability,
+                  inference_id: ids.inference_id,
+                  model_ledger: synthesis.model_ledger,
+                  success,
+                  fallback_class,
+                }) + '\n',
+              );
+            }
           } catch (e) {
             fallback_class = /timeout|aborted/i.test(String(e.message))
               ? FALLBACK_CLASS.MODEL_TIMEOUT
@@ -358,44 +462,101 @@ async function main() {
           `progress ${sessionIndex}/${TOTAL} eligible=${counters.model_eligible_turns} success=${counters.model_success_turns} fail=${hard_failures.length}\n`,
         );
       }
-      if (hard_failures.length > 0 && process.env.PHASE34_FAIL_CLOSED === '1') break;
+      if (hard_failures.length > 0) {
+        // Finish active logical unit (this session already done), stop releasing new sessions.
+        stopNew = true;
+        process.stdout.write(`FAIL_CLOSED at session=${sessionIndex} failures=${hard_failures.length}\n`);
+      }
     }
   }
   sessionStream.end();
+  modelStream.end();
+  await finished(sessionStream);
+  await finished(modelStream);
 
   const coverage = assertEligibilityCoverage(counters);
+  const completedAll = !stopNew && sessionIndex === TOTAL;
   const ok =
-    sessionIndex === TOTAL &&
+    completedAll &&
     hard_failures.length === 0 &&
     coverage.ok &&
     counters.unexpected_rule_fallback_turns === 0 &&
     counters.model_success_turns === counters.model_eligible_turns &&
-    multi_turn_sessions >= Math.floor(TOTAL * MULTI_FRAC) - 50; // allow small class-filter variance
+    multi_turn_sessions >= Math.floor(TOTAL * 0.25) &&
+    multi_turn_sessions <= Math.ceil(TOTAL * 0.3) + 50;
 
+  const latency = latencyReport(generationLatencies);
   const report = {
     ok,
     generated_at: new Date().toISOString(),
     evidence_root: EVID,
     sessions_total: sessionIndex,
     multi_turn_sessions,
+    eligibility_preview: preview,
     eligibility_counters: counters,
     coverage,
+    model_generation_latency_ms: latency,
     model_tier: gateway.model_tier,
     hard_failure_count: hard_failures.length,
     hard_failures: hard_failures.slice(0, 40),
+    stop_new_sessions: stopNew,
     classification: ok
       ? [
-          'PHASE 34 REAL MODEL PILOT PASS —',
+          'PHASE 34 REAL MODEL FULL EVAL PASS —',
           `MODEL ELIGIBLE=${counters.model_eligible_turns} SUCCESS=${counters.model_success_turns} —`,
-          'FULL REAL-INFERENCE EVAL PENDING —',
+          'HUMAN REVIEW AND OWNER PACKAGE PENDING —',
           'PRODUCTION NOT APPROVED',
         ].join('\n')
-      : ['PHASE 34 REAL MODEL PILOT BLOCKED —', 'PRODUCTION NOT APPROVED'].join('\n'),
+      : [
+          'PHASE 34 REAL MODEL FULL EVAL BLOCKED —',
+          `SESSIONS=${sessionIndex}/${TOTAL} ELIGIBLE=${counters.model_eligible_turns} SUCCESS=${counters.model_success_turns} FAIL=${hard_failures.length} —`,
+          'PRODUCTION NOT APPROVED',
+        ].join('\n'),
     production: 'NOT APPROVED',
     model_weight_training: 'NO',
     chatgpt_tier_claimed: false,
   };
-  fs.writeFileSync(`${EVID}/real-model-pilot.json`, JSON.stringify(report, null, 2) + '\n');
+  fs.writeFileSync(`${EVID}/real-model-full-eval.json`, JSON.stringify(report, null, 2) + '\n');
+
+  if (ok) {
+    fs.mkdirSync(`${EVID}/FROZEN_PASS_EVIDENCE`, { recursive: true });
+    fs.writeFileSync(
+      `${EVID}/FROZEN_PASS_EVIDENCE/freeze.json`,
+      JSON.stringify(
+        {
+          frozen_at: new Date().toISOString(),
+          status: 'FROZEN_PASS',
+          report: 'real-model-full-eval.json',
+          report_sha256: sha(fs.readFileSync(`${EVID}/real-model-full-eval.json`)),
+          model_eligible_turns: counters.model_eligible_turns,
+          do_not_resume: true,
+          do_not_mutate: true,
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+  } else {
+    fs.mkdirSync(`${EVID}/FROZEN_BLOCKED_EVIDENCE`, { recursive: true });
+    fs.writeFileSync(
+      `${EVID}/FROZEN_BLOCKED_EVIDENCE/freeze.json`,
+      JSON.stringify(
+        {
+          frozen_at: new Date().toISOString(),
+          status: 'FROZEN_BLOCKED',
+          report: 'real-model-full-eval.json',
+          report_sha256: sha(fs.readFileSync(`${EVID}/real-model-full-eval.json`)),
+          sessions_completed: sessionIndex,
+          hard_failure_count: hard_failures.length,
+          do_not_resume: true,
+          do_not_mutate: true,
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+  }
+
   console.log(
     JSON.stringify(
       {
@@ -405,8 +566,10 @@ async function main() {
         model_eligible: counters.model_eligible_turns,
         model_success: counters.model_success_turns,
         hard_failures: hard_failures.length,
+        latency_p50: latency.p50,
+        latency_p99: latency.p99,
         classification: report.classification.split('\n')[0],
-        out: `${EVID}/real-model-pilot.json`,
+        out: `${EVID}/real-model-full-eval.json`,
       },
       null,
       2,

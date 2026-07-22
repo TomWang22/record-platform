@@ -69,7 +69,7 @@ export async function ollamaGenerate({
   baseUrl = DEFAULT_OLLAMA_BASE,
   timeoutMs = Number(process.env.PHASE34_OLLAMA_TIMEOUT_MS || 180_000),
   keepAlive = process.env.PHASE34_OLLAMA_KEEP_ALIVE || '30m',
-  numPredict = Number(process.env.PHASE34_OLLAMA_NUM_PREDICT || 64),
+  numPredict = Number(process.env.PHASE34_OLLAMA_NUM_PREDICT || 48),
   requestId = null,
 } = {}) {
   const started = Date.now();
@@ -175,9 +175,10 @@ export function createOllamaModelGateway(options = {}) {
       const request_id = inference_id || `req-${crypto.randomUUID().replace(/-/g, '')}`;
       const structured = structured_result || {};
       const system =
-        'You are a grounded marketplace assistant. Use ONLY the structured facts. ' +
-        'Do not invent prices, sales, bids, bidders, forecasts, or scarcity. ' +
-        'If a number is missing, say evidence is insufficient. Keep the answer concise.';
+        'You are a grounded marketplace assistant. Use ONLY the structured facts JSON. ' +
+        'Restate only numbers that appear in that JSON. Do not introduce any other digits, ' +
+        'prices, counts, dates, percentages, or IDs. Do not invent sales, bids, or rarity. ' +
+        'If a number is missing, say evidence is insufficient. Keep the answer under 80 words.';
       const prompt = [
         `Capability: ${capability || 'unknown'}`,
         `Structured facts JSON: ${JSON.stringify(structured)}`,

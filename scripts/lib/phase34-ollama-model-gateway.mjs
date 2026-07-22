@@ -1,13 +1,66 @@
 /**
  * Local Ollama model gateway for Phase 34 grounded model synthesis proofs.
  * MODEL_WEIGHT_TRAINING = NO. Inference only. Invention guard must run after.
+ * Native host default :11436 (Colima mux owns :11434).
  */
 import crypto from 'node:crypto';
 
-// Prefer native host Ollama on :11436 (avoids Colima SSH mux on :11434 and flaky
-// cluster port-forwards under memory pressure). Override with OLLAMA_BASE_URL.
 export const DEFAULT_OLLAMA_BASE = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11436';
 export const DEFAULT_OLLAMA_MODEL = process.env.PHASE34_OLLAMA_MODEL || 'llama3.2:1b';
+export const GATEWAY_VERSION = 'phase34-ollama-gateway-v2';
+
+/** Product-quality role for known local models. */
+export function classifyModelTier(modelName) {
+  const name = String(modelName || '');
+  if (name.includes('1b') || name === 'llama3.2:1b') {
+    return {
+      role: 'TRANSPORT_AND_SMOKE_ONLY',
+      product_quality: 'MODEL_TIER_INSUFFICIENT',
+      chatgpt_tier_claimed: false,
+    };
+  }
+  return {
+    role: 'LOCAL_CANDIDATE',
+    product_quality: 'UNRATED',
+    chatgpt_tier_claimed: false,
+  };
+}
+
+export async function ollamaHealth({ baseUrl = DEFAULT_OLLAMA_BASE, timeoutMs = 5_000 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${baseUrl}/api/version`, { signal: controller.signal });
+    if (!res.ok) return { ok: false, ready: false, reason: `http_${res.status}` };
+    const body = await res.json();
+    return { ok: true, ready: true, version: body.version || null, baseUrl };
+  } catch (e) {
+    return { ok: false, ready: false, reason: String(e.message || e), baseUrl };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function ollamaListModels({ baseUrl = DEFAULT_OLLAMA_BASE, timeoutMs = 10_000 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${baseUrl}/api/tags`, { signal: controller.signal });
+    if (!res.ok) throw new Error(`ollama_tags_http_${res.status}`);
+    const body = await res.json();
+    const models = (body.models || []).map((m) => ({
+      name: m.name,
+      digest: m.digest || null,
+      size_bytes: m.size || null,
+      parameter_size: m.details?.parameter_size || null,
+      quantization: m.details?.quantization_level || null,
+      ...classifyModelTier(m.name),
+    }));
+    return { ok: true, models };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function ollamaGenerate({
   prompt,
@@ -17,6 +70,7 @@ export async function ollamaGenerate({
   timeoutMs = Number(process.env.PHASE34_OLLAMA_TIMEOUT_MS || 180_000),
   keepAlive = process.env.PHASE34_OLLAMA_KEEP_ALIVE || '30m',
   numPredict = Number(process.env.PHASE34_OLLAMA_NUM_PREDICT || 64),
+  requestId = null,
 } = {}) {
   const started = Date.now();
   const controller = new AbortController();
@@ -24,7 +78,10 @@ export async function ollamaGenerate({
   try {
     const res = await fetch(`${baseUrl}/api/generate`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...(requestId ? { 'x-request-id': requestId } : {}),
+      },
       body: JSON.stringify({
         model,
         prompt,
@@ -42,6 +99,7 @@ export async function ollamaGenerate({
     const body = await res.json();
     const output = String(body.response || '').trim();
     const latency = Date.now() - started;
+    const loadMs = body.load_duration ? Math.round(body.load_duration / 1e6) : null;
     return {
       ok: true,
       output,
@@ -51,22 +109,32 @@ export async function ollamaGenerate({
       input_tokens: body.prompt_eval_count ?? null,
       output_tokens: body.eval_count ?? null,
       total_latency_ms: latency,
-      load_duration_ms: body.load_duration ? Math.round(body.load_duration / 1e6) : null,
+      load_duration_ms: loadMs,
+      warm_cold: loadMs != null && loadMs < 2_000 ? 'warm' : 'cold_or_unknown',
       generation_latency_ms: body.eval_duration
         ? Math.round(body.eval_duration / 1e6)
         : latency,
       time_to_first_token_ms: body.prompt_eval_duration
         ? Math.round(body.prompt_eval_duration / 1e6)
         : null,
-      raw: body,
+      request_id: requestId,
+      // Do not echo raw prompt/system in return — only hashes at ledger layer.
+      raw_meta: {
+        done: body.done,
+        done_reason: body.done_reason,
+        eval_count: body.eval_count,
+        prompt_eval_count: body.prompt_eval_count,
+      },
     };
   } catch (err) {
     const aborted = err?.name === 'AbortError' || /aborted/i.test(String(err?.message || err));
     if (aborted) {
-      throw new Error(
+      const e = new Error(
         `ollama_generate_aborted_after_${timeoutMs}ms (base=${baseUrl} model=${model}); ` +
           'treat as inference/client timeout — /api/tags success is not generation health',
       );
+      e.code = 'MODEL_TIMEOUT';
+      throw e;
     }
     throw err;
   } finally {
@@ -75,19 +143,36 @@ export async function ollamaGenerate({
 }
 
 /**
- * Gateway adapter compatible with synthesizeGrounded({ modelGateway }).
- * Returns synthesis-shaped fields; caller must still run invention guard.
+ * Gateway with bounded consecutive-failure circuit breaker.
  */
 export function createOllamaModelGateway(options = {}) {
   const model = options.model || DEFAULT_OLLAMA_MODEL;
   const baseUrl = options.baseUrl || DEFAULT_OLLAMA_BASE;
-  const timeoutMs = options.timeoutMs || 45_000;
+  const timeoutMs = options.timeoutMs || Number(process.env.PHASE34_OLLAMA_TIMEOUT_MS || 120_000);
+  const failureThreshold = options.failureThreshold || 5;
+  const tier = classifyModelTier(model);
+  let consecutiveFailures = 0;
+  let circuitOpen = false;
 
   return {
     provider: 'ollama',
     model,
-    async complete({ capability, structured_result, snapshot, evidence_summary } = {}) {
+    gateway_version: GATEWAY_VERSION,
+    model_tier: tier,
+    async health() {
+      return ollamaHealth({ baseUrl });
+    },
+    async listModels() {
+      return ollamaListModels({ baseUrl });
+    },
+    async complete({ capability, structured_result, snapshot, evidence_summary, inference_id } = {}) {
+      if (circuitOpen) {
+        const err = new Error('MODEL_UNAVAILABLE:circuit_open');
+        err.code = 'MODEL_UNAVAILABLE';
+        throw err;
+      }
       const invocation_id = `mi-${crypto.randomUUID().replace(/-/g, '')}`;
+      const request_id = inference_id || `req-${crypto.randomUUID().replace(/-/g, '')}`;
       const structured = structured_result || {};
       const system =
         'You are a grounded marketplace assistant. Use ONLY the structured facts. ' +
@@ -109,17 +194,37 @@ export function createOllamaModelGateway(options = {}) {
       const prompt_hash = crypto.createHash('sha256').update(prompt).digest('hex');
       const config_hash = crypto
         .createHash('sha256')
-        .update(JSON.stringify({ provider: 'ollama', model, temperature: 0.1 }))
+        .update(JSON.stringify({ provider: 'ollama', model, temperature: 0.1, gateway: GATEWAY_VERSION }))
         .digest('hex');
 
-      const gen = await ollamaGenerate({ prompt, system, model, baseUrl, timeoutMs });
-      const output_hash = crypto.createHash('sha256').update(gen.output).digest('hex');
+      let gen;
+      try {
+        gen = await ollamaGenerate({
+          prompt,
+          system,
+          model,
+          baseUrl,
+          timeoutMs,
+          requestId: request_id,
+        });
+        consecutiveFailures = 0;
+      } catch (e) {
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= failureThreshold) circuitOpen = true;
+        throw e;
+      }
 
+      const output_hash = crypto.createHash('sha256').update(gen.output).digest('hex');
       const model_ledger = {
         model_invocation_id: invocation_id,
+        inference_id: inference_id || null,
+        request_id,
         provider: 'ollama',
         model_identifier: model,
+        model_role: tier.role,
+        product_quality: tier.product_quality,
         model_configuration_hash: config_hash,
+        gateway_version: GATEWAY_VERSION,
         prompt_configuration_id: 'phase34-grounded-prose-v1',
         prompt_configuration_hash: prompt_hash,
         system_prompt_hash,
@@ -131,6 +236,8 @@ export function createOllamaModelGateway(options = {}) {
         total_latency_ms: gen.total_latency_ms,
         time_to_first_token_ms: gen.time_to_first_token_ms,
         generation_latency_ms: gen.generation_latency_ms,
+        load_duration_ms: gen.load_duration_ms,
+        warm_cold: gen.warm_cold,
         finish_reason: gen.finish_reason,
         output_hash,
       };
@@ -139,7 +246,7 @@ export function createOllamaModelGateway(options = {}) {
         synthesis_version: 'phase34-grounded-synthesis-v1',
         tier: 'privacy-local',
         model_invoked: true,
-        model_gateway: { provider: 'ollama', model },
+        model_gateway: { provider: 'ollama', model, gateway_version: GATEWAY_VERSION },
         synthesis_label: 'GROUNDED MODEL SYNTHESIS',
         direct_answer: gen.output,
         customer_summary: gen.output,
@@ -149,7 +256,11 @@ export function createOllamaModelGateway(options = {}) {
           typeof evidence_summary === 'string'
             ? evidence_summary
             : `Structured facts used; model=${model}.`,
-        limitations: ['MODEL_WEIGHT_TRAINING_NO', 'LOCAL_OLLAMA_INFERENCE'],
+        limitations: [
+          'MODEL_WEIGHT_TRAINING_NO',
+          'LOCAL_OLLAMA_INFERENCE',
+          tier.product_quality,
+        ],
         next_actions: [],
         uncertainties: [],
         confidence: structured.confidence ?? 'medium',

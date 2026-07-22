@@ -4,7 +4,9 @@
  */
 import crypto from 'node:crypto';
 
-export const DEFAULT_OLLAMA_BASE = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
+// Prefer native host Ollama on :11436 (avoids Colima SSH mux on :11434 and flaky
+// cluster port-forwards under memory pressure). Override with OLLAMA_BASE_URL.
+export const DEFAULT_OLLAMA_BASE = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11436';
 export const DEFAULT_OLLAMA_MODEL = process.env.PHASE34_OLLAMA_MODEL || 'llama3.2:1b';
 
 export async function ollamaGenerate({
@@ -12,7 +14,9 @@ export async function ollamaGenerate({
   system,
   model = DEFAULT_OLLAMA_MODEL,
   baseUrl = DEFAULT_OLLAMA_BASE,
-  timeoutMs = 45_000,
+  timeoutMs = Number(process.env.PHASE34_OLLAMA_TIMEOUT_MS || 180_000),
+  keepAlive = process.env.PHASE34_OLLAMA_KEEP_ALIVE || '30m',
+  numPredict = Number(process.env.PHASE34_OLLAMA_NUM_PREDICT || 64),
 } = {}) {
   const started = Date.now();
   const controller = new AbortController();
@@ -26,7 +30,8 @@ export async function ollamaGenerate({
         prompt,
         system,
         stream: false,
-        options: { temperature: 0.1, num_predict: 256 },
+        keep_alive: keepAlive,
+        options: { temperature: 0.1, num_predict: numPredict },
       }),
       signal: controller.signal,
     });
@@ -46,6 +51,7 @@ export async function ollamaGenerate({
       input_tokens: body.prompt_eval_count ?? null,
       output_tokens: body.eval_count ?? null,
       total_latency_ms: latency,
+      load_duration_ms: body.load_duration ? Math.round(body.load_duration / 1e6) : null,
       generation_latency_ms: body.eval_duration
         ? Math.round(body.eval_duration / 1e6)
         : latency,
@@ -54,6 +60,15 @@ export async function ollamaGenerate({
         : null,
       raw: body,
     };
+  } catch (err) {
+    const aborted = err?.name === 'AbortError' || /aborted/i.test(String(err?.message || err));
+    if (aborted) {
+      throw new Error(
+        `ollama_generate_aborted_after_${timeoutMs}ms (base=${baseUrl} model=${model}); ` +
+          'treat as inference/client timeout — /api/tags success is not generation health',
+      );
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
   }

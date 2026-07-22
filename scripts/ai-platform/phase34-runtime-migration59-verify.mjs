@@ -947,23 +947,23 @@ async function main() {
          ) VALUES ($1,$2,'valuation','{}'::jsonb) ON CONFLICT DO NOTHING`,
         [snapS, sha(snapS)],
       );
-      const ins = async (eid, me, session, turn, at) => {
+      const ins = async (eid, me, session, turn, turnIndex, at) => {
         await pool.query(
           `INSERT INTO intelligence.eligibility_decisions (
              evidence_snapshot_id, market_event_id, decision, capability, subject,
-             eligibility_decision_id, decided_at, session_id, turn_id, request_id
-           ) VALUES ($1,$2,'INCLUDED','valuation','{"a":1}'::jsonb,$3,$4::timestamptz,$5,$6,$7)`,
-          [snapS, me, eid, at, session, turn, `req-${session}`],
+             eligibility_decision_id, decided_at, session_id, turn_id, turn_index, request_id
+           ) VALUES ($1,$2,'INCLUDED','valuation','{"a":1}'::jsonb,$3,$4::timestamptz,$5,$6,$7,$8)`,
+          [snapS, me, eid, at, session, turn, turnIndex, `req-${session}`],
         );
       };
       const prev = `ed-prev-${prefix}`;
       const nextBadSess = `ed-badsess-${prefix}`;
       const nextBadTurn = `ed-badturn-${prefix}`;
       const nextOk = `ed-ok-${prefix}`;
-      await ins(prev, `me-p-${prefix}`, 'sess-a', 'turn-01', new Date(stamp).toISOString());
-      await ins(nextBadSess, `me-bs-${prefix}`, 'sess-b', 'turn-02', new Date(stamp + 1000).toISOString());
-      await ins(nextBadTurn, `me-bt-${prefix}`, 'sess-a', 'turn-01', new Date(stamp + 2000).toISOString());
-      await ins(nextOk, `me-ok-${prefix}`, 'sess-a', 'turn-02', new Date(stamp + 3000).toISOString());
+      await ins(prev, `me-p-${prefix}`, 'sess-a', 'turn-01', 1, new Date(stamp).toISOString());
+      await ins(nextBadSess, `me-bs-${prefix}`, 'sess-b', 'turn-02', 2, new Date(stamp + 1000).toISOString());
+      await ins(nextBadTurn, `me-bt-${prefix}`, 'sess-a', 'turn-01', 1, new Date(stamp + 2000).toISOString());
+      await ins(nextOk, `me-ok-${prefix}`, 'sess-a', 'turn-02', 2, new Date(stamp + 3000).toISOString());
 
       let sessFails = false;
       try {

@@ -97,9 +97,21 @@ async function insertSaleOutbox(
     process.env.RP_SOURCE_SHA || process.env.SOURCE_SHA || process.env.GIT_SHA || ''
   if (
     !sourceSha ||
-    ['unknown', 'unknown-pre-migration-56', 'LEGACY_UNKNOWN'].includes(sourceSha.toLowerCase())
+    [
+      'unknown',
+      'unknown-pre-migration-56',
+      'legacy_unknown',
+      'legacy',
+      'unavailable',
+      'unset',
+      'test',
+      'fixture',
+    ].includes(sourceSha.toLowerCase()) ||
+    !/^[0-9a-fA-F]{40}$/.test(sourceSha)
   ) {
-    throw new Error('OUTBOX_SOURCE_SHA_INVALID: SaleCompleted requires concrete RP_SOURCE_SHA')
+    throw new Error(
+      'OUTBOX_SOURCE_SHA_INVALID: SaleCompleted requires concrete 40-char hex RP_SOURCE_SHA',
+    )
   }
   await client.query(
     `INSERT INTO listings.outbox_events (

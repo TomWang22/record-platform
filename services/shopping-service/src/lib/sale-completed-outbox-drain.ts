@@ -526,30 +526,33 @@ function createPgDeps(pool = listingsPool): DrainDeps {
       return normalizeSaleCompleted(parsed, pool)
     },
     async markPublished(row, ack, owner) {
-      const n = await pool.query(
-        `SELECT listings.acknowledge_outbox_publish($1::uuid, $2, $3, $4, $5::bigint) AS n`,
+      const { rows } = await pool.query(
+        `SELECT listings.acknowledge_outbox_publish($1::uuid, $2, $3, $4, $5::bigint) AS r`,
         [row.id, owner, ack.topic, ack.partition, Number(ack.offset) || 0],
       )
-      if (Number(n.rows?.[0]?.n || 0) < 1) {
-        throw new Error(`OUTBOX_ACK_DENIED:${row.id}`)
+      const r = rows?.[0]?.r
+      if (!r || r.result === 'DENIED' || Number(r.affected_rows || 0) < 1) {
+        throw new Error(`OUTBOX_ACK_DENIED:${row.id}:${r?.error_class || 'UNKNOWN'}`)
       }
     },
     async markRetry(row, error, nextAttemptAt, owner) {
-      const n = await pool.query(
-        `SELECT listings.reschedule_outbox_event($1::uuid, $2, $3, $4::timestamptz) AS n`,
+      const { rows } = await pool.query(
+        `SELECT listings.reschedule_outbox_event($1::uuid, $2, $3, $4::timestamptz) AS r`,
         [row.id, owner, error.slice(0, 2000), nextAttemptAt.toISOString()],
       )
-      if (Number(n.rows?.[0]?.n || 0) < 1) {
-        throw new Error(`OUTBOX_RESCHEDULE_DENIED:${row.id}`)
+      const r = rows?.[0]?.r
+      if (!r || r.result === 'DENIED' || Number(r.affected_rows || 0) < 1) {
+        throw new Error(`OUTBOX_RESCHEDULE_DENIED:${row.id}:${r?.error_class || 'UNKNOWN'}`)
       }
     },
     async markDeadLetter(row, error, owner) {
-      const n = await pool.query(
-        `SELECT listings.dead_letter_outbox_event($1::uuid, $2, $3) AS n`,
+      const { rows } = await pool.query(
+        `SELECT listings.dead_letter_outbox_event($1::uuid, $2, $3) AS r`,
         [row.id, owner, error.slice(0, 2000)],
       )
-      if (Number(n.rows?.[0]?.n || 0) < 1) {
-        throw new Error(`OUTBOX_DEAD_LETTER_DENIED:${row.id}`)
+      const r = rows?.[0]?.r
+      if (!r || r.result === 'DENIED' || Number(r.affected_rows || 0) < 1) {
+        throw new Error(`OUTBOX_DEAD_LETTER_DENIED:${row.id}:${r?.error_class || 'UNKNOWN'}`)
       }
     },
   }

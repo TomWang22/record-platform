@@ -10,7 +10,7 @@ import { EIGHT_CAPABILITIES } from '../lib/phase34-capability-response.mjs';
 
 const EVID =
   process.env.PHASE34_EVIDENCE_ROOT ||
-  '/tmp/phase34-runtime-data-to-answer-integration-v1';
+  '/tmp/phase34-runtime-data-to-answer-integration-v2/canary';
 const OUT_DIR = `${EVID}/checkpoints/eight-capability-runtime-canary-v1`;
 const OUT = `${EVID}/eight-capability-runtime-canary.json`;
 

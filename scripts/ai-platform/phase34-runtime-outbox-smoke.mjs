@@ -13,8 +13,9 @@ const URL =
   'postgresql://postgres:postgres@127.0.0.1:5435/listings';
 const EVID =
   process.env.PHASE34_EVIDENCE_ROOT ||
-  '/tmp/phase34-runtime-data-to-answer-integration-v1';
+  '/tmp/phase34-runtime-data-to-answer-integration-v2';
 const OUT = `${EVID}/outbox-reliability-report.json`;
+const SHA40 = '1f366b7a82595cade658087231556c61d4b7fcb9';
 
 async function main() {
   fs.mkdirSync(EVID, { recursive: true });
@@ -44,7 +45,7 @@ async function main() {
          id, aggregate_id, type, version, payload, published,
          idempotency_key, payload_hash, source_sha, next_attempt_at
        ) VALUES ($1::uuid, $2, 'SaleCompleted', 1, $3::bytea, false, $1, $4, $5, NOW())`,
-      [id, 'smoke-listing', payload, payloadHash, 'smoke-sha-m57'],
+      [id, 'smoke-listing', payload, payloadHash, SHA40],
     );
 
     // Lease as worker-a before reschedule (owner-bound)
@@ -86,20 +87,24 @@ async function main() {
     });
 
     let wrongOwnerDenied = false;
-    try {
-      await pool.query(
-        `SELECT listings.acknowledge_outbox_publish($1::uuid, 'worker-b', $2, 0, 42)`,
-        [id, 'smoke.listing.events'],
-      );
-    } catch (err) {
-      wrongOwnerDenied = /OUTBOX_ACK_DENIED|not owned/i.test(String(err.message || err));
+    {
+      const r = (
+        await pool.query(
+          `SELECT listings.acknowledge_outbox_publish($1::uuid, 'worker-b', $2, 0, $3::bigint) AS r`,
+          [id, 'smoke.listing.events', Date.now()],
+        )
+      ).rows[0].r;
+      wrongOwnerDenied = r?.result === 'DENIED';
     }
     cases.push({ name: 'wrong_owner_ack_denied', ok: wrongOwnerDenied });
 
-    await pool.query(
-      `SELECT listings.acknowledge_outbox_publish($1::uuid, 'worker-a', $2, 0, 42)`,
-      [id, 'smoke.listing.events'],
-    );
+    const ackOffset = Date.now() + 1;
+    const ackR = (
+      await pool.query(
+        `SELECT listings.acknowledge_outbox_publish($1::uuid, 'worker-a', $2, 0, $3::bigint) AS r`,
+        [id, 'smoke.listing.events', ackOffset],
+      )
+    ).rows[0].r;
     const afterAck = (
       await pool.query(
         `SELECT published, published_at IS NOT NULL AS has_published_at, broker_topic, broker_offset
@@ -109,8 +114,13 @@ async function main() {
     ).rows[0];
     cases.push({
       name: 'broker_ack_then_published_at',
-      ok: afterAck.published === true && afterAck.has_published_at === true && Number(afterAck.broker_offset) === 42,
+      ok:
+        ackR?.result === 'OK' &&
+        afterAck.published === true &&
+        afterAck.has_published_at === true &&
+        Number(afterAck.broker_offset) === ackOffset,
       row: afterAck,
+      ackR,
     });
 
     // Poison dead-letter requires lease owner
@@ -118,19 +128,26 @@ async function main() {
     const poisonPayload = Buffer.from('{not-json');
     const poisonHash = crypto.createHash('sha256').update(poisonPayload).digest('hex');
     await pool.query(
+      `UPDATE listings.outbox_events
+       SET next_attempt_at = NOW() + interval '1 day'
+       WHERE published = false AND type = 'SaleCompleted' AND COALESCE(dead_lettered,false)=false`,
+    );
+    await pool.query(
       `INSERT INTO listings.outbox_events (
          id, aggregate_id, type, version, payload, published,
          idempotency_key, payload_hash, source_sha, next_attempt_at, retry_count
-       ) VALUES ($1::uuid, 'smoke-poison', 'SaleCompleted', 1, $2::bytea, false, $1, $3, 'smoke-sha-m57', NOW(), 7)`,
-      [poisonId, poisonPayload, poisonHash],
+       ) VALUES ($1::uuid, 'smoke-poison', 'SaleCompleted', 1, $2::bytea, false, $1, $3, $4, NOW(), 7)`,
+      [poisonId, poisonPayload, poisonHash, SHA40],
     );
     await pool.query(
       `SELECT id FROM listings.lease_outbox_batch(1, 'worker-dlq', 60000, 'SaleCompleted')`,
     );
-    await pool.query(`SELECT listings.dead_letter_outbox_event($1::uuid, 'worker-dlq', $2)`, [
-      poisonId,
-      'MALFORMED_OUTBOX_PAYLOAD',
-    ]);
+    const dlqR = (
+      await pool.query(`SELECT listings.dead_letter_outbox_event($1::uuid, 'worker-dlq', $2) AS r`, [
+        poisonId,
+        'MALFORMED_OUTBOX_PAYLOAD',
+      ])
+    ).rows[0].r;
     const poison = (
       await pool.query(
         `SELECT dead_lettered, published FROM listings.outbox_events WHERE id = $1::uuid`,
@@ -139,8 +156,9 @@ async function main() {
     ).rows[0];
     cases.push({
       name: 'poison_dead_lettered',
-      ok: poison.dead_lettered === true && poison.published === false,
+      ok: dlqR?.result === 'OK' && poison.dead_lettered === true && poison.published === false,
       row: poison,
+      dlqR,
     });
 
     let immutableBlocked = false;

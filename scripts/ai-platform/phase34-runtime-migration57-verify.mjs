@@ -14,6 +14,7 @@ const EVID =
   process.env.PHASE34_EVIDENCE_ROOT ||
   '/tmp/phase34-runtime-data-to-answer-integration-v1';
 const OUT = `${EVID}/migrations-57-verification.json`;
+const SHA40 = '1f366b7a82595cade658087231556c61d4b7fcb9';
 
 function sha(s) {
   return crypto.createHash('sha256').update(String(s)).digest('hex');
@@ -125,9 +126,9 @@ async function main() {
          id, aggregate_id, type, version, payload, published,
          idempotency_key, payload_hash, source_sha
        ) VALUES
-       ($1::uuid, 'a', 'SaleCompleted', 1, $3::bytea, false, $1, $4, 'test-sha-m57'),
-       ($2::uuid, 'b', 'SaleCompleted', 1, $3::bytea, false, $2, $4, 'test-sha-m57')`,
-      [o1, o2, Buffer.from('{}'), similarHash],
+       ($1::uuid, 'a', 'SaleCompleted', 1, $3::bytea, false, $1, $4, $5),
+       ($2::uuid, 'b', 'SaleCompleted', 1, $3::bytea, false, $2, $4, $5)`,
+      [o1, o2, Buffer.from('{}'), similarHash, SHA40],
     );
     cases.push({ name: 'two_settlements_same_payload_hash_accepted', ok: true });
 
@@ -175,7 +176,7 @@ async function main() {
       `INSERT INTO listings.outbox_events (
          id, aggregate_id, type, version, payload, published,
          idempotency_key, payload_hash, source_sha, next_attempt_at
-       ) VALUES ($1::uuid, 'lease', 'SaleCompleted', 1, $2::bytea, false, $1, $3, 'test-sha-m57', NOW())`,
+       ) VALUES ($1::uuid, 'lease', 'SaleCompleted', 1, $2::bytea, false, $1, $3, '1f366b7a82595cade658087231556c61d4b7fcb9', NOW())`,
       [leaseId, Buffer.from('{"ok":true}'), sha(leaseId)],
     );
     const leased = (
@@ -184,16 +185,13 @@ async function main() {
     if (!leased.includes(leaseId)) {
       cases.push({ name: 'wrong_lease_owner_cannot_ack', ok: false, error: 'lease_missed_target', leased });
     } else {
-      let wrongAckDenied = false;
-      try {
+      const wrongAck = (
         await pool.query(
-          `SELECT listings.acknowledge_outbox_publish($1::uuid, 'worker-b', 't', 0, 1)`,
+          `SELECT listings.acknowledge_outbox_publish($1::uuid, 'worker-b', 't', 0, 1) AS r`,
           [leaseId],
-        );
-      } catch (err) {
-        wrongAckDenied = /OUTBOX_ACK_DENIED|not owned/i.test(String(err.message || err));
-      }
-      cases.push({ name: 'wrong_lease_owner_cannot_ack', ok: wrongAckDenied });
+        )
+      ).rows[0].r;
+      cases.push({ name: 'wrong_lease_owner_cannot_ack', ok: wrongAck?.result === 'DENIED', wrongAck });
     }
 
     await pool.query(
@@ -211,24 +209,41 @@ async function main() {
       recovered,
     });
     if (recovered.includes(leaseId)) {
-      await pool.query(
-        `SELECT listings.acknowledge_outbox_publish($1::uuid, 'worker-c', 't', 0, 7)`,
-        [leaseId],
-      );
+      const ackR = (
+        await pool.query(
+          `SELECT listings.acknowledge_outbox_publish($1::uuid, 'worker-c', 't-m57', 0, $2::bigint) AS r`,
+          [leaseId, stamp + 7007],
+        )
+      ).rows[0].r;
       const ackOk = (
         await pool.query(`SELECT published FROM listings.outbox_events WHERE id=$1::uuid`, [leaseId])
       ).rows[0].published;
-      cases.push({ name: 'owner_ack_after_recovery', ok: ackOk === true });
+      cases.push({ name: 'owner_ack_after_recovery', ok: ackR?.result === 'OK' && ackOk === true });
     } else {
       cases.push({ name: 'owner_ack_after_recovery', ok: false, error: 'not_recovered' });
     }
 
-    // 9–10 eligibility append-only + supersession edge
+    // 9–10 eligibility append-only + supersession edge (FK-valid decisions)
     let eligUpdateBlocked = false;
     const edPrev = `ed-prev-${stamp}`;
     const edNew = `ed-new-${stamp}`;
-    // Use a disposable snapshot if needed — skip if table constraints require FKs
+    const snap = `es-m57-${stamp}`;
     try {
+      await pool.query(
+        `INSERT INTO intelligence.evidence_snapshots (
+           evidence_snapshot_id, evidence_snapshot_hash, capability, payload
+         ) VALUES ($1,$2,'valuation','{}'::jsonb) ON CONFLICT DO NOTHING`,
+        [snap, sha(snap)],
+      );
+      await pool.query(
+        `INSERT INTO intelligence.eligibility_decisions (
+           evidence_snapshot_id, market_event_id, decision, capability, subject,
+           eligibility_decision_id, previous_decision_id, decided_at, superseded_by_decision_id
+         ) VALUES
+           ($1,$2,'INCLUDED','valuation','{"k":1}'::jsonb,$3,NULL,NOW()-interval '1 minute',NULL),
+           ($1,$4,'INCLUDED','valuation','{"k":1}'::jsonb,$5,$3,NOW(),NULL)`,
+        [snap, `me-${edPrev}`, edPrev, `me-${edNew}`, edNew],
+      );
       await pool.query(
         `INSERT INTO intelligence.eligibility_supersession_edges (
            supersession_edge_id, previous_decision_id, new_decision_id, reason
@@ -272,16 +287,17 @@ async function main() {
     ).rows[0].n;
     cases.push({ name: 'deterministic_calculation_append_only', ok: calcTrig >= 1 });
 
-    // 12 claim integrity helper
+    // 12 claim integrity helper (migration 58 DB-derived verifier)
     let claimFail = false;
     try {
-      await pool.query(
-        `SELECT intelligence.assert_claim_calculation_integrity(
-           'missing-calc', 'snap-a', 'snap-a', '1'::jsonb, '1'::jsonb
-         )`,
-      );
+      const r = (
+        await pool.query(
+          `SELECT intelligence.verify_claim_integrity_from_db('missing-resp','missing-claim',NULL) AS r`,
+        )
+      ).rows[0].r;
+      claimFail = r?.result === 'FAIL';
     } catch (err) {
-      claimFail = /CLAIM_CALCULATION_MISSING/i.test(String(err.message || err));
+      claimFail = /CLAIM_/i.test(String(err.message || err));
     }
     cases.push({ name: 'claim_wrong_calculation_rejected', ok: claimFail });
 
@@ -292,7 +308,7 @@ async function main() {
         `INSERT INTO listings.outbox_events (
            id, aggregate_id, type, version, payload, published,
            idempotency_key, payload_hash, source_sha
-         ) VALUES ($1::uuid, 'legacy', 'SaleCompleted', 1, $2::bytea, false, $1, $3, 'unknown')`,
+         ) VALUES ($1::uuid, 'legacy', 'SaleCompleted', 1, $2::bytea, false, $1, $3, 'LEGACY_UNKNOWN')`,
         [crypto.randomUUID(), Buffer.from('{}'), sha('legacy')],
       );
     } catch (err) {

@@ -49,10 +49,10 @@ export type PublishAck = {
 export type DrainDeps = {
   leaseBatch: (limit: number, owner: string, leaseMs: number) => Promise<OutboxRow[]>
   publish: (row: OutboxRow, text: string, headers: Record<string, string>) => Promise<PublishAck>
-  normalize: (parsed: Record<string, unknown>, row: OutboxRow) => Promise<string>
-  markPublished: (row: OutboxRow, ack: PublishAck) => Promise<void>
-  markRetry: (row: OutboxRow, error: string, nextAttemptAt: Date) => Promise<void>
-  markDeadLetter: (row: OutboxRow, error: string) => Promise<void>
+  normalize: (parsed: Record<string, unknown>, row: OutboxRow, ack?: PublishAck) => Promise<string>
+  markPublished: (row: OutboxRow, ack: PublishAck, owner: string) => Promise<void>
+  markRetry: (row: OutboxRow, error: string, nextAttemptAt: Date, owner: string) => Promise<void>
+  markDeadLetter: (row: OutboxRow, error: string, owner: string) => Promise<void>
   maxRetries?: number
   now?: () => Date
   owner?: string
@@ -141,18 +141,23 @@ export async function drainSaleCompletedOutboxCore(
       const ack = await deps.publish(row, text, headers)
       result.published += 1
       // Crash window A: after Kafka ack, before normalize/mark — retry must be idempotent.
-      await deps.normalize(parsed, row)
+      const withBroker = {
+        ...parsed,
+        _broker_partition: ack.partition,
+        _broker_offset: Number(ack.offset) || 0,
+      }
+      await deps.normalize(withBroker, row, ack)
       result.normalized += 1
-      await deps.markPublished(row, ack)
+      await deps.markPublished(row, ack, owner)
     } catch (err: any) {
       const msg = String(err?.message || err)
       result.errors.push(`OUTBOX_${row.id}:${msg}`)
       if (err?.code === 'MALFORMED_OUTBOX_PAYLOAD' || retryCount + 1 >= maxRetries) {
-        await deps.markDeadLetter(row, msg)
+        await deps.markDeadLetter(row, msg, owner)
         result.dead_lettered += 1
       } else {
         const next = new Date(now().getTime() + backoffMs(retryCount))
-        await deps.markRetry(row, msg, next)
+        await deps.markRetry(row, msg, next, owner)
         result.retried += 1
       }
     }
@@ -197,6 +202,125 @@ export async function normalizeSaleCompleted(
     canonicalPayloadHash,
   }).slice(0, 24)}`
 
+  const eventPayload = {
+    ...inner,
+    listing_id: listingId,
+    sale_event_id: saleEventId,
+    price_normalized: finalPrice,
+    currency_normalized: currency,
+    rights_class: 'TEST_INTEGRATION_EVENT',
+  }
+  const eventPayloadHash = sha256(eventPayload)
+
+  // Migration 57: decide identity/delivery BEFORE creating market events.
+  const topic = SALE_COMPLETED_EVENTS_TOPIC
+  const partitionId = Number((payload as any)._broker_partition ?? 0)
+  const recordOffset = Number((payload as any)._broker_offset ?? Date.now() % 1_000_000_000)
+  const normVersion = 'phase34-market-event-v2'
+  const deliveryId = `dlv-${sha256({ topic, partitionId, recordOffset }).slice(0, 28)}`
+
+  const priorDelivery = await pool
+    .query(
+      `SELECT delivery_lineage_id, result, market_event_id
+       FROM intelligence.kafka_delivery_lineage
+       WHERE topic = $1 AND partition_id = $2 AND record_offset = $3
+       LIMIT 1`,
+      [topic, partitionId, recordOffset],
+    )
+    .catch(() => ({ rows: [] as any[] }))
+
+  if (priorDelivery.rows.length) {
+    return String(priorDelivery.rows[0].market_event_id || marketEventId)
+  }
+
+  const identity = await pool
+    .query(
+      `SELECT source_event_id, canonical_payload_hash, accepted_market_event_id
+       FROM intelligence.kafka_event_identities
+       WHERE source_event_id = $1 AND normalization_version = $2
+       LIMIT 1`,
+      [sourceEventId, normVersion],
+    )
+    .catch(() => ({ rows: [] as any[] }))
+
+  if (identity.rows.length) {
+    const prev = identity.rows[0]
+    if (prev.canonical_payload_hash === eventPayloadHash) {
+      await pool
+        .query(
+          `INSERT INTO intelligence.kafka_delivery_lineage (
+             delivery_lineage_id, topic, partition_id, record_offset, source_event_id,
+             normalization_version, received_payload_hash, canonical_payload_hash,
+             market_event_id, result, duplicate_flag, source_sha
+           ) VALUES (
+             $1, $2, $3, $4, $5, $6, $7, $8, $9, 'DUPLICATE_DELIVERY', true, $10
+           )
+           ON CONFLICT (topic, partition_id, record_offset) DO NOTHING`,
+          [
+            deliveryId,
+            topic,
+            partitionId,
+            recordOffset,
+            sourceEventId,
+            normVersion,
+            eventPayloadHash,
+            prev.canonical_payload_hash,
+            prev.accepted_market_event_id || marketEventId,
+            SOURCE_SHA,
+          ],
+        )
+        .catch(() => {})
+      return String(prev.accepted_market_event_id || marketEventId)
+    }
+
+    const quarantineId = `q-${sha256({ sourceEventId, eventPayloadHash }).slice(0, 24)}`
+    await pool
+      .query(
+        `INSERT INTO intelligence.kafka_event_quarantine (
+           quarantine_id, topic, partition_id, record_offset, source_event_id, payload, reason
+         ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+         ON CONFLICT (quarantine_id) DO NOTHING`,
+        [
+          quarantineId,
+          topic,
+          partitionId,
+          recordOffset,
+          sourceEventId,
+          JSON.stringify(eventPayload),
+          'IDENTITY_PAYLOAD_CONFLICT',
+        ],
+      )
+      .catch(() => {})
+    await pool
+      .query(
+        `INSERT INTO intelligence.kafka_delivery_lineage (
+           delivery_lineage_id, topic, partition_id, record_offset, source_event_id,
+           normalization_version, received_payload_hash, canonical_payload_hash,
+           market_event_id, result, duplicate_flag, rejection_reason, source_sha
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, 'IDENTITY_PAYLOAD_CONFLICT', false,
+           'IDENTITY_PAYLOAD_CONFLICT', $10
+         )
+         ON CONFLICT (topic, partition_id, record_offset) DO NOTHING`,
+        [
+          deliveryId,
+          topic,
+          partitionId,
+          recordOffset,
+          sourceEventId,
+          normVersion,
+          eventPayloadHash,
+          prev.canonical_payload_hash,
+          prev.accepted_market_event_id || null,
+          SOURCE_SHA,
+        ],
+      )
+      .catch(() => {})
+    const err = new Error(`IDENTITY_PAYLOAD_CONFLICT:${sourceEventId}`)
+    ;(err as any).code = 'IDENTITY_PAYLOAD_CONFLICT'
+    throw err
+  }
+
   await pool.query(
     `INSERT INTO intelligence.raw_observations (
        observation_id, source_class, source_connector, source_record_id, source_event_type,
@@ -207,7 +331,7 @@ export async function normalizeSaleCompleted(
        $1, 'FIRST_PARTY_SETTLEMENT', 'shopping-service-sale-completed-outbox', $2, 'SaleCompleted',
        $3::timestamptz, $3::timestamptz, $4::jsonb, $5,
        'first_party_settlement', $6, 'ACTIVE', 'ACTIVE',
-       'phase34-runtime-drain-v2', $7
+       'phase34-runtime-drain-v3', $7
      )
      ON CONFLICT (observation_id) DO NOTHING`,
     [
@@ -220,16 +344,6 @@ export async function normalizeSaleCompleted(
       saleEventId,
     ],
   )
-
-  const eventPayload = {
-    ...inner,
-    listing_id: listingId,
-    sale_event_id: saleEventId,
-    price_normalized: finalPrice,
-    currency_normalized: currency,
-    rights_class: 'TEST_INTEGRATION_EVENT',
-  }
-  const eventPayloadHash = sha256(eventPayload)
 
   await pool.query(
     `INSERT INTO intelligence.market_events (
@@ -260,75 +374,74 @@ export async function normalizeSaleCompleted(
     ],
   )
 
-  // Consumer lineage: UNIQUE(source_event_id, normalization_version).
-  // Same hash → DUPLICATE; different hash → IDENTITY_PAYLOAD_CONFLICT + quarantine.
-  const existing = await pool.query(
-    `SELECT lineage_id, payload_hash, market_event_id, result
-     FROM intelligence.kafka_consumer_lineage
-     WHERE source_event_id = $1 AND normalization_version = 'phase34-market-event-v2'
-     LIMIT 1`,
-    [sourceEventId],
-  ).catch(() => ({ rows: [] }))
-
-  if (existing.rows.length) {
-    const prev = existing.rows[0]
-    if (prev.payload_hash === eventPayloadHash) {
-      await pool.query(
-        `UPDATE intelligence.kafka_consumer_lineage
-         SET duplicate_flag = true, result = 'DUPLICATE'
-         WHERE lineage_id = $1`,
-        [prev.lineage_id],
-      ).catch(() => {})
-      return String(prev.market_event_id || marketEventId)
-    }
-
-    const quarantineId = `q-${sha256({ sourceEventId, eventPayloadHash }).slice(0, 24)}`
-    await pool.query(
-      `INSERT INTO intelligence.kafka_event_quarantine (
-         quarantine_id, topic, partition_id, record_offset, source_event_id, payload, reason
-       ) VALUES ($1, $2, 0, 0, $3, $4::jsonb, $5)
-       ON CONFLICT (quarantine_id) DO NOTHING`,
+  await pool
+    .query(
+      `INSERT INTO intelligence.kafka_event_identities (
+         source_event_id, normalization_version, canonical_payload_hash,
+         accepted_market_event_id, first_topic, first_partition, first_offset, source_sha
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (source_event_id, normalization_version) DO NOTHING`,
       [
-        quarantineId,
-        SALE_COMPLETED_EVENTS_TOPIC,
         sourceEventId,
-        JSON.stringify(eventPayload),
-        'IDENTITY_PAYLOAD_CONFLICT',
+        normVersion,
+        eventPayloadHash,
+        marketEventId,
+        topic,
+        partitionId,
+        recordOffset,
+        SOURCE_SHA,
       ],
-    ).catch(() => {})
-    await pool.query(
-      `UPDATE intelligence.kafka_consumer_lineage
-       SET result = 'IDENTITY_PAYLOAD_CONFLICT',
-           rejection_reason = 'IDENTITY_PAYLOAD_CONFLICT',
-           duplicate_flag = false
-       WHERE lineage_id = $1`,
-      [prev.lineage_id],
-    ).catch(() => {})
-    const err = new Error(`IDENTITY_PAYLOAD_CONFLICT:${sourceEventId}`)
-    ;(err as any).code = 'IDENTITY_PAYLOAD_CONFLICT'
-    throw err
-  }
+    )
+    .catch(() => {})
 
-  const lineageId = `lin-${sha256({ sourceEventId, eventPayloadHash }).slice(0, 24)}`
-  await pool.query(
-    `INSERT INTO intelligence.kafka_consumer_lineage (
-       lineage_id, topic, partition_id, record_offset, source_event_id, market_event_id,
-       payload_hash, normalization_version, result, duplicate_flag, source_sha
-     ) VALUES (
-       $1, $2, 0, 0, $3, $4, $5, 'phase34-market-event-v2', 'ACCEPTED', false, $6
-     )
-     ON CONFLICT DO NOTHING`,
-    [
-      lineageId,
-      SALE_COMPLETED_EVENTS_TOPIC,
-      sourceEventId,
-      marketEventId,
-      eventPayloadHash,
-      SOURCE_SHA,
-    ],
-  ).catch(() => {
-    /* table may not exist until migration 54/56 */
-  })
+  await pool
+    .query(
+      `INSERT INTO intelligence.kafka_delivery_lineage (
+         delivery_lineage_id, topic, partition_id, record_offset, source_event_id,
+         normalization_version, received_payload_hash, canonical_payload_hash,
+         market_event_id, result, duplicate_flag, source_sha
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, 'ACCEPTED', false, $10
+       )
+       ON CONFLICT (topic, partition_id, record_offset) DO NOTHING`,
+      [
+        deliveryId,
+        topic,
+        partitionId,
+        recordOffset,
+        sourceEventId,
+        normVersion,
+        eventPayloadHash,
+        eventPayloadHash,
+        marketEventId,
+        SOURCE_SHA,
+      ],
+    )
+    .catch(() => {})
+
+  const lineageId = `lin-${sha256({ sourceEventId, eventPayloadHash, recordOffset }).slice(0, 24)}`
+  await pool
+    .query(
+      `INSERT INTO intelligence.kafka_consumer_lineage (
+         lineage_id, topic, partition_id, record_offset, source_event_id, market_event_id,
+         payload_hash, normalization_version, result, duplicate_flag, source_sha
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6, $7, $8, 'ACCEPTED', false, $9
+       )
+       ON CONFLICT (topic, partition_id, record_offset) DO NOTHING`,
+      [
+        lineageId,
+        topic,
+        partitionId,
+        recordOffset,
+        sourceEventId,
+        marketEventId,
+        eventPayloadHash,
+        normVersion,
+        SOURCE_SHA,
+      ],
+    )
+    .catch(() => {})
 
   return marketEventId
 }
@@ -412,67 +525,31 @@ function createPgDeps(pool = listingsPool): DrainDeps {
     async normalize(parsed) {
       return normalizeSaleCompleted(parsed, pool)
     },
-    async markPublished(row, ack) {
-      try {
-        await pool.query(`SELECT listings.acknowledge_outbox_publish($1::uuid, $2, $3, $4::bigint)`, [
-          row.id,
-          ack.topic,
-          ack.partition,
-          Number(ack.offset) || 0,
-        ])
-      } catch {
-        await pool.query(
-          `UPDATE listings.outbox_events
-           SET published = true,
-               published_at = NOW(),
-               leased_until = NULL,
-               lease_owner = NULL,
-               last_error = NULL,
-               broker_topic = $2,
-               broker_partition = $3,
-               broker_offset = $4
-           WHERE id = $1::uuid`,
-          [row.id, ack.topic, ack.partition, Number(ack.offset) || 0],
-        )
+    async markPublished(row, ack, owner) {
+      const n = await pool.query(
+        `SELECT listings.acknowledge_outbox_publish($1::uuid, $2, $3, $4, $5::bigint) AS n`,
+        [row.id, owner, ack.topic, ack.partition, Number(ack.offset) || 0],
+      )
+      if (Number(n.rows?.[0]?.n || 0) < 1) {
+        throw new Error(`OUTBOX_ACK_DENIED:${row.id}`)
       }
     },
-    async markRetry(row, error, nextAttemptAt) {
-      try {
-        await pool.query(`SELECT listings.reschedule_outbox_event($1::uuid, $2, $3::timestamptz)`, [
-          row.id,
-          error.slice(0, 2000),
-          nextAttemptAt.toISOString(),
-        ])
-      } catch {
-        await pool.query(
-          `UPDATE listings.outbox_events
-           SET retry_count = COALESCE(retry_count, 0) + 1,
-               next_attempt_at = $2,
-               last_error = $3,
-               leased_until = NULL,
-               lease_owner = NULL
-           WHERE id = $1::uuid`,
-          [row.id, nextAttemptAt.toISOString(), error.slice(0, 2000)],
-        ).catch(() => undefined)
+    async markRetry(row, error, nextAttemptAt, owner) {
+      const n = await pool.query(
+        `SELECT listings.reschedule_outbox_event($1::uuid, $2, $3, $4::timestamptz) AS n`,
+        [row.id, owner, error.slice(0, 2000), nextAttemptAt.toISOString()],
+      )
+      if (Number(n.rows?.[0]?.n || 0) < 1) {
+        throw new Error(`OUTBOX_RESCHEDULE_DENIED:${row.id}`)
       }
     },
-    async markDeadLetter(row, error) {
-      try {
-        await pool.query(`SELECT listings.dead_letter_outbox_event($1::uuid, $2)`, [
-          row.id,
-          error.slice(0, 2000),
-        ])
-      } catch {
-        await pool.query(
-          `UPDATE listings.outbox_events
-           SET dead_lettered = true,
-               dead_lettered_at = NOW(),
-               last_error = $2,
-               leased_until = NULL,
-               lease_owner = NULL
-           WHERE id = $1::uuid`,
-          [row.id, error.slice(0, 2000)],
-        ).catch(() => undefined)
+    async markDeadLetter(row, error, owner) {
+      const n = await pool.query(
+        `SELECT listings.dead_letter_outbox_event($1::uuid, $2, $3) AS n`,
+        [row.id, owner, error.slice(0, 2000)],
+      )
+      if (Number(n.rows?.[0]?.n || 0) < 1) {
+        throw new Error(`OUTBOX_DEAD_LETTER_DENIED:${row.id}`)
       }
     },
   }

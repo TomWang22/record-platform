@@ -94,7 +94,13 @@ async function insertSaleOutbox(
   const payloadBuf = Buffer.from(payloadJson, 'utf8')
   const payloadHash = crypto.createHash('sha256').update(payloadBuf).digest('hex')
   const sourceSha =
-    process.env.RP_SOURCE_SHA || process.env.SOURCE_SHA || process.env.GIT_SHA || 'unknown'
+    process.env.RP_SOURCE_SHA || process.env.SOURCE_SHA || process.env.GIT_SHA || ''
+  if (
+    !sourceSha ||
+    ['unknown', 'unknown-pre-migration-56', 'LEGACY_UNKNOWN'].includes(sourceSha.toLowerCase())
+  ) {
+    throw new Error('OUTBOX_SOURCE_SHA_INVALID: SaleCompleted requires concrete RP_SOURCE_SHA')
+  }
   await client.query(
     `INSERT INTO listings.outbox_events (
        id, aggregate_id, type, version, payload, published,

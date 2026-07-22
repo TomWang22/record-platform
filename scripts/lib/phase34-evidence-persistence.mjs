@@ -62,6 +62,8 @@ export async function persistCapabilityEvidenceArtifacts(
     claim_entries: 0,
     envelope_persisted: false,
     calculation_persisted: false,
+    calculation_id: null,
+    supersession_edges: 0,
   };
 
   try {
@@ -215,6 +217,26 @@ export async function persistCapabilityEvidenceArtifacts(
           d.previous_decision_id || null,
         ],
       );
+      if (d.previous_decision_id) {
+        const edgeId = `ese-${decisionId}`.slice(0, 120);
+        await client.query(
+          `INSERT INTO intelligence.eligibility_supersession_edges (
+             supersession_edge_id, previous_decision_id, new_decision_id, reason,
+             request_id, session_id, turn_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (previous_decision_id, new_decision_id) DO NOTHING`,
+          [
+            edgeId,
+            d.previous_decision_id,
+            decisionId,
+            d.supersession_reason || d.reason_detail || 'correction_recompute',
+            snapshot.request_id || null,
+            snapshot.session_id || null,
+            snapshot.turn_id || null,
+          ],
+        );
+        result.supersession_edges = (result.supersession_edges || 0) + 1;
+      }
       result.eligibility_rows += 1;
     }
 

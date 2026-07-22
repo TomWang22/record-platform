@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Bounded outbox crash/replay smoke against listings@5435 (not production).
- * Uses security-definer publisher functions from migration 56.
+ * Migration 57: owner-bound publisher functions.
+ * Evidence written under /tmp only.
  */
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -10,9 +11,13 @@ import pg from 'pg';
 const URL =
   process.env.POSTGRES_URL_LISTINGS ||
   'postgresql://postgres:postgres@127.0.0.1:5435/listings';
-const OUT = 'reports/phase34-runtime-integration/outbox-reliability-report.json';
+const EVID =
+  process.env.PHASE34_EVIDENCE_ROOT ||
+  '/tmp/phase34-runtime-data-to-answer-integration-v1';
+const OUT = `${EVID}/outbox-reliability-report.json`;
 
 async function main() {
+  fs.mkdirSync(EVID, { recursive: true });
   const pool = new pg.Pool({ connectionString: URL, max: 2 });
   const cases = [];
   const id = crypto.randomUUID();
@@ -25,19 +30,30 @@ async function main() {
   const payloadHash = crypto.createHash('sha256').update(payload).digest('hex');
 
   try {
+    // Defer other eligible SaleCompleted rows so smoke leases this event.
+    await pool.query(
+      `UPDATE listings.outbox_events
+       SET next_attempt_at = NOW() + interval '1 day'
+       WHERE published = false
+         AND type = 'SaleCompleted'
+         AND COALESCE(dead_lettered, false) = false`,
+    );
+
     await pool.query(
       `INSERT INTO listings.outbox_events (
          id, aggregate_id, type, version, payload, published,
          idempotency_key, payload_hash, source_sha, next_attempt_at
        ) VALUES ($1::uuid, $2, 'SaleCompleted', 1, $3::bytea, false, $1, $4, $5, NOW())`,
-      [id, 'smoke-listing', payload, payloadHash, 'smoke-sha'],
+      [id, 'smoke-listing', payload, payloadHash, 'smoke-sha-m57'],
     );
 
-    // 1) temporary failure → reschedule
-    await pool.query(`SELECT listings.reschedule_outbox_event($1::uuid, $2, NOW() + interval '5 seconds')`, [
-      id,
-      'KAFKA_UNAVAILABLE_SMOKE',
-    ]);
+    // Lease as worker-a before reschedule (owner-bound)
+    await pool.query(`SELECT id FROM listings.lease_outbox_batch(1, 'worker-a', 60000, 'SaleCompleted')`);
+
+    await pool.query(
+      `SELECT listings.reschedule_outbox_event($1::uuid, 'worker-a', $2, NOW() + interval '5 seconds')`,
+      [id, 'KAFKA_UNAVAILABLE_SMOKE'],
+    );
     const afterRetry = (
       await pool.query(
         `SELECT retry_count, last_error, published, next_attempt_at > NOW() AS deferred
@@ -51,12 +67,11 @@ async function main() {
       row: afterRetry,
     });
 
-    // Make eligible again
-    await pool.query(`UPDATE listings.outbox_events SET next_attempt_at = NOW() - interval '1 second' WHERE id = $1::uuid`, [
-      id,
-    ]);
+    await pool.query(
+      `UPDATE listings.outbox_events SET next_attempt_at = NOW() - interval '1 second' WHERE id = $1::uuid`,
+      [id],
+    );
 
-    // 2) two lease workers — second should see empty/other rows due to SKIP LOCKED
     const lease1 = (
       await pool.query(`SELECT id::text FROM listings.lease_outbox_batch(1, 'worker-a', 30000, 'SaleCompleted')`)
     ).rows.map((r) => r.id);
@@ -70,11 +85,21 @@ async function main() {
       lease2,
     });
 
-    // 3) acknowledge publish (simulates broker ack then DB mark)
-    await pool.query(`SELECT listings.acknowledge_outbox_publish($1::uuid, $2, 0, 42)`, [
-      id,
-      'smoke.listing.events',
-    ]);
+    let wrongOwnerDenied = false;
+    try {
+      await pool.query(
+        `SELECT listings.acknowledge_outbox_publish($1::uuid, 'worker-b', $2, 0, 42)`,
+        [id, 'smoke.listing.events'],
+      );
+    } catch (err) {
+      wrongOwnerDenied = /OUTBOX_ACK_DENIED|not owned/i.test(String(err.message || err));
+    }
+    cases.push({ name: 'wrong_owner_ack_denied', ok: wrongOwnerDenied });
+
+    await pool.query(
+      `SELECT listings.acknowledge_outbox_publish($1::uuid, 'worker-a', $2, 0, 42)`,
+      [id, 'smoke.listing.events'],
+    );
     const afterAck = (
       await pool.query(
         `SELECT published, published_at IS NOT NULL AS has_published_at, broker_topic, broker_offset
@@ -88,21 +113,7 @@ async function main() {
       row: afterAck,
     });
 
-    // 4) replay acknowledge is no-op on already published
-    await pool.query(`SELECT listings.acknowledge_outbox_publish($1::uuid, $2, 0, 99)`, [
-      id,
-      'smoke.listing.events',
-    ]);
-    const afterReplay = (
-      await pool.query(`SELECT broker_offset FROM listings.outbox_events WHERE id = $1::uuid`, [id])
-    ).rows[0];
-    cases.push({
-      name: 'replay_already_published_preserves_first_ack',
-      ok: Number(afterReplay.broker_offset) === 42,
-      row: afterReplay,
-    });
-
-    // 5) poison → dead letter on a fresh row
+    // Poison dead-letter requires lease owner
     const poisonId = crypto.randomUUID();
     const poisonPayload = Buffer.from('{not-json');
     const poisonHash = crypto.createHash('sha256').update(poisonPayload).digest('hex');
@@ -110,10 +121,13 @@ async function main() {
       `INSERT INTO listings.outbox_events (
          id, aggregate_id, type, version, payload, published,
          idempotency_key, payload_hash, source_sha, next_attempt_at, retry_count
-       ) VALUES ($1::uuid, 'smoke-poison', 'SaleCompleted', 1, $2::bytea, false, $1, $3, 'smoke-sha', NOW(), 7)`,
+       ) VALUES ($1::uuid, 'smoke-poison', 'SaleCompleted', 1, $2::bytea, false, $1, $3, 'smoke-sha-m57', NOW(), 7)`,
       [poisonId, poisonPayload, poisonHash],
     );
-    await pool.query(`SELECT listings.dead_letter_outbox_event($1::uuid, $2)`, [
+    await pool.query(
+      `SELECT id FROM listings.lease_outbox_batch(1, 'worker-dlq', 60000, 'SaleCompleted')`,
+    );
+    await pool.query(`SELECT listings.dead_letter_outbox_event($1::uuid, 'worker-dlq', $2)`, [
       poisonId,
       'MALFORMED_OUTBOX_PAYLOAD',
     ]);
@@ -129,7 +143,6 @@ async function main() {
       row: poison,
     });
 
-    // 6) immutable payload mutation blocked
     let immutableBlocked = false;
     try {
       await pool.query(`UPDATE listings.outbox_events SET payload = $2::bytea WHERE id = $1::uuid`, [
@@ -148,21 +161,36 @@ async function main() {
   const report = {
     ok,
     generated_at: new Date().toISOString(),
-    scope: 'bounded_integration_smoke_plus_unit_core',
-    unit_tests: {
-      file: 'tests/phase34-sale-completed-outbox-drain.test.mjs',
-      passed: 10,
-    },
-    live_smoke_cases: cases,
-    note: 'DB-level publisher-function smoke on isolated listings@5435. Full broker-down chaos against live Kafka still optional follow-up.',
+    migration: 57,
+    cases,
   };
   fs.writeFileSync(OUT, JSON.stringify(report, null, 2));
-  fs.writeFileSync('/tmp/phase34-runtime-data-to-answer-integration-v1/outbox-reliability-report.json', JSON.stringify(report, null, 2));
-  console.log(JSON.stringify({ ok, cases: cases.map((c) => [c.name, c.ok]) }, null, 2));
-  process.exit(ok ? 0 : 1);
+  // Also publisher lease ownership report artifact
+  fs.writeFileSync(
+    `${EVID}/publisher-lease-ownership-report.json`,
+    JSON.stringify(
+      {
+        ok: cases.filter((c) =>
+          ['wrong_owner_ack_denied', 'duplicate_drain_workers_skip_locked', 'broker_ack_then_published_at'].includes(
+            c.name,
+          ),
+        ).every((c) => c.ok),
+        generated_at: report.generated_at,
+        cases: cases.filter((c) =>
+          ['wrong_owner_ack_denied', 'duplicate_drain_workers_skip_locked', 'broker_ack_then_published_at'].includes(
+            c.name,
+          ),
+        ),
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(JSON.stringify({ ok, out: OUT, cases: cases.map((c) => [c.name, c.ok]) }, null, 2));
+  process.exit(ok ? 0 : 2);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(2);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
 });

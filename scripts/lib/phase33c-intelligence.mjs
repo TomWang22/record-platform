@@ -6,6 +6,13 @@ import path from 'node:path';
 import { analyzeScarcity } from './phase33c-scarcity.mjs';
 import { analyzeValuation } from './phase33c-valuation.mjs';
 import { analyzeAuction } from './phase33c-auction.mjs';
+import { analyzeNegotiation } from './phase33d-negotiation.mjs';
+import { analyzeRecommendations } from './phase33d-recommendations.mjs';
+import { analyzeMarketAnalytics } from './phase33e-analytics.mjs';
+import {
+  analyzeEmbeddings,
+  analyzeSemanticSearch,
+} from './phase34-runtime-search-embeddings.mjs';
 import {
   FORBIDDEN_TRAINING_PATTERNS,
   PRIVATE_FIELD_PATTERNS,
@@ -25,6 +32,11 @@ export const PROMPT_TEMPLATES = {
   scarcity: { id: 'scarcity-explain', version: '1', role: 'summarize_only' },
   valuation: { id: 'valuation-explain', version: '1', role: 'summarize_only' },
   auction_intelligence: { id: 'auction-explain', version: '1', role: 'summarize_only' },
+  embeddings: { id: 'embeddings-diagnostic', version: '1', role: 'summarize_only' },
+  semantic_search: { id: 'semantic-search-explain', version: '1', role: 'summarize_only' },
+  negotiation_assistance: { id: 'negotiation-reply-draft', version: '1', role: 'draft_after_facts' },
+  recommendations: { id: 'recommendation-explain', version: '1', role: 'explain_after_rank' },
+  market_analytics: { id: 'market-analytics-explain', version: '1', role: 'summarize_only' },
 };
 
 function candidatesFromResult(input, result) {
@@ -233,6 +245,26 @@ export async function runCapabilityAsync(capability, input = {}) {
     case 'auction_intelligence':
       out = withPlatformEnvelope('auction_intelligence', nextInput, analyzeAuction(nextInput));
       break;
+    case 'embeddings':
+      out = withPlatformEnvelope('embeddings', nextInput, analyzeEmbeddings(nextInput));
+      break;
+    case 'semantic_search':
+      out = withPlatformEnvelope('semantic_search', nextInput, analyzeSemanticSearch(nextInput));
+      break;
+    case 'negotiation_assistance':
+    case 'negotiation':
+      out = withPlatformEnvelope(
+        'negotiation_assistance',
+        nextInput,
+        analyzeNegotiation(nextInput),
+      );
+      break;
+    case 'recommendations':
+      out = withPlatformEnvelope('recommendations', nextInput, analyzeRecommendations(nextInput));
+      break;
+    case 'market_analytics':
+      out = withPlatformEnvelope('market_analytics', nextInput, analyzeMarketAnalytics(nextInput));
+      break;
     default: {
       const _exhaustive = capability;
       throw new Error(`unknown_capability:${_exhaustive}`);
@@ -279,6 +311,21 @@ export function runCapability(capability, input = {}) {
       );
     case 'auction_intelligence':
       return withPlatformEnvelope('auction_intelligence', input, analyzeAuction(input));
+    case 'embeddings':
+      return withPlatformEnvelope('embeddings', input, analyzeEmbeddings(input));
+    case 'semantic_search':
+      return withPlatformEnvelope('semantic_search', input, analyzeSemanticSearch(input));
+    case 'negotiation_assistance':
+    case 'negotiation':
+      return withPlatformEnvelope(
+        'negotiation_assistance',
+        input,
+        analyzeNegotiation(input),
+      );
+    case 'recommendations':
+      return withPlatformEnvelope('recommendations', input, analyzeRecommendations(input));
+    case 'market_analytics':
+      return withPlatformEnvelope('market_analytics', input, analyzeMarketAnalytics(input));
     default: {
       const _exhaustive = capability;
       throw new Error(`unknown_capability:${_exhaustive}`);
@@ -340,6 +387,32 @@ export function validateCapabilityResultShape(capability, result) {
       'risk_flags',
       'notable_auctions',
     ]) {
+      if (!(k in result)) violations.push(`schema_invalid:missing:${k}`);
+    }
+  }
+  if (capability === 'embeddings') {
+    for (const k of ['embedding_status', 'neighbor_count', 'model_weight_training']) {
+      if (!(k in result)) violations.push(`schema_invalid:missing:${k}`);
+    }
+    if (result.model_weight_training !== 'NO') violations.push('hard:model_weight_training');
+  }
+  if (capability === 'semantic_search') {
+    for (const k of ['search_mode', 'result_count', 'results']) {
+      if (!(k in result)) violations.push(`schema_invalid:missing:${k}`);
+    }
+  }
+  if (capability === 'negotiation_assistance' || capability === 'negotiation') {
+    for (const k of ['auto_send', 'automatic_send_allowed', 'impersonation', 'reply_drafts']) {
+      if (!(k in result)) violations.push(`schema_invalid:missing:${k}`);
+    }
+  }
+  if (capability === 'recommendations') {
+    for (const k of ['recommendations', 'pay_to_rank']) {
+      if (!(k in result)) violations.push(`schema_invalid:missing:${k}`);
+    }
+  }
+  if (capability === 'market_analytics') {
+    for (const k of ['analytics_mode', 'currency']) {
       if (!(k in result)) violations.push(`schema_invalid:missing:${k}`);
     }
   }

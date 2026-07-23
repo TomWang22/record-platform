@@ -35,8 +35,12 @@ import {
   activeFactsMap,
   createDraft,
 } from '../lib/phase34-conversation-memory.mjs';
+import {
+  acquireEvidenceRootLock,
+  launcherFilePathFromMeta,
+} from '../lib/phase34-evidence-root-lock.mjs';
 
-const EVID = process.env.PHASE34_EVIDENCE_ROOT || '/tmp/phase34-real-model-full-eval-v1';
+const EVID_RAW = process.env.PHASE34_EVIDENCE_ROOT || '/tmp/phase34-real-model-full-eval-v1';
 const TOTAL = Number(process.env.PHASE34_FULL_EVAL_SESSIONS || 20000);
 const PER_CAP = TOTAL / EIGHT_CAPABILITIES.length; // 2500
 const MULTI_FRAC = Number(process.env.PHASE34_MULTI_FRAC || 0.27);
@@ -159,22 +163,45 @@ function expectedEligiblePreview() {
 }
 
 async function main() {
-  if (fs.existsSync(`${EVID}/real-model-full-eval.json`)) {
-    console.error(JSON.stringify({ ok: false, reason: 'EVIDENCE_ROOT_ALREADY_FINALIZED', evid: EVID }));
-    process.exit(3);
-  }
-  if (fs.existsSync(`${EVID}/FROZEN_BLOCKED_EVIDENCE`) || fs.existsSync(`${EVID}/FROZEN_PASS_EVIDENCE`)) {
-    console.error(JSON.stringify({ ok: false, reason: 'EVIDENCE_ROOT_FROZEN', evid: EVID }));
-    process.exit(3);
+  let sourceSha = null;
+  try {
+    sourceSha = fs.readFileSync('/Users/tom/record-platform/.git/HEAD', 'utf8').trim();
+    if (sourceSha.startsWith('ref:')) {
+      const ref = sourceSha.slice(4).trim();
+      sourceSha = fs.readFileSync(`/Users/tom/record-platform/.git/${ref}`, 'utf8').trim();
+    }
+  } catch {
+    sourceSha = process.env.RP_SOURCE_SHA || null;
   }
 
+  let lock;
+  try {
+    lock = acquireEvidenceRootLock({
+      evidenceRoot: EVID_RAW,
+      sourceSha,
+      launcherPath: launcherFilePathFromMeta(import.meta.url),
+    });
+  } catch (e) {
+    console.error(
+      JSON.stringify({
+        ok: false,
+        reason: e.code || 'LOCK_FAILED',
+        message: String(e.message || e),
+        existing_lock: e.existing_lock || null,
+      }),
+    );
+    process.exit(3);
+  }
+  const EVID = lock.root;
+
   clearCanonicalInferenceStore();
-  fs.mkdirSync(`${EVID}/ledgers`, { recursive: true });
 
   const preview = expectedEligiblePreview();
   process.stdout.write(`model_eligible_turns_denominator_preview=${preview.model_eligible_turns}\n`);
   process.stdout.write(`sessions=${preview.sessions} multi=${preview.multi_turn_sessions} turns=${preview.total_turns}\n`);
+  process.stdout.write(`writer_lock=${lock.lockPath} run_id=${lock.payload.run_id}\n`);
   fs.writeFileSync(`${EVID}/eligibility-denominator-preview.json`, JSON.stringify(preview, null, 2) + '\n');
+  const seenSessionIds = new Set();
 
   const docs = [
     {
@@ -209,7 +236,9 @@ async function main() {
   });
   const health = await gateway.health();
   if (!health.ok) {
+    lock.writeCheckpoint({ state: 'GATEWAY_HEALTH_FAIL', health });
     console.error(JSON.stringify({ ok: false, health }));
+    lock.release({ unlinkLock: false });
     process.exit(2);
   }
 
@@ -221,6 +250,9 @@ async function main() {
   const modelStream = fs.createWriteStream(`${EVID}/ledgers/model-invocations.jsonl`, { flags: 'a' });
   let sessionIndex = 0;
   let stopNew = false;
+  let timeout_attempts = 0;
+  let timeout_exhausted = 0;
+  let successful_retries = 0;
 
   for (const capability of EIGHT_CAPABILITIES) {
     if (stopNew) break;
@@ -232,6 +264,12 @@ async function main() {
       if (isMulti) multi_turn_sessions += 1;
 
       const session_id = `rmf-${String(sessionIndex).padStart(5, '0')}`;
+      if (seenSessionIds.has(session_id)) {
+        hard_failures.push({ session_id, reason: 'DUPLICATE_SESSION_ID' });
+        stopNew = true;
+        break;
+      }
+      seenSessionIds.add(session_id);
       sessionIndex += 1;
       const owner = `owner-${sessionIndex % 31}`;
       const sessionDoc = createConversationSession({
@@ -316,7 +354,14 @@ async function main() {
                 capability,
                 tier: 'privacy-local',
                 structured_result: structured,
-                evidence_summary: `${structured.sold_count || 0} eligible sales.`,
+                evidence_summary: [
+                  `${structured.sold_count || 0} eligible sales.`,
+                  `Allowed numbers only: ${Object.entries(structured)
+                    .filter(([, v]) => typeof v === 'number')
+                    .map(([k, v]) => `${k}=${v}`)
+                    .join(', ')}.`,
+                  'Do not invent any other numeric values.',
+                ].join(' '),
                 modelGateway: gateway,
                 snapshot,
               });
@@ -410,6 +455,7 @@ async function main() {
             } catch (e) {
               lastError = e;
               const transient = /timeout|aborted|ECONNRESET|fetch failed/i.test(String(e.message));
+              if (transient) timeout_attempts += 1;
               if (transient && attempt < maxAttempts) {
                 process.stdout.write(
                   `retry_timeout session=${session_id} turn=${t} attempt=${attempt}\n`,
@@ -417,18 +463,27 @@ async function main() {
                 await new Promise((r) => setTimeout(r, 1500));
                 continue;
               }
+              if (transient) timeout_exhausted += 1;
               fallback_class = /timeout|aborted/i.test(String(e.message))
                 ? FALLBACK_CLASS.MODEL_TIMEOUT
                 : FALLBACK_CLASS.MODEL_UNAVAILABLE;
               hard_failures.push({
                 session_id,
-                reason: fallback_class,
+                reason: transient ? 'MODEL_TIMEOUT_EXHAUSTED' : fallback_class,
                 error: String(e.message).slice(0, 120),
                 attempts: attempt,
               });
-              synthesis = synthesizeDeterministic({ capability, structured_result: structured });
+              // Never convert timeout into a silent deterministic customer answer.
+              synthesis = {
+                ...synthesizeDeterministic({ capability, structured_result: structured }),
+                model_invoked: false,
+                fallback_class,
+                direct_answer:
+                  'Model generation timed out. No grounded customer answer was produced for this turn.',
+              };
             }
           }
+          if (success && synthesis?.model_ledger?.retry_count > 0) successful_retries += 1;
           void lastError;
         } else {
           synthesis = synthesizeDeterministic({ capability, structured_result: structured });
@@ -486,6 +541,20 @@ async function main() {
         process.stdout.write(
           `progress ${sessionIndex}/${TOTAL} eligible=${counters.model_eligible_turns} success=${counters.model_success_turns} fail=${hard_failures.length}\n`,
         );
+        lock.writeHeartbeat({ phase: 'running', sessions_completed: sessionIndex });
+        lock.writeCheckpoint({
+          state: 'RUNNING',
+          sessions_completed: sessionIndex,
+          model_eligible_turns: counters.model_eligible_turns,
+          model_invoked_turns: counters.model_invoked_turns,
+          model_success_turns: counters.model_success_turns,
+          unexpected_rule_fallbacks: counters.unexpected_rule_fallback_turns,
+          hard_failure_count: hard_failures.length,
+          timeout_attempts,
+          timeout_exhausted,
+          successful_retries,
+          writer_count: 1,
+        });
       }
       if (hard_failures.length > 0) {
         // Finish active logical unit (this session already done), stop releasing new sessions.
@@ -507,19 +576,32 @@ async function main() {
     coverage.ok &&
     counters.unexpected_rule_fallback_turns === 0 &&
     counters.model_success_turns === counters.model_eligible_turns &&
+    counters.model_invoked_turns === counters.model_eligible_turns &&
+    timeout_exhausted === 0 &&
     multi_turn_sessions >= Math.floor(TOTAL * 0.25) &&
     multi_turn_sessions <= Math.ceil(TOTAL * 0.3) + 50;
 
   const latency = latencyReport(generationLatencies);
+  const modelTierInsufficient =
+    gateway.model_tier?.product_quality === 'MODEL_TIER_INSUFFICIENT' ||
+    gateway.model_tier?.role === 'TRANSPORT_AND_SMOKE_ONLY';
   const report = {
     ok,
     generated_at: new Date().toISOString(),
     evidence_root: EVID,
+    writer_lock: lock.payload,
     sessions_total: sessionIndex,
     multi_turn_sessions,
     eligibility_preview: preview,
     eligibility_counters: counters,
     coverage,
+    timeout_policy: {
+      client_timeout_ms: Number(process.env.PHASE34_OLLAMA_TIMEOUT_MS || 180000),
+      max_attempts: 2,
+      timeout_attempts,
+      timeout_exhausted,
+      successful_retries,
+    },
     model_generation_latency_ms: latency,
     model_tier: gateway.model_tier,
     hard_failure_count: hard_failures.length,
@@ -527,9 +609,14 @@ async function main() {
     stop_new_sessions: stopNew,
     classification: ok
       ? [
-          'PHASE 34 REAL MODEL FULL EVAL PASS —',
+          modelTierInsufficient
+            ? 'PHASE 34 REAL-MODEL FULL EVALUATION TECHNICAL PASS —'
+            : 'PHASE 34 REAL MODEL FULL EVAL PASS —',
           `MODEL ELIGIBLE=${counters.model_eligible_turns} SUCCESS=${counters.model_success_turns} —`,
-          'HUMAN REVIEW AND OWNER PACKAGE PENDING —',
+          modelTierInsufficient
+            ? 'MODEL TIER INSUFFICIENT FOR FINAL PRODUCT-QUALITY ACCEPTANCE —'
+            : 'HUMAN REVIEW AND OWNER PACKAGE PENDING —',
+          'HUMAN REVIEW REQUIRED —',
           'PRODUCTION NOT APPROVED',
         ].join('\n')
       : [
@@ -543,6 +630,20 @@ async function main() {
   };
   fs.writeFileSync(`${EVID}/real-model-full-eval.json`, JSON.stringify(report, null, 2) + '\n');
 
+  lock.writeCheckpoint({
+    state: ok ? 'FROZEN_PASS' : 'FROZEN_BLOCKED',
+    sessions_completed: sessionIndex,
+    model_eligible_turns: counters.model_eligible_turns,
+    model_invoked_turns: counters.model_invoked_turns,
+    model_success_turns: counters.model_success_turns,
+    unexpected_rule_fallbacks: counters.unexpected_rule_fallback_turns,
+    hard_failure_count: hard_failures.length,
+    timeout_attempts,
+    timeout_exhausted,
+    successful_retries,
+    writer_count: 1,
+  });
+
   if (ok) {
     fs.mkdirSync(`${EVID}/FROZEN_PASS_EVIDENCE`, { recursive: true });
     fs.writeFileSync(
@@ -554,6 +655,7 @@ async function main() {
           report: 'real-model-full-eval.json',
           report_sha256: sha(fs.readFileSync(`${EVID}/real-model-full-eval.json`)),
           model_eligible_turns: counters.model_eligible_turns,
+          writer_lock_run_id: lock.payload.run_id,
           do_not_resume: true,
           do_not_mutate: true,
         },
@@ -573,6 +675,7 @@ async function main() {
           report_sha256: sha(fs.readFileSync(`${EVID}/real-model-full-eval.json`)),
           sessions_completed: sessionIndex,
           hard_failure_count: hard_failures.length,
+          writer_lock_run_id: lock.payload.run_id,
           do_not_resume: true,
           do_not_mutate: true,
         },
@@ -581,6 +684,8 @@ async function main() {
       ) + '\n',
     );
   }
+
+  lock.release({ unlinkLock: false });
 
   console.log(
     JSON.stringify(

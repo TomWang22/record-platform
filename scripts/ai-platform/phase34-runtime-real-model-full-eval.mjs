@@ -205,7 +205,7 @@ async function main() {
   const stores = createRetrievalStores({ catalog: docs });
   const gateway = createOllamaModelGateway({
     baseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11436',
-    timeoutMs: Number(process.env.PHASE34_OLLAMA_TIMEOUT_MS || 120000),
+    timeoutMs: Number(process.env.PHASE34_OLLAMA_TIMEOUT_MS || 180000),
   });
   const health = await gateway.health();
   if (!health.ok) {
@@ -308,103 +308,128 @@ async function main() {
         let success = false;
 
         if (eligibility.eligible) {
-          try {
-            synthesis = await synthesizeGrounded({
-              capability,
-              tier: 'privacy-local',
-              structured_result: structured,
-              evidence_summary: `${structured.sold_count || 0} eligible sales.`,
-              modelGateway: gateway,
-              snapshot,
-            });
-            if (!synthesis.model_invoked) {
-              fallback_class = FALLBACK_CLASS.UNEXPECTED_RULE_FALLBACK;
-              hard_failures.push({ session_id, reason: 'UNEXPECTED_RULE_FALLBACK' });
-              synthesis = synthesizeDeterministic({ capability, structured_result: structured });
-            } else {
-              invoked = true;
-              const claim_ledger = {
-                entries: Object.entries(structured)
-                  .filter(([, v]) => typeof v === 'number')
-                  .map(([k, v]) => ({
-                    claim_type: k,
-                    normalized_claim_value: v,
-                    verification_result: 'SUPPORTED',
-                  })),
-              };
-              const guarded = await guardWithRetry({
-                text: synthesis.direct_answer,
+          const maxAttempts = 2; // bounded retry on transient timeout/unavailable
+          let lastError = null;
+          for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+            try {
+              synthesis = await synthesizeGrounded({
+                capability,
+                tier: 'privacy-local',
                 structured_result: structured,
-                claim_ledger,
-                synthesisInput: { capability, structured_result: structured },
-                retryOnce: async ({ violations }) => {
-                  const banned = violations
-                    .map((v) => v.claim?.raw)
-                    .filter(Boolean)
-                    .slice(0, 8)
-                    .join(', ');
-                  const retry = await gateway.complete({
-                    capability,
-                    structured_result: structured,
-                    evidence_summary: `Retry. Do not use these unsupported values: ${banned}. Only JSON numbers.`,
-                    snapshot,
-                    inference_id: ids.inference_id,
-                  });
-                  return retry.direct_answer;
-                },
+                evidence_summary: `${structured.sold_count || 0} eligible sales.`,
+                modelGateway: gateway,
+                snapshot,
               });
-              if (guarded.ok && !guarded.used_fallback) {
-                success = true;
-                fallback_class = FALLBACK_CLASS.NONE;
-                synthesis_label = 'GROUNDED MODEL SYNTHESIS';
-                synthesis = { ...synthesis, direct_answer: guarded.guarded_text };
-              } else if (guarded.used_fallback) {
-                fallback_class = FALLBACK_CLASS.MODEL_GUARD_REJECTED;
-                hard_failures.push({
-                  session_id,
-                  turn_index: t,
-                  reason: 'INVENTION_GUARD',
-                  violations: (guarded.prior_violations || []).slice(0, 3),
+              if (!synthesis.model_invoked) {
+                fallback_class = FALLBACK_CLASS.UNEXPECTED_RULE_FALLBACK;
+                hard_failures.push({ session_id, reason: 'UNEXPECTED_RULE_FALLBACK' });
+                synthesis = synthesizeDeterministic({ capability, structured_result: structured });
+              } else {
+                invoked = true;
+                const claim_ledger = {
+                  entries: Object.entries(structured)
+                    .filter(([, v]) => typeof v === 'number')
+                    .map(([k, v]) => ({
+                      claim_type: k,
+                      normalized_claim_value: v,
+                      verification_result: 'SUPPORTED',
+                    })),
+                };
+                const guarded = await guardWithRetry({
+                  text: synthesis.direct_answer,
+                  structured_result: structured,
+                  claim_ledger,
+                  synthesisInput: { capability, structured_result: structured },
+                  retryOnce: async ({ violations }) => {
+                    const banned = violations
+                      .map((v) => v.claim?.raw)
+                      .filter(Boolean)
+                      .slice(0, 8)
+                      .join(', ');
+                    const retry = await gateway.complete({
+                      capability,
+                      structured_result: structured,
+                      evidence_summary: `Retry. Do not use these unsupported values: ${banned}. Only JSON numbers.`,
+                      snapshot,
+                      inference_id: ids.inference_id,
+                    });
+                    return retry.direct_answer;
+                  },
                 });
-                fs.appendFileSync(
-                  `${EVID}/ledgers/failures.jsonl`,
+                if (guarded.ok && !guarded.used_fallback) {
+                  success = true;
+                  fallback_class = FALLBACK_CLASS.NONE;
+                  synthesis_label = 'GROUNDED MODEL SYNTHESIS';
+                  synthesis = { ...synthesis, direct_answer: guarded.guarded_text };
+                } else if (guarded.used_fallback) {
+                  fallback_class = FALLBACK_CLASS.MODEL_GUARD_REJECTED;
+                  hard_failures.push({
+                    session_id,
+                    turn_index: t,
+                    reason: 'INVENTION_GUARD',
+                    violations: (guarded.prior_violations || []).slice(0, 3),
+                  });
+                  fs.appendFileSync(
+                    `${EVID}/ledgers/failures.jsonl`,
+                    JSON.stringify({
+                      session_id,
+                      turn_index: t,
+                      capability,
+                      violations: guarded.prior_violations,
+                      answer: String(synthesis.direct_answer || '').slice(0, 240),
+                    }) + '\n',
+                  );
+                  synthesis = guarded.fallback_synthesis;
+                } else {
+                  fallback_class = FALLBACK_CLASS.MODEL_GUARD_REJECTED;
+                  hard_failures.push({ session_id, reason: 'INVENTION_GUARD' });
+                  synthesis = synthesizeDeterministic({ capability, structured_result: structured });
+                }
+              }
+              if (synthesis.model_ledger) {
+                synthesis.model_ledger.inference_id = ids.inference_id;
+                synthesis.model_ledger.retry_count = attempt - 1;
+                generationLatencies.push(
+                  synthesis.model_ledger.generation_latency_ms ?? synthesis.model_ledger.total_latency_ms ?? null,
+                );
+                modelStream.write(
                   JSON.stringify({
                     session_id,
                     turn_index: t,
                     capability,
-                    violations: guarded.prior_violations,
-                    answer: String(synthesis.direct_answer || '').slice(0, 240),
+                    inference_id: ids.inference_id,
+                    model_ledger: synthesis.model_ledger,
+                    success,
+                    fallback_class,
+                    attempt,
                   }) + '\n',
                 );
-                synthesis = guarded.fallback_synthesis;
-              } else {
-                fallback_class = FALLBACK_CLASS.MODEL_GUARD_REJECTED;
-                hard_failures.push({ session_id, reason: 'INVENTION_GUARD' });
-                synthesis = synthesizeDeterministic({ capability, structured_result: structured });
               }
+              lastError = null;
+              break;
+            } catch (e) {
+              lastError = e;
+              const transient = /timeout|aborted|ECONNRESET|fetch failed/i.test(String(e.message));
+              if (transient && attempt < maxAttempts) {
+                process.stdout.write(
+                  `retry_timeout session=${session_id} turn=${t} attempt=${attempt}\n`,
+                );
+                await new Promise((r) => setTimeout(r, 1500));
+                continue;
+              }
+              fallback_class = /timeout|aborted/i.test(String(e.message))
+                ? FALLBACK_CLASS.MODEL_TIMEOUT
+                : FALLBACK_CLASS.MODEL_UNAVAILABLE;
+              hard_failures.push({
+                session_id,
+                reason: fallback_class,
+                error: String(e.message).slice(0, 120),
+                attempts: attempt,
+              });
+              synthesis = synthesizeDeterministic({ capability, structured_result: structured });
             }
-            if (synthesis.model_ledger) {
-              synthesis.model_ledger.inference_id = ids.inference_id;
-              generationLatencies.push(synthesis.model_ledger.generation_latency_ms ?? synthesis.model_ledger.total_latency_ms ?? null);
-              modelStream.write(
-                JSON.stringify({
-                  session_id,
-                  turn_index: t,
-                  capability,
-                  inference_id: ids.inference_id,
-                  model_ledger: synthesis.model_ledger,
-                  success,
-                  fallback_class,
-                }) + '\n',
-              );
-            }
-          } catch (e) {
-            fallback_class = /timeout|aborted/i.test(String(e.message))
-              ? FALLBACK_CLASS.MODEL_TIMEOUT
-              : FALLBACK_CLASS.MODEL_UNAVAILABLE;
-            hard_failures.push({ session_id, reason: fallback_class, error: String(e.message).slice(0, 120) });
-            synthesis = synthesizeDeterministic({ capability, structured_result: structured });
           }
+          void lastError;
         } else {
           synthesis = synthesizeDeterministic({ capability, structured_result: structured });
         }

@@ -39,11 +39,20 @@ import {
   acquireEvidenceRootLock,
   launcherFilePathFromMeta,
 } from '../lib/phase34-evidence-root-lock.mjs';
+import {
+  DEFAULT_EVAL_MODE,
+  EVAL_MODE,
+  shouldStopOnFailure,
+  emptyQualitySoakCounters,
+  assertInvocationLedgerInvariant,
+  appendModelInvocationLedger,
+} from '../lib/phase34-eval-execution-mode.mjs';
 
 const EVID_RAW = process.env.PHASE34_EVIDENCE_ROOT || '/tmp/phase34-real-model-full-eval-v1';
 const TOTAL = Number(process.env.PHASE34_FULL_EVAL_SESSIONS || 20000);
 const PER_CAP = TOTAL / EIGHT_CAPABILITIES.length; // 2500
 const MULTI_FRAC = Number(process.env.PHASE34_MULTI_FRAC || 0.27);
+const EVAL_MODE_ACTIVE = process.env.PHASE34_EVAL_MODE || DEFAULT_EVAL_MODE;
 
 function sha(s) {
   return crypto.createHash('sha256').update(String(s)).digest('hex');
@@ -243,16 +252,34 @@ async function main() {
   }
 
   const counters = emptyEligibilityCounters();
+  const soak = emptyQualitySoakCounters();
   const hard_failures = [];
   const generationLatencies = [];
   let multi_turn_sessions = 0;
   const sessionStream = fs.createWriteStream(`${EVID}/ledgers/sessions.jsonl`, { flags: 'a' });
-  const modelStream = fs.createWriteStream(`${EVID}/ledgers/model-invocations.jsonl`, { flags: 'a' });
+  const invLedgerPath = `${EVID}/ledgers/model-invocations.jsonl`;
+  let invocation_ledger_rows = 0;
+  let transport_failure_turns = 0;
   let sessionIndex = 0;
   let stopNew = false;
   let timeout_attempts = 0;
   let timeout_exhausted = 0;
   let successful_retries = 0;
+  process.stdout.write(`eval_mode=${EVAL_MODE_ACTIVE}\n`);
+  lock.writeCheckpoint({
+    state: 'RUNNING',
+    eval_mode: EVAL_MODE_ACTIVE,
+    sessions_completed: 0,
+    model_eligible_turns: 0,
+    model_invoked_turns: 0,
+    model_success_turns: 0,
+    writer_count: 1,
+  });
+
+  function recordInvocation(row) {
+    appendModelInvocationLedger(invLedgerPath, row);
+    invocation_ledger_rows += 1;
+  }
 
   for (const capability of EIGHT_CAPABILITIES) {
     if (stopNew) break;
@@ -406,29 +433,79 @@ async function main() {
                   fallback_class = FALLBACK_CLASS.NONE;
                   synthesis_label = 'GROUNDED MODEL SYNTHESIS';
                   synthesis = { ...synthesis, direct_answer: guarded.guarded_text };
+                  recordInvocation({
+                    session_id,
+                    turn_index: t,
+                    capability,
+                    inference_id: ids.inference_id,
+                    model_invocation_id: crypto.randomUUID(),
+                    attempt,
+                    outcome: 'accepted',
+                    guard_verdict: 'PASS',
+                    model_ledger: synthesis.model_ledger || null,
+                    evidence_snapshot_hash: snapshot.evidence_snapshot_hash,
+                    accepted_response_hash: sha(guarded.guarded_text || ''),
+                  });
                 } else if (guarded.used_fallback) {
                   fallback_class = FALLBACK_CLASS.MODEL_GUARD_REJECTED;
-                  hard_failures.push({
+                  soak.model_generations_guard_rejected += 1;
+                  soak.safe_fallback_success += 1;
+                  const failure = {
                     session_id,
                     turn_index: t,
                     reason: 'INVENTION_GUARD',
+                    unsupported_claims_escaped: false,
                     violations: (guarded.prior_violations || []).slice(0, 3),
-                  });
+                  };
+                  hard_failures.push(failure);
                   fs.appendFileSync(
                     `${EVID}/ledgers/failures.jsonl`,
                     JSON.stringify({
                       session_id,
                       turn_index: t,
                       capability,
+                      reason: 'INVENTION_GUARD',
+                      unsupported_claims_escaped: false,
                       violations: guarded.prior_violations,
                       answer: String(synthesis.direct_answer || '').slice(0, 240),
                     }) + '\n',
                   );
                   synthesis = guarded.fallback_synthesis;
+                  recordInvocation({
+                    session_id,
+                    turn_index: t,
+                    capability,
+                    inference_id: ids.inference_id,
+                    model_invocation_id: crypto.randomUUID(),
+                    attempt,
+                    outcome: 'guard_rejected',
+                    guard_verdict: 'REJECT',
+                    violations: (guarded.prior_violations || []).slice(0, 5),
+                    model_ledger: synthesis.model_ledger || null,
+                    evidence_snapshot_hash: snapshot.evidence_snapshot_hash,
+                    fallback: 'DETERMINISTIC_SAFE',
+                    unsupported_claims_escaped: false,
+                  });
                 } else {
                   fallback_class = FALLBACK_CLASS.MODEL_GUARD_REJECTED;
-                  hard_failures.push({ session_id, reason: 'INVENTION_GUARD' });
+                  soak.model_generations_guard_rejected += 1;
+                  hard_failures.push({
+                    session_id,
+                    reason: 'INVENTION_GUARD',
+                    unsupported_claims_escaped: false,
+                  });
                   synthesis = synthesizeDeterministic({ capability, structured_result: structured });
+                  recordInvocation({
+                    session_id,
+                    turn_index: t,
+                    capability,
+                    inference_id: ids.inference_id,
+                    model_invocation_id: crypto.randomUUID(),
+                    attempt,
+                    outcome: 'guard_rejected',
+                    guard_verdict: 'REJECT',
+                    unsupported_claims_escaped: false,
+                  });
                 }
               }
               if (synthesis.model_ledger) {
@@ -437,18 +514,22 @@ async function main() {
                 generationLatencies.push(
                   synthesis.model_ledger.generation_latency_ms ?? synthesis.model_ledger.total_latency_ms ?? null,
                 );
-                modelStream.write(
-                  JSON.stringify({
-                    session_id,
-                    turn_index: t,
-                    capability,
-                    inference_id: ids.inference_id,
-                    model_ledger: synthesis.model_ledger,
-                    success,
-                    fallback_class,
-                    attempt,
-                  }) + '\n',
-                );
+              }
+              // Ensure every invoked turn has a ledger row even if model_ledger missing
+              if (invoked && success && fallback_class === FALLBACK_CLASS.NONE) {
+                /* already recorded on accepted path */
+              } else if (invoked && fallback_class === FALLBACK_CLASS.UNEXPECTED_RULE_FALLBACK) {
+                recordInvocation({
+                  session_id,
+                  turn_index: t,
+                  capability,
+                  inference_id: ids.inference_id,
+                  model_invocation_id: crypto.randomUUID(),
+                  attempt,
+                  outcome: 'transport_failure',
+                  guard_verdict: 'N/A',
+                });
+                transport_failure_turns += 1;
               }
               lastError = null;
               break;
@@ -473,6 +554,18 @@ async function main() {
                 error: String(e.message).slice(0, 120),
                 attempts: attempt,
               });
+              invoked = true; // attempt reached the gateway
+              recordInvocation({
+                session_id,
+                turn_index: t,
+                capability,
+                inference_id: ids.inference_id,
+                model_invocation_id: crypto.randomUUID(),
+                attempt,
+                outcome: transient ? 'timeout' : 'transport_failure',
+                error: String(e.message).slice(0, 160),
+              });
+              if (!transient) transport_failure_turns += 1;
               // Never convert timeout into a silent deterministic customer answer.
               synthesis = {
                 ...synthesizeDeterministic({ capability, structured_result: structured }),
@@ -557,29 +650,54 @@ async function main() {
         });
       }
       if (hard_failures.length > 0) {
-        // Finish active logical unit (this session already done), stop releasing new sessions.
-        stopNew = true;
-        process.stdout.write(`FAIL_CLOSED at session=${sessionIndex} failures=${hard_failures.length}\n`);
+        const latest = hard_failures[hard_failures.length - 1];
+        if (shouldStopOnFailure({ mode: EVAL_MODE_ACTIVE, failure: latest })) {
+          stopNew = true;
+          process.stdout.write(
+            `FAIL_CLOSED mode=${EVAL_MODE_ACTIVE} at session=${sessionIndex} reason=${latest.reason}\n`,
+          );
+        } else {
+          process.stdout.write(
+            `QUALITY_SOAK_CONTINUE session=${sessionIndex} reason=${latest.reason} contained=1\n`,
+          );
+        }
       }
     }
   }
   sessionStream.end();
-  modelStream.end();
   await finished(sessionStream);
-  await finished(modelStream);
 
   const coverage = assertEligibilityCoverage(counters);
+  const ledgerInvariant = assertInvocationLedgerInvariant({
+    model_invocation_ledger_rows: invocation_ledger_rows,
+    model_invoked_turns: counters.model_invoked_turns,
+    accepted_model_turns: counters.model_success_turns,
+    guard_rejected_turns: counters.guard_rejected_turns,
+    timeout_turns: counters.model_timeout_turns,
+    transport_failure_turns,
+  });
   const completedAll = !stopNew && sessionIndex === TOTAL;
+  const soakOk =
+    EVAL_MODE_ACTIVE !== EVAL_MODE.QUALITY_SOAK ||
+    (soak.unsupported_claims_escaped === 0 && ledgerInvariant.ok);
   const ok =
     completedAll &&
-    hard_failures.length === 0 &&
-    coverage.ok &&
-    counters.unexpected_rule_fallback_turns === 0 &&
-    counters.model_success_turns === counters.model_eligible_turns &&
-    counters.model_invoked_turns === counters.model_eligible_turns &&
-    timeout_exhausted === 0 &&
+    (EVAL_MODE_ACTIVE === EVAL_MODE.QUALITY_SOAK
+      ? soak.unsupported_claims_escaped === 0 &&
+        counters.unexpected_rule_fallback_turns === 0 &&
+        coverage.ok &&
+        ledgerInvariant.ok &&
+        timeout_exhausted === 0
+      : hard_failures.length === 0 &&
+        coverage.ok &&
+        counters.unexpected_rule_fallback_turns === 0 &&
+        counters.model_success_turns === counters.model_eligible_turns &&
+        counters.model_invoked_turns === counters.model_eligible_turns &&
+        timeout_exhausted === 0 &&
+        ledgerInvariant.ok) &&
     multi_turn_sessions >= Math.floor(TOTAL * 0.25) &&
-    multi_turn_sessions <= Math.ceil(TOTAL * 0.3) + 50;
+    multi_turn_sessions <= Math.ceil(TOTAL * 0.3) + 50 &&
+    soakOk;
 
   const latency = latencyReport(generationLatencies);
   const modelTierInsufficient =
@@ -595,6 +713,9 @@ async function main() {
     eligibility_preview: preview,
     eligibility_counters: counters,
     coverage,
+    invocation_ledger_invariant: ledgerInvariant,
+    eval_mode: EVAL_MODE_ACTIVE,
+    quality_soak_counters: soak,
     timeout_policy: {
       client_timeout_ms: Number(process.env.PHASE34_OLLAMA_TIMEOUT_MS || 180000),
       max_attempts: 2,

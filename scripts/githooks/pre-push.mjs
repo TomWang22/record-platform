@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import {
   auditCommitMessage,
   auditCommitIdentity,
+  auditOwnerGitIdentity,
 } from '../lib/no-cursor-attribution-policy.mjs';
 import { isForbiddenRetainedRef } from '../lib/retained-ref-policy.mjs';
 import { auditAllRefs, auditGitHistory } from '../lib/no-cursor-trailer-guard.mjs';
@@ -58,14 +59,16 @@ function auditOutgoingCommit(sha) {
     throw new Error(`malformed commit record for ${sha}`);
   }
   const [, authorName, authorEmail, committerName, committerEmail, body] = parts;
-  const identity = auditCommitIdentity({
+  const identityFields = {
     authorName,
     authorEmail,
     committerName,
     committerEmail,
-  });
+  };
+  const identity = auditCommitIdentity(identityFields);
+  const owner = auditOwnerGitIdentity(identityFields);
   const message = auditCommitMessage(body);
-  const violations = [...identity.violations, ...message.violations];
+  const violations = [...identity.violations, ...owner.violations, ...message.violations];
   return violations.map((v) => ({ sha, ref: sha, ...v }));
 }
 

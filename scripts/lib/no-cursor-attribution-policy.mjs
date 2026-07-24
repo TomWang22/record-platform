@@ -1,11 +1,17 @@
 /**
  * Shared Cursor/CursorAgent attribution policy for guards and hooks.
  */
+export const OWNER_GIT_IDENTITY = Object.freeze({
+  name: 'MelonGodTier',
+  email: 'tomwang22@yahoo.com',
+});
+
 export const EXACT_CURSOR_COAUTHOR_TRAILER_RE =
   /^Co-authored-by:\s*Cursor(?:\s+Agent)?\s*<cursoragent@(cursor\.com|users\.noreply\.github\.com)>\s*$/i;
 
+/** Case-insensitive attribution trailers that must never credit Cursor. */
 export const ATTRIBUTION_TRAILER_RE =
-  /^(?:co-authored-by|signed-off-by|reviewed-by|assisted-by):\s*.*(?:cursoragent@cursor\.com|cursoragent@users\.noreply\.github\.com|\bcursor\b).*$/i;
+  /^(?:co-authored-by|signed-off-by|reviewed-by|assisted-by|generated-by|on-behalf-of):\s*.*(?:cursoragent@cursor\.com|cursoragent@users\.noreply\.github\.com|\bcursor(?:\s+agent|\s+bot)?\b).*$/i;
 
 export const FORBIDDEN_IDENTITY_EMAILS = [
   'cursoragent@cursor.com',
@@ -79,5 +85,28 @@ export function auditCommitIdentity(identity) {
   return {
     status: 'FAIL',
     violations: violations.map((v) => ({ kind: 'identity', ...v })),
+  };
+}
+
+/**
+ * Outgoing commits must be exactly owner-attributed (not merely Cursor-free).
+ * Cursor may execute git locally; it must not become author/committer.
+ */
+export function auditOwnerGitIdentity(identity = {}) {
+  const violations = [];
+  const checks = [
+    ['author_name', identity.authorName, OWNER_GIT_IDENTITY.name],
+    ['author_email', identity.authorEmail, OWNER_GIT_IDENTITY.email],
+    ['committer_name', identity.committerName, OWNER_GIT_IDENTITY.name],
+    ['committer_email', identity.committerEmail, OWNER_GIT_IDENTITY.email],
+  ];
+  for (const [field, actual, expected] of checks) {
+    if (String(actual || '') !== expected) {
+      violations.push({ kind: 'owner-identity', field, value: String(actual || ''), expected });
+    }
+  }
+  return {
+    status: violations.length === 0 ? 'PASS' : 'FAIL',
+    violations,
   };
 }

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
  * commit-msg hook: reject forbidden Cursor assistant attribution trailers.
+ * Cursor may be the local editor executing git; it must not appear in trailers.
  */
 import fs from 'node:fs';
-import { findExactCursorCoauthorTrailerLine } from '../lib/no-cursor-attribution-policy.mjs';
+import { findCursorTrailerLine } from '../lib/no-cursor-attribution-policy.mjs';
 
 const messageFile = process.argv[2];
 if (!messageFile) {
@@ -12,7 +13,7 @@ if (!messageFile) {
 }
 
 const message = fs.readFileSync(messageFile, 'utf8');
-const forbidden = findExactCursorCoauthorTrailerLine(message);
+const forbidden = findCursorTrailerLine(message);
 
 if (forbidden) {
   console.error(`commit-msg: forbidden attribution trailer rejected:\n${forbidden}`);

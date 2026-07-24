@@ -24,6 +24,16 @@ describe('commit-msg hook', () => {
     assert.match(result.stderr, /forbidden attribution trailer/i);
   });
 
+  it('rejects Generated-by Cursor trailer', () => {
+    const result = runCommitMsg('feat: x\n\nGenerated-by: Cursor\n');
+    assert.notEqual(result.status, 0);
+  });
+
+  it('rejects on-behalf-of Cursor trailer', () => {
+    const result = runCommitMsg('feat: x\n\non-behalf-of: Cursor\n');
+    assert.notEqual(result.status, 0);
+  });
+
   it('allows ordinary Cursor prose', () => {
     const result = runCommitMsg('docs: note about Cursor editor integration\n');
     assert.equal(result.status, 0);
@@ -41,6 +51,7 @@ describe('end-to-end disposable repository fixtures', () => {
     execFileSync('git', ['init', '-b', 'main'], { cwd: dir });
     execFileSync('git', ['config', 'user.name', 'MelonGodTier'], { cwd: dir });
     execFileSync('git', ['config', 'user.email', 'tomwang22@yahoo.com'], { cwd: dir });
+    execFileSync('git', ['config', 'user.useConfigOnly', 'true'], { cwd: dir });
     execFileSync('git', ['config', 'core.hooksPath', path.join(REPO_ROOT, '.githooks')], { cwd: dir });
     fs.writeFileSync(path.join(dir, 'README.md'), 'fixture\n', 'utf8');
     execFileSync('git', ['add', 'README.md'], { cwd: dir });
@@ -78,6 +89,98 @@ describe('end-to-end disposable repository fixtures', () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('CURSOR_AGENT=1 with clean owner Git metadata passes', () => {
+    const dir = initRepo();
+    try {
+      execFileSync('git', ['commit', '-m', 'clean under cursor agent env'], {
+        cwd: dir,
+        env: {
+          ...process.env,
+          CURSOR_AGENT: '1',
+          CURSOR_LAYOUT: '1',
+        },
+      });
+      const log = execFileSync('git', ['log', '-1', '--format=%an <%ae> | %cn <%ce>'], {
+        cwd: dir,
+        encoding: 'utf8',
+      });
+      assert.equal(log.trim(), 'MelonGodTier <tomwang22@yahoo.com> | MelonGodTier <tomwang22@yahoo.com>');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('Cursor author fails', async () => {
+    const { auditCommitIdentity, auditOwnerGitIdentity } = await import(
+      '../scripts/lib/no-cursor-attribution-policy.mjs'
+    );
+    const identity = auditCommitIdentity({
+      authorName: 'Cursor',
+      authorEmail: 'cursoragent@cursor.com',
+      committerName: 'MelonGodTier',
+      committerEmail: 'tomwang22@yahoo.com',
+    });
+    assert.equal(identity.status, 'FAIL');
+    assert.ok(identity.violations.some((v) => v.field === 'author_name'));
+    const owner = auditOwnerGitIdentity({
+      authorName: 'Cursor',
+      authorEmail: 'cursoragent@cursor.com',
+      committerName: 'MelonGodTier',
+      committerEmail: 'tomwang22@yahoo.com',
+    });
+    assert.equal(owner.status, 'FAIL');
+  });
+
+  it('Cursor committer fails', async () => {
+    const { auditCommitIdentity, auditOwnerGitIdentity } = await import(
+      '../scripts/lib/no-cursor-attribution-policy.mjs'
+    );
+    const identity = auditCommitIdentity({
+      authorName: 'MelonGodTier',
+      authorEmail: 'tomwang22@yahoo.com',
+      committerName: 'Cursor Agent',
+      committerEmail: 'cursoragent@cursor.com',
+    });
+    assert.equal(identity.status, 'FAIL');
+    assert.ok(identity.violations.some((v) => v.field.startsWith('committer_')));
+    const owner = auditOwnerGitIdentity({
+      authorName: 'MelonGodTier',
+      authorEmail: 'tomwang22@yahoo.com',
+      committerName: 'Cursor Agent',
+      committerEmail: 'cursoragent@cursor.com',
+    });
+    assert.equal(owner.status, 'FAIL');
+  });
+
+  it('mixed outgoing range fails when any commit is non-owner', async () => {
+    const { auditOwnerGitIdentity, auditCommitMessage } = await import(
+      '../scripts/lib/no-cursor-attribution-policy.mjs'
+    );
+    const outgoing = [
+      {
+        authorName: 'MelonGodTier',
+        authorEmail: 'tomwang22@yahoo.com',
+        committerName: 'MelonGodTier',
+        committerEmail: 'tomwang22@yahoo.com',
+        message: 'good commit',
+      },
+      {
+        authorName: 'MelonGodTier',
+        authorEmail: 'tomwang22@yahoo.com',
+        committerName: 'MelonGodTier',
+        committerEmail: 'tomwang22@yahoo.com',
+        message: 'bad\n\nCo-authored-by: Cursor <cursoragent@cursor.com>',
+      },
+    ];
+    const violations = [];
+    for (const c of outgoing) {
+      violations.push(...auditOwnerGitIdentity(c).violations);
+      violations.push(...auditCommitMessage(c.message).violations);
+    }
+    assert.ok(violations.length >= 1);
+    assert.ok(violations.some((v) => v.kind === 'trailer'));
   });
 });
 

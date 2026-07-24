@@ -46,7 +46,11 @@ import {
   emptyQualitySoakCounters,
   assertInvocationLedgerInvariant,
   appendModelInvocationLedger,
+  isFailureLedgerRow,
+  countFailureLedgerRows,
 } from '../lib/phase34-eval-execution-mode.mjs';
+import { buildTripleVerdicts } from '../lib/phase34-typed-claims.mjs';
+import { writeFreezeManifest, summarizeFailureSessions } from '../lib/phase34-freeze-manifest.mjs';
 
 const EVID_RAW = process.env.PHASE34_EVIDENCE_ROOT || '/tmp/phase34-real-model-full-eval-v1';
 const TOTAL = Number(process.env.PHASE34_FULL_EVAL_SESSIONS || 20000);
@@ -703,6 +707,28 @@ async function main() {
   const modelTierInsufficient =
     gateway.model_tier?.product_quality === 'MODEL_TIER_INSUFFICIENT' ||
     gateway.model_tier?.role === 'TRANSPORT_AND_SMOKE_ONLY';
+  const failureRows = [];
+  if (fs.existsSync(`${EVID}/ledgers/failures.jsonl`)) {
+    for (const line of fs.readFileSync(`${EVID}/ledgers/failures.jsonl`, 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const row = JSON.parse(line);
+        if (isFailureLedgerRow(row)) failureRows.push(row);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  const failureSummary = summarizeFailureSessions(failureRows);
+  const triple_verdicts = buildTripleVerdicts({
+    unsupported_claims_escaped: soak.unsupported_claims_escaped,
+    model_generations_accepted: counters.model_success_turns,
+    model_generations_guard_rejected: counters.guard_rejected_turns,
+    verified_fallback_delivered: soak.safe_fallback_success,
+    accepted_grounded_model_response: counters.model_success_turns,
+    safe_deterministic_fallback: soak.safe_fallback_success,
+    customer_request_failed: soak.customer_request_failures,
+  });
   const report = {
     ok,
     generated_at: new Date().toISOString(),
@@ -716,6 +742,8 @@ async function main() {
     invocation_ledger_invariant: ledgerInvariant,
     eval_mode: EVAL_MODE_ACTIVE,
     quality_soak_counters: soak,
+    triple_verdicts,
+    failure_summary: failureSummary,
     timeout_policy: {
       client_timeout_ms: Number(process.env.PHASE34_OLLAMA_TIMEOUT_MS || 180000),
       max_attempts: 2,
@@ -734,6 +762,9 @@ async function main() {
             ? 'PHASE 34 REAL-MODEL FULL EVALUATION TECHNICAL PASS —'
             : 'PHASE 34 REAL MODEL FULL EVAL PASS —',
           `MODEL ELIGIBLE=${counters.model_eligible_turns} SUCCESS=${counters.model_success_turns} —`,
+          `SAFETY_CONTAINMENT=${triple_verdicts.SAFETY_CONTAINMENT.verdict} —`,
+          `MODEL_QUALITY=${triple_verdicts.MODEL_QUALITY.verdict} —`,
+          `CUSTOMER_OUTCOME=${triple_verdicts.CUSTOMER_OUTCOME.verdict} —`,
           modelTierInsufficient
             ? 'MODEL TIER INSUFFICIENT FOR FINAL PRODUCT-QUALITY ACCEPTANCE —'
             : 'HUMAN REVIEW AND OWNER PACKAGE PENDING —',
@@ -743,6 +774,8 @@ async function main() {
       : [
           'PHASE 34 REAL MODEL FULL EVAL BLOCKED —',
           `SESSIONS=${sessionIndex}/${TOTAL} ELIGIBLE=${counters.model_eligible_turns} SUCCESS=${counters.model_success_turns} FAIL=${hard_failures.length} —`,
+          `SAFETY_CONTAINMENT=${triple_verdicts.SAFETY_CONTAINMENT.verdict} —`,
+          `MODEL_QUALITY=${triple_verdicts.MODEL_QUALITY.verdict} —`,
           'PRODUCTION NOT APPROVED',
         ].join('\n'),
     production: 'NOT APPROVED',
@@ -763,6 +796,12 @@ async function main() {
     timeout_exhausted,
     successful_retries,
     writer_count: 1,
+    triple_verdicts,
+  });
+
+  // Manifest before terminal marker
+  const manifest = writeFreezeManifest(EVID, {
+    status: ok ? 'FROZEN_PASS' : 'FROZEN_BLOCKED',
   });
 
   if (ok) {
@@ -775,6 +814,7 @@ async function main() {
           status: 'FROZEN_PASS',
           report: 'real-model-full-eval.json',
           report_sha256: sha(fs.readFileSync(`${EVID}/real-model-full-eval.json`)),
+          manifest_sha256: sha(fs.readFileSync(`${EVID}/reports/SHA256SUMS.json`)),
           model_eligible_turns: counters.model_eligible_turns,
           writer_lock_run_id: lock.payload.run_id,
           do_not_resume: true,
@@ -794,6 +834,7 @@ async function main() {
           status: 'FROZEN_BLOCKED',
           report: 'real-model-full-eval.json',
           report_sha256: sha(fs.readFileSync(`${EVID}/real-model-full-eval.json`)),
+          manifest_sha256: sha(fs.readFileSync(`${EVID}/reports/SHA256SUMS.json`)),
           sessions_completed: sessionIndex,
           hard_failure_count: hard_failures.length,
           writer_lock_run_id: lock.payload.run_id,
@@ -807,6 +848,8 @@ async function main() {
   }
 
   lock.release({ unlinkLock: false });
+  void manifest;
+  void countFailureLedgerRows;
 
   console.log(
     JSON.stringify(

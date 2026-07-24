@@ -1,12 +1,17 @@
 /**
- * Phase E5 — invention guard.
- * Extract numeric/factual claims; compare to structured result + claim ledger.
- * Reject unsupported values, wrong currency, exact-pressing from release-only,
- * excluded events. Retry-once hook + fallback to deterministic prose.
+ * Phase E5 — invention guard (v2 typed claims).
+ * Extract numeric/factual claims; compare to typed supported claims + claim ledger.
+ * Being inside a fair range does NOT authorize inventing a recommended price.
  */
 import { synthesizeDeterministic } from './phase34-grounded-synthesis.mjs';
+import {
+  buildTypedSupportedClaims,
+  inferClaimType,
+  isTypedClaimSupported,
+  CLAIM_TYPES,
+} from './phase34-typed-claims.mjs';
 
-export const INVENTION_GUARD_VERSION = 'phase34-invention-guard-v1';
+export const INVENTION_GUARD_VERSION = 'phase34-invention-guard-v2-typed';
 
 const CURRENCY_RE = /\b(USD|EUR|GBP|CAD|AUD|JPY)\b/gi;
 const MONEY_RE = /(?:\$|€|£)\s?\d+(?:\.\d+)?|\b\d+(?:\.\d+)?\s?(?:USD|EUR|GBP)\b/gi;
@@ -15,36 +20,6 @@ const EXACT_PRESSING_RE = /\bexact(?:ly)?\s+pressing\b|\bthis\s+specific\s+press
 
 function asArray(v) {
   return Array.isArray(v) ? v : [];
-}
-
-function collectAllowedNumbers(structured = {}, ledger = null, calcValues = []) {
-  const allowed = new Set();
-  const add = (v) => {
-    if (typeof v === 'number' && Number.isFinite(v)) {
-      allowed.add(String(v));
-      allowed.add(String(Math.round(v * 100) / 100));
-    }
-  };
-  const walk = (obj, depth = 0) => {
-    if (obj == null || depth > 4) return;
-    if (typeof obj === 'number') {
-      add(obj);
-      return;
-    }
-    if (Array.isArray(obj)) {
-      for (const item of obj) walk(item, depth + 1);
-      return;
-    }
-    if (typeof obj === 'object') {
-      for (const v of Object.values(obj)) walk(v, depth + 1);
-    }
-  };
-  walk(structured);
-  for (const v of calcValues) add(v);
-  for (const entry of asArray(ledger?.entries)) {
-    if (entry.normalized_claim_value != null) add(Number(entry.normalized_claim_value));
-  }
-  return allowed;
 }
 
 function collectAllowedCurrencies(structured = {}, constraints = {}) {
@@ -77,12 +52,10 @@ function extractClaims(text) {
 
   for (const m of s.matchAll(NUMBER_RE)) {
     const raw = m[0];
-    // Skip if already captured as money span
     if (claims.some((c) => c.index <= m.index && m.index < c.index + c.raw.length)) continue;
     const bare = raw.replace(/[^\d.]/g, '');
     if (!bare) continue;
     const num = Number(bare);
-    // Ignore tiny structural numbers unless percent/currency-like
     if (!raw.includes('$') && !raw.includes('%') && num < 3) continue;
     claims.push({
       kind: raw.includes('%') ? 'percent' : 'number',
@@ -117,9 +90,7 @@ function extractClaims(text) {
 }
 
 /**
- * Guard a synthesized answer against structured truth.
- *
- * @returns {{ ok: boolean, violations: array, claims: array, guarded_text: string }}
+ * Guard a synthesized answer against typed structured truth.
  */
 export function guardInvention({
   text = '',
@@ -129,12 +100,20 @@ export function guardInvention({
   subject_resolution = null,
   constraints = {},
   calc_values = [],
+  use_typed_claims = true,
 } = {}) {
   const claims = extractClaims(text);
-  const allowedNums = collectAllowedNumbers(structured_result, claim_ledger, calc_values);
+  const supported = buildTypedSupportedClaims(structured_result, claim_ledger);
+  for (const v of calc_values) {
+    if (typeof v === 'number' && Number.isFinite(v) && !supported.money_usd.includes(v)) {
+      supported.money_usd.push(v);
+    }
+  }
   const allowedCurrencies = collectAllowedCurrencies(structured_result, constraints);
   const excludedIds = new Set(
-    asArray(snapshot?.excluded_event_ids).map((x) => (typeof x === 'string' ? x : x?.id)).filter(Boolean),
+    asArray(snapshot?.excluded_event_ids)
+      .map((x) => (typeof x === 'string' ? x : x?.id))
+      .filter(Boolean),
   );
   const violations = [];
 
@@ -146,19 +125,17 @@ export function guardInvention({
 
   for (const claim of claims) {
     if (claim.kind === 'money' || claim.kind === 'number' || claim.kind === 'percent') {
-      const bare = String(claim.value);
-      const ok =
-        allowedNums.has(bare) ||
-        allowedNums.has(String(Math.round(claim.value * 100) / 100)) ||
-        // Allow counts that match sold_count etc. already walked
-        [...allowedNums].some((a) => a === bare);
+      const claimType = use_typed_claims
+        ? inferClaimType(text, claim)
+        : claim.kind === 'money'
+          ? CLAIM_TYPES.MONEY_GENERIC
+          : CLAIM_TYPES.COUNT_GENERIC;
+      const ok = isTypedClaimSupported(claimType, claim.value, supported);
       if (!ok && Number.isFinite(claim.value)) {
-        // Empty allowed set + honest "no evidence" prose with no numbers is fine;
-        // any number not in structured result is invention.
         violations.push({
           code: 'UNSUPPORTED_NUMERIC_VALUE',
-          claim,
-          message: `unsupported value ${claim.raw}`,
+          claim: { ...claim, claim_type: claimType },
+          message: `unsupported value ${claim.raw} as ${claimType}`,
         });
       }
     }
@@ -186,7 +163,6 @@ export function guardInvention({
     }
   }
 
-  // Excluded event IDs must not appear as supporting citations in prose.
   for (const id of excludedIds) {
     if (id && text.includes(id)) {
       violations.push({
@@ -197,7 +173,6 @@ export function guardInvention({
     }
   }
 
-  // Failed ledger blocks delivery.
   if (claim_ledger && claim_ledger.verification_status === 'FAIL') {
     violations.push({
       code: 'CLAIM_LEDGER_FAIL',
@@ -211,6 +186,7 @@ export function guardInvention({
     violations,
     claims,
     guarded_text: text,
+    supported_claims: supported,
     invention_guard_version: INVENTION_GUARD_VERSION,
   };
 }
@@ -273,7 +249,6 @@ export async function guardWithRetry({
     }
   }
 
-  // Fail closed → deterministic prose from structured result only.
   const det = synthesizeDeterministic({
     ...(synthesisInput || {}),
     capability: synthesisInput?.capability || 'market_analytics',
@@ -289,7 +264,7 @@ export async function guardWithRetry({
   const fallbackGuard = guardInvention({
     text: det.direct_answer,
     structured_result,
-    claim_ledger: null, // deterministic path; ledger rebuilt by pipeline
+    claim_ledger: null,
     snapshot,
     subject_resolution,
     constraints,

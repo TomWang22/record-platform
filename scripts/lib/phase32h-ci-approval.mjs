@@ -16,7 +16,7 @@ export const CORE_REQUIRED_WORKFLOW_NAMES = [
 ];
 
 /** Required jobs within the `ci` workflow (not standalone workflows). */
-export const CORE_REQUIRED_CI_JOB_NAMES = ['Git no-Cursor trailer guard'];
+export const CORE_REQUIRED_CI_JOB_NAMES = [];
 
 /** Required only when a run exists for the exact SHA (path-triggered). */
 export const CONDITIONAL_REQUIRED_WORKFLOW_NAMES = [

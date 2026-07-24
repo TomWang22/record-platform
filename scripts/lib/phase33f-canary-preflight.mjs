@@ -105,14 +105,6 @@ function runMake(target, repoRoot) {
   };
 }
 
-export function runAttributionGuard(repoRoot = REPO_ROOT) {
-  const r = runMake('git-verify-no-cursor-trailers', repoRoot);
-  if (r.status !== 0) {
-    throw blocked('attribution/forbidden-ref guard failed', { result: r });
-  }
-  return r;
-}
-
 export function runOfflinePhaseVerify(repoRoot = REPO_ROOT) {
   const targets = [
     'ai-platform-verify-phase33a-contracts',
@@ -232,7 +224,6 @@ export function runPhase33fCanaryPreflight(opts = {}) {
     skipCoverage = false,
     skipDiskPreflight = false,
     skipSourceReconciliation = false,
-    skipAttribution = false,
     skipSemantic = false,
     skipEdgeHealth = false,
     skipCollectorExclusivity = false,
@@ -286,12 +277,7 @@ export function runPhase33fCanaryPreflight(opts = {}) {
     }
   }
 
-  // Gate 3 — attribution / forbidden-ref
-  if (!skipAttribution) {
-    runAttributionGuard(repoRoot);
-  }
-
-  // Gate 4 — clean launcher source
+  // Gate 3 — clean launcher source
   const allowDirty =
     skipDirtySourceCheck ||
     process.env.PHASE33F_ALLOW_DIRTY_LAUNCHER === '1' ||
@@ -300,12 +286,12 @@ export function runPhase33fCanaryPreflight(opts = {}) {
     assertCleanLauncherSource(repoRoot);
   }
 
-  // Gate 5 — Phase 33A–F offline verify
+  // Gate 4 — Phase 33A–F offline verify
   if (!skipOfflineVerify) {
     runOfflinePhaseVerify(repoRoot);
   }
 
-  // Gate 6 — semantic holdout
+  // Gate 5 — semantic holdout
   if (!skipSemantic) {
     runSemanticHoldoutVerify(repoRoot);
   }

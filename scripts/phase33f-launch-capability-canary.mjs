@@ -103,7 +103,6 @@ async function main() {
       skipOfflineVerify: process.env.PHASE33F_SKIP_OFFLINE_VERIFY === '1',
       skipCoverage: process.env.PHASE33F_SKIP_COVERAGE === '1',
       skipSemantic: process.env.PHASE33F_SKIP_SEMANTIC === '1',
-      skipAttribution: process.env.PHASE33F_SKIP_ATTRIBUTION === '1',
       skipDiskPreflight: opts.mode === 'smoke' || process.env.PHASE33F_SKIP_DISK === '1',
       skipCollectorExclusivity: process.env.PHASE33F_SKIP_EXCLUSIVITY === '1',
       ...(process.env.PHASE33F_PREFLIGHT_OFFLINE === '1'

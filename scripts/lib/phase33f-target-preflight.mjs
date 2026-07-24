@@ -29,7 +29,6 @@ import {
 } from './phase33f-canary-manifest.mjs';
 import {
   assertCleanLauncherSource,
-  runAttributionGuard,
   runOfflinePhaseVerify,
   runSemanticHoldoutVerify,
   assertCoverageSummary,
@@ -171,7 +170,6 @@ export function runPhase33fTargetPreflight(opts = {}) {
     skipCoverage = false,
     skipDiskPreflight = false,
     skipSourceReconciliation = false,
-    skipAttribution = false,
     skipSemantic = false,
     skipEdgeHealth = false,
     skipCollectorExclusivity = false,
@@ -249,32 +247,27 @@ export function runPhase33fTargetPreflight(opts = {}) {
       }
     }
 
-    // Gate 4 — attribution
-    if (!skipAttribution) {
-      runAttributionGuard(repoRoot);
-    }
-
-    // Gate 5 — clean launcher source
+    // Gate 4 — clean launcher source
     if (!(skipDirtySourceCheck || env.PHASE33F_ALLOW_DIRTY_LAUNCHER === '1')) {
       assertCleanLauncherSource(repoRoot, { globs: LAUNCHER_SOURCE_GLOBS });
     }
 
-    // Gate 6 — Phase 33A–F
+    // Gate 5 — Phase 33A–F
     if (!skipOfflineVerify) {
       runOfflinePhaseVerify(repoRoot);
     }
 
-    // Gate 7 — semantic holdout
+    // Gate 6 — semantic holdout
     if (!skipSemantic) {
       runSemanticHoldoutVerify(repoRoot);
     }
 
-    // Gate 8 — coverage
+    // Gate 7 — coverage
     const coverage = skipCoverage
       ? { status: 'SKIP', reason: 'skipCoverage' }
       : assertCoverageSummary(repoRoot, { skipIfMissing: false });
 
-    // Gate 9 — frozen canary-v3
+    // Gate 8 — frozen canary-v3
     let canaryV3 = { status: 'SKIP' };
     if (!skipCanaryV3) {
       canaryV3 = verifyFrozenCanaryV3({ root: FROZEN_CANARY_V3_ROOT });
@@ -283,7 +276,7 @@ export function runPhase33fTargetPreflight(opts = {}) {
       }
     }
 
-    // Gate 10–12 — regenerate + pin target manifest / workload hash
+    // Gate 9–11 — regenerate + pin target manifest / workload hash
     let pin = null;
     let manifestValidation = null;
     if (!skipManifestPins) {

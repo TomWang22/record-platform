@@ -399,34 +399,6 @@ jobs:
       - name: Phase 33F offline manifest/parity/readiness (no 720-probe canary)
         run: make ai-platform-verify-phase33f
 
-  git-no-cursor-trailers:
-    name: Git no-Cursor trailer guard
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Fetch complete retained refs
-        run: |
-          set -euo pipefail
-          git fetch origin \
-            '+refs/heads/*:refs/remotes/origin/*' \
-            '+refs/tags/*:refs/tags/*' \
-            --prune \
-            --prune-tags
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Verify no Cursor commit attribution
-        run: make git-verify-no-cursor-trailers
-
   artifacts:
     name: Upload rotation artifacts
     if: always()

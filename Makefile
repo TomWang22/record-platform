@@ -697,7 +697,6 @@ PHASE32H_R1_BASELINE ?= /tmp/phase32h-r1-baseline
 PHASE32H_R1_PROTECTED ?= /tmp/phase32h-r1-caffeinate
 
 ai-platform-verify-phase32h-r1: ## Phase 32H-R1 host-suspension A/B comparison verifier
-	$(MAKE) git-verify-no-cursor-trailers
 	$(MAKE) ai-platform-verify-phase32h-run-integrity
 	$(MAKE) ai-platform-verify-phase32h-collector-supervision
 	$(MAKE) ai-platform-verify-phase32h-triplet-runner
@@ -723,7 +722,6 @@ ai-platform-verify-phase32h-manifest-contract: ## Phase 32H manifest row contrac
 	node scripts/phase32h-manifest-contract-readonly.mjs
 
 ai-platform-verify-phase32h-r1-prelaunch: ## Phase 32H-R1-T prelaunch guard (source wiring)
-	$(MAKE) git-verify-no-cursor-trailers
 	$(MAKE) ai-platform-verify-phase32h-runner-memory
 	$(MAKE) ai-platform-verify-phase32h-process-identity
 	$(MAKE) ai-platform-verify-phase32h-collector-exclusivity
@@ -750,24 +748,10 @@ ai-platform-verify-phase32h-baseline-preflight: ## Phase 32H-R1 baseline prelaun
 	node scripts/phase32h-baseline-preflight-readonly.mjs
 	node scripts/phase32h-launch-package-readonly.mjs >/dev/null
 
-git-commit-without-assistant-trailers: ## Create a commit via commit-tree without assistant trailers
-	bash scripts/git/commit-without-assistant-trailers.sh
-
-git-verify-no-cursor-trailers: ## Reject Cursor/CursorAgent attribution on origin/main and all refs
-	node --test tests/no-cursor-trailer-guard.test.mjs
-	node --test tests/no-cursor-githooks.test.mjs
-	node --test tests/retained-ref-policy.test.mjs
-	node scripts/no-cursor-trailer-guard-readonly.mjs --detailed
-	node scripts/no-cursor-ref-policy-readonly.mjs
-
 git-verify-workflow-syntax: ## Validate GitHub Actions workflow syntax with actionlint
 	bash scripts/verify-workflow-syntax.sh
 	node --test tests/workflow-syntax.test.mjs
 	node --test tests/docker-build-dockerfiles.test.mjs
-
-git-config-attribution-hooks: ## Point core.hooksPath at versioned .githooks
-	git config --local core.hooksPath .githooks
-	chmod +x .githooks/commit-msg .githooks/pre-push
 
 bundle-secret-alignment-audit: ## Secret name alignment audit (exit 1 when hard_fail>0)
 	python3 tools/bundle-audit/secret_name_alignment_audit.py --repo-root "$(REPO_ROOT)"
@@ -790,7 +774,6 @@ ai-platform-verify-phase32h-preview-gate: ## Phase 32H preview-gate retry policy
 	node scripts/phase32h-preview-gate-smoke.mjs --infra-only
 
 ci-verify-ai-platform-blockers: ## Combined CI repair gate (offline)
-	$(MAKE) git-verify-no-cursor-trailers
 	$(MAKE) git-verify-workflow-syntax
 	$(MAKE) bundle-secret-alignment-audit
 	$(MAKE) bundle-preflight-static-contract

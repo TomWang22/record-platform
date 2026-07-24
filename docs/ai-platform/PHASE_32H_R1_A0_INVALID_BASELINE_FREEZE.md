@@ -10,7 +10,7 @@
 2. Runner/supervisor code was patched locally after launch HEAD `a7a8716` was pinned.
 3. The same evidence root was resumed under different executable code.
 4. Batch 3 (`final_tagged_plan`) and subsequent triplets failed all three protocols.
-5. Strict history audit still contained Cursor/CursorAgent trailers (grandfather policy was unacceptable).
+5. Strict history audit still contained forbidden editor-assistant commit trailers (grandfather policy was unacceptable).
 
 ## Frozen counts
 

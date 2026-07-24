@@ -53,7 +53,6 @@ function baseTargetOpts(overrides = {}) {
     headSha: HEAD,
     originMainSha: HEAD,
     skipCiApproval: true,
-    skipAttribution: true,
     skipDirtySourceCheck: true,
     skipOfflineVerify: true,
     skipSemantic: true,

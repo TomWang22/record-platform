@@ -32,7 +32,6 @@ function baseOpts(overrides = {}) {
     headSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     originMainSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     skipCiApproval: true,
-    skipAttribution: true,
     skipDirtySourceCheck: true,
     skipOfflineVerify: true,
     skipSemantic: true,

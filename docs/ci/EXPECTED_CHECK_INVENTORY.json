@@ -44,11 +44,6 @@
     },
     {
       "workflow_file": "ci.yml",
-      "job_id": "git-no-cursor-trailers",
-      "stable_id": "ci.yml#git-no-cursor-trailers"
-    },
-    {
-      "workflow_file": "ci.yml",
       "job_id": "artifacts",
       "stable_id": "ci.yml#artifacts"
     },

@@ -9,7 +9,26 @@
   "exact_ui_attribution_source": "NO_CURSOR_UI_ACTOR_IN_RECENT_GITHUB_API — commit author/committer metadata is MelonGodTier; recent PushEvents and GitHub commit actors are TomWang22; check-run apps on HEAD are github-actions only. If a Cursor badge is still visible in the GitHub UI, classify as K. UNKNOWN_REQUIRES_OWNER_SCREENSHOT (cannot confirm A–I from API alone).",
   "historical_records_preserved": true,
   "main_history_rewrite": false,
-  "audit_head_sha": "e561a5a0cc1f9a325a14de65b9031f9b21b06f23",
+  "audit_head_sha_pre_hardening": "e561a5a0cc1f9a325a14de65b9031f9b21b06f23",
+  "acceptance_proof": {
+    "commit_sha": "467407cbb766ed6236fb765f565f05e3b098ff29",
+    "author_name": "MelonGodTier",
+    "author_email": "tomwang22@yahoo.com",
+    "committer_name": "MelonGodTier",
+    "committer_email": "tomwang22@yahoo.com",
+    "signature_identity": null,
+    "push_authentication_class": "OWNER_HTTPS_GH_AUTH_GIT_CREDENTIAL",
+    "github_commit_actor": "TomWang22",
+    "github_pr_actor": null,
+    "github_check_actors": ["github-actions"],
+    "github_deployment_actors": [],
+    "cursor_coauthor_trailer": false,
+    "cursor_attribution_trailer": false,
+    "cursor_created_pr": false,
+    "cursor_created_comment_or_review": false,
+    "branch": "main",
+    "source_changes_with_cursor_local_assistance": true
+  },
   "classifications": [
     {
       "item": "HEAD commit author/committer",

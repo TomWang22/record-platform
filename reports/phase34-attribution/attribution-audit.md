@@ -59,3 +59,30 @@ The current user token cannot list App installations (403). Owner should open [G
 ## History policy
 
 No rewrite of existing `main` SHAs. Exact-SHA evidence, frozen eval roots, manifests, and deployment lineage remain valid.
+
+## Future attribution acceptance proof
+
+Genuine source commit (guard + audit artifacts), not an empty attribution-only commit:
+
+| Field | Value |
+| --- | --- |
+| `commit_sha` | `467407cbb766ed6236fb765f565f05e3b098ff29` |
+| `author_name` / `author_email` | MelonGodTier / tomwang22@yahoo.com |
+| `committer_name` / `committer_email` | MelonGodTier / tomwang22@yahoo.com |
+| `signature_identity` | none |
+| `push_authentication_class` | OWNER_HTTPS_GH_AUTH_GIT_CREDENTIAL |
+| `github_commit_actor` | TomWang22 |
+| `github_pr_actor` | none (direct push to main) |
+| `github_check_actors` | github-actions |
+| `github_deployment_actors` | none |
+
+Cursor trailers absent. No Cursor-created PR/comment/review/deployment. GitHub Actions checks remain acceptable as Actions activity.
+
+```text
+PHASE 34 CURSOR LOCAL DEVELOPMENT REMAINS ENABLED —
+FUTURE GIT COMMITS USER-ATTRIBUTED —
+CURSOR REMOTE WRITE ACTIONS DISABLED OR OWNER-ACTION-PENDING —
+OWNER-AUTHENTICATED PUSH VERIFIED —
+HISTORICAL EXACT-SHA RECORD PRESERVED —
+NO MAIN HISTORY REWRITE
+```

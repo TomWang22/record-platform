@@ -152,4 +152,28 @@ test('quality soak counters shape', () => {
   assert.equal(c.model_generations_guard_rejected, 0);
   assert.equal(c.safe_fallback_success, 0);
   assert.equal(c.customer_request_failures, 0);
+  assert.equal(c.guard_rejected_contained, 0);
+  assert.equal(c.verified_fallback_delivered, 0);
+  assert.equal(c.model_timeout, 0);
+});
+
+test('attempt-level ledger invariant allows retries above turn count', () => {
+  const r = assertInvocationLedgerInvariant({
+    model_invocation_ledger_rows: 3,
+    successful_attempts: 1,
+    guard_rejected_attempts: 0,
+    timed_out_attempts: 2,
+    transport_failed_attempts: 0,
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.level, 'attempt');
+});
+
+test('appendModelInvocationLedger normalizes schema_version', () => {
+  const tmp = path.join(os.tmpdir(), `phase34-inv-schema-${Date.now()}.jsonl`);
+  appendModelInvocationLedger(tmp, { inference_id: 'x', outcome: 'accepted' });
+  const row = JSON.parse(fs.readFileSync(tmp, 'utf8').trim());
+  assert.equal(row.schema_version, 'phase34-model-invocation-v1');
+  assert.equal(row.outcome, 'accepted');
+  fs.unlinkSync(tmp);
 });

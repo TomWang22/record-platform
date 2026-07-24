@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { guardInvention } from '../scripts/lib/phase34-invention-guard.mjs';
+import { inferClaimType, CLAIM_TYPES } from '../scripts/lib/phase34-typed-claims.mjs';
+import {
+  scanInventionGuardFailures,
+  buildModelInvocationRow,
+} from '../scripts/lib/phase34-eval-execution-mode.mjs';
 
 const AUCTION_STRUCTURED = {
   sold_count: 3,
@@ -36,9 +42,15 @@ test('rmf-05895 exact replay: invented $45 is rejected and does not escape', () 
     claim_ledger: ledgerFor(AUCTION_STRUCTURED),
   });
   assert.equal(g.ok, false);
-  assert.ok(g.violations.some((v) => Number(v.claim?.value) === 45));
-  // Contained: guarded_text must not retain unsupported 45 if guard strips — current API returns ok=false with original; fallback is caller's duty.
-  assert.equal(g.ok, false);
+  const fortyFive = g.violations.find((v) => Number(v.claim?.value) === 45);
+  assert.ok(fortyFive);
+  assert.equal(fortyFive.code, 'UNSUPPORTED_NUMERIC_VALUE');
+  assert.equal(fortyFive.claim.claim_type, CLAIM_TYPES.RECOMMENDED_PRICE);
+  // Supported $40 as money must not be mis-typed as bid_count
+  assert.equal(
+    g.violations.some((v) => Number(v.claim?.value) === 40),
+    false,
+  );
 });
 
 test('adversarial numeric inventions: 1000 unsupported prices never pass the guard', () => {
@@ -46,7 +58,6 @@ test('adversarial numeric inventions: 1000 unsupported prices never pass the gua
   let rejected = 0;
   let escaped = 0;
   for (let i = 0; i < 1000; i += 1) {
-    // Pick a price not in the allowlist
     let forged = 10 + (i % 90);
     if (allowed.has(forged)) forged += 1;
     if (allowed.has(forged)) forged = 99;
@@ -71,4 +82,89 @@ test('supported numbers from allowlist pass', () => {
     claim_ledger: ledgerFor(AUCTION_STRUCTURED),
   });
   assert.equal(g.ok, true);
+});
+
+test('near-bound 45 between floor 40 and fair_high 50 remains rejected as recommended price', () => {
+  const text = 'I recommend a sale at $45 USD.';
+  const g = guardInvention({
+    text,
+    structured_result: AUCTION_STRUCTURED,
+    claim_ledger: ledgerFor(AUCTION_STRUCTURED),
+  });
+  assert.equal(g.ok, false);
+  assert.ok(g.violations.some((v) => Number(v.claim?.value) === 45));
+});
+
+test('semantic typing: watcher count 45 does not authorize price 45', () => {
+  const structured = { ...AUCTION_STRUCTURED, watchers: 45 };
+  const text = 'There are 45 watchers. I recommend offering $45 USD.';
+  const g = guardInvention({
+    text,
+    structured_result: structured,
+    claim_ledger: ledgerFor(structured),
+  });
+  assert.equal(g.ok, false);
+  assert.ok(
+    g.violations.some(
+      (v) => Number(v.claim?.value) === 45 && v.claim?.claim_type === CLAIM_TYPES.RECOMMENDED_PRICE,
+    ),
+  );
+});
+
+test('best-bid money amount is not typed as bid_count', () => {
+  const text = 'Our current best bid is $40 USD.';
+  const claim = { kind: 'money', raw: '$40', value: 40, index: text.indexOf('$40') };
+  assert.notEqual(inferClaimType(text, claim), CLAIM_TYPES.BID_COUNT);
+});
+
+test('retry provenance: independent attempt hashes and parent linkage', () => {
+  const a0 = buildModelInvocationRow({
+    model_invocation_id: crypto.randomUUID(),
+    attempt_index: 0,
+    raw_output_hash: crypto.createHash('sha256').update('attempt0').digest('hex'),
+    guard_verdict: 'REJECT',
+    outcome: 'timeout',
+  });
+  const a1 = buildModelInvocationRow({
+    model_invocation_id: crypto.randomUUID(),
+    parent_invocation_id: a0.model_invocation_id,
+    attempt_index: 1,
+    raw_output_hash: crypto.createHash('sha256').update('attempt1').digest('hex'),
+    guard_verdict: 'PASS',
+    outcome: 'accepted',
+  });
+  assert.notEqual(a0.model_invocation_id, a1.model_invocation_id);
+  assert.equal(a1.parent_invocation_id, a0.model_invocation_id);
+  assert.notEqual(a0.raw_output_hash, a1.raw_output_hash);
+  assert.notEqual(a0.completed_at, null);
+});
+
+test('failure scanner: one session failure for v3 invention (no double count)', () => {
+  const failureRow = {
+    session_id: 'rmf-05895',
+    turn_index: 0,
+    reason: 'INVENTION_GUARD',
+    unsupported_claims_escaped: false,
+    violations: [
+      {
+        code: 'UNSUPPORTED_NUMERIC_VALUE',
+        claim: { value: 45, index: 53 },
+      },
+    ],
+  };
+  const hard = [
+    {
+      session_id: 'rmf-05895',
+      reason: 'INVENTION_GUARD',
+      unsupported_claims_escaped: false,
+      violations: failureRow.violations,
+    },
+  ];
+  const scan = scanInventionGuardFailures([failureRow], hard);
+  assert.equal(scan.failed_session_count, 1);
+  assert.equal(scan.guard_rejected_model_turns, 1);
+  assert.deepEqual(scan.unsupported_numeric_values, [45]);
+  assert.equal(scan.unsupported_claims_escaped, 0);
+  assert.ok(scan.violation_codes.includes('UNSUPPORTED_NUMERIC_VALUE'));
+  assert.ok(scan.reasons.includes('INVENTION_GUARD'));
 });

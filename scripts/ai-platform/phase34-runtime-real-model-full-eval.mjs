@@ -45,9 +45,11 @@ import {
   shouldStopOnFailure,
   emptyQualitySoakCounters,
   assertInvocationLedgerInvariant,
+  assertTurnInvocationInvariant,
   appendModelInvocationLedger,
   isFailureLedgerRow,
   countFailureLedgerRows,
+  scanInventionGuardFailures,
 } from '../lib/phase34-eval-execution-mode.mjs';
 import { buildTripleVerdicts } from '../lib/phase34-typed-claims.mjs';
 import { writeFreezeManifest, summarizeFailureSessions } from '../lib/phase34-freeze-manifest.mjs';
@@ -264,6 +266,13 @@ async function main() {
   const invLedgerPath = `${EVID}/ledgers/model-invocations.jsonl`;
   let invocation_ledger_rows = 0;
   let transport_failure_turns = 0;
+  const attemptOutcomes = {
+    successful_attempts: 0,
+    guard_rejected_attempts: 0,
+    timed_out_attempts: 0,
+    transport_failed_attempts: 0,
+    cancelled_attempts: 0,
+  };
   let sessionIndex = 0;
   let stopNew = false;
   let timeout_attempts = 0;
@@ -283,6 +292,25 @@ async function main() {
   function recordInvocation(row) {
     appendModelInvocationLedger(invLedgerPath, row);
     invocation_ledger_rows += 1;
+    switch (row.outcome) {
+      case 'accepted':
+        attemptOutcomes.successful_attempts += 1;
+        break;
+      case 'guard_rejected':
+        attemptOutcomes.guard_rejected_attempts += 1;
+        break;
+      case 'timeout':
+        attemptOutcomes.timed_out_attempts += 1;
+        break;
+      case 'transport_failure':
+        attemptOutcomes.transport_failed_attempts += 1;
+        break;
+      case 'cancelled':
+        attemptOutcomes.cancelled_attempts += 1;
+        break;
+      default:
+        break;
+    }
   }
 
   for (const capability of EIGHT_CAPABILITIES) {
@@ -379,7 +407,9 @@ async function main() {
         if (eligibility.eligible) {
           const maxAttempts = 2; // bounded retry on transient timeout/unavailable
           let lastError = null;
+          let parent_invocation_id = null;
           for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+            const model_invocation_id = crypto.randomUUID();
             try {
               synthesis = await synthesizeGrounded({
                 capability,
@@ -432,6 +462,7 @@ async function main() {
                     return retry.direct_answer;
                   },
                 });
+                const rawHash = sha(String(synthesis.direct_answer || ''));
                 if (guarded.ok && !guarded.used_fallback) {
                   success = true;
                   fallback_class = FALLBACK_CLASS.NONE;
@@ -441,11 +472,16 @@ async function main() {
                     session_id,
                     turn_index: t,
                     capability,
+                    scenario_class: klass,
                     inference_id: ids.inference_id,
-                    model_invocation_id: crypto.randomUUID(),
-                    attempt,
+                    model_invocation_id,
+                    parent_invocation_id,
+                    attempt_index: attempt - 1,
                     outcome: 'accepted',
                     guard_verdict: 'PASS',
+                    raw_output_hash: rawHash,
+                    sanitized_output_hash: sha(guarded.guarded_text || ''),
+                    customer_response_path: 'ACCEPTED_MODEL',
                     model_ledger: synthesis.model_ledger || null,
                     evidence_snapshot_hash: snapshot.evidence_snapshot_hash,
                     accepted_response_hash: sha(guarded.guarded_text || ''),
@@ -453,7 +489,9 @@ async function main() {
                 } else if (guarded.used_fallback) {
                   fallback_class = FALLBACK_CLASS.MODEL_GUARD_REJECTED;
                   soak.model_generations_guard_rejected += 1;
+                  soak.guard_rejected_contained += 1;
                   soak.safe_fallback_success += 1;
+                  soak.verified_fallback_delivered += 1;
                   const failure = {
                     session_id,
                     turn_index: t,
@@ -479,20 +517,26 @@ async function main() {
                     session_id,
                     turn_index: t,
                     capability,
+                    scenario_class: klass,
                     inference_id: ids.inference_id,
-                    model_invocation_id: crypto.randomUUID(),
-                    attempt,
+                    model_invocation_id,
+                    parent_invocation_id,
+                    attempt_index: attempt - 1,
                     outcome: 'guard_rejected',
                     guard_verdict: 'REJECT',
+                    guard_violation_codes: (guarded.prior_violations || []).map((v) => v.code),
                     violations: (guarded.prior_violations || []).slice(0, 5),
+                    raw_output_hash: rawHash,
                     model_ledger: synthesis.model_ledger || null,
                     evidence_snapshot_hash: snapshot.evidence_snapshot_hash,
-                    fallback: 'DETERMINISTIC_SAFE',
+                    fallback_result: 'DETERMINISTIC_SAFE',
+                    customer_response_path: 'DETERMINISTIC_FALLBACK_AFTER_GUARD',
                     unsupported_claims_escaped: false,
                   });
                 } else {
                   fallback_class = FALLBACK_CLASS.MODEL_GUARD_REJECTED;
                   soak.model_generations_guard_rejected += 1;
+                  soak.guard_rejected_contained += 1;
                   hard_failures.push({
                     session_id,
                     reason: 'INVENTION_GUARD',
@@ -503,11 +547,15 @@ async function main() {
                     session_id,
                     turn_index: t,
                     capability,
+                    scenario_class: klass,
                     inference_id: ids.inference_id,
-                    model_invocation_id: crypto.randomUUID(),
-                    attempt,
+                    model_invocation_id,
+                    parent_invocation_id,
+                    attempt_index: attempt - 1,
                     outcome: 'guard_rejected',
                     guard_verdict: 'REJECT',
+                    raw_output_hash: rawHash,
+                    customer_response_path: 'DETERMINISTIC_FALLBACK_AFTER_GUARD',
                     unsupported_claims_escaped: false,
                   });
                 }
@@ -527,14 +575,19 @@ async function main() {
                   session_id,
                   turn_index: t,
                   capability,
+                  scenario_class: klass,
                   inference_id: ids.inference_id,
-                  model_invocation_id: crypto.randomUUID(),
-                  attempt,
+                  model_invocation_id,
+                  parent_invocation_id,
+                  attempt_index: attempt - 1,
                   outcome: 'transport_failure',
                   guard_verdict: 'N/A',
+                  timeout_transport_status: 'UNEXPECTED_RULE_FALLBACK',
                 });
                 transport_failure_turns += 1;
+                soak.model_transport_failed += 1;
               }
+              parent_invocation_id = model_invocation_id;
               lastError = null;
               break;
             } catch (e) {
@@ -545,10 +598,29 @@ async function main() {
                 process.stdout.write(
                   `retry_timeout session=${session_id} turn=${t} attempt=${attempt}\n`,
                 );
+                recordInvocation({
+                  session_id,
+                  turn_index: t,
+                  capability,
+                  scenario_class: klass,
+                  inference_id: ids.inference_id,
+                  model_invocation_id,
+                  parent_invocation_id,
+                  attempt_index: attempt - 1,
+                  outcome: 'timeout',
+                  timeout_transport_status: 'RETRYABLE_TIMEOUT',
+                  error: String(e.message).slice(0, 160),
+                });
+                parent_invocation_id = model_invocation_id;
                 await new Promise((r) => setTimeout(r, 1500));
                 continue;
               }
-              if (transient) timeout_exhausted += 1;
+              if (transient) {
+                timeout_exhausted += 1;
+                soak.model_timeout += 1;
+              } else {
+                soak.model_transport_failed += 1;
+              }
               fallback_class = /timeout|aborted/i.test(String(e.message))
                 ? FALLBACK_CLASS.MODEL_TIMEOUT
                 : FALLBACK_CLASS.MODEL_UNAVAILABLE;
@@ -563,10 +635,13 @@ async function main() {
                 session_id,
                 turn_index: t,
                 capability,
+                scenario_class: klass,
                 inference_id: ids.inference_id,
-                model_invocation_id: crypto.randomUUID(),
-                attempt,
+                model_invocation_id,
+                parent_invocation_id,
+                attempt_index: attempt - 1,
                 outcome: transient ? 'timeout' : 'transport_failure',
+                timeout_transport_status: transient ? 'TIMEOUT_EXHAUSTED' : 'TRANSPORT_FAILED',
                 error: String(e.message).slice(0, 160),
               });
               if (!transient) transport_failure_turns += 1;
@@ -674,6 +749,9 @@ async function main() {
   const coverage = assertEligibilityCoverage(counters);
   const ledgerInvariant = assertInvocationLedgerInvariant({
     model_invocation_ledger_rows: invocation_ledger_rows,
+    ...attemptOutcomes,
+  });
+  const turnInvariant = assertTurnInvocationInvariant({
     model_invoked_turns: counters.model_invoked_turns,
     accepted_model_turns: counters.model_success_turns,
     guard_rejected_turns: counters.guard_rejected_turns,
@@ -683,7 +761,7 @@ async function main() {
   const completedAll = !stopNew && sessionIndex === TOTAL;
   const soakOk =
     EVAL_MODE_ACTIVE !== EVAL_MODE.QUALITY_SOAK ||
-    (soak.unsupported_claims_escaped === 0 && ledgerInvariant.ok);
+    (soak.unsupported_claims_escaped === 0 && ledgerInvariant.ok && turnInvariant.ok);
   const ok =
     completedAll &&
     (EVAL_MODE_ACTIVE === EVAL_MODE.QUALITY_SOAK
@@ -691,6 +769,7 @@ async function main() {
         counters.unexpected_rule_fallback_turns === 0 &&
         coverage.ok &&
         ledgerInvariant.ok &&
+        turnInvariant.ok &&
         timeout_exhausted === 0
       : hard_failures.length === 0 &&
         coverage.ok &&
@@ -698,7 +777,8 @@ async function main() {
         counters.model_success_turns === counters.model_eligible_turns &&
         counters.model_invoked_turns === counters.model_eligible_turns &&
         timeout_exhausted === 0 &&
-        ledgerInvariant.ok) &&
+        ledgerInvariant.ok &&
+        turnInvariant.ok) &&
     multi_turn_sessions >= Math.floor(TOTAL * 0.25) &&
     multi_turn_sessions <= Math.ceil(TOTAL * 0.3) + 50 &&
     soakOk;
@@ -720,6 +800,7 @@ async function main() {
     }
   }
   const failureSummary = summarizeFailureSessions(failureRows);
+  const invention_scan = scanInventionGuardFailures(failureRows, hard_failures);
   const triple_verdicts = buildTripleVerdicts({
     unsupported_claims_escaped: soak.unsupported_claims_escaped,
     model_generations_accepted: counters.model_success_turns,
@@ -740,6 +821,9 @@ async function main() {
     eligibility_counters: counters,
     coverage,
     invocation_ledger_invariant: ledgerInvariant,
+    turn_invocation_invariant: turnInvariant,
+    attempt_outcomes: attemptOutcomes,
+    invention_scan,
     eval_mode: EVAL_MODE_ACTIVE,
     quality_soak_counters: soak,
     triple_verdicts,

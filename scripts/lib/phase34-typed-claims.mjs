@@ -85,6 +85,8 @@ export function buildTypedSupportedClaims(structured = {}, claim_ledger = null) 
 /**
  * Infer semantic claim type from surrounding prose when possible.
  * Prefer the keyword closest to the numeric token (before, or immediate after).
+ * Money tokens ($/USD) never become count types (bid_count/watchers/sold_count)
+ * just because "bid"/"watcher"/"sale" appears nearby ("best bid is $40").
  */
 export function inferClaimType(text, claim) {
   const s = String(text || '');
@@ -93,24 +95,33 @@ export function inferClaimType(text, claim) {
   const before = s.slice(Math.max(0, i - 40), i).toLowerCase();
   const after = s.slice(i + rawLen, Math.min(s.length, i + rawLen + 24)).toLowerCase();
   const local = `${before}${s.slice(i, i + rawLen)}${after}`;
+  const isMoney =
+    claim?.kind === 'money' ||
+    /\$|€|£/.test(String(claim?.raw || '')) ||
+    /\b(?:usd|eur|gbp)\b/i.test(String(claim?.raw || ''));
 
   if (/sale at|offer(?:ing)?|recommend(?:ed)?|draft message|consider|asking|suggests a sale/.test(local)) {
     return CLAIM_TYPES.RECOMMENDED_PRICE;
   }
 
-  // Immediate postfix units: "3 sales", "12 watchers", "4 bids"
-  if (/^\s*sales?\b/.test(after)) return CLAIM_TYPES.SOLD_COUNT;
-  if (/^\s*watchers?\b/.test(after)) return CLAIM_TYPES.WATCHERS;
-  if (/^\s*bids?\b/.test(after)) return CLAIM_TYPES.BID_COUNT;
+  // Immediate postfix units only for bare counts: "3 sales", "12 watchers", "4 bids"
+  if (!isMoney) {
+    if (/^\s*sales?\b/.test(after)) return CLAIM_TYPES.SOLD_COUNT;
+    if (/^\s*watchers?\b/.test(after)) return CLAIM_TYPES.WATCHERS;
+    if (/^\s*bids?\b/.test(after)) return CLAIM_TYPES.BID_COUNT;
+  }
 
-  const patterns = [
+  const moneyPatterns = [
     { type: CLAIM_TYPES.MEDIAN_PRICE, re: /median/g },
     { type: CLAIM_TYPES.SELLER_FLOOR, re: /floor/g },
     { type: CLAIM_TYPES.FAIR_RANGE, re: /fair|range/g },
+  ];
+  const countPatterns = [
     { type: CLAIM_TYPES.WATCHERS, re: /watcher/g },
     { type: CLAIM_TYPES.BID_COUNT, re: /\bbids?\b/g },
     { type: CLAIM_TYPES.SOLD_COUNT, re: /\bsold\b|\bsales\b|\beligible\b/g },
   ];
+  const patterns = isMoney ? moneyPatterns : [...moneyPatterns, ...countPatterns];
   let best = null;
   for (const p of patterns) {
     let m;
@@ -123,7 +134,7 @@ export function inferClaimType(text, claim) {
   if (best) return best.type;
 
   if (claim?.kind === 'percent') return CLAIM_TYPES.PERCENT;
-  if (claim?.kind === 'money' || /\$|usd|eur|gbp/.test(local)) return CLAIM_TYPES.MONEY_GENERIC;
+  if (isMoney) return CLAIM_TYPES.MONEY_GENERIC;
   return CLAIM_TYPES.COUNT_GENERIC;
 }
 

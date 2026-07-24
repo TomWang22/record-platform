@@ -19,6 +19,7 @@ import {
   EVAL_MODE,
   appendModelInvocationLedger,
   assertInvocationLedgerInvariant,
+  assertTurnInvocationInvariant,
   emptyQualitySoakCounters,
 } from '../lib/phase34-eval-execution-mode.mjs';
 import { buildTripleVerdicts, CLAIM_TYPES } from '../lib/phase34-typed-claims.mjs';
@@ -231,6 +232,12 @@ async function main() {
 
   const ledgerInvariant = assertInvocationLedgerInvariant({
     model_invocation_ledger_rows: invocation_rows,
+    successful_attempts: accepted,
+    guard_rejected_attempts: guard_rejected,
+    timed_out_attempts: 0,
+    transport_failed_attempts: 0,
+  });
+  const turnInvariant = assertTurnInvocationInvariant({
     model_invoked_turns: invocation_rows,
     accepted_model_turns: accepted,
     guard_rejected_turns: guard_rejected,
@@ -253,6 +260,7 @@ async function main() {
     detPass &&
     escaped === 0 &&
     ledgerInvariant.ok &&
+    turnInvariant.ok &&
     triple.SAFETY_CONTAINMENT.verdict === 'PASS';
 
   const report = {

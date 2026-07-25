@@ -1,34 +1,52 @@
 # Runtime hardening context (pre-performance gate)
 
 **Status:** PARTIAL — pre-pgbench stop line **not earned**.  
-**Phase 34 AI / pgbench / k6 / Playwright full suites:** **paused**.
+**Phase 34 AI / pgbench / k6 / Playwright full suites:** **paused**.  
+**Active pin:** `HARDENING_SHA=47d1afbe617c2d784c04297c3097d0a612812e26` (`origin/main` tip).  
+**Orchestrator:** `make runtime-heartbeat-acceptance` → evidence root `/tmp/record-platform-runtime-heartbeat-v1/`.  
+**Hard gate:** Tickets **2–6** must PASS before Tickets 7+ (observability journeys / soak).
 
 ## What we are fixing
 
-The platform is being hardened for **runtime acceptance** before any database or application load testing. The earlier inventory was **discovery evidence only**. Static source greps (e.g. `grpc_server_interceptor = false`) are **not** defects until composition-root registration and a live request trace prove otherwise.
-
-We are executing gates **A→I** in order. Nothing after a red gate is treated as green.
+The platform must prove **real authenticated work** across transport, DB, cache, outbox, Kafka, consumers, observability, and inference — not merely that pods are Running. Pod replacement alone is **not** graceful shutdown.
 
 ## Honest gate classification (current)
 
 | Gate | Classification |
 |------|----------------|
-| A Capability contract | Vocabulary corrected (13 services); **0** `REQUIRED_RUNTIME_PROVEN` cells |
-| B Runtime provenance | `HEAD == origin/main`; prior pod SHA was rewrite-equivalent but **wrong label**; repin/rebuild still required for hardening code |
-| C ReplicaSet hygiene | PASS at last 15m observation (`obsolete_rs_with_replicas = 0`) |
-| D Graceful shutdown | Coordinator wired in Node entrypoints; **1/13** SIGTERM proven (media); python-ai/webapp were missing from matrix |
-| E Kafka client identity | Role-suffixed IDs implemented in common; **topology census + `.role` runtime proof** still open |
-| F Interceptor runtime proof | Registration/wiring only — **NOT_PROVEN** |
-| G Strict transport | NOT_STARTED (known blocker: unauthorized gRPC identity accepted) |
-| H Observability journeys | NOT_STARTED |
-| I Pre-pgbench | **NOT_EARNED** |
+| A Capability contract | PARTIAL |
+| B Runtime provenance | **PASS** (exact-SHA pin; re-verify via Ticket 1) |
+| C ReplicaSet hygiene | **PASS** (15m on pin; re-verify if redeployed) |
+| D Graceful shutdown | **PARTIAL_SEMANTICS_NOT_FULLY_PROVEN** — 13/13 pod replacement Ready only; drain/refusal/Kafka/outbox/telemetry lifecycle not fully observed |
+| E Kafka runtime | PARTIAL |
+| F Interceptor execution | NOT_PROVEN |
+| G Strict transport | **BLOCKED_UNAUTHORIZED_PEER_ACCEPTED** (peer-auth source + unit tests only; Ticket 2 is PKI_MATERIAL_AND_MOUNT_INTEGRITY only — not RUNTIME_MTLS) |
+| H Observability journeys | NOT_STARTED (blocked until Tickets 3–6 live-proven) |
+| I Pre-performance | **NOT_EARNED** |
 
-## History-rewrite SHA issue (critical)
+**v1 evidence root:** `/tmp/record-platform-runtime-heartbeat-v1/` = **FROZEN_BLOCKED_EVIDENCE** (immutable; do not rewrite).  
+**Dirty-tree classification:** `/tmp/record-platform-runtime-heartbeat-v1-analysis/dirty-tree-classification.json`  
+**v2:** create only after clean exact-SHA pin with `oci_revision` 13/13.
 
-1. Local tip and `origin/main` had **identical trees** but **different commit SHAs** (rewrite drift).
-2. Live pods were labeled `RP_SOURCE_SHA=3c634e18…`, which is **reachable as a git object** but **not an ancestor of `origin/main`**.
-3. Local `main` was soft-reset to `origin/main` (`8bcc822e…`) so **`HEAD == origin/main`**.
-4. Hardening code (shutdown coordinator, Kafka role IDs, drain endpoints, etc.) remains largely **working-tree / uncommitted** relative to that tip — **images must be rebuilt** before runtime proof of those fixes.
+## Completed on this pin
+
+1. Clean worktree build at `47d1afbe…` → Colima load → provenance patch → one-at-a-time rollout (`reports/runtime/post-hardening-rollout.json`).
+2. Restored missing `hostAliases` on media/messaging/notification/trust/webapp (Colima → `192.168.5.2`) after trust stuck on `ENOTFOUND host.docker.internal`.
+3. 15-minute steady-state **PASS** (`reports/runtime/all-service-rollout-stability-15m.json`).
+4. Full 13-workload SIGTERM matrix **13/13 PASS** (`reports/runtime/graceful-shutdown-matrix.json`).
+5. Consolidated snapshot: `reports/runtime/gate-consolidated-report.{json,md}`.
+
+### Known drain/build-info gaps on this pin (do not invent stronger PASS)
+
+- `analytics-service`: custom `/healthz`/`/readyz`; **no** `mountRpHttpHealth` → `/internal/build-info` 404; preStop drain is best-effort (`|| true`).
+- `api-gateway`: `/internal/build-info` returns **401** (auth middleware); drain may be blocked the same way.
+- `webapp`: Next.js — no `/internal/*` drain/build-info; post-SIGTERM node `readyz` fetch failed though kubelet Ready=true.
+
+## History-rewrite SHA issue (resolved for this pin)
+
+1. Local tip and `origin/main` had identical trees but different SHAs (rewrite drift).
+2. Prior live label `RP_SOURCE_SHA=3c634e18…` was **not** an ancestor of `origin/main`.
+3. Hardening landed as commits on `origin/main`; tip is now `47d1afbe…` and live pods match.
 
 ## What “done” means for each near-term item
 

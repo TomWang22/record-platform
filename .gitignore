@@ -31,6 +31,8 @@ tmp/
 !pnpm-lock.yaml
 !tsconfig*.json
 !infra/observability/*.json
+!infra/contracts/*.json
+!services/common/contracts/*.json
 !docs/bundles/INTEGRITY_*.json
 !scripts/protocol/fixtures/**/*.json
 !scripts/coverage/*.json

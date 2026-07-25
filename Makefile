@@ -2442,3 +2442,14 @@ trust-integration-tests: ## Trust HTTP+DB integration (needs Postgres 5442); SKI
 
 test-vitest-stack: ## integration:all (Kafka assert) → system contracts → unit batch; same as pnpm run test:vitest-stack
 	cd $(REPO_ROOT) && pnpm -C services/common run build && ROLLUP_DISABLE_NATIVE=true pnpm run test:vitest-stack
+
+# --- Runtime heartbeat acceptance (Tickets 0–13; fail-closed) ---
+.PHONY: runtime-heartbeat-acceptance runtime-heartbeat-acceptance-status
+
+runtime-heartbeat-acceptance: ## Fail-closed Tickets 1–6 orchestrator (requires clean worktree; see directive)
+	chmod +x $(SCRIPTS)/runtime-heartbeat/accept.sh $(SCRIPTS)/runtime-heartbeat/status.sh $(SCRIPTS)/runtime-heartbeat/tickets/*.sh
+	bash $(SCRIPTS)/runtime-heartbeat/accept.sh
+
+runtime-heartbeat-acceptance-status: ## Read-only status of /tmp/record-platform-runtime-heartbeat-v1
+	chmod +x $(SCRIPTS)/runtime-heartbeat/status.sh
+	REPO_ROOT=$(REPO_ROOT) bash $(SCRIPTS)/runtime-heartbeat/status.sh

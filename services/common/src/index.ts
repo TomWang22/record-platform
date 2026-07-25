@@ -15,6 +15,7 @@ export * from "./grpc-health.js";
 export * from "./grpc-local-readiness.js";
 export * from "./grpc-server-credentials.js";
 export * from "./grpc-server-factory.js";
+export * from "./grpc-peer-auth.js";
 export * from "./shutdown-coordinator.js";
 export * from "./user-lifecycle-kafka.js";
 export * from "./user-lifecycle-consumer.js";

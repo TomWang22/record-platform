@@ -54,9 +54,14 @@ docker_build_service() {
     return 0
   fi
 
-  git_commit="$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+  git_commit="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
   echo "  🔨 building ${tag} expected_sha=${sha} GIT_COMMIT=${git_commit}"
-  local build_args=(--build-arg "RP_SOURCE_SHA=$sha" --build-arg "GIT_COMMIT=$git_commit")
+  local build_args=(
+    --build-arg "RP_SOURCE_SHA=$sha"
+    --build-arg "GIT_COMMIT=$git_commit"
+    --label "org.opencontainers.image.revision=${git_commit}"
+    --label "org.opencontainers.image.source=https://github.com/record-platform/record-platform"
+  )
   local net_args=()
   if [[ "${RP_DOCKER_BUILD_NETWORK:-host}" == "host" ]]; then
     net_args=(--network=host)

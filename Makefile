@@ -876,7 +876,7 @@ help: ## List targets and short descriptions
 	@echo "  make performance-lab-one  Latest ceiling run -> combined-10 + interpretation outputs"
 	@echo "  make capacity-recommend  Generate pool/ingress/dashboard outputs from performance-lab"
 	@echo "  make capacity-one        One command: lab + capacity + happiness + H2 hints + dashboards + 10-file bundle"
-	@echo "  make explain-all-dbs     EXPLAIN ANALYZE across housing Postgres (5441–5448)"
+	@echo "  make explain-all-dbs     EXPLAIN ANALYZE across RP Postgres (5433–5443)"
 	@echo "  make generate-diagrams        Unified logical ER + domain + flow + poster + physical (SVG+PNG)"
 	@echo "  make generate-uml              PlantUML C4 + UML → diagrams/data-modeling/png/"
 	@echo "  make clean-data-modeling-png   Delete diagrams/data-modeling/png/*.png only"
@@ -1411,7 +1411,7 @@ metallb-fix: ## Check caddy-h3 LB IP and apply MetalLB fix helper (caddy may not
 hosts-sanity: ## Edge hostname in /etc/hosts (auto: HOSTS_AUTO=1 default; EXTERNAL_IP= to pin LB IP)
 	@HOSTS_AUTO="$(HOSTS_AUTO)" EXTERNAL_IP="$(EXTERNAL_IP)" EDGE_HOSTS_STRICT=0 bash $(SCRIPTS)/ensure-edge-hosts.sh
 
-ensure-edge-hosts: ## Idempotent hosts line for OCH edge hostname (EDGE_HOSTS_STRICT=1 fails if LB IP missing — dev-onboard uses this after deploy)
+ensure-edge-hosts: ## Idempotent hosts line for RP edge hostname record-platform.test (EDGE_HOSTS_STRICT=1 fails if LB IP missing — dev-onboard uses this after deploy)
 	@HOSTS_AUTO="$(HOSTS_AUTO)" EXTERNAL_IP="$(EXTERNAL_IP)" EDGE_HOSTS_STRICT="$${EDGE_HOSTS_STRICT:-0}" bash $(SCRIPTS)/ensure-edge-hosts.sh
 
 # ROLE: DEV — quick preflight gate before long runs
@@ -1925,7 +1925,7 @@ verify-docker-ports: ## Require mapped host ports for OCH Postgres + Redis (dock
 	bash $(SCRIPTS)/ci/verify-docker-ports.sh
 
 # ROLE: LIFECYCLE — register → DELETE /account → poll auth.auth_outbox drain (+ optional processed_events). Needs auth HTTP + psql.
-verify-deletion-flow: ## VERIFY_AUTH_URL, POSTGRES_URL_AUTH (or 5441 defaults); optional VERIFY_POSTGRES_URL_* for consumers
+verify-deletion-flow: ## VERIFY_AUTH_URL, POSTGRES_URL_AUTH (or 5437 auth defaults); optional VERIFY_POSTGRES_URL_* for consumers
 	bash $(SCRIPTS)/verify-deletion-flow.sh
 
 # ROLE: DEV — recreate 8 Postgres containers so compose `command:` (e.g. max_connections) applies; keeps volumes
@@ -1976,8 +1976,8 @@ certify-production: ## verify-network-coherence + verify-kafka-cluster + edge + 
 	echo "▶ collapse-smoke"; $(MAKE) collapse-smoke; \
 	echo ""; echo "✅ certify-production complete"
 
-# ROLE: PERF — EXPLAIN across all housing Postgres instances (host ports 5441–5448; see script for DB list)
-explain-all-dbs: ## Run EXPLAIN ANALYZE for every housing DB (needs local psql + reachable Postgres)
+# ROLE: PERF — EXPLAIN across RP Postgres instances (host ports 5433–5443; see script for DB list)
+explain-all-dbs: ## Run EXPLAIN ANALYZE for every RP DB (needs local psql + reachable Postgres)
 	@mkdir -p $(BENCH)
 	bash $(SCRIPTS)/perf/run-all-explain.sh $(BENCH)/explain-all-$$(date +%Y%m%d-%H%M%S).md
 
@@ -2114,25 +2114,25 @@ deploy-dev: ## Apply + smoke + rollout wait (SKIP_STRICT_ENVELOPE=1 if strict-en
 
 rollouts: deploy-dev ## Alias: same as deploy-dev
 
-stack: ## Full idempotent stack setup WITHOUT preflight (Colima, infra, certs, DBs, Kafka, build, deploy, secrets, event-layer)
-	bash $(SCRIPTS)/setup-full-off-campus-housing-stack.sh
+stack: ## Alias of make up — canonical RP one-command bootstrap (Colima, infra, certs, DBs, deploy)
+	$(MAKE) up
 
-demo: ## Colima+k3s stack + preflight (MetalLB + k6 LB IP); stops after housing suites+Playwright; no k3d
+demo: ## Colima+k3s RP stack + preflight (MetalLB + k6 LB IP); stops after RP suites+Playwright; no k3d
 	REQUIRE_COLIMA=1 METALLB_USE_K3D=0 METALLB_ENABLED=1 K6_USE_METALLB=1 RUN_PGBENCH=0 RUN_FULL_LOAD=0 RUN_PREFLIGHT=1 \
 	  PREFLIGHT_EXIT_AFTER_HOUSING_SUITES=1 PREFLIGHT_PHASE_D_TAIL_LAB=0 \
-	  bash $(SCRIPTS)/setup-full-off-campus-housing-stack.sh
+	  bash $(SCRIPTS)/run-preflight-scale-and-all-suites.sh
 
 demo-full: ## Colima+k3s + full preflight continuation (transport/pgbench when enabled); no early exit
 	REQUIRE_COLIMA=1 METALLB_USE_K3D=0 METALLB_ENABLED=1 K6_USE_METALLB=1 RUN_FULL_LOAD=1 RUN_PREFLIGHT=1 \
 	  PREFLIGHT_EXIT_AFTER_HOUSING_SUITES=0 \
-	  bash $(SCRIPTS)/setup-full-off-campus-housing-stack.sh
+	  bash $(SCRIPTS)/run-preflight-scale-and-all-suites.sh
 
 demo-network: ## Colima path: preflight + sslkeylog + packet capture (./scripts/run-demo-network-preflight.sh)
 	REQUIRE_COLIMA=1 METALLB_USE_K3D=0 bash $(SCRIPTS)/run-demo-network-preflight.sh
 
-demo-k3d: ## stack + preflight for k3d (no Colima): set kubectl context to k3d first
+demo-k3d: ## RP stack + preflight for k3d (no Colima): set kubectl context to k3d first
 	METALLB_ENABLED=1 METALLB_USE_K3D=1 REQUIRE_COLIMA=0 K6_USE_METALLB=1 RUN_PGBENCH=0 RUN_FULL_LOAD=0 RUN_PREFLIGHT=1 \
-	  PREFLIGHT_PHASE_D_TAIL_LAB=0 SKIP_COLIMA=1 bash $(SCRIPTS)/setup-full-off-campus-housing-stack.sh
+	  PREFLIGHT_PHASE_D_TAIL_LAB=0 SKIP_COLIMA=1 bash $(SCRIPTS)/run-preflight-scale-and-all-suites.sh
 
 preflight-metallb: ## Run preflight only (MetalLB + k6 LB IP). Example: RUN_PGBENCH=0 RUN_FULL_LOAD=0 make preflight-metallb
 	REQUIRE_COLIMA=1 METALLB_USE_K3D=0 METALLB_ENABLED=1 K6_USE_METALLB=1 bash $(SCRIPTS)/run-preflight-scale-and-all-suites.sh
@@ -2226,7 +2226,7 @@ validate-observability: ## Jaeger Step7 span-tree + overlap gates (needs JAEGER_
 
 e2e-full-strict: ## Playwright E2E against record-platform.test (strict env; requires cluster + TLS + dev-root.pem)
 	cd "$(REPO_ROOT)" && \
-	  export NODE_EXTRA_CA_CERTS="$(REPO_ROOT)/certs/dev-root.pem" && \
+	  export NODE_EXTRA_CA_CERTS="$(REPO_ROOT)/certs/dev-chain.pem" && \
 	  export E2E_API_BASE="https://record-platform.test" && \
 	  pnpm --filter webapp exec playwright test
 
@@ -2437,7 +2437,7 @@ resilience-menu: ## Interactive bash menu (forensics + chaos); non-interactive: 
 metrics-server-ready: ## Restart kube-system/metrics-server and wait until kubectl top nodes works (k3s/Colima)
 	bash $(SCRIPTS)/ensure-metrics-server-ready.sh
 
-trust-integration-tests: ## Trust HTTP+DB integration (needs Postgres 5446); SKIP_TRUST_INTEGRATION=1 to skip
+trust-integration-tests: ## Trust HTTP+DB integration (needs Postgres 5442); SKIP_TRUST_INTEGRATION=1 to skip
 	cd $(REPO_ROOT)/services/trust-service && pnpm run test:integration
 
 test-vitest-stack: ## integration:all (Kafka assert) → system contracts → unit batch; same as pnpm run test:vitest-stack

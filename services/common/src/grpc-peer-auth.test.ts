@@ -55,4 +55,15 @@ describe("isCallerAuthorized", () => {
     });
     expect(d.allowed).toBe(true);
   });
+
+  it("allows same-service identity", () => {
+    const d = isCallerAuthorized({
+      serverServiceName: "auth-service",
+      peerIdentities: ["auth-service.record-platform.svc.cluster.local"],
+      methodPath: "/auth.AuthService/GetUser",
+      graph,
+    });
+    expect(d.allowed).toBe(true);
+    expect(d.reason).toBe("same_service_identity");
+  });
 });

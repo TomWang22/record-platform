@@ -75,9 +75,9 @@
       "./otel": ["./dist/otel/index.d.ts"]
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "contracts"],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && mkdir -p contracts dist && cp -f ../../infra/contracts/rp-service-call-graph.json contracts/rp-service-call-graph.json && cp -f contracts/rp-service-call-graph.json dist/rp-service-call-graph.json",
     "test": "vitest run",
     "prepare": "pnpm run build"
   },

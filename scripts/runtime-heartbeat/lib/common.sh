@@ -5,7 +5,10 @@ set -euo pipefail
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 EVIDENCE_ROOT="${RUNTIME_HEARTBEAT_EVIDENCE_ROOT:-/tmp/record-platform-runtime-heartbeat-v1}"
 NS="${HOUSING_NS:-record-platform}"
-HARDENING_SHA_EXPECTED="${RUNTIME_HEARTBEAT_EXPECTED_SHA:-47d1afbe617c2d784c04297c3097d0a612812e26}"
+HARDENING_SHA_EXPECTED="${RUNTIME_HEARTBEAT_EXPECTED_SHA:-}"
+if [[ -z "$HARDENING_SHA_EXPECTED" ]]; then
+  HARDENING_SHA_EXPECTED="$(git -C "${REPO_ROOT:-.}" rev-parse origin/main 2>/dev/null || git -C "${REPO_ROOT:-.}" rev-parse HEAD)"
+fi
 
 WORKLOADS=(
   analytics-service api-gateway auction-monitor auth-service listings-service

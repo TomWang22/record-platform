@@ -135,7 +135,8 @@ describe('createMediaHttpApp (mocked db + s3)', () => {
     const res = await request(app).get('/readyz')
     expect(res.status).toBe(200)
     expect(res.body.ok).toBe(true)
-    expect(res.body.db).toBe('connected')
+    expect(res.body.ready).toBe(true)
+    expect(res.body.service).toBe('media-service')
   })
 
   it('GET /readyz — 503 when DB down', async () => {

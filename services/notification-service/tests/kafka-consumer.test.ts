@@ -10,17 +10,24 @@ const runFn = vi.hoisted(() => vi.fn());
 const disconnectFn = vi.hoisted(() => vi.fn());
 const ochSuffixFn = vi.hoisted(() => vi.fn(() => ""));
 
-vi.mock("@common/utils/kafka", () => ({
-  kafka: {
-    consumer: vi.fn(() => ({
-      connect: connectFn,
-      subscribe: subscribeFn,
-      run: runFn,
-      disconnect: disconnectFn,
+vi.mock("@common/utils/kafka", () => {
+  const consumerFactory = vi.fn(() => ({
+    connect: connectFn,
+    subscribe: subscribeFn,
+    run: runFn,
+    disconnect: disconnectFn,
+  }));
+  return {
+    kafka: {
+      consumer: consumerFactory,
+    },
+    getRpKafka: vi.fn(() => ({
+      consumer: consumerFactory,
+      producer: vi.fn(),
     })),
-  },
-  ochKafkaTopicIsolationSuffix: (...args: unknown[]) => ochSuffixFn(...args),
-}));
+    ochKafkaTopicIsolationSuffix: (...args: unknown[]) => ochSuffixFn(...args),
+  };
+});
 
 vi.mock("../src/realtime-publisher.js", () => ({
   publishRealtimeNotification: vi.fn().mockResolvedValue(undefined),

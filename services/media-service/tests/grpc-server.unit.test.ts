@@ -44,6 +44,10 @@ vi.mock("@common/utils/grpc-server-credentials", () => ({
   createRpGrpcServerCredentialsForBind: vi.fn(() => ({})),
 }));
 
+vi.mock("@common/utils/grpc-server-factory", () => ({
+  createRpGrpcServer: () => new (grpcHoisted.Server as unknown as new () => unknown)(),
+}));
+
 const handlers = vi.hoisted(() => ({
   createUploadUrl: vi.fn().mockResolvedValue({
     mediaId: "mid-1",

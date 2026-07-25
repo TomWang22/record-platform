@@ -59,20 +59,66 @@ const brokers = rawBrokers
       .map((entry) => (entry.includes(':') ? entry : `${entry}:${brokerPort}`))
   : [`kafka:${brokerPort}`]
 
-export const kafka = new Kafka({
-  clientId: process.env.KAFKA_CLIENT_ID || 'record-platform',
-  brokers,
-  ssl: sslConfig,
-  // Strict connection settings
-  connectionTimeout: 3000,
-  requestTimeout: 25000,
-  retry: {
-    retries: 8,
-    initialRetryTime: 100,
-    maxRetryTime: 30000,
-  }
-})
+export type KafkaClientRole = "consumer" | "producer" | "admin";
 
+/**
+ * Bounded Kafka client identity: record-platform.<service>.<pod-token>.<role>
+ * Role is required. No user/request/session/message IDs. Max length 200.
+ * Env KAFKA_CLIENT_ID overrides only when it already ends with .<role>.
+ */
+export function resolveKafkaClientId(role: KafkaClientRole): string {
+  const normalizedRole: KafkaClientRole = role;
+  const override = (process.env.KAFKA_CLIENT_ID || "").trim();
+  if (override) {
+    if (override.endsWith(`.${normalizedRole}`)) return override.slice(0, 200);
+    return `${override.slice(0, 180)}.${normalizedRole}`.slice(0, 200);
+  }
+  const service = (
+    process.env.OTEL_SERVICE_NAME ||
+    process.env.SERVICE_NAME ||
+    process.env.K8S_SERVICE_NAME ||
+    "unknown"
+  )
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .slice(0, 48);
+  const podRaw =
+    process.env.POD_NAME ||
+    process.env.HOSTNAME ||
+    process.env.K8S_POD_NAME ||
+    "local";
+  // Prefer first 8 of POD_UID, else last segment of pod name
+  const uid = (process.env.POD_UID || "").replace(/-/g, "");
+  const podToken = (uid ? uid.slice(0, 8) : podRaw.split("-").pop() || podRaw)
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 12) || "local";
+  const id = `record-platform.${service}.${podToken}.${normalizedRole}`;
+  return id.slice(0, 200);
+}
+
+const kafkaClients = new Map<KafkaClientRole, Kafka>();
+
+/** Role-scoped KafkaJS client (separate client IDs for producer vs consumer). */
+export function getRpKafka(role: KafkaClientRole): Kafka {
+  const existing = kafkaClients.get(role);
+  if (existing) return existing;
+  const client = new Kafka({
+    clientId: resolveKafkaClientId(role),
+    brokers,
+    ssl: sslConfig,
+    connectionTimeout: 3000,
+    requestTimeout: 25000,
+    retry: {
+      retries: 8,
+      initialRetryTime: 100,
+      maxRetryTime: 30000,
+    },
+  });
+  kafkaClients.set(role, client);
+  return client;
+}
+
+/** @deprecated Prefer getRpKafka('producer'|'consumer'). Defaults to producer identity. */
+export const kafka = getRpKafka("producer");
 export type EnsureKafkaBrokerReadyOptions = {
   requiredTopics?: string[];
 };

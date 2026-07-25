@@ -1,4 +1,5 @@
 import * as grpc from "@grpc/grpc-js";
+import { createRpGrpcServer } from "@common/utils/grpc-server-factory";
 import * as protoLoader from "@grpc/proto-loader";
 import {
   registerHealthService,
@@ -377,7 +378,7 @@ export async function trustGrpcHealthCheckForTest(): Promise<boolean> {
 }
 
 export function startGrpcServer(port: number): grpc.Server {
-  const server = new grpc.Server();
+  const server = createRpGrpcServer();
   server.addService(trustProto.trust.TrustService.service, trustGrpcHandlersForTest);
 
   registerHealthService(server, "trust.TrustService", trustGrpcHealthCheckForTest);

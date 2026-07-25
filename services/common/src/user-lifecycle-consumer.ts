@@ -3,7 +3,7 @@
  * Each service supplies schema-qualified processed_events + handler.
  */
 import type { Consumer } from "kafkajs";
-import { kafka } from "./kafka.js";
+import { getRpKafka } from "./kafka.js";
 import { withKafkaConsumerSpan } from "./otel/kafka-propagation.js";
 
 /** Portable alias for services that wrap `startUserLifecycleConsumer` (avoid kafkajs in every package.json). */
@@ -65,7 +65,7 @@ export async function startUserLifecycleConsumer(
   }
 
   const topic = userLifecycleV1Topic();
-  const consumer = kafka.consumer({ groupId: opts.groupId });
+  const consumer = getRpKafka("consumer").consumer({ groupId: opts.groupId });
   const connectBudgetMs = Number(process.env.USER_LIFECYCLE_KAFKA_CONNECT_MS || "8000");
   try {
     await Promise.race([

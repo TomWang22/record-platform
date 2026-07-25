@@ -1,5 +1,6 @@
 /* cspell:ignore grpc */
 import * as grpc from "@grpc/grpc-js";
+import { createRpGrpcServer } from "@common/utils/grpc-server-factory";
 import * as protoLoader from "@grpc/proto-loader";
 import { signJwt, verifyJwt } from "@common/utils/auth";
 import { hashPassword, comparePassword, getQueueStatus } from "./lib/bcrypt-queue.js";
@@ -686,7 +687,7 @@ export { withLogging as grpcWithLoggingForTest };
 // Create and start gRPC server with HTTP/2 only
 // @grpc/grpc-js uses HTTP/2 internally, we just need to configure it properly
 export function startGrpcServer(port: number = 50051) {
-  const server = new grpc.Server({
+  const server = createRpGrpcServer({
     // Force HTTP/2 only - no HTTP/1.1 fallback
     'grpc.keepalive_time_ms': 30000,
     'grpc.keepalive_timeout_ms': 5000,

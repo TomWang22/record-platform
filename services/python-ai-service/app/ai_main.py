@@ -25,6 +25,17 @@ app = FastAPI(title="python-ai-service", version="0.4.0")
 app.include_router(ai_platform_router)
 REQS = Counter("ai_http_requests_total","AI HTTP",[ "route","code" ])
 
+# Graceful shutdown drain flag (preStop / SIGTERM)
+_draining = False
+
+def begin_drain(reason: str = "manual") -> None:
+    global _draining
+    _draining = True
+    logger.info("[shutdown] python-ai-service DRAINING reason=%s", reason)
+
+def is_draining() -> bool:
+    return _draining
+
 GRADES = { "M":0.35, "NM":0.25, "EX":0.18, "VG+":0.10, "VG":0.0, "G+":-0.15, "G":-0.25, "P":-0.5 }
 USER_AGENT = "record-platform/0.4 (+https://example)"
 DISCOGS_TOKEN = os.getenv("DISCOGS_TOKEN")
@@ -62,12 +73,44 @@ class PredictReq(BaseModel):
 
 @app.get("/healthz")
 async def healthz():
-    """Liveness: process up only."""
-    return {"ok": True, "status": "healthy", "service": "python-ai-service"}
+    """Liveness: process up only (stays up while draining)."""
+    return {"ok": True, "status": "healthy", "service": "python-ai-service", "draining": is_draining()}
+
+@app.post("/internal/drain")
+async def internal_drain():
+    begin_drain("preStop")
+    return {"ok": True, "draining": True, "service": "python-ai-service"}
+
+@app.get("/internal/build-info")
+async def internal_build_info():
+    return {
+        "service": "python-ai-service",
+        "source_sha": os.getenv("RP_SOURCE_SHA") or os.getenv("SOURCE_SHA") or "unknown",
+        "image_tag": os.getenv("RP_IMAGE_TAG") or os.getenv("IMAGE_TAG") or "unknown",
+        "image_digest": os.getenv("RP_IMAGE_DIGEST") or "unknown",
+        "build_timestamp": os.getenv("RP_BUILD_TIMESTAMP") or "unknown",
+        "build_id": os.getenv("RP_BUILD_ID") or "unknown",
+        "pod_name": os.getenv("POD_NAME") or os.getenv("HOSTNAME") or "unknown",
+    }
+
+@app.get("/internal/runtime")
+async def internal_runtime():
+    return {
+        "service": "python-ai-service",
+        "source_sha": os.getenv("RP_SOURCE_SHA") or os.getenv("SOURCE_SHA") or "unknown",
+        "draining": is_draining(),
+        "readiness": "not_ready" if is_draining() else "ready_unless_deps_fail",
+        "phase": "DRAINING" if is_draining() else "RUNNING",
+    }
 
 @app.get("/readyz")
 async def readyz():
-    """Readiness: local mTLS gRPC health SERVING."""
+    """Readiness: local mTLS gRPC health SERVING; false while draining."""
+    if is_draining():
+        return JSONResponse(
+            status_code=503,
+            content={"ok": False, "ready": False, "service": "python-ai-service", "draining": True},
+        )
     import subprocess
     grpc_port = os.getenv("GRPC_PORT", "50060")
     grpc_svc = "python_ai.PythonAIService"
@@ -935,6 +978,7 @@ async def warm_cache():
 async def shutdown_event():
     """Shutdown gRPC server and data pipeline gracefully"""
     global grpc_server
+    begin_drain("SIGTERM/shutdown")
     
     # Shutdown data pipeline
     try:

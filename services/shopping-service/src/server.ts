@@ -1,6 +1,8 @@
 import express, { type Request, type Response, type NextFunction } from 'express'
 import os from 'os'
-import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions } from '@common/utils'
+import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions, installShutdownSignalHandlers } from '@common/utils'
+
+installShutdownSignalHandlers({ service: 'shopping-service' })
 import { requireUser, type AuthedRequest } from './lib/auth.js'
 import { pool, syncOrderNumberSequence } from './lib/db.js'
 import { makeRedis, CacheManager, getCacheStats } from './lib/cache.js'

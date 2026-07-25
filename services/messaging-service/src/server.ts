@@ -14,7 +14,7 @@
  */
 import './otel-bootstrap.js'
 import os from 'os'
-import { userLifecycleV1Topic } from '@common/utils'
+import { userLifecycleV1Topic, installShutdownSignalHandlers } from '@common/utils'
 import { ensureKafkaBrokerReady } from '@common/utils/kafka'
 import { MESSAGING_EVENTS_TOPIC } from './kafkaMessagingEvents.js'
 import { startMessagingUserLifecycleConsumer } from './user-lifecycle-consumer.js'
@@ -30,6 +30,7 @@ const redis = makeRedis()
 const app = createMessagingHttpApp(redis, cpuCores)
 
 async function main() {
+  installShutdownSignalHandlers({ service: 'messaging-service' })
   await ensureKafkaBrokerReady('messaging-service', {
     requiredTopics: [MESSAGING_EVENTS_TOPIC, userLifecycleV1Topic()],
   })

@@ -1,4 +1,5 @@
 import * as grpc from '@grpc/grpc-js'
+import { createRpGrpcServer } from '@common/utils/grpc-server-factory'
 import * as protoLoader from '@grpc/proto-loader'
 import { createUploadUrl } from './handlers/createUploadUrl.js'
 import { completeUpload } from './handlers/completeUpload.js'
@@ -17,7 +18,7 @@ if (!mediaProto?.MediaService?.service) {
 }
 
 export function startGrpcServer(port: number): void {
-  const server = new grpc.Server()
+  const server = createRpGrpcServer()
 
   server.addService(mediaProto.MediaService.service, {
     CreateUploadUrl: async (call: any, callback: any) => {

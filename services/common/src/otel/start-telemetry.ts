@@ -188,11 +188,17 @@ function buildSamplerFromEnv(): Sampler {
 let sdk: NodeSDK | undefined;
 let shutdownHookRegistered = false;
 
+export async function shutdownTracing(): Promise<void> {
+  if (!sdk) return;
+  await sdk.shutdown().catch((e) => console.error("[otel] shutdown error:", e));
+}
+
 function registerTracingShutdownHook(): void {
   if (shutdownHookRegistered || !sdk) return;
   shutdownHookRegistered = true;
+  // Prefer shared shutdown-coordinator when present; keep light flush as fallback.
   const flush = () => {
-    void sdk?.shutdown().catch((e) => console.error("[otel] shutdown error:", e));
+    void shutdownTracing();
   };
   process.once("SIGTERM", flush);
   process.once("SIGINT", flush);

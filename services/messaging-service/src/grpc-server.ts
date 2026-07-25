@@ -1,5 +1,6 @@
 /* cspell:ignore grpc */
 import * as grpc from '@grpc/grpc-js'
+import { createRpGrpcServer } from '@common/utils/grpc-server-factory'
 import * as protoLoader from '@grpc/proto-loader'
 import os from 'os'
 import { pool } from './lib/db.js'
@@ -541,7 +542,7 @@ for (const [method, handler] of Object.entries(messagingGrpcHandlers)) {
 }
 
 export function startGrpcServer(port: number) {
-  const server = new grpc.Server({
+  const server = createRpGrpcServer({
     'grpc.keepalive_time_ms': 30000,
     'grpc.keepalive_timeout_ms': 5000,
     'grpc.keepalive_permit_without_calls': 1,

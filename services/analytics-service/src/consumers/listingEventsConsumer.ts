@@ -1,7 +1,7 @@
 /**
  * Consume ${ENV_PREFIX}.listing.events — project ListingCreatedV1 into analytics.daily_metrics (idempotent).
  */
-import { kafka, ochKafkaTopicIsolationSuffix } from "@common/utils";
+import { getRpKafka, ochKafkaTopicIsolationSuffix } from "@common/utils";
 import { withKafkaConsumerSpan } from "@common/utils/otel";
 import type { Consumer } from "kafkajs";
 import type { Pool } from "pg";
@@ -49,7 +49,7 @@ export async function startListingEventsConsumer(pool: Pool | null): Promise<Con
     }
   }
 
-  const consumer = kafka.consumer({ groupId: GROUP_ID });
+  const consumer = getRpKafka("consumer").consumer({ groupId: GROUP_ID });
   const connectBudgetMs = Number(process.env.ANALYTICS_KAFKA_CONNECT_MS || "8000");
   try {
     await Promise.race([

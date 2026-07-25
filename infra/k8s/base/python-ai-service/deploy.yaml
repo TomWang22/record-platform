@@ -78,6 +78,12 @@ spec:
               value: "true"
             - name: KAFKA_SSL_ENABLED
               value: "true"
+            - name: KAFKA_CA_CERT
+              value: "/etc/kafka/secrets/ca-cert.pem"
+            - name: KAFKA_CLIENT_CERT
+              value: "/etc/kafka/secrets/client.crt"
+            - name: KAFKA_CLIENT_KEY
+              value: "/etc/kafka/secrets/client.key"
             # Explicit POSTGRES_URL_PYTHON_AI (belt-and-suspenders with envFrom; ensures pool can connect)
             - name: POSTGRES_URL_PYTHON_AI
               valueFrom:

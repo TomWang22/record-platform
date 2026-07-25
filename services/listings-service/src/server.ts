@@ -1,5 +1,7 @@
 import express from "express";
-import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions } from "@common/utils";
+import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions, installShutdownSignalHandlers } from "@common/utils";
+
+installShutdownSignalHandlers({ service: "listings-service" });
 import type { Router } from "express";
 import oauthRouter from "./oauth-discogs.js";
 import axios from "axios";

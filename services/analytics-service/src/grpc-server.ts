@@ -1,4 +1,5 @@
 import * as grpc from "@grpc/grpc-js";
+import { createRpGrpcServer } from "@common/utils/grpc-server-factory";
 import * as protoLoader from "@grpc/proto-loader";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
 import {
@@ -208,7 +209,7 @@ export async function analyticsGrpcHealthProbe(): Promise<boolean> {
 }
 
 export function startGrpcServer(port: number): grpc.Server {
-  const server = new grpc.Server();
+  const server = createRpGrpcServer();
   server.addService(root.analytics.AnalyticsService.service, analyticsGrpcHandlers);
   const recommendationAdmin = root.analytics?.RecommendationAdminService?.service;
   const extraHealthServices: string[] = [];

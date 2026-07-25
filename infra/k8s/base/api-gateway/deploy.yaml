@@ -41,6 +41,10 @@ spec:
               value: "/certs/dev-root.pem"
             - name: KAFKA_CA_CERT
               value: "/etc/kafka/secrets/ca-cert.pem"
+            - name: KAFKA_CLIENT_CERT
+              value: "/etc/kafka/secrets/client.crt"
+            - name: KAFKA_CLIENT_KEY
+              value: "/etc/kafka/secrets/client.key"
             # transport-watchdog sidecar probes loopback gateway readiness
             - name: TRANSPORT_WATCHDOG_GATEWAY_URL
               value: "http://127.0.0.1:4000/readyz"

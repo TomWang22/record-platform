@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import * as grpc from "@grpc/grpc-js";
+import { createRpGrpcServer } from "@common/utils/grpc-server-factory";
 import * as protoLoader from "@grpc/proto-loader";
 import {
   registerHealthService,
@@ -512,7 +513,7 @@ function createListingsGrpcServerCredentials(): grpc.ServerCredentials {
 }
 
 function buildListingsGrpcServer(): grpc.Server {
-  const server = new grpc.Server();
+  const server = createRpGrpcServer();
   server.addService(
     listingsProto.listings.ListingsService.service,
     listingsGrpcHandlersForTest,

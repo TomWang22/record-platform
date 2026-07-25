@@ -128,7 +128,6 @@ https://record-platform.test {
 	}
 
 	# gRPC: route to Envoy via h2c only (Content-Type: application/grpc).
-	# TODO: remove X-OCH-Edge-Proto once all RP interceptors use X-RP-Edge-Proto only.
 	@grpc {
 		header Content-Type application/grpc*
 	}
@@ -136,7 +135,6 @@ https://record-platform.test {
 		reverse_proxy envoy-test.envoy-test.svc.cluster.local:10000 {
 			header_up Host {http.request.host}
 			header_up X-RP-Edge-Proto {http.request.proto}
-			header_up X-OCH-Edge-Proto {http.request.proto}
 			transport http {
 				versions h2c
 			}
@@ -224,7 +222,6 @@ https://record-platform.test {
 		reverse_proxy http://api-gateway.record-platform.svc.cluster.local:4000 {
 			header_up Host {http.request.host}
 			header_up X-RP-Edge-Proto {http.request.proto}
-			header_up X-OCH-Edge-Proto {http.request.proto}
 			transport http {
 				versions h1
 				dial_timeout 10s
@@ -243,7 +240,6 @@ https://record-platform.test {
 			header_up Host {http.request.host}
 			header_up X-Forwarded-Proto https
 			header_up X-RP-Edge-Proto {http.request.proto}
-			header_up X-OCH-Edge-Proto {http.request.proto}
 			transport http {
 				versions h1
 				dial_timeout 10s

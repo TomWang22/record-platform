@@ -58,7 +58,7 @@ RUN python -m grpc_tools.protoc \
 COPY services/python-ai-service/app /app/app
 
 # ---------- node deps (pg for Phase 34 evidence persistence) ----------
-FROM node:20-bookworm-slim AS node-deps
+FROM node:22-bookworm-slim AS node-deps
 WORKDIR /deps
 RUN npm init -y >/dev/null 2>&1 \
  && npm install --omit=dev pg@8.12.0
@@ -93,7 +93,7 @@ RUN chmod 755 /usr/local/bin/grpc-health-probe \
  && ls -la /usr/local/bin/grpc-health-probe
 
 # Phase 33C–E deterministic engines shell out to Node runners (fail-closed if absent).
-COPY --from=node:20-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 COPY --from=node-deps --chown=python:python /deps/node_modules /app/node_modules
 COPY scripts/ai-platform/run-phase33c-capability.mjs \
      scripts/ai-platform/run-phase33d-capability.mjs \

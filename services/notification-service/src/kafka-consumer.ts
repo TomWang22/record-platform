@@ -2,7 +2,7 @@
  * Consume domain event topics; insert pending in-app notifications (idempotent via processed_events).
  */
 import { trace } from "@opentelemetry/api";
-import { kafka, ochKafkaTopicIsolationSuffix } from "@common/utils/kafka";
+import { getRpKafka, ochKafkaTopicIsolationSuffix } from "@common/utils/kafka";
 import { withKafkaConsumerSpan } from "@common/utils/otel";
 import { Consumer } from "kafkajs";
 import type { Pool } from "pg";
@@ -376,7 +376,9 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
     }
   }
 
-  const consumer = kafka.consumer({ groupId: process.env.KAFKA_GROUP_ID || "notification-service-group" });
+  const consumer = getRpKafka("consumer").consumer({
+    groupId: process.env.KAFKA_GROUP_ID || "notification-service-group",
+  });
   const connectBudgetMs = Number(process.env.NOTIFICATION_KAFKA_CONNECT_MS || "8000");
   try {
     await Promise.race([

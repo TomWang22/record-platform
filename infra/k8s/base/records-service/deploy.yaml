@@ -61,6 +61,10 @@ spec:
               value: "/certs/dev-root.pem"
             - name: KAFKA_CA_CERT
               value: "/etc/kafka/secrets/ca-cert.pem"
+            - name: KAFKA_CLIENT_CERT
+              value: "/etc/kafka/secrets/client.crt"
+            - name: KAFKA_CLIENT_KEY
+              value: "/etc/kafka/secrets/client.key"
             # Use external Docker Postgres (port 5433) as per run_pgbench_sweep.sh reference
             # DATABASE_URL from app-config.yaml is already set correctly to host.docker.internal:5433
           volumeMounts:

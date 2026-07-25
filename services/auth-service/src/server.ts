@@ -16,7 +16,10 @@ import {
   initOchOutboxSurfaceSupported,
   mountRpHttpHealth,
   rpGrpcHealthOptions,
+  installShutdownSignalHandlers,
 } from "@common/utils";
+
+installShutdownSignalHandlers({ service: "auth-service" });
 import { inferNetProtoForSpan, mountDebugTraceHeaders, tracingMiddleware } from "@common/utils/otel";
 import {
   signJwt,

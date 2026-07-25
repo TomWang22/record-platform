@@ -18,3 +18,22 @@ export const httpRequestDurationSeconds = new client.Histogram({
   buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30],
 })
 register.registerMetric(httpRequestDurationSeconds)
+
+/** Bounded build provenance (no pod UID in labels). */
+export const rpBuildInfo = new client.Gauge({
+  name: "rp_build_info",
+  help: "Record Platform build provenance (value always 1)",
+  labelNames: ["service", "source_sha", "image_tag", "image_digest"],
+});
+register.registerMetric(rpBuildInfo);
+
+export function setRpBuildInfoMetric(service: string): void {
+  rpBuildInfo
+    .labels(
+      service,
+      (process.env.RP_SOURCE_SHA || "unknown").slice(0, 40),
+      (process.env.RP_IMAGE_TAG || process.env.IMAGE_TAG || "unknown").slice(0, 64),
+      (process.env.RP_IMAGE_DIGEST || "unknown").slice(0, 72),
+    )
+    .set(1);
+}

@@ -1,4 +1,4 @@
-import { kafka, ochKafkaTopicIsolationSuffix } from "@common/utils/kafka";
+import { getRpKafka, ochKafkaTopicIsolationSuffix } from "@common/utils/kafka";
 import type { Consumer } from "kafkajs";
 import { pool } from "./lib/db.js";
 
@@ -97,7 +97,7 @@ export async function startBookingThreadConsumer(): Promise<Consumer | null> {
     }
   }
 
-  const consumer = kafka.consumer({
+  const consumer = getRpKafka("consumer").consumer({
     groupId: process.env.MESSAGING_BOOKING_THREAD_GROUP_ID || "messaging-service-booking-thread-ensure",
   });
   const connectBudgetMs = Number(process.env.MESSAGING_KAFKA_CONNECT_MS || "8000");

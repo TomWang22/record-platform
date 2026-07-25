@@ -4,7 +4,9 @@ import helmet from "helmet";
 import compression from "compression";
 import cors from "cors";
 import { PrismaClient } from '../generated/records-client';
-import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions } from "@common/utils";
+import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions, installShutdownSignalHandlers } from "@common/utils";
+
+installShutdownSignalHandlers({ service: "records-service" });
 import { recordsRouter } from "./routes/records.js";
 import { exportRouter } from "./routes/export.js";
 import { makeRedis, attachPgInvalidationListener } from "./lib/cache.js";

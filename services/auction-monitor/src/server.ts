@@ -1,6 +1,8 @@
 import express from 'express';
 import { Pool } from 'pg';
-import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions } from '@common/utils';
+import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions, installShutdownSignalHandlers } from '@common/utils';
+
+installShutdownSignalHandlers({ service: 'auction-monitor' });
 
 // Dual-DB setup: listings DB for reading watchlist, auction-monitor DB for writing results
 const POSTGRES_URL_LISTINGS = process.env.POSTGRES_URL_LISTINGS || process.env.POSTGRES_URL!;

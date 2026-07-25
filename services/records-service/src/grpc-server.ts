@@ -1,5 +1,6 @@
 /* cspell:ignore grpc */
-import * as grpc from "@grpc/grpc-js";
+import * as grpc from "@grpc/grpc-js"
+import { createRpGrpcServer } from "@common/utils/grpc-server-factory";
 import * as protoLoader from "@grpc/proto-loader";
 import type { PrismaClient } from '../generated/records-client';
 import { PrismaClient as PrismaClientCtor, Prisma } from '../generated/records-client';
@@ -98,7 +99,7 @@ function recordInputFromProto(proto: any, userId: string) {
 export function startGrpcServer(port: number = 50051, prismaClient?: PrismaClient) {
   const prisma = prismaClient ?? new PrismaClientCtor();
 
-  const server = new grpc.Server({
+  const server = createRpGrpcServer({
     "grpc.keepalive_time_ms": 30000,
     "grpc.keepalive_timeout_ms": 5000,
     "grpc.keepalive_permit_without_calls": 1,

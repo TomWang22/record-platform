@@ -1,6 +1,10 @@
 import "./otel-bootstrap.js";
 import "dotenv/config";
-import { userLifecycleV1Topic } from "@common/utils";
+import {
+  userLifecycleV1Topic,
+  installShutdownSignalHandlers,
+  setRpBuildInfoMetric,
+} from "@common/utils";
 import { ensureKafkaBrokerReady } from "@common/utils/kafka";
 import { warmupTrustDb } from "./db.js";
 import { startGrpcServer } from "./grpc-server.js";
@@ -11,6 +15,8 @@ const HTTP_PORT = Number(process.env.HTTP_PORT || "4016");
 const GRPC_PORT = Number(process.env.GRPC_PORT || "50066");
 
 async function main() {
+  installShutdownSignalHandlers({ service: "trust-service" });
+  setRpBuildInfoMetric("trust-service");
   // gRPC before HTTP so /readyz local mTLS health check can reach a listening server.
   startGrpcServer(GRPC_PORT);
   startTrustHttpServer(HTTP_PORT);

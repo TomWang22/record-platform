@@ -1,6 +1,6 @@
 import "./otel-bootstrap.js";
 import "dotenv/config";
-import { userLifecycleV1Topic } from "@common/utils";
+import { userLifecycleV1Topic, installShutdownSignalHandlers } from "@common/utils";
 import { ensureKafkaBrokerReady } from "@common/utils/kafka";
 import { startGrpcServer } from "./grpc-server.js";
 import { startNotificationHttpServer } from "./http-server.js";
@@ -12,6 +12,7 @@ const HTTP_PORT = Number(process.env.HTTP_PORT || "4015");
 const GRPC_PORT = Number(process.env.GRPC_PORT || "50065");
 
 async function main() {
+  installShutdownSignalHandlers({ service: "notification-service" });
   startNotificationHttpServer(HTTP_PORT);
   startGrpcServer(GRPC_PORT);
   void (async () => {

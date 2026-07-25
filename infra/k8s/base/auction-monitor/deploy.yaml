@@ -76,6 +76,10 @@ spec:
               value: "true"
             - name: KAFKA_CA_CERT
               value: "/etc/kafka/secrets/ca-cert.pem"
+            - name: KAFKA_CLIENT_CERT
+              value: "/etc/kafka/secrets/client.crt"
+            - name: KAFKA_CLIENT_KEY
+              value: "/etc/kafka/secrets/client.key"
             - name: ENABLE_GRPC
               value: "true"
             - name: GRPC_PORT

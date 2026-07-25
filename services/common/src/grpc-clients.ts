@@ -3,6 +3,7 @@ import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as fs from "fs";
 import { resolveProtoPath } from "./proto.js";
+import { createGrpcClientTracingInterceptor } from "./otel/grpc-client-interceptor.js";
 
 function buildCredentials() {
   const caPath =
@@ -137,6 +138,7 @@ function createClientWithOptions(ServiceClass: any, address: string, credentials
   const tlsServerName = grpcTlsServerNameFromAddress(address);
   const options: grpc.ChannelOptions = {
     "grpc.ssl_target_name_override": tlsServerName,
+    interceptors: [createGrpcClientTracingInterceptor()],
   };
   return new ServiceClass(address, credentials, options);
 }

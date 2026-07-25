@@ -10,7 +10,7 @@ import os from 'os'
 import { Worker } from 'worker_threads'
 import path from 'path'
 import crypto from 'crypto'
-import { register, httpCounter } from '@common/utils'
+import { register, httpCounter, installShutdownSignalHandlers } from '@common/utils'
 import { kafka } from '@common/utils/kafka'
 import { getRedis } from '@common/utils/redis'
 import {
@@ -575,6 +575,7 @@ let server: ReturnType<typeof app.listen> | null = null
 let grpcServer: any = null
 
 async function main() {
+  installShutdownSignalHandlers({ service: 'analytics-service' })
   await waitForAnalyticsPools()
 
   const PORT = process.env.ANALYTICS_PORT || process.env.HTTP_PORT || 4004

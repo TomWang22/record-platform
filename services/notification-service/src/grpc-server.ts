@@ -1,4 +1,5 @@
 import * as grpc from "@grpc/grpc-js";
+import { createRpGrpcServer } from "@common/utils/grpc-server-factory";
 import * as protoLoader from "@grpc/proto-loader";
 import {
   registerHealthService,
@@ -57,7 +58,7 @@ export async function notificationGrpcHealthCheck(): Promise<boolean> {
 }
 
 export function startGrpcServer(port: number): grpc.Server {
-  const server = new grpc.Server();
+  const server = createRpGrpcServer();
   server.addService(notifProto.notification.NotificationService.service, notificationGrpcHandlers);
   registerHealthService(server, "notification.NotificationService", notificationGrpcHealthCheck);
 

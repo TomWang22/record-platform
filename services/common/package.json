@@ -77,7 +77,7 @@
   },
   "files": ["dist", "contracts"],
   "scripts": {
-    "build": "tsc -p tsconfig.json && mkdir -p contracts dist && cp -f ../../infra/contracts/rp-service-call-graph.json contracts/rp-service-call-graph.json && cp -f contracts/rp-service-call-graph.json dist/rp-service-call-graph.json",
+    "build": "tsc -p tsconfig.json && mkdir -p contracts dist && (cp -f ../../infra/contracts/rp-service-call-graph.json contracts/rp-service-call-graph.json 2>/dev/null || true) && (test -f contracts/rp-service-call-graph.json && cp -f contracts/rp-service-call-graph.json dist/rp-service-call-graph.json || true)",
     "test": "vitest run",
     "prepare": "pnpm run build"
   },

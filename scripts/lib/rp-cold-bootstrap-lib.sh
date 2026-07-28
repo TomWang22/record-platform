@@ -694,3 +694,34 @@ rp_cb_plan_forbidden_audit() {
   fi
   return 0
 }
+
+# Re-assert Compose Redis/Postgres/MinIO before F.cluster_deploy (BOOTSTRAP_SKIP_INFRA=1).
+# Host loopback probes live here (allowlisted); never put 127.0.0.1 in cold-bootstrap.sh.
+rp_cb_ensure_compose_external_infra() {
+  local repo="${RP_CB_REPO_ROOT:-}"
+  local script_dir="${SCRIPT_DIR:-$repo/scripts}"
+  [[ -n "$repo" ]] || { echo "❌ RP_CB_REPO_ROOT unset" >&2; return 1; }
+  # shellcheck source=ensure-colima-docker-context.sh
+  source "$script_dir/lib/ensure-colima-docker-context.sh"
+  OCH_FORCE_COLIMA_DOCKER=1 och_ensure_colima_docker_context || return 1
+  (
+    cd "$repo"
+    docker compose -f docker-compose.yml up -d \
+      redis minio \
+      postgres-records postgres-messaging postgres-listings postgres-shopping postgres-auth \
+      postgres-auction-monitor-core postgres-analytics postgres-python-ai \
+      postgres-notification postgres-trust postgres-media
+  ) || return 1
+  local i
+  for i in $(seq 1 60); do
+    nc -z 127.0.0.1 6379 2>/dev/null && break
+    sleep 1
+  done
+  if ! nc -z 127.0.0.1 6379 2>/dev/null; then
+    echo "❌ Compose Redis still down on host :6379 after compose up" >&2
+    return 1
+  fi
+  bash "$script_dir/rp-verify-external-runtime-ports.sh" || return 1
+  echo "✅ compose external infra published (Redis/Postgres/MinIO)"
+  return 0
+}

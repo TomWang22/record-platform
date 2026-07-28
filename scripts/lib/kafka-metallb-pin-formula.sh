@@ -2,6 +2,7 @@
 # Single source of truth for kafka-N-external MetalLB pin IPs (must match patch-kafka-external-metallb-pinned-ips.sh).
 # Sourced by patch script + verify-kafka-metallb-pin-formula.sh (CI).
 # Convention: first IPv4 in METALLB_POOL + KAFKA_METALLB_FIRST_OFFSET + broker_index.
+# Default offset is 0 so kafka-0..2 own pool start (.240-.242); ollama/caddy take later free IPs.
 
 if [[ -n "${_RP_KAFKA_METALLB_PIN_FORMULA_LOADED:-}" ]]; then
   return 0

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "table_name": "outbox_events",
+  "columns": {
+    "id": { "type": "uuid", "primary_key": true },
+    "aggregate_type": { "type": "text", "nullable": false },
+    "aggregate_id": { "type": "text", "nullable": false },
+    "event_type": { "type": "text", "nullable": false },
+    "topic": { "type": "text", "nullable": false },
+    "key": { "type": "text", "nullable": true },
+    "payload": { "type": "jsonb", "nullable": false },
+    "headers": { "type": "jsonb", "nullable": false, "default": "{}" },
+    "status": { "type": "text", "nullable": false, "default": "pending" },
+    "attempts": { "type": "int", "nullable": false, "default": 0 },
+    "available_at": { "type": "timestamptz", "nullable": false, "default": "now()" },
+    "locked_at": { "type": "timestamptz", "nullable": true },
+    "locked_by": { "type": "text", "nullable": true },
+    "published_at": { "type": "timestamptz", "nullable": true },
+    "last_error": { "type": "text", "nullable": true },
+    "created_at": { "type": "timestamptz", "nullable": false, "default": "now()" },
+    "updated_at": { "type": "timestamptz", "nullable": false, "default": "now()" }
+  },
+  "indexes": [
+    { "name": "outbox_pending_publish", "columns": ["status", "available_at", "created_at"] },
+    { "name": "outbox_aggregate", "columns": ["aggregate_type", "aggregate_id"] },
+    { "name": "outbox_topic", "columns": ["topic"] },
+    { "name": "outbox_created_at", "columns": ["created_at"] }
+  ],
+  "publisher": {
+    "claim_sql": "FOR UPDATE SKIP LOCKED",
+    "mark_published_on": "kafka_ack",
+    "max_attempts": 25,
+    "backoff": "exponential"
+  },
+  "services": [
+    { "service": "auth-service", "port": 5437, "ddl": "infra/db/01-auth-outbox.sql" },
+    { "service": "records-service", "port": 5433, "ddl": "infra/db/01-records-outbox.sql" },
+    { "service": "listings-service", "port": 5435, "ddl": "infra/db/03-listings-outbox.sql" },
+    { "service": "shopping-service", "port": 5436, "ddl": "infra/db/01-shopping-outbox.sql" },
+    { "service": "messaging-service", "port": 5434, "ddl": "infra/db/02-messaging-outbox.sql" },
+    { "service": "notification-service", "port": 5441, "ddl": "infra/db/03-notification-outbox.sql" },
+    { "service": "trust-service", "port": 5442, "ddl": "infra/db/03-trust-outbox.sql" },
+    { "service": "media-service", "port": 5443, "ddl": "infra/db/02-media-outbox.sql" },
+    { "service": "analytics-service", "port": 5439, "ddl": "infra/db/03-analytics-outbox.sql" },
+    { "service": "auction-monitor", "port": 5438, "ddl": "infra/db/01-auction-monitor-outbox.sql" },
+    { "service": "python-ai-service", "port": 5440, "ddl": "infra/db/01-ai-outbox.sql" }
+  ],
+  "excluded": ["social-service", "booking-service"]
+}

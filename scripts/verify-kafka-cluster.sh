@@ -66,7 +66,7 @@ command -v kubectl >/dev/null 2>&1 || { bad "kubectl required"; exit 1; }
 command -v openssl >/dev/null 2>&1 || { bad "openssl required"; exit 1; }
 
 _mount_required_deploys() {
-  echo "${VERIFY_KAFKA_MOUNT_REQUIRED_DEPLOYS:-auth-service booking-service listings-service media-service notification-service analytics-service trust-service}"
+  echo "${VERIFY_KAFKA_MOUNT_REQUIRED_DEPLOYS:-auth-service records-service shopping-service auction-monitor listings-service messaging-service media-service notification-service analytics-service trust-service}"
 }
 
 if [[ "${VERIFY_KAFKA_CLIENT_MOUNTS_ONLY:-0}" == "1" ]]; then

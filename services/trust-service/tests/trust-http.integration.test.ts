@@ -1,5 +1,5 @@
 /**
- * Integration tests: trust HTTP against real Postgres (5446). **No Kafka** — not a cluster-backed event suite.
+ * Integration tests: trust HTTP against real Postgres (5442). **No Kafka** — not a cluster-backed event suite.
  * Run: cd services/trust-service && pnpm run test:integration
  * Skip: SKIP_TRUST_INTEGRATION=1 or no DB
  */
@@ -27,7 +27,7 @@ describe.skipIf(skip)("trust HTTP integration", () => {
       await pool.query("SELECT 1");
     } catch {
       throw new Error(
-        "Trust DB unreachable (POSTGRES_URL_TRUST / port 5446). Start Postgres or set SKIP_TRUST_INTEGRATION=1",
+        "Trust DB unreachable (POSTGRES_URL_TRUST / port 5442). Start Postgres or set SKIP_TRUST_INTEGRATION=1",
       );
     }
     const app = createTrustHttpApp();

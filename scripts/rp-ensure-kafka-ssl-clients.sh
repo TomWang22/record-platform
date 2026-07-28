@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Ensure kafka-ssl-secret has client.crt/client.key (Node/KafkaJS mTLS). Repair partial secrets.
+# Ensure kafka-ssl-secret has client.crt/client.key (Node/KafkaJS mTLS), and that
+# producer/consumer Deployments set KAFKA_CLIENT_CERT/KEY (ssl.client.auth=required).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,28 +17,32 @@ _kafka_secret_has_client_mtls() {
   kubectl get secret kafka-ssl-secret -n "$NS" -o jsonpath='{.data.client\.crt}' --request-timeout=15s 2>/dev/null | grep -q .
 }
 
-if _kafka_secret_has_client_mtls; then
-  ok "kafka-ssl-secret already has client.crt (ns=$NS)"
-  exit 0
-fi
-
-say "kafka-ssl-secret incomplete in $NS — applying full material from certs/kafka-ssl"
-if [[ ! -f "$REPO_ROOT/certs/kafka-ssl/client.crt" ]]; then
-  bad "missing $REPO_ROOT/certs/kafka-ssl/client.crt — run: bash scripts/kafka-ssl-from-dev-root.sh"
-  exit 1
-fi
-
-HOUSING_NS="$NS" bash "$SCRIPT_DIR/apply-rp-kafka-ssl-secret.sh"
-
 if ! _kafka_secret_has_client_mtls; then
-  bad "kafka-ssl-secret still missing client.crt after apply"
-  exit 1
+  say "kafka-ssl-secret incomplete in $NS — applying full material from certs/kafka-ssl"
+  if [[ ! -f "$REPO_ROOT/certs/kafka-ssl/client.crt" ]]; then
+    bad "missing $REPO_ROOT/certs/kafka-ssl/client.crt — run: bash scripts/kafka-ssl-from-dev-root.sh"
+    exit 1
+  fi
+  HOUSING_NS="$NS" bash "$SCRIPT_DIR/apply-rp-kafka-ssl-secret.sh"
+  if ! _kafka_secret_has_client_mtls; then
+    bad "kafka-ssl-secret still missing client.crt after apply"
+    exit 1
+  fi
+  ok "kafka-ssl-secret repaired"
+else
+  ok "kafka-ssl-secret already has client.crt (ns=$NS)"
 fi
-ok "kafka-ssl-secret repaired"
+
+# Brokers require client auth on INTERNAL:9093. Mount alone is not enough — KafkaJS
+# only presents client cert when KAFKA_CLIENT_CERT/KEY are set.
+chmod +x "$SCRIPT_DIR/rp-patch-kafka-mtls-client-env.sh" 2>/dev/null || true
+HOUSING_NS="$NS" bash "$SCRIPT_DIR/rp-patch-kafka-mtls-client-env.sh"
 
 if [[ "${RP_KAFKA_SSL_RESTART_APPS:-1}" == "1" ]]; then
   say "Restarting Kafka mTLS consumer Deployments"
-  for dep in media-service messaging-service notification-service trust-service analytics-service shopping-service listings-service auth-service api-gateway auction-monitor; do
+  for dep in media-service messaging-service notification-service trust-service analytics-service \
+    shopping-service listings-service auth-service api-gateway auction-monitor records-service \
+    python-ai-service; do
     kubectl rollout restart "deployment/$dep" -n "$NS" --request-timeout=30s 2>/dev/null || true
   done
   ok "rollout restart requested for Kafka client services"

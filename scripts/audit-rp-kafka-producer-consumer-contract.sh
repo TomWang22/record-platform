@@ -61,12 +61,8 @@ for dep in "${PRODUCERS[@]}"; do
   env="$(kubectl get deployment "$dep" -n "$NS" -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{"\n"}{end}' 2>/dev/null || true)"
   echo "$env" | grep -qE 'KAFKA_(SSL_ENABLED|USE_SSL)=true' || fail "$dep missing KAFKA_SSL_ENABLED/USE_SSL"
   echo "$env" | grep -qE 'KAFKA_(CA_CERT|SSL_CA_CERT)=/etc/kafka/secrets/ca-cert.pem' && pass "$dep kafka CA env" || fail "$dep KAFKA_CA_CERT"
-  if kubectl get deployment "$dep" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | grep -q python-ai; then
-    : # python-ai may be consumer-only via analytics jobs
-  else
-    echo "$env" | grep -q 'KAFKA_CLIENT_CERT=/etc/kafka/secrets/client.crt' && pass "$dep KAFKA_CLIENT_CERT" || fail "$dep KAFKA_CLIENT_CERT"
-    echo "$env" | grep -q 'KAFKA_CLIENT_KEY=/etc/kafka/secrets/client.key' && pass "$dep KAFKA_CLIENT_KEY" || fail "$dep KAFKA_CLIENT_KEY"
-  fi
+  echo "$env" | grep -q 'KAFKA_CLIENT_CERT=/etc/kafka/secrets/client.crt' && pass "$dep KAFKA_CLIENT_CERT" || fail "$dep KAFKA_CLIENT_CERT"
+  echo "$env" | grep -q 'KAFKA_CLIENT_KEY=/etc/kafka/secrets/client.key' && pass "$dep KAFKA_CLIENT_KEY" || fail "$dep KAFKA_CLIENT_KEY"
   kubectl exec -n "$NS" "deployment/$dep" -- sh -c 'test -f /etc/kafka/secrets/ca-cert.pem && test -f /etc/kafka/secrets/client.crt && test -f /etc/kafka/secrets/client.key' \
     && pass "$dep kafka secret mounts" || fail "$dep kafka secret mounts"
   if kubectl exec -n "$NS" "deployment/$dep" -- sh -c 'command -v node >/dev/null' 2>/dev/null; then

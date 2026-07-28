@@ -59,10 +59,16 @@ test_result() {
 
 say "=== Comprehensive TLS/mTLS Test Suite ==="
 
-# Get CA certificate (prefer repo certs/dev-root.pem from preflight/rotation)
+# Get CA certificate (prefer repo trust bundle: intermediate+root, then root alone)
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd)"
+# shellcheck source=lib/rp-dev-ca.sh
+source "$SCRIPT_DIR/lib/rp-dev-ca.sh" 2>/dev/null || true
 CA_CERT=""
-[[ -f "$REPO_ROOT/certs/dev-root.pem" ]] && [[ -s "$REPO_ROOT/certs/dev-root.pem" ]] && CA_CERT="$REPO_ROOT/certs/dev-root.pem"
+if command -v rp_dev_edge_ca_file >/dev/null 2>&1; then
+  CA_CERT="$(rp_dev_edge_ca_file 2>/dev/null || true)"
+fi
+[[ -z "$CA_CERT" || ! -f "$CA_CERT" ]] && [[ -f "$REPO_ROOT/certs/dev-chain.pem" ]] && CA_CERT="$REPO_ROOT/certs/dev-chain.pem"
+[[ -z "$CA_CERT" || ! -f "$CA_CERT" ]] && [[ -f "$REPO_ROOT/certs/dev-root.pem" ]] && CA_CERT="$REPO_ROOT/certs/dev-root.pem"
 if [[ -z "$CA_CERT" ]] || [[ ! -f "$CA_CERT" ]]; then
 K8S_CA_ING=$(_kb -n "$NS_ING" get secret dev-root-ca -o jsonpath='{.data.dev-root\.pem}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
 if [[ -n "$K8S_CA_ING" ]]; then
@@ -445,7 +451,7 @@ if [[ -n "$CADDY_POD" ]]; then
 fi
 # 2) Fallback: get chain from Kubernetes secret (leaf + CA)
 if [[ -z "$CERT_FILE" ]] || [[ "${CERT_COUNT:-0}" -lt 2 ]]; then
-  LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"
+  LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-record-platform-local-tls}"
   SECRET_LEAF=$(_kb -n "$NS_ING" get secret "$LEAF_TLS_SECRET" -o jsonpath='{.data.tls\.crt}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
   SECRET_CA=$(_kb -n "$NS_ING" get secret dev-root-ca -o jsonpath='{.data.dev-root\.pem}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
   if [[ -n "$SECRET_LEAF" ]]; then
@@ -465,7 +471,7 @@ fi
 if [[ -n "$CERT_COUNT" ]] && [[ "$CERT_COUNT" =~ ^[0-9]+$ ]] && [[ $CERT_COUNT -ge 2 ]]; then
   test_result 0 "Certificate chain completeness: PASSED ($CERT_COUNT certificates)"
 elif [[ "${CERT_COUNT:-0}" -eq 1 ]] && [[ -n "${SECRET_CA:-}" ]]; then
-  # Leaf in off-campus-housing-local-tls + CA in dev-root-ca (separate secrets) is valid
+  # Leaf in record-platform-local-tls + CA in dev-root-ca (separate secrets) is valid
   test_result 0 "Certificate chain completeness: PASSED (leaf in $LEAF_TLS_SECRET + CA in dev-root-ca)"
 elif [[ "${CERT_COUNT:-0}" -eq 1 ]]; then
   test_result 1 "Certificate chain completeness: FAILED (need leaf tls.crt + dev-root-ca; reissue writes leaf-only tls.crt)"
@@ -475,7 +481,7 @@ fi
 
 # Test 6: mTLS Configuration Check
 say "Test 6: mTLS Configuration Check"
-SERVICES=("auth-service" "listings-service" "booking-service" "messaging-service" "trust-service" "analytics-service" "media-service" "notification-service")
+SERVICES=("auth-service" "listings-service" "records-service" "messaging-service" "trust-service" "analytics-service" "media-service" "notification-service" "shopping-service" "auction-monitor" "python-ai-service" "api-gateway")
 MTLS_CAPABLE=0
 MTLS_ENABLED=0
 
@@ -527,24 +533,36 @@ else
   info "Redis: Externalized (not in cluster) - cache check skipped"
 fi
 
-# DB connectivity (quick: housing 8 DBs on 5441–5448)
+# DB connectivity (quick: Record Platform Postgres host ports 5433–5443)
 say "DB connectivity (quick)"
-DB_PORTS=(5441 5442 5443 5444 5445 5446 5447 5448)
-DB_NAMES=(auth listings bookings messaging notification trust analytics media)
+# port:db_name pairs matching app-config / compose external mapping
+DB_SPECS=(
+  "5433:records"
+  "5434:messaging"
+  "5435:listings"
+  "5436:shopping"
+  "5437:auth"
+  "5438:postgres"
+  "5439:analytics"
+  "5440:python_ai"
+  "5441:notification"
+  "5442:trust"
+  "5443:media"
+)
 DB_OK=0
-for i in "${!DB_PORTS[@]}"; do
-  port="${DB_PORTS[$i]}"
-  db="${DB_NAMES[$i]:-postgres}"
+for spec in "${DB_SPECS[@]}"; do
+  port="${spec%%:*}"
+  db="${spec##*:}"
   if PGPASSWORD=postgres psql -h localhost -p "$port" -U postgres -d "$db" -tAc "SELECT 1;" 2>/dev/null | grep -q 1; then
     DB_OK=$((DB_OK + 1))
   elif PGPASSWORD=postgres psql -h localhost -p "$port" -U postgres -d postgres -tAc "SELECT 1;" 2>/dev/null | grep -q 1; then
     DB_OK=$((DB_OK + 1))
   fi
 done
-if [[ $DB_OK -eq ${#DB_PORTS[@]} ]]; then
-  test_result 0 "DB connectivity: PASSED ($DB_OK/${#DB_PORTS[@]} ports)"
+if [[ $DB_OK -eq ${#DB_SPECS[@]} ]]; then
+  test_result 0 "DB connectivity: PASSED ($DB_OK/${#DB_SPECS[@]} ports)"
 else
-  test_result 1 "DB connectivity: FAILED ($DB_OK/${#DB_PORTS[@]} ports - expected 5441-5448)"
+  test_result 1 "DB connectivity: FAILED ($DB_OK/${#DB_SPECS[@]} ports - expected RP 5433-5443)"
 fi
 
 # Summary

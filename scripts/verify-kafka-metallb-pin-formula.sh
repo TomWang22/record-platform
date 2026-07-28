@@ -32,10 +32,11 @@ _assert_row() {
 }
 
 echo "=== verify-kafka-metallb-pin-formula (table tests) ==="
-# Colima doc default + k3d-style pool
+# Colima / cold-bootstrap default: offset 0 (kafka owns pool start; avoids ollama-lb on .243)
+_assert_row "192.168.64.240-192.168.64.250" 0 3 192.168.64.240 192.168.64.241 192.168.64.242
+_assert_row "172.18.0.240-172.18.0.250" 0 3 172.18.0.240 172.18.0.241 172.18.0.242
+# offset 1 still supported (legacy / dedicated kafka pool) but collides with ollama on shared Colima pool
 _assert_row "192.168.64.240-192.168.64.250" 1 3 192.168.64.241 192.168.64.242 192.168.64.243
-_assert_row "172.18.0.240-172.18.0.250" 1 3 172.18.0.241 172.18.0.242 172.18.0.243
-# offset 0: broker-0 equals pool first IP
 _assert_row "10.0.0.100-10.0.0.110" 0 2 10.0.0.100 10.0.0.101
 
 if [[ "$FAIL" -ne 0 ]]; then
@@ -47,14 +48,14 @@ echo "✅ Table tests passed"
 # Optional live check (self-hosted runner / dev with cluster)
 NS="${HOUSING_NS:-record-platform}"
 POOL="${METALLB_POOL:-192.168.64.240-192.168.64.250}"
-OFF="${KAFKA_METALLB_FIRST_OFFSET:-1}"
+OFF="${KAFKA_METALLB_FIRST_OFFSET:-0}"
 REP="${KAFKA_BROKER_REPLICAS:-3}"
 
 if command -v kubectl >/dev/null 2>&1 && kubectl get svc kafka-0-external -n "$NS" --request-timeout=10s >/dev/null 2>&1; then
   echo "=== verify-kafka-metallb-pin-formula (live annotation vs formula, ns=$NS) ==="
   for ((i = 0; i < REP; i++)); do
     want="$(rp_kafka_metallb_expected_ip_for_broker "$POOL" "$OFF" "$i")"
-    got="$(kubectl get svc "kafka-${i}-external" -n "$NS" -o jsonpath="{.metadata.annotations['metallb.universe.tf/loadBalancerIPs']}" --request-timeout=15s 2>/dev/null || true)"
+    got="$(kubectl get svc "kafka-${i}-external" -n "$NS" -o go-template='{{index .metadata.annotations "metallb.universe.tf/loadBalancerIPs"}}' --request-timeout=15s 2>/dev/null || true)"
     if [[ -z "$got" ]]; then
       echo "⚠️  kafka-${i}-external: no metallb pin annotation (OK for fresh cluster)" >&2
       continue

@@ -284,7 +284,8 @@ services:
       - minio_data:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL","wget -qO- http://127.0.0.1:9000/minio/health/ready >/dev/null"]
+      # MinIO RELEASE images no longer ship wget/curl; use mc ready.
+      test: ["CMD-SHELL","MC_HOST_local=http://minio:minio123@127.0.0.1:9000 mc ready local"]
       interval: 10s
       timeout: 5s
       retries: 15

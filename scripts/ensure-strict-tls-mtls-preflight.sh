@@ -240,7 +240,7 @@ if [[ "${FORCE_TLS_RESTART:-0}" == "1" ]] || [[ $SECRET_UPDATED -eq 1 ]]; then
     RP_ROLLOUT_NS="$NS" rp_rollout_caddy_last
     ok "Sequential app + Caddy rollouts triggered (RP_ROLLOUT_STATUS_TIMEOUT=${RP_ROLLOUT_STATUS_TIMEOUT:-180}s each)"
   else
-    for dep in api-gateway auth-service listings-service booking-service messaging-service trust-service analytics-service; do
+    for dep in api-gateway auth-service records-service shopping-service auction-monitor listings-service messaging-service media-service notification-service trust-service analytics-service python-ai-service; do
       kubectl -n "$NS" rollout restart "deploy/$dep" --request-timeout=15s 2>/dev/null && ok "Restarted $dep" || warn "Restart $dep failed"
     done
     kubectl -n "$NS_ING" rollout restart deploy/caddy-h3 --request-timeout=15s 2>/dev/null && ok "Restarted caddy-h3" || warn "Restart caddy-h3 failed"

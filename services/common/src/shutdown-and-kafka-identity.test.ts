@@ -4,6 +4,7 @@ import {
   beginDrain,
   getShutdownPhase,
   isDraining,
+  registerHttpServerForShutdown,
   registerShutdownResource,
   runShutdown,
 } from "./shutdown-coordinator.js";
@@ -61,11 +62,22 @@ describe("shutdown coordinator", () => {
         closed.push("test-res");
       },
     });
+    let httpClosed = false;
+    registerHttpServerForShutdown(
+      {
+        close: (cb?: (err?: Error) => void) => {
+          httpClosed = true;
+          cb?.();
+        },
+      },
+      { name: "http-test", order: 2 },
+    );
     beginDrain("unit");
     expect(isDraining()).toBe(true);
     expect(getShutdownPhase()).toBe("DRAINING");
     await runShutdown("unit");
     expect(getShutdownPhase()).toBe("TERMINATED");
     expect(closed).toEqual(["test-res"]);
+    expect(httpClosed).toBe(true);
   });
 });

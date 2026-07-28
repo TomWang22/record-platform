@@ -469,7 +469,7 @@ ai-platform-verify-phase33f-canary-preflight: ## Phase 33F preflight offline fai
 	PHASE33F_PREFLIGHT_OFFLINE=1 node scripts/ai-platform/verify-phase33f-canary-preflight.mjs
 
 ai-platform-verify-phase33f-canary-smoke: ## Phase 33F launcher smoke (optional; skips when edge down)
-	@if curl -sk --max-time 3 --cacert certs/dev-chain.pem https://record-platform.test/api/health >/dev/null 2>&1; then \
+	@if curl -sS --max-time 3 --cacert certs/dev-chain.pem https://record-platform.test/api/health >/dev/null 2>&1; then \
 	  PHASE33F_ALLOW_DIRTY_LAUNCHER=1 PHASE33F_SKIP_OFFLINE_VERIFY=1 PHASE33F_SKIP_SEMANTIC=1 PHASE33F_SKIP_COVERAGE=1 PHASE33F_SKIP_ATTRIBUTION=1 PHASE33F_SKIP_EXCLUSIVITY=1 PHASE33F_VERDICT_DELAY_MS=100 node scripts/phase33f-launch-capability-canary.mjs --mode smoke --out /tmp/phase33f-canary-launcher-smoke-v1; \
 	else \
 	  echo "ai-platform-verify-phase33f-canary-smoke: skipping — edge record-platform.test unreachable"; \

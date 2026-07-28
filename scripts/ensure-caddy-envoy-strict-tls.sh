@@ -30,8 +30,8 @@ kubectl create namespace "$NS_INGRESS" --dry-run=client -o yaml | kubectl apply 
 kubectl create namespace "$NS_ENVOY" --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 ok "Namespaces $NS_INGRESS, $NS_ENVOY ensured"
 
-# 2. TLS secrets (off-campus-housing-local-tls, dev-root-ca in ingress-nginx; dev-root-ca, envoy-client-tls in envoy-test)
-TLS_SECRET="${TLS_SECRET:-off-campus-housing-local-tls}"
+# 2. TLS secrets (record-platform-local-tls, dev-root-ca in ingress-nginx; dev-root-ca, envoy-client-tls in envoy-test)
+TLS_SECRET="${TLS_SECRET:-record-platform-local-tls}"
 if [[ -f "$REPO_ROOT/certs/dev-root.pem" ]] && [[ -f "$REPO_ROOT/certs/record-platform.test.crt" ]] && [[ -f "$REPO_ROOT/certs/record-platform.test.key" ]]; then
   if ! kubectl -n "$NS_INGRESS" get secret "$TLS_SECRET" &>/dev/null || ! kubectl -n "$NS_INGRESS" get secret dev-root-ca &>/dev/null; then
     info "Creating TLS secrets (strict-tls-bootstrap)..."

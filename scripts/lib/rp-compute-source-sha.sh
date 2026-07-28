@@ -8,18 +8,39 @@ svc="${1:?service name (e.g. auth-service, webapp)}"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo_root"
 
-EXCLUDE_DIR_RE='(node_modules|dist|\.next|\.turbo|bench_logs|backups|\.git|coverage|\.cache)(/|$)'
-EXCLUDE_FILE_RE='\.(map|log|pem|crt|key|jks|p12)$'
+EXCLUDE_DIR_RE='(node_modules|dist|\.next|\.turbo|bench_logs|backups|\.git|coverage|\.cache|\.venv|venv|__pycache__|\.pytest_cache|\.mypy_cache|\.ruff_cache|\.tox|htmlcov)(/|$)'
+EXCLUDE_FILE_RE='\.(map|log|pem|crt|key|jks|p12|pyc)$'
 
 hash_paths() {
-  find "$@" -type f 2>/dev/null \
-    | grep -Ev "$EXCLUDE_DIR_RE" \
+  # Exclude host-local venvs/caches from image source SHAs (python-ai-service/.venv was
+  # previously hashed and made E.build_images fail mid pre-check under set -o pipefail).
+  # Use find -prune instead of grep|pipefail so an empty filter never aborts the script.
+  local tmp
+  tmp="$(mktemp)"
+  # shellcheck disable=SC2068
+  find "$@" \( \
+      -name node_modules -o -name dist -o -name .next -o -name .turbo -o \
+      -name bench_logs -o -name backups -o -name .git -o -name coverage -o \
+      -name .cache -o -name .venv -o -name venv -o -name __pycache__ -o \
+      -name .pytest_cache -o -name .mypy_cache -o -name .ruff_cache -o \
+      -name .tox -o -name htmlcov \
+    \) -prune -o -type f -print 2>/dev/null \
     | grep -Ev "$EXCLUDE_FILE_RE" \
-    | LC_ALL=C sort \
-    | xargs shasum -a 256 2>/dev/null \
-    | shasum -a 256 \
-    | awk '{print $1}'
+    | LC_ALL=C sort >"$tmp" || true
+  if [[ ! -s "$tmp" ]]; then
+    rm -f "$tmp"
+    echo "error: no hashable files for: $*" >&2
+    return 1
+  fi
+  # xargs -n batches automatically; ignore per-file shasum noise, require aggregate output.
+  local sha
+  sha="$(xargs -n 200 shasum -a 256 <"$tmp" 2>/dev/null | shasum -a 256 | awk '{print $1}')"
+  rm -f "$tmp"
+  [[ -n "$sha" ]] || return 1
+  printf '%s\n' "$sha"
 }
+
+
 
 inputs=()
 extras=()
@@ -41,6 +62,9 @@ case "$svc" in
       services/python-ai-service/requirements.txt
     )
     [[ -f services/python-ai-service/pyproject.toml ]] && extras+=(services/python-ai-service/pyproject.toml)
+    # Dockerfile copies Phase 33/34 runners into the image — include in freshness hash.
+    [[ -d scripts/ai-platform ]] && inputs+=(scripts/ai-platform)
+    [[ -d scripts/lib ]] && inputs+=(scripts/lib)
     include_proto=1
     ;;
   transport-watchdog)

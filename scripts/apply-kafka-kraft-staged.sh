@@ -33,8 +33,11 @@ kubectl apply -f "$REPO_ROOT/infra/k8s/kafka-kraft-metallb/headless-service.yaml
 
 if [[ "${KAFKA_PIN_METALLB_EXTERNAL_AFTER_SVC_APPLY:-1}" == "1" ]] && [[ "${KAFKA_SKIP_METALLB_EXTERNAL_PIN:-0}" != "1" ]]; then
   chmod +x "$SCRIPT_DIR/patch-kafka-external-metallb-pinned-ips.sh" 2>/dev/null || true
-  METALLB_POOL="${METALLB_POOL:-192.168.64.240-192.168.64.250}" HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$R" \
-    bash "$SCRIPT_DIR/patch-kafka-external-metallb-pinned-ips.sh" || echo "⚠️  MetalLB pin skipped or failed (see patch-kafka-external-metallb-pinned-ips.sh)" >&2
+  # Hard-fail on collision (e.g. offset-1 kafka-2=.243 vs ollama-lb) — soft-warn left kafka EXTERNAL-IP pending.
+  METALLB_POOL="${METALLB_POOL:-192.168.64.240-192.168.64.250}" \
+    KAFKA_METALLB_FIRST_OFFSET="${KAFKA_METALLB_FIRST_OFFSET:-0}" \
+    HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$R" \
+    bash "$SCRIPT_DIR/patch-kafka-external-metallb-pinned-ips.sh"
 fi
 
 if [[ "$ATOMIC" == "1" ]] && [[ "$_had_sts" -eq 1 ]]; then

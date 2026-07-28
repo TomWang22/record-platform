@@ -210,6 +210,11 @@ if rp_cb_color_enabled; then
 else
   printf '\n[P3] EXTERNAL INFRA — compose up (restore is E.restore only)\n'
 fi
+# shellcheck source=scripts/lib/ensure-colima-docker-context.sh
+source "$SCRIPT_DIR/lib/ensure-colima-docker-context.sh"
+OCH_FORCE_COLIMA_DOCKER=1 och_ensure_colima_docker_context || \
+  rp_cb_phase_fail C.infra "Docker Desktop vs Colima conflict (or Colima docker socket down)" \
+    "quit Docker Desktop; DOCKER_HOST=unix://\$HOME/.colima/default/docker.sock docker context use colima"
 export RP_CB_RUN_LABEL="stop legacy external containers"
 rp_cb_run bash "$SCRIPT_DIR/rp-stop-external-runtime-containers.sh"
 export RP_CB_RUN_LABEL="verify compose contract"
@@ -424,6 +429,13 @@ else
       rp_cb_phase_fail F.cluster_deploy "image freshness re-check failed" "make rp-build-and-audit-images"
   fi
 
+  # BOOTSTRAP_SKIP_INFRA=1 assumes C.infra left Redis/Postgres up; they are often SIGTERM'd
+  # before F (compose stop / docker recycle). Re-assert via allowlisted helper (no 127.0.0.1 here).
+  export RP_CB_RUN_LABEL="ensure compose redis+postgres still published (pre F)"
+  rp_cb_ensure_compose_external_infra || \
+    rp_cb_phase_fail F.cluster_deploy "compose external infra not published" \
+      "source scripts/lib/rp-cold-bootstrap-lib.sh && rp_cb_ensure_compose_external_infra"
+
   export BOOTSTRAP_CONFIRM=yes
   export BOOTSTRAP_SKIP_RESET=1
   export BOOTSTRAP_SKIP_P0=1
@@ -437,6 +449,8 @@ else
   export BOOTSTRAP_SKIP_INFRA=1
   export RP_COLD_BOOTSTRAP_RESET_DONE=1
   export METALLB_POOL="${METALLB_POOL:-192.168.64.240-192.168.64.250}"
+  # Kafka owns pool start (.240-.242); ollama/caddy take later free IPs. Offset 1 collides with ollama-lb.
+  export KAFKA_METALLB_FIRST_OFFSET="${KAFKA_METALLB_FIRST_OFFSET:-0}"
   export KAFKA_PIN_METALLB_EXTERNAL_AFTER_SVC_APPLY="${KAFKA_PIN_METALLB_EXTERNAL_AFTER_SVC_APPLY:-0}"
   export KAFKA_SKIP_METALLB_EXTERNAL_PIN="${KAFKA_SKIP_METALLB_EXTERNAL_PIN:-1}"
   export KAFKA_LB_WAIT_MAX_ATTEMPTS="${KAFKA_LB_WAIT_MAX_ATTEMPTS:-120}"

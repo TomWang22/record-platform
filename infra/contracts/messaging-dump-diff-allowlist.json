@@ -1,0 +1,4 @@
+{
+  "description": "Allowed schema diff line patterns when OCH 5444-messaging and RP 5434-messaging dumps are not byte-identical. Empty list = no drift permitted.",
+  "diff_line_patterns": []
+}

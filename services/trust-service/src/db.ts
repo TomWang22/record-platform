@@ -2,8 +2,8 @@ import pg from "pg";
 
 const { Pool } = pg;
 
-/** Trust DB is port 5446 in docker-compose / docs. Do not use generic DB_PORT (other services differ). */
-const trustPort = process.env.TRUST_DB_PORT || "5446";
+/** Trust DB is port 5442 in docker-compose / RP backup map. Do not use generic DB_PORT (other services differ). */
+const trustPort = process.env.TRUST_DB_PORT || "5442";
 
 const conn =
   process.env.POSTGRES_URL_TRUST ||

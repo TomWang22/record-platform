@@ -43,7 +43,6 @@ data:
   POSTGRES_URL:         postgresql://postgres:postgres@host.docker.internal:5433/records?connect_timeout=5
   POSTGRES_URL_AUTH:    postgresql://postgres:postgres@host.docker.internal:5437/auth?connect_timeout=5
   POSTGRES_URL_RECORDS: postgresql://postgres:postgres@host.docker.internal:5433/records?connect_timeout=10
-  POSTGRES_URL_SOCIAL:  postgresql://postgres:postgres@host.docker.internal:5434/social?connect_timeout=5
   # Database port mappings (external:internal):
   # Python AI DB: 5440:5432
   # Analytics DB: 5439:5432

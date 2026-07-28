@@ -46,6 +46,21 @@ export function registerShutdownResource(resource: ShutdownResource): void {
   state.resources.push(resource);
 }
 
+/** Thin helper so service server.ts stays listen-only (api-gateway route audit ≤15 lines). */
+export function registerHttpServerForShutdown(
+  server: { close: (callback?: (err?: Error | undefined) => void) => void },
+  opts?: { name?: string; order?: number },
+): void {
+  registerShutdownResource({
+    name: opts?.name ?? "http-server",
+    order: opts?.order ?? 50,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      }),
+  });
+}
+
 export function setShutdownServiceName(name: string): void {
   if (name) state.service = name;
 }

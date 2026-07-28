@@ -24,7 +24,7 @@ export default defineConfig({
     env: {
       POSTGRES_URL_TRUST:
         process.env.POSTGRES_URL_TRUST ??
-        "postgresql://postgres:postgres@127.0.0.1:5446/trust",
+        "postgresql://postgres:postgres@127.0.0.1:5442/trust",
     },
   },
 });

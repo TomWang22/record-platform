@@ -185,25 +185,32 @@ if kubectl get secret service-tls -n "$NS" --request-timeout=15s >/dev/null 2>&1
   fi
   ok "service-tls and kafka broker trust anchor match"
 
-  say "5c) Mounted truststore alias dev-root-ca vs service-tls ca.crt (runtime JKS parity)"
+  say "5c) Mounted truststore CA vs service-tls ca.crt (runtime JKS parity)"
+  # service-tls.ca.crt is the intermediate in this PKI; truststore also has dev-root-ca.
+  # Match whichever alias equals service-tls (prefer intermediate, then root).
   _ts_pass_pod="$(kubectl get secret kafka-ssl-secret -n "$NS" -o jsonpath='{.data.kafka\.truststore-password}' --request-timeout=20s | base64 -d | tr -d '\r\n')"
   for p in "${pods[@]}"; do
-    _alias_fp="$(
-      kubectl exec -n "$NS" "$p" -c kafka --request-timeout=60s -- \
-        env TS_PASS="$_ts_pass_pod" bash -c 'keytool -exportcert -alias dev-root-ca -keystore /etc/kafka/secrets/kafka.truststore.jks -storepass "$TS_PASS" -rfc 2>/dev/null' \
-        | openssl x509 -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2
-    )"
-    if [[ -z "$_alias_fp" ]]; then
-      bad "Could not export dev-root-ca from truststore in $p"
+    _matched=""
+    for _alias in dev-intermediate-ca dev-root-ca; do
+      _alias_fp="$(
+        kubectl exec -n "$NS" "$p" -c kafka --request-timeout=60s -- \
+          env TS_PASS="$_ts_pass_pod" ALIAS="$_alias" bash -c 'keytool -exportcert -alias "$ALIAS" -keystore /etc/kafka/secrets/kafka.truststore.jks -storepass "$TS_PASS" -rfc 2>/dev/null' \
+          | openssl x509 -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2
+      )"
+      [[ -z "$_alias_fp" ]] && continue
+      echo "   $p truststore $_alias SHA-256=$_alias_fp"
+      if [[ "$_alias_fp" == "$_st_fp" ]]; then
+        _matched="$_alias"
+        break
+      fi
+    done
+    if [[ -z "$_matched" ]]; then
+      bad "$p truststore has no alias matching service-tls ca.crt (JKS vs edge drift — make kafka-tls-rotate-atomic)"
       exit 1
     fi
-    echo "   $p truststore dev-root-ca SHA-256=$_alias_fp"
-    if [[ "$_alias_fp" != "$_st_fp" ]]; then
-      bad "$p truststore CA != service-tls ca.crt (JKS vs edge drift — make kafka-tls-rotate-atomic)"
-      exit 1
-    fi
+    echo "   $p matched service-tls via alias $_matched"
   done
-  ok "Broker truststore dev-root-ca matches service-tls on all replicas"
+  ok "Broker truststore CA matches service-tls on all replicas"
 else
   echo "   ℹ️  service-tls absent — skipped (Kafka-only check)"
 fi
@@ -238,9 +245,22 @@ fi # end !POST_ROLLOUT_ONLY
 
 if [[ "${KAFKA_TLS_GUARD_SKIP_LOG_SCAN:-0}" != "1" ]]; then
   say "7) Recent broker logs — SSL handshake / PKIX"
+  # POST_ROLLOUT_ONLY: fail only on PKIX (inter-broker / trust-anchor drift). Generic
+  # "SSL handshake failed" is also raised when app clients omit KAFKA_CLIENT_* under
+  # ssl.client.auth=required — that is a client-contract issue, not broker TLS parity.
+  if [[ "${KAFKA_TLS_GUARD_POST_ROLLOUT_ONLY:-0}" == "1" ]]; then
+    _log_pat='PKIX path validation failed'
+  else
+    _log_pat='SSL handshake failed|PKIX path validation failed'
+  fi
   for p in "${pods[@]}"; do
-    if kubectl logs "$p" -n "$NS" -c kafka --request-timeout=45s --tail=250 2>/dev/null | grep -qiE 'SSL handshake failed|PKIX path validation failed'; then
+    if kubectl logs "$p" -n "$NS" -c kafka --request-timeout=45s --tail=250 2>/dev/null | grep -qiE "$_log_pat"; then
       bad "SSL/PKIX errors in recent logs for $p"
+      if [[ "${KAFKA_TLS_GUARD_POST_ROLLOUT_ONLY:-0}" == "1" ]]; then
+        echo "   hint: PKIX = truststore/CA drift — make kafka-tls-rotate-atomic / recreate all brokers" >&2
+      else
+        echo "   hint: if only 'SSL handshake failed' from app pods, set KAFKA_CLIENT_CERT/KEY (scripts/rp-patch-kafka-mtls-client-env.sh)" >&2
+      fi
       exit 1
     fi
   done

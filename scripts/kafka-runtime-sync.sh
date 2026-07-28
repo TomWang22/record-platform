@@ -122,6 +122,14 @@ kubectl rollout restart statefulset/kafka -n "$NS" --request-timeout=30s
 _rollout_to="${KAFKA_REMEDIATE_ROLLOUT_TIMEOUT:-${KAFKA_ROLLOUT_TIMEOUT:-600s}}"
 kubectl rollout status statefulset/kafka -n "$NS" --timeout="$_rollout_to"
 
+# When app Deployments already exist (bootstrap resume / alignment suite), ensure they
+# present client certs before post-rollout log scans — INTERNAL listener requires mTLS.
+if [[ "${KAFKA_SKIP_CLIENT_MTLS_PATCH:-0}" != "1" ]] && kubectl get deploy auction-monitor -n "$NS" --request-timeout=10s >/dev/null 2>&1; then
+  chmod +x "$SCRIPT_DIR/rp-patch-kafka-mtls-client-env.sh" 2>/dev/null || true
+  HOUSING_NS="$NS" bash "$SCRIPT_DIR/rp-patch-kafka-mtls-client-env.sh" || \
+    echo "⚠️  remediate: kafka client mTLS env patch failed (continuing)" >&2
+fi
+
 chmod +x "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" 2>/dev/null || true
 HOUSING_NS="$NS" KAFKA_BROKER_REPLICAS="$REP" bash "$SCRIPT_DIR/kafka-after-rollout-verify-brokers.sh" || {
   echo "❌ Post-rollout broker TLS parity / Ready check failed (see kafka-tls-guard / PKIX logs above)" >&2

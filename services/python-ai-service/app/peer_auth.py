@@ -14,12 +14,21 @@ from typing import Any, Callable, Optional, Sequence
 
 SERVICE_NAME = "python-ai-service"
 
-_GRAPH_CANDIDATES = (
-    os.getenv("RP_SERVICE_CALL_GRAPH_PATH", ""),
-    "/app/contracts/rp-service-call-graph.json",
-    "/contracts/rp-service-call-graph.json",
-    str(Path(__file__).resolve().parents[3] / "infra/contracts/rp-service-call-graph.json"),
-)
+def _graph_candidate_paths() -> list[str]:
+    candidates = [
+        os.getenv("RP_SERVICE_CALL_GRAPH_PATH", ""),
+        "/app/contracts/rp-service-call-graph.json",
+        "/contracts/rp-service-call-graph.json",
+    ]
+    try:
+        # Repo checkout layout only (not present under /app/app in the container image).
+        candidates.append(
+            str(Path(__file__).resolve().parents[3] / "infra/contracts/rp-service-call-graph.json")
+        )
+    except IndexError:
+        pass
+    return candidates
+
 
 _graph_cache: Optional[dict[str, Any]] = None
 
@@ -28,7 +37,7 @@ def load_service_call_graph() -> dict[str, Any]:
     global _graph_cache
     if _graph_cache is not None:
         return _graph_cache
-    for candidate in _GRAPH_CANDIDATES:
+    for candidate in _graph_candidate_paths():
         if candidate and Path(candidate).is_file():
             with open(candidate, "r", encoding="utf-8") as fh:
                 _graph_cache = json.load(fh)

@@ -37,3 +37,14 @@ export function setRpBuildInfoMetric(service: string): void {
     )
     .set(1);
 }
+
+/**
+ * Bounded peer-authorization decisions (no caller identity / fingerprint / request-id labels).
+ * reason is a low-cardinality enum from grpc-peer-auth.
+ */
+export const rpGrpcPeerAuthorizationTotal = new client.Counter({
+  name: "rp_grpc_peer_authorization_total",
+  help: "gRPC peer authorization decisions (mTLS service-call graph)",
+  labelNames: ["target_service", "rpc_service", "rpc_method", "decision", "reason"],
+});
+register.registerMetric(rpGrpcPeerAuthorizationTotal);

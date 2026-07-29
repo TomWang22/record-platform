@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Reject Cursor / agent attribution trailers. Owner-only commits only.
+set -euo pipefail
+
+MSG_FILE="${1:-}"
+if [[ -z "$MSG_FILE" || ! -f "$MSG_FILE" ]]; then
+  echo "commit-msg: missing commit message file" >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "commit-msg: python3 required" >&2
+  exit 1
+fi
+
+python3 - "$MSG_FILE" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8", errors="replace")
+
+forbidden_patterns = [
+    re.compile(r"(?i)\bcursoragent\b"),
+    re.compile(r"(?i)cursoragent@cursor\.com"),
+    re.compile(r"(?i)cursor\+noreply"),
+    re.compile(r"(?i)^co-authored-by:.*\bcursor\b", re.M),
+    re.compile(r"(?i)^generated-by:.*\bcursor\b", re.M),
+    re.compile(r"(?i)^assisted-by:.*\bcursor\b", re.M),
+    re.compile(r"(?i)^signed-off-by:.*\bcursor\b", re.M),
+    re.compile(r"(?i)^on-behalf-of:.*\bcursor\b", re.M),
+    re.compile(r"(?i)^co-authored-by:\s*cursor\s*<", re.M),
+]
+
+hits = []
+for pat in forbidden_patterns:
+    for m in pat.finditer(text):
+        hits.append(m.group(0).strip())
+
+if hits:
+    print("commit-msg: forbidden Cursor attribution detected:", file=sys.stderr)
+    for h in hits:
+        print(f"  - {h}", file=sys.stderr)
+    print(
+        "Owner-only attribution required "
+        "(MelonGodTier <tomwang22@yahoo.com>).",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+PY

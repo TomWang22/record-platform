@@ -1,0 +1,22 @@
+{
+  "old_sha": "936e25002b98821fe1e71c8ff8c83ec4f6598f1e",
+  "old_tree": "dc7752df374722c2fbaf87521402d18e4b3af25d",
+  "old_parent": "1123909b90669817ed3154082c4fd3011f66d461",
+  "new_parent": "1123909b90669817ed3154082c4fd3011f66d461",
+  "parent_equal": true,
+  "old_commit_message_sha256": "bdcde592a00b9e7316288bff34e76b125d8fefa8408ff89d396c48e05f7c4756",
+  "rewrite_reason": "REMOVE_UNWANTED_CURSOR_COAUTHOR_TRAILER",
+  "attribution_injection_root_cause": "Cursor agent git-commit wrapper appended Co-authored-by after the owner message; repository hooks did not inject it. Mitigated with reject-only commit-msg guard and commit-tree rewrite.",
+  "old_canary_root": "/tmp/record-platform-gate3-repair-canary-v1",
+  "old_canary_status": "FROZEN_PASS_EVIDENCE",
+  "old_canary_classification": "FUNCTIONALLY_VALID_HISTORICAL_CANARY \u2014 SUPERSEDED_FOR_EXACT_SHA_ACCEPTANCE_BY_ATTRIBUTION_REWRITE",
+  "acceptance_evidence_must_be_regenerated": true,
+  "hook_paths_added": [
+    "scripts/git-hooks/commit-msg",
+    "scripts/git-hooks/install-hooks.sh",
+    "tests/git-commit-attribution-guard.test.mjs"
+  ],
+  "tree_equal": false,
+  "new_sha": "RESOLVE_VIA_GIT_REV_PARSE_HEAD",
+  "new_tree": "RESOLVE_VIA_GIT_REV_PARSE_HEAD_TREE"
+}

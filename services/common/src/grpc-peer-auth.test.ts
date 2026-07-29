@@ -24,7 +24,7 @@ const graph: ServiceCallGraph = {
   healthAndReflectionBypass: true,
   servers: {
     "auth-service": {
-      allowedCallers: ["api-gateway", "envoy-client", "analytics-service"],
+      allowedCallers: ["api-gateway", "envoy", "analytics-service"],
       deniedMethods: ["/auth.AuthService/RpGate3ForbiddenProbe"],
       methodAllowedCallers: {
         "/auth.AuthService/RefreshToken": ["api-gateway"],

@@ -21,7 +21,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
         "analytics-service",
         "auction-monitor",
         "python-ai-service",
-        "envoy-client"
+        "envoy"
       ],
       "deniedMethods": [
         "/auth.AuthService/RpGate3ForbiddenProbe"
@@ -29,7 +29,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
       "methodAllowedCallers": {
         "/auth.AuthService/RefreshToken": [
           "api-gateway",
-          "envoy-client"
+          "envoy"
         ]
       }
     },
@@ -41,7 +41,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
         "analytics-service",
         "media-service",
         "python-ai-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "listings-service": {
@@ -53,7 +53,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
         "messaging-service",
         "media-service",
         "python-ai-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "shopping-service": {
@@ -63,7 +63,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
         "auction-monitor",
         "notification-service",
         "analytics-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "auction-monitor": {
@@ -72,7 +72,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
         "listings-service",
         "shopping-service",
         "analytics-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "messaging-service": {
@@ -81,7 +81,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
         "notification-service",
         "listings-service",
         "trust-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "notification-service": {
@@ -91,7 +91,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
         "shopping-service",
         "trust-service",
         "auction-monitor",
-        "envoy-client"
+        "envoy"
       ]
     },
     "media-service": {
@@ -100,7 +100,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
         "listings-service",
         "records-service",
         "python-ai-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "trust-service": {
@@ -110,7 +110,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
         "notification-service",
         "listings-service",
         "shopping-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "analytics-service": {
@@ -120,7 +120,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
         "shopping-service",
         "auction-monitor",
         "python-ai-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "python-ai-service": {
@@ -129,7 +129,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
         "analytics-service",
         "listings-service",
         "media-service",
-        "envoy-client"
+        "envoy"
       ]
     }
   },
@@ -138,7 +138,7 @@ export const EMBEDDED_SERVICE_CALL_GRAPH = {
     "wrong-service same-CA leaf must be DENIED when caller SAN is not in allowedCallers",
     "Health Check / reflection may bypass when healthAndReflectionBypass=true",
     "deniedMethods on auth-service: /auth.AuthService/RpGate3ForbiddenProbe is a Gate-3 probe path (PERMISSION_DENIED before handler); not a product RPC",
-    "methodAllowedCallers on auth-service GetUser: only api-gateway and envoy-client (Gate 3 unauthorized-RPC probe)",
-    "methodAllowedCallers: RefreshToken restricted to api-gateway/envoy-client for Gate-3 unauthorized-RPC proof"
+    "methodAllowedCallers on auth-service GetUser: only api-gateway and envoy (Gate 3 unauthorized-RPC probe)",
+    "methodAllowedCallers: RefreshToken restricted to api-gateway/envoy for Gate-3 unauthorized-RPC proof"
   ]
 } as const;

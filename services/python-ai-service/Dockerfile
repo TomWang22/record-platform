@@ -56,6 +56,8 @@ RUN python -m grpc_tools.protoc \
 
 # Copy the app from monorepo path (build from repo root)
 COPY services/python-ai-service/app /app/app
+# Peer-auth call graph (CA trust alone is insufficient)
+COPY infra/contracts/rp-service-call-graph.json /app/contracts/rp-service-call-graph.json
 
 # ---------- node deps (pg for Phase 34 evidence persistence) ----------
 FROM node:22-bookworm-slim AS node-deps

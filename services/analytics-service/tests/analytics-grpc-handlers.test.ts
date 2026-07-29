@@ -196,6 +196,28 @@ describe("analyticsGrpcHandlers", () => {
     });
     expect(err?.code).toBe(grpc.status.INTERNAL);
   });
+
+  it("GetTrendingSearches — empty success (proto-aligned)", async () => {
+    const { err, res } = await runRpc(analyticsGrpcHandlers.GetTrendingSearches, {
+      days: 7,
+      limit: 5,
+    });
+    expect(err).toBeNull();
+    expect(res).toMatchObject({ days: 7, trending: [], count: 0 });
+  });
+
+  it("LogSearch — INVALID_ARGUMENT without query", async () => {
+    const { err } = await runRpc(analyticsGrpcHandlers.LogSearch, {
+      query: "",
+    } as { query: string });
+    expect(err?.code).toBe(grpc.status.INVALID_ARGUMENT);
+  });
+
+  it("HealthCheck — healthy", async () => {
+    const { err, res } = await runRpc(analyticsGrpcHandlers.HealthCheck, {});
+    expect(err).toBeNull();
+    expect(res).toMatchObject({ healthy: true });
+  });
 });
 
 describe("analyticsRecommendationAdminGrpcHandlers", () => {

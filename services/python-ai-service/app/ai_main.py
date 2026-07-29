@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 import os, asyncio, time, statistics, json
 import httpx
-from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, REGISTRY, generate_latest, CONTENT_TYPE_LATEST
 import redis.asyncio as redis
 from datetime import datetime
 import logging
@@ -23,7 +23,24 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="python-ai-service", version="0.4.0")
 app.include_router(ai_platform_router)
-REQS = Counter("ai_http_requests_total","AI HTTP",[ "route","code" ])
+
+def _get_or_create_counter(name: str, documentation: str, labelnames: list[str]) -> Counter:
+    """Idempotent Counter registration (duplicate module imports must not crash)."""
+    base = name[:-6] if name.endswith("_total") else name
+    collectors = getattr(REGISTRY, "_names_to_collectors", {})
+    existing = collectors.get(base) or collectors.get(name)
+    if existing is not None:
+        return existing  # type: ignore[return-value]
+    try:
+        return Counter(name, documentation, labelnames)
+    except ValueError:
+        collectors = getattr(REGISTRY, "_names_to_collectors", {})
+        existing = collectors.get(base) or collectors.get(name)
+        if existing is not None:
+            return existing  # type: ignore[return-value]
+        raise
+
+REQS = _get_or_create_counter("ai_http_requests_total", "AI HTTP", ["route", "code"])
 
 # Graceful shutdown drain flag (preStop / SIGTERM)
 _draining = False

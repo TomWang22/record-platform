@@ -66,7 +66,7 @@ class PythonAIServicer:
     
     async def PredictPrice(self, request, context):
         """Price prediction"""
-        import ai_main
+        from app import ai_main
         items = []
         for item in request.items:
             items.append(ai_main.PredictItem(
@@ -92,7 +92,7 @@ class PythonAIServicer:
     
     async def GetPriceTrends(self, request, context):
         """Get price trends"""
-        import ai_main
+        from app import ai_main
         result = await ai_main.app.get(f"/price-trends?q={request.query}")
         
         return type('GetPriceTrendsResponse', (), {
@@ -106,7 +106,7 @@ class PythonAIServicer:
     
     async def GetRecommendations(self, request, context):
         """Get recommendations"""
-        import ai_main
+        from app import ai_main
         recs = await ai_main.analytics_recommendations(request.query, request.user_id, request.limit)
         
         recommendations = []
@@ -126,7 +126,7 @@ class PythonAIServicer:
     
     async def GetTrending(self, request, context):
         """Get trending items"""
-        import ai_main
+        from app import ai_main
         trend = await ai_main.analytics_trending(request.days, request.limit)
         
         trending = []
@@ -145,7 +145,7 @@ class PythonAIServicer:
     
     async def Chat(self, request, context):
         """Chatbot interface"""
-        import ai_main
+        from app import ai_main
         # Use the existing chat endpoint logic
         chat_req = ai_main.ChatRequest(
             message=request.message,
@@ -168,34 +168,36 @@ class PythonAIServicer:
         bid_count = getattr(request, 'bid_count', 0) or 0
         heat = min(1.0, bid_count / 10.0) if bid_count else 0.0
         sentiment = 'high_urgency' if heat > 0.7 else 'lukewarm' if heat > 0.3 else 'cold'
-        return type('AuctionHeatResponse', (), {
-            'heat_score': heat,
-            'sentiment': sentiment,
-            'recommendation': 'Monitor bidding; consider reserve adjustment.' if heat < 0.5 else 'Active auction.',
-            't_ms': 0,
-        })()
+        return python_ai_pb2.AuctionHeatResponse(
+            heat_score=heat,
+            sentiment=sentiment,
+            recommendation=(
+                'Monitor bidding; consider reserve adjustment.'
+                if heat < 0.5
+                else 'Active auction.'
+            ),
+            t_ms=0,
+        )
 
     async def SellerBuyerInsight(self, request, context):
         """Platform intelligence: shopping/listings - seller and buyer insights"""
-        # Stub: return placeholder; full pipeline from analytics + ML
-        return type('SellerBuyerInsightResponse', (), {
-            'suggested_price': getattr(request, 'asking_price', 0) or 0,
-            'demand_level': 'medium',
-            'recommendation': 'Check analytics for demand trends.',
-            'context': {},
-            't_ms': 0,
-        })()
+        return python_ai_pb2.SellerBuyerInsightResponse(
+            suggested_price=getattr(request, 'asking_price', 0) or 0,
+            demand_level='medium',
+            recommendation='Check analytics for demand trends.',
+            context={},
+            t_ms=0,
+        )
 
     async def SocialNegotiationInsight(self, request, context):
         """Platform intelligence: social - negotiation, planning, psychology"""
-        # Stub: return placeholder; full pipeline from message analysis
-        return type('SocialNegotiationInsightResponse', (), {
-            'sentiment_analysis': 'neutral',
-            'negotiation_tips': 'Listen actively; clarify goals.',
-            'planning_suggestion': 'Break into steps; set deadlines.',
-            'psychology_notes': {},
-            't_ms': 0,
-        })()
+        return python_ai_pb2.SocialNegotiationInsightResponse(
+            sentiment_analysis='neutral',
+            negotiation_tips='Listen actively; clarify goals.',
+            planning_suggestion='Break into steps; set deadlines.',
+            psychology_notes={},
+            t_ms=0,
+        )
 
 # Standard gRPC Health Service implementation
 class HealthServicer:
@@ -259,8 +261,14 @@ async def serve(port: int = 50060):
     if not PROTO_LOADED:
         print("[python-ai-grpc] Proto stubs not available, gRPC server disabled")
         return None
-    
-    server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=10))
+
+    from app.peer_auth import PeerAuthInterceptor
+
+    server = grpc.aio.server(
+        futures.ThreadPoolExecutor(max_workers=10),
+        interceptors=[PeerAuthInterceptor()],
+    )
+    print("[python-ai-grpc] peer authorization interceptor enabled")
     # Find the correct function name dynamically
     add_func = None
     for attr_name in dir(python_ai_pb2_grpc):

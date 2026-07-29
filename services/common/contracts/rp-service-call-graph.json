@@ -20,7 +20,7 @@
         "analytics-service",
         "auction-monitor",
         "python-ai-service",
-        "envoy-client"
+        "envoy"
       ],
       "deniedMethods": [
         "/auth.AuthService/RpGate3ForbiddenProbe"
@@ -28,7 +28,7 @@
       "methodAllowedCallers": {
         "/auth.AuthService/RefreshToken": [
           "api-gateway",
-          "envoy-client"
+          "envoy"
         ]
       }
     },
@@ -40,7 +40,7 @@
         "analytics-service",
         "media-service",
         "python-ai-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "listings-service": {
@@ -52,7 +52,7 @@
         "messaging-service",
         "media-service",
         "python-ai-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "shopping-service": {
@@ -62,7 +62,7 @@
         "auction-monitor",
         "notification-service",
         "analytics-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "auction-monitor": {
@@ -71,7 +71,7 @@
         "listings-service",
         "shopping-service",
         "analytics-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "messaging-service": {
@@ -80,7 +80,7 @@
         "notification-service",
         "listings-service",
         "trust-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "notification-service": {
@@ -90,7 +90,7 @@
         "shopping-service",
         "trust-service",
         "auction-monitor",
-        "envoy-client"
+        "envoy"
       ]
     },
     "media-service": {
@@ -99,7 +99,7 @@
         "listings-service",
         "records-service",
         "python-ai-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "trust-service": {
@@ -109,7 +109,7 @@
         "notification-service",
         "listings-service",
         "shopping-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "analytics-service": {
@@ -119,7 +119,7 @@
         "shopping-service",
         "auction-monitor",
         "python-ai-service",
-        "envoy-client"
+        "envoy"
       ]
     },
     "python-ai-service": {
@@ -128,7 +128,7 @@
         "analytics-service",
         "listings-service",
         "media-service",
-        "envoy-client"
+        "envoy"
       ]
     }
   },
@@ -137,7 +137,7 @@
     "wrong-service same-CA leaf must be DENIED when caller SAN is not in allowedCallers",
     "Health Check / reflection may bypass when healthAndReflectionBypass=true",
     "deniedMethods on auth-service: /auth.AuthService/RpGate3ForbiddenProbe is a Gate-3 probe path (PERMISSION_DENIED before handler); not a product RPC",
-    "methodAllowedCallers on auth-service GetUser: only api-gateway and envoy-client (Gate 3 unauthorized-RPC probe)",
-    "methodAllowedCallers: RefreshToken restricted to api-gateway/envoy-client for Gate-3 unauthorized-RPC proof"
+    "methodAllowedCallers on auth-service GetUser: only api-gateway and envoy (Gate 3 unauthorized-RPC probe)",
+    "methodAllowedCallers: RefreshToken restricted to api-gateway/envoy for Gate-3 unauthorized-RPC proof"
   ]
 }

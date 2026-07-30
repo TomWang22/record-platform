@@ -1,0 +1,167 @@
+{
+  "generated_at": "2026-07-30T23:50:00Z",
+  "acceptance_sha": "9c985432cd4fda67503367e3303da1482dd0f527",
+  "classification_notes": "api-gateway is one workload with two containers (app + transport-watchdog). transport-watchdog is a separately built sidecar image, not a fourteenth application workload.",
+  "workloads_expected": 13,
+  "workloads_discovered": 13,
+  "workloads": [
+    "api-gateway",
+    "auth-service",
+    "records-service",
+    "listings-service",
+    "shopping-service",
+    "messaging-service",
+    "media-service",
+    "trust-service",
+    "notification-service",
+    "analytics-service",
+    "python-ai-service",
+    "auction-monitor",
+    "webapp"
+  ],
+  "runtime_containers_expected": 14,
+  "runtime_containers_discovered": 14,
+  "runtime_containers_note": "13 single-container workloads + api-gateway app + api-gateway transport-watchdog sidecar = 14 containers across 13 workloads",
+  "images_expected": 14,
+  "images_discovered": 14,
+  "targets_without_dockerfile": 0,
+  "targets": [
+    {
+      "workload": "api-gateway",
+      "container_name": "app",
+      "image_repository": "api-gateway",
+      "dockerfile": "services/api-gateway/Dockerfile",
+      "build_context": "repo root",
+      "target_stage": "runtime (final)",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "api-gateway",
+      "container_name": "transport-watchdog",
+      "image_repository": "transport-watchdog",
+      "dockerfile": "services/transport-watchdog/Dockerfile",
+      "build_context": "repo root",
+      "target_stage": "runtime (final)",
+      "bundles_common_telemetry": false,
+      "deployment_required": true,
+      "acceptance_participating": true,
+      "classification": "separately_built_sidecar_image_not_workload"
+    },
+    {
+      "workload": "auth-service",
+      "container_name": "app",
+      "image_repository": "auth-service",
+      "dockerfile": "services/auth-service/Dockerfile",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "records-service",
+      "container_name": "app",
+      "image_repository": "records-service",
+      "dockerfile": "services/records-service/Dockerfile",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "listings-service",
+      "container_name": "app",
+      "image_repository": "listings-service",
+      "dockerfile": "services/listings-service/Dockerfile",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "shopping-service",
+      "container_name": "app",
+      "image_repository": "shopping-service",
+      "dockerfile": "services/shopping-service/Dockerfile",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "messaging-service",
+      "container_name": "app",
+      "image_repository": "messaging-service",
+      "dockerfile": "services/messaging-service/Dockerfile",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "media-service",
+      "container_name": "app",
+      "image_repository": "media-service",
+      "dockerfile": "services/media-service/Dockerfile",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "trust-service",
+      "container_name": "app",
+      "image_repository": "trust-service",
+      "dockerfile": "services/trust-service/Dockerfile",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "notification-service",
+      "container_name": "app",
+      "image_repository": "notification-service",
+      "dockerfile": "services/notification-service/Dockerfile",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "analytics-service",
+      "container_name": "app",
+      "image_repository": "analytics-service",
+      "dockerfile": "services/analytics-service/Dockerfile",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "python-ai-service",
+      "container_name": "app",
+      "image_repository": "python-ai-service",
+      "dockerfile": "services/python-ai-service/Dockerfile",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "auction-monitor",
+      "container_name": "app",
+      "image_repository": "auction-monitor",
+      "dockerfile": "services/auction-monitor/Dockerfile",
+      "bundles_common_telemetry": true,
+      "deployment_required": true,
+      "acceptance_participating": true
+    },
+    {
+      "workload": "webapp",
+      "container_name": "app",
+      "image_repository": "webapp",
+      "dockerfile": "webapp/Dockerfile",
+      "bundles_common_telemetry": false,
+      "deployment_required": true,
+      "acceptance_participating": true
+    }
+  ],
+  "invariants": {
+    "workloads_expected_discovered": "13/13",
+    "runtime_containers_expected_discovered": "14/14",
+    "images_expected_discovered": "14/14",
+    "targets_without_dockerfile_or_canonical_build_path": 0
+  }
+}

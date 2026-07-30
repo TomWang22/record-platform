@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-07-30T23:50:00Z",
+  "acceptance_sha_at_rca": "9c985432cd4fda67503367e3303da1482dd0f527",
+  "failing_image_id_observed": "sha256:3a4d3d989182e3ed045806144d54c645329e0aba14b7764ff5a34ae615843fee",
+  "crash_symptom": "Error: Cannot find module './otel-bootstrap.js' (Require stack: /app/dist/server.js)",
+  "source_path": "services/api-gateway/src/otel-bootstrap.ts",
+  "compiled_path": "services/api-gateway/dist/otel-bootstrap.js",
+  "final_image_path": "/app/dist/otel-bootstrap.js",
+  "runtime_import_path": "./otel-bootstrap.js (from /app/dist/server.js via import \"./otel-bootstrap.js\")",
+  "typescript_project": "services/api-gateway (tsconfig rootDir=src outDir=dist; build script: tsc -b)",
+  "build_stage": "build (pnpm -w build / pnpm -C services/api-gateway; then pnpm deploy --filter api-gateway --prod /app/deploy)",
+  "copy_stage": "runtime COPY --from=build /app/deploy/ ./",
+  "package_filter": "pnpm --filter api-gateway... and --filter @common/utils...; deploy --filter api-gateway",
+  "dockerignore_result": "root .dockerignore excludes dist/ (host artifacts only). Source src/otel-bootstrap.ts is NOT excluded. Exclusion of dist/ is correct because compilation happens inside the image.",
+  "module_format": "CommonJS (node dist/server.js; .js extension on relative import)",
+  "source_present_on_acceptance_sha": true,
+  "source_introduced_in_commit": "ddc94032d03baaa7b792f01b627f5db1dd9c7965",
+  "exact_root_cause": "services/api-gateway/src/server.ts imported ./otel-bootstrap.js while services/api-gateway/src/otel-bootstrap.ts was untracked/absent from the tree used to build the deployed image. The CrashLoop image was built before (or without) commit ddc94032; tsc therefore never emitted dist/otel-bootstrap.js into the pnpm deploy bundle, but dist/server.js still required it at startup.",
+  "repair": [
+    "otel-bootstrap.ts is now tracked on origin/main (ancestor of 1521c553).",
+    "Stop superseded builders writing api-gateway:dev from older SHAs.",
+    "Rebuild api-gateway from clean detached worktree at final acceptance SHA.",
+    "Verify /app/dist/otel-bootstrap.js exists and node can load it before rollout.",
+    "Roll api-gateway Deployment with matching transport-watchdog image in the same pod template."
+  ],
+  "not_causes": [
+    ".dockerignore excluding compiled dist/ on the host",
+    "pnpm deploy omitting a file that was never compiled",
+    "transport-watchdog sidecar image contents"
+  ]
+}

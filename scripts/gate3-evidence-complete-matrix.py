@@ -848,6 +848,7 @@ def main() -> int:
             trace_required = cat in TRACE_REQUIRED_CATS
             trace_meta = {"required": trace_required, "queryable": None, "traces": []}
             if trace_required:
+                time.sleep(6)
                 trace_meta = {"required": True, **query_jaeger_traces(server, start_s, end_s)}
                 (traces_dir / f"{test_id}.json").write_text(json.dumps(trace_meta, indent=2) + "\n")
                 if passed and not trace_meta.get("queryable"):

@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-07-30T22:48:56.843733+00:00",
+  "files_expected_scanned": "7319/7319",
+  "active_source_hits_before": "see external incident",
+  "active_source_hits_after": 0,
+  "active_configuration_hits_after": 0,
+  "active_telemetry_hits_after": 0,
+  "active_bootstrap_hits_after": 0,
+  "active_test_fixture_hits_after": 0,
+  "active_generated_file_hits_after": 0,
+  "owner_pattern_false_positives": "unix_ts-style tokens classified FALSE_POSITIVE",
+  "verdict": "PASS"
+}

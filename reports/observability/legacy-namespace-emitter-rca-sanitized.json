@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-07-30T22:48:56.843733+00:00",
+  "incident_token": "LEGACY_NAMESPACE_1",
+  "classification": "ACTIVE_LEGACY_NAMESPACE_CONTAMINATION",
+  "gate4_v10_root": "/tmp/record-platform-runtime-heartbeat-gate4-v10",
+  "gate4_v10_state": "FROZEN_BLOCKED_EVIDENCE",
+  "emitter_composition_root": "services/common/src/otel/net-protocol.ts",
+  "functions": [
+    "decorateHttpSpanWithTransport",
+    "decorateIncomingMessageSpanWithTransport"
+  ],
+  "remediation": "replaced with rp.transport.* attributes and x-rp-* headers; no compatibility aliases",
+  "raw_literal_evidence": "external only under /tmp/record-platform-legacy-namespace-purge-v1/incident/"
+}

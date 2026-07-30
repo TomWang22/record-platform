@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-07-30T22:48:56.843733+00:00",
+  "gates": [
+    "A.namespace_integrity_static",
+    "F.namespace_integrity_runtime"
+  ],
+  "order": {
+    "static_before": "E.build_images",
+    "runtime_after": "H.observability.trace_round_trip",
+    "runtime_before": "H.observability"
+  },
+  "static_verdict": "PASS"
+}

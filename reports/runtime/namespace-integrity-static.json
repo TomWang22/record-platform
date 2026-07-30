@@ -1,0 +1,8 @@
+{
+  "gate": "A.namespace_integrity_static",
+  "files_expected_scanned": 7319,
+  "files_scanned": 7319,
+  "active_hits": 0,
+  "sample_hits": [],
+  "verdict": "PASS"
+}

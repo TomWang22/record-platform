@@ -1,0 +1,15 @@
+{
+  "generated_at": "2026-07-30T22:48:56.843733+00:00",
+  "forbidden_headers_removed": [
+    "LEGACY_NAMESPACE_1 edge/transport headers"
+  ],
+  "canonical_headers": [
+    "x-rp-edge-proto",
+    "x-rp-transport"
+  ],
+  "canonical_attributes": [
+    "rp.transport.edge_protocol",
+    "rp.transport.upstream_protocol"
+  ],
+  "dual_write": false
+}

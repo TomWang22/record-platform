@@ -1,4 +1,5 @@
 /* cspell:ignore healthz */
+import "./otel-bootstrap.js";
 import express, { type Request, type Response, type NextFunction } from "express";
 import helmet from "helmet";
 import compression from "compression";

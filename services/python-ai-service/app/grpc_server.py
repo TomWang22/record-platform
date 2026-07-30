@@ -262,11 +262,16 @@ async def serve(port: int = 50060):
         print("[python-ai-grpc] Proto stubs not available, gRPC server disabled")
         return None
 
+    from app.otel_bootstrap import init_tracing
+    from app.otel_grpc_interceptor import build_server_interceptors
     from app.peer_auth import PeerAuthInterceptor
+
+    init_tracing("python-ai-service")
+    interceptors = build_server_interceptors(PeerAuthInterceptor())
 
     server = grpc.aio.server(
         futures.ThreadPoolExecutor(max_workers=10),
-        interceptors=[PeerAuthInterceptor()],
+        interceptors=interceptors,
     )
     print("[python-ai-grpc] peer authorization interceptor enabled")
     # Find the correct function name dynamically

@@ -1,3 +1,4 @@
+import './otel-bootstrap.js'
 import express, { type Request, type Response, type NextFunction } from 'express'
 import os from 'os'
 import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions, installShutdownSignalHandlers } from '@common/utils'

@@ -1,3 +1,5 @@
+import "./otel-bootstrap.js";
+
 // Load environment variables from .env file if it exists
 try {
   require('dotenv').config({ path: require('path').join(__dirname, '../.env') });

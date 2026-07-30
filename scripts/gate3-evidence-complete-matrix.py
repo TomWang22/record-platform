@@ -545,6 +545,8 @@ def main() -> int:
         )
         peer_allow = cls not in ("PERMISSION_DENIED", "TLS_REJECTED", "DeadlineExceeded")
         passed = peer_allow and business_ok
+        # BatchSpanProcessor default export delay ~5s; wait before first Jaeger query.
+        time.sleep(6)
         # Trace required for all positives
         trace_meta = query_jaeger_traces(server, start_s, end_s)
         (traces_dir / f"{test_id}.json").write_text(json.dumps(trace_meta, indent=2) + "\n")
@@ -552,8 +554,8 @@ def main() -> int:
             passed = False
         if passed and not trace_meta.get("queryable"):
             # one retry after short wait for async export
-            time.sleep(2)
-            trace_meta = query_jaeger_traces(server, start_s, end_s + 5)
+            time.sleep(5)
+            trace_meta = query_jaeger_traces(server, start_s, end_s + 10)
             (traces_dir / f"{test_id}.json").write_text(json.dumps(trace_meta, indent=2) + "\n")
             if not trace_meta.get("queryable"):
                 passed = False

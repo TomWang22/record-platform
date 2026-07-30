@@ -85,6 +85,9 @@ describe("gateway route contract", () => {
     const legacy = process.env.RP_ENABLE_LEGACY_SOCIAL_ROUTES;
     if (legacy === "1" || legacy === "true") return;
     const stack = readFileSync(join(process.cwd(), "src/proxy/marketplace-routes.ts"), "utf8");
-    expect(stack).not.toMatch(/\/social(\/|$)/);
+    // /social may exist only as a 308 rewrite to /community; must not proxy to an excluded peer host.
+    expect(stack).toMatch(/replace\(\/\^\\\/social\/,\s*"\/community"\)/);
+    expect(stack).not.toMatch(/createProxyMiddleware\([^)]*\/social/);
+    expect(stack).not.toMatch(/reservation-mesh/);
   });
 });

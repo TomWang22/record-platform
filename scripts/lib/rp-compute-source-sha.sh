@@ -73,10 +73,6 @@ case "$svc" in
     include_common=0
     include_proto=0
     ;;
-  messaging-service)
-    echo "error: $svc is not an active RP image target" >&2
-    exit 2
-    ;;
   *)
     if [[ ! -d "services/$svc" ]]; then
       echo "error: missing services/$svc" >&2

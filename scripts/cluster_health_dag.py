@@ -79,7 +79,7 @@ def _run_make(repo: Path, target: str) -> int:
 
 
 RP_FORBIDDEN_NAMESPACES = frozenset({"record-platform"})
-RP_FORBIDDEN_DEPLOYMENTS = frozenset({"reservation-mesh", "messaging-service"})
+RP_FORBIDDEN_DEPLOYMENTS = frozenset({"reservation-mesh"})
 
 
 def _doctor_min_score(*, strict: bool) -> int:

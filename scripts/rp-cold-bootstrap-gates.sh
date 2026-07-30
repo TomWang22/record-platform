@@ -20,7 +20,7 @@ ok() {
 }
 
 gate_workspace_forbidden() {
-  for svc in reservation-mesh messaging-service; do
+  for svc in reservation-mesh; do
     [[ -d "$REPO_ROOT/services/$svc" ]] && fail "services/$svc must not exist"
   done
   if [[ "$_DRY" == "1" ]]; then
@@ -31,7 +31,7 @@ gate_workspace_forbidden() {
     # Skip live cluster checks when the API is unreachable (common during P0/Z reset).
     if KUBECTL_REQUEST_TIMEOUT=5s kubectl get ns >/dev/null 2>&1; then
       kubectl get ns record-platform &>/dev/null && fail "namespace record-platform exists"
-      for dep in reservation-mesh messaging-service; do
+      for dep in reservation-mesh; do
         kubectl get deploy -n "$NS" "$dep" &>/dev/null 2>&1 && fail "deployment $dep in $NS"
       done
     else
@@ -172,7 +172,7 @@ KP_PASS=$(cat /etc/kafka/secrets/kafka.key-password 2>/dev/null || echo "$KS_PAS
 
 gate_k8s_rollout() {
   kubectl get ns "$NS" &>/dev/null || fail "namespace $NS missing"
-  for bad in reservation-mesh messaging-service record-platform; do
+  for bad in reservation-mesh; do
     kubectl get deploy,svc,pod -n "$NS" 2>/dev/null | grep -qi "$bad" && fail "forbidden resource $bad in $NS"
   done
   for want in api-gateway auth-service records-service listings-service shopping-service messaging-service media-service notification-service trust-service analytics-service python-ai-service auction-monitor webapp; do

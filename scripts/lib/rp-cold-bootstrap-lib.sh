@@ -546,13 +546,13 @@ rp_cb_setup_full_log() {
 
 rp_cb_assert_workspace_no_booking_social() {
   local bad=0
-  for svc in reservation-mesh messaging-service; do
+  for svc in reservation-mesh; do
     if [[ -d "$RP_CB_REPO_ROOT/services/$svc" ]]; then
       echo "❌ services/$svc must not be in workspace build matrix" >&2
       bad=1
     fi
   done
-  if pnpm -r list 2>/dev/null | grep -qE 'messaging-service'; then
+  if pnpm -r list 2>/dev/null | grep -qE 'reservation-mesh'; then
     echo "❌ pnpm workspace lists forbidden legacy service (skipped at restore)" >&2
     bad=1
   fi
@@ -671,11 +671,11 @@ rp_cb_print_allowed_order() {
 rp_cb_plan_forbidden_audit() {
   echo "=== Plan: forbidden runtime audit ==="
   local issues=0
-  if [[ -d "$RP_CB_REPO_ROOT/services/reservation-mesh" ]] || [[ -d "$RP_CB_REPO_ROOT/services/messaging-service" ]]; then
-    echo "  ❌ reservation-mesh or messaging-service directory present in services/"
+  if [[ -d "$RP_CB_REPO_ROOT/services/reservation-mesh" ]]; then
+    echo "  ❌ reservation-mesh directory present in services/"
     issues=$((issues + 1))
   else
-    echo "  ✅ no reservation-mesh / messaging-service in services/"
+    echo "  ✅ no reservation-mesh in services/"
   fi
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -qiE 'record-platform|rp-'; then
     echo "  ❌ legacy external containers still running"

@@ -1,4 +1,4 @@
-# RP app Deployments (k8s overlay + bootstrap gates). No reservation-mesh / messaging-service.
+# RP app Deployments (k8s overlay + bootstrap gates). No reservation-mesh.
 RP_RUNTIME_APP_DEPLOYS=(
   auth-service
   records-service

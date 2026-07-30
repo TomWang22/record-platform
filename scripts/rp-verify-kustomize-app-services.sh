@@ -19,7 +19,7 @@ FAIL=0
 fail() { echo "❌ $*" >&2; FAIL=1; }
 ok() { echo "✅ $*"; }
 
-FORBIDDEN_APP_SERVICES=(reservation-mesh messaging-service)
+FORBIDDEN_APP_SERVICES=(reservation-mesh)
 FORBIDDEN_NS='record-platform'
 
 _manifest="$(mktemp)"

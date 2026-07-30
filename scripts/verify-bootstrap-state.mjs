@@ -720,7 +720,7 @@ function verifyStrictRpContract(ns) {
   if (ns !== "record-platform") {
     errors.push(`namespace must be record-platform (got ${ns})`);
   }
-  const forbidden = ["reservation-mesh", "messaging-service", "record-platform"];
+  const forbidden = ["reservation-mesh"];
   if (shQuiet("kubectl", ["version", "--client"])) {
     try {
       const nsList = kubectl(["get", "ns", "-o", "jsonpath={.items[*].metadata.name}"]);

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://och.local/schemas/transport-study-v7b.schema.json",
+  "$id": "https://rp.local/schemas/transport-study-v7b.schema.json",
   "title": "7b load-phase transport study (v7b)",
   "type": "object",
   "additionalProperties": true,

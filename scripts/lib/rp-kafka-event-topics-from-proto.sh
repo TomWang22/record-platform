@@ -46,8 +46,3 @@ rp_kafka_event_topics_fill() {
 
   RP_KAFKA_EVENT_TOPICS=("${RP_KAFKA_EVENT_TOPICS[@]}")
 }
-
-# Legacy function name
-rp_kafka_event_topics_fill() {
-  rp_kafka_event_topics_fill "$@"
-}

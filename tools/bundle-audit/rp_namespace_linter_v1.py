@@ -134,7 +134,7 @@ def scan(repo: Path) -> list[Violation]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--repo", type=Path, default=Path("."))
+    ap.add_argument("--repo", "--repo-root", type=Path, default=Path("."), dest="repo")
     ap.add_argument("--report", type=Path, default=Path("reports/runtime/namespace-lint-report.json"))
     args = ap.parse_args()
     repo = args.repo.resolve()

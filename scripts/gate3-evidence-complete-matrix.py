@@ -268,36 +268,47 @@ def sha256_file(path: Path) -> str | None:
     return sha256_bytes(path.read_bytes())
 
 
-def pem_fingerprint(pem: str) -> str | None:
+def _as_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def pem_fingerprint(pem) -> str | None:
+    pem = _as_text(pem)
     if not pem or "BEGIN CERTIFICATE" not in pem:
         return None
     proc = subprocess.run(
         ["openssl", "x509", "-fingerprint", "-sha256", "-noout"],
-        input=pem.encode(),
+        input=pem,
         capture_output=True,
+        text=True,
     )
     if proc.returncode != 0:
         return None
-    line = (proc.stdout or b"").decode().strip()
+    line = (proc.stdout or "").strip()
     # SHA256 Fingerprint=AB:CD:...
     if "=" in line:
         return line.split("=", 1)[1].replace(":", "").lower()
     return None
 
 
-def cert_fields(pem: str) -> dict:
+def cert_fields(pem) -> dict:
+    pem = _as_text(pem)
     out = {"fingerprint_sha256": pem_fingerprint(pem), "subject": None, "issuer": None, "eku": None, "sans": []}
     if not pem:
         return out
-    sub = subprocess.run(["openssl", "x509", "-noout", "-subject", "-issuer"], input=pem.encode(), capture_output=True, text=True)
+    sub = subprocess.run(["openssl", "x509", "-noout", "-subject", "-issuer"], input=pem, capture_output=True, text=True)
     for line in (sub.stdout or "").splitlines():
         if line.lower().startswith("subject="):
             out["subject"] = line.split("=", 1)[1].strip()
         if line.lower().startswith("issuer="):
             out["issuer"] = line.split("=", 1)[1].strip()
-    eku = subprocess.run(["openssl", "x509", "-noout", "-ext", "extendedKeyUsage"], input=pem.encode(), capture_output=True, text=True)
+    eku = subprocess.run(["openssl", "x509", "-noout", "-ext", "extendedKeyUsage"], input=pem, capture_output=True, text=True)
     out["eku"] = (eku.stdout or "").strip()
-    san = subprocess.run(["openssl", "x509", "-noout", "-ext", "subjectAltName"], input=pem.encode(), capture_output=True, text=True)
+    san = subprocess.run(["openssl", "x509", "-noout", "-ext", "subjectAltName"], input=pem, capture_output=True, text=True)
     m = re.findall(r"DNS:([^,\s]+)", san.stdout or "")
     out["sans"] = m
     return out
@@ -305,9 +316,9 @@ def cert_fields(pem: str) -> dict:
 
 def k8s_secret_leaf_pem(service: str) -> str:
     # tls.crt may be chain; take first cert
-    b64 = kubectl(
-        "get", "secret", f"service-tls-{service}", "-o", "jsonpath={.data.tls\\.crt}"
-    ).stdout.strip()
+    b64 = _as_text(
+        kubectl("get", "secret", f"service-tls-{service}", "-o", "jsonpath={.data.tls\\.crt}").stdout
+    ).strip()
     if not b64:
         return ""
     import base64
@@ -317,7 +328,7 @@ def k8s_secret_leaf_pem(service: str) -> str:
 
 def mounted_leaf_pem(service: str) -> str:
     proc = kubectl("exec", f"deploy/{service}", "-c", "app", "--", "cat", "/etc/certs/tls.crt", timeout=30)
-    return proc.stdout or ""
+    return _as_text(proc.stdout)
 
 
 def runtime_presented_leaf_pem(service: str, ip: str, port: int, sni: str) -> str:
@@ -328,7 +339,7 @@ def runtime_presented_leaf_pem(service: str, ip: str, port: int, sni: str) -> st
       -key /tmp/caller-certs/api-gateway/tls.key </dev/null 2>/dev/null | \
       awk 'BEGIN{{p=0}} /BEGIN CERTIFICATE/{{p=1}} p{{print}} /END CERTIFICATE/{{exit}}'"""
     proc = kubectl("exec", POD, "--", "sh", "-c", script, timeout=25)
-    return proc.stdout or ""
+    return _as_text(proc.stdout)
 
 
 def collect_server_pki(service: str, ip: str, port: int, sni: str) -> dict:

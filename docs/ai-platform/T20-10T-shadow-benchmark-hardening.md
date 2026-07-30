@@ -34,7 +34,7 @@ rerank_select_ms_p50 / p95
 ```bash
 BENCH_REQUIRE_OLLAMA_WARM=1 BENCH_WARMUP_RUNS=1 bash scripts/rp-ai-shadow-real-query-timing.sh
 bash scripts/rp-ai-shadow-source-diagnostic.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 ## Definition of done

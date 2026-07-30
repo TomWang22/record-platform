@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Remove legacy spec.loadBalancerIP from kafka-*-external (MetalLB allocator assigns IPs; OCH cold-bootstrap pattern).
+# Remove legacy spec.loadBalancerIP from kafka-*-external (MetalLB allocator assigns IPs; RP cold-bootstrap pattern).
 set -euo pipefail
 
 NS="${HOUSING_NS:-record-platform}"

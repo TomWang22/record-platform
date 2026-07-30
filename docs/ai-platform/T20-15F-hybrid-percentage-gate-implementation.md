@@ -63,7 +63,7 @@ Allowlist continues to override percentage. Percent=0 excludes all percentage us
 | `audit-rp-ai-endpoints-contract.sh` | **PASS** |
 | `rp-ai-provider-readiness.sh` | **PASS** |
 | `rp-ai-pgvector-readiness.sh` | **PASS** |
-| `rp-och-decontaminate-scan.sh` | **PASS** |
+| `rp-rp-decontaminate-scan.sh` | **PASS** |
 
 ---
 

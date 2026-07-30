@@ -5,12 +5,12 @@
 # Usage:
 #   ./scripts/verify-preflight-edge-routing.sh [namespace] [edge_hostname]
 # Env:
-#   HOUSING_NS, OCH_EDGE_HOSTNAME (default record-platform.test)
+#   HOUSING_NS, RP_EDGE_HOSTNAME (default record-platform.test)
 #   VERIFY_PREFLIGHT_EDGE_PHASES — comma list: ingress,dns,curl (default: all three)
 #   PREFLIGHT_SKIP_EDGE_INGRESS_PARITY_GATE=1 — skip ingress
 #   PREFLIGHT_SKIP_EDGE_DNS_LB_GATE=1 — skip dns
 #   SKIP_K6_EDGE_CURL_GATE=1 — skip curl phase
-#   OCH_EDGE_IP — if set to an IPv4, use for 6b2 LB alignment instead of resolving HOST (optional override)
+#   RP_EDGE_IP — if set to an IPv4, use for 6b2 LB alignment instead of resolving HOST (optional override)
 #
 # 6b2 resolves HOST with the system resolver (Python socket / getent / ping), not dig — dig often skips /etc/hosts,
 # so it disagrees with curl, k6, and Playwright on macOS dev machines.
@@ -23,7 +23,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/edge-test-url.sh"
 
 NS="${1:-${HOUSING_NS:-record-platform}}"
-HOST="${2:-${RP_PUBLIC_HOST:-${OCH_EDGE_HOSTNAME:-record-platform.test}}}"
+HOST="${2:-${RP_PUBLIC_HOST:-${RP_EDGE_HOSTNAME:-record-platform.test}}}"
 ING_NAME="${EDGE_INGRESS_NAME:-record-platform}"
 ING_NS="${EDGE_INGRESS_NAMESPACE:-record-platform}"
 
@@ -154,14 +154,14 @@ fi
 
 if [[ "$RUN_DNS" -eq 1 ]]; then
   say "Edge 6b2 — Hostname → LoadBalancer alignment ($HOST; system resolver, not dig-first)"
-  if [[ -n "${OCH_EDGE_IP:-}" ]] && [[ "${OCH_EDGE_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    EDGE_IP="${OCH_EDGE_IP}"
-    ok "Using OCH_EDGE_IP=$EDGE_IP for alignment check"
+  if [[ -n "${RP_EDGE_IP:-}" ]] && [[ "${RP_EDGE_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    EDGE_IP="${RP_EDGE_IP}"
+    ok "Using RP_EDGE_IP=$EDGE_IP for alignment check"
   else
     EDGE_IP="$(_resolve_edge_ipv4)"
   fi
   if [[ -z "$EDGE_IP" ]]; then
-    bad "Could not resolve IPv4 for $HOST (tried Python socket, getent, ping, dig). Fix /etc/hosts or DNS (see OCH_EDGE_IP)."
+    bad "Could not resolve IPv4 for $HOST (tried Python socket, getent, ping, dig). Fix /etc/hosts or DNS (see RP_EDGE_IP)."
     exit 1
   fi
   CADDY_IP="$(kubectl get svc caddy-h3 -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"

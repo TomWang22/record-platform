@@ -1,5 +1,5 @@
 /**
- * Match scripts/lib/och-kafka-event-topics-from-proto.sh + ochKafkaTopicIsolationSuffix().
+ * Match scripts/lib/rp-kafka-event-topics-from-proto.sh + rpKafkaTopicIsolationSuffix().
  */
 export declare function topicSuffixFromEnv(raw: string | undefined): string;
 /**

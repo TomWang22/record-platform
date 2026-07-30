@@ -32,7 +32,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: booking-service
+  name: reservation-mesh
   namespace: record-platform
 spec:
   template:

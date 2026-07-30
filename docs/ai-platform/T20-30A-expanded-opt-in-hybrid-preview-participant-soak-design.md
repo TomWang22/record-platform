@@ -18,7 +18,7 @@ Expanded post-T20.29 soak using the same **12 JWT participants** with more windo
 | 2 | UI + API enrollment lifecycle (UI smoke; API bulk per window) |
 | 3 | Per-window revoke → verify keyword → enroll → verify preview → run → revoke |
 | 4 | 429 retry/backoff for 12-user load |
-| 5 | Quality, telemetry, leakage, OCH, Playwright gates |
+| 5 | Quality, telemetry, leakage, RP, Playwright gates |
 | 6 | Rollback / `CANARY=0` drill |
 | 7 | Reject production-default options |
 
@@ -48,7 +48,7 @@ Minimum floor (documented infra fallback only): 2160 cases (4 windows).
 | Hybrid p95 | ≤3000 ms |
 | Canary errors | 0 |
 | Telemetry WARNs | 0 |
-| Leakage / OCH / Playwright | PASS |
+| Leakage / RP / Playwright | PASS |
 | PERCENT | 0 |
 | Post-revoke `keyword_default` | PASS |
 

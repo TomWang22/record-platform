@@ -36,7 +36,7 @@ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
 ok() { echo "✅ $*"; }
 warn() { echo "⚠️  $*"; }
 
-och_terminate_db_sessions() {
+rp_terminate_db_sessions() {
   psql -h "$PGHOST" -p "$1" -U "$PGUSER" -d postgres -v ON_ERROR_STOP=0 -q -t -c \
     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$2' AND pid <> pg_backend_pid();" 2>/dev/null || true
 }
@@ -52,7 +52,7 @@ for port in 5433 5434 5435 5436 5437 5438 5439 5440 5441 5442 5443; do
   sqlgz="$READY/${port}-${slug}.sql.gz"
   if [[ -f "$dump" ]]; then
     echo "Restoring $db @ $port from $(basename "$dump")"
-    och_terminate_db_sessions "$port" "$db"
+    rp_terminate_db_sessions "$port" "$db"
     psql -h "$PGHOST" -p "$port" -U "$PGUSER" -d postgres -c "DROP DATABASE IF EXISTS \"$db\";"
     psql -h "$PGHOST" -p "$port" -U "$PGUSER" -d postgres -c "CREATE DATABASE \"$db\";"
     if [[ "$port" == "5439" ]]; then
@@ -63,7 +63,7 @@ for port in 5433 5434 5435 5436 5437 5438 5439 5440 5441 5442 5443; do
     psql -h "$PGHOST" -p "$port" -U "$PGUSER" -d "$db" -c "ANALYZE;" 2>/dev/null || true
     ok "$db:$port"
   elif [[ -f "$sqlgz" ]]; then
-    och_terminate_db_sessions "$port" "$db"
+    rp_terminate_db_sessions "$port" "$db"
     psql -h "$PGHOST" -p "$port" -U "$PGUSER" -d postgres -c "DROP DATABASE IF EXISTS \"$db\";"
     psql -h "$PGHOST" -p "$port" -U "$PGUSER" -d postgres -c "CREATE DATABASE \"$db\";"
     if [[ "$port" == "5439" ]]; then

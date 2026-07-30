@@ -33,8 +33,8 @@ else
 fi
 echo ""
 
-echo "2. Checking social-service pod status..."
-SOCIAL_POD=$(kubectl -n record-platform get pods -l app=social-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+echo "2. Checking messaging-service pod status..."
+SOCIAL_POD=$(kubectl -n record-platform get pods -l app=messaging-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 if [[ -n "$SOCIAL_POD" ]]; then
   echo "  Pod: $SOCIAL_POD"
   kubectl -n record-platform get pod "$SOCIAL_POD" -o jsonpath='{.status.phase}' 2>/dev/null | xargs echo "  Status:"
@@ -42,7 +42,7 @@ if [[ -n "$SOCIAL_POD" ]]; then
   echo "  Recent logs (errors only):"
   kubectl -n record-platform logs "$SOCIAL_POD" --tail=50 2>&1 | grep -iE "error|failed|refused|50056" | tail -10 || echo "    (no errors found)"
 else
-  echo "  ❌ social-service pod not found"
+  echo "  ❌ messaging-service pod not found"
 fi
 echo ""
 
@@ -51,7 +51,7 @@ kubectl get svc -A -o wide 2>/dev/null | grep -E "10\.43\.44|50056" || echo "  N
 kubectl get endpoints -A -o wide 2>/dev/null | grep -E "10\.43\.44|50056" || echo "  No endpoint found at that IP"
 echo ""
 
-echo "4. Checking social-service gRPC server status..."
+echo "4. Checking messaging-service gRPC server status..."
 if [[ -n "$SOCIAL_POD" ]]; then
   echo "  Checking if gRPC port 50056 is listening..."
   kubectl -n record-platform exec "$SOCIAL_POD" -- sh -c "netstat -tlnp 2>/dev/null | grep 50056 || ss -tlnp 2>/dev/null | grep 50056 || echo '  (netstat/ss not available)'" 2>/dev/null || echo "  (exec failed)"

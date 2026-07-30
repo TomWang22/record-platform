@@ -153,7 +153,7 @@ Corpus-wide (all users) notification docs remain **55,451** with **0** entity-me
 | Check | Result |
 |-------|--------|
 | Dry-run exit code | 0 |
-| OCH decontaminate scan | PASS |
+| RP decontaminate scan | PASS |
 | Node tests | Not required (new script only; no changes to `rp-ai-normalize-documents.test.mjs`) |
 | python-ai | Not touched |
 
@@ -206,5 +206,5 @@ Corpus-wide (all users) notification docs remain **55,451** with **0** entity-me
 | Embeddings touched (metadata-only path) = 0 | Yes |
 | Would-change metadata count understood | Yes — 11,904 metadata updates; 11,849 gain `listing_id` |
 | No-write proof passes | Yes |
-| OCH scan passes | Yes |
+| RP scan passes | Yes |
 | No bench logs staged | Yes |

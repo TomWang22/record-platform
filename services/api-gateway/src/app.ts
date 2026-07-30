@@ -30,6 +30,7 @@ import type { Socket } from "net";
 import { registerMarketplaceHttpProxies } from "./proxy/marketplace-routes.js";
 import { mountGatewayHealth } from "./health.js";
 import { isOpenRoute } from "./middleware/open-routes.js";
+import { tracingMiddleware } from "@common/utils/otel";
 import {
   AUTH_GRPC_TARGET,
   AUTH_HTTP_TARGET,
@@ -62,7 +63,7 @@ const noKeepAliveAgent = new HttpAgent({
   maxSockets: Infinity,  // No limit since we're not reusing connections
 });
 
-/** social-service removed — messaging-service owns community/messaging HTTP. */
+/** messaging-service removed — messaging-service owns community/messaging HTTP. */
 const RP_SKIP_SOCIAL = true;
 
 const authGrpcClient = createAuthClient(AUTH_GRPC_TARGET);
@@ -237,6 +238,9 @@ export function createApp(): express.Express {
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
+
+// Extract W3C traceparent and emit gateway HTTP spans (MetalLB exact-trace-ID acceptance).
+app.use(tracingMiddleware);
 
 // DEV: trust x-user-id and short-circuit auth if DEBUG_FAKE_AUTH is on
 const UUID_RX =
@@ -1631,7 +1635,7 @@ app.use(
 );
 
 /* ----------------------- Service Health Endpoints (Public, Before Auth Guard) ----------------------- */
-// social-service removed — use /messaging via marketplace-http-proxies
+// messaging-service removed — use /messaging via marketplace-http-proxies
 
 
 /* ----------------------- Shopping Service HTTP Route Aliases (for /api/cart, /api/orders, etc.) ----------------------- */

@@ -1,8 +1,8 @@
 /**
- * k6 Social Service Limit Test - Progressive Load Test
+ * k6 Messaging Service Limit Test - Progressive Load Test
  * 
- * Finds the upper limit of social-service by progressively increasing load:
- * - Tests all social-service features: Reddit-style posts, P2P messaging, group chat
+ * Finds the upper limit of messaging-service by progressively increasing load:
+ * - Tests all messaging-service features: Reddit-style posts, P2P messaging, group chat
  * - Progressive VU increase until degradation
  * - Monitors error rates, latency, throughput
  * - Identifies breaking points for each feature
@@ -107,7 +107,7 @@ function getReqOptions(token = null) {
     headers: headers,
     params: {
       timeout: '30s',
-      tags: { name: 'social-service' },
+      tags: { name: 'messaging-service' },
     },
   };
 }
@@ -331,7 +331,7 @@ export default function () {
   let groupIds = [];
   let otherUserIds = [];
 
-  group('Social Service Limit Test', () => {
+  group('Messaging Service Limit Test', () => {
     // 1. Create forum post (Reddit-style)
     group('Forum Posts', () => {
       const title = `Limit Test Post ${vuId}-${Date.now()}`;

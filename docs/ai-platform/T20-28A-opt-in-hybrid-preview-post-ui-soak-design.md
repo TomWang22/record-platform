@@ -63,7 +63,7 @@ Per-window setup: revoke all → verify keyword → enroll 5 cohort (API bulk; U
 | Hybrid p95 | ≤3000 ms |
 | Canary errors | 0 |
 | Telemetry WARNs | 0 |
-| Leakage / OCH | PASS |
+| Leakage / RP | PASS |
 | Playwright | PASS |
 | PERCENT | 0 |
 | `gate_reason` | allowlist 180, preview_opt_in 900 |

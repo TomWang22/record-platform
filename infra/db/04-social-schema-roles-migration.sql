@@ -1,4 +1,4 @@
--- Social Service: Add 'owner' role + WhatsApp-style read receipts & timestamps
+-- Messaging Service: Add 'owner' role + WhatsApp-style read receipts & timestamps
 -- Owner = creator of group; admin = promoted; moderator = can moderate; member = standard
 -- Run on social DB (port 5434)
 -- Schema already has: messages.is_read, message_reads.read_at, read_by_sender (iOS/WhatsApp style)

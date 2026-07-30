@@ -165,7 +165,7 @@ Then ensure base is applied and backends restarted if you changed their secrets:
 
 ```bash
 kubectl apply -k infra/k8s/base
-kubectl -n record-platform rollout restart deployment/auth-service deployment/records-service deployment/social-service deployment/listings-service deployment/analytics-service deployment/shopping-service deployment/auction-monitor deployment/python-ai-service
+kubectl -n record-platform rollout restart deployment/auth-service deployment/records-service deployment/messaging-service deployment/listings-service deployment/analytics-service deployment/shopping-service deployment/auction-monitor deployment/python-ai-service
 ```
 
 ---

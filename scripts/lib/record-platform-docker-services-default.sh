@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Default Docker build service list for Record Platform (no booking/social; webapp appended once at call sites).
+# Default Docker build service list for Record Platform (no excluded peers; webapp appended once at call sites).
 set -euo pipefail
 _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib/rp-active-image-targets.sh

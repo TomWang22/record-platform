@@ -3,7 +3,7 @@
 # in-cluster KRaft brokers and ensures event topics (same contract as before: explicit topics + partitions).
 #
 # Env:
-#   REPO_ROOT, ENV_PREFIX (default dev), OCH_KAFKA_TOPIC_SUFFIX (optional)
+#   REPO_ROOT, ENV_PREFIX (default dev), RP_KAFKA_TOPIC_SUFFIX (optional)
 #   PREFLIGHT_SKIP_DOCKER_COMPOSE_KAFKA_STRICT=1 — exit 0
 #   KAFKA_K8S_NS — default record-platform
 #   KAFKA_K8S_SKIP_API_HEALTH=1 — skip rp-kube-api-health.sh

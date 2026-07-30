@@ -35,7 +35,7 @@ Phase 21: not started
 | HTTP/2 | curl + browser h2 on `/insights` (T20.13U) | PASS |
 | HTTP/3 | curl `--http3-only` on edge (T20.13U) | PASS |
 | Leakage | 0 failures across UI suites; message bodies excluded | PASS |
-| Contracts/readiness | RAG, runtime, endpoints, provider, pgvector, OCH decontaminate (T20.13Z) | PASS |
+| Contracts/readiness | RAG, runtime, endpoints, provider, pgvector, RP decontaminate (T20.13Z) | PASS |
 | Production retrieval | `keyword`; `model_used=rule-engine` | PASS |
 | Event/proto contracts | Proto ↔ 15 topics, producer/consumer audit (T20.13U) | PASS |
 | AI RAG sync path | No Kafka/event completion dependency for `/api/ai/rag/query` | PASS |

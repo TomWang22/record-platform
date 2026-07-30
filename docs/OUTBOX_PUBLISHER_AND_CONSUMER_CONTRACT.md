@@ -17,7 +17,7 @@ Domain write and outbox `INSERT` MUST share one **database transaction**.
 
 - **Value**: `EventEnvelope` (`proto/events/envelope.proto`) with `payload` = same domain bytes as outbox.
 - **Key**: `aggregate_id` / `entity_id` (per domain rules; messaging uses `conversation_id` where documented).
-- **Topic routing**: Default `${ENV_PREFIX}.<domain>.events` from `proto/events/<domain>.proto`, with explicit exceptions in `scripts/lib/och-kafka-event-topics-from-proto.sh` (e.g. **`${ENV_PREFIX}.user.lifecycle.v1`** for account deletion, **`messaging.events.v1`**, DLQ).
+- **Topic routing**: Default `${ENV_PREFIX}.<domain>.events` from `proto/events/<domain>.proto`, with explicit exceptions in `scripts/lib/rp-kafka-event-topics-from-proto.sh` (e.g. **`${ENV_PREFIX}.user.lifecycle.v1`** for account deletion, **`messaging.events.v1`**, DLQ).
 
 ## Consumers
 

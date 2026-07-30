@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Safe recycle of the 8 OCH Postgres containers so docker-compose.yml runtime flags apply
+# Safe recycle of the 8 RP Postgres containers so docker-compose.yml runtime flags apply
 # (e.g. max_connections=400). Does NOT remove volumes — data stays on disk.
 #
 # Use after changing Postgres `command:` or image in docker-compose.yml. No backup restore

@@ -23,7 +23,7 @@ E rejected — hybrid/vector production default
 | T20.42B closeout validator | PASS |
 | T20.42C-LIVE final verification | PASS — 4320/4320 HTTP 200, 0% fallback, hybrid p95 124.37 ms |
 | T20.42D rollback | PASS |
-| T20.42E telemetry | PASS — OCH, WARNs 0, Playwright 7/7 |
+| T20.42E telemetry | PASS — RP, WARNs 0, Playwright 7/7 |
 | Cumulative live | 57105/57105 HTTP 200, 0% fallback |
 
 ---

@@ -58,7 +58,7 @@ Keyword path untouched.
 bash scripts/coverage/run-service-coverage.sh python-ai-service
 node scripts/coverage/enforce-service-coverage.mjs
 bash scripts/rp-ai-shadow-real-query-timing.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 ## Acceptance

@@ -69,8 +69,8 @@ echo "Main log: $MAIN_LOG"
 echo "All output will be timestamped to handle terminal wraparound"
 echo ""
 
-# Step 0: Investigate gRPC NodePort and Social Service Issues
-say "=== Step 0: Investigating gRPC NodePort and Social Service Issues ==="
+# Step 0: Investigate gRPC NodePort and Messaging Service Issues
+say "=== Step 0: Investigating gRPC NodePort and Messaging Service Issues ==="
 INVESTIGATION_LOG="$RESULTS_DIR/investigation.log"
 if [[ -f "$SCRIPT_DIR/investigate-grpc-social-issues.sh" ]]; then
   say "Running investigation before tests..."
@@ -85,16 +85,16 @@ if [[ -f "$SCRIPT_DIR/investigate-grpc-social-issues.sh" ]]; then
     warn "Investigation completed with issues (exit $INVESTIGATION_EXIT)"
   fi
   
-  # Attempt to fix social service targetPort if needed
-  if [[ -f "$SCRIPT_DIR/fix-social-service-targetport.sh" ]]; then
-    say "Attempting to fix social service targetPort issue..."
-    "$SCRIPT_DIR/fix-social-service-targetport.sh" 2>&1 | while IFS= read -r line; do
+  # Attempt to fix messaging-plane targetPort if needed
+  if [[ -f "$SCRIPT_DIR/fix-messaging-service-targetport.sh" ]]; then
+    say "Attempting to fix messaging-plane targetPort issue..."
+    "$SCRIPT_DIR/fix-messaging-service-targetport.sh" 2>&1 | while IFS= read -r line; do
       timestamped="[$(date +'%Y-%m-%d %H:%M:%S')] $line"
       echo "$timestamped" | tee -a "$INVESTIGATION_LOG" | tee -a "$MAIN_LOG"
     done
     FIX_EXIT=${PIPESTATUS[0]}
     if [[ $FIX_EXIT -eq 0 ]]; then
-      ok "Social service fix attempted"
+      ok "messaging-plane fix attempted"
     fi
   fi
 else
@@ -144,7 +144,7 @@ cat > "$RESULTS_DIR/SUMMARY.md" <<EOF
 
 ## Log Files
 
-- **Investigation Log**: \`investigation.log\` (gRPC NodePort and Social Service diagnostics)
+- **Investigation Log**: \`investigation.log\` (gRPC NodePort and Messaging Service diagnostics)
 - **Main Log**: \`main.log\`
 - **Preflight Log**: \`preflight.log\`
 - **Test Suite Log**: \`test-suite.log\`

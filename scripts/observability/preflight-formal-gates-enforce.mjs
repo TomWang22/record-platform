@@ -4,9 +4,9 @@
  * Intended for: PREFLIGHT_REQUIRE_FORMAL_TRACE_GATES=1 (see Makefile _preflight-lab-inner).
  *
  * Env:
- *   OCH_FORMAL_REQUIRE_TRACE=1 (default) — trace-ltl / model / temporal must not be skipped
- *   OCH_DCI_MIN — must match distributed-correctness-index (default 90)
- *   OCH_SLA_SCORE_MIN — must match sla-resilience-score (default 0.85)
+ *   RP_FORMAL_REQUIRE_TRACE=1 (default) — trace-ltl / model / temporal must not be skipped
+ *   RP_DCI_MIN — must match distributed-correctness-index (default 90)
+ *   RP_SLA_SCORE_MIN — must match sla-resilience-score (default 0.85)
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -32,9 +32,9 @@ function fail(msg) {
 }
 
 function main() {
-  const requireTrace = process.env.OCH_FORMAL_REQUIRE_TRACE !== "0";
-  const dciMin = Number(process.env.OCH_DCI_MIN || "90");
-  const slaMin = Number(process.env.OCH_SLA_SCORE_MIN || "0.85");
+  const requireTrace = process.env.RP_FORMAL_REQUIRE_TRACE !== "0";
+  const dciMin = Number(process.env.RP_DCI_MIN || "90");
+  const slaMin = Number(process.env.RP_SLA_SCORE_MIN || "0.85");
   const tracePath = join(BENCH, "trace_contract.json");
 
   const dci = loadJson("dci-report.json", null);

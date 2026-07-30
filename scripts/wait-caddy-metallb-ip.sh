@@ -19,7 +19,7 @@ for i in {1..120}; do
     echo
     kubectl get svc -n "$NS_ING" caddy-h3 -o wide 2>/dev/null || true
     echo
-    echo "sudo sed -i '' '/off-campus-housing.test/d' /etc/hosts"
+    echo "sudo sed -i '' '/record-platform.test/d' /etc/hosts"
     echo "sudo sed -i '' '/record-platform.test/d' /etc/hosts"
     echo "echo '$METALLB_IP record-platform.test' | sudo tee -a /etc/hosts"
     echo

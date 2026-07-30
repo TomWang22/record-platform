@@ -66,24 +66,24 @@ edge_print_resolve_and_hosts_hint() {
   local ip="${2:-}"
   [[ -z "$ip" ]] && ip="$(edge_hint_lb_ip_for_och || true)"
   if [[ -z "$ip" ]]; then
-    echo "  (Could not discover LB IP — set OCH_EDGE_IP=... from: kubectl get svc -A | grep LoadBalancer)" >&2
+    echo "  (Could not discover LB IP — set RP_EDGE_IP=... from: kubectl get svc -A | grep LoadBalancer)" >&2
     return 0
   fi
   echo "  curl TLS examples use SNI + MetalLB IP:" >&2
-  echo "    export OCH_EDGE_IP=$ip" >&2
+  echo "    export RP_EDGE_IP=$ip" >&2
   echo "    curl --cacert certs/dev-root.pem --resolve ${host}:443:${ip} https://${host}/api/readyz" >&2
   echo "  Add stable DNS for Node/Playwright (needs /etc/hosts pointing at MetalLB IP, not 127.0.0.1):" >&2
   echo "    sudo sh -c 'grep -qF \"$ip $host\" /etc/hosts || echo \"$ip $host\" >> /etc/hosts'" >&2
-  echo "  Or: OCH_AUTO_EDGE_HOSTS=1 (uses OCH_EDGE_IP or discovered LB IP; requires sudo on non-root)" >&2
+  echo "  Or: RP_AUTO_EDGE_HOSTS=1 (uses RP_EDGE_IP or discovered LB IP; requires sudo on non-root)" >&2
 }
 
 # Idempotent append to /etc/hosts when user opts in (fixes headless / CI agents without split DNS).
 edge_maybe_auto_hosts() {
   local host="$1"
   local ip="$2"
-  [[ "${OCH_AUTO_EDGE_HOSTS:-0}" != "1" ]] && return 0
+  [[ "${RP_AUTO_EDGE_HOSTS:-0}" != "1" ]] && return 0
   if [[ ! "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "⚠️  OCH_AUTO_EDGE_HOSTS=1 but IP invalid: $ip" >&2
+    echo "⚠️  RP_AUTO_EDGE_HOSTS=1 but IP invalid: $ip" >&2
     return 1
   fi
   if grep -qE "[[:space:]]${host}([[:space:]]|$)" /etc/hosts 2>/dev/null; then
@@ -99,7 +99,7 @@ edge_maybe_auto_hosts() {
     echo "✅ Appended $ip $host to /etc/hosts (sudo)" >&2
     return 0
   fi
-  echo "❌ OCH_AUTO_EDGE_HOSTS=1 but cannot write /etc/hosts (need root or sudo)" >&2
+  echo "❌ RP_AUTO_EDGE_HOSTS=1 but cannot write /etc/hosts (need root or sudo)" >&2
   return 1
 }
 

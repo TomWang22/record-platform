@@ -48,7 +48,7 @@
 - Combined live 2025/2025 HTTP 200, 0% fallback
 - `final_tagged_plan` fallback 0 through T20.21B
 - Pure vector 8/16 report-only; anchored hybrid 16/16
-- Telemetry WARNs 0; leakage / OCH PASS
+- Telemetry WARNs 0; leakage / RP PASS
 
 ## 5. Verdict
 

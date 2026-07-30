@@ -1,6 +1,6 @@
 /**
- * k6: search-history + watchlist flows (booking-service via api-gateway).
- * Requires: BASE_URL=https://… (pass -e from run-housing-k6-edge-smoke.sh), SSL_CERT_FILE=./certs/dev-root.pem
+ * k6: search-history + watchlist flows (reservation-mesh via api-gateway).
+ * Requires: BASE_URL=https://… (pass -e from run-platform-k6-edge-smoke.sh), SSL_CERT_FILE=./certs/dev-root.pem
  */
 import http from "k6/http";
 import { check, sleep } from "k6";

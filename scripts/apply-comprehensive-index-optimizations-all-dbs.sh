@@ -121,8 +121,8 @@ ANALYZE analytics.user_behavior;
 ok "Analytics service: Composite, hot sharding indexes created"
 ANALYTICSEOF
 
-# Social Service (Port 5434)
-say "=== Social Service: Comprehensive Index Strategy ==="
+# Messaging Service (Port 5434)
+say "=== Messaging Service: Comprehensive Index Strategy ==="
 PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d records << 'SOCIALEOF'
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
@@ -142,7 +142,7 @@ CREATE INDEX IF NOT EXISTS idx_forum_posts_hot_tenant
   INCLUDE (id, title, content);
 
 ANALYZE forum.posts;
-ok "Social service: Trigram, composite, hot tenant indexes created"
+ok "messaging-plane: Trigram, composite, hot tenant indexes created"
 SOCIALEOF
 
 # Shopping Service (Port 5436)

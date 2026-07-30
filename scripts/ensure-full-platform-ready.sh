@@ -139,7 +139,7 @@ done
 # Step 6: Scale services to 1 replica (record-platform namespace)
 say "=== Step 6: Scaling Services to 1 Replica ==="
 
-SERVICES=("auth-service" "records-service" "listings-service" "social-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service" "api-gateway")
+SERVICES=("auth-service" "records-service" "listings-service" "messaging-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service" "api-gateway")
 
 for service in "${SERVICES[@]}"; do
   if _kubectl scale deployment "$service" -n "$NS" --replicas=1 --request-timeout=15s 2>&1; then
@@ -190,7 +190,7 @@ fi
 # Step 10: Verify strict TLS + mTLS configuration
 say "=== Step 10: Verifying Strict TLS + mTLS Configuration ==="
 
-STRICT_TLS_SERVICES=("auth-service" "records-service" "listings-service" "social-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service")
+STRICT_TLS_SERVICES=("auth-service" "records-service" "listings-service" "messaging-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service")
 
 for service in "${STRICT_TLS_SERVICES[@]}"; do
   pod=$(_kubectl get pods -n "$NS" -l app="$service" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
@@ -217,7 +217,7 @@ done
 # Step 11: Verify Kafka SSL configuration (no PLAINTEXT fallback)
 say "=== Step 11: Verifying Kafka SSL Configuration ==="
 
-KAFKA_CONSUMING_SERVICES=("social-service" "analytics-service" "auction-monitor")
+KAFKA_CONSUMING_SERVICES=("messaging-service" "analytics-service" "auction-monitor")
 
 for service in "${KAFKA_CONSUMING_SERVICES[@]}"; do
   pod=$(_kubectl get pods -n "$NS" -l app="$service" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
@@ -309,7 +309,7 @@ if [[ "$ALL_READY" == "true" ]]; then
 else
   warn "Not all pods are ready ($READY_COUNT/$TOTAL_COUNT) after ${MAX_WAIT}s"
   say "Current pod status:"
-  _kubectl get pods -n "$NS" -l 'app in (auth-service,records-service,listings-service,social-service,shopping-service,analytics-service,auction-monitor,python-ai-service,api-gateway,nginx-exporter,haproxy-exporter)' \
+  _kubectl get pods -n "$NS" -l 'app in (auth-service,records-service,listings-service,messaging-service,shopping-service,analytics-service,auction-monitor,python-ai-service,api-gateway,nginx-exporter,haproxy-exporter)' \
     -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[0].ready,STATUS:.status.phase --request-timeout=15s 2>&1 | head -15
 fi
 

@@ -24,10 +24,10 @@ RP_LEGACY_EVENT_PROTO_STEMS=(booking social)
 rp_proto_stem_excluded() {
   local base="$1"
   rp_apply_proto_skip_env
-  if [[ "${RP_SKIP_BOOKING_SERVICE}" == "1" && "$base" == "booking" ]]; then
+  if [[ "${RP_SKIP_RESERVATION_MESH}" == "1" && "$base" == "booking" ]]; then
     return 0
   fi
-  if [[ "${RP_SKIP_SOCIAL_SERVICE}" == "1" && "$base" == "social" ]]; then
+  if [[ "${RP_SKIP_MESSAGING_LEGACY_PEER}" == "1" && "$base" == "social" ]]; then
     return 0
   fi
   return 1

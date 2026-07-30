@@ -1,4 +1,4 @@
--- Delivery metadata for external email/SMS sent from OCH (history row created after successful send).
+-- Delivery metadata for external email/SMS sent from RP (history row created after successful send).
 ALTER TABLE messages.external_contacts
   ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS delivery_error TEXT,

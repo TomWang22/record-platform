@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Search all 11 RP Postgres DBs for forbidden OCH/housing text in user-facing columns.
+# Search all 11 RP Postgres DBs for forbidden RP/housing text in user-facing columns.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPORT_DIR="${REPORT_DIR:-$REPO_ROOT/bench_logs/domain-comb}"
-REPORT="${REPORT:-$REPORT_DIR/rp-och-db-comb.md}"
+REPORT="${REPORT:-$REPORT_DIR/rp-rp-db-comb.md}"
 
 PGHOST="${PGHOST:-127.0.0.1}"
 PGUSER="${PGUSER:-postgres}"
@@ -43,12 +43,12 @@ _run_psql() {
 }
 
 TOKENS=(
-  OCH 'off-campus' housing landlord tenant booking apartment
-  'Send in OCH' guest host furnished 'off campus'
+  RP 'off-campus' housing landlord tenant booking apartment
+  'Send in RP' guest host furnished 'off campus'
 )
 
 {
-  echo "# RP/OCH DB comb"
+  echo "# RP/RP DB comb"
   echo ""
   echo "Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "Host: \`$PGHOST\`"
@@ -83,7 +83,7 @@ for port in "${PORTS[@]}"; do
     IFS='.' read -r schema table col <<<"$schema_table_col"
     for tok in "${TOKENS[@]}"; do
       cond="\"$col\"::text ILIKE '%${tok//\'/\'\'}%'"
-      [[ "$tok" == "OCH" ]] && cond="\"$col\"::text ~* '\\\\mOCH\\\\M'"
+      [[ "$tok" == "RP" ]] && cond="\"$col\"::text ~* '\\\\mOCH\\\\M'"
       sql="SELECT COUNT(*) FROM \"$schema\".\"$table\" WHERE $cond;"
       cnt="$(_run_psql "$port" "$db" "$sql" 2>/dev/null || echo "")"
       [[ -z "$cnt" || "$cnt" == "0" ]] && continue

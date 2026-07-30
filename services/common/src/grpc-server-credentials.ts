@@ -13,14 +13,14 @@ const defaultCa = "/etc/certs/ca.crt";
 function grpcInsecureTestBindEnabled(): boolean {
   const raw =
     process.env.RP_GRPC_INSECURE_TEST_BIND ??
-    process.env.OCH_GRPC_INSECURE_TEST_BIND ??
+    process.env.RP_GRPC_INSECURE_TEST_BIND ??
     "";
   return raw === "1" || raw === "true";
 }
 
 /**
  * Production: strict mTLS (same as {@link createRpStrictMtlsServerCredentials}).
- * Local/CI integration: if **RP_GRPC_INSECURE_TEST_BIND=1** (legacy: OCH_GRPC_INSECURE_TEST_BIND) and
+ * Local/CI integration: if **RP_GRPC_INSECURE_TEST_BIND=1** (legacy: RP_GRPC_INSECURE_TEST_BIND) and
  * **NODE_ENV** is not **production**, binds with **grpc.ServerCredentials.createInsecure()**.
  */
 export function createRpGrpcServerCredentialsForBind(label: string): grpc.ServerCredentials {

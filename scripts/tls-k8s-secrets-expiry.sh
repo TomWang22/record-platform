@@ -14,7 +14,7 @@ EPOCH=$(date +%s)
 
 emit() {
   local ns="$1" sec="$2" days="$3"
-  echo "och_tls_cert_days_remaining{namespace=\"$ns\",secret=\"$sec\"} $days"
+  echo "rp_tls_cert_days_remaining{namespace=\"$ns\",secret=\"$sec\"} $days"
 }
 
 for ns in $NS_LIST; do

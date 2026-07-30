@@ -28,19 +28,19 @@ else
   echo "  Response: $AUTH_HEALTH"
 fi
 
-# Test 2: Standard Health Service Check - Social Service (h2c - in-cluster direct)
-say "Test 2: Social Service Standard Health Check (grpc.health.v1.Health/Check - h2c)"
+# Test 2: Standard Health Service Check - Messaging Service (h2c - in-cluster direct)
+say "Test 2: Messaging Service Standard Health Check (grpc.health.v1.Health/Check - h2c)"
 SOCIAL_HEALTH=$(kubectl -n "$NS" run grpc-test-social-$(date +%s) --rm -i --restart=Never \
   --image=fullstorydev/grpcurl:latest \
   -- grpcurl -plaintext -max-time 5 \
-  -d '{"service": "social.SocialService"}' \
-  social-service.record-platform.svc.cluster.local:50056 \
+  -d '{"service": "messaging.MessagingService"}' \
+  messaging-service.record-platform.svc.cluster.local:50056 \
   grpc.health.v1.Health/Check 2>&1) || SOCIAL_HEALTH=""
 if echo "$SOCIAL_HEALTH" | grep -qE '"status"\s*:\s*"SERVING"|status.*SERVING|"SERVING"'; then
-  ok "Social Service standard health check works (h2c)"
+  ok "Messaging Service standard health check works (h2c)"
   echo "  Response: $SOCIAL_HEALTH"
 else
-  warn "Social Service standard health check failed (h2c)"
+  warn "Messaging Service standard health check failed (h2c)"
   echo "  Response: $SOCIAL_HEALTH"
 fi
 

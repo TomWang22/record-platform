@@ -73,7 +73,7 @@ After any approved product change:
 ./scripts/webapp-playwright-strict-edge.sh e2e/ai-rag-record-intelligence.spec.ts --grep "AI record intelligence UI acceptance"
 ./scripts/webapp-playwright-strict-edge.sh e2e/ai-rag-longform-record-session.spec.ts --grep "AI longform record collector RAG session"
 node scripts/ai-quality-telemetry-report.mjs
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 Do not commit `bench_logs/` artifacts.

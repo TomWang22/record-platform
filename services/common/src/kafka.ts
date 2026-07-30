@@ -4,10 +4,10 @@ import { recordKafkaPartitionLeaderMetrics } from "./kafkaLeaderMetrics.js";
 
 /**
  * Optional isolation suffix for tests/CI. Appended to default topic names when env vars are unset.
- * Producers and consumers must share the same OCH_KAFKA_TOPIC_SUFFIX (or RP_KAFKA_TOPIC_SUFFIX).
+ * Producers and consumers must share the same RP_KAFKA_TOPIC_SUFFIX (or RP_KAFKA_TOPIC_SUFFIX).
  */
-export function ochKafkaTopicIsolationSuffix(): string {
-  const raw = (process.env.RP_KAFKA_TOPIC_SUFFIX || process.env.OCH_KAFKA_TOPIC_SUFFIX || "").trim();
+export function rpKafkaTopicIsolationSuffix(): string {
+  const raw = (process.env.RP_KAFKA_TOPIC_SUFFIX || "").trim();
   if (!raw) return "";
   const cleaned = raw.replace(/^\.+/, "");
   return cleaned ? `.${cleaned}` : "";
@@ -131,12 +131,12 @@ export async function ensureKafkaBrokerReady(
   serviceLabel: string,
   options?: EnsureKafkaBrokerReadyOptions,
 ): Promise<void> {
-  const budgetMs = Number(process.env.RP_KAFKA_STARTUP_BARRIER_MS || process.env.OCH_KAFKA_STARTUP_BARRIER_MS || "120000");
-  const minRetryMs = Number(process.env.RP_KAFKA_STARTUP_RETRY_MIN_MS || process.env.OCH_KAFKA_STARTUP_RETRY_MIN_MS || "1000");
-  const maxRetryMs = Number(process.env.RP_KAFKA_STARTUP_RETRY_MAX_MS || process.env.OCH_KAFKA_STARTUP_RETRY_MAX_MS || "8000");
+  const budgetMs = Number(process.env.RP_KAFKA_STARTUP_BARRIER_MS || "120000");
+  const minRetryMs = Number(process.env.RP_KAFKA_STARTUP_RETRY_MIN_MS || "1000");
+  const maxRetryMs = Number(process.env.RP_KAFKA_STARTUP_RETRY_MAX_MS || "8000");
   const deadline = Date.now() + budgetMs;
   const fromEnv =
-    (process.env.RP_KAFKA_STARTUP_REQUIRED_TOPICS || process.env.OCH_KAFKA_STARTUP_REQUIRED_TOPICS || "")
+    (process.env.RP_KAFKA_STARTUP_REQUIRED_TOPICS || "")
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean) ?? [];

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runtime messaging domain comb — API JSON must not leak OCH/housing fields.
+# Runtime messaging domain comb — API JSON must not leak RP/housing fields.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,7 +28,7 @@ EDGE_LB_IP="${EDGE_LB_IP:-$(rp_http3_lb_ip)}"
 }
 CURL_TLS=(--cacert "$CA" --resolve "${HOST}:443:${EDGE_LB_IP}")
 
-FORBIDDEN_RE='landlord|tenant|booking|housing|OCH|record\.local'
+FORBIDDEN_RE='landlord|tenant|booking|housing|RP|record\.local'
 mkdir -p "$REPORT_DIR"
 FAILS=()
 SAMPLES=()

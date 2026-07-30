@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Record Platform bootstrap terminal UX — OCH-style colored summaries, raw logs in bench_logs/.
+# Record Platform bootstrap terminal UX — RP-style colored summaries, raw logs in bench_logs/.
 # Source from cold-bootstrap / cluster scripts; do not execute directly.
 set -euo pipefail
 

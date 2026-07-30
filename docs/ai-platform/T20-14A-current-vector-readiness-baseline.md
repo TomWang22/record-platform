@@ -31,7 +31,7 @@ Production retrieval remains keyword
 | `scripts/audit-rp-ai-endpoints-contract.sh` | PASS | `bench_logs/ai-platform/python-ai-ollama-contract.md` |
 | `scripts/rp-ai-provider-readiness.sh` | PASS | `bench_logs/ai-platform/phase-17-provider-readiness.md` |
 | `scripts/rp-ai-pgvector-readiness.sh` | PASS | `bench_logs/ai-platform/phase-18-pgvector-readiness.md` |
-| `scripts/rp-och-decontaminate-scan.sh` | PASS | `bench_logs/domain-comb/rp-och-code-comb.md` |
+| `scripts/rp-rp-decontaminate-scan.sh` | PASS | `bench_logs/domain-comb/rp-rp-code-comb.md` |
 | Playwright seller intelligence UI | PASS 4/4 | `bench_logs/ai-platform/seller-intelligence-ui/20260628-181537/` |
 | Playwright record intelligence | PASS 7/7 avg 3.86 | `bench_logs/ai-platform/ui-record-intelligence/20260628-181600/` |
 | Playwright longform session | PASS 12/12 avg 3.67 | `bench_logs/ai-platform/longform-rag-session/20260628-181600/` |

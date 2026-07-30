@@ -8,7 +8,7 @@
 #
 # Does NOT ship private keys under certs/. Generate with scripts/dev-generate-certs.sh or reissue flow.
 #
-# Output: $HOME/record-platform-och-preflight-cert-kafka-bundle-<stamp>.tar.gz
+# Output: $HOME/record-platform-rp-preflight-cert-kafka-bundle-<stamp>.tar.gz
 #         RECORD_PLATFORM_PREFLIGHT_CERT_BUNDLE_DIR=/path  — output directory
 #         RECORD_PLATFORM_CERT_BUNDLE_KEEP_ALL=1 — keep older archives in that dir
 #
@@ -19,7 +19,7 @@ OUT_DIR="${RECORD_PLATFORM_PREFLIGHT_CERT_BUNDLE_DIR:-$HOME}"
 [[ -d "$OUT_DIR" ]] || { echo "OUT_DIR not a directory: $OUT_DIR" >&2; exit 1; }
 STAMP="$(date +%Y%m%d-%H%M%S)"
 STAGE="$(mktemp -d)"
-TOP="record-platform-och-preflight-cert-kafka-bundle"
+TOP="record-platform-rp-preflight-cert-kafka-bundle"
 BUNDLE="$STAGE/$TOP"
 mkdir -p "$BUNDLE"
 
@@ -76,9 +76,9 @@ copy_optional "pnpm-workspace.yaml"
 copy_optional "pnpm-lock.yaml"
 copy_one "certs/README.txt"
 
-# validate-kafka-stack-contract greps services/**/*.ts — provide minimal tree (no OCH_KAFKA_DISABLED).
+# validate-kafka-stack-contract greps services/**/*.ts — provide minimal tree (no RP_KAFKA_DISABLED).
 mkdir -p "$BUNDLE/services/__bundle_placeholder__"
-echo "// record-platform bundle placeholder — extend with full services/ from OCH repo for image builds." >"$BUNDLE/services/__bundle_placeholder__/placeholder.ts"
+echo "// record-platform bundle placeholder — extend with full services/ from RP repo for image builds." >"$BUNDLE/services/__bundle_placeholder__/placeholder.ts"
 
 copy_optional "docs/CERT_GENERATION_STRICT_TLS_MTLS.md"
 copy_optional "docs/SECURITY_CERTS_REPOSITORY.md"
@@ -97,10 +97,10 @@ _record_platform_rewrites() {
     -o -name '*.txt' -o -name '*.fragment' -o -name '*.json' -o -name '*.mts' -o -name '*.md' \
     -o -name '*.ts' -o -name '*.tsx' -o -name 'Makefile' -o -name 'pnpm-lock.yaml' \
   \) ! -path '*/node_modules/*' -print0 2>/dev/null | while IFS= read -r -d '' f; do
-    perl -pi -e 's/off-campus-housing\.test/record-platform.test/g' "$f"
+    perl -pi -e 's/record-platform\.test/record-platform.test/g' "$f"
     perl -pi -e 's/record-platform/record-platform/g' "$f"
     perl -pi -e 's/record-platform-quic/record-platform-quic/g' "$f"
-    perl -pi -e 's/\(OCH: record\.test/(Record Platform: record-platform.test/g' "$f"
+    perl -pi -e 's/\(RP: record\.test/(Record Platform: record-platform.test/g' "$f"
   done
 }
 
@@ -110,7 +110,7 @@ cat > "$BUNDLE/README_BUNDLE.txt" <<'EOF'
 Record Platform — Preflight + TLS/mTLS + Kafka cert gates (EKU-aware)
 ======================================================================
 
-Bundled for record-platform.test / record-platform namespace (rewritten from OCH upstream).
+Bundled for record-platform.test / record-platform namespace (rewritten from RP upstream).
 
 Contents
 --------
@@ -126,7 +126,7 @@ Contents
   • infra/k8s/base/config/ — app bootstrap seeds (KAFKA_BROKER, etc.)
   • infra/k8s/base/namespaces.yaml — includes record-platform namespace after rewrite
   • package.json, pnpm-workspace.yaml, pnpm-lock.yaml — pnpm verify:kafka-bootstrap / verify:kafka-tls-sans
-  • services/__bundle_placeholder__/ — minimal TS so validate-kafka-stack-contract static grep passes; replace with full services/ from OCH for image builds
+  • services/__bundle_placeholder__/ — minimal TS so validate-kafka-stack-contract static grep passes; replace with full services/ from RP for image builds
   • certs/README.txt — EKU + SAN expectations (generate keys locally; do not commit)
 
 Run preflight (from bundle root, with cluster + pnpm installed)
@@ -144,7 +144,7 @@ EKU contract (Kafka broker)
   both EKUs (verify-kafka-broker-keystore-jks.sh). validate-kafka-stack-contract.sh enforces static alignment
   across kafka-ssl-from-dev-root.sh, dev-generate-certs.sh, and scripts/ci/generate-kafka-ci-tls.sh when present.
 
-Regenerate bundle from OCH repo:
+Regenerate bundle from RP repo:
   bash scripts/package-record-platform-preflight-cert-kafka-bundle.sh
 EOF
 
@@ -156,7 +156,7 @@ rm -rf "$STAGE"
 
 if [[ "${RECORD_PLATFORM_CERT_BUNDLE_KEEP_ALL:-0}" != "1" ]]; then
   shopt -s nullglob
-  for f in "$OUT_DIR"/record-platform-och-preflight-cert-kafka-bundle-*.tar.gz; do
+  for f in "$OUT_DIR"/record-platform-rp-preflight-cert-kafka-bundle-*.tar.gz; do
     [[ "$f" == "$OUT" ]] && continue
     rm -f "$f"
   done

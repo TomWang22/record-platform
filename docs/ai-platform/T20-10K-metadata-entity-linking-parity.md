@@ -168,7 +168,7 @@ Unit test proves alias works when keyword listing `source_id` matches OBO `listi
 | endpoints contract | **PASS** |
 | provider readiness | **PASS** |
 | pgvector readiness | **PASS** |
-| OCH scan | **PASS** |
+| RP scan | **PASS** |
 
 ---
 

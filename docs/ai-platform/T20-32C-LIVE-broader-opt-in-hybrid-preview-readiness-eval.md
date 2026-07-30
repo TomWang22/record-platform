@@ -33,7 +33,7 @@ Per-window: revoke → verify `keyword_default` → bulk enroll 11 → verify `p
 | Canary errors | **0** | 0 **PASS** |
 | Soak telemetry WARNs | **0** | 0 **PASS** |
 | Leakage | **PASS** | **PASS** |
-| OCH | **PASS** | **PASS** |
+| RP | **PASS** | **PASS** |
 | Playwright | **PASS** | **PASS** |
 | PERCENT | **0** | **PASS** |
 | Post-revoke `keyword_default` | **PASS** | **PASS** |

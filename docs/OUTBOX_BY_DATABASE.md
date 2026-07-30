@@ -31,4 +31,4 @@ Every **producing** service database that can emit Kafka events should expose th
 
 ## Proto ↔ topic
 
-Top-level `proto/events/*.proto` files (except `envelope.proto`) map to `${ENV_PREFIX}.<filename-stem>.events` via `scripts/lib/och-kafka-event-topics-from-proto.sh`. Run `./scripts/create-kafka-event-topics-k8s.sh` (or host script) after brokers are healthy.
+Top-level `proto/events/*.proto` files (except `envelope.proto`) map to `${ENV_PREFIX}.<filename-stem>.events` via `scripts/lib/rp-kafka-event-topics-from-proto.sh`. Run `./scripts/create-kafka-event-topics-k8s.sh` (or host script) after brokers are healthy.

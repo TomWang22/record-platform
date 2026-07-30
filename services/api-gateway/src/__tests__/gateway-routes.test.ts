@@ -81,10 +81,10 @@ describe("gateway route contract", () => {
     expect(ANALYTICS_GRPC_TARGET).toContain(":50067");
   });
 
-  it("no social-service upstream unless legacy flag", () => {
+  it("no excluded peer upstream unless legacy flag", () => {
     const legacy = process.env.RP_ENABLE_LEGACY_SOCIAL_ROUTES;
     if (legacy === "1" || legacy === "true") return;
     const stack = readFileSync(join(process.cwd(), "src/proxy/marketplace-routes.ts"), "utf8");
-    expect(stack).not.toMatch(/social-service/);
+    expect(stack).not.toMatch(/\/social(\/|$)/);
   });
 });

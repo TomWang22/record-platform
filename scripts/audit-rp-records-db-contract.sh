@@ -45,10 +45,10 @@ else
   fail "GET /api/records returned unexpected HTTP $API_CODE"
 fi
 
-if grep -qiE '"table_name":"(.*och.*|.*housing.*|.*booking.*|.*social.*)"' <<<"$TABLE_JSON"; then
-  fail "OCH/housing-style table names found in records DB"
+if grep -qiE '"table_name":"(.*rp.*|.*housing.*|.*booking.*|.*social.*)"' <<<"$TABLE_JSON"; then
+  fail "RP/housing-style table names found in records DB"
 else
-  pass "No OCH/housing/booking/social table names in active records DB tables"
+  pass "No RP/housing/booking/social table names in active records DB tables"
 fi
 
 echo ""

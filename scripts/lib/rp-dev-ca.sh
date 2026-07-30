@@ -156,6 +156,6 @@ rp_dev_verify_leaf_chain() {
 rp_dev_forbidden_in_cert() {
   local pem="$1"
   openssl x509 -in "$pem" -noout -text 2>/dev/null | grep -qiE \
-    'off-campus-housing\.test|record\.local|DNS:localhost|DNS:127\.0\.0\.1|IP Address:127\.0\.0\.1|IP:127\.0\.0\.1' && return 0
+    'record-platform\.test|record\.local|DNS:localhost|DNS:127\.0\.0\.1|IP Address:127\.0\.0\.1|IP:127\.0\.0\.1' && return 0
   return 1
 }

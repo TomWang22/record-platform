@@ -3,17 +3,17 @@
  * Post-run: scripts/validate-k6-traces.sh parses K6_TRACE_ID + 32-hex trace id from this log (structured k6 lines OK).
  *
  * Env:
- *   BASE_URL — default https://off-campus-housing.test
+ *   BASE_URL — default https://record-platform.test
  *   K6_TRACE_VUS — default 4 (concurrent VUs hammering the same route set)
  *   K6_TRACE_ITERATIONS — default 12 (total iterations across all VUs)
  *
  * Run:
- *   BASE_URL=https://off-campus-housing.test k6 run scripts/load/k6-trace-contract-smoke.js 2>&1 | tee bench_logs/k6-trace-contract.log
+ *   BASE_URL=https://record-platform.test k6 run scripts/load/k6-trace-contract-smoke.js 2>&1 | tee bench_logs/k6-trace-contract.log
  */
 import http from "k6/http";
 import { check } from "k6";
 
-const BASE = (__ENV.BASE_URL || "https://off-campus-housing.test").replace(/\/$/, "");
+const BASE = (__ENV.BASE_URL || "https://record-platform.test").replace(/\/$/, "");
 
 function traceparent() {
   const hex = () => Math.floor(Math.random() * 16 ** 8).toString(16).padStart(8, "0");
@@ -64,7 +64,7 @@ export default function () {
     headers: {
       traceparent: tp,
       "x-debug-replay": "k6-trace-contract",
-      "x-och-edge-proto": "h3",
+      "x-rp-edge-proto": "h3",
       "x-loadtest": "1",
       "x-suite": k6Suite,
     },

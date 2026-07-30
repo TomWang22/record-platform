@@ -20,7 +20,7 @@ printf '%s\n' \
   "1 bash  gateway-image-source-staleness-guard.sh (warn if api-gateway:dev older than route-coverage sources)" \
   "2 make  fetch-gateway-route-hits (before + after Vitest matrix)" \
   "1 bash  run-matrix-vitest-coverage.sh (SKIP_MATRIX_VITEST=1 skips)" \
-  "1 node  verify-api-docs + och-coverage-model + och-service-coverage-matrix (SERVICE_COVERAGE_MATRIX_ENFORCE=1)" \
+  "1 node  verify-api-docs + rp-coverage-model + rp-service-coverage-matrix (SERVICE_COVERAGE_MATRIX_ENFORCE=1)" \
   "1 node  generate-preflight-lab-report.mjs → bench_logs/preflight-lab-report.md"
 echo ""
 echo "  Optional: make k6-coverage-warmup — debug-only manifest sweep (x-suite=coverage-warmup → matrix unknown bucket; not in preflight-lab)."
@@ -30,13 +30,13 @@ echo ""
 echo "=== Step 7 matrix (_run_all_suites in run-preflight-scale-and-all-suites.sh) — by type ==="
 # Discrete invocations (not file counts).
 cat <<'INV'
-  bash/guards     verify-required-housing-pods.sh, _preflight_ci_transport_alignment_gates (transport scripts)
+  bash/guards     verify-required-record-platform-pods.sh, _preflight_ci_transport_alignment_gates (transport scripts)
   vitest          services/event-layer-verification (pnpm test) + pnpm run coverage:phase-vi2-verify (7a0b2; skip: PREFLIGHT_SKIP_COVERAGE_PHASE_VI2_VERIFY=1)
   vitest (stack)  pnpm test:vitest-stack = integration:all + test:system + repo test (default PREFLIGHT_RUN_REPO_VITEST_STACK=1)
   vitest          services/messaging-service (pnpm test), services/media-service (pnpm test)
   bash            test-microservices-http2-http3-housing.sh, test-messaging-service-comprehensive.sh
   playwright      run-playwright-e2e-preflight.sh (1× when PREFLIGHT_VALIDATE_BEFORE_LOAD=1 default, else after k6)
-  k6 (edge grid)  run-housing-k6-edge-smoke.sh — 9 core smokes + listing-feel (unless SKIP) + 2 JWT scripts + optional preflight-lab randomized (PREFLIGHT_LAB=1 → ~12–13 k6 invocations)
+  k6 (edge grid)  run-platform-k6-edge-smoke.sh — 9 core smokes + listing-feel (unless SKIP) + 2 JWT scripts + optional preflight-lab randomized (PREFLIGHT_LAB=1 → ~12–13 k6 invocations)
 INV
 
 echo ""

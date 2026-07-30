@@ -35,7 +35,7 @@ _check_main_log() {
   fi
 
   if ! grep -q '"allowed_order"' "$log"; then
-    echo "❌ missing bootstrap_allowed_order JSON on stdout (OCH plan shape)" >&2
+    echo "❌ missing bootstrap_allowed_order JSON on stdout (RP plan shape)" >&2
     return 1
   fi
 

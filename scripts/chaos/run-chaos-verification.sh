@@ -13,5 +13,5 @@ if [[ "${CHAOS_VERIFY_RUN:-0}" == "1" ]]; then
   exit 1
 fi
 
-node -e "require('fs').writeFileSync(process.argv[1], JSON.stringify({specVersion:'och-coverage-chaos-v1',skipped:true,reason:'CHAOS_VERIFY_RUN!=1 (opt-in only)',brokerKillTest:false,outboxRecovered:false,gatewayStable:false,generatedAt:new Date().toISOString()},null,2)+'\n')" "$OUT"
+node -e "require('fs').writeFileSync(process.argv[1], JSON.stringify({specVersion:'rp-coverage-chaos-v1',skipped:true,reason:'CHAOS_VERIFY_RUN!=1 (opt-in only)',brokerKillTest:false,outboxRecovered:false,gatewayStable:false,generatedAt:new Date().toISOString()},null,2)+'\n')" "$OUT"
 echo "Wrote stub $OUT (chaos verify opt-in)"

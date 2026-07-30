@@ -19,7 +19,7 @@ BEGIN
   END IF;
 END $$;
 
--- Main table: one row per listing (house/apt). Booking/availability live in booking-service DB only.
+-- Main table: one row per listing (house/apt). Booking/availability live in reservation-mesh DB only.
 CREATE TABLE IF NOT EXISTS listings.listings (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id            UUID NOT NULL,

@@ -2,7 +2,7 @@
 -- Each database gets tuning optimized for its workload
 
 -- ============================================================
--- SOCIAL SERVICE (Port 5434) - Write-Heavy, Messaging
+-- messaging-plane (Port 5434) - Write-Heavy, Messaging
 -- Schemas: forum.posts, messages.messages (see 04-social-schema.sql)
 -- ============================================================
 

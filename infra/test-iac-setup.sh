@@ -103,7 +103,7 @@ locals {
     records_service = 4002
     listings_service = 4003
     shopping_service = 4007
-    social_service  = 4004
+    messaging-plane  = 4004
     analytics_service = 4005
     auction_monitor = 4008
     python_ai_service = 4009

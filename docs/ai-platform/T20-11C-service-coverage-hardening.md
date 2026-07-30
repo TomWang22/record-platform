@@ -78,7 +78,7 @@ Audit commands run at baseline `e379a1e`:
 bash scripts/coverage/run-service-coverage.sh python-ai-service
 bash scripts/coverage/run-service-coverage.sh all
 node scripts/coverage/enforce-service-coverage.mjs
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 **`run-service-coverage.sh all` per-service:**
@@ -116,7 +116,7 @@ run-service-coverage summary: manifest=18 run_ok=5 run_fail_non_strict=0 skip=13
 enforce-service-coverage: 1 pass, 17 skip, 0 fail
 ```
 
-**OCH scan:** PASS.
+**RP scan:** PASS.
 
 ---
 

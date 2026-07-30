@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 FORBIDDEN = re.compile(
-    r"demo|mock|sample fallback|placeholder|lorem ipsum|proxy max|max_bid_cents|proxy_bids|OCH|off[- ]campus",
+    r"demo|mock|sample fallback|placeholder|lorem ipsum|proxy max|max_bid_cents|proxy_bids|RP|off[- ]campus",
     re.I,
 )
 MESSAGE_LEAK = re.compile(r"message_body|thread_text|private obo message", re.I)

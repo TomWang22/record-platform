@@ -15,7 +15,7 @@ Summary of **current test coverage**, **schema/table considerations**, and **sug
 | 5 | rotation | rotation-suite.sh | CA/leaf rotation, Caddy reload, k6 chaos |
 | 6 | standalone-capture | test-packet-capture-standalone.sh | Packet capture (H2/H3/gRPC) |
 | 7 | tls-mtls | test-tls-mtls-comprehensive.sh | HTTP/3 cert chain, gRPC TLS/mTLS, chain completeness |
-| 8 | social | test-social-service-comprehensive.sh | All forum + messages routes (archive, recall, kick/ban, list groups, etc.) |
+| 8 | social | test-messaging-service-comprehensive.sh | All forum + messages routes (archive, recall, kick/ban, list groups, etc.) |
 | 9 | lb-coordinated | (inside run-all) | Caddy, HAProxy, MetalLB |
 
 **E2E gap:** Baseline/enhanced only hit **health** for analytics, auction-monitor, and python-ai. No functional e2e for:
@@ -144,7 +144,7 @@ Re-run a single suite (e.g. baseline or social):
 
 ```bash
 ./scripts/test-microservices-http2-http3.sh
-./scripts/test-social-service-comprehensive.sh
+./scripts/test-messaging-service-comprehensive.sh
 ```
 
 ---

@@ -58,7 +58,7 @@ EMBEDDING_BACKFILL_PER_TYPE_LIMITS="obo_offer_summary=0,listing=250,listing_revi
 |-------|--------|
 | `--check-lock t20-tranche-7` | exit **2** (lock exists; rerun blocked) ✓ |
 | `rp-ai-backfill-rerun-guard-smoke.sh` | PASS |
-| `rp-och-decontaminate-scan.sh` | PASS (at T20.12Q) |
+| `rp-rp-decontaminate-scan.sh` | PASS (at T20.12Q) |
 
 ## Actual write (NOT APPROVED)
 

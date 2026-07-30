@@ -5,8 +5,8 @@
  */
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { discoverHousingServiceDirs } from "./trace-validators/lib/housing-services.mjs";
+import { discoverPlatformServiceDirs } from "./trace-validators/lib/platform-services.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const services = discoverHousingServiceDirs(root);
+const services = discoverPlatformServiceDirs(root);
 process.stdout.write(`${JSON.stringify(services)}\n`);

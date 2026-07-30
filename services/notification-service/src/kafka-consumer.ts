@@ -2,7 +2,7 @@
  * Consume domain event topics; insert pending in-app notifications (idempotent via processed_events).
  */
 import { trace } from "@opentelemetry/api";
-import { getRpKafka, ochKafkaTopicIsolationSuffix } from "@common/utils/kafka";
+import { getRpKafka, rpKafkaTopicIsolationSuffix } from "@common/utils/kafka";
 import { withKafkaConsumerSpan } from "@common/utils/otel";
 import { Consumer } from "kafkajs";
 import type { Pool } from "pg";
@@ -37,7 +37,7 @@ const DEFAULT_TOPIC_CSV = [
 ].join(",");
 
 export function notificationKafkaTopics(): string[] {
-  const suf = ochKafkaTopicIsolationSuffix();
+  const suf = rpKafkaTopicIsolationSuffix();
   const apply = (name: string) => (name === "messaging.events.v1" ? name : `${name}${suf}`);
   return (process.env.NOTIFICATION_KAFKA_TOPICS || DEFAULT_TOPIC_CSV)
     .split(",")
@@ -58,7 +58,7 @@ async function ensureProcessed(pool: Pool, eventId: string): Promise<boolean> {
   }
 }
 
-/** Booking-service envelope: `{ metadata: { event_id, event_type, aggregate_id }, payload }` */
+/** Reservation mesh envelope: `{ metadata: { event_id, event_type, aggregate_id }, payload }` */
 function applyBookingEnvelopeTraceAttrs(buf: Buffer): void {
   const span = trace.getActiveSpan();
   if (!span) return;

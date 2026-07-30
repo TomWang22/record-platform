@@ -91,8 +91,8 @@ ANALYZE listings.listings;
 -- OK: Success
 LISTINGSEOF
 
-# Social Service Optimizations (Port 5434)
-say "=== Social Service: Optimizing for messaging load ==="
+# Messaging Service Optimizations (Port 5434)
+say "=== Messaging Service: Optimizing for messaging load ==="
 PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d records << 'SOCIALEOF'
 -- Optimize for high message volume
 

@@ -49,7 +49,7 @@ Hybrid p95: 140.4 ms
 Avg/worst quality: 4.0 / 4.0
 Rollback: PASS
 Telemetry WARNs: 0
-OCH: PASS
+RP: PASS
 Playwright C-suite: 7/7 PASS
 Message-body exposure: 0
 Post-revoke keyword_default: PASS for all 5

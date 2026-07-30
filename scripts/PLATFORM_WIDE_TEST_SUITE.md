@@ -12,7 +12,7 @@ Tests gRPC, HTTP/2, and HTTP/3 with strict TLS verification.
 
 #### Test 1.1: gRPC Health Checks (Strict TLS)
 - **Purpose**: Verify gRPC services respond correctly with strict TLS (mTLS)
-- **Services Tested**: auth-service, social-service, listings-service, analytics-service, python-ai-service, auction-monitor
+- **Services Tested**: auth-service, messaging-service, listings-service, analytics-service, python-ai-service, auction-monitor
 - **What It Does**: 
   - Executes `grpc-health-probe` inside each service pod
   - Uses strict TLS verification (`-tls-no-verify=false`)
@@ -82,9 +82,9 @@ Tests complete user journeys across multiple services.
 
 ---
 
-#### Test 2.2: Social Service - Negotiation Helper
+#### Test 2.2: Messaging Service - Negotiation Helper
 
-**Purpose**: Test social service's ability to determine next negotiation tone based on context.
+**Purpose**: Test messaging-plane's ability to determine next negotiation tone based on context.
 
 **What It Does**:
 - Sends negotiation advice request to `/api/ai/negotiation-advice`
@@ -277,7 +277,7 @@ Results are saved to:
 - **Endpoints Tested**: `/api/auction-monitor/monitor`
 - **What It Does**: Receives auction listings, normalizes data, sends to analytics pipeline
 
-### Social Service
+### Messaging Service
 - **Role**: Forum and messaging, negotiation context
 - **Endpoints Tested**: `/api/social/healthz` (indirectly via negotiation advice)
 - **What It Does**: Provides context for negotiation helper (determines next tone)

@@ -44,7 +44,7 @@ T20.18A: NOT STARTED
 | Shadow pure / anchored | **8/16 / 16/16** (3 runs) |
 | Telemetry WARNs | **0** |
 | Leakage | **PASS** |
-| OCH | **PASS** |
+| RP | **PASS** |
 | Playwright | **PASS** |
 | Rollback drill | **PASS** (T20.17B) |
 | Lane C controls | **PASS** |

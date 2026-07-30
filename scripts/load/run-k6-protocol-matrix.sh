@@ -39,23 +39,23 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
 # Portable absolute paths for matrix logs (macOS + Linux).
-_och_realpath() {
+_rp_realpath() {
   python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1" 2>/dev/null || echo "$1"
 }
 
 # Resolve k6 binary to an absolute path (PATH lookup or path with a slash).
-_och_k6_abs() {
+_rp_k6_abs() {
   local e="$1"
   if [[ "$e" == /* || "$e" == */* ]]; then
     if [[ -x "$e" ]]; then
-      _och_realpath "$e"
+      _rp_realpath "$e"
       return
     fi
   fi
   local w
   w=$(command -v "$e" 2>/dev/null || true)
   if [[ -n "$w" ]]; then
-    _och_realpath "$w"
+    _rp_realpath "$w"
     return
   fi
   echo "$e"
@@ -213,15 +213,15 @@ k6_matrix_exec() {
   fi
 
   local sum_abs script_abs k6_abs ssl_abs tls_abs ca_abs
-  sum_abs=$(_och_realpath "$sum")
-  script_abs=$(_och_realpath "$script")
-  k6_abs=$(_och_k6_abs "$k6exe")
+  sum_abs=$(_rp_realpath "$sum")
+  script_abs=$(_rp_realpath "$script")
+  k6_abs=$(_rp_k6_abs "$k6exe")
   ssl_abs=""
-  [[ -n "${SSL_CERT_FILE:-}" ]] && ssl_abs=$(_och_realpath "${SSL_CERT_FILE}")
+  [[ -n "${SSL_CERT_FILE:-}" ]] && ssl_abs=$(_rp_realpath "${SSL_CERT_FILE}")
   tls_abs=""
-  [[ -n "${K6_TLS_CA_CERT:-}" ]] && tls_abs=$(_och_realpath "${K6_TLS_CA_CERT}")
+  [[ -n "${K6_TLS_CA_CERT:-}" ]] && tls_abs=$(_rp_realpath "${K6_TLS_CA_CERT}")
   ca_abs=""
-  [[ -n "${K6_CA_ABSOLUTE:-}" ]] && ca_abs=$(_och_realpath "${K6_CA_ABSOLUTE}")
+  [[ -n "${K6_CA_ABSOLUTE:-}" ]] && ca_abs=$(_rp_realpath "${K6_CA_ABSOLUTE}")
 
   local exact_repro=""
   case "$proto" in
@@ -349,15 +349,15 @@ if [[ "${1:-}" == "http1" || "${1:-}" == "http2" || "${1:-}" == "http3" ]]; then
       echo "http3 requires xk6-http3 (e.g. .k6-build/bin/k6-http3). Set K6_HTTP3_BIN or run K6_MATRIX_ENSURE_HTTP3=1 $0 ..." >&2
       exit 1
     fi
-    say "http3 binary (resolved): $(_och_k6_abs "$HTTP3_BIN")"
+    say "http3 binary (resolved): $(_rp_k6_abs "$HTTP3_BIN")"
     export K6_HTTP3_NO_REUSE="${K6_HTTP3_NO_REUSE:-1}"
     [[ "$SINGLE_SVC" == "gateway" ]] && script_cell="$H3_SCRIPT"
     k6_matrix_exec http3 "$SINGLE_SVC" "$script_cell" "$HTTP3_BIN"
   elif [[ "$SINGLE_PROTO" == "http2" ]]; then
-    say "http2 binary (resolved): $(_och_k6_abs "$K6_BIN")"
+    say "http2 binary (resolved): $(_rp_k6_abs "$K6_BIN")"
     k6_matrix_exec http2 "$SINGLE_SVC" "$script_cell" "$K6_BIN"
   else
-    say "http1 binary (resolved): $(_och_k6_abs "$K6_BIN")"
+    say "http1 binary (resolved): $(_rp_k6_abs "$K6_BIN")"
     k6_matrix_exec http1 "$SINGLE_SVC" "$script_cell" "$K6_BIN"
   fi
   "$REPO_ROOT/scripts/perf/summarize-protocol-matrix.sh" "$OUT"
@@ -368,9 +368,9 @@ fi
 say "Protocol matrix → $OUT"
 say "Per-run k6 logs → $OUT/k6-matrix-logs/"
 if [[ -n "$HTTP3_BIN" ]]; then
-  say "Binary resolution: http1/http2 → $(_och_k6_abs "$K6_BIN") | http3 → $HTTP3_BIN (resolved: $(_och_k6_abs "$HTTP3_BIN"))"
+  say "Binary resolution: http1/http2 → $(_rp_k6_abs "$K6_BIN") | http3 → $HTTP3_BIN (resolved: $(_rp_k6_abs "$HTTP3_BIN"))"
 else
-  say "Binary resolution: http1/http2 → $(_och_k6_abs "$K6_BIN") | http3 → <none — skipped or missing xk6-http3>"
+  say "Binary resolution: http1/http2 → $(_rp_k6_abs "$K6_BIN") | http3 → <none — skipped or missing xk6-http3>"
 fi
 
 say "1/3 ALPN/HTTP2 over core services"

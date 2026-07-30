@@ -16,7 +16,7 @@
 | T20.15C API | 9/9 HTTP 200, 1 keyword fallback, avg score 3.78 |
 | T20.15C shadow | pure 8/16, anchored 16/16, p95 427 ms, zero 0/16 |
 | T20.15C UI (canary off) | Playwright PASS, 0 WARNs, keyword retrieval |
-| Leakage / OCH | PASS |
+| Leakage / RP | PASS |
 
 ---
 

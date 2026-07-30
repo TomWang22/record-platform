@@ -1,5 +1,5 @@
 export * from "./metrics.js";
-export * from "./och-outbox-surface-metrics.js";
+export * from "./rp-outbox-surface-metrics.js";
 export * from "./http-concurrency-guard.js";
 export * from "./http-health.js";
 export * from "./logger.js";

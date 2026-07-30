@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-APPS=( api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service auction-monitor )
+APPS=( api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service shopping-service auction-monitor )
 
 # From k3d pods, the Docker host is the k3d network gateway (172.18.0.1). Use that so Redis/Postgres on host are reachable.
 _host_ip="${HOST_DOCKER_INTERNAL_IP:-}"

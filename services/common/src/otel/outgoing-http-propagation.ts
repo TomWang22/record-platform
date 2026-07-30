@@ -84,7 +84,7 @@ export type TracedFetchInit = RequestInit & {
 };
 
 function httpClientTracer() {
-  return trace.getTracer("och-http-client");
+  return trace.getTracer("rp-http-client");
 }
 
 /**
@@ -107,7 +107,7 @@ export async function tracedFetch(url: string | URL, init: TracedFetchInit = {})
         "url.full": href,
         "network.protocol.name": "http",
         "network.protocol.version": "unknown",
-        "och.upstream_proto": "unknown",
+        "rp.transport.upstream_protocol": "unknown",
       },
     },
     parentCtx,

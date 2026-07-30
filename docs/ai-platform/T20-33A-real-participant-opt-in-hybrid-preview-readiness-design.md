@@ -51,7 +51,7 @@ Same enroll/revoke/status/RAG gate checks as T20.27–T20.32; applied to artifac
 
 ## 7. Telemetry and quality gates
 
-HTTP 200 100%, fallback ≤1%, `final_tagged_plan` fallback 0, avg quality ≥3.5, worst ≥3.0, hybrid p95 ≤3000 ms, soak-path telemetry WARNs 0, leakage PASS, OCH PASS, Playwright PASS, PERCENT=0.
+HTTP 200 100%, fallback ≤1%, `final_tagged_plan` fallback 0, avg quality ≥3.5, worst ≥3.0, hybrid p95 ≤3000 ms, soak-path telemetry WARNs 0, leakage PASS, RP PASS, Playwright PASS, PERCENT=0.
 
 ## 8. Rollback and `CANARY=0`
 

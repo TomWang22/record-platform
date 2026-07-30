@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stop OCH local dev workloads: delete app namespace (Kubernetes) and docker compose down (host Postgres/Redis).
+# Stop RP local dev workloads: delete app namespace (Kubernetes) and docker compose down (host Postgres/Redis).
 # Does not delete Colima VM or cluster-wide ingress-nginx by default.
 #
 #   DEV_DOWN_CONFIRM=yes ./scripts/dev-down.sh
@@ -18,9 +18,9 @@ if command -v kubectl >/dev/null 2>&1 && [[ -f "$SCRIPT_DIR/lib/colima-kubeconfi
   # shellcheck source=scripts/lib/colima-kubeconfig.sh
   source "$SCRIPT_DIR/lib/colima-kubeconfig.sh"
   if ! kubectl get nodes --request-timeout=8s >/dev/null 2>&1; then
-    och_export_colima_kubeconfig_prefer_reachable || true
+    rp_export_colima_kubeconfig_prefer_reachable || true
   elif [[ -z "${KUBECONFIG:-}" ]]; then
-    och_export_colima_kubeconfig_prefer_reachable || {
+    rp_export_colima_kubeconfig_prefer_reachable || {
       _k="${HOME}/.colima/default/kubernetes/kubeconfig"
       [[ -s "$_k" ]] || _k="${HOME}/.colima/default/kubeconfig"
       [[ -s "$_k" ]] && export KUBECONFIG="$_k"

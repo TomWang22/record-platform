@@ -111,7 +111,7 @@ fi
 
 # 4. Check gRPC Service TLS Configuration
 say "4. gRPC Service TLS Configuration"
-SERVICES=("auth-service:50051" "records-service:50051" "social-service:50056" "listings-service:50057" "analytics-service:50054" "shopping-service:50058" "auction-monitor:50059")
+SERVICES=("auth-service:50051" "records-service:50051" "messaging-service:50056" "listings-service:50057" "analytics-service:50054" "shopping-service:50058" "auction-monitor:50059")
 for svc_port in "${SERVICES[@]}"; do
   svc="${svc_port%%:*}"
   port="${svc_port##*:}"

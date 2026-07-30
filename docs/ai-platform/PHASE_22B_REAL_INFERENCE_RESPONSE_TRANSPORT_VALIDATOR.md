@@ -123,7 +123,7 @@ Validator run 2026-07-05T03:06:16Z. Baseline capture only — not a hard gate.
 | Search / retrieval latency | **Baseline captured** — `rag_total_ms` per probe |
 | Ingestion success rates | **Defined** — metrics + gaps documented (`PHASE_22_KPI_OBSERVABILITY_READINESS.md`) |
 | Data-to-searchable time | **Defined** — lifecycle fields proposed; no invented data |
-| Operational health | **Defined** — gates + existing T20/OCH references |
+| Operational health | **Defined** — gates + existing T20/RP references |
 
 Summarizer:
 

@@ -47,7 +47,7 @@ revoke → verify `keyword_default` → enroll → verify `preview_opt_in` + RAG
 
 ## 7–10. Gates, rollback, rejections
 
-Same as T20.34: UI/API consistency, `CANARY=0` drill after C-LIVE, telemetry/leakage/OCH/Playwright gates, no production defaults, no staging relabeling.
+Same as T20.34: UI/API consistency, `CANARY=0` drill after C-LIVE, telemetry/leakage/RP/Playwright gates, no production defaults, no staging relabeling.
 
 ## 11. Verdict
 

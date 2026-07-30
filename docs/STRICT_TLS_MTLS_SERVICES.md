@@ -21,7 +21,7 @@ All gRPC backends use **strict TLS and mTLS**: server TLS with client certificat
 | auth-service      | 50051     | true                          | /certs/dev-root.pem| /etc/certs        | gRPC+TLS    |
 | records-service   | 50051     | true                          | /certs/dev-root.pem| /etc/certs        | gRPC+TLS    |
 | listings-service  | 50057     | true                          | /certs/dev-root.pem| /etc/certs        | gRPC+TLS    |
-| social-service    | 50056     | true                          | /certs/dev-root.pem| /etc/certs        | gRPC+TLS    |
+| messaging-service    | 50056     | true                          | /certs/dev-root.pem| /etc/certs        | gRPC+TLS    |
 | shopping-service  | 50058     | true                          | /certs/dev-root.pem| /etc/certs        | gRPC+TLS    |
 | analytics-service | 50054     | true                          | /certs/dev-root.pem| /etc/certs        | gRPC+TLS    |
 | auction-monitor   | 50059     | true                          | /certs/dev-root.pem| /etc/certs        | gRPC+TLS    |

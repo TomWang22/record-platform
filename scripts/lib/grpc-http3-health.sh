@@ -65,10 +65,10 @@ run_grpc_http3_health_checks() {
   say "Health: gRPC via Caddy/Envoy (grpcurl → ${TARGET_IP}:443, -authority $host)"
   local grpc_certs_dir="${GRPC_CERTS_DIR:-/tmp/grpc-certs}"
   if [[ ! -f "${grpc_certs_dir}/tls.crt" ]] || [[ ! -s "${grpc_certs_dir}/tls.crt" ]]; then
-    if [[ -f "$lib_dir/ensure-och-grpc-certs.sh" ]]; then
-      # shellcheck source=scripts/lib/ensure-och-grpc-certs.sh
-      source "$lib_dir/ensure-och-grpc-certs.sh"
-      och_sync_grpc_certs_to_dir "$grpc_certs_dir" "$ns" || true
+    if [[ -f "$lib_dir/ensure-rp-grpc-certs.sh" ]]; then
+      # shellcheck source=scripts/lib/ensure-rp-grpc-certs.sh
+      source "$lib_dir/ensure-rp-grpc-certs.sh"
+      rp_sync_grpc_certs_to_dir "$grpc_certs_dir" "$ns" || true
     fi
   fi
   local use_mtls=0

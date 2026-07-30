@@ -17,7 +17,7 @@
 | pgvector / HNSW | **PASS** |
 | Starting PERCENT | **0** |
 | Telemetry WARNs (pre) | **0** |
-| Contracts / OCH (pre) | **PASS** |
+| Contracts / RP (pre) | **PASS** |
 
 ---
 
@@ -94,9 +94,9 @@ seller-intelligence **PASS** · record RAG (Lane C) **PASS** · longform RAG (La
 
 ---
 
-## 7. Telemetry / contracts / OCH / source diagnostic
+## 7. Telemetry / contracts / RP / source diagnostic
 
-Telemetry WARNs **0** · contracts **PASS** · OCH **PASS** · leakage **PASS** · source diagnostic **PASS** (Lane C)
+Telemetry WARNs **0** · contracts **PASS** · RP **PASS** · leakage **PASS** · source diagnostic **PASS** (Lane C)
 
 ---
 

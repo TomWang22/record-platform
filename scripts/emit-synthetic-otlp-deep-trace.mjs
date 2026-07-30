@@ -69,7 +69,7 @@ const body = {
       },
       scopeSpans: [
         {
-          scope: { name: "och-synthetic-trace", version: "1.0.0" },
+          scope: { name: "rp-synthetic-trace", version: "1.0.0" },
           spans,
         },
       ],

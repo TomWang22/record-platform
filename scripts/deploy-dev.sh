@@ -207,8 +207,8 @@ fi
 
 # 10) Service Endpoints gate (hard fail — no silent 502s)
 say "Waiting for Record Platform Service Endpoints (before smoke)…"
-chmod +x "$SCRIPT_DIR/wait-for-housing-service-endpoints.sh" 2>/dev/null || true
-bash "$SCRIPT_DIR/wait-for-housing-service-endpoints.sh"
+chmod +x "$SCRIPT_DIR/wait-for-platform-service-endpoints.sh" 2>/dev/null || true
+bash "$SCRIPT_DIR/wait-for-platform-service-endpoints.sh"
 
 # 11) Smoke test
 if [[ "${SKIP_SMOKE:-0}" != "1" ]] && [[ -f "$SCRIPT_DIR/smoke-test-dev.sh" ]]; then

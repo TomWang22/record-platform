@@ -124,9 +124,9 @@ _check_make_bootstrap_env() {
   grep -q 'BOOTSTRAP_SKIP_P0=1' "$cb" || _bump 'missing BOOTSTRAP_SKIP_P0=1'
   grep -q 'BOOTSTRAP_FULL_WIPE=0' "$cb" || _bump 'missing BOOTSTRAP_FULL_WIPE=0'
   grep -q 'source.*ensure-colima-docker-context' "$cb" || _bump 'F.cluster_deploy must source ensure-colima-docker-context.sh'
-  grep -qE 'och_ensure_colima_docker_context' "$cb" || _bump 'F.cluster_deploy must call och_ensure_colima_docker_context'
-  grep -qE 'env OCH_FORCE_COLIMA_DOCKER=1 och_ensure_colima_docker_context' "$cb" && \
-    _bump 'F.cluster_deploy must not run och_ensure_colima_docker_context via env (shell function, not binary)'
+  grep -qE 'rp_ensure_colima_docker_context' "$cb" || _bump 'F.cluster_deploy must call rp_ensure_colima_docker_context'
+  grep -qE 'env RP_FORCE_COLIMA_DOCKER=1 rp_ensure_colima_docker_context' "$cb" && \
+    _bump 'F.cluster_deploy must not run rp_ensure_colima_docker_context via env (shell function, not binary)'
   grep -q 'live output in log' "$REPO_ROOT/scripts/lib/rp-cold-bootstrap-lib.sh" && \
     _bump 'F.cluster_deploy must not print tail -f / live output in log hint'
   grep -q 'rp-audit-runtime-service-list' "$cb" || _bump 'cold-bootstrap must run rp-audit-runtime-service-list before C.images and F.cluster_deploy'
@@ -161,5 +161,5 @@ if [[ $_fail -ne 0 ]]; then
   echo "Log: $LOG" >&2
   exit 1
 fi
-echo "✅ cold-bootstrap order + OCH UX checks passed"
+echo "✅ cold-bootstrap order + RP UX checks passed"
 echo "   log: $LOG"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Emit Markdown index audit matrix: definition + idx_scan + size (per OCH DB).
+# Emit Markdown index audit matrix: definition + idx_scan + size (per RP DB).
 # Usage: ./generate-index-audit-md.sh [report.md]
 set -euo pipefail
 

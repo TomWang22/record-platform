@@ -56,7 +56,7 @@ bash scripts/coverage/run-service-coverage.sh python-ai-service
 node scripts/coverage/enforce-service-coverage.mjs
 bash scripts/audit-rp-ai-rag-contract.sh
 bash scripts/rp-ai-rag-quality-smoke.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 ## Proof SQL (contract seller)

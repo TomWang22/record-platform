@@ -18,7 +18,7 @@ usage() {
   cat <<USAGE
 Usage: ${0##*/} [options]
   -p, --pod NAME           Postgres pod name (default: autodetect)
-  -n, --namespace NS       Kubernetes namespace (default: off-campus-housing)
+  -n, --namespace NS       Kubernetes namespace (default: record-platform)
   -u, --user UUID          User UUID to benchmark (default: 0dc268d0-a86f-4e12-8d10-9db0f1b735e0)
   -d, --duration SEC       Duration per benchmark run (default: 60)
   -c, --clients LIST       Comma-separated client counts (default: based on MODE)
@@ -54,7 +54,7 @@ AUTH_DB_USER="${AUTH_DB_USER:-postgres}"
 AUTH_DB_NAME="${AUTH_DB_NAME:-records}"
 AUTH_DB_PASS="${AUTH_DB_PASS:-postgres}"
 
-NS="off-campus-housing"
+NS="record-platform"
 POD=""
 USER_UUID="0dc268d0-a86f-4e12-8d10-9db0f1b735e0"
 DURATION=60

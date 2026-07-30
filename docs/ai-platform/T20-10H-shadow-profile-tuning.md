@@ -65,7 +65,7 @@ Also fixed: removed stale `OLLAMA_BASE_URL` override in deploy manifest (was poi
 | python-ai tests | **119 passed**, 91.42% line cov |
 | enforce-service-coverage | **PASS** |
 | RAG contract | **PASS** |
-| OCH scan | **PASS** |
+| RP scan | **PASS** |
 | Shadow source diagnostic | **PASS** (OBO owner-visible **18**) |
 
 **Artifact:** `bench_logs/ai-platform/t20-10-shadow-real-query-20260622-212447.md`

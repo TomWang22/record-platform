@@ -38,7 +38,7 @@
 | Canary errors | **0** | 0 **PASS** |
 | Telemetry WARNs | **0** | 0 **PASS** |
 | Leakage | **PASS** | **PASS** |
-| OCH | **PASS** | **PASS** |
+| RP | **PASS** | **PASS** |
 | PERCENT | **0** | **PASS** |
 | Playwright | seller + record + longform **PASS** | **PASS** |
 

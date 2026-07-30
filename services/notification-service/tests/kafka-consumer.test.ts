@@ -25,7 +25,7 @@ vi.mock("@common/utils/kafka", () => {
       consumer: consumerFactory,
       producer: vi.fn(),
     })),
-    ochKafkaTopicIsolationSuffix: (...args: unknown[]) => ochSuffixFn(...args),
+    rpKafkaTopicIsolationSuffix: (...args: unknown[]) => ochSuffixFn(...args),
   };
 });
 
@@ -59,7 +59,7 @@ describe("notification kafka-consumer", () => {
     Object.keys(origEnv).forEach((k) => delete origEnv[k]);
     saveEnv("ENV_PREFIX");
     saveEnv("NOTIFICATION_KAFKA_TOPICS");
-    saveEnv("OCH_KAFKA_TOPIC_SUFFIX");
+    saveEnv("RP_KAFKA_TOPIC_SUFFIX");
     saveEnv("NOTIFICATION_KAFKA_CONSUMER");
     saveEnv("KAFKA_SSL_ENABLED");
     saveEnv("KAFKA_CA_CERT");
@@ -69,7 +69,7 @@ describe("notification kafka-consumer", () => {
 
     process.env.ENV_PREFIX = "dev";
     delete process.env.NOTIFICATION_KAFKA_TOPICS;
-    delete process.env.OCH_KAFKA_TOPIC_SUFFIX;
+    delete process.env.RP_KAFKA_TOPIC_SUFFIX;
     delete process.env.NOTIFICATION_KAFKA_CONSUMER;
     delete process.env.KAFKA_SSL_ENABLED;
     delete process.env.KAFKA_CA_CERT;

@@ -3,7 +3,7 @@
 # of caddy-h3 (or first ingress-nginx LoadBalancer). Used by make hosts-sanity / ensure-edge-hosts / dev-onboard.
 #
 # Env:
-#   OCH_EDGE_HOSTNAME   — hostname (default record-platform.test)
+#   RP_EDGE_HOSTNAME   — hostname (default record-platform.test)
 #   EXTERNAL_IP         — force LB IP (skips kubectl discovery)
 #   HOSTS_AUTO          — 1 = append with sudo if missing (default 1 when unset; set 0 for hints only)
 #   EDGE_HOSTS_STRICT   — 1 = exit 1 if IP missing after discovery, or sudo fails
@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/edge-test-url.sh"
 
-HOST="${RP_PUBLIC_HOST:-${OCH_EDGE_HOSTNAME:-record-platform.test}}"
+HOST="${RP_PUBLIC_HOST:-${RP_EDGE_HOSTNAME:-record-platform.test}}"
 STRICT="${EDGE_HOSTS_STRICT:-0}"
 # Default auto-apply for greenfield onboarding; set HOSTS_AUTO=0 to only print hints.
 HOSTS_AUTO="${HOSTS_AUTO:-1}"
@@ -100,17 +100,17 @@ write_hosts_mapping() {
     fi
   fi
   if [[ "$(id -u)" -eq 0 ]]; then
-    grep -vF "$h" /etc/hosts > /tmp/och.hosts.new 2>/dev/null || true
-    printf '%s\n' "$line" >> /tmp/och.hosts.new
-    mv /tmp/och.hosts.new /etc/hosts
+    grep -vF "$h" /etc/hosts > /tmp/rp.hosts.new 2>/dev/null || true
+    printf '%s\n' "$line" >> /tmp/rp.hosts.new
+    mv /tmp/rp.hosts.new /etc/hosts
     ok "Updated /etc/hosts: $line (root)"
     return 0
   fi
   if command -v sudo >/dev/null 2>&1; then
-    sudo env OCH_HOSTS_NAME="$h" OCH_HOSTS_LINE="$line" bash -c '
-      grep -vF "$OCH_HOSTS_NAME" /etc/hosts > /tmp/och.hosts.new 2>/dev/null || true
-      printf "%s\n" "$OCH_HOSTS_LINE" >> /tmp/och.hosts.new
-      mv /tmp/och.hosts.new /etc/hosts
+    sudo env RP_HOSTS_NAME="$h" RP_HOSTS_LINE="$line" bash -c '
+      grep -vF "$RP_HOSTS_NAME" /etc/hosts > /tmp/rp.hosts.new 2>/dev/null || true
+      printf "%s\n" "$RP_HOSTS_LINE" >> /tmp/rp.hosts.new
+      mv /tmp/rp.hosts.new /etc/hosts
     '
     ok "Updated /etc/hosts: $line (sudo)"
     return 0

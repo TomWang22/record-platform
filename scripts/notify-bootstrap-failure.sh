@@ -12,20 +12,20 @@ LOG="${2:-}"
 WEBHOOK="${BOOTSTRAP_ALERT_WEBHOOK:-}"
 [[ -z "$WEBHOOK" ]] && exit 0
 
-export OCH_PHASE="$PHASE"
-export OCH_LOG="${LOG:-}"
-export OCH_HOST="$(hostname 2>/dev/null || echo unknown)"
-export OCH_TS="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)"
+export RP_PHASE="$PHASE"
+export RP_LOG="${LOG:-}"
+export RP_HOST="$(hostname 2>/dev/null || echo unknown)"
+export RP_TS="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)"
 
 PAYLOAD="$(python3 <<'PY'
 import json, os
 
 lines = [
     "❌ Bootstrap FAILED",
-    f"Phase: {os.environ.get('OCH_PHASE', '')}",
-    f"Log: {os.environ.get('OCH_LOG') or '(none)'}",
-    f"Host: {os.environ.get('OCH_HOST', '')}",
-    f"Time: {os.environ.get('OCH_TS', '')}",
+    f"Phase: {os.environ.get("RP_PHASE', '')}",
+    f"Log: {os.environ.get("RP_LOG') or '(none)'}",
+    f"Host: {os.environ.get("RP_HOST', '')}",
+    f"Time: {os.environ.get("RP_TS', '')}",
 ]
 print(json.dumps({"content": "\n".join(lines)}))
 PY

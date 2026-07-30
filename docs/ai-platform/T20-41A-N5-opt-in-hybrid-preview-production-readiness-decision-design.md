@@ -44,7 +44,7 @@ Hybrid p95: 164.39 ms
 Avg/worst quality: 4.0 / 4.0
 Rollback: PASS
 Telemetry WARNs: 0
-OCH: PASS
+RP: PASS
 Playwright C-suite: 7/7 PASS
 ```
 

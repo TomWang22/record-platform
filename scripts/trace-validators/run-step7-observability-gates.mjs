@@ -61,7 +61,7 @@ async function main() {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const specVersion = "och-observability-integrity-spec-v1";
+  const specVersion = "rp-observability-integrity-spec-v1";
 
   let lastErr = "no trace passed gates";
   for (let attempt = 1; attempt <= retries; attempt++) {

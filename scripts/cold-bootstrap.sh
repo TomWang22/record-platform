@@ -32,8 +32,8 @@ source "$SCRIPT_DIR/lib/rp-cold-bootstrap-lib.sh"
 source "$SCRIPT_DIR/lib/rp-cold-bootstrap-kafka-tls.sh"
 
 export RP_SKIP_BOOKING_DB="${RP_SKIP_BOOKING_DB:-1}"
-export RP_SKIP_BOOKING_SERVICE="${RP_SKIP_BOOKING_SERVICE:-${RP_SKIP_BOOKING_DB}}"
-export RP_SKIP_SOCIAL_SERVICE="${RP_SKIP_SOCIAL_SERVICE:-1}"
+export RP_SKIP_RESERVATION_MESH="${RP_SKIP_RESERVATION_MESH:-${RP_SKIP_BOOKING_DB}}"
+export RP_SKIP_MESSAGING_LEGACY_PEER="${RP_SKIP_MESSAGING_LEGACY_PEER:-1}"
 export RP_CORE_ONLY_BOOTSTRAP="${RP_CORE_ONLY_BOOTSTRAP:-0}"
 # shellcheck source=scripts/lib/rp-ollama-gate-policy.sh
 source "$SCRIPT_DIR/lib/rp-ollama-gate-policy.sh"
@@ -116,7 +116,7 @@ if [[ "$RP_CB_DRY_RUN" != "1" ]]; then
       rp_cb_phase_fail A.workspace "pnpm run build failed" "pnpm run build"
   fi
   test -s tools/kafka-contract/dist/index.js || rp_cb_phase_fail A.workspace "missing tools/kafka-contract/dist/index.js" "pnpm run build"
-  rp_cb_assert_workspace_no_booking_social || rp_cb_phase_fail A.workspace "booking/social in workspace" "remove services/booking-service and social-service from workspace"
+  rp_cb_assert_workspace_no_booking_social || rp_cb_phase_fail A.workspace "excluded peers in workspace" "remove excluded legacy peer package directories from workspace"
   rp_cb_ok "workspace invariant OK"
 else
   echo "[dry-run] make kafka-alignment-report-venv && pnpm install --frozen-lockfile && pnpm run build"
@@ -130,6 +130,16 @@ else
   rp_cb_ok "skip workspace gate (dry-run or COLD_BOOTSTRAP_SKIP_GATES=1)"
 fi
 rp_cb_phase_complete A.workspace
+
+# --- A.namespace_integrity_static (fail-closed before destructive reset / builds) ---
+rp_cb_phase_enter A.namespace_integrity_static "static legacy-namespace purity scan"
+if [[ "$RP_CB_DRY_RUN" != "1" ]]; then
+  bash "$SCRIPT_DIR/verify-namespace-integrity-static.sh" || \
+    rp_cb_phase_fail A.namespace_integrity_static "active legacy namespace hits in checkout" "bash scripts/verify-namespace-integrity-static.sh"
+else
+  echo "[dry-run] bash scripts/verify-namespace-integrity-static.sh"
+fi
+rp_cb_phase_complete A.namespace_integrity_static
 
 # --- P0.hard_reset (destructive boundary — before Colima start) ---
 rp_cb_phase_enter P0.hard_reset "destructive reset"
@@ -212,7 +222,7 @@ else
 fi
 # shellcheck source=scripts/lib/ensure-colima-docker-context.sh
 source "$SCRIPT_DIR/lib/ensure-colima-docker-context.sh"
-OCH_FORCE_COLIMA_DOCKER=1 och_ensure_colima_docker_context || \
+RP_FORCE_COLIMA_DOCKER=1 rp_ensure_colima_docker_context || \
   rp_cb_phase_fail C.infra "Docker Desktop vs Colima conflict (or Colima docker socket down)" \
     "quit Docker Desktop; DOCKER_HOST=unix://\$HOME/.colima/default/docker.sock docker context use colima"
 export RP_CB_RUN_LABEL="stop legacy external containers"
@@ -269,7 +279,7 @@ fi
 rp_cb_phase_complete D.backup_materialization
 
 # --- E.restore (dump restore only — SKIP_COMPOSE_UP=1; not a second compose up) ---
-rp_cb_phase_enter E.restore "restore 5433–5443 only (booking/social skipped)"
+rp_cb_phase_enter E.restore "restore 5433–5443 only (excluded peers skipped)"
 export SKIP_COMPOSE_UP=1
 export SKIP_AUTO_RESTORE=0
 export RP_CB_RUN_LABEL="hybrid restore (bring-up-external-infra, SKIP_COMPOSE_UP=1)"
@@ -357,6 +367,16 @@ else
 fi
 rp_cb_phase_complete D.contract_audits
 
+# Re-run static namespace gate immediately before image build
+rp_cb_phase_enter A.namespace_integrity_static "static namespace purity before E.build_images"
+if [[ "$RP_CB_DRY_RUN" != "1" ]]; then
+  bash "$SCRIPT_DIR/verify-namespace-integrity-static.sh" || \
+    rp_cb_phase_fail A.namespace_integrity_static "active legacy namespace hits before image build" "bash scripts/verify-namespace-integrity-static.sh"
+else
+  echo "[dry-run] bash scripts/verify-namespace-integrity-static.sh"
+fi
+rp_cb_phase_complete A.namespace_integrity_static
+
 # --- E.build_images (all active :dev images with RP_SOURCE_SHA) ---
 rp_cb_phase_enter E.build_images "build active RP :dev images (RP_SOURCE_SHA per service)"
 if [[ "$RP_CB_DRY_RUN" != "1" ]]; then
@@ -366,8 +386,8 @@ if [[ "$RP_CB_DRY_RUN" != "1" ]]; then
   echo ""
   # shellcheck source=scripts/lib/ensure-colima-docker-context.sh
   source "$SCRIPT_DIR/lib/ensure-colima-docker-context.sh"
-  export OCH_FORCE_COLIMA_DOCKER=1
-  och_ensure_colima_docker_context || rp_cb_phase_fail E.build_images "Colima docker context failed" "colima start; docker context use colima"
+  export RP_FORCE_COLIMA_DOCKER=1
+  rp_ensure_colima_docker_context || rp_cb_phase_fail E.build_images "Colima docker context failed" "colima start; docker context use colima"
   export RP_CB_RUN_LABEL="make rp-build-missing-images"
   export RP_COLD_BOOTSTRAP=1
   rp_cb_run make rp-build-missing-images || \
@@ -416,9 +436,9 @@ else
   fi
   # shellcheck source=scripts/lib/ensure-colima-docker-context.sh
   source "$SCRIPT_DIR/lib/ensure-colima-docker-context.sh"
-  export OCH_FORCE_COLIMA_DOCKER=1
-  export OCH_KUBE_CONTEXT="${OCH_KUBE_CONTEXT:-colima}"
-  och_ensure_colima_docker_context || rp_cb_phase_fail F.cluster_deploy "Colima docker context failed" "colima start; docker context use colima"
+  export RP_FORCE_COLIMA_DOCKER=1
+  export RP_KUBE_CONTEXT="${RP_KUBE_CONTEXT:-colima}"
+  rp_ensure_colima_docker_context || rp_cb_phase_fail F.cluster_deploy "Colima docker context failed" "colima start; docker context use colima"
   chmod +x "$SCRIPT_DIR/rp-audit-runtime-service-list.sh" 2>/dev/null || true
   export RP_CB_RUN_LABEL="audit runtime service lists (pre cluster deploy)"
   rp_cb_run bash "$SCRIPT_DIR/rp-audit-runtime-service-list.sh" || \
@@ -571,10 +591,55 @@ if [[ "$RP_CB_DRY_RUN" != "1" ]]; then
 fi
 rp_cb_phase_complete G.app_runtime
 
-# --- H.observability (light) ---
-if [[ "${COLD_BOOTSTRAP_SKIP_OBSERVABILITY_ARTIFACTS:-0}" != "1" ]] && [[ "$RP_CB_DRY_RUN" != "1" ]] && [[ -x "$SCRIPT_DIR/ensure-observability-stack-ready.sh" ]]; then
-  rp_cb_phase_enter H.observability "ensure observability stack"
-  rp_cb_run bash "$SCRIPT_DIR/ensure-observability-stack-ready.sh" || echo "⚠️  observability stack not ready (non-fatal before hosts gate)"
+# --- H.observability (query plane required; fail-closed) ---
+if [[ "${COLD_BOOTSTRAP_SKIP_OBSERVABILITY_ARTIFACTS:-0}" != "1" ]] && [[ "$RP_CB_DRY_RUN" != "1" ]]; then
+  rp_cb_phase_enter H.observability.deploy "apply/ensure observability resources"
+  if [[ -x "$SCRIPT_DIR/ensure-observability-stack.sh" ]]; then
+    rp_cb_run bash "$SCRIPT_DIR/ensure-observability-stack.sh" || \
+      rp_cb_phase_fail H.observability.deploy "observability apply failed" "bash scripts/ensure-observability-stack.sh"
+  elif [[ -x "$SCRIPT_DIR/ensure-observability-stack-ready.sh" ]]; then
+    rp_cb_run bash "$SCRIPT_DIR/ensure-observability-stack-ready.sh" || \
+      rp_cb_phase_fail H.observability.deploy "observability ready failed" "bash scripts/ensure-observability-stack-ready.sh"
+  else
+    rp_cb_phase_fail H.observability.deploy "missing ensure-observability-stack*.sh" "add scripts/ensure-observability-stack.sh"
+  fi
+  rp_cb_phase_complete H.observability.deploy
+
+  rp_cb_phase_enter H.observability.otel_ingestion "OTel Collector ClusterIP ingestion"
+  rp_cb_run bash "$SCRIPT_DIR/verify-otel-collector-ingestion.sh" || \
+    rp_cb_phase_fail H.observability.otel_ingestion "collector not ready" "bash scripts/verify-otel-collector-ingestion.sh"
+  rp_cb_phase_complete H.observability.otel_ingestion
+
+  rp_cb_phase_enter H.observability.jaeger_storage "Jaeger storage/query Ready"
+  rp_cb_run bash "$SCRIPT_DIR/ensure-observability-stack-ready.sh" || \
+    rp_cb_phase_fail H.observability.jaeger_storage "jaeger not ready" "bash scripts/ensure-observability-stack-ready.sh"
+  rp_cb_phase_complete H.observability.jaeger_storage
+
+  rp_cb_phase_enter H.observability.jaeger_query_metallb "Jaeger Query MetalLB + hosts"
+  if [[ -x "$SCRIPT_DIR/ensure-jaeger-query-hosts.sh" ]]; then
+    HOSTS_AUTO="${HOSTS_AUTO:-1}" EDGE_HOSTS_STRICT=0 \
+      rp_cb_run bash "$SCRIPT_DIR/ensure-jaeger-query-hosts.sh" || true
+  fi
+  rp_cb_run bash "$SCRIPT_DIR/verify-jaeger-query-metallb.sh" || \
+    rp_cb_phase_fail H.observability.jaeger_query_metallb "MetalLB/DNS failed" "sudo bash scripts/ensure-jaeger-query-hosts.sh && bash scripts/verify-jaeger-query-metallb.sh"
+  rp_cb_phase_complete H.observability.jaeger_query_metallb
+
+  rp_cb_phase_enter H.observability.external_tls "Jaeger query TLS chain"
+  rp_cb_run bash "$SCRIPT_DIR/verify-jaeger-query-tls.sh" || \
+    rp_cb_phase_fail H.observability.external_tls "query TLS failed" "bash scripts/verify-jaeger-query-tls.sh"
+  rp_cb_phase_complete H.observability.external_tls
+
+  rp_cb_phase_enter H.observability.trace_round_trip "exact-trace MetalLB round-trip"
+  rp_cb_run bash "$SCRIPT_DIR/jaeger-metallb-trace-roundtrip.sh" || \
+    rp_cb_phase_fail H.observability.trace_round_trip "trace round-trip failed" "bash scripts/jaeger-metallb-trace-roundtrip.sh"
+  rp_cb_phase_complete H.observability.trace_round_trip
+
+  rp_cb_phase_enter F.namespace_integrity_runtime "runtime legacy-namespace purity (K8s + MetalLB Jaeger)"
+  rp_cb_run bash "$SCRIPT_DIR/verify-namespace-integrity-runtime.sh" || \
+    rp_cb_phase_fail F.namespace_integrity_runtime "runtime namespace hits or fresh-trace failure" "bash scripts/verify-namespace-integrity-runtime.sh"
+  rp_cb_phase_complete F.namespace_integrity_runtime
+
+  rp_cb_phase_enter H.observability "observability query-plane umbrella"
   rp_cb_phase_complete H.observability
 fi
 

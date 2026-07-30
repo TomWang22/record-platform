@@ -44,8 +44,8 @@ fail() { echo "FAIL: $*" | tee -a "$PROBE_LOG" >&2; exit 1; }
 
 jq_assert_no_forbidden() {
   local label="$1" json="$2"
-  if echo "$json" | jq -e '.. | strings | test("landlord|tenant|booking|housing|OCH|record\\.local"; "i")' >/dev/null 2>&1; then
-    fail "$label contains forbidden OCH/housing terms"
+  if echo "$json" | jq -e '.. | strings | test("landlord|tenant|booking|housing|RP|record\\.local"; "i")' >/dev/null 2>&1; then
+    fail "$label contains forbidden RP/housing terms"
   fi
   if echo "$json" | jq -e 'has("landlord_id") or has("landlordId")' >/dev/null 2>&1; then
     fail "$label contains landlord_id"

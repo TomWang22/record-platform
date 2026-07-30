@@ -79,7 +79,7 @@ fi
 if [[ -n "${METALLB_POOL:-}" ]] && [[ -f "$SCRIPT_DIR/lib/metallb-subnet-guard.sh" ]]; then
   # shellcheck disable=SC1091
   source "$SCRIPT_DIR/lib/metallb-subnet-guard.sh"
-  if ! och_assert_metallb_pool_coherent "$METALLB_POOL"; then
+  if ! rp_assert_metallb_pool_coherent "$METALLB_POOL"; then
     warn "Unset METALLB_POOL to auto-derive from node InternalIP, or set METALLB_POOL to match: kubectl get nodes -o wide"
     exit 1
   fi
@@ -136,4 +136,4 @@ fi
 step 6 "Cluster bootstrap complete"
 say "✅ Done (steps 1–${TOTAL_STEPS}/${TOTAL_STEPS}). MetalLB pool: see install-metallb-colima output or: kubectl -n metallb-system get ipaddresspool -o wide"
 say "Next (manual pieces): ./scripts/bring-up-external-infra.sh → ./scripts/build-housing-images-k3s.sh → ./scripts/deploy-dev.sh"
-say "One-shot (idiot-proof): ./scripts/setup-full-off-campus-housing-stack.sh — see docs/RUN_PIPELINE_ORDER.md"
+say "One-shot (idiot-proof): ./scripts/setup-full-record-platform-stack.sh — see docs/RUN_PIPELINE_ORDER.md"

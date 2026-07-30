@@ -1,4 +1,4 @@
--- Transactional outbox for booking-service. Run after 02-booking-state-machine.sql.
+-- Transactional outbox for reservation-mesh. Run after 02-booking-state-machine.sql.
 -- Flow: write domain change + insert outbox row in same transaction; commit; background worker publishes to Kafka; mark published.
 -- Contract: payload = serialized proto bytes (not JSON). envelope.event_id = outbox.id. Kafka key = aggregate_id. See docs/OUTBOX_PUBLISHER_AND_CONSUMER_CONTRACT.md.
 

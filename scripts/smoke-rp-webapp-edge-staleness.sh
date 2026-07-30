@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fail if edge HTML shows stale OCH/housing/dev-provider UI.
+# Fail if edge HTML shows stale RP/housing/dev-provider UI.
 set -euo pipefail
 
 BASE="${RP_EDGE_BASE:-https://record-platform.test}"
@@ -25,7 +25,7 @@ check_stale() {
   fi
   if echo "$html" | grep -qi 'Off-Campus'; then issues+=('off-campus'); fi
   if echo "$html" | grep -qiE '\bHousing\b'; then issues+=('housing'); fi
-  if echo "$html" | grep -q 'OCH'; then issues+=('och'); fi
+  if echo "$html" | grep -q 'RP'; then issues+=('och'); fi
   if echo "$html" | grep -qiE '\bbooking\b'; then issues+=('booking'); fi
   if echo "$html" | grep -qiE '\blandlord\b'; then issues+=('landlord'); fi
   if echo "$html" | grep -qiE '\blease\b'; then issues+=('lease'); fi

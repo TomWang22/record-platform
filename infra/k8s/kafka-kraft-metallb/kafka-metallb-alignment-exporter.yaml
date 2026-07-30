@@ -1,4 +1,4 @@
-# Optional: scrapes LB vs broker advertised EXTERNAL for Prometheus (housing-pods job).
+# Optional: scrapes LB vs broker advertised EXTERNAL for Prometheus (record-platform-pods job).
 # Requires prometheus_client + kubernetes (installed via initContainer).
 apiVersion: v1
 kind: ServiceAccount

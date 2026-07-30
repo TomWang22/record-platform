@@ -131,7 +131,7 @@ Auth: JWT login (`ContractPass123!`). JWT `sub` must match UUID — **no header 
 | Hybrid p95 | — | **≤3000 ms** |
 | Canary errors | **0** | **0** |
 | Telemetry WARNs | **0** | **0** |
-| Leakage / OCH / contracts / Playwright | **PASS** | **PASS** |
+| Leakage / RP / contracts / Playwright | **PASS** | **PASS** |
 | Anchored overlap | **16/16** | **≥10/16** |
 | Pure overlap | report-only | no promotion |
 | True zero-results / embed timeouts | **0** | **0** |

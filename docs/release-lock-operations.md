@@ -29,7 +29,7 @@ COLD_BOOTSTRAP_CONFIRM=yes RESTORE_BACKUP_DIR=backups/rp-all-11-<date> make cold
 ```bash
 pnpm install --frozen-lockfile
 bash scripts/rp-repo-hygiene-contract.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 bash scripts/rp-runtime-domain-comb.sh
 bash scripts/rp-db-domain-comb.sh
 bash scripts/rp-messaging-domain-comb.sh
@@ -80,7 +80,7 @@ make ollama-env           # point analytics-service at in-cluster Ollama LB
 |-----------|---------------|
 | `record.local` | `record-platform.test` |
 | `curl -k` / `--insecure` | `--cacert certs/dev-root.pem` |
-| OCH / off-campus-housing / landlord / tenant terms in product paths | RP marketplace vocabulary |
+| RP / record-platform / landlord / tenant terms in product paths | RP marketplace vocabulary |
 | Cursor `Co-authored-by` trailers in commits | `git commit-tree` rewrite before push |
 
 ## Rollback

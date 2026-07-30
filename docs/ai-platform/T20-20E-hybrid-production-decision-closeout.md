@@ -44,7 +44,7 @@ T20.21A: NOT STARTED
 | Hybrid p50 / p95 | **42.53 / 141.65 ms** |
 | Shadow pure / anchored | **8/16 / 16/16** |
 | Telemetry WARNs | **0** |
-| Leakage / OCH | **PASS** |
+| Leakage / RP | **PASS** |
 | Playwright | **PASS** |
 
 ---

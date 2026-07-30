@@ -92,7 +92,7 @@ Post-soak: all non-allowlist users → `keyword_default`.
 | Canary errors | **0** |
 | Soak-path telemetry WARNs | **0** |
 | Leakage | **PASS** |
-| OCH | **PASS** |
+| RP | **PASS** |
 | Playwright C-suite | **PASS** |
 | Guest preview hidden | **PASS** |
 | Message-body exposure | **0** |
@@ -129,7 +129,7 @@ If C-LIVE blocked or fails: **T20.37D SKIPPED**.
 | Gate reason counts | preview_opt_in + allowlist |
 | Quality / latency | avg, worst, hybrid p50/p95, keyword p50/p95 |
 | Telemetry WARNs | 0 for soak path |
-| OCH | PASS |
+| RP | PASS |
 | Leakage / message bodies | PASS / 0 |
 | Source diagnostic | report-only if OBO/route class |
 | Cumulative live | prior 26145 + T20.37C increment |

@@ -19,7 +19,7 @@ spec:
             - name: GATEWAY_CLUSTER_WEIGHT_CAP
               value: "600"
             - name: GATEWAY_CLUSTER_WEIGHT_KEY
-              value: "och:cluster:weight:sum"
+              value: "rp:cluster:weight:sum"
             - name: GATEWAY_WATCHDOG_POLL
               value: "1"
             - name: GATEWAY_E2E_TEST_INFLIGHT_CAP

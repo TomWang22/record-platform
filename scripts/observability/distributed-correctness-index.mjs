@@ -5,9 +5,9 @@
  *   0.15 formal temporal (LTL ∧ model-check-lite ∧ trace-temporal) +
  *   0.15 chaos + 0.10 SLA + 0.10 protocol
  *
- * Writes bench_logs/dci-metrics.prom (merged in och-service-coverage-matrix → coverage-export.prom).
+ * Writes bench_logs/dci-metrics.prom (merged in rp-service-coverage-matrix → coverage-export.prom).
  *
- * Env: OCH_DCI_MIN (default 90)
+ * Env: RP_DCI_MIN (default 90)
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -55,8 +55,8 @@ function main() {
   const matrix = loadJson(MATRIX, { rows: [], distributed_integrity: 0 });
   const chaos = loadJson(CHAOS, { score: 100, compliant: 1 });
 
-  const C = Number(process.env.OCH_COVERAGE_COMPLIANT ?? "1");
-  const M = Number(process.env.OCH_MUTATION_COMPLIANT ?? "1");
+  const C = Number(process.env.RP_COVERAGE_COMPLIANT ?? "1");
+  const M = Number(process.env.RP_MUTATION_COMPLIANT ?? "1");
   const T = matrix.distributed_integrity ? 1 : 0;
   const F = formalTemporalScore();
   const R = chaos.compliant ? chaos.score / 100 : 0;
@@ -67,19 +67,19 @@ function main() {
     100 *
     (0.15 * C + 0.15 * M + 0.2 * T + 0.15 * F + 0.15 * R + 0.1 * S + 0.1 * P);
   const rounded = Math.round(dci * 10) / 10;
-  const min = Number(process.env.OCH_DCI_MIN || "90");
+  const min = Number(process.env.RP_DCI_MIN || "90");
   const compliant = rounded >= min ? 1 : 0;
 
   const prom = [
-    "# HELP och_distributed_correctness_index Combined structural/formal/SLA score 0-100 (elite v2).",
-    "# TYPE och_distributed_correctness_index gauge",
-    `och_distributed_correctness_index ${rounded}`,
-    "# HELP och_dci_min_required Policy floor.",
-    "# TYPE och_dci_min_required gauge",
-    `och_dci_min_required ${min}`,
-    "# HELP och_dci_compliant 1 if DCI ≥ floor.",
-    "# TYPE och_dci_compliant gauge",
-    `och_dci_compliant ${compliant}`,
+    "# HELP rp_distributed_correctness_index Combined structural/formal/SLA score 0-100 (elite v2).",
+    "# TYPE rp_distributed_correctness_index gauge",
+    `rp_distributed_correctness_index ${rounded}`,
+    "# HELP rp_dci_min_required Policy floor.",
+    "# TYPE rp_dci_min_required gauge",
+    `rp_dci_min_required ${min}`,
+    "# HELP rp_dci_compliant 1 if DCI ≥ floor.",
+    "# TYPE rp_dci_compliant gauge",
+    `rp_dci_compliant ${compliant}`,
     "",
   ].join("\n");
   writeFileSync(join(BENCH, "dci-metrics.prom"), prom);
@@ -87,7 +87,7 @@ function main() {
     join(BENCH, "dci-report.json"),
     `${JSON.stringify(
       {
-        specVersion: "och-dci-elite-v2",
+        specVersion: "rp-dci-elite-v2",
         dci: rounded,
         min,
         compliant,

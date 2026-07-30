@@ -104,7 +104,7 @@ rp-ai-rag-quality-smoke.sh
 audit-rp-ai-endpoints-contract.sh
 rp-ai-provider-readiness.sh
 rp-ai-pgvector-readiness.sh
-rp-och-decontaminate-scan.sh
+rp-rp-decontaminate-scan.sh
 ai-quality-telemetry-report.mjs
 ```
 
@@ -163,7 +163,7 @@ T20.39C-LIVE must satisfy:
 | Canary errors | 0 |
 | Soak-path telemetry WARNs | 0 |
 | Leakage | PASS |
-| OCH | PASS |
+| RP | PASS |
 | Playwright C-suite | PASS |
 | Guest preview hidden | PASS |
 | Message-body exposure | 0 |

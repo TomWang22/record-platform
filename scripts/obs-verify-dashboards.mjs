@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Query Prometheus for metrics referenced in OCH Grafana dashboards (ConfigMaps).
+ * Query Prometheus for metrics referenced in RP Grafana dashboards (ConfigMaps).
  * Fails when required panel metrics are absent and no diagnostic fallback exists.
  */
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -23,27 +23,27 @@ const PROM_URL = PROM_BASE.endsWith("/prometheus") ? PROM_BASE : `${PROM_BASE}/p
 const REQUIRED_METRICS = [
   "app_runtime_critical_path_ms",
   "app_runtime_latency_ms",
-  "och_bootstrap_wall_clock_seconds",
-  "och_preflight_lab_wall_clock_seconds",
-  "och_coverage_phase_vi2_verify_wall_clock_seconds",
-  "och_trace_smoke_span_count",
-  "och_outbox_supported",
-  "och_outbox_unpublished_count",
-  "och_gateway_protocol_smoke_success",
-  "och_quic_forensic_valid",
-  "och_quic_frame_count",
+  "rp_bootstrap_wall_clock_seconds",
+  "rp_preflight_lab_wall_clock_seconds",
+  "rp_coverage_phase_vi2_verify_wall_clock_seconds",
+  "rp_trace_smoke_span_count",
+  "rp_outbox_supported",
+  "rp_outbox_unpublished_count",
+  "rp_gateway_protocol_smoke_success",
+  "rp_quic_forensic_valid",
+  "rp_quic_frame_count",
   "http_requests_total",
   "trace_service_latency_ms_bucket",
 ];
 
 /** Must have a Prometheus sample newer than this many seconds (Pushgateway + scrapes). */
-const METRIC_MAX_AGE_SEC = Number(process.env.OCH_PROM_METRIC_MAX_AGE_SEC || "7200");
+const METRIC_MAX_AGE_SEC = Number(process.env.RP_PROM_METRIC_MAX_AGE_SEC || "7200");
 
 const FRESHNESS_REQUIRED = [
-  "och_trace_smoke_span_count",
-  "och_gateway_protocol_smoke_success",
-  "och_quic_forensic_valid",
-  "och_outbox_supported",
+  "rp_trace_smoke_span_count",
+  "rp_gateway_protocol_smoke_success",
+  "rp_quic_forensic_valid",
+  "rp_outbox_supported",
 ];
 
 /** Metrics with diagnostic fallback — warn only. */
@@ -150,7 +150,7 @@ async function main() {
 
   const deadExprs = [];
   for (const { file, expr } of allExprs) {
-    if (/diagnostic|och_bootstrap_run_info|vector\(0\)/.test(expr)) continue;
+    if (/diagnostic|rp_bootstrap_run_info|vector\(0\)/.test(expr)) continue;
     try {
       const r = await promQuery(expr);
       if (r.length === 0) deadExprs.push({ file, expr });

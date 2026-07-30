@@ -9,7 +9,7 @@ infra/k8s/base/observability/
 scripts/
 Makefile
 webapp/e2e/frontend-contract.spec.ts
-services/common/src/och-outbox-surface-metrics.ts
+services/common/src/rp-outbox-surface-metrics.ts
 services/common/src/index.ts
 services/common/src/otel/
 services/media-service/src/handlers/getDownloadUrl.ts

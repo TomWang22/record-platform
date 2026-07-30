@@ -9,7 +9,7 @@ describe("listing-media-validation", () => {
     expect(validateListingImageUrlShape("https://cdn.example/p.jpg").ok).toBe(true);
   });
 
-  it("accepts OCH gateway media paths", () => {
+  it("accepts RP gateway media paths", () => {
     expect(
       validateListingImageUrlShape(
         "/api/media/public/aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee?e=1&s=sig",

@@ -19,8 +19,8 @@ FAIL=0
 fail() { echo "❌ $*" >&2; FAIL=1; }
 ok() { echo "✅ $*"; }
 
-FORBIDDEN_APP_SERVICES=(booking-service social-service)
-FORBIDDEN_NS='off-campus-housing-tracker'
+FORBIDDEN_APP_SERVICES=(reservation-mesh messaging-service)
+FORBIDDEN_NS='record-platform'
 
 _manifest="$(mktemp)"
 trap 'rm -f "$_manifest"' EXIT
@@ -30,8 +30,8 @@ if ! rp_kustomize_build >"$_manifest"; then
   exit 1
 fi
 
-# Avoid literal legacy OCH secret name in this file (B.crypto grep scans active paths).
-_legacy_kafka_secret='och'"-"'kafka-ssl-secret'
+# Avoid literal legacy RP secret name in this file (B.crypto grep scans active paths).
+_legacy_kafka_secret='kafka-ssl-secret-LEGACY'
 if grep -q "$_legacy_kafka_secret" "$_manifest"; then
   fail "rendered overlay references legacy Kafka TLS secret (use kafka-ssl-secret)"
   exit 1

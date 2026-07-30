@@ -6,7 +6,7 @@ on:
     paths:
       - "tools/bundle-audit/**"
       - "docs/bundles/BUNDLE_INGESTION_POLICY.md"
-      - "docs/bundles/OCH_RP_ARTIFACT_CONTRACT.md"
+      - "docs/bundles/RP_RP_ARTIFACT_CONTRACT.md"
       - ".github/workflows/bundle-ingestion.yml"
 
 jobs:

@@ -58,16 +58,16 @@ Based on `run-all-suites.log` and baseline/enhanced runs (auth, records, social,
 
 ---
 
-## 5. Social service — 502 “social upstream error”, ECONNREFUSED 50056
+## 5. messaging-plane — 502 “social upstream error”, ECONNREFUSED 50056
 
 **What happens:** Forum create, get posts, P2P messaging fail with 502. Upstream error includes `connect ECONNREFUSED 10.43.44.110:50056`.
 
-**Root cause:** API gateway proxies social traffic to `social-service:50056` (gRPC). The connection to `:50056` is refused → social pod’s gRPC server not accepting, or pod not ready.
+**Root cause:** API gateway proxies social traffic to `messaging-service:50056` (gRPC). The connection to `:50056` is refused → social pod’s gRPC server not accepting, or pod not ready.
 
 **Next steps:**  
-- Check `kubectl -n record-platform get pods -l app=social-service` and logs. Ensure pod is Ready and not CrashLooping.  
+- Check `kubectl -n record-platform get pods -l app=messaging-service` and logs. Ensure pod is Ready and not CrashLooping.  
 - Confirm gRPC server listens on 50056 and that deploy has correct readiness/liveness (e.g. grpc-health-probe).  
-- Restart social-service if needed; re-run suites.
+- Restart messaging-service if needed; re-run suites.
 
 ---
 
@@ -87,7 +87,7 @@ Based on `run-all-suites.log` and baseline/enhanced runs (auth, records, social,
 
 1. **Auth schema in 5433:** Already present (verified). If you use a fresh 5433 DB, run auth migrations there first.
 2. **Apply config** (pipeline does this): ensures `app-config` has auth 5433, then restarts auth/records/analytics/auction.
-3. **Optional:** Restart social-service if it was 0/1 Ready; check logs for 50056.
+3. **Optional:** Restart messaging-service if it was 0/1 Ready; check logs for 50056.
 
 ---
 

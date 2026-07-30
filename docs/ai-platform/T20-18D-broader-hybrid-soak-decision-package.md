@@ -56,7 +56,7 @@ T20.18 broader soak: multi-user evidence PASS; operational allowlist restored to
 | Anchored overlap | **16/16 PASS** |
 | Pure overlap | **8/16** report-only |
 | Telemetry WARNs | **0 PASS** |
-| Leakage / OCH | **PASS** |
+| Leakage / RP | **PASS** |
 | Playwright | **PASS** |
 
 ---

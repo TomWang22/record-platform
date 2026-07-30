@@ -28,7 +28,7 @@ T20.13E/F embed warmup eliminated harness cold-start noise (`embed_timeout_befor
 | Post-warmup baseline | `docs/ai-platform/T20-13F-post-warmup-inference-telemetry.md` |
 | Synthesis eval | `docs/ai-platform/T20-13J-keyword-synthesis-quality-eval.md` |
 | pgvector readiness | `bench_logs/ai-platform/phase-18-pgvector-readiness.md` — **PASS** |
-| OCH decontaminate | **PASS** (590 files scanned) |
+| RP decontaminate | **PASS** (590 files scanned) |
 
 **Harness commands (T20.13L run):**
 

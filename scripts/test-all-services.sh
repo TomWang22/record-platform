@@ -29,7 +29,7 @@ SERVICES=(
   "records-service:4002"
   "listings-service:4003"
   "analytics-service:4004"
-  "social-service:4006"
+  "messaging-service:4006"
   "shopping-service:4007"
   "auction-monitor:4008"
   "python-ai-service:5005"

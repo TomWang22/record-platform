@@ -22,7 +22,7 @@
 | `final_tagged_plan` fallback | 0 |
 | Canary errors | 0 |
 | Leakage | **PASS** |
-| OCH | **PASS** (`__SCANNED__=589`) |
+| RP | **PASS** (`__SCANNED__=589`) |
 
 ## 2. Telemetry WARNs
 

@@ -33,7 +33,7 @@ def init_tracing(service_name: Optional[str] = None) -> None:
     direct = (os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") or "").strip()
     base = (
         (os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or "").strip()
-        or (os.getenv("OCH_OTEL_EXPORTER_OTLP_ENDPOINT") or "").strip()
+        or (os.getenv("RP_OTEL_EXPORTER_OTLP_ENDPOINT") or "").strip()
     )
     if direct:
         traces_url = direct
@@ -41,7 +41,8 @@ def init_tracing(service_name: Optional[str] = None) -> None:
         normalized = base.rstrip("/")
         traces_url = normalized if normalized.endswith("/v1/traces") else f"{normalized}/v1/traces"
     else:
-        traces_url = "http://jaeger.observability.svc.cluster.local:4318/v1/traces"
+        # In-cluster OTel Collector (ingestion plane). Never default to localhost or Jaeger Query.
+        traces_url = "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"
 
     resource = Resource.create(
         {

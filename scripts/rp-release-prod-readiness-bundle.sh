@@ -42,7 +42,7 @@ run_gate image-freshness bash scripts/rp-release-image-freshness.sh || true
 run_gate runtime bash scripts/rp-runtime-domain-comb.sh || true
 run_gate db bash scripts/rp-db-domain-comb.sh || true
 run_gate messaging bash scripts/rp-messaging-domain-comb.sh || true
-run_gate och bash scripts/rp-och-decontaminate-scan.sh || true
+run_gate och bash scripts/rp-rp-decontaminate-scan.sh || true
 run_gate grpc bash scripts/rp-bootstrap-grpc-mtls-gate.sh || true
 run_gate edge bash scripts/smoke-rp-edge-h2-h3-strict-tls.sh || true
 run_gate mtls bash scripts/smoke-rp-mtls-real.sh || true

@@ -53,10 +53,10 @@ export function maskBidderId(bidderUserId) {
   return `bidder_${h}`;
 }
 
-/** Strip legacy OCH/housing seed artifacts from export text (analytics curation). */
+/** Strip legacy RP/housing seed artifacts from export text (analytics curation). */
 export function sanitizePlatformText(text) {
   return String(text ?? '')
-    .replace(/\boch-page[-\d\w]*/gi, 'marketplace-listing')
+    .replace(/\brp-page[-\d\w]*/gi, 'marketplace-listing')
     .replace(/\boff[- ]campus\b/gi, '')
     .replace(/\bresidence_type\b/gi, '')
     .replace(/\blease_length_months\b/gi, '')
@@ -66,7 +66,7 @@ export function sanitizePlatformText(text) {
 
 export function sanitizeListingTitle(title, id) {
   const raw = String(title ?? '').trim();
-  if (/^och-page[-\d]/i.test(raw)) {
+  if (/^rp-page[-\d]/i.test(raw)) {
     return `Listing ${String(id).slice(0, 8)}`;
   }
   return sanitizePlatformText(raw) || `Listing ${String(id).slice(0, 8)}`;

@@ -2,9 +2,9 @@
 /**
  * Fail-fast gate before listings/booking Vitest integration (pnpm run test:integration:all).
  * Enforces: ≥3 unique broker seeds, TLS + PEM files on disk, no localhost / :29092, no CI_KAFKA_PLAINTEXT.
- * Discovers MetalLB brokers when OCH_INTEGRATION_KAFKA_FROM_K8S_LB=1 (same as @common/utils/kafka-vitest-cluster).
+ * Discovers MetalLB brokers when RP_INTEGRATION_KAFKA_FROM_K8S_LB=1 (same as @common/utils/kafka-vitest-cluster).
  *
- * Skip (e.g. CI without cluster): OCH_SKIP_KAFKA_INTEGRATION_ASSERT=1
+ * Skip (e.g. CI without cluster): RP_SKIP_KAFKA_INTEGRATION_ASSERT=1
  *
  * Requires: pnpm -C services/common run build
  */
@@ -15,8 +15,8 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..");
 
-if (process.env.OCH_SKIP_KAFKA_INTEGRATION_ASSERT === "1" || process.env.OCH_SKIP_KAFKA_INTEGRATION_ASSERT === "true") {
-  console.warn("[rp-it] assert-kafka-integration-cluster: skipped (OCH_SKIP_KAFKA_INTEGRATION_ASSERT=1)");
+if (process.env.RP_SKIP_KAFKA_INTEGRATION_ASSERT === "1" || process.env.RP_SKIP_KAFKA_INTEGRATION_ASSERT === "true") {
+  console.warn("[rp-it] assert-kafka-integration-cluster: skipped (RP_SKIP_KAFKA_INTEGRATION_ASSERT=1)");
   process.exit(0);
 }
 
@@ -26,7 +26,7 @@ if (!existsSync(distPath)) {
   process.exit(1);
 }
 
-process.env.OCH_INTEGRATION_KAFKA_FROM_K8S_LB ??= "1";
+process.env.RP_INTEGRATION_KAFKA_FROM_K8S_LB ??= "1";
 process.env.BOOKING_IT_KAFKA_FROM_K8S_LB ??= "1";
 
 const { assertVitestKafkaClusterIntegrationPolicy } = await import(distPath);

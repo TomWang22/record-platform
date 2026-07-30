@@ -1,9 +1,9 @@
-import { getRpKafka, ochKafkaTopicIsolationSuffix } from "@common/utils/kafka";
+import { getRpKafka, rpKafkaTopicIsolationSuffix } from "@common/utils/kafka";
 import type { Consumer } from "kafkajs";
 import { pool } from "./lib/db.js";
 
 const BOOKING_EVENTS_TOPIC =
-  process.env.BOOKING_EVENTS_TOPIC || `dev.booking.events.v1${ochKafkaTopicIsolationSuffix()}`;
+  process.env.BOOKING_EVENTS_TOPIC || `dev.booking.events.v1${rpKafkaTopicIsolationSuffix()}`;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

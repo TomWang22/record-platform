@@ -126,7 +126,7 @@ Production default remains `keyword`. Preview UI/API remains KEEP. Permanent all
 | `scripts/audit-rp-ai-endpoints-contract.sh` | PASS |
 | `scripts/rp-ai-provider-readiness.sh` | PASS |
 | `scripts/rp-ai-pgvector-readiness.sh` | PASS |
-| `scripts/rp-och-decontaminate-scan.sh` | PASS (`__SCANNED__=589`) |
+| `scripts/rp-rp-decontaminate-scan.sh` | PASS (`__SCANNED__=589`) |
 | `node scripts/ai-quality-telemetry-report.mjs` | PASS; WARNs 0 |
 
 Telemetry:

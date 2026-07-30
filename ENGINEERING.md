@@ -100,7 +100,7 @@ This document provides in-depth technical documentation for the Record Platform 
         │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
         │         │                 │                 │              │
         │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-        │  │Analytics     │  │Social Service│  │Shopping      │     │
+        │  │Analytics     │  │Messaging Service│  │Shopping      │     │
         │  │Service (4004)│  │    (4006)    │  │Service (4007)│     │
         │  │ gRPC:50054   │  │ gRPC:50056   │  │ gRPC:50058   │     │
         │  │ HTTP:4004    │  │ HTTP:4006    │  │ HTTP:4007    │     │
@@ -321,7 +321,7 @@ Preflight and all suites run on **Colima + k3s** by default. Colima is started w
 3. **Preflight before suites**: `run-preflight-scale-and-all-suites.sh` runs the strict TLS preflight in step 5 and fails fast if the chain cannot be established; `run-all-test-suites.sh` runs the same script unless `SKIP_TLS_PREFLIGHT=1` (set when invoked from the preflight pipeline).
 
 **Implementation**:
-- **Script**: `scripts/ensure-strict-tls-mtls-preflight.sh` — validates full chain (CA + leaf + key), provisions from repo or OpenSSL, restarts api-gateway, auth-service, social-service, listings-service, shopping-service, auction-monitor, python-ai-service, analytics-service when `service-tls` is updated.
+- **Script**: `scripts/ensure-strict-tls-mtls-preflight.sh` — validates full chain (CA + leaf + key), provisions from repo or OpenSSL, restarts api-gateway, auth-service, messaging-service, listings-service, shopping-service, auction-monitor, python-ai-service, analytics-service when `service-tls` is updated.
 - **Preflight pipeline**: Step 5 runs the script then `ensure-all-services-tls.sh` (deploy manifest check). Step 7 runs `run-all-test-suites.sh` with `SKIP_TLS_PREFLIGHT=1`.
 - **Standalone**: `./scripts/run-all-test-suites.sh` runs the script as cert preflight so standalone runs also get valid certs.
 
@@ -345,7 +345,7 @@ Preflight and all suites run on **Colima + k3s** by default. Colima is started w
 
 **Doc**: `PLATFORM-AI-ENGINE.md`
 
-### Social Service Roles (owner, admin, moderator, member)
+### Messaging Service Roles (owner, admin, moderator, member)
 
 **Decision**: Group members have role hierarchy: owner > admin > moderator > member.
 
@@ -459,7 +459,7 @@ The full test pipeline is structured as **preflight** followed by **eight suites
 - **Rationale**: Running suites without preflight leads to misleading failures (e.g. "rotation failed" when the real cause was API server timeout). Preflight is skipped when `SKIP_PREFLIGHT=1` (e.g. when called from `run-preflight-scale-and-all-suites.sh` after preflight has already run).
 
 ### Suite Order and Completion
-- **Order**: 1) auth (test-auth-service.sh), 2) baseline (test-microservices-http2-http3.sh), 3) enhanced (test-microservices-http2-http3-enhanced.sh), 4) adversarial (enhanced-adversarial-tests.sh), 5) rotation (rotation-suite.sh), 6) standalone-capture (test-packet-capture-standalone.sh), 7) tls-mtls (test-tls-mtls-comprehensive.sh), 8) social (test-social-service-comprehensive.sh). Each suite is tee'd to `$SUITE_LOG_DIR/<suite>.log`; verification to `$SUITE_LOG_DIR/<suite>-verification.log`.
+- **Order**: 1) auth (test-auth-service.sh), 2) baseline (test-microservices-http2-http3.sh), 3) enhanced (test-microservices-http2-http3-enhanced.sh), 4) adversarial (enhanced-adversarial-tests.sh), 5) rotation (rotation-suite.sh), 6) standalone-capture (test-packet-capture-standalone.sh), 7) tls-mtls (test-tls-mtls-comprehensive.sh), 8) social (test-messaging-service-comprehensive.sh). Each suite is tee'd to `$SUITE_LOG_DIR/<suite>.log`; verification to `$SUITE_LOG_DIR/<suite>-verification.log`.
 - **Completion**: The runner prints "=== All Test Suites Complete ===" after all eight suites finish. Only suites that exited non-zero are reported in the error summary. There is no artificial timeout; run with `2>&1 | tee /tmp/full-run-$(date +%s).log` for live output and saved log. If a suite appears to hang, see docs/Runbook.md for packet-capture and gRPC/Envoy NodePort issues.
 
 ### How to run (command center)
@@ -520,7 +520,7 @@ We run **eight** suites because the platform has **multiple protocols**, **stric
 | 5 | **Rotation** | rotation-suite.sh | CA/leaf rotation under k6 load; zero-downtime and wire-level capture. Proves rotation and Caddy reload. |
 | 6 | **Standalone capture** | test-packet-capture-standalone.sh | Packet capture in isolation (drain → stop → copy → tshark); same pattern as rotation for QUIC verification. |
 | 7 | **TLS/mTLS** | test-tls-mtls-comprehensive.sh | Full chain validation, mTLS, gRPC strict TLS; proves cert chain and client cert handling. |
-| 8 | **Social** | test-social-service-comprehensive.sh | Forum, messages, archive/recall/kick/ban, groups; requires social DB migrations. |
+| 8 | **Social** | test-messaging-service-comprehensive.sh | Forum, messages, archive/recall/kick/ban, groups; requires social DB migrations. |
 
 **Why so many tests:** One “e2e” cannot (1) prove HTTP/2 vs HTTP/3 at the wire, (2) prove zero-downtime rotation under load, (3) validate strict TLS/mTLS and cert chain, (4) stress auth and social and DBs in isolation, (5) run pgbench across 8 DBs. Splitting into eight suites gives clear failure scope (e.g. “rotation failed” vs “social 501”) and allows optional k6/pgbench without re-running auth/baseline every time. DB and cache verification (8 DBs, 5433–5440) after each suite keeps the platform honest.
 
@@ -550,7 +550,7 @@ We run **eight** suites because the platform has **multiple protocols**, **stric
 
 ### Data Layer
 - **PostgreSQL 16**: 8 dedicated instances for service isolation
-- **Redis 7**: JWT revocation cache, search result caching. **Cache layer (see architecture diagram)**: Redis is used by API Gateway (JWT revocation), records-service (search cache), auth-service (user lookup), listings-service (listing cache), social-service and auction-monitor (singleflight + rate limiting). **Lua scripts** in Redis provide singleflight (cache stampede prevention), LFU/LRU eviction (e.g. shopping-service), and token-bucket/sliding-window rate limiting. See README “Caching & Redis Lua Scripts” for script list and data flow.
+- **Redis 7**: JWT revocation cache, search result caching. **Cache layer (see architecture diagram)**: Redis is used by API Gateway (JWT revocation), records-service (search cache), auth-service (user lookup), listings-service (listing cache), messaging-service and auction-monitor (singleflight + rate limiting). **Lua scripts** in Redis provide singleflight (cache stampede prevention), LFU/LRU eviction (e.g. shopping-service), and token-bucket/sliding-window rate limiting. See README “Caching & Redis Lua Scripts” for script list and data flow.
 - **Kafka**: Event streaming, real-time messaging. **Strict TLS enabled** with SSL listener on port 9093. SSL certificates stored in `kafka-ssl-secret`.
 
 ### Inter-Service Communication
@@ -654,7 +654,7 @@ Client: POST /api/social/messages
     ▼
 Caddy → ingress-nginx → API Gateway
     │
-    └─► Envoy (gRPC Proxy:10000) → Social Service (gRPC:50056)
+    └─► Envoy (gRPC Proxy:10000) → Messaging Service (gRPC:50056)
         │
         ├─► Social DB (5434) - social schema
         │   └─► Store Message
@@ -663,7 +663,7 @@ Caddy → ingress-nginx → API Gateway
             │
             └─► Kafka Topic: messages
                 │
-                └─► Kafka Consumer (Social Service)
+                └─► Kafka Consumer (Messaging Service)
                     │
                     └─► WebSocket/SSE → Client
 ```
@@ -906,7 +906,7 @@ See **README.md** (Full disaster recovery protocol), **Runbook.md** (item 82), a
 
 **Collection**:
 - **ServiceMonitors** (`infra/k8s/base/monitoring/servicemonitors.yaml`): Auto-discovery of service metrics
-  - Targets: api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, python-ai-service, auction-monitor, nginx, haproxy
+  - Targets: api-gateway, auth-service, records-service, listings-service, analytics-service, messaging-service, shopping-service, python-ai-service, auction-monitor, nginx, haproxy
 - **PodMonitors** (`infra/k8s/base/observability/podmonitors.yaml`): Pod-level metrics collection
 - **Scrape interval**: 15-30 seconds
 - **Retention**: 30 days
@@ -1322,7 +1322,7 @@ notes.
 - ✅ **Auth Service**: 99.91% success (8 errors out of 9,043 requests)
 - ✅ **Records Service**: 100% success (13,530 requests)
 - ✅ **Listings Service**: 99.75% success (11,629 requests)
-- ✅ **Social Service**: 99.96% success (9,033 requests)
+- ✅ **Messaging Service**: 99.96% success (9,033 requests)
 - ✅ **Shopping Service**: 99.91% success (11,807 requests)
 - ✅ **Analytics Service**: 99.95% success (4,520 requests)
 - ⚠️ **Python AI Service**: 67.69% success (1,184 requests, 565 errors)
@@ -1331,7 +1331,7 @@ notes.
 - ❌ **Auth Service**: 0% success (1,026 errors) - **PRIMARY BOTTLENECK**
 - ❌ **Records Service**: 17.88% success (8,638 errors)
 - ❌ **Listings Service**: 21.74% success (8,207 errors)
-- ❌ **Social Service**: 19.71% success (4,019 errors)
+- ❌ **Messaging Service**: 19.71% success (4,019 errors)
 - ❌ **Shopping Service**: 19.68% success (8,121 errors)
 - ❌ **Analytics Service**: 19.66% success (3,259 errors)
 - ❌ **Python AI Service**: 15.33% success (403 errors)
@@ -1341,7 +1341,7 @@ notes.
 - ❌ **Auth Service**: 0% success (308 errors) - **PRIMARY BOTTLENECK**
 - ⚠️ **Records Service**: 71.31% success (1,116 errors) - **Better than HTTP/2**
 - ✅ **Listings Service**: 93.70% success (239 errors) - **Much better than HTTP/2**
-- ✅ **Social Service**: 88.18% success (182 errors) - **Much better than HTTP/2**
+- ✅ **Messaging Service**: 88.18% success (182 errors) - **Much better than HTTP/2**
 - ✅ **Shopping Service**: 87.53% success (398 errors) - **Much better than HTTP/2**
 - ✅ **Analytics Service**: 87.94% success (161 errors) - **Much better than HTTP/2**
 - ⚠️ **Python AI Service**: 42.62% success (175 errors)
@@ -1655,7 +1655,7 @@ wireshark test-results/YYYYMMDD-HHMMSS-http3-verification/quic-capture.pcap
   - CA certificate mounted from `dev-root-ca` Kubernetes secret at `/certs/dev-root.pem`
   - `NODE_EXTRA_CA_CERTS=/certs/dev-root.pem` for Node.js CA trust store
   - Volume mount: `dev-root-ca` secret with `dev-root.pem` key
-- **Services with Strict TLS**: auth-service, listings-service, records-service, social-service, shopping-service, analytics-service, api-gateway, python-ai-service
+- **Services with Strict TLS**: auth-service, listings-service, records-service, messaging-service, shopping-service, analytics-service, api-gateway, python-ai-service
 - **gRPC Health Checks**: Services with gRPC endpoints use `grpc.health.v1.Health/Check` protocol (HTTP/2/3) for Kubernetes health probes:
   - **auth-service**: Uses `grpc-health-probe` binary for gRPC health checks
   - **python-ai-service**: Uses native Kubernetes `grpc` probe type
@@ -1752,14 +1752,14 @@ wireshark test-results/YYYYMMDD-HHMMSS-http3-verification/quic-capture.pcap
 
 **Health Probe Timeouts Increased**:
 - **Records Service**: HTTP probe timeout 3s → 10s, period 5s → 10s
-- **Social Service**: gRPC probe timeout 5s → 10s, Kubernetes timeout 10s → 15s
+- **Messaging Service**: gRPC probe timeout 5s → 10s, Kubernetes timeout 10s → 15s
 - **Impact**: Prevents pod restarts under load due to probe timeouts
 - **Files**: 
   - `infra/k8s/base/records-service/deploy.yaml`
-  - `infra/k8s/base/social-service/deploy.yaml`
+  - `infra/k8s/base/messaging-service/deploy.yaml`
 
 **Resource Limits Added**:
-- **Records & Social Services**: 
+- **Records & Messaging Services**: 
   - Requests: 100m CPU / 256Mi memory
   - Limits: 500m CPU / 512Mi memory (Records), 1024Mi memory (Social)
 - **Impact**: Prevents Docker Desktop VM corruption while allowing normal operation
@@ -1990,7 +1990,7 @@ The Auction Monitor service implements a comprehensive data pipeline for ingesti
 **Key Features**:
 - **Granular Percentiles (p1-p99)**: Calculates every percentile from p1 to p99 (not just p25, p50, p75, p95) for precise price positioning and better AI predictions
 - **Discogs Price History**: Browser automation for full sales arc scraping (not just low/median/high)
-- **Service Integrations**: Provides price analytics to Social Service (negotiation assistance), Shopping Service (buyer evaluation), and Listings Service (seller optimization)
+- **Service Integrations**: Provides price analytics to Messaging Service (negotiation assistance), Shopping Service (buyer evaluation), and Listings Service (seller optimization)
 - **Data Quality Engine**: Multi-factor confidence scoring (0.0-1.0) with enrichment bonuses
 - **Comprehensive Documentation**: See `services/auction-monitor/SERVICE_INTEGRATIONS.md` for complete integration details
 
@@ -2291,7 +2291,7 @@ const data = await cache.getOrSet(
 
 ### Service Integrations
 
-**Social Service Integration**:
+**Messaging Service Integration**:
 - **Negotiation Assistance**: Price context (granular percentiles p1-p99) for buyer/seller negotiations
 - **Mood Analysis**: Python AI analyzes negotiation mood based on price position
 - **Bigger Context**: Market trends, new drops detection

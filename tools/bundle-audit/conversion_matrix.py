@@ -1,4 +1,4 @@
-"""Load OCH → RP literal replacements from docs/bundles/OCH_TO_RP_CONVERSION_MATRIX.md."""
+"""Load RP → RP literal replacements from docs/bundles/RP_TO_RP_CONVERSION_MATRIX.md."""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 /**
  * Adaptive listings DB export — supports marketplace columns and legacy price_cents/pricing_mode layout.
- * Never exports housing/OCH fields (residence_type, furnished, bedrooms, lease, etc.).
+ * Never exports housing/RP fields (residence_type, furnished, bedrooms, lease, etc.).
  */
 import { columnExists } from './rp-ai-rag-db.mjs';
 

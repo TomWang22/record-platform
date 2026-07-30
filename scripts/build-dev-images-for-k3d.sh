@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 PLATFORM="${PLATFORM:-linux/amd64}"
-SERVICES=( api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service auction-monitor )
+SERVICES=( api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service shopping-service auction-monitor )
 
 for name in "${SERVICES[@]}"; do
   if [[ -f "services/$name/Dockerfile" ]]; then

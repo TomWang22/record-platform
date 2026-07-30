@@ -40,7 +40,7 @@
 | Leakage | **PASS** | wrong_dim=0; transcript PASS |
 | Keyword stability | **PASS** | 7/7 keyword cases non-empty |
 | Tranche rerun guard | **PASS** | Tranche 2–8 locks block (exit 2) |
-| Full validation bundle | **PASS** | contracts, smoke, runtime, provider, OCH |
+| Full validation bundle | **PASS** | contracts, smoke, runtime, provider, RP |
 
 ## Timing benchmark (warm)
 

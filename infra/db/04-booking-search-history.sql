@@ -1,4 +1,4 @@
--- Saved searches + watchlist (Prisma booking-service also creates these; required for CI SQL-only bootstrap).
+-- Saved searches + watchlist (Prisma reservation-mesh also creates these; required for CI SQL-only bootstrap).
 -- Run after 01-booking-schema.sql, before 19-booking-search-history-alerts.sql.
 
 CREATE TABLE IF NOT EXISTS booking.search_history (
@@ -33,5 +33,5 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_watchlist_user_listing
 CREATE INDEX IF NOT EXISTS idx_watchlist_user_active_added
   ON booking.watchlist_items (user_id, is_active, added_at DESC);
 
-COMMENT ON TABLE booking.search_history IS 'Per-user saved listing search filters (booking-service).';
-COMMENT ON TABLE booking.watchlist_items IS 'User watchlist for listings (booking-service).';
+COMMENT ON TABLE booking.search_history IS 'Per-user saved listing search filters (reservation-mesh).';
+COMMENT ON TABLE booking.watchlist_items IS 'User watchlist for listings (reservation-mesh).';

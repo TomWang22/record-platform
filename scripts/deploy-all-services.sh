@@ -130,7 +130,7 @@ wait_for_deployments() {
     "api-gateway"
     "auth-service"
     "analytics-service"
-    "social-service"
+    "messaging-service"
     "listings-service"
     "shopping-service"
     "auction-monitor"

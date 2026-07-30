@@ -12,7 +12,7 @@ const redisUrl = process.env.REDIS_URL || "redis://redis:6379";
 const redisEnabled =
   process.env.LISTINGS_REDIS_CACHE !== "0" &&
   process.env.VITEST !== "true" &&
-  process.env.OCH_DISABLE_EXTERNALS !== "1";
+  process.env.RP_DISABLE_EXTERNALS !== "1";
 let redis: RedisClientType | null = null;
 let redisConnectAttempted = false;
 

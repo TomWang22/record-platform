@@ -29,7 +29,7 @@ Phase 21 **non-vector seller intelligence** completed final validation in P21.7B
 | Endpoints contract | PASS — 10/10 |
 | Provider readiness | PASS |
 | pgvector readiness | PASS |
-| OCH decontaminate | PASS |
+| RP decontaminate | PASS |
 | Leakage | PASS |
 
 | Metric | Value |

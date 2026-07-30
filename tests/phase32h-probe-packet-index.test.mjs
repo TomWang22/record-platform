@@ -30,8 +30,8 @@ function mockBatch(batchId = 'w1-r1-u1-c1') {
 function mockWorkerResult(startedEpoch = 1_700_000_000) {
   return {
     started_at: new Date(startedEpoch * 1000).toISOString(),
-    started_epoch: startedEpoch,
-    finished_epoch: startedEpoch + 0.5,
+    started_eprp: startedEpoch,
+    finished_eprp: startedEpoch + 0.5,
   };
 }
 

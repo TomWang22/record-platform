@@ -173,7 +173,7 @@ For tooling or import, a minimal component list in XML form:
     <service name="auth-service" db="5437"/>
     <service name="records-service" db="5433" cache="Redis"/>
     <service name="listings-service" db="5435" cache="Redis"/>
-    <service name="social-service" db="5434" messaging="Kafka"/>
+    <service name="messaging-service" db="5434" messaging="Kafka"/>
     <service name="shopping-service" db="5436"/>
     <service name="analytics-service" db="5439" messaging="Kafka"/>
     <service name="auction-monitor" db="5438" messaging="Kafka"/>

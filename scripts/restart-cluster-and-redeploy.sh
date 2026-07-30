@@ -284,7 +284,7 @@ fi
 # Step 12: Restart services that need rebuilding
 say "Step 12: Restarting services that need rebuilding..."
 SERVICES_TO_RESTART=(
-  "social-service"
+  "messaging-service"
   "auction-monitor"
 )
 

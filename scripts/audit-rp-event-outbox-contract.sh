@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Event/outbox contract: static matrix, DB schema, optional runtime API proofs, no OCH topics.
+# Event/outbox contract: static matrix, DB schema, optional runtime API proofs, no RP topics.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -48,14 +48,14 @@ else
   fail "verify-outbox-infra-alignment"
 fi
 
-# --- 2) Forbidden OCH / housing / booking / social topic names ---
+# --- 2) Forbidden RP / housing / booking / social topic names ---
 FORBIDDEN_TOPIC_RE='(och\.|off[- ]campus|housing\.|landlord\.|tenant\.|booking\.events|social\.events)'
 if rg -i "$FORBIDDEN_TOPIC_RE" proto/events scripts/lib/rp-kafka-event-topics-from-proto.sh \
   --glob '!bench_logs/**' --glob '!docs/reference/**' 2>/dev/null | grep -v '^#' >/tmp/rp-forbidden-topics.txt; then
   fail "Forbidden topic names in proto/topic scripts:"
   sed 's/^/  /' /tmp/rp-forbidden-topics.txt
 else
-  pass "No forbidden OCH/housing/booking/social topic names in proto generators"
+  pass "No forbidden RP/housing/booking/social topic names in proto generators"
 fi
 
 # --- 3) Service scope: outbox DDL + producer hints ---
@@ -312,7 +312,7 @@ PY
   echo ""
   echo "## Static"
   echo "- Infra alignment: verify-outbox-infra-alignment.sh"
-  echo "- Forbidden OCH topics: scanned proto + topic generator"
+  echo "- Forbidden RP topics: scanned proto + topic generator"
   echo "- Service outbox DDL + producer/consumer file hints"
   echo ""
   echo "## DB schema"

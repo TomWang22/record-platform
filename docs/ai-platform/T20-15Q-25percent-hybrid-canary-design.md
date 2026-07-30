@@ -129,7 +129,7 @@ Verification-only unless gaps found:
 2. Set PERCENT=25 (dev/staging only)  
 3. Four-path proof: allowlist, cohort buckets 0–24, non-cohort ≥25  
 4. 3× allowlist transcript + cohort prompt matrix (≥4 prompts per cohort user)  
-5. Shadow timing, Playwright (Lane C control), telemetry, contracts, OCH, source diagnostic (Lane C)  
+5. Shadow timing, Playwright (Lane C control), telemetry, contracts, RP, source diagnostic (Lane C)  
 6. **Restore PERCENT=0** on any failure or after eval (default)
 
 ---

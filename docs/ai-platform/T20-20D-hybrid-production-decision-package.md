@@ -68,7 +68,7 @@ T20.21A: NOT STARTED
 | Hybrid p95 | **141.65 ms PASS** |
 | Anchored overlap | **16/16 PASS** |
 | Pure overlap | **8/16** report-only |
-| Telemetry / leakage / OCH | **PASS** |
+| Telemetry / leakage / RP | **PASS** |
 
 ---
 

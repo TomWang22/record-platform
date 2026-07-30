@@ -141,7 +141,7 @@ bash scripts/audit-rp-ai-runtime-contract.sh              # PASS
 bash scripts/audit-rp-ai-endpoints-contract.sh            # PASS
 bash scripts/rp-ai-provider-readiness.sh                  # PASS
 bash scripts/rp-ai-pgvector-readiness.sh                  # PASS
-bash scripts/rp-och-decontaminate-scan.sh                 # PASS
+bash scripts/rp-rp-decontaminate-scan.sh                 # PASS
 ```
 
 ## Product configuration (unchanged)

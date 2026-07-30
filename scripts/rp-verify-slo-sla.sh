@@ -124,7 +124,7 @@ for dep in prometheus grafana jaeger otel-collector; do
   fi
 done
 if [[ -d "$REPO_ROOT/infra/monitoring/grafana/dashboards" ]]; then
-  if grep -ril 'off-campus-housing\|OCH \|housing tracker' "$REPO_ROOT/infra/monitoring/grafana/dashboards" 2>/dev/null | head -1 | grep -q .; then
+  if grep -ril 'record-platform\|RP \|housing tracker' "$REPO_ROOT/infra/monitoring/grafana/dashboards" 2>/dev/null | head -1 | grep -q .; then
     obs_ok=0
     fail_gate "observability: Grafana dashboard still has legacy title (not RP-named)"
   fi

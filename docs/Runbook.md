@@ -29,7 +29,7 @@ This document catalogs all bugs, issues, and solutions encountered during the st
 | Full Playwright | see `docs/release-lock-operations.md` |
 | Repo hygiene | `bash scripts/rp-repo-hygiene-contract.sh` |
 
-**Do not use:** `record.local`, `curl -k`, OCH/housing terminology in product paths, Cursor/Co-authored commit trailers.
+**Do not use:** `record.local`, `curl -k`, RP/housing terminology in product paths, Cursor/Co-authored commit trailers.
 
 ## Bugs and decisions index (explicit)
 
@@ -54,7 +54,7 @@ This document catalogs all bugs, issues, and solutions encountered during the st
 | 29 | Rotation | Restart all gRPC/TLS workloads after Caddy so certs reload (python-ai SSLV3_ALERT_BAD_CERTIFICATE fix) | Fixes applied (January 30) |
 | 30 | Colima | k6 CA ConfigMap via VM file (no stdin pipe) so rotation suite does not fail | Fixes applied (January 30) |
 | 31 | tls-mtls | Skip Test 3 (gRPC direct port-forward) on Colima when port-forward not ready | Fixes applied (January 30) |
-| 32 | Social | Comprehensive social-service test suite (all forum + messages routes) | Test Suites; Fixes applied (January 30) |
+| 32 | Social | Comprehensive messaging-service test suite (all forum + messages routes) | Test Suites; Fixes applied (January 30) |
 | 33 | Logging / noise | Shared test-log.sh (ERROR/WARN/INFO/OK); suppress apk/apt in pod exec; k6 job name trim | Fixes applied (January 30) |
 | 34 | Social suite | sed extract_user_id (macOS unescaped newline); GET /forum/posts requires Authorization; CA/port after rotation | Fixes applied (January 30) |
 | 35 | Social roles | owner, admin, moderator, member; creator = owner; DB migration 04-social-schema-roles-migration.sql | Fixes applied (January 30) |
@@ -127,7 +127,7 @@ This document catalogs all bugs, issues, and solutions encountered during the st
 
 **HTTP/3 packet capture:** Baseline, enhanced, standalone, and rotation all use the same wire-level pattern for HTTP/3/QUIC: (1) **nohup** — tcpdump is started with `nohup` so it survives the exec session end (otherwise SIGHUP kills it → 0-byte pcaps). (2) **Drain** — sleep 5–15s before stopping tcpdump so in-flight QUIC packets are captured (UDP can arrive late). (3) **Copy** — copy pcaps from Caddy/Envoy pods to host (`CAPTURE_COPY_DIR`) so tshark can analyze. (4) **tshark** — when available, `scripts/lib/protocol-verification.sh` verifies HTTP/2 and QUIC in pcaps. Set `CAPTURE_DRAIN_SECONDS=5` (or 10) and `CAPTURE_COPY_DIR` before `stop_and_analyze_captures`; see `scripts/lib/packet-capture.sh`.
 
-**Social suite known failures:** `test-social-service-comprehensive.sh` may report: Archive thread failed, List archived failed, Delete thread failed, List groups failed, Kick member failed, Ban member failed, Recall message failed. **Fix:** The social suite **runs `ensure-social-migrations.sh` at the start** (and preflight also runs it at step 3b4). Migrations apply **in order**: (1) `04-social-schema.sql` (base: forum + messages schemas and tables), (2) `04-social-schema-archive-recall-kickban.sql` (user_archived_threads, user_deleted_threads, group_bans, recalled_at), (3) `04-social-schema-roles-migration.sql` (owner role). All run on social DB **records** (port 5434). If migrations were skipped (e.g. psql not installed or DB unreachable), run manually: `PGHOST=127.0.0.1 SOCIAL_DB_PORT=5434 ./scripts/ensure-social-migrations.sh`. **Causes if still failing:** (1) **501** — migration not applied; check script output for "Applied" and any errors. (2) **403** — Kick requires owner/admin/moderator; ban requires owner/admin. Test uses User1 (creator) to kick/ban User2; creator is set as owner on group create. (3) **GET /messages/groups 500** — check social-service logs and DB (group_members, groups). **Logging:** social-service logs `[social] Error …` with status; check pod logs for 42P01 (missing table), 42703 (missing column).
+**Social suite known failures:** `test-messaging-service-comprehensive.sh` may report: Archive thread failed, List archived failed, Delete thread failed, List groups failed, Kick member failed, Ban member failed, Recall message failed. **Fix:** The social suite **runs `ensure-social-migrations.sh` at the start** (and preflight also runs it at step 3b4). Migrations apply **in order**: (1) `04-social-schema.sql` (base: forum + messages schemas and tables), (2) `04-social-schema-archive-recall-kickban.sql` (user_archived_threads, user_deleted_threads, group_bans, recalled_at), (3) `04-social-schema-roles-migration.sql` (owner role). All run on social DB **records** (port 5434). If migrations were skipped (e.g. psql not installed or DB unreachable), run manually: `PGHOST=127.0.0.1 SOCIAL_DB_PORT=5434 ./scripts/ensure-social-migrations.sh`. **Causes if still failing:** (1) **501** — migration not applied; check script output for "Applied" and any errors. (2) **403** — Kick requires owner/admin/moderator; ban requires owner/admin. Test uses User1 (creator) to kick/ban User2; creator is set as owner on group create. (3) **GET /messages/groups 500** — check messaging-service logs and DB (group_members, groups). **Logging:** messaging-service logs `[social] Error …` with status; check pod logs for 42P01 (missing table), 42703 (missing column).
 
 **API Gateway req.path getter:** The API gateway URL-rewrite middleware was setting `(req as any).path` and `(req as any).originalUrl` so `/api/*` routes matched as `/*`. On Node/Express, `req.path` and `req.originalUrl` are read-only getters; assigning to them throws. Fix: only set `(req as any).url = newUrl`; Express derives `req.path` from `req.url`, so route matching still sees the rewritten path. See `services/api-gateway/src/server.ts` "API Prefix Middleware".
 
@@ -180,7 +180,7 @@ We moved from k3d-as-primary back to **Colima k3s as the primary cluster** for p
 **Carts/orders “lost” after k3d → k3s (Colima):** Shopping and all app data live in **external** Postgres (Docker Compose, ports 5433–5440), not inside the cluster. If you see far fewer carts/orders (e.g. 5k vs millions) after switching to Colima, the usual cause is a **new** Postgres stack (new machine or new `docker compose` = new volumes). **See:** docs/K3D_TO_K3S_DATA.md for why and how to re-seed or restore.
 
 **Colima pods 0/1 Ready (item 75)**
-App pods (records-service, auth-service, etc.) stay **0/1** when they cannot reach **host.docker.internal** (Postgres/Redis/Kafka on the Mac host). **analytics-service** can stay **Init:0/1** because its init container waits for port 5433; **auction-monitor**, **social-service** and others stay 0/1 Ready when readiness (DB/Redis) fails. **Fix:** (1) Start Postgres and Redis on the host: `cd <repo> && docker compose up -d` so ports 5433–5440 and 6379 are listening. (2) Ensure **host.docker.internal** resolves: on **Colima** run **`./scripts/colima-apply-host-aliases.sh`** (or preflight step 3c0-colima); on **k3d** (REQUIRE_COLIMA=0) run **`./scripts/apply-k3d-host-aliases.sh`** (preflight runs it in 3c0 and after 3c). Both patch all app deployments so `host.docker.internal` → host gateway. Base YAML uses 192.168.5.2 (Colima); if your gateway is different (e.g. after `colima-undo-host-aliases.sh`), re-run the alias script. **502 on Test 12f** or **logged:false on 13k/13k2** on k3d: run **apply-k3d-host-aliases.sh** then **diagnose-502-and-analytics.sh**. **Override IP:** `HOST_GATEWAY_IP=<ip> ./scripts/colima-apply-host-aliases.sh` or `HOST_GATEWAY_IP=<ip> ./scripts/apply-k3d-host-aliases.sh`. **See:** docs/COLIMA_POD_STABILITY_AND_HOST_ALIASES.md.
+App pods (records-service, auth-service, etc.) stay **0/1** when they cannot reach **host.docker.internal** (Postgres/Redis/Kafka on the Mac host). **analytics-service** can stay **Init:0/1** because its init container waits for port 5433; **auction-monitor**, **messaging-service** and others stay 0/1 Ready when readiness (DB/Redis) fails. **Fix:** (1) Start Postgres and Redis on the host: `cd <repo> && docker compose up -d` so ports 5433–5440 and 6379 are listening. (2) Ensure **host.docker.internal** resolves: on **Colima** run **`./scripts/colima-apply-host-aliases.sh`** (or preflight step 3c0-colima); on **k3d** (REQUIRE_COLIMA=0) run **`./scripts/apply-k3d-host-aliases.sh`** (preflight runs it in 3c0 and after 3c). Both patch all app deployments so `host.docker.internal` → host gateway. Base YAML uses 192.168.5.2 (Colima); if your gateway is different (e.g. after `colima-undo-host-aliases.sh`), re-run the alias script. **502 on Test 12f** or **logged:false on 13k/13k2** on k3d: run **apply-k3d-host-aliases.sh** then **diagnose-502-and-analytics.sh**. **Override IP:** `HOST_GATEWAY_IP=<ip> ./scripts/colima-apply-host-aliases.sh` or `HOST_GATEWAY_IP=<ip> ./scripts/apply-k3d-host-aliases.sh`. **See:** docs/COLIMA_POD_STABILITY_AND_HOST_ALIASES.md.
 
 **Colima API (native port, no 6443 tunnel):** The pipeline uses **Colima's native API port** (e.g. 127.0.0.1:49400 or 51819) only. The 6443 SSH tunnel is **not** used in preflight/reissue (it was flaky under load — "apiserver not ready", "connection reset by peer"). Preflight and reissue use kubeconfig as-is from `~/.colima/default/kubernetes/kubeconfig` (or merged `~/.kube/config`); do **not** overwrite the server to 6443. If you need 6443 for another tool, run `./scripts/colima-forward-6443.sh` manually. When host `kubectl` gets connection refused, scripts that use `PATH=scripts/shims:...` get the kubectl shim, which falls back to `colima ssh -- kubectl` automatically.
 
@@ -1117,7 +1117,7 @@ The full test run is executed by `scripts/run-all-test-suites.sh`. Pre-flight (u
 | 4 | rotation | `rotation-suite.sh` | CA/leaf cert rotation, Caddy reload (admin API or rolling restart), wire-level packet capture on all Caddy pods, adaptive k6 chaos with protocol verification |
 | 5 | standalone-capture | `test-packet-capture-standalone.sh` | Standalone gRPC + HTTP/2 + HTTP/3 traffic, capture on Caddy/Envoy, protocol count verification (summed across pods) |
 | 6 | tls-mtls | `test-tls-mtls-comprehensive.sh` | HTTP/3 cert chain, gRPC via Envoy NodePort/port-forward, Authenticate method, cert chain completeness, mTLS config |
-| 7 | social | `test-social-service-comprehensive.sh` | All social-service routes: healthz, forum (posts CRUD/vote, comments CRUD/vote), messages (list/send/get/reply/thread/read), groups (create/list/get/add member/group message/leave) |
+| 7 | social | `test-messaging-service-comprehensive.sh` | All messaging-service routes: healthz, forum (posts CRUD/vote, comments CRUD/vote), messages (list/send/get/reply/thread/read), groups (create/list/get/add member/group message/leave) |
 
 **Run full suite (with preflight and API server ready check):**
 ```bash
@@ -1142,7 +1142,7 @@ cd /path/to/record-platform
 ./scripts/rotation-suite.sh                              # rotation
 ./scripts/test-packet-capture-standalone.sh              # standalone-capture
 ./scripts/test-tls-mtls-comprehensive.sh                 # tls-mtls
-./scripts/test-social-service-comprehensive.sh           # social
+./scripts/test-messaging-service-comprehensive.sh           # social
 ```
 
 Suite logs and per-suite verification logs go to `SUITE_LOG_DIR` (default: `/tmp/suite-logs-<timestamp>`).
@@ -1243,10 +1243,10 @@ These fixes address rotation-suite failures and make packet capture reliable acr
 14. **Test 15 root cause + messages count 0 (January 2026)**
    - **Test 15a (Auth HealthCheck):** Use **standard** `grpc.health.v1.Health/Check` with `health.proto` and `{"service":""}` instead of `auth.AuthService/HealthCheck` so Envoy and port-forward both use the same method; success pattern accepts `SERVING` or `healthy`.
    - **Port-forward timing:** Colima/host port-forward can be slow. **Fix:** In `grpc_test` and `grpc_test_strict_tls`, increase initial sleep to 4s and retries to 12 (total ~16s) before declaring port-forward failed; use `command -v nc` before calling `nc`.
-   - **Messages count 0 in verification:** Smoke tests send P2P and group messages, but verification reported "0 messages". **Root cause:** Social service stores messages in **`messages.messages`** (schema `messages`), not `forum.messages`. **Fix:** In `verify-db-cache-quick.sh` and `verify-db-and-cache-comprehensive.sh`, change message count queries from `forum.messages` to **`messages.messages`** (same DB, port 5434, `records`).
+   - **Messages count 0 in verification:** Smoke tests send P2P and group messages, but verification reported "0 messages". **Root cause:** messaging-plane stores messages in **`messages.messages`** (schema `messages`), not `forum.messages`. **Fix:** In `verify-db-cache-quick.sh` and `verify-db-and-cache-comprehensive.sh`, change message count queries from `forum.messages` to **`messages.messages`** (same DB, port 5434, `records`).
 
 15. **Social features (WhatsApp/Discord-style)**  
-   - **Implemented:** Edit post (`PUT /forum/posts/:id`), edit message (`PUT /messages/:id`), reply to message (`POST /messages/:id/reply` with `parent_message` in response), attachments, groups, mark read, delete. See `services/social-service/SOCIAL_FEATURES.md`.
+   - **Implemented:** Edit post (`PUT /forum/posts/:id`), edit message (`PUT /messages/:id`), reply to message (`POST /messages/:id/reply` with `parent_message` in response), attachments, groups, mark read, delete. See `services/messaging-service/SOCIAL_FEATURES.md`.
    - **Planned:** React (emoji on posts/messages), @-mention users (Discord-style), rich text/markdown formatting.
 
 16. **Test 15 port-forward readiness on macOS (January 2026)**
@@ -1295,7 +1295,7 @@ These fixes address rotation-suite failures and make packet capture reliable acr
 
 27. **Rotation suite: k6 CA ConfigMap on Colima, post-rotation Kafka TLS, Caddy reload (January 2026)**
    - **k6 CA ConfigMap on Colima:** When rotation-suite runs on Colima, `kctl` may run kubectl inside the VM; `--from-file=ca.crt=$CA_ROOT` then points to a host path not visible in the VM, so ConfigMap create fails and the chaos job never starts. **Fix:** Create the k6 CA ConfigMap by piping CA content: `cat "$CA_ROOT" | kctl create configmap ... --from-file=ca.crt=-` so it works when kctl runs on host or inside Colima VM.
-   - **Post-rotation Kafka "unable to verify the first certificate":** After CA rotation, `dev-root-ca` in K8s is updated to the new CA; Kafka (Docker) still uses certs signed by the old CA. Social-service and auction-monitor (and any restarted pod) load the new CA and fail to verify Kafka’s server cert. **Fix:** Set **`ROTATION_UPDATE_KAFKA_SSL=1`** when using external Kafka with strict TLS. Rotation-suite will then copy the new CA to `certs/`, run **`kafka-ssl-from-dev-root.sh`**, restart the Kafka container, and rollout-restart social-service and auction-monitor so they pick up the new CA and can verify Kafka.
+   - **Post-rotation Kafka "unable to verify the first certificate":** After CA rotation, `dev-root-ca` in K8s is updated to the new CA; Kafka (Docker) still uses certs signed by the old CA. messaging-plane and auction-monitor (and any restarted pod) load the new CA and fail to verify Kafka’s server cert. **Fix:** Set **`ROTATION_UPDATE_KAFKA_SSL=1`** when using external Kafka with strict TLS. Rotation-suite will then copy the new CA to `certs/`, run **`kafka-ssl-from-dev-root.sh`**, restart the Kafka container, and rollout-restart messaging-service and auction-monitor so they pick up the new CA and can verify Kafka.
    - **Caddy Admin API 400:** Caddy has no `/config/reload` endpoint; POST to that path returns **400**. Reloading TLS requires **POST /load** with full config or a process restart. **Fix:** Rotation-suite uses rolling restart (fallback); the warning message now states that Caddy has no `/config/reload` and 400 is expected.
 
 28. **Reissue: API not reachable before updating secrets (February 2026)**
@@ -1551,7 +1551,7 @@ A **separate test suite** is planned for the **analytics engine and Python AI** 
 - E2E k6 tests showing 0-16% success rates across services
 - Analytics service returning 404 for `/api/analytics/log-search`
 - Python AI service returning 404 for `/api/ai/advice/selling`
-- Social service health endpoint returning 404
+- messaging-plane health endpoint returning 404
 - Kafka connection timeouts in social and analytics services
 - Database connection timeouts in social and shopping services
 
@@ -1567,11 +1567,11 @@ A **separate test suite** is planned for the **analytics engine and Python AI** 
    - Missing or misconfigured Kafka SSL certificates
 
 3. **Database Connection Timeouts**:
-   - Social service: Database connection timeouts during health checks
+   - messaging-plane: Database connection timeouts during health checks
    - Shopping service: Listings DB query timeouts
 
 4. **Missing Health Endpoint Routing**:
-   - Social service `/healthz` endpoint exists but API Gateway routing may be missing
+   - messaging-plane `/healthz` endpoint exists but API Gateway routing may be missing
 
 ### Solutions
 
@@ -1655,7 +1655,7 @@ kubectl get pods -n record-platform | grep postgres
 kubectl get svc -n record-platform | grep postgres
 
 # Check service logs for connection errors
-kubectl logs -n record-platform -l app=social-service --tail=50 | grep -i "timeout\|connection"
+kubectl logs -n record-platform -l app=messaging-service --tail=50 | grep -i "timeout\|connection"
 ```
 
 **Actions**:
@@ -1666,18 +1666,18 @@ kubectl logs -n record-platform -l app=social-service --tail=50 | grep -i "timeo
 
 **Status**: ⚠️ Needs investigation
 
-#### Fix 5: Social Service Health Endpoint
+#### Fix 5: Messaging Service Health Endpoint
 **Check Health Endpoint**:
 ```bash
 # Direct service access
-kubectl exec -n record-platform -it deployment/social-service -- curl http://localhost:4006/healthz
+kubectl exec -n record-platform -it deployment/messaging-service -- curl http://localhost:4006/healthz
 
 # Via API Gateway
 curl -k https://record.local:30443/api/social/healthz
 ```
 
 **Actions**:
-- Verify `/healthz` endpoint exists in social-service (it does: `app.get('/healthz', ...)`)
+- Verify `/healthz` endpoint exists in messaging-service (it does: `app.get('/healthz', ...)`)
 - Check API Gateway routing for `/api/social/healthz`
 - Add explicit route if missing
 
@@ -1714,19 +1714,19 @@ bash scripts/analyze-connection-failures.sh
 
 ---
 
-## Critical Issue #4: Social Service gRPC Connection Failures and Python AI Routing (December 21, 2025)
+## Critical Issue #4: Messaging Service gRPC Connection Failures and Python AI Routing (December 21, 2025)
 
 ### Symptoms
-- Social service gRPC connections failing with `ECONNREFUSED 10.96.30.58:50056`
+- messaging-plane gRPC connections failing with `ECONNREFUSED 10.96.30.58:50056`
 - Python AI service returning 404 for `/api/ai/selling-advice`, `/api/ai/buying-advice`, `/api/ai/negotiation-advice`
 - Analytics service returning 500 error: `invalid input syntax for type integer: "{}"`
-- Social service success rate at 80.89% (should be 99%+)
+- messaging-plane success rate at 80.89% (should be 99%+)
 - Python AI service success rate at 0% (all 404 errors)
 
 ### Root Causes
 
-1. **Social Service gRPC Client Certificate Verification**:
-   - Social service gRPC server was requiring client certificate verification (`checkClientCert = true`)
+1. **Messaging Service gRPC Client Certificate Verification**:
+   - messaging-plane gRPC server was requiring client certificate verification (`checkClientCert = true`)
    - API Gateway gRPC client was not providing client certificates
    - This caused intermittent `ECONNREFUSED` errors during load tests
 
@@ -1743,8 +1743,8 @@ bash scripts/analyze-connection-failures.sh
 
 ### Solutions
 
-#### Fix 1: Social Service gRPC Client Certificate Verification
-**File**: `services/social-service/src/grpc-server.ts`
+#### Fix 1: Messaging Service gRPC Client Certificate Verification
+**File**: `services/messaging-service/src/grpc-server.ts`
 
 **Change**: Added support for `GRPC_REQUIRE_CLIENT_CERT` environment variable (like auth-service):
 ```typescript
@@ -1759,7 +1759,7 @@ credentials = grpc.ServerCredentials.createSsl(
 );
 ```
 
-**File**: `infra/k8s/base/social-service/deploy.yaml`
+**File**: `infra/k8s/base/messaging-service/deploy.yaml`
 
 **Change**: Added environment variable:
 ```yaml
@@ -1769,8 +1769,8 @@ env:
 ```
 
 **Result**: 
-- Social service success rate: 80.89% → **99.70%** (+18.81%)
-- Social service p95 latency: 4948ms → **1293ms** (-74%)
+- messaging-plane success rate: 80.89% → **99.70%** (+18.81%)
+- messaging-plane p95 latency: 4948ms → **1293ms** (-74%)
 - **gRPC is now always up and working!**
 
 #### Fix 2: Python AI URL Rewrite Ordering
@@ -1839,8 +1839,8 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 4. **Token Persistence**: Ensure k6 test `setup()` function provides token to all iterations via `data` parameter
 
 ### Related Files
-- `services/social-service/src/grpc-server.ts` - gRPC server TLS configuration
-- `infra/k8s/base/social-service/deploy.yaml` - Environment variables
+- `services/messaging-service/src/grpc-server.ts` - gRPC server TLS configuration
+- `infra/k8s/base/messaging-service/deploy.yaml` - Environment variables
 - `services/api-gateway/src/server.ts` - Route ordering and pathRewrite
 - `scripts/load/k6-all-services-comprehensive.js` - Test payloads
 
@@ -2068,7 +2068,7 @@ async function withRetry<T>(
    - Success rates drop to 16-35% at 100 VUs
    - Services return 502/503 errors ("upstream error", "gRPC timeout")
 
-4. **Social Service Health Probe Timeouts**:
+4. **Messaging Service Health Probe Timeouts**:
    - 19 pod restarts due to health probe timeouts
    - Probe timeout (10s) too short for overloaded service
    - Service gRPC server slow to respond under load
@@ -2413,7 +2413,7 @@ routes:
 **Services Updated**:
 - ✅ `/auth.` → `auth_service`
 - ✅ `/records.` → `records_service`
-- ✅ `/social.` → `social_service`
+- ✅ `/social.` → `messaging-plane`
 - ✅ `/listings.` → `listings_service`
 - ✅ `/analytics.` → `analytics_service`
 - ✅ `/shopping.` → `shopping_service`
@@ -2426,13 +2426,13 @@ routes:
 
 **Before Fix**:
 - ❌ `records.RecordsService/HealthCheck` → "Unimplemented"
-- ❌ `social.SocialService/HealthCheck` → "Unimplemented"
+- ❌ `messaging.MessagingService/HealthCheck` → "Unimplemented"
 - ✅ `grpc.health.v1.Health/Check` → Works (coincidence)
 
 **After Fix**:
 - ✅ `records.RecordsService/HealthCheck` → `{"healthy": true, "version": "1.0.0"}`
 - ✅ `auth.AuthService/HealthCheck` → `{"healthy": true, "version": "1.0.0"}`
-- ✅ `social.SocialService/HealthCheck` → `{"healthy": true, "version": "0.1.0"}`
+- ✅ `messaging.MessagingService/HealthCheck` → `{"healthy": true, "version": "0.1.0"}`
 - ✅ All 8 services route correctly via Envoy
 
 ### Prevention Strategies
@@ -2451,7 +2451,7 @@ routes:
 All 8 gRPC services are configured with prefix matching:
 1. **auth** (port 50051) - `/auth.` → `auth_service`
 2. **records** (port 50051) - `/records.` → `records_service`
-3. **social** (port 50056) - `/social.` → `social_service`
+3. **social** (port 50056) - `/social.` → `messaging-plane`
 4. **listings** (port 50057) - `/listings.` → `listings_service`
 5. **analytics** (port 50054) - `/analytics.` → `analytics_service`
 6. **shopping** (port 50058) - `/shopping.` → `shopping_service`
@@ -2466,7 +2466,7 @@ All 8 gRPC services are configured with prefix matching:
 
 ### Symptoms
 - Records service experiencing high restart counts (65 restarts) during load
-- Social service experiencing high restart counts (51 restarts) during load
+- messaging-plane experiencing high restart counts (51 restarts) during load
 - Health probe timeouts causing pod restarts under load
 - Services crashing due to resource exhaustion (Docker Desktop VM corruption risk)
 
@@ -2474,7 +2474,7 @@ All 8 gRPC services are configured with prefix matching:
 
 1. **Health Probe Timeouts Too Short**:
    - Records service: HTTP probe timeout 3s too short for overloaded service
-   - Social service: gRPC probe timeout 5s too short, timeoutSeconds 10s insufficient
+   - messaging-plane: gRPC probe timeout 5s too short, timeoutSeconds 10s insufficient
    - Services slow to respond under load, causing probe failures and restarts
 
 2. **Missing Resource Limits**:
@@ -2491,7 +2491,7 @@ All 8 gRPC services are configured with prefix matching:
 #### Fix 1: Increase Health Probe Timeouts
 **Files**: 
 - `infra/k8s/base/records-service/deploy.yaml`
-- `infra/k8s/base/social-service/deploy.yaml`
+- `infra/k8s/base/messaging-service/deploy.yaml`
 
 **Records Service Changes**:
 ```yaml
@@ -2511,7 +2511,7 @@ startupProbe:
   periodSeconds: 5 → 10   # Increased from 5s to 10s
 ```
 
-**Social Service Changes**:
+**Messaging Service Changes**:
 ```yaml
 readinessProbe:
   -connect-timeout: 5s → 10s  # Increased gRPC connect timeout
@@ -2533,7 +2533,7 @@ livenessProbe:
 #### Fix 2: Add Resource Limits (Reasonable, Avoid Docker Desktop VM Corruption)
 **Files**: 
 - `infra/k8s/base/records-service/deploy.yaml`
-- `infra/k8s/base/social-service/deploy.yaml`
+- `infra/k8s/base/messaging-service/deploy.yaml`
 
 **Resource Limits Added**:
 ```yaml
@@ -2686,7 +2686,7 @@ H2_INCREMENT=20 H3_INCREMENT=10 ./scripts/find-ca-rotation-limit.sh
 
 ### Related Files
 - `infra/k8s/base/records-service/deploy.yaml` - Health probe and resource limit updates
-- `infra/k8s/base/social-service/deploy.yaml` - Health probe and resource limit updates
+- `infra/k8s/base/messaging-service/deploy.yaml` - Health probe and resource limit updates
 - `scripts/test-http2-http3-strict-tls.sh` - Strict TLS test with 2 Caddy pods
 - `scripts/rotation-suite.sh` - CA and leaf rotation test suite
 
@@ -2822,7 +2822,7 @@ INCREMENT=20 MAX_VUS=200 ./scripts/run-k6-limit-test-http2.sh
 - records-service: 1/1
 - listings-service: 1/1
 - shopping-service: 1/1
-- social-service: 1/1
+- messaging-service: 1/1
 - caddy-h3: 2/2
 
 ### Prevention Strategies
@@ -3348,7 +3348,7 @@ environment:
 ### Related Files
 - `infra/k8s/base/auction-monitor/deploy.yaml` - Health probes fixed, mTLS added
 - `infra/k8s/base/analytics-service/deploy.yaml` - Startup probe TLS flags added
-- `infra/k8s/base/social-service/deploy.yaml` - Already correct (no changes needed)
+- `infra/k8s/base/messaging-service/deploy.yaml` - Already correct (no changes needed)
 - `scripts/patch-kafka-external-host.sh` - Colima IP detection fixed
 - `scripts/ensure-kafka-ready.sh` - Endpoint patching added
 - `scripts/check-all-pods-and-tls.sh` - Already has Kafka endpoint auto-fix (line 244-270)
@@ -3382,7 +3382,7 @@ After applying fixes:
    - This caused services to run in "dev mode" (client cert verification disabled) despite strict TLS being enabled
 
 2. **Missing Kafka SSL Configuration**
-   - `social-service` uses Kafka (via `@common/utils/kafka`) but was missing:
+   - `messaging-service` uses Kafka (via `@common/utils/kafka`) but was missing:
      - `kafka-ssl-certs` volume mount
      - Kafka SSL environment variables (`KAFKA_BROKER`, `KAFKA_USE_SSL`, `KAFKA_CA_CERT`)
    - This caused Kafka connections to fail or fall back to PLAINTEXT
@@ -3409,8 +3409,8 @@ After applying fixes:
 
 **Status**: ✅ Fixed - All 8 services now have mTLS enabled
 
-#### Fix 2: Added Kafka SSL to social-service
-**File**: `infra/k8s/base/social-service/deploy.yaml`
+#### Fix 2: Added Kafka SSL to messaging-service
+**File**: `infra/k8s/base/messaging-service/deploy.yaml`
 
 **Changes**:
 - Added Kafka SSL environment variables:
@@ -3427,7 +3427,7 @@ After applying fixes:
 - Added `kafka-ssl-certs` volume mount
 - Added `kafka-ssl-secret` volume
 
-**Status**: ✅ Fixed - social-service now has complete Kafka SSL configuration
+**Status**: ✅ Fixed - messaging-service now has complete Kafka SSL configuration
 
 #### Fix 3: Completed Kafka Configuration for python-ai-service
 **File**: `infra/k8s/base/python-ai-service/deploy.yaml`
@@ -3454,7 +3454,7 @@ After applying fixes:
 1. **analytics-service** - Publishes analytics events
 2. **auction-monitor** - Monitors auction events
 3. **python-ai-service** - Platform-wide inference, consumes analytics events
-4. **social-service** - Publishes forum posts, messages, group chat events
+4. **messaging-service** - Publishes forum posts, messages, group chat events
 
 All now have:
 - `kafka-ssl-certs` volume mount
@@ -3492,9 +3492,9 @@ All services verified:
 January 27, 2026
 
 ### Symptoms
-1. **Social Service Kafka Connection Failures**:
+1. **Messaging Service Kafka Connection Failures**:
    - Error logs: `Connection error: broker":"localhost:29093"` with `ECONNREFUSED`
-   - Social service trying to connect to `localhost:29093` instead of `kafka-external.record-platform.svc.cluster.local:9093`
+   - messaging-plane trying to connect to `localhost:29093` instead of `kafka-external.record-platform.svc.cluster.local:9093`
    - Environment variable `KAFKA_BROKER` correctly set, but KafkaJS using wrong address
    - Caused HTTP 502 "social upstream error" for P2P messages, group messages, and some forum operations
 
@@ -3693,15 +3693,15 @@ kctl() {
 
 **Before Fixes**:
 - Test 4: Caddy health check via HTTP/3 ⚠️
-- Test 6: Social Service Create Forum Post via HTTP/2 (timeout) ⚠️
-- Test 8: Social Service Send P2P Message via HTTP/2 (HTTP 502) ⚠️
-- Test 8b: Social Service Send P2P Message via HTTP/3 (HTTP 502 + curl 77) ⚠️
-- Test 9d: Social Service Send Group Message via HTTP/3 (HTTP 502 + curl 77) ⚠️
-- Test 9f: Social Service Reply to Group Message via HTTP/2 (timeout) ⚠️
-- Test 9g: Social Service Create Forum Post with upload_type (timeout) ⚠️
+- Test 6: Messaging Service Create Forum Post via HTTP/2 (timeout) ⚠️
+- Test 8: Messaging Service Send P2P Message via HTTP/2 (HTTP 502) ⚠️
+- Test 8b: Messaging Service Send P2P Message via HTTP/3 (HTTP 502 + curl 77) ⚠️
+- Test 9d: Messaging Service Send Group Message via HTTP/3 (HTTP 502 + curl 77) ⚠️
+- Test 9f: Messaging Service Reply to Group Message via HTTP/2 (timeout) ⚠️
+- Test 9g: Messaging Service Create Forum Post with upload_type (timeout) ⚠️
 
 **Expected After Fixes**:
-- All social service tests should pass (Kafka connection fixed)
+- All messaging-plane tests should pass (Kafka connection fixed)
 - HTTP/3 tests should pass with strict TLS (certificate mounting fixed)
 - Caddy HTTP/3 health check should pass (response format handling fixed)
 
@@ -3717,8 +3717,8 @@ kctl() {
    kubectl get endpoints kafka-external -n record-platform
    # Should show: 192.168.5.1:29093
    
-   # Check social-service logs (no Kafka errors)
-   kubectl logs -n record-platform -l app=social-service | grep -i kafka
+   # Check messaging-service logs (no Kafka errors)
+   kubectl logs -n record-platform -l app=messaging-service | grep -i kafka
    ```
 
 2. **HTTP/3 Certificate Mounting**:
@@ -3923,7 +3923,7 @@ Use these for protocol verification, packet capture, and profiling. CI/workflows
 ### Symptoms
 1. **Rotation suite**: "Some secret updates may have failed (5 jobs failed)"; wire-level verification reports "No QUIC packets detected"; Caddy rollout timeout with one pod in ContainerCreating.
 2. **tls-mtls suite**: gRPC via Envoy NodePort fails (both 30000/30001) with "context deadline exceeded"; certificate chain test fails (could not retrieve chain).
-3. **Social service DB connectivity**: Comprehensive verification reports "Social service DB connectivity: FAILED" when run from inside the pod (POSTGRES_URL_SOCIAL or network from pod to externalized Postgres).
+3. **messaging-plane DB connectivity**: Comprehensive verification reports "messaging-plane DB connectivity: FAILED" when run from inside the pod (POSTGRES_URL_SOCIAL or network from pod to externalized Postgres).
 4. **Packet capture**: Standalone capture shows UDP 443: 0 on Caddy pods after rotation (HTTP/3 traffic not present in capture window); some Caddy pods lack tcpdump (Alpine vs Ubuntu base).
 
 ### Root Causes / Notes
@@ -3969,12 +3969,12 @@ Use these for protocol verification, packet capture, and profiling. CI/workflows
 
 ### Fixes applied (January 30) – Redis, rotation restarts, Colima k6 ConfigMap, tls-mtls skip, social suite
 - **Redis AUTH when externalized**: When Redis is externalized (Docker Compose) without a password, clients were sending `AUTH postgres` and saw `ERR AUTH <password> called without any password configured`. **Fix**: (1) `infra/k8s/base/config/app-secrets.yaml` sets `REDIS_PASSWORD: ""` with a comment when Redis is externalized without auth. (2) All Node.js services (auth, listings, shopping, common/redis) treat empty or whitespace `REDIS_PASSWORD` as "no password" and do not send AUTH to Redis.
-- **Post-rotation gRPC/TLS failures (python-ai SSLV3_ALERT_BAD_CERTIFICATE)**: After CA rotation, Kubernetes secrets were updated but gRPC services kept old certs in memory. **Fix**: In `scripts/rotation-suite.sh`, immediately after Caddy reload/restart, trigger a rollout restart of all gRPC/TLS workloads: auth-service, api-gateway, records-service, listings-service, social-service, shopping-service, analytics-service, auction-monitor, python-ai-service; then sleep 8s so pods reload mounted certificates and trust the new CA.
-- **Kafka TLS after rotation**: social-service and auction-monitor consume Kafka; after rotation they must trust Kafka's new cert. **Fix**: `ROTATION_UPDATE_KAFKA_SSL=1` in run-all-test-suites before rotation; rotation-suite regenerates Kafka TLS from the new CA, restarts Docker Kafka and rollout restarts social-service and auction-monitor. Preflight also includes social-service in Kafka strict TLS apply/restart (steps 3c, 3f).
+- **Post-rotation gRPC/TLS failures (python-ai SSLV3_ALERT_BAD_CERTIFICATE)**: After CA rotation, Kubernetes secrets were updated but gRPC services kept old certs in memory. **Fix**: In `scripts/rotation-suite.sh`, immediately after Caddy reload/restart, trigger a rollout restart of all gRPC/TLS workloads: auth-service, api-gateway, records-service, listings-service, messaging-service, shopping-service, analytics-service, auction-monitor, python-ai-service; then sleep 8s so pods reload mounted certificates and trust the new CA.
+- **Kafka TLS after rotation**: messaging-service and auction-monitor consume Kafka; after rotation they must trust Kafka's new cert. **Fix**: `ROTATION_UPDATE_KAFKA_SSL=1` in run-all-test-suites before rotation; rotation-suite regenerates Kafka TLS from the new CA, restarts Docker Kafka and rollout restarts messaging-service and auction-monitor. Preflight also includes messaging-service in Kafka strict TLS apply/restart (steps 3c, 3f).
 - **Colima: k6 CA ConfigMap creation failed**: Piping CA cert via stdin to `kubectl create configmap --from-file=ca.crt=-` was unreliable when kubectl runs via `colima ssh`. **Fix**: On Colima, rotation-suite copies the CA into a temp file inside the VM, creates the ConfigMap with `--from-file=ca.crt=/path/in/vm`, then removes the temp file.
 - **tls-mtls Test 3 (gRPC direct port-forward)**: On Colima, port-forward is often flaky; suite failed when port-forward was not ready. **Fix**: In `scripts/test-tls-mtls-comprehensive.sh`, if Test 2 (gRPC via Envoy strict TLS) passed, Test 3 is **skipped** on Colima when port-forward is not ready, with message "gRPC port-forward: SKIPPED (Envoy strict TLS passed; port-forward not available on host)" so the suite does not fail unnecessarily.
 - **Redis "pod not found" message in tls-mtls**: When Redis is externalized, the suite printed a misleading "Redis pod not found" failure. **Fix**: Script now outputs "Redis: Externalized (not in cluster) - cache check skipped" when no Redis pod is found.
-- **Social service comprehensive test**: New suite `scripts/test-social-service-comprehensive.sh` exercises all social-service routes (healthz, forum posts CRUD/vote, comments CRUD/vote, messages list/send/get/reply/thread/read, groups create/list/get/members/group message/leave). Wired as suite 7 in `run-all-test-suites.sh`. Run standalone: `./scripts/test-social-service-comprehensive.sh`.
+- **messaging-plane comprehensive test**: New suite `scripts/test-messaging-service-comprehensive.sh` exercises all messaging-service routes (healthz, forum posts CRUD/vote, comments CRUD/vote, messages list/send/get/reply/thread/read, groups create/list/get/members/group message/leave). Wired as suite 7 in `run-all-test-suites.sh`. Run standalone: `./scripts/test-messaging-service-comprehensive.sh`.
 - **Logging and noise reduction (item 33)**: (1) **Shared test logging**: `scripts/lib/test-log.sh` provides `log_error` / `log_warn` / `log_info` / `log_ok` (and aliases `say` / `ok` / `warn` / `fail` / `info`) so output can be grepped for `ERROR:`, `WARN:`, `INFO:`, `OK:` and real failures are easier to spot. Optional env: `TEST_LOG_JSON=1` for one-line JSON. (2) **apk/apt noise in pod exec**: All `kubectl exec` that install tcpdump in pods (rotation-suite, packet-capture, start-wire-capture-for-k6, run-complete-wire-verification-suite, test-e2e-wire-verification) now redirect stdout and use `-qq` for apt so "fetch/Hit/Reading package lists" no longer floods the log. (3) **k6 job name**: `run-k6-chaos.sh` start now sends `kubectl apply` stdout to `/dev/null` so only the job name is printed; rotation-suite parses the job name with `grep -oE 'k6-chaos-[0-9]+'` so trailing newlines or "job.batch/... created" no longer break wait/collect.
 
 ### Run-all-test-suites: Progress and Known Failures (January 29)
@@ -4001,7 +4001,7 @@ Use these for protocol verification, packet capture, and profiling. CI/workflows
 
 | Consumer | Use case |
 |----------|----------|
-| **Social service** | Negotiation/sentiment sense; suggest to user (e.g. tone, compromise suggestions). |
+| **messaging-plane** | Negotiation/sentiment sense; suggest to user (e.g. tone, compromise suggestions). |
 | **Shopping service** | Recommend records from user search history; recommendation engine + chatbot-style suggestions. |
 | **Listings service** | Suggest how to make a listing stronger for the seller (title, description, pricing). |
 | **Records service** | Better cataloging (e.g. metadata, matching, dedup). |
@@ -4276,7 +4276,7 @@ Use these for protocol verification, packet capture, and profiling. CI/workflows
 - Script syntax errors: `local: can only be used in a function`
 - Arithmetic syntax errors: `[[: 0 0: arithmetic syntax error`
 - Missing function errors: `info: command not found`
-- Social service 502 errors: `{"error":"social upstream error"}`
+- messaging-plane 502 errors: `{"error":"social upstream error"}`
 - HTTP/3 packet capture not detecting QUIC packets
 - Shopping cart verification failing (items removed during checkout)
 - Missing cache hit rate verification
@@ -4288,7 +4288,7 @@ Use these for protocol verification, packet capture, and profiling. CI/workflows
    - Variables from `tshark` output containing newlines causing arithmetic comparison failures
    - Missing `info()` function definition in test scripts
 
-2. **Social Service Issues**:
+2. **Messaging Service Issues**:
    - Database connectivity problems
    - Redis connectivity issues
    - API Gateway proxy configuration problems
@@ -4325,14 +4325,14 @@ Use these for protocol verification, packet capture, and profiling. CI/workflows
   - Added default values `${var:-0}` for all arithmetic comparisons
   - Ensured variables default to "0" if empty
 
-#### Fix 2: Social Service Error Analysis
-**Created `scripts/capture-social-service-errors.sh`**:
+#### Fix 2: Messaging Service Error Analysis
+**Created `scripts/capture-messaging-service-errors.sh`**:
 - Comprehensive error capture and analysis script
 - Checks pod status, logs, health endpoints
 - Tests database and Redis connectivity
 - Analyzes API Gateway proxy configuration
 - Pipes all results to timestamped log directory for analysis
-- Usage: `./scripts/capture-social-service-errors.sh`
+- Usage: `./scripts/capture-messaging-service-errors.sh`
 
 #### Fix 3: HTTP/3 Packet Capture Enhancement
 **Updated `scripts/lib/packet-capture.sh`**:
@@ -4373,7 +4373,7 @@ Use these for protocol verification, packet capture, and profiling. CI/workflows
 - `scripts/test-microservices-http2-http3.sh` - Added `info()` function
 - `scripts/enhanced-adversarial-tests.sh` - Added `info()` function, improved Redis check message
 - `scripts/lib/packet-capture.sh` - Enhanced QUIC/HTTP/3 packet capture
-- `scripts/capture-social-service-errors.sh` - NEW: Social service error analysis
+- `scripts/capture-messaging-service-errors.sh` - NEW: messaging-plane error analysis
 - `scripts/verify-all-db-operations.sh` - NEW: Comprehensive DB verification
 - `scripts/verify-cache-hit-rates.sh` - NEW: Cache hit rate verification
 
@@ -4386,10 +4386,10 @@ Use these for protocol verification, packet capture, and profiling. CI/workflows
    # Should complete without syntax errors
    ```
 
-2. **Social Service Analysis**:
+2. **Messaging Service Analysis**:
    ```bash
-   ./scripts/capture-social-service-errors.sh
-   # Check logs in /tmp/social-service-analysis-*/
+   ./scripts/capture-messaging-service-errors.sh
+   # Check logs in /tmp/messaging-service-analysis-*/
    ```
 
 3. **Database Verification**:
@@ -4423,7 +4423,7 @@ Use these for protocol verification, packet capture, and profiling. CI/workflows
    - Validate variable format before using in arithmetic
 
 3. **Error analysis**:
-   - Create dedicated scripts for error analysis (like `capture-social-service-errors.sh`)
+   - Create dedicated scripts for error analysis (like `capture-messaging-service-errors.sh`)
    - Pipe results to timestamped directories for easy analysis
    - Include comprehensive checks: pod status, logs, connectivity, configuration
 
@@ -4514,7 +4514,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-log.sh" 2>/dev/null || {
 }
 ```
 
-### Issue #39: Social Service API Operations Failing (January 31, 2026)
+### Issue #39: Messaging Service API Operations Failing (January 31, 2026)
 
 #### Failed Operations
 | Operation | Endpoint | Issue |
@@ -4544,7 +4544,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-log.sh" 2>/dev/null || {
    - `messages.is_recalled` column for message recall
    - `group_bans` table for ban functionality
 
-2. **Implement missing routes** in social-service:
+2. **Implement missing routes** in messaging-service:
    - POST `/forum/comments/:id/vote`
    - DELETE `/forum/comments/:id`
    - DELETE `/forum/posts/:id`

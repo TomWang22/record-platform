@@ -20,7 +20,7 @@ say "Analyzing Connection Failures and Error Types"
   echo "## Service Logs Analysis"
   echo ""
   
-  for service in auth-service records-service social-service listings-service shopping-service analytics-service python-ai-service api-gateway; do
+  for service in auth-service records-service messaging-service listings-service shopping-service analytics-service python-ai-service api-gateway; do
     say "Analyzing $service logs..."
     echo "### $service"
     echo ""

@@ -54,4 +54,4 @@ fi
 
 BOOKING_ID="$BOOKING_ID" "$(dirname "$0")/backfill-landlord-cancelled-notifications.sh"
 
-echo "Done. Redeploy webapp + booking-service if needed; hard-refresh landlord dashboard."
+echo "Done. Redeploy webapp + reservation-mesh if needed; hard-refresh landlord dashboard."

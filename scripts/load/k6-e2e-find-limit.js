@@ -8,7 +8,7 @@
  * - Auth Service (register, login, logout) - gatekeeper, needs careful budgeting
  * - Records Service (CRUD operations)
  * - Listings Service (search, create, get)
- * - Social Service (forum posts, messages)
+ * - Messaging Service (forum posts, messages)
  * - Shopping Service (cart, checkout, orders)
  * - Analytics Service (ingestion)
  * - Python AI Service (advice)
@@ -356,8 +356,8 @@ export default function (data) {
     }
   });
   
-  // Social Service
-  group('Social Service', () => {
+  // Messaging Service
+  group('Messaging Service', () => {
     // Get forum posts
     if (Math.random() > 0.5) {
       const { res, latency: socialLatencyMs, success: socialSuccessVal } = makeRequest(

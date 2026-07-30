@@ -85,7 +85,7 @@ PYTHONPATH=. python -m pytest tests/ -q
 
 **251 passed** including `test_t20_14g3_entity_expansion_v2.py`.
 
-Contracts: audit RAG, quality smoke, endpoints, provider/pgvector readiness, OCH scan — **PASS**.
+Contracts: audit RAG, quality smoke, endpoints, provider/pgvector readiness, RP scan — **PASS**.
 
 ---
 

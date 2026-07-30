@@ -236,7 +236,7 @@ bash scripts/coverage/run-service-coverage.sh python-ai-service
 bash scripts/rp-ai-shadow-source-diagnostic.sh   # target: hinted union >= 5
 BENCH_REQUIRE_OLLAMA_WARM=1 BENCH_WARMUP_RUNS=1 bash scripts/rp-ai-shadow-real-query-timing.sh
 bash scripts/audit-rp-ai-rag-contract.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 **Success targets:**
@@ -282,7 +282,7 @@ Do **not** run T20.10Z until T20.10Y validates diversity restoration.
 | `git status --short` | Hygiene OK — no AI code staged |
 | `bash scripts/rp-ai-shadow-source-diagnostic.sh` | FAIL — 4 hinted types |
 | `BENCH_REQUIRE_OLLAMA_WARM=1 BENCH_WARMUP_RUNS=1 bash scripts/rp-ai-shadow-real-query-timing.sh` | PASS harness — cf p95 **461 ms**, shadow p95 **1,736 ms** |
-| `bash scripts/rp-och-decontaminate-scan.sh` | **PASS** (589 files) |
+| `bash scripts/rp-rp-decontaminate-scan.sh` | **PASS** (589 files) |
 
 Artifacts (local, not committed): `bench_logs/ai-platform/t19-6-route-shadow-quality.md`, `t20-10-shadow-real-query-20260624-200439.{md,jsonl}`
 

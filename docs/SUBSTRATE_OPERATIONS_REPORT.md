@@ -10,7 +10,7 @@
 
 The substrate bundle produced by `scripts/build-substrate-bundle.sh` is aligned with a **housing-platform global-scale spec**:
 
-- **7 domain services:** auth-service (ported), listings-service, booking-service, messaging-service, notification-service, trust-service, analytics-service. Event-driven; cross-domain only via Kafka. No cross-service DB access.
+- **7 domain services:** auth-service (ported), listings-service, reservation-mesh, messaging-service, notification-service, trust-service, analytics-service. Event-driven; cross-domain only via Kafka. No cross-service DB access.
 - **Root layout:** `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `docker-compose.yml` (Postgres + Kafka + Redis), `services/`, `webapp/`, `proto/`, `infra/k8s/base` and `overlays/`, `scripts/`, `docs/`.
 - **Infra set in stone:** Caddy, Envoy, MetalLB, strict TLS, Kafka mTLS required. Each service: own DB/Prisma, /health, /metrics, multi-stage Dockerfile (build common first), non-root user, CI-ready.
 - **Spec docs in bundle:** When building with the housing spec, the bundle includes **docs/ARCHITECTURE.md** (full architecture and service boundaries) and **docs/CURSOR_SCAFFOLD_INSTRUCTIONS.md** (Cursor instruction block to scaffold workspace, Dockerfiles, and CI). Use them in the new repo to scaffold from the spec without over-coupling.

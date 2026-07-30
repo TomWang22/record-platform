@@ -44,11 +44,11 @@ Scrape job `node-services` in `infra/prometheus.yml` targets auth, records, list
 
 | Metric | Service | Labels |
 |--------|---------|--------|
-| `och_outbox_unpublished_count` | all outbox services | `service` |
-| `och_outbox_publish_failures_total` | all outbox services | `service` |
-| `och_outbox_publish_success_total` | all outbox services | `service` |
+| `rp_outbox_unpublished_count` | all outbox services | `service` |
+| `rp_outbox_publish_failures_total` | all outbox services | `service` |
+| `rp_outbox_publish_success_total` | all outbox services | `service` |
 | `notification_consume_latency` | notification-service | — |
-| `och_kafka_leader_imbalance_max_ratio` | common | — |
+| `rp_kafka_leader_imbalance_max_ratio` | common | — |
 
 ### HTTP / Redis / gRPC
 
@@ -64,4 +64,4 @@ Scrape job `node-services` in `infra/prometheus.yml` targets auth, records, list
 - Bootstrap dashboard generator: `scripts/generate-grafana-dashboard.mjs` → `bench_logs/bootstrap_grafana_dashboard.json`
 - Formal gates: `scripts/observability/*.mjs`, `docs/observability/rp-observability-integrity-spec-v1.md`
 
-Phase 16 does not add mock metrics or OCH/housing dashboards.
+Phase 16 does not add mock metrics or RP/housing dashboards.

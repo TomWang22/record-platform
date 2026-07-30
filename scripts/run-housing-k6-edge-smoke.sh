@@ -6,7 +6,7 @@
 #   - BASE_URL must be https (default https://record-platform.test)
 #   - SSL_CERT_FILE must be a non-empty file (default REPO_ROOT/certs/dev-root.pem)
 #   - K6_INSECURE_SKIP_TLS is forced to 0
-#   - Hostname must resolve (e.g. /etc/hosts: <MetalLB IP> record-platform.test) — see scripts/lib/edge-test-url.sh, OCH_AUTO_EDGE_HOSTS=1
+#   - Hostname must resolve (e.g. /etc/hosts: <MetalLB IP> record-platform.test) — see scripts/lib/edge-test-url.sh, RP_AUTO_EDGE_HOSTS=1
 # Edge paths: gateway health is /api/healthz; auth via gateway is /auth/healthz (k6-auth-service-health.js). Caddy routes both to api-gateway.
 #   If traffic goes through nginx Ingress in housing ns, apply infra/k8s/overlays/dev/ingress.yaml (includes Prefix /auth → api-gateway).
 # Troubleshooting: ./scripts/diagnose-k6-edge-connectivity.sh
@@ -25,7 +25,7 @@
 #   SKIP_K6_EDGE_CURL_GATE=1 — skip strict curl to /api/healthz and /auth/healthz before k6 (not recommended).
 #   PREFLIGHT_LAB=1 — after the standard grid + JWT flows, run k6-preflight-lab-randomized-all-endpoints.js (set by make preflight-lab).
 #   PREFLIGHT_LAB_K6_RANDOM_DURATION / PREFLIGHT_LAB_K6_RANDOM_VUS — tune lab randomized script (defaults 120s / 10).
-#   SKIP_K6_BOOKING_HEALTH=1 — skip k6-booking-health.js (RP has no booking-service; default in make preflight-lab).
+#   SKIP_K6_BOOKING_HEALTH=1 — skip k6-booking-health.js (RP has no reservation-mesh; default in make preflight-lab).
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -111,7 +111,7 @@ _run() {
 
 say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
 
-say "run-housing-k6-edge-smoke (BASE_URL=$BASE_URL, SSL_CERT_FILE=$SSL_CERT_FILE)"
+say "run-platform-k6-edge-smoke (BASE_URL=$BASE_URL, SSL_CERT_FILE=$SSL_CERT_FILE)"
 
 # Preflight-lab: analytics + randomized grid hit strict Kafka-adjacent paths under load; relax k6 thresholds unless overridden.
 if [[ "${PREFLIGHT_LAB:-0}" == "1" ]] || [[ "${PREFLIGHT_LAB:-0}" == "yes" ]] || [[ "${PREFLIGHT_LAB:-0}" == "true" ]]; then
@@ -136,7 +136,7 @@ for triple in \
   is_car="${rest##*:}"
   file="${rest%:*}"
   if [[ "$file" == "k6-booking-health.js" ]] && [[ "${SKIP_K6_BOOKING_HEALTH:-${SKIP_K6_BOOKING_SEARCH:-0}}" == "1" ]]; then
-    echo "ℹ️  Skip $name (SKIP_K6_BOOKING_HEALTH=1 — no booking-service in RP)"
+    echo "ℹ️  Skip $name (SKIP_K6_BOOKING_HEALTH=1 — no reservation-mesh in RP)"
     continue
   fi
   _run "$name" "$file" "$is_car" || {
@@ -202,4 +202,4 @@ if [[ "${PREFLIGHT_LAB:-0}" == "1" ]] || [[ "${PREFLIGHT_LAB:-0}" == "yes" ]] ||
   fi
 fi
 
-say "run-housing-k6-edge-smoke done"
+say "run-platform-k6-edge-smoke done"

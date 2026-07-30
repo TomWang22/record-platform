@@ -16,7 +16,7 @@
 | `audit-rp-ai-endpoints-contract.sh` | **PASS** |
 | `rp-ai-provider-readiness.sh` | **PASS** |
 | `rp-ai-pgvector-readiness.sh` | **PASS** |
-| `rp-och-decontaminate-scan.sh` | **PASS** (`__SCANNED__=105`) |
+| `rp-rp-decontaminate-scan.sh` | **PASS** (`__SCANNED__=105`) |
 | `ai-quality-telemetry-report.mjs` | **0 WARNs** |
 
 ## 2. JWT runtime smoke (no header spoofing)
@@ -68,7 +68,7 @@ AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0
 | Allowlist not broadened | **PASS** |
 | Active enrollments after audit | **0** (revoked) |
 | Telemetry WARNs | **0** |
-| OCH | **PASS** |
+| RP | **PASS** |
 
 ## 4. Verdict
 

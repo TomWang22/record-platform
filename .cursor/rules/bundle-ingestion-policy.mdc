@@ -4,10 +4,10 @@ globs:
   - tools/bundle-audit/**
   - docs/bundles/BUNDLE_*.md
   - docs/bundles/*INGESTION*
-  - docs/bundles/OCH_RP_ARTIFACT_CONTRACT.md
+  - docs/bundles/RP_RP_ARTIFACT_CONTRACT.md
   - docs/bundles/CHECKSUM_RECORD_*.txt
   - docs/bundles/INTEGRITY_*.json
-  - docs/bundles/OCH_TO_RP_*.md
+  - docs/bundles/RP_TO_RP_*.md
   - docs/bundles/BUNDLE_CLASSIFICATION_SUMMARY.md
 ---
 
@@ -17,7 +17,7 @@ When working with **home-directory lab tarballs** (roughly 2026-04-09 through 20
 
 1. **Do not** `tar x` into the repo root, CWD, or `cp -r` from bundles into tracked paths without an explicit human decision. **Never** use `tar -P` for these bundles.
 2. **Do** run **`tools/bundle-audit/extract_bundle_v1.sh`** (Protocol v1: checksum → `validate_bundle_v1.py` index-only → controlled extract → manifest equality → per-file SHA256 → case check → `chmod -R a-w` freeze) or **`./tools/bundle-audit/extract_and_analyze.sh`** for batch discovery + analysis.
-3. **Do** extract only under `~/bundle-staging/<bundle-stem>/` with staging versioning (`*.bak.<timestamp>`) when re-running; see `docs/bundles/BUNDLE_INGESTION_POLICY.md` and `docs/bundles/OCH_RP_ARTIFACT_CONTRACT.md`.
+3. **Do** extract only under `~/bundle-staging/<bundle-stem>/` with staging versioning (`*.bak.<timestamp>`) when re-running; see `docs/bundles/BUNDLE_INGESTION_POLICY.md` and `docs/bundles/RP_RP_ARTIFACT_CONTRACT.md`.
 4. **Do** verify `.sha256` sidecars when present (`shasum -c` when adjacent sidecar exists); never modify the original `.tar.gz`; never normalize line endings or rewrite archive bytes.
 5. **Do** emit `docs/bundles/CHECKSUM_RECORD_<stem>.txt`, `INTEGRITY_<stem>.json`, and `BUNDLE_ANALYSIS_<stem>.md` via the protocol scripts — not ad-hoc extracts.
 6. Treat the **git repo as canonical** for structure, **Record** namespace/SNI (`record-platform`, `record.test`, `kafka-ssl-secret`, api-gateway `:4000`). Tarballs are **historical artifacts**, not source-of-truth.

@@ -1,12 +1,12 @@
-# RP messaging schema migration (OCH 5444 → runtime 5434)
+# RP messaging schema migration (RP 5444 → runtime 5434)
 
 ## Source of truth
 
-RP **messaging** inherits **OCH messaging** (`5444-messaging`), not RP `social` or `5434-social`.
+RP **messaging** inherits **RP messaging** (`5444-messaging`), not RP `social` or `5434-social`.
 
 | Role | Path / port |
 |------|-------------|
-| OCH source dump | `backups/all-8-20260517-152701/5444-messaging.dump` |
+| RP source dump | `backups/all-8-20260517-152701/5444-messaging.dump` |
 | RP runtime dump | `backups/hybrid-rp-och/materialized-rp-runtime/5434-messaging.dump` |
 | Runtime port | `5434` |
 | Database name | `messaging` |

@@ -104,7 +104,7 @@ Temporary 6-user allowlist during eval only. Restore single contract-user allowl
 | Canary errors | **0** | **0** |
 | Telemetry WARNs | **0** | **0** |
 | Leakage | **PASS** | **PASS** |
-| OCH | **PASS** | **PASS** |
+| RP | **PASS** | **PASS** |
 | Contracts | **PASS** | **PASS** |
 | Playwright | **PASS** | **PASS** |
 | Anchored overlap | **16/16** | **≥10/16** |

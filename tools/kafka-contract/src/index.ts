@@ -6,7 +6,7 @@
  *   pnpm --filter kafka-contract run build
  *   node dist/index.js validate [options]
  *
- * Env: REPO_ROOT, KAFKA_CONTRACT_PROTO_ROOT, PROTO_ROOT, ENV_PREFIX, OCH_KAFKA_TOPIC_SUFFIX, KAFKA_BROKER, KAFKA_SSL_*,
+ * Env: REPO_ROOT, KAFKA_CONTRACT_PROTO_ROOT, PROTO_ROOT, ENV_PREFIX, RP_KAFKA_TOPIC_SUFFIX, KAFKA_BROKER, KAFKA_SSL_*,
  *   KAFKA_SSL_SKIP_HOSTNAME_CHECK=1 — dev only; TLS verify CA but skip broker hostname/SAN check (e.g. MetalLB IP not on cert).
  */
 import fs from "node:fs";
@@ -50,7 +50,7 @@ async function runValidate(args: ReturnType<typeof parseArgs>): Promise<Validati
   const root = repoRootFromTool();
   const protoRoot = resolveProtoEventsDir(root);
   const envPrefix = process.env.ENV_PREFIX ?? "dev";
-  const suf = topicSuffixFromEnv(process.env.OCH_KAFKA_TOPIC_SUFFIX);
+  const suf = topicSuffixFromEnv(process.env.RP_KAFKA_TOPIC_SUFFIX);
 
   const protoNames = scanProtoEvents(protoRoot);
   const expectedTopics = buildExpectedTopics(protoNames, envPrefix, suf);
@@ -201,10 +201,10 @@ async function main() {
     console.log(`Usage: node dist/index.js validate [--json] [--strict-topics] [--broker-config] [--skip-broker-config]
   [--rack-aware] [--rolling-restart-safe] [--check-cert-expiry]
 Env: REPO_ROOT, KAFKA_CONTRACT_PROTO_ROOT (absolute proto/events override), PROTO_ROOT (relative to repo),
-  ENV_PREFIX, OCH_KAFKA_TOPIC_SUFFIX, KAFKA_BROKER, KAFKA_SSL_ENABLED,
+  ENV_PREFIX, RP_KAFKA_TOPIC_SUFFIX, KAFKA_BROKER, KAFKA_SSL_ENABLED,
   KAFKA_CONTRACT_CHECK_AUTO_CREATE=1 (or --broker-config) to assert auto.create.topics.enable=false via Admin API
   KAFKA_CONTRACT_MIN_BROKERS=N — fail if describeCluster broker count < N (quorum gate)
-  OCH_KAFKA_REQUIRE_QUORUM_3=1 — scripts/validate-kafka-stack-contract.sh sets min brokers to 3 when used there
+  RP_KAFKA_REQUIRE_QUORUM_3=1 — scripts/validate-kafka-stack-contract.sh sets min brokers to 3 when used there
   KAFKA_CONTRACT_AUTO_TOPOLOGY=1 — set MIN_REPLICATION / MIN_ISR floors from cluster size (3→RF3 ISR≥2, 2→RF2 ISR≥1)
   KAFKA_CONTRACT_MIN_ISR — explicit min in-sync replica count per partition (used with or without AUTO_TOPOLOGY)`);
     process.exit(0);

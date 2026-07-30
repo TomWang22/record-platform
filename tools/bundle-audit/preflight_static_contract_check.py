@@ -4,7 +4,7 @@ Structural integrity checks for preflight wiring (no cluster, no kubectl).
 
 - Collects `scripts/...sh` references from the preflight driver + Makefile
 - Verifies files exist
-- Flags legacy OCH script path tokens
+- Flags legacy RP script path tokens
 - Spot-checks trace-validators, observability / TLS / transport / secret-audit tools
 - Informational: lists `PREFLIGHT_*`-style vars expanded in the body but absent from the
   contiguous leading `#` banner (for doc drift review; not a hard failure)
@@ -95,16 +95,16 @@ def main() -> int:
     issues: list[str] = []
     blocking: list[dict[str, str]] = []
     for rel in sorted(all_refs):
-        if "och-" in rel.lower() or "/och" in rel.lower():
-            msg = f"Legacy OCH path still referenced: `{rel}`"
+        if "rp-" in rel.lower() or "/och" in rel.lower():
+            msg = f"Legacy RP path still referenced: `{rel}`"
             issues.append(msg)
             blocking.append(
                 {
-                    "issue_code": "LEGACY_OCH_SCRIPT_REFERENCE",
+                    "issue_code": "LEGACY_NAMESPACE_SCRIPT_REFERENCE",
                     "severity": "error",
                     "variable_or_contract": rel,
                     "source_paths": rel,
-                    "reason": "OCH-era script path still referenced in preflight/Makefile union",
+                    "reason": "RP-era script path still referenced in preflight/Makefile union",
                 }
             )
             continue
@@ -146,18 +146,18 @@ def main() -> int:
             }
         )
 
-    och_path_hits = sorted(
+    rp_path_hits = sorted(
         set(re.findall(r"scripts/[a-zA-Z0-9_./-]*och[a-zA-Z0-9_./-]*\.sh", pf, re.I))
-        - {b["variable_or_contract"] for b in blocking if b["issue_code"] == "LEGACY_OCH_SCRIPT_REFERENCE"}
+        - {b["variable_or_contract"] for b in blocking if b["issue_code"] == "LEGACY_NAMESPACE_SCRIPT_REFERENCE"}
     )
-    for hit in och_path_hits:
+    for hit in rp_path_hits:
         blocking.append(
             {
-                "issue_code": "LEGACY_OCH_PREFLIGHT_BODY_TOKEN",
+                "issue_code": "LEGACY_RP_PREFLIGHT_BODY_TOKEN",
                 "severity": "error",
                 "variable_or_contract": hit,
                 "source_paths": str(pre.relative_to(repo)),
-                "reason": "OCH-era script token appears in preflight body",
+                "reason": "RP-era script token appears in preflight body",
             }
         )
 
@@ -175,7 +175,7 @@ def main() -> int:
         "",
         f"- Count: **{len(all_refs)}** (preflight + `$(SCRIPTS)/` + Makefile `bash scripts/...`)",
         "",
-        "## Missing files / legacy OCH paths",
+        "## Missing files / legacy RP paths",
     ]
     if issues:
         lines += [f"- {m}" for m in issues]
@@ -225,9 +225,9 @@ def main() -> int:
         "",
         f"- `tools/bundle-audit/secret_name_alignment_audit.py`: **{'present' if audit_tool.is_file() else 'MISSING'}**",
         "",
-        "## OCH path tokens inside preflight body",
+        "## RP path tokens inside preflight body",
     ]
-    lines += [f"- `{h}`" for h in och_path_hits] or ["- _(none)_"]
+    lines += [f"- `{h}`" for h in rp_path_hits] or ["- _(none)_"]
     lines.append("")
 
     out.parent.mkdir(parents=True, exist_ok=True)

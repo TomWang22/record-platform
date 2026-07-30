@@ -81,10 +81,10 @@ BENCH_REQUIRE_OLLAMA_WARM=1 BENCH_WARMUP_RUNS=1 \
 bash scripts/rp-ai-shadow-source-diagnostic.sh
 bash scripts/audit-rp-ai-rag-contract.sh
 bash scripts/rp-ai-rag-quality-smoke.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
-Required: source diagnostic PASS (≥5 types, ideally 6); contracts/smoke/OCH PASS; leakage 0; flags 0/0.
+Required: source diagnostic PASS (≥5 types, ideally 6); contracts/smoke/RP PASS; leakage 0; flags 0/0.
 
 If cold source diagnostic fails from embed timeout: rerun warmup/diagnostic only — do not start backup/write from cold failed diagnostic.
 
@@ -127,7 +127,7 @@ bash scripts/audit-rp-ai-runtime-contract.sh
 bash scripts/audit-rp-ai-endpoints-contract.sh
 bash scripts/rp-ai-provider-readiness.sh
 bash scripts/rp-ai-pgvector-readiness.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 Expected: post-count 8,065; tranche 8 lock exit 2; wrong_dim=0; message_embeddings=0; proxy_leaks=0; vector rollout still NOT APPROVED.
@@ -171,7 +171,7 @@ bash scripts/rp-ai-provider-readiness.sh
 bash scripts/rp-ai-pgvector-readiness.sh
 bash scripts/rp-ai-backfill-rerun-guard-smoke.sh
 bash scripts/rp-ai-live-inference-transcript.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 Required verdict:
@@ -211,7 +211,7 @@ bash scripts/rp-ai-embedding-backfill-controlled.sh
 
 bash scripts/rp-ai-embedding-backfill-controlled.sh --check-lock t20-tranche-8
 bash scripts/rp-ai-backfill-rerun-guard-smoke.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 Create: `docs/ai-platform/T20-12V-tranche9-dry-run-plan.md`

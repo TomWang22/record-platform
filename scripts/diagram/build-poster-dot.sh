@@ -17,7 +17,7 @@ mkdir -p "$(dirname "$out")"
   graph [
     rankdir=TB,
     fontsize=12,
-    label="Off-Campus Housing — system architecture (poster)",
+    label="Record Platform — system architecture (poster)",
     labelloc=t
   ];
   node [fontname="Helvetica"];

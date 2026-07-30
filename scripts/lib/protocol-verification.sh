@@ -145,7 +145,7 @@ count_udp443_stray_not_pod_in_pcap() {
   [[ "$count" =~ ^[0-9]+$ ]] && echo "$count" || echo "0"
 }
 
-# Gold-standard checks for a Caddy pod pcap: no stray UDP/443 to other hosts; QUIC SNI matches OCH hostname.
+# Gold-standard checks for a Caddy pod pcap: no stray UDP/443 to other hosts; QUIC SNI matches RP hostname.
 # Returns 0 on success; 1 if STRICT_QUIC_VALIDATION=1 and checks fail.
 verify_caddy_pcap_quic_enforcement() {
   local pcap="${1:?pcap}"
@@ -168,7 +168,7 @@ verify_caddy_pcap_quic_enforcement() {
     echo "  [capture-verify] WARN: UDP/443 present but no QUIC TLS SNI '${sni}' decoded (tshark version or encrypted Initial); curl --http3 success still counts for app layer"
     [[ "${CAPTURE_ENFORCE_QUIC_SNI:-0}" == "1" ]] && { echo "  [capture-verify] FAIL: CAPTURE_ENFORCE_QUIC_SNI=1 requires SNI proof"; return 1; }
   elif [[ "${sni_count:-0}" -gt 0 ]]; then
-    echo "  [capture-verify] OK: QUIC + SNI '${sni}' present (definitive OCH edge proof)"
+    echo "  [capture-verify] OK: QUIC + SNI '${sni}' present (definitive RP edge proof)"
   fi
   return 0
 }

@@ -79,7 +79,7 @@ This document catalogs all k6 scripts in `scripts/load/` and related pgbench scr
 - **Auth**: `k6-auth-comprehensive.js`, `k6-auth-limit-test.js`, `k6-auth-limit-test-improved.js`, `k6-auth-incremental-load.js`.
 - **Shopping**: `k6-shopping-comprehensive.js`, `k6-shopping-stress.js`, `k6-shopping-ramp.js`, `k6-shopping-db-validation.js`.
 - **Listings**: `k6-listings-service-comprehensive.js`.
-- **Social**: `k6-social-service-comprehensive.js`, `k6-social-limit-test.js`.
+- **Social**: `k6-messaging-service-comprehensive.js`, `k6-social-limit-test.js`.
 - **Python AI**: `k6-python-ai.js`, `k6-python-ai-pipeline.js`.
 - **Platform / E2E**: `k6-platform-wide-comprehensive.js`, `k6-all-services-comprehensive.js`, `k6-mixed.js`, `k6-http3-complete.js`, `k6-http3-toolchain.js`, `k6-bottleneck-finder.js`, `k6-ca-rotation.js`, `k6-summary-handler.js`.
 

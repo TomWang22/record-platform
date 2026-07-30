@@ -6,13 +6,13 @@
 # If the parent shell exported --jitless, we strip it here before exec.
 #
 # Env:
-#   OCH_INTEGRATION_KAFKA_FROM_K8S_LB — default 1 (same as prior package.json inline)
+#   RP_INTEGRATION_KAFKA_FROM_K8S_LB — default 1 (same as prior package.json inline)
 #   ROLLUP_DISABLE_NATIVE — forced true for Vitest stability
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-export OCH_INTEGRATION_KAFKA_FROM_K8S_LB="${OCH_INTEGRATION_KAFKA_FROM_K8S_LB:-1}"
+export RP_INTEGRATION_KAFKA_FROM_K8S_LB="${RP_INTEGRATION_KAFKA_FROM_K8S_LB:-1}"
 export ROLLUP_DISABLE_NATIVE=true
 
 if [[ -n "${NODE_OPTIONS:-}" ]] && echo " ${NODE_OPTIONS} " | grep -qE '[[:space:]]--jitless[[:space:]]'; then

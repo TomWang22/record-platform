@@ -57,7 +57,7 @@ echo ""
 
 # Check service status
 say "Service Pod Status:"
-kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,social-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' \
+kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,messaging-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' \
   -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[0].ready,STATUS:.status.phase,AGE:.metadata.creationTimestamp \
   --sort-by=.metadata.creationTimestamp 2>/dev/null | tail -10 || echo "  (could not get pod status)"
 echo ""

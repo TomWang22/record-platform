@@ -64,10 +64,10 @@ Covers `validation.ts`, `search-listings-query.ts`, and HTTP app construction (`
 
 ### 3b. HTTP + gRPC + Postgres + **cluster Kafka** integration
 
-Integration Vitest uses **`vitest.integration.config.mts`**: **no plaintext Kafka**. You need **≥3 TLS broker seeds** (MetalLB `kafka-*-external` :9094 via **`OCH_INTEGRATION_KAFKA_FROM_K8S_LB=1`**, or explicit **`KAFKA_BROKER`**) and client PEMs under **`certs/kafka-ssl/`** or **`certs/kafka-ssl-ci/`**. **globalSetup** creates **`${ENV_PREFIX}.listing.events`** (+ `OCH_KAFKA_TOPIC_SUFFIX`) if missing.
+Integration Vitest uses **`vitest.integration.config.mts`**: **no plaintext Kafka**. You need **≥3 TLS broker seeds** (MetalLB `kafka-*-external` :9094 via **`RP_INTEGRATION_KAFKA_FROM_K8S_LB=1`**, or explicit **`KAFKA_BROKER`**) and client PEMs under **`certs/kafka-ssl/`** or **`certs/kafka-ssl-ci/`**. **globalSetup** creates **`${ENV_PREFIX}.listing.events`** (+ `RP_KAFKA_TOPIC_SUFFIX`) if missing.
 
 ```bash
-# From repo root (script sets OCH_INTEGRATION_KAFKA_FROM_K8S_LB=1); needs kubectl → Colima/k3s + externals
+# From repo root (script sets RP_INTEGRATION_KAFKA_FROM_K8S_LB=1); needs kubectl → Colima/k3s + externals
 pnpm --filter listings-service run test:integration
 ```
 
@@ -77,7 +77,7 @@ These suites hit real **Kafka** (listing events topic), **Postgres 5442**, HTTP 
 
 **GitHub Actions** does **not** run listings Kafka integration (same as booking); run locally against your stack.
 
-**gRPC** integration tests use **insecure bind** via **`OCH_GRPC_INSECURE_TEST_BIND=1`** only under this Vitest config.
+**gRPC** integration tests use **insecure bind** via **`RP_GRPC_INSECURE_TEST_BIND=1`** only under this Vitest config.
 
 ### 4. Start the listings-service
 

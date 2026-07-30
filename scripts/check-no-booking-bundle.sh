@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Verify och-platform-no-booking-bundle tarball layout and exclusions (no extract required).
-# Handles archives whose paths are prefixed with och-platform-no-booking-bundle/.
+# Verify rp-platform-no-booking-bundle tarball layout and exclusions (no extract required).
+# Handles archives whose paths are prefixed with rp-platform-no-booking-bundle/.
 #
 # Usage: bash scripts/check-no-booking-bundle.sh [/path/to/bundle.tar.gz]
 set -euo pipefail
 
 TARBALL="${1:-}"
 if [[ -z "$TARBALL" ]]; then
-  TARBALL="$(ls -t "$HOME"/och-platform-no-booking-bundle-*.tar.gz 2>/dev/null | head -1 || true)"
+  TARBALL="$(ls -t "$HOME"/rp-platform-no-booking-bundle-*.tar.gz 2>/dev/null | head -1 || true)"
 fi
 if [[ -z "$TARBALL" || ! -f "$TARBALL" ]]; then
-  echo "ERROR: tarball not found (pass path or place och-platform-no-booking-bundle-*.tar.gz in \$HOME)" >&2
+  echo "ERROR: tarball not found (pass path or place rp-platform-no-booking-bundle-*.tar.gz in \$HOME)" >&2
   exit 1
 fi
 
@@ -113,8 +113,8 @@ done
 echo
 echo "== Forbidden runnable booking paths =="
 forbidden_patterns=(
-  '^services/booking-service(/|$)'
-  '^infra/k8s/base/booking-service(/|$)'
+  '^services/reservation-mesh(/|$)'
+  '^infra/k8s/base/reservation-mesh(/|$)'
   '^proto/booking\.proto$'
   '^proto/events/booking\.proto$'
   '^infra/k8s/base/config/proto/booking\.proto$'
@@ -172,24 +172,24 @@ fi
 echo "--- bootstrap-all-dbs.sh (bookings call) ---"
 grep -n bootstrap_bookings "$DOC_ROOT/scripts/bootstrap-all-dbs.sh" 2>/dev/null || echo "(file missing)"
 
-echo "--- kustomization.yaml (booking-service resource) ---"
-grep -n booking-service "$DOC_ROOT/infra/k8s/base/kustomization.yaml" 2>/dev/null || echo "(no booking-service line — OK)"
+echo "--- kustomization.yaml (reservation-mesh resource) ---"
+grep -n reservation-mesh "$DOC_ROOT/infra/k8s/base/kustomization.yaml" 2>/dev/null || echo "(no reservation-mesh line — OK)"
 
 echo
 echo "== Booking path report (documentation vs runnable) =="
 echo "--- Runnable leftovers (must be empty) ---"
-grep -Ei '^(services/booking-service|infra/k8s/base/booking-service|proto/booking\.proto|proto/events/booking\.proto|infra/db/.*booking.*\.sql|.*5443-bookings)' "$STRIPPED" || echo "(none)"
+grep -Ei '^(services/infra/k8s/base/proto/booking\.proto|proto/events/booking\.proto|infra/db/.*booking.*\.sql|.*5443-bookings)' "$STRIPPED" || echo "(none)"
 
 echo "--- Docs / text mentioning booking (informational only) ---"
 grep -Ei 'booking' "$STRIPPED" | grep -Ei '^docs/|^README|^Runbook|BOOKING' | head -20 || echo "(none in first 20 doc hits)"
 
 echo
-echo "== Deep scan (runnable booking-service paths only) =="
-if grep -Ei '^(services/booking-service|infra/k8s/base/booking-service|proto/booking\.proto|proto/events/booking\.proto|.*5443-bookings)' "$STRIPPED"; then
+echo "== Deep scan (runnable reservation-mesh paths only) =="
+if grep -Ei '^(services/infra/k8s/base/proto/booking\.proto|proto/events/booking\.proto|.*5443-bookings)' "$STRIPPED"; then
   echo "WARNING: runnable booking paths still in archive."
   bad=1
 else
-  echo "OK: no runnable booking-service path leftovers."
+  echo "OK: no runnable reservation-mesh path leftovers."
 fi
 
 echo

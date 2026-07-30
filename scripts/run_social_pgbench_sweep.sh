@@ -6,7 +6,7 @@
 #   - Schemas used: forum, messages, bench (results), public, auth
 #
 # Important:
-#   - This script benchmarks the Docker Postgres instance for social service, NOT the K8s postgres pod.
+#   - This script benchmarks the Docker Postgres instance for messaging-plane, NOT the K8s postgres pod.
 #   - K8s microservices connect to the same Docker DB via:
 #       host.docker.internal:5434 (db=records, search_path=forum|messages|...)
 set -Euo pipefail

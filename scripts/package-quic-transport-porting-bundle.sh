@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build a portable tarball of QUIC / HTTP3 capture + transport-invariant tooling for Record Platform.
-# Bundled copies rewrite OCH defaults → record.test (edge hostname / SNI) and record-platform (k8s namespace).
+# Bundled copies rewrite RP defaults → record.test (edge hostname / SNI) and record-platform (k8s namespace).
 # Output: $HOME/record-platform-quic-transport-porting-bundle-<stamp>.tar.gz (not inside the repo).
 #         Override: RECORD_PLATFORM_PORTING_BUNDLE_DIR=/path/to/dir
 # Usage: bash scripts/package-quic-transport-porting-bundle.sh
@@ -72,10 +72,10 @@ _record_platform_rewrites() {
   find "$d" -type f \( \
     -name '*.sh' -o -name '*.py' -o -name '*.mjs' -o -name '*.yaml' -o -name '*.yml' -o -name '*.txt' -o -name '*.fragment' \
   \) ! -path '*/docs/preflight-quic-step-grep.txt' -print0 | while IFS= read -r -d '' f; do
-    perl -pi -e 's/off-campus-housing\.test/record.test/g' "$f"
+    perl -pi -e 's/record-platform\.test/record.test/g' "$f"
     perl -pi -e 's/record-platform/record-platform/g' "$f"
     perl -pi -e 's/record-platform-quic/record-platform-quic/g' "$f"
-    perl -pi -e 's/\(OCH: record\.test/(Record Platform: record.test/g' "$f"
+    perl -pi -e 's/\(RP: record\.test/(Record Platform: record.test/g' "$f"
   done
 }
 _record_platform_rewrites "$BUNDLE"
@@ -84,7 +84,7 @@ cat > "$BUNDLE/README_PORTING.txt" <<'EOF'
 Record Platform — QUIC transport + packet capture porting bundle
 ==================================================================
 
-Defaults in this bundle (rewritten from OCH upstream):
+Defaults in this bundle (rewritten from RP upstream):
   • Edge hostname / SNI: record.test  (override HOST / CAPTURE_EXPECTED_SNI)
   • App / workload Kubernetes namespace: record-platform  (override NS / HOUSING_NS)
 
@@ -93,7 +93,7 @@ Wire-level HTTP/3 / QUIC capture and transport-invariant tooling:
 
 See MANIFEST.txt. Merge make-fragments/*.fragment into your Makefile (set REPO_ROOT / SCRIPTS).
 
-Regenerate this tarball from the OCH repo (writes archive to $HOME by default):
+Regenerate this tarball from the RP repo (writes archive to $HOME by default):
   bash scripts/package-quic-transport-porting-bundle.sh
   RECORD_PLATFORM_PORTING_BUNDLE_DIR=/custom/dir bash scripts/package-quic-transport-porting-bundle.sh
 

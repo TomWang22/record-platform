@@ -15,7 +15,7 @@
 | Longform scenario score | **3.67** |
 | Final turn score | **4.0** |
 | Leakage | **PASS** |
-| OCH scan | **PASS** (`__SCANNED__=589`) |
+| RP scan | **PASS** (`__SCANNED__=589`) |
 
 ## 2. Soak gate evidence (T20.28C)
 

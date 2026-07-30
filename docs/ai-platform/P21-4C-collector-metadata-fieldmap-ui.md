@@ -79,7 +79,7 @@ Turn 12 UI assertions (hard, not soft):
 | ------- | ------ |
 | `seller-intelligence-ui.spec.ts` | 1 passed (19.9s) |
 | `ai-rag-longform-record-session.spec.ts` | **12/12 pass**, turn 12 score **4.0**, avg **3.67** |
-| `rp-och-decontaminate-scan.sh` | PASS |
+| `rp-rp-decontaminate-scan.sh` | PASS |
 
 Screenshot (local only, not committed): Playwright run output; no screenshot artifact staged.
 

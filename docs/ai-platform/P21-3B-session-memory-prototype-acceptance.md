@@ -104,7 +104,7 @@ Forbidden patterns checked per turn: `message_body`, `thread_text`, `private obo
 | `audit-rp-ai-rag-contract.sh` | PASS |
 | `rp-ai-rag-quality-smoke.sh` | PASS |
 | `audit-rp-ai-endpoints-contract.sh` | PASS |
-| `rp-och-decontaminate-scan.sh` | PASS |
+| `rp-rp-decontaminate-scan.sh` | PASS |
 
 ---
 

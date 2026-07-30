@@ -12,7 +12,7 @@ menu_text() {
   cat <<'MENU'
 
 ╔══════════════════════════════════════════════════════════════╗
-║  OCH — Resilience & forensics menu                           ║
+║  RP — Resilience & forensics menu                           ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  1) cluster-log-sweep (keywords + restarts)                  ║
 ║  2) forensic-log-sweep (raw pod log tails → forensic/)       ║

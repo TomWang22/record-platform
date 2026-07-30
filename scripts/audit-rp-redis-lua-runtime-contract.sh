@@ -111,11 +111,11 @@ _static_keys_scan() {
   return 0
 }
 
-_och_prefix_scan() {
+_rp_prefix_scan() {
   local svc="$1"
   local dir="$REPO_ROOT/services/$svc"
   [[ -d "$dir" ]] || return 0
-  if grep -rqE 'och:|off-campus|housing\.cache' "$dir" \
+  if grep -rqE 'rp:|off-campus|housing\.cache' "$dir" \
     --include='*.ts' --include='*.js' \
     --exclude-dir=node_modules --exclude-dir=dist 2>/dev/null; then
     return 1
@@ -172,19 +172,19 @@ for svc in "${SERVICES[@]}"; do
     continue
   fi
   keys_st=pass
-  och_st=pass
+  rp_st=pass
   if ! _static_keys_scan "$svc"; then
     keys_st=fail
     FAIL=1
     _log "❌ $svc: KEYS in Lua/TS source"
   fi
-  if ! _och_prefix_scan "$svc"; then
-    och_st=fail
+  if ! _rp_prefix_scan "$svc"; then
+    rp_st=fail
     FAIL=1
-    _log "❌ $svc: OCH cache prefix in source"
+    _log "❌ $svc: RP cache prefix in source"
   fi
-  _log "✅ $svc: PING + SCRIPT LOAD OK (keys=$keys_st och=$och_st)"
-  echo "{\"service\":\"$svc\",\"ping\":\"ok\",\"script_load\":\"ok\",\"keys_static\":\"$keys_st\",\"och_prefix\":\"$och_st\"}" >>"$results_tmp"
+  _log "✅ $svc: PING + SCRIPT LOAD OK (keys=$keys_st och=$rp_st)"
+  echo "{\"service\":\"$svc\",\"ping\":\"ok\",\"script_load\":\"ok\",\"keys_static\":\"$keys_st\",\"rp_prefix\":\"$rp_st\"}" >>"$results_tmp"
 done
 
 _log ""

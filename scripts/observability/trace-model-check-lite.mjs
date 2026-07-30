@@ -17,7 +17,7 @@ const REQUIRED = new Set([
   "api-gateway",
   "auth-service",
   "listings-service",
-  "booking-service",
+  "reservation-mesh",
   "messaging-service",
   "media-service",
   "notification-service",
@@ -121,14 +121,14 @@ function main() {
 
   const ok = badCycles.length === 0;
   const doc = {
-    specVersion: "och-trace-model-lite-v1",
+    specVersion: "rp-trace-model-lite-v1",
     ok,
     missing_required_services: missing,
     unexpected_cycles: badCycles,
     edge_count: seen.size,
   };
   writeFileSync(OUT, `${JSON.stringify(doc, null, 2)}\n`);
-  const strict = process.env.OCH_MODEL_CHECK_ENFORCE === "1" || process.env.PREFLIGHT_REQUIRE_FORMAL_TRACE_GATES === "1";
+  const strict = process.env.RP_MODEL_CHECK_ENFORCE === "1" || process.env.PREFLIGHT_REQUIRE_FORMAL_TRACE_GATES === "1";
   if (!ok && strict) process.exit(1);
   process.exit(0);
 }

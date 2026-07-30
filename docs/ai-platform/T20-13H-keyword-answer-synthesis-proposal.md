@@ -412,7 +412,7 @@ Future T20.13I implementation must run:
 | Endpoints contract | existing endpoint tests / smoke |
 | Live inference | `bash scripts/rp-ai-live-inference-transcript.sh --embed-warmup-runs 3 …` |
 | Evaluator rubric | Manual or scripted rerun of T20.13G-S scoring on new raw JSON |
-| OCH scan | `bash scripts/rp-och-decontaminate-scan.sh` |
+| RP scan | `bash scripts/rp-rp-decontaminate-scan.sh` |
 | Unit tests | `pytest services/python-ai-service/tests/test_rag_synthesis.py` |
 
 **Pass criteria:**

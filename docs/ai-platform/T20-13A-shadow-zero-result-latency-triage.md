@@ -156,7 +156,7 @@ Flagged diagnostic mode **improves overlap** on some prompts (entity/doc overlap
 | Provider/pgvector | PASS |
 | Live inference keyword | 7/7 PASS |
 | Leakage | PASS |
-| OCH | PASS |
+| RP | PASS |
 
 ---
 

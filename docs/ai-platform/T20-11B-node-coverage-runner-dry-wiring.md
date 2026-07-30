@@ -77,7 +77,7 @@ No Node service can fail enforcement while `strict_enabled=false`.
 bash scripts/coverage/run-service-coverage.sh python-ai-service
 bash scripts/coverage/run-service-coverage.sh all
 node scripts/coverage/enforce-service-coverage.mjs
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 ---

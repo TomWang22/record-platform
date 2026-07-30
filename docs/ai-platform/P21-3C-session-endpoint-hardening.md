@@ -79,7 +79,7 @@ Uses `assert_session_envelope` (allows empty `source_refs` for session lifecycle
 | `audit-rp-ai-rag-contract.sh` | PASS |
 | `rp-ai-rag-quality-smoke.sh` | PASS |
 | `audit-rp-ai-endpoints-contract.sh` | PASS (incl. 4 session endpoints) |
-| `rp-och-decontaminate-scan.sh` | PASS |
+| `rp-rp-decontaminate-scan.sh` | PASS |
 
 Deploy: `python-ai-service:t20-p213c` rolled out to Colima cluster for live endpoint audit.
 

@@ -77,7 +77,7 @@ rp_kafka_ssl_verify_triple_match() {
   return 0
 }
 
-# Verify live secret ca-cert.pem matches rp.dev/ca-fingerprint-sha256 (not legacy och.dev).
+# Verify live secret ca-cert.pem matches rp.dev/ca-fingerprint-sha256 (not legacy rp.dev).
 rp_kafka_ssl_verify_secret_ca_annotation() {
   local ns="${1:-record-platform}"
   local live_pem="$2"
@@ -94,10 +94,10 @@ rp_kafka_ssl_verify_secret_ca_annotation() {
   }
 
   legacy_ann="$(kubectl get secret kafka-ssl-secret -n "$ns" \
-    -o go-template='{{index .metadata.annotations "och.dev/ca-fingerprint-sha256"}}' 2>/dev/null | tr -d '\r\n' || true)"
+    -o go-template='{{index .metadata.annotations "rp.dev/ca-fingerprint-sha256"}}' 2>/dev/null | tr -d '\r\n' || true)"
   if rp_kafka_ssl_annotation_value "$legacy_ann" >/dev/null; then
     legacy_ann="$(rp_kafka_ssl_annotation_value "$legacy_ann")"
-    echo "kafka-ssl-secret still has legacy och.dev/ca-fingerprint-sha256=$legacy_ann (run scripts/apply-rp-kafka-ssl-secret.sh)" >&2
+    echo "kafka-ssl-secret still has legacy rp.dev/ca-fingerprint-sha256=$legacy_ann (run scripts/apply-rp-kafka-ssl-secret.sh)" >&2
     return 1
   fi
 

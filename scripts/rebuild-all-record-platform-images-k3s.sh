@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build every Record Platform backend image in RECORD_PLATFORM_DOCKER_SERVICES_DEFAULT, load into Colima Docker, and
-# rollout restart each Deployment that exists in the namespace (OCH: transport-watchdog → api-gateway).
+# rollout restart each Deployment that exists in the namespace (RP: transport-watchdog → api-gateway).
 #
 # End-to-end ship check (rollouts + Kafka + alignment): ./scripts/golden-snapshot-verify.sh or make golden-snapshot
 #

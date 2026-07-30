@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 HYBRID="$REPO_ROOT/backups/hybrid-rp-och"
 RP_SRC="${RP_ALL8_DIR:-$REPO_ROOT/backups/all-8-20260312-091418}"
-OCH_SRC="${OCH_ALL8_DIR:-$REPO_ROOT/backups/all-8-20260517-152701}"
+RP_SRC="${RP_ALL8_DIR:-$REPO_ROOT/backups/all-8-20260517-152701}"
 
 mkdir -p "$HYBRID/sources" "$HYBRID/materialized-rp-runtime" "$HYBRID/post-restore"
 
@@ -20,23 +20,23 @@ link_src() {
 }
 
 link_src "rp-all-8-$(basename "$RP_SRC")" "$RP_SRC"
-link_src "och-all-8-$(basename "$OCH_SRC")" "$OCH_SRC"
+link_src "rp-all-8-$(basename "$RP_SRC")" "$RP_SRC"
 
-export OCH_ALL8_DIR="$OCH_SRC" RP_ALL8_DIR="$RP_SRC"
+export RP_ALL8_DIR="$RP_SRC" RP_ALL8_DIR="$RP_SRC"
 bash "$SCRIPT_DIR/build-rp-hybrid-runtime-backup.sh"
 bash "$HYBRID/validate-hybrid-backup.sh" "$HYBRID/materialized-rp-runtime"
 
 cat >"$HYBRID/README.md" <<EOF
-# Hybrid RP/OCH backup layout
+# Hybrid RP/RP backup layout
 
-OCH \`all-8-*\` folders are **source inputs only** (ports 5441–5448). They must not run as OCH containers.
+RP \`all-8-*\` folders are **source inputs only** (ports 5441–5448). They must not run as RP containers.
 
 RP **runtime** restore uses \`materialized-rp-runtime/\` (ports **5433–5443**).
 
 ## Sources (read-only)
 
 - \`sources/rp-all-8-*\` — RP snapshot (5433–5440)
-- \`sources/och-all-8-*\` — OCH snapshot (5441–5448)
+- \`sources/rp-all-8-*\` — RP snapshot (5441–5448)
 
 ## Materialized runtime
 
@@ -45,7 +45,7 @@ RP **runtime** restore uses \`materialized-rp-runtime/\` (ports **5433–5443**)
 Rebuild:
 
 \`\`\`bash
-OCH_ALL8_DIR=backups/all-8-20260517-152701 RP_ALL8_DIR=backups/all-8-20260312-091418 \\
+RP_ALL8_DIR=backups/all-8-20260517-152701 RP_ALL8_DIR=backups/all-8-20260312-091418 \\
   bash scripts/build-rp-hybrid-runtime-backup.sh
 \`\`\`
 

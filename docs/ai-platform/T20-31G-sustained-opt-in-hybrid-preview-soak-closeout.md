@@ -45,10 +45,10 @@ AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0
 
 1 post-batch `ui_latency_p95_ms` (non-soak UI class). Soak path: 0 WARNs.
 
-## Leakage / OCH / Playwright / rollback
+## Leakage / RP / Playwright / rollback
 
 - Leakage: **PASS**
-- OCH: **PASS** (`__SCANNED__=590`)
+- RP: **PASS** (`__SCANNED__=590`)
 - Playwright: **PASS** (final clean runs)
 - Rollback + `CANARY=0`: **PASS**
 

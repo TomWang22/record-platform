@@ -91,7 +91,7 @@ JWT `sub` drives gating — **no header user-ID spoofing**.
 | Canary errors | **0** |
 | Telemetry WARNs | **0** |
 | Leakage | **PASS** |
-| OCH | **PASS** |
+| RP | **PASS** |
 | Anchored overlap (shadow) | **16/16** (hard min **≥10/16**) |
 | True zero-results | **0** |
 | Embed timeouts | **0** |

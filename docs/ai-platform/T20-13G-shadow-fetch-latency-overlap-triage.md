@@ -22,7 +22,7 @@ T20.13E/F embed warmup eliminated harness cold-start noise (`embed_timeout_befor
 | Quality smoke | `bench_logs/ai-platform/phase-17-rag-quality-smoke.md` — **PASS** |
 | Provider readiness | `bench_logs/ai-platform/phase-17-provider-readiness.md` — **PASS** |
 | pgvector readiness | `bench_logs/ai-platform/phase-18-pgvector-readiness.md` — **PASS** |
-| OCH decontaminate | **PASS** (590 files scanned) |
+| RP decontaminate | **PASS** (590 files scanned) |
 
 **Harness commands (T20.13G run):**
 

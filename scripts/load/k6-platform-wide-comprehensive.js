@@ -5,7 +5,7 @@
  * 
  * SECTION 1: End-to-End Workflows
  * - Auction Monitor → Analytics → Python AI (user plans)
- * - Social Service (negotiation helper, next tone determination)
+ * - Messaging Service (negotiation helper, next tone determination)
  * - Listings Service (past price history with Discogs, profit maximization for sellers)
  * - Shopping Service (shopper experience)
  * 
@@ -236,7 +236,7 @@ export default function () {
       }
     });
     
-    group('E2E: Social Service - Negotiation Helper', () => {
+    group('E2E: Messaging Service - Negotiation Helper', () => {
       const negotiationStart = Date.now();
       const negotiationData = {
         query: randomQuery(),

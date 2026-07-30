@@ -3,12 +3,12 @@
  * Topic: ${ENV_PREFIX}.listing.events (see scripts/create-kafka-event-topics.sh).
  */
 import { randomUUID } from "node:crypto";
-import { kafka, ochKafkaTopicIsolationSuffix } from "@common/utils";
+import { kafka, rpKafkaTopicIsolationSuffix } from "@common/utils";
 import { buildKafkaMessageHeaders, withKafkaProduceSpan } from "@common/utils/otel";
 
 const ENV_PREFIX = process.env.ENV_PREFIX || "dev";
 export const LISTING_EVENTS_TOPIC =
-  process.env.LISTING_EVENTS_TOPIC || `${ENV_PREFIX}.listing.events${ochKafkaTopicIsolationSuffix()}`;
+  process.env.LISTING_EVENTS_TOPIC || `${ENV_PREFIX}.listing.events${rpKafkaTopicIsolationSuffix()}`;
 const SERVICE_NAME = "listings-service";
 
 const producer = kafka.producer();

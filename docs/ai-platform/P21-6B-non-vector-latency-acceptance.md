@@ -14,7 +14,7 @@
 | Record intel | `./scripts/webapp-playwright-strict-edge.sh e2e/ai-rag-record-intelligence.spec.ts --grep "AI record intelligence UI acceptance"` | **PASS** (7/7, p95 UI 5.6s) |
 | Longform | `./scripts/webapp-playwright-strict-edge.sh e2e/ai-rag-longform-record-session.spec.ts --grep "AI longform record collector RAG session"` | **PASS** (12/12, p95 UI 5.4s) |
 | Telemetry | `node scripts/ai-quality-telemetry-report.mjs` | **PASS** (0 WARNs) |
-| OCH decontaminate | `bash scripts/rp-och-decontaminate-scan.sh` | **PASS** |
+| RP decontaminate | `bash scripts/rp-rp-decontaminate-scan.sh` | **PASS** |
 
 Deploy: `webapp:dev` rolled out to cluster before acceptance runs.
 

@@ -5,13 +5,13 @@
  * Pure core is injectable for crash/replay unit tests.
  */
 import crypto from 'node:crypto'
-import { kafka, ochKafkaTopicIsolationSuffix } from '@common/utils/kafka'
+import { kafka, rpKafkaTopicIsolationSuffix } from '@common/utils/kafka'
 import { listingsPool } from './availability.js'
 
 const ENV_PREFIX = process.env.ENV_PREFIX || 'dev'
 export const SALE_COMPLETED_EVENTS_TOPIC =
   process.env.LISTING_EVENTS_TOPIC ||
-  `${ENV_PREFIX}.listing.events${ochKafkaTopicIsolationSuffix()}`
+  `${ENV_PREFIX}.listing.events${rpKafkaTopicIsolationSuffix()}`
 
 export const DEFAULT_MAX_RETRIES = Number(process.env.PHASE34_OUTBOX_MAX_RETRIES || 8)
 export const DEFAULT_LEASE_MS = Number(process.env.PHASE34_OUTBOX_LEASE_MS || 30000)

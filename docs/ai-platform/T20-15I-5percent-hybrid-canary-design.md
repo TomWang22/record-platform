@@ -186,7 +186,7 @@ All must pass (or fresh rerun PASS) before owner approves T20.15J:
 | K4 | ≥3 API prompts per cohort bucket user (reuse `t20-15g-cohort0` + non-cohort buyer) |
 | K5 | 1× shadow timing |
 | K6 | Playwright: seller intel (allowlist OK); record/longform via fake-allowlist Lane C control |
-| K7 | Telemetry, contracts, OCH |
+| K7 | Telemetry, contracts, RP |
 | K8 | Record: request count, cohort users, fallback count, errors, p50/p95, gate_reason counts |
 | K9 | **Restore PERCENT=0** immediately on any gate failure or after eval (default) |
 

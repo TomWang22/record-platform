@@ -153,7 +153,7 @@ Timestamp: `20260627-034139`
 | `audit-rp-ai-endpoints-contract.sh` | PASS |
 | `rp-ai-provider-readiness.sh` | PASS |
 | `rp-ai-pgvector-readiness.sh` | PASS |
-| `rp-och-decontaminate-scan.sh` | PASS |
+| `rp-rp-decontaminate-scan.sh` | PASS |
 
 Production retrieval remains **keyword**; `model_used=rule-engine`.
 

@@ -14,7 +14,7 @@
   python3 scripts/cluster_health_dag.py drift --repo REPO [--ns NS]
       → bench_logs/drift-detection.json; exit 1 if any drift vs bootstrap-artifact.json.
 
-Env: RP_PUBLIC_HOST / OCH_EDGE_HOSTNAME (default record-platform.test), HOUSING_NS (doctor, drift).
+Env: RP_PUBLIC_HOST / RP_EDGE_HOSTNAME (default record-platform.test), HOUSING_NS (doctor, drift).
 """
 from __future__ import annotations
 
@@ -78,8 +78,8 @@ def _run_make(repo: Path, target: str) -> int:
     return r.returncode
 
 
-RP_FORBIDDEN_NAMESPACES = frozenset({"off-campus-housing-tracker"})
-RP_FORBIDDEN_DEPLOYMENTS = frozenset({"booking-service", "social-service"})
+RP_FORBIDDEN_NAMESPACES = frozenset({"record-platform"})
+RP_FORBIDDEN_DEPLOYMENTS = frozenset({"reservation-mesh", "messaging-service"})
 
 
 def _doctor_min_score(*, strict: bool) -> int:
@@ -388,7 +388,7 @@ def score_endpoints(ns: str, warnings: list[str]) -> float:
 
 def score_edge(repo: Path, warnings: list[str]) -> float:
     mx = float(WEIGHTS["edge"])
-    host = os.environ.get("RP_PUBLIC_HOST") or os.environ.get("OCH_EDGE_HOSTNAME", "record-platform.test")
+    host = os.environ.get("RP_PUBLIC_HOST") or os.environ.get("RP_EDGE_HOSTNAME", "record-platform.test")
     ca = _edge_trust_ca(repo)
     if ca is None:
         warnings.append("edge: missing CA for curl (certs/dev-chain.pem or dev-root.pem)")
@@ -396,7 +396,7 @@ def score_edge(repo: Path, warnings: list[str]) -> float:
     attempts = int(os.environ.get("BOOTSTRAP_HEALTH_EDGE_CURL_ATTEMPTS", "12"))
     sleep_s = float(os.environ.get("BOOTSTRAP_HEALTH_EDGE_CURL_SLEEP", "2"))
     last_tail = ""
-    suite = os.environ.get("OCH_X_SUITE", "bash")
+    suite = os.environ.get("RP_X_SUITE", "bash")
     for att in range(1, attempts + 1):
         r = subprocess.run(
             [
@@ -602,7 +602,7 @@ def _bootstrap_state_contract(repo: Path, ns: str) -> dict[str, Any]:
 def _load_dag(repo: Path) -> dict[str, Any]:
     for rel in (
         "scripts/lib/rp-cluster-dependency-dag.json",
-        "scripts/lib/och-cluster-dependency-dag.json",
+        "scripts/lib/rp-cluster-dependency-dag.json",
     ):
         path = repo / rel
         if path.is_file():
@@ -953,8 +953,8 @@ def cmd_bootstrap(ns: str, repo: Path) -> int:
 
 
 def _curl_edge(repo: Path, extra_args: list[str]) -> bool:
-    host = os.environ.get("RP_PUBLIC_HOST") or os.environ.get("OCH_EDGE_HOSTNAME", "record-platform.test")
-    suite = os.environ.get("OCH_X_SUITE", "bash")
+    host = os.environ.get("RP_PUBLIC_HOST") or os.environ.get("RP_EDGE_HOSTNAME", "record-platform.test")
+    suite = os.environ.get("RP_X_SUITE", "bash")
     ca = _edge_trust_ca(repo)
     if ca is None:
         return False

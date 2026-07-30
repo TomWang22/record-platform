@@ -159,7 +159,7 @@ Typical apply order (Colima / dev)
        CHAOS_CONFIRM=1 KAFKA_ALIGNMENT_TEST_MODE=1 make chaos-suite-kafka
      or run components manually (see scripts/run-chaos-suite.sh).
 
-Regenerate this tarball from the OCH repo:
+Regenerate this tarball from the RP repo:
   bash scripts/package-kafka-kraft-3broker-chaos-bundle.sh
 
 No committed secrets. Generate keys locally; do not commit .key / .jks from certs/.

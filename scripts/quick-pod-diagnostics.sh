@@ -18,7 +18,7 @@ warn(){ echo "⚠️  $*"; }
 fail(){ echo "❌ $*" >&2; }
 
 NS="${HOUSING_NS:-record-platform}"
-SERVICES=("auth-service" "listings-service" "booking-service" "messaging-service" "trust-service" "analytics-service" "api-gateway")
+SERVICES=("auth-service" "listings-service" "reservation-mesh" "messaging-service" "trust-service" "analytics-service" "api-gateway")
 
 say "=== Quick Pod Diagnostics (Problem Pods Only) ==="
 
@@ -104,7 +104,7 @@ for pod_path in "${NOT_READY_PODS[@]}"; do
     
     # Check if Node.js service
     container_image=$(_kubectl get pod "$pod" -n "$ns" -o jsonpath='{.spec.containers[0].image}' 2>/dev/null || echo "")
-    if echo "$container_image" | grep -qE "(auth-service|listings-service|booking-service|messaging-service|trust-service|analytics-service)"; then
+    if echo "$container_image" | grep -qE "(auth-service|listings-service|messaging-service|trust-service|analytics-service)"; then
       echo ""
       echo "  🔍 Node.js service checks:"
       

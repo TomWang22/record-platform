@@ -88,8 +88,8 @@ if [[ -n "${RECORD_ID:-}" ]]; then
   fi
 fi
 
-# 3. Verify social service tables
-say "3. Verifying social service tables..."
+# 3. Verify messaging-plane tables
+say "3. Verifying messaging-plane tables..."
 if [[ -n "${USER1_ID:-}" ]]; then
   # Verify forum.posts
   if [[ -n "${FORUM_POST_ID:-}" ]]; then

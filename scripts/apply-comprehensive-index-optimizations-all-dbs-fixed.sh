@@ -92,8 +92,8 @@ ANALYZE analytics.user_behavior;
 SELECT 'Analytics service: Composite indexes created' as status;
 ANALYTICSEOF
 
-# Social Service (Port 5434)
-say "=== Social Service: Comprehensive Index Strategy ==="
+# Messaging Service (Port 5434)
+say "=== Messaging Service: Comprehensive Index Strategy ==="
 PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d records << 'SOCIALEOF'
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
@@ -111,7 +111,7 @@ CREATE INDEX IF NOT EXISTS idx_forum_posts_hot_tenant_fixed
   WHERE created_at > CURRENT_DATE - INTERVAL '30 days';
 
 ANALYZE forum.posts;
-SELECT 'Social service: Trigram, composite, hot tenant indexes created' as status;
+SELECT 'messaging-plane: Trigram, composite, hot tenant indexes created' as status;
 SOCIALEOF
 
 # Shopping Service (Port 5436)

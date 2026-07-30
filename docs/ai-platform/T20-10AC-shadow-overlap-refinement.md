@@ -90,7 +90,7 @@ Both are read in `app/ai/config.py` at process start. **No production default-on
 | candidate_fetch p95 | **844 ms** |
 | Unit tests | **153 passed** |
 | Coverage (`app/ai`) | **90.08% PASS** |
-| OCH scan | **PASS** |
+| RP scan | **PASS** |
 
 **Conclusion:** Default-off behavior preserved; overlap distribution matches pre-T20.10AC baseline.
 

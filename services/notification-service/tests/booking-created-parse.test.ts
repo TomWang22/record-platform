@@ -5,7 +5,7 @@ import {
 } from "../src/consumers/booking-created.js";
 
 describe("parseBookingCreated", () => {
-  it("parses booking-service envelope for BookingRequestV1", () => {
+  it("parses reservation-mesh envelope for BookingRequestV1", () => {
     const buf = Buffer.from(
       JSON.stringify({
         metadata: {
@@ -14,7 +14,7 @@ describe("parseBookingCreated", () => {
           aggregate_id: "22222222-2222-4222-8222-222222222222",
           aggregate_type: "booking",
           occurred_at: new Date().toISOString(),
-          producer: "booking-service",
+          producer: "reservation-mesh",
           version: "1",
         },
         payload: {

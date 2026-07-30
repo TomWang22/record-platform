@@ -17,7 +17,7 @@ ok()  { echo "✅ $*"; }
 warn(){ echo "⚠️  $*"; }
 
 NS="record-platform"
-SERVICES=("auth-service" "records-service" "listings-service" "social-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service" "api-gateway")
+SERVICES=("auth-service" "records-service" "listings-service" "messaging-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service" "api-gateway")
 
 say "=== Cleaning Up Old ReplicaSets ==="
 

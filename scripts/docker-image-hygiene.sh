@@ -58,7 +58,7 @@ done
 if [[ "$ALL_DEV" == "true" ]]; then
   echo ""
   echo "Removing all *:dev app images (auth, records, api-gateway, etc.)..."
-  for name in auth-service:dev records-service:dev api-gateway:dev analytics-service:dev social-service:dev auction-monitor:dev python-ai-service:dev cron-jobs:dev; do
+  for name in auth-service:dev records-service:dev api-gateway:dev analytics-service:dev messaging-service:dev auction-monitor:dev python-ai-service:dev cron-jobs:dev; do
     if docker image inspect "$name" &>/dev/null; then
       _rm "$name"
     fi

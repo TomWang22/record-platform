@@ -11,22 +11,22 @@
 
 ```text
 T20.41E: PASS
-OCH: PASS
+RP: PASS
 Telemetry WARNs: 0
 Playwright C-suite: 7/7 PASS
 Message-body exposure: 0
 ```
 
-Post-live telemetry, OCH, and Playwright C-suite gates all passed after T20.41C-LIVE and T20.41D rollback drill.
+Post-live telemetry, RP, and Playwright C-suite gates all passed after T20.41C-LIVE and T20.41D rollback drill.
 
 ---
 
-## 2. OCH scan
+## 2. RP scan
 
 ```text
-scripts/rp-och-decontaminate-scan.sh
+scripts/rp-rp-decontaminate-scan.sh
 __SCANNED__=105
-OCH code comb PASS
+RP code comb PASS
 ```
 
 ---

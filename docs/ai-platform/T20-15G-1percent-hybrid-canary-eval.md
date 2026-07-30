@@ -38,7 +38,7 @@ Hybrid canary evidence collection — NOT vector production rollout.
 | `audit-rp-ai-endpoints-contract.sh` | **PASS** |
 | `rp-ai-provider-readiness.sh` | **PASS** |
 | `rp-ai-pgvector-readiness.sh` | **PASS** |
-| `rp-och-decontaminate-scan.sh` | **PASS** |
+| `rp-rp-decontaminate-scan.sh` | **PASS** |
 
 ### Python-ai tests (docker)
 

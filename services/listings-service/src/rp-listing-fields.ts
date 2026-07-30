@@ -1,6 +1,6 @@
 /**
  * Record Platform vinyl/media fields derived from amenities JSON and listing metadata.
- * Housing/OCH columns remain in DB for legacy rows but must not surface in RP UI/API.
+ * Housing/RP columns remain in DB for legacy rows but must not surface in RP UI/API.
  */
 
 const HOUSING_RESIDENCE_TYPES = new Set([

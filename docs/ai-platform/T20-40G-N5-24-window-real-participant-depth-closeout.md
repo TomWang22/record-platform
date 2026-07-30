@@ -13,7 +13,7 @@ T20.40: CLOSED PASS
 N=5 artifact: PASS
 T20.40C-LIVE: 6480/6480 HTTP 200, 0% fallback
 Rollback: PASS
-Telemetry/OCH/Playwright: PASS
+Telemetry/RP/Playwright: PASS
 Decision: C KEEP selected, D recommended, E rejected
 ```
 
@@ -94,12 +94,12 @@ The contract user `e2e-contract@record-platform.local` remained allowlist contro
 
 ---
 
-## 6. Telemetry/OCH/Playwright
+## 6. Telemetry/RP/Playwright
 
 | Gate | Result |
 |------|--------|
 | Full C-suite | **7/7 PASS** |
-| OCH | **PASS** (`__SCANNED__=589`) |
+| RP | **PASS** (`__SCANNED__=589`) |
 | Telemetry WARNs | **0** |
 | Record score | **3.86** |
 | Longform score | **3.67** |

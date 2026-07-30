@@ -38,7 +38,7 @@ This document defines an **opt-in hybrid preview** path that is explicitly non-d
 | Pure vector overlap | **8/16** report-only |
 | `final_tagged_plan` fallback | **0** through T20.21B |
 | Telemetry WARNs | **0** |
-| Leakage / OCH | **PASS** |
+| Leakage / RP | **PASS** |
 
 ### Live evidence table (T20.16D → T20.21B)
 
@@ -111,7 +111,7 @@ Preview scope is **additive and reversible**. Broadening the permanent allowlist
 | Hybrid p95 latency | **≤3000 ms** |
 | Telemetry WARNs | **0** |
 | Leakage scan | **PASS** |
-| OCH scan | **PASS** |
+| RP scan | **PASS** |
 | Playwright acceptance | **PASS** |
 | Anchored overlap | Target **16/16**; hard min **≥10/16** |
 | Pure overlap | **Report-only** unless separately approved |

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Semantic preflight diff: OCH staging script vs RP repo script (read-only).
+Semantic preflight diff: RP staging script vs RP repo script (read-only).
 
 Normalizes both bodies (strip leading doc banner, comments, namespace strings,
 hostnames, whitespace) then compares structured *presence* signals — not a raw
@@ -52,8 +52,8 @@ def normalize(text: str) -> str:
         s = line.strip()
         if not s or s.startswith("#"):
             continue
-        s = re.sub(r"(?i)off-campus-housing-tracker|record-platform", "NS", s)
-        s = re.sub(r"(?i)off-campus-housing\.test|record\.test|record\.local", "HOST", s)
+        s = re.sub(r"(?i)record-platform|record-platform", "NS", s)
+        s = re.sub(r"(?i)record-platform\.test|record\.test|record\.local", "HOST", s)
         s = re.sub(r"\s+", " ", s)
         out.append(s.lower())
     return "\n".join(out)
@@ -82,19 +82,19 @@ def has_errexit_early(text: str) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--och-script", type=Path, required=True)
+    ap.add_argument("--legacy-script", type=Path, required=True)
     ap.add_argument("--rp-script", type=Path, required=True)
     ap.add_argument("--stem", type=str, default="preflight")
     ap.add_argument("--output", type=Path, default=None)
     args = ap.parse_args()
-    och = args.och_script.expanduser().resolve()
+    och = args.rp_script.expanduser().resolve()
     rp = args.rp_script.expanduser().resolve()
-    if not och.is_file() or not rp.is_file():
-        print("Both --och-script and --rp-script must exist.", file=sys.stderr)
+    if not rp.is_file() or not rp.is_file():
+        print("Both --legacy-script and --rp-script must exist.", file=sys.stderr)
         return 2
     out = args.output or (Path.cwd() / "docs" / "bundles" / f"PREFLIGHT_BEHAVIORAL_DIFF_{args.stem}.md")
 
-    o_raw = och.read_text(encoding="utf-8", errors="replace")
+    o_raw = rp.read_text(encoding="utf-8", errors="replace")
     r_raw = rp.read_text(encoding="utf-8", errors="replace")
 
     o_sig = extract_signals(o_raw)
@@ -106,9 +106,9 @@ def main() -> int:
     lines = [
         f"# Preflight behavioral diff — `{args.stem}`",
         "",
-        f"- **OCH (staging):** `{och}`",
+        f"- **RP (staging):** `{och}`",
         f"- **RP (repo):** `{rp}`",
-        f"- **Fingerprint (normalized body, OCH):** `{fingerprint(o_raw)}`",
+        f"- **Fingerprint (normalized body, RP):** `{fingerprint(o_raw)}`",
         f"- **Fingerprint (normalized body, RP):** `{fingerprint(r_raw)}`",
         "",
         "## Missing Phase Blocks",
@@ -132,19 +132,19 @@ def main() -> int:
     r_exit1 = count_matches(_exit_pat, r_raw)
     o_pluse = count_matches(_pluse_pat, o_raw)
     r_pluse = count_matches(_pluse_pat, r_raw)
-    lines.append(f"- **`exit 1` occurrences:** OCH={o_exit1} vs RP={r_exit1}")
+    lines.append(f"- **`exit 1` occurrences:** RP={o_exit1} vs RP={r_exit1}")
     lines.append(
-        f"- **`set +e` occurrences:** OCH={o_pluse} vs RP={r_pluse} "
+        f"- **`set +e` occurrences:** RP={o_pluse} vs RP={r_pluse} "
         "(lower is stricter unless intentionally scoped)"
     )
     lines.append(
-        f"- **`set -euo pipefail` in driver head:** OCH={has_errexit_early(o_raw)} vs RP={has_errexit_early(r_raw)}"
+        f"- **`set -euo pipefail` in driver head:** RP={has_errexit_early(o_raw)} vs RP={has_errexit_early(r_raw)}"
     )
 
-    lines += ["", "## Added Logic in RP (signals present in RP, not in OCH)"]
+    lines += ["", "## Added Logic in RP (signals present in RP, not in RP)"]
     lines += [f"- `{a}`" for a in added] or ["- _(none)_"]
 
-    lines += ["", "## Removed Logic in RP (signals present in OCH, not in RP)"]
+    lines += ["", "## Removed Logic in RP (signals present in RP, not in RP)"]
     removed = sorted(o_sig - r_sig)
     lines += [f"- `{m}`" for m in removed] or ["- _(none)_"]
 

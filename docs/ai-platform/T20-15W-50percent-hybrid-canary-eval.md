@@ -17,7 +17,7 @@
 | pgvector / HNSW | **PASS** |
 | Starting PERCENT | **0** |
 | Telemetry WARNs (pre) | **0** |
-| Contracts / OCH (pre) | **PASS** |
+| Contracts / RP (pre) | **PASS** |
 
 ---
 
@@ -111,13 +111,13 @@ All non-allowlisted users → `keyword` / `keyword_default`. Allowlist transcrip
 
 ---
 
-## 7. Telemetry / contracts / OCH / source diagnostic
+## 7. Telemetry / contracts / RP / source diagnostic
 
 | Check | Result |
 |-------|--------|
 | Telemetry WARNs | **0** |
 | Contracts (post-restore) | **PASS** |
-| OCH | **PASS** |
+| RP | **PASS** |
 | Leakage | **PASS** |
 | Source diagnostic | **PASS** (Lane C fake allowlist) |
 

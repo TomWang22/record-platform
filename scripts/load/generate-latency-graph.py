@@ -31,8 +31,8 @@ def parse_k6_output(output_text):
         data['test_name'] = 'Listings Service Limit Test'
     elif 'Python AI Service Pipeline' in output_text or 'python-ai-pipeline' in output_text.lower():
         data['test_name'] = 'Python AI Service Pipeline'
-    elif 'Social Service' in output_text or 'social' in output_text.lower():
-        data['test_name'] = 'Social Service'
+    elif 'Messaging Service' in output_text or 'social' in output_text.lower():
+        data['test_name'] = 'Messaging Service'
     elif 'analytics' in output_text.lower() and 'ai' in output_text.lower():
         data['test_name'] = 'Python AI Service Pipeline'
     # Add more test suite detection as needed
@@ -496,7 +496,7 @@ def _generate_component_cards_html(test_name, forum_post_metrics, comment_metric
             </div>
         """
     else:
-        # Social Service components (default)
+        # Messaging Service components (default)
         return f"""
             <div class="metric-card">
                 <div class="metric-label">Forum Post Creation</div>
@@ -563,7 +563,7 @@ def generate_html_report(data, summary_file_path=None):
     if 'http_metrics' in data:
         # Our summary format (legacy text parsing format)
         http_metrics = data.get('http_metrics', {}).get('percentiles', {})
-        # For legacy format, use http_metrics as base (no social-service specific metrics)
+        # For legacy format, use http_metrics as base (no messaging-service specific metrics)
         # Extract Python AI Pipeline custom metrics from parsed data
         custom_metrics = data.get('custom_metrics', {})
         analytics_metrics = custom_metrics.get('analytics_to_ai', {})
@@ -752,12 +752,12 @@ def generate_html_report(data, summary_file_path=None):
         if 'listings' in str(test_name).lower() or 'listings-limit' in str(input_file).lower() if 'input_file' in locals() else False:
             test_name = 'Listings Service Limit Test'
         
-        # Auto-detect Social Service if we have social-service specific metrics
+        # Auto-detect Messaging Service if we have messaging-service specific metrics
         if (test_name == 'Service' and 
             (forum_post_metrics or comment_metrics or group_metrics or p2p_message_metrics)):
-            test_name = 'Social Service'
+            test_name = 'Messaging Service'
         
-        # For social-service specific metrics, get from custom metrics
+        # For messaging-service specific metrics, get from custom metrics
         # These are Trend metrics that track latency for different features
         forum_post_metrics = data.get('metrics', {}).get('forum_post_creation_time', {}).get('values', {})
         comment_metrics = data.get('metrics', {}).get('comment_creation_time', {}).get('values', {})
@@ -895,7 +895,7 @@ def generate_html_report(data, summary_file_path=None):
         if search_metrics_check and search_metrics_check.get('avg', 0) > 0:
             test_name = 'Listings Service'
     
-    # Auto-detect Social Service if we have social-service specific metrics
+    # Auto-detect Messaging Service if we have messaging-service specific metrics
     forum_post_metrics = data.get('metrics', {}).get('forum_post_creation_time', {}).get('values', {})
     comment_metrics = data.get('metrics', {}).get('comment_creation_time', {}).get('values', {})
     group_metrics = data.get('metrics', {}).get('group_creation_time', {}).get('values', {})
@@ -948,10 +948,10 @@ def generate_html_report(data, summary_file_path=None):
     
     if (test_name == 'Service' and 
         (forum_post_metrics or comment_metrics or group_metrics or p2p_message_metrics)):
-        test_name = 'Social Service'
+        test_name = 'Messaging Service'
     
     # Determine success rate label based on test type
-    if 'Social Service' in test_name:
+    if 'Messaging Service' in test_name:
         success_label = 'Request Success'
         # Calculate overall success rate from HTTP requests
         http_reqs = data.get('metrics', {}).get('http_reqs', {})
@@ -1406,10 +1406,10 @@ if __name__ == '__main__':
                 'ai/selling-advice' in content.lower() or
                 'ai/buying-advice' in content.lower()):
                 test_suite = 'python-ai-pipeline'
-            # Check for Social Service test
-            elif ('Social Service' in content or 
+            # Check for Messaging Service test
+            elif ('Messaging Service' in content or 
                   ('social' in content.lower() and 'service' in content.lower() and 'python' not in content.lower())):
-                test_suite = 'social-service'
+                test_suite = 'messaging-service'
             
             # Generate filename with timestamp
             from datetime import datetime

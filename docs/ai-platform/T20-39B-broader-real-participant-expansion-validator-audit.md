@@ -106,7 +106,7 @@ AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0
 | `audit-rp-ai-endpoints-contract.sh` | **PASS** |
 | `rp-ai-provider-readiness.sh` | **PASS** |
 | `rp-ai-pgvector-readiness.sh` | **PASS** |
-| `rp-och-decontaminate-scan.sh` | **PASS** (`__SCANNED__=590`) |
+| `rp-rp-decontaminate-scan.sh` | **PASS** (`__SCANNED__=590`) |
 | `ai-quality-telemetry-report.mjs` | **PASS** (WARNs 0) |
 | Preview UI smoke | **PASS** (`ai-rag-opt-in-hybrid-preview-ui.spec.ts` 4/4) |
 

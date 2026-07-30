@@ -188,7 +188,7 @@ test_protocol_correctness() {
   
   # Test 1.1: gRPC Health Checks (strict TLS with client certs)
   say "Test 1.1: gRPC Health Checks (strict TLS with client certs)"
-  local grpc_services=("auth-service" "social-service" "listings-service" "analytics-service" "python-ai-service" "auction-monitor")
+  local grpc_services=("auth-service" "messaging-service" "listings-service" "analytics-service" "python-ai-service" "auction-monitor")
   for svc in "${grpc_services[@]}"; do
     local pod=$(_kubectl -n "$NS" get pods -l app="$svc" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
     if [[ -n "$pod" ]]; then
@@ -405,8 +405,8 @@ test_auction_monitor_to_analytics_to_python_ai() {
 }
 
 test_social_negotiation_helper() {
-  say "=== SECTION 2.2: Social Service - Negotiation Helper ==="
-  say "Tests: Social service determines next negotiation tone based on context"
+  say "=== SECTION 2.2: Messaging Service - Negotiation Helper ==="
+  say "Tests: messaging-plane determines next negotiation tone based on context"
   
   local passed=0
   local failed=0

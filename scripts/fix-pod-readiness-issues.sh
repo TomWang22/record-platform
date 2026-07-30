@@ -18,7 +18,7 @@ warn(){ echo "⚠️  $*"; }
 fail(){ echo "❌ $*" >&2; }
 
 NS="record-platform"
-SERVICES=("auth-service" "records-service" "listings-service" "social-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service" "api-gateway")
+SERVICES=("auth-service" "records-service" "listings-service" "messaging-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service" "api-gateway")
 
 say "=== Fixing Pod Readiness Issues ==="
 
@@ -106,7 +106,7 @@ for service in "${SERVICES[@]}"; do
       
       # Check if it's a Node.js service
       container_image=$(_kubectl get pod "$pod" -n "$NS" -o jsonpath='{.spec.containers[0].image}' 2>/dev/null || echo "")
-      if echo "$container_image" | grep -qE "(auth-service|records-service|listings-service|social-service|shopping-service|analytics-service|auction-monitor)"; then
+      if echo "$container_image" | grep -qE "(auth-service|records-service|listings-service|shopping-service|analytics-service|auction-monitor)"; then
         # Check for dist/server.js or dist/start.js
         if echo "$container_image" | grep -q "auction-monitor"; then
           entrypoint="dist/start.js"
@@ -114,9 +114,9 @@ for service in "${SERVICES[@]}"; do
           entrypoint="dist/server.js"
         fi
         
-        # Check working directory (social-service uses different path)
-        if echo "$container_image" | grep -q "social-service"; then
-          check_path="/app/services/social-service/$entrypoint"
+        # Check working directory (messaging-service uses different path)
+        if echo "$container_image" | grep -q "messaging-service"; then
+          check_path="/app/services/messaging-service/$entrypoint"
         else
           check_path="/app/$entrypoint"
         fi

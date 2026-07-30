@@ -113,7 +113,7 @@ echo "Services: $SERVICES"
 
 built=()
 for s in $SERVICES; do
-  if [[ "$s" == "booking-service" || "$s" == "social-service" ]]; then
+  if [[ "$s" == "reservation-mesh" || "$s" == "messaging-service" ]]; then
     warn "Skip $s (not an active RP image target)"
     continue
   fi

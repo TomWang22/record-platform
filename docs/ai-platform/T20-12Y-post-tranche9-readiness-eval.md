@@ -41,7 +41,7 @@
 | Leakage | **PASS** | wrong_dim=0; transcript PASS |
 | Keyword stability | **PASS** | 7/7 keyword cases non-empty |
 | Tranche rerun guard | **PASS** | Tranche 2–9 locks block (exit 2) |
-| Full validation bundle | **PASS** | contracts, smoke, runtime, provider, OCH |
+| Full validation bundle | **PASS** | contracts, smoke, runtime, provider, RP |
 
 **Latency note:** Shadow p95 remains **CONDITIONAL** and **rollout-blocking** (target ≤3,000 ms). This does not block the embedding ladder; it blocks vector rollout and Phase 21.
 

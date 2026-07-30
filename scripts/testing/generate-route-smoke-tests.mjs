@@ -22,7 +22,7 @@ const APP_SETUP = {
   "api-gateway": { mode: "app", from: "../../src/server.js", name: "app" },
   "auth-service": { mode: "app", from: "../../src/server.js", name: "app" },
   "listings-service": { mode: "factory", from: "../../src/http-server.js", name: "createListingsHttpApp" },
-  "booking-service": { mode: "factory", from: "../../src/http-app.js", name: "createBookingHttpApp" },
+  "reservation-mesh": { mode: "factory", from: "../../src/http-app.js", name: "createBookingHttpApp" },
   "analytics-service": { mode: "factory", from: "../../src/http-server.js", name: "createAnalyticsHttpApp" },
   "trust-service": { mode: "factory", from: "../../src/http-server.js", name: "createTrustHttpApp" },
   "notification-service": { mode: "factory", from: "../../src/http-server.js", name: "createNotificationHttpApp" },

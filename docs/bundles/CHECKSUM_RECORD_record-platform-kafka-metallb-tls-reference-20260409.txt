@@ -1,6 +1,0 @@
-ARCHIVE_SHA256=467d021cb9ebeca7939aad2b236e1c755f9cd2283ad341d7737f04efdba15f30
-ARCHIVE_PATH=/Users/tom/record-platform-kafka-metallb-tls-reference-20260409.tar.gz
-SIDECAR_PATH=none
-SIDECAR_HASH_EXPECTED=
-RECORDED_AT_UTC=2026-04-19T00:52:11.861227+00:00
-PROTOCOL=bundle_extraction_v1

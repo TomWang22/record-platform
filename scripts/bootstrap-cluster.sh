@@ -69,7 +69,7 @@
 #   SKIP_STRICT_ENVELOPE / SKIP_SMOKE — passed to deploy-dev (defaults 1).
 #   BOOTSTRAP_READYZ_MAX_ATTEMPTS — P8 curl https://…/api/readyz retries (default 45).
 #   BOOTSTRAP_READYZ_SLEEP_SEC — sleep between P8 readyz attempts (default 3).
-#   OCH_X_SUITE — sent with x-traffic-class:infra on P8 edge /api/readyz curl (default bash; strict gateway).
+#   RP_X_SUITE — sent with x-traffic-class:infra on P8 edge /api/readyz curl (default bash; strict gateway).
 #   BOOTSTRAP_AUTO_BACKUP_8_DBS_BEFORE_COMPOSE_DOWN=1 (default when BOOTSTRAP_COMPOSE_DOWN=1) — run backup-rp-postgres-dbs.sh before docker compose down.
 #   BOOTSTRAP_AUTO_BACKUP_8_DBS_BEFORE_COMPOSE_DOWN=0 — skip that snapshot even if COMPOSE_DOWN=1.
 #   BOOTSTRAP_SKIP_COLIMA_VM_CAPTURE_TOOLS=1 — skip P0b apt/apk install (not recommended; breaks strict QUIC packet gates).
@@ -143,7 +143,7 @@ fi
 source "$SCRIPT_DIR/lib/rp-ensure-node-toolchain.sh"
 rp_ensure_node_toolchain_require "$REPO_ROOT" || exit 1
 
-_och_ensure_kube_api() {
+_rp_ensure_kube_api() {
   local _label="${1:-bootstrap}"
   [[ "${RP_KUBE_ENSURE_SKIP:-0}" == "1" ]] && return 0
   command -v kubectl >/dev/null 2>&1 || return 0
@@ -154,7 +154,7 @@ _och_ensure_kube_api() {
   bash "$SCRIPT_DIR/rp-ensure-kube-api.sh"
 }
 
-_och_bootstrap_phase_guard() {
+_rp_bootstrap_phase_guard() {
   [[ "${BOOTSTRAP_SKIP_PHASE_GUARD:-0}" == "1" ]] && return 0
   local _g="$REPO_ROOT/infra/bootstrap_invariants.graph.json"
   local _p="$REPO_ROOT/bench_logs/bootstrap_state_progress.json"
@@ -163,12 +163,12 @@ _och_bootstrap_phase_guard() {
 }
 
 if [[ -s "$REPO_ROOT/tools/kafka-contract/dist/index.js" ]]; then
-  _och_bootstrap_phase_guard --complete A.workspace 2>/dev/null || true
+  _rp_bootstrap_phase_guard --complete A.workspace 2>/dev/null || true
 fi
 
 chmod +x "$SCRIPT_DIR/check-curl-preflight-reqs.sh" "$SCRIPT_DIR/dev-kill-all.sh" "$SCRIPT_DIR/colima-factory-reset.sh" "$SCRIPT_DIR/trust-dev-root-ca-host.sh" "$SCRIPT_DIR/trust-dev-root-ca-linux.sh" "$SCRIPT_DIR/lib/trust-dev-root-ca-macos.sh" "$SCRIPT_DIR/bring-up-external-infra.sh" "$SCRIPT_DIR/restore-external-postgres-from-backup.sh" \
   "$SCRIPT_DIR/strict-tls-bootstrap.sh" \
-  "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh" "$SCRIPT_DIR/deploy-dev.sh" "$SCRIPT_DIR/apply-ollama-gateway-stack.sh" "$SCRIPT_DIR/wait-for-housing-service-endpoints.sh" "$SCRIPT_DIR/verify-ollama.sh" "$SCRIPT_DIR/verify-ollama-gateway.sh" \
+  "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh" "$SCRIPT_DIR/deploy-dev.sh" "$SCRIPT_DIR/apply-ollama-gateway-stack.sh" "$SCRIPT_DIR/wait-for-platform-service-endpoints.sh" "$SCRIPT_DIR/verify-ollama.sh" "$SCRIPT_DIR/verify-ollama-gateway.sh" \
   "$SCRIPT_DIR/verify-http3.sh" "$SCRIPT_DIR/verify-google-maps.sh" \
   "$SCRIPT_DIR/verify-deployment-integrity.sh" "$SCRIPT_DIR/wait-for-housing-rollouts.sh" "$SCRIPT_DIR/probe-edge-route-latency.sh" \
   "$SCRIPT_DIR/verify-kustomize-overlay-core-deployments.sh" "$SCRIPT_DIR/verify-deploy-manifest-drift.sh" "$SCRIPT_DIR/smart-rollout-rp-if-image-changed.sh" \
@@ -190,23 +190,23 @@ source "$SCRIPT_DIR/lib/record-platform-docker-services-default.sh"
 source "$SCRIPT_DIR/lib/bootstrap-phase-rollbacks.sh"
 # shellcheck source=scripts/lib/bootstrap-phase-timings.sh
 source "$SCRIPT_DIR/lib/bootstrap-phase-timings.sh"
-# shellcheck source=scripts/lib/och-run-id.sh
-source "$SCRIPT_DIR/lib/och-run-id.sh"
-BOOTSTRAP_RUN_ID="$(och_ensure_run_id "$REPO_ROOT")"
+# shellcheck source=scripts/lib/rp-run-id.sh
+source "$SCRIPT_DIR/lib/rp-run-id.sh"
+BOOTSTRAP_RUN_ID="$(rp_ensure_run_id "$REPO_ROOT")"
 export BOOTSTRAP_RUN_ID VERIFY_BOOTSTRAP_RUN_ID="$BOOTSTRAP_RUN_ID" VERIFY_APP_RUNTIME_RUN_ID="$BOOTSTRAP_RUN_ID"
 echo "bootstrap run_id=${BOOTSTRAP_RUN_ID}"
 
 REPO_ROOT_BOOT_GRAPH="$REPO_ROOT/infra/bootstrap_invariants.graph.json"
 REPO_ROOT_BOOT_PROGRESS="$REPO_ROOT/bench_logs/bootstrap_state_progress.json"
 
-_och_node_is_complete() {
+_rp_node_is_complete() {
   local n="$1"
   [[ "${BOOTSTRAP_SKIP_PHASE_GUARD:-0}" == "1" ]] && return 1
   [[ -f "$REPO_ROOT_BOOT_GRAPH" ]] || return 1
   node "$SCRIPT_DIR/bootstrap-phase-guard.mjs" --graph "$REPO_ROOT_BOOT_GRAPH" --progress "$REPO_ROOT_BOOT_PROGRESS" --is-complete "$n" >/dev/null 2>&1
 }
 
-_och_bootstrap_record_fail() {
+_rp_bootstrap_record_fail() {
   local node="$1"
   local msg="${2:-failed}"
   local logf="${3:-}"
@@ -220,28 +220,28 @@ _och_bootstrap_record_fail() {
   bash "$SCRIPT_DIR/notify-bootstrap-failure.sh" "$node" "${logf:-}" || true
 }
 
-_och_should_skip_to_post_c_infra() {
+_rp_should_skip_to_post_c_infra() {
   [[ "${BOOTSTRAP_RESUME:-0}" != "1" ]] && return 1
-  _och_node_is_complete C.infra || return 1
+  _rp_node_is_complete C.infra || return 1
   command -v kubectl >/dev/null 2>&1 || return 1
   kubectl get nodes --request-timeout=12s >/dev/null 2>&1 || return 1
   kubectl get pods -n metallb-system --no-headers 2>/dev/null | grep -qiE 'metallb|controller|speaker' || return 1
   return 0
 }
 
-_och_prune_colima_kube() {
+_rp_prune_colima_kube() {
   kubectl config delete-context colima 2>/dev/null || true
   kubectl config delete-cluster colima 2>/dev/null || true
   kubectl config delete-user colima 2>/dev/null || true
 }
 
 # Full Colima reset (stop + delete + ~/.colima) — fixes stuck ⚠️ / wedged Lima state; see scripts/colima-factory-reset.sh.
-_och_colima_factory_reset() {
+_rp_colima_factory_reset() {
   bash "$SCRIPT_DIR/colima-factory-reset.sh"
 }
 
 # Colima profile Running but status or Kubernetes API unhealthy (e.g. ^C during k3s).
-_och_bootstrap_colima_heal_wedged_profile() {
+_rp_bootstrap_colima_heal_wedged_profile() {
   [[ "${BOOTSTRAP_SKIP_COLIMA_AUTO_RECOVER:-0}" == "1" ]] && return 0
   colima list 2>/dev/null | grep -qiE '\bRunning\b' || return 0
   local _bad=0
@@ -257,14 +257,14 @@ _och_bootstrap_colima_heal_wedged_profile() {
   if [[ "$_bad" -ne 1 ]]; then
     return 0
   fi
-  export OCH_INFRA_HEALED=1
+  export RP_INFRA_HEALED=1
   warn "C.infra healed (cold guarantee enforced)"
   echo "  ⚠️  Colima Running but status/API unhealthy — factory reset (stop, delete -f, rm ~/.colima)…" >&2
-  _och_colima_factory_reset
+  _rp_colima_factory_reset
 }
 
 # Colima sometimes survives Ctrl+C during k3s bring-up: VM "running" but status errors — delete + kube prune.
-_och_bootstrap_colima_recover_if_corrupt() {
+_rp_bootstrap_colima_recover_if_corrupt() {
   [[ "${BOOTSTRAP_SKIP_COLIMA_AUTO_RECOVER:-0}" == "1" ]] && return 0
   local _st
   _st="$(colima status 2>&1 || true)"
@@ -273,10 +273,10 @@ _och_bootstrap_colima_recover_if_corrupt() {
     return 0
   fi
   echo "  ⚠️  Colima status looks corrupted (e.g. interrupted k3s start). Auto-reset: factory reset (stop, delete -f, rm ~/.colima)…" >&2
-  _och_colima_factory_reset
+  _rp_colima_factory_reset
 }
 
-if _och_should_skip_to_post_c_infra; then
+if _rp_should_skip_to_post_c_infra; then
   say "[P0–P2b] BOOTSTRAP_RESUME=1 — C.infra already complete; cluster + MetalLB look healthy (skipping dev-kill-all / Colima cycle / MetalLB install)"
   command -v colima >/dev/null 2>&1 || { bad "colima not on PATH"; exit 1; }
   rp_ensure_node_toolchain_require "$REPO_ROOT" || exit 1
@@ -292,30 +292,30 @@ if _och_should_skip_to_post_c_infra; then
   command -v kubectl >/dev/null 2>&1 || { bad "kubectl not on PATH"; exit 1; }
   # shellcheck source=scripts/lib/ensure-colima-docker-context.sh
   source "$SCRIPT_DIR/lib/ensure-colima-docker-context.sh"
-  export OCH_KUBE_CONTEXT="${OCH_KUBE_CONTEXT:-$(kubectl config current-context 2>/dev/null || echo colima)}"
-  och_ensure_colima_docker_context || true
+  export RP_KUBE_CONTEXT="${RP_KUBE_CONTEXT:-$(kubectl config current-context 2>/dev/null || echo colima)}"
+  rp_ensure_colima_docker_context || true
   # shellcheck source=scripts/lib/colima-kubeconfig.sh
   source "$SCRIPT_DIR/lib/colima-kubeconfig.sh"
-  _och_ensure_kube_api "BOOTSTRAP_RESUME pre-C.infra"
+  _rp_ensure_kube_api "BOOTSTRAP_RESUME pre-C.infra"
   kubectl get nodes --request-timeout=15s
   ok "resume: kube + MetalLB assumed healthy (re-synced context)"
   if [[ "${BOOTSTRAP_SKIP_METRICS_SERVER:-0}" != "1" ]]; then
     chmod +x "$SCRIPT_DIR/bootstrap-metrics-server.sh" "$SCRIPT_DIR/export-node-headroom-prom.sh" 2>/dev/null || true
-    if _och_bootstrap_phase_guard --enter C.metrics 2>/dev/null; then
+    if _rp_bootstrap_phase_guard --enter C.metrics 2>/dev/null; then
       REPO_ROOT="$REPO_ROOT" bash "$SCRIPT_DIR/bootstrap-metrics-server.sh" || warn "bootstrap-metrics-server.sh failed on resume (non-fatal)"
-      _och_bootstrap_phase_guard --complete C.metrics 2>/dev/null || true
+      _rp_bootstrap_phase_guard --complete C.metrics 2>/dev/null || true
     else
       warn "bootstrap phase guard: could not enter C.metrics on resume (run a full bootstrap once with metrics-server)"
     fi
   fi
 else
-_BOOT_C_INFRA_START_MS="$(_och_bootstrap_ms_now)"
+_BOOT_C_INFRA_START_MS="$(_rp_bootstrap_ms_now)"
 
-_och_bootstrap_skip_host_path() {
+_rp_bootstrap_skip_host_path() {
   [[ "${BOOTSTRAP_SKIP_RESET:-0}" == "1" || "${BOOTSTRAP_SKIP_P0:-0}" == "1" || "${BOOTSTRAP_SKIP_COLIMA:-0}" == "1" ]]
 }
 
-if _och_bootstrap_skip_host_path; then
+if _rp_bootstrap_skip_host_path; then
   if [[ "${RP_COLD_BOOTSTRAP_RESET_DONE:-0}" != "1" ]]; then
     warn "BOOTSTRAP_SKIP_P0=1 but RP_COLD_BOOTSTRAP_RESET_DONE is unset — cold-bootstrap should run P0.hard_reset + Z.colima_clean first"
   fi
@@ -327,9 +327,9 @@ if _och_bootstrap_skip_host_path; then
   command -v kubectl >/dev/null 2>&1 || { bad "kubectl not on PATH"; exit 1; }
   # shellcheck source=scripts/lib/ensure-colima-docker-context.sh
   source "$SCRIPT_DIR/lib/ensure-colima-docker-context.sh"
-  export OCH_KUBE_CONTEXT="${OCH_KUBE_CONTEXT:-$(kubectl config current-context 2>/dev/null || echo colima)}"
-  och_ensure_colima_docker_context || true
-  _och_ensure_kube_api "embedded bootstrap (P2+ only)"
+  export RP_KUBE_CONTEXT="${RP_KUBE_CONTEXT:-$(kubectl config current-context 2>/dev/null || echo colima)}"
+  rp_ensure_colima_docker_context || true
+  _rp_ensure_kube_api "embedded bootstrap (P2+ only)"
 else
 # --- P0 HARD RESET ---
 say "[P0] HARD RESET"
@@ -342,22 +342,22 @@ rm -f "${HOME}/.kube/config.colima-forward" 2>/dev/null || true
 
 command -v colima >/dev/null 2>&1 || { bad "colima not on PATH"; exit 1; }
 
-_och_bootstrap_colima_heal_wedged_profile
-if [[ "${OCH_INFRA_HEALED:-0}" == "1" ]]; then
-  OCH_INFRA_HEALED=1 bash "$SCRIPT_DIR/export-bootstrap-phase-metrics.sh" >/dev/null 2>&1 || true
-  unset OCH_INFRA_HEALED
+_rp_bootstrap_colima_heal_wedged_profile
+if [[ "${RP_INFRA_HEALED:-0}" == "1" ]]; then
+  RP_INFRA_HEALED=1 bash "$SCRIPT_DIR/export-bootstrap-phase-metrics.sh" >/dev/null 2>&1 || true
+  unset RP_INFRA_HEALED
 fi
 
 if [[ "${BOOTSTRAP_FULL_WIPE:-0}" == "1" ]]; then
   echo "  ▶ BOOTSTRAP_FULL_WIPE=1 — Colima factory reset + .build-cache wipe…"
-  _och_colima_factory_reset
+  _rp_colima_factory_reset
   rm -rf "${REPO_ROOT}/.build-cache" 2>/dev/null || true
 fi
 
-_och_bootstrap_colima_recover_if_corrupt
+_rp_bootstrap_colima_recover_if_corrupt
 colima stop 2>/dev/null || true
 sleep 2
-_och_bootstrap_colima_recover_if_corrupt
+_rp_bootstrap_colima_recover_if_corrupt
 CPU="${CPU:-12}"
 MEMORY="${MEMORY:-16}"
 DISK="${DISK:-256}"
@@ -374,13 +374,13 @@ if ! colima "${_colima_args[@]}"; then
   rp_colima_print_start_argv _colima_args
   colima "${_colima_args[@]}" || {
   bad "colima start failed (k3s / VM bring-up)"
-  _t1="$(_och_bootstrap_ms_now)"
-  _och_bootstrap_record_phase_timing_ms C.infra "$((_t1 - _BOOT_C_INFRA_START_MS))"
-  _lf="$(_och_bootstrap_write_phase_error_log C.infra colima-start)"
+  _t1="$(_rp_bootstrap_ms_now)"
+  _rp_bootstrap_record_phase_timing_ms C.infra "$((_t1 - _BOOT_C_INFRA_START_MS))"
+  _lf="$(_rp_bootstrap_write_phase_error_log C.infra colima-start)"
   { colima status 2>&1 || true; echo "---"; docker info 2>&1 | head -60 || true; } >>"$_lf"
-  _och_bootstrap_record_fail C.infra "colima start failed" "$_lf"
+  _rp_bootstrap_record_fail C.infra "colima start failed" "$_lf"
   echo "  📄 error log: $_lf" >&2
-  och_bootstrap_rollback_dispatch C.infra || true
+  rp_bootstrap_rollback_dispatch C.infra || true
   exit 1
   }
 fi
@@ -460,30 +460,30 @@ if [[ "${BOOTSTRAP_SKIP_P1B:-0}" == "1" ]] || [[ "${BOOTSTRAP_SKIP_KAFKA_ALIGNME
   echo "  ℹ️  skipping kafka-alignment-report venv (BOOTSTRAP_SKIP_P1B / BOOTSTRAP_SKIP_KAFKA_ALIGNMENT_REPORT_VENV)"
 else
 say "[P1b] Workspace lab venv (matplotlib for Kafka alignment report / suite PNGs)"
-if _och_node_is_complete A.workspace && [[ "${BOOTSTRAP_RESUME:-0}" == "1" ]]; then
+if _rp_node_is_complete A.workspace && [[ "${BOOTSTRAP_RESUME:-0}" == "1" ]]; then
   echo "  ⏭️  BOOTSTRAP_RESUME=1 — A.workspace already complete; skipping kafka-alignment-report-venv"
 else
-  _t_a0="$(_och_bootstrap_ms_now)"
+  _t_a0="$(_rp_bootstrap_ms_now)"
   make kafka-alignment-report-venv || { bad "kafka-alignment-report-venv failed"; exit 1; }
-  _och_bootstrap_record_phase_timing_ms A.workspace "$(($(_och_bootstrap_ms_now) - _t_a0))"
+  _rp_bootstrap_record_phase_timing_ms A.workspace "$(($(_rp_bootstrap_ms_now) - _t_a0))"
   ok "kafka-alignment-report venv ready"
 fi
 fi
 
 if [[ "${BOOTSTRAP_SKIP_P1C:-0}" == "1" ]] || [[ "${BOOTSTRAP_SKIP_LOCAL_CRYPTO_INVARIANT:-0}" == "1" ]]; then
   echo "  ℹ️  skipping dev-generate-certs (BOOTSTRAP_SKIP_P1C / BOOTSTRAP_SKIP_LOCAL_CRYPTO_INVARIANT)"
-  _och_bootstrap_phase_guard --complete B.crypto 2>/dev/null || true
+  _rp_bootstrap_phase_guard --complete B.crypto 2>/dev/null || true
 else
 say "[P1c] Local dev TLS invariant (DEV_CERTS_ENSURE_ONLY=1 — CA + edge leaf + Kafka client/broker material if missing)"
-if _och_node_is_complete B.crypto && [[ "${BOOTSTRAP_RESUME:-0}" == "1" ]]; then
+if _rp_node_is_complete B.crypto && [[ "${BOOTSTRAP_RESUME:-0}" == "1" ]]; then
   [[ -f "$REPO_ROOT/certs/dev-root.pem" ]] || { bad "BOOTSTRAP_RESUME: B.crypto marked complete but certs/dev-root.pem missing"; exit 1; }
   echo "  ⏭️  BOOTSTRAP_RESUME=1 — B.crypto already complete; skipping dev-generate-certs"
 else
-  _och_bootstrap_phase_guard --enter B.crypto || { bad "phase guard: cannot enter B.crypto"; exit 1; }
-  _t_b0="$(_och_bootstrap_ms_now)"
+  _rp_bootstrap_phase_guard --enter B.crypto || { bad "phase guard: cannot enter B.crypto"; exit 1; }
+  _t_b0="$(_rp_bootstrap_ms_now)"
   DEV_CERTS_ENSURE_ONLY=1 bash "$SCRIPT_DIR/dev-generate-certs.sh" || { bad "dev-generate-certs.sh failed"; exit 1; }
-  _och_bootstrap_record_phase_timing_ms B.crypto "$(($(_och_bootstrap_ms_now) - _t_b0))"
-  _och_bootstrap_phase_guard --complete B.crypto || true
+  _rp_bootstrap_record_phase_timing_ms B.crypto "$(($(_rp_bootstrap_ms_now) - _t_b0))"
+  _rp_bootstrap_phase_guard --complete B.crypto || true
   ok "local TLS material under certs/"
 fi
 fi
@@ -509,25 +509,25 @@ fi
 say "[P2] Kubernetes control plane"
 # shellcheck source=scripts/lib/ensure-colima-docker-context.sh
 source "$SCRIPT_DIR/lib/ensure-colima-docker-context.sh"
-export OCH_KUBE_CONTEXT="${OCH_KUBE_CONTEXT:-$(kubectl config current-context 2>/dev/null || echo colima)}"
-och_ensure_colima_docker_context || true
+export RP_KUBE_CONTEXT="${RP_KUBE_CONTEXT:-$(kubectl config current-context 2>/dev/null || echo colima)}"
+rp_ensure_colima_docker_context || true
 _k=0
 while ! kubectl get nodes --request-timeout=15s >/dev/null 2>&1; do
   _k=$((_k + 1))
   if [[ "$_k" -gt 90 ]]; then
     bad "kubectl get nodes timeout"
-    _t1="$(_och_bootstrap_ms_now)"
-    _och_bootstrap_record_phase_timing_ms C.infra "$((_t1 - _BOOT_C_INFRA_START_MS))"
-    _lf="$(_och_bootstrap_write_phase_error_log C.infra kubectl-nodes-timeout)"
+    _t1="$(_rp_bootstrap_ms_now)"
+    _rp_bootstrap_record_phase_timing_ms C.infra "$((_t1 - _BOOT_C_INFRA_START_MS))"
+    _lf="$(_rp_bootstrap_write_phase_error_log C.infra kubectl-nodes-timeout)"
     { kubectl get nodes -o wide 2>&1 || true; kubectl get pods -A --no-headers 2>&1 | head -80 || true; } >>"$_lf"
-    _och_bootstrap_record_fail C.infra "kubectl get nodes timeout after colima start" "$_lf"
+    _rp_bootstrap_record_fail C.infra "kubectl get nodes timeout after colima start" "$_lf"
     echo "  📄 error log: $_lf" >&2
-    och_bootstrap_rollback_dispatch C.infra || true
+    rp_bootstrap_rollback_dispatch C.infra || true
     exit 1
   fi
   sleep 2
 done
-_och_ensure_kube_api "P2 control plane"
+_rp_ensure_kube_api "P2 control plane"
 kubectl get nodes
 ok "nodes"
 
@@ -550,13 +550,13 @@ while true; do
   _ks=$((_ks + 1))
   if [[ "$_ks" -gt 120 ]]; then
     bad "kube-system not healthy (pods=${_ln} notReady=${_bad})"
-    _t1="$(_och_bootstrap_ms_now)"
-    _och_bootstrap_record_phase_timing_ms C.infra "$((_t1 - _BOOT_C_INFRA_START_MS))"
-    _lf="$(_och_bootstrap_write_phase_error_log C.infra kube-system-unhealthy)"
+    _t1="$(_rp_bootstrap_ms_now)"
+    _rp_bootstrap_record_phase_timing_ms C.infra "$((_t1 - _BOOT_C_INFRA_START_MS))"
+    _lf="$(_rp_bootstrap_write_phase_error_log C.infra kube-system-unhealthy)"
     kubectl get pods -n kube-system -o wide >>"$_lf" 2>&1 || true
-    _och_bootstrap_record_fail C.infra "kube-system not healthy after colima start" "$_lf"
+    _rp_bootstrap_record_fail C.infra "kube-system not healthy after colima start" "$_lf"
     echo "  📄 error log: $_lf" >&2
-    och_bootstrap_rollback_dispatch C.infra || true
+    rp_bootstrap_rollback_dispatch C.infra || true
     exit 1
   fi
   echo "  ⏳ kube-system ($_ks/120) pods=${_ln} notReady=${_bad}"
@@ -571,7 +571,7 @@ ok "ingress-nginx + envoy-test namespaces"
 
 # --- P2b METALLB ---
 say "[P2b] MetalLB (L2 pool for Kafka per-broker LoadBalancers)"
-_och_ensure_kube_api "before MetalLB install"
+_rp_ensure_kube_api "before MetalLB install"
 if [[ "${SKIP_METALLB:-0}" == "1" ]]; then
   bad "SKIP_METALLB=1 is incompatible with in-cluster KRaft bootstrap (kafka-*-external need LoadBalancer IPs)."
   exit 1
@@ -579,29 +579,29 @@ fi
 export METALLB_POOL="${METALLB_POOL:-}"
 bash "$SCRIPT_DIR/install-metallb-colima.sh"
 ok "MetalLB"
-_och_bootstrap_phase_guard --enter C.infra || { bad "phase guard: cannot enter C.infra (complete B.crypto first)"; exit 1; }
-_och_bootstrap_phase_guard --complete C.infra || true
-_t_c_end="$(_och_bootstrap_ms_now)"
-_och_bootstrap_record_phase_timing_ms C.infra "$((_t_c_end - _BOOT_C_INFRA_START_MS))"
+_rp_bootstrap_phase_guard --enter C.infra || { bad "phase guard: cannot enter C.infra (complete B.crypto first)"; exit 1; }
+_rp_bootstrap_phase_guard --complete C.infra || true
+_t_c_end="$(_rp_bootstrap_ms_now)"
+_rp_bootstrap_record_phase_timing_ms C.infra "$((_t_c_end - _BOOT_C_INFRA_START_MS))"
 
 # --- P2c METRICS-SERVER (DAG C.metrics — must complete before C.images) ---
 if [[ "${BOOTSTRAP_SKIP_METRICS_SERVER:-0}" != "1" ]]; then
   say "[P2c] metrics-server (C.metrics — install/patch + kubectl top + node headroom → bench_logs/bootstrap.prom)"
   chmod +x "$SCRIPT_DIR/bootstrap-metrics-server.sh" "$SCRIPT_DIR/export-node-headroom-prom.sh" 2>/dev/null || true
-  _och_bootstrap_phase_guard --enter C.metrics || { bad "phase guard: cannot enter C.metrics (complete C.infra first)"; exit 1; }
+  _rp_bootstrap_phase_guard --enter C.metrics || { bad "phase guard: cannot enter C.metrics (complete C.infra first)"; exit 1; }
   REPO_ROOT="$REPO_ROOT" bash "$SCRIPT_DIR/bootstrap-metrics-server.sh" || {
     bad "bootstrap-metrics-server.sh failed (set BOOTSTRAP_SKIP_METRICS_SERVER=1 to skip)"
     exit 1
   }
-  _och_bootstrap_phase_guard --complete C.metrics || true
+  _rp_bootstrap_phase_guard --complete C.metrics || true
   ok "C.metrics — metrics-server ready"
 else
   warn "BOOTSTRAP_SKIP_METRICS_SERVER=1 — skipping metrics-server install"
   mkdir -p "$REPO_ROOT/bench_logs"
   echo "# BOOTSTRAP_SKIP_METRICS_SERVER=1 at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$REPO_ROOT/bench_logs/bootstrap.prom"
   echo "bootstrap_metrics_server_ready 0" >>"$REPO_ROOT/bench_logs/bootstrap.prom"
-  _och_bootstrap_phase_guard --enter C.metrics || { bad "phase guard: cannot enter C.metrics (complete C.infra first)"; exit 1; }
-  _och_bootstrap_phase_guard --complete C.metrics || true
+  _rp_bootstrap_phase_guard --enter C.metrics || { bad "phase guard: cannot enter C.metrics (complete C.infra first)"; exit 1; }
+  _rp_bootstrap_phase_guard --complete C.metrics || true
 fi
 
 fi
@@ -669,7 +669,7 @@ ok "strict-tls + app-secrets + cluster secret aliases"
 
 # --- P5b IN-CLUSTER KAFKA (KRaft) — before app images / deploy-dev ---
 say "[P5b] In-cluster Kafka (KRaft + staged TLS from MetalLB)"
-_och_ensure_kube_api "before Kafka KRaft apply"
+_rp_ensure_kube_api "before Kafka KRaft apply"
 if [[ "${BOOTSTRAP_SKIP_KAFKA_APPLY:-0}" == "1" ]]; then
   echo "  ℹ️  BOOTSTRAP_SKIP_KAFKA_APPLY=1 — skipping Kafka apply (you must have StatefulSet/kafka + verify-kafka-bootstrap yourself)"
 else
@@ -705,7 +705,7 @@ if [[ "${BOOTSTRAP_SKIP_KAFKA_APPLY:-0}" == "1" ]]; then
 elif [[ "${BOOTSTRAP_SKIP_KAFKA_TOPIC_PROVISION:-0}" == "1" ]]; then
   echo "  ℹ️  BOOTSTRAP_SKIP_KAFKA_TOPIC_PROVISION=1 — skipping P5c topic create / verify / alignment"
 else
-  _och_ensure_kube_api "before Kafka topic creation"
+  _rp_ensure_kube_api "before Kafka topic creation"
   export KAFKA_K8S_NS="$NS"
   export ENV_PREFIX="${ENV_PREFIX:-dev}"
   bash "$SCRIPT_DIR/create-kafka-event-topics-k8s.sh"
@@ -761,8 +761,8 @@ if [[ "$_p6_skip_runtime_build" != "1" ]]; then
     bash "$SCRIPT_DIR/verify-build-context.sh"
   fi
 
-  # shellcheck source=scripts/lib/och-docker-image-source-hash.sh
-  source "$SCRIPT_DIR/lib/och-docker-image-source-hash.sh"
+  # shellcheck source=scripts/lib/rp-docker-image-source-hash.sh
+  source "$SCRIPT_DIR/lib/rp-docker-image-source-hash.sh"
   # shellcheck source=scripts/lib/rp-docker-lib.sh
   source "$SCRIPT_DIR/lib/rp-docker-lib.sh"
 
@@ -792,21 +792,21 @@ if [[ "$_p6_skip_runtime_build" != "1" ]]; then
     echo "  ▶ docker build ${svc}:${tag} …"
     _docker_build_tag_run
     if [[ "${BOOTSTRAP_SKIP_DOCKER_IMAGE_HASH_CACHE:-0}" != "1" ]]; then
-      mkdir -p "$(och_docker_hash_cache_dir)"
-      och_compute_service_source_hash "$svc" >"$(och_docker_hash_cache_dir)/${svc}.src.hash" || true
+      mkdir -p "$(rp_docker_hash_cache_dir)"
+      rp_compute_service_source_hash "$svc" >"$(rp_docker_hash_cache_dir)/${svc}.src.hash" || true
     fi
     return 0
   fi
 
   local cdir hnew hold
-  cdir="$(och_docker_hash_cache_dir)"
+  cdir="$(rp_docker_hash_cache_dir)"
   mkdir -p "$cdir"
-  hnew="$(och_compute_service_source_hash "$svc")" || { bad "source hash failed for $svc"; exit 1; }
+  hnew="$(rp_compute_service_source_hash "$svc")" || { bad "source hash failed for $svc"; exit 1; }
   hold=""
   [[ -f "$cdir/${svc}.src.hash" ]] && read -r hold <"$cdir/${svc}.src.hash" || true
   if [[ -n "$hold" ]] && [[ "$hold" == "$hnew" ]] && rp_docker_image_fresh_for_service "$svc" "$tag"; then
     echo "  ⏭️  ${svc}:${tag} — labeled image fresh (source hash unchanged) — skip docker build"
-    och_ensure_colima_has_image "${svc}:${tag}" || { bad "colima load for ${svc}:${tag} failed"; exit 1; }
+    rp_ensure_colima_has_image "${svc}:${tag}" || { bad "colima load for ${svc}:${tag} failed"; exit 1; }
     return 0
   fi
 
@@ -860,31 +860,31 @@ else
   say "[P6b] DAG C.images — ingress tcpdump images on host + load into Colima VM Docker"
   chmod +x "$SCRIPT_DIR/ensure-required-images.sh" "$SCRIPT_DIR/verify-required-images.sh" "$SCRIPT_DIR/ensure-caddy-envoy-tcpdump.sh" 2>/dev/null || true
   SKIP_PATCH=1 bash "$SCRIPT_DIR/ensure-caddy-envoy-tcpdump.sh" || {
-    bad "ensure-caddy-envoy-tcpdump.sh (build only, SKIP_PATCH=1) failed — if Docker Hub 429: Dockerfiles use mirror.gcr.io bases; retry after pull, or docker login, or set OCH_*_TCPDUMP_BUILD_ARGS (see ensure-caddy-envoy-tcpdump.sh header)"
+    bad "ensure-caddy-envoy-tcpdump.sh (build only, SKIP_PATCH=1) failed — if Docker Hub 429: Dockerfiles use mirror.gcr.io bases; retry after pull, or docker login, or set rp_*_TCPDUMP_BUILD_ARGS (see ensure-caddy-envoy-tcpdump.sh header)"
     exit 1
   }
-  _t_ci="$(_och_bootstrap_ms_now)"
-  _och_bootstrap_phase_guard --enter C.images || {
+  _t_ci="$(_rp_bootstrap_ms_now)"
+  _rp_bootstrap_phase_guard --enter C.images || {
     bad "phase guard: cannot enter C.images (complete C.metrics first — cold bootstrap installs metrics-server after C.infra, or BOOTSTRAP_RESUME)"
     exit 1
   }
   if ! REPO_ROOT="$REPO_ROOT" bash "$SCRIPT_DIR/ensure-required-images.sh"; then
     bad "C.images failed: ensure-required-images.sh (host → Colima VM docker load). See infra/required_images.json"
-    _lf="$(_och_bootstrap_write_phase_error_log C.images ensure-required-images)"
+    _lf="$(_rp_bootstrap_write_phase_error_log C.images ensure-required-images)"
     { colima status 2>&1 || true; docker images 2>&1 | head -40 || true; } >>"$_lf"
-    _och_bootstrap_record_fail C.images "ensure-required-images failed" "$_lf"
+    _rp_bootstrap_record_fail C.images "ensure-required-images failed" "$_lf"
     echo "  📄 error log: $_lf" >&2
-    och_bootstrap_rollback_dispatch C.images || true
+    rp_bootstrap_rollback_dispatch C.images || true
     exit 1
   fi
-  _och_bootstrap_record_phase_timing_ms C.images "$(($(_och_bootstrap_ms_now) - _t_ci))"
-  _och_bootstrap_phase_guard --complete C.images || true
+  _rp_bootstrap_record_phase_timing_ms C.images "$(($(_rp_bootstrap_ms_now) - _t_ci))"
+  _rp_bootstrap_phase_guard --complete C.images || true
   ok "C.images — required images in Colima VM Docker"
 fi
 
 # --- P7 MANIFESTS ---
 say "[P7] MANIFESTS + rollouts (deploy-dev — RP app Services before Caddy)"
-_och_ensure_kube_api "before deploy-dev / kustomize apply"
+_rp_ensure_kube_api "before deploy-dev / kustomize apply"
 chmod +x "$SCRIPT_DIR/rp-verify-kustomize-app-services.sh" \
   "$SCRIPT_DIR/rp-sync-proto-configmap.sh" "$SCRIPT_DIR/sync-proto-to-k8s.sh" 2>/dev/null || true
 bash "$SCRIPT_DIR/rp-verify-kustomize-app-services.sh"
@@ -929,7 +929,7 @@ say "[P8] ENDPOINT + edge + Kafka"
 export HOUSING_NS="$NS"
 chmod +x "$SCRIPT_DIR/ensure-rp-ollama-enabled.sh" 2>/dev/null || true
 HOUSING_NS="$NS" bash "$SCRIPT_DIR/ensure-rp-ollama-enabled.sh"
-bash "$SCRIPT_DIR/wait-for-housing-service-endpoints.sh"
+bash "$SCRIPT_DIR/wait-for-platform-service-endpoints.sh"
 
 if [[ "${BOOTSTRAP_SKIP_OLLAMA_VERIFY:-0}" != "1" ]]; then
   say "[P8] Ollama (analytics LLM — deployment/ollama + model pull)"
@@ -955,9 +955,9 @@ else
   echo "  ℹ️  BOOTSTRAP_SKIP_MAPS_VERIFY=1 — skipping verify-google-maps.sh"
 fi
 
-EDGE_HOST="${OCH_EDGE_HOSTNAME:-record-platform.test}"
+EDGE_HOST="${RP_EDGE_HOSTNAME:-record-platform.test}"
 # Strict gateway: classify bootstrap edge checks as infra (see docs/TRAFFIC_CLASSIFICATION_POLICY.md).
-export OCH_X_SUITE="${OCH_X_SUITE:-bash}"
+export RP_X_SUITE="${RP_X_SUITE:-bash}"
 CADDY_LB_IP="$(kubectl get svc caddy-h3 -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
 # Pod Ready ≠ app ready: gateway may return 503 until upstream warms (Kafka, DB pools, OTLP). Retry, do not fail on first 503.
 _rz_max="${BOOTSTRAP_READYZ_MAX_ATTEMPTS:-45}"
@@ -966,7 +966,7 @@ echo "  ▶ edge /api/readyz (max ${_rz_max} attempts × ${_rz_sleep}s, host=${E
 _readyz_ok=0
 for ((_rz_i = 1; _rz_i <= _rz_max; _rz_i++)); do
   _curl_args=(--connect-timeout 15 --max-time 90 --cacert "$EDGE_CA_PEM" \
-    -H "x-traffic-class: infra" -H "x-suite: ${OCH_X_SUITE}" \
+    -H "x-traffic-class: infra" -H "x-suite: ${RP_X_SUITE}" \
     -o /dev/null -w "%{http_code}")
   if [[ -n "${CADDY_LB_IP:-}" ]]; then
     _curl_args+=(--resolve "${EDGE_HOST}:443:${CADDY_LB_IP}")
@@ -1009,8 +1009,8 @@ ok "Kafka bootstrap verify"
 
 # Cluster material (P2–P8) is done; mark F before G so a G failure does not block retro-completion of deploy work.
 if [[ "${BOOTSTRAP_SKIP_PHASE_GUARD:-0}" != "1" ]]; then
-  _och_bootstrap_phase_guard --enter F.cluster_deploy 2>/dev/null || true
-  _och_bootstrap_phase_guard --complete F.cluster_deploy 2>/dev/null || true
+  _rp_bootstrap_phase_guard --enter F.cluster_deploy 2>/dev/null || true
+  _rp_bootstrap_phase_guard --complete F.cluster_deploy 2>/dev/null || true
 fi
 
 if [[ "${BOOTSTRAP_SKIP_GRPC_MTLS_GATE:-0}" != "1" ]] && [[ "${RP_SKIP_GRPC_MTLS_REQUIRED:-0}" != "1" ]]; then
@@ -1025,35 +1025,35 @@ fi
 
 say "[P8b] Application runtime readiness (scripts/verify-app-runtime.sh — DAG G.app_runtime)"
 chmod +x "$SCRIPT_DIR/verify-app-runtime.sh" "$SCRIPT_DIR/wait-grpc-mtls-readiness.sh" 2>/dev/null || true
-if ! _och_node_is_complete G.app_runtime; then
-  _och_bootstrap_phase_guard --enter G.app_runtime || {
+if ! _rp_node_is_complete G.app_runtime; then
+  _rp_bootstrap_phase_guard --enter G.app_runtime || {
     bad "phase guard: cannot enter G.app_runtime (complete F.cluster_deploy first — cluster deploy phase incomplete)"
     exit 1
   }
 fi
-if _och_node_is_complete G.app_runtime && [[ "${BOOTSTRAP_RESUME:-0}" == "1" ]] && [[ "${BOOTSTRAP_RESUME_FORCE_APP_RUNTIME_VERIFY:-0}" != "1" ]]; then
+if _rp_node_is_complete G.app_runtime && [[ "${BOOTSTRAP_RESUME:-0}" == "1" ]] && [[ "${BOOTSTRAP_RESUME_FORCE_APP_RUNTIME_VERIFY:-0}" != "1" ]]; then
   echo "  ⏭️  BOOTSTRAP_RESUME=1 — G.app_runtime already complete; skipping verify-app-runtime.sh (set BOOTSTRAP_RESUME_FORCE_APP_RUNTIME_VERIFY=1 to re-run)"
 else
-  _t_g0="$(_och_bootstrap_ms_now)"
+  _t_g0="$(_rp_bootstrap_ms_now)"
   if ! HOUSING_NS="$NS" NAMESPACE="$NS" VERIFY_APP_RUNTIME_PHASE="${VERIFY_APP_RUNTIME_PHASE:-cold}" bash "$SCRIPT_DIR/verify-app-runtime.sh"; then
     bad "verify-app-runtime.sh failed — critical app Deployments not rolled out or /healthz not OK (JSON on stdout ends with ok:false + errors[]; tune VERIFY_APP_RUNTIME_*)"
-    _t1="$(_och_bootstrap_ms_now)"
-    _och_bootstrap_record_phase_timing_ms G.app_runtime "$((_t1 - _t_g0))"
-    _lf="$(_och_bootstrap_write_phase_error_log G.app_runtime verify-app-runtime)"
+    _t1="$(_rp_bootstrap_ms_now)"
+    _rp_bootstrap_record_phase_timing_ms G.app_runtime "$((_t1 - _t_g0))"
+    _lf="$(_rp_bootstrap_write_phase_error_log G.app_runtime verify-app-runtime)"
     {
       echo "namespace=${NS}"
       kubectl get pods -n "$NS" -o wide 2>&1 || true
       kubectl get deploy -n "$NS" -o wide 2>&1 | head -80 || true
     } >>"$_lf"
-    _och_bootstrap_record_fail G.app_runtime "verify-app-runtime.sh failed" "$_lf"
+    _rp_bootstrap_record_fail G.app_runtime "verify-app-runtime.sh failed" "$_lf"
     echo "  📄 error log: $_lf" >&2
-    och_bootstrap_rollback_dispatch G.app_runtime || true
+    rp_bootstrap_rollback_dispatch G.app_runtime || true
     exit 1
   fi
-  _och_bootstrap_record_phase_timing_ms G.app_runtime "$(($(_och_bootstrap_ms_now) - _t_g0))"
+  _rp_bootstrap_record_phase_timing_ms G.app_runtime "$(($(_rp_bootstrap_ms_now) - _t_g0))"
 fi
 
-_och_bootstrap_phase_guard --complete G.app_runtime 2>/dev/null || true
+_rp_bootstrap_phase_guard --complete G.app_runtime 2>/dev/null || true
 
 if [[ "${BOOTSTRAP_SKIP_CRITICAL_PATH_REGRESSION:-0}" != "1" ]]; then
   say "[P8c] App-runtime DAG critical-path regression (detect-critical-path-regression.mjs)"
@@ -1068,11 +1068,11 @@ fi
 
 if [[ "${BOOTSTRAP_SKIP_PHASE_GUARD:-0}" != "1" ]] && [[ -f "$REPO_ROOT/infra/bootstrap_invariants.graph.json" ]]; then
   if [[ "${BOOTSTRAP_SKIP_KAFKA_APPLY:-0}" != "1" ]] && [[ "${BOOTSTRAP_SKIP_KAFKA_TOPIC_PROVISION:-0}" != "1" ]]; then
-    _och_bootstrap_phase_guard --enter F.cluster_deploy || { bad "phase guard: cannot enter F.cluster_deploy (complete G.app_runtime first)"; exit 1; }
-    _och_bootstrap_phase_guard --complete F.cluster_deploy 2>/dev/null || true
+    _rp_bootstrap_phase_guard --enter F.cluster_deploy || { bad "phase guard: cannot enter F.cluster_deploy (complete G.app_runtime first)"; exit 1; }
+    _rp_bootstrap_phase_guard --complete F.cluster_deploy 2>/dev/null || true
   elif [[ "${BOOTSTRAP_GRAPH_COMPLETE_F_WITHOUT_P5C:-0}" == "1" ]]; then
-    _och_bootstrap_phase_guard --enter F.cluster_deploy || { bad "phase guard: cannot enter F.cluster_deploy (complete G.app_runtime first)"; exit 1; }
-    _och_bootstrap_phase_guard --complete F.cluster_deploy 2>/dev/null || true
+    _rp_bootstrap_phase_guard --enter F.cluster_deploy || { bad "phase guard: cannot enter F.cluster_deploy (complete G.app_runtime first)"; exit 1; }
+    _rp_bootstrap_phase_guard --complete F.cluster_deploy 2>/dev/null || true
     echo "  ℹ️  BOOTSTRAP_GRAPH_COMPLETE_F_WITHOUT_P5C=1 — marked F.cluster_deploy after G (topics/alignment asserted out-of-band)."
   fi
 fi
@@ -1099,11 +1099,11 @@ fi
 say "[P9b] Push bootstrap + app-runtime metrics to Pushgateway (Grafana DAG dashboards)"
 bash "$SCRIPT_DIR/export-bootstrap-phase-metrics.sh" >/dev/null 2>&1 || true
 if [[ -f "$REPO_ROOT/bench_logs/app_runtime_metrics.prom" ]]; then
-  OCH_PUSHGATEWAY_JOB=app-runtime OCH_PUSHGATEWAY_INSTANCE="$BOOTSTRAP_RUN_ID" \
-    bash "$SCRIPT_DIR/lib/push-och-prom.sh" "$REPO_ROOT/bench_logs/app_runtime_metrics.prom" >/dev/null 2>&1 || true
+  RP_PUSHGATEWAY_JOB=app-runtime RP_PUSHGATEWAY_INSTANCE="$BOOTSTRAP_RUN_ID" \
+    bash "$SCRIPT_DIR/lib/push-rp-prom.sh" "$REPO_ROOT/bench_logs/app_runtime_metrics.prom" >/dev/null 2>&1 || true
 fi
 if [[ -f "$REPO_ROOT/bench_logs/cold-bootstrap-last-timing.json" ]]; then
-  bash "$SCRIPT_DIR/export-och-wall-clock-prom.sh" cold-bootstrap >/dev/null 2>&1 || true
+  bash "$SCRIPT_DIR/export-rp-wall-clock-prom.sh" cold-bootstrap >/dev/null 2>&1 || true
 fi
 
 say "✅ Bootstrap v2 complete (run_id=${BOOTSTRAP_RUN_ID})."

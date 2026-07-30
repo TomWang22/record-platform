@@ -181,7 +181,7 @@ Keyword retrieval optimizes **lexical query-term match** on the production path.
 | `rp-ai-shadow-source-diagnostic.sh` | **FAIL** (6 issues) — transient `obo_counter` keyword stability on fixture prompt; **real-query harness keyword rows unchanged** |
 | `audit-rp-ai-rag-contract.sh` | **PASS** |
 | `rp-ai-rag-quality-smoke.sh` | **PASS** |
-| `rp-och-decontaminate-scan.sh` | **PASS** (589 files) |
+| `rp-rp-decontaminate-scan.sh` | **PASS** (589 files) |
 
 ---
 

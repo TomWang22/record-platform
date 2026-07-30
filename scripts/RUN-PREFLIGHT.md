@@ -29,7 +29,7 @@ Optional: apply schemas/tuning before preflight so step 3b4 is quick: `./scripts
 
 ## Rebuild and deploy after code changes
 
-After changing **api-gateway**, **social-service**, **analytics-service**, or **python-ai-service** (or any other service), rebuild images and roll out so the suite sees the new code:
+After changing **api-gateway**, **messaging-service**, **analytics-service**, or **python-ai-service** (or any other service), rebuild images and roll out so the suite sees the new code:
 
 1. **Build and load**
    - **Colima:** Run `./scripts/build-and-rollout-colima.sh` to build all `:dev` images and rollout restart deployments. Or let preflight (step 2e) build missing images when `PREFLIGHT_ENSURE_IMAGES=1` (default). To build only (no rollout): build each service with `docker build -t <service>:dev -f services/<service>/Dockerfile .`.
@@ -39,8 +39,8 @@ After changing **api-gateway**, **social-service**, **analytics-service**, or **
 2. **Restart deployments** so pods pick up the new image:
 
    ```bash
-   kubectl rollout restart deployment api-gateway social-service analytics-service python-ai-service -n record-platform
-   kubectl rollout status deployment api-gateway social-service analytics-service python-ai-service -n record-platform --timeout=120s
+   kubectl rollout restart deployment api-gateway messaging-service analytics-service python-ai-service -n record-platform
+   kubectl rollout status deployment api-gateway messaging-service analytics-service python-ai-service -n record-platform --timeout=120s
    ```
 
    Or restart only the ones you changed, e.g. `kubectl rollout restart deployment api-gateway -n record-platform`.

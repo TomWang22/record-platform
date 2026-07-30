@@ -63,7 +63,7 @@ if [[ "$SKIP_BASE" != "1" ]]; then
   # Re-apply registry image + IfNotPresent so kustomize doesn't leave imagePullPolicy: Never
   say "Re-patching deployments to registry image and IfNotPresent (strict TLS/mTLS unchanged)..."
   REG_NAME="k3d-${CLUSTER}-registry"
-  for s in api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service auction-monitor; do
+  for s in api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service shopping-service auction-monitor; do
     kubectl set image "deployment/$s" -n record-platform "app=${REG_NAME}:5000/${s}:dev" 2>/dev/null || true
     kubectl patch deployment "$s" -n record-platform --type=json -p='[{"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"IfNotPresent"}]' 2>/dev/null || true
   done

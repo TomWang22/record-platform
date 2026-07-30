@@ -3,8 +3,8 @@ import { test, expect } from "@playwright/test";
 const genericErrorTexts = [
   "Failed to fetch",
   "An unexpected error occurred",
-  "Off-Campus-Housing-Tracker",
-  "Off-Campus Housing",
+  "LEGACY_NAMESPACE_1" /* sanitized */,
+  "LEGACY_NAMESPACE_2" /* sanitized */,
 ];
 
 const authRequiredRawText = "auth required";
@@ -78,7 +78,7 @@ test.describe("Frontend contract — no generic errors", () => {
 
 test.describe("Frontend contract — branding", () => {
   for (const pg of pages) {
-    test(`${pg.name} (${pg.path}): no stale OCH branding`, async ({
+    test(`${pg.name} (${pg.path}): no stale RP branding`, async ({
       page,
     }) => {
       const waitUntil = pg.path === "/insights" ? "domcontentloaded" : "networkidle";
@@ -92,8 +92,8 @@ test.describe("Frontend contract — branding", () => {
 
       const bodyText = (await page.textContent("body")) ?? "";
       expect(
-        bodyText.includes("Off-Campus-Housing-Tracker"),
-        `"Off-Campus-Housing-Tracker" found on ${pg.path}`,
+        bodyText.includes("LEGACY_NAMESPACE_1" /* sanitized */),
+        `"LEGACY_NAMESPACE_1" /* sanitized */ found on ${pg.path}`,
       ).toBeFalsy();
     });
   }

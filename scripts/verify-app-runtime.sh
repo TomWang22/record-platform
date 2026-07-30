@@ -25,9 +25,9 @@ cd "$REPO_ROOT"
 CONFIG="${VERIFY_APP_RUNTIME_CONFIG:-$REPO_ROOT/infra/app_runtime_services.json}"
 PROM_OUT="${VERIFY_APP_RUNTIME_PROM_OUT:-$REPO_ROOT/bench_logs/app_runtime_metrics.prom}"
 HISTORY_OUT="${VERIFY_APP_RUNTIME_HISTORY:-$REPO_ROOT/bench_logs/app_runtime_history.jsonl}"
-# shellcheck source=scripts/lib/och-run-id.sh
-source "$REPO_ROOT/scripts/lib/och-run-id.sh"
-RUN_ID="${VERIFY_APP_RUNTIME_RUN_ID:-$(och_read_run_id "$REPO_ROOT")}"
+# shellcheck source=scripts/lib/rp-run-id.sh
+source "$REPO_ROOT/scripts/lib/rp-run-id.sh"
+RUN_ID="${VERIFY_APP_RUNTIME_RUN_ID:-$(rp_read_run_id "$REPO_ROOT")}"
 export RUN_ID
 
 # cold | warm | unknown — used only for JSONL history / cold-vs-warm reports (not gating).
@@ -814,11 +814,11 @@ while true; do
 done
 
 _write_prom_file "$TMP_DIR" "$PROM_OUT"
-if [[ "${OCH_PUSH_APP_RUNTIME:-1}" == "1" ]] && [[ -f "$PROM_OUT" ]]; then
-  chmod +x "$REPO_ROOT/scripts/lib/push-och-prom.sh" 2>/dev/null || true
-  OCH_PUSHGATEWAY_JOB="${OCH_PUSHGATEWAY_JOB:-app-runtime}" \
-    OCH_PUSHGATEWAY_INSTANCE="${OCH_PUSHGATEWAY_INSTANCE:-$RUN_ID}" \
-    bash "$REPO_ROOT/scripts/lib/push-och-prom.sh" "$PROM_OUT" >/dev/null \
+if [[ "${RP_PUSH_APP_RUNTIME:-1}" == "1" ]] && [[ -f "$PROM_OUT" ]]; then
+  chmod +x "$REPO_ROOT/scripts/lib/push-rp-prom.sh" 2>/dev/null || true
+  RP_PUSHGATEWAY_JOB="${RP_PUSHGATEWAY_JOB:-app-runtime}" \
+    RP_PUSHGATEWAY_INSTANCE="${RP_PUSHGATEWAY_INSTANCE:-$RUN_ID}" \
+    bash "$REPO_ROOT/scripts/lib/push-rp-prom.sh" "$PROM_OUT" >/dev/null \
       || echo "verify-app-runtime: pushgateway push skipped/failed (non-fatal)" >&2
 fi
 

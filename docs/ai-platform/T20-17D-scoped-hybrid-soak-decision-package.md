@@ -43,7 +43,7 @@ Combined live evidence: **135/135** HTTP 200, **0%** fallback across D-LIVE + C-
 | Anchored overlap | 16/16 | 16/16 | **PASS** |
 | Pure overlap | 8/16 | 8/16 | report-only |
 | Telemetry WARNs | 0 | 0 | **PASS** |
-| Leakage / OCH | PASS | PASS | **PASS** |
+| Leakage / RP | PASS | PASS | **PASS** |
 | Playwright | PASS | PASS | **PASS** |
 
 ---

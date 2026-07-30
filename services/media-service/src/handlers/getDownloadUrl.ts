@@ -10,7 +10,7 @@ export interface GetDownloadUrlResult {
 }
 
 function mediaPublicSecret(): string {
-  return String(process.env.MEDIA_PUBLIC_URL_SECRET || process.env.JWT_SECRET || 'och-media-public-dev').trim()
+  return String(process.env.MEDIA_PUBLIC_URL_SECRET || process.env.JWT_SECRET || 'rp-media-public-dev').trim()
 }
 
 export function signInlineMediaDownload(mediaId: string, expSec: number): string {

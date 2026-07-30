@@ -54,7 +54,7 @@ Percentage ladder **1% → 100%** all PASS with percent restored after each eval
 | Leakage | **PASS** |
 | Anchored overlap | **16/16 PASS** |
 | Percent restored | **PASS** |
-| Playwright / source diagnostic / OCH | **PASS** |
+| Playwright / source diagnostic / RP | **PASS** |
 
 ---
 
@@ -103,7 +103,7 @@ Image: `python-ai-service:t20-p215f`
 1. Set `AI_RAG_HYBRID_CANARY=0` on `deployment/python-ai-service`.
 2. Rollout restart; verify all users → `keyword` / `keyword_default`.
 3. Re-run `scripts/rp-ai-hybrid-canary-transcript.sh` — expect keyword for all cases.
-4. Re-run contracts + OCH.
+4. Re-run contracts + RP.
 
 To restore allowlist-only hybrid: set `AI_RAG_HYBRID_CANARY=1`, allowlist UUID, `PERCENT=0`.
 

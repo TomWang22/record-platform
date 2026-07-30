@@ -11,7 +11,7 @@ ok() { echo "✅ $*"; }
 warn() { echo "⚠️  $*"; }
 fail() { echo "❌ $*" >&2; exit 1; }
 
-say "=== K6 Social Service Test with Latency Graphs ==="
+say "=== K6 Messaging Service Test with Latency Graphs ==="
 
 # Check if k6 image is available
 K6_IMAGE="${K6_IMAGE:-grafana/k6:latest}"
@@ -111,7 +111,7 @@ say "Creating k6 job: $JOB_NAME"
 
 # Copy k6 script to a ConfigMap
 ./scripts/kubectl-kind-h3 -n record-platform create configmap k6-social-script-graphs \
-  --from-file=test.js="$SCRIPT_DIR/load/k6-social-service-comprehensive.js" \
+  --from-file=test.js="$SCRIPT_DIR/load/k6-messaging-service-comprehensive.js" \
   --dry-run=client -o yaml | ./scripts/kubectl-kind-h3 apply -f - >/dev/null 2>&1 || true
 
 # Get Caddy service ClusterIP for hostAliases
@@ -265,7 +265,7 @@ sleep 2  # Give Kafka time to process
 # Check Kafka topics (simplified - just verify topics exist)
 say "Kafka topics available (ingestion verified via k6 metrics):"
 for topic in "forum-posts" "forum-comments" "messages" "group-messages"; do
-  ok "Topic '${topic}' configured for social-service"
+  ok "Topic '${topic}' configured for messaging-service"
 done
 
 

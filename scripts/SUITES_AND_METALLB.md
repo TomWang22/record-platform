@@ -23,7 +23,7 @@ The single entry point that runs **preflight then all 8 test suites** is:
 | 5b| k6 (optional)    | `load/run-k6-phases.sh` (when RUN_K6=1)     |
 | 6 | standalone-capture | `test-packet-capture-standalone.sh`        |
 | 7 | tls-mtls         | `test-tls-mtls-comprehensive.sh`             |
-| 8 | social           | `test-social-service-comprehensive.sh`       |
+| 8 | social           | `test-messaging-service-comprehensive.sh`       |
 
 After each suite, `verify-db-cache-quick.sh` runs. Suite logs go to `SUITE_LOG_DIR` (e.g. `bench_logs/preflight-<timestamp>/suite-logs/`).
 

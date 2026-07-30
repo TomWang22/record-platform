@@ -73,7 +73,7 @@ for t in "${RP_KAFKA_EVENT_TOPICS[@]}"; do
 done
 
 say "verify-proto-topic-alignment.sh (mirror)"
-run env PROTO_EVENTS_ROOT="$EV_DST" RP_SKIP_BOOKING_DB="${RP_SKIP_BOOKING_DB:-1}" RP_SKIP_SOCIAL_SERVICE="${RP_SKIP_SOCIAL_SERVICE:-1}" \
+run env PROTO_EVENTS_ROOT="$EV_DST" RP_SKIP_BOOKING_DB="${RP_SKIP_BOOKING_DB:-1}" RP_SKIP_MESSAGING_LEGACY_PEER="${RP_SKIP_MESSAGING_LEGACY_PEER:-1}" \
   bash "$SCRIPT_DIR/verify-proto-topic-alignment.sh"
 
 bash "$SCRIPT_DIR/assert-rp-shell-output-clean.sh" "$LOG"

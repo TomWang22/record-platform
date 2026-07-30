@@ -85,9 +85,9 @@ else
 fi
 
 echo "DELETE ${AUTH_BASE}/account …"
-HTTP_CODE="$(curl -sS -o /tmp/och_del_account.json -w "%{http_code}" -X DELETE "${AUTH_BASE}/account" \
+HTTP_CODE="$(curl -sS -o /tmp/rp_del_account.json -w "%{http_code}" -X DELETE "${AUTH_BASE}/account" \
   -H "Authorization: Bearer ${TOKEN}")"
-BODY="$(cat /tmp/och_del_account.json)"
+BODY="$(cat /tmp/rp_del_account.json)"
 echo "HTTP ${HTTP_CODE} body: ${BODY}"
 
 if [[ "$HTTP_CODE" != "202" ]]; then

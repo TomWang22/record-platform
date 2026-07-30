@@ -127,14 +127,14 @@ rp_cert_proof_say ""
 rp_cert_proof_say "--- kafka-ssl-secret writer audit ---"
 bash "$SCRIPT_DIR/rp-audit-kafka-ssl-secret-writers.sh" || RP_CERT_PROOF_FAIL=1
 
-_hits="$(grep -rl 'och-kafka-ssl-secret' "$REPO_ROOT/scripts" "$REPO_ROOT/infra" 2>/dev/null \
+_hits="$(grep -rl 'rp-kafka-ssl-secret' "$REPO_ROOT/scripts" "$REPO_ROOT/infra" 2>/dev/null \
   | grep -vE 'rp-verify-kafka-cert-chain|rp-verify-kustomize-app-services|print-rp-cert-proof|verify-bootstrap-state|cluster_health|package-|toolkit-reference|dev-onboard|apply-och|rollout-restart-och|check-rp-hybrid-cold-bootstrap-toolkit|README\.md' || true)"
 if [[ -n "$_hits" ]]; then
-  rp_cert_proof_bad "och-kafka-ssl-secret referenced in active paths:"
+  rp_cert_proof_bad "rp-kafka-ssl-secret referenced in active paths:"
   printf '%s\n' "$_hits" | sed 's/^/  /'
   RP_CERT_PROOF_FAIL=1
 else
-  rp_cert_proof_ok "no och-kafka-ssl-secret in active bootstrap scripts/manifests"
+  rp_cert_proof_ok "no rp-kafka-ssl-secret in active bootstrap scripts/manifests"
 fi
 
 if [[ -f "$KAFKA_SSL/client.crt" && -f "$KAFKA_SSL/kafka-broker.pem" ]]; then

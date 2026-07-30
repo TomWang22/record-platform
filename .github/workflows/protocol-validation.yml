@@ -19,10 +19,10 @@ on:
       - "scripts/ci/**"
       - "scripts/bring-up-external-infra.sh"
       - "scripts/validate-kafka-stack-contract.sh"
-      - "scripts/recycle-och-postgres-compose.sh"
+      - "scripts/recycle-rp-postgres-compose.sh"
       - "scripts/lib/**"
       - "scripts/verify-preflight-edge-routing.sh"
-      - "scripts/run-housing-k6-edge-smoke.sh"
+      - "scripts/run-platform-k6-edge-smoke.sh"
       - "infra/k8s/overlays/dev/ingress.yaml"
       - "scripts/run-preflight-scale-and-all-suites.sh"
       - "scripts/verify-kafka-tls-sans.sh"
@@ -58,7 +58,7 @@ jobs:
       - name: ShellCheck certification script
         run: shellcheck -S error scripts/ci/run-full-certification.sh
       - name: ShellCheck CI invariant scripts
-        run: shellcheck -S error -x -e SC2015,SC2016,SC2012,SC1091,SC2002 scripts/ci/verify-docker-ports.sh scripts/ci/verify-quic-hostname-invariant.sh scripts/ci/verify-housing-grpc-matrix.sh scripts/ci/generate-kafka-ci-tls.sh scripts/ci/start-kafka-tls-ci.sh scripts/ci/delete-kafka-event-topics.sh scripts/create-kafka-event-topics.sh scripts/create-kafka-event-topics-k8s.sh scripts/lib/och-kafka-event-topics-from-proto.sh scripts/lib/kafka-kraft-quorum-ok.sh scripts/verify-proto-topic-alignment.sh scripts/verify-proto-events-topics.sh scripts/verify-kafka-broker-keystore-jks.sh scripts/verify-kafka-event-topic-partitions.sh scripts/verify-kafka-tls-sans.sh scripts/verify-kafka-kraft-advertised-listeners.sh scripts/verify-kafka-cluster.sh scripts/kafka-rolling-restart.sh scripts/kafka-tls-guard.sh scripts/kafka-tls-rotate-atomic.sh scripts/export-kafka-ca-metric.sh scripts/verify-preflight-edge-routing.sh scripts/run-housing-k6-edge-smoke.sh scripts/wait-for-docker-compose-kafka-strict-ready.sh scripts/ensure-kafka-ready.sh scripts/validate-kafka-stack-contract.sh scripts/run-kafka-contract-validate.sh scripts/verify-kafka-kraft-e2e.sh scripts/colima-forward-6443.sh scripts/colima-api-health.sh scripts/bring-up-external-infra.sh scripts/recycle-och-postgres-compose.sh scripts/rollout-deferred-after-kafka-tls.sh scripts/apply-kafka-kraft-staged.sh scripts/kafka-quorum-stable.sh scripts/service-tls-alias-guard.sh scripts/edge-readiness-gate.sh
+        run: shellcheck -S error -x -e SC2015,SC2016,SC2012,SC1091,SC2002 scripts/ci/verify-docker-ports.sh scripts/ci/verify-quic-hostname-invariant.sh scripts/ci/verify-platform-grpc-matrix.sh scripts/ci/generate-kafka-ci-tls.sh scripts/ci/start-kafka-tls-ci.sh scripts/ci/delete-kafka-event-topics.sh scripts/create-kafka-event-topics.sh scripts/create-kafka-event-topics-k8s.sh scripts/lib/rp-kafka-event-topics-from-proto.sh scripts/lib/kafka-kraft-quorum-ok.sh scripts/verify-proto-topic-alignment.sh scripts/verify-proto-events-topics.sh scripts/verify-kafka-broker-keystore-jks.sh scripts/verify-kafka-event-topic-partitions.sh scripts/verify-kafka-tls-sans.sh scripts/verify-kafka-kraft-advertised-listeners.sh scripts/verify-kafka-cluster.sh scripts/kafka-rolling-restart.sh scripts/kafka-tls-guard.sh scripts/kafka-tls-rotate-atomic.sh scripts/export-kafka-ca-metric.sh scripts/verify-preflight-edge-routing.sh scripts/run-platform-k6-edge-smoke.sh scripts/wait-for-docker-compose-kafka-strict-ready.sh scripts/ensure-kafka-ready.sh scripts/validate-kafka-stack-contract.sh scripts/run-kafka-contract-validate.sh scripts/verify-kafka-kraft-e2e.sh scripts/colima-forward-6443.sh scripts/colima-api-health.sh scripts/bring-up-external-infra.sh scripts/recycle-rp-postgres-compose.sh scripts/rollout-deferred-after-kafka-tls.sh scripts/apply-kafka-kraft-staged.sh scripts/kafka-quorum-stable.sh scripts/service-tls-alias-guard.sh scripts/edge-readiness-gate.sh
 
       - name: Kafka broker EKU + infra auto-create invariants
         run: |

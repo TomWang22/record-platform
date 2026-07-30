@@ -17,7 +17,7 @@
 | pgvector / HNSW | **PASS** |
 | Starting PERCENT | **0** |
 | Telemetry WARNs (pre) | **0** |
-| Contracts / OCH (pre) | **PASS** |
+| Contracts / RP (pre) | **PASS** |
 
 ---
 
@@ -125,13 +125,13 @@ No header spoofing — JWT `sub` drives gating.
 
 ---
 
-## 7. Telemetry / contracts / OCH
+## 7. Telemetry / contracts / RP
 
 | Check | Result |
 |-------|--------|
 | Telemetry WARNs | **0** |
 | Contracts (post-restore) | **PASS** |
-| OCH | **PASS** |
+| RP | **PASS** |
 | Leakage | **PASS** |
 
 ---

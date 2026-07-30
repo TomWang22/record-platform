@@ -112,7 +112,7 @@ No retrieval logic changed.
 ```bash
 BENCH_REQUIRE_OLLAMA_WARM=1 BENCH_WARMUP_RUNS=1 bash scripts/rp-ai-shadow-real-query-timing.sh
 bash scripts/rp-ai-shadow-source-diagnostic.sh   # PASS, 0 issues
-bash scripts/rp-och-decontaminate-scan.sh        # PASS
+bash scripts/rp-rp-decontaminate-scan.sh        # PASS
 ```
 
 ## Artifacts referenced (not committed)

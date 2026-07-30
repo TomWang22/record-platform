@@ -21,7 +21,7 @@ After T20.31 sustained multi-window soak (6480/6480 PASS), this batch extends wi
 | 5 | 429 retry/backoff |
 | 6 | Enrollment churn and re-enrollment safety |
 | 7 | Guest/anonymous exclusion |
-| 8 | Telemetry, quality, leakage, OCH, Playwright gates |
+| 8 | Telemetry, quality, leakage, RP, Playwright gates |
 | 9 | Rollback / `CANARY=0` drill (after live eval only) |
 | 10 | Reject production-default options |
 

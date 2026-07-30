@@ -108,8 +108,8 @@ function main() {
 
   const dashboard = {
     id: null,
-    uid: "och-bootstrap-observability",
-    title: "OCH — Bootstrap observability",
+    uid: "rp-bootstrap-observability",
+    title: "RP — Bootstrap observability",
     tags: ["och", "bootstrap", "record-platform"],
     schemaVersion: 39,
     version: 1,

@@ -20,7 +20,7 @@
 - **Phase 1B:** Log showed `[PHASE 1B] WRITES (no lock — flock not available or PREFLIGHT_WRITE_LOCK_FILE=)` (flock was not installed at run time).
 - **Reissue step 2:** Multiple "connection reset by peer" and "apiserver not ready" retries; step 2 eventually completed (secrets created).
 - **Service restarts (step 7):** auth, api-gateway, records OK; listings, social, shopping, analytics, auction-monitor, python-ai **restart failed**.
-- **3c applies:** config and kafka-external **failed**; social-service, auction-monitor applied; analytics **failed**. caddy-h3-service-nodeport **failed** (twice).
+- **3c applies:** config and kafka-external **failed**; messaging-service, auction-monitor applied; analytics **failed**. caddy-h3-service-nodeport **failed** (twice).
 - **Recovery pass (4a):** config, kafka-external, analytics, caddy-h3-service-nodeport **succeeded** on retry.
 - **Scale (4):** auth, api-gateway, records, listings, social, auction-monitor, python-ai, nginx-exporter, haproxy-exporter, envoy-test **failed**; shopping, analytics, caddy-h3 scaled. Same failures on recovery retry.
 - **4d Caddy verify:** Failed after 3 attempts (NodePort 30443 / port-forward).
@@ -33,7 +33,7 @@
 ## 3. Good run (preflight-full-20260206-215733.log) — why it didn’t have this
 
 - **Reissue step 2:** No connection resets. All secrets created/configured in one go (record-local-tls, dev-root-ca, service-tls).
-- **3c applies:** All succeeded (config, kafka-external, social-service, auction-monitor, analytics-service).
+- **3c applies:** All succeeded (config, kafka-external, messaging-service, auction-monitor, analytics-service).
 - **3c2:** No caddy-h3-service-nodeport failure mentioned (likely applied once).
 - **Scale (4):** Every deployment scaled successfully (auth, api-gateway, records, listings, social, shopping, analytics, auction-monitor, python-ai, nginx-exporter, haproxy-exporter, envoy-test, caddy-h3).
 - **4d Caddy verify:** "Caddy strict TLS OK (HTTP 200, no curl 60)."

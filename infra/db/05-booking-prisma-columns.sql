@@ -1,4 +1,4 @@
--- Align booking.bookings with booking-service Prisma schema (infra-only DBs skip prisma migrate).
+-- Align booking.bookings with reservation-mesh Prisma schema (infra-only DBs skip prisma migrate).
 -- Safe to re-run (IF NOT EXISTS).
 
 ALTER TABLE booking.bookings

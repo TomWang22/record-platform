@@ -58,13 +58,13 @@ fi
 
 # --- eth0 vs node ---
 say "VM eth0 vs k3s node InternalIP"
-_vm="$(och_colima_eth0_ipv4 || true)"
-_node="$(och_k8s_node_internal_ipv4 || true)"
+_vm="$(rp_colima_eth0_ipv4 || true)"
+_node="$(rp_k8s_node_internal_ipv4 || true)"
 [[ -n "$_vm" ]] && ok "Colima eth0 IPv4: $_vm" || warn "Could not read Colima eth0 (colima stopped or ssh failed)"
 [[ -n "$_node" ]] && ok "Node InternalIP: $_node" || warn "Could not read node InternalIP"
 if [[ -n "$_vm" && -n "$_node" ]]; then
-  _vp="$(och_ipv4_prefix "$_vm" || true)"
-  _np="$(och_ipv4_prefix "$_node" || true)"
+  _vp="$(rp_ipv4_prefix "$_vm" || true)"
+  _np="$(rp_ipv4_prefix "$_node" || true)"
   if [[ -n "$_vp" && -n "$_np" && "$_vp" != "$_np" ]]; then
     fail "Colima eth0 /24 ($_vp) != node InternalIP /24 ($_np) — split-brain networking"
   else
@@ -83,7 +83,7 @@ if [[ -z "$_pool_raw" ]]; then
   warn "No IPAddressPool found (MetalLB not installed or CRD missing) — pool check skipped"
 else
   ok "IPAddressPool range: $_pool_raw"
-  if ! och_assert_metallb_pool_coherent "$_pool_raw"; then
+  if ! rp_assert_metallb_pool_coherent "$_pool_raw"; then
     exit 1
   fi
 fi
@@ -116,10 +116,10 @@ else
     fi
     _bpfx="$(echo "$_line" | sed -n 's/.*EXTERNAL:\/\/\([0-9.]*\):9094.*/\1/p' | head -1)"
     if [[ -n "$_bpfx" && "$_bpfx" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      _kp="$(och_ipv4_prefix "$_bpfx" || true)"
+      _kp="$(rp_ipv4_prefix "$_bpfx" || true)"
       if [[ -n "$_pool_raw" ]]; then
-        _first="$(och_metallb_pool_first_ip "${_pool_raw// /}" || true)"
-        _poolpfx="$(och_ipv4_prefix "$_first" || true)"
+        _first="$(rp_metallb_pool_first_ip "${_pool_raw// /}" || true)"
+        _poolpfx="$(rp_ipv4_prefix "$_first" || true)"
         if [[ -n "$_kp" && -n "$_poolpfx" && "$_kp" != "$_poolpfx" ]]; then
           bad "kafka-$i EXTERNAL /24 ($_kp) != MetalLB pool /24 ($_poolpfx) — subnet drift"
           _kfail=1

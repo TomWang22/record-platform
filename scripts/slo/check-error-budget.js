@@ -8,7 +8,7 @@
  *
  * Env:
  *   UPTIME_SUMMARY_FILE — path to JSON (default: bench_logs/uptime-summary.json)
- *   OCH_SLO_TARGET      — decimal availability target (default: 0.995)
+ *   RP_SLO_TARGET      — decimal availability target (default: 0.995)
  *   SKIP_SLO_POLICY_CHECK — set to 1 to no-op (local only)
  *
  * JSON shape:
@@ -18,7 +18,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const SLO_TARGET = Number(process.env.OCH_SLO_TARGET || "0.995");
+const SLO_TARGET = Number(process.env.RP_SLO_TARGET || "0.995");
 const BUDGET = 1 - SLO_TARGET;
 
 if (process.env.SKIP_SLO_POLICY_CHECK === "1") {

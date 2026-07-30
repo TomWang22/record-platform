@@ -30,7 +30,7 @@ while true; do
   
   # Services
   echo "🚀 Services (target: 1/1 each):"
-  SERVICES=("api-gateway" "auth-service" "records-service" "listings-service" "social-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service")
+  SERVICES=("api-gateway" "auth-service" "records-service" "listings-service" "messaging-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service")
   
   READY_COUNT=0
   TOTAL_COUNT=${#SERVICES[@]}
@@ -61,10 +61,10 @@ while true; do
   echo ""
   
   # Check for errors
-  ERROR_PODS=$(kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,social-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' --field-selector=status.phase!=Running,status.phase!=Succeeded --no-headers 2>/dev/null | wc -l | tr -d ' \n' || echo "0")
+  ERROR_PODS=$(kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,messaging-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' --field-selector=status.phase!=Running,status.phase!=Succeeded --no-headers 2>/dev/null | wc -l | tr -d ' \n' || echo "0")
   if [[ "$ERROR_PODS" -gt 0 ]]; then
     echo "⚠️  $ERROR_PODS pods with errors (not Running/Succeeded)"
-    kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,social-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' --field-selector=status.phase!=Running,status.phase!=Succeeded --no-headers 2>/dev/null | head -3 | awk '{print "    " $1 ": " $3}'
+    kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,messaging-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' --field-selector=status.phase!=Running,status.phase!=Succeeded --no-headers 2>/dev/null | head -3 | awk '{print "    " $1 ": " $3}'
     echo ""
   fi
   

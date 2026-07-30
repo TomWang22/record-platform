@@ -140,7 +140,7 @@ Shadow bench artifact: `t20-10-shadow-real-query-20260629-130733.md`
 
 ## 11. Safety/leakage
 
-- OCH scan: **PASS** (589 files)
+- RP scan: **PASS** (589 files)
 - Playwright leakage checks: **PASS**
 - No proxy_bids / message_body in excerpts (sanitized path active)
 - `model_used`: **rule-engine** throughout

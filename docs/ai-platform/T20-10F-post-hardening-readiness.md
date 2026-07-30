@@ -99,7 +99,7 @@ bash scripts/rp-ai-provider-readiness.sh
 bash scripts/rp-ai-pgvector-readiness.sh
 bash scripts/coverage/run-service-coverage.sh python-ai-service  # 109 passed, 91.53%
 node scripts/coverage/enforce-service-coverage.mjs
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 ## Product configuration (unchanged)

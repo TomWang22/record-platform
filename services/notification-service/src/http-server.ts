@@ -33,7 +33,7 @@ type AuthedRequest = Request & { userId?: string };
 const UUID_RX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/** booking-service mesh → internal push: any 36-char UUID string (DB/JWT may differ from strict RFC variant bits). */
+/** reservation-mesh mesh → internal push: any 36-char UUID string (DB/JWT may differ from strict RFC variant bits). */
 const MESH_UUID36 = /^[0-9a-f-]{36}$/i;
 
 function requireBookingMeshSecret(req: Request, res: Response, next: NextFunction): void {
@@ -115,7 +115,7 @@ export function createNotificationHttpApp(): Application {
     res.json({ ok: true, at: new Date().toISOString() });
   });
 
-  /** In-cluster: booking-service inserts saved-search match notifications (shared mesh secret). */
+  /** In-cluster: reservation-mesh inserts saved-search match notifications (shared mesh secret). */
   app.post("/internal/push-notification", requireBookingMeshSecret, async (req: Request, res: Response) => {
     if (!pool) return res.status(503).json({ error: "db unavailable" });
     const b = (req.body || {}) as {

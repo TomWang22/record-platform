@@ -35,12 +35,12 @@ if [[ -f "$ROOT/scripts/lib/jaeger-resolve-query-base.sh" ]]; then
   source "$ROOT/scripts/lib/jaeger-resolve-query-base.sh"
 fi
 
-och_jaeger_traces_smoke() {
+rp_jaeger_traces_smoke() {
   local base="${1%/}"
   local end_ms=$(( $(date +%s) * 1000000 ))
   local start_ms=$(( end_ms - 3600 * 1000000 ))
   local tmp
-  tmp="$(mktemp "${TMPDIR:-/tmp}/och-jaeger-traces.XXXXXX")"
+  tmp="$(mktemp "${TMPDIR:-/tmp}/rp-jaeger-traces.XXXXXX")"
   if [[ "$base" == https:* ]]; then
     local ca="${NODE_EXTRA_CA_CERTS:-$ROOT/certs/dev-root.pem}"
     if [[ -f "$ca" ]]; then
@@ -96,7 +96,7 @@ if [[ "$_prefer_pf" == "1" ]] && command -v kubectl >/dev/null 2>&1; then
     kubectl port-forward -n "$_ns" "svc/jaeger" "${_local_pf_port}:16686" >/dev/null 2>&1 &
     JAEGER_PF_PID=$!
     for ((_i = 1; _i <= 45; _i++)); do
-      if declare -F och_jaeger_services_curl_ok >/dev/null 2>&1 && och_jaeger_services_curl_ok "$_local_base"; then
+      if declare -F rp_jaeger_services_curl_ok >/dev/null 2>&1 && rp_jaeger_services_curl_ok "$_local_base"; then
         export JAEGER_QUERY_BASE="$_local_base"
         printf '%s\n' "$JAEGER_QUERY_BASE" >"$ROOT/bench_logs/.jaeger-query-base"
         echo "TRACE GUARANTEE: JAEGER_QUERY_BASE=$JAEGER_QUERY_BASE (port-forward)"
@@ -115,7 +115,7 @@ fi
 if [[ "$_resolved" != "1" ]]; then
   if [[ -f "$ROOT/bench_logs/.jaeger-query-base" ]]; then
     _jb="$(tr -d '\r\n' <"$ROOT/bench_logs/.jaeger-query-base" | sed 's/[[:space:]]*$//')"
-    if [[ -n "$_jb" ]] && declare -F och_jaeger_services_curl_ok >/dev/null 2>&1 && och_jaeger_services_curl_ok "$_jb"; then
+    if [[ -n "$_jb" ]] && declare -F rp_jaeger_services_curl_ok >/dev/null 2>&1 && rp_jaeger_services_curl_ok "$_jb"; then
       export JAEGER_QUERY_BASE="$_jb"
       echo "TRACE GUARANTEE: JAEGER_QUERY_BASE from bench_logs/.jaeger-query-base → $JAEGER_QUERY_BASE"
       _resolved=1
@@ -123,19 +123,19 @@ if [[ "$_resolved" != "1" ]]; then
   fi
 fi
 
-if [[ "$_resolved" != "1" ]] && declare -F och_jaeger_resolve_query_base >/dev/null 2>&1; then
-  if och_jaeger_resolve_query_base; then
+if [[ "$_resolved" != "1" ]] && declare -F rp_jaeger_resolve_query_base >/dev/null 2>&1; then
+  if rp_jaeger_resolve_query_base; then
     _resolved=1
   fi
 fi
 
-if [[ "$_resolved" != "1" ]] && [[ -n "${JAEGER_QUERY_BASE:-}" ]] && declare -F och_jaeger_services_curl_ok >/dev/null 2>&1 && och_jaeger_services_curl_ok "${JAEGER_QUERY_BASE}"; then
+if [[ "$_resolved" != "1" ]] && [[ -n "${JAEGER_QUERY_BASE:-}" ]] && declare -F rp_jaeger_services_curl_ok >/dev/null 2>&1 && rp_jaeger_services_curl_ok "${JAEGER_QUERY_BASE}"; then
   export JAEGER_QUERY_BASE="${JAEGER_QUERY_BASE%/}"
   echo "TRACE GUARANTEE: using pre-set JAEGER_QUERY_BASE=$JAEGER_QUERY_BASE"
   _resolved=1
 fi
 
-if [[ "$_resolved" != "1" ]] && [[ "$_allow_loop" == "1" ]] && declare -F och_jaeger_services_curl_ok >/dev/null 2>&1 && och_jaeger_services_curl_ok "$_local_base"; then
+if [[ "$_resolved" != "1" ]] && [[ "$_allow_loop" == "1" ]] && declare -F rp_jaeger_services_curl_ok >/dev/null 2>&1 && rp_jaeger_services_curl_ok "$_local_base"; then
   export JAEGER_QUERY_BASE="$_local_base"
   echo "TRACE GUARANTEE: JAEGER_ALLOW_LOOPBACK_JAEGER=1 — using $_local_base"
   _resolved=1
@@ -148,7 +148,7 @@ if [[ "$_resolved" != "1" ]] && [[ "$_auto_pf" == "1" ]] && command -v kubectl >
     kubectl port-forward -n "$_ns" "svc/jaeger" "${_local_pf_port}:16686" >/dev/null 2>&1 &
     JAEGER_PF_PID=$!
     for ((_i = 1; _i <= 45; _i++)); do
-      if declare -F och_jaeger_services_curl_ok >/dev/null 2>&1 && och_jaeger_services_curl_ok "$_local_base"; then
+      if declare -F rp_jaeger_services_curl_ok >/dev/null 2>&1 && rp_jaeger_services_curl_ok "$_local_base"; then
         export JAEGER_QUERY_BASE="$_local_base"
         printf '%s\n' "$JAEGER_QUERY_BASE" >"$ROOT/bench_logs/.jaeger-query-base"
         echo "TRACE GUARANTEE: JAEGER_QUERY_BASE=$JAEGER_QUERY_BASE (auto port-forward)"
@@ -167,7 +167,7 @@ if [[ "$_resolved" != "1" ]] || [[ -z "${JAEGER_QUERY_BASE:-}" ]]; then
   exit 1
 fi
 
-if ! och_jaeger_traces_smoke "${JAEGER_QUERY_BASE}"; then
+if ! rp_jaeger_traces_smoke "${JAEGER_QUERY_BASE}"; then
   echo "::error::TRACE GUARANTEE: Jaeger /api/traces?service=api-gateway probe failed for JAEGER_QUERY_BASE=${JAEGER_QUERY_BASE}"
   exit 1
 fi

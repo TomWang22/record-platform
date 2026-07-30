@@ -16,7 +16,7 @@
 
 ### ⏳ Services Status
 - **Ready (1/1)**: analytics-service, api-gateway, auction-monitor, python-ai-service
-- **Starting (0/1)**: auth-service, records-service, listings-service, social-service, shopping-service
+- **Starting (0/1)**: auth-service, records-service, listings-service, messaging-service, shopping-service
 
 **Note**: Services showing 0/1 are in Running state but health probes haven't passed yet. They may need more time to start or may have startup issues.
 
@@ -45,7 +45,7 @@ The test suite will:
 
 ```bash
 # Check all pod status
-kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,social-service,shopping-service,analytics-service,auction-monitor,python-ai-service,api-gateway)'
+kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,messaging-service,shopping-service,analytics-service,auction-monitor,python-ai-service,api-gateway)'
 
 # Check mTLS configuration
 kubectl exec -n record-platform <pod-name> -- env | grep GRPC_REQUIRE_CLIENT_CERT

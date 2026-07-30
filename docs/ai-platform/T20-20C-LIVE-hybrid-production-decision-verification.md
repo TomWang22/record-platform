@@ -115,7 +115,7 @@
 | Avg / worst score | ≥3.5 / ≥3.0 | **PASS** (4.0 / 4.0) |
 | Hybrid p95 | ≤3000 ms | **PASS** (141.65 ms) |
 | Anchored overlap | ≥10/16 | **PASS** (16/16) |
-| Telemetry / leakage / OCH | PASS | **PASS** |
+| Telemetry / leakage / RP | PASS | **PASS** |
 | Playwright | PASS | **PASS** |
 
 Proceed to **T20.20D** formal production-decision package.

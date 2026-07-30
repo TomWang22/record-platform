@@ -66,7 +66,7 @@ No permanent allowlist broadening, production-default change, runtime image chan
 | `scripts/audit-rp-ai-endpoints-contract.sh` | **PASS** |
 | `scripts/rp-ai-provider-readiness.sh` | **PASS** |
 | `scripts/rp-ai-pgvector-readiness.sh` | **PASS** |
-| `scripts/rp-och-decontaminate-scan.sh` | **PASS** (`__SCANNED__=589`) |
+| `scripts/rp-rp-decontaminate-scan.sh` | **PASS** (`__SCANNED__=589`) |
 | `scripts/ai-quality-telemetry-report.mjs` | **PASS** — WARNs 0 |
 | Preview UI smoke | **PASS** — `ai-rag-opt-in-hybrid-preview-ui.spec.ts` 4/4 |
 

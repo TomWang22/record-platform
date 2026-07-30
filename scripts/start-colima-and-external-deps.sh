@@ -39,7 +39,7 @@ fi
 # shellcheck source=lib/ensure-colima-docker-context.sh
 source "$SCRIPT_DIR/lib/ensure-colima-docker-context.sh"
 if command -v colima >/dev/null 2>&1 && rp_colima_is_running; then
-  OCH_FORCE_COLIMA_DOCKER=1 och_ensure_colima_docker_context || true
+  RP_FORCE_COLIMA_DOCKER=1 rp_ensure_colima_docker_context || true
 fi
 
 docker info >/dev/null 2>&1 || { warn "Docker not reachable"; exit 1; }

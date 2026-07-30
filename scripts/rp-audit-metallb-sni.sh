@@ -2,7 +2,7 @@
 # Verify MetalLB caddy-h3 exposes TCP+UDP 443 and edge health over SNI record-platform.test (h1/h2/h3).
 #
 # Usage: bash scripts/rp-audit-metallb-sni.sh
-# Env: METALLB_IP, RP_PUBLIC_HOST, RP_TLS_INSECURE, RP_SMOKE_HEALTH_PATH, OCH_EDGE_PROTO_DEBUG=1
+# Env: METALLB_IP, RP_PUBLIC_HOST, RP_TLS_INSECURE, RP_SMOKE_HEALTH_PATH, RP_EDGE_PROTO_DEBUG=1
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -63,13 +63,13 @@ curl_probe() {
     return 1
   fi
   ok "curl $label → HTTP $code"
-  if [[ "${OCH_EDGE_PROTO_DEBUG:-0}" == "1" ]] || [[ "${RP_EDGE_PROTO_DEBUG:-0}" == "1" ]]; then
+  if [[ "${RP_EDGE_PROTO_DEBUG:-0}" == "1" ]] || [[ "${RP_EDGE_PROTO_DEBUG:-0}" == "1" ]]; then
     local edge_hdr
-    edge_hdr="$(awk 'tolower($0) ~ /^x-och-debug-edge-proto:|^x-rp-debug-edge-proto:/ {print; exit}' "$hdr" | tr -d '\r')"
+    edge_hdr="$(awk 'tolower($0) ~ /^x-rp-debug-edge-proto:|^x-rp-debug-edge-proto:/ {print; exit}' "$hdr" | tr -d '\r')"
     if [[ -n "$edge_hdr" ]]; then
       ok "edge proto header: $edge_hdr"
     else
-      warn "no X-OCH-Debug-Edge-Proto / X-RP-Debug-Edge-Proto (set OCH_EDGE_PROTO_DEBUG=1 on gateway)"
+      warn "no X-RP-Debug-Edge-Proto / X-RP-Debug-Edge-Proto (set RP_EDGE_PROTO_DEBUG=1 on gateway)"
     fi
   fi
   rm -f "$tmp" "$hdr"

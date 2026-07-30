@@ -574,7 +574,7 @@ fi
 say "Suite run policy: strict TLS/mTLS enforced (CA cert, no -k); HTTP/3 uses --http3-only (no HTTP/2 fallback)"
 info "Traffic target: $CAPTURE_TRAFFIC_TARGET — packet capture and all suites use this IP and port"
 
-# Readiness gate: ensure Caddy + api-gateway + housing services are ready and grace delay (avoids 504, 404, curl 28 during rotation)
+# Readiness gate: ensure Caddy + api-gateway + platform-planes are ready and grace delay (avoids 504, 404, curl 28 during rotation)
 if [[ -f "$SCRIPT_DIR/ensure-readiness-before-suites.sh" ]] && [[ "${SKIP_READINESS_GATE:-0}" != "1" ]]; then
   chmod +x "$SCRIPT_DIR/ensure-readiness-before-suites.sh" 2>/dev/null || true
   "$SCRIPT_DIR/ensure-readiness-before-suites.sh" || warn "Readiness gate had issues (continuing)"

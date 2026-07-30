@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-command HTTP/3 diagnostic: Caddy built with h3, UDP 443 exposed, alt-svc, and curl --http3.
-# Uses: namespace ingress-nginx, deployment caddy-h3 (not off-campus-housing / deploy/caddy).
+# Uses: namespace ingress-nginx, deployment caddy-h3 (not record-platform / deploy/caddy).
 #
 # Usage: ./scripts/verify-http3-edge.sh
 #   TARGET=https://record-platform.test  (default)
@@ -46,7 +46,7 @@ FAIL=0
 say "HTTP/3 edge verification (namespace=$NS, deploy=$SVC)"
 echo "  Target: $TARGET"
 echo "  curl: $CURL_CMD (script prefers Homebrew curl for --http3 test)"
-echo "  (Resource names: deploy/$DEPLOY, svc/$SVC in namespace $NS — not off-campus-housing/deploy/caddy)"
+echo "  (Resource names: deploy/$DEPLOY, svc/$SVC in namespace $NS — not record-platform/deploy/caddy)"
 echo ""
 
 # --- Step 1: Caddy built with HTTP/3 ---

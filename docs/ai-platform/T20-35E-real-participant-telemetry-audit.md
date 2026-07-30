@@ -21,7 +21,7 @@
 | Metric | Value |
 |--------|------:|
 | Telemetry WARNs | **0** |
-| OCH | **PASS** (`__SCANNED__=105`) |
+| RP | **PASS** (`__SCANNED__=105`) |
 
 ## 3. Soak gates
 

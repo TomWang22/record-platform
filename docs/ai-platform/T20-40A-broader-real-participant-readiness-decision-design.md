@@ -35,7 +35,7 @@ T20.40A evaluates readiness decision options after T20.39 closed PASS. It does n
 | N=5 artifact | **PASS** |
 | Rollback | **PASS** |
 | Telemetry WARNs | **0** |
-| OCH | **PASS** |
+| RP | **PASS** |
 | Playwright C-suite | **7/7 PASS** |
 
 T20.39C gate counts:
@@ -141,7 +141,7 @@ If T20.40C is later approved, live gates are:
 | Canary errors | 0 |
 | Telemetry WARNs | 0 |
 | Leakage | PASS |
-| OCH | PASS |
+| RP | PASS |
 | Playwright C-suite | PASS |
 | Message-body exposure | 0 |
 | Post-revoke keyword_default | PASS for all preview participants |

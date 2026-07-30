@@ -3,7 +3,7 @@
  * Ensures route-hit JSONL keys align with the static manifest (unlike randomized lab k6, which can
  * skip routes by chance). Does not replace OpenAPI or full E2E surface — only manifest coverage.
  *
- *   BASE_URL=https://off-campus-housing.test k6 run scripts/load/k6-coverage-warmup.js
+ *   BASE_URL=https://record-platform.test k6 run scripts/load/k6-coverage-warmup.js
  *
  * Env:
  *   K6_COVERAGE_MANIFEST — absolute or repo-relative path to gateway-route-manifest.json (Makefile sets absolute).

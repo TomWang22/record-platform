@@ -36,8 +36,8 @@ fi
 curl -sS "${CA_ARGS[@]}" "$URL" \
   -H "traceparent: 00-${TRACE_ID}-0000000000000001-01" \
   -H "x-debug-replay: step7" \
-  -H "x-och-edge-proto: h3" \
-  -H "x-suite: ${OCH_X_SUITE:-bash}" \
+  -H "x-rp-edge-proto: h3" \
+  -H "x-suite: ${RP_X_SUITE:-bash}" \
   -o /dev/null
 
 printf '%s\n' "$TRACE_ID"

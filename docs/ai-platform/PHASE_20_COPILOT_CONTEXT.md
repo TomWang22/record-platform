@@ -290,7 +290,7 @@ Key implementation: `_apply_shadow_overlap_refinements()` in `rag_retrieval.py`.
 6. **Do NOT** change product behavior (keyword path, API contracts, default env) as part of Phase 20 hardening/eval tickets.
 7. **Do NOT** start Phase 21.
 8. **Do NOT** commit: `bench_logs/`, `backups/`, screenshots, DB dumps, coverage output artifacts.
-9. **Do** run `bash scripts/rp-och-decontaminate-scan.sh` before push; no OCH/housing/landlord/tenant contamination in committed text.
+9. **Do** run `bash scripts/rp-rp-decontaminate-scan.sh` before push; no RP/housing/landlord/tenant contamination in committed text.
 10. **Pipefail trap:** When testing script exit codes, run **directly** — never pipe to `tail` without `set -o pipefail` (T20.7R lesson).
 
 ---
@@ -383,7 +383,7 @@ bash scripts/rp-ai-backfill-rerun-guard-smoke.sh  # after tranche work
 ```bash
 bash scripts/rp-runtime-domain-comb.sh
 bash scripts/rp-db-domain-comb.sh                 # slow (~30–80 min)
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 bash scripts/rp-bootstrap-grpc-mtls-gate.sh       # slow (~20–50 min)
 CLUSTER_DOCTOR_STRICT=1 make cluster-doctor
 ```
@@ -427,7 +427,7 @@ Refusal rules:
 1. **If asked to "enable vector"** → refuse until all rollout gates pass; cite this doc and `docs/ai-platform/T20-8-vector-rollout-readiness.md`.
 2. **If asked to default-on overlap flags** → refuse; T20.10AG closed branch as diagnostic-only.
 3. **If rerunning Tranche 2–12** → refuse; locks exist (exit **2**).
-4. **Before any push** → OCH scan, strip Co-authored trailers if needed, no `bench_logs/` in commit.
+4. **Before any push** → RP scan, strip Co-authored trailers if needed, no `bench_logs/` in commit.
 
 ---
 

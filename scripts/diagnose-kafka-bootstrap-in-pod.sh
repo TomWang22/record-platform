@@ -34,8 +34,8 @@ KP_PASS=$(cat /etc/kafka/secrets/kafka.key-password 2>/dev/null || echo "$KS_PAS
   echo "ssl.keystore.location=/etc/kafka/secrets/kafka.keystore.jks"
   echo "ssl.keystore.password=${KS_PASS}"
   echo "ssl.key.password=${KP_PASS}"
-} > /tmp/och-diagnose.props
-kafka-topics --bootstrap-server 127.0.0.1:9093 --command-config /tmp/och-diagnose.props --list
+} > /tmp/rp-diagnose.props
+kafka-topics --bootstrap-server 127.0.0.1:9093 --command-config /tmp/rp-diagnose.props --list
 ' | head -20
 echo "… (trimmed) — if you see topic names, loopback SSL bootstrap is OK."
 
@@ -54,8 +54,8 @@ KP_PASS=$(cat /etc/kafka/secrets/kafka.key-password 2>/dev/null || echo "$KS_PAS
   echo "ssl.keystore.location=/etc/kafka/secrets/kafka.keystore.jks"
   echo "ssl.keystore.password=${KS_PASS}"
   echo "ssl.key.password=${KP_PASS}"
-} > /tmp/och-diagnose-dns.props
-kafka-topics --bootstrap-server "kafka-0.kafka.${POD_NS}.svc.cluster.local:9093" --command-config /tmp/och-diagnose-dns.props --list
+} > /tmp/rp-diagnose-dns.props
+kafka-topics --bootstrap-server "kafka-0.kafka.${POD_NS}.svc.cluster.local:9093" --command-config /tmp/rp-diagnose-dns.props --list
 ' | head -20
 echo "… (trimmed) — if both B and C list topics, set KAFKA_BOOTSTRAP_SERVER to either for admin tools."
 

@@ -49,7 +49,7 @@ T20.15M 10% design: RECOMMENDED (owner approval required)
 | Pure overlap | **8/16** report-only |
 | Percent restored | **PASS** |
 | Playwright | **PASS** |
-| OCH / contracts | **PASS** |
+| RP / contracts | **PASS** |
 
 ---
 

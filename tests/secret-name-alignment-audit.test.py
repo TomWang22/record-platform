@@ -99,7 +99,7 @@ class SecretAlignmentAuditTests(unittest.TestCase):
                       volumes:
                         - name: tls
                           secret:
-                            secretName: och-kafka-ssl-secret
+                            secretName: rp-kafka-ssl-secret
                 """,
             )
             proc = run_audit(repo)
@@ -152,7 +152,7 @@ class SecretAlignmentAuditTests(unittest.TestCase):
             report.parent.mkdir(parents=True, exist_ok=True)
             report.write_text(
                 "# Secret name alignment audit\n\n"
-                "Referenced secret `och-kafka-ssl-secret` in infra/k8s/demo/deploy.yaml\n",
+                "Referenced secret `rp-kafka-ssl-secret` in infra/k8s/demo/deploy.yaml\n",
                 encoding="utf-8",
             )
             proc = run_audit(repo)

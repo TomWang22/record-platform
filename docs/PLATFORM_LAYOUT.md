@@ -39,7 +39,7 @@ Pods in k8s connect to these via `host.docker.internal` (Postgres, Redis) and th
 
 ### record-platform
 
-- **Services:** api-gateway, auth-service, records-service, listings-service, analytics-service, python-ai-service, social-service, shopping-service, auction-monitor.
+- **Services:** api-gateway, auth-service, records-service, listings-service, analytics-service, python-ai-service, messaging-service, shopping-service, auction-monitor.
 - **Edge / LB:** haproxy, nginx.
 - **Exporters:** nginx-exporter, haproxy-exporter.
 - **External refs:** kafka-external (Service + Endpoints → host Kafka), redis-external (Service + Endpoints; app-config also uses REDIS_URL=host.docker.internal).
@@ -98,7 +98,7 @@ All of the following should be in place so pods start and traffic is secured.
 | **record-local-tls** | ingress-nginx, record-platform | Same script (server cert + key for record.local) |
 | **kafka-ssl-secret** | record-platform | Bring-up step 5b, or create `certs/kafka-ssl/` (keystore/truststore) then `./scripts/ensure-dependencies-ready.sh`; or `pnpm run kafka-ssl`. Must include ca-cert.pem; for broker/client TLS also keystore/truststore + password files. |
 | **Caddy** | ingress-nginx | Uses record-local-tls + dev-root-ca. LoadBalancer deploy has no hostPort. |
-| **Service pods** | record-platform | api-gateway, auth-service, records-service, listings-service, analytics-service, python-ai-service, social-service, shopping-service, auction-monitor: all mount **dev-root-ca** and **kafka-ssl-certs** (from kafka-ssl-secret) for TLS and Kafka SSL. |
+| **Service pods** | record-platform | api-gateway, auth-service, records-service, listings-service, analytics-service, python-ai-service, messaging-service, shopping-service, auction-monitor: all mount **dev-root-ca** and **kafka-ssl-certs** (from kafka-ssl-secret) for TLS and Kafka SSL. |
 | **Envoy** | envoy-test | Mounts **dev-root-ca** (must exist in envoy-test namespace). |
 | **Kafka (external)** | Docker | Strict TLS on 9093; certs from `certs/kafka-ssl` (keystore/truststore). k8s clients use kafka-external Service → host:29093. |
 

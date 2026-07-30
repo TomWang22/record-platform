@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run scripts/sql/real-query-plan-suite/*.sql against the default OCH ports and append to a Markdown report.
+# Run scripts/sql/real-query-plan-suite/*.sql against the default RP ports and append to a Markdown report.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

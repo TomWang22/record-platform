@@ -5,7 +5,7 @@
  * Run with `SSL_CERT_FILE=<repo>/certs/dev-root.pem` (Linux / most Docker images). On macOS, host `k6`
  * may use the system keychain — trust dev-root there, or run k6 on Linux/CI.
  *
- * Runners may pass `-e BASE_URL=https://…` (see run-housing-k6-edge-smoke.sh). If unset, defaults to
+ * Runners may pass `-e BASE_URL=https://…` (see run-platform-k6-edge-smoke.sh). If unset, defaults to
  * https://record.test so `k6 run scripts/load/k6-*.js` works from repo root.
  */
 export function defaultRawBase() {

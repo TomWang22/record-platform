@@ -1,8 +1,8 @@
 /**
- * Preflight-lab k6: one VU loop that **randomly** picks among edge routes for **every** housing service
+ * Preflight-lab k6: one VU loop that **randomly** picks among edge routes for **every** platform-plane
  * (health + key public reads + register/login with unique emails + analytics daily + optional listing-feel).
  *
- * Intended for `make preflight-lab` (PREFLIGHT_LAB=1) via run-housing-k6-edge-smoke.sh — avoids fixed cache keys
+ * Intended for `make preflight-lab` (PREFLIGHT_LAB=1) via run-platform-k6-edge-smoke.sh — avoids fixed cache keys
  * by varying query strings, UUIDs, dates, and JSON bodies every iteration.
  *
  * Env: BASE_URL, SSL_CERT_FILE / K6_TLS_CA_CERT (see k6-strict-edge-tls.js), DURATION, VUS

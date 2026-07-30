@@ -2,10 +2,10 @@
 # Record Platform tarball: cluster health score, DAG validator, cluster-doctor, bootstrap + proof wiring.
 # Same porting rules as other record-platform bundles (record-platform.test / record-platform).
 #
-# Output: $HOME/record-platform-och-cluster-verifier-bundle-<stamp>.tar.gz
+# Output: $HOME/record-platform-rp-cluster-verifier-bundle-<stamp>.tar.gz
 #   CLUSTER_VERIFIER_BUNDLE_DIR=/path  — output directory (default: $HOME)
 #   CLUSTER_VERIFIER_BUNDLE_KEEP_ALL=1 — do not remove prior same-prefix *.tar.gz in out dir
-#   CLUSTER_VERIFIER_BUNDLE_FILE_PREFIX=name — tarball prefix (default: record-platform-och-cluster-verifier-bundle)
+#   CLUSTER_VERIFIER_BUNDLE_FILE_PREFIX=name — tarball prefix (default: record-platform-rp-cluster-verifier-bundle)
 #
 # Usage: bash scripts/package-record-platform-cluster-verifier-bundle.sh
 set -euo pipefail
@@ -14,7 +14,7 @@ OUT_DIR="${CLUSTER_VERIFIER_BUNDLE_DIR:-$HOME}"
 [[ -d "$OUT_DIR" ]] || { echo "OUT_DIR not a directory: $OUT_DIR" >&2; exit 1; }
 STAMP="$(date +%Y%m%d-%H%M%S)"
 STAGE="$(mktemp -d)"
-TOP="record-platform-och-cluster-verifier-bundle"
+TOP="record-platform-rp-cluster-verifier-bundle"
 BUNDLE_FILE_PREFIX="${CLUSTER_VERIFIER_BUNDLE_FILE_PREFIX:-$TOP}"
 BUNDLE="$STAGE/$TOP"
 mkdir -p "$BUNDLE"
@@ -58,7 +58,7 @@ _record_platform_rewrites() {
     -name '*.sh' -o -name '*.py' -o -name '*.json' -o -name 'Makefile' -o -name '*.txt' -o -name '*.md' \
     -o -name '*.mjs' -o -name '*.yaml' -o -name '*.yml' \
   \) -print0 | while IFS= read -r -d '' f; do
-    perl -pi -e 's/off-campus-housing\.test/record-platform.test/g' "$f"
+    perl -pi -e 's/record-platform\.test/record-platform.test/g' "$f"
     perl -pi -e 's/record-platform/record-platform/g' "$f"
     perl -pi -e 's/record-platform-quic/record-platform-quic/g' "$f"
   done
@@ -69,13 +69,13 @@ for rel in \
   Makefile \
   scripts/package-record-platform-cluster-verifier-bundle.sh \
   scripts/cluster_health_dag.py \
-  scripts/lib/och-cluster-dependency-dag.json \
-  scripts/lib/och-housing-docker-services-default.sh \
+  scripts/lib/rp-cluster-dependency-dag.json \
+  scripts/lib/rp-housing-docker-services-default.sh \
   scripts/lib/kafka-broker-sans.sh \
   scripts/lib/metallb-subnet-guard.sh \
   scripts/lib/bootstrap-phase-rollbacks.sh \
   scripts/lib/bootstrap-phase-timings.sh \
-  scripts/lib/och-kafka-event-topics-from-proto.sh \
+  scripts/lib/rp-kafka-event-topics-from-proto.sh \
   scripts/bootstrap-cluster.sh \
   scripts/colima-factory-reset.sh \
   scripts/dev-kill-all.sh \
@@ -99,7 +99,7 @@ for rel in \
   scripts/strict-tls-bootstrap.sh \
   scripts/ensure-housing-cluster-secrets.sh \
   scripts/deploy-dev.sh \
-  scripts/wait-for-housing-service-endpoints.sh \
+  scripts/wait-for-platform-service-endpoints.sh \
   scripts/verify-deployment-integrity.sh \
   scripts/rollout-caddy.sh \
   scripts/verify-kafka-tls-sans.sh \
@@ -205,7 +205,7 @@ for rel in \
   scripts/bootstrap-trace-guard.sh \
   scripts/build-housing-images-parallel.sh \
   scripts/build-housing-images-k3s.sh \
-  scripts/rebuild-och-images-and-rollout.sh \
+  scripts/rebuild-rp-images-and-rollout.sh \
   scripts/verify-route-exists.sh \
   scripts/verify-image-digest.sh \
   scripts/bootstrap-trace-guarantee.sh \
@@ -291,7 +291,7 @@ Contents:
   scripts/k8s-ollama-generate-smoke.sh, scripts/ollama-local-diag.sh — bounded in-cluster generate probe + local 11434 listener diagnostics
   scripts/load/k6-trust-public.js, scripts/load/k6-trust-concurrency.js — public trust reputation k6 (RFC-valid sample UUID)
   scripts/load/k6-strict-edge-tls.js, scripts/load/services/trust.js, scripts/perf/service-envelope-manifest.tsv, scripts/load/k6-analytics-public.js — k6 edge / service-envelope helpers
-  scripts/wait-for-housing-service-endpoints.sh, scripts/verify-deployment-integrity.sh — rollout wait + integrity gate (Ollama-aware)
+  scripts/wait-for-platform-service-endpoints.sh, scripts/verify-deployment-integrity.sh — rollout wait + integrity gate (Ollama-aware)
   services/api-gateway/src/server.ts, infra/k8s/base/api-gateway/deploy.yaml, infra/k8s/caddy-h3-configmap.yaml — gateway + edge timeouts
   services/common/src/redis.ts, services/common/src/redis-lua.ts — Redis client defaults (listing-feel / locks)
   services/analytics-service/src/http-server.ts — listing-feel HTTP route
@@ -305,9 +305,9 @@ Contents:
   scripts/bootstrap-drift-detector.sh — drift-report + bootstrap_drift.prom + dependency_impact from the graph
   scripts/ci/verify-bootstrap-state-ci.sh — GitHub Actions workspace+crypto gate
   scripts/cluster_health_dag.py — bootstrap P9, doctor, drift; state_contract in bootstrap-artifact.json; DAG formal block
-  scripts/lib/och-cluster-dependency-dag.json — service DAG
+  scripts/lib/rp-cluster-dependency-dag.json — service DAG
   scripts/lib/ensure-colima-docker-context.sh, scripts/lib/colima-kubeconfig.sh — Compose/Docker alignment for bring-up-external-infra
-  scripts/lib/och-kafka-event-topics-from-proto.sh — topic list for create + verify-partitions
+  scripts/lib/rp-kafka-event-topics-from-proto.sh — topic list for create + verify-partitions
   scripts/bootstrap-cluster.sh — Colima auto-heal, BOOTSTRAP_RESUME, rollback + --fail on colima / verify-app-runtime hard errors; P2b…P9 as before
   scripts/inspect-external-db-schemas.sh, scripts/backup-all-8-dbs.sh, scripts/restore-external-postgres-from-backup.sh — cold-bootstrap DB path
   scripts/install-metallb-colima.sh, wait-for-metallb-lb-ready.sh, colima-api-health.sh, apply-kafka-kraft-staged.sh, create-kafka-event-topics-k8s.sh, verify-kafka-event-topic-partitions.sh, verify-cluster-kafka-three-brokers.sh, kafka-refresh-tls-from-lb.sh, … — MetalLB + KRaft + topics path
@@ -329,7 +329,7 @@ Record Platform rewrites applied in this tarball:
 
 Extract:
   tar -xzf ${BUNDLE_FILE_PREFIX}-${STAMP}.tar.gz -C /path/to/patch-root
-  (merge paths into a full OCH checkout or use as a porting reference)
+  (merge paths into a full RP checkout or use as a porting reference)
 EOF
 
 _record_platform_rewrites "$BUNDLE"

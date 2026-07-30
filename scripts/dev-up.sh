@@ -5,7 +5,7 @@ set -euo pipefail
 KIND_CLUSTER="${KIND_CLUSTER:-h3}"
 OVERLAY_DIR="infra/k8s/overlays/dev"
 NS="record-platform"
-SERVICES=(api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service)
+SERVICES=(api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service shopping-service)
 # ----------------------------
 
 log()  { printf "\n\033[1;36m▶ %s\033[0m\n" "$*"; }
@@ -114,7 +114,7 @@ fi
 
 # 9) restart DB-using services to pick up migrations/env
 log "Restarting DB-using services…"
-kubectl -n "$NS" rollout restart deploy/auth-service deploy/records-service deploy/listings-service deploy/social-service deploy/shopping-service || true
+kubectl -n "$NS" rollout restart deploy/auth-service deploy/records-service deploy/listings-service deploy/messaging-service deploy/shopping-service || true
 
 # 10) wait for all core services
 log "Waiting for deployments to roll out…"

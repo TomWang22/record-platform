@@ -121,7 +121,7 @@ fi
 if [[ -f "$SCRIPT_DIR/lib/metallb-subnet-guard.sh" ]]; then
   # shellcheck source=scripts/lib/metallb-subnet-guard.sh
   source "$SCRIPT_DIR/lib/metallb-subnet-guard.sh"
-  if ! och_assert_metallb_pool_coherent "$METALLB_POOL"; then
+  if ! rp_assert_metallb_pool_coherent "$METALLB_POOL"; then
     echo "  Fix: align METALLB_POOL with VM eth0 (see: colima ssh -- ip -4 addr show eth0) or SKIP_METALLB_SUBNET_GUARD=1 for emergency only."
     exit 1
   fi

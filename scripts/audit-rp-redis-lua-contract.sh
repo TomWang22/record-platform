@@ -82,16 +82,16 @@ audit_svc() {
   if grep -rqE 'EVALSHA|scriptLoad' "$dir" --include='*.ts' --include='*.js' 2>/dev/null; then
     eval=$(grep -rE 'EVALSHA|scriptLoad' "$dir" --include='*.ts' --include='*.js' 2>/dev/null | wc -l | awk '{print $1}')
   fi
-  if grep -rqE "['\"]och:|['\"]housing:" "$dir" --include='*.ts' --include='*.js' 2>/dev/null; then
-    och=$(grep -rE "['\"]och:|['\"]housing:" "$dir" --include='*.ts' --include='*.js' 2>/dev/null | wc -l | awk '{print $1}')
+  if grep -rqE "['\"]rp:|['\"]housing:" "$dir" --include='*.ts' --include='*.js' 2>/dev/null; then
+    och=$(grep -rE "['\"]rp:|['\"]housing:" "$dir" --include='*.ts' --include='*.js' 2>/dev/null | wc -l | awk '{print $1}')
   fi
   if [[ "$och" -gt 0 ]]; then
-    issues="${issues}och-key-prefix,"
+    issues="${issues}rp-key-prefix,"
     critical=$((critical + 1))
   fi
 
-  printf '{"service":"%s","uses_redis":"%s","redis_env":"%s","keys_hits":%s,"flush_hits":%s,"lua_hits":%s,"och_prefix_hits":%s,"issues":"%s"},' \
-    "$svc" "$uses" "$re" "${keys:-0}" "${flush:-0}" "${eval:-0}" "${och:-0}" "${issues%,}" >>"$tmp"
+  printf '{"service":"%s","uses_redis":"%s","redis_env":"%s","keys_hits":%s,"flush_hits":%s,"lua_hits":%s,"rp_prefix_hits":%s,"issues":"%s"},' \
+    "$svc" "$uses" "$re" "${keys:-0}" "${flush:-0}" "${eval:-0}" "${rp:-0}" "${issues%,}" >>"$tmp"
 }
 
 {
@@ -99,7 +99,7 @@ audit_svc() {
   echo ""
   echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo ""
-  echo "| Service | Redis | REDIS env | KEYS | FLUSH | Lua | OCH prefix | Issues |"
+  echo "| Service | Redis | REDIS env | KEYS | FLUSH | Lua | RP prefix | Issues |"
   echo "|---------|-------|-----------|------|-------|-----|------------|--------|"
 } >"$REPORT"
 
@@ -116,7 +116,7 @@ import json, pathlib
 p = pathlib.Path("bench_logs/redis-lua-contract/results.json")
 rows = json.loads(p.read_text())
 for r in rows:
-    print(f"| {r['service']} | {r['uses_redis']} | {r['redis_env']} | {r['keys_hits']} | {r['flush_hits']} | {r['lua_hits']} | {r['och_prefix_hits']} | {r['issues'] or '—'} |")
+    print(f"| {r['service']} | {r['uses_redis']} | {r['redis_env']} | {r['keys_hits']} | {r['flush_hits']} | {r['lua_hits']} | {r['rp_prefix_hits']} | {r['issues'] or '—'} |")
 PY
 
 echo "" >>"$REPORT"

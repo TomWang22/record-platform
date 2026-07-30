@@ -40,11 +40,11 @@ else
 fi
 
 say "=== Tier 4: Functional (social / microservices) ==="
-if [[ -f "$SCRIPT_DIR/test-social-service-comprehensive.sh" ]]; then
-  "$SCRIPT_DIR/test-social-service-comprehensive.sh" || exit 1
+if [[ -f "$SCRIPT_DIR/test-messaging-service-comprehensive.sh" ]]; then
+  "$SCRIPT_DIR/test-messaging-service-comprehensive.sh" || exit 1
   ok "Tier 4 passed"
 else
-  warn "test-social-service-comprehensive.sh not found; skipping Tier 4"
+  warn "test-messaging-service-comprehensive.sh not found; skipping Tier 4"
 fi
 
 if [[ "${RUN_LOAD}" == "1" ]]; then

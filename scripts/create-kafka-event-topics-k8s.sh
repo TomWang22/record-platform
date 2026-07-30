@@ -10,7 +10,7 @@
 #   KAFKA_K8S_NS=record-platform
 #   KAFKA_K8S_POD=kafka-0
 #   KAFKA_K8S_REPLICATION_FACTOR=3
-#   ENV_PREFIX, PARTITIONS, OCH_KAFKA_TOPIC_SUFFIX — same as create-kafka-event-topics.sh
+#   ENV_PREFIX, PARTITIONS, RP_KAFKA_TOPIC_SUFFIX — same as create-kafka-event-topics.sh
 #   KAFKA_K8S_SKIP_API_HEALTH=1 — do not run rp-kube-api-health.sh first
 #   REPO_ROOT
 set -euo pipefail
@@ -40,14 +40,14 @@ command -v kubectl >/dev/null 2>&1 || die "kubectl required"
 
 kubectl get pod "$KPOD" -n "$NS" --request-timeout=30s >/dev/null 2>&1 || die "Pod $KPOD not found in $NS"
 
-och_topic_suffix() {
-  local raw="${OCH_KAFKA_TOPIC_SUFFIX:-}"
+rp_topic_suffix() {
+  local raw="${RP_KAFKA_TOPIC_SUFFIX:-}"
   raw="${raw#"${raw%%[![:space:]]*}"}"
   raw="${raw%"${raw##*[![:space:]]}"}"
   while [[ "$raw" == .* ]]; do raw="${raw#.}"; done
   if [[ -n "$raw" ]]; then printf '.%s' "$raw"; fi
 }
-SUF="$(och_topic_suffix)"
+SUF="$(rp_topic_suffix)"
 
 # shellcheck source=lib/rp-kafka-event-topics-from-proto.sh
 source "$SCRIPT_DIR/lib/rp-kafka-event-topics-from-proto.sh"

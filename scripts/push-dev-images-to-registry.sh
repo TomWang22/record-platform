@@ -15,7 +15,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 REG="${K3D_REGISTRY:-k3d-record-platform-registry:5000}"
-SERVICES=( api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service auction-monitor )
+SERVICES=( api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service shopping-service auction-monitor )
 
 ok()  { echo "✅ $*"; }
 warn(){ echo "⚠️  $*"; }

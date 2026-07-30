@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regression: Kafka TLS material must match RP 3-stage PKI (no separate CA, no och.dev drift).
+# Regression: Kafka TLS material must match RP 3-stage PKI (no separate CA, no rp.dev drift).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -78,8 +78,8 @@ KAFKA_KEYSTORE_PATH="$KAFKA_SSL/kafka.keystore.jks" \
   bash "$SCRIPT_DIR/verify-kafka-broker-keystore-jks.sh" || FAIL=1
 
 if command -v kubectl >/dev/null 2>&1 && kubectl get secret kafka-ssl-secret -n "$NS" &>/dev/null; then
-  _och_ann="$(kubectl get secret kafka-ssl-secret -n "$NS" -o jsonpath='{.metadata.annotations.och\.dev/ca-fingerprint-sha256}' 2>/dev/null || true)"
-  [[ -z "$_och_ann" ]] || die "kafka-ssl-secret still has och.dev/ca-fingerprint-sha256 annotation"
+  _rp_ann="$(kubectl get secret kafka-ssl-secret -n "$NS" -o jsonpath='{.metadata.annotations.och\.dev/ca-fingerprint-sha256}' 2>/dev/null || true)"
+  [[ -z "$_rp_ann" ]] || die "kafka-ssl-secret still has rp.dev/ca-fingerprint-sha256 annotation"
   if [[ "${RP_VERIFY_KAFKA_SKIP_SECRET_ANNOTATION:-0}" != "1" ]]; then
     if rp_kafka_ssl_verify_triple_match "$NS" "$KAFKA_SSL/ca-cert.pem"; then
       ok "kafka-ssl-secret: disk ca-cert.pem == secret data == rp.dev annotation"
@@ -89,8 +89,8 @@ if command -v kubectl >/dev/null 2>&1 && kubectl get secret kafka-ssl-secret -n 
   else
     ok "kafka-ssl-secret cluster check skipped (B.crypto disk-only; annotation applied in F.kafka_alignment)"
   fi
-  if kubectl get secret och-kafka-ssl-secret -n "$NS" &>/dev/null 2>&1; then
-    die "och-kafka-ssl-secret must not exist in namespace $NS"
+  if kubectl get secret rp-kafka-ssl-secret -n "$NS" &>/dev/null 2>&1; then
+    die "rp-kafka-ssl-secret must not exist in namespace $NS"
   fi
 elif [[ "${RP_VERIFY_KAFKA_SKIP_SECRET_ANNOTATION:-0}" != "1" ]]; then
   echo "ℹ️  kafka-ssl-secret not in cluster yet (expected before F.kafka_alignment / apply-rp-kafka-ssl-secret.sh)"
@@ -98,12 +98,12 @@ fi
 
 bash "$SCRIPT_DIR/rp-audit-kafka-ssl-secret-writers.sh" || FAIL=1
 
-_hits="$(grep -rl 'och-kafka-ssl-secret' "$REPO_ROOT/scripts" "$REPO_ROOT/infra" 2>/dev/null \
+_hits="$(grep -rl 'rp-kafka-ssl-secret' "$REPO_ROOT/scripts" "$REPO_ROOT/infra" 2>/dev/null \
   | grep -vE 'rp-verify-kafka-cert-chain|rp-verify-kustomize-app-services|print-rp-cert-proof|verify-bootstrap-state|cluster_health|package-|toolkit-reference|dev-onboard|apply-och|rollout-restart-och|check-rp-hybrid-cold-bootstrap-toolkit|README\.md' || true)"
 if [[ -n "$_hits" ]]; then
-  die "och-kafka-ssl-secret still referenced in active paths: $_hits"
+  die "rp-kafka-ssl-secret still referenced in active paths: $_hits"
 else
-  ok "no och-kafka-ssl-secret in active bootstrap scripts/manifests"
+  ok "no rp-kafka-ssl-secret in active bootstrap scripts/manifests"
 fi
 
 if [[ "$FAIL" -ne 0 ]]; then

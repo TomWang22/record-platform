@@ -34,7 +34,7 @@ mkcert -cert-file "$CERT_DIR/tls.crt" -key-file "$CERT_DIR/tls.key" \
   "*.record-platform.svc.cluster.local" \
   "auth-service.record-platform.svc.cluster.local" \
   "records-service.record-platform.svc.cluster.local" \
-  "social-service.record-platform.svc.cluster.local" \
+  "messaging-service.record-platform.svc.cluster.local" \
   "shopping-service.record-platform.svc.cluster.local" \
   "listings-service.record-platform.svc.cluster.local" \
   "analytics-service.record-platform.svc.cluster.local" \
@@ -78,7 +78,7 @@ ROTATION_START=$(date +%s)
 
 (
   # CRITICAL: Update CA certificate in record-platform namespace for services with strict TLS
-  # Services like social-service, auth-service, etc. need this CA to verify TLS certificates
+  # Services like messaging-service, auth-service, etc. need this CA to verify TLS certificates
   # when making outbound requests (e.g., to Caddy, other services via HTTPS)
   kubectl -n record-platform create secret generic dev-root-ca \
     --from-file=dev-root.pem="$CA_PATH" \

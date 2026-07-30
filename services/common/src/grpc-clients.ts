@@ -64,7 +64,7 @@ const recordsPackageDefinition = protoLoader.loadSync(RECORDS_PROTO_PATH, {
 });
 const recordsProto = grpc.loadPackageDefinition(recordsPackageDefinition) as any;
 
-// Load messaging proto (forum + DMs; replaces legacy social-service)
+// Load messaging proto (forum + DMs; replaces legacy messaging-service)
 const MESSAGING_PROTO_PATH = resolveProtoPath("messaging.proto");
 const messagingPackageDefinition = protoLoader.loadSync(MESSAGING_PROTO_PATH, {
   keepCase: true,

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Hit core /metrics endpoints so Grafana panels that use http_requests_total, process_*, etc. have fresh samples.
-# Run from a host that resolves OCH edge (default https://record-platform.test) or set METRICS_BASE_URLS (space-separated).
+# Run from a host that resolves RP edge (default https://record-platform.test) or set METRICS_BASE_URLS (space-separated).
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -8,7 +8,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 if [[ -n "${METRICS_BASE_URLS:-}" ]]; then
   read -r -a URLS <<<"${METRICS_BASE_URLS}"
 else
-  EDGE="${OCH_EDGE_BASE_URL:-https://record-platform.test}"
+  EDGE="${RP_EDGE_BASE_URL:-https://record-platform.test}"
   URLS=(
     "${EDGE}/api/healthz"
     "${EDGE}/metrics"
@@ -16,7 +16,7 @@ else
 fi
 
 curl_common=(curl -fsS --connect-timeout 5 --max-time 15)
-if [[ "${OCH_INSECURE_TLS:-}" == "1" ]]; then
+if [[ "${RP_INSECURE_TLS:-}" == "1" ]]; then
   curl_common+=(--insecure)
 fi
 

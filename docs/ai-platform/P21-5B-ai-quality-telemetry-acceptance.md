@@ -14,7 +14,7 @@
 | Record intel | `./scripts/webapp-playwright-strict-edge.sh e2e/ai-rag-record-intelligence.spec.ts --grep "AI record intelligence UI acceptance"` | **PASS** (7/7, avg 3.86, 1.1m) |
 | Longform gauntlet | `./scripts/webapp-playwright-strict-edge.sh e2e/ai-rag-longform-record-session.spec.ts --grep "AI longform record collector RAG session"` | **PASS** (12/12, avg 3.67, final 4.0, 1.9m) |
 | Telemetry reporter | `node scripts/ai-quality-telemetry-report.mjs` | **PASS** (report written) |
-| OCH decontaminate | `bash scripts/rp-och-decontaminate-scan.sh` | **PASS** |
+| RP decontaminate | `bash scripts/rp-rp-decontaminate-scan.sh` | **PASS** |
 
 Seller panel stamp after UI run: `node scripts/ai-quality-telemetry-report.mjs --stamp seller-intelligence:4`
 
@@ -77,7 +77,7 @@ WARNs are **non-blocking** per P21.5A design (telemetry visibility, not CI gate)
 
 - All artifact rows: `leakage_result: PASS`
 - `forbidden_hit_count: 0`
-- OCH decontaminate scan: **PASS**
+- RP decontaminate scan: **PASS**
 - No message bodies in reports or UI artifacts
 
 ---

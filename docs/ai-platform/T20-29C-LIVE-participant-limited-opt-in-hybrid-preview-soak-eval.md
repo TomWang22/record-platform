@@ -33,7 +33,7 @@ Enrollment: API bulk per window (UI enroll/revoke verified in Playwright). Rate-
 | Canary errors | **0** | 0 **PASS** |
 | Telemetry WARNs | **0** | 0 **PASS** |
 | Leakage | **PASS** | **PASS** |
-| OCH | **PASS** | **PASS** |
+| RP | **PASS** | **PASS** |
 | Playwright | **PASS** | **PASS** |
 | PERCENT | **0** | **PASS** |
 | Guest hidden / no message bodies | **PASS** | **PASS** |

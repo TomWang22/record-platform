@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 0: forbid host drift (record.test, OCH) in active RP frontend/backend runtime paths.
+# Phase 0: forbid host drift (record.test, RP) in active RP frontend/backend runtime paths.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -21,7 +21,7 @@ ok() {
 }
 
 FORBIDDEN_HOST_RE='record\.test'
-FORBIDDEN_OCH_RE='(off-campus-housing|/och/|\boch\b|housing)'
+FORBIDDEN_RP_RE='(record-platform|/och/|\boch\b|housing)'
 
 # Active runtime paths (exclude toolkit-reference, docs bundles, test-results)
 SCAN_PATHS=(
@@ -86,15 +86,15 @@ else
 fi
 
 echo ""
-echo "--- Forbidden OCH strings (webapp + services + infra/k8s) ---"
-if _grep_scan -i "$FORBIDDEN_OCH_RE" webapp services infra/k8s \
+echo "--- Forbidden RP strings (webapp + services + infra/k8s) ---"
+if _grep_scan -i "$FORBIDDEN_RP_RE" webapp services infra/k8s \
   --glob '!**/toolkit-reference/**' \
   --glob '!**/*.md' \
   --glob '!**/node_modules/**' \
   2>/dev/null | head -30; then
-  fail "Found OCH/housing contamination in active paths"
+  fail "Found RP/housing contamination in active paths"
 else
-  ok "No OCH/housing strings in active webapp/services/k8s"
+  ok "No RP/housing strings in active webapp/services/k8s"
 fi
 
 echo ""

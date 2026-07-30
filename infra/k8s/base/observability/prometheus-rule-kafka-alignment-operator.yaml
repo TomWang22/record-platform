@@ -8,7 +8,7 @@ metadata:
   namespace: observability
   labels:
     app: prometheus
-    och.dev/role: kafka-alignment
+    rp.dev/role: kafka-alignment
 spec:
   groups:
     - name: kafka-alignment.rules

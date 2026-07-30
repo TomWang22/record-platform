@@ -81,7 +81,7 @@ Script: `scripts/smoke-ai-rag-real-inference-response-readonly.sh`
 ### 4. Production-readiness evidence
 
 - Telemetry WARNs
-- OCH
+- RP
 - Playwright C-suite
 - Rollback proof
 - Post-revoke proof
@@ -97,7 +97,7 @@ Separate from matrix totals and from H1/H2/H3 smoke counts:
 - Retrieval latency baselines (`rag_total_ms`, hybrid latency when exposed)
 - Ingestion pipeline success rates (defined; instrumentation gaps documented)
 - Data-to-searchable lifecycle timing (defined; no invented data)
-- Operational health gates (uptime, error rates, fallback, telemetry, OCH)
+- Operational health gates (uptime, error rates, fallback, telemetry, RP)
 
 See: `docs/ai-platform/PHASE_22_KPI_OBSERVABILITY_READINESS.md`  
 Summarizer: `scripts/summarize-phase22-ai-kpis-readonly.mjs`

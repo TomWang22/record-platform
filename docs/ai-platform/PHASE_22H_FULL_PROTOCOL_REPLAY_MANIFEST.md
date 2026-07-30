@@ -221,7 +221,7 @@ Deterministic probe order (preview batches): `for window → for user (USERS lis
 | Retrieval latency by protocol/workflow | Phase 22C captured H1/H2/H3 sample; full 57105 replay not run |
 | Ingestion pipeline KPI | **Gap** — see `PHASE_22_KPI_OBSERVABILITY_READINESS.md` |
 | Data-to-searchable KPI | **Gap** — no `searchable_verified_at` / `arrival_to_searchable_ms` in standard path |
-| Operational health / error rate / uptime | OCH PASS at Phase 21 closeout; no continuous export for replay |
+| Operational health / error rate / uptime | RP PASS at Phase 21 closeout; no continuous export for replay |
 
 ---
 

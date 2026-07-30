@@ -17,11 +17,11 @@ export function smtpLooksLikeTestSink(): boolean {
   return smtpPort === 1025 || smtpHost.includes("mailpit") || smtpHost.includes("mailhog");
 }
 
-/** Primary: EMAIL_DELIVERY_MODE; legacy: OCH_SMTP_DELIVERY_MODE, SMTP_DELIVERY_MODE */
+/** Primary: EMAIL_DELIVERY_MODE; legacy: RP_SMTP_DELIVERY_MODE, SMTP_DELIVERY_MODE */
 export function getEmailDeliveryMode(): EmailDeliveryMode {
   const raw = (
     process.env.EMAIL_DELIVERY_MODE ||
-    process.env.OCH_SMTP_DELIVERY_MODE ||
+    process.env.RP_SMTP_DELIVERY_MODE ||
     process.env.SMTP_DELIVERY_MODE ||
     ""
   )

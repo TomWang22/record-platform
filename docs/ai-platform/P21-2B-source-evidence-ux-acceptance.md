@@ -98,7 +98,7 @@ Playwright + page body scan for:
 | Script | Result |
 | ------ | ------ |
 | Playwright seller intelligence UI | 1 passed |
-| `rp-och-decontaminate-scan.sh` | PASS (590 scanned) |
+| `rp-rp-decontaminate-scan.sh` | PASS (590 scanned) |
 | pytest `test_seller_listing_advice_live` | PASS (`details.excerpts` present) |
 
 ---

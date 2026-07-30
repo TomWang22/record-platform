@@ -45,7 +45,7 @@
 | Canary errors | **0** | 0 **PASS** |
 | Telemetry WARNs | **0** | 0 **PASS** |
 | Leakage | **PASS** | **PASS** |
-| OCH | **PASS** (`__SCANNED__=590`) | **PASS** |
+| RP | **PASS** (`__SCANNED__=590`) | **PASS** |
 | Playwright | seller + record + longform **PASS** | **PASS** |
 | PERCENT | **0** | **PASS** |
 

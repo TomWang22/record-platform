@@ -26,7 +26,7 @@ if [[ "${DEV_ONBOARD_STRICT:-1}" == "1" ]]; then
   export HOSTS_AUTO=1
   export METALLB_FIX_LENIENT=0
   export VERIFY_KAFKA_CHECK_CLIENT_DEPLOY_MOUNTS=1
-  export OCH_ROLLOUT_STATUS_TIMEOUT="${OCH_ROLLOUT_STATUS_TIMEOUT:-300}"
+  export RP_ROLLOUT_STATUS_TIMEOUT="${RP_ROLLOUT_STATUS_TIMEOUT:-300}"
 else
   export VERIFY_KAFKA_SKIP_META_IDENTITY="${VERIFY_KAFKA_SKIP_META_IDENTITY:-0}"
   export VERIFY_KAFKA_HEALTH_ONLY="${VERIFY_KAFKA_HEALTH_ONLY:-0}"
@@ -35,13 +35,13 @@ else
   export METALLB_FIX_LENIENT="${METALLB_FIX_LENIENT:-1}"
 fi
 
-_verify_och_kafka_pem_secret() {
+_verify_rp_kafka_pem_secret() {
   local ns="$1"
   python3 -c "
 import json, subprocess, sys
 ns = sys.argv[1]
 r = subprocess.run(
-    ['kubectl', '-n', ns, 'get', 'secret', 'och-kafka-ssl-secret', '-o', 'json', '--request-timeout=25s'],
+    ['kubectl', '-n', ns, 'get', 'secret', 'rp-kafka-ssl-secret', '-o', 'json', '--request-timeout=25s'],
     capture_output=True,
     text=True,
 )
@@ -51,7 +51,7 @@ data = json.loads(r.stdout).get('data') or {}
 for k in ('ca-cert.pem', 'client.crt', 'client.key'):
     if k not in data or not (data[k] or '').strip():
         sys.exit(1)
-print('  ✅ och-kafka-ssl-secret verified (ca-cert.pem, client.crt, client.key)')
+print('  ✅ rp-kafka-ssl-secret verified (ca-cert.pem, client.crt, client.key)')
 " "$ns"
 }
 
@@ -67,11 +67,11 @@ make kafka-onboarding-reset
 echo "▶ Phase 3: Kafka Services + atomic TLS refresh"
 make apply-kafka-kraft
 
-echo "▶ Phase 3.5: Housing secrets — sync och-kafka-ssl-secret + verify keys"
+echo "▶ Phase 3.5: Housing secrets — sync rp-kafka-ssl-secret + verify keys"
 chmod +x "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
 _NS="${HOUSING_NS:-record-platform}"
 HOUSING_NS="$_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
-if ! _verify_och_kafka_pem_secret "$_NS"; then
+if ! _verify_rp_kafka_pem_secret "$_NS"; then
   echo "▶ Phase 3.5 remediate: kafka-ssl-from-dev-root.sh + re-sync"
   chmod +x "$SCRIPT_DIR/kafka-ssl-from-dev-root.sh"
   KAFKA_SSL_NS="$_NS" bash "$SCRIPT_DIR/kafka-ssl-from-dev-root.sh"
@@ -81,8 +81,8 @@ if ! _verify_och_kafka_pem_secret "$_NS"; then
     kubectl rollout status statefulset/kafka -n "$_NS" --timeout=480s
   fi
   HOUSING_NS="$_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
-  if ! _verify_och_kafka_pem_secret "$_NS"; then
-    echo "❌ och-kafka-ssl-secret still incomplete — check context, namespace $_NS, certs/dev-root.{pem,key}" >&2
+  if ! _verify_rp_kafka_pem_secret "$_NS"; then
+    echo "❌ rp-kafka-ssl-secret still incomplete — check context, namespace $_NS, certs/dev-root.{pem,key}" >&2
     exit 1
   fi
 fi
@@ -123,7 +123,7 @@ else
   echo "  (skipped SKIP_OBSERVABILITY_WAIT=1)"
 fi
 
-echo "▶ Phase 6b: Verify app Deployments mount och-kafka-ssl-secret (optional)"
+echo "▶ Phase 6b: Verify app Deployments mount rp-kafka-ssl-secret (optional)"
 if [[ "${VERIFY_KAFKA_CHECK_CLIENT_DEPLOY_MOUNTS:-0}" == "1" ]]; then
   VERIFY_KAFKA_CLIENT_MOUNTS_ONLY=1 bash "$SCRIPT_DIR/verify-kafka-cluster.sh"
 fi

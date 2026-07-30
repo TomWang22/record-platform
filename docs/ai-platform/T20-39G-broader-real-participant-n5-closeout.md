@@ -13,7 +13,7 @@ T20.39: CLOSED PASS
 N=5 artifact: PASS
 T20.39C-LIVE: 4320/4320 HTTP 200, 0% fallback
 Rollback: PASS
-Telemetry/OCH/Playwright: PASS
+Telemetry/RP/Playwright: PASS
 Decision: C KEEP selected, D recommended, E rejected
 ```
 
@@ -89,13 +89,13 @@ No `@record-platform.local`, `t20-*`, `e2e-*`, contract, auth-test, k6/load, ben
 
 ---
 
-## 6. Telemetry/OCH/Playwright
+## 6. Telemetry/RP/Playwright
 
 | Gate | Result |
 |------|--------|
 | Preview UI smoke | **4/4 PASS** |
 | Full C-suite | **7/7 PASS** |
-| OCH | **PASS** (`__SCANNED__=589`) |
+| RP | **PASS** (`__SCANNED__=589`) |
 | Telemetry WARNs | **0** |
 | Record score | **3.86** |
 | Longform score | **3.67** |

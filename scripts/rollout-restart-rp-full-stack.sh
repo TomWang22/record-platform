@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Full-stack ordered rollout: refresh housing Secrets (Kafka client PEM alias, service-tls mirrors),
-# then restart every OCH app Deployment and caddy-h3 so pods remount Secrets.
+# then restart every RP app Deployment and caddy-h3 so pods remount Secrets.
 #
 # Use when:
 #   - Kafka TLS was fixed (kafka-ssl-from-dev-root.sh) but pods still see empty /etc/kafka/secrets

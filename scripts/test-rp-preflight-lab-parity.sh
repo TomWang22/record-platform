@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Static parity: RP make preflight-lab vs OCH toolkit preflight-strict recipe (ordering + env exports).
+# Static parity: RP make preflight-lab vs RP toolkit preflight-strict recipe (ordering + env exports).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -9,7 +9,7 @@ _bump() { echo "❌ $*" >&2; _fail=1; }
 
 MK="$ROOT/Makefile"
 PKG="$ROOT/package.json"
-CB="$ROOT/scripts/run-housing-k6-edge-smoke.sh"
+CB="$ROOT/scripts/run-platform-k6-edge-smoke.sh"
 PF="$ROOT/scripts/run-preflight-scale-and-all-suites.sh"
 VI2="$ROOT/scripts/coverage/run-phase-vi2-matrix-verify.sh"
 
@@ -31,7 +31,7 @@ grep -q 'preflight-lab: preflight-strict' "$MK" || _bump 'preflight-lab must ali
 grep -q 'ensure-node20' "$MK" || _bump 'Makefile missing ensure-node20'
 grep -q 'kafka-alignment-suite' "$PF" || _bump 'run-preflight missing kafka-alignment-suite step'
 grep -q 'PREFLIGHT_LAB' "$PF" || _bump 'run-preflight lab profile must set PREFLIGHT_LAB'
-grep -q 'k6-preflight-lab-randomized-all-endpoints' "$CB" || _bump 'run-housing-k6 missing preflight-lab randomized k6'
+grep -q 'k6-preflight-lab-randomized-all-endpoints' "$CB" || _bump 'run-platform-k6 missing preflight-lab randomized k6'
 grep -q 'transport-quic-v6-v7-prove' "$MK" || _bump 'Makefile must run transport-quic-v6-v7-prove before preflight-and-suites'
 grep -q 'coverage:phase-vi2-verify' "$PKG" || _bump 'package.json missing coverage:phase-vi2-verify'
 grep -q 'coverage:report' "$PKG" || _bump 'package.json missing coverage:report'

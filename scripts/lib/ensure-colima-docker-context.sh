@@ -9,17 +9,17 @@
 #
 # Usage (from repo root or scripts):
 #   source "$SCRIPT_DIR/lib/ensure-colima-docker-context.sh"
-#   export OCH_KUBE_CONTEXT="$(kubectl config current-context 2>/dev/null)"
-#   och_ensure_colima_docker_context || exit 1
+#   export RP_KUBE_CONTEXT="$(kubectl config current-context 2>/dev/null)"
+#   rp_ensure_colima_docker_context || exit 1
 #
 # Env:
-#   OCH_KUBE_CONTEXT — if unset, uses kubectl current-context (if *colima*, enforce socket)
-#   OCH_FORCE_COLIMA_DOCKER — 1: apply Colima docker context even if kube context name lacks "colima"
-#   OCH_COLIMA_FIX_DOCKER_CONTEXT — 0: do not rewrite the colima context's docker endpoint (default 1 when we recover via a socket)
+#   RP_KUBE_CONTEXT — if unset, uses kubectl current-context (if *colima*, enforce socket)
+#   RP_FORCE_COLIMA_DOCKER — 1: apply Colima docker context even if kube context name lacks "colima"
+#   RP_COLIMA_FIX_DOCKER_CONTEXT — 0: do not rewrite the colima context's docker endpoint (default 1 when we recover via a socket)
 
-och_ensure_colima_docker_context() {
-  local kube_ctx="${OCH_KUBE_CONTEXT:-$(kubectl config current-context 2>/dev/null || true)}"
-  if [[ "${OCH_FORCE_COLIMA_DOCKER:-0}" != "1" ]] && [[ "$kube_ctx" != *colima* ]]; then
+rp_ensure_colima_docker_context() {
+  local kube_ctx="${RP_KUBE_CONTEXT:-$(kubectl config current-context 2>/dev/null || true)}"
+  if [[ "${RP_FORCE_COLIMA_DOCKER:-0}" != "1" ]] && [[ "$kube_ctx" != *colima* ]]; then
     return 0
   fi
   if ! command -v docker >/dev/null 2>&1; then
@@ -67,7 +67,7 @@ och_ensure_colima_docker_context() {
   export DOCKER_HOST="unix://${sock}"
   fixed_sock="$sock"
 
-  if [[ "${OCH_COLIMA_FIX_DOCKER_CONTEXT:-1}" == "1" ]] && docker context update colima --docker "host=unix://${fixed_sock}" >/dev/null 2>&1; then
+  if [[ "${RP_COLIMA_FIX_DOCKER_CONTEXT:-1}" == "1" ]] && docker context update colima --docker "host=unix://${fixed_sock}" >/dev/null 2>&1; then
     :
   fi
 
@@ -81,6 +81,6 @@ och_ensure_colima_docker_context() {
 # Allow: bash scripts/lib/ensure-colima-docker-context.sh (print status; always try Colima alignment)
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   set -euo pipefail
-  OCH_FORCE_COLIMA_DOCKER=1 OCH_KUBE_CONTEXT=colima och_ensure_colima_docker_context || exit 1
+  RP_FORCE_COLIMA_DOCKER=1 RP_KUBE_CONTEXT=colima rp_ensure_colima_docker_context || exit 1
   echo "✅ Docker OK — context=$(docker context show 2>/dev/null) DOCKER_HOST=${DOCKER_HOST:-<default>}"
 fi

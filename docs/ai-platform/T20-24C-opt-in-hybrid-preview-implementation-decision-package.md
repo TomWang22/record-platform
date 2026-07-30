@@ -34,7 +34,7 @@ T20.25A: NOT STARTED
 | T20.22 rollout design | **CLOSED**; rollout **NOT APPROVED** |
 | T20.23 preview design | **CLOSED**; preview implementation **NOT APPROVED** |
 | Telemetry WARNs | **0** |
-| Leakage / OCH | **PASS** |
+| Leakage / RP | **PASS** |
 
 ---
 

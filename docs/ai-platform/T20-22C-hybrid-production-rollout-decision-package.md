@@ -31,7 +31,7 @@ T20.23A: NOT STARTED
 | Anchored overlap | **16/16** |
 | Pure overlap | **8/16** report-only |
 | Telemetry WARNs | **0** |
-| Leakage / OCH | **PASS** |
+| Leakage / RP | **PASS** |
 
 ### Live evidence table
 
@@ -58,7 +58,7 @@ T20.23A: NOT STARTED
 | Contract → hybrid_canary | **PASS** |
 | Cohort → keyword | **PASS** |
 | Preflight scripts | **PASS** |
-| OCH / telemetry | **PASS** |
+| RP / telemetry | **PASS** |
 
 ---
 

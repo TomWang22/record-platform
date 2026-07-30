@@ -182,7 +182,7 @@ function generateUUID() {
 
 export default function () {
   // ============================================
-  // HEALTH CHECKS (HTTP/2/3) - Like social service tests
+  // HEALTH CHECKS (HTTP/2/3) - Like messaging-plane tests
   // ============================================
   
   // Test Python AI service health check (HTTP/2 via gRPC or HTTP/1.1 fallback)

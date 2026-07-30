@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Roll out Envoy (envoy-test gRPC edge + optional ingress-nginx envoy) and OCH app workloads
+# Roll out Envoy (envoy-test gRPC edge + optional ingress-nginx envoy) and RP app workloads
 # after Postgres recycle / pool tuning so pods pick up new Prisma pool sizes and refreshed config.
 #
 # Usage (repo root):
@@ -7,21 +7,21 @@
 #
 # Env:
 #   KUBECTL  — default kubectl
-#   OCH_NS   — default record-platform
+#   RP_NS   — default record-platform
 #   INGRESS_NS — default ingress-nginx
 #   SKIP_ENVOY — 1: skip all Envoy deployment restarts
 set -euo pipefail
 
 KUBECTL="${KUBECTL:-kubectl}"
-OCH_NS="${OCH_NS:-record-platform}"
+RP_NS="${RP_NS:-record-platform}"
 INGRESS_NS="${INGRESS_NS:-ingress-nginx}"
 SKIP_ENVOY="${SKIP_ENVOY:-0}"
 
-OCH_DEPLOYMENTS=(
+RP_DEPLOYMENTS=(
   api-gateway
   auth-service
   listings-service
-  booking-service
+  reservation-mesh
   messaging-service
   trust-service
   analytics-service
@@ -43,10 +43,10 @@ if [[ "$SKIP_ENVOY" != "1" ]]; then
   fi
 fi
 
-echo "Rollout restart: ${OCH_DEPLOYMENTS[*]} -n $OCH_NS"
-"$KUBECTL" rollout restart deployment "${OCH_DEPLOYMENTS[@]}" -n "$OCH_NS"
-for d in "${OCH_DEPLOYMENTS[@]}"; do
-  "$KUBECTL" rollout status "deployment/$d" -n "$OCH_NS" --timeout=300s
+echo "Rollout restart: ${RP_DEPLOYMENTS[*]} -n $RP_NS"
+"$KUBECTL" rollout restart deployment "${RP_DEPLOYMENTS[@]}" -n "$RP_NS"
+for d in "${RP_DEPLOYMENTS[@]}"; do
+  "$KUBECTL" rollout status "deployment/$d" -n "$RP_NS" --timeout=300s
 done
 
 echo "Done."

@@ -13,7 +13,7 @@ SERVICES=(
   listings-service
   analytics-service
   python-ai-service
-  social-service
+  messaging-service
   shopping-service
   auction-monitor
   cron-jobs

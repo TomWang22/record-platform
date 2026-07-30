@@ -73,7 +73,7 @@ function main() {
     }
   }
   const report = {
-    specVersion: "och-trace-temporal-v1",
+    specVersion: "rp-trace-temporal-v1",
     tracePath,
     ok: violations.length === 0,
     violations,

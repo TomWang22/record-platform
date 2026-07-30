@@ -42,17 +42,17 @@ for f in \
   auction-monitor.proto python-ai.proto; do
   _sync "$f" || FAIL=1
 done
-if [[ "${RP_SKIP_SOCIAL_SERVICE}" != "1" ]] && [[ -f "$SRC/social.proto" ]]; then
+if [[ "${RP_SKIP_MESSAGING_LEGACY_PEER}" != "1" ]] && [[ -f "$SRC/social.proto" ]]; then
   _sync social.proto || FAIL=$((FAIL + 1))
 else
   rm -f "$DST/social.proto" "$DST/events/social.proto" 2>/dev/null || true
   echo "  skipped social.proto (messaging-service replaced social)"
 fi
-if [[ "${RP_SKIP_BOOKING_SERVICE}" != "1" ]] && [[ -f "$SRC/booking.proto" ]]; then
+if [[ "${RP_SKIP_RESERVATION_MESH}" != "1" ]] && [[ -f "$SRC/booking.proto" ]]; then
   _sync booking.proto || FAIL=1
 else
   rm -f "$DST/booking.proto" 2>/dev/null || true
-  echo "  skipped booking.proto (Record Platform — no booking service)"
+  echo "  skipped booking.proto (Record Platform — no reservation-mesh)"
 fi
 
 for f in \

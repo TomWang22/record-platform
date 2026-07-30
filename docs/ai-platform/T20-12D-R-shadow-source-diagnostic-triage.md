@@ -123,7 +123,7 @@ Also confirmed in triage:
 | `rp-ai-shadow-real-query-timing.sh` (warm) | shadow p50/p95 2494 / 4451 ms; **0 embed timeouts** |
 | `audit-rp-ai-rag-contract.sh` | PASS |
 | `rp-ai-rag-quality-smoke.sh` | PASS |
-| `rp-och-decontaminate-scan.sh` | PASS |
+| `rp-rp-decontaminate-scan.sh` | PASS |
 
 Warm timing artifact: `bench_logs/ai-platform/t20-10-shadow-real-query-20260625-160205.md`
 

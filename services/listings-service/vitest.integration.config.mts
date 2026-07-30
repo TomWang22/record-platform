@@ -7,16 +7,16 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 applyVitestClusterKafkaBrokerEnv(repoRoot);
 
 const topicSuffix =
-  process.env.OCH_KAFKA_TOPIC_SUFFIX?.trim() ||
+  process.env.RP_KAFKA_TOPIC_SUFFIX?.trim() ||
   process.env.GITHUB_RUN_ID?.trim() ||
   `local-${process.pid}-${Date.now()}`;
-process.env.OCH_KAFKA_TOPIC_SUFFIX = topicSuffix;
+process.env.RP_KAFKA_TOPIC_SUFFIX = topicSuffix;
 
 const env: Record<string, string> = {
-  OCH_GRPC_INSECURE_TEST_BIND: "1",
+  RP_GRPC_INSECURE_TEST_BIND: "1",
   KAFKA_BROKER: process.env.KAFKA_BROKER!,
   KAFKA_SSL_ENABLED: process.env.KAFKA_SSL_ENABLED!,
-  OCH_KAFKA_TOPIC_SUFFIX: topicSuffix,
+  RP_KAFKA_TOPIC_SUFFIX: topicSuffix,
   POSTGRES_URL_LISTINGS:
     process.env.POSTGRES_URL_LISTINGS ?? "postgresql://postgres:postgres@127.0.0.1:5442/listings",
   ANALYTICS_SYNC_MODE: process.env.ANALYTICS_SYNC_MODE ?? "0",

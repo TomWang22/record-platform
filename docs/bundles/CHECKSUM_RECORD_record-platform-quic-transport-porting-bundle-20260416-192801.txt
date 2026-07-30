@@ -1,6 +1,0 @@
-ARCHIVE_SHA256=dcf341809c1c1f4e5bca12ab947963fd9ff9cfc96b37428c0caf95b3c1f94d3c
-ARCHIVE_PATH=/Users/tom/record-platform-quic-transport-porting-bundle-20260416-192801.tar.gz
-SIDECAR_PATH=none
-SIDECAR_HASH_EXPECTED=
-RECORDED_AT_UTC=2026-04-19T00:53:53.244885+00:00
-PROTOCOL=bundle_extraction_v1

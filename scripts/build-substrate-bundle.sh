@@ -135,7 +135,7 @@ done
 # run-k6-in-cluster, colima-quic-sysctl, verify-caddy-http3-in-cluster, run_pgbench_sweep.
 # Invoked by run-all-test-suites: optimize-k3s-kine-database, verify-db-cache-quick, quick-pod-diagnostics, deep-dive-pod-diagnostics, setup-lb-ip-host-access,
 # ensure-readiness-before-suites, test-auth-service, test-microservices-http2-http3*, enhanced-adversarial-tests, rotation-suite, test-packet-capture-standalone,
-# test-tls-mtls-comprehensive, test-social-service-comprehensive, test-lb-coordinated, verify-db-and-cache-comprehensive.
+# test-tls-mtls-comprehensive, test-messaging-service-comprehensive, test-lb-coordinated, verify-db-and-cache-comprehensive.
 mkdir -p "$BUNDLE_ABS/scripts"
 _preflight_suites_scripts=(
   strict-tls-bootstrap.sh rollout-caddy.sh generate-envoy-client-cert.sh
@@ -161,7 +161,7 @@ _preflight_suites_scripts=(
   run_pgbench_sweep.sh
   optimize-k3s-kine-database.sh verify-db-cache-quick.sh quick-pod-diagnostics.sh deep-dive-pod-diagnostics.sh setup-lb-ip-host-access.sh
   ensure-readiness-before-suites.sh test-auth-service.sh enhanced-adversarial-tests.sh
-  test-packet-capture-standalone.sh test-tls-mtls-comprehensive.sh test-social-service-comprehensive.sh test-lb-coordinated.sh
+  test-packet-capture-standalone.sh test-tls-mtls-comprehensive.sh test-messaging-service-comprehensive.sh test-lb-coordinated.sh
   verify-db-and-cache-comprehensive.sh
 )
 for f in "${_preflight_suites_scripts[@]}"; do
@@ -215,14 +215,14 @@ if [[ ! -f "$BUNDLE_ABS/backups/5437-auth.dump" ]]; then
   echo "# Place 5437-auth.dump here for auth-service DB restore (e.g. from record-platform backups/all-8-YYYYMMDD-HHMMSS/5437-auth.dump). Restore: pg_restore -h HOST -p 5437 -U postgres -d auth --clean --if-exists backups/5437-auth.dump" > "$BUNDLE_ABS/backups/README.txt"
 fi
 
-# 6 housing service skeletons (7 domain services total: auth ported + these). Per docs/ARCHITECTURE.md.
-for svc in listings-service booking-service messaging-service notification-service trust-service analytics-service; do
+# 6 platform-plane skeletons (7 domain services total: auth ported + these). Per docs/ARCHITECTURE.md.
+for svc in listings-service reservation-mesh messaging-service notification-service trust-service analytics-service; do
   mkdir -p "$BUNDLE_ABS/services/$svc"
   echo "# $svc" > "$BUNDLE_ABS/services/$svc/README.md"
   echo "" >> "$BUNDLE_ABS/services/$svc/README.md"
   case "$svc" in
     listings-service)   echo "Owns: listings, geolocation, pricing, availability, search index, filtering, image metadata. DB: listings. No booking logic. Emit Kafka on listing changes." >> "$BUNDLE_ABS/services/$svc/README.md" ;;
-    booking-service)   echo "Owns: reservation state machine, booking lifecycle, cancellation, landlord approval. DB: bookings. Emit: booking_created, booking_confirmed, booking_cancelled." >> "$BUNDLE_ABS/services/$svc/README.md" ;;
+    reservation-mesh)   echo "Owns: reservation state machine, booking lifecycle, cancellation, landlord approval. DB: bookings. Emit: booking_created, booking_confirmed, booking_cancelled." >> "$BUNDLE_ABS/services/$svc/README.md" ;;
     messaging-service) echo "Owns: conversations, messages, read receipts, attachment refs. DB: messaging. No booking/listing logic." >> "$BUNDLE_ABS/services/$svc/README.md" ;;
     notification-service) echo "Consumes Kafka only. Email/push, rent reminders, price drop alerts. Stateless preferred." >> "$BUNDLE_ABS/services/$svc/README.md" ;;
     trust-service)     echo "Owns: reviews, ratings aggregation, report abuse, moderation, listing flag state. DB: trust. Emit: user_suspended, listing_flagged." >> "$BUNDLE_ABS/services/$svc/README.md" ;;
@@ -253,7 +253,7 @@ cat > "$BUNDLE_ABS/services/README.md" << 'SVCEOF'
 |---|---------|-----|------|
 | 1 | auth-service | auth | ✅ Ported |
 | 2 | listings-service | listings | Listings, geo, pricing, search, filtering (skeleton) |
-| 3 | booking-service | bookings | Reservation lifecycle, Kafka: booking_created/confirmed/cancelled (skeleton) |
+| 3 | reservation-mesh | bookings | Reservation lifecycle, Kafka: booking_created/confirmed/cancelled (skeleton) |
 | 4 | messaging-service | messaging | Conversations, messages (skeleton) |
 | 5 | notification-service | — | Kafka consumer only; stateless (skeleton) |
 | 6 | trust-service | trust | Reviews, ratings, moderation, listing_flagged (skeleton) |

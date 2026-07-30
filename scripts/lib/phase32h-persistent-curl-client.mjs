@@ -59,8 +59,8 @@ export function curlH3PersistentPair({
   return {
     started_at: startedAt,
     finished_at: finishedAt,
-    started_epoch: startedEpoch,
-    finished_epoch: finishedEpoch,
+    started_eprp: startedEpoch,
+    finished_eprp: finishedEpoch,
     curl_exit_code: result.status,
     stderr: result.stderr || '',
     prime: {
@@ -72,8 +72,8 @@ export function curlH3PersistentPair({
       http_status: Number(reusePart[0] || 0),
       http_version: reusePart[1] || null,
       correlation_id: reuseCorrelationId,
-      started_epoch: startedEpoch,
-      finished_epoch: finishedEpoch,
+      started_eprp: startedEpoch,
+      finished_eprp: finishedEpoch,
     },
     persistent_client: true,
   };
@@ -119,8 +119,8 @@ export function curlH3Cold({
   return {
     started_at: startedAt,
     finished_at: finishedAt,
-    started_epoch: startedEpoch,
-    finished_epoch: finishedEpoch,
+    started_eprp: startedEpoch,
+    finished_eprp: finishedEpoch,
     http_status: Number(parts[0] || 0),
     http_version: parts[1] || null,
     curl_exit_code: result.status,

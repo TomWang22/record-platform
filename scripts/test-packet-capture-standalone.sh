@@ -87,10 +87,10 @@ strict_http3_curl() {
 # HTTP3_RESOLVE: same IP as curl MetalLB/--resolve (CURL_RESOLVE_IP), not ClusterIP — matches strict capture + grpc-http3-health
 HTTP3_RESOLVE="${HOST}:${PORT:-443}:${CURL_RESOLVE_IP}"
 GRPC_CERTS_DIR="${GRPC_CERTS_DIR:-/tmp/grpc-certs}"
-if [[ -f "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh" ]]; then
-  # shellcheck source=scripts/lib/ensure-och-grpc-certs.sh
-  source "$SCRIPT_DIR/lib/ensure-och-grpc-certs.sh"
-  och_sync_grpc_certs_to_dir "$GRPC_CERTS_DIR" "$NS" 2>/dev/null || true
+if [[ -f "$SCRIPT_DIR/lib/ensure-rp-grpc-certs.sh" ]]; then
+  # shellcheck source=scripts/lib/ensure-rp-grpc-certs.sh
+  source "$SCRIPT_DIR/lib/ensure-rp-grpc-certs.sh"
+  rp_sync_grpc_certs_to_dir "$GRPC_CERTS_DIR" "$NS" 2>/dev/null || true
 fi
 export HTTP3_RESOLVE CA_CERT NS HOST PORT SCRIPT_DIR GRPC_CERTS_DIR
 
@@ -202,17 +202,17 @@ for i in 1 2 3 4 5 6; do
 done
 
 # Optional burst (QUIC_FORENSIC_TRAFFIC_MODE=strict|full) to grow ACK / in-flight signal; not required for strict transport proof.
-_och_burst_n=0
+_rp_burst_n=0
 case "${QUIC_FORENSIC_TRAFFIC_MODE:-minimal}" in
-  strict) _och_burst_n=24 ;;
-  full) _och_burst_n=120 ;;
+  strict) _rp_burst_n=24 ;;
+  full) _rp_burst_n=120 ;;
 esac
-if [[ "$_och_burst_n" -gt 0 ]]; then
-  ok "QUIC_FORENSIC_TRAFFIC_MODE=${QUIC_FORENSIC_TRAFFIC_MODE:-minimal}: HTTP/3 burst ($_och_burst_n requests, listings search)…"
-  for ((_och_bi = 1; _och_bi <= _och_burst_n; _och_bi++)); do
+if [[ "$_rp_burst_n" -gt 0 ]]; then
+  ok "QUIC_FORENSIC_TRAFFIC_MODE=${QUIC_FORENSIC_TRAFFIC_MODE:-minimal}: HTTP/3 burst ($_rp_burst_n requests, listings search)…"
+  for ((_rp_bi = 1; _rp_bi <= _rp_burst_n; _rp_bi++)); do
     strict_http3_curl -s --connect-timeout 6 --resolve "${HOST}:${_h3_port}:${CURL_RESOLVE_IP}" -H "Host: $HOST" \
-      "${_h3_url}/api/listings/search?q=test${_och_bi}" >/dev/null 2>&1 &
-    if ((_och_bi % 40 == 0)); then wait || true; fi
+      "${_h3_url}/api/listings/search?q=test${_rp_bi}" >/dev/null 2>&1 &
+    if ((_rp_bi % 40 == 0)); then wait || true; fi
   done
   wait || true
 fi

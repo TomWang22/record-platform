@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Call edge APIs; fail on OCH domain contamination (not transient 5xx during warmup).
+# Call edge APIs; fail on RP domain contamination (not transient 5xx during warmup).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,7 +15,7 @@ NS="${K8S_NAMESPACE:-record-platform}"
 CA="${NODE_EXTRA_CA_CERTS:-$(rp_dev_edge_ca_file)}"
 BASE="$(edge_normalize_e2e_api_base)"
 REPORT_DIR="${REPORT_DIR:-$REPO_ROOT/bench_logs/domain-comb}"
-REPORT="${REPORT:-$REPORT_DIR/rp-och-runtime-api-comb.md}"
+REPORT="${REPORT:-$REPORT_DIR/rp-rp-runtime-api-comb.md}"
 HARDENING_REPORT="${REPORT_DIR}/runtime-comb-readiness-hardening.md"
 EMAIL="${RP_COMB_EMAIL:-e2e-contract@record-platform.local}"
 PASS="${RP_COMB_PASSWORD:-ContractPass123!}"
@@ -31,8 +31,8 @@ FORBIDDEN_KEYS=(
 )
 
 FORBIDDEN_STRINGS=(
-  'OCH' 'off-campus' 'off campus' 'housing' 'landlord' 'tenant' 'booking'
-  'apartment' 'Send in OCH' 'furnished' 'lease terms'
+  'RP' 'off-campus' 'off campus' 'housing' 'landlord' 'tenant' 'booking'
+  'apartment' 'Send in RP' 'furnished' 'lease terms'
 )
 
 DEPLOYS=(
@@ -131,9 +131,9 @@ def string_hits(obj):
     text = json.dumps(obj, ensure_ascii=False)
     low = text.lower()
     for s in strings:
-        if s == "OCH":
+        if s == "RP":
             if re.search(r"\bOCH\b", text):
-                found.append("OCH")
+                found.append("RP")
         elif s in ("off-campus", "off campus"):
             if re.search(r"off[- ]campus", low):
                 found.append(s)
@@ -197,7 +197,7 @@ for ep in "${endpoints[@]}"; do
 done
 
 {
-  echo "# RP/OCH runtime API comb"
+  echo "# RP/RP runtime API comb"
   echo ""
   echo "Base: \`$BASE\`"
   echo "User: \`$EMAIL\`"

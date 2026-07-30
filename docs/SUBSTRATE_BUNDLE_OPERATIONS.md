@@ -12,7 +12,7 @@ This document describes the **portable substrate tarball** produced by `scripts/
 - **infra/:** Copied from RP **except** `infra/db` and `infra/ansible`. Included: **infra/docs**, **infra/haproxy**, **infra/kafka**, **infra/nginx**, **infra/k8s**. So you get the full k8s substrate layout.
 - **infra/k8s:** Top-level Caddy YAML, MetalLB, **overlays** (full). **base/** = **substrate only**: namespaces, config, kafka-external, kafka, envoy-test, redis, haproxy, nginx, observability, monitoring, exporters. **No** RP app services (api-gateway, auth-service, records-service, etc.) — add your own `base/<service>/` per app and register in **base/kustomization.yaml**. **base/README.md** explains. Overlay has **hpa-api-gateway.yaml** as template; add HPAs as you add services.
 - **proto:** All `proto/*.proto` files (health, auth, and RP app protos as gRPC reference; replace with housing-specific protos as needed).
-- **services:** `services/common`, `services/api-gateway`, `services/auth-service` (ported), `services/cron-jobs`, and **6 housing skeletons** (listings-service, booking-service, messaging-service, notification-service, trust-service, analytics-service). **webapp/** at repo root. **backups/:** Place or use `5437-auth.dump` for auth-service DB restore.
+- **services:** `services/common`, `services/api-gateway`, `services/auth-service` (ported), `services/cron-jobs`, and **6 housing skeletons** (listings-service, reservation-mesh, messaging-service, notification-service, trust-service, analytics-service). **webapp/** at repo root. **backups/:** Place or use `5437-auth.dump` for auth-service DB restore.
 - **scripts:** TLS/Colima/MetalLB: `strict-tls-bootstrap.sh`, `rollout-caddy.sh`, `generate-envoy-client-cert.sh`, `colima-apply-host-aliases.sh`, `ensure-ready-for-preflight.sh`, `ensure-k8s-api.sh`, `get-pods-to-ready.sh`, `install-metallb.sh`, `verify-metallb-and-traffic-policy.sh`, `setup-new-colima-cluster.sh` (one-shot Colima + MetalLB; **set METALLB_POOL** per project).  
   Preflight and tests: `run-preflight-scale-and-all-suites.sh`, `test-microservices-http2-http3.sh`, `test-grpc-http2-http3.sh`, `test-http2-http3-strict-tls.sh`, `test-full-chain-with-rotation.sh`, `smoke-services.sh`.  
   Rotation/k6: `rotation-suite.sh`, `run-k6-chaos.sh`, `k6-chaos-test.js`; **scripts/load/run-k6-phases.sh** (k6 phases + optional xk6 HTTP/3; on Colima, host HTTP/3 is skipped). k6 load: `k6-http3-complete.js`, `k6-reads.js`, `k6-limit-test-comprehensive.js`, `k6-find-max-rps-http3.js`, `k6-http3-toolchain.js` (strict TLS via K6_CA_ABSOLUTE).  
@@ -78,7 +78,7 @@ Use the substrate as the base; follow **docs/ARCHITECTURE.md** and **docs/CURSOR
 |---|---------|-----|-----------|
 | 1 | **auth-service** | auth | Ported (full). Restore from backups/5437-auth.dump. |
 | 2 | **listings-service** | listings | Skeleton. Listings, geo, pricing, search, filtering. No booking logic. |
-| 3 | **booking-service** | bookings | Skeleton. Reservation lifecycle. Emit: booking_created, booking_confirmed, booking_cancelled. |
+| 3 | **reservation-mesh** | bookings | Skeleton. Reservation lifecycle. Emit: booking_created, booking_confirmed, booking_cancelled. |
 | 4 | **messaging-service** | messaging | Skeleton. Conversations, messages, read receipts. |
 | 5 | **notification-service** | — | Skeleton. Kafka consumer only; stateless. |
 | 6 | **trust-service** | trust | Skeleton. Reviews, ratings, moderation, listing_flagged, user_suspended. |

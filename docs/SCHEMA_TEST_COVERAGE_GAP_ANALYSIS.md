@@ -62,8 +62,8 @@ These tables now have tests in `test-microservices-http2-http3.sh`.
 | **forum.post_votes** | 5434 | 7c, 7d | POST /api/forum/posts/:id/vote |
 | **forum.comment_votes** | 5434 | 7e, 7f | POST /api/forum/comments/:id/vote |
 | **messages.message_reads** | 5434 | (read when fetching?) | May be implicit on GET |
-| **messages.user_archived_threads** | 5434 | Archive API if exists | Check social-service routes |
-| **messages.user_deleted_threads** | 5434 | Delete API if exists | Check social-service routes |
+| **messages.user_archived_threads** | 5434 | Archive API if exists | Check messaging-service routes |
+| **messages.user_deleted_threads** | 5434 | Delete API if exists | Check messaging-service routes |
 | **feedback.reviews** | 5436 | Shopping feedback API? | Check if POST /api/shopping/feedback or similar |
 | **auth.user_addresses** | 5437 | Profile/checkout address | Check auth or shopping API |
 

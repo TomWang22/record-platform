@@ -71,7 +71,7 @@ This isn't a tutorial project—it's a production-grade system solving real prob
 - **Kubernetes-native workflows** - `infra/k8s` provides composable bases and overlays; Colima + k3s is the primary cluster (bootstrapping via `scripts/setup-new-colima-cluster.sh`); build images, apply manifests, and run preflight/suites.
 - **Hardened gateway path** - API Gateway keeps the JWT guard, adds optional `DEBUG_FAKE_AUTH`, injects identity headers, and exposes detailed metrics.
 - **Redis-assisted records caching** - `services/records-service/src/lib/cache.ts` adds normalized search keys, safe JSON encoding, and targeted invalidation hooks.
-- **Kafka messaging with strict TLS** - Real-time messaging for forum posts, direct messages, and group chats via Kafka integration in social-service. **Strict TLS enabled** with SSL listener on port 9093, certificates managed via `kafka-ssl-secret`.
+- **Kafka messaging with strict TLS** - Real-time messaging for forum posts, direct messages, and group chats via Kafka integration in messaging-service. **Strict TLS enabled** with SSL listener on port 9093, certificates managed via `kafka-ssl-secret`.
 - **Operational tooling** - `scripts/` covers smoke tests, TLS helpers, QUIC tuning, backup/restore, load tests, and rollout automation. **307+ scripts** organized by purpose (testing, load testing, service management, database management, infrastructure, debugging, utilities) to support constant debugging and iterative development. **CI** (`.github/workflows/ci.yml`): each matrix job builds the common package then the service; transport-validation skips tshark when no pcap is present.
 - **Webapp** - Next.js 14 frontend with landing pages, dashboard, authentication, and comprehensive documentation. See `webapp/README.md` for frontend architecture and connection guide.
 
@@ -101,7 +101,7 @@ cd webapp && CONTRACT_SCREENSHOT_DATE="$(date -u +%F)" \
 CONTRACT_ONLY=1 make rp-frontend-screenshot-strict-contract
 ```
 
-**Do not use:** `record.local`, `curl -k`, OCH/housing terms in product paths. **Rollback:** `git revert <release-lock-sha>`.
+**Do not use:** `record.local`, `curl -k`, RP/housing terms in product paths. **Rollback:** `git revert <release-lock-sha>`.
 
 ## 🎉 Recent Breakthroughs
 
@@ -356,7 +356,7 @@ For detailed technical documentation, system design diagrams, and deep dives int
         │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
         │         │                 │                 │              │
         │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-        │  │Analytics     │  │Social Service│  │Shopping      │     │
+        │  │Analytics     │  │Messaging Service│  │Shopping      │     │
         │  │Service (4004)│  │    (4006)    │  │Service (4007)│     │
         │  │ gRPC:50054   │  │ gRPC:50056   │  │ gRPC:50058   │     │
         │  │ HTTP:4004    │  │ HTTP:4006    │  │ HTTP:4007    │     │
@@ -546,7 +546,7 @@ For detailed technical documentation, system design diagrams, and deep dives int
 | **Records Service** | 4002/50051 | HTTP/gRPC | CRUD + search over records, uses Redis for search caching, enforces user ownership, gRPC on port 50051 |
 | **Listings Service** | 4003/50057 | HTTP/gRPC | Public catalogue endpoints, eBay integration, gRPC interface on port 50057 for marketplace data |
 | **Analytics Service** | 4004/50054 | HTTP/gRPC | Authenticated aggregations, price snapshots, dual-DB (listings + analytics), multi-core worker pool, gRPC on port 50054 |
-| **Social Service** | 4006/50056 | HTTP/gRPC | Forum posts, comments, votes, user messaging, threaded conversations, gRPC on port 50056 |
+| **Messaging Service** | 4006/50056 | HTTP/gRPC | Forum posts, comments, votes, user messaging, threaded conversations, gRPC on port 50056 |
 | **Shopping Service** | 4007/50058 | HTTP/gRPC | Shopping cart, checkout, order management, wishlist, purchase history, gRPC on port 50058. **Strict TLS enforced** in all k6 load tests (`run-k6-shopping.sh`, `find-bottlenecks.sh`) with CA certificate validation. Tests use ClusterIP for in-cluster testing; Colima + k3s uses MetalLB LB IP for host-originated HTTP/2 and HTTP/3.
 | **Auction Monitor** | 4008/50059 | HTTP/gRPC | Monitors auction trends, price tracking, dual-DB (listings read + auction-monitor write), **granular percentiles (p1-p99)**, **Discogs price history scraping**, **service integrations** (Social, Shopping, Listings), gRPC on port 50059 |
 | **Python AI Service** | 5005/50060 | HTTP/gRPC | FastAPI service for AI/ML predictions, grade recommendations, Discogs/eBay integration, chatbot interface, gRPC on port 50060 |
@@ -688,7 +688,7 @@ Services connect via Kubernetes Service names (e.g., `postgres-auth-external.rec
 
 - **ServiceMonitors/PodMonitors** - Auto-discovery and scraping
   - **ServiceMonitors** (`infra/k8s/base/monitoring/servicemonitors.yaml`): 
-    - Targets: api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, python-ai-service, auction-monitor, nginx, haproxy
+    - Targets: api-gateway, auth-service, records-service, listings-service, analytics-service, messaging-service, shopping-service, python-ai-service, auction-monitor, nginx, haproxy
   - **PodMonitors** (`infra/k8s/base/observability/podmonitors.yaml`):
     - Pod-level metrics for detailed observability
   - **Auto-discovery**: Prometheus automatically discovers and scrapes targets
@@ -935,7 +935,7 @@ We run **8 core suites** plus optional k6 load and pgbench sweeps (15+ scripts w
    # Example: LB_IP from `kubectl get svc caddy-h3 -n ingress-nginx`
    echo '<METALLB_IP> record.test' | sudo tee -a /etc/hosts
    ```
-   Or run `./scripts/ensure-edge-hosts.sh` (discovers the LoadBalancer IP and appends the line). Override hostname with `OCH_EDGE_HOSTNAME=record.test`.
+   Or run `./scripts/ensure-edge-hosts.sh` (discovers the LoadBalancer IP and appends the line). Override hostname with `RP_EDGE_HOSTNAME=record.test`.
 2. Bootstrap (or refresh) the cluster and dev overlay:
    ```bash
    ./infra/k8s/overlays/dev/bootstrap.sh
@@ -1057,7 +1057,7 @@ Seed jobs under `infra/k8s/overlays/dev/jobs` populate demo users and records. R
   ```bash
   pnpm -C services/records-service prisma migrate deploy
   pnpm -C services/auth-service prisma migrate deploy
-  pnpm -C services/social-service prisma migrate deploy
+  pnpm -C services/messaging-service prisma migrate deploy
   ```
 - Database initialization scripts in `infra/db/`:
   - `03-database.sql` - Main database schemas
@@ -1202,7 +1202,7 @@ This end-to-end simulation **finds system limits** by testing the complete flow 
                               Cache Miss? Try Lock → Lock Acquired? Fetch & Set
                                                       Lock Exists? Wait & Retry
      ```
-   - **Services**: `records-service`, `social-service`, `python-ai-service`, `auction-monitor`
+   - **Services**: `records-service`, `messaging-service`, `python-ai-service`, `auction-monitor`
    - **Benefits**: Reduces database load, prevents cache stampede, improves response times
 
 2. **LFU/LRU Cache** (`lfu_lru_cache.lua`):
@@ -1611,7 +1611,7 @@ kubectl -n record-platform wait --for=condition=ready pod --all --timeout=300s
   - **User Notes**: Per-item notes for buyer context (e.g., "Has minor scratch", "Gift for John")
   - **Rich Display**: Image, title, condition, catalog ID, price, quantity, and total per item
   - **Responsive Design**: Works seamlessly on mobile, tablet, and desktop
-- **Auction Monitor**: Real-time auction tracking with trend visualization, **granular price percentiles (p1-p99)**, **Discogs price history (full sales arc)**, and price alerts. Integrates with Social Service (negotiation assistance), Shopping Service (buyer evaluation), and Listings Service (seller optimization).
+- **Auction Monitor**: Real-time auction tracking with trend visualization, **granular price percentiles (p1-p99)**, **Discogs price history (full sales arc)**, and price alerts. Integrates with Messaging Service (negotiation assistance), Shopping Service (buyer evaluation), and Listings Service (seller optimization).
 - **Insights & AI**: Price recommendations, grade predictions, collection analytics, and AI-powered chatbot
 - **Integrations**: Discogs OAuth (starter), external marketplace connections
 - **Responsive Design**: Mobile-friendly UI with modern component library

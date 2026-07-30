@@ -37,22 +37,22 @@ function main() {
     }
   }
   const out = {
-    specVersion: "och-chaos-resilience-v1",
+    specVersion: "rp-chaos-resilience-v1",
     score,
-    min_required: Number(process.env.OCH_CHAOS_MIN || "80"),
-    compliant: score >= Number(process.env.OCH_CHAOS_MIN || "80") ? 1 : 0,
+    min_required: Number(process.env.RP_CHAOS_MIN || "80"),
+    compliant: score >= Number(process.env.RP_CHAOS_MIN || "80") ? 1 : 0,
   };
   writeFileSync(join(BENCH, "chaos-resilience-score.json"), `${JSON.stringify(out, null, 2)}\n`);
   const prom = [
-    "# HELP och_chaos_resilience_score Weighted chaos harness score 0-100.",
-    "# TYPE och_chaos_resilience_score gauge",
-    `och_chaos_resilience_score ${out.score}`,
-    "# HELP och_chaos_resilience_min_required Policy floor.",
-    "# TYPE och_chaos_resilience_min_required gauge",
-    `och_chaos_resilience_min_required ${out.min_required}`,
-    "# HELP och_chaos_resilience_compliant 1 if score ≥ min_required.",
-    "# TYPE och_chaos_resilience_compliant gauge",
-    `och_chaos_resilience_compliant ${out.compliant}`,
+    "# HELP rp_chaos_resilience_score Weighted chaos harness score 0-100.",
+    "# TYPE rp_chaos_resilience_score gauge",
+    `rp_chaos_resilience_score ${out.score}`,
+    "# HELP rp_chaos_resilience_min_required Policy floor.",
+    "# TYPE rp_chaos_resilience_min_required gauge",
+    `rp_chaos_resilience_min_required ${out.min_required}`,
+    "# HELP rp_chaos_resilience_compliant 1 if score ≥ min_required.",
+    "# TYPE rp_chaos_resilience_compliant gauge",
+    `rp_chaos_resilience_compliant ${out.compliant}`,
     "",
   ].join("\n");
   writeFileSync(join(BENCH, "chaos-metrics.prom"), prom);

@@ -52,7 +52,7 @@ SERVICES=(
   "auth-service"
   "records-service"
   "listings-service"
-  "social-service"
+  "messaging-service"
   "shopping-service"
   "analytics-service"
   "auction-monitor"
@@ -152,7 +152,7 @@ for service in "${SERVICES[@]}"; do
         auth-service) grpc_port="50051" ;;
         records-service) grpc_port="50052" ;;
         listings-service) grpc_port="50057" ;;
-        social-service) grpc_port="50056" ;;
+        messaging-service) grpc_port="50056" ;;
         shopping-service) grpc_port="50058" ;;
         analytics-service) grpc_port="50054" ;;
         auction-monitor) grpc_port="50059" ;;

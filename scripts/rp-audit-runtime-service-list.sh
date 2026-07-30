@@ -33,8 +33,8 @@ _check_forbidden() {
   local x
   for x in "${items[@]}"; do
     case "$x" in
-      booking-service|social-service|booking|social)
-        _fail "$label: forbidden legacy OCH service '$x'"
+      booking|social)
+        _fail "$label: forbidden legacy RP service '$x'"
         ;;
     esac
   done

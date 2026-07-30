@@ -31,7 +31,7 @@ export function runStage<T>(name: string, fn: (span: Span) => Promise<T>, attrs:
 
 export function stageSkipped(span: Span, reason?: string): void {
   span.setAttribute("stage.skipped", true);
-  if (reason) span.setAttribute("och.skip_reason", reason);
+  if (reason) span.setAttribute("rp.skip_reason", reason);
 }
 
 /** Seven nested spans (lock → … → quality) for short-circuit returns; keeps CHILD_OF depth stable. */
@@ -51,9 +51,9 @@ export async function listingFeelShortCircuitTail<T extends { analysis_text: str
             stageSkipped(s5, exitKind);
             return runStage("analytics.quality.compute", async (s6) => {
               s6.setAttribute("stage.skipped", true);
-              s6.setAttribute("och.quality_precalculated", true);
-              s6.setAttribute("och.quality_score", result.quality_score);
-              s6.setAttribute("och.short_circuit", exitKind);
+              s6.setAttribute("rp.quality_precalculated", true);
+              s6.setAttribute("rp.quality_score", result.quality_score);
+              s6.setAttribute("rp.short_circuit", exitKind);
               return result;
             });
           });

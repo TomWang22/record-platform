@@ -23,7 +23,7 @@
 |--------|------:|
 | Telemetry WARNs | **0** |
 | Record / longform scores | 3.86 / 3.67 |
-| OCH | **PASS** (`__SCANNED__=590`) |
+| RP | **PASS** (`__SCANNED__=590`) |
 
 ## 3. Soak-path gates (N/A)
 

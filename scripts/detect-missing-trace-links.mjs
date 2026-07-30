@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { discoverJaegerHousingServices } from "./trace-validators/lib/housing-services.mjs";
+import { discoverJaegerPlatformServices } from "./trace-validators/lib/platform-services.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const graphPath = process.argv[2] || join(root, "bench_logs/trace_call_graph.json");
@@ -15,7 +15,7 @@ const outPath = join(root, "bench_logs/trace_missing_edges.json");
 const actual = JSON.parse(readFileSync(graphPath, "utf8"));
 const actualSet = new Set(actual.map((e) => `${e.from}->${e.to}`));
 
-const all = discoverJaegerHousingServices(root);
+const all = discoverJaegerPlatformServices(root);
 const targets = all.filter((s) => s !== "api-gateway");
 const missing = [];
 for (const to of targets) {

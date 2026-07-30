@@ -36,7 +36,7 @@ housing_ensure_api_gateway_rollout() {
   local raw="${1:-}"
   local need=0 tok
   for tok in ${raw}; do
-    if [[ "${tok}" == "notification-service" || "${tok}" == "webapp" || "${tok}" == "booking-service" || "${tok}" == "trust-service" ]]; then
+    if [[ "${tok}" == "notification-service" || "${tok}" == "webapp" || "${tok}" == "reservation-mesh" || "${tok}" == "trust-service" ]]; then
       need=1
       break
     fi

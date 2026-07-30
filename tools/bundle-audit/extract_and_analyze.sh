@@ -32,7 +32,7 @@ discover_tarballs() {
     "$ARCHIVE_SCAN"/record-platform*.tar.gz \
     "$ARCHIVE_SCAN"/preflight-cluster-quic*.tar.gz \
     "$ARCHIVE_SCAN"/kafka-kraft*.tar.gz \
-    "$ARCHIVE_SCAN"/och-preflight*.tar.gz \
+    "$ARCHIVE_SCAN"/rp-preflight*.tar.gz \
     "$ARCHIVE_SCAN"/record.test*.tar.gz; do
     [[ -f "$f" ]] || continue
     b=$(basename "$f")

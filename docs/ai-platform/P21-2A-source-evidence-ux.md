@@ -66,7 +66,7 @@ Objects/JSON metadata dumps are rejected by `sanitizeEvidenceExcerpt`.
   e2e/seller-intelligence-ui.spec.ts \
   --grep "Seller intelligence UI"
 
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 ---

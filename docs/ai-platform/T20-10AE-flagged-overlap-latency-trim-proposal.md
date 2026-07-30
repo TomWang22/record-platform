@@ -265,7 +265,7 @@ T20.10AE is docs-only. When trims are implemented:
 | RAG contract | `bash scripts/audit-rp-ai-rag-contract.sh` | PASS |
 | Unit tests | `pytest services/python-ai-service/tests/test_shadow_overlap_refinement.py` | PASS + new trim cases |
 | Coverage | `bash scripts/coverage/run-service-coverage.sh python-ai-service` | ≥90% `app/ai` |
-| OCH scan | `bash scripts/rp-och-decontaminate-scan.sh` | PASS |
+| RP scan | `bash scripts/rp-rp-decontaminate-scan.sh` | PASS |
 
 Do **not** commit `bench_logs/`.
 
@@ -309,7 +309,7 @@ Rollback is code revert + flag reset — no DB migration.
 
 ```bash
 git status --short
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 **Vector rollout: NOT APPROVED**

@@ -74,7 +74,7 @@ Existing free-form RAG card unchanged and functional after fresh login.
 | pytest python-ai | 203 passed |
 | `audit-rp-ai-endpoints-contract.sh` | PASS |
 | `rp-ai-rag-quality-smoke.sh` | PASS |
-| `rp-och-decontaminate-scan.sh` | PASS |
+| `rp-rp-decontaminate-scan.sh` | PASS |
 
 ---
 

@@ -29,7 +29,7 @@ kubectl -n record-platform rollout restart deployment/python-ai-service ...
 | Embedded chunks | **10,065** |
 | HNSW index | `ai_document_chunks_embedding_vec_hnsw_idx` **present** |
 
-Pre-recovery health scripts: provider readiness, pgvector readiness, OCH scan — **PASS**.
+Pre-recovery health scripts: provider readiness, pgvector readiness, RP scan — **PASS**.
 
 ---
 
@@ -73,7 +73,7 @@ PYTHONPATH=. python -m pytest tests/ -q
 
 **240 passed** including G2R latency cap tests.
 
-Contracts: audit RAG, quality smoke, endpoints, provider/pgvector readiness, OCH scan — **PASS**.
+Contracts: audit RAG, quality smoke, endpoints, provider/pgvector readiness, RP scan — **PASS**.
 
 ---
 

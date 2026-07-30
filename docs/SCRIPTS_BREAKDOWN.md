@@ -33,7 +33,7 @@ This document groups the main shell scripts in `scripts/` by purpose so you can 
 | **test-microservices-http2-http3.sh** | Baseline: HTTP/2 and HTTP/3 (curl) + gRPC health and business logic. |
 | **test-microservices-http2-http3-enhanced.sh** | Enhanced baseline with packet capture. |
 | **test-tls-mtls-comprehensive.sh** | TLS/mTLS: cert chain, gRPC with strict TLS, NodePort vs port-forward. |
-| **test-social-service-comprehensive.sh** | Social: forum + messages, archive/recall/kick/ban (requires migrations). |
+| **test-messaging-service-comprehensive.sh** | Social: forum + messages, archive/recall/kick/ban (requires migrations). |
 | **enhanced-adversarial-tests.sh** | Adversarial tests. |
 | **test-packet-capture-standalone.sh** | Standalone packet capture verification. |
 

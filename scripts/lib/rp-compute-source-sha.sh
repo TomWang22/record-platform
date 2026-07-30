@@ -73,7 +73,7 @@ case "$svc" in
     include_common=0
     include_proto=0
     ;;
-  booking-service|social-service)
+  messaging-service)
     echo "error: $svc is not an active RP image target" >&2
     exit 2
     ;;

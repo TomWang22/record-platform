@@ -46,7 +46,7 @@
 | Quality smoke | **PASS** | `rp-ai-rag-quality-smoke.sh` |
 | Runtime/endpoints | **PASS** | runtime + endpoints contract |
 | Provider/pgvector | **PASS** | Ollama available; pgvector ready |
-| OCH | **PASS** | `rp-och-decontaminate-scan.sh` |
+| RP | **PASS** | `rp-rp-decontaminate-scan.sh` |
 
 ### Shadow source diagnostic (T19.6C)
 

@@ -20,7 +20,7 @@ bash scripts/audit-rp-ai-runtime-contract.sh
 bash scripts/audit-rp-ai-endpoints-contract.sh
 bash scripts/rp-ai-provider-readiness.sh
 bash scripts/rp-ai-pgvector-readiness.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 **Local artifacts (not committed):**
@@ -793,7 +793,7 @@ HTTP 404 — endpoint not exposed (pre-existing gap)
 | audit-rp-ai-endpoints-contract | PASS |
 | rp-ai-provider-readiness | PASS |
 | rp-ai-pgvector-readiness | PASS |
-| rp-och-decontaminate-scan | PASS (589 files) |
+| rp-rp-decontaminate-scan | PASS (589 files) |
 
 ## Acceptance criteria
 

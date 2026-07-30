@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { httpRequestDurationSeconds } from "../metrics.js";
 import { logHttpInterceptorFinish } from "./interceptor-log.js";
-import { isOchTraceDebugLogEnabled, logTraceDebug } from "./trace-debug-log.js";
+import { isRpTraceDebugLogEnabled, logTraceDebug } from "./trace-debug-log.js";
 import {
   decorateHttpSpanWithTransport,
   decorateIncomingMessageSpanWithTransport,
@@ -66,7 +66,7 @@ export function tracingMiddleware(req: Request, res: Response, next: NextFunctio
   attachIncomingHttpOtelContext(req, ctx);
   const start = process.hrtime.bigint();
 
-  if (isOchTraceDebugLogEnabled()) {
+  if (isRpTraceDebugLogEnabled()) {
     const svc = process.env.OTEL_SERVICE_NAME?.trim() || "http";
     const tp =
       typeof req.get === "function"
@@ -85,7 +85,7 @@ export function tracingMiddleware(req: Request, res: Response, next: NextFunctio
       "http.route": req.path,
       "http.status_code": res.statusCode,
       "http.latency_ms": durationMs,
-      ...(xTrace ? { "och.x_trace_id": xTrace } : {}),
+      ...(xTrace ? { "rp.x_trace_id": xTrace } : {}),
     });
 
     if (res.statusCode >= 500) {

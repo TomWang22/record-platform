@@ -122,7 +122,7 @@ Do NOT expose message bodies.
 Do NOT enable anonymous/guest hybrid access.
 Do NOT remove keyword fallback or overlap anchors.
 Do NOT use staging/test/e2e/t20/contract/disposable users.
-Stop immediately if validator freshness, preflight, preview UI smoke, leakage, OCH, WARN, rollback, or post-revoke gates fail.
+Stop immediately if validator freshness, preflight, preview UI smoke, leakage, RP, WARN, rollback, or post-revoke gates fail.
 ```
 
 ---

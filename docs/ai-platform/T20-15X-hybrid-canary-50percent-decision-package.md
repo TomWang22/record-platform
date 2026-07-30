@@ -46,7 +46,7 @@ T20.15Y 75% design: RECOMMENDED (owner approval required)
 | Percent restored | **PASS** |
 | Playwright | **PASS** |
 | Source diagnostic (Lane C) | **PASS** |
-| OCH / contracts | **PASS** |
+| RP / contracts | **PASS** |
 
 ---
 

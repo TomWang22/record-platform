@@ -33,7 +33,7 @@ T20.24A: NOT STARTED
 | Pure overlap | **8/16** report-only |
 | T20.22 rollout design | **CLOSED**; rollout **NOT APPROVED** |
 | Telemetry WARNs | **0** |
-| Leakage / OCH | **PASS** |
+| Leakage / RP | **PASS** |
 
 ---
 

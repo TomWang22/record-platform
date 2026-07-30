@@ -103,7 +103,7 @@ No measurable regression vs prior structured endpoints.
 | `pytest tests/ -q` | 222 passed |
 | `audit-rp-ai-endpoints-contract.sh` | PASS |
 | `rp-ai-rag-quality-smoke.sh` | PASS |
-| `rp-och-decontaminate-scan.sh` | PASS |
+| `rp-rp-decontaminate-scan.sh` | PASS |
 | Record intelligence Playwright | 1 passed (59.4s) |
 | Longform Playwright | turn 12 UI sync flake (not collector-specific) |
 

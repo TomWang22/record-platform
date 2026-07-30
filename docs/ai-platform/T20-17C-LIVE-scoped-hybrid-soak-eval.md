@@ -122,7 +122,7 @@ Rollback drill from T20.17B: `CANARY=0` → keyword 9/9; KEEP restore → hybrid
 | Canary errors | 0 | **PASS** |
 | Telemetry WARNs | 0 | **PASS** |
 | Leakage | PASS | **PASS** |
-| OCH | PASS | **PASS** |
+| RP | PASS | **PASS** |
 | Anchored overlap | ≥10/16 | **PASS** (16/16) |
 | Pure overlap | report-only | **8/16** (no promotion) |
 | True zero-results | 0 | **PASS** |

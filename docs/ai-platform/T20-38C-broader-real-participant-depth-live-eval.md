@@ -54,11 +54,11 @@ Total                                                    = 4320
 | `ai-rag-record-intelligence.spec.ts` | **1/1 PASS** |
 | `ai-rag-longform-record-session.spec.ts` | **1/1 PASS** |
 
-## 5. OCH / telemetry
+## 5. RP / telemetry
 
 | Check | Result |
 |-------|--------|
-| OCH | **PASS** (`__SCANNED__=589`) |
+| RP | **PASS** (`__SCANNED__=589`) |
 | Soak-path telemetry WARNs | **0** |
 
 ## 6. Shadow diagnostics

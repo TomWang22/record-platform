@@ -2,7 +2,7 @@ import type { Span } from "@opentelemetry/api";
 import { logger } from "../logger.js";
 
 function interceptorLog(): typeof logger.info {
-  return process.env.OCH_INTERCEPTOR_ACCESS_LOG === "1" || process.env.OCH_INTERCEPTOR_ACCESS_LOG === "true"
+  return process.env.RP_INTERCEPTOR_ACCESS_LOG === "1" || process.env.RP_INTERCEPTOR_ACCESS_LOG === "true"
     ? logger.info.bind(logger)
     : logger.debug.bind(logger);
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Canonical OCH transport certification (deterministic order). Repo root as cwd.
+# Canonical RP transport certification (deterministic order). Repo root as cwd.
 # 1) Regenerate protocol matrix CSV + anomalies (CSV fallback when run-*/protocol-matrix is missing).
 # 2) Fail if any_http2_collapse_anomaly is true.
 # 3) Unit tests → strict Playwright → transport-lab → declare-readiness --strict-quic.

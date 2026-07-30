@@ -28,7 +28,7 @@ bash scripts/audit-rp-ai-runtime-contract.sh
 bash scripts/audit-rp-ai-endpoints-contract.sh
 bash scripts/rp-ai-provider-readiness.sh
 bash scripts/rp-ai-pgvector-readiness.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 ## Review checklist

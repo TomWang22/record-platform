@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Three-stage TLS for Record Platform / OCH-style clusters:
+# Three-stage TLS for Record Platform / RP-style clusters:
 #   Stage 1 — Dev CA + edge leaf material under certs/ (dev-generate-certs.sh).
 #   Stage 2 — Kafka broker PKCS12/JKS from dev-root (kafka-ssl-from-dev-root.sh) with
 #             serverAuth + clientAuth EKU; local JKS verify (verify-kafka-broker-keystore-jks.sh).

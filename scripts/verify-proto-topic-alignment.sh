@@ -22,7 +22,7 @@ fail() { echo "❌ $*" >&2; exit 1; }
 ok() { echo "✅ $*"; }
 
 SUF=""
-raw="${RP_KAFKA_TOPIC_SUFFIX:-${OCH_KAFKA_TOPIC_SUFFIX:-}}"
+raw="${RP_KAFKA_TOPIC_SUFFIX:-${RP_KAFKA_TOPIC_SUFFIX:-}}"
 raw="${raw#"${raw%%[![:space:]]*}"}"
 raw="${raw%"${raw##*[![:space:]]}"}"
 while [[ "$raw" == .* ]]; do raw="${raw#.}"; done

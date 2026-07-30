@@ -46,7 +46,7 @@ SERVICES=(
   "auth-service"
   "records-service"
   "listings-service"
-  "social-service"
+  "messaging-service"
   "shopping-service"
   "analytics-service"
   "auction-monitor"
@@ -70,7 +70,7 @@ for service in "${SERVICES[@]}"; do
 done
 
 # Force delete any pods that are not Ready and older than 5 minutes
-kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,social-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' -o json 2>/dev/null | \
+kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,messaging-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' -o json 2>/dev/null | \
   jq -r '.items[] | select(.status.containerStatuses[0].ready != true) | select((.metadata.creationTimestamp | fromdateiso8601) < (now - 300)) | .metadata.name' 2>/dev/null | \
   while read -r pod; do
     if [[ -n "$pod" ]]; then
@@ -157,7 +157,7 @@ echo ""
 
 # Step 6: Check for build issues
 say "Step 6: Checking Docker images..."
-docker images --format '{{.Repository}}:{{.Tag}}' | grep -E "(auth-service|records-service|listings-service|social-service|shopping-service|analytics-service|auction-monitor|python-ai-service):dev" | head -8 | while read -r image; do
+docker images --format '{{.Repository}}:{{.Tag}}' | grep -E "(auth-service|records-service|listings-service|shopping-service|analytics-service|auction-monitor|python-ai-service):dev" | head -8 | while read -r image; do
   if [[ -n "$image" ]]; then
     ok "Image exists: $image"
   fi

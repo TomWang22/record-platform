@@ -183,7 +183,7 @@ timeout count
 429 retry count
 pod restart count
 telemetry WARN count
-OCH result
+RP result
 Playwright C-suite result
 ```
 
@@ -193,14 +193,14 @@ Playwright C-suite result
 Phase 21 archive verification: PASS
 Transport + response smoke: PASS (15/15)
 Telemetry WARNs = 0 for validator smoke scope (when checked)
-OCH PASS (when run)
+RP PASS (when run)
 Preview UI smoke PASS (when run)
 No production-default drift
 No PERCENT drift
 No allowlist drift
 ```
 
-Existing references: T20 closeout telemetry audits, `scripts/verify-phase-21-archive-readonly.sh`, OCH/coverage scripts under `scripts/coverage/`.
+Existing references: T20 closeout telemetry audits, `scripts/verify-phase-21-archive-readonly.sh`, RP/coverage scripts under `scripts/coverage/`.
 
 ---
 

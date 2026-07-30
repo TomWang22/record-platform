@@ -1,4 +1,4 @@
-# Investigation Summary: gRPC NodePort and Social Service Issues
+# Investigation Summary: gRPC NodePort and Messaging Service Issues
 
 ## Issues Found
 
@@ -9,13 +9,13 @@
 - **Envoy TLS**: Envoy uses strict TLS to backends, so plaintext grpcurl will fail
 - **Solution**: Use TLS with CA certificate for gRPC calls via NodePort
 
-### 2. Social Service Issues
+### 2. Messaging Service Issues
 
 #### Target Port Mismatch
 - **Current**: `targetPort: http` (named port)
 - **Expected**: `targetPort: 4006` (numeric port)
 - **Impact**: Service may not route correctly
-- **Fix**: Run `./scripts/fix-social-service-targetport.sh`
+- **Fix**: Run `./scripts/fix-messaging-service-targetport.sh`
 
 #### Port Not Listening
 - **Issue**: Port 4006 not listening in pod
@@ -25,7 +25,7 @@
   - Container health check failing
 
 #### Database Connection Failed
-- **Issue**: Social service cannot connect to database
+- **Issue**: messaging-plane cannot connect to database
 - **Possible Causes**:
   - `POSTGRES_URL_SOCIAL` environment variable not set
   - Database not accessible from pod
@@ -36,8 +36,8 @@
 - **Impact**: Kafka publish fails (non-fatal, but indicates certificate mismatch)
 - **Solution**: Update Kafka certificate SANs to include pod IP ranges
 
-### 3. API Gateway to Social Service Connectivity
-- **Issue**: API Gateway cannot reach social-service:4006
+### 3. API Gateway to Messaging Service Connectivity
+- **Issue**: API Gateway cannot reach messaging-service:4006
 - **Possible Causes**:
   - Service selector mismatch
   - Target port issue (http vs 4006)
@@ -47,17 +47,17 @@
 
 ### Immediate Fixes
 
-1. **Fix Social Service targetPort**:
+1. **Fix Messaging Service targetPort**:
    ```bash
-   ./scripts/fix-social-service-targetport.sh
+   ./scripts/fix-messaging-service-targetport.sh
    ```
 
-2. **Verify Social Service is listening**:
+2. **Verify Messaging Service is listening**:
    ```bash
    kubectl exec -n record-platform <social-pod> -- netstat -ln | grep 4006
    ```
 
-3. **Check Social Service environment**:
+3. **Check Messaging Service environment**:
    ```bash
    kubectl exec -n record-platform <social-pod> -- env | grep POSTGRES_URL_SOCIAL
    ```
@@ -70,7 +70,7 @@
 
 1. **Add NodePort 30001** to Envoy service (if needed)
 2. **Fix Kafka certificate SANs** to include pod IP ranges
-3. **Verify database connectivity** from social-service pod
+3. **Verify database connectivity** from messaging-service pod
 4. **Update service definitions** to use numeric ports instead of named ports
 
 ## Test Results Location

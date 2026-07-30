@@ -2,7 +2,7 @@
 # Cross-service performance analysis: run each edge k6 script in **isolation** with
 # kubectl top snapshots + cooldowns, export per-script JSON summaries, then aggregate.
 #
-# Use this to compare against the full back-to-back grid (run-housing-k6-edge-smoke.sh /
+# Use this to compare against the full back-to-back grid (run-platform-k6-edge-smoke.sh /
 # preflight 7a): if tails disappear here but show up in the suite, contention/order effects
 # are likely — see docs/perf/TAIL_LATENCY_AND_CROSS_SERVICE_ANALYSIS.md
 #
@@ -116,7 +116,7 @@ iso_run() {
 say "k6 cross-service isolation matrix → $OUT"
 say "BASE_URL=$BASE_URL POST_COOLDOWN=${POST}s CAR_EXTRA=${CAR_EXTRA}s DUR=$DUR VUS=$VUS"
 
-# Order matches run-housing-k6-edge-smoke.sh (third field: 1 = constant-arrival-rate)
+# Order matches run-platform-k6-edge-smoke.sh (third field: 1 = constant-arrival-rate)
 for triple in \
   "gateway-health:k6-gateway-health.js:0" \
   "auth-health:k6-auth-service-health.js:0" \

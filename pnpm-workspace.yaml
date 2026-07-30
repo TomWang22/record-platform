@@ -1,7 +1,5 @@
 packages:
   - "services/*"
-  - "!services/social-service"
-  - "!services/booking-service"
   - "webapp"
   - "tools/kafka-contract"
 

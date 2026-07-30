@@ -87,7 +87,7 @@ PYTHONPATH=. python -m pytest tests/ -q
 6. Source-type floor OBO-as-notification evidence
 7. Keyword retrieval unchanged
 
-Contracts: `audit-rp-ai-rag-contract.sh`, `rp-ai-rag-quality-smoke.sh`, `audit-rp-ai-endpoints-contract.sh`, OCH scan — **PASS**.
+Contracts: `audit-rp-ai-rag-contract.sh`, `rp-ai-rag-quality-smoke.sh`, `audit-rp-ai-endpoints-contract.sh`, RP scan — **PASS**.
 
 ---
 

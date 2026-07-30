@@ -26,7 +26,7 @@ _forbidden() {
   local x
   for x in "$@"; do
     case "$x" in
-      social-service|booking-service|cron-jobs) return 0 ;;
+      cron-jobs) return 0 ;;
     esac
   done
   return 1

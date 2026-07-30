@@ -95,7 +95,7 @@ echo ""
 
 # Scale all services to 1
 say "Scaling all services to 1 replica..."
-SERVICES=("auth-service" "records-service" "listings-service" "social-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service" "api-gateway")
+SERVICES=("auth-service" "records-service" "listings-service" "messaging-service" "shopping-service" "analytics-service" "auction-monitor" "python-ai-service" "api-gateway")
 
 for service in "${SERVICES[@]}"; do
   if kubectl scale deployment "$service" -n record-platform --replicas=1 >/dev/null 2>&1; then
@@ -119,7 +119,7 @@ echo ""
 
 # Check pod status
 say "Current pod status:"
-kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,social-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' \
+kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,messaging-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' \
   -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[0].ready,STATUS:.status.phase,RESTARTS:.status.containerStatuses[0].restartCount 2>&1 | head -12
 echo ""
 

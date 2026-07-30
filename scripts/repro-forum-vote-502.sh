@@ -80,8 +80,8 @@ echo "=== 4. Gateway logs (forum/vote/502/proxy) ==="
 kubectl -n record-platform logs -l app=api-gateway --tail=100 2>/dev/null | grep -E "forum|vote|502|proxy error|socket hang" || echo "(none)"
 
 echo ""
-echo "=== 5. Social-service logs (last 20) ==="
-kubectl -n record-platform logs -l app=social-service --tail=20 2>/dev/null | grep -v kafkajs || echo "(no non-Kafka logs)"
+echo "=== 5. messaging-plane logs (last 20) ==="
+kubectl -n record-platform logs -l app=messaging-service --tail=20 2>/dev/null | grep -v kafkajs || echo "(no non-Kafka logs)"
 
 [[ -f "${CA_CERT:-}" ]] && rm -f "$CA_CERT" 2>/dev/null || true
 echo ""
@@ -90,4 +90,4 @@ echo ""
 echo "=== Quick diagnosis ==="
 echo "If 502: gateway sees 'socket hang up', social sees 'request aborted'."
 echo "  - Usually: gateway timeout (15s) or social/DB slow. Run: ./scripts/diagnose-502-and-analytics.sh"
-echo "  - Or exec into social and curl vote directly: kubectl -n record-platform exec -it deploy/social-service -- curl -sS -X POST -H 'Content-Type: application/json' -H \"x-user-id: <USER_ID>\" -d '{\"vote\":\"up\"}' http://localhost:4006/forum/posts/<POST_ID>/vote"
+echo "  - Or exec into social and curl vote directly: kubectl -n record-platform exec -it deploy/messaging-service -- curl -sS -X POST -H 'Content-Type: application/json' -H \"x-user-id: <USER_ID>\" -d '{\"vote\":\"up\"}' http://localhost:4006/forum/posts/<POST_ID>/vote"

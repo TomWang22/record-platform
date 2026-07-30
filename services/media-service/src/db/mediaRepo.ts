@@ -2,7 +2,7 @@ import pg from 'pg'
 
 const { Pool } = pg
 
-/** Media DB runtime port 5443 (OCH dump source 5448). */
+/** Media DB runtime port 5443 (RP dump source 5448). */
 const mediaPort = process.env.MEDIA_DB_PORT || process.env.PG_PORT || '5443'
 const mediaDb = process.env.MEDIA_DB_NAME || process.env.PG_DATABASE || 'media'
 const conn =

@@ -34,7 +34,7 @@ kind load docker-image python-ai-service:dev --name "$CLUSTER" 2>/dev/null || tr
 # Step 3: Restart services
 say "Step 3: Restarting services..."
 kubectl -n "$NS" rollout restart deploy/python-ai-service 2>/dev/null || true
-kubectl -n "$NS" rollout restart deploy/social-service 2>/dev/null || true
+kubectl -n "$NS" rollout restart deploy/messaging-service 2>/dev/null || true
 
 # Step 4: Wait for services
 say "Step 4: Waiting for services to be ready..."

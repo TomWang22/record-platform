@@ -81,7 +81,7 @@ G3R-specific coverage:
 7. Production keyword retrieval unchanged
 8. No forbidden leakage strings in diagnostics
 
-Contract bundle: PASS (audit-rp-ai-rag-contract, quality-smoke, endpoints, provider, pgvector, och-decontaminate).
+Contract bundle: PASS (audit-rp-ai-rag-contract, quality-smoke, endpoints, provider, pgvector, rp-decontaminate).
 
 ## Deploy image
 

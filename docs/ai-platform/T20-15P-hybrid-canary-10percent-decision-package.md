@@ -52,7 +52,7 @@ T20.15Q 25% design: RECOMMENDED (owner approval required)
 | Percent restored | **PASS** |
 | Playwright | **PASS** |
 | Source diagnostic (Lane C) | **PASS** |
-| OCH / contracts | **PASS** |
+| RP / contracts | **PASS** |
 
 ---
 
@@ -107,7 +107,7 @@ Image: `python-ai-service:t20-p215f`
 1. **Percent-only off:** `AI_RAG_HYBRID_CANARY_PERCENT=0` → rollout restart (~2 min)
 2. **Full hybrid off:** `AI_RAG_HYBRID_CANARY=0`, clear allowlist → rollout restart
 3. **Image pin:** `python-ai-service:t20-p215f` or `t20-p215b2` if needed
-4. **Verify:** contract user → `retrieval_mode=keyword`; OCH/contracts PASS
+4. **Verify:** contract user → `retrieval_mode=keyword`; RP/contracts PASS
 
 Target: under 5 minutes for percent-only rollback.
 

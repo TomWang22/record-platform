@@ -52,7 +52,7 @@ T20.15F gate engine already supports arbitrary percent via `bucket < percent`. *
 | `audit-rp-ai-endpoints-contract.sh` | **PASS** |
 | `rp-ai-provider-readiness.sh` | **PASS** |
 | `rp-ai-pgvector-readiness.sh` | **PASS** |
-| `rp-och-decontaminate-scan.sh` | **PASS** |
+| `rp-rp-decontaminate-scan.sh` | **PASS** |
 
 ---
 

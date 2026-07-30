@@ -2,15 +2,15 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: prometheus-rules-och-outbox
+  name: prometheus-rules-rp-outbox
   namespace: observability
   labels:
     app: prometheus
-    och.dev/role: outbox-rules
+    rp.dev/role: outbox-rules
 data:
-  och-outbox.yml: |
+  rp-outbox.yml: |
     groups:
-      - name: och-outbox-alerts
+      - name: rp-outbox-alerts
         interval: 30s
         rules:
           - alert: OchOutboxUnpublishedBacklog

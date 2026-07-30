@@ -43,7 +43,7 @@
 | Flagged overlap | **FAIL** (diagnostic) | 3/7 live inference — improved but not rollout |
 | Zero-result shadow runs | **FAIL** | 8/16 |
 | Tranche rerun guard | **PASS** | Tranche 2–12 locks block |
-| Full validation bundle | **PASS** | contracts/smokes/OCH; post-write source diagnostic had transient request failures |
+| Full validation bundle | **PASS** | contracts/smokes/RP; post-write source diagnostic had transient request failures |
 
 ## Timing (warm eval)
 

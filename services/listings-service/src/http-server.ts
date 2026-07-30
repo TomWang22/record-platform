@@ -511,7 +511,7 @@ export function createListingsHttpApp(): Application {
     }),
   );
 
-  /** Booking-service internal: compact listing card for moderation / fraud dashboards (mTLS-ish via shared secret). */
+  /** Reservation mesh internal: compact listing card for moderation / fraud dashboards (mTLS-ish via shared secret). */
   app.get("/internal/listings/:listingId", async (req, res) => {
     try {
       const secret = (req.get("x-booking-internal-secret") || "").trim();
@@ -702,9 +702,9 @@ export function createListingsHttpApp(): Application {
           : /^\d{4}-\d{2}-\d{2}$/.test(occStartRaw)
             ? { start: occStartRaw, end: occStartRaw }
             : null;
-      /** Overlap window for booking-service reserved-listing filter (must stay aligned with cache key). */
+      /** Overlap window for reservation-mesh reserved-listing filter (must stay aligned with cache key). */
       const occupancyForReserved = occupancyForReservedFromSearchParams(occupancyOverlap, availableFrom);
-      /** Must match overlap sent to booking-service (explicit UTC day default avoids stale cache across UTC midnight). */
+      /** Must match overlap sent to reservation-mesh (explicit UTC day default avoids stale cache across UTC midnight). */
       const occupancyForCache = occupancyForReserved ?? defaultSearchOccupancyUtcDay();
       const searchLatRaw = req.query.search_lat ?? req.query.searchLat;
       const searchLngRaw = req.query.search_lng ?? req.query.searchLng;

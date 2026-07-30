@@ -41,7 +41,7 @@ After disk is freed, the node condition may take a few minutes to clear. Then re
 If you must run before disk is fully fixed, the following already include **disk-pressure tolerations** so pods can schedule on the tainted node:
 
 - **Caddy:** `infra/k8s/caddy-h3-deploy.yaml` — toleration `node.kubernetes.io/disk-pressure:NoSchedule`; **preferred** (not required) anti-affinity so both replicas can run on one node.
-- **record-platform + envoy-test:** dev overlay patch `infra/k8s/overlays/dev/patches/disk-pressure-tolerations.yaml` — same toleration for api-gateway, auth-service, records-service, listings-service, analytics-service, python-ai-service, social-service, shopping-service, auction-monitor, haproxy, nginx, haproxy-exporter, nginx-exporter, envoy-test.
+- **record-platform + envoy-test:** dev overlay patch `infra/k8s/overlays/dev/patches/disk-pressure-tolerations.yaml` — same toleration for api-gateway, auth-service, records-service, listings-service, analytics-service, python-ai-service, messaging-service, shopping-service, auction-monitor, haproxy, nginx, haproxy-exporter, nginx-exporter, envoy-test.
 
 Apply the dev overlay (includes the patch):
 

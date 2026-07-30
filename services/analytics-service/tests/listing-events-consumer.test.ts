@@ -34,7 +34,7 @@ vi.mock("@common/utils", async (importOriginal) => {
         disconnect: disconnectFn,
       })),
     },
-    ochKafkaTopicIsolationSuffix: vi.fn(() => ""),
+    rpKafkaTopicIsolationSuffix: vi.fn(() => ""),
   };
 });
 

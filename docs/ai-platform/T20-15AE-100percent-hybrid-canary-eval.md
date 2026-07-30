@@ -17,7 +17,7 @@
 | pgvector / HNSW | **PASS** |
 | Starting PERCENT | **0** |
 | Telemetry WARNs (pre) | **0** |
-| Contracts / OCH (pre) | **PASS** |
+| Contracts / RP (pre) | **PASS** |
 | Allowlist transcript 3×9 (pre) | **27/27**, fallback **11.11%** |
 
 ---
@@ -106,14 +106,14 @@ pure **8/16** · anchored **16/16** · zero-results **0/16** · embed timeouts *
 
 ---
 
-## 7. Telemetry / contracts / OCH / source diagnostic
+## 7. Telemetry / contracts / RP / source diagnostic
 
 | Check | Result |
 |-------|--------|
 | Telemetry WARNs | **0 PASS** |
 | RAG contract | **PASS** |
 | Endpoints contract (post-restore) | **PASS** |
-| OCH | **PASS** |
+| RP | **PASS** |
 | Leakage | **PASS** |
 | Source diagnostic (Lane C) | **PASS** |
 
@@ -143,7 +143,7 @@ Env confirmed: `AI_RAG_HYBRID_CANARY_PERCENT=0`.
 | Anchored overlap | **16/16 PASS** |
 | Pure overlap (reported) | **8/16** |
 | Percent restored | **PASS** |
-| Playwright / source diagnostic / OCH | **PASS** |
+| Playwright / source diagnostic / RP | **PASS** |
 
 ---
 

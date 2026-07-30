@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Static gate: k6/load scripts must not default BASE_URL to a raw https://<IP> (breaks TLS SNI for HTTP/3).
-# OCH edge contract: hostname record.test + --resolve / K6_RESOLVE to LB IP.
+# RP edge contract: hostname record.test + --resolve / K6_RESOLVE to LB IP.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

@@ -354,7 +354,7 @@ stop_and_analyze_captures() {
       echo "  [packet-capture] Verifying protocols (tshark) in $copy_dir_used"
       verify_protocol_in_dir "$copy_dir_used" "capture" || true
     fi
-    # Per-pod QUIC proof: stray UDP/443 vs pod IP + optional SNI (OCH: CAPTURE_EXPECTED_SNI default record.test)
+    # Per-pod QUIC proof: stray UDP/443 vs pod IP + optional SNI (RP: CAPTURE_EXPECTED_SNI default record.test)
     if [[ "${CAPTURE_POST_VERIFY_QUIC:-1}" != "0" ]] && command -v tshark >/dev/null 2>&1 && type verify_caddy_pcap_quic_enforcement &>/dev/null 2>&1; then
       for (( _ci=0; _ci<${#_CAPTURE_PODS[@]}; _ci++ )); do
         local _cns="${_CAPTURE_NS[$_ci]}" _cpod="${_CAPTURE_PODS[$_ci]}"

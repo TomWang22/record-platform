@@ -1,6 +1,0 @@
-ARCHIVE_SHA256=cccf91235608ce4b7d3b64db24defacd0bd3a5683e7695c8c5abbc73e83da912
-ARCHIVE_PATH=/Users/tom/record-platform-kafka-observability-proto-reference-20260410.tar.gz
-SIDECAR_PATH=none
-SIDECAR_HASH_EXPECTED=
-RECORDED_AT_UTC=2026-04-19T00:52:14.980841+00:00
-PROTOCOL=bundle_extraction_v1

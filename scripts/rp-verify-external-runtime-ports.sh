@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify RP owns host ports 5433–5443, 6379, 9000/9001 — no OCH runtime on 5444–5448 or 6380.
+# Verify RP owns host ports 5433–5443, 6379, 9000/9001 — no RP runtime on 5444–5448 or 6380.
 set -euo pipefail
 
 FAIL=0
@@ -47,12 +47,12 @@ else
   echo "✅ minio: record-platform-minio (9000/9001)"
 fi
 
-if docker ps --format '{{.Names}}' | grep -q '^off-campus-housing-tracker-'; then
-  echo "❌ OCH containers still running"
-  docker ps --format '  {{.Names}}\t{{.Ports}}' | grep '^off-campus-housing-tracker-' || true
+if docker ps --format '{{.Names}}' | grep -q '^record-platform-'; then
+  echo "❌ RP containers still running"
+  docker ps --format '  {{.Names}}\t{{.Ports}}' | grep '^record-platform-' || true
   FAIL=1
 else
-  echo "✅ no off-campus-housing-tracker-* containers"
+  echo "✅ no record-platform-* containers"
 fi
 
 for p in 5444 5445 5446 5447 5448 6380 29093 9092 2181; do

@@ -31,7 +31,7 @@ KP_PASS=$(cat /etc/kafka/secrets/kafka.key-password 2>/dev/null || echo "$KS_PAS
   echo "ssl.keystore.location=/etc/kafka/secrets/kafka.keystore.jks"
   echo "ssl.keystore.password=${KS_PASS}"
   echo "ssl.key.password=${KP_PASS}"
-} > /tmp/och-k8s-verify-topics.props'
+} > /tmp/rp-k8s-verify-topics.props'
 
 kubectl "${KREQ[@]}" exec -n "$NS" "$KPOD" -- bash -ec "$_inner_props" || {
   echo "❌ Could not write TLS props in $KPOD" >&2
@@ -41,7 +41,7 @@ kubectl "${KREQ[@]}" exec -n "$NS" "$KPOD" -- bash -ec "$_inner_props" || {
 BS="${KAFKA_BOOTSTRAP_SERVER:-kafka-0.kafka.${NS}.svc.cluster.local:9093}"
 
 k8s_kafka_topics() {
-  kubectl "${KREQ[@]}" exec -n "$NS" "$KPOD" -- kafka-topics --bootstrap-server "$BS" --command-config /tmp/och-k8s-verify-topics.props "$@"
+  kubectl "${KREQ[@]}" exec -n "$NS" "$KPOD" -- kafka-topics --bootstrap-server "$BS" --command-config /tmp/rp-k8s-verify-topics.props "$@"
 }
 
 missing=0

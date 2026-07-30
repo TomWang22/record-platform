@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Recursive folder parity: source repo vs extracted no-booking bundle at every directory level.
-# Uses the same exclude rules as package-och-platform-no-booking-bundle.sh.
+# Uses the same exclude rules as package-rp-platform-no-booking-bundle.sh.
 #
 # Usage: bash scripts/compare-bundle-folder-counts.sh /path/to/bundle.tar.gz [top|all]
 #   top — only compare top-level folder buckets
@@ -42,7 +42,7 @@ BUNDLE_ONLY=(
 echo "== Extracting bundle =="
 tar -xzf "$TARBALL" -C "$TMP"
 
-BUNDLE_ROOT="$TMP/och-platform-no-booking-bundle"
+BUNDLE_ROOT="$TMP/rp-platform-no-booking-bundle"
 if [[ ! -d "$BUNDLE_ROOT" ]]; then
   found_roots="$(find "$TMP" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
   if [[ "$found_roots" == "1" ]]; then

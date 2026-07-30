@@ -27,7 +27,7 @@ NODE_SERVICES=(
   auth-service
   records-service
   listings-service
-  social-service
+  messaging-service
   shopping-service
   analytics-service
   auction-monitor
@@ -67,7 +67,7 @@ if [[ "$APPLY" == "true" ]]; then
   kubectl create ns record-platform 2>/dev/null || true
   kubectl apply -k infra/k8s/overlays/dev
   step "Rollout status (timeout 120s per deploy)"
-  for d in api-gateway auth-service records-service listings-service social-service shopping-service analytics-service auction-monitor python-ai-service haproxy nginx; do
+  for d in api-gateway auth-service records-service listings-service messaging-service shopping-service analytics-service auction-monitor python-ai-service haproxy nginx; do
     kubectl -n record-platform rollout status "deploy/$d" --timeout=120s 2>/dev/null || echo "  (deploy/$d not found or still rolling)"
   done
   step "Pods"

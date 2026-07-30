@@ -71,7 +71,7 @@ function parseTsharkFieldStdout(stdout, opts = {}) {
     if (normVersion) versions.add(normVersion);
     packets.push({
       frame_number: Number(frameNumber),
-      time_epoch: Number(timeEpoch),
+      time_eprp: Number(timeEpoch),
       quic_version: normVersion,
       quic_version_label: quicVersionLabel(normVersion),
       packet_space: packetSpace,

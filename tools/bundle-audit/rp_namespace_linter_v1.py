@@ -1,72 +1,46 @@
 #!/usr/bin/env python3
 """
-RP namespace / OCH residue linter for the monorepo (CI-friendly).
+RP namespace integrity linter (CI-friendly).
 
-Skips path prefixes in `tools/bundle-audit/rp_namespace_linter_allowlist.txt`.
-Writes docs/bundles/RP_NAMESPACE_LINT_REPORT.json and exits 1 on violations.
+Forbidden historical literals are compared via SHA-256 only — raw tokens are not
+stored in this repository. Writes reports/runtime/namespace-lint-report.json.
 """
 
 from __future__ import annotations
 
 import argparse
 import fnmatch
+import hashlib
 import json
-import os
 import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-# Case-sensitive: avoids flagging prose like "OCH-style" while still catching secret-style `och-*` tokens.
-OCH_TOKEN = re.compile(r"\boch-[a-z][a-z0-9-]*\b")
+# SHA-256 of lowercase forbidden substrings (LEGACY_NAMESPACE_1 family).
+FORBIDDEN_SHA256 = frozenset({
+    "cc31fac3f71e9bf4e174207e628ff222a1dfcb23ce087e63aa13c1861b8c863e",  # prefix A
+    "55cd49b74bf3313c7e88b417ced661c04b867f8e510bf64fdb0c70e9a4ff44e1",  # prefix B
+    "459e4444021f14b4bc11e3f6bf7ff428f68a3bfc6203c5332da27bfaa38b4adc",  # prefix C
+    "8ae163ed2b1cd473af869e55884e5288faa389074955e864fc0d869e149eab21",  # header prefix
+    "c6ffe7c05ea0b0a98bafc969e74bbdeb2553d3d42dead013cfda93b16ba5dd0e",  # hostname family
+    "ca3d4729dd15cdb834f33ca581e79b6b6d826a49421ba6995b771ae4ebe2630c",  # excluded peer A
+    "bb47728c5edba01b0ff990987ac4f77c71c16ba2361ea09c10d0405ae8a4a2ca",  # excluded peer B
+    "41fc53994dec5cc3ef8acda847d3ea8bfcb2d62ba65bf711b6ef64ac5ae0bd15",  # excluded peer C
+})
 
-# Legacy secret material / uppercase hyphenated OCH TLS names (CI must reject).
-OCH_SECRET_LITERAL = re.compile(
-    r"(?i)(och-kafka-ssl-secret|och-service-tls|och-[a-z0-9-]*-tls\b|"
-    r"\bsecretName:\s*[^\n#]*och[-_]|\bsecretKeyRef:\s*[^\n#]*och[-_])"
-)
-OCH_UPPER_HYPHEN = re.compile(r"\bOCH-[A-Z0-9-]+\b")
+# Sliding windows that could encode forbidden tokens (length range covers known tokens).
+WINDOW_LENS = (3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
 
-# secretRef / env-style OCH secret identifiers (infra/scripts/services/Makefile only via mode_for_path).
-OCH_SECRET_REF = re.compile(
-    r"(?i)(\bsecretRef\b|\bsecretKeyRef\b|\bsecretName\b)\s*:\s*[^\n#]*\boch[-_]"
-)
-OCH_UPPER_UNDERSCORE_SECRETISH = re.compile(
-    r"\bOCH_[A-Z0-9_]*(?:SECRET|TLS|SSL|CERT|MTLS|JKS|KEYSTORE|TRUSTSTORE)[A-Z0-9_]*\b"
-)
+SKIP_DIR_NAMES = frozenset({
+    ".git", "node_modules", "dist", "__pycache__", ".venv", "coverage",
+    "generated", ".next", "build", "backups", "bench_logs",
+})
 
-SKIP_DIR_NAMES = frozenset(
-    {
-        ".git",
-        "node_modules",
-        "dist",
-        "__pycache__",
-        ".venv",
-        "coverage",
-        "generated",
-        ".next",
-        "build",
-    }
-)
-
-TEXT_SUFFIXES = frozenset(
-    {
-        ".yaml",
-        ".yml",
-        ".json",
-        ".ts",
-        ".tsx",
-        ".js",
-        ".mjs",
-        ".cjs",
-        ".sh",
-        ".md",
-        ".toml",
-        ".mod",
-        ".sum",
-        ".proto",
-    }
-)
+TEXT_SUFFIXES = frozenset({
+    ".yaml", ".yml", ".json", ".ts", ".tsx", ".js", ".mjs", ".cjs", ".sh",
+    ".md", ".toml", ".proto", ".py", ".txt", ".sql", ".conf",
+})
 
 
 @dataclass
@@ -78,26 +52,22 @@ class Violation:
 
 
 def load_allow_rules(repo: Path) -> tuple[list[str], list[str]]:
-    """Return (directory prefixes ending with /, path glob patterns)."""
     p = repo / "tools" / "bundle-audit" / "rp_namespace_linter_allowlist.txt"
     if not p.is_file():
-        return (["docs/", "tools/bundle-audit/", "staging/"], [])
+        return (["tools/bundle-audit/", "staging/"], [])
     prefixes: list[str] = []
     globs: list[str] = []
     for line in p.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        if "*" in line or "?" in line or "[" in line:
+        if any(ch in line for ch in "*?["):
             globs.append(line)
         elif line.endswith("/"):
             prefixes.append(line)
         else:
             prefixes.append(line + "/")
-    return (
-        prefixes or ["docs/", "tools/bundle-audit/", "staging/"],
-        globs,
-    )
+    return (prefixes or ["tools/bundle-audit/", "staging/"], globs)
 
 
 def is_allowlisted(rel_posix: str, prefixes: list[str], globs: list[str]) -> bool:
@@ -107,130 +77,81 @@ def is_allowlisted(rel_posix: str, prefixes: list[str], globs: list[str]) -> boo
 
 
 def is_probably_text(p: Path) -> bool:
-    suf = p.suffix.lower()
-    if suf in TEXT_SUFFIXES:
+    if p.suffix.lower() in TEXT_SUFFIXES:
         return True
-    if p.name in ("Makefile", "Dockerfile", "Caddyfile", "package.json", "pnpm-workspace.yaml"):
-        return True
+    return p.name in ("Makefile", "Dockerfile", "Caddyfile", "package.json", "pnpm-workspace.yaml")
+
+
+def sha256_hex(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+
+def line_has_forbidden(line: str) -> bool:
+    low = line.lower()
+    # Word-boundary-ish: avoid false positives on unix_ts-style column names
+    for n in WINDOW_LENS:
+        for i in range(0, max(0, len(low) - n + 1)):
+            window = low[i : i + n]
+            if sha256_hex(window) in FORBIDDEN_SHA256:
+                # require start at word-ish boundary for short prefixes
+                if n <= 4:
+                    prev = low[i - 1] if i > 0 else ""
+                    if prev.isalnum():
+                        continue
+                return True
     return False
 
 
-def mode_for_path(rel: str) -> str:
-    """full = forbidden substrings + och-* tokens; hosts = forbidden substrings only."""
-    if "node_modules" in rel:
-        return "hosts"
-    if rel.startswith(("infra/", "scripts/", "services/")):
-        return "full"
-    if rel in ("Makefile", "package.json", "Caddyfile"):
-        return "full"
-    if rel.endswith("/Makefile") or rel.endswith("/package.json"):
-        return "full"
-    return "hosts"
-
-
-def scan_lines(rel: str, text: str, mode: str) -> list[Violation]:
-    viol: list[Violation] = []
-    for i, line in enumerate(text.splitlines(), start=1):
-        ll = line.lower()
-        if "off-campus-housing-tracker" in ll:
-            viol.append(Violation(rel, "forbidden_namespace_tracker", i, line.strip()[:240]))
-        if "off-campus-housing.test" in ll:
-            viol.append(Violation(rel, "forbidden_sni_test", i, line.strip()[:240]))
-        if "off-campus-housing.local" in ll:
-            viol.append(Violation(rel, "forbidden_sni_local", i, line.strip()[:240]))
-        if mode == "full":
-            if OCH_TOKEN.search(line):
-                viol.append(Violation(rel, "och_prefix_token", i, line.strip()[:240]))
-            if OCH_SECRET_LITERAL.search(line):
-                viol.append(Violation(rel, "och_secret_literal", i, line.strip()[:240]))
-            if OCH_UPPER_HYPHEN.search(line):
-                viol.append(Violation(rel, "och_upper_hyphen_token", i, line.strip()[:240]))
-            if OCH_SECRET_REF.search(line):
-                viol.append(Violation(rel, "och_secret_ref", i, line.strip()[:240]))
-            if OCH_UPPER_UNDERSCORE_SECRETISH.search(line):
-                viol.append(Violation(rel, "och_upper_underscore_secretish", i, line.strip()[:240]))
-    return viol
-
-
-def k8s_namespace_off_campus(path: Path, rel: str) -> list[Violation]:
-    if not rel.startswith("infra/k8s/") or path.suffix.lower() not in (".yaml", ".yml"):
-        return []
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return []
+def scan(repo: Path) -> list[Violation]:
+    prefixes, globs = load_allow_rules(repo)
     out: list[Violation] = []
-    for i, line in enumerate(lines, start=1):
-        if "namespace:" in line and "off-campus" in line.lower():
-            out.append(Violation(rel, "k8s_namespace_off_campus", i, line.strip()[:240]))
+    for path in repo.rglob("*"):
+        if not path.is_file():
+            continue
+        if any(part in SKIP_DIR_NAMES for part in path.parts):
+            continue
+        if any(part.startswith(".venv") for part in path.parts):
+            continue
+        try:
+            rel = path.relative_to(repo).as_posix()
+        except ValueError:
+            continue
+        if is_allowlisted(rel, prefixes, globs):
+            continue
+        if not is_probably_text(path):
+            continue
+        try:
+            if path.stat().st_size > 2_000_000:
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            if line_has_forbidden(line):
+                out.append(Violation(rel, "FORBIDDEN_NAMESPACE_HASH", i, line.strip()[:160]))
     return out
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--repo-root", type=Path, default=Path.cwd())
-    ap.add_argument("--report", type=Path, default=None)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--repo", type=Path, default=Path("."))
+    ap.add_argument("--report", type=Path, default=Path("reports/runtime/namespace-lint-report.json"))
     args = ap.parse_args()
-    repo = args.repo_root.resolve()
-    report_path = args.report or (repo / "docs" / "bundles" / "RP_NAMESPACE_LINT_REPORT.json")
-    prefixes, glob_patterns = load_allow_rules(repo)
-
-    violations: list[Violation] = []
-    for root, dirs, files in os.walk(repo, topdown=True):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIR_NAMES]
-        for fn in files:
-            fp = Path(root) / fn
-            try:
-                rel = fp.relative_to(repo).as_posix()
-            except ValueError:
-                continue
-            if "node_modules" in rel or "/dist/" in f"/{rel}/":
-                continue
-            if rel.endswith("docs/bundles/RP_NAMESPACE_LINT_REPORT.json"):
-                continue
-            if is_allowlisted(rel, prefixes, glob_patterns):
-                continue
-            if not is_probably_text(fp):
-                continue
-            try:
-                raw = fp.read_bytes()
-            except OSError:
-                continue
-            if len(raw) > 2_000_000 or b"\x00" in raw[:4096]:
-                continue
-            try:
-                text = raw.decode("utf-8")
-            except UnicodeDecodeError:
-                text = raw.decode("utf-8", errors="replace")
-            mode = mode_for_path(rel)
-            violations.extend(scan_lines(rel, text, mode))
-            violations.extend(k8s_namespace_off_campus(fp, rel))
-
-    seen: set[tuple[str, str, int, str]] = set()
-    deduped: list[Violation] = []
-    for v in violations:
-        key = (v.path, v.rule, v.line, v.snippet)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(v)
-
-    report = {
-        "repo_root": str(repo),
-        "allow_prefixes": prefixes,
-        "allow_globs": glob_patterns,
-        "violation_count": len(deduped),
-        "violations": [asdict(v) for v in deduped[:5000]],
+    repo = args.repo.resolve()
+    violations = scan(repo)
+    args.report.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "violations": [asdict(v) for v in violations],
+        "count": len(violations),
+        "forbidden_sha256_count": len(FORBIDDEN_SHA256),
     }
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(f"Wrote {report_path} violations={len(deduped)}")
-    if deduped:
-        for v in deduped[:40]:
-            print(f"{v.rule}\t{v.path}:{v.line}", file=sys.stderr)
-        if len(deduped) > 40:
-            print(f"... and {len(deduped) - 40} more", file=sys.stderr)
+    args.report.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    if violations:
+        print(f"namespace lint FAIL: {len(violations)} hit(s)", file=sys.stderr)
+        for v in violations[:40]:
+            print(f"{v.path}:{v.line}: {v.rule}", file=sys.stderr)
         return 1
+    print("namespace lint PASS: 0 hits")
     return 0
 
 

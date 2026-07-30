@@ -45,7 +45,7 @@ if ! kubectl get svc kafka-0-external -n "$NS" --request-timeout=15s >/dev/null 
 fi
 
 POOL="${METALLB_POOL:-192.168.64.240-192.168.64.250}"
-och_metallb_pool_first_ip "$POOL" >/dev/null || {
+rp_metallb_pool_first_ip "$POOL" >/dev/null || {
   echo "❌ Invalid METALLB_POOL: $POOL" >&2
   exit 1
 }

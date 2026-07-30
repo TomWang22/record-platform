@@ -81,8 +81,8 @@ ANALYZE listings.listings;
 LISTINGSEOF
 ok "Listings service optimized"
 
-# Social Service Optimizations (Port 5434)
-say "=== Social Service: Optimizing for messaging load ==="
+# Messaging Service Optimizations (Port 5434)
+say "=== Messaging Service: Optimizing for messaging load ==="
 PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d records << 'SOCIALEOF'
 -- Optimize for high message volume
 
@@ -98,7 +98,7 @@ CREATE INDEX IF NOT EXISTS idx_forum_posts_created_covering
 ANALYZE messages.messages;
 ANALYZE forum.posts;
 SOCIALEOF
-ok "Social service optimized"
+ok "messaging-plane optimized"
 
 # Shopping Service Optimizations (Port 5436)
 say "=== Shopping Service: Optimizing for cart operations ==="

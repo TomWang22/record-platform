@@ -134,7 +134,7 @@ verify_cache_operations() {
 }
 
 # Verify messaging service health (housing: port 5444)
-verify_social_service() {
+verify_messaging-plane() {
   say "Verifying Messaging Service (DB port 5444)..."
   MESSAGING_PORT="${MESSAGING_DB_PORT:-5444}"
   MESSAGING_PODS=($(kubectl -n "${HOUSING_NS:-record-platform}" get pods -l app=messaging-service -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo ""))
@@ -219,7 +219,7 @@ main() {
   test_db_connectivity
   verify_shopping_cart
   verify_cache_operations
-  verify_social_service
+  verify_messaging-plane
   verify_http3_capture
   
   say "=== Verification Complete ==="

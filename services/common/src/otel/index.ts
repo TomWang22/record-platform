@@ -27,7 +27,7 @@ export {
   tracingInterceptor,
 } from "./grpc-client-interceptor.js";
 export { createGrpcServerTracingInterceptor } from "./grpc-server-interceptor.js";
-export { isOchTraceDebugLogEnabled, logTraceDebug } from "./trace-debug-log.js";
+export { isRpTraceDebugLogEnabled, logTraceDebug } from "./trace-debug-log.js";
 export {
   canonicalNetProtoFromEdgeHeader,
   decorateHttpSpanWithTransport,
@@ -50,3 +50,11 @@ export {
   withKafkaProduceSpan,
   type KafkaMessageHeaders,
 } from "./kafka-propagation.js";
+export {
+  assertAllowedNamespaceKey,
+  containsForbiddenNamespaceLiteral,
+  FORBIDDEN_NAMESPACE_SHA256,
+  requireAllowedNamespaceKey,
+  type NamespaceDecision,
+  type NamespaceKind,
+} from "./namespace-integrity.js";

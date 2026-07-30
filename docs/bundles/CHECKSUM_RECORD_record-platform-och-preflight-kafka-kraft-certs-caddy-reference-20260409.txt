@@ -1,6 +1,0 @@
-ARCHIVE_SHA256=017dc4875ca3d0904be4e813bf2298e31b4ad2bc244dc58e39e2efc9865d4d28
-ARCHIVE_PATH=/Users/tom/record-platform-och-preflight-kafka-kraft-certs-caddy-reference-20260409.tar.gz
-SIDECAR_PATH=none
-SIDECAR_HASH_EXPECTED=
-RECORDED_AT_UTC=2026-04-19T00:53:08.659734+00:00
-PROTOCOL=bundle_extraction_v1

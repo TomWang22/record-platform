@@ -13,7 +13,7 @@
 | File | Package | Messages |
 |------|---------|----------|
 | auth.proto | events.auth | UserCreatedV1, UserDeletedV1, **UserAccountDeletedV1**, **UserDeletionAckV1**, UserRoleUpdatedV1, UserSuspendedV1 |
-| booking.proto | events.booking | *(legacy OCH — not deployed in RP; topic removed)* |
+| booking.proto | events.booking | *(legacy RP — not deployed in RP; topic removed)* |
 | listing.proto | events.listing | ListingCreatedV1, ListingUpdatedV1, ListingDeletedV1, ListingPriceUpdatedV1 |
 | trust.proto | events.trust | ListingFlaggedV1, ListingUnflaggedV1, ReviewCreatedV1, UserReputationUpdatedV1 |
 | analytics.proto | events.analytics | WatchlistActivityV1, DailyMetricsSnapshotV1, ListingInsightRequestedV1 |
@@ -56,4 +56,4 @@ Every consumer must deduplicate by event_id: table `processed_events (event_id U
 
 ## Topic naming (parameterized)
 
-Topics use **ENV_PREFIX**: `${ENV_PREFIX:-dev}.listing.events`, etc. Create with `ENV_PREFIX=dev ./scripts/create-kafka-event-topics.sh` (or staging/prod). No hardcoded env in code. Legacy OCH booking/social topics are excluded from RP generators.
+Topics use **ENV_PREFIX**: `${ENV_PREFIX:-dev}.listing.events`, etc. Create with `ENV_PREFIX=dev ./scripts/create-kafka-event-topics.sh` (or staging/prod). No hardcoded env in code. Legacy RP booking/social topics are excluded from RP generators.

@@ -25,7 +25,7 @@ Each phase ends in a **stable equilibrium** before the next begins:
 | **Cluster headroom** | Same semantics as `scripts/cluster-stability-guard.sh` (`kubectl top nodes`, CPU/MEM % → idle/free vs `CLUSTER_GUARD_*`). Skippable: `PHASE_BARRIER_SKIP_CLUSTER_HEADROOM=1`. |
 | **Pod stability** | In `HOUSING_NS` only: fail if any pod is not `Running` and not `Succeeded` (requires `jq`). Skippable: `PHASE_BARRIER_SKIP_POD_STABILITY=1`. |
 | **Gateway drain** | `kubectl rollout restart deployment/api-gateway` + `rollout status` + `PHASE_BARRIER_POST_GATEWAY_SLEEP_SEC` (default 5). Stateless gateway: clears E2E shaper `inUse` / waiter queue. Skippable: `PHASE_BARRIER_SKIP_GATEWAY_RESTART=1`. |
-| **Watchdog reset** | Best-effort `DEL` on `och:gw:watchdog_throttle` via `deploy/redis` + `redis-cli` when present. For external Redis, set **`PHASE_BARRIER_WATCHDOG_REDIS_DEL_CMD`** to a shell snippet that deletes the key. Skippable: `PHASE_BARRIER_SKIP_WATCHDOG_CLEAR=1`. |
+| **Watchdog reset** | Best-effort `DEL` on `rp:gw:watchdog_throttle` via `deploy/redis` + `redis-cli` when present. For external Redis, set **`PHASE_BARRIER_WATCHDOG_REDIS_DEL_CMD`** to a shell snippet that deletes the key. Skippable: `PHASE_BARRIER_SKIP_WATCHDOG_CLEAR=1`. |
 | **Jaeger** | Runs `scripts/verify-jaeger-liveness.sh` when `JAEGER_QUERY_BASE` is set. Skippable: `PHASE_BARRIER_SKIP_JAEGER=1`. |
 | **Pool stabilize** | Optional trailing `sleep` via `PHASE_BARRIER_TRAILING_STABILIZE_SEC` (e.g. `10` after integration-heavy phases). |
 

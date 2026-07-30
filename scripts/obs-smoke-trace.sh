@@ -5,14 +5,14 @@ BASE_URL="${BASE_URL:-https://record-platform.test}"
 JAEGER_BASE="${JAEGER_BASE:-$BASE_URL/jaeger}"
 LOOKBACK_RETRIES="${LOOKBACK_RETRIES:-12}"
 SLEEP_SECS="${SLEEP_SECS:-3}"
-REQUIRED_SERVICES="${REQUIRED_SERVICES:-api-gateway,booking-service,listings-service,notification-service}"
+REQUIRED_SERVICES="${REQUIRED_SERVICES:-api-gateway,reservation-mesh,listings-service,notification-service}"
 MIN_SERVICES="${MIN_SERVICES:-3}"
 MIN_SPANS="${MIN_SPANS:-8}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck source=scripts/lib/och-run-id.sh
-source "$ROOT/scripts/lib/och-run-id.sh"
-RUN_ID="${OCH_TRACE_SMOKE_RUN_ID:-$(och_read_run_id "$ROOT")}"
+# shellcheck source=scripts/lib/rp-run-id.sh
+source "$ROOT/scripts/lib/rp-run-id.sh"
+RUN_ID="${RP_TRACE_SMOKE_RUN_ID:-$(rp_read_run_id "$ROOT")}"
 
 curl_args=(-sS)
 if [[ -n "${CA_CERT:-}" ]]; then
@@ -21,9 +21,9 @@ else
   curl_args+=(-k)
 fi
 
-tmp_resp="$(mktemp "${TMPDIR:-/tmp}/och-trace-smoke-response.XXXXXX.json")"
-tmp_trace="$(mktemp "${TMPDIR:-/tmp}/och-trace-smoke-jaeger.XXXXXX.json")"
-tmp_prom="$(mktemp "${TMPDIR:-/tmp}/och-trace-smoke.prom.XXXXXX")"
+tmp_resp="$(mktemp "${TMPDIR:-/tmp}/rp-trace-smoke-response.XXXXXX.json")"
+tmp_trace="$(mktemp "${TMPDIR:-/tmp}/rp-trace-smoke-jaeger.XXXXXX.json")"
+tmp_prom="$(mktemp "${TMPDIR:-/tmp}/rp-trace-smoke.prom.XXXXXX")"
 cleanup() {
   rm -f "$tmp_resp" "$tmp_trace" "$tmp_prom"
 }
@@ -109,30 +109,30 @@ if [[ "$jaeger_ok" != "1" ]]; then
 fi
 
 cat >"$tmp_prom" <<EOF
-# HELP och_trace_smoke_span_count Spans in Jaeger for last full-trace smoke.
-# TYPE och_trace_smoke_span_count gauge
-och_trace_smoke_span_count{run_id="${RUN_ID}"} ${span_count:-0}
-# HELP och_trace_smoke_service_count Distinct services in last full-trace smoke trace.
-# TYPE och_trace_smoke_service_count gauge
-och_trace_smoke_service_count{run_id="${RUN_ID}"} ${service_count:-0}
-# HELP och_trace_smoke_non_2xx_count Non-2xx or error-tagged spans in last smoke trace.
-# TYPE och_trace_smoke_non_2xx_count gauge
-och_trace_smoke_non_2xx_count{run_id="${RUN_ID}"} ${non_2xx:-0}
-# HELP och_trace_smoke_last_success_timestamp_seconds Unix time when smoke passed Jaeger gates.
-# TYPE och_trace_smoke_last_success_timestamp_seconds gauge
-och_trace_smoke_last_success_timestamp_seconds{run_id="${RUN_ID}"} $([[ "$jaeger_ok" == "1" ]] && echo "$ts_now" || echo 0)
-# HELP och_trace_smoke_duration_seconds Wall time for smoke script including Jaeger poll.
-# TYPE och_trace_smoke_duration_seconds gauge
-och_trace_smoke_duration_seconds{run_id="${RUN_ID}"} ${dur_sec}
-# HELP och_trace_smoke_last_trace_id_info Last trace id (value 1).
-# TYPE och_trace_smoke_last_trace_id_info gauge
-och_trace_smoke_last_trace_id_info{trace_id="${trace_id}",run_id="${RUN_ID}"} 1
+# HELP rp_trace_smoke_span_count Spans in Jaeger for last full-trace smoke.
+# TYPE rp_trace_smoke_span_count gauge
+rp_trace_smoke_span_count{run_id="${RUN_ID}"} ${span_count:-0}
+# HELP rp_trace_smoke_service_count Distinct services in last full-trace smoke trace.
+# TYPE rp_trace_smoke_service_count gauge
+rp_trace_smoke_service_count{run_id="${RUN_ID}"} ${service_count:-0}
+# HELP rp_trace_smoke_non_2xx_count Non-2xx or error-tagged spans in last smoke trace.
+# TYPE rp_trace_smoke_non_2xx_count gauge
+rp_trace_smoke_non_2xx_count{run_id="${RUN_ID}"} ${non_2xx:-0}
+# HELP rp_trace_smoke_last_success_timestamp_seconds Unix time when smoke passed Jaeger gates.
+# TYPE rp_trace_smoke_last_success_timestamp_seconds gauge
+rp_trace_smoke_last_success_timestamp_seconds{run_id="${RUN_ID}"} $([[ "$jaeger_ok" == "1" ]] && echo "$ts_now" || echo 0)
+# HELP rp_trace_smoke_duration_seconds Wall time for smoke script including Jaeger poll.
+# TYPE rp_trace_smoke_duration_seconds gauge
+rp_trace_smoke_duration_seconds{run_id="${RUN_ID}"} ${dur_sec}
+# HELP rp_trace_smoke_last_trace_id_info Last trace id (value 1).
+# TYPE rp_trace_smoke_last_trace_id_info gauge
+rp_trace_smoke_last_trace_id_info{trace_id="${trace_id}",run_id="${RUN_ID}"} 1
 EOF
 
-cp "$tmp_prom" "$ROOT/bench_logs/och-trace-smoke.prom"
-chmod +x "$ROOT/scripts/lib/push-och-prom.sh" 2>/dev/null || true
-OCH_PUSHGATEWAY_JOB=trace-smoke OCH_PUSHGATEWAY_INSTANCE="$RUN_ID" \
-  bash "$ROOT/scripts/lib/push-och-prom.sh" "$tmp_prom" || echo "obs-smoke-trace: pushgateway push failed (non-fatal)" >&2
+cp "$tmp_prom" "$ROOT/bench_logs/rp-trace-smoke.prom"
+chmod +x "$ROOT/scripts/lib/push-rp-prom.sh" 2>/dev/null || true
+RP_PUSHGATEWAY_JOB=trace-smoke RP_PUSHGATEWAY_INSTANCE="$RUN_ID" \
+  bash "$ROOT/scripts/lib/push-rp-prom.sh" "$tmp_prom" || echo "obs-smoke-trace: pushgateway push failed (non-fatal)" >&2
 
 [[ "$jaeger_ok" == "1" ]] || exit 1
 echo "obs-smoke-trace: OK (pushed metrics, duration=${dur_sec}s)"

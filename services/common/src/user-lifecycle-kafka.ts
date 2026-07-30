@@ -2,7 +2,7 @@
  * ${ENV_PREFIX}.user.lifecycle.v1 — EventEnvelope + UserAccountDeletedV1 (proto/events).
  */
 import { createRequire } from "node:module";
-import { ochKafkaTopicIsolationSuffix } from "./kafka.js";
+import { rpKafkaTopicIsolationSuffix } from "./kafka.js";
 import { resolveProtoPath } from "./proto.js";
 
 const nodeRequire = createRequire(__filename);
@@ -32,7 +32,7 @@ export function userLifecycleV1Topic(): string {
   const override = process.env.USER_LIFECYCLE_TOPIC?.trim();
   if (override) return override;
   const p = process.env.ENV_PREFIX || "dev";
-  return `${p}.user.lifecycle.v1${ochKafkaTopicIsolationSuffix()}`;
+  return `${p}.user.lifecycle.v1${rpKafkaTopicIsolationSuffix()}`;
 }
 
 export type UserAccountDeletedPayload = {

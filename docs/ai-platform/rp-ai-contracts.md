@@ -15,7 +15,7 @@ Current implementation status is tracked in `bench_logs/ai-platform/t15-ai-archi
 2. **Degraded, not fake** — when Ollama or upstream DB is unavailable, return `source_status: degraded` with structured error codes, not mock AI text.
 3. **Owner-scoped privacy** — RAG and summaries are filtered by `owner_user_id`; private message bodies never cross users.
 4. **Outbox-first events** — AI signals publish via existing transactional outbox → Kafka → notification path.
-5. **No OCH/housing semantics** — marketplace record/listing/auction vocabulary only.
+5. **No RP/housing semantics** — marketplace record/listing/auction vocabulary only.
 
 ---
 

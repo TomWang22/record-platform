@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Terminal/runner UX regression for RP cold-bootstrap (OCH execution model).
+# Terminal/runner UX regression for RP cold-bootstrap (RP execution model).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,7 +33,7 @@ grep -q 'rp_run_logged.*Colima+k3s start' "$_z" && _bump "rp-colima-start-clean 
 grep -q 'rp_run_native_tty' "$_z" "$_p0" || _bump "Z/P0 scripts must reference rp_run_native_tty where needed"
 grep -q 'rp_run_native_tty.*colima-start' "$_z" || _bump "colima start must use rp_run_native_tty"
 
-# Phase order in source (OCH: A → P1 → P0 → Z)
+# Phase order in source (RP: A → P1 → P0 → Z)
 _an=$(grep -n 'rp_cb_phase_enter A.workspace' "$_cb" | head -1 | cut -d: -f1)
 _p1n=$(grep -n 'rp_cb_phase_enter P1.host_deps' "$_cb" | head -1 | cut -d: -f1)
 _p0n=$(grep -n 'rp_cb_phase_enter P0.hard_reset' "$_cb" | head -1 | cut -d: -f1)

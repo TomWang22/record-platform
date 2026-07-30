@@ -79,7 +79,7 @@ Non-message chunks: **73,043** → coverage **5,565 / 73,043 = 7.62%**
 | Endpoints contract | **PASS** |
 | Provider readiness | **PASS** |
 | pgvector readiness | **PASS** |
-| OCH scan | **PASS** |
+| RP scan | **PASS** |
 
 Shadow selection preserved: owner OBO prompt **6 OBO + 2 listing** (total **1909 ms**). Zero-overlap: **12/16**.
 

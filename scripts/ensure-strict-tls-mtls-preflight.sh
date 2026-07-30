@@ -107,7 +107,7 @@ _provision_from_mkcert() {
     "auth-service.record-platform.svc.cluster.local" \
     "api-gateway.record-platform.svc.cluster.local" \
     "listings-service.record-platform.svc.cluster.local" \
-    "booking-service.record-platform.svc.cluster.local" \
+    "reservation-mesh.record-platform.svc.cluster.local" \
     "messaging-service.record-platform.svc.cluster.local" \
     "trust-service.record-platform.svc.cluster.local" \
     "analytics-service.record-platform.svc.cluster.local" \

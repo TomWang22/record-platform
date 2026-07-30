@@ -148,9 +148,9 @@ T20.39B complete. Validator BLOCKED — current artifact remains N=3; no two add
 T20.39B2 complete. Real-participant artifact intake tooling added; artifact remains N=3 until owner-provided JSON is appended and validated.
 T20.39B3 complete. Two owner-approved internal_staff preview participants provisioned; artifact is now N=5 (`1849c7a658151dd7a896c02d86d202f844d28e8d01ffc4ac9b1a5086f8b71caa`); 5/5 JWT-sub audit PASS.
 T20.39B RERUN complete. N=5 validator PASS; preflight PASS; telemetry WARNs 0; preview UI smoke 4/4 PASS.
-T20.39C-LIVE: PASS — 4320/4320 HTTP 200 (5 artifact participants + contract control, 16 windows), 0% fallback, hybrid p95 131.99 ms, avg quality 4.0, Playwright C-suite 7/7, OCH PASS, WARNs 0.
+T20.39C-LIVE: PASS — 4320/4320 HTTP 200 (5 artifact participants + contract control, 16 windows), 0% fallback, hybrid p95 131.99 ms, avg quality 4.0, Playwright C-suite 7/7, RP PASS, WARNs 0.
 T20.39D complete. Rollback drill PASS — UI/API enroll→revoke, bulk revoke all 5, CANARY=0 drill, KEEP restore verified.
-T20.39E complete. Telemetry audit PASS — OCH PASS, telemetry WARNs 0, Playwright C-suite 7/7.
+T20.39E complete. Telemetry audit PASS — RP PASS, telemetry WARNs 0, Playwright C-suite 7/7.
 T20.39F complete. Decision C selected: KEEP broader real-participant opt-in preview UI/API, PERCENT=0; D recommended; E rejected.
 T20.39G complete. Broader real-participant N=5 batch CLOSED PASS; next approval phrase: "Approved: start T20.40A broader real-participant opt-in hybrid preview readiness decision design only".
 T20.39A–G CLOSED PASS: N=5 real/internal participant soak PASS 4320/4320; cumulative 37665/37665.
@@ -335,7 +335,7 @@ T20.39B3 COMPLETE: two owner-approved internal_staff preview participants provis
 T20.39B RERUN PASS: N=5 artifact validator, preflight, telemetry, and preview UI smoke PASS.
 T20.39C-LIVE PASS: N=5 matrix 4320/4320; cumulative 37665/37665; fallback 0%; post-revoke keyword_default PASS for all 5.
 T20.39D ROLLBACK PASS: UI/API enroll-revoke, bulk revoke, CANARY=0, and KEEP restore verified.
-T20.39E TELEMETRY PASS: OCH PASS, WARNs 0, C-suite 7/7.
+T20.39E TELEMETRY PASS: RP PASS, WARNs 0, C-suite 7/7.
 T20.39F DECISION: C KEEP selected; D recommended; E production default rejected.
 T20.39G CLOSED PASS: T20.39 complete; next T20.40A design-only approval required.
 T20.39A–G CLOSED PASS: N=5 real/internal participant soak PASS 4320/4320; cumulative 37665/37665.
@@ -484,7 +484,7 @@ Re-validate:
 node scripts/ai-quality-telemetry-report.mjs
 cd services/python-ai-service && source .venv/bin/activate && PYTHONPATH=. python -m pytest tests/ -q
 bash scripts/audit-rp-ai-endpoints-contract.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 Telemetry reporter: `scripts/ai-quality-telemetry-report.mjs`  

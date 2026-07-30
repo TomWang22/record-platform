@@ -1,7 +1,7 @@
 /**
  * Consume ${ENV_PREFIX}.listing.events — project ListingCreatedV1 into analytics.daily_metrics (idempotent).
  */
-import { getRpKafka, ochKafkaTopicIsolationSuffix } from "@common/utils";
+import { getRpKafka, rpKafkaTopicIsolationSuffix } from "@common/utils";
 import { withKafkaConsumerSpan } from "@common/utils/otel";
 import type { Consumer } from "kafkajs";
 import type { Pool } from "pg";
@@ -9,7 +9,7 @@ import { applyListingCreatedForAnalytics } from "../listing-metrics-projection.j
 
 const PREFIX = process.env.ENV_PREFIX || "dev";
 export const ANALYTICS_LISTING_EVENTS_TOPIC =
-  process.env.LISTING_EVENTS_TOPIC || `${PREFIX}.listing.events${ochKafkaTopicIsolationSuffix()}`;
+  process.env.LISTING_EVENTS_TOPIC || `${PREFIX}.listing.events${rpKafkaTopicIsolationSuffix()}`;
 const GROUP_ID = process.env.ANALYTICS_LISTING_KAFKA_GROUP || "analytics-service-listing-events";
 
 type Envelope = {

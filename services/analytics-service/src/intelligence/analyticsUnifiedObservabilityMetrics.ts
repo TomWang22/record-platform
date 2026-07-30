@@ -444,9 +444,9 @@ function parseModelCostsEnv(): Record<string, number> {
   return out;
 }
 
-/** Best-effort: read repo bench_logs skew JSON (host dev) when OCH_COVERAGE_KAFKA_SKEW_JSON is set. */
+/** Best-effort: read repo bench_logs skew JSON (host dev) when RP_COVERAGE_KAFKA_SKEW_JSON is set. */
 export function refreshKafkaSkewGaugesFromFile(): void {
-  const p = process.env.OCH_COVERAGE_KAFKA_SKEW_JSON?.trim();
+  const p = process.env.RP_COVERAGE_KAFKA_SKEW_JSON?.trim();
   if (!p || !existsSync(p)) return;
   try {
     const j = JSON.parse(readFileSync(p, "utf8")) as { pass?: boolean; max_partition_share?: number };
@@ -464,10 +464,10 @@ export function refreshKafkaSkewGaugesFromFile(): void {
 const defaultSkewPath = join(process.cwd(), "bench_logs", "coverage-kafka-skew.json");
 
 export function startSkewGaugePoller(): void {
-  const intervalMs = Number(process.env.OCH_KAFKA_SKEW_GAUGE_POLL_MS || "20000");
+  const intervalMs = Number(process.env.RP_KAFKA_SKEW_GAUGE_POLL_MS || "20000");
   if (!Number.isFinite(intervalMs) || intervalMs < 5000) return;
-  const path = process.env.OCH_COVERAGE_KAFKA_SKEW_JSON?.trim() || defaultSkewPath;
+  const path = process.env.RP_COVERAGE_KAFKA_SKEW_JSON?.trim() || defaultSkewPath;
   if (!existsSync(path)) return;
-  process.env.OCH_COVERAGE_KAFKA_SKEW_JSON = path;
+  process.env.RP_COVERAGE_KAFKA_SKEW_JSON = path;
   setInterval(() => refreshKafkaSkewGaugesFromFile(), intervalMs).unref?.();
 }

@@ -53,7 +53,7 @@ Template for owner completion: `T20-24A-opt-in-hybrid-preview-implementation-des
 
 | Script | Result |
 |--------|--------|
-| `rp-och-decontaminate-scan.sh` | **PASS** (`__SCANNED__=105`) |
+| `rp-rp-decontaminate-scan.sh` | **PASS** (`__SCANNED__=105`) |
 | `ai-quality-telemetry-report.mjs` | **0 WARNs** (record 3.86, longform 3.67, final 4.0) |
 
 No live inference. No deploy. No code change.

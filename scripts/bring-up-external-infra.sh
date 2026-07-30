@@ -26,7 +26,7 @@ source "$SCRIPT_DIR/lib/ensure-colima-docker-context.sh"
 # shellcheck source=lib/rp-colima-running.sh
 source "$SCRIPT_DIR/lib/rp-colima-running.sh"
 if command -v colima >/dev/null 2>&1 && rp_colima_is_running; then
-  OCH_FORCE_COLIMA_DOCKER=1 och_ensure_colima_docker_context || true
+  RP_FORCE_COLIMA_DOCKER=1 rp_ensure_colima_docker_context || true
 fi
 docker info >/dev/null 2>&1 || { warn "Docker not reachable"; exit 1; }
 
@@ -117,7 +117,7 @@ if [[ -n "$RESTORE_BACKUP_DIR" ]] && [[ "${SKIP_AUTO_RESTORE:-0}" != "1" ]]; the
   RESTORE_BACKUP_DIR="${RESTORE_BACKUP_DIR_ABS:-$RESTORE_BACKUP_DIR}"
   echo "=== Auto-restore (RP runtime 5433–5443): $RESTORE_BACKUP_DIR ==="
   export RP_SKIP_BOOKING_DB="${RP_SKIP_BOOKING_DB:-1}"
-  export RP_SKIP_SOCIAL_SERVICE="${RP_SKIP_SOCIAL_SERVICE:-1}"
+  export RP_SKIP_MESSAGING_LEGACY_PEER="${RP_SKIP_MESSAGING_LEGACY_PEER:-1}"
   "$SCRIPT_DIR/restore-rp-hybrid-backup.sh" "$RESTORE_BACKUP_DIR"
 fi
 

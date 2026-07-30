@@ -39,7 +39,7 @@ This document defines **how** a future opt-in hybrid preview would be implemente
 | T20.22 rollout design | **CLOSED**; rollout **NOT APPROVED** |
 | T20.23 preview design | **CLOSED**; preview implementation **NOT APPROVED** |
 | Telemetry WARNs | **0** |
-| Leakage / OCH | **PASS** |
+| Leakage / RP | **PASS** |
 
 ---
 

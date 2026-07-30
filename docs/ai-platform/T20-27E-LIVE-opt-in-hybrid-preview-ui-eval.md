@@ -33,7 +33,7 @@ Enrollment: 5 cohort users via API (UI enroll verified in Playwright `e2e/ai-rag
 | Canary errors | **0** | 0 **PASS** |
 | Telemetry WARNs | **0** | 0 **PASS** |
 | Leakage | **PASS** | **PASS** |
-| OCH | **PASS** | **PASS** |
+| RP | **PASS** | **PASS** |
 | PERCENT | **0** | **PASS** |
 | Playwright (preview + seller + record + longform) | **PASS** | **PASS** |
 

@@ -13,7 +13,7 @@ export function occupancyForReservedFromSearchParams(
   return null;
 }
 
-/** UTC calendar day YYYY-MM-DD (aligned with booking-service date-only overlap). */
+/** UTC calendar day YYYY-MM-DD (aligned with reservation-mesh date-only overlap). */
 export function defaultSearchOccupancyUtcDay(): { start: string; end: string } {
   const d = new Date();
   const y = d.getUTCFullYear();
@@ -24,7 +24,7 @@ export function defaultSearchOccupancyUtcDay(): { start: string; end: string } {
 }
 
 /**
- * Listing IDs with an overlapping active booking in the occupancy window (booking-service internal API).
+ * Listing IDs with an overlapping active booking in the occupancy window (reservation-mesh internal API).
  */
 export async function fetchReservedSearchListingIds(
   listingIds: string[],

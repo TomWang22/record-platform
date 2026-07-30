@@ -40,11 +40,11 @@ spec:
             name: auth-service
             port:
               number: 50051
-      - path: /social.SocialService
+      - path: /messaging.MessagingService
         pathType: Prefix
         backend:
           service:
-            name: social-service
+            name: messaging-service
             port:
               number: 50056
       - path: /listings.ListingsService

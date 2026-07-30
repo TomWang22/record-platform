@@ -3,11 +3,11 @@
 # Exit 1 on any failure. Live checks target in-cluster KRaft Kafka (Compose broker removed).
 #
 # Env:
-#   REPO_ROOT, ENV_PREFIX (default dev), OCH_KAFKA_TOPIC_SUFFIX (optional)
+#   REPO_ROOT, ENV_PREFIX (default dev), RP_KAFKA_TOPIC_SUFFIX (optional)
 #   SKIP_KAFKA_CONTRACT=1 — exit 0 (e.g. SKIP_KAFKA bring-up)
 #   KAFKA_CONTRACT_NO_LIVE=1 — only static + JKS checks (no docker kafka required)
 #   KAFKA_CONTRACT_MIN_BROKERS=N — after live checks, fail if kafka-contract describeCluster count < N
-#   OCH_KAFKA_REQUIRE_QUORUM_3=1 — same as KAFKA_CONTRACT_MIN_BROKERS=3 (k8s KRaft / production gate)
+#   RP_KAFKA_REQUIRE_QUORUM_3=1 — same as KAFKA_CONTRACT_MIN_BROKERS=3 (k8s KRaft / production gate)
 #   KAFKA_CONTRACT_MIN_CHAOS_SCORE=0.85 — fail if kafka-contract chaosReadinessScore is below threshold (needs jq)
 #   KAFKA_CONTRACT_LIVE_TARGET=k8s — skip docker compose live path; validate via kubectl + kafka-contract (MetalLB / in-cluster)
 #     Requires: kubectl, KAFKA_BROKER, KAFKA_SSL_ENABLED=true, KAFKA_CA_CERT, KAFKA_CLIENT_CERT, KAFKA_CLIENT_KEY
@@ -29,7 +29,7 @@ kafka_contract_apply_quorum_chaos_gates() {
   local json_path="$1"
   [[ -n "$json_path" && -f "$json_path" ]] || fail "kafka_contract_apply_quorum_chaos_gates: missing JSON file"
   local _req_brokers="${KAFKA_CONTRACT_MIN_BROKERS:-0}"
-  [[ "${OCH_KAFKA_REQUIRE_QUORUM_3:-0}" == "1" ]] && _req_brokers=3
+  [[ "${RP_KAFKA_REQUIRE_QUORUM_3:-0}" == "1" ]] && _req_brokers=3
 
   if [[ "$_req_brokers" -eq 0 ]] && [[ -z "${KAFKA_CONTRACT_MIN_CHAOS_SCORE:-}" ]]; then
     return 0
@@ -64,11 +64,11 @@ say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
 
 say "Kafka stack contract validation"
 
-# --- Static: no OCH_KAFKA_DISABLED in TS sources
-if grep -R --include='*.ts' -E '\bOCH_KAFKA_DISABLED\b' services scripts 2>/dev/null | grep -vE 'verify-housing-grpc-matrix|validate-kafka-stack-contract' | grep -q .; then
-  fail "OCH_KAFKA_DISABLED must not appear in services/scripts TypeScript"
+# --- Static: no RP_KAFKA_DISABLED in TS sources
+if grep -R --include='*.ts' -E '\bRP_KAFKA_DISABLED\b' services scripts 2>/dev/null | grep -vE 'verify-platform-grpc-matrix|validate-kafka-stack-contract' | grep -q .; then
+  fail "RP_KAFKA_DISABLED must not appear in services/scripts TypeScript"
 fi
-pass "No OCH_KAFKA_DISABLED in TS sources"
+pass "No RP_KAFKA_DISABLED in TS sources"
 
 # --- Static: broker signing scripts must include clientAuth alongside serverAuth for broker EKU
 for _f in scripts/kafka-ssl-from-dev-root.sh scripts/dev-generate-certs.sh scripts/ci/generate-kafka-ci-tls.sh; do
@@ -86,10 +86,10 @@ done
 pass "Broker OpenSSL templates include clientAuth with serverAuth"
 
 # --- Static: k8s Kafka manifests must not enable auto-create
-for _och_kf in infra/k8s/base/kafka/deploy.yaml infra/k8s/kafka-kraft-metallb/statefulset.yaml; do
-  [[ -f "$_och_kf" ]] || continue
-  if grep 'KAFKA_AUTO_CREATE_TOPICS_ENABLE' "$_och_kf" | grep -qiE 'value:\s*"true"'; then
-    fail "$_och_kf must not set KAFKA_AUTO_CREATE_TOPICS_ENABLE true"
+for _rp_kf in infra/k8s/base/kafka/deploy.yaml infra/k8s/kafka-kraft-metallb/statefulset.yaml; do
+  [[ -f "$_rp_kf" ]] || continue
+  if grep 'KAFKA_AUTO_CREATE_TOPICS_ENABLE' "$_rp_kf" | grep -qiE 'value:\s*"true"'; then
+    fail "$_rp_kf must not set KAFKA_AUTO_CREATE_TOPICS_ENABLE true"
   fi
 done
 pass "k8s Kafka manifests: auto-create not true (base + kraft-metallb)"
@@ -146,7 +146,7 @@ if [[ "${KAFKA_CONTRACT_LIVE_TARGET:-k8s}" == "k8s" ]]; then
   pnpm --filter kafka-contract run build >/dev/null 2>&1 || pnpm --filter kafka-contract run build
 
   _k8s_min_brokers="${KAFKA_CONTRACT_MIN_BROKERS:-0}"
-  [[ "${OCH_KAFKA_REQUIRE_QUORUM_3:-0}" == "1" ]] && [[ "$_k8s_min_brokers" -eq 0 ]] && _k8s_min_brokers=3
+  [[ "${RP_KAFKA_REQUIRE_QUORUM_3:-0}" == "1" ]] && [[ "$_k8s_min_brokers" -eq 0 ]] && _k8s_min_brokers=3
 
   _kc_out="$(mktemp)"
   set +e

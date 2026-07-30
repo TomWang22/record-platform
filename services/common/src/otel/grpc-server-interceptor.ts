@@ -3,7 +3,7 @@ import { context, propagation, trace, SpanStatusCode, type Span } from "@opentel
 import { grpcMetadataGetter } from "./grpc-metadata.js";
 import { normalizeEdgeProto } from "./net-protocol.js";
 import { logGrpcServerInterceptorFinish } from "./interceptor-log.js";
-import { isOchTraceDebugLogEnabled, logTraceDebug } from "./trace-debug-log.js";
+import { isRpTraceDebugLogEnabled, logTraceDebug } from "./trace-debug-log.js";
 
 const metadataGetter = grpcMetadataGetter();
 
@@ -34,12 +34,12 @@ export function createGrpcServerTracingInterceptor(): grpc.ServerInterceptor {
             state.span.setAttribute("rpc.system", "grpc");
             state.span.setAttribute("network.protocol.name", "grpc");
             state.span.setAttribute("network.protocol.version", "2");
-            state.span.setAttribute("och.upstream_proto", "grpc");
-            const edgeHdr = metadataGetter.get(metadata, "x-och-edge-proto");
+            state.span.setAttribute("rp.transport.upstream_protocol", "grpc");
+            const edgeHdr = metadataGetter.get(metadata, "x-rp-edge-proto");
             const edgeRaw = Array.isArray(edgeHdr) ? edgeHdr[0] : edgeHdr;
             const edge = normalizeEdgeProto(edgeRaw != null ? String(edgeRaw) : undefined);
             if (edge !== "unknown") {
-              state.span.setAttribute("och.edge_proto", edge);
+              state.span.setAttribute("rp.transport.edge_protocol", edge);
             }
             const dbg = metadataGetter.get(metadata, "x-debug-replay");
             const dbgVal = Array.isArray(dbg) ? dbg[0] : dbg;
@@ -52,7 +52,7 @@ export function createGrpcServerTracingInterceptor(): grpc.ServerInterceptor {
             state.startHr = process.hrtime.bigint();
             state.activeCtx = trace.setSpan(extracted, state.span);
             context.with(state.activeCtx, () => {
-              if (isOchTraceDebugLogEnabled()) {
+              if (isRpTraceDebugLogEnabled()) {
                 const tpRaw = metadataGetter.get(metadata, "traceparent");
                 const tp = Array.isArray(tpRaw) ? tpRaw[0] : tpRaw;
                 logTraceDebug(process.env.OTEL_SERVICE_NAME?.trim() || "grpc", tp);

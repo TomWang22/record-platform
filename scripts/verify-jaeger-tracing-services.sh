@@ -26,7 +26,7 @@ trap cleanup EXIT
 required=(
   api-gateway
   auth-service
-  booking-service
+  reservation-mesh
   listings-service
   analytics-service
   messaging-service

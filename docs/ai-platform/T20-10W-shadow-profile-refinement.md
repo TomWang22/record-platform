@@ -100,7 +100,7 @@ T20.10U pre-change cache-hit contributors were **1,394–2,684 ms** on comparabl
 | Endpoints contract | **PASS** |
 | Provider readiness | **PASS** |
 | pgvector readiness | **PASS** |
-| OCH decontaminate scan | **PASS** |
+| RP decontaminate scan | **PASS** |
 | Source diagnostic | **FAIL** (1 issue — see below) |
 | Keyword stability (source diagnostic) | **PASS** — all 7 prompts unchanged |
 | Leakage (forbidden prose / private leak scan) | **0** |
@@ -131,7 +131,7 @@ bash scripts/audit-rp-ai-runtime-contract.sh
 bash scripts/audit-rp-ai-endpoints-contract.sh
 bash scripts/rp-ai-provider-readiness.sh
 bash scripts/rp-ai-pgvector-readiness.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 Deploy note: benchmark requires `python-ai-service:dev` image build + rollout restart before timing run.

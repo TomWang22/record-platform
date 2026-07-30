@@ -13,7 +13,7 @@ fi
 _arch=$(docker info -f '{{.Architecture}}' 2>/dev/null || uname -m)
 [[ "$_arch" == "aarch64" ]] || [[ "$_arch" == "arm64" ]] && _plat="linux/arm64" || _plat="linux/amd64"
 PLATFORM="${PLATFORM:-$_plat}"
-SERVICES=( api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service auction-monitor )
+SERVICES=( api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service shopping-service auction-monitor )
 build_one() {
   local name="$1" df="" net_opt=()
   if [[ -f "$ROOT/services/$name/Dockerfile" ]]; then df="$ROOT/services/$name/Dockerfile"

@@ -51,7 +51,7 @@ while true; do
   
   # Services - Pod Status
   echo -e "${BLUE}🚀 Services (Pod Status):${NC}"
-  SERVICES="api-gateway auth-service records-service listings-service social-service shopping-service analytics-service auction-monitor python-ai-service"
+  SERVICES="api-gateway auth-service records-service listings-service messaging-service shopping-service analytics-service auction-monitor python-ai-service"
   READY_COUNT=0
   TOTAL_COUNT=0
   for svc in $SERVICES; do

@@ -2,8 +2,8 @@
 # Concurrent HTTP/3 requests to stress QUIC stream limits (curl 55 / resets under load).
 #
 # Usage:
-#   OCH_H3_URL=https://record.test/api/healthz \
-#   OCH_H3_CA=certs/dev-root.pem \
+#   RP_H3_URL=https://record.test/api/healthz \
+#   RP_H3_CA=certs/dev-root.pem \
 #   CONCURRENCY=200 \
 #   ./scripts/transport/http3-concurrent-curl-stress.sh
 #
@@ -11,12 +11,12 @@
 # many failures often indicate stream / flow-control saturation.
 set -euo pipefail
 
-URL="${OCH_H3_URL:-https://record.test/api/healthz}"
-CA="${OCH_H3_CA:-certs/dev-root.pem}"
+URL="${RP_H3_URL:-https://record.test/api/healthz}"
+CA="${RP_H3_CA:-certs/dev-root.pem}"
 CONCURRENCY="${CONCURRENCY:-200}"
 
 if [[ ! -f "$CA" ]]; then
-  echo "Missing CA file: $CA (set OCH_H3_CA)" >&2
+  echo "Missing CA file: $CA (set RP_H3_CA)" >&2
   exit 1
 fi
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Emit bench_logs/coverage-transport.json with observed H1/H2/H3 (och-transport-v2).
+# Emit bench_logs/coverage-transport.json with observed H1/H2/H3 (rp-transport-v2).
 # Stock k6 runs H1/H2 checks; HTTP/3 requires .k6-build/k6-http3 (optional — h3.observed false if missing).
 # H1: GODEBUG_TRANSPORT_H1=http2client=0 (default) disables Go HTTP/2 client so ALPN cannot mask as HTTP/2 when probing H1.
 #
@@ -17,7 +17,7 @@ OUT="${COVERAGE_TRANSPORT_OUT:-$REPO/bench_logs/coverage-transport.json}"
 mkdir -p "$(dirname "$OUT")"
 
 if [[ "${SKIP_TRANSPORT_V2:-0}" == "1" ]]; then
-  node -e "require('fs').writeFileSync(process.argv[1], JSON.stringify({specVersion:'och-transport-v2',note:'SKIP_TRANSPORT_V2=1',h1:{observed:false},h2:{observed:false},h3:{observed:false},generatedAt:new Date().toISOString(),verifiedBy:'skipped'},null,2)+'\n')" "$OUT"
+  node -e "require('fs').writeFileSync(process.argv[1], JSON.stringify({specVersion:'rp-transport-v2',note:'SKIP_TRANSPORT_V2=1',h1:{observed:false},h2:{observed:false},h3:{observed:false},generatedAt:new Date().toISOString(),verifiedBy:'skipped'},null,2)+'\n')" "$OUT"
   echo "ℹ️  SKIP_TRANSPORT_V2=1 — wrote stub $OUT (transport score 0 in model)"
   exit 0
 fi
@@ -44,7 +44,7 @@ node -e "
 const fs = require('fs');
 const [out, a, b, c] = process.argv.slice(1);
 const doc = {
-  specVersion: 'och-transport-v2',
+  specVersion: 'rp-transport-v2',
   generatedAt: new Date().toISOString(),
   verifiedBy: 'k6-protocol-observation',
   h1: { observed: a === '1' },

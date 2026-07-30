@@ -38,7 +38,7 @@ fi
 source "$SCRIPT_DIR/lib/rp-runtime-deploy-services.sh"
 REQUIRED=(ollama "${RP_RUNTIME_APP_DEPLOYS[@]}")
 
-_och_kustomize_build() {
+_rp_kustomize_build() {
   if command -v kustomize &>/dev/null 2>&1; then
     kustomize build "$OVERLAY_DIR"
   else
@@ -60,7 +60,7 @@ if [[ "$FROM_STDIN" == "1" ]]; then
   fi
 else
   [[ -d "$OVERLAY_DIR" ]] || { echo "Not a directory: $OVERLAY_DIR" >&2; exit 1; }
-  if ! _dry_out="$(_och_kustomize_build | kubectl apply -f - --dry-run=client -o name 2>&1)"; then
+  if ! _dry_out="$(_rp_kustomize_build | kubectl apply -f - --dry-run=client -o name 2>&1)"; then
     echo "::error::kustomize build or kubectl dry-run failed for $OVERLAY_DIR" >&2
     echo "$_dry_out" >&2
     exit 1

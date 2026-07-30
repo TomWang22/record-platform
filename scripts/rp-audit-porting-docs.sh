@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Non-blocking audit: OCH/booking reference strings in porting/bundle docs (not runtime).
+# Non-blocking audit: RP/booking reference strings in porting/bundle docs (not runtime).
 # Blocks only when RP_STRICT_DOC_PORTING_AUDIT=1.
 set -euo pipefail
 
@@ -13,10 +13,10 @@ warn() { echo "ℹ️  $*"; }
 
 VIOLATIONS=0
 PATTERNS=(
-  'off-campus-housing\.test'
-  'off-campus-housing\.local'
-  'booking-service'
-  'social-service'
+  'record-platform\.test'
+  'record-platform\.local'
+  'reservation-mesh'
+  'messaging-service'
 )
 
 scan_dir() {
@@ -38,7 +38,7 @@ scan_dir "$REPO_ROOT/docs/porting"
 scan_dir "$REPO_ROOT/docs/bundles"
 
 if [[ "$VIOLATIONS" -eq 0 ]]; then
-  ok "no OCH/booking reference strings in porting/bundle docs"
+  ok "no RP/booking reference strings in porting/bundle docs"
   exit 0
 fi
 

@@ -39,7 +39,7 @@ Percentage ladder 1%→75% all PASS with percent restored after each eval window
 | Leakage | **PASS** |
 | Anchored overlap | **16/16 PASS** |
 | Percent restored | **PASS** |
-| Playwright / source diagnostic / OCH | **PASS** |
+| Playwright / source diagnostic / RP | **PASS** |
 
 ---
 

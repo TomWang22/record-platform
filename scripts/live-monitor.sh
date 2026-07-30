@@ -66,7 +66,7 @@ while true; do
   
   # Service pods
   echo -e "${BLUE}🚀 Services (target: 1/1 each):${NC}"
-  SERVICES="auth-service records-service listings-service social-service shopping-service analytics-service auction-monitor python-ai-service api-gateway"
+  SERVICES="auth-service records-service listings-service messaging-service shopping-service analytics-service auction-monitor python-ai-service api-gateway"
   for svc in $SERVICES; do
     READY=$(kubectl get pods -n record-platform -l app=$svc --request-timeout=3s --no-headers 2>/dev/null | awk '{print $2}' | grep -c "1/1" || echo "0")
     TOTAL=$(kubectl get pods -n record-platform -l app=$svc --request-timeout=3s --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")

@@ -3,13 +3,13 @@
 # Does not change Caddy — validation only.
 #
 # Env:
-#   OCH_EDGE_HOSTNAME — default record-platform.test
+#   RP_EDGE_HOSTNAME — default record-platform.test
 #   VERIFY_HTTP3_URL — full URL override (default https://$HOST/)
 #   VERIFY_HTTP3_CACERT — PEM path (default dev-chain.pem, else dev-root.pem); if missing, uses -k
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-HOST="${OCH_EDGE_HOSTNAME:-record-platform.test}"
+HOST="${RP_EDGE_HOSTNAME:-record-platform.test}"
 URL="${VERIFY_HTTP3_URL:-https://${HOST}/}"
 if [[ -z "${VERIFY_HTTP3_CACERT:-}" ]]; then
   if [[ -f "$REPO_ROOT/certs/dev-chain.pem" ]]; then

@@ -110,7 +110,7 @@ Shadow supplementary — separate from anchored gate.
 | Canary errors | **0** | **0** |
 | Telemetry WARNs | **0** | **0** |
 | Leakage | **PASS** | **PASS** |
-| OCH | **PASS** | **PASS** |
+| RP | **PASS** | **PASS** |
 | Anchored overlap | **16/16** | **≥10/16** |
 | Pure overlap | report-only | no promotion |
 | True zero-results | **0** | **0** |

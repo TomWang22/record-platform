@@ -32,7 +32,7 @@ From **`infra/k8s/base/config/app-config.yaml`**:
 - **records-service** — POSTGRES_URL_RECORDS, Redis.
 - **listings-service** — POSTGRES_URL_LISTINGS, Redis.
 - **shopping-service** — POSTGRES_URL_SHOPPING, Redis.
-- **social-service** — POSTGRES_URL_SOCIAL, Redis.
+- **messaging-service** — POSTGRES_URL_SOCIAL, Redis.
 - **analytics-service** — POSTGRES_URL_ANALYTICS, Kafka, Redis.
 - **auction-monitor** — POSTGRES_URL_AUCTION_MONITOR, Kafka.
 - **python-ai-service** — POSTGRES_URL_PYTHON_AI.

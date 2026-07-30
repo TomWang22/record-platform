@@ -32,7 +32,7 @@ fi
 
 _run_debian() {
   local dest_dir="$1"
-  local dest="$dest_dir/dev-root-och.crt"
+  local dest="$dest_dir/dev-root-rp.crt"
   if [[ "$(id -u)" -eq 0 ]]; then
     install -d -m 0755 "$dest_dir"
     install -m 0644 "$CA_FILE" "$dest"
@@ -50,7 +50,7 @@ _run_debian() {
 
 _run_rhel() {
   local dest_dir="/etc/pki/ca-trust/source/anchors"
-  local dest="$dest_dir/dev-root-och.pem"
+  local dest="$dest_dir/dev-root-rp.pem"
   if [[ "$(id -u)" -eq 0 ]]; then
     install -d -m 0755 "$dest_dir"
     install -m 0644 "$CA_FILE" "$dest"
@@ -86,8 +86,8 @@ fi
 # _run_* returned 2 = need interactive sudo
 info "Could not run CA install without a TTY sudo password. On this host, run once:"
 if command -v update-ca-certificates >/dev/null 2>&1; then
-  echo "  sudo install -m 0644 \"$CA_FILE\" /usr/local/share/ca-certificates/dev-root-och.crt && sudo update-ca-certificates"
+  echo "  sudo install -m 0644 \"$CA_FILE\" /usr/local/share/ca-certificates/dev-root-rp.crt && sudo update-ca-certificates"
 elif command -v update-ca-trust >/dev/null 2>&1; then
-  echo "  sudo install -m 0644 \"$CA_FILE\" /etc/pki/ca-trust/source/anchors/dev-root-och.pem && sudo update-ca-trust extract"
+  echo "  sudo install -m 0644 \"$CA_FILE\" /etc/pki/ca-trust/source/anchors/dev-root-rp.pem && sudo update-ca-trust extract"
 fi
 exit 0

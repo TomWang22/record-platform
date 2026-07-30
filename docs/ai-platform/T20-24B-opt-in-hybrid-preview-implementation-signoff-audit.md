@@ -34,7 +34,7 @@
 | `audit-rp-ai-endpoints-contract.sh` | **PASS** |
 | `rp-ai-provider-readiness.sh` | **PASS** |
 | `rp-ai-pgvector-readiness.sh` | **PASS** |
-| `rp-och-decontaminate-scan.sh` | **PASS** (run at T20.24E) |
+| `rp-rp-decontaminate-scan.sh` | **PASS** (run at T20.24E) |
 | `ai-quality-telemetry-report.mjs` | **0 WARNs** (record 3.86, longform 3.67, final 4.0) |
 
 ---

@@ -1,12 +1,12 @@
 import { expect, type Page } from '@playwright/test'
 
-/** Product UI must never show legacy OCH/housing/dev-provider strings. */
+/** Product UI must never show legacy RP/housing/dev-provider strings. */
 const STALE_PATTERNS: { re: RegExp; label: string }[] = [
   { re: /Provider:\s*dev/i, label: 'Provider: dev' },
   { re: /Provider dev/i, label: 'Provider dev' },
   { re: /\bOff-Campus\b/i, label: 'Off-Campus' },
   { re: /\bHousing\b/i, label: 'Housing' },
-  { re: /\bOCH\b/, label: 'OCH' },
+  { re: /\bOCH\b/, label: 'RP' },
   { re: /\bbooking\b/i, label: 'booking' },
   { re: /\blandlord\b/i, label: 'landlord' },
   { re: /\blease\b/i, label: 'lease' },

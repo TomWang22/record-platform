@@ -1,6 +1,6 @@
-# OCH Observability Integrity Spec v1
+# RP Observability Integrity Spec v1
 
-This document defines **contract-driven** trace validation for the Off-Campus Housing Tracker lab. Implementations live under `scripts/trace-validators/`. Preflight may invoke gates after Step 7 when `JAEGER_QUERY_BASE` is set and `PREFLIGHT_STEP7_OBSERVABILITY_GATES=1` (default in strict lab flows).
+This document defines **contract-driven** trace validation for the Record Platform Tracker lab. Implementations live under `scripts/trace-validators/`. Preflight may invoke gates after Step 7 when `JAEGER_QUERY_BASE` is set and `PREFLIGHT_STEP7_OBSERVABILITY_GATES=1` (default in strict lab flows).
 
 ## 1. Scope
 
@@ -68,7 +68,7 @@ Statistical coverage (`|traces| / requests ≥ 0.95`) and per-service span floor
 
 ## 9. Versioning
 
-Validator output includes `specVersion: "och-observability-integrity-spec-v1"`.
+Validator output includes `specVersion: "rp-observability-integrity-spec-v1"`.
 
 ## 10. CI
 

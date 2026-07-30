@@ -196,7 +196,7 @@ bash scripts/rp-ai-rag-quality-smoke.sh
 bash scripts/coverage/run-service-coverage.sh python-ai-service
 node scripts/coverage/enforce-service-coverage.mjs
 bash scripts/rp-ai-backfill-rerun-guard-smoke.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 Benchmark harness (read-only; artifacts stay local):

@@ -169,7 +169,7 @@ Example N=3: preview_opt_in = 1080, allowlist = 360, **total = 1440**.
 | Canary errors | 0 |
 | Soak-path telemetry WARNs | 0 |
 | Leakage | PASS |
-| OCH | PASS |
+| RP | PASS |
 | Playwright (C-suite) | PASS |
 | Guest preview hidden | PASS |
 | Message-body exposure | 0 |

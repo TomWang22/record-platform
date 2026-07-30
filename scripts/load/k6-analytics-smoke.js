@@ -1,7 +1,7 @@
 /**
  * Analytics edge smoke: gateway /api/analytics/* with latency + error thresholds.
  *
- *   BASE_URL=https://off-campus-housing.test k6 run scripts/load/k6-analytics-smoke.js
+ *   BASE_URL=https://record-platform.test k6 run scripts/load/k6-analytics-smoke.js
  *
  * Env: K6_ANALYTICS_SMOKE_MAX_FAIL_RATE — default 0.02; Makefile preflight uses 0.20 under lab load unless overridden.
  * Env: K6_ANALYTICS_SMOKE_P95_MAX_MS — default 2000 (was 500; gateway+Postgres often exceeds 500ms p95 under load).
@@ -9,7 +9,7 @@
 import http from "k6/http";
 import { check } from "k6";
 
-const base = (__ENV.BASE_URL || "https://off-campus-housing.test").replace(/\/$/, "");
+const base = (__ENV.BASE_URL || "https://record-platform.test").replace(/\/$/, "");
 /** YYYY-MM-DD — analytics-service returns 400 {"error":"date=YYYY-MM-DD required"} without this query param. */
 const today = new Date().toISOString().slice(0, 10);
 

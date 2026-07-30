@@ -25,7 +25,7 @@ rm -f "$OUT"/* 2>/dev/null || true
 # Ephemeral CI CA (7 days)
 openssl genrsa -out "$TMP/ca.key" 2048
 openssl req -x509 -new -nodes -key "$TMP/ca.key" -sha256 -days 7 \
-  -subj "/CN=rp-kafka-ci-ca/O=off-campus-housing-ci" \
+  -subj "/CN=rp-kafka-ci-ca/O=record-platform-ci" \
   -out "$TMP/ca.pem"
 
 KAFKA_SANS="DNS:kafka,DNS:localhost,DNS:host.docker.internal,IP:127.0.0.1"

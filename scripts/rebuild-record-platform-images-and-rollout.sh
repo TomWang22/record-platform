@@ -7,7 +7,7 @@
 #   SERVICES=api-gateway ./scripts/rebuild-record-platform-images-and-rollout.sh   # gateway only
 #   SERVICES="auth-service analytics-service" ./scripts/rebuild-record-platform-images-and-rollout.sh
 #   SERVICES="api-gateway,listings-service" ./scripts/rebuild-record-platform-images-and-rollout.sh   # commas OK too
-#   SERVICES="transport-watchdog api-gateway" …  # OCH: watchdog is a sidecar on deploy/api-gateway (no deploy/transport-watchdog)
+#   SERVICES="transport-watchdog api-gateway" …  # RP: watchdog is a sidecar on deploy/api-gateway (no deploy/transport-watchdog)
 #   ROLLOUT=0 ./scripts/rebuild-record-platform-images-and-rollout.sh   # build/load only, no kubectl restart
 #   WAIT_ROLLOUT=0 ./scripts/rebuild-record-platform-images-and-rollout.sh   # skip rollout status wait
 #
@@ -64,7 +64,7 @@ fi
 
 say "Rollout restart in namespace $HOUSING_NS"
 
-# transport-watchdog (OCH) is a container inside deploy/api-gateway, not its own Deployment.
+# transport-watchdog (RP) is a container inside deploy/api-gateway, not its own Deployment.
 deploy_for_service() {
   case "$1" in
     transport-watchdog) echo api-gateway ;;

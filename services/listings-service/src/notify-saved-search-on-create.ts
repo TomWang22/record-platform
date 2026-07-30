@@ -1,5 +1,5 @@
 /**
- * Fire-and-forget: booking-service matches saved searches and inserts notifications.
+ * Fire-and-forget: reservation-mesh matches saved searches and inserts notifications.
  */
 export function fireSavedSearchNotifyForNewListing(payload: {
   listing_id: string;

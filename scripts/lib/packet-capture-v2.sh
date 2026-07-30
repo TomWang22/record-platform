@@ -14,7 +14,7 @@
 # Env: CAPTURE_V2_CADDY_POD, CAPTURE_V2_CADDY_NS (default ingress-nginx),
 #      CAPTURE_V2_ENVOY_POD, CAPTURE_V2_ENVOY_NS (default envoy-test),
 #      CAPTURE_V2_LB_IP (optional), DISABLE_PACKET_CAPTURE=1 to skip.
-#      CAPTURE_V2_NODE_PCAP_BASENAME — file under VM $HOME for L1 tcpdump -w (default och-node-capture-v2.pcap; /tmp and /var/tmp may deny non-root).
+#      CAPTURE_V2_NODE_PCAP_BASENAME — file under VM $HOME for L1 tcpdump -w (default rp-node-capture-v2.pcap; /tmp and /var/tmp may deny non-root).
 #      CAPTURE_NODE_ONLY=1 — run only node-level capture (no kubectl exec); macOS-proof, no OOM.
 #      CAPTURE_RING_BUFFER=1 — when multiple node pcaps exist, merge to node-capture.pcap (mergecap).
 #      CAPTURE_V2_TCPDUMP_BUFFER_KB=1024 — tcpdump -B (default 1024; lower reduces OOM / SIGKILL in small pods).
@@ -52,7 +52,7 @@ _CAPTURE_V2_NODE_VM_BN=""
 _CAPTURE_V2_CADDY_PCAP=""
 _CAPTURE_V2_ENVOY_PCAP=""
 KUBECTL_EXEC_TIMEOUT="${KUBECTL_EXEC_TIMEOUT:-15s}"
-: "${CAPTURE_V2_NODE_PCAP_BASENAME:=och-node-capture-v2.pcap}"
+: "${CAPTURE_V2_NODE_PCAP_BASENAME:=rp-node-capture-v2.pcap}"
 
 packet_capture_dir() {
   echo "${_CAPTURE_V2_DIR:-/tmp/packet-captures-v2-$$}"
@@ -134,7 +134,7 @@ start_capture_v2() {
     if [[ "${CAPTURE_V2_TCPDUMP_NO_BUFFER:-0}" != "1" ]]; then
       _td_buf="-B ${CAPTURE_V2_TCPDUMP_BUFFER_KB:-1024}"
     fi
-    local _vm_bn="${CAPTURE_V2_NODE_PCAP_BASENAME:-och-node-capture-v2.pcap}"
+    local _vm_bn="${CAPTURE_V2_NODE_PCAP_BASENAME:-rp-node-capture-v2.pcap}"
     _CAPTURE_V2_NODE_VM_BN="$_vm_bn"
     # shellcheck disable=SC2086
     # Do not use exec — tcpdump must stay a child of bash so colima ssh keeps the session open until SIGINT.
@@ -328,7 +328,7 @@ stop_and_analyze_captures_v2() {
     fi
   fi
   # Copy node pcap from Colima to host (single file or ring-buffer rotated files)
-  local _vm_bn_stop="${_CAPTURE_V2_NODE_VM_BN:-${CAPTURE_V2_NODE_PCAP_BASENAME:-och-node-capture-v2.pcap}}"
+  local _vm_bn_stop="${_CAPTURE_V2_NODE_VM_BN:-${CAPTURE_V2_NODE_PCAP_BASENAME:-rp-node-capture-v2.pcap}}"
   if command -v colima >/dev/null 2>&1 && [[ -n "$_vm_bn_stop" ]]; then
     if [[ "${CAPTURE_RING_BUFFER:-1}" == "1" ]]; then
       local _files
@@ -718,7 +718,7 @@ TRANSPORT_JSON
             },
             connection: {unique_destination_cids: 0, cid_rotation_detected: false, key_phase_transitions: 0},
             correlation: {trace_ids_seen: [], jaeger_trace_linked: false},
-            capture_window: {start_epoch: null, end_epoch: null},
+            capture_window: {start_eprp: null, end_eprp: null},
             ci_metadata: {transport_invariant_version: "v7", generated_at: $ts, forensic_upstream: "stub-v7-failure"}
           }' >"$dir/transport-summary-v7.json" 2>/dev/null || rm -f "$dir/transport-summary-v7.json" 2>/dev/null || true
         echo "  [STRICT] forensic v7 stub (analyzer failed): $dir/transport-summary-v7.json"

@@ -129,7 +129,7 @@ Image rebuilt: **`python-ai-service:t20-p216b`**
 | Leakage | **PASS** |
 | RAG contract | **PASS** |
 | Endpoints contract | **PASS** |
-| OCH | **PASS** |
+| RP | **PASS** |
 | seller-intelligence Playwright | **PASS** |
 | record RAG (Lane C) | **PASS** |
 | longform RAG (Lane C) | **PASS** |

@@ -2,7 +2,7 @@
   "flows": [
     {
       "name": "booking-http",
-      "services": ["api-gateway", "booking-service"],
+      "services": ["api-gateway", "reservation-mesh"],
       "requireSingleRoot": true,
       "minSpanCount": 2
     },

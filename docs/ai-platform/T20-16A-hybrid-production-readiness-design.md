@@ -230,7 +230,7 @@ kubectl -n record-platform rollout status deployment/python-ai-service --timeout
 bash scripts/rp-ai-hybrid-canary-transcript.sh
 bash scripts/audit-rp-ai-rag-contract.sh
 bash scripts/audit-rp-ai-endpoints-contract.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 node scripts/ai-quality-telemetry-report.mjs
 ```
 

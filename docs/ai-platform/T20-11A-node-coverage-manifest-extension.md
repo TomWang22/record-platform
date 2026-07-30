@@ -77,7 +77,7 @@ node scripts/coverage/enforce-service-coverage.mjs
 |-------|--------|
 | `run-service-coverage.sh python-ai-service` | PASS |
 | `enforce-service-coverage.mjs` | 1 pass, 17 skip, 0 fail |
-| `rp-och-decontaminate-scan.sh` | PASS |
+| `rp-rp-decontaminate-scan.sh` | PASS |
 
 ---
 

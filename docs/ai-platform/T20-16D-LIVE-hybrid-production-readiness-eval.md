@@ -37,7 +37,7 @@ AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0
 | Endpoints contract | **PASS** |
 | Provider readiness | **PASS** |
 | pgvector readiness | **PASS** |
-| OCH | **PASS** |
+| RP | **PASS** |
 | Telemetry WARNs (pre) | **0** |
 
 ---
@@ -137,7 +137,7 @@ candidate_fetch p95: **~62–74 ms** across runs.
 | Canary errors | 0 | **PASS** |
 | Telemetry WARNs | 0 | **PASS** |
 | Leakage | PASS | **PASS** |
-| OCH | PASS | **PASS** |
+| RP | PASS | **PASS** |
 | Anchored overlap | ≥10/16 | **PASS** (16/16) |
 | True zero-results | 0 | **PASS** |
 | Embed timeouts | 0 | **PASS** |

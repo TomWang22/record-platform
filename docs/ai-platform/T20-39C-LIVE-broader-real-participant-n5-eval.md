@@ -96,7 +96,7 @@ phase21-preview-internal-2@example.com keyword keyword_default
 |------|--------|
 | Preview UI smoke | **4/4 PASS** |
 | Full Playwright C-suite | **7/7 PASS** |
-| OCH scan | **PASS** (`__SCANNED__=589`) |
+| RP scan | **PASS** (`__SCANNED__=589`) |
 | Telemetry WARNs | **0 PASS** |
 | Record score | **3.86** |
 | Longform score | **3.67** |

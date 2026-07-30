@@ -19,26 +19,30 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import { Resource } from "@opentelemetry/resources";
 import { EnsureNetProtoSpanProcessor } from "./ensure-net-proto-span-processor.js";
-import { OchAiPreferentialTraceIdSampler } from "./och-ai-preferential-sampler.js";
+import { OchAiPreferentialTraceIdSampler } from "./rp-ai-preferential-sampler.js";
 
 export type StartNodeTelemetryOptions = {
   serviceName: string;
 };
 
-/** In-cluster Jaeger Service (see infra/k8s/base/observability/jaeger-deploy.yaml). */
-export const DEFAULT_K8S_JAEGER_OTLP_HTTP_BASE = "http://jaeger.observability.svc.cluster.local:4318";
+/** In-cluster OTel Collector (acceptance ingestion plane). Apps must not export OTLP to localhost or Jaeger Query. */
+export const DEFAULT_K8S_OTEL_COLLECTOR_OTLP_HTTP_BASE =
+  "http://otel-collector.observability.svc.cluster.local:4318";
+
+/** @deprecated Prefer DEFAULT_K8S_OTEL_COLLECTOR_OTLP_HTTP_BASE — retained for callers that still name Jaeger. */
+export const DEFAULT_K8S_JAEGER_OTLP_HTTP_BASE = DEFAULT_K8S_OTEL_COLLECTOR_OTLP_HTTP_BASE;
 
 function defaultInClusterJaegerTracesUrl(): string | undefined {
-  if (process.env.OCH_OTEL_DISABLE_CLUSTER_JAEGER === "1" || process.env.OCH_OTEL_DISABLE_CLUSTER_JAEGER === "true") {
+  if (process.env.RP_OTEL_DISABLE_CLUSTER_JAEGER === "1" || process.env.RP_OTEL_DISABLE_CLUSTER_JAEGER === "true") {
     return undefined;
   }
   if (!process.env.KUBERNETES_SERVICE_HOST) return undefined;
-  return `${DEFAULT_K8S_JAEGER_OTLP_HTTP_BASE.replace(/\/$/, "")}/v1/traces`;
+  return `${DEFAULT_K8S_OTEL_COLLECTOR_OTLP_HTTP_BASE.replace(/\/$/, "")}/v1/traces`;
 }
 
 /** MetalLB IP or hostname reachable from the process (no scheme). */
 function otlpTracesUrlFromOchJaegerHost(): string | undefined {
-  const host = process.env.OCH_JAEGER_OTLP_HOST?.trim();
+  const host = process.env.RP_JAEGER_OTLP_HOST?.trim();
   if (!host) return undefined;
   if (host.startsWith("http://") || host.startsWith("https://")) {
     const normalized = host.replace(/\/$/, "");
@@ -49,8 +53,8 @@ function otlpTracesUrlFromOchJaegerHost(): string | undefined {
 
 function allowsLocalhostOtlp(): boolean {
   return (
-    process.env.OCH_OTEL_LOCAL_JAEGER === "1" ||
-    process.env.OCH_OTEL_LOCAL_JAEGER === "true" ||
+    process.env.RP_OTEL_LOCAL_JAEGER === "1" ||
+    process.env.RP_OTEL_LOCAL_JAEGER === "true" ||
     process.env.NODE_ENV === "test"
   );
 }
@@ -73,7 +77,7 @@ export function assertNoForbiddenLocalhostOtlpUrl(url: string | undefined): void
   if (!url || allowsLocalhostOtlp()) return;
   if (urlLooksLikeForbiddenLocalhostOtlp(url)) {
     throw new Error(
-      "[otel] OTLP traces URL must not use localhost / 127.0.0.1 unless OCH_OTEL_LOCAL_JAEGER=1. Use in-cluster Jaeger DNS, MetalLB (OCH_JAEGER_OTLP_HOST), or explicit non-loopback OTEL_EXPORTER_OTLP_*.",
+      "[otel] OTLP traces URL must not use localhost / 127.0.0.1 unless RP_OTEL_LOCAL_JAEGER=1. Use in-cluster Jaeger DNS, MetalLB (RP_JAEGER_OTLP_HOST), or explicit non-loopback OTEL_EXPORTER_OTLP_*.",
     );
   }
 }
@@ -89,20 +93,20 @@ export function assertNoForbiddenLocalhostOtlpEnv(): void {
     if (!v) return;
     if (urlLooksLikeForbiddenLocalhostOtlp(v)) {
       throw new Error(
-        `[otel] ${name} must not use localhost / 127.0.0.1 unless OCH_OTEL_LOCAL_JAEGER=1 (MetalLB or cluster DNS only).`,
+        `[otel] ${name} must not use localhost / 127.0.0.1 unless RP_OTEL_LOCAL_JAEGER=1 (MetalLB or cluster DNS only).`,
       );
     }
   };
 
   check("OTEL_EXPORTER_OTLP_ENDPOINT", process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
   check("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT);
-  check("OCH_OTEL_EXPORTER_OTLP_ENDPOINT", process.env.OCH_OTEL_EXPORTER_OTLP_ENDPOINT);
-  check("OCH_JAEGER_OTLP_HOST", process.env.OCH_JAEGER_OTLP_HOST);
+  check("RP_OTEL_EXPORTER_OTLP_ENDPOINT", process.env.RP_OTEL_EXPORTER_OTLP_ENDPOINT);
+  check("RP_JAEGER_OTLP_HOST", process.env.RP_JAEGER_OTLP_HOST);
 }
 
 /** Explicit docker-compose / laptop Jaeger (opt-in; not used in cluster). */
 function defaultLocalJaegerOtlpTracesUrl(): string | undefined {
-  if (process.env.OCH_OTEL_LOCAL_JAEGER !== "1" && process.env.OCH_OTEL_LOCAL_JAEGER !== "true") {
+  if (process.env.RP_OTEL_LOCAL_JAEGER !== "1" && process.env.RP_OTEL_LOCAL_JAEGER !== "true") {
     return undefined;
   }
   if (process.env.CI === "true" || process.env.CI === "1") return undefined;
@@ -114,7 +118,7 @@ function resolveOtlpTracesUrl(): string | undefined {
   const direct = process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?.trim();
   if (direct) return direct;
   const base =
-    process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim() || process.env.OCH_OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim() || process.env.RP_OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
   if (base) {
     const normalized = base.replace(/\/$/, "");
     if (normalized.endsWith("/v1/traces")) return normalized;
@@ -140,8 +144,8 @@ const propagator = new CompositePropagator({
  * BOOTSTRAP_TRACE=1 — force AlwaysOnSampler (deterministic bootstrap / contract traces).
  * RUNTIME_HIGH_LOAD=1 — when OTEL_TRACES_SAMPLER is unset, use a capped trace-id ratio (see OTEL_TRACE_RATIO).
  * OTEL_TRACES_SAMPLER: always_on | always_off | traceidratio | parentbased_always_on |
- * parentbased_always_off | parentbased_traceidratio | parentbased_och_ai_preferential (default: parentbased_always_on).
- * parentbased_och_ai_preferential: 100% analytics / listing-feel / intelligence routes; SHA-256(traceId) ratio elsewhere.
+ * parentbased_always_off | parentbased_traceidratio | parentbased_rp_ai_preferential (default: parentbased_always_on).
+ * parentbased_rp_ai_preferential: 100% analytics / listing-feel / intelligence routes; SHA-256(traceId) ratio elsewhere.
  * OTEL_TRACES_SAMPLER_ARG: ratio for *traceidratio variants (0–1).
  */
 function buildSamplerFromEnv(): Sampler {
@@ -179,7 +183,7 @@ function buildSamplerFromEnv(): Sampler {
   if (raw === "parentbased_traceidratio") {
     return new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(ratio()) });
   }
-  if (raw === "parentbased_och_ai_preferential" || raw === "och_ai_preferential") {
+  if (raw === "parentbased_rp_ai_preferential" || raw === "rp_ai_preferential") {
     return new ParentBasedSampler({ root: new OchAiPreferentialTraceIdSampler(ratio()) });
   }
   return new ParentBasedSampler({ root: new AlwaysOnSampler() });

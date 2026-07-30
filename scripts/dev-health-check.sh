@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Post-dev-up gates: Compose Postgres/Redis, api-gateway /readyz, Jaeger, strict TLS/mTLS preflight, Kafka bootstrap.
-# Edge hostname defaults to OCH SNI: record-platform.test
+# Edge hostname defaults to RP SNI: record-platform.test
 #
-# Env: HOUSING_NS, OCH_EDGE_HOSTNAME, NS_ING, DEV_SKIP_STRICT_TLS_PREFLIGHT=1 to skip ensure-strict-tls-mtls-preflight.sh
+# Env: HOUSING_NS, RP_EDGE_HOSTNAME, NS_ING, DEV_SKIP_STRICT_TLS_PREFLIGHT=1 to skip ensure-strict-tls-mtls-preflight.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,7 +10,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 HOUSING_NS="${HOUSING_NS:-record-platform}"
-EDGE_HOST="${OCH_EDGE_HOSTNAME:-record-platform.test}"
+EDGE_HOST="${RP_EDGE_HOSTNAME:-record-platform.test}"
 CA_PEM="${REPO_ROOT}/certs/dev-root.pem"
 
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
@@ -22,9 +22,9 @@ if command -v kubectl >/dev/null 2>&1 && [[ -f "$SCRIPT_DIR/lib/colima-kubeconfi
   # shellcheck source=scripts/lib/colima-kubeconfig.sh
   source "$SCRIPT_DIR/lib/colima-kubeconfig.sh"
   if ! kubectl get nodes --request-timeout=8s >/dev/null 2>&1; then
-    och_export_colima_kubeconfig_prefer_reachable || true
+    rp_export_colima_kubeconfig_prefer_reachable || true
   elif [[ -z "${KUBECONFIG:-}" ]]; then
-    och_export_colima_kubeconfig_prefer_reachable || {
+    rp_export_colima_kubeconfig_prefer_reachable || {
       _k="${HOME}/.colima/default/kubernetes/kubeconfig"
       [[ -s "$_k" ]] || _k="${HOME}/.colima/default/kubeconfig"
       [[ -s "$_k" ]] && export KUBECONFIG="$_k"
@@ -56,15 +56,15 @@ if ! curl --version 2>/dev/null | head -1 | grep -qE 'curl 8\.(1[9]|[2-9][0-9])\
 fi
 
 say "dev-health-check — Service Endpoints (cluster routing gate)"
-if [[ -f "$SCRIPT_DIR/wait-for-housing-service-endpoints.sh" ]]; then
-  bash "$SCRIPT_DIR/wait-for-housing-service-endpoints.sh"
+if [[ -f "$SCRIPT_DIR/wait-for-platform-service-endpoints.sh" ]]; then
+  bash "$SCRIPT_DIR/wait-for-platform-service-endpoints.sh"
 else
-  warn "wait-for-housing-service-endpoints.sh missing — skipping Endpoint gate"
+  warn "wait-for-platform-service-endpoints.sh missing — skipping Endpoint gate"
 fi
 
 say "dev-health-check — api-gateway /readyz (HTTPS $EDGE_HOST)"
 [[ -f "$CA_PEM" ]] || { bad "missing $CA_PEM"; exit 1; }
-export OCH_X_SUITE="${OCH_X_SUITE:-bash}"
+export RP_X_SUITE="${RP_X_SUITE:-bash}"
 _readyz_attempts="${DEV_READYZ_ATTEMPTS:-25}"
 _readyz_delay="${DEV_READYZ_DELAY_SEC:-3}"
 _curl_retry_ex=()
@@ -77,7 +77,7 @@ for ((_i = 1; _i <= _readyz_attempts; _i++)); do
     --retry 4 --retry-delay 2 --retry-connrefused \
     "${_curl_retry_ex[@]}" \
     --cacert "$CA_PEM" \
-    -H "x-traffic-class: infra" -H "x-suite: ${OCH_X_SUITE}" \
+    -H "x-traffic-class: infra" -H "x-suite: ${RP_X_SUITE}" \
     "https://${EDGE_HOST}/api/readyz" 2>/dev/null || echo 000)"
   [[ "$code" == "200" ]] && break
   sleep "$_readyz_delay"

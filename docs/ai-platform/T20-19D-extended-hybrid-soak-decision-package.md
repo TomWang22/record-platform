@@ -67,7 +67,7 @@ T20.19 extended soak: PASS — operational allowlist restored to contract user
 | Hybrid p95 | **119.34 ms PASS** |
 | Anchored overlap | **16/16 PASS** |
 | Pure overlap | **8/16** report-only |
-| Telemetry / leakage / OCH | **PASS** |
+| Telemetry / leakage / RP | **PASS** |
 
 ---
 

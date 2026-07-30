@@ -8,7 +8,7 @@ metadata:
   namespace: observability
   labels:
     app: prometheus
-    och.dev/role: kafka-rules
+    rp.dev/role: kafka-rules
 data:
   kafka-health.yml: |
     groups:
@@ -47,7 +47,7 @@ data:
     - name: kafka-tls
       interval: 30s
       rules:
-      # Emitted by kafka-ca-exporter (record-platform) — scraped via housing-pods job when pod has prometheus.io/* annotations.
+      # Emitted by kafka-ca-exporter (record-platform) — scraped via record-platform-pods job when pod has prometheus.io/* annotations.
       - alert: KafkaCARotated
         expr: increase(kafka_ca_rotation_detected_total[5m]) > 0
         for: 1m

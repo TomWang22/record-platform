@@ -119,7 +119,7 @@ analyze_query 5439 analytics "Price Snapshots Time Series" \
 analyze_query 5439 analytics "User Behavior Aggregation" \
   "SELECT user_id, COUNT(*) FROM analytics.user_behavior WHERE event_timestamp > NOW() - INTERVAL '7 days' GROUP BY user_id LIMIT 50;"
 
-say "=== Social Service Analysis (Port 5434) ==="
+say "=== Messaging Service Analysis (Port 5434) ==="
 analyze_query 5434 social "User Messages" \
   "SELECT * FROM social.messages WHERE recipient_id = (SELECT id FROM auth.users LIMIT 1) ORDER BY created_at DESC LIMIT 50;" 2>/dev/null || \
 analyze_query 5434 social "Forum Posts" \

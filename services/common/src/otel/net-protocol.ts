@@ -8,6 +8,14 @@ export type EdgeProto = "h1" | "h2" | "h3" | "unknown";
 /** Upstream wire between reverse-proxy hop and this process (Caddy→gateway, gateway→service, …). */
 export type UpstreamProto = "h1" | "h2" | "h2c" | "grpc" | "unknown";
 
+/** Record Platform custom transport attribute keys (rp.* only). */
+export const RP_TRANSPORT_EDGE_PROTOCOL = "rp.transport.edge_protocol";
+export const RP_TRANSPORT_UPSTREAM_PROTOCOL = "rp.transport.upstream_protocol";
+
+/** Canonical request headers stamped by the edge (Caddy). */
+export const RP_EDGE_PROTO_HEADER = "x-rp-edge-proto";
+export const RP_TRANSPORT_HEADER = "x-rp-transport";
+
 export function normalizeEdgeProto(raw: string | undefined): EdgeProto {
   const v = String(raw || "")
     .toLowerCase()
@@ -18,7 +26,7 @@ export function normalizeEdgeProto(raw: string | undefined): EdgeProto {
   return "unknown";
 }
 
-/** @deprecated Prefer {@link normalizeEdgeProto} — kept for call sites that pass Caddy-style raw values. */
+/** @deprecated Prefer {@link normalizeEdgeProto}. */
 export function canonicalNetProtoFromEdgeHeader(raw: string | undefined): string {
   return normalizeEdgeProto(raw);
 }
@@ -31,13 +39,13 @@ function expressHeaderFirst(req: Request, name: string): string | undefined {
 }
 
 /**
- * Edge protocol from `X-OCH-Edge-Proto` (Caddy `{http.request.proto}`) or lab `X-OCH-Transport` only.
+ * Edge protocol from `X-RP-Edge-Proto` (Caddy `{http.request.proto}`) or lab `X-RP-Transport` only.
  * Does **not** fall back to Node `httpVersion` (that is the proxy hop, not the browser edge).
  */
 export function edgeProtoFromRequestHeaders(req: Request): EdgeProto {
-  const edge = normalizeEdgeProto(expressHeaderFirst(req, "x-och-edge-proto"));
+  const edge = normalizeEdgeProto(expressHeaderFirst(req, RP_EDGE_PROTO_HEADER));
   if (edge !== "unknown") return edge;
-  return normalizeEdgeProto(expressHeaderFirst(req, "x-och-transport"));
+  return normalizeEdgeProto(expressHeaderFirst(req, RP_TRANSPORT_HEADER));
 }
 
 /** Node↔proxy HTTP version for this socket (not the browser edge). */
@@ -56,8 +64,7 @@ export function networkProtocolVersionFromEdge(edge: EdgeProto): string {
 }
 
 /**
- * Legacy name: same as {@link edgeProtoFromRequestHeaders} (edge-only, no hop fallback).
- * Prefer `edgeProtoFromRequestHeaders` for new code.
+ * Same as {@link edgeProtoFromRequestHeaders} (edge-only, no hop fallback).
  */
 export function inferNetProtoForSpan(req: Request): string {
   return edgeProtoFromRequestHeaders(req);
@@ -72,9 +79,9 @@ function pickIncomingHeader(req: IncomingMessage, name: string): string | undefi
 }
 
 export function edgeProtoFromIncomingMessage(req: IncomingMessage): EdgeProto {
-  const edge = normalizeEdgeProto(pickIncomingHeader(req, "x-och-edge-proto"));
+  const edge = normalizeEdgeProto(pickIncomingHeader(req, RP_EDGE_PROTO_HEADER));
   if (edge !== "unknown") return edge;
-  return normalizeEdgeProto(pickIncomingHeader(req, "x-och-transport"));
+  return normalizeEdgeProto(pickIncomingHeader(req, RP_TRANSPORT_HEADER));
 }
 
 export function upstreamProtoFromIncomingHop(req: IncomingMessage): UpstreamProto {
@@ -110,8 +117,8 @@ export function applyDebugReplayFromIncomingHeaders(span: Span, req: IncomingMes
 export function decorateHttpSpanWithTransport(span: Span, req: Request): void {
   const edge = edgeProtoFromRequestHeaders(req);
   const up = upstreamProtoFromExpressHop(req);
-  span.setAttribute("och.edge_proto", edge);
-  span.setAttribute("och.upstream_proto", up);
+  span.setAttribute(RP_TRANSPORT_EDGE_PROTOCOL, edge);
+  span.setAttribute(RP_TRANSPORT_UPSTREAM_PROTOCOL, up);
   span.setAttribute("network.protocol.name", "http");
   span.setAttribute("network.protocol.version", networkProtocolVersionFromEdge(edge));
   span.setAttribute("net.proto", edge);
@@ -121,8 +128,8 @@ export function decorateHttpSpanWithTransport(span: Span, req: Request): void {
 export function decorateIncomingMessageSpanWithTransport(span: Span, req: IncomingMessage): void {
   const edge = edgeProtoFromIncomingMessage(req);
   const up = upstreamProtoFromIncomingHop(req);
-  span.setAttribute("och.edge_proto", edge);
-  span.setAttribute("och.upstream_proto", up);
+  span.setAttribute(RP_TRANSPORT_EDGE_PROTOCOL, edge);
+  span.setAttribute(RP_TRANSPORT_UPSTREAM_PROTOCOL, up);
   span.setAttribute("network.protocol.name", "http");
   span.setAttribute("network.protocol.version", networkProtocolVersionFromEdge(edge));
   span.setAttribute("net.proto", edge);

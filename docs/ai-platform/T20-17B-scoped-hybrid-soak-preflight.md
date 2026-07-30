@@ -38,7 +38,7 @@ AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0
 | `audit-rp-ai-endpoints-contract.sh` | **PASS** (RAG + seller endpoints); `session_reset` **degraded** — no active session in probe sequence (informational; non-blocking for hybrid soak) |
 | `rp-ai-provider-readiness.sh` | **PASS** |
 | `rp-ai-pgvector-readiness.sh` | **PASS** |
-| `rp-och-decontaminate-scan.sh` | **PASS** (`__SCANNED__=589`) |
+| `rp-rp-decontaminate-scan.sh` | **PASS** (`__SCANNED__=589`) |
 | `ai-quality-telemetry-report.mjs` | **0 WARNs** (record 3.86, longform 3.67, final 4.0) |
 
 ---

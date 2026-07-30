@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Aggregate H2/H3 strict + gRPC checks for all housing services → bench_logs/transport-lab/*.json
+# Aggregate H2/H3 strict + gRPC checks for all platform-planes → bench_logs/transport-lab/*.json
 # Requires: kubectl, curl, cluster + Caddy (same as test-microservices-http2-http3-housing.sh).
 #
 # Usage: ./scripts/protocol/full-edge-transport-validation.sh [out-dir]
@@ -51,7 +51,7 @@ while IFS='|' read -r sk path deploy gport gsvc; do
 done <<'MATRIX'
 auth|/api/auth/healthz|auth-service|50061|auth.AuthService
 listings|/api/listings/healthz|listings-service|50062|listings.ListingsService
-booking|/api/booking/healthz|booking-service|50063|booking.BookingService
+booking|/api/booking/healthz|50063|reservation.ReservationService
 messaging|/api/messaging/healthz|messaging-service|50064|messaging.v1.MessagingService
 trust|/api/trust/healthz|trust-service|50066|trust.TrustService
 analytics|/api/analytics/healthz|analytics-service|50067|analytics.AnalyticsService

@@ -40,7 +40,7 @@ if [[ -f "$SCRIPT_DIR/lib/colima-kubeconfig.sh" ]]; then
   # shellcheck source=scripts/lib/colima-kubeconfig.sh
   source "$SCRIPT_DIR/lib/colima-kubeconfig.sh"
   if ! kubectl get nodes --request-timeout=12s &>/dev/null; then
-    och_export_colima_kubeconfig_prefer_reachable || true
+    rp_export_colima_kubeconfig_prefer_reachable || true
   fi
 fi
 kubectl get nodes --request-timeout=20s >/dev/null 2>&1 || {
@@ -52,9 +52,9 @@ ok "Kubernetes API reachable"
 say "S4 IMAGES_PRESENT (only when SKIP_BUILD=1)"
 if [[ "${SKIP_BUILD:-}" == "1" ]]; then
   _need=()
-  if [[ -f "$SCRIPT_DIR/lib/och-housing-docker-services-default.sh" ]]; then
-    # shellcheck source=scripts/lib/och-housing-docker-services-default.sh
-    source "$SCRIPT_DIR/lib/och-housing-docker-services-default.sh"
+  if [[ -f "$SCRIPT_DIR/lib/rp-housing-docker-services-default.sh" ]]; then
+    # shellcheck source=scripts/lib/rp-housing-docker-services-default.sh
+    source "$SCRIPT_DIR/lib/rp-housing-docker-services-default.sh"
     for _n in $HOUSING_DOCKER_SERVICES_DEFAULT webapp; do
       _need+=("${_n}:dev")
     done

@@ -41,7 +41,7 @@ Renter framing: verdict must state recommend / cautious / avoid (pick one) with 
 
 Arrays: 2-4 strings each (quick mode still complete). confidence_score 0-100; risk_severity_index and pricing_pressure_score 0-10.`;
 
-const JSON_CONTRACT_SLOT = "<<<OCH_JSON_CONTRACT>>>";
+const JSON_CONTRACT_SLOT = "<<<RP_JSON_CONTRACT>>>";
 
 const landlordStrategic = `You are a senior real-estate revenue strategist.
 Analyze listings like a pricing and yield advisor.

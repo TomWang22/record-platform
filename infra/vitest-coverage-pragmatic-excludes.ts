@@ -1,5 +1,5 @@
-/** Shared vitest coverage excludes for ported OCH/RP services. */
-export function coverageExcludeForHousingService(_profile: "default"): string[] {
+/** Shared vitest coverage excludes for ported RP/RP services. */
+export function coverageExcludeForPlatformService(_profile: "default"): string[] {
   return [
     "dist/**",
     "**/*.d.ts",

@@ -10,7 +10,7 @@
 
 ```text
 T20.40E: PASS
-OCH: PASS
+RP: PASS
 Telemetry WARNs: 0
 Playwright C-suite: 7/7 PASS
 ```
@@ -19,17 +19,17 @@ T20.40E ran after T20.40C-LIVE PASS and T20.40D rollback PASS.
 
 ---
 
-## 2. OCH
+## 2. RP
 
 ```text
 __SCANNED__=589
-OCH code comb PASS
+RP code comb PASS
 ```
 
 Report path:
 
 ```text
-bench_logs/domain-comb/rp-och-code-comb.md
+bench_logs/domain-comb/rp-rp-code-comb.md
 ```
 
 ---

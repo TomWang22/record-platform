@@ -41,7 +41,7 @@ T20.15F gate engine supports `PERCENT=100` via `bucket < percent` with percent c
 
 ## Contract / readiness
 
-All scripts **PASS** (rag contract, quality smoke, endpoints, provider, pgvector, OCH).
+All scripts **PASS** (rag contract, quality smoke, endpoints, provider, pgvector, RP).
 
 ---
 

@@ -76,7 +76,7 @@ Each run includes **`final_tagged_plan`**. Sparse corpus scored honestly with fa
 | Canary errors | **0** | **0** |
 | Telemetry WARNs | **0** | **0** |
 | Leakage | **PASS** | **PASS** |
-| OCH | **PASS** | **PASS** |
+| RP | **PASS** | **PASS** |
 | Contracts | **PASS** | **PASS** |
 | Playwright | **PASS** | **PASS** |
 | Anchored overlap | **16/16** | **≥10/16** |

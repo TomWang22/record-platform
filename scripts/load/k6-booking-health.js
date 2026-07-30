@@ -1,5 +1,5 @@
 /**
- * k6: booking-service health via edge GET /api/booking/healthz.
+ * k6: reservation-mesh health via edge GET /api/booking/healthz.
  */
 import http from "k6/http";
 import { check, sleep } from "k6";
@@ -26,7 +26,7 @@ export const options = Object.assign({}, strictEdgeTlsOptions(RAW_BASE), {
 export default function () {
   const r = http.get(
     `${BASE}/api/booking/healthz`,
-    mergeEdgeTls(RAW_BASE, { tags: { service: "booking-service", name: "BookingHealthz" }, timeout: "12s" }),
+    mergeEdgeTls(RAW_BASE, { tags: { service: "reservation-mesh", name: "BookingHealthz" }, timeout: "12s" }),
   );
   check(r, { "200": (res) => res.status === 200 });
   sleep(0.05);

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Emit a unified diff patch from a frozen staging tree (OCH → RP string rewrites).
+Emit a unified diff patch from a frozen staging tree (RP → RP string rewrites).
 
 Does NOT apply the patch or modify staging on disk — stdout / --output only.
 Paths in the patch are relative to repository root (bundle top-level stripped when present).
@@ -163,7 +163,7 @@ def generate_patch(
             body += "\n"
         hunks.append(body)
     header = (
-        "# OCH → RP namespace patch (generated; NOT applied)\n"
+        "# RP → RP namespace patch (generated; NOT applied)\n"
         f"# Matrix: {matrix}\n"
         f"# Staging: {staging.resolve()}\n"
         "# Review with: git apply --check <this-file>\n"

@@ -82,7 +82,7 @@ const OVERLAP_SERVICES = [
   "api-gateway",
   "auth-service",
   "listings-service",
-  "booking-service",
+  "reservation-mesh",
   "analytics-service",
 ];
 
@@ -178,8 +178,8 @@ function buildV7bDoc(v7in, pcapPath, jaegerBlock) {
     valid: Boolean(v7in.valid),
     mode: "load-phase-transport-study",
     capture_window: {
-      start_epoch: Number.isFinite(s0) ? s0 : 0,
-      end_epoch: Number.isFinite(e0) ? e0 : 0,
+      start_eprp: Number.isFinite(s0) ? s0 : 0,
+      end_eprp: Number.isFinite(e0) ? e0 : 0,
       duration_seconds: dur,
     },
     quic: v7in.quic || {

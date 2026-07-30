@@ -34,7 +34,7 @@
 | `gate_reason` | allowlist 45, preview_opt_in 225 |
 | Cumulative (D16→C) | **2835/2835** |
 | Telemetry WARNs | 0 |
-| Leakage / OCH / Playwright | **PASS** |
+| Leakage / RP / Playwright | **PASS** |
 
 ## 4. Runtime state
 

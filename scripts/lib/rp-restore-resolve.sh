@@ -87,7 +87,7 @@ rp_find_partner_all8_dir() {
 
 rp_resolve_restore_backup_dir() {
   local input="${1:-${RESTORE_BACKUP_DIR:-latest}}"
-  local materialized och_dir rp_dir flavor
+  local materialized rp_dir rp_dir flavor
 
   REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
   materialized="$(rp_restore_materialized_dir)"
@@ -135,17 +135,17 @@ rp_resolve_restore_backup_dir() {
   flavor="$(rp_detect_all8_flavor "$input")"
   case "$flavor" in
     och)
-      och_dir="$input"
+      rp_dir="$input"
       rp_dir="$(rp_find_partner_all8_dir "$input" rp || true)"
       rp_dir="${rp_dir:-$REPO_ROOT/backups/all-8-20260312-091418}"
       ;;
     rp)
       rp_dir="$input"
-      och_dir="$(rp_find_partner_all8_dir "$input" och || true)"
-      och_dir="${och_dir:-$REPO_ROOT/backups/all-8-20260517-152701}"
+      rp_dir="$(rp_find_partner_all8_dir "$input" och || true)"
+      rp_dir="${rp_dir:-$REPO_ROOT/backups/all-8-20260517-152701}"
       ;;
     mixed)
-      och_dir="$input"
+      rp_dir="$input"
       rp_dir="$input"
       ;;
     *)
@@ -154,10 +154,10 @@ rp_resolve_restore_backup_dir() {
       ;;
   esac
 
-  [[ -d "$och_dir" ]] || { echo "ERROR: legacy all-8 source missing: $och_dir" >&2; return 1; }
+  [[ -d "$rp_dir" ]] || { echo "ERROR: legacy all-8 source missing: $rp_dir" >&2; return 1; }
   [[ -d "$rp_dir" ]] || { echo "ERROR: RP all-8 source missing: $rp_dir" >&2; return 1; }
 
-  export OCH_ALL8_DIR="$och_dir" RP_ALL8_DIR="$rp_dir" OUT_DIR="$materialized"
+  export RP_ALL8_DIR="$rp_dir" RP_ALL8_DIR="$rp_dir" OUT_DIR="$materialized"
   if [[ "${RP_RESTORE_DRY_RUN:-0}" == "1" ]]; then
     echo "DRY-RUN: would materialize legacy all-8 sources → $materialized" >&2
   else

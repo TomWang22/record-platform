@@ -1,4 +1,4 @@
-import { coverageExcludeForHousingService } from '../../infra/vitest-coverage-pragmatic-excludes'
+import { coverageExcludeForPlatformService } from '../../infra/vitest-coverage-pragmatic-excludes'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
@@ -12,7 +12,7 @@ export default defineConfig({
       reporter: ["text", "json", "html", "json-summary"],
       reportsDirectory: './coverage',
       /** ≥98% enforced at repo root: `pnpm run coverage:enforce-98` (manifest). */
-      exclude: [...coverageExcludeForHousingService('default'), 'tests/**/*.integration.test.ts'],
+      exclude: [...coverageExcludeForPlatformService('default'), 'tests/**/*.integration.test.ts'],
     },
   },
 })

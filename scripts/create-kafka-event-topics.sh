@@ -3,8 +3,8 @@
 # Mirror default: infra/k8s/base/config/proto/events (sync via scripts/sync-proto-to-k8s.sh).
 # Partition key = entity_id. Run after Kafka is ready (broker API up), before application services start.
 #
-# Isolation: when OCH_KAFKA_TOPIC_SUFFIX is set (e.g. GITHUB_RUN_ID), the same rules as
-# ochKafkaTopicIsolationSuffix() in services/common/src/kafka.ts apply — appended to all prefixed
+# Isolation: when RP_KAFKA_TOPIC_SUFFIX is set (e.g. GITHUB_RUN_ID), the same rules as
+# rpKafkaTopicIsolationSuffix() in services/common/src/kafka.ts apply — appended to all prefixed
 # topics except messaging.events.v1. booking/social stems are skipped when RP_SKIP_*=1.
 #
 # TLS + mTLS: use KAFKA_DOCKER_CONTAINER (plain docker name, e.g. kafka-ci) or
@@ -18,10 +18,10 @@
 #   KAFKA_BOOTSTRAP=<host:port>       — e.g. MetalLB :9094 for external broker (Compose broker removed)
 #   For in-cluster KRaft use: ./scripts/create-kafka-event-topics-k8s.sh
 #   PARTITIONS=6
-#   OCH_KAFKA_TOPIC_SUFFIX=...       — optional CI/test isolation (matches services)
+#   RP_KAFKA_TOPIC_SUFFIX=...       — optional CI/test isolation (matches services)
 #   KAFKA_DOCKER_CONTAINER=kafka-ci  — CI Confluent container
 #   KAFKA_DOCKER_COMPOSE_SERVICE=kafka — legacy; Compose kafka removed (use k8s script or KAFKA_DOCKER_CONTAINER)
-#   OCH_KAFKA_TOPICS_DELETE=1         — delete the same topic set (--if-exists), then exit (optional CI/teardown)
+#   RP_KAFKA_TOPICS_DELETE=1         — delete the same topic set (--if-exists), then exit (optional CI/teardown)
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -39,8 +39,8 @@ KAFKA_DOCKER_CONTAINER="${KAFKA_DOCKER_CONTAINER:-}"
 KAFKA_DOCKER_COMPOSE_SERVICE="${KAFKA_DOCKER_COMPOSE_SERVICE:-}"
 KAFKA_COMMAND_CONFIG="${KAFKA_COMMAND_CONFIG:-}"
 
-och_topic_suffix() {
-  local raw="${OCH_KAFKA_TOPIC_SUFFIX:-}"
+rp_topic_suffix() {
+  local raw="${RP_KAFKA_TOPIC_SUFFIX:-}"
   raw="${raw#"${raw%%[![:space:]]*}"}"
   raw="${raw%"${raw##*[![:space:]]}"}"
   while [[ "$raw" == .* ]]; do raw="${raw#.}"; done
@@ -49,7 +49,7 @@ och_topic_suffix() {
   fi
 }
 
-SUF="$(och_topic_suffix)"
+SUF="$(rp_topic_suffix)"
 
 say() { printf "\n\033[1m%s\033[0m\n" "$*"; }
 ok() { echo "✅ $*"; }
@@ -117,8 +117,8 @@ fi
 
 BS="$(bootstrap_for_cli)"
 
-if [[ "${OCH_KAFKA_TOPICS_DELETE:-}" == "1" ]]; then
-  say "OCH_KAFKA_TOPICS_DELETE=1 — deleting listed topics (best-effort, --if-exists)"
+if [[ "${RP_KAFKA_TOPICS_DELETE:-}" == "1" ]]; then
+  say "RP_KAFKA_TOPICS_DELETE=1 — deleting listed topics (best-effort, --if-exists)"
   for t in "${TOPICS[@]}"; do
     if kafka_topics_bin --bootstrap-server "$BS" "${CONFIG_ARGS[@]}" --delete --if-exists --topic "$t" 2>/dev/null; then
       ok "Deleted (or absent): $t"

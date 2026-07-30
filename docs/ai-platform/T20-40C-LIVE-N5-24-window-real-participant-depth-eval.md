@@ -102,7 +102,7 @@ e2e-contract@record-platform.local hybrid_canary allowlist
 
 | Gate | Result |
 |------|--------|
-| OCH | **PASS** (`__SCANNED__=589`) |
+| RP | **PASS** (`__SCANNED__=589`) |
 | Telemetry WARNs | **0 PASS** |
 | Full Playwright C-suite | **7/7 PASS** |
 | Record score | **3.86** |

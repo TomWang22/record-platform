@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Temporal overlap invariants O1–O4 (parent containment, Kafka async gap bound, root envelope).
- * See docs/observability/och-observability-integrity-spec-v1.md §4.
+ * See docs/observability/rp-observability-integrity-spec-v1.md §4.
  */
 import { spanMap, tagValue, serviceName } from "./lib/jaeger-traces.mjs";
 

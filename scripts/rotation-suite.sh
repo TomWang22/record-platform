@@ -6,7 +6,7 @@ set -euo pipefail
 # Do not combine ROTATION_H2_KEYLOG=1 with perf; use forensic for decrypted frame proof.
 
 ### CONFIG
-# Rotation only affects application TLS (Caddy off-campus-housing-local-tls, service-tls, dev-root-ca in namespaces).
+# Rotation only affects application TLS (Caddy edge-local-tls, service-tls, dev-root-ca in namespaces).
 # It does NOT modify kubeconfig or the cluster API server certs; kubectl continues to use cluster CA (e.g. k3d/k3s).
 # ROTATION_SKIP_KEYCHAIN_TRUST=1: skip adding CA to macOS keychain (no security prompt); k6/ConfigMap use certs/dev-root.pem. Set by run-all-test-suites.sh so suite 5/9 never requires manual verify.
 # Defaults: ROTATION_H2_KEYLOG=0 (in-cluster k6, no SSH/keylog) so rotation passes reliably; ROTATE_CA=1 (full cert chain test).
@@ -16,7 +16,7 @@ HOST="${HOST:-record-platform.test}"
 NS_ING="ingress-nginx"
 NS_APP="${HOUSING_NS:-record-platform}"
 SERVICE="caddy-h3"
-LEAF_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"
+LEAF_SECRET="${LEAF_TLS_SECRET:-edge-local-tls}"
 CA_SECRET="dev-root-ca"
 ROTATION_H2_KEYLOG="${ROTATION_H2_KEYLOG:-0}"
 ROTATE_CA="${ROTATE_CA:-1}"
@@ -551,7 +551,7 @@ if $ROTATE_CA && [[ -f "${CA_ROOT:-}" ]] && [[ -f "${CA_KEY:-}" ]]; then
   fi
 fi
 
-# Verify edge TLS secret exists (LEAF_SECRET / off-campus-housing-local-tls; use kctl so Colima shim works when host kubectl would fail)
+# Verify edge TLS secret exists (LEAF_SECRET / edge-local-tls; use kctl so Colima shim works when host kubectl would fail)
 if ! kctl -n "$NS_ING" get secret "$LEAF_SECRET" >/dev/null 2>&1; then
   fail "$LEAF_SECRET missing in $NS_ING - Caddy pods will fail to mount; fix secret updates above"
 fi
@@ -652,7 +652,7 @@ say "ROT_PHASE = $ROT_PHASE"
 # have already loaded certs at startup. Restart all gRPC/TLS workloads so they reload the new certs.
 # Otherwise python-ai, auth, records, etc. reject new client certs (SSLV3_ALERT_BAD_CERTIFICATE).
 say "Restarting gRPC/TLS workloads so they pick up new service-tls and dev-root-ca…"
-for dep in auth-service api-gateway listings-service booking-service messaging-service trust-service analytics-service; do
+for dep in auth-service api-gateway listings-service reservation-mesh messaging-service trust-service analytics-service; do
   kctl -n "$NS_APP" rollout restart "deploy/$dep" --request-timeout=15s 2>/dev/null && ok "Rollout restart started: $dep" || true
 done
 # Grace window: wait for Caddy and Envoy to be fully ready before starting load (avoids QUIC requests during reload propagation).
@@ -995,7 +995,7 @@ if [[ "$WIRE_VERIFY" == "true" ]] && [[ "${CAPTURE_DURING_K6:-1}" != "0" ]]; the
       else
         warn "caddy-rotation: No QUIC packets detected (HTTP/3 may not be in use or traffic hit other paths)"
       fi
-      # Gold standard: per-pod pcap — UDP/443 dst must be pod IP only; optional QUIC SNI (OCH hostname, not RP record.local)
+      # Gold standard: per-pod pcap — UDP/443 dst must be pod IP only; optional QUIC SNI (RP hostname, not RP record.local)
       if type verify_caddy_pcap_quic_enforcement &>/dev/null; then
         _sni_enf="${CAPTURE_EXPECTED_SNI:-record-platform.test}"
         say "Caddy capture enforcement (stray UDP/443 vs pod IP + SNI ${_sni_enf})…"

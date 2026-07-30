@@ -16,7 +16,7 @@ SERVICES=(
   listings-service
   analytics-service
   python-ai-service
-  social-service
+  messaging-service
   shopping-service
   auction-monitor
   cron-jobs
@@ -43,9 +43,9 @@ done
 say "=== Restarting deployments (record-platform namespace) ==="
 if kubectl get namespace record-platform &>/dev/null; then
   # cron-jobs is commented out in kustomization (Temporarily disabled) so omit from restart
-  kubectl rollout restart deployment api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service auction-monitor -n record-platform
-  kubectl rollout status deployment api-gateway social-service analytics-service python-ai-service -n record-platform --timeout=120s
-  ok "Rollout restarted; status checked for api-gateway, social-service, analytics-service, python-ai-service"
+  kubectl rollout restart deployment api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service shopping-service auction-monitor -n record-platform
+  kubectl rollout status deployment api-gateway messaging-service analytics-service python-ai-service -n record-platform --timeout=120s
+  ok "Rollout restarted; status checked for api-gateway, messaging-service, analytics-service, python-ai-service"
 else
   warn "Namespace record-platform not found (cluster may not be up). Build completed; run kubectl rollout restart when cluster is ready."
 fi

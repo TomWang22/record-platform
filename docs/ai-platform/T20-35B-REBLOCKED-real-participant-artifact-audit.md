@@ -21,7 +21,7 @@ Owner-approved re-run of T20.35B artifact audit per post-closeout authorization.
 | `audit-rp-ai-endpoints-contract.sh` | **PASS** |
 | `rp-ai-provider-readiness.sh` | **PASS** |
 | `rp-ai-pgvector-readiness.sh` | **PASS** |
-| `rp-och-decontaminate-scan.sh` | **PASS** (`__SCANNED__=105`) |
+| `rp-rp-decontaminate-scan.sh` | **PASS** (`__SCANNED__=105`) |
 | `ai-quality-telemetry-report.mjs` | **0 WARNs** |
 
 ## 3. Preview UI smoke (preflight control)

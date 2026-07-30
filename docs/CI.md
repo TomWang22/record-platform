@@ -22,7 +22,7 @@ The main workflow is defined in [.github/workflows/ci.yml](../.github/workflows/
 
 ## Build and test matrix
 
-- **Build:** 9 services — api-gateway, auth-service, records-service, listings-service, analytics-service, social-service, shopping-service, auction-monitor, cron-jobs.
+- **Build:** 9 services — api-gateway, auth-service, records-service, listings-service, analytics-service, messaging-service, shopping-service, auction-monitor, cron-jobs.
 - **Test:** matrix matches build (minus python-ai-service pytest, which runs in coverage workflow); each job builds `@common/utils` then runs `pnpm -C services/<service> run --if-present test` (skips services with no `test` script).
 - **Docker build:** 9 images — same 8 as test plus python-ai-service; build context is repo root, Dockerfile path `services/<service>/Dockerfile`.
 

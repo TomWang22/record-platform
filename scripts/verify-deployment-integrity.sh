@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fail (or optionally re-apply kustomize) when housing Services lack matching Deployments,
+# Fail (or optionally re-apply kustomize) when platform-planes lack matching Deployments,
 # selector alignment, Pods, or Endpoint addresses — prevents silent 502s (Service with no backends).
 #
 # Usage: HOUSING_NS=record-platform ./scripts/verify-deployment-integrity.sh
@@ -46,7 +46,7 @@ if [[ -f "$SCRIPT_DIR/lib/colima-kubeconfig.sh" ]]; then
   # shellcheck source=scripts/lib/colima-kubeconfig.sh
   source "$SCRIPT_DIR/lib/colima-kubeconfig.sh"
   if ! kubectl get nodes --request-timeout=10s &>/dev/null; then
-    och_export_colima_kubeconfig_prefer_reachable || true
+    rp_export_colima_kubeconfig_prefer_reachable || true
   fi
 fi
 

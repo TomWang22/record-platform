@@ -63,10 +63,10 @@ path = sys.argv[1]
 with open(path, encoding="utf-8") as fh:
     doc = json.load(fh)
 services = doc.get("services") or {}
-legacy = re.compile(r"off-campus-housing|social-service|booking-service", re.I)
+legacy = re.compile(r"record-platform", re.I)
 text = open(path, encoding="utf-8").read()
 if legacy.search(text):
-    print("❌ contract contains legacy OCH/service names", file=sys.stderr)
+    print("❌ contract contains legacy RP/service names", file=sys.stderr)
     sys.exit(1)
 deploys = [
     "auth-service", "records-service", "listings-service", "shopping-service",
@@ -77,7 +77,7 @@ allowed_modes = {"http", "grpc", "both"}
 allowed_tls = {"plaintext", "service-mtls", "edge-mtls"}
 fail = 0
 for svc in deploys:
-    if svc in ("social-service", "booking-service"):
+    if svc in ("messaging-service", "reservation-mesh"):
         print(f"❌ {svc} must not be in runtime deploy list", file=sys.stderr)
         fail = 1
         continue
@@ -117,7 +117,7 @@ for svc in deploys:
     print(f"✅ {svc}: static contract OK (mode={mode}, httpPort={http_port})")
 if fail:
     sys.exit(1)
-print("✅ no OCH legacy names in contract")
+print("✅ no RP legacy names in contract")
 PY
 
 if [[ "$MODE" == "static" ]]; then

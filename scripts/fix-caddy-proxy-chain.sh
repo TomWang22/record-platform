@@ -141,9 +141,9 @@ https://record.local {
     }
   }
 
-  # Route social-service gRPC requests
+  # Route messaging-service gRPC requests
   handle @grpc_social {
-    reverse_proxy social-service.record-platform.svc.cluster.local:50056 {
+    reverse_proxy messaging-service.record-platform.svc.cluster.local:50056 {
       header_up Host {http.request.host}
       header_up TE trailers
       header_up grpc-timeout {http.request.header.grpc-timeout}
@@ -288,9 +288,9 @@ https://record.local {
     }
   }
 
-  # Route social-service gRPC requests
+  # Route messaging-service gRPC requests
   handle @grpc_social {
-    reverse_proxy social-service.record-platform.svc.cluster.local:50056 {
+    reverse_proxy messaging-service.record-platform.svc.cluster.local:50056 {
       header_up Host {http.request.host}
       header_up TE trailers
       header_up grpc-timeout {http.request.header.grpc-timeout}

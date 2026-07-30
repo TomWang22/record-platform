@@ -1,7 +1,0 @@
-# record.test — OCH lab bundle manifest (SNI / edge record parity)
-# Hostname contract: record.test (TLS/SNI); this tarball is for audit/replay of tooling changes only.
-# Contents: Node 20 gate, Colima Docker alignment, Vitest system launcher, macOS CA detection-only preflight,
-# Step 7 Jaeger span-tree + overlap validators, observability spec + state-machine JSON, Makefile/pnpm hooks.
-
-bundle_version=1
-generated_utc=2026-04-18T20:15:10Z

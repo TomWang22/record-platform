@@ -64,7 +64,7 @@ bash scripts/rp-ai-rag-quality-smoke.sh             # PASS
 ./scripts/webapp-playwright-strict-edge.sh \
   e2e/seller-intelligence-ui.spec.ts \
   --grep "Seller intelligence UI"                   # 1 passed
-bash scripts/rp-och-decontaminate-scan.sh           # PASS
+bash scripts/rp-rp-decontaminate-scan.sh           # PASS
 ```
 
 ---

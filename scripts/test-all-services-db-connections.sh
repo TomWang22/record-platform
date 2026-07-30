@@ -144,7 +144,7 @@ say "=== Step 2: Testing Service Pod Database Connections ==="
 # Test each service
 test_service_db_connection "auth-service" "POSTGRES_URL_AUTH" "5437" "Auth Service"
 test_service_db_connection "records-service" "POSTGRES_URL" "5433" "Records Service"
-test_service_db_connection "social-service" "POSTGRES_URL_SOCIAL" "5434" "Social Service"
+test_service_db_connection "messaging-service" "POSTGRES_URL_SOCIAL" "5434" "Messaging Service"
 test_service_db_connection "listings-service" "POSTGRES_URL_LISTINGS" "5435" "Listings Service"
 test_service_db_connection "shopping-service" "POSTGRES_URL_SHOPPING" "5436" "Shopping Service"
 test_service_db_connection "auction-monitor" "POSTGRES_URL_AUCTION_MONITOR" "5438" "Auction Monitor"

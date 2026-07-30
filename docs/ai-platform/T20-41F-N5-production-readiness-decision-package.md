@@ -23,7 +23,7 @@ E rejected — hybrid/vector production default
 | T20.41B validator | PASS — N=5 artifact, JWT sub match, preflight, UI smoke |
 | T20.41C-LIVE | PASS — 8640/8640 HTTP 200, 0% fallback, hybrid p95 140.4 ms |
 | T20.41D rollback | PASS — UI/API enroll-revoke, bulk revoke, CANARY=0, KEEP restore |
-| T20.41E telemetry | PASS — OCH, WARNs 0, Playwright 7/7 |
+| T20.41E telemetry | PASS — RP, WARNs 0, Playwright 7/7 |
 | Cumulative live | 52785/52785 HTTP 200, 0% fallback |
 
 Gate counts from T20.41C:

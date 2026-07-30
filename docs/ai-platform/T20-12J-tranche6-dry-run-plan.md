@@ -62,7 +62,7 @@ bash scripts/rp-ai-embedding-backfill-controlled.sh
 |-------|--------|
 | `--check-lock t20-tranche-5` | lock exists; rerun blocked ✓ |
 | `rp-ai-backfill-rerun-guard-smoke.sh` | PASS |
-| `rp-och-decontaminate-scan.sh` | PASS (at T20.12I) |
+| `rp-rp-decontaminate-scan.sh` | PASS (at T20.12I) |
 
 ## Actual write (NOT APPROVED)
 

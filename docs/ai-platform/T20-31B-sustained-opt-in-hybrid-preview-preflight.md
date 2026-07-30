@@ -16,7 +16,7 @@
 | `audit-rp-ai-endpoints-contract.sh` | **PASS** |
 | `rp-ai-provider-readiness.sh` | **PASS** |
 | `rp-ai-pgvector-readiness.sh` | **PASS** |
-| `rp-och-decontaminate-scan.sh` | **PASS** (`__SCANNED__=590`) |
+| `rp-rp-decontaminate-scan.sh` | **PASS** (`__SCANNED__=590`) |
 | `ai-quality-telemetry-report.mjs` | **1 WARN** (`ui_latency_p95_ms` — prior Playwright longform, non-soak) |
 
 ## 2. Env (unchanged)

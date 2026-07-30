@@ -279,7 +279,7 @@ T20.10AB is docs-only. When refinements are implemented:
 | RAG contract | `bash scripts/audit-rp-ai-rag-contract.sh` | PASS |
 | Source diagnostic | `bash scripts/rp-ai-shadow-source-diagnostic.sh` | PASS — ≥5 types, no leakage |
 | Quality smoke | `bash scripts/rp-ai-rag-quality-smoke.sh` | PASS |
-| OCH scan | `bash scripts/rp-och-decontaminate-scan.sh` | PASS |
+| RP scan | `bash scripts/rp-rp-decontaminate-scan.sh` | PASS |
 | Unit tests | `pytest services/python-ai-service/tests/test_shadow_fetch_strategy.py` + new overlap tests | PASS |
 
 Do **not** commit `bench_logs/`, screenshots, or coverage artifacts.
@@ -330,7 +330,7 @@ Rollback is **code + env flag revert** — no DB migration or embedding rollback
 
 ```bash
 git status --short
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 **Vector rollout: NOT APPROVED**

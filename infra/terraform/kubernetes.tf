@@ -24,7 +24,7 @@ resource "kubernetes_config_map" "app_config" {
     LISTINGS_SERVICE_PORT = tostring(local.service_ports.listings_service)
     ANALYTICS_SERVICE_PORT = tostring(local.service_ports.analytics_service)
     SHOPPING_SERVICE_PORT = tostring(local.service_ports.shopping_service)
-    SOCIAL_SERVICE_PORT   = tostring(local.service_ports.social_service)
+    messaging-plane_PORT   = tostring(local.service_ports.messaging-plane)
     AUCTION_MONITOR_PORT  = tostring(local.service_ports.auction_monitor)
     PYTHON_AI_SERVICE_PORT = tostring(local.service_ports.python_ai_service)
   }

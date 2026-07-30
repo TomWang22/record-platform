@@ -8,7 +8,7 @@ import { join } from "node:path";
 
 const strict = process.env.STEP7_REQUIRE_KAFKA_OFFSET === "1";
 const out = {
-  specVersion: "och-observability-integrity-spec-v1",
+  specVersion: "rp-observability-integrity-spec-v1",
   gate: "kafka-offset-invariant",
   status: strict ? "FAIL" : "SKIPPED",
   reason: strict

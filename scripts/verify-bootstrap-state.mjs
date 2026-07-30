@@ -9,7 +9,7 @@
  *   HOUSING_NS — default record-platform
  *   VERIFY_BOOTSTRAP_STATE_SKIP — 1 to exit 0 immediately (shell wrappers)
  *   VERIFY_BOOTSTRAP_INFRA_DEPLOY_WAIT_SEC — max seconds to poll ingress-nginx Deployments (default 45; set 0 for one shot)
- *   EDGE_LB_MODE — metallb-only (default) or servicelb-nodeport (legacy OCH/k3s); controls nodePort assertions
+ *   EDGE_LB_MODE — metallb-only (default) or servicelb-nodeport (legacy RP/k3s); controls nodePort assertions
  *   VERIFY_BOOTSTRAP_SKIP_CADDY_UDP_NODEPORT_CHECK — 1 skips caddy-h3 edge port invariant (emergency only)
  *   VERIFY_BOOTSTRAP_HTTP3_EDGE — 1 runs scripts/verify-http3-and-runtime.mjs (curl --http3 + edge validation → bench_logs/http3_edge_metrics.prom). make cold-bootstrap sets default 1; use 0 to skip. VERIFY_HTTP3_SKIP_CURL=1 skips curl inside that script.
  *   VERIFY_BOOTSTRAP_SKIP_APP_RUNTIME — 1 skips app_runtime phase (emergency only)
@@ -259,7 +259,7 @@ function waitIngressNginxDeploymentsReady() {
  *   - no kube-system svclb-caddy-h3 (klipper-lb)
  *   - MetalLB controller/speaker must be active
  *
- * servicelb-nodeport (legacy OCH / k3s ServiceLB):
+ * servicelb-nodeport (legacy RP / k3s ServiceLB):
  *   - UDP 443 must have a nodePort
  */
 function checkCaddyH3UdpNodePortInvariant() {
@@ -666,7 +666,7 @@ function verifySecretSync(ns) {
   } catch (e) {
     errors.push(`missing secret ingress-nginx/dev-root-ca: ${e.message}`);
   }
-  for (const name of ["kafka-ssl-secret", "och-kafka-ssl-secret"]) {
+  for (const name of ["kafka-ssl-secret", "rp-kafka-ssl-secret"]) {
     try {
       kubectl(["-n", ns, "get", "secret", name, "--request-timeout=15s"]);
     } catch {
@@ -720,12 +720,12 @@ function verifyStrictRpContract(ns) {
   if (ns !== "record-platform") {
     errors.push(`namespace must be record-platform (got ${ns})`);
   }
-  const forbidden = ["booking-service", "social-service", "off-campus-housing"];
+  const forbidden = ["reservation-mesh", "messaging-service", "record-platform"];
   if (shQuiet("kubectl", ["version", "--client"])) {
     try {
       const nsList = kubectl(["get", "ns", "-o", "jsonpath={.items[*].metadata.name}"]);
-      if (nsList.split(/\s+/).includes("off-campus-housing-tracker")) {
-        errors.push("forbidden namespace off-campus-housing-tracker is present");
+      if (nsList.split(/\s+/).includes("record-platform")) {
+        errors.push("forbidden namespace record-platform is present");
       }
     } catch {
       /* ignore */
@@ -829,7 +829,7 @@ function verifyStrictRpContract(ns) {
     for (const f of readdirSync(dashDir)) {
       if (!f.endsWith(".json")) continue;
       const t = readFileSync(join(dashDir, f), "utf8");
-      if (/off-campus-housing|OCH /i.test(t)) {
+      if (/record-platform|RP /i.test(t)) {
         errors.push(`Grafana dashboard ${f} still has legacy title`);
         break;
       }

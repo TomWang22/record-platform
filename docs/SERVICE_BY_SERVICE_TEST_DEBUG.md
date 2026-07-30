@@ -17,24 +17,24 @@ This document helps diagnose failing tests from `scripts/test-microservices-http
 
 ---
 
-## Social Service (Tests 7c, 7d — forum.post_votes)
+## Messaging Service (Tests 7c, 7d — forum.post_votes)
 
 **Symptom:** Vote works (200) but DB has no row in `forum.post_votes`.
 
 **Checks:**
 ```bash
 # 1. Verify social gRPC VotePost writes to DB
-kubectl -n record-platform logs -l app=social-service --tail=50 | grep -i vote
+kubectl -n record-platform logs -l app=messaging-service --tail=50 | grep -i vote
 
 # 2. After a vote, check DB (social DB on 5434 has forum schema)
 PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d social -c \
   "SELECT * FROM forum.post_votes ORDER BY created_at DESC LIMIT 5;"
 
-# 3. Ensure social-service uses social DB (POSTGRES_URL_SOCIAL → 5434)
-kubectl -n record-platform get deploy social-service -o jsonpath='{.spec.template.spec.containers[0].env}' | jq .
+# 3. Ensure messaging-service uses social DB (POSTGRES_URL_SOCIAL → 5434)
+kubectl -n record-platform get deploy messaging-service -o jsonpath='{.spec.template.spec.containers[0].env}' | jq .
 ```
 
-**Fix applied:** gRPC `VotePost` / `VoteComment` in `services/social-service/src/grpc-server.ts` now INSERT into `forum.post_votes` / `forum.comment_votes`. Rebuild and redeploy social-service.
+**Fix applied:** gRPC `VotePost` / `VoteComment` in `services/messaging-service/src/grpc-server.ts` now INSERT into `forum.post_votes` / `forum.comment_votes`. Rebuild and redeploy messaging-service.
 
 ---
 
@@ -191,7 +191,7 @@ kubectl -n k6-load get configmap k6-ca-cert -o yaml
 
 **Symptom:** `GET /api/social/healthz` via HTTP/3 returns 503.
 
-**Root cause:** Social-service's `/healthz` intentionally returns 503 when unhealthy. In `services/social-service/src/server.ts`:
+**Root cause:** messaging-plane's `/healthz` intentionally returns 503 when unhealthy. In `services/messaging-service/src/server.ts`:
 
 - **DB disconnected:** If `pool.query('SELECT 1')` fails or times out (2s), `status.db = 'disconnected'`, `status.ok = false` → 503
 - **Overall timeout:** If the full health check exceeds 3s, it returns 503
@@ -212,8 +212,8 @@ curl -sS -w "\n%{http_code}" --resolve record.local:443:$TARGET_IP \
 # 2. Social DB reachable?
 PGPASSWORD=postgres PGCONNECT_TIMEOUT=2 psql -h localhost -p 5434 -U postgres -d social -c "SELECT 1;"
 
-# 3. Social-service logs (DB errors)
-kubectl -n record-platform logs -l app=social-service --tail=80 | grep -iE "DB|health|error"
+# 3. messaging-plane logs (DB errors)
+kubectl -n record-platform logs -l app=messaging-service --tail=80 | grep -iE "DB|health|error"
 ```
 
 **Mitigations:**

@@ -3,7 +3,7 @@
 # Supports Colima/k3s; uses kubectl shim (shims-first PATH).
 #
 # Destructive fixes (kubectl delete pod) are OFF by default — they amplify crash/probe storms.
-# Set OCH_DIAGNOSTIC_ALLOW_POD_DELETE=1 to allow stuck-Pending, FailedMount-retry, and probe-TLS pod deletion.
+# Set RP_DIAGNOSTIC_ALLOW_POD_DELETE=1 to allow stuck-Pending, FailedMount-retry, and probe-TLS pod deletion.
 
 set -euo pipefail
 
@@ -123,15 +123,15 @@ fi
 # 5. App workloads (dynamic): *-service + api-gateway — excludes nginx/haproxy/exporters/caddy/envoy
 HOUSING_CHECK_NS="${HOUSING_NS:-record-platform}"
 say "5. Checking app pods ($HOUSING_CHECK_NS, should be 1/1 Ready)..."
-if type och_list_app_deployments &>/dev/null; then
-  _listed=$(och_list_app_deployments "$HOUSING_CHECK_NS" | tr '\n' ' ')
+if type rp_list_app_deployments &>/dev/null; then
+  _listed=$(rp_list_app_deployments "$HOUSING_CHECK_NS" | tr '\n' ' ')
   if [[ -n "${_listed// /}" ]]; then
     read -r -a SERVICES <<< "$_listed"
   else
-    SERVICES=("auth-service" "api-gateway" "listings-service" "booking-service" "messaging-service" "trust-service" "analytics-service" "media-service" "notification-service")
+    SERVICES=("auth-service" "api-gateway" "listings-service" "reservation-mesh" "messaging-service" "trust-service" "analytics-service" "media-service" "notification-service")
   fi
 else
-  SERVICES=("auth-service" "api-gateway" "listings-service" "booking-service" "messaging-service" "trust-service" "analytics-service" "media-service" "notification-service")
+  SERVICES=("auth-service" "api-gateway" "listings-service" "reservation-mesh" "messaging-service" "trust-service" "analytics-service" "media-service" "notification-service")
 fi
 APP_EXPECTED=${#SERVICES[@]}
 echo "  ℹ️  App deployments to verify: $APP_EXPECTED (${SERVICES[*]})"
@@ -139,9 +139,9 @@ echo "  ℹ️  App deployments to verify: $APP_EXPECTED (${SERVICES[*]})"
 # Kafka runs in-cluster (KRaft); pods use headless bootstrap from app-config.
 true
 
-# Optional settle time: OCH_APP_READY_WAIT_SEC (default 180), poll OCH_APP_READY_POLL_STEP (default 12)
-APP_WAIT_SEC="${OCH_APP_READY_WAIT_SEC:-180}"
-APP_POLL_STEP="${OCH_APP_READY_POLL_STEP:-12}"
+# Optional settle time: RP_APP_READY_WAIT_SEC (default 180), poll RP_APP_READY_POLL_STEP (default 12)
+APP_WAIT_SEC="${RP_APP_READY_WAIT_SEC:-180}"
+APP_POLL_STEP="${RP_APP_READY_POLL_STEP:-12}"
 _elapsed=0
 READY=0
 NOT_READY=()
@@ -256,13 +256,13 @@ if [[ "${READY:-0}" -ne "$APP_EXPECTED" ]]; then
         # Check if pod is older than 2 minutes
         AGE_SEC=$(($(date +%s) - $(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${AGE}Z" +%s 2>/dev/null || echo 0)))
         if [[ $AGE_SEC -gt 120 ]]; then
-          if [[ "${OCH_DIAGNOSTIC_ALLOW_POD_DELETE:-0}" == "1" ]]; then
+          if [[ "${RP_DIAGNOSTIC_ALLOW_POD_DELETE:-0}" == "1" ]]; then
             warn "  Pod $POD stuck in $PHASE for ${AGE_SEC}s, deleting..."
             echo "  Deleting stuck pod: $POD" | tee -a "$DIAG_LOG"
             _kubectl delete pod "$POD" -n "${HOUSING_NS:-record-platform}" --force --grace-period=0 2>&1 | tee -a "$DIAG_LOG" || true
             FIXED_THIS_SERVICE=1
           else
-            warn "  Pod $POD stuck in $PHASE for ${AGE_SEC}s (set OCH_DIAGNOSTIC_ALLOW_POD_DELETE=1 to delete)"
+            warn "  Pod $POD stuck in $PHASE for ${AGE_SEC}s (set RP_DIAGNOSTIC_ALLOW_POD_DELETE=1 to delete)"
             echo "  Stuck pod (no delete): $POD" | tee -a "$DIAG_LOG"
           fi
         fi
@@ -287,13 +287,13 @@ if [[ "${READY:-0}" -ne "$APP_EXPECTED" ]]; then
         warn "  service-tls secret missing! This is required."
         echo "  service-tls secret missing!" | tee -a "$DIAG_LOG"
       else
-        if [[ "${OCH_DIAGNOSTIC_ALLOW_POD_DELETE:-0}" == "1" ]]; then
+        if [[ "${RP_DIAGNOSTIC_ALLOW_POD_DELETE:-0}" == "1" ]]; then
           warn "  Secret exists but mount failed, deleting pod to retry..."
           echo "  Deleting pod to retry mount: $POD" | tee -a "$DIAG_LOG"
           _kubectl delete pod "$POD" -n "${HOUSING_NS:-record-platform}" --force --grace-period=0 2>&1 | tee -a "$DIAG_LOG" || true
           FIXED_THIS_SERVICE=1
         else
-          warn "  Mount failed but pod delete disabled (OCH_DIAGNOSTIC_ALLOW_POD_DELETE=1 to retry via delete)"
+          warn "  Mount failed but pod delete disabled (RP_DIAGNOSTIC_ALLOW_POD_DELETE=1 to retry via delete)"
           echo "  Mount retry skipped: $POD" | tee -a "$DIAG_LOG"
         fi
       fi
@@ -341,13 +341,13 @@ if [[ "${READY:-0}" -ne "$APP_EXPECTED" ]]; then
       echo "  Probe error: $PROBE_ERROR" | tee -a "$DIAG_LOG"
       # If it's a TLS/probe config issue, delete pod to retry
       if echo "$PROBE_ERROR" | grep -qi "tls\|cert"; then
-        if [[ "${OCH_DIAGNOSTIC_ALLOW_POD_DELETE:-0}" == "1" ]]; then
+        if [[ "${RP_DIAGNOSTIC_ALLOW_POD_DELETE:-0}" == "1" ]]; then
           warn "  TLS/probe config issue detected, deleting pod to retry..."
           echo "  Deleting pod due to probe error: $POD" | tee -a "$DIAG_LOG"
           _kubectl delete pod "$POD" -n "${HOUSING_NS:-record-platform}" --force --grace-period=0 2>&1 | tee -a "$DIAG_LOG" || true
           FIXED_THIS_SERVICE=1
         else
-          warn "  TLS/probe issue logged; not deleting pod (OCH_DIAGNOSTIC_ALLOW_POD_DELETE=1 to enable)"
+          warn "  TLS/probe issue logged; not deleting pod (RP_DIAGNOSTIC_ALLOW_POD_DELETE=1 to enable)"
           echo "  Probe TLS issue (no delete): $POD — $PROBE_ERROR" | tee -a "$DIAG_LOG"
         fi
       fi
@@ -428,11 +428,11 @@ say "9. Checking no in-cluster postgres..."
 UNWANTED=$(_kubectl get pods -n "${HOUSING_NS:-record-platform}" -l 'app=postgres' --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
 [[ "${UNWANTED:-0}" -eq 0 ]] && ok "No in-cluster postgres" || warn "Found ${UNWANTED:-0} in-cluster postgres pod(s) (external PG expected)"
 
-# 10. TLS secrets (dev-root-ca + off-campus-housing-local-tls for CA/Caddy match)
+# 10. TLS secrets (dev-root-ca + edge-local-tls for CA/Caddy match)
 say "10. Checking TLS secrets..."
 [[ -n "$(_kubectl get secret -n ingress-nginx dev-root-ca -o name 2>/dev/null)" ]] && ok "dev-root-ca (ingress-nginx)" || warn "dev-root-ca missing"
-# off-campus-housing-local-tls should exist in ingress-nginx namespace (for Caddy)
-LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"
+# edge-local-tls should exist in ingress-nginx namespace (for Caddy)
+LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-edge-local-tls}"
 if [[ -n "$(_kubectl get secret -n ingress-nginx "$LEAF_TLS_SECRET" -o name 2>/dev/null)" ]]; then
   ok "$LEAF_TLS_SECRET (ingress-nginx)"
 else

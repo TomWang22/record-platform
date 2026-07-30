@@ -151,8 +151,8 @@ verify_query_plan 5439 analytics "User Behavior Aggregation" \
   "SELECT user_id, COUNT(*) FROM analytics.user_behavior WHERE timestamp > NOW() - INTERVAL '7 days' GROUP BY user_id LIMIT 50;" \
   3000
 
-# Social Service - Critical queries
-say "=== Social Service Query Plans (Port 5434) ==="
+# Messaging Service - Critical queries
+say "=== Messaging Service Query Plans (Port 5434) ==="
 
 # Query 1: User messages (recipient index)
 verify_query_plan 5434 social "User Messages (Recipient)" \

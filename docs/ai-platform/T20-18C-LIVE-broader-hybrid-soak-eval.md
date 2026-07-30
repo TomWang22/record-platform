@@ -118,7 +118,7 @@ Auth: JWT login for all 6 users; JWT `sub` matched expected UUID (no header spoo
 | Hybrid p95 | ≤3000 ms | **PASS** (145.78 ms) |
 | Authenticated users | ≥3 | **PASS** (6/6) |
 | Anchored overlap | ≥10/16 | **PASS** (16/16) |
-| Telemetry / leakage / OCH | PASS | **PASS** |
+| Telemetry / leakage / RP | PASS | **PASS** |
 | Playwright | PASS | **PASS** |
 
 ---

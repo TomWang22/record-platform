@@ -35,11 +35,11 @@
 | Gate: allowlist | **1080** |
 | keyword_default during matrix | **0** |
 
-## 3. OCH / UI
+## 3. RP / UI
 
 | Check | Result |
 |-------|--------|
-| OCH | **PASS** (`__SCANNED__=589`) |
+| RP | **PASS** (`__SCANNED__=589`) |
 | Guest preview hidden | **PASS** (Playwright) |
 | Message-body exposure | **0** |
 | Playwright C-suite | **7/7 PASS** |

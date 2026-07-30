@@ -11,7 +11,7 @@
 
 ```text
 T20.39E: PASS
-OCH: PASS
+RP: PASS
 Telemetry WARNs: 0
 Playwright C-suite: 7/7 PASS
 Production default: keyword
@@ -38,11 +38,11 @@ PERCENT: 0
 
 ---
 
-## 3. OCH / UI / quality
+## 3. RP / UI / quality
 
 | Gate | Result |
 |------|--------|
-| OCH decontamination scan | **PASS** (`__SCANNED__=589`) |
+| RP decontamination scan | **PASS** (`__SCANNED__=589`) |
 | Preview UI smoke | **4/4 PASS** |
 | Full C-suite | **7/7 PASS** |
 | Telemetry WARNs | **0** |

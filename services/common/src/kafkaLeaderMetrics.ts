@@ -4,14 +4,14 @@ import { register } from "./metrics.js";
 
 /** Max broker share of partition leadership in sampled topic (0..1). High ⇒ single-broker dominance. */
 export const ochKafkaLeaderImbalanceMaxRatio = new client.Gauge({
-  name: "och_kafka_leader_imbalance_max_ratio",
+  name: "rp_kafka_leader_imbalance_max_ratio",
   help: "Among sampled topic partitions, max(fraction of partitions led by one broker)",
   registers: [register],
 });
 
 /** Partition leader counts per broker id from a metadata snapshot (startup barrier). */
 export const ochKafkaBrokerPartitionLeaders = new client.Gauge({
-  name: "och_kafka_broker_partition_leaders",
+  name: "rp_kafka_broker_partition_leaders",
   help: "Count of partitions where broker is leader (single-topic snapshot)",
   labelNames: ["broker_id"] as const,
   registers: [register],
@@ -32,14 +32,14 @@ const INTERNAL_TOPICS = /^(__consumer_offsets|__transaction_state)/;
 
 /**
  * After admin.connect(), samples one topic's partition leadership for observability.
- * Skipped when OCH_KAFKA_LEADER_METRICS=0 or describe/fetch fails (non-fatal).
+ * Skipped when RP_KAFKA_LEADER_METRICS=0 or describe/fetch fails (non-fatal).
  */
 export async function recordKafkaPartitionLeaderMetrics(admin: Admin): Promise<void> {
-  if (process.env.OCH_KAFKA_LEADER_METRICS === "0" || process.env.OCH_KAFKA_LEADER_METRICS === "false") {
+  if (process.env.RP_KAFKA_LEADER_METRICS === "0" || process.env.RP_KAFKA_LEADER_METRICS === "false") {
     return;
   }
   try {
-    const forced = process.env.OCH_KAFKA_METRICS_TOPIC?.trim();
+    const forced = process.env.RP_KAFKA_METRICS_TOPIC?.trim();
     let topic: string | undefined = forced || undefined;
     if (!topic) {
       const topics = (await admin.listTopics()).filter((t) => !INTERNAL_TOPICS.test(t));

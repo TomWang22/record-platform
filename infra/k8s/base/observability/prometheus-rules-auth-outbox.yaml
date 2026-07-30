@@ -6,7 +6,7 @@ metadata:
   namespace: observability
   labels:
     app: prometheus
-    och.dev/role: auth-rules
+    rp.dev/role: auth-rules
 data:
   auth-outbox.yml: |
     groups:

@@ -20,7 +20,7 @@ if [[ -n "${WAIT_APP_SERVICES:-}" ]]; then
 elif [[ -n "${PREFLIGHT_APP_DEPLOYS:-}" ]]; then
   read -r -a SERVICES <<< "$PREFLIGHT_APP_DEPLOYS"
 else
-  SERVICES=("auth-service" "listings-service" "booking-service" "messaging-service" "trust-service" "analytics-service" "api-gateway" "media-service")
+  SERVICES=("auth-service" "listings-service" "reservation-mesh" "messaging-service" "trust-service" "analytics-service" "api-gateway" "media-service")
 fi
 
 say "=== Forcing Deployments to Use Working ReplicaSets ==="

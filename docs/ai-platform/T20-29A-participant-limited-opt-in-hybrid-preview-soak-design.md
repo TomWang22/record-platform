@@ -22,7 +22,7 @@ Participant-limited soak validates opt-in preview lifecycle with JWT-authenticat
 | 6 | Allowlist contract user remains `hybrid_canary` / `allowlist` |
 | 7 | `PERCENT=0` throughout |
 | 8 | No production-default semantics |
-| 9 | Telemetry, leakage, OCH, Playwright, rollback, post-revoke proof |
+| 9 | Telemetry, leakage, RP, Playwright, rollback, post-revoke proof |
 
 ## 2. Participant policy
 
@@ -67,7 +67,7 @@ Expected `gate_reason`: allowlist 180, preview_opt_in 1980.
 | Hybrid p95 | ≤3000 ms |
 | Canary errors | 0 |
 | Telemetry WARNs | 0 |
-| Leakage / OCH / Playwright | PASS |
+| Leakage / RP / Playwright | PASS |
 | PERCENT | 0 |
 | Post-revoke `keyword_default` | PASS |
 | Guest hidden / no message bodies | PASS |

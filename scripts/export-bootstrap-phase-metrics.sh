@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Emit bench_logs/bootstrap_phase_metrics.prom from bootstrap_phase_timings.json (Prometheus text exposition).
 # Env: VERIFY_BOOTSTRAP_TIMING_JSON, VERIFY_BOOTSTRAP_PROM_OUT — override paths.
-# Env: OCH_INFRA_HEALED=1 — increment bench_logs/infra_heal_count.txt (C.infra Colima wedged-profile heal).
+# Env: RP_INFRA_HEALED=1 — increment bench_logs/infra_heal_count.txt (C.infra Colima wedged-profile heal).
 # Env: VERIFY_BOOTSTRAP_INFRA_HEAL_COUNT — override path to infra_heal_count.txt
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-# shellcheck source=scripts/lib/och-run-id.sh
-source "$ROOT/scripts/lib/och-run-id.sh"
-RUN_ID="${VERIFY_BOOTSTRAP_RUN_ID:-$(och_read_run_id "$ROOT")}"
+# shellcheck source=scripts/lib/rp-run-id.sh
+source "$ROOT/scripts/lib/rp-run-id.sh"
+RUN_ID="${VERIFY_BOOTSTRAP_RUN_ID:-$(rp_read_run_id "$ROOT")}"
 TIMING="${VERIFY_BOOTSTRAP_TIMING_JSON:-$ROOT/bench_logs/bootstrap_phase_timings.json}"
 OUT="${VERIFY_BOOTSTRAP_PROM_OUT:-$ROOT/bench_logs/bootstrap_phase_metrics.prom}"
 GRAPH="${VERIFY_BOOTSTRAP_GRAPH:-$ROOT/infra/bootstrap_invariants.graph.json}"
@@ -159,7 +159,7 @@ with open(out_path, "w", encoding="utf-8") as fh:
 PY
 
 mkdir -p "$(dirname "$INFRA_HEAL_COUNT_FILE")"
-if [[ "${OCH_INFRA_HEALED:-0}" == "1" ]]; then
+if [[ "${RP_INFRA_HEALED:-0}" == "1" ]]; then
   _c=0
   if [[ -f "$INFRA_HEAL_COUNT_FILE" ]] && [[ -s "$INFRA_HEAL_COUNT_FILE" ]]; then
     _raw="$(tr -d ' \n\r\t' < "$INFRA_HEAL_COUNT_FILE" | head -c 24)"
@@ -186,9 +186,9 @@ rm -f "$OUT_TMP"
 
 echo "$OUT"
 
-if [[ "${OCH_PUSH_BOOTSTRAP_PHASE:-1}" == "1" ]] && [[ -f "$OUT" ]]; then
-  chmod +x "$ROOT/scripts/lib/push-och-prom.sh" 2>/dev/null || true
-  OCH_PUSHGATEWAY_JOB="${OCH_PUSHGATEWAY_JOB:-bootstrap-phase}" \
-    OCH_PUSHGATEWAY_INSTANCE="${OCH_PUSHGATEWAY_INSTANCE:-$RUN_ID}" \
-    bash "$ROOT/scripts/lib/push-och-prom.sh" "$OUT" || echo "export-bootstrap-phase-metrics: push skipped/failed (non-fatal)" >&2
+if [[ "${RP_PUSH_BOOTSTRAP_PHASE:-1}" == "1" ]] && [[ -f "$OUT" ]]; then
+  chmod +x "$ROOT/scripts/lib/push-rp-prom.sh" 2>/dev/null || true
+  RP_PUSHGATEWAY_JOB="${RP_PUSHGATEWAY_JOB:-bootstrap-phase}" \
+    RP_PUSHGATEWAY_INSTANCE="${RP_PUSHGATEWAY_INSTANCE:-$RUN_ID}" \
+    bash "$ROOT/scripts/lib/push-rp-prom.sh" "$OUT" || echo "export-bootstrap-phase-metrics: push skipped/failed (non-fatal)" >&2
 fi

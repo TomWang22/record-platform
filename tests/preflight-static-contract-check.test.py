@@ -42,14 +42,14 @@ class PreflightStaticContractTests(unittest.TestCase):
             self.assertEqual(proc.returncode, 1)
             self.assertIn("MISSING_SCRIPT_REFERENCE", proc.stderr)
 
-    def test_legacy_och_reference_fails(self) -> None:
+    def test_legacy_namespace_reference_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            write(repo, "Makefile", "bash scripts/init-hybrid-rp-och-backup-layout.sh\n")
+            write(repo, "Makefile", "bash scripts/init-hybrid-rp-rp-backup-layout.sh\n")
             write(repo, "scripts/run-preflight-scale-and-all-suites.sh", "#!/usr/bin/env bash\necho ok\n")
             proc = run_check(repo)
             self.assertEqual(proc.returncode, 1)
-            self.assertIn("LEGACY_OCH_SCRIPT_REFERENCE", proc.stderr)
+            self.assertIn("LEGACY_NAMESPACE_SCRIPT_REFERENCE", proc.stderr)
 
     def test_generated_report_not_used_as_input(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

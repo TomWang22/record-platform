@@ -79,9 +79,9 @@ with open(path, "w", encoding="utf-8") as fh:
 print(f"Timing JSON: {path}")
 PY
 
-if [[ -x "$ROOT/scripts/export-och-wall-clock-prom.sh" ]]; then
-  OCH_PUSH_WALL_CLOCK="${OCH_PUSH_WALL_CLOCK:-1}" \
-    bash "$ROOT/scripts/export-och-wall-clock-prom.sh" "$SUITE" || true
+if [[ -x "$ROOT/scripts/export-rp-wall-clock-prom.sh" ]]; then
+  RP_PUSH_WALL_CLOCK="${RP_PUSH_WALL_CLOCK:-1}" \
+    bash "$ROOT/scripts/export-rp-wall-clock-prom.sh" "$SUITE" || true
 fi
 
 exit "${_wall_timer_exit}"

@@ -4,10 +4,10 @@
  *
  * Rules (best-effort on first trace in file):
  *  - gateway_first: earliest root span must be api-gateway
- *  - booking_requires_auth: any booking-service span must have a prior auth-service span in same trace
+ *  - booking_requires_auth: any reservation-mesh span must have a prior auth-service span in same trace
  *  - listing_then_analytics: POST /listings → analytics-service within 5s (same trace)
  *
- * Env: OCH_LTL_ENFORCE=1 or PREFLIGHT_REQUIRE_FORMAL_TRACE_GATES=1 → exit 1 on violation
+ * Env: RP_LTL_ENFORCE=1 or PREFLIGHT_REQUIRE_FORMAL_TRACE_GATES=1 → exit 1 on violation
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -49,7 +49,7 @@ function roots(spans) {
 }
 
 function enforce() {
-  return process.env.OCH_LTL_ENFORCE === "1" || process.env.PREFLIGHT_REQUIRE_FORMAL_TRACE_GATES === "1";
+  return process.env.RP_LTL_ENFORCE === "1" || process.env.PREFLIGHT_REQUIRE_FORMAL_TRACE_GATES === "1";
 }
 
 function main() {
@@ -74,7 +74,7 @@ function main() {
 
   const byStart = [...spans].sort((a, b) => Number(a.startTime) - Number(b.startTime));
   for (const s of spans) {
-    if (serviceName(s, processes) !== "booking-service") continue;
+    if (serviceName(s, processes) !== "reservation-mesh") continue;
     const t0 = Number(s.startTime);
     const priorAuth = byStart.find((x) => serviceName(x, processes) === "auth-service" && Number(x.startTime) < t0);
     if (!priorAuth) {
@@ -103,7 +103,7 @@ function main() {
   }
 
   const ok = violations.length === 0;
-  const doc = { specVersion: "och-trace-ltl-v1", ok, violations, tracePath: TRACE };
+  const doc = { specVersion: "rp-trace-ltl-v1", ok, violations, tracePath: TRACE };
   writeFileSync(OUT, `${JSON.stringify(doc, null, 2)}\n`);
   if (!ok) console.error("trace-ltl-validator: violations", JSON.stringify(violations, null, 2));
   if (!ok && enforce()) process.exit(1);

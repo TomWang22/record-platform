@@ -52,7 +52,7 @@ T20.15F already implements deterministic percentage gating (`bucket < percent`).
 | `audit-rp-ai-endpoints-contract.sh` | **PASS** |
 | `rp-ai-provider-readiness.sh` | **PASS** (preflight) |
 | `rp-ai-pgvector-readiness.sh` | **PASS** (preflight) |
-| `rp-och-decontaminate-scan.sh` | **PASS** (preflight) |
+| `rp-rp-decontaminate-scan.sh` | **PASS** (preflight) |
 
 ---
 

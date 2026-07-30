@@ -6,7 +6,7 @@ Pods in `record-platform` need to reach **Postgres** and **Redis** on the host (
 
 - If that IP is **wrong**, pods cannot reach Postgres/Redis. You then see:
   - **analytics-service** stuck in **Init:0/1** (init container `wait-db` does `nc -zv host.docker.internal 5433` and never succeeds).
-  - **auction-monitor**, **social-service**, and others **0/1 Running** (readiness fails because DB/Redis is unreachable).
+  - **auction-monitor**, **messaging-service**, and others **0/1 Running** (readiness fails because DB/Redis is unreachable).
 - Base YAML uses a **hardcoded** IP **192.168.5.2** (typical Lima/Colima default). Your Colima VM may use a **different** gateway (e.g. with `--network-address`, or a different subnet). Then the base alias is wrong and you get the instability above.
 
 ## Fix: apply the correct host alias
@@ -32,7 +32,7 @@ If you ran **colima-undo-host-aliases.sh**, deployments are restored from the re
 ## Services that depend on host.docker.internal
 
 - **Init container** (must reach DB before main container starts): analytics-service (5433), listings-service (5435), python-ai-service (5440).
-- **Readiness** (DB/Redis in app): auth-service, records-service, social-service, shopping-service, auction-monitor, etc.
+- **Readiness** (DB/Redis in app): auth-service, records-service, messaging-service, shopping-service, auction-monitor, etc.
 
 All of these use the same **hostAliases** in the pod spec. One wrong IP affects all of them.
 

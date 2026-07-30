@@ -52,7 +52,7 @@ vi.mock("../src/notification-list-cache.js", () => ({
   setCachedNotificationList: vi.fn().mockResolvedValue(undefined),
   invalidateNotificationListCacheForUser: (...args: unknown[]) =>
     invalidateNotificationListCacheForUser(...args),
-  notificationListCacheHeaders: () => ({ "X-OCH-Cache": "miss" }),
+  notificationListCacheHeaders: () => ({ "X-RP-Cache": "miss" }),
 }));
 
 function defaultPool(sql: string): { rows: unknown[]; rowCount?: number } {

@@ -42,7 +42,7 @@ T20.16D: NOT STARTED
 |-------|--------|
 | `rp-ai-shadow-real-query-timing.sh` | pure **8/16**, anchored **16/16**, zero-results **0/16**, embed timeouts **0** |
 | `audit-rp-ai-rag-contract.sh` | **PASS** |
-| `rp-och-decontaminate-scan.sh` | **PASS** |
+| `rp-rp-decontaminate-scan.sh` | **PASS** |
 | `rp-ai-shadow-source-diagnostic.sh` | FAIL (20 issues — owner/OBO diagnostic class; overlap research does not depend on this gate) |
 
 ---

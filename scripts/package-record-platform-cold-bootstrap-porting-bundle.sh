@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Record Platform cold-bootstrap porting bundle: full OCH tree (combed like no-booking bundle)
-# WITH booking-service + all K8s manifests. Rewrites: record-platform.test / record-platform.
+# Record Platform cold-bootstrap porting bundle: full RP tree (combed like no-booking bundle)
+# WITH reservation-mesh + all K8s manifests. Rewrites: record-platform.test / record-platform.
 #
-# Output: $HOME/record-platform-och-cold-bootstrap-porting-bundle-<stamp>.tar.gz
+# Output: $HOME/record-platform-rp-cold-bootstrap-porting-bundle-<stamp>.tar.gz
 #   RECORD_PLATFORM_COLD_BOOTSTRAP_BUNDLE_DIR=/path
 #   RECORD_PLATFORM_COLD_BOOTSTRAP_BUNDLE_KEEP_ALL=1
 #
@@ -13,7 +13,7 @@ OUT_DIR="${RECORD_PLATFORM_COLD_BOOTSTRAP_BUNDLE_DIR:-$HOME}"
 [[ -d "$OUT_DIR" ]] || { echo "OUT_DIR not a directory: $OUT_DIR" >&2; exit 1; }
 STAMP="$(date +%Y%m%d-%H%M%S)"
 STAGE="$(mktemp -d)"
-TOP="record-platform-och-cold-bootstrap-porting-bundle"
+TOP="record-platform-rp-cold-bootstrap-porting-bundle"
 BUNDLE="$STAGE/$TOP"
 BACKUP_REL="backups/all-8-20260517-152701"
 
@@ -44,7 +44,7 @@ RSYNC_EXCLUDES=(
 )
 
 copy_repo_tree() {
-  echo "→ rsync full OCH tree (all services + infra + webapp)…"
+  echo "→ rsync full RP tree (all services + infra + webapp)…"
   rsync -a "${RSYNC_EXCLUDES[@]}" --delete "$ROOT/" "$BUNDLE/"
 }
 
@@ -57,10 +57,10 @@ _record_platform_rewrites() {
     -name '*.txt' -o -name '*.json' -o -name '*.mts' -o -name '*.md' -o -name '*.ts' \
     -o -name '*.tsx' -o -name 'Makefile' -o -name 'pnpm-lock.yaml' -o -name 'Caddyfile' \
   \) ! -path '*/node_modules/*' -print0 2>/dev/null | while IFS= read -r -d '' f; do
-    perl -pi -e 's/off-campus-housing\.test/record-platform.test/g' "$f"
+    perl -pi -e 's/record-platform\.test/record-platform.test/g' "$f"
     perl -pi -e 's/record-platform/record-platform/g' "$f"
     perl -pi -e 's/record-platform-quic/record-platform-quic/g' "$f"
-    perl -pi -e 's/\(OCH: record\.test/(Record Platform: record-platform.test/g' "$f"
+    perl -pi -e 's/\(RP: record\.test/(Record Platform: record-platform.test/g' "$f"
   done
 }
 
@@ -68,18 +68,18 @@ _record_platform_rewrites "$BUNDLE"
 
 if [[ -f "$ROOT/scripts/lib/no-booking-bundle-ports-warning.txt" ]]; then
   sed \
-    -e 's/OCH platform bundle/Record Platform cold-bootstrap porting bundle/g' \
+    -e 's/RP platform bundle/Record Platform cold-bootstrap porting bundle/g' \
     -e 's/record-platform/record-platform/g' \
     "$ROOT/scripts/lib/no-booking-bundle-ports-warning.txt" \
     >"$BUNDLE/PORTS_AND_CONFLICTS.txt"
 fi
 
 cat >"$BUNDLE/README_BUNDLE.txt" <<'EOF'
-Record Platform — OCH cold-bootstrap porting bundle (full comb)
+Record Platform — RP cold-bootstrap porting bundle (full comb)
 =============================================================
 
 Ported defaults: record-platform.test (edge) / record-platform (Kubernetes namespace).
-Includes ALL OCH folders: services (incl. booking), webapp, scripts, infra/k8s, docker,
+Includes ALL RP folders: services (incl. booking), webapp, scripts, infra/k8s, docker,
 monitoring, observability, backups/all-8-20260517-152701 (8 DBs), CI workflows.
 
 Core services + manifests (verify with check-record-platform-cold-bootstrap-bundle.sh)
@@ -89,7 +89,7 @@ Core services + manifests (verify with check-record-platform-cold-bootstrap-bund
   services/messaging-service/     infra/k8s/base/messaging-service/
   services/trust-service/         infra/k8s/base/trust-service/
   services/media-service/         infra/k8s/base/media-service/
-  services/booking-service/       infra/k8s/base/booking-service/
+  services/reservation-mesh/       infra/k8s/base/reservation-mesh/
   services/api-gateway/           infra/k8s/base/api-gateway/
   services/notification-service/  infra/k8s/base/notification-service/
   services/analytics-service/     infra/k8s/base/analytics-service/
@@ -103,12 +103,12 @@ backups/all-8-20260517-152701/
 
 Ports
 -----
-  See PORTS_AND_CONFLICTS.txt (OCH host Postgres 5441–5448, Redis 6380, Kafka 9092/9093/9094).
+  See PORTS_AND_CONFLICTS.txt (RP host Postgres 5441–5448, Redis 6380, Kafka 9092/9093/9094).
 
 Quick start (Record Platform)
 -----------------------------
-  tar -xzf record-platform-och-cold-bootstrap-porting-bundle-<stamp>.tar.gz -C /path/to/record-platform
-  cd record-platform-och-cold-bootstrap-porting-bundle
+  tar -xzf record-platform-rp-cold-bootstrap-porting-bundle-<stamp>.tar.gz -C /path/to/record-platform
+  cd record-platform-rp-cold-bootstrap-porting-bundle
   export HOUSING_NS=record-platform
   pnpm install && pnpm run build
   COLD_BOOTSTRAP_CONFIRM=yes RESTORE_BACKUP_DIR=backups/all-8-20260517-152701 make cold-bootstrap
@@ -152,7 +152,7 @@ _verify_core_paths() {
   done <"$ROOT/scripts/lib/record-platform-cold-bootstrap-required-paths.txt"
   for dir in \
     services/auth-service services/listings-service services/messaging-service \
-    services/trust-service services/media-service services/booking-service \
+    services/trust-service services/media-service services/reservation-mesh \
     webapp infra/k8s/base/auth-service infra/k8s/base/messaging-service \
     infra/k8s/base/trust-service infra/k8s/base/media-service infra/k8s/base/listings-service \
     infra/k8s/base/webapp; do

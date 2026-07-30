@@ -2,7 +2,7 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 import { Trend } from "k6/metrics";
 
-const BASE_URL = (__ENV.BASE_URL || "https://off-campus-housing.test").replace(/\/+$/, "");
+const BASE_URL = (__ENV.BASE_URL || "https://record-platform.test").replace(/\/+$/, "");
 const LISTING_ID = __ENV.LISTING_ID || "00000000-0000-0000-0000-000000000001";
 const JWT = __ENV.JWT || "";
 const BOOKING_PATH = __ENV.BOOKING_PATH || "/api/booking/request";

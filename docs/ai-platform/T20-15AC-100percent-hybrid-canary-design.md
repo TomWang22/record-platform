@@ -54,7 +54,7 @@ Hybrid canary remains gated, reversible, and allowlist-overridable.
 
 ## 5. Required gates before T20.15AD
 
-Same as prior tranches: D-T drill, contracts, OCH, PERCENT=0 before/after, no code change expected.
+Same as prior tranches: D-T drill, contracts, RP, PERCENT=0 before/after, no code change expected.
 
 ---
 

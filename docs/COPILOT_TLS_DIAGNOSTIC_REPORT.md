@@ -62,7 +62,7 @@ Subject Alternative Name:
 **To apply:**
 ```bash
 kubectl apply -k infra/k8s/base/
-kubectl -n record-platform rollout restart deployment/auth-service deployment/records-service deployment/listings-service deployment/analytics-service deployment/social-service deployment/shopping-service deployment/auction-monitor deployment/python-ai-service
+kubectl -n record-platform rollout restart deployment/auth-service deployment/records-service deployment/listings-service deployment/analytics-service deployment/messaging-service deployment/shopping-service deployment/auction-monitor deployment/python-ai-service
 ```
 
 ---

@@ -33,11 +33,11 @@
 | Gate: preview_opt_in | **1080** |
 | Gate: allowlist | **360** |
 
-## 3. OCH / UI
+## 3. RP / UI
 
 | Check | Result |
 |-------|--------|
-| OCH | **PASS** (`__SCANNED__=590`) |
+| RP | **PASS** (`__SCANNED__=590`) |
 | Guest preview hidden | **PASS** (Playwright) |
 | Message-body exposure | **0** |
 

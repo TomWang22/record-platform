@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Optional row-count sanity check after k6 messaging load (local dev).
 # VERIFY_DB=1 ./scripts/verify-after-k6-messaging-db.sh
-# Env: PGHOST PGPORT MESSAGING_DB PGUSER PGPASSWORD (defaults match OCH external layout)
+# Env: PGHOST PGPORT MESSAGING_DB PGUSER PGPASSWORD (defaults match RP external layout)
 set -euo pipefail
 
 if [[ "${VERIFY_DB:-0}" != "1" ]]; then

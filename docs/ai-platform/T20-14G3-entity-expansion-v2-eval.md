@@ -78,7 +78,7 @@ Zero-overlap shadow runs: **8/16** (was 9/16 at G2R).
 | `audit-rp-ai-endpoints-contract.sh` | PASS |
 | `rp-ai-provider-readiness.sh` | PASS |
 | `rp-ai-pgvector-readiness.sh` | PASS |
-| `rp-och-decontaminate-scan.sh` | PASS |
+| `rp-rp-decontaminate-scan.sh` | PASS |
 | Seller intelligence Playwright | PASS 4/4 |
 | Record intelligence Playwright | PASS 7/7 avg 3.86 |
 | Longform session Playwright | PASS 12/12 avg 3.67 |

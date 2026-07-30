@@ -9,8 +9,8 @@ metadata:
 data:
   auth-outbox.json: |
     {
-      "title": "OCH — Auth transactional outbox (legacy — use OCH Transactional Outbox)",
-      "uid": "och-auth-outbox",
+      "title": "RP — Auth transactional outbox (legacy — use RP Transactional Outbox)",
+      "uid": "rp-auth-outbox",
       "schemaVersion": 39,
       "version": 1,
       "tags": ["och", "auth", "kafka", "outbox", "deletion"],

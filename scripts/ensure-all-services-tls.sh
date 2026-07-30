@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ensure OCH microservice Deployments mount CA + leaf for strict TLS/mTLS (gRPC + Kafka).
+# Ensure RP microservice Deployments mount CA + leaf for strict TLS/mTLS (gRPC + Kafka).
 # CA may be: dev-root-ca volume and/or ca.crt inside service-tls / edge-service-tls secret items.
 
 set -euo pipefail
@@ -15,12 +15,12 @@ warn() { echo "  ⚠️  $*"; }
 
 say "=== Ensuring All Services Have Strict TLS (CA + Leaf) ==="
 
-# Off-campus housing stack (align with PREFLIGHT_APP_DEPLOYS / APP_DEPLOYS_FULL).
+# record-platform stack (align with PREFLIGHT_APP_DEPLOYS / APP_DEPLOYS_FULL).
 SERVICES=(
   auth-service
   api-gateway
   listings-service
-  booking-service
+  reservation-mesh
   messaging-service
   trust-service
   analytics-service
@@ -37,7 +37,7 @@ _tls_deploy_has_ca() {
   local f="$1"
   # Explicit dev-root-ca volume (e.g. NODE_EXTRA_CA_CERTS)
   grep -qE 'name:\s*dev-root-ca\b' "$f" && return 0
-  # CA chain file alongside leaf in the same TLS secret (typical OCH pattern)
+  # CA chain file alongside leaf in the same TLS secret (typical RP pattern)
   grep -qE 'key:\s*ca\.crt\b' "$f" && return 0
   return 1
 }

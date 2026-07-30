@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Core OCH dev bring-up phases (Colima → infra → deps → certs → images → cluster/Kafka/edge).
-# **Preferred entry:** `scripts/dev-up.sh` ( **`make dev`** ) — sets OCH edge hostname, runs this script, then `dev-health-check.sh` + `dev-state.json`.
+# Core RP dev bring-up phases (Colima → infra → deps → certs → images → cluster/Kafka/edge).
+# **Preferred entry:** `scripts/dev-up.sh` ( **`make dev`** ) — sets RP edge hostname, runs this script, then `dev-health-check.sh` + `dev-state.json`.
 # Preflight pipelines stay separate — do not invoke this from preflight.
 #
 # Usage (repo root):
@@ -28,8 +28,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-# OCH edge SNI / hostname (not record-platform.test).
-export OCH_EDGE_HOSTNAME="${OCH_EDGE_HOSTNAME:-record-platform.test}"
+# RP edge SNI / hostname (not record-platform.test).
+export RP_EDGE_HOSTNAME="${RP_EDGE_HOSTNAME:-record-platform.test}"
 
 DRY_RUN="${DRY_RUN:-0}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
@@ -111,13 +111,13 @@ ensure_docker_context() {
     return 0
   fi
   if is_dry; then
-    echo "  [DRY_RUN] source ensure-colima-docker-context.sh + och_ensure_colima_docker_context"
+    echo "  [DRY_RUN] source ensure-colima-docker-context.sh + rp_ensure_colima_docker_context"
     return 0
   fi
   # shellcheck disable=SC1091
   source "$SCRIPT_DIR/lib/ensure-colima-docker-context.sh"
-  export OCH_KUBE_CONTEXT="${OCH_KUBE_CONTEXT:-$(kubectl config current-context 2>/dev/null || echo colima)}"
-  if ! och_ensure_colima_docker_context; then
+  export RP_KUBE_CONTEXT="${RP_KUBE_CONTEXT:-$(kubectl config current-context 2>/dev/null || echo colima)}"
+  if ! rp_ensure_colima_docker_context; then
     echo "❌ Docker context / Colima socket alignment failed." >&2
     exit 1
   fi
@@ -147,9 +147,9 @@ ensure_kubeconfig() {
     source "$SCRIPT_DIR/lib/colima-kubeconfig.sh"
     if ! kubectl get nodes --request-timeout=12s >/dev/null 2>&1; then
       echo "  ℹ️  kubectl API still unreachable — trying Colima kubeconfig files (native port)…"
-      och_export_colima_kubeconfig_prefer_reachable || true
+      rp_export_colima_kubeconfig_prefer_reachable || true
     elif [[ -z "${KUBECONFIG:-}" ]]; then
-      och_export_colima_kubeconfig_prefer_reachable || {
+      rp_export_colima_kubeconfig_prefer_reachable || {
         local _k="${HOME}/.colima/default/kubernetes/kubeconfig"
         [[ -s "$_k" ]] || _k="${HOME}/.colima/default/kubeconfig"
         [[ -s "$_k" ]] && export KUBECONFIG="$_k"
@@ -347,9 +347,9 @@ fail_if_eks_wrong_path
 
 # If Phase 1 restores from all-8 dumps, Phase 5 (make up-fast → infra-cluster) must not re-run infra/db SQL
 # or a second restore — use SKIP_BOOTSTRAP + SKIP_AUTO_RESTORE for that subprocess tree.
-OCH_PHASE1_DUMP_RESTORE=0
-[[ -n "${RESTORE_BACKUP_DIR:-}" && "${SKIP_INFRA:-0}" != "1" ]] && OCH_PHASE1_DUMP_RESTORE=1
-export OCH_PHASE1_DUMP_RESTORE
+RP_PHASE1_DUMP_RESTORE=0
+[[ -n "${RESTORE_BACKUP_DIR:-}" && "${SKIP_INFRA:-0}" != "1" ]] && RP_PHASE1_DUMP_RESTORE=1
+export RP_PHASE1_DUMP_RESTORE
 
 if [[ "$SKIP_INFRA" != "1" ]]; then
   _phase "Phase 1 — External infra (Compose: Postgres, Redis, MinIO)"
@@ -406,13 +406,13 @@ fi
 
 _phase "Phase 5–10 — Cluster bootstrap + Kafka + edge (dev-onboard-from-up-fast)"
 export DEV_ONBOARD_STRICT="${DEV_ONBOARD_STRICT:-1}"
-if [[ "${OCH_PHASE1_DUMP_RESTORE:-0}" == "1" ]]; then
+if [[ "${RP_PHASE1_DUMP_RESTORE:-0}" == "1" ]]; then
   export SKIP_BOOTSTRAP=1
   export SKIP_AUTO_RESTORE=1
   echo "  ℹ️  Dump restore was requested in Phase 1 → SKIP_BOOTSTRAP=1 SKIP_AUTO_RESTORE=1 for up-fast (no infra/db SQL; no second restore)."
 fi
 if is_dry; then
-  echo "[DRY_RUN] bash scripts/dev-onboard-from-up-fast.sh (OCH_PHASE1_DUMP_RESTORE=${OCH_PHASE1_DUMP_RESTORE:-0} SKIP_BOOTSTRAP=${SKIP_BOOTSTRAP:-})"
+  echo "[DRY_RUN] bash scripts/dev-onboard-from-up-fast.sh (RP_PHASE1_DUMP_RESTORE=${RP_PHASE1_DUMP_RESTORE:-0} SKIP_BOOTSTRAP=${SKIP_BOOTSTRAP:-})"
   echo ""
   echo "✅ make dev — dry run complete."
   exit 0

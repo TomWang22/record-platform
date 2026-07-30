@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Derive RP_KAFKA_EVENT_TOPICS from active proto/events mirror only (no booking/social when skipped).
+# Derive RP_KAFKA_EVENT_TOPICS from active proto/events mirror only (no excluded peers when skipped).
 #
 # Requires: REPO_ROOT, ENV_PREFIX, SUF (optional isolation suffix)
-# Sets: RP_KAFKA_EVENT_TOPICS (and OCH_KAFKA_EVENT_TOPICS alias for legacy callers)
+# Sets: RP_KAFKA_EVENT_TOPICS (and RP_KAFKA_EVENT_TOPICS alias for legacy callers)
 #
 # shellcheck source=rp-proto-env.sh
 # shellcheck source=rp-active-proto-events.sh
@@ -11,7 +11,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rp-active-proto-events.sh"
 
 rp_kafka_event_topics_fill() {
   RP_KAFKA_EVENT_TOPICS=()
-  OCH_KAFKA_EVENT_TOPICS=()
+  RP_KAFKA_EVENT_TOPICS=()
   rp_apply_proto_skip_env
 
   local proto_root
@@ -44,10 +44,10 @@ rp_kafka_event_topics_fill() {
     RP_KAFKA_EVENT_TOPICS+=("$line")
   done < <(printf '%s\n' "${tmp_topics[@]}" | LC_ALL=C sort -u)
 
-  OCH_KAFKA_EVENT_TOPICS=("${RP_KAFKA_EVENT_TOPICS[@]}")
+  RP_KAFKA_EVENT_TOPICS=("${RP_KAFKA_EVENT_TOPICS[@]}")
 }
 
 # Legacy function name
-och_kafka_event_topics_fill() {
+rp_kafka_event_topics_fill() {
   rp_kafka_event_topics_fill "$@"
 }

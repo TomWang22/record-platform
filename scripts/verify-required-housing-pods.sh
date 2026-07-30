@@ -2,7 +2,7 @@
 # Fail if expected housing Deployments are missing or not Available in the app namespace,
 # plus envoy-test and Caddy in ingress-nginx. Use after kustomize apply + image load.
 #
-# Usage: ./scripts/verify-required-housing-pods.sh
+# Usage: ./scripts/verify-required-record-platform-pods.sh
 #   HOUSING_NS=record-platform   (default — USE THIS, not NS=)
 #   STRICT=1                       exit 1 on any failure (default 1)
 #   PREFLIGHT_APP_DEPLOYS="..."    space-separated list (default = full housing set + media)

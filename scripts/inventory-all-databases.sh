@@ -197,7 +197,7 @@ main() {
     echo ""
     say "=== What each service uses (from app-config) ==="
     echo "5433  records-service      POSTGRES_URL_RECORDS   → 5433/records"
-    echo "5434  social-service       POSTGRES_URL_SOCIAL    → 5434/records"
+    echo "5434  messaging-service       POSTGRES_URL_SOCIAL    → 5434/records"
     echo "5435  listings-service     POSTGRES_URL_LISTINGS   → 5435/records"
     echo "5436  shopping-service     POSTGRES_URL_SHOPPING   → 5436/shopping"
     echo "5437  auth-service         POSTGRES_URL_AUTH      → 5437/auth"

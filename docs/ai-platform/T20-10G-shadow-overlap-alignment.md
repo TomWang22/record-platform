@@ -104,7 +104,7 @@ Document/entity overlap and reason breakdown were **not available** (pre-T20.10G
 |-------|--------|
 | `run-service-coverage.sh python-ai-service` | **PASS** — 111 tests, 91.65% |
 | RAG contract | **PASS** |
-| OCH decontaminate scan | **PASS** |
+| RP decontaminate scan | **PASS** |
 | Keyword behavior | **unchanged** |
 | Vector default | **shadow-only** |
 
@@ -114,7 +114,7 @@ Full post-deploy validation bundle (after redeploy):
 bash scripts/rp-ai-shadow-real-query-timing.sh
 bash scripts/rp-ai-shadow-source-diagnostic.sh
 bash scripts/audit-rp-ai-rag-contract.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 ## Rollout verdict

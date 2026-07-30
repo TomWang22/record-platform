@@ -130,7 +130,7 @@ Typical causes:
 
 ## 3. Fix: SNI and backend certs
 
-**Per-service certs (current):** Envoy uses `sni: <service>.record-platform.svc.cluster.local` per cluster. The **service-tls** leaf cert must have SANs for all gRPC services (auth-service, records-service, social-service, etc.). `ensure-strict-tls-mtls-preflight.sh` provisions from mkcert with these SANs. `rotate-ca-and-fix-tls.sh` also updates service-tls with the rotated cert.
+**Per-service certs (current):** Envoy uses `sni: <service>.record-platform.svc.cluster.local` per cluster. The **service-tls** leaf cert must have SANs for all gRPC services (auth-service, records-service, messaging-service, etc.). `ensure-strict-tls-mtls-preflight.sh` provisions from mkcert with these SANs. `rotate-ca-and-fix-tls.sh` also updates service-tls with the rotated cert.
 
 - Confirm Envoy SNI: `./scripts/diagnose-envoy-grpc.sh --save /tmp/diag` then grep `sni` in /tmp/diag/envoy-config-dump.json.
 - Confirm backend cert SANs: from a pod that mounts service-tls, `openssl x509 -in /etc/certs/tls.crt -noout -text` and check Subject Alternative Name includes the service FQDN.

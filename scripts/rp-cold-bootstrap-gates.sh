@@ -20,7 +20,7 @@ ok() {
 }
 
 gate_workspace_forbidden() {
-  for svc in booking-service social-service; do
+  for svc in reservation-mesh messaging-service; do
     [[ -d "$REPO_ROOT/services/$svc" ]] && fail "services/$svc must not exist"
   done
   if [[ "$_DRY" == "1" ]]; then
@@ -30,8 +30,8 @@ gate_workspace_forbidden() {
   if command -v kubectl >/dev/null 2>&1; then
     # Skip live cluster checks when the API is unreachable (common during P0/Z reset).
     if KUBECTL_REQUEST_TIMEOUT=5s kubectl get ns >/dev/null 2>&1; then
-      kubectl get ns off-campus-housing-tracker &>/dev/null && fail "namespace off-campus-housing-tracker exists"
-      for dep in booking-service social-service; do
+      kubectl get ns record-platform &>/dev/null && fail "namespace record-platform exists"
+      for dep in reservation-mesh messaging-service; do
         kubectl get deploy -n "$NS" "$dep" &>/dev/null 2>&1 && fail "deployment $dep in $NS"
       done
     else
@@ -50,7 +50,7 @@ gate_workspace_forbidden() {
       docker "$@" 2>/dev/null || true
     fi
   }
-  if _docker_ps ps --format '{{.Names}}' | grep -qiE 'off-campus-housing|och-'; then
+  if _docker_ps ps --format '{{.Names}}' | grep -qiE 'record-platform|rp-'; then
     fail "legacy external containers running"
   fi
   for p in 5444 5445 5446 5447 5448; do
@@ -131,7 +131,7 @@ gate_certs() {
   bash "$SCRIPT_DIR/verify-rp-cert-chain.sh" >/dev/null || fail "verify-rp-cert-chain failed"
   bash "$SCRIPT_DIR/test-rp-ollama-gate.sh" >/dev/null || fail "test-rp-ollama-gate failed"
   bash "$SCRIPT_DIR/verify-kafka-tls-sans.sh" >/dev/null 2>&1 || fail "verify-kafka-tls-sans failed"
-  for bad in record.local localhost off-campus-housing.test; do
+  for bad in record.local localhost record-platform.test; do
     grep -rq "$bad" "$REPO_ROOT/certs/" 2>/dev/null && fail "forbidden SNI/host $bad in certs/"
   done
   openssl x509 -in "$REPO_ROOT/certs/record-platform.test.crt" -noout -ext subjectAltName 2>/dev/null | grep -q record-platform.test \
@@ -172,7 +172,7 @@ KP_PASS=$(cat /etc/kafka/secrets/kafka.key-password 2>/dev/null || echo "$KS_PAS
 
 gate_k8s_rollout() {
   kubectl get ns "$NS" &>/dev/null || fail "namespace $NS missing"
-  for bad in booking-service social-service off-campus-housing; do
+  for bad in reservation-mesh messaging-service record-platform; do
     kubectl get deploy,svc,pod -n "$NS" 2>/dev/null | grep -qi "$bad" && fail "forbidden resource $bad in $NS"
   done
   for want in api-gateway auth-service records-service listings-service shopping-service messaging-service media-service notification-service trust-service analytics-service python-ai-service auction-monitor webapp; do

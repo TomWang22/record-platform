@@ -268,7 +268,7 @@ T20.10V is docs-only. The following gates apply when refinements are implemented
 | RAG contract | `bash scripts/audit-rp-ai-rag-contract.sh` | PASS |
 | Quality smoke | `bash scripts/rp-ai-rag-quality-smoke.sh` | PASS |
 | Source diagnostic | `bash scripts/rp-ai-shadow-source-diagnostic.sh` | No new leakage; source mix documented |
-| OCH scan | `bash scripts/rp-och-decontaminate-scan.sh` | PASS |
+| RP scan | `bash scripts/rp-rp-decontaminate-scan.sh` | PASS |
 | Keyword stability | Existing contract gates | Unchanged keyword behavior |
 
 Compare against T20.10T-hardened benchmark artifacts; do not commit `bench_logs/`.
@@ -326,9 +326,9 @@ No doc/script fix required for swapped labels.
 
 ```bash
 git status --short
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
-OCH: PASS (588 files scanned).
+RP: PASS (588 files scanned).
 
 **Vector rollout:** NOT APPROVED

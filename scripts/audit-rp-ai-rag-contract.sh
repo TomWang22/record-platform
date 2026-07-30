@@ -79,7 +79,7 @@ MOCK_HITS=$("${PSQL[@]}" -c "
 if [[ "${MOCK_HITS:-0}" -eq 0 ]]; then pass "no_mock_source_rows"; else fail "no_mock_source_rows" "count=$MOCK_HITS"; fi
 
 # 9 forbidden domain terms in chunks
-FORBIDDEN_RE='(OCH|off[- ]campus|housing|landlord|tenant|booking\.events)'
+FORBIDDEN_RE='(RP|off[- ]campus|housing|landlord|tenant|booking\.events)'
 DOMAIN_HITS=$("${PSQL[@]}" -c "
   SELECT COUNT(*) FROM ai.ai_document_chunks WHERE content ~* '$FORBIDDEN_RE'
 " 2>/dev/null || echo 0)

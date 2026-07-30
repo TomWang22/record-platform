@@ -41,7 +41,7 @@ build_one() {
 }
 
 if [[ "$SERVICE" == "all" ]]; then
-  for s in api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service auction-monitor cron-jobs; do
+  for s in api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service shopping-service auction-monitor cron-jobs; do
     build_one "$s" || true
   done
 else

@@ -125,7 +125,7 @@ Writes local report: `bench_logs/ai-platform/t20-10u-pgvector-candidate-fetch-<s
 |-------|--------|
 | Diagnostic script | exit 0 |
 | pgvector readiness | PASS |
-| OCH | PASS |
+| RP | PASS |
 
 ## Recommendation
 

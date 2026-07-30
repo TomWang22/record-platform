@@ -5,7 +5,7 @@
  * - Auth Service (register, login, logout)
  * - Records Service (CRUD operations)
  * - Listings Service (search, create, get)
- * - Social Service (forum posts, messages)
+ * - Messaging Service (forum posts, messages)
  * - Shopping Service (cart, checkout, orders)
  * - Analytics Service (ingestion)
  * - Python AI Service (advice)
@@ -416,7 +416,7 @@ export default function (data) {
     }
   });
   
-  group('Social Service', () => {
+  group('Messaging Service', () => {
     // Create forum post
     if (Math.random() > 0.5) {
       const { res, latency, success } = makeRequest(

@@ -80,4 +80,4 @@ Phase 22C **7200** probes are labeled protocol-parity matrix evidence. Phase 21 
 
 No new telemetry WARNs introduced by Phase 22C runner. Matrix used read-only curl probes; no runtime/env/image changes.
 
-OCH / Playwright C-suite: not re-run in Phase 22C scope (unchanged from Phase 21 closeout).
+RP / Playwright C-suite: not re-run in Phase 22C scope (unchanged from Phase 21 closeout).

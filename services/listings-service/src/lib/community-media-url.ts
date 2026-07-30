@@ -19,7 +19,7 @@ export function signInlineMediaDownload(mediaId: string, expSec: number): string
 const DEFAULT_TTL_SEC = 7 * 24 * 60 * 60;
 
 export function buildFreshPublicMediaUrl(mediaId: string): string {
-  const ttl = Number(process.env.OCH_COMMUNITY_MEDIA_URL_TTL_SEC || DEFAULT_TTL_SEC);
+  const ttl = Number(process.env.RP_COMMUNITY_MEDIA_URL_TTL_SEC || DEFAULT_TTL_SEC);
   const safeTtl = Number.isFinite(ttl) ? Math.min(Math.max(3600, ttl), 30 * 24 * 3600) : DEFAULT_TTL_SEC;
   const exp = Math.floor(Date.now() / 1000) + safeTtl;
   const sig = signInlineMediaDownload(mediaId, exp);

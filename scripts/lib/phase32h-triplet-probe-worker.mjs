@@ -24,7 +24,7 @@ async function runOne({ probe, cfg, releaseAtMs, probeContext }) {
     protocol: probe.matrix_protocol,
     started_at,
     started_epoch,
-    finished_epoch: Date.now() / 1000,
+    finished_eprp: Date.now() / 1000,
     row,
     probeFail,
     failureClass,

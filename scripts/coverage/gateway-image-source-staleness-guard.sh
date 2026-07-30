@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Warn if local api-gateway:dev image was built before the latest commit touching
-# route coverage middleware or gateway server (stale image → no /tmp/och-routes-hit.jsonl).
+# route coverage middleware or gateway server (stale image → no /tmp/rp-routes-hit.jsonl).
 # Exit 0 always (warnings only). SKIP_GATEWAY_IMAGE_STALENESS_GUARD=1 skips.
 # GATEWAY_STALENESS_GUARD_STRICT=1 → exit 1 when stale (CI / operator opt-in).
 set -euo pipefail

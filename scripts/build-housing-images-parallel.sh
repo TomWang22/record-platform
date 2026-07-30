@@ -5,8 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-# shellcheck source=lib/och-housing-docker-services-default.sh
-source "$SCRIPT_DIR/lib/och-housing-docker-services-default.sh"
+# shellcheck source=lib/rp-housing-docker-services-default.sh
+source "$SCRIPT_DIR/lib/rp-housing-docker-services-default.sh"
 
 SERVICES="${SERVICES:-$HOUSING_DOCKER_SERVICES_DEFAULT}"
 SERVICES="${SERVICES//,/ }"

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Clean OCH/housing strings from RP seed/test data (not schema migrations).
+# Clean RP/housing strings from RP seed/test data (not schema migrations).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPORT_DIR="${REPORT_DIR:-$REPO_ROOT/bench_logs/domain-comb}"
-REPORT="${REPORT:-$REPORT_DIR/rp-och-cleanup-report.md}"
+REPORT="${REPORT:-$REPORT_DIR/rp-rp-cleanup-report.md}"
 
 PGHOST="${PGHOST:-127.0.0.1}"
 PGUSER="${PGUSER:-postgres}"
@@ -35,7 +35,7 @@ _try() {
 }
 
 {
-  echo "# RP/OCH DB cleanup report"
+  echo "# RP/RP DB cleanup report"
   echo ""
   echo "Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo ""
@@ -68,19 +68,19 @@ _try 5435 listings \
   "listings.community_posts scrubbed"
 
 _try 5435 listings \
-  "UPDATE listings.community_post_images SET image_url = regexp_replace(image_url, 'off-campus-housing\\.test', 'record-platform.test', 'gi')
+  "UPDATE listings.community_post_images SET image_url = regexp_replace(image_url, 'record-platform\\.test', 'record-platform.test', 'gi')
    WHERE image_url ~* 'off-campus|housing';" \
   "listings.community_post_images URLs rewritten"
 
 _try 5434 messaging \
-  "DELETE FROM messages.messages WHERE message_type ILIKE '%booking%' OR content ~* 'Booking request|Send in OCH|off[- ]campus|housing';" \
-  "messages.messages booking/OCH rows removed"
+  "DELETE FROM messages.messages WHERE message_type ILIKE '%booking%' OR content ~* 'Booking request|Send in RP|off[- ]campus|housing';" \
+  "messages.messages booking/RP rows removed"
 
 _try 5434 messaging \
   "UPDATE messages.external_contacts SET
     subject = 'Marketplace',
-    provider_message_id = regexp_replace(provider_message_id::text, 'off-campus-housing-tracker', 'record-platform', 'gi')
-  WHERE subject ~* 'OCH|housing' OR provider_message_id::text ~* 'off-campus|housing';" \
+    provider_message_id = regexp_replace(provider_message_id::text, 'record-platform', 'record-platform', 'gi')
+  WHERE subject ~* 'RP|housing' OR provider_message_id::text ~* 'off-campus|housing';" \
   "messages.external_contacts scrubbed"
 
 _try 5441 notification \

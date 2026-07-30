@@ -59,7 +59,7 @@ T20.22A: NOT STARTED
 | Hybrid p95 | **155.20 ms PASS** |
 | Anchored overlap | **16/16 PASS** |
 | Pure overlap | **8/16** report-only |
-| Telemetry / leakage / OCH / contracts / Playwright | **PASS** |
+| Telemetry / leakage / RP / contracts / Playwright | **PASS** |
 
 ---
 

@@ -73,7 +73,7 @@ After this tranche, **OBO backfill capacity is zero** under current selection ru
 |-------|--------|
 | `--check-lock t20-tranche-5` | exit **2** (lock exists; rerun blocked) ✓ |
 | `rp-ai-backfill-rerun-guard-smoke.sh` | PASS |
-| `rp-och-decontaminate-scan.sh` | PASS |
+| `rp-rp-decontaminate-scan.sh` | PASS |
 
 Local artifact (not committed): `bench_logs/ai-platform/t18-7-controlled-backfill-plan.md`
 

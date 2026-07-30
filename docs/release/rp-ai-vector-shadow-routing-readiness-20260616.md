@@ -171,6 +171,6 @@ bash scripts/audit-rp-redis-lua-runtime-contract.sh
 bash scripts/audit-rp-event-outbox-contract.sh
 bash scripts/rp-runtime-domain-comb.sh
 bash scripts/rp-db-domain-comb.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 CLUSTER_DOCTOR_STRICT=1 make cluster-doctor
 ```

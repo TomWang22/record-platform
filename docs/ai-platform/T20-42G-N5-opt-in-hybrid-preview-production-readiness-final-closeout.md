@@ -13,7 +13,7 @@ T20.42: CLOSED PASS
 N5 opt-in hybrid preview production-readiness final verification: PASS
 T20.42C-LIVE: 4320/4320 HTTP 200, 0% fallback
 Rollback: PASS
-Telemetry/OCH/Playwright: PASS
+Telemetry/RP/Playwright: PASS
 Decision: C KEEP selected, D recommended, E rejected
 Phase 21: production-readiness-closeout-ready for opt-in preview at PERCENT=0
 ```
@@ -86,11 +86,11 @@ New cumulative: 57105/57105 HTTP 200, 0% fallback
 
 ---
 
-## 7. Telemetry/OCH/Playwright
+## 7. Telemetry/RP/Playwright
 
 | Gate | Result |
 |------|--------|
-| OCH | PASS (`__SCANNED__=590`) |
+| RP | PASS (`__SCANNED__=590`) |
 | Telemetry WARNs | 0 |
 | Playwright C-suite | 7/7 PASS |
 | Message-body exposure | 0 |

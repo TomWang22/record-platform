@@ -320,11 +320,11 @@ if [[ "${SKIP_GRPC:-1}" == "0" ]]; then
     echo "Response: $GRPC_RECORDS_HEALTH" | head -3
   fi
 
-  # Test Social Service gRPC
-  say "Step 10d: gRPC Social Service - HealthCheck"
+  # Test Messaging Service gRPC
+  say "Step 10d: gRPC Messaging Service - HealthCheck"
   GRPC_SOCIAL_HEALTH=$(grpcurl_with_timeout 10 grpcurl -insecure -H "Host: $HOST" \
     -d '{}' \
-    "$HOST:8443" /social.SocialService/HealthCheck) || GRPC_SOCIAL_HEALTH=""
+    "$HOST:8443" /messaging.MessagingService/HealthCheck) || GRPC_SOCIAL_HEALTH=""
   if echo "$GRPC_SOCIAL_HEALTH" | grep -q "healthy"; then
     ok "gRPC Social HealthCheck works"
   else

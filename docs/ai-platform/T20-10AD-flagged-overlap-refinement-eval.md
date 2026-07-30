@@ -137,7 +137,7 @@ Keyword-anchor pin (T20.10AB Option B) could raise chunk overlap further but ris
 | `rp-ai-rag-quality-smoke.sh` | **PASS** | |
 | `rp-ai-provider-readiness.sh` | **PASS** | |
 | `rp-ai-pgvector-readiness.sh` | **PASS** | |
-| `rp-och-decontaminate-scan.sh` | **PASS** (588 files) | |
+| `rp-rp-decontaminate-scan.sh` | **PASS** (588 files) | |
 
 ### Known non-blocking contract observations (pre-existing)
 

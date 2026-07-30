@@ -33,7 +33,7 @@ Per-window setup: revoke all → verify `keyword_default` → API enroll 5 cohor
 | Canary errors | **0** | 0 **PASS** |
 | Telemetry WARNs | **0** | 0 **PASS** |
 | Leakage | **PASS** | **PASS** |
-| OCH | **PASS** | **PASS** |
+| RP | **PASS** | **PASS** |
 | Playwright (preview + seller + record + longform) | **PASS** | **PASS** |
 | PERCENT | **0** | **PASS** |
 | Post-revoke `keyword_default` | **PASS** | **PASS** |

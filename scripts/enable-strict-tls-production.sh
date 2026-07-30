@@ -18,7 +18,7 @@ SERVICES=(
   "auth-service"
   "records-service"
   "listings-service"
-  "social-service"
+  "messaging-service"
   "shopping-service"
   "analytics-service"
   "auction-monitor"

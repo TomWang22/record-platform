@@ -189,7 +189,7 @@ check_pod_status() {
 say "1. Checking Pod Status"
 check_pod_status "auth-service"
 check_pod_status "records-service"
-check_pod_status "social-service"
+check_pod_status "messaging-service"
 check_pod_status "listings-service"
 check_pod_status "shopping-service"
 check_pod_status "analytics-service"
@@ -200,7 +200,7 @@ say "2. Checking HTTP Health Endpoints"
 check_http_health "API Gateway" "/api/healthz" "200"
 check_http_health "Auth Service" "/api/auth/healthz" "200"
 check_http_health "Records Service" "/api/records/healthz" "200"
-check_http_health "Social Service" "/api/social/healthz" "200"
+check_http_health "Messaging Service" "/api/social/healthz" "200"
 check_http_health "Listings Service" "/api/listings/healthz" "200"
 check_http_health "Shopping Service" "/api/shopping/healthz" "200"
 check_http_health "Analytics Service" "/api/analytics/healthz" "200"
@@ -210,7 +210,7 @@ say "3. Checking gRPC Health (using health.proto)"
 # Get service IPs from Kubernetes
 AUTH_SVC_IP=$(kubectl -n "$NS" get svc auth-service -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
 RECORDS_SVC_IP=$(kubectl -n "$NS" get svc records-service -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
-SOCIAL_SVC_IP=$(kubectl -n "$NS" get svc social-service -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
+SOCIAL_SVC_IP=$(kubectl -n "$NS" get svc messaging-service -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
 LISTINGS_SVC_IP=$(kubectl -n "$NS" get svc listings-service -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
 SHOPPING_SVC_IP=$(kubectl -n "$NS" get svc shopping-service -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
 ANALYTICS_SVC_IP=$(kubectl -n "$NS" get svc analytics-service -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
@@ -223,7 +223,7 @@ if [[ -n "$RECORDS_SVC_IP" ]]; then
   check_grpc_health "Records Service" "$RECORDS_SVC_IP" "50051"
 fi
 if [[ -n "$SOCIAL_SVC_IP" ]]; then
-  check_grpc_health "Social Service" "$SOCIAL_SVC_IP" "50056"
+  check_grpc_health "Messaging Service" "$SOCIAL_SVC_IP" "50056"
 fi
 if [[ -n "$LISTINGS_SVC_IP" ]]; then
   check_grpc_health "Listings Service" "$LISTINGS_SVC_IP" "50057"

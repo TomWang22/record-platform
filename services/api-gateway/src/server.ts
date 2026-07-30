@@ -1,3 +1,4 @@
+import "./otel-bootstrap.js";
 import { createApp } from "./app.js";
 import {
   installShutdownSignalHandlers,

@@ -39,7 +39,7 @@ Files:
 - **Trust:** No cross-DB write. Listing service **consumes** Kafka `listing.flagged` and sets `status = 'flagged'` in this DB only. Trust service never writes to listings DB.
 - **Soft delete:** `deleted_at TIMESTAMPTZ`; all reads use `WHERE deleted_at IS NULL`. History preserved for analytics.
 - **Location:** `latitude`, `longitude` (DOUBLE PRECISION) for distance-from-campus and map. Index `idx_listings_lat_lon` for active, non-deleted.
-- **Booking:** Availability and reservation logic live in **booking-service DB only**. Listings DB is metadata; no booking table here.
+- **Booking:** Availability and reservation logic live in **reservation-mesh DB only**. Listings DB is metadata; no booking table here.
 - **Search:** Trigram on `search_norm` only; no redundant tsvector GIN (keeps write cost down).
 - **Optimistic lock:** `version` incremented on every UPDATE (trigger). Use in API/gRPC for concurrent edits and trust updates.
 - **Events:** On listing change, emit minimal Kafka payload (e.g. `listing.updated` with `id`, `status`, `price_cents`, `version`). Do not emit full row.
@@ -48,7 +48,7 @@ Files:
 
 - **listing_favorites** — user_id, listing_id, created_at (for “saved” listings).
 - **listing_views** — listing_id, viewed_at, optional user_id (for analytics).
-- **neighborhoods** — id, name, slug, bounds (polygon or box) for geo filters. (Availability/booking slots live in **booking-service** DB only.)
+- **neighborhoods** — id, name, slug, bounds (polygon or box) for geo filters. (Availability/booking slots live in **reservation-mesh** DB only.)
 - **Vector ANN (HNSW):** In `02-listings-pgbench-trigram-knn.sql`, uncomment the `vector` extension and `embedding` column + HNSW index for semantic search (e.g. pgvector). Then add `search_listings_knn_ann(user_id, query_embedding, lim)` that orders by `embedding <=> query_embedding`.
 - **Outbox (03):** `03-listings-outbox.sql` — transactional outbox; payload = serialized proto bytes; publisher sets envelope.event_id = outbox.id, Kafka key = aggregate_id. See docs/OUTBOX_PUBLISHER_AND_CONSUMER_CONTRACT.md.
 - **Processed events (04):** `04-listings-processed-events.sql` — idempotent consumer table (listings consumes e.g. listing.flagged from trust). Applied by ensure-listings-schema.sh after 03.
@@ -59,7 +59,7 @@ Files:
 - **Schema:** `booking`. Table: `booking.bookings` with listing_id, tenant_id, landlord_id (auth user UUIDs; no cross-DB FK), start_date, end_date, status enum, price_cents_snapshot, version. Overlap prevention via `btree_gist` EXCLUDE on (listing_id, daterange).
 - **Apply:** `PGPASSWORD=postgres ./scripts/ensure-booking-schema.sh` or `psql -h 127.0.0.1 -p 5443 -U postgres -d bookings -f infra/db/01-booking-schema.sql`
 - **State machine (02):** `infra/db/02-booking-state-machine.sql` enforces legal transitions (created → pending_confirmation | cancelled; pending_confirmation → confirmed | rejected | cancelled | expired; confirmed → completed | cancelled). Terminal states allow no further changes. Applied by ensure-booking-schema.sh after 01.
-- **Events:** booking-service emits `booking.created`, `booking.confirmed`, `booking.rejected`, `booking.cancelled`, `booking.completed`, `booking.expired` (minimal payload). See docs/KAFKA_TOPICS_AND_PARTITIONS.md.
+- **Events:** reservation-mesh emits `booking.created`, `booking.confirmed`, `booking.rejected`, `booking.cancelled`, `booking.completed`, `booking.expired` (minimal payload). See docs/KAFKA_TOPICS_AND_PARTITIONS.md.
 - **Search history + watchlist (04):** `infra/db/04-booking-search-history.sql` creates `booking.search_history` and `booking.watchlist_items` (required before migration 19 on SQL-only CI bootstrap).
 - **Saved search alerts (19):** `infra/db/19-booking-search-history-alerts.sql` adds `max_campus_miles` and `alert_on_match` on `booking.search_history` for distance-from-campus filters and “notify when a new listing matches this search.” Applied by `scripts/ensure-booking-schema.sh` after prior booking SQL files.
 

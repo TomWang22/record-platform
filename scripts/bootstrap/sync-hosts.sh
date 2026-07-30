@@ -9,9 +9,9 @@
 #   SYNC_HOSTS_WAIT_FOR_LB — default 1; set 0 to skip wait loop (use if EXTERNAL_IP already set)
 #   SYNC_HOSTS_WAIT_SEC — default 240
 #   SYNC_HOSTS_POLL_SEC — default 3
-#   OCH_CADDY_K8S_NS / OCH_CADDY_K8S_SVC — passed through to ensure-edge-hosts (defaults ingress-nginx / caddy-h3)
+#   RP_CADDY_K8S_NS / RP_CADDY_K8S_SVC — passed through to ensure-edge-hosts (defaults ingress-nginx / caddy-h3)
 #   COLD_BOOTSTRAP_HOSTS_STRICT — default 1 when COLD_BOOTSTRAP=1: EDGE_HOSTS_STRICT=1 (exit 1 if IP never appears)
-#   HOSTS_AUTO, OCH_EDGE_HOSTNAME, EXTERNAL_IP — see scripts/ensure-edge-hosts.sh
+#   HOSTS_AUTO, RP_EDGE_HOSTNAME, EXTERNAL_IP — see scripts/ensure-edge-hosts.sh
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -21,8 +21,8 @@ if [[ "${SKIP_COLD_BOOTSTRAP_HOSTS_SYNC:-0}" == "1" ]]; then
   exit 0
 fi
 
-_NS="${OCH_CADDY_K8S_NS:-ingress-nginx}"
-_SVC="${OCH_CADDY_K8S_SVC:-caddy-h3}"
+_NS="${RP_CADDY_K8S_NS:-ingress-nginx}"
+_SVC="${RP_CADDY_K8S_SVC:-caddy-h3}"
 _WAIT="${SYNC_HOSTS_WAIT_FOR_LB:-1}"
 _MAX="${SYNC_HOSTS_WAIT_SEC:-240}"
 _POLL="${SYNC_HOSTS_POLL_SEC:-3}"
@@ -53,10 +53,10 @@ fi
 
 wait_for_lb || exit 1
 
-export OCH_CADDY_K8S_NS="$_NS"
-export OCH_CADDY_K8S_SVC="$_SVC"
+export RP_CADDY_K8S_NS="$_NS"
+export RP_CADDY_K8S_SVC="$_SVC"
 export HOSTS_AUTO="${HOSTS_AUTO:-1}"
 export EDGE_HOSTS_STRICT="$_strict"
-export OCH_EDGE_HOSTNAME="${OCH_EDGE_HOSTNAME:-record.test}"
+export RP_EDGE_HOSTNAME="${RP_EDGE_HOSTNAME:-record.test}"
 
 exec bash "$REPO/scripts/ensure-edge-hosts.sh"

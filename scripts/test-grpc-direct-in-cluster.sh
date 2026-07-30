@@ -27,7 +27,7 @@ fi
 case "$SVC" in
   auth-service)     PORT=50051 ;;
   records-service)  PORT=50051 ;;
-  social-service)   PORT=50056 ;;
+  messaging-service)   PORT=50056 ;;
   listings-service) PORT=50057 ;;
   analytics-service) PORT=50054 ;;
   shopping-service) PORT=50058 ;;

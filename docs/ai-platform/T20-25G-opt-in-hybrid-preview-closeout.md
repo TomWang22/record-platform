@@ -43,7 +43,7 @@
 | Hybrid p95 | 214 ms |
 | Combined live (D16→D25D) | **2565/2565** |
 | Telemetry WARNs | 0 |
-| Leakage / OCH | PASS |
+| Leakage / RP | PASS |
 | Playwright | PASS |
 
 ## 5. Rollback proof (T20.25E)

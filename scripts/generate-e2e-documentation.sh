@@ -167,7 +167,7 @@ The test identifies which service reaches its limit first under increasing load:
 1. **Auth Service**: Gatekeeper service with bcrypt bottleneck
 2. **Records Service**: Database-intensive operations
 3. **Listings Service**: Search and CRUD operations
-4. **Social Service**: Kafka-dependent messaging
+4. **Messaging Service**: Kafka-dependent messaging
 5. **Shopping Service**: Cart and checkout operations
 6. **Analytics Service**: Kafka-dependent event ingestion
 7. **Python AI Service**: AI processing and advice generation

@@ -22,12 +22,12 @@ fail() { echo "  ❌ $*"; }
 
 say "1) Edge curl (expect HTML or 308→slash)"
 for path in "/grafana/" "/prometheus/"; do
-  code=$(curl -sS -o /tmp/och-verify-body.txt -w "%{http_code}" $CURL_EXTRA "https://${EDGE_HOST}${path}" || echo "000")
+  code=$(curl -sS -o /tmp/rp-verify-body.txt -w "%{http_code}" $CURL_EXTRA "https://${EDGE_HOST}${path}" || echo "000")
   if [[ "$code" == "200" ]]; then
-    if head -c 64 /tmp/och-verify-body.txt | grep -qiE 'html|grafana|prometheus'; then
+    if head -c 64 /tmp/rp-verify-body.txt | grep -qiE 'html|grafana|prometheus'; then
       ok "https://${EDGE_HOST}${path} → HTTP $code (looks like HTML)"
     else
-      warn "https://${EDGE_HOST}${path} → HTTP $code (body may not be HTML; check /tmp/och-verify-body.txt)"
+      warn "https://${EDGE_HOST}${path} → HTTP $code (body may not be HTML; check /tmp/rp-verify-body.txt)"
     fi
   elif [[ "$code" == "308" ]] || [[ "$code" == "301" ]] || [[ "$code" == "302" ]]; then
     warn "https://${EDGE_HOST}${path} → HTTP $code redirect"

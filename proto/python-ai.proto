@@ -22,7 +22,7 @@ service PythonAIService {
   rpc Chat(ChatRequest) returns (ChatResponse);
   
   // Platform-wide intelligence (analytics engine piped to Python AI)
-  // Used by auction-monitor, shopping, listings, social services
+  // Used by auction-monitor, shopping, listings, community services
   rpc AuctionHeat(AuctionHeatRequest) returns (AuctionHeatResponse);
   rpc SellerBuyerInsight(SellerBuyerInsightRequest) returns (SellerBuyerInsightResponse);
   rpc SocialNegotiationInsight(SocialNegotiationInsightRequest) returns (SocialNegotiationInsightResponse);

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build caddy-with-tcpdump:dev and load into Colima so caddy-h3 pods can pull it (fixes ImagePullBackOff).
-# Strict TLS/mTLS: Caddy uses off-campus-housing-local-tls + dev-root-ca in ingress-nginx (from strict-tls-bootstrap).
+# Strict TLS/mTLS: Caddy uses edge-local-tls + dev-root-ca in ingress-nginx (from strict-tls-bootstrap).
 #
 # Usage: ./scripts/load-caddy-image-colima.sh
 # Prefer: ./scripts/prepare-caddy-edge-rollout.sh (secrets + configmap + image).

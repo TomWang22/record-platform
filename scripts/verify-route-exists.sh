@@ -11,7 +11,7 @@ if [[ -z "$URL" ]]; then
 fi
 
 echo "▶ route-check: probing $URL"
-status="$(curl -ksS -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT_SEC" -H "x-suite: ${OCH_X_SUITE:-bash}" "$URL" || true)"
+status="$(curl -ksS -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT_SEC" -H "x-suite: ${RP_X_SUITE:-bash}" "$URL" || true)"
 
 if [[ "$status" == 2* ]]; then
   echo "✅ route-check: $URL -> HTTP $status"

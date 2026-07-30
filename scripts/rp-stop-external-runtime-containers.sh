@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Remove OCH external compose containers (off-campus-housing-tracker-*) so RP owns 5433–5443.
+# Remove RP external compose containers (record-platform-*) so RP owns 5433–5443.
 set -euo pipefail
 
 say() { printf '%s\n' "$*"; }
 
-ids="$(docker ps -aq --filter 'name=off-campus-housing-tracker-' 2>/dev/null || true)"
+ids="$(docker ps -aq --filter 'name=record-platform-' 2>/dev/null || true)"
 if [[ -z "$ids" ]]; then
-  say "✅ no off-campus-housing-tracker-* containers"
+  say "✅ no record-platform-* containers"
   exit 0
 fi
 
-say "Removing OCH external containers:"
-docker ps -a --filter 'name=off-campus-housing-tracker-' --format '  {{.Names}}' || true
+say "Removing RP external containers:"
+docker ps -a --filter 'name=record-platform-' --format '  {{.Names}}' || true
 docker rm -f $ids 2>/dev/null || true
-say "✅ OCH external containers removed"
+say "✅ RP external containers removed"

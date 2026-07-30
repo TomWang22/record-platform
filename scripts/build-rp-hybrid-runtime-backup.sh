@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${REPO_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 cd "$REPO_ROOT"
 
-LEGACY_SOURCE_ALL8_DIR="${LEGACY_SOURCE_ALL8_DIR:-${OCH_ALL8_DIR:-$REPO_ROOT/backups/all-8-20260517-152701}}"
+LEGACY_SOURCE_ALL8_DIR="${LEGACY_SOURCE_ALL8_DIR:-${RP_ALL8_DIR:-$REPO_ROOT/backups/all-8-20260517-152701}}"
 RP_ALL8_DIR="${RP_ALL8_DIR:-$REPO_ROOT/backups/all-8-20260312-091418}"
 OUT_DIR="${OUT_DIR:-$REPO_ROOT/backups/hybrid-rp-och/materialized-rp-runtime}"
 DRY_RUN="${DRY_RUN:-0}"

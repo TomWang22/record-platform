@@ -18,7 +18,7 @@ source "$SCRIPT_DIR/lib/rp-edge-url.sh"
 MAX_MS="${LATENCY_SLA_MS:-5000}"
 SAMPLES="${EDGE_PROBE_SAMPLES:-5}"
 WARMUP="${EDGE_PROBE_WARMUP:-1}"
-export OCH_X_SUITE="${OCH_X_SUITE:-bash}"
+export RP_X_SUITE="${RP_X_SUITE:-bash}"
 
 ENDPOINTS=(
   "/api/readyz"
@@ -53,7 +53,7 @@ _probe_once() {
   result="$(curl -sS -o /dev/null -w "%{http_code} %{time_total} %{ssl_verify_result}" \
     --connect-timeout 8 --max-time 60 \
     -H "x-traffic-class: infra" \
-    -H "x-suite: ${OCH_X_SUITE}" \
+    -H "x-suite: ${RP_X_SUITE}" \
     "${EDGE_CURL_TLS_ARGS[@]}" \
     "${EDGE_RESOLVE_ARGS[@]}" \
     "$url" 2>/dev/null || echo "000 9.999 1")"

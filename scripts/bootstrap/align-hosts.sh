@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Idempotent /etc/hosts line for OCH edge hostname → Caddy reachability IP.
+# Idempotent /etc/hosts line for RP edge hostname → Caddy reachability IP.
 #
 # Default IP source: LoadBalancer EXTERNAL-IP (MetalLB) — correct for host → edge TLS/HTTP3.
 # Optional: ALIGN_HOSTS_IP_SOURCE=clusterip uses .spec.clusterIP (only works if that IP is
@@ -8,8 +8,8 @@
 # Env:
 #   ALIGN_HOSTS_DRY_RUN=1 — print before/after snapshot only; do not write /etc/hosts
 #   SKIP_ALIGN_HOSTS=1 — no-op exit 0
-#   OCH_EDGE_HOSTNAME — default record.test
-#   OCH_CADDY_K8S_NS / OCH_CADDY_K8S_SVC — defaults depend on ALIGN_HOSTS_IP_SOURCE (see below)
+#   RP_EDGE_HOSTNAME — default record.test
+#   RP_CADDY_K8S_NS / RP_CADDY_K8S_SVC — defaults depend on ALIGN_HOSTS_IP_SOURCE (see below)
 #   ALIGN_HOSTS_WAIT_FOR_IP — default 1; set 0 to skip wait loop
 #   ALIGN_HOSTS_WAIT_SEC / ALIGN_HOSTS_POLL_SEC — wait tuning
 #   EXTERNAL_IP — force target IP (skip kubectl)
@@ -26,7 +26,7 @@ if [[ "${SKIP_ALIGN_HOSTS:-0}" == "1" ]]; then
   exit 0
 fi
 
-HOST="${OCH_EDGE_HOSTNAME:-record.test}"
+HOST="${RP_EDGE_HOSTNAME:-record.test}"
 MODE="${ALIGN_HOSTS_IP_SOURCE:-loadbalancer}"
 _DRY="${ALIGN_HOSTS_DRY_RUN:-0}"
 _WAIT="${ALIGN_HOSTS_WAIT_FOR_IP:-1}"
@@ -34,11 +34,11 @@ _MAX="${ALIGN_HOSTS_WAIT_SEC:-240}"
 _POLL="${ALIGN_HOSTS_POLL_SEC:-3}"
 
 if [[ "$MODE" == "clusterip" ]]; then
-  export OCH_CADDY_K8S_NS="${OCH_CADDY_K8S_NS:-ingress}"
-  export OCH_CADDY_K8S_SVC="${OCH_CADDY_K8S_SVC:-caddy}"
+  export RP_CADDY_K8S_NS="${RP_CADDY_K8S_NS:-ingress}"
+  export RP_CADDY_K8S_SVC="${RP_CADDY_K8S_SVC:-caddy}"
 else
-  export OCH_CADDY_K8S_NS="${OCH_CADDY_K8S_NS:-ingress-nginx}"
-  export OCH_CADDY_K8S_SVC="${OCH_CADDY_K8S_SVC:-caddy-h3}"
+  export RP_CADDY_K8S_NS="${RP_CADDY_K8S_NS:-ingress-nginx}"
+  export RP_CADDY_K8S_SVC="${RP_CADDY_K8S_SVC:-caddy-h3}"
 fi
 
 snapshot_hosts() {
@@ -60,9 +60,9 @@ discover_ip() {
     return 1
   fi
   if [[ "$MODE" == "clusterip" ]]; then
-    ip="$(kubectl get svc "${OCH_CADDY_K8S_SVC}" -n "${OCH_CADDY_K8S_NS}" -o jsonpath='{.spec.clusterIP}' 2>/dev/null | tr -d '\r' || true)"
+    ip="$(kubectl get svc "${RP_CADDY_K8S_SVC}" -n "${RP_CADDY_K8S_NS}" -o jsonpath='{.spec.clusterIP}' 2>/dev/null | tr -d '\r' || true)"
   else
-    ip="$(kubectl get svc "${OCH_CADDY_K8S_SVC}" -n "${OCH_CADDY_K8S_NS}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null | tr -d '\r' || true)"
+    ip="$(kubectl get svc "${RP_CADDY_K8S_SVC}" -n "${RP_CADDY_K8S_NS}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null | tr -d '\r' || true)"
   fi
   if [[ -n "$ip" ]] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     printf '%s\n' "$ip"
@@ -74,7 +74,7 @@ discover_ip() {
 wait_ip() {
   [[ "$_WAIT" != "1" ]] && return 0
   local ip="" n=0
-  echo "align-hosts: waiting up to ${_MAX}s for ${OCH_CADDY_K8S_NS}/svc/${OCH_CADDY_K8S_SVC} ($MODE)…"
+  echo "align-hosts: waiting up to ${_MAX}s for ${RP_CADDY_K8S_NS}/svc/${RP_CADDY_K8S_SVC} ($MODE)…"
   while [[ $n -lt $_MAX ]]; do
     ip="$(discover_ip | head -1 || true)"
     if [[ -n "$ip" ]] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -85,7 +85,7 @@ wait_ip() {
     sleep "$_POLL"
     n=$((n + _POLL))
   done
-  echo "❌ align-hosts: no IP after ${_MAX}s (mode=$MODE ns=${OCH_CADDY_K8S_NS} svc=${OCH_CADDY_K8S_SVC})" >&2
+  echo "❌ align-hosts: no IP after ${_MAX}s (mode=$MODE ns=${RP_CADDY_K8S_NS} svc=${RP_CADDY_K8S_SVC})" >&2
   return 1
 }
 
@@ -113,7 +113,7 @@ wait_ip || exit 1
 
 export HOSTS_AUTO="${HOSTS_AUTO:-1}"
 export EDGE_HOSTS_STRICT="$_strict"
-export OCH_EDGE_HOSTNAME="$HOST"
+export RP_EDGE_HOSTNAME="$HOST"
 bash "$REPO/scripts/ensure-edge-hosts.sh"
 
 echo "align-hosts: AFTER"

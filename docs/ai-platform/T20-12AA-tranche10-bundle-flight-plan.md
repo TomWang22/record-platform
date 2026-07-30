@@ -75,7 +75,7 @@ BENCH_REQUIRE_OLLAMA_WARM=1 BENCH_WARMUP_RUNS=1 bash scripts/rp-ai-shadow-real-q
 bash scripts/rp-ai-shadow-source-diagnostic.sh
 bash scripts/audit-rp-ai-rag-contract.sh
 bash scripts/rp-ai-rag-quality-smoke.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 If cold source diagnostic fails from embed timeout: rerun warmup/diagnostic only — do not start backup/write.

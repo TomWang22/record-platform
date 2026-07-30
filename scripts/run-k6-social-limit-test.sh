@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run k6 limit test for social-service to find breaking points
+# Run k6 limit test for messaging-service to find breaking points
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -11,7 +11,7 @@ ok() { echo "✅ $*"; }
 warn() { echo "⚠️  $*"; }
 fail() { echo "❌ $*" >&2; exit 1; }
 
-say "=== K6 Social Service Limit Test ==="
+say "=== K6 Messaging Service Limit Test ==="
 
 # Check if k6 image is available
 K6_IMAGE="${K6_IMAGE:-grafana/k6:latest}"

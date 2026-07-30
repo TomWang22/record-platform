@@ -41,7 +41,7 @@
 - Pure vector 8/16 report-only
 - Anchored hybrid 16/16
 - Telemetry WARNs 0
-- Leakage / OCH PASS
+- Leakage / RP PASS
 
 ## Approval reference
 

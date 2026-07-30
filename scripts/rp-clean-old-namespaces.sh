@@ -92,9 +92,9 @@ if [[ "${RP_FORCE_NAMESPACE_DELETE:-0}" == "1" ]]; then
     echo "ℹ️  RP_COLD_BOOTSTRAP_RESET_DONE=1 — destructive delete still allowed (RP_FORCE_NAMESPACE_DELETE=1)"
   fi
   _rp_force_delete_ns "$HOUSING_NS" || exit 1
-  # OCH namespace only when explicitly forcing cleanup (recovery / mixed clusters)
-  kubectl delete namespace off-campus-housing-tracker --ignore-not-found=true --wait=true --timeout=60s 2>/dev/null \
-    || kubectl delete namespace off-campus-housing-tracker --ignore-not-found=true 2>/dev/null || true
+  # RP namespace only when explicitly forcing cleanup (recovery / mixed clusters)
+  kubectl delete namespace record-platform --ignore-not-found=true --wait=true --timeout=60s 2>/dev/null \
+    || kubectl delete namespace record-platform --ignore-not-found=true 2>/dev/null || true
   if [[ -x "$SCRIPT_DIR/strict-tls-bootstrap.sh" ]]; then
     echo "▶ re-apply strict-tls-bootstrap after namespace recreate"
     bash "$SCRIPT_DIR/strict-tls-bootstrap.sh" || {

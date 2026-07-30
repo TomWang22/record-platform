@@ -8,7 +8,7 @@ import { join } from "node:path";
 
 const strict = process.env.STEP7_REQUIRE_PACKET_TRACE === "1";
 const out = {
-  specVersion: "och-observability-integrity-spec-v1",
+  specVersion: "rp-observability-integrity-spec-v1",
   gate: "packet-trace-correlation",
   status: strict ? "FAIL" : "SKIPPED",
   reason: strict

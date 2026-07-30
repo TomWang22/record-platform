@@ -47,7 +47,7 @@ if [[ -z "${KUBECTL_PORT_FORWARD:-}" ]]; then
 fi
 
 NS="record-platform"
-# Legacy social-service removed — forum/DMs live on messaging-service (set SKIP_SOCIAL=0 only for old harness experiments).
+# Legacy messaging-service removed — forum/DMs live on messaging-service (set SKIP_SOCIAL=0 only for old harness experiments).
 export SKIP_SOCIAL="${SKIP_SOCIAL:-1}"
 HOST="${HOST:-record.local}"
 # Prefer a curl that supports HTTP/3 (--http3): Homebrew curl has it; system curl on macOS does not.
@@ -806,7 +806,7 @@ check_service_ready "auth-service" 90 || warn "auth-service readiness check fail
 check_service_ready "records-service" 90 || warn "records-service readiness check failed, continuing anyway..."
 check_service_ready "api-gateway" 90 || warn "api-gateway readiness check failed, continuing anyway..."
 
-# messaging-service owns forum + DMs (replaced social-service)
+# messaging-service owns forum + DMs (replaced messaging-service)
 if kubectl -n "$NS" get deployment "messaging-service" >/dev/null 2>&1; then
   check_service_ready "messaging-service" 90 || warn "messaging-service readiness check failed, continuing anyway..."
 else
@@ -1232,9 +1232,9 @@ else
   warn "API Gateway test failed - HTTP $GATEWAY_CODE"
 fi
 
-# Test 6: Social Service - Forum Endpoints (HTTP/2)
+# Test 6: Messaging Service - Forum Endpoints (HTTP/2)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
-  say "Test 6: Social Service - Create Forum Post via HTTP/2"
+  say "Test 6: Messaging Service - Create Forum Post via HTTP/2"
   FORUM_POST_RC=0
   FORUM_POST_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 30 \
     --resolve "$HOST:${PORT}:${CURL_RESOLVE_IP}" \
@@ -1256,12 +1256,12 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
     echo "Response body: $(echo "$FORUM_POST_RESPONSE" | sed '$d' | head -5)"
   fi
 else
-  warn "Skipping forum post creation - social-service not available or no auth token"
+  warn "Skipping forum post creation - messaging-service not available or no auth token"
 fi
 
-# Test 6b: Social Service - Forum Endpoints (HTTP/3)
+# Test 6b: Messaging Service - Forum Endpoints (HTTP/3)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
-  say "Test 6b: Social Service - Create Forum Post via HTTP/3"
+  say "Test 6b: Messaging Service - Create Forum Post via HTTP/3"
   FORUM_POST_H3_RC=0
   FORUM_POST_H3_RESPONSE=$(strict_http3_curl -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
@@ -1285,12 +1285,12 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
     fi
   fi
 else
-  warn "Skipping forum post creation via HTTP/3 - social-service not available or no auth token"
+  warn "Skipping forum post creation via HTTP/3 - messaging-service not available or no auth token"
 fi
 
-# Test 7: Social Service - Get Forum Posts (HTTP/2) — strict TLS + resolve; retry up to 2x on curl exit 7 (connection)
+# Test 7: Messaging Service - Get Forum Posts (HTTP/2) — strict TLS + resolve; retry up to 2x on curl exit 7 (connection)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
-  say "Test 7: Social Service - Get Forum Posts via HTTP/2"
+  say "Test 7: Messaging Service - Get Forum Posts via HTTP/2"
   GET_FORUM_RC=0
   GET_FORUM_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 30 \
     --resolve "$HOST:${PORT}:${CURL_RESOLVE_IP}" \
@@ -1326,12 +1326,12 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
     echo "Response body: $(echo "$GET_FORUM_RESPONSE" | sed '$d' | head -5)"
   fi
 else
-  warn "Skipping get forum posts - social-service not available or no auth token"
+  warn "Skipping get forum posts - messaging-service not available or no auth token"
 fi
 
-# Test 7b: Social Service - Add Comment to Forum Post (HTTP/3) - User 2 comments on User 1's post
+# Test 7b: Messaging Service - Add Comment to Forum Post (HTTP/3) - User 2 comments on User 1's post
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${FORUM_POST_ID:-}" ]]; then
-  say "Test 7b: Social Service - Add Comment to Forum Post via HTTP/3 (User 2)"
+  say "Test 7b: Messaging Service - Add Comment to Forum Post via HTTP/3 (User 2)"
   ADD_COMMENT_RC=0
   # Increased timeout to 60s and add retry logic for HTTP/3 (QUIC can be slower)
   ADD_COMMENT_RESPONSE=$(strict_http3_curl -sS -w "\n%{http_code}" --http3-only --max-time 60 \
@@ -1378,13 +1378,13 @@ else
   if [[ -z "${FORUM_POST_ID:-}" ]]; then
     warn "Skipping add comment - Forum post ID not available"
   else
-    warn "Skipping add comment - social-service not available or no auth token"
+    warn "Skipping add comment - messaging-service not available or no auth token"
   fi
 fi
 
 # Test 7c: Forum post vote (HTTP/2) — hits forum.post_votes (port 5434, CURRENT_DB_SCHEMA_REPORT)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${FORUM_POST_ID:-}" ]]; then
-  say "Test 7c: Social Service - Vote on Forum Post via HTTP/2"
+  say "Test 7c: Messaging Service - Vote on Forum Post via HTTP/2"
   POST_VOTE_RC=0
   POST_VOTE_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 20 \
     --resolve "$HOST:${PORT}:${CURL_RESOLVE_IP}" \
@@ -1407,7 +1407,7 @@ fi
 
 # Test 7d: Forum post vote (HTTP/3)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${FORUM_POST_ID:-}" ]] && type strict_http3_curl &>/dev/null && [[ -n "${HTTP3_RESOLVE:-}" ]]; then
-  say "Test 7d: Social Service - Vote on Forum Post via HTTP/3"
+  say "Test 7d: Messaging Service - Vote on Forum Post via HTTP/3"
   POST_VOTE_H3_RC=0
   POST_VOTE_H3_RESPONSE=$(strict_http3_curl -sS -w "\n%{http_code}" --http3-only --max-time 20 \
     -H "Host: $HOST" \
@@ -1429,7 +1429,7 @@ fi
 
 # Test 7e: Forum comment vote (HTTP/2) — hits forum.comment_votes (port 5434)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${COMMENT_ID:-}" ]]; then
-  say "Test 7e: Social Service - Vote on Forum Comment via HTTP/2"
+  say "Test 7e: Messaging Service - Vote on Forum Comment via HTTP/2"
   COMMENT_VOTE_RC=0
   COMMENT_VOTE_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 20 \
     --resolve "$HOST:${PORT}:${CURL_RESOLVE_IP}" \
@@ -1453,7 +1453,7 @@ fi
 
 # Test 7f: Forum comment vote (HTTP/3)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${COMMENT_ID:-}" ]] && type strict_http3_curl &>/dev/null && [[ -n "${HTTP3_RESOLVE:-}" ]]; then
-  say "Test 7f: Social Service - Vote on Forum Comment via HTTP/3"
+  say "Test 7f: Messaging Service - Vote on Forum Comment via HTTP/3"
   COMMENT_VOTE_H3_RC=0
   COMMENT_VOTE_H3_RESPONSE=$(strict_http3_curl -sS -w "\n%{http_code}" --http3-only --max-time 20 \
     -H "Host: $HOST" \
@@ -1473,9 +1473,9 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${COMMENT_
   fi
 fi
 
-# Test 8: Social Service - P2P Direct Message (HTTP/2) - User 1 to User 2
+# Test 8: Messaging Service - P2P Direct Message (HTTP/2) - User 1 to User 2
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${USER2_ID:-}" ]]; then
-  say "Test 8: Social Service - Send P2P Direct Message via HTTP/2 (User 1 -> User 2)"
+  say "Test 8: Messaging Service - Send P2P Direct Message via HTTP/2 (User 1 -> User 2)"
   SEND_MSG_RC=0
   SEND_MSG_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 30 \
     --resolve "$HOST:${PORT}:${CURL_RESOLVE_IP}" \
@@ -1498,13 +1498,13 @@ else
   if [[ -z "${USER2_ID:-}" ]]; then
     warn "Skipping P2P message test - User 2 ID not available"
   else
-    warn "Skipping P2P message test - social-service not available or no auth token"
+    warn "Skipping P2P message test - messaging-service not available or no auth token"
   fi
 fi
 
-# Test 8b: Social Service - P2P Direct Message (HTTP/3) - User 2 to User 1
+# Test 8b: Messaging Service - P2P Direct Message (HTTP/3) - User 2 to User 1
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${USER1_ID:-}" ]]; then
-  say "Test 8b: Social Service - Send P2P Direct Message via HTTP/3 (User 2 -> User 1)"
+  say "Test 8b: Messaging Service - Send P2P Direct Message via HTTP/3 (User 2 -> User 1)"
   SEND_MSG_H3_RC=0
   SEND_MSG_H3_RESPONSE=$(strict_http3_curl -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
@@ -1529,13 +1529,13 @@ else
   if [[ -z "${USER1_ID:-}" ]]; then
     warn "Skipping P2P message reply test - User 1 ID not available"
   else
-    warn "Skipping P2P message reply test - social-service not available or no auth token"
+    warn "Skipping P2P message reply test - messaging-service not available or no auth token"
   fi
 fi
 
-# Test 9: Social Service - Get Messages (HTTP/2) - User 2's inbox
+# Test 9: Messaging Service - Get Messages (HTTP/2) - User 2's inbox
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]]; then
-  say "Test 9: Social Service - Get Messages via HTTP/2 (User 2's inbox)"
+  say "Test 9: Messaging Service - Get Messages via HTTP/2 (User 2's inbox)"
   GET_MSG_RC=0
   GET_MSG_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 20 \
     --resolve "$HOST:${PORT}:${CURL_RESOLVE_IP}" \
@@ -1552,12 +1552,12 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]]; then
     echo "Response body: $(echo "$GET_MSG_RESPONSE" | sed '$d' | head -5)"
   fi
 else
-  warn "Skipping get messages - social-service not available or no auth token"
+  warn "Skipping get messages - messaging-service not available or no auth token"
 fi
 
-# Test 9b: Social Service - Create Group Chat (HTTP/2)
+# Test 9b: Messaging Service - Create Group Chat (HTTP/2)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
-  say "Test 9b: Social Service - Create Group Chat via HTTP/2"
+  say "Test 9b: Messaging Service - Create Group Chat via HTTP/2"
   CREATE_GROUP_RC=0
   CREATE_GROUP_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 30 \
     --resolve "$HOST:${PORT}:${CURL_RESOLVE_IP}" \
@@ -1579,12 +1579,12 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
     echo "Response body: $(echo "$CREATE_GROUP_RESPONSE" | sed '$d' | head -5)"
   fi
 else
-  warn "Skipping create group - social-service not available or no auth token"
+  warn "Skipping create group - messaging-service not available or no auth token"
 fi
 
-# Test 9c: Social Service - Add User 2 to Group (HTTP/2)
+# Test 9c: Messaging Service - Add User 2 to Group (HTTP/2)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${GROUP_ID:-}" ]] && [[ -n "${USER2_ID:-}" ]]; then
-  say "Test 9c: Social Service - Add User 2 to Group via HTTP/2"
+  say "Test 9c: Messaging Service - Add User 2 to Group via HTTP/2"
   ADD_MEMBER_RC=0
   ADD_MEMBER_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 30 \
     --resolve "$HOST:${PORT}:${CURL_RESOLVE_IP}" \
@@ -1609,13 +1609,13 @@ else
   elif [[ -z "${USER2_ID:-}" ]]; then
     warn "Skipping add member - User 2 ID not available"
   else
-    warn "Skipping add member - social-service not available or no auth token"
+    warn "Skipping add member - messaging-service not available or no auth token"
   fi
 fi
 
-# Test 9d: Social Service - Send Group Message (HTTP/3)
+# Test 9d: Messaging Service - Send Group Message (HTTP/3)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${GROUP_ID:-}" ]]; then
-  say "Test 9d: Social Service - Send Group Message via HTTP/3"
+  say "Test 9d: Messaging Service - Send Group Message via HTTP/3"
   SEND_GROUP_MSG_RC=0
   SEND_GROUP_MSG_RESPONSE=$(strict_http3_curl -sS -w "\n%{http_code}" --http3-only --max-time 30 \
     -H "Host: $HOST" \
@@ -1639,13 +1639,13 @@ else
   if [[ -z "${GROUP_ID:-}" ]]; then
     warn "Skipping group message - Group ID not available"
   else
-    warn "Skipping group message - social-service not available or no auth token"
+    warn "Skipping group message - messaging-service not available or no auth token"
   fi
 fi
 
-# Test 9e: Social Service - Get Group Details (HTTP/2) — strict TLS + resolve; retry up to 2x on curl exit 7 (connection)
+# Test 9e: Messaging Service - Get Group Details (HTTP/2) — strict TLS + resolve; retry up to 2x on curl exit 7 (connection)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${GROUP_ID:-}" ]]; then
-  say "Test 9e: Social Service - Get Group Details via HTTP/2"
+  say "Test 9e: Messaging Service - Get Group Details via HTTP/2"
   GET_GROUP_RC=0
   GET_GROUP_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 30 \
     --resolve "$HOST:${PORT}:${CURL_RESOLVE_IP}" \
@@ -1675,13 +1675,13 @@ else
   if [[ -z "${GROUP_ID:-}" ]]; then
     warn "Skipping get group details - Group ID not available"
   else
-    warn "Skipping get group details - social-service not available or no auth token"
+    warn "Skipping get group details - messaging-service not available or no auth token"
   fi
 fi
 
-# Test 9f: Social Service - Reply to Group Message (WhatsApp-style) (HTTP/2)
+# Test 9f: Messaging Service - Reply to Group Message (WhatsApp-style) (HTTP/2)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${GROUP_ID:-}" ]]; then
-  say "Test 9f: Social Service - Reply to Group Message via HTTP/2 (WhatsApp-style)"
+  say "Test 9f: Messaging Service - Reply to Group Message via HTTP/2 (WhatsApp-style)"
   # First, get a message ID from the group (from Test 9d)
   # Try to get group messages by querying the group details or messages with group_id filter
   GET_GROUP_MSG_RC=0
@@ -1760,13 +1760,13 @@ else
   if [[ -z "${GROUP_ID:-}" ]]; then
     warn "Skipping reply to group message - Group ID not available"
   else
-    warn "Skipping reply to group message - social-service not available or no auth token"
+    warn "Skipping reply to group message - messaging-service not available or no auth token"
   fi
 fi
 
-# Test 9g: Social Service - Forum Post with upload_type (HTTP/2)
+# Test 9g: Messaging Service - Forum Post with upload_type (HTTP/2)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
-  say "Test 9g: Social Service - Create Forum Post with upload_type via HTTP/2"
+  say "Test 9g: Messaging Service - Create Forum Post with upload_type via HTTP/2"
   FORUM_POST_UPLOAD_RC=0
   FORUM_POST_UPLOAD_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 30 \
     --resolve "$HOST:${PORT}:${CURL_RESOLVE_IP}" \
@@ -1790,12 +1790,12 @@ if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]]; then
     echo "Response body: $(echo "$FORUM_POST_UPLOAD_RESPONSE" | sed '$d' | head -5)"
   fi
 else
-  warn "Skipping forum post with upload_type - social-service not available or no auth token"
+  warn "Skipping forum post with upload_type - messaging-service not available or no auth token"
 fi
 
-# Test 9h: Social Service - Add Attachment to Forum Post (HTTP/2)
+# Test 9h: Messaging Service - Add Attachment to Forum Post (HTTP/2)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${FORUM_POST_UPLOAD_ID:-${FORUM_POST_ID:-}}" ]]; then
-  say "Test 9h: Social Service - Add Attachment to Forum Post via HTTP/2"
+  say "Test 9h: Messaging Service - Add Attachment to Forum Post via HTTP/2"
   POST_ATTACH_RC=0
   POST_ID="${FORUM_POST_UPLOAD_ID:-$FORUM_POST_ID}"
   POST_ATTACH_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 30 \
@@ -1819,13 +1819,13 @@ else
   if [[ -z "${FORUM_POST_UPLOAD_ID:-${FORUM_POST_ID:-}}" ]]; then
     warn "Skipping add post attachment - Forum post ID not available"
   else
-    warn "Skipping add post attachment - social-service not available or no auth token"
+    warn "Skipping add post attachment - messaging-service not available or no auth token"
   fi
 fi
 
-# Test 9i: Social Service - Add Attachment to Comment (HTTP/3)
+# Test 9i: Messaging Service - Add Attachment to Comment (HTTP/3)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${FORUM_POST_ID:-}" ]]; then
-  say "Test 9i: Social Service - Add Comment with Attachment via HTTP/3"
+  say "Test 9i: Messaging Service - Add Comment with Attachment via HTTP/3"
   # First create a comment
   COMMENT_WITH_ATTACH_RC=0
   COMMENT_RESPONSE=$(strict_http3_curl -sS -w "\n%{http_code}" --http3-only --max-time 30 \
@@ -1879,13 +1879,13 @@ else
   if [[ -z "${FORUM_POST_ID:-}" ]]; then
     warn "Skipping add comment attachment - Forum post ID not available"
   else
-    warn "Skipping add comment attachment - social-service not available or no auth token"
+    warn "Skipping add comment attachment - messaging-service not available or no auth token"
   fi
 fi
 
-# Test 9j: Social Service - Add Attachment to Message (HTTP/2)
+# Test 9j: Messaging Service - Add Attachment to Message (HTTP/2)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN:-}" ]] && [[ -n "${MESSAGE_ID:-${MESSAGE_H3_ID:-}}" ]]; then
-  say "Test 9j: Social Service - Add Attachment to Message via HTTP/2"
+  say "Test 9j: Messaging Service - Add Attachment to Message via HTTP/2"
   MSG_ATTACH_RC=0
   MSG_ID="${MESSAGE_ID:-$MESSAGE_H3_ID}"
   MSG_ATTACH_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 30 \
@@ -1909,13 +1909,13 @@ else
   if [[ -z "${MESSAGE_ID:-${MESSAGE_H3_ID:-}}" ]]; then
     warn "Skipping add message attachment - Message ID not available"
   else
-    warn "Skipping add message attachment - social-service not available or no auth token"
+    warn "Skipping add message attachment - messaging-service not available or no auth token"
   fi
 fi
 
-# Test 9k: Social Service - Leave Group Chat (HTTP/2)
+# Test 9k: Messaging Service - Leave Group Chat (HTTP/2)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${TOKEN_USER2:-}" ]] && [[ -n "${GROUP_ID:-}" ]]; then
-  say "Test 9k: Social Service - Leave Group Chat via HTTP/2"
+  say "Test 9k: Messaging Service - Leave Group Chat via HTTP/2"
   LEAVE_GROUP_RC=0
   LEAVE_GROUP_RESPONSE=$(strict_curl -sS -w "\n%{http_code}" --http2 --max-time 30 \
     --resolve "$HOST:${PORT}:${CURL_RESOLVE_IP}" \
@@ -1957,13 +1957,13 @@ else
   if [[ -z "${GROUP_ID:-}" ]]; then
     warn "Skipping leave group - Group ID not available"
   else
-    warn "Skipping leave group - social-service not available or no auth token"
+    warn "Skipping leave group - messaging-service not available or no auth token"
   fi
 fi
 
-# Test 9l: Social Service - Get Post Attachments (HTTP/3)
+# Test 9l: Messaging Service - Get Post Attachments (HTTP/3)
 if [[ "${SKIP_SOCIAL:-}" != "1" ]] && [[ -n "${FORUM_POST_UPLOAD_ID:-${FORUM_POST_ID:-}}" ]]; then
-  say "Test 9l: Social Service - Get Post Attachments via HTTP/3"
+  say "Test 9l: Messaging Service - Get Post Attachments via HTTP/3"
   GET_POST_ATTACH_RC=0
   POST_ID="${FORUM_POST_UPLOAD_ID:-$FORUM_POST_ID}"
   GET_POST_ATTACH_RESPONSE=$(strict_http3_curl -sS -w "\n%{http_code}" --http3-only --max-time 30 \
@@ -4307,7 +4307,7 @@ grpc_test_strict_tls() {
   case "$service_name_lower" in
     auth) svc_pod=$(kubectl -n "$NS" get pods -l app=auth-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
     records) svc_pod=$(kubectl -n "$NS" get pods -l app=records-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
-    social) svc_pod=$(kubectl -n "$NS" get pods -l app=social-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
+    social) svc_pod=$(kubectl -n "$NS" get pods -l app=messaging-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
     listings) svc_pod=$(kubectl -n "$NS" get pods -l app=listings-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
     analytics) svc_pod=$(kubectl -n "$NS" get pods -l app=analytics-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
     shopping) svc_pod=$(kubectl -n "$NS" get pods -l app=shopping-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "") ;;
@@ -4669,7 +4669,7 @@ else
     fi
   fi
 
-  # Test gRPC Messaging Service - HealthCheck (replaces legacy social-service)
+  # Test gRPC Messaging Service - HealthCheck (replaces legacy messaging-service)
   say "Test 15e: gRPC Messaging Service - HealthCheck via HTTP/2 (Envoy + Strict TLS/mTLS)"
   [[ "${ctx:-}" == *"colima"* ]] && sleep 1
   GRPC_MESSAGING_HEALTH=$(_grpc_test_with_cap 45 "Messaging" "grpc.health.v1.Health/Check" "health.proto" '{"service":""}' 10)
@@ -4898,8 +4898,8 @@ elif [[ -n "$RECORDS_HEALTH_H3_RESPONSE" ]]; then
   fi
 fi
 
-# Test 16c: Social Service - HTTP/3 Health Check (retry once on exit 55 — QUIC send failure; retry once on 503 — transient DB load)
-say "Test 16c: Social Service - Health Check via HTTP/3"
+# Test 16c: Messaging Service - HTTP/3 Health Check (retry once on exit 55 — QUIC send failure; retry once on 503 — transient DB load)
+say "Test 16c: Messaging Service - Health Check via HTTP/3"
 SOCIAL_HEALTH_H3_RC=0
 SOCIAL_HEALTH_H3_RESPONSE=$(strict_http3_curl -sS -w "\n%{http_code}" --http3-only --max-time "${CURL_MAX_TIME:-15}" \
   -H "Host: $HOST" --resolve "$HTTP3_RESOLVE" "https://$HOST/api/social/healthz" 2>&1) || SOCIAL_HEALTH_H3_RC=$?
@@ -4925,7 +4925,7 @@ elif [[ -n "$SOCIAL_HEALTH_H3_RESPONSE" ]]; then
     ok "Social health check works via HTTP/3"
   else
     warn "Social health check via HTTP/3 failed - HTTP $SOCIAL_HEALTH_H3_CODE"
-    # 503 = social-service reports unhealthy (db disconnected or health timeout)
+    # 503 = messaging-service reports unhealthy (db disconnected or health timeout)
     if [[ "$SOCIAL_HEALTH_H3_CODE" == "503" ]]; then
       _body=$(echo "$SOCIAL_HEALTH_H3_RESPONSE" | sed '$d')
       [[ -n "$_body" ]] && info "  Response body (db/redis status): $_body"

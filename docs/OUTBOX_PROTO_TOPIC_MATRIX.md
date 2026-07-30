@@ -16,6 +16,6 @@
 | python_ai | `infra/db/01-ai-outbox.sql` | `proto/events/ai.proto` | `${ENV_PREFIX}.ai.events` |
 | analytics | `infra/db/03-analytics-outbox.sql` | `proto/events/analytics.proto` | `${ENV_PREFIX}.analytics.events` |
 
-Topic generation script: **`scripts/lib/och-kafka-event-topics-from-proto.sh`** (also adds **`user.lifecycle.v1`**, **`user.lifecycle.ack.v1`**, **`messaging.dlq`**, **`booking.events.v1`**).
+Topic generation script: **`scripts/lib/rp-kafka-event-topics-from-proto.sh`** (also adds **`user.lifecycle.v1`**, **`user.lifecycle.ack.v1`**, **`messaging.dlq`**, **`booking.events.v1`**).
 
 Apply outbox DDL before enabling producers. **Auth** lifecycle rows are not emitted from auth-service yet; use **`@common/utils/outbox`** (`buildKafkaMessageFromOutboxRow`) + a publisher worker with **`01-auth-outbox.sql`** applied.

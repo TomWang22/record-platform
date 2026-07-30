@@ -7,7 +7,7 @@ import { join } from "node:path";
 
 const strict = process.env.STEP7_REQUIRE_DB_ROW === "1";
 const out = {
-  specVersion: "och-observability-integrity-spec-v1",
+  specVersion: "rp-observability-integrity-spec-v1",
   gate: "db-row-invariant",
   status: strict ? "FAIL" : "SKIPPED",
   reason: strict

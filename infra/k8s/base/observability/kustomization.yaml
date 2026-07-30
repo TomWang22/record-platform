@@ -7,6 +7,7 @@ resources:
   - namespace.yaml
   - otel-collector-deploy.yaml
   - jaeger-deploy.yaml
+  - jaeger-query-metallb.yaml
   - prometheus-rules-rp-slo.yaml
   - prometheus-rules-kafka-health.yaml
   - prometheus-rules-auth-outbox.yaml
@@ -24,7 +25,7 @@ resources:
   - splunk-secret.yaml
 
 # Optional (not in resources — require extra CRDs / Alertmanager):
-#   och-slo-prometheusrule.yaml     — Prometheus Operator PrometheusRule
+#   rp-slo-prometheusrule.yaml     — Prometheus Operator PrometheusRule
 #   prometheus-rule-kafka-alignment-operator.yaml — PrometheusRule for kafka_alignment_test_pass (operator clusters)
 #   prometheus-rule-trace-flow-validation-operator.example.yaml — TraceFlowValidationFailure (needs trace_flow_validation_pass scrape)
 #   prometheus-rule-quic-transport-invariant.example.yaml — QUICTransportValidationFailure (needs quic_transport_invariant_pass scrape)

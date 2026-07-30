@@ -107,7 +107,7 @@ T20.10Y adds 2–4 small typed fetches per route-mode query — expected cf incr
 | Endpoints contract | **PASS** |
 | Provider readiness | **PASS** |
 | pgvector readiness | **PASS** (retry after transient psql timeout) |
-| OCH scan | **PASS** |
+| RP scan | **PASS** |
 | OBO owner-visible embedded | **18** (≥10) |
 | Leakage | **0** |
 | Keyword stability | **PASS** — all 7 prompts unchanged |
@@ -127,7 +127,7 @@ bash scripts/audit-rp-ai-runtime-contract.sh
 bash scripts/audit-rp-ai-endpoints-contract.sh
 bash scripts/rp-ai-provider-readiness.sh
 bash scripts/rp-ai-pgvector-readiness.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 Deploy: `docker build` + `kubectl rollout restart deployment/python-ai-service` required before live diagnostics.

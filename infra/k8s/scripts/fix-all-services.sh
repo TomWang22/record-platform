@@ -95,9 +95,9 @@ else
   warn "api-gateway deployment not found"
 fi
 
-# Step 4: Fix listings-service and social-service ConfigMap errors
-step "4. Fixing ConfigMap Errors (listings-service, social-service)"
-for SERVICE in listings-service social-service; do
+# Step 4: Fix listings-service and messaging-service ConfigMap errors
+step "4. Fixing ConfigMap Errors (listings-service, messaging-service)"
+for SERVICE in listings-service messaging-service; do
   if kubectl get deployment "$SERVICE" -n "$NS" >/dev/null 2>&1; then
     # Check if ConfigMap/Secret references are correct
     if kubectl get deployment "$SERVICE" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].envFrom}' | grep -q app-config; then

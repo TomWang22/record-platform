@@ -7,7 +7,7 @@ All test suites now include comprehensive database and cache verification after 
 - **Redis cache** is working (hit/miss rates)
 - **Lua singleflight scripts** are loaded and functioning
 - **Shopping cart operations** are verified (including checkout removal)
-- **Social service operations** are verified (posts, messages)
+- **messaging-plane operations** are verified (posts, messages)
 
 ## Scripts
 
@@ -17,14 +17,14 @@ Quick verification called after each test suite:
 - Redis cache hit/miss verification
 - Lua script verification (proves singleflight working)
 - Shopping cart verification
-- Social service verification
+- messaging-plane verification
 
 ### 2. `verify-db-and-cache-comprehensive.sh`
 Comprehensive verification with detailed analysis:
 - Full database connectivity matrix
 - Detailed cache statistics
 - HTTP/3 packet capture verification
-- Social service health checks
+- messaging-plane health checks
 - Complete shopping cart analysis
 
 ### 3. `run-preflight-and-test-suite.sh`
@@ -96,7 +96,7 @@ The verification checks:
    - Orders count (items removed during checkout)
    - Purchase history
 
-4. **Social Service Verification**
+4. **Messaging Service Verification**
    - Forum posts count
    - Messages count
    - Service health
@@ -185,11 +185,11 @@ If `USER1_ID` is not set, verification will still check:
 - Overall table health
 - Cache connectivity (if Redis available)
 
-### Social Service 502 Errors
+### Messaging Service 502 Errors
 
 Check verification logs for:
 ```
-⚠️  Social service health endpoint: 502 upstream error
+⚠️  messaging-plane health endpoint: 502 upstream error
 ```
 
-This indicates social-service pod may be down or unreachable.
+This indicates messaging-service pod may be down or unreachable.

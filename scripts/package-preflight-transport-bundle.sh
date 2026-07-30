@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Two archives from one script:
 #
-# 1) OCH upstream (default): record-platform.test / record-platform unchanged.
+# 1) RP upstream (default): record-platform.test / record-platform unchanged.
 #    Output: $HOME/preflight-cluster-stability-jaeger-transport-bundle-<stamp>.tar.gz
 #
 # 2) Record Platform porting: same file set + hostname/namespace rewrites (record-platform.test, record-platform)
@@ -9,11 +9,11 @@
 #    RECORD_PLATFORM_PORTING_BUNDLE=1 bash scripts/package-preflight-transport-bundle.sh
 #    Output: $HOME/record-platform-preflight-scale-transport-v7b-<stamp>.tar.gz
 #
-# Override out dir: OCH_PREFLIGHT_BUNDLE_DIR=/path
-# Keep older archives: OCH_BUNDLE_KEEP_ALL=1
+# Override out dir: RP_PREFLIGHT_BUNDLE_DIR=/path
+# Keep older archives: RP_BUNDLE_KEEP_ALL=1
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUNDLE_OUT_DIR="${OCH_PREFLIGHT_BUNDLE_DIR:-$HOME}"
+BUNDLE_OUT_DIR="${RP_PREFLIGHT_BUNDLE_DIR:-$HOME}"
 [[ -d "$BUNDLE_OUT_DIR" ]] || { echo "BUNDLE_OUT_DIR not a directory: $BUNDLE_OUT_DIR" >&2; exit 1; }
 STAMP="$(date +%Y%m%d-%H%M%S)"
 STAGE="$(mktemp -d)"
@@ -61,10 +61,10 @@ _record_platform_rewrites() {
     -name '*.sh' -o -name '*.py' -o -name '*.mjs' -o -name '*.yaml' -o -name '*.yml' \
     -o -name '*.txt' -o -name '*.fragment' -o -name '*.json' -o -name '*.mts' -o -name '*.md' -o -name 'Makefile' \
   \) ! -path '*/docs/preflight-transport-phase-grep.txt' -print0 | while IFS= read -r -d '' f; do
-    perl -pi -e 's/off-campus-housing\.test/record-platform.test/g' "$f"
+    perl -pi -e 's/record-platform\.test/record-platform.test/g' "$f"
     perl -pi -e 's/record-platform/record-platform/g' "$f"
     perl -pi -e 's/record-platform-quic/record-platform-quic/g' "$f"
-    perl -pi -e 's/\(OCH: record\.test/(Record Platform: record-platform.test/g' "$f"
+    perl -pi -e 's/\(RP: record\.test/(Record Platform: record-platform.test/g' "$f"
   done
 }
 
@@ -135,14 +135,14 @@ copy_optional "docs/preflight-phase-barrier-contract.md"
 if [[ "$DO_REWRITE" == "1" ]]; then
   _record_platform_rewrites "$BUNDLE"
   cat > "$BUNDLE/README_BUNDLE.txt" <<'EOF'
-Record Platform — OCH preflight + scale suites + transport v7b (ported paths)
+Record Platform — RP preflight + scale suites + transport v7b (ported paths)
 =============================================================================
 
-Bundled defaults (rewritten from OCH upstream):
+Bundled defaults (rewritten from RP upstream):
   • Edge hostname / SNI: record-platform.test  (override HOST / CAPTURE_EXPECTED_SNI)
   • Kubernetes workload namespace: record-platform  (override NS / HOUSING_NS)
 
-Same layout as the OCH upstream bundle, including:
+Same layout as the RP upstream bundle, including:
   • scripts/lib/quic_command_center/*.py and scripts/lib/quic-forensic/*.sh (rewritten)
   • scripts/run-preflight-scale-and-all-suites.sh, transport-study-v7b.mjs, Jaeger helpers, Makefile + fragments
 
@@ -154,7 +154,7 @@ Extract:
 EOF
 else
   cat > "$BUNDLE/README_BUNDLE.txt" <<'EOF'
-OCH — Preflight + cluster stability + Jaeger + QUIC / HTTP3 transport bundle (upstream paths)
+RP — Preflight + cluster stability + Jaeger + QUIC / HTTP3 transport bundle (upstream paths)
 ===============================================================================================
 
 This archive matches the upstream lab repository layout (no hostname/namespace rewrites).
@@ -180,7 +180,7 @@ Record Platform port (record-platform.test / record-platform everywhere in bundl
 
 Regenerate (upstream):
   bash scripts/package-preflight-transport-bundle.sh
-  OCH_PREFLIGHT_BUNDLE_DIR=/tmp bash scripts/package-preflight-transport-bundle.sh
+  RP_PREFLIGHT_BUNDLE_DIR=/tmp bash scripts/package-preflight-transport-bundle.sh
 
 Extract:
   tar -xzf /path/to/preflight-cluster-stability-jaeger-transport-bundle-<stamp>.tar.gz -C /path/to/dest
@@ -195,7 +195,7 @@ OUT="$BUNDLE_OUT_DIR/${BUNDLE_TOP}-${STAMP}.tar.gz"
 COPYFILE_DISABLE=1 tar -czf "$OUT" -C "$STAGE" "$BUNDLE_TOP"
 rm -rf "$STAGE"
 
-if [[ "${OCH_BUNDLE_KEEP_ALL:-0}" != "1" ]]; then
+if [[ "${RP_BUNDLE_KEEP_ALL:-0}" != "1" ]]; then
   shopt -s nullglob
   for f in "$BUNDLE_OUT_DIR"/$OUT_GLOB; do
     [[ "$f" == "$OUT" ]] && continue

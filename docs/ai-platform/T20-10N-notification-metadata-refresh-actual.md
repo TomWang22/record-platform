@@ -137,7 +137,7 @@ Notification query (`What notifications matter most…`) on `shadow_obo_owner`: 
 |-------|--------|
 | Actual exit | 0 |
 | Idempotent re-run | 0 updates |
-| OCH decontaminate scan | PASS |
+| RP decontaminate scan | PASS |
 | python-ai code changes | None |
 | Node tests | Not required (script-only) |
 

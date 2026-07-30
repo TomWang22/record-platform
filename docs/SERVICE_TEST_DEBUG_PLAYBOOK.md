@@ -18,11 +18,11 @@ This doc explains how to investigate and fix failures from `scripts/test-microse
 
 ---
 
-## 1. Social Service — Forum post votes (7c, 7d)
+## 1. Messaging Service — Forum post votes (7c, 7d)
 
 **Symptom:** HTTP 200 but DB check fails (no row in forum.post_votes).
 
-**Cause:** gRPC VotePost was a stub. **Fix:** Implemented in `services/social-service/src/grpc-server.ts` to INSERT into forum.post_votes.
+**Cause:** gRPC VotePost was a stub. **Fix:** Implemented in `services/messaging-service/src/grpc-server.ts` to INSERT into forum.post_votes.
 
 **Debug:**
 ```bash
@@ -30,8 +30,8 @@ This doc explains how to investigate and fix failures from `scripts/test-microse
 PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d social -c \
   "SELECT * FROM forum.post_votes ORDER BY created_at DESC LIMIT 5"
 
-# Check social-service logs
-kubectl -n record-platform logs -l app=social-service --tail=100
+# Check messaging-service logs
+kubectl -n record-platform logs -l app=messaging-service --tail=100
 ```
 
 ---

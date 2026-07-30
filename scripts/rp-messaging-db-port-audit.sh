@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fail if messaging-service is wired to legacy OCH port 5444 instead of RP 5434.
+# Fail if messaging-service is wired to legacy RP port 5444 instead of RP 5434.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,7 +37,7 @@ scan 'och social port in messaging deploy' 'POSTGRES_URL_SOCIAL.*5444|5444.*soci
   if [[ $bad -eq 0 ]]; then
     echo "Result: **PASS** — no active 5444 messaging references found."
   else
-    echo "Result: **FAIL** — legacy OCH port references:"
+    echo "Result: **FAIL** — legacy RP port references:"
     echo '```'
     printf '%s\n' "${hits[@]}"
     echo '```'

@@ -43,7 +43,7 @@ T20.23A: NOT STARTED
 | `final_tagged_plan` fallback | **0** through T20.21B |
 | Anchored / pure overlap | **16/16 / 8/16** (report-only) |
 | Telemetry WARNs | **0** |
-| Leakage / OCH | **PASS** |
+| Leakage / RP | **PASS** |
 | T20.22B audit | **PASS** (no new live inference) |
 
 ---

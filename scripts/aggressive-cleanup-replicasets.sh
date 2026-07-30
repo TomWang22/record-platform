@@ -5,7 +5,7 @@
 # CrashLoop vs Running split-brain (two RS with pods). Prefer: kubectl rollout status deploy/NAME,
 # kubectl rollout restart deploy/NAME, and ./scripts/k8s-rollout-rp-ordered.sh for dependency order.
 #
-# Set OCH_AGGRESSIVE_RS_CLEANUP=1 only for interactive emergency debugging.
+# Set RP_AGGRESSIVE_RS_CLEANUP=1 only for interactive emergency debugging.
 
 set -euo pipefail
 
@@ -24,9 +24,9 @@ log() { echo "[$(date +%H:%M:%S)] $*" | tee -a "${CLEANUP_LOG:-/dev/stdout}"; }
 
 NS="${HOUSING_NS:-record-platform}"
 
-if [[ "${OCH_AGGRESSIVE_RS_CLEANUP:-0}" != "1" ]]; then
+if [[ "${RP_AGGRESSIVE_RS_CLEANUP:-0}" != "1" ]]; then
   say "=== ReplicaSet cleanup skipped (default) ==="
-  log "OCH_AGGRESSIVE_RS_CLEANUP is not 1 — not scaling or deleting ReplicaSets."
+  log "RP_AGGRESSIVE_RS_CLEANUP is not 1 — not scaling or deleting ReplicaSets."
   log "Use: kubectl rollout status deploy/<name> -n $NS"
   log "Ordered rollout: $SCRIPT_DIR/k8s-rollout-rp-ordered.sh"
   _kubectl get rs -n "$NS" 2>/dev/null | head -40 || true
@@ -34,13 +34,13 @@ if [[ "${OCH_AGGRESSIVE_RS_CLEANUP:-0}" != "1" ]]; then
   exit 0
 fi
 
-warn "OCH_AGGRESSIVE_RS_CLEANUP=1 — running legacy RS manipulation (debug only)"
+warn "RP_AGGRESSIVE_RS_CLEANUP=1 — running legacy RS manipulation (debug only)"
 if [[ -n "${WAIT_APP_SERVICES:-}" ]]; then
   read -r -a SERVICES <<< "$WAIT_APP_SERVICES"
 elif [[ -n "${PREFLIGHT_APP_DEPLOYS:-}" ]]; then
   read -r -a SERVICES <<< "$PREFLIGHT_APP_DEPLOYS"
 else
-  SERVICES=("auth-service" "listings-service" "booking-service" "messaging-service" "trust-service" "analytics-service" "api-gateway" "media-service")
+  SERVICES=("auth-service" "listings-service" "reservation-mesh" "messaging-service" "trust-service" "analytics-service" "api-gateway" "media-service")
 fi
 
 say "=== Aggressive ReplicaSet Cleanup ==="

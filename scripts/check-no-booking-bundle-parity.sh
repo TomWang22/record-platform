@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Compare OCH repo (current branch) vs extracted no-booking bundle: file + byte counts per folder.
-# Uses the same exclude rules as package-och-platform-no-booking-bundle.sh.
+# Compare RP repo (current branch) vs extracted no-booking bundle: file + byte counts per folder.
+# Uses the same exclude rules as package-rp-platform-no-booking-bundle.sh.
 #
-# Usage: bash scripts/check-no-booking-bundle-parity.sh /path/to/och-platform-no-booking-bundle.tar.gz
+# Usage: bash scripts/check-no-booking-bundle-parity.sh /path/to/rp-platform-no-booking-bundle.tar.gz
 set -euo pipefail
 
-TARBALL="${1:?usage: $0 /path/to/och-platform-no-booking-bundle.tar.gz}"
+TARBALL="${1:?usage: $0 /path/to/rp-platform-no-booking-bundle.tar.gz}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPORT_DIR="$REPO_ROOT/reports"
 mkdir -p "$REPORT_DIR"
@@ -19,7 +19,7 @@ cleanup() { rm -rf "$TMP"; }
 trap cleanup EXIT
 
 tar -xzf "$TARBALL" -C "$TMP"
-BUNDLE_ROOT="$TMP/och-platform-no-booking-bundle"
+BUNDLE_ROOT="$TMP/rp-platform-no-booking-bundle"
 if [[ ! -d "$BUNDLE_ROOT" ]]; then
   echo "ERROR: expected bundle root not found: $BUNDLE_ROOT" >&2
   exit 1

@@ -45,7 +45,7 @@ This document defines **what would be required** for any future hybrid default r
 | Pure vector overlap | **8/16** report-only |
 | `final_tagged_plan` fallback | **0** through T20.21B |
 | Telemetry WARNs | **0** |
-| Leakage / OCH | **PASS** |
+| Leakage / RP | **PASS** |
 | Playwright | **PASS** |
 
 ---
@@ -120,7 +120,7 @@ Phases 2–4 require owner/product sign-off and documented blocker acceptance be
 | Canary errors | **0** | **0** |
 | Telemetry WARNs | **0** | **0** |
 | Leakage | **PASS** | **PASS** |
-| OCH | **PASS** | **PASS** |
+| RP | **PASS** | **PASS** |
 | Playwright | **PASS** | **PASS** |
 | Anchored overlap | **16/16** | **≥10/16** |
 | Pure overlap | report-only | no promotion unless separately approved |

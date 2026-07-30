@@ -28,7 +28,7 @@ check_leaf_chain() {
     return
   fi
   if rp_dev_forbidden_in_cert "$pem"; then
-    bad "$label contains forbidden SAN/subject (OCH/localhost/127.0.0.1)"
+    bad "$label contains forbidden SAN/subject (RP/localhost/127.0.0.1)"
     return
   fi
   if rp_dev_verify_leaf_chain "$pem" | grep -q ': OK'; then

@@ -33,7 +33,7 @@ while true; do
   
   # Services
   echo -e "${BLUE}🚀 Services (target: 1/1 each):${NC}"
-  SERVICES="api-gateway auth-service records-service listings-service social-service shopping-service analytics-service auction-monitor python-ai-service"
+  SERVICES="api-gateway auth-service records-service listings-service messaging-service shopping-service analytics-service auction-monitor python-ai-service"
   for svc in $SERVICES; do
     READY=$(kubectl get pods -n record-platform -l app=$svc --request-timeout=5s --no-headers 2>/dev/null | awk '$2 ~ /^[1-9]\//' | wc -l | tr -d ' ' || echo "0")
     TOTAL=$(kubectl get pods -n record-platform -l app=$svc --request-timeout=5s --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
@@ -86,8 +86,8 @@ while true; do
   echo ""
   
   # Summary
-  READY_COUNT=$(kubectl get pods -n record-platform -l 'app in (api-gateway,auth-service,records-service,listings-service,social-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' --request-timeout=5s --field-selector=status.phase=Running --no-headers 2>/dev/null | awk '$2 ~ /^[1-9]\//' | wc -l | tr -d ' ' || echo "0")
-  TOTAL_COUNT=$(kubectl get pods -n record-platform -l 'app in (api-gateway,auth-service,records-service,listings-service,social-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' --request-timeout=5s --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+  READY_COUNT=$(kubectl get pods -n record-platform -l 'app in (api-gateway,auth-service,records-service,listings-service,messaging-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' --request-timeout=5s --field-selector=status.phase=Running --no-headers 2>/dev/null | awk '$2 ~ /^[1-9]\//' | wc -l | tr -d ' ' || echo "0")
+  TOTAL_COUNT=$(kubectl get pods -n record-platform -l 'app in (api-gateway,auth-service,records-service,listings-service,messaging-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' --request-timeout=5s --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
   echo -e "${BLUE}📊 Overall Progress:${NC} $READY_COUNT/$TOTAL_COUNT service pods Ready"
   echo ""
   echo "Next update in ${INTERVAL}s... (Ctrl+C to stop)"

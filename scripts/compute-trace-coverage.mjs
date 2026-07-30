@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * trace coverage = distinct Jaeger services in trace / expected housing services (repo discovery).
+ * trace coverage = distinct Jaeger services in trace / expected platform-planes (repo discovery).
  * Usage: node scripts/compute-trace-coverage.mjs <trace.json> [--json-out bench_logs/trace_coverage.json]
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeTrace, serviceName } from "./trace-validators/lib/jaeger-traces.mjs";
-import { discoverJaegerHousingServices } from "./trace-validators/lib/housing-services.mjs";
+import { discoverJaegerPlatformServices } from "./trace-validators/lib/platform-services.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -30,7 +30,7 @@ const trace = Array.isArray(j.data) && j.data[0] ? normalizeTrace(j.data[0]) : n
 const spans = trace?.spans || [];
 const processes = trace?.processes || {};
 const inTrace = new Set(spans.map((s) => serviceName(s, processes)).filter(Boolean));
-const all = discoverJaegerHousingServices(root);
+const all = discoverJaegerPlatformServices(root);
 const coverage = all.length ? inTrace.size / all.length : 0;
 const missing = all.filter((s) => !inTrace.has(s));
 

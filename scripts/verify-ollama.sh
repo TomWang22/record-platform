@@ -43,7 +43,7 @@ if [[ -f "$SCRIPT_DIR/lib/colima-kubeconfig.sh" ]]; then
   # shellcheck source=scripts/lib/colima-kubeconfig.sh
   source "$SCRIPT_DIR/lib/colima-kubeconfig.sh"
   if ! kubectl get nodes --request-timeout=10s &>/dev/null; then
-    och_export_colima_kubeconfig_prefer_reachable || true
+    rp_export_colima_kubeconfig_prefer_reachable || true
   fi
 fi
 

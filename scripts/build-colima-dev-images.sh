@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-_colima_services=(api-gateway auth-service records-service listings-service analytics-service python-ai-service social-service shopping-service auction-monitor)
+_colima_services=(api-gateway auth-service records-service listings-service analytics-service python-ai-service messaging-service shopping-service auction-monitor)
 
 need_build=()
 for _s in "${_colima_services[@]}"; do

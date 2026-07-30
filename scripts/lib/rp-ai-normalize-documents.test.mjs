@@ -127,11 +127,11 @@ describe('rp-ai-normalize-documents', () => {
     assert.equal(doc.source_type, 'message');
   });
 
-  it('sanitizes OCH seed listing titles', () => {
+  it('sanitizes RP seed listing titles', () => {
     const doc = normalizePublicListing({
       id: 'l-och',
       user_id: 'seller1',
-      title: 'och-page-4-1778201292009 batch-93',
+      title: 'rp-page-4-1778201292009 batch-93',
       listing_type: 'fixed_price',
       price: 25,
       currency: 'USD',

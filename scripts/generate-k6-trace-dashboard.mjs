@@ -12,7 +12,7 @@ const out = join(root, "bench_logs/k6_trace_dashboard.json");
 
 const dashboard = {
   title: "K6 + trace correlation (generated)",
-  uid: "och-k6-trace",
+  uid: "rp-k6-trace",
   schemaVersion: 39,
   version: 1,
   tags: ["k6", "tracing", "och"],

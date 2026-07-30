@@ -43,7 +43,7 @@ export function parseBookingCreated(value: Buffer): BookingCreatedPayload | null
   try {
     const raw = JSON.parse(value.toString("utf8")) as Record<string, unknown>;
     const md = (raw.metadata as Record<string, unknown>) || {};
-    /** Booking-service publishes `metadata.event_type`; legacy events may set top-level `event`. */
+    /** Reservation mesh publishes `metadata.event_type`; legacy events may set top-level `event`. */
     const event = String(
       raw.event ||
         raw.type ||

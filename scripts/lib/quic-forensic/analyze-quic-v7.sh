@@ -201,8 +201,8 @@ jq \
       },
       capture_window: (
         if ($cap_s != "" and $cap_e != "") then
-          { start_epoch: ($cap_s | tonumber), end_epoch: ($cap_e | tonumber) }
-        else { start_epoch: null, end_epoch: null }
+          { start_eprp: ($cap_s | tonumber), end_eprp: ($cap_e | tonumber) }
+        else { start_eprp: null, end_eprp: null }
         end
       ),
       ci_metadata: {

@@ -51,15 +51,15 @@ echo "Total suites: $TOTAL_SUITES"
 echo "Passed: $PASSED_SUITES"
 echo "Failed: $FAILED_SUITES"
 
-# Social service specific analysis
-say "=== Social Service Analysis ==="
+# messaging-plane specific analysis
+say "=== Messaging Service Analysis ==="
 SOCIAL_ERRORS=$(grep -iE "social.*502|social upstream error|social.*failed" "$SUITE_LOG_DIR"/*.log 2>/dev/null | wc -l || echo "0")
 if [[ "$SOCIAL_ERRORS" -gt 0 ]]; then
-  warn "Social service errors found: $SOCIAL_ERRORS"
+  warn "messaging-plane errors found: $SOCIAL_ERRORS"
   echo "  Error details:"
   grep -iE "social.*502|social upstream error" "$SUITE_LOG_DIR"/*.log 2>/dev/null | head -5 | sed 's/^/    - /'
 else
-  ok "No social service errors found"
+  ok "No messaging-plane errors found"
 fi
 
 # HTTP/3 packet capture analysis

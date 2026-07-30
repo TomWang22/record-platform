@@ -2,9 +2,9 @@
 # Force h1/h2/h3 edge requests; classify failures; push protocol smoke metrics to Pushgateway.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck source=scripts/lib/och-run-id.sh
-source "$ROOT/scripts/lib/och-run-id.sh"
-RUN_ID="${OCH_GATEWAY_SMOKE_RUN_ID:-$(och_read_run_id "$ROOT")}"
+# shellcheck source=scripts/lib/rp-run-id.sh
+source "$ROOT/scripts/lib/rp-run-id.sh"
+RUN_ID="${RP_GATEWAY_SMOKE_RUN_ID:-$(rp_read_run_id "$ROOT")}"
 
 HOST="${HOST:-${RP_PUBLIC_HOST:-record-platform.test}}"
 BASE_URL="${BASE_URL:-https://${HOST}}"
@@ -83,7 +83,7 @@ edge_debug_header_match() {
   [[ "$d" == "$expected" ]] && echo 1 || echo 0
 }
 
-fetch_x_och_debug_edge_proto() {
+fetch_x_rp_debug_edge_proto() {
   local url="$1" resolve_ip="$2"
   shift 2
   local curl_base=(-sSI --connect-timeout 10 --max-time 15 -o /dev/null)
@@ -95,7 +95,7 @@ fetch_x_och_debug_edge_proto() {
   if [[ -n "$resolve_ip" ]]; then
     curl_base+=(--resolve "${HOST}:443:${resolve_ip}")
   fi
-  curl "${curl_base[@]}" "$@" "$url" 2>/dev/null | tr -d '\r' | awk -F': ' 'tolower($1)=="x-och-debug-edge-proto" {gsub(/^[ \t]+|[ \t]+$/,"",$2); print tolower($2); exit}'
+  curl "${curl_base[@]}" "$@" "$url" 2>/dev/null | tr -d '\r' | awk -F': ' 'tolower($1)=="x-rp-debug-edge-proto" {gsub(/^[ \t]+|[ \t]+$/,"",$2); print tolower($2); exit}'
 }
 
 probe_http() {
@@ -201,9 +201,9 @@ fi
 
 DBG_H1="" DBG_H2="" DBG_H3=""
 if [[ -n "$TARGET_IP" ]]; then
-  [[ "$h1_ok" == 1 ]] && DBG_H1="$(fetch_x_och_debug_edge_proto "${BASE_URL}${PROBE_PATH}" "$TARGET_IP" --http1.1)" || true
-  [[ "$h2_ok" == 1 ]] && DBG_H2="$(fetch_x_och_debug_edge_proto "${BASE_URL}${PROBE_PATH}" "$TARGET_IP" --http2)" || true
-  [[ "$h3_ok" == 1 ]] && DBG_H3="$(fetch_x_och_debug_edge_proto "${BASE_URL}${H3_PROBE_PATH}" "$TARGET_IP" --http3-only -H "Host: ${HOST}")" || true
+  [[ "$h1_ok" == 1 ]] && DBG_H1="$(fetch_x_rp_debug_edge_proto "${BASE_URL}${PROBE_PATH}" "$TARGET_IP" --http1.1)" || true
+  [[ "$h2_ok" == 1 ]] && DBG_H2="$(fetch_x_rp_debug_edge_proto "${BASE_URL}${PROBE_PATH}" "$TARGET_IP" --http2)" || true
+  [[ "$h3_ok" == 1 ]] && DBG_H3="$(fetch_x_rp_debug_edge_proto "${BASE_URL}${H3_PROBE_PATH}" "$TARGET_IP" --http3-only -H "Host: ${HOST}")" || true
 fi
 h1_hdr_match=1 h2_hdr_match=1 h3_hdr_match=1
 [[ "$h1_ok" == 1 ]] && h1_hdr_match="$(edge_debug_header_match h1 "$DBG_H1")"
@@ -232,35 +232,35 @@ if command -v kubectl >/dev/null 2>&1; then
   " 2>/dev/null || echo 0)"
 fi
 
-prom="$ROOT/bench_logs/och-gateway-protocol-smoke.prom"
+prom="$ROOT/bench_logs/rp-gateway-protocol-smoke.prom"
 mkdir -p "$(dirname "$prom")"
 {
   cat <<EOF
-# HELP och_gateway_protocol_smoke_supported 1 when curl build supports HTTP/3.
-# TYPE och_gateway_protocol_smoke_supported gauge
-och_gateway_protocol_smoke_supported{run_id="${RUN_ID}"} ${client_h3_supported}
-# HELP och_gateway_protocol_smoke_success 1 when forced-protocol probe returned HTTP 200 (h3 also requires version 3).
-# TYPE och_gateway_protocol_smoke_success gauge
-och_gateway_protocol_smoke_success{proto="h1",run_id="${RUN_ID}"} ${h1_ok}
-och_gateway_protocol_smoke_success{proto="h2",run_id="${RUN_ID}"} ${h2_ok}
-och_gateway_protocol_smoke_success{proto="h3",run_id="${RUN_ID}"} ${h3_ok}
-# HELP och_gateway_protocol_smoke_http_version 1 on successful forced-protocol probe; http_version from curl.
-# TYPE och_gateway_protocol_smoke_http_version gauge
-och_gateway_protocol_smoke_http_version{proto="h1",http_version="${hv1}",run_id="${RUN_ID}"} ${h1_ok}
-och_gateway_protocol_smoke_http_version{proto="h2",http_version="${hv2}",run_id="${RUN_ID}"} ${h2_ok}
-och_gateway_protocol_smoke_http_version{proto="h3",http_version="${hv3}",run_id="${RUN_ID}"} ${h3_ok}
-# HELP och_gateway_protocol_smoke_edge_header_match 1 when X-OCH-Debug-Edge-Proto is absent or matches forced proto (requires OCH_EDGE_PROTO_DEBUG on gateway).
-# TYPE och_gateway_protocol_smoke_edge_header_match gauge
-och_gateway_protocol_smoke_edge_header_match{proto="h1",run_id="${RUN_ID}"} ${h1_hdr_match}
-och_gateway_protocol_smoke_edge_header_match{proto="h2",run_id="${RUN_ID}"} ${h2_hdr_match}
-och_gateway_protocol_smoke_edge_header_match{proto="h3",run_id="${RUN_ID}"} ${h3_hdr_match}
-# HELP och_gateway_protocol_smoke_ok Legacy alias for och_gateway_protocol_smoke_success.
-# TYPE och_gateway_protocol_smoke_ok gauge
-och_gateway_protocol_smoke_ok{proto="h1",run_id="${RUN_ID}"} ${h1_ok}
-och_gateway_protocol_smoke_ok{proto="h2",run_id="${RUN_ID}"} ${h2_ok}
-och_gateway_protocol_smoke_ok{proto="h3",run_id="${RUN_ID}"} ${h3_ok}
-# HELP och_gateway_protocol_smoke_failure_reason_info Outcome reason for last smoke (value 1).
-# TYPE och_gateway_protocol_smoke_failure_reason_info gauge
+# HELP rp_gateway_protocol_smoke_supported 1 when curl build supports HTTP/3.
+# TYPE rp_gateway_protocol_smoke_supported gauge
+rp_gateway_protocol_smoke_supported{run_id="${RUN_ID}"} ${client_h3_supported}
+# HELP rp_gateway_protocol_smoke_success 1 when forced-protocol probe returned HTTP 200 (h3 also requires version 3).
+# TYPE rp_gateway_protocol_smoke_success gauge
+rp_gateway_protocol_smoke_success{proto="h1",run_id="${RUN_ID}"} ${h1_ok}
+rp_gateway_protocol_smoke_success{proto="h2",run_id="${RUN_ID}"} ${h2_ok}
+rp_gateway_protocol_smoke_success{proto="h3",run_id="${RUN_ID}"} ${h3_ok}
+# HELP rp_gateway_protocol_smoke_http_version 1 on successful forced-protocol probe; http_version from curl.
+# TYPE rp_gateway_protocol_smoke_http_version gauge
+rp_gateway_protocol_smoke_http_version{proto="h1",http_version="${hv1}",run_id="${RUN_ID}"} ${h1_ok}
+rp_gateway_protocol_smoke_http_version{proto="h2",http_version="${hv2}",run_id="${RUN_ID}"} ${h2_ok}
+rp_gateway_protocol_smoke_http_version{proto="h3",http_version="${hv3}",run_id="${RUN_ID}"} ${h3_ok}
+# HELP rp_gateway_protocol_smoke_edge_header_match 1 when X-RP-Debug-Edge-Proto is absent or matches forced proto (requires RP_EDGE_PROTO_DEBUG on gateway).
+# TYPE rp_gateway_protocol_smoke_edge_header_match gauge
+rp_gateway_protocol_smoke_edge_header_match{proto="h1",run_id="${RUN_ID}"} ${h1_hdr_match}
+rp_gateway_protocol_smoke_edge_header_match{proto="h2",run_id="${RUN_ID}"} ${h2_hdr_match}
+rp_gateway_protocol_smoke_edge_header_match{proto="h3",run_id="${RUN_ID}"} ${h3_hdr_match}
+# HELP rp_gateway_protocol_smoke_ok Legacy alias for rp_gateway_protocol_smoke_success.
+# TYPE rp_gateway_protocol_smoke_ok gauge
+rp_gateway_protocol_smoke_ok{proto="h1",run_id="${RUN_ID}"} ${h1_ok}
+rp_gateway_protocol_smoke_ok{proto="h2",run_id="${RUN_ID}"} ${h2_ok}
+rp_gateway_protocol_smoke_ok{proto="h3",run_id="${RUN_ID}"} ${h3_ok}
+# HELP rp_gateway_protocol_smoke_failure_reason_info Outcome reason for last smoke (value 1).
+# TYPE rp_gateway_protocol_smoke_failure_reason_info gauge
 EOF
   for _p in h1 h2 h3; do
     _ok_var="${_p}_ok"
@@ -268,21 +268,21 @@ EOF
     _r="${!_r_var:-}"
     [[ "${!_ok_var:-0}" == "1" ]] && continue
     [[ -n "$_r" ]] || continue
-    printf 'och_gateway_protocol_smoke_failure_reason_info{proto="%s",reason="%s",run_id="%s"} 1\n' "$_p" "$_r" "$RUN_ID"
+    printf 'rp_gateway_protocol_smoke_failure_reason_info{proto="%s",reason="%s",run_id="%s"} 1\n' "$_p" "$_r" "$RUN_ID"
   done
   cat <<EOF
-# HELP och_gateway_h3_smoke_reason_info Legacy h3 reason gauge.
-# TYPE och_gateway_h3_smoke_reason_info gauge
-och_gateway_h3_smoke_reason_info{reason="${h3_reason:-unavailable}",run_id="${RUN_ID}"} 1
-# HELP och_gateway_unknown_proto_ratio Instantaneous unknown/total from api-gateway (best-effort).
-# TYPE och_gateway_unknown_proto_ratio gauge
-och_gateway_unknown_proto_ratio{run_id="${RUN_ID}"} ${unknown_ratio}
+# HELP rp_gateway_h3_smoke_reason_info Legacy h3 reason gauge.
+# TYPE rp_gateway_h3_smoke_reason_info gauge
+rp_gateway_h3_smoke_reason_info{reason="${h3_reason:-unavailable}",run_id="${RUN_ID}"} 1
+# HELP rp_gateway_unknown_proto_ratio Instantaneous unknown/total from api-gateway (best-effort).
+# TYPE rp_gateway_unknown_proto_ratio gauge
+rp_gateway_unknown_proto_ratio{run_id="${RUN_ID}"} ${unknown_ratio}
 EOF
 } >"$prom"
 
-chmod +x "$ROOT/scripts/lib/push-och-prom.sh" 2>/dev/null || true
-OCH_PUSHGATEWAY_JOB=gateway-protocol-smoke OCH_PUSHGATEWAY_INSTANCE="$RUN_ID" \
-  bash "$ROOT/scripts/lib/push-och-prom.sh" "$prom" || echo "obs-smoke-gateway-protocols: push failed (non-fatal)" >&2
+chmod +x "$ROOT/scripts/lib/push-rp-prom.sh" 2>/dev/null || true
+RP_PUSHGATEWAY_JOB=gateway-protocol-smoke RP_PUSHGATEWAY_INSTANCE="$RUN_ID" \
+  bash "$ROOT/scripts/lib/push-rp-prom.sh" "$prom" || echo "obs-smoke-gateway-protocols: push failed (non-fatal)" >&2
 
 exit_code=0
 if [[ "$h1_ok" != 1 || "$h2_ok" != 1 ]]; then

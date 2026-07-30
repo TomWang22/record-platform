@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Export all OCH external DBs → JSON + physical DOT + SVG; PNGs → data-modeling/png/ (single folder).
+# Export all RP external DBs → JSON + physical DOT + SVG; PNGs → data-modeling/png/ (single folder).
 # Requires: psql, jq, dot (Graphviz).
 #
 # Usage: ./scripts/diagram/generate-all.sh [output_root]

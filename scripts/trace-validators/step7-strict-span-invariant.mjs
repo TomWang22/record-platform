@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Step 7B — structural span-tree invariant on a single Jaeger trace.
- * See docs/observability/och-observability-integrity-spec-v1.md §3.
+ * See docs/observability/rp-observability-integrity-spec-v1.md §3.
  */
 import { spanMap, tagValue, serviceName } from "./lib/jaeger-traces.mjs";
 

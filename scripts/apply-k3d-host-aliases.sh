@@ -42,7 +42,7 @@ if [[ -z "$_host_ip" ]]; then
 fi
 
 say "Patching host.docker.internal -> $_host_ip for app deployments (k3d)..."
-for _d in auth-service api-gateway records-service listings-service social-service shopping-service analytics-service auction-monitor python-ai-service; do
+for _d in auth-service api-gateway records-service listings-service messaging-service shopping-service analytics-service auction-monitor python-ai-service; do
   if kubectl get deployment "$_d" -n "$NS" --request-timeout=5s >/dev/null 2>&1; then
     kubectl patch deployment "$_d" -n "$NS" --type=merge \
       -p "{\"spec\":{\"template\":{\"spec\":{\"hostAliases\":[{\"ip\":\"$_host_ip\",\"hostnames\":[\"host.docker.internal\",\"host.lima.internal\"]}]}}}}" \

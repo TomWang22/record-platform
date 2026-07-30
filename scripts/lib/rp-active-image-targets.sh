@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Active RP :dev image targets (no booking-service, social-service, legacy OCH-only).
+# Active RP :dev image targets (excluded legacy peers are not listed).
 set -euo pipefail
 
 # Backend + edge services (build/deploy lists append webapp once — see record-platform-docker-services-default.sh).

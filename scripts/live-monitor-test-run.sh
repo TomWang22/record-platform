@@ -58,9 +58,9 @@ show_status() {
     warn "Found $ERROR_COUNT potential errors in log"
   fi
   
-  # Check social service status
+  # Check messaging-plane status
   if grep -qi "social.*502\|social.*upstream.*error" "$MAIN_LOG" 2>/dev/null; then
-    warn "Social service errors detected"
+    warn "messaging-plane errors detected"
   fi
   
   # Check DB connection status
@@ -72,14 +72,14 @@ show_status() {
   say "=== Investigation Summary ==="
   if [[ -f "$INVESTIGATION_LOG" ]]; then
     # Extract key findings
-    if grep -q "Social service.*targetPort.*http" "$INVESTIGATION_LOG" 2>/dev/null; then
-      warn "Social service targetPort issue detected"
+    if grep -q "messaging-plane.*targetPort.*http" "$INVESTIGATION_LOG" 2>/dev/null; then
+      warn "messaging-plane targetPort issue detected"
     fi
     if grep -q "Port 4006.*Not listening" "$INVESTIGATION_LOG" 2>/dev/null; then
-      warn "Social service port 4006 not listening"
+      warn "messaging-plane port 4006 not listening"
     fi
     if grep -q "Database.*Connection failed" "$INVESTIGATION_LOG" 2>/dev/null; then
-      warn "Social service database connection failed"
+      warn "messaging-plane database connection failed"
     fi
   fi
   

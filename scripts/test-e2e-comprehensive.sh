@@ -113,14 +113,14 @@ else
 fi
 
 # Test 5: Social - Create Forum Post
-say "Test 5: Social Service - Create Forum Post"
+say "Test 5: Messaging Service - Create Forum Post"
 FORUM_POST=$("$CURL_BIN" -k -sS -w "\n%{http_code}" --http2 --max-time 30 \
   --resolve "$HOST:${PORT}:127.0.0.1" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -X POST "https://$HOST:${PORT}/api/forum/posts" \
-  -d '{"title":"E2E Test Post","content":"Testing social service","flair":"general"}' 2>&1) || FORUM_POST=""
+  -d '{"title":"E2E Test Post","content":"Testing messaging-plane","flair":"general"}' 2>&1) || FORUM_POST=""
 FORUM_CODE=$(echo "$FORUM_POST" | tail -1)
 if [[ "$FORUM_CODE" =~ ^(200|201)$ ]]; then
   FORUM_POST_ID=$(extract_json "$FORUM_POST" "id")

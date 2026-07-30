@@ -11,7 +11,7 @@ message EventEnvelope {
   string event_id = 1;   // UUID
   string type = 2;       // e.g. booking.created
   int32 version = 3;     // 1
-  string source = 4;     // e.g. booking-service
+  string source = 4;     // e.g. reservation-mesh
   string entity_id = 5;  // e.g. booking_id (partition key)
   string timestamp = 6;  // ISO-8601
   bytes payload = 7;     // serialized domain event message (e.g. BookingCreatedV1)

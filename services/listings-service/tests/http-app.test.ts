@@ -695,7 +695,7 @@ describe("createListingsHttpApp", () => {
     expect(res.body.listing?.id).toBeTruthy();
   });
 
-  it("POST /listings/:id/media — 201 accepts OCH signed inline media path", async () => {
+  it("POST /listings/:id/media — 201 accepts RP signed inline media path", async () => {
     const mid = "aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee";
     const signedPath = `/api/media/public/${mid}?e=9999999999&s=abcdef`;
     const app = createListingsHttpApp();

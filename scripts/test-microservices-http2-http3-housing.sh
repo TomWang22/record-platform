@@ -493,12 +493,12 @@ GW_CODE=$(strict_curl -sS -o /dev/null -w "%{http_code}" --http2 --max-time 10 \
   "${CURL_H2_RESOLVE[@]}" -H "Host: $HOST" "https://$HOST:${PORT}/api/healthz" 2>/dev/null || echo "000")
 [[ "$GW_CODE" == "200" ]] && ok "API Gateway health: $GW_CODE" || warn "API Gateway health: $GW_CODE"
 
-# --- Test 5b: Service health checks HTTP/2 (all OCH services) ---
-say "Test 5b: Service health checks via HTTP/2 (all OCH services)"
+# --- Test 5b: Service health checks HTTP/2 (all RP services) ---
+say "Test 5b: Service health checks via HTTP/2 (all RP services)"
 for route in \
   "/auth/healthz:Auth Service" \
   "/api/listings/healthz:Listings Service" \
-  "/api/booking/healthz:Booking Service" \
+  "/api/booking/healthz:Reservation Mesh" \
   "/api/messaging/healthz:Messaging Service" \
   "/api/notification/healthz:Notification Service" \
   "/api/trust/healthz:Trust Service" \
@@ -1442,13 +1442,13 @@ else
   info "Test 13 skipped (HTTP/3 not available)"
 fi
 
-# Test 14: HTTP/3 health checks for all OCH services (incl. notification)
+# Test 14: HTTP/3 health checks for all RP services (incl. notification)
 if type strict_http3_curl &>/dev/null && [[ -n "${HTTP3_RESOLVE:-}" ]]; then
   say "Test 14: Service Health Checks via HTTP/3"
   for route in \
     "/auth/healthz:Auth Service" \
     "/api/listings/healthz:Listings Service" \
-    "/api/booking/healthz:Booking Service" \
+    "/api/booking/healthz:Reservation Mesh" \
     "/api/messaging/healthz:Messaging Service" \
     "/api/notification/healthz:Notification Service" \
     "/api/trust/healthz:Trust Service" \
@@ -1479,12 +1479,12 @@ if type strict_http3_curl &>/dev/null && [[ -n "${HTTP3_RESOLVE:-}" ]]; then
   done
 fi
 
-# Test 15: gRPC health checks for OCH services (incl. notification :50065)
+# Test 15: gRPC health checks for RP services (incl. notification :50065)
 say "Test 15: gRPC Health Checks"
 if command -v grpcurl >/dev/null 2>&1; then
   grpc_test "auth-service" "auth-service" "50061"
   grpc_test "listings-service" "listings-service" "50062"
-  grpc_test "booking-service" "booking-service" "50063"
+  grpc_test "reservation-mesh" "reservation-mesh" "50063"
   grpc_test "messaging-service" "messaging-service" "50064"
   grpc_test "notification-service" "notification-service" "50065"
   grpc_test "trust-service" "trust-service" "50066"
@@ -1539,7 +1539,7 @@ fi
 
 # Booking: HTTP/2 + HTTP/3 + edge gRPC (MetalLB) — preflight runs this suite unless skipped
 if [[ "${SKIP_BOOKING_IN_HOUSING_SUITE:-0}" != "1" ]]; then
-  say "Test 18: Booking service protocol suite (delegates to test-booking-http2-http3.sh)"
+  say "Test 18: reservation-mesh protocol suite (delegates to test-booking-http2-http3.sh)"
   if [[ -x "$SCRIPT_DIR/test-booking-http2-http3.sh" ]]; then
     HOST="${HOST:-record-platform.test}" "$SCRIPT_DIR/test-booking-http2-http3.sh" || fail "Booking protocol suite failed"
   else

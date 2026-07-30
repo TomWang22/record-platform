@@ -38,8 +38,8 @@ BASE="${BASE%/}"
 VERTICAL="${1:-${JAEGER_TRACE_VERTICAL:-booking}}"
 case "$VERTICAL" in
   booking)
-    SERVICE="booking-service"
-    REQUIRED_RAW="api-gateway,booking-service"
+    SERVICE="reservation-mesh"
+    REQUIRED_RAW="api-gateway,reservation-mesh"
     ;;
   messaging)
     SERVICE="messaging-service"

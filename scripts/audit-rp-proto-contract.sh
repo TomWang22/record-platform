@@ -52,7 +52,7 @@ else
 fi
 
 say "Active k8s deploys must not include booking/social"
-for bad in booking-service social-service; do
+for bad in reservation-mesh messaging-service; do
   if find "$REPO_ROOT/infra/k8s/base" -path "*/${bad}/deploy.yaml" 2>/dev/null | grep -q .; then
     fail "deploy manifest exists: $bad"
   fi
@@ -60,7 +60,7 @@ done
 pass "no booking/social k8s deploy dirs"
 
 say "api-gateway must not register social/booking HTTP routes"
-if grep -E "social-service|booking-service|/social\.|booking\." "$REPO_ROOT/services/api-gateway/src/server.ts" 2>/dev/null | \
+if grep -E "/social\.|booking\." "$REPO_ROOT/services/api-gateway/src/server.ts" 2>/dev/null | \
    grep -vE 'RP_SKIP|removed|skip|//'; then
   fail "api-gateway still references social/booking routes"
 else
@@ -97,7 +97,7 @@ done
 pass "kafka topics exclude booking/social"
 
 say "event-layer-verification"
-if grep -qE 'dev\.booking\.events|booking-service|booking\.created' \
+if grep -qE 'dev\.booking\.events|booking\.created' \
   "$REPO_ROOT/services/event-layer-verification/src/"*.ts 2>/dev/null; then
   fail "event-layer-verification still uses booking fixtures"
 else

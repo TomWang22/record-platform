@@ -20,7 +20,7 @@ SERVICES=(
   "api-gateway"
   "auth-service"
   "analytics-service"
-  "social-service"
+  "messaging-service"
   "listings-service"
   "shopping-service"
   "auction-monitor"

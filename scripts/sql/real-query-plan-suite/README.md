@@ -1,6 +1,6 @@
 # Real query plan suite
 
-Read-only(ish) **`EXPLAIN (ANALYZE, BUFFERS, VERBOSE)`** templates aligned to **OCH** schemas under `infra/db/`.
+Read-only(ish) **`EXPLAIN (ANALYZE, BUFFERS, VERBOSE)`** templates aligned to **RP** schemas under `infra/db/`.
 
 ## Caveats
 

@@ -10,7 +10,7 @@ export type BookingPartySnapshot = {
   status: string;
   tenant_id: string;
   landlord_id: string;
-  /** YYYY-MM-DD lease end (UTC calendar), from booking-service public JSON. */
+  /** YYYY-MM-DD lease end (UTC calendar), from reservation-mesh public JSON. */
   end_date?: string | null;
 };
 

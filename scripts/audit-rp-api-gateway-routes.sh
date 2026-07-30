@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Audit api-gateway integration: routes, targets, ports, edge, no social-service.
+# Audit api-gateway integration: routes, targets, ports, edge, no messaging-service.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -138,14 +138,14 @@ for gid in auth records listings shopping messaging media trust notification ana
     || add_issue "gateway-route-manifest missing $gid"
 done
 
-if grep -rn 'social-service' "$GW_SRC" --exclude='*test*' 2>/dev/null | grep -vE 'removed|legacy|RP_SKIP|RP_ENABLE|308|redirect|/\*\*|//|__tests__'; then
-  add_issue "social-service reference in gateway source"
+if grep -rn 'messaging-service' "$GW_SRC" --exclude='*test*' 2>/dev/null | grep -vE 'removed|legacy|RP_SKIP|RP_ENABLE|308|redirect|/\*\*|//|__tests__'; then
+  add_issue "messaging-service reference in gateway source"
 else
-  add_ok "no social-service upstream in gateway"
+  add_ok "no messaging-service upstream in gateway"
 fi
 
-grep -rq 'booking-service' "$GW_SRC" "$APP_CFG" 2>/dev/null \
-  && add_issue "booking-service reference in active gateway" || add_ok "no booking-service in gateway"
+grep -rq 'reservation-mesh' "$GW_SRC" "$APP_CFG" 2>/dev/null \
+  && add_issue "reservation-mesh reference in active gateway" || add_ok "no reservation-mesh in gateway"
 
 status="pass"
 [[ ${#issues[@]} -gt 0 ]] && status="fail"

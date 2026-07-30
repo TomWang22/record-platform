@@ -1,4 +1,4 @@
--- Social Service Database Schema
+-- Messaging Service Database Schema
 -- Run on PostgreSQL port 5434 (social DB). Database name: social.
 -- app-config: POSTGRES_URL_SOCIAL = ...@host:5434/social
 -- User: postgres / postgres (or configure as needed)

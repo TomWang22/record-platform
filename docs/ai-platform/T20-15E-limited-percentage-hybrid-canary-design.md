@@ -38,7 +38,7 @@ Evidence from T20.15D-S soak and T20.15D-T control/rollback drill.
 | canary errors | **0** |
 | leakage failures | **0** |
 | telemetry WARNs | **0** |
-| Contracts / OCH | **PASS** |
+| Contracts / RP | **PASS** |
 
 ### D-T control and rollback
 
@@ -151,7 +151,7 @@ All must pass (or fresh rerun PASS) before owner approves T20.15F:
 | 3 fresh API transcript runs | 27/27 HTTP 200 | `rp-ai-hybrid-canary-transcript.sh` |
 | Playwright seller / record / longform | PASS | strict-edge suites |
 | telemetry WARNs | **0** | `ai-quality-telemetry-report.mjs` |
-| leakage | **PASS** | OCH + transcript |
+| leakage | **PASS** | RP + transcript |
 | fallback rate | **≤ 15%** | API transcript aggregate |
 | canary error count | **0** | API + shadow |
 | hybrid p95 | **≤ 3000 ms** | transcript + shadow |
@@ -194,7 +194,7 @@ Before T20.15F, rerun Playwright with `AI_RAG_HYBRID_CANARY=0` OR document hybri
 | G4 | Run 3× `rp-ai-hybrid-canary-transcript.sh` |
 | G5 | Run shadow timing (1 run minimum) |
 | G6 | Run Playwright (hybrid-aware or canary-off for Lane C subset) |
-| G7 | Run telemetry + contracts + OCH |
+| G7 | Run telemetry + contracts + RP |
 | G8 | Record: distinct users in percentage cohort, request count, fallback count, error count |
 | G9 | **Restore `AI_RAG_HYBRID_CANARY_PERCENT=0`** immediately if any gate fails |
 | G10 | Write `T20-15G-1percent-hybrid-canary-eval.md` → feeds T20.15H decision |

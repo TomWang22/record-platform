@@ -75,7 +75,7 @@ make() {
 }
 
 # Exit 0 iff Secret/kafka-ssl-secret has non-empty data for ca-cert.pem, client.crt, client.key.
-_verify_och_kafka_pem_secret() {
+_verify_rp_kafka_pem_secret() {
   local ns="$1"
   python3 -c "
 import json, subprocess, sys
@@ -124,7 +124,7 @@ echo "▶ Phase 3.5: Housing secrets — sync kafka-ssl-secret (app Kafka mTLS P
 chmod +x "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
 _NS="${HOUSING_NS:-record-platform}"
 HOUSING_NS="$_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
-if ! _verify_och_kafka_pem_secret "$_NS"; then
+if ! _verify_rp_kafka_pem_secret "$_NS"; then
   echo "▶ Phase 3.5 remediate: kafka-ssl-from-dev-root.sh + re-sync (broker PEM material → kafka-ssl-secret)"
   chmod +x "$SCRIPT_DIR/kafka-ssl-from-dev-root.sh"
   KAFKA_SSL_NS="$_NS" bash "$SCRIPT_DIR/kafka-ssl-from-dev-root.sh"
@@ -134,7 +134,7 @@ if ! _verify_och_kafka_pem_secret "$_NS"; then
     kubectl rollout status statefulset/kafka -n "$_NS" --timeout=480s
   fi
   HOUSING_NS="$_NS" bash "$SCRIPT_DIR/ensure-housing-cluster-secrets.sh"
-  if ! _verify_och_kafka_pem_secret "$_NS"; then
+  if ! _verify_rp_kafka_pem_secret "$_NS"; then
     echo "❌ kafka-ssl-secret still incomplete — check kubectl context, namespace $_NS, and certs/dev-root.{pem,key}" >&2
     exit 1
   fi

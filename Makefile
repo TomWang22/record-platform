@@ -94,7 +94,7 @@ CI_MODE ?= 0
 HEADLESS ?= 0
 KUBECONFIG_COLIMA ?= $(HOME)/.colima/default/kubeconfig
 RESTORE_BACKUP_DIR ?= backups/hybrid-rp-och/assembled
-RP_SKIP_SOCIAL_SERVICE ?= 1
+RP_SKIP_MESSAGING_LEGACY_PEER ?= 1
 RP_PAUSE_FOR_HOSTS ?= 1
 COLD_BOOTSTRAP_CONFIRM ?=
 COLD_BOOTSTRAP_DEFAULT_RESTORE ?= backups/hybrid-rp-och/materialized-rp-runtime
@@ -103,7 +103,7 @@ RP_ENABLE_OLLAMA ?= 0
 RP_ENABLE_ANALYTICS_AI ?= 0
 RP_ENABLE_HEAVY_OBS ?= 0
 RP_SKIP_BOOKING_DB ?= 1
-RP_SKIP_BOOKING_SERVICE ?= 1
+RP_SKIP_RESERVATION_MESH ?= 1
 # Default 1: append record-platform.test → MetalLB IP via sudo when needed (set 0 for hints only).
 HOSTS_AUTO ?= 1
 EXTERNAL_IP ?=
@@ -1418,7 +1418,7 @@ ensure-edge-hosts: ## Idempotent hosts line for RP edge hostname record-platform
 preflight-gate: ## Run ensure-ready-for-preflight gate
 	$(SCRIPTS)/ensure-ready-for-preflight.sh
 
-rp-verify-compose-contract: ## Fail if docker-compose.yml includes Kafka/apps/OCH ports (external infra only)
+rp-verify-compose-contract: ## Fail if docker-compose.yml includes Kafka/apps/RP ports (external infra only)
 	@bash -n $(SCRIPTS)/rp-verify-compose-contract.sh
 	@chmod +x $(SCRIPTS)/rp-verify-compose-contract.sh
 	@REPO_ROOT="$(REPO_ROOT)" bash $(SCRIPTS)/rp-verify-compose-contract.sh
@@ -1506,7 +1506,7 @@ rp-verify-toolchain-contract: ## Node >=22.13 <23 + pnpm 11.1.3 + lockfile contr
 	@chmod +x $(SCRIPTS)/rp-verify-toolchain-contract.sh $(SCRIPTS)/lib/rp-ensure-node-pnpm.sh
 	@env RP_VERIFY_TOOLCHAIN_SKIP_IMAGE_CONTRACT=1 bash $(SCRIPTS)/rp-verify-toolchain-contract.sh
 
-rp-audit-porting-docs: ## OCH/booking strings in docs/porting (non-blocking unless RP_STRICT_DOC_PORTING_AUDIT=1)
+rp-audit-porting-docs: ## RP/booking strings in docs/porting (non-blocking unless RP_STRICT_DOC_PORTING_AUDIT=1)
 	@chmod +x $(SCRIPTS)/rp-audit-porting-docs.sh
 	@bash $(SCRIPTS)/rp-audit-porting-docs.sh
 
@@ -1561,7 +1561,7 @@ rp-audit-grpc-cert-sans: ## mTLS leaf SANs match certPolicy (+ optional cluster 
 rp-audit-grpc-health-source: ## gRPC health service names appear in workload logs
 	bash $(SCRIPTS)/audit-rp-grpc-health-source.sh
 
-rp-audit-caddyfile: ## Caddyfile edge routing contract (RP vhost, paths, no OCH leakage)
+rp-audit-caddyfile: ## Caddyfile edge routing contract (RP vhost, paths, no RP leakage)
 	@chmod +x $(SCRIPTS)/audit-rp-caddyfile.sh
 	@bash $(SCRIPTS)/audit-rp-caddyfile.sh
 
@@ -1921,7 +1921,7 @@ shellcheck-preflight: ## ShellCheck scripts/run-preflight-scale-and-all-suites.s
 	shellcheck $(SCRIPTS)/run-preflight-scale-and-all-suites.sh
 
 # ROLE: DEV — after docker compose up: assert Postgres 5433–5443 + Redis 6379 are published (see docker-compose.yml)
-verify-docker-ports: ## Require mapped host ports for OCH Postgres + Redis (docker ps)
+verify-docker-ports: ## Require mapped host ports for RP Postgres + Redis (docker ps)
 	bash $(SCRIPTS)/ci/verify-docker-ports.sh
 
 # ROLE: LIFECYCLE — register → DELETE /account → poll auth.auth_outbox drain (+ optional processed_events). Needs auth HTTP + psql.
@@ -1929,7 +1929,7 @@ verify-deletion-flow: ## VERIFY_AUTH_URL, POSTGRES_URL_AUTH (or 5437 auth defaul
 	bash $(SCRIPTS)/verify-deletion-flow.sh
 
 # ROLE: DEV — recreate 8 Postgres containers so compose `command:` (e.g. max_connections) applies; keeps volumes
-recycle-postgres-infra: ## Safe stop/rm/up for OCH Postgres + optional psql max_connections check
+recycle-postgres-infra: ## Safe stop/rm/up for RP Postgres + optional psql max_connections check
 	bash $(SCRIPTS)/recycle-rp-postgres-compose.sh
 
 # ROLE: PERF / SRE — MetalLB edge H2/H3 strict + gRPC roll-up (needs live cluster + curl --http3-only)
@@ -1939,7 +1939,7 @@ full-edge-transport-validation: ## Write bench_logs/transport-lab/transport-vali
 transport-lab: ## transport-lab/ + final-transport-artifact.json; optional QUIC: TRANSPORT_LAB_QUIC=1 (see scripts/transport/run-transport-lab.sh)
 	bash $(SCRIPTS)/transport/run-transport-lab.sh
 
-# ROLE: CI / SRE — single red/green OCH transport certification (strict-quic + H2 collapse gate)
+# ROLE: CI / SRE — single red/green RP transport certification (strict-quic + H2 collapse gate)
 certify: ## Full certification: extract anomalies → unit → strict e2e → transport-lab → declare-readiness
 	bash $(SCRIPTS)/ci/run-full-certification.sh
 
@@ -2097,7 +2097,7 @@ ci-full: ## CI-safe full perf + regression guard
 images build-images: ## Build Record Platform :dev images and load into Colima/k3s (./scripts/build-record-platform-images-k3s.sh)
 	bash $(SCRIPTS)/build-record-platform-images-k3s.sh
 
-images-all: ## Build all :dev images (default service list), load Colima, rollout each deploy (OCH transport-watchdog → api-gateway)
+images-all: ## Build all :dev images (default service list), load Colima, rollout each deploy (RP transport-watchdog → api-gateway)
 	bash -n $(SCRIPTS)/rebuild-all-record-platform-images-k3s.sh
 	bash $(SCRIPTS)/rebuild-all-record-platform-images-k3s.sh
 
@@ -2148,7 +2148,7 @@ ensure-node22:
 	@bash $(SCRIPTS)/rp-verify-toolchain-contract.sh
 ensure-node20: ensure-node22 ## Deprecated alias — RP toolchain is Node 22 + pnpm 11.1.3
 
-# Ordered lab body (OCH parity): cluster-stability → QUIC packet capture prove → preflight-and-suites (Kafka alignment 6a2c9 inside).
+# Ordered lab body (RP parity): cluster-stability → QUIC packet capture prove → preflight-and-suites (Kafka alignment 6a2c9 inside).
 _rp_preflight_strict_body = \
 	cd "$(REPO_ROOT)" && \
 	  export HOUSING_NS="$(HOUSING_NS)" METALLB_ENABLED=1 METALLB_USE_K3D=0 REQUIRE_COLIMA=1 K6_USE_METALLB=1 && \
@@ -2196,8 +2196,8 @@ preflight-lab-coverage: ensure-node22 ## Optional post-lab coverage matrix (rout
 	  $(MAKE) fetch-gateway-route-hits && \
 	  SKIP_MATRIX_VITEST=0 bash "$(SCRIPTS)/coverage/run-matrix-vitest-coverage.sh" && \
 	  node "$(SCRIPTS)/coverage/verify-api-docs.mjs" && \
-	  node "$(SCRIPTS)/coverage/och-coverage-model-v1.mjs" && \
-	  SERVICE_COVERAGE_MATRIX_ENFORCE=1 node "$(SCRIPTS)/coverage/och-service-coverage-matrix.mjs" && \
+	  node "$(SCRIPTS)/coverage/rp-coverage-model-v1.mjs" && \
+	  SERVICE_COVERAGE_MATRIX_ENFORCE=1 node "$(SCRIPTS)/coverage/rp-service-coverage-matrix.mjs" && \
 	  node "$(SCRIPTS)/coverage/generate-preflight-lab-report.mjs"
 
 fetch-gateway-route-hits: ## Copy api-gateway pod route-hit JSONL → bench_logs/routes-hit.jsonl (coverage matrix)
@@ -2208,7 +2208,7 @@ coverage-phase-vi2-verify: ensure-node22 ## Alias for pnpm run coverage:phase-vi
 	cd "$(REPO_ROOT)" && pnpm run coverage:phase-vi2-verify
 
 .PHONY: observe
-observe: ensure-node22 ## Phase-vi2 matrix + analytics QA + sample k6 (best-effort; OCH parity)
+observe: ensure-node22 ## Phase-vi2 matrix + analytics QA + sample k6 (best-effort; RP parity)
 	@echo "=== Running Coverage + Kafka Skew (phase vi2) ==="
 	cd "$(REPO_ROOT)" && pnpm run coverage:phase-vi2-verify || true
 	@echo "=== Running Analytics QA ==="

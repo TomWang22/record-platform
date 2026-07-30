@@ -257,7 +257,7 @@ build_images() {
     "records-service"
     "listings-service"
     "analytics-service"
-    "social-service"
+    "messaging-service"
     "shopping-service"
     "python-ai-service"
   )
@@ -335,7 +335,7 @@ wait_for_deployments() {
     "records-service"
     "listings-service"
     "analytics-service"
-    "social-service"
+    "messaging-service"
     "shopping-service"
     "python-ai-service"
     "haproxy"

@@ -2,13 +2,13 @@
  * Kafka producer for community forum events (HTTP create post / comment paths).
  */
 import { randomUUID } from "node:crypto";
-import { kafka, ochKafkaTopicIsolationSuffix } from "@common/utils";
+import { kafka, rpKafkaTopicIsolationSuffix } from "@common/utils";
 import { buildKafkaMessageHeaders, withKafkaProduceSpan } from "@common/utils/otel";
 
 const ENV_PREFIX = process.env.ENV_PREFIX || "dev";
 export const COMMUNITY_EVENTS_TOPIC =
   process.env.COMMUNITY_EVENTS_TOPIC ||
-  `${ENV_PREFIX}.community.events.v1${ochKafkaTopicIsolationSuffix()}`;
+  `${ENV_PREFIX}.community.events.v1${rpKafkaTopicIsolationSuffix()}`;
 const SERVICE_NAME = "listings-service";
 
 const producer = kafka.producer();

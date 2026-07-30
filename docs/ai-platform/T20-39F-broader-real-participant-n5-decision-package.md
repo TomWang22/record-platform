@@ -14,7 +14,7 @@ Recommended next: D — broader readiness decision design only
 Rejected: E — hybrid/vector production default
 ```
 
-T20.39 satisfied the N=5 participant gate, live matrix, rollback, OCH, telemetry, and Playwright gates. The correct decision is to keep opt-in preview UI/API enabled with keyword default and zero percentage rollout.
+T20.39 satisfied the N=5 participant gate, live matrix, rollback, RP, telemetry, and Playwright gates. The correct decision is to keep opt-in preview UI/API enabled with keyword default and zero percentage rollout.
 
 ---
 
@@ -30,7 +30,7 @@ T20.39 satisfied the N=5 participant gate, live matrix, rollback, OCH, telemetry
 | Avg / worst quality | **4.0 / 4.0** |
 | Gate counts | `preview_opt_in=3600`, `allowlist=720` |
 | Playwright C-suite | **7/7 PASS** |
-| OCH | **PASS** |
+| RP | **PASS** |
 | Telemetry WARNs | **0** |
 | Rollback drill | **PASS** |
 | Post-revoke | **all 5 keyword_default PASS** |
@@ -41,7 +41,7 @@ T20.39 satisfied the N=5 participant gate, live matrix, rollback, OCH, telemetry
 
 | Option | Decision | Rationale |
 |--------|----------|-----------|
-| A — rollback preview UI/API | **Not selected** | Live, rollback, OCH, telemetry, and Playwright gates passed. |
+| A — rollback preview UI/API | **Not selected** | Live, rollback, RP, telemetry, and Playwright gates passed. |
 | B — keep API runtime, hide UI | **Not selected** | UI smoke and C-suite passed; no UI privacy or leakage issue found. |
 | C — KEEP broader real-participant opt-in preview UI/API, PERCENT=0 | **SELECTED** | Best fit for passed evidence while preserving explicit opt-in and zero rollout. |
 | D — recommend next readiness step | **Recommended** | Next work should be design-only readiness decision, not production default. |

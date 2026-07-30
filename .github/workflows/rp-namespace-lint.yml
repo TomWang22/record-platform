@@ -25,22 +25,22 @@ jobs:
       - name: Preflight static contract check
         run: python3 tools/bundle-audit/preflight_static_contract_check.py --repo-root "$GITHUB_WORKSPACE"
 
-      # Set Actions variable `OCH_PREFLIGHT_SCRIPT` to an absolute path on the runner (e.g. checked-out staging)
-      # to compare OCH vs RP preflight; otherwise this step is a no-op.
+      # Set Actions variable `RP_PREFLIGHT_SCRIPT` to an absolute path on the runner (e.g. checked-out staging)
+      # to compare RP vs RP preflight; otherwise this step is a no-op.
       - name: Preflight behavioral diff (optional)
         env:
-          OCH_PREFLIGHT_SCRIPT: ${{ vars.OCH_PREFLIGHT_SCRIPT }}
+          RP_PREFLIGHT_SCRIPT: ${{ vars.RP_PREFLIGHT_SCRIPT }}
         run: |
           set -euo pipefail
-          if [[ -z "${OCH_PREFLIGHT_SCRIPT:-}" ]]; then
-            echo "Skip preflight behavioral diff: unset Actions variable OCH_PREFLIGHT_SCRIPT"
+          if [[ -z "${RP_PREFLIGHT_SCRIPT:-}" ]]; then
+            echo "Skip preflight behavioral diff: unset Actions variable RP_PREFLIGHT_SCRIPT"
             exit 0
           fi
-          if [[ ! -f "${OCH_PREFLIGHT_SCRIPT}" ]]; then
-            echo "OCH_PREFLIGHT_SCRIPT is not a readable file: ${OCH_PREFLIGHT_SCRIPT}" >&2
+          if [[ ! -f "${RP_PREFLIGHT_SCRIPT}" ]]; then
+            echo "RP_PREFLIGHT_SCRIPT is not a readable file: ${RP_PREFLIGHT_SCRIPT}" >&2
             exit 1
           fi
           python3 tools/bundle-audit/preflight_behavioral_diff.py \
-            --och-script "${OCH_PREFLIGHT_SCRIPT}" \
+            --legacy-script "${RP_PREFLIGHT_SCRIPT}" \
             --rp-script "${GITHUB_WORKSPACE}/scripts/run-preflight-scale-and-all-suites.sh" \
             --stem ci

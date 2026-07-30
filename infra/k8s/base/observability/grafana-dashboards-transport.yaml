@@ -7,7 +7,7 @@ metadata:
   labels:
     grafana_dashboard: "1"
 data:
-  och-transport-edge.json: |
+  rp-transport-edge.json: |
     {
       "annotations": { "list": [] },
       "editable": true,
@@ -63,7 +63,7 @@ data:
           "gridPos": { "h": 6, "w": 6, "x": 0, "y": 8 },
           "id": 101,
           "options": { "colorMode": "value", "graphMode": "none", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "max(och_gateway_protocol_smoke_success{proto=\"h3\"}) or vector(0)", "refId": "A" }],
+          "targets": [{ "expr": "max(rp_gateway_protocol_smoke_success{proto=\"h3\"}) or vector(0)", "refId": "A" }],
           "title": "H3 — forced smoke success (Pushgateway)",
           "type": "stat"
         },
@@ -73,7 +73,7 @@ data:
           "gridPos": { "h": 6, "w": 6, "x": 6, "y": 8 },
           "id": 102,
           "options": { "colorMode": "value", "graphMode": "none", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "max(och_quic_forensic_valid{version=\"v7\"}) or vector(0)", "refId": "A" }],
+          "targets": [{ "expr": "max(rp_quic_forensic_valid{version=\"v7\"}) or vector(0)", "refId": "A" }],
           "title": "H3 — QUIC forensic v7 valid",
           "type": "stat"
         },
@@ -83,7 +83,7 @@ data:
           "gridPos": { "h": 6, "w": 6, "x": 12, "y": 8 },
           "id": 103,
           "options": { "colorMode": "value", "graphMode": "none", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "max(och_quic_1rtt_present{version=\"v7\"}) or vector(0)", "refId": "A" }],
+          "targets": [{ "expr": "max(rp_quic_1rtt_present{version=\"v7\"}) or vector(0)", "refId": "A" }],
           "title": "H3 — QUIC 1-RTT present (v7)",
           "type": "stat"
         },
@@ -93,7 +93,7 @@ data:
           "gridPos": { "h": 6, "w": 6, "x": 18, "y": 8 },
           "id": 104,
           "options": { "colorMode": "value", "graphMode": "area", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "max(och_quic_frame_count{version=\"v7\"}) or vector(0)", "refId": "A" }],
+          "targets": [{ "expr": "max(rp_quic_frame_count{version=\"v7\"}) or vector(0)", "refId": "A" }],
           "title": "H3 — QUIC frame count (v7 capture)",
           "type": "stat"
         },
@@ -143,7 +143,7 @@ data:
           "gridPos": { "h": 6, "w": 8, "x": 0, "y": 22 },
           "id": 111,
           "options": { "colorMode": "value", "graphMode": "none", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "max(och_gateway_protocol_smoke_success{proto=\"h2\"}) or vector(0)", "refId": "A" }],
+          "targets": [{ "expr": "max(rp_gateway_protocol_smoke_success{proto=\"h2\"}) or vector(0)", "refId": "A" }],
           "title": "H2 — forced smoke success",
           "type": "stat"
         },
@@ -209,7 +209,7 @@ data:
           "gridPos": { "h": 6, "w": 8, "x": 8, "y": 29 },
           "id": 122,
           "options": { "colorMode": "value", "graphMode": "none", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "max(och_gateway_protocol_smoke_success{proto=\"h1\"}) or vector(0)", "refId": "A" }],
+          "targets": [{ "expr": "max(rp_gateway_protocol_smoke_success{proto=\"h1\"}) or vector(0)", "refId": "A" }],
           "title": "H1 — forced smoke success",
           "type": "stat"
         },
@@ -263,7 +263,7 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
           "id": 132,
           "options": {
-            "content": "**Near-zero target.** In-cluster callers (e.g. kube probes, mesh) may lack `X-OCH-Edge-Proto`; those show as `proto=unknown` on the gateway counter.\n\n**If this spikes:** confirm Caddy sets `X-OCH-Edge-Proto` from `{http.request.proto}` and `header_up X-OCH-Edge-Proto` on the api-gateway `reverse_proxy`. Run `make obs-smoke-gateway-protocols` (forced h1/h2/h3) and compare to browser traffic.\n\nRecording rule: `och:gateway_http_unknown_proto_ratio_5m`.",
+            "content": "**Near-zero target.** In-cluster callers (e.g. kube probes, mesh) may lack `X-RP-Edge-Proto`; those show as `proto=unknown` on the gateway counter.\n\n**If this spikes:** confirm Caddy sets `X-RP-Edge-Proto` from `{http.request.proto}` and `header_up X-RP-Edge-Proto` on the api-gateway `reverse_proxy`. Run `make obs-smoke-gateway-protocols` (forced h1/h2/h3) and compare to browser traffic.\n\nRecording rule: `rp:gateway_http_unknown_proto_ratio_5m`.",
             "mode": "markdown"
           },
           "title": "Unknown — what to check",
@@ -387,7 +387,7 @@ data:
       "time": { "from": "now-6h", "to": "now" },
       "timepicker": {},
       "timezone": "browser",
-      "title": "OCH — transport / edge protocol (H3 prefer → H2 default → H1 legacy)",
-      "uid": "och-transport-edge",
+      "title": "RP — transport / edge protocol (H3 prefer → H2 default → H1 legacy)",
+      "uid": "rp-transport-edge",
       "version": 2
     }

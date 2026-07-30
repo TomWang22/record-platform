@@ -28,7 +28,7 @@ is_allowlisted_path() {
     */docs/legacy/*|*/docs/bundles/*|*/istio-*/*|*/node_modules/*|*/.git/*|*/coverage/*|*/.venv*/*)
       return 0
       ;;
-    */docs/porting/RP_NETWORK_CONTRACT.md|*/docs/porting/RP_*_CONTRACT.md|*/docs/porting/RP_COLIMA_PROFILE_SWITCH.md|*/docs/porting/RP_COLD_BOOTSTRAP.md|*/docs/porting/RP_OCH_PREFLIGHT_LAB_TOOLKIT.md|*/docs/porting/RP_PREFLIGHT_LAB.md)
+    */docs/porting/RP_NETWORK_CONTRACT.md|*/docs/porting/RP_*_CONTRACT.md|*/docs/porting/RP_COLIMA_PROFILE_SWITCH.md|*/docs/porting/RP_COLD_BOOTSTRAP.md|*/docs/porting/RP_RP_PREFLIGHT_LAB_TOOLKIT.md|*/docs/porting/RP_PREFLIGHT_LAB.md)
       return 0
       ;;
     */backups/hybrid-rp-och/*)
@@ -55,11 +55,11 @@ line_is_allowlisted_content() {
   if [[ "$line" == *"DB_RESTORE_ONLY"* ]]; then
     return 0
   fi
-  # Documented hosts cleanup (remove OCH line before adding record-platform.test)
-  if [[ "$line" == *"sed"* ]] && [[ "$line" == *"off-campus-housing.test"* ]]; then
+  # Documented hosts cleanup (remove RP line before adding record-platform.test)
+  if [[ "$line" == *"sed"* ]] && [[ "$line" == *"record-platform.test"* ]]; then
     return 0
   fi
-  if [[ "$line" == *"remove"* ]] && [[ "$line" == *"off-campus-housing.test"* ]]; then
+  if [[ "$line" == *"remove"* ]] && [[ "$line" == *"record-platform.test"* ]]; then
     return 0
   fi
   if [[ "$line" == *"svc.cluster.local"* ]] || [[ "$line" == *"cluster.local"* ]]; then
@@ -206,8 +206,8 @@ scan_file() {
         record_violation "$rel" "$n" "host.docker.internal" "$(echo "$line" | sed 's/^[[:space:]]*//' | cut -c1-120)"
       fi
     fi
-    if [[ "$line" == *"off-campus-housing.test"* ]] || [[ "$line" == *"off-campus-housing.local"* ]]; then
-      record_violation "$rel" "$n" "och-hostname" "$(echo "$line" | sed 's/^[[:space:]]*//' | cut -c1-120)"
+    if [[ "$line" == *"record-platform.test"* ]] || [[ "$line" == *"record-platform.local"* ]]; then
+      record_violation "$rel" "$n" "rp-hostname" "$(echo "$line" | sed 's/^[[:space:]]*//' | cut -c1-120)"
     fi
     if [[ "$line" =~ (^|[^a-zA-Z0-9_.-])record\.local([^a-zA-Z0-9_.-]|$) ]]; then
       if [[ "$line" != *"svc.cluster.local"* ]]; then
@@ -303,7 +303,7 @@ audit_kube_api_tunnel_in_bootstrap_scripts() {
 say "RP active runtime network audit (host=${RP_PUBLIC_HOST}, scope=${SCOPE})"
 echo "  scope: bootstrap/deploy scripts + infra/k8s + Makefile + compose + Caddyfile"
 echo "  excluded: docs/ porting bundles toolkit-reference bench_logs backups"
-echo "  doc OCH strings: make rp-audit-porting-docs (non-blocking)"
+echo "  doc RP strings: make rp-audit-porting-docs (non-blocking)"
 
 K8S_SCAN_DIRS=(
   "$REPO_ROOT/infra/k8s/base/config"
@@ -332,7 +332,7 @@ ACTIVE_BOOTSTRAP_SCRIPTS=(
   scripts/verify-app-runtime.sh
   scripts/verify-deployment-integrity.sh
   scripts/wait-for-housing-rollouts.sh
-  scripts/wait-for-housing-service-endpoints.sh
+  scripts/wait-for-platform-service-endpoints.sh
   scripts/rp-clean-old-namespaces.sh
   scripts/rp-build-required-images.sh
   scripts/ensure-required-images.sh
@@ -386,5 +386,5 @@ if [[ "$VIOLATIONS" -gt 0 ]]; then
 fi
 
 ok "active runtime network audit OK"
-echo "ℹ️  docs/reference OCH strings ignored by runtime audit; run: make rp-audit-porting-docs"
+echo "ℹ️  docs/reference RP strings ignored by runtime audit; run: make rp-audit-porting-docs"
 exit 0

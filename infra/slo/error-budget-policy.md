@@ -61,8 +61,8 @@ Default: **current on-call engineer** for the service / platform (as defined in 
 
 ## Recording rule names (quick reference)
 
-- **`och:service_error_budget_remaining_ratio`** — absolute headroom: `0.005 − (1h error rate)` in the same units as the monthly budget (0.005 = 100% of that budget). **Can be negative** when you are over budget; the name is historical, not a 0–1 ratio.
-- **`och:service_budget_remaining_ratio_1h`** — normalized **non-negative** fraction of budget left in `[0, 1]`, derived from the same 1h error rate.
+- **`rp:service_error_budget_remaining_ratio`** — absolute headroom: `0.005 − (1h error rate)` in the same units as the monthly budget (0.005 = 100% of that budget). **Can be negative** when you are over budget; the name is historical, not a 0–1 ratio.
+- **`rp:service_budget_remaining_ratio_1h`** — normalized **non-negative** fraction of budget left in `[0, 1]`, derived from the same 1h error rate.
 
 ## Prometheus retention
 

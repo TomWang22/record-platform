@@ -7,7 +7,7 @@ Single place for “what do I run?” and “which port?” so **README.md**, **
 | Item | Value |
 |------|--------|
 | HTTPS hostname | **`record.test`** (put **`METALLB_IP record.test`** in `/etc/hosts`; avoid `*.local` → mDNS on macOS) |
-| Kubernetes namespace (workloads, Kafka clients) | **`record-platform`** — Makefile and scripts use **`HOUSING_NS`** with the same default (not `off-campus-housing-tracker`) |
+| Kubernetes namespace (workloads, Kafka clients) | **`record-platform`** — Makefile and scripts use **`HOUSING_NS`** with the same default (not `record-platform`) |
 | Edge URL | **`https://record.test`** (port **443**, TCP + QUIC/UDP) |
 | TLS verify | `curl --cacert certs/dev-root.pem …` or trust dev-root CA in keychain (macOS k6) |
 | Helpers | `./scripts/ensure-edge-hosts.sh`, `scripts/lib/edge-test-url.sh` |
@@ -56,10 +56,10 @@ Artifacts live under **`/Users/tom/`** (adjust paths for your machine). Verify S
 
 | Bundle | Path (example) | SHA-256 | Copied into repo |
 |--------|----------------|---------|------------------|
-| Preflight / Kafka KRaft / certs / Caddy | `record-platform-och-preflight-kafka-kraft-certs-caddy-reference-20260409.tar.gz` | `017dc4875ca3d0904be4e813bf2298e31b4ad2bc244dc58e39e2efc9865d4d28` | `docs/bundles/preflight-kafka-caddy-20260409/*.md` |
-| Vitest / Playwright / event-layer / analytics | `record-platform-och-vitest-playwright-event-layer-analytics-reference-20260409.tar.gz` | `362e531762ea6d44c723d7f01bad9a688a3c2096bd9999a333f0f2bfbc50a6a4` | See `docs/RECORD_PLATFORM_REFERENCE_BUNDLE.md` |
-| Full scripts/infra (OCH) | `record-platform-och-full-scripts-infra-reference-20260410-1245.tar.gz` | `e321f349d24cf61695c086d28ccd0812879ebbd1864a9902f56ce65fb93f1684` | Merged into tree as applicable (`docs/OCH_FULL_REFERENCE_BUNDLE_MERGE.md`) |
-| Transport-watchdog, preflight, Kafka mesh, full scripts ref | `record-platform-och-transport-watchdog-preflight-kafka-mesh-full-scripts-reference-20260410.tar.gz` | `955d5eec9a6219973e124f33311a0f59c998ed9a68f9d7366982d567502ff5ae` | See `docs/SELF_BUILT_SERVICE_MESH.md`, `docs/runbooks/kafka-kraft-stale-dns-rca.md` |
+| Preflight / Kafka KRaft / certs / Caddy | `record-platform-rp-preflight-kafka-kraft-certs-caddy-reference-20260409.tar.gz` | `017dc4875ca3d0904be4e813bf2298e31b4ad2bc244dc58e39e2efc9865d4d28` | `docs/bundles/preflight-kafka-caddy-20260409/*.md` |
+| Vitest / Playwright / event-layer / analytics | `record-platform-rp-vitest-playwright-event-layer-analytics-reference-20260409.tar.gz` | `362e531762ea6d44c723d7f01bad9a688a3c2096bd9999a333f0f2bfbc50a6a4` | See `docs/RECORD_PLATFORM_REFERENCE_BUNDLE.md` |
+| Full scripts/infra (RP) | `record-platform-rp-full-scripts-infra-reference-20260410-1245.tar.gz` | `e321f349d24cf61695c086d28ccd0812879ebbd1864a9902f56ce65fb93f1684` | Merged into tree as applicable (`docs/RP_FULL_REFERENCE_BUNDLE_MERGE.md`) |
+| Transport-watchdog, preflight, Kafka mesh, full scripts ref | `record-platform-rp-transport-watchdog-preflight-kafka-mesh-full-scripts-reference-20260410.tar.gz` | `955d5eec9a6219973e124f33311a0f59c998ed9a68f9d7366982d567502ff5ae` | See `docs/SELF_BUILT_SERVICE_MESH.md`, `docs/runbooks/kafka-kraft-stale-dns-rca.md` |
 | Final combined (Vitest, Kafka event-layer, chaos, golden, full tree) | `record-platform-final-vitest-kafka-event-layer-chaos-golden-20260410.tar.gz` | `2ae24cbc99afae4b2d3036f5282048127ea5e2ee448113bf3b6cc846e0591765` | `README-BUNDLE.md`, `GOLDEN_SNAPSHOT_AND_CHAOS.md` in bundle; namespace **record-platform** |
 | Kafka ops, certs alignment CronJob, preflight wiring | `record-platform-kafka-ops-certs-alignment-cron-preflight-20260410.tar.gz` | `a447077cb019ec7e1c2f51a49ae589ad11b376ed96cf1f7f586418b3d1eac150` | In-tree: `docs/bundles/kafka-ops-certs-alignment-20260410/`, `infra/ops/` (kustomize), `infra/k8s/kafka-ops/kafka-alignment-cronjob.yaml`, `infra/docker/kafka-alignment-cron/`, `monitoring/prometheus-rules/kafka-kraft-dns.yaml` |
 | Makefile, golden snapshot, Kafka chaos (full scripts tree in tarball) | `record-platform-makefile-golden-snapshot-kafka-chaos-20260410.tar.gz` | `1154eb5fbf17f5f590e9c33118582b192fa268f3d1eb31b62836330579d8d0eb` | In-repo: `docs/bundles/makefile-golden-chaos-kafka-20260410/README-BUNDLE.md`, `infra/k8s/base/observability/prometheus-rules-kafka-health.yaml` (`make sync-prometheus-kafka-rules`), image scripts under `scripts/rebuild-all-record-platform-images-k3s.sh` |
@@ -73,8 +73,8 @@ Artifacts live under **`/Users/tom/`** (adjust paths for your machine). Verify S
 **Extract preflight/Kafka/Caddy bundle:**
 
 ```bash
-tar xzf /path/to/record-platform-och-preflight-kafka-kraft-certs-caddy-reference-20260409.tar.gz
-cd record-platform-och-preflight-kafka-kraft-certs-caddy-reference-20260409
+tar xzf /path/to/record-platform-rp-preflight-kafka-kraft-certs-caddy-reference-20260409.tar.gz
+cd record-platform-rp-preflight-kafka-kraft-certs-caddy-reference-20260409
 less README-BUNDLE.md
 ```
 
@@ -93,7 +93,7 @@ cd record-platform-makefile-golden-chaos-kafka-20260410
 
 - `README.md` — narrative, recruiter summary, recovery sections  
 - `docs/RECORD_PLATFORM_REFERENCE_BUNDLE.md` — Playwright/Vitest bundle  
-- `docs/OCH_FULL_REFERENCE_BUNDLE_MERGE.md` — full infra tarball  
+- `docs/RP_FULL_REFERENCE_BUNDLE_MERGE.md` — full infra tarball  
 - `docs/OUTBOX_BY_DATABASE.md` — Kafka + outbox layout  
 - `docs/GDPR_ACCOUNT_DELETION_AND_ANONYMIZATION.md` — lifecycle topic + anonymization playbook  
 - `docs/SERVICE_SLO_SLA.md` — Prometheus SLO examples (`monitoring/prometheus-rules/service-slos.yaml`)  

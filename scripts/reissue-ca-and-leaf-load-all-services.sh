@@ -2,9 +2,9 @@
 # Re-issue CA + leaf certs and load into all services.
 #
 # WHEN TO RUN: Test suite fails with "curl exit 60" or "CA and Caddy don't match".
-# Same CA signs the leaf; dev-root-ca (tests) and off-campus-housing-local-tls (Caddy) stay in sync.
+# Same CA signs the leaf; dev-root-ca (tests) and edge-local-tls (Caddy) stay in sync.
 #
-# Updates: dev-root-ca, LEAF_TLS_SECRET (default off-campus-housing-local-tls), service-tls (record-platform + ingress-nginx),
+# Updates: dev-root-ca, LEAF_TLS_SECRET (default edge-local-tls), service-tls (record-platform + ingress-nginx),
 # edge-service-tls (alias of service-tls for Deployments that mount edge-service-tls — auth, listings, …; keeps mTLS trust aligned with api-gateway),
 # envoy-test (via sync-envoy-tls-secrets), certs/, restarts Caddy and optionally all services.
 #
@@ -39,7 +39,7 @@ cd "$REPO_ROOT"
 
 NS_ING="ingress-nginx"
 NS_APP="record-platform"
-LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-off-campus-housing-local-tls}"
+LEAF_TLS_SECRET="${LEAF_TLS_SECRET:-edge-local-tls}"
 HOST="${HOST:-record-platform.test}"
 RESTART_SERVICES="${RESTART_SERVICES:-1}"
 
@@ -191,7 +191,7 @@ _reissue_main() {
   SANS="DNS:${HOST},DNS:*.${HOST},DNS:localhost,DNS:${CLUSTERIP_FQDN}"
   SANS="${SANS},DNS:*.ingress-nginx.svc.cluster.local,DNS:*.record-platform.svc.cluster.local"
   SANS="${SANS},DNS:auth-service.record-platform.svc.cluster.local,DNS:listings-service.record-platform.svc.cluster.local"
-  SANS="${SANS},DNS:booking-service.record-platform.svc.cluster.local,DNS:messaging-service.record-platform.svc.cluster.local"
+  SANS="${SANS},DNS:reservation-mesh.record-platform.svc.cluster.local,DNS:messaging-service.record-platform.svc.cluster.local"
   SANS="${SANS},DNS:trust-service.record-platform.svc.cluster.local,DNS:analytics-service.record-platform.svc.cluster.local"
   SANS="${SANS},DNS:api-gateway.record-platform.svc.cluster.local,IP:127.0.0.1,IP:::1"
 

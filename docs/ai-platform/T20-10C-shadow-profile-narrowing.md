@@ -55,7 +55,7 @@ node scripts/coverage/enforce-service-coverage.mjs
 bash scripts/rp-ai-shadow-real-query-timing.sh
 bash scripts/rp-ai-shadow-source-diagnostic.sh
 bash scripts/audit-rp-ai-rag-contract.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 ## Acceptance targets (vs post-T20.10D baseline)

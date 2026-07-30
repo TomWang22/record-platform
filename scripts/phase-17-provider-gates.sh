@@ -38,7 +38,7 @@ run_gate redis bash scripts/audit-rp-redis-lua-runtime-contract.sh || FAIL=1
 run_gate outbox bash scripts/audit-rp-event-outbox-contract.sh || FAIL=1
 run_gate runtime_comb bash scripts/rp-runtime-domain-comb.sh || FAIL=1
 run_gate db_comb bash scripts/rp-db-domain-comb.sh || FAIL=1
-run_gate och bash scripts/rp-och-decontaminate-scan.sh || FAIL=1
+run_gate och bash scripts/rp-rp-decontaminate-scan.sh || FAIL=1
 run_gate cluster_doctor env CLUSTER_DOCTOR_STRICT=1 make cluster-doctor || FAIL=1
 
 echo "" >> "$LOG"
@@ -63,7 +63,7 @@ fail = False
 if not os.path.isfile(doc):
     print("❌ missing", doc); sys.exit(1)
 text = open(doc).read()
-for term in ("record.local", "off-campus", "landlord", "tenant", "housing", " OCH"):
+for term in ("record.local", "off-campus", "landlord", "tenant", "housing", " RP"):
     if term.strip() in text:
         print(f"❌ forbidden term: {term}"); fail = True
 for needle in ("rp-ai-apply-ollama-cluster-env", "rp-ai-rag-reindex", "AI_MODEL_PROVIDER", "ollama.record-platform"):

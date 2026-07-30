@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Audit RP messaging/community port vs OCH reference expectations.
+# Audit RP messaging/community port vs RP reference expectations.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,12 +29,12 @@ for p in \
 done
 
 # --- stale social/booking on active paths ---
-if grep -Rql 'social-service' infra/k8s/base infra/k8s/overlays/dev scripts/cold-bootstrap.sh scripts/deploy-dev.sh 2>/dev/null \
+if grep -Rql 'messaging-service' infra/k8s/base infra/k8s/overlays/dev scripts/cold-bootstrap.sh scripts/deploy-dev.sh 2>/dev/null \
   | grep -v 'RP_SKIP_SOCIAL' | grep -v '#'; then
-  add_warn "social-service references still in active k8s/bootstrap paths (review grep hits)"
+  add_warn "messaging-service references still in active k8s/bootstrap paths (review grep hits)"
 fi
-if grep -Rql 'booking-service\|bookings-service' infra/k8s/base scripts/cold-bootstrap.sh 2>/dev/null; then
-  add_warn "booking-service references in infra/bootstrap (should be skipped)"
+if grep -Rql 'reservation-mesh\|bookings-service' infra/k8s/base scripts/cold-bootstrap.sh 2>/dev/null; then
+  add_warn "reservation-mesh references in infra/bootstrap (should be skipped)"
 fi
 
 # --- Prisma vs inspect contract ---
@@ -86,10 +86,10 @@ if kubectl get deploy messaging-service -n record-platform >/dev/null 2>&1; then
 else
   add_warn "cluster: messaging-service deployment not found (cluster may be down)"
 fi
-if kubectl get deploy social-service -n record-platform >/dev/null 2>&1; then
-  add_issue "cluster: social-service deployment still present"
+if kubectl get deploy messaging-service -n record-platform >/dev/null 2>&1; then
+  add_issue "cluster: messaging-service deployment still present"
 else
-  add_ok "cluster: no social-service deployment"
+  add_ok "cluster: no messaging-service deployment"
 fi
 
 status="pass"

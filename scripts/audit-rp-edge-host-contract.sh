@@ -31,7 +31,7 @@ CONTRACT_PATHS=(
   scripts/rp-auth-contract-comb.sh
   scripts/rp-runtime-domain-comb.sh
   scripts/rp-db-domain-comb.sh
-  scripts/rp-och-decontaminate-scan.sh
+  scripts/rp-rp-decontaminate-scan.sh
   scripts/rp-verify-kafka-cert-chain.sh
   scripts/verify-kafka-ready.sh
   scripts/audit-rp-ci-service-matrix.sh

@@ -56,7 +56,7 @@ done
 
 # Step 5: Check service status
 say "Step 5: Checking service pod status..."
-kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,social-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' \
+kubectl get pods -n record-platform -l 'app in (auth-service,records-service,listings-service,messaging-service,shopping-service,analytics-service,auction-monitor,python-ai-service)' \
   -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[0].ready,STATUS:.status.phase \
   --no-headers 2>/dev/null | head -10 || warn "Could not get pod status"
 

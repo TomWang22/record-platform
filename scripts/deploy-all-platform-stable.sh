@@ -99,7 +99,7 @@ main() {
   say "Batch 5: Additional services"
   kubectl apply -k infra/k8s/base/listings-service --validate=false 2>&1 | head -5 || true
   kubectl apply -k infra/k8s/base/shopping-service --validate=false 2>&1 | head -5 || true
-  kubectl apply -k infra/k8s/base/social-service --validate=false 2>&1 | head -5 || true
+  kubectl apply -k infra/k8s/base/messaging-service --validate=false 2>&1 | head -5 || true
   kubectl apply -k infra/k8s/base/analytics-service --validate=false 2>&1 | head -5 || true
   kubectl apply -k infra/k8s/base/python-ai-service --validate=false 2>&1 | head -5 || true
   kubectl apply -k infra/k8s/base/auction-monitor --validate=false 2>&1 | head -5 || true

@@ -14,7 +14,7 @@
 #   COLD_START_SKIP_NODE_CLEAN=1 — skip rm -rf node_modules
 #   COLD_START_REQUIRE_HTTP3=1 — require curl --http3 /api/healthz returns HTTP version 3
 #   COLD_START_ALLOW_NON_COLIMA=1 — skip colima stop; set REQUIRE_COLIMA=0 for make dev (k3d experiments)
-#   OCH_EDGE_HOSTNAME          — default record-platform.test
+#   RP_EDGE_HOSTNAME          — default record-platform.test
 #   HOUSING_NS                 — default record-platform
 set -euo pipefail
 
@@ -27,7 +27,7 @@ PRE="${BENCH}/dev-cold-start-pre.txt"
 POST="${BENCH}/dev-cold-start-post.txt"
 METRICS="${BENCH}/dev-cold-start-metrics.json"
 HOUSING_NS="${HOUSING_NS:-record-platform}"
-EDGE_HOST="${OCH_EDGE_HOSTNAME:-record-platform.test}"
+EDGE_HOST="${RP_EDGE_HOSTNAME:-record-platform.test}"
 CA_PEM="${REPO_ROOT}/certs/dev-root.pem"
 
 mkdir -p "$BENCH"
@@ -155,7 +155,7 @@ export_kube_colima() {
   if [[ -f "$_lib" ]]; then
     # shellcheck source=scripts/lib/colima-kubeconfig.sh
     source "$_lib"
-    och_export_colima_kubeconfig_prefer_reachable || {
+    rp_export_colima_kubeconfig_prefer_reachable || {
       local _k="${HOME}/.colima/default/kubernetes/kubeconfig"
       [[ -s "$_k" ]] || _k="${HOME}/.colima/default/kubeconfig"
       [[ -s "$_k" ]] && export KUBECONFIG="$_k"
@@ -368,7 +368,7 @@ make dev
 T_D1_1="$(now_s)"
 MAKE_DEV_1_SEC=$((T_D1_1 - T_D1_0))
 
-_TMP_POST="$(mktemp "${TMPDIR:-/tmp}/och-cold-post.XXXXXX.txt")"
+_TMP_POST="$(mktemp "${TMPDIR:-/tmp}/rp-cold-post.XXXXXX.txt")"
 snapshot_state "$_TMP_POST"
 {
   echo "cold-start POST log @ $(ts)"
@@ -377,7 +377,7 @@ snapshot_state "$_TMP_POST"
 rm -f "$_TMP_POST"
 
 # Avoid pipe+tee losing lines when the subshell exits on first kubectl failure (SIGPIPE / stdio buffer).
-_phase_d_out="$(mktemp "${TMPDIR:-/tmp}/och-phase-d-full.XXXXXX.log")"
+_phase_d_out="$(mktemp "${TMPDIR:-/tmp}/rp-phase-d-full.XXXXXX.log")"
 if ! phase_d_verify_full >"$_phase_d_out" 2>&1; then
   cat "$_phase_d_out" | tee -a "$POST"
   rm -f "$_phase_d_out"
@@ -401,7 +401,7 @@ MAKE_DEV_2_SEC=$((T_D2_1 - T_D2_0))
 say "make dev-verify (second time, must exit 0)"
 make dev-verify
 
-_phase_d_light="$(mktemp "${TMPDIR:-/tmp}/och-phase-d-light.XXXXXX.log")"
+_phase_d_light="$(mktemp "${TMPDIR:-/tmp}/rp-phase-d-light.XXXXXX.log")"
 if ! phase_d_verify_light >"$_phase_d_light" 2>&1; then
   cat "$_phase_d_light" | tee -a "$POST"
   rm -f "$_phase_d_light"
@@ -418,7 +418,7 @@ export COLD_START_RESET_CERTS="${COLD_START_RESET_CERTS:-0}"
 write_metrics_json
 ok "Wrote $METRICS"
 
-_TMP_FIN="$(mktemp "${TMPDIR:-/tmp}/och-cold-fin.XXXXXX.txt")"
+_TMP_FIN="$(mktemp "${TMPDIR:-/tmp}/rp-cold-fin.XXXXXX.txt")"
 snapshot_state "$_TMP_FIN"
 {
   echo ""

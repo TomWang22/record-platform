@@ -104,7 +104,7 @@ fi
 
 # Check service pods
 say "4. Checking service pods (gRPC services)"
-SERVICES=("auth-service:50051" "records-service:50051" "social-service:50056" "listings-service:50057" "analytics-service:50054" "shopping-service:50058")
+SERVICES=("auth-service:50051" "records-service:50051" "messaging-service:50056" "listings-service:50057" "analytics-service:50054" "shopping-service:50058")
 ALL_GOOD=1
 
 for svc_port in "${SERVICES[@]}"; do

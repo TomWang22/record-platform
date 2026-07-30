@@ -72,7 +72,7 @@ Coverage:
 bash scripts/audit-rp-ai-rag-contract.sh
 bash scripts/rp-ai-rag-quality-smoke.sh
 bash scripts/audit-rp-ai-endpoints-contract.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 Deploy required before cluster shadow timing reflects D changes:

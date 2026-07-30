@@ -1,4 +1,4 @@
-/** Domain status strings as emitted on booking.status.updated (booking-service). */
+/** Domain status strings as emitted on booking.status.updated (reservation-mesh). */
 export type BookingDomainStatusUpper =
   | "PENDING"
   | "ACCEPTED"

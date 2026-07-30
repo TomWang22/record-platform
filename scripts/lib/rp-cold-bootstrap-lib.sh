@@ -546,13 +546,13 @@ rp_cb_setup_full_log() {
 
 rp_cb_assert_workspace_no_booking_social() {
   local bad=0
-  for svc in booking-service social-service; do
+  for svc in reservation-mesh messaging-service; do
     if [[ -d "$RP_CB_REPO_ROOT/services/$svc" ]]; then
       echo "❌ services/$svc must not be in workspace build matrix" >&2
       bad=1
     fi
   done
-  if pnpm -r list 2>/dev/null | grep -qE 'booking-service|social-service'; then
+  if pnpm -r list 2>/dev/null | grep -qE 'messaging-service'; then
     echo "❌ pnpm workspace lists forbidden legacy service (skipped at restore)" >&2
     bad=1
   fi
@@ -646,8 +646,8 @@ import json
 d={'kind':'suite_wall_timer','suite':'cold-bootstrap','duration_ms':int('$end_ms')-int('$RP_CB_START_MS'),'duration_human':'${min}m ${sec}s'}
 open('$RP_CB_BENCH/cold-bootstrap-last-timing.json','w').write(json.dumps(d,indent=2)+'\n')
 "
-  if [[ -x "$RP_CB_REPO_ROOT/scripts/export-och-wall-clock-prom.sh" ]]; then
-    OCH_PUSH_WALL_CLOCK=1 bash "$RP_CB_REPO_ROOT/scripts/export-och-wall-clock-prom.sh" cold-bootstrap 2>/dev/null || true
+  if [[ -x "$RP_CB_REPO_ROOT/scripts/export-rp-wall-clock-prom.sh" ]]; then
+    RP_PUSH_WALL_CLOCK=1 bash "$RP_CB_REPO_ROOT/scripts/export-rp-wall-clock-prom.sh" cold-bootstrap 2>/dev/null || true
   fi
   if [[ -x "$RP_CB_REPO_ROOT/scripts/rp-export-bootstrap-slo-prom.sh" ]]; then
     bash "$RP_CB_REPO_ROOT/scripts/rp-export-bootstrap-slo-prom.sh" 2>/dev/null || true
@@ -671,13 +671,13 @@ rp_cb_print_allowed_order() {
 rp_cb_plan_forbidden_audit() {
   echo "=== Plan: forbidden runtime audit ==="
   local issues=0
-  if [[ -d "$RP_CB_REPO_ROOT/services/booking-service" ]] || [[ -d "$RP_CB_REPO_ROOT/services/social-service" ]]; then
-    echo "  ❌ booking-service or social-service directory present in services/"
+  if [[ -d "$RP_CB_REPO_ROOT/services/reservation-mesh" ]] || [[ -d "$RP_CB_REPO_ROOT/services/messaging-service" ]]; then
+    echo "  ❌ reservation-mesh or messaging-service directory present in services/"
     issues=$((issues + 1))
   else
-    echo "  ✅ no booking-service / social-service in services/"
+    echo "  ✅ no reservation-mesh / messaging-service in services/"
   fi
-  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qiE 'off-campus-housing|och-'; then
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qiE 'record-platform|rp-'; then
     echo "  ❌ legacy external containers still running"
     issues=$((issues + 1))
   else
@@ -703,7 +703,7 @@ rp_cb_ensure_compose_external_infra() {
   [[ -n "$repo" ]] || { echo "❌ RP_CB_REPO_ROOT unset" >&2; return 1; }
   # shellcheck source=ensure-colima-docker-context.sh
   source "$script_dir/lib/ensure-colima-docker-context.sh"
-  OCH_FORCE_COLIMA_DOCKER=1 och_ensure_colima_docker_context || return 1
+  RP_FORCE_COLIMA_DOCKER=1 rp_ensure_colima_docker_context || return 1
   (
     cd "$repo"
     docker compose -f docker-compose.yml up -d \

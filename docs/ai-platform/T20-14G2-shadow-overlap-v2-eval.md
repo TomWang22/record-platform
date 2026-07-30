@@ -96,7 +96,7 @@ G2 adds shadow-only work on zero-result paths (global untyped retry, source-type
 | `audit-rp-ai-endpoints-contract.sh` | PASS |
 | `rp-ai-provider-readiness.sh` | PASS |
 | `rp-ai-pgvector-readiness.sh` | PASS |
-| `rp-och-decontaminate-scan.sh` | PASS |
+| `rp-rp-decontaminate-scan.sh` | PASS |
 | Seller intelligence Playwright | PASS 4/4 |
 | Record intelligence Playwright | PASS 7/7 avg 3.86 |
 | Longform session Playwright | PASS 12/12 avg 3.67 |

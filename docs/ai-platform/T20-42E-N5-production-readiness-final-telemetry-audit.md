@@ -10,7 +10,7 @@
 
 ```text
 T20.42E: PASS
-OCH: PASS
+RP: PASS
 Telemetry WARNs: 0
 Playwright C-suite: 7/7 PASS
 Message-body exposure: 0
@@ -18,12 +18,12 @@ Message-body exposure: 0
 
 ---
 
-## 2. OCH scan
+## 2. RP scan
 
 ```text
-scripts/rp-och-decontaminate-scan.sh
+scripts/rp-rp-decontaminate-scan.sh
 __SCANNED__=590
-OCH code comb PASS
+RP code comb PASS
 ```
 
 ---

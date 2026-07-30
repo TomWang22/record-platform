@@ -31,7 +31,7 @@ export async function geocodeStructuredAddress(
   if (!q || q.length < 8) return null;
   const ua =
     process.env.LISTINGS_GEOCODE_USER_AGENT ||
-    "OffCampusHousingTracker/listings-service (contact: dev@localhost)";
+    "RecordPlatform/listings-service (contact: dev@localhost)";
   try {
     const url = new URL("https://nominatim.openstreetmap.org/search");
     url.searchParams.set("format", "jsonv2");

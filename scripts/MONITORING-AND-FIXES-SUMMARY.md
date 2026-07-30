@@ -12,19 +12,19 @@
 #### ✅ Fixed Issues
 1. **All 8 Databases Externalized**: Confirmed all databases (ports 5433-5440) are externalized
 2. **Database Connection Strings**: All services have correct `POSTGRES_URL_*` pointing to `host.docker.internal`
-3. **Social Service DB Config**: `POSTGRES_URL_SOCIAL` correctly set to port 5434
+3. **Messaging Service DB Config**: `POSTGRES_URL_SOCIAL` correctly set to port 5434
 
 #### ⚠️ Issues Found
-1. **Social Service targetPort**: Currently `targetPort: http` (named port) instead of `targetPort: 4006` (numeric)
-   - **Fix Applied**: Created `infra/k8s/overlays/dev/patches/social-service-targetport-fix.yaml`
-   - **Temporary Fix**: `./scripts/fix-social-service-targetport.sh` (runs automatically in test suite)
+1. **Messaging Service targetPort**: Currently `targetPort: http` (named port) instead of `targetPort: 4006` (numeric)
+   - **Fix Applied**: Created `infra/k8s/overlays/dev/patches/messaging-service-targetport-fix.yaml`
+   - **Temporary Fix**: `./scripts/fix-messaging-service-targetport.sh` (runs automatically in test suite)
    - **Permanent Fix**: Kustomize patch file created
 
 2. **gRPC NodePort**: Only port 30000 configured, not 30001
    - **Impact**: Tests trying to use 30001 will fail
    - **Solution**: Use port 30000 only, or add 30001 to Envoy service
 
-3. **Social Service Port Not Listening**: Port 4006 not detected as listening in pod
+3. **Messaging Service Port Not Listening**: Port 4006 not detected as listening in pod
    - **Possible Cause**: Service may be starting slowly or health check timing
    - **Status**: Health endpoint works, so service is functional
 
@@ -47,8 +47,8 @@ All services use `host.docker.internal:PORT` for database connections.
 
 ## Scripts Created
 
-1. **`scripts/investigate-grpc-social-issues.sh`**: Comprehensive investigation of gRPC NodePort and social service issues
-2. **`scripts/fix-social-service-targetport.sh`**: Temporary fix for social service targetPort
+1. **`scripts/investigate-grpc-social-issues.sh`**: Comprehensive investigation of gRPC NodePort and messaging-plane issues
+2. **`scripts/fix-messaging-service-targetport.sh`**: Temporary fix for messaging-plane targetPort
 3. **`scripts/fix-all-db-externalization.sh`**: Ensures all 8 databases are properly externalized
 4. **`scripts/test-all-services-db-connections.sh`**: Tests all service database connections
 5. **`scripts/live-monitor-test-run.sh`**: Live monitoring of test run with auto-refresh
@@ -56,13 +56,13 @@ All services use `host.docker.internal:PORT` for database connections.
 
 ## Permanent Fixes Applied
 
-1. **Social Service targetPort**: Created Kustomize patch `infra/k8s/overlays/dev/patches/social-service-targetport-fix.yaml`
+1. **Messaging Service targetPort**: Created Kustomize patch `infra/k8s/overlays/dev/patches/messaging-service-targetport-fix.yaml`
 2. **Database Externalization**: All 8 database services configured to use `host.docker.internal` with correct ports
 
 ## Next Steps
 
 1. **Monitor Test Run**: Use `./scripts/start-live-monitoring.sh` to watch progress
-2. **Verify Fixes**: After test completes, verify social service targetPort fix is permanent
+2. **Verify Fixes**: After test completes, verify messaging-plane targetPort fix is permanent
 3. **Review Results**: Check `test-results/20260128-103318-preflight-and-tests/` for full results
 
 ## Live Monitoring

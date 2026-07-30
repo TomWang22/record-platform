@@ -149,7 +149,7 @@ Keyword stability: all 7 contract prompts unchanged (retrieval_mode=keyword, sum
 | `rp-ai-provider-readiness.sh` | **PASS** |
 | `rp-ai-pgvector-readiness.sh` | **PASS** |
 | `rp-ai-backfill-rerun-guard-smoke.sh` | **PASS** (blocked rerun exit 2) |
-| `rp-och-decontaminate-scan.sh` | **PASS** (588 files) |
+| `rp-rp-decontaminate-scan.sh` | **PASS** (588 files) |
 
 ## Remaining blockers
 

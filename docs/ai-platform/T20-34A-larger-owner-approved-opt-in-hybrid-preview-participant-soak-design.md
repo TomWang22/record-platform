@@ -57,7 +57,7 @@ After C-LIVE only: UI/API churn, bulk revoke, `AI_RAG_HYBRID_CANARY=0` drill, KE
 
 ## 9. Gates
 
-HTTP 200 100%, fallback ≤1%, `final_tagged_plan` fallback 0, avg quality ≥3.5, worst ≥3.0, hybrid p95 ≤3000 ms, soak-path telemetry WARNs 0, leakage PASS, OCH PASS, Playwright PASS, PERCENT=0, guest hidden, no message bodies.
+HTTP 200 100%, fallback ≤1%, `final_tagged_plan` fallback 0, avg quality ≥3.5, worst ≥3.0, hybrid p95 ≤3000 ms, soak-path telemetry WARNs 0, leakage PASS, RP PASS, Playwright PASS, PERCENT=0, guest hidden, no message bodies.
 
 ## 10. Explicit rejections
 

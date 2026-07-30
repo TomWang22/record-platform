@@ -77,7 +77,7 @@ if ! kubectl apply -f "$_yaml" --request-timeout=30s 2>/dev/null; then
 fi
 ok "kafka-ssl-secret data applied from $OUT"
 
-kctl annotate secret kafka-ssl-secret -n "$NS" "och.dev/ca-fingerprint-sha256-" --overwrite 2>/dev/null || true
+kctl annotate secret kafka-ssl-secret -n "$NS" "rp.dev/ca-fingerprint-sha256-" --overwrite 2>/dev/null || true
 kctl annotate secret kafka-ssl-secret -n "$NS" \
   "rp.dev/ca-fingerprint-sha256=${_disk_fp}" \
   "rp.dev/last-writer=${RP_LAST_KAFKA_SSL_SECRET_WRITER}" \

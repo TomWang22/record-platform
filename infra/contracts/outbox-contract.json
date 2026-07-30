@@ -45,5 +45,5 @@
     { "service": "auction-monitor", "port": 5438, "ddl": "infra/db/01-auction-monitor-outbox.sql" },
     { "service": "python-ai-service", "port": 5440, "ddl": "infra/db/01-ai-outbox.sql" }
   ],
-  "excluded": ["social-service", "booking-service"]
+  "excluded": ["messaging-service", "reservation-mesh"]
 }

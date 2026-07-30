@@ -71,7 +71,7 @@ Entity key collection extended to include `auction_id` and `bid_id` metadata fie
 6. empty payload  
 7. full `normalizeNotification` — preserves event fields, adds entity IDs, excludes secret body/message  
 
-**Result:** 7/7 new notification tests pass (15/16 suite pass; 1 pre-existing OCH title test unrelated).
+**Result:** 7/7 new notification tests pass (15/16 suite pass; 1 pre-existing RP title test unrelated).
 
 ### Python (`test_shadow_diagnostics.py`)
 
@@ -116,7 +116,7 @@ Full notification reindex would touch up to 20,000 rows per `exportNotifications
 | endpoints contract | **PASS** |
 | provider readiness | **PASS** |
 | pgvector readiness | **PASS** |
-| OCH scan | **PASS** |
+| RP scan | **PASS** |
 
 ---
 

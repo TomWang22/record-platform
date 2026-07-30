@@ -192,13 +192,13 @@ apply_social_tuning() {
   local port=$1
   local db_name=$2
   
-  say "Applying Social Service tuning (write-heavy, messaging)..."
+  say "Applying Messaging Service tuning (write-heavy, messaging)..."
   say "  - Composite indexes for user + message lookups"
   say "  - Forum posts indexes"
   say "  - Autovacuum tuning (write-heavy)"
   
   PGPASSWORD=postgres psql -h localhost -p "$port" -U postgres -d "$db_name" << 'EOF' 2>&1 | tee /tmp/tune-social.log
--- Social service specific tuning (write-heavy, messaging)
+-- messaging-plane specific tuning (write-heavy, messaging)
 CREATE INDEX IF NOT EXISTS idx_messages_user_created ON social.messages (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_recipient_created ON social.messages (recipient_id, created_at DESC) WHERE recipient_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_forum_posts_user_created ON social.forum_posts (user_id, created_at DESC);
@@ -208,7 +208,7 @@ ANALYZE social.messages;
 ANALYZE social.forum_posts;
 EOF
   
-  ok "Social service tuning applied"
+  ok "messaging-plane tuning applied"
 }
 
 apply_auth_tuning() {

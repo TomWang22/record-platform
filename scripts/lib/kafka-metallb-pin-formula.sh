@@ -29,6 +29,6 @@ rp_kafka_metallb_add_last_octet() {
 rp_kafka_metallb_expected_ip_for_broker() {
   local pool="$1" offset="$2" broker_index="$3"
   local first
-  first="$(och_metallb_pool_first_ip "$pool")" || return 1
+  first="$(rp_metallb_pool_first_ip "$pool")" || return 1
   rp_kafka_metallb_add_last_octet "$first" $((offset + broker_index))
 }

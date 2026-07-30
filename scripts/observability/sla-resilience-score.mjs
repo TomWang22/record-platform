@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * SLA slack from trace_contract.json: per-service max(span.duration) vs budgets (microseconds).
- * och_sla_resilience_score = 1 - violations/total_checks
+ * rp_sla_resilience_score = 1 - violations/total_checks
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -18,7 +18,7 @@ const OUT_PROM = join(BENCH, "sla-metrics.prom");
 const SLA_US = {
   "api-gateway": 300_000,
   "auth-service": 200_000,
-  "booking-service": 300_000,
+  "reservation-mesh": 300_000,
   "listings-service": 300_000,
   "messaging-service": 500_000,
   "analytics-service": 2_000_000,
@@ -27,7 +27,7 @@ const SLA_US = {
   "notification-service": 400_000,
 };
 
-const E2E_MAX_US = Number(process.env.OCH_SLA_E2E_TRACE_US || 2_000_000) || 2_000_000;
+const E2E_MAX_US = Number(process.env.RP_SLA_E2E_TRACE_US || 2_000_000) || 2_000_000;
 
 function loadFirstTrace() {
   if (!existsSync(TRACE)) return null;
@@ -55,12 +55,12 @@ function main() {
     writeFileSync(
       OUT_PROM,
       [
-        "# HELP och_sla_resilience_score 1 - (violations/total SLA checks)",
-        "# TYPE och_sla_resilience_score gauge",
-        "och_sla_resilience_score 1",
-        "# HELP och_sla_resilience_compliant 1 if score ≥ floor",
-        "# TYPE och_sla_resilience_compliant gauge",
-        "och_sla_resilience_compliant 1",
+        "# HELP rp_sla_resilience_score 1 - (violations/total SLA checks)",
+        "# TYPE rp_sla_resilience_score gauge",
+        "rp_sla_resilience_score 1",
+        "# HELP rp_sla_resilience_compliant 1 if score ≥ floor",
+        "# TYPE rp_sla_resilience_compliant gauge",
+        "rp_sla_resilience_compliant 1",
         "",
       ].join("\n"),
     );
@@ -90,10 +90,10 @@ function main() {
   if (tMax - tMin > E2E_MAX_US) violations += 1;
 
   const score = checks ? Math.max(0, Math.min(1, 1 - violations / checks)) : 1;
-  const minScore = Number(process.env.OCH_SLA_SCORE_MIN || "0.85");
+  const minScore = Number(process.env.RP_SLA_SCORE_MIN || "0.85");
   const compliant = score >= minScore ? 1 : 0;
   const doc = {
-    specVersion: "och-sla-resilience-v1",
+    specVersion: "rp-sla-resilience-v1",
     score: Math.round(score * 1000) / 1000,
     violations,
     checks,
@@ -103,16 +103,16 @@ function main() {
   };
   writeFileSync(OUT_JSON, `${JSON.stringify(doc, null, 2)}\n`);
   const prom = [
-    "# HELP och_sla_resilience_score 1 - violations/checks on per-service span duration vs SLA table",
-    "# TYPE och_sla_resilience_score gauge",
-    `och_sla_resilience_score ${doc.score}`,
-    "# HELP och_sla_resilience_compliant 1 if score ≥ OCH_SLA_SCORE_MIN (default 0.85)",
-    "# TYPE och_sla_resilience_compliant gauge",
-    `och_sla_resilience_compliant ${compliant}`,
+    "# HELP rp_sla_resilience_score 1 - violations/checks on per-service span duration vs SLA table",
+    "# TYPE rp_sla_resilience_score gauge",
+    `rp_sla_resilience_score ${doc.score}`,
+    "# HELP rp_sla_resilience_compliant 1 if score ≥ RP_SLA_SCORE_MIN (default 0.85)",
+    "# TYPE rp_sla_resilience_compliant gauge",
+    `rp_sla_resilience_compliant ${compliant}`,
     "",
   ].join("\n");
   writeFileSync(OUT_PROM, prom);
-  const strict = process.env.OCH_SLA_ENFORCE === "1" || process.env.PREFLIGHT_REQUIRE_FORMAL_TRACE_GATES === "1";
+  const strict = process.env.RP_SLA_ENFORCE === "1" || process.env.PREFLIGHT_REQUIRE_FORMAL_TRACE_GATES === "1";
   if (!compliant && strict) process.exit(1);
   process.exit(0);
 }

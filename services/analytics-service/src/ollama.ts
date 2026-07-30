@@ -471,7 +471,7 @@ async function analyzeListingFeelTextPipeline(
   const pipelineT0 = Date.now();
   const cacheLookup = await runStage("analytics.cache.lookup", async (span) => {
     if (listingFeelSkipCache()) {
-      span.setAttribute("och.cache", "policy_skip");
+      span.setAttribute("rp.cache", "policy_skip");
       return { kind: "miss" as const };
     }
     try {
@@ -482,11 +482,11 @@ async function analyzeListingFeelTextPipeline(
       if (cached.rows[0] && !isNonLlmListingFeelCacheModel(cached.rows[0].model)) {
         const analysis_text = String(cached.rows[0].analysis_text);
         const model_used = String(cached.rows[0].model);
-        span.setAttribute("och.cache", "hit");
+        span.setAttribute("rp.cache", "hit");
         const quality_score = computeListingFeelQualityScore(analysis_text);
         return { kind: "hit" as const, analysis_text, model_used, quality_score };
       }
-      span.setAttribute("och.cache", "miss");
+      span.setAttribute("rp.cache", "miss");
     } catch (e) {
       console.error("[listing-feel] cache read failed (continuing without cache)", e);
     }
@@ -558,7 +558,7 @@ async function analyzeListingFeelTextPipeline(
     const lockKey = `rp:listing-feel:${hash}:${audience}`;
     const token = randomUUID();
     let gotLock = await acquireLockWithToken(lockKey, token, 45_000);
-    lockSpan.setAttribute("och.lock_acquired", gotLock);
+    lockSpan.setAttribute("rp.lock_acquired", gotLock);
     if (!gotLock) {
       await new Promise((r) => setTimeout(r, 400));
       if (!listingFeelSkipCache()) {
@@ -595,7 +595,7 @@ async function analyzeListingFeelTextPipeline(
 
     try {
       return await runStage("analytics.routing.model_path", async (routeSpan) => {
-        routeSpan.setAttribute("och.li_v2_enabled", isListingIntelligenceV2Enabled());
+        routeSpan.setAttribute("rp.li_v2_enabled", isListingIntelligenceV2Enabled());
         return await runStage("analytics.model.generate", async () => {
           const promptWall0 = Date.now();
           const priceUsd = (input.price_cents / 100).toFixed(2);

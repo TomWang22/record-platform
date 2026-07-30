@@ -22,8 +22,8 @@ bash "$SCRIPT_DIR/run-listings-community-migrations-k8s.sh"
 
 NS="${K8S_NS:-${HOUSING_NS:-record-platform}}"
 echo "▶ Rollout restart (ns=$NS)"
-kubectl -n "$NS" rollout restart deploy/booking-service deploy/listings-service deploy/notification-service
-kubectl -n "$NS" rollout status deploy/booking-service --timeout=180s
+kubectl -n "$NS" rollout restart deploy/reservation-mesh deploy/listings-service deploy/notification-service
+kubectl -n "$NS" rollout status deploy/reservation-mesh --timeout=180s
 kubectl -n "$NS" rollout status deploy/listings-service --timeout=180s
 kubectl -n "$NS" rollout status deploy/notification-service --timeout=180s
 

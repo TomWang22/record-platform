@@ -12,7 +12,7 @@ echo "POST $BASE/api/generate (minimal num_predict)"
 curl -sS -m 180 -X POST "$BASE/api/generate" \
   -H "Content-Type: application/json" \
   -d "$BODY" \
-  -o /tmp/och-bench-ollama.json \
+  -o /tmp/rp-bench-ollama.json \
   -w "generate_wall_seconds=%{time_total}\n" || echo "generate_failed"
-head -c 240 /tmp/och-bench-ollama.json 2>/dev/null || true
+head -c 240 /tmp/rp-bench-ollama.json 2>/dev/null || true
 echo

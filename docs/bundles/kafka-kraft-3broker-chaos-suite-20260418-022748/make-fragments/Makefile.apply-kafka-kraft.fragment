@@ -1,3 +1,0 @@
-apply-kafka-kraft: ## Staged: headless + external LB svcs → wait IPs → kafka-ssl refresh → PDB + SS (KAFKA_TLS_ATOMIC_BEFORE_REFRESH=1 scales to 0 first)
-	chmod +x "$(SCRIPTS)/apply-kafka-kraft-staged.sh" "$(SCRIPTS)/ensure-dev-root-ca.sh" "$(SCRIPTS)/kafka-refresh-tls-from-lb.sh" "$(SCRIPTS)/wait-for-kafka-external-lb-ips.sh"
-	HOUSING_NS=$(HOUSING_NS) KAFKA_TLS_ATOMIC_BEFORE_REFRESH=$(KAFKA_TLS_ATOMIC_BEFORE_REFRESH) KAFKA_BROKER_REPLICAS=$(KAFKA_BROKER_REPLICAS) bash "$(SCRIPTS)/apply-kafka-kraft-staged.sh"

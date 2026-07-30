@@ -6,7 +6,7 @@
  *   - Avoid cache-only health noise: mix health, public search, trust lookup, register+login with unique emails.
  *
  * Env:
- *   BASE_URL — https://off-campus-housing.test (default)
+ *   BASE_URL — https://record-platform.test (default)
  *   DURATION — per-scenario duration (default 2m)
  *   K6_H1_RATE / K6_H2_RATE / K6_H3_RATE — iterations/s per scenario (defaults 8,8,5)
  *   K6_HTTP3_REQUIRE_MODULE — set 1 when using h3 scenario with stock k6 to fail fast (see k6-gateway-health-http3.js)

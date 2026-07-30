@@ -88,8 +88,8 @@ export async function invalidateNotificationListCacheForUser(userId: string): Pr
 
 export function notificationListCacheHeaders(hit: boolean, source: "redis" | "db"): Record<string, string> {
   return {
-    "X-OCH-Cache": hit ? "hit" : "miss",
-    "X-OCH-Data-Source": source,
+    "X-RP-Cache": hit ? "hit" : "miss",
+    "X-RP-Data-Source": source,
   };
 }
 

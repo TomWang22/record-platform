@@ -44,7 +44,7 @@ AI_RAG_HYBRID_CANARY_ALLOW_PROD_PERCENT=0
 ## Telemetry / controls
 
 - Preflight telemetry WARNs: **0**
-- OCH: **PASS**
+- RP: **PASS**
 - Playwright preview UI smoke: **4/4 PASS**
 - Rollback (real-participant): **SKIPPED**
 

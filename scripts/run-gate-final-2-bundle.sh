@@ -18,7 +18,7 @@ scripts=(
   scripts/rp-verify-kafka-cert-chain.sh
   scripts/rp-runtime-domain-comb.sh
   scripts/rp-db-domain-comb.sh
-  scripts/rp-och-decontaminate-scan.sh
+  scripts/rp-rp-decontaminate-scan.sh
 )
 
 declare -a codes=()

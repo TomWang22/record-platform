@@ -59,15 +59,15 @@ grep -q ':443' "$CF" && grep -q '421' "$CF" && ok "fallback :443 / 421 present" 
 
 grep -q 'protocols h1 h2 h3' "$CF" && ok "strict h1/h2/h3 protocols" || bad "missing protocols h1 h2 h3"
 
-grep -q 'off-campus-housing' "$CF" && bad "Caddyfile references off-campus-housing" || ok "no off-campus-housing"
-grep -qE 'path /social|/social/\*|social-service' "$CF" && bad "Caddyfile references /social" || ok "no /social"
-grep -qE 'path /booking|/bookings/\*|booking-service' "$CF" && bad "Caddyfile references /booking" || ok "no /booking"
+grep -q 'record-platform' "$CF" && bad "Caddyfile references record-platform" || ok "no record-platform"
+grep -qE 'path /social|/social/\*' "$CF" && bad "Caddyfile references /social" || ok "no /social"
+grep -qE 'path /booking|/bookings/\*' "$CF" && bad "Caddyfile references /booking" || ok "no /booking"
 
 if grep -q 'health_uri' "$CF"; then
   if [[ "${RP_CADDY_ALLOW_ACTIVE_HEALTH:-0}" == "1" ]]; then
     warn "active health_uri present (RP_CADDY_ALLOW_ACTIVE_HEALTH=1)"
   else
-    bad "active health_uri on reverse_proxy (OCH: rely on kube readiness only)"
+    bad "active health_uri on reverse_proxy (RP: rely on kube readiness only)"
   fi
 else
   ok "no active upstream health checks"
@@ -77,8 +77,8 @@ grep -q '/_caddy/healthz' "$CF" && grep -q 'alt-svc' "$CF" && ok "/_caddy/health
   || bad "missing /_caddy/healthz or alt-svc"
 
 grep -q 'X-RP-Edge-Proto' "$CF" && ok "X-RP-Edge-Proto stamped" || bad "missing X-RP-Edge-Proto"
-grep -q 'X-OCH-Edge-Proto' "$CF" && grep -q 'TODO' "$CF" && ok "X-OCH-Edge-Proto with TODO compat" \
-  || warn "X-OCH-Edge-Proto without TODO marker"
+grep -q 'X-RP-Edge-Proto' "$CF" && grep -q 'TODO' "$CF" && ok "X-RP-Edge-Proto with TODO compat" \
+  || warn "X-RP-Edge-Proto without TODO marker"
 
 for p in '/api/*' '/auth/*' '/records/*' '/shopping/*' '/messaging/*' '/community/*' '/media/*' '/trust/*' '/notification/*' '/analytics/*' '/insights/*' '/ai/*' '/python-ai/*' '/auctions/*' '/auction-monitor/*'; do
   grep -qF "$p" "$CF" || bad "missing REST path $p"

@@ -44,7 +44,7 @@ This doc catalogs **known** failures and warnings from the full suite (auth, bas
 
 | Item | Severity | Cause | Action |
 |------|----------|--------|--------|
-| Social health check via HTTP/3 returned 503 | ⚠️ | Social-service `/healthz` returns 503 when DB disconnected or health timeout (2–3s) | Check social DB (port 5434); see **docs/SERVICE_BY_SERVICE_TEST_DEBUG.md** "Social HTTP/3 Health Check — 503". Script now retries once after 3s. |
+| Social health check via HTTP/3 returned 503 | ⚠️ | messaging-plane `/healthz` returns 503 when DB disconnected or health timeout (2–3s) | Check social DB (port 5434); see **docs/SERVICE_BY_SERVICE_TEST_DEBUG.md** "Social HTTP/3 Health Check — 503". Script now retries once after 3s. |
 | Auction Monitor health via HTTP/3 returned 401 | ✅ | Endpoint requires authentication | Expected; 401 = correct auth enforcement. Suite treats 401 as OK. |
 | gRPC Envoy (plaintext): not OK | ⚠️ | NodePort 30000/30001 not exposed to host (Colima/k3d) | Expected; primary path is strict TLS/mTLS via port-forward. |
 | gRPC Envoy (strict TLS/mTLS): not OK | ⚠️ | Same: Envoy not on host 127.0.0.1:30000/30001 | On Colima, use port-forward to Envoy pod + grpcurl to local port (see grpc-http3-health.sh). |
@@ -186,7 +186,7 @@ When rotation **regresses** (worked before, fails now), check these first:
 
 | Item | Severity | Cause | Action |
 |------|----------|--------|--------|
-| List groups failed (non-200) | ⚠️ | (1) Request went to wrong host (e.g. 127.0.0.1 when using LB IP), or (2) social-service DB/query error (500) | When running after run-all with LB IP, the script now uses `TARGET_IP`/`REACHABLE_LB_IP` for `--resolve` and PORT=443. If still failing: check response body (script prints first 300 chars on first failure); if 500, check social-service logs and messages.groups / group_members tables. |
+| List groups failed (non-200) | ⚠️ | (1) Request went to wrong host (e.g. 127.0.0.1 when using LB IP), or (2) messaging-service DB/query error (500) | When running after run-all with LB IP, the script now uses `TARGET_IP`/`REACHABLE_LB_IP` for `--resolve` and PORT=443. If still failing: check response body (script prints first 300 chars on first failure); if 500, check messaging-service logs and messages.groups / group_members tables. |
 
 ---
 

@@ -34,5 +34,5 @@ Apply in `infra/k8s/base/*/deployment.yaml` for each ported service.
 
 ## Not deployed
 
-- booking-service
+- reservation-mesh
 - housing-specific cron/jobs

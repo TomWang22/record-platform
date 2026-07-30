@@ -125,7 +125,7 @@ Production default remains `keyword`. Preview UI/API remains KEEP. Permanent all
 | `scripts/audit-rp-ai-endpoints-contract.sh` | PASS |
 | `scripts/rp-ai-provider-readiness.sh` | PASS |
 | `scripts/rp-ai-pgvector-readiness.sh` | PASS |
-| `scripts/rp-och-decontaminate-scan.sh` | PASS (`__SCANNED__=590`) |
+| `scripts/rp-rp-decontaminate-scan.sh` | PASS (`__SCANNED__=590`) |
 | `scripts/ai-quality-telemetry-report.mjs` | PASS via `node scripts/ai-quality-telemetry-report.mjs`; WARNs 0 |
 
 Note: direct shell execution of `scripts/ai-quality-telemetry-report.mjs` returned a file permission error before telemetry logic ran. The validator did not change script file modes; it executed the same telemetry script through `node`, which passed with WARNs 0.

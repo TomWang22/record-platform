@@ -41,4 +41,4 @@ say "Loading $IMAGE into Colima k3s (containerd)"
 docker save "$IMAGE" | colima ssh -- sudo k3s ctr -n k8s.io images import -
 ok "Loaded $IMAGE into k3s"
 
-say "Done. Deploy with: kubectl apply -k infra/k8s/base/auth-service (ensure namespace off-campus-housing exists)."
+say "Done. Deploy with: kubectl apply -k infra/k8s/base/auth-service (ensure namespace record-platform exists)."

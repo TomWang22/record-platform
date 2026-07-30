@@ -166,7 +166,7 @@ Unchanged: keyword retrieval, rule-engine synthesis, shadow diagnostics opt-in v
 | No message bodies in retrieval or response | Existing `_chunk_passes_privacy`, message opt-in filters |
 | No private OBO message exposure | OBO summaries only; negotiation panels use `obo_offer_summary` |
 | No proxy bid fields | `FORBIDDEN_CHUNK_RE` filter; contract audit `no_proxy_max_in_chunks` |
-| Leakage scans required | `rp-och-decontaminate-scan.sh` on every T20.15B/C release candidate |
+| Leakage scans required | `rp-rp-decontaminate-scan.sh` on every T20.15B/C release candidate |
 | Hybrid failure → keyword fallback | `AI_RAG_HYBRID_REQUIRE_KEYWORD_FALLBACK=1` mandatory |
 | No generative Ollama as RAG default | Rule-engine synthesis unchanged |
 | Anchor cap | `AI_RAG_HYBRID_ANCHOR_MAX=1` (second anchor only if overlap still zero per G3R) |
@@ -219,7 +219,7 @@ All metrics emitted per canary request and aggregated for T20.15C eval.
 | `true_zero_results` | Counter | Must remain 0 |
 | `embed_timeouts` | Counter | Must remain 0 |
 | `source_diagnostic` | Pass/fail | T19.6C route shadow quality |
-| `leakage` | Pass/fail | OCH + Playwright leakage checks |
+| `leakage` | Pass/fail | RP + Playwright leakage checks |
 | `answer_quality_score` | Score | Existing evaluator capture (≥3.5 avg target) |
 | `hybrid_fallback_count` | Counter | Report; high rate triggers investigation |
 | `canary_error_count` | Counter | Report; any spike triggers rollback |
@@ -289,7 +289,7 @@ Prior stable pin: `python-ai-service:t20-p214g3r` @ `cc3fb42`.
 ```bash
 bash scripts/audit-rp-ai-rag-contract.sh
 bash scripts/audit-rp-ai-endpoints-contract.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ./scripts/webapp-playwright-strict-edge.sh e2e/seller-intelligence-ui.spec.ts --grep "Seller intelligence UI"
 node scripts/ai-quality-telemetry-report.mjs
 ```

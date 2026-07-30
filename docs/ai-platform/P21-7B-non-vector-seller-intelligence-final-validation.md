@@ -22,7 +22,7 @@ bash scripts/audit-rp-ai-runtime-contract.sh
 bash scripts/audit-rp-ai-endpoints-contract.sh
 bash scripts/rp-ai-provider-readiness.sh
 bash scripts/rp-ai-pgvector-readiness.sh
-bash scripts/rp-och-decontaminate-scan.sh
+bash scripts/rp-rp-decontaminate-scan.sh
 ```
 
 ---
@@ -42,7 +42,7 @@ bash scripts/rp-och-decontaminate-scan.sh
 | endpoints contract     | PASS   |
 | provider readiness     | PASS   |
 | pgvector readiness     | PASS   |
-| OCH                    | PASS   |
+| RP                    | PASS   |
 | leakage                | PASS   |
 
 ---
@@ -92,7 +92,7 @@ Local artifacts (not committed):
 | endpoints contract | `bench_logs/ai-platform/python-ai-ollama-contract.json` |
 | provider readiness | `bench_logs/ai-platform/phase-17-provider-readiness.md` |
 | pgvector readiness | `bench_logs/ai-platform/phase-18-pgvector-readiness.md` |
-| OCH | `bench_logs/domain-comb/rp-och-code-comb.md` |
+| RP | `bench_logs/domain-comb/rp-rp-code-comb.md` |
 
 ---
 

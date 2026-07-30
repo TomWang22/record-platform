@@ -133,7 +133,7 @@ Continue using **preflight-B external warmup gate** for benchmarks. If Phase 20 
 
 | Check | Result |
 |-------|--------|
-| OCH scan | **PASS** |
+| RP scan | **PASS** |
 | T20.10I product changes | **Reverted** — main at `66c1573` |
 | Benchmark artifacts | **Not committed** |
 

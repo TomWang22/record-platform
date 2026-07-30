@@ -29,7 +29,7 @@ import {
   extractRootHttpRoute,
   maxTreeDepth,
 } from "./lib/trace-analysis.mjs";
-import { discoverJaegerHousingServices } from "./trace-validators/lib/housing-services.mjs";
+import { discoverJaegerPlatformServices } from "./trace-validators/lib/platform-services.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, "..");
@@ -65,7 +65,7 @@ function tagHasCoverage(span) {
 function resolveRequired() {
   const legacy = process.env.TRACE_CONTRACT_LEGACY_SUBSET === "1";
   if (legacy) {
-    return ["api-gateway", "auth-service", "listings-service", "trust-service", "booking-service"];
+    return ["api-gateway", "auth-service", "listings-service", "trust-service", "reservation-mesh"];
   }
   if (process.env.TRACE_CONTRACT_REQUIRED_SERVICES !== undefined) {
     const raw = process.env.TRACE_CONTRACT_REQUIRED_SERVICES;
@@ -76,9 +76,9 @@ function resolveRequired() {
       .filter(Boolean);
   }
   if (process.env.TRACE_CONTRACT_REQUIRE_ALL_SERVICES === "0") {
-    return ["api-gateway", "auth-service", "listings-service", "trust-service", "booking-service"];
+    return ["api-gateway", "auth-service", "listings-service", "trust-service", "reservation-mesh"];
   }
-  return discoverJaegerHousingServices(REPO);
+  return discoverJaegerPlatformServices(REPO);
 }
 
 function validate(trace, opts) {

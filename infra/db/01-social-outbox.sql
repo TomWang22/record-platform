@@ -1,4 +1,4 @@
--- Transactional outbox for social-service. Run against database 'social' (e.g. port 5434).
+-- Transactional outbox for messaging-service. Run against database 'social' (e.g. port 5434).
 -- Dedicated schema `social` for platform glue (forum/messages schemas hold domain tables).
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;

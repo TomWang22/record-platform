@@ -60,8 +60,8 @@ for svc in "${SERVICES[@]}"; do
   meta="${dir}/meta.json"
   tmp="${REPO_ROOT}/.kafka-client-tls-tmp.$$.${svc}"
   mkdir -p "$tmp"
-  # shellcheck disable=SC2064
-  trap "rm -rf '${tmp}'" RETURN
+  cleanup_tmp() { rm -rf "$tmp"; }
+  trap cleanup_tmp EXIT
 
   if [[ "$FORCE" == "1" ]]; then
     rm -f "$leaf" "$key" "$chain_out" "$ca_chain" "$meta"
@@ -95,6 +95,8 @@ EOF
       -extensions kafka_client_tls -extfile "${tmp}/leaf.ext" 2>/dev/null \
       || fail "sign failed for ${svc}"
   fi
+  cleanup_tmp
+  trap - EXIT
 
   # tls.crt = leaf + intermediate (common K8s pattern); ca-chain = intermediate + root
   cat "$leaf" "$(rp_dev_intermediate_pem)" >"$chain_out"

@@ -3,7 +3,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
-import { kafka } from "@common/utils/kafka";
+import { getRpKafka } from "@common/utils/kafka";
 
 export type AuctionAiSignal = {
   listing_id: string;
@@ -223,7 +223,7 @@ export async function scanAndPersistAuctionSignals(
 export async function publishAuctionMonitorOutbox(auctionPool: Pool): Promise<number> {
   const PREFIX = process.env.ENV_PREFIX || "dev";
   const topic = `${PREFIX}.auction_monitor.events`;
-  const producer = kafka.producer();
+  const producer = getRpKafka("outbox-publisher").producer();
   try {
     await producer.connect();
     const { rows } = await auctionPool.query<{

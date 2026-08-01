@@ -17,6 +17,8 @@ RP_DOCKER_BUILD_SERVICES=(
   python-ai-service
   auction-monitor
   transport-watchdog
+  ollama-gateway
+  ollama-worker
 )
 
 # Full freshness / audit target set (exactly one webapp).

@@ -29,6 +29,8 @@ jobs:
           - python-ai-service
           - auction-monitor
           - transport-watchdog
+          - ollama-gateway
+          - ollama-worker
           - webapp
     steps:
       - uses: actions/checkout@v4

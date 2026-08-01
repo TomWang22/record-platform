@@ -1,0 +1,31 @@
+{
+  "document": "gate5-kubernetes-client-identity-contract",
+  "required_env": {
+    "RP_SERVICE_NAME": "canonical service name",
+    "RP_POD_UID": "metadata.uid (authoritative client-id token)",
+    "RP_POD_NAME": "metadata.name",
+    "RP_KAFKA_CLIENT_ID_STRICT": "1 in acceptance"
+  },
+  "injection_paths": [
+    "scripts/rp-patch-runtime-provenance-and-identity.sh (live deploy patch; includes ollama-gateway/worker)",
+    "infra/k8s/base/python-ai-service/deploy.yaml (base cold-bootstrap)",
+    "k8s/ollama-gateway.yaml",
+    "k8s/ollama-worker.yaml"
+  ],
+  "participants": [
+    {"workload": "analytics-service", "container": "app", "roles": ["producer", "outbox-publisher"]},
+    {"workload": "auction-monitor", "container": "app", "roles": ["producer", "outbox-publisher"]},
+    {"workload": "auth-service", "container": "app", "roles": ["outbox-publisher"]},
+    {"workload": "listings-service", "container": "app", "roles": ["producer"]},
+    {"workload": "media-service", "container": "app", "roles": ["lifecycle-consumer"]},
+    {"workload": "messaging-service", "container": "app", "roles": ["producer", "lifecycle-consumer"]},
+    {"workload": "notification-service", "container": "app", "roles": ["notification-consumer", "lifecycle-consumer"]},
+    {"workload": "shopping-service", "container": "app", "roles": ["producer", "outbox-publisher"]},
+    {"workload": "trust-service", "container": "app", "roles": ["lifecycle-consumer"]},
+    {"workload": "python-ai-service", "container": "app", "roles": ["producer", "market-event-consumer", "outbox-publisher"]},
+    {"workload": "ollama-gateway", "container": "gateway", "roles": ["producer"]},
+    {"workload": "ollama-worker", "container": "worker", "roles": ["inference-consumer"]}
+  ],
+  "client_id_format": "record-platform.<service>.<pod-uid-prefix8>.<role>",
+  "authorization": "TLS client certificate + SAN/SPIFFE + trust chain + ACL/policy; client.id never authorizes"
+}

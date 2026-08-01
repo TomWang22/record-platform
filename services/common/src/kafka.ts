@@ -59,45 +59,92 @@ const brokers = rawBrokers
       .map((entry) => (entry.includes(':') ? entry : `${entry}:${brokerPort}`))
   : [`kafka:${brokerPort}`]
 
-export type KafkaClientRole = "consumer" | "producer" | "admin";
+/** Explicit logical Kafka client roles (client.id attribution only — not authorization). */
+export const KAFKA_CLIENT_ROLES = [
+  "consumer",
+  "producer",
+  "admin",
+  "outbox-publisher",
+  "lifecycle-consumer",
+  "market-event-consumer",
+  "notification-consumer",
+  "retry-consumer",
+  "DLQ-consumer",
+  "replay-producer",
+  "inference-consumer",
+  "result-producer",
+  "dlq-producer",
+] as const;
+
+export type KafkaClientRole = (typeof KAFKA_CLIENT_ROLES)[number];
+
+const ROLE_SET = new Set<string>(KAFKA_CLIENT_ROLES);
+
+function acceptanceStrict(): boolean {
+  const v = (process.env.RP_KAFKA_CLIENT_ID_STRICT || process.env.RP_ACCEPTANCE_MODE || "").trim();
+  return v === "1" || v.toLowerCase() === "true";
+}
+
+function sanitizeService(raw: string): string {
+  const cleaned = raw.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
+  return cleaned || "unknown";
+}
+
+function podTokenFromUid(uidRaw: string): string {
+  const uid = uidRaw.replace(/-/g, "");
+  return uid.slice(0, 8).replace(/[^a-zA-Z0-9]/g, "").slice(0, 12);
+}
 
 /**
- * Bounded Kafka client identity: record-platform.<service>.<pod-token>.<role>
+ * Bounded Kafka client identity: record-platform.<service>.<pod-uid-prefix>.<role>
  * Role is required. No user/request/session/message IDs. Max length 200.
+ * RP_POD_UID (preferred) or POD_UID is authoritative for the pod token.
  * Env KAFKA_CLIENT_ID overrides only when it already ends with .<role>.
+ *
+ * client.id is attribution only — never an authorization identity.
  */
 export function resolveKafkaClientId(role: KafkaClientRole): string {
+  if (!ROLE_SET.has(role)) {
+    throw new Error(`[kafka] invalid client role: ${String(role)}`);
+  }
   const normalizedRole: KafkaClientRole = role;
   const override = (process.env.KAFKA_CLIENT_ID || "").trim();
   if (override) {
     if (override.endsWith(`.${normalizedRole}`)) return override.slice(0, 200);
     return `${override.slice(0, 180)}.${normalizedRole}`.slice(0, 200);
   }
-  const service = (
-    process.env.OTEL_SERVICE_NAME ||
-    process.env.SERVICE_NAME ||
-    process.env.K8S_SERVICE_NAME ||
-    "unknown"
-  )
-    .replace(/[^a-zA-Z0-9._-]/g, "-")
-    .slice(0, 48);
-  const podRaw =
-    process.env.POD_NAME ||
-    process.env.HOSTNAME ||
-    process.env.K8S_POD_NAME ||
-    "local";
-  // Prefer first 8 of POD_UID, else last segment of pod name
-  const uid = (process.env.POD_UID || "").replace(/-/g, "");
-  const podToken = (uid ? uid.slice(0, 8) : podRaw.split("-").pop() || podRaw)
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .slice(0, 12) || "local";
-  const id = `record-platform.${service}.${podToken}.${normalizedRole}`;
+  const service = sanitizeService(
+    process.env.RP_SERVICE_NAME ||
+      process.env.OTEL_SERVICE_NAME ||
+      process.env.SERVICE_NAME ||
+      process.env.K8S_SERVICE_NAME ||
+      "",
+  );
+  if (acceptanceStrict() && (!service || service === "unknown")) {
+    throw new Error("[kafka] RP_SERVICE_NAME/OTEL_SERVICE_NAME required in acceptance mode");
+  }
+  const uidRaw = (process.env.RP_POD_UID || process.env.POD_UID || "").trim();
+  let podToken = podTokenFromUid(uidRaw);
+  if (!podToken) {
+    if (acceptanceStrict()) {
+      throw new Error("[kafka] RP_POD_UID/POD_UID required in acceptance mode; refusing hostname fallback");
+    }
+    const podRaw =
+      process.env.RP_POD_NAME ||
+      process.env.POD_NAME ||
+      process.env.HOSTNAME ||
+      process.env.K8S_POD_NAME ||
+      "local";
+    podToken =
+      (podRaw.split("-").pop() || podRaw).replace(/[^a-zA-Z0-9]/g, "").slice(0, 12) || "local";
+  }
+  const id = `record-platform.${service || "unknown"}.${podToken}.${normalizedRole}`;
   return id.slice(0, 200);
 }
 
 const kafkaClients = new Map<KafkaClientRole, Kafka>();
 
-/** Role-scoped KafkaJS client (separate client IDs for producer vs consumer). */
+/** Role-scoped KafkaJS client (separate client IDs per logical role). */
 export function getRpKafka(role: KafkaClientRole): Kafka {
   const existing = kafkaClients.get(role);
   if (existing) return existing;

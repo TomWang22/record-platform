@@ -1,0 +1,12 @@
+{
+  "document": "gate5-certificate-fingerprint-closure",
+  "method": "kubectl exec cat + host openssl (not in-pod openssl)",
+  "shared_client_certificate_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+  "subject": "CN=kafka-client, O=record-platform",
+  "issuer": "CN=record-platform-dev-intermediate, O=Record Platform, C=US",
+  "clientAuth_EKU": true,
+  "secret": "kafka-ssl-secret",
+  "v1_nine_classifications": "see reports/kafka/gate5-v1-client-identity-rca.json",
+  "roles_with_mounted_fingerprint_expected": 19,
+  "note": "Multiple roles per pod legitimately share the same mounted client certificate; each role references this proven fingerprint. Fingerprints proven from mounted pod files only — not source tree certs."
+}

@@ -15,6 +15,7 @@ DEPLOYS=(
   analytics-service api-gateway auction-monitor auth-service listings-service
   media-service messaging-service notification-service python-ai-service
   records-service shopping-service trust-service webapp
+  ollama-gateway ollama-worker
 )
 
 port_for() {
@@ -33,6 +34,8 @@ port_for() {
     media-service) echo 4018 ;;
     python-ai-service) echo 5005 ;;
     webapp) echo 3001 ;;
+    ollama-gateway) echo 8081 ;;
+    ollama-worker) echo 9100 ;;
     *) echo 0 ;;
   esac
 }
@@ -74,10 +77,14 @@ def ensure_env(container):
   setv("RP_BUILD_ID", build_id)
   setv("RP_IMAGE_TAG", "dev")
   setv("SERVICE_NAME", name)
+  setv("RP_SERVICE_NAME", name)
   setv("OTEL_SERVICE_NAME", name)
   setf("POD_NAME", "metadata.name")
+  setf("RP_POD_NAME", "metadata.name")
   setf("POD_UID", "metadata.uid")
+  setf("RP_POD_UID", "metadata.uid")
   setf("POD_NAMESPACE", "metadata.namespace")
+  setv("RP_KAFKA_CLIENT_ID_STRICT", "1")
   attrs = f"service.name={name},service.version={sha[:12]},deployment.environment=local,rp.source_sha={sha}"
   setv("OTEL_RESOURCE_ATTRIBUTES", attrs)
   container["env"] = list(by.values())
@@ -96,7 +103,7 @@ def ensure_env(container):
 
 for c in spec.get("containers") or []:
   cname = c.get("name") or ""
-  if cname in ("app", "web") or len(spec.get("containers") or []) == 1:
+  if cname in ("app", "web", "webapp", "worker", "gateway") or len(spec.get("containers") or []) == 1:
     ensure_env(c)
 
 json.dump(dep, open(out_path, "w"))

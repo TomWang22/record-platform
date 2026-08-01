@@ -1,0 +1,179 @@
+{
+  "document": "gate5-v1-client-identity-rca",
+  "immutable": true,
+  "gate5_v1_root": "/tmp/record-platform-runtime-heartbeat-gate5-v1",
+  "terminal_state": "FROZEN_BLOCKED_EVIDENCE",
+  "FROZEN_BLOCKED_EVIDENCE_sha256": "3719a3ceac23bb3f00717d934c64fe2fca1a88413cd157bc39bc5d8d153d3f61",
+  "HARD_FAILURE_json_sha256": "db405376085b93a3728d59e0533b921950aff17839d6424b2bf84b10d3768b45",
+  "files_in_root": 17,
+  "root_bytes_approx_kib": 152,
+  "unchanged_confirmation": "Do not resume, delete, rewrite terminal markers, add PASS rows, or convert to PASS.",
+  "accepted_v1_denominators": {
+    "participant_services_expected_discovered": "12/12",
+    "logical_roles_expected_discovered": "15/15",
+    "topics_expected_discovered": "20/20",
+    "consumer_groups_expected_discovered": "7/7"
+  },
+  "matrix_started": false,
+  "failing_live_client_ids": {
+    "generic_client_ids": ["aiokafka-0.11.0"],
+    "missing_role_suffix": [
+      "aiokafka-0.11.0",
+      "ollama-worker-ollama-worker-66c777bff-6vzck",
+      "ollama-worker-ollama-worker-66c777bff-jqrxt"
+    ],
+    "duplicate_live_client_ids": ["aiokafka-0.11.0"],
+    "nonconforming_client_ids": [
+      "aiokafka-0.11.0",
+      "ollama-worker-ollama-worker-66c777bff-6vzck",
+      "ollama-worker-ollama-worker-66c777bff-jqrxt"
+    ],
+    "source_hardcoded_gateway_id": "ollama-gateway"
+  },
+  "defect_classes": {
+    "generic_client_id": {
+      "ids": ["aiokafka-0.11.0"],
+      "class": "source_defect",
+      "paths": [
+        "services/python-ai-service/app/data_pipeline.py",
+        "services/python-ai-service/app/ai/outbox.py"
+      ],
+      "detail": "AIOKafkaProducer/AIOKafkaConsumer constructed without client_id; library default aiokafka-<version> used."
+    },
+    "duplicate_client_id": {
+      "ids": ["aiokafka-0.11.0"],
+      "class": "source_defect",
+      "detail": "Multiple consumer members in group python-ai-service share one generic library client_id."
+    },
+    "missing_role_suffix": {
+      "ids": [
+        "aiokafka-0.11.0",
+        "ollama-worker-ollama-worker-66c777bff-6vzck",
+        "ollama-worker-ollama-worker-66c777bff-jqrxt"
+      ],
+      "class": "source_defect",
+      "paths": [
+        "services/python-ai-service/app/data_pipeline.py",
+        "services/ollama-worker/worker.js",
+        "k8s/ollama-worker-configmap.yaml",
+        "services/ollama-gateway/server.js",
+        "k8s/ollama-gateway-configmap.yaml"
+      ]
+    },
+    "missing_pod_uniqueness": {
+      "class": "source_defect",
+      "detail": "python-ai ignores POD_UID already injected by rp-patch-runtime-provenance-and-identity.sh; ollama uses HOSTNAME/full pod name instead of metadata.uid prefix; ollama Deployments omitted from provenance patch list."
+    },
+    "participant_omitted_from_exact_sha_pin": {
+      "class": "kubernetes_configuration_defect",
+      "workloads": ["ollama-gateway", "ollama-worker"],
+      "detail": "Gate4 pin covered 13 app workloads / 14 containers. Ollama gateway/workers run Kafka clients from node:22-alpine + ConfigMap code without RP_SOURCE_SHA / OCI revision pin membership."
+    }
+  },
+  "nine_missing_fingerprint_rows": {
+    "v1_count": 9,
+    "v1_note": "gate5-runtime-role-client-ids.json cert_proof had 10 Node/python rows; 1 ok (python-ai); 9 failed. Ollama was skipped in that collector loop, not part of the raw 9.",
+    "rows": [
+      {
+        "service": "analytics-service",
+        "classification": "CERTIFICATE_PRESENT_COLLECTOR_LOOKUP_FAILED",
+        "mounted_path": "/etc/kafka/secrets/client.crt",
+        "secret": "kafka-ssl-secret",
+        "host_proven_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+        "clientAuth_EKU": true,
+        "subject": "CN=kafka-client, O=record-platform",
+        "collector_defect": "in-pod openssl absent; collector required openssl x509 inside container"
+      },
+      {
+        "service": "auction-monitor",
+        "classification": "CERTIFICATE_PRESENT_COLLECTOR_LOOKUP_FAILED",
+        "mounted_path": "/etc/kafka/secrets/client.crt",
+        "secret": "kafka-ssl-secret",
+        "host_proven_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+        "clientAuth_EKU": true
+      },
+      {
+        "service": "auth-service",
+        "classification": "CERTIFICATE_PRESENT_COLLECTOR_LOOKUP_FAILED",
+        "mounted_path": "/etc/kafka/secrets/client.crt",
+        "secret": "kafka-ssl-secret",
+        "host_proven_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+        "clientAuth_EKU": true
+      },
+      {
+        "service": "listings-service",
+        "classification": "CERTIFICATE_PRESENT_COLLECTOR_LOOKUP_FAILED",
+        "mounted_path": "/etc/kafka/secrets/client.crt",
+        "secret": "kafka-ssl-secret",
+        "host_proven_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+        "clientAuth_EKU": true
+      },
+      {
+        "service": "media-service",
+        "classification": "CERTIFICATE_PRESENT_COLLECTOR_LOOKUP_FAILED",
+        "mounted_path": "/etc/kafka/secrets/client.crt",
+        "secret": "kafka-ssl-secret",
+        "host_proven_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+        "clientAuth_EKU": true
+      },
+      {
+        "service": "messaging-service",
+        "classification": "CERTIFICATE_PRESENT_COLLECTOR_LOOKUP_FAILED",
+        "mounted_path": "/etc/kafka/secrets/client.crt",
+        "secret": "kafka-ssl-secret",
+        "host_proven_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+        "clientAuth_EKU": true
+      },
+      {
+        "service": "notification-service",
+        "classification": "CERTIFICATE_PRESENT_COLLECTOR_LOOKUP_FAILED",
+        "mounted_path": "/etc/kafka/secrets/client.crt",
+        "secret": "kafka-ssl-secret",
+        "host_proven_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+        "clientAuth_EKU": true
+      },
+      {
+        "service": "shopping-service",
+        "classification": "CERTIFICATE_PRESENT_COLLECTOR_LOOKUP_FAILED",
+        "mounted_path": "/etc/kafka/secrets/client.crt",
+        "secret": "kafka-ssl-secret",
+        "host_proven_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+        "clientAuth_EKU": true
+      },
+      {
+        "service": "trust-service",
+        "classification": "CERTIFICATE_PRESENT_COLLECTOR_LOOKUP_FAILED",
+        "mounted_path": "/etc/kafka/secrets/client.crt",
+        "secret": "kafka-ssl-secret",
+        "host_proven_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+        "clientAuth_EKU": true
+      }
+    ],
+    "related_not_in_raw_nine": [
+      {
+        "service": "python-ai-service",
+        "classification": "ROLE_USES_SHARED_PROVEN_CERTIFICATE",
+        "note": "v1 collector succeeded (openssl present); cert mounted"
+      },
+      {
+        "service": "ollama-worker",
+        "classification": "PARTICIPANT_NOT_INCLUDED_IN_RUNTIME_PIN",
+        "secondary": "CERTIFICATE_PRESENT_COLLECTOR_LOOKUP_FAILED",
+        "mounted_path": "/etc/kafka/secrets/tls.crt",
+        "host_proven_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+        "note": "Skipped by v1 cert_proof loop; not in Gate4 13-workload pin; cert is mounted"
+      },
+      {
+        "service": "ollama-gateway",
+        "classification": "PARTICIPANT_NOT_INCLUDED_IN_RUNTIME_PIN",
+        "secondary": "CERTIFICATE_PRESENT_COLLECTOR_LOOKUP_FAILED",
+        "mounted_path": "/etc/kafka/secrets/tls.crt",
+        "host_proven_sha256_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+        "note": "Skipped by v1 cert_proof loop; not in Gate4 13-workload pin; cert is mounted"
+      }
+    ],
+    "unknown_blocking": 0,
+    "evidence_collector_defect": "scripts/gate5-kafka-denominator-closure.py required in-pod openssl; Node Alpine/distroless-style images lack openssl. Correct method: kubectl exec cat + host openssl."
+  },
+  "authorization_note": "Kafka client.id is attribution only. Authorization remains TLS client certificate SAN/SPIFFE + trust chain + Kafka ACL/policy. Forged client.id must not grant access."
+}

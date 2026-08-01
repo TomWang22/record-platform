@@ -44,6 +44,8 @@ jobs:
           - python-ai-service
           - auction-monitor
           - transport-watchdog
+          - ollama-gateway
+          - ollama-worker
 
     steps:
       - name: Checkout
@@ -81,6 +83,9 @@ jobs:
           if [[ "$svc" == "python-ai-service" ]]; then
             python3 -m compileall -q "services/$svc"
             echo "python-ai-service: Python compile check OK"
+          elif [[ "$svc" == "ollama-gateway" || "$svc" == "ollama-worker" ]]; then
+            node --check "services/$svc/$([[ "$svc" == ollama-gateway ]] && echo server.js || echo worker.js)"
+            echo "$svc: Node syntax check OK"
           else
             pnpm -C "services/$svc" build
           fi
@@ -107,6 +112,8 @@ jobs:
           - python-ai-service
           - auction-monitor
           - transport-watchdog
+          - ollama-gateway
+          - ollama-worker
 
     steps:
       - name: Checkout
@@ -141,6 +148,10 @@ jobs:
             echo "python-ai-service: unit tests run in coverage workflow"
             exit 0
           fi
+          if [[ "$svc" == "ollama-gateway" || "$svc" == "ollama-worker" ]]; then
+            node tests/ollama-kafka-client-id-contract.test.mjs
+            exit 0
+          fi
           if [[ ! -f "services/$svc/package.json" ]]; then
             echo "No package.json for $svc — skip"
             exit 0
@@ -169,6 +180,8 @@ jobs:
           - python-ai-service
           - auction-monitor
           - transport-watchdog
+          - ollama-gateway
+          - ollama-worker
           - webapp
 
     steps:

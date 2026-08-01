@@ -347,8 +347,33 @@ async function main() {
   }
 
   if (KAFKA_ENABLED) {
+    const resolveKafkaClientId = (role) => {
+      const allowed = new Set(['producer', 'consumer', 'admin', 'outbox-publisher']);
+      if (!allowed.has(role)) throw new Error(`[ollama-gateway] invalid kafka role: ${role}`);
+      const strict =
+        process.env.RP_KAFKA_CLIENT_ID_STRICT === '1' ||
+        process.env.RP_ACCEPTANCE_MODE === '1' ||
+        String(process.env.RP_ACCEPTANCE_MODE || '').toLowerCase() === 'true';
+      const service = (
+        process.env.RP_SERVICE_NAME ||
+        process.env.OTEL_SERVICE_NAME ||
+        process.env.SERVICE_NAME ||
+        'ollama-gateway'
+      )
+        .replace(/[^a-zA-Z0-9._-]/g, '-')
+        .slice(0, 48);
+      const uid = (process.env.RP_POD_UID || process.env.POD_UID || '').replace(/-/g, '');
+      let token = uid.slice(0, 8).replace(/[^a-zA-Z0-9]/g, '');
+      if (!token) {
+        if (strict) {
+          throw new Error('[ollama-gateway] RP_POD_UID/POD_UID required in acceptance mode');
+        }
+        token = 'local';
+      }
+      return `record-platform.${service}.${token}.${role}`.slice(0, 200);
+    };
     const kafka = new Kafka({
-      clientId: 'ollama-gateway',
+      clientId: resolveKafkaClientId('producer'),
       brokers: KAFKA_BROKERS,
       ssl: loadKafkaJsSslOption(),
       connectionTimeout: Number(process.env.KAFKAJS_CONNECTION_TIMEOUT_MS || '4000'),

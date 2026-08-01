@@ -83,8 +83,46 @@ const redis = new Redis(REDIS_URL, { maxRetriesPerRequest: 3 });
 redis.on('error', (err) => {
   console.warn('[ollama-worker] redis:', err?.message || err);
 });
+
+/** Attribution-only client.id — not an authorization identity. */
+function resolveKafkaClientId(role) {
+  const allowed = new Set([
+    'producer',
+    'consumer',
+    'admin',
+    'inference-consumer',
+    'result-producer',
+    'dlq-producer',
+    'retry-consumer',
+  ]);
+  if (!allowed.has(role)) {
+    throw new Error(`[ollama-worker] invalid kafka role: ${role}`);
+  }
+  const strict =
+    process.env.RP_KAFKA_CLIENT_ID_STRICT === '1' ||
+    process.env.RP_ACCEPTANCE_MODE === '1' ||
+    String(process.env.RP_ACCEPTANCE_MODE || '').toLowerCase() === 'true';
+  const service = (
+    process.env.RP_SERVICE_NAME ||
+    process.env.OTEL_SERVICE_NAME ||
+    process.env.SERVICE_NAME ||
+    'ollama-worker'
+  )
+    .replace(/[^a-zA-Z0-9._-]/g, '-')
+    .slice(0, 48);
+  const uid = (process.env.RP_POD_UID || process.env.POD_UID || '').replace(/-/g, '');
+  let token = uid.slice(0, 8).replace(/[^a-zA-Z0-9]/g, '');
+  if (!token) {
+    if (strict) {
+      throw new Error('[ollama-worker] RP_POD_UID/POD_UID required in acceptance mode');
+    }
+    token = 'local';
+  }
+  return `record-platform.${service}.${token}.${role}`.slice(0, 200);
+}
+
 const kafka = new Kafka({
-  clientId: `ollama-worker-${process.env.HOSTNAME || '0'}`,
+  clientId: resolveKafkaClientId('inference-consumer'),
   brokers: KAFKA_BROKERS,
   ssl: loadKafkaJsSslOption(),
   connectionTimeout: Number(process.env.KAFKAJS_CONNECTION_TIMEOUT_MS || '4000'),

@@ -1,0 +1,79 @@
+{
+  "document": "gate5-runtime-image-target-census",
+  "runtime_carry_forward_from_f99868f1": false,
+  "source_built_image_targets_expected": 16,
+  "source_built_image_targets_discovered": 16,
+  "source_built_image_targets": [
+    "analytics-service",
+    "api-gateway",
+    "auction-monitor",
+    "auth-service",
+    "listings-service",
+    "media-service",
+    "messaging-service",
+    "notification-service",
+    "python-ai-service",
+    "records-service",
+    "shopping-service",
+    "trust-service",
+    "webapp",
+    "transport-watchdog",
+    "ollama-gateway",
+    "ollama-worker"
+  ],
+  "kafka_workloads_expected": 12,
+  "kafka_workloads_discovered": 12,
+  "kafka_workloads": [
+    "analytics-service",
+    "auction-monitor",
+    "auth-service",
+    "listings-service",
+    "media-service",
+    "messaging-service",
+    "notification-service",
+    "shopping-service",
+    "trust-service",
+    "python-ai-service",
+    "ollama-gateway",
+    "ollama-worker"
+  ],
+  "kafka_pods_expected": 13,
+  "kafka_pods_rationale": "10 single-replica kafka workloads + python-ai + ollama-gateway + 2 ollama-worker replicas = 13",
+  "logical_roles_expected": 19,
+  "logical_roles_discovered": 19,
+  "logical_roles_change_from_v1": {
+    "v1": 15,
+    "remediation": 19,
+    "rationale": [
+      "Split outbox-publisher from producer wherever a dedicated publisher client is constructed (analytics, auction-monitor, auth, shopping, python-ai).",
+      "Split shopping grpc producer from SaleCompleted outbox-publisher.",
+      "Rename python consumer to market-event-consumer; ollama-worker to inference-consumer.",
+      "notification-consumer and lifecycle-consumer are distinct getRpKafka roles (were both .consumer)."
+    ]
+  },
+  "logical_roles": [
+    {"service": "analytics-service", "role": "producer"},
+    {"service": "analytics-service", "role": "outbox-publisher"},
+    {"service": "auction-monitor", "role": "producer"},
+    {"service": "auction-monitor", "role": "outbox-publisher"},
+    {"service": "auth-service", "role": "outbox-publisher"},
+    {"service": "listings-service", "role": "producer"},
+    {"service": "media-service", "role": "lifecycle-consumer"},
+    {"service": "messaging-service", "role": "producer"},
+    {"service": "messaging-service", "role": "lifecycle-consumer"},
+    {"service": "notification-service", "role": "notification-consumer"},
+    {"service": "notification-service", "role": "lifecycle-consumer"},
+    {"service": "shopping-service", "role": "producer"},
+    {"service": "shopping-service", "role": "outbox-publisher"},
+    {"service": "trust-service", "role": "lifecycle-consumer"},
+    {"service": "python-ai-service", "role": "market-event-consumer"},
+    {"service": "python-ai-service", "role": "producer"},
+    {"service": "python-ai-service", "role": "outbox-publisher"},
+    {"service": "ollama-worker", "role": "inference-consumer"},
+    {"service": "ollama-gateway", "role": "producer"}
+  ],
+  "image_vs_replica": {
+    "ollama_worker_image_targets": 1,
+    "ollama_worker_replicas": 2
+  }
+}

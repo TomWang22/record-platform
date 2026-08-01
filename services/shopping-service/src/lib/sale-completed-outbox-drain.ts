@@ -5,7 +5,7 @@
  * Pure core is injectable for crash/replay unit tests.
  */
 import crypto from 'node:crypto'
-import { kafka, rpKafkaTopicIsolationSuffix } from '@common/utils/kafka'
+import { getRpKafka, rpKafkaTopicIsolationSuffix } from '@common/utils/kafka'
 import { listingsPool } from './availability.js'
 
 const ENV_PREFIX = process.env.ENV_PREFIX || 'dev'
@@ -18,7 +18,7 @@ export const DEFAULT_LEASE_MS = Number(process.env.PHASE34_OUTBOX_LEASE_MS || 30
 export const SOURCE_SHA =
   process.env.RP_SOURCE_SHA || process.env.SOURCE_SHA || process.env.GIT_SHA || 'unknown'
 
-let producer: Awaited<ReturnType<typeof kafka.producer>> | null = null
+let producer: Awaited<ReturnType<ReturnType<typeof getRpKafka>["producer"]>> | null = null
 let drainTimer: NodeJS.Timeout | null = null
 let draining = false
 
@@ -167,7 +167,7 @@ export async function drainSaleCompletedOutboxCore(
 
 async function getProducer() {
   if (!producer) {
-    producer = kafka.producer()
+    producer = getRpKafka("outbox-publisher").producer()
     await producer.connect()
   }
   return producer

@@ -3,11 +3,11 @@
  * Safe under at-least-once: consumers dedupe by envelope event_id.
  */
 import type { PrismaClient } from "../../prisma/generated/client";
-import { kafka, setOchOutboxOldestUnpublishedAgeSeconds, incOchOutboxPublishAttempt, incOchOutboxPublishFailure, incOchOutboxPublishSuccess } from "@common/utils";
+import { getRpKafka, setOchOutboxOldestUnpublishedAgeSeconds, incOchOutboxPublishAttempt, incOchOutboxPublishFailure, incOchOutboxPublishSuccess } from "@common/utils";
 import { buildKafkaMessageHeaders } from "@common/utils/otel";
 import { setAuthOutboxUnpublishedCount } from "./auth-outbox-metrics.js";
 
-const producer = kafka.producer();
+const producer = getRpKafka("outbox-publisher").producer();
 let producerReady = false;
 
 export type AuthOutboxRow = {

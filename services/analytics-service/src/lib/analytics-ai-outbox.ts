@@ -3,17 +3,17 @@
  */
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
-import { kafka } from "@common/utils/kafka";
+import { getRpKafka } from "@common/utils/kafka";
 
 const PREFIX = process.env.ENV_PREFIX || "dev";
 export const AI_EVENTS_TOPIC = `${PREFIX}.ai.events`;
 
-let producer: ReturnType<typeof kafka.producer> | null = null;
+let producer: ReturnType<ReturnType<typeof getRpKafka>["producer"]> | null = null;
 let producerReady = false;
 
-async function ensureProducer(): Promise<ReturnType<typeof kafka.producer> | null> {
+async function ensureProducer(): Promise<ReturnType<ReturnType<typeof getRpKafka>["producer"]> | null> {
   if (process.env.ANALYTICS_OUTBOX_PUBLISHER === "0") return null;
-  if (!producer) producer = kafka.producer();
+  if (!producer) producer = getRpKafka("outbox-publisher").producer();
   if (!producerReady) {
     try {
       await producer.connect();

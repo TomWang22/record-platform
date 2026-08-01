@@ -65,7 +65,7 @@ export async function startUserLifecycleConsumer(
   }
 
   const topic = userLifecycleV1Topic();
-  const consumer = getRpKafka("consumer").consumer({ groupId: opts.groupId });
+  const consumer = getRpKafka("lifecycle-consumer").consumer({ groupId: opts.groupId });
   const connectBudgetMs = Number(process.env.USER_LIFECYCLE_KAFKA_CONNECT_MS || "8000");
   try {
     await Promise.race([

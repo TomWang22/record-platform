@@ -14,6 +14,7 @@ import logging
 
 # Use centralized Redis cache module with singleflight
 from app.redis_cache import get_with_singleflight, set_cache, get_cache, get_redis_client
+from app.kafka_client_id import resolve_kafka_client_id
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,7 @@ async def get_kafka_producer() -> Optional[AIOKafkaProducer]:
         
         kafka_producer = AIOKafkaProducer(
             bootstrap_servers=KAFKA_BROKER,
+            client_id=resolve_kafka_client_id("producer"),
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
             key_serializer=lambda k: k.encode('utf-8') if k else None,
             security_protocol=security_protocol,
@@ -429,6 +431,7 @@ async def start_kafka_consumer():
             "analytics-predictions",
             "analytics-searches",
             bootstrap_servers=KAFKA_BROKER,
+            client_id=resolve_kafka_client_id("market-event-consumer"),
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
             group_id="python-ai-service",
             auto_offset_reset="latest",

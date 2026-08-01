@@ -9,6 +9,8 @@ from typing import Any, Dict, Optional
 
 from aiokafka import AIOKafkaProducer
 
+from app.kafka_client_id import resolve_kafka_client_id
+
 PREFIX = os.getenv("ENV_PREFIX", "dev")
 AI_EVENTS_TOPIC = f"{PREFIX}.ai.events"
 
@@ -29,6 +31,7 @@ async def _kafka_producer() -> Optional[AIOKafkaProducer]:
         ctx.load_cert_chain(cert, key)
     producer = AIOKafkaProducer(
         bootstrap_servers=broker,
+        client_id=resolve_kafka_client_id("outbox-publisher"),
         security_protocol="SSL",
         ssl_context=ctx,
     )

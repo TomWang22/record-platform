@@ -376,7 +376,7 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
     }
   }
 
-  const consumer = getRpKafka("consumer").consumer({
+  const consumer = getRpKafka("notification-consumer").consumer({
     groupId: process.env.KAFKA_GROUP_ID || "notification-service-group",
   });
   const connectBudgetMs = Number(process.env.NOTIFICATION_KAFKA_CONNECT_MS || "8000");

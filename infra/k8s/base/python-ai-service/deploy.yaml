@@ -108,6 +108,26 @@ spec:
             # T20.10H — cap gunicorn workers (preload_app + grpc/kafka per worker is memory-heavy)
             - name: WEB_CONCURRENCY
               value: "4"
+            - name: RP_SERVICE_NAME
+              value: "python-ai-service"
+            - name: RP_KAFKA_CLIENT_ID_STRICT
+              value: "1"
+            - name: RP_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: RP_POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto

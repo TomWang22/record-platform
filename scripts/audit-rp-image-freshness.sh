@@ -99,14 +99,14 @@ say_ok() { oks+=("$1"); echo "✅ $1"; }
 say_fail() { issues+=("$1"); echo "❌ $1" >&2; }
 say_warn() { warns+=("$1"); echo "⚠️  $1"; }
 
-for forbidden in reservation-mesh messaging-service; do
+for forbidden in reservation-mesh; do
   if docker image inspect "${forbidden}:${IMAGE_TAG}" >/dev/null 2>&1; then
     say_warn "${forbidden}:${IMAGE_TAG} exists locally but is not an active RP runtime target"
   fi
 done
 
 for svc in "${TARGETS[@]}"; do
-  if [[ "$svc" == "reservation-mesh" || "$svc" == "messaging-service" ]]; then
+  if [[ "$svc" == "reservation-mesh" ]]; then
     say_fail "${svc}: not an active RP image target"
     continue
   fi

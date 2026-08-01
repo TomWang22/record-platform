@@ -31,6 +31,8 @@ on:
       - "monitoring/prometheus-rules/kafka-kraft-dns.yaml"
       - "monitoring/prometheus-rules/service-slos.yaml"
       - "infra/k8s/base/observability/prometheus-rules-kafka-health.yaml"
+      - "infra/k8s/base/observability/jaeger-query-metallb.yaml"
+      - "infra/k8s/base/observability/kustomization.yaml"
       - "scripts/verify-outbox-infra-alignment.sh"
       - "scripts/run-chaos-suite.sh"
       - "scripts/run-governed-chaos.sh"

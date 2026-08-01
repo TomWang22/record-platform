@@ -63,13 +63,24 @@ Nineteen roles referencing this one leaf ≠ nineteen service identities.
 - **Target:** SPIFFE/DN principal per service + topic/group ACLs (see `gate5-v7-acl-contract.json`)
 - **client.id:** attribution only (must not authorize)
 
-## CI gate (before v7)
+## CI gate (exact-SHA)
 
-`kafka-dns-validate` was **REQUIRED_AND_FAILED** because `infra/k8s/base/observability/jaeger-query-metallb.yaml` was referenced by Kustomize but not tracked in Git.
+Accepted SHA: `c252607d49bb3c7c580dd6355e0127c8c29bc213`
 
-Required before gate5-v7 creation:
+| Workflow | Disposition |
+|---|---|
+| ci | REQUIRED_AND_PASSED |
+| docker-build | REQUIRED_AND_PASSED |
+| RP Namespace Lint | REQUIRED_AND_PASSED |
+| Protocol validation | REQUIRED_AND_PASSED |
+| kafka-dns-validate | REQUIRED_AND_PASSED (was red on cc627dac; Jaeger MetalLB now tracked) |
+| Kafka alignment | REQUIRED_AND_PASSED |
+| Kafka cluster verify (static) | REQUIRED_AND_PASSED |
+| coverage | PATH_FILTER_NA (services/** unchanged) |
 
-  workflows expected/passed/failed = 8/8/0
+Triggered required: **7/7 passed, 0 failed**. Coverage is N/A by path filter, not a red check.
+
+Full machine report: `reports/kafka/gate5-v7-exact-sha-ci-status.json`
 
 ## Artifacts (repo, not /tmp)
 
@@ -78,11 +89,13 @@ Required before gate5-v7 creation:
 - `reports/kafka/gate5-v7-acl-contract.json`
 - `reports/kafka/gate5-v7-certificate-acl-matrix.json`
 - `reports/kafka/gate5-v7-certificate-acl-matrix.md` (this file)
+- `reports/kafka/gate5-v7-exact-sha-ci-status.json`
 
-## Next remediation (not done in this report)
+## Still blocking gate5-v7 creation
 
-1. Track Jaeger MetalLB manifest; green exact-SHA CI
-2. Issue ollama leaves; add SPIFFE SANs; prefer clientAuth-only Kafka client leaves
-3. Wire each participant Kafka client paths to its service leaf (or kafka-client-<service> secret)
-4. Enable Kafka authorizer + ACL contract
-5. Rebuild/repin; PKI canary; then create `/tmp/.../gate5-v7/`
+CI is no longer the blocker. Runtime PKI/ACL remediation remains:
+
+1. Issue ollama leaves; add SPIFFE SANs; prefer clientAuth-only Kafka client leaves / serverAuth-only broker leaves
+2. Wire each participant Kafka client path to its service leaf (stop mounting shared `kafka-client`)
+3. Enable Kafka authorizer + ACL contract so same-CA wrong-service is denied
+4. Rebuild/repin from clean detached worktree; PKI canary; **then** create `/tmp/.../gate5-v7/`

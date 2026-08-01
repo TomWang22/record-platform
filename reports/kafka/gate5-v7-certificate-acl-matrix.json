@@ -520,10 +520,12 @@
       "OLLAMA_SERVICE_LEAVES_MISSING_FROM_CERTS_FOLDER",
       "SPIFFE_URI_SAN_ABSENT_ON_EXISTING_LEAVES",
       "DUAL_USE_EKU_ON_SERVICE_AND_BROKER_LEAVES",
-      "NO_KAFKA_ACL_AUTHORIZER_FOR_SERVICE_PRINCIPALS",
-      "KAFKA_DNS_VALIDATE_CI_REQUIRED_AND_FAILED_UNTIL_JAEGER_MANIFEST_TRACKED"
+      "NO_KAFKA_ACL_AUTHORIZER_FOR_SERVICE_PRINCIPALS"
     ],
-    "ci_universally_green": false,
+    "ci_universally_green": true,
+    "ci_status_report": "reports/kafka/gate5-v7-exact-sha-ci-status.json",
+    "ci_sha": "c252607d49bb3c7c580dd6355e0127c8c29bc213",
+    "ci_note": "7/7 required-and-triggered workflows green; coverage PATH_FILTER_NA",
     "folder_distinct_service_leaves": 10,
     "folder_missing_leaves": [
       "ollama-gateway",

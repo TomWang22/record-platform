@@ -1,0 +1,105 @@
+{
+  "document": "gate5-v7-exact-sha-ci-status",
+  "ts": "2026-08-01T23:16:00Z",
+  "accepted_remediation_sha": "c252607d49bb3c7c580dd6355e0127c8c29bc213",
+  "prior_matrix_sha": "3656fc59b3e59a204e35afb96b7927948c2401e2",
+  "author_committer": "MelonGodTier <tomwang22@yahoo.com>",
+  "cursor_trailers": 0,
+  "co_author_trailers": 0,
+  "gate5_v6_immutable": true,
+  "gate5_v7_authorized_to_create": false,
+  "reason_v7_not_authorized": [
+    "RUNTIME_KAFKA_USES_SHARED_GENERIC_CLIENT_LEAF",
+    "OLLAMA_SERVICE_LEAVES_MISSING_FROM_CERTS_FOLDER",
+    "SPIFFE_URI_SAN_ABSENT_ON_EXISTING_LEAVES",
+    "DUAL_USE_EKU_ON_SERVICE_AND_BROKER_LEAVES",
+    "NO_KAFKA_ACL_AUTHORIZER_FOR_SERVICE_PRINCIPALS"
+  ],
+  "jaeger_metallb_manifest": {
+    "path": "infra/k8s/base/observability/jaeger-query-metallb.yaml",
+    "tracked": true,
+    "kustomize_offline_verify": "PASS",
+    "hostname": "jaeger.record-platform.test",
+    "metallb_ip": "192.168.64.245"
+  },
+  "workflows": {
+    "denominator_model": "required_when_path_triggered_plus_explicit_na",
+    "expected_named": [
+      "ci",
+      "docker-build",
+      "coverage",
+      "RP Namespace Lint",
+      "Protocol validation (static + fixtures)",
+      "kafka-dns-validate",
+      "Kafka alignment",
+      "Kafka cluster verify (static)"
+    ],
+    "on_sha_c252607d": [
+      {
+        "name": "ci",
+        "status": "success",
+        "disposition": "REQUIRED_AND_PASSED",
+        "url": "https://github.com/TomWang22/record-platform/actions/runs/30722756267"
+      },
+      {
+        "name": "docker-build",
+        "status": "success",
+        "disposition": "REQUIRED_AND_PASSED",
+        "url": "https://github.com/TomWang22/record-platform/actions/runs/30722756238"
+      },
+      {
+        "name": "coverage",
+        "status": null,
+        "disposition": "PATH_FILTER_NA",
+        "rationale": "coverage.yml paths limited to services/**, scripts/coverage/**, workflow file; this remediation touched observability + reports + workflow path filters only"
+      },
+      {
+        "name": "RP Namespace Lint",
+        "status": "success",
+        "disposition": "REQUIRED_AND_PASSED",
+        "url": "https://github.com/TomWang22/record-platform/actions/runs/30722756249"
+      },
+      {
+        "name": "Protocol validation (static + fixtures)",
+        "status": "success",
+        "disposition": "REQUIRED_AND_PASSED",
+        "url": "https://github.com/TomWang22/record-platform/actions/runs/30722756229"
+      },
+      {
+        "name": "kafka-dns-validate",
+        "status": "success",
+        "disposition": "REQUIRED_AND_PASSED",
+        "url": "https://github.com/TomWang22/record-platform/actions/runs/30722756234",
+        "prior_failure_on_cc627dac": "https://github.com/TomWang22/record-platform/actions/runs/30684087087",
+        "repair": "tracked jaeger-query-metallb.yaml; added observability path filters"
+      },
+      {
+        "name": "Kafka alignment",
+        "status": "success",
+        "disposition": "REQUIRED_AND_PASSED",
+        "url": "https://github.com/TomWang22/record-platform/actions/runs/30722756243"
+      },
+      {
+        "name": "Kafka cluster verify (static)",
+        "status": "success",
+        "disposition": "REQUIRED_AND_PASSED",
+        "url": "https://github.com/TomWang22/record-platform/actions/runs/30722756224"
+      }
+    ],
+    "summary": {
+      "named_expected": 8,
+      "required_and_triggered": 7,
+      "required_and_passed": 7,
+      "required_and_failed": 0,
+      "path_filter_na": 1,
+      "unresolved": 0,
+      "universally_green_for_triggered_required": true,
+      "do_not_describe_as_7_of_8_red": true,
+      "note": "coverage is PATH_FILTER_NA, not failed. kafka-dns-validate is green on c252607d."
+    }
+  },
+  "also_proven_locally": {
+    "verify-kafka-prometheus-rules-offline.sh": "PASS",
+    "kubectl_kustomize_infra_k8s_base_observability": "PASS_includes_jaeger_query_192.168.64.245"
+  }
+}

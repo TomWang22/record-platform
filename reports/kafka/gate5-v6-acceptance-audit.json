@@ -1,0 +1,133 @@
+{
+  "audit_root": "/tmp/record-platform-gate5-v6-acceptance-audit-v1",
+  "broker_negatives": {
+    "INVALID_CLIENT_AUTH_EKU": "3/0/0",
+    "MISSING_CLIENT_CERTIFICATE": "3/1/True",
+    "PLAINTEXT_CONNECTION": "3/1/True",
+    "SAME_CA_UNAUTHORIZED_SERVICE_IDENTITY": "3/0/0",
+    "SAME_CA_WRONG_SERVICE_IDENTITY": "3/0/0",
+    "UNKNOWN_TRUSTED_CA_TEST_IDENTITY": "3/0/0",
+    "WRONG_BROKER_SNI_OR_SAN": "3/0/0",
+    "WRONG_TRUST_ROOT": "3/0/0"
+  },
+  "broker_positive": {
+    "consume": "3/0/0",
+    "metadata": "3/3/3",
+    "produce": "3/0/0"
+  },
+  "ci": {
+    "exact_sha_ci_universally_green": false,
+    "kafka_dns_validate_disposition": "REQUIRED_AND_FAILED",
+    "required_workflows_expected": 8,
+    "required_workflows_failed": 1,
+    "required_workflows_passed": 7,
+    "required_workflows_unresolved": 0
+  },
+  "classification": "FUNCTIONAL_PASS_EVIDENCE_INCOMPLETE",
+  "classification_enum": [
+    "EVIDENCE_COMPLETE_PASS",
+    "FUNCTIONAL_PASS_EVIDENCE_INCOMPLETE",
+    "TERMINAL_CLASSIFICATION_CONFLICT",
+    "CORRUPT_OR_UNVERIFIABLE"
+  ],
+  "document": "gate5-v6-acceptance-audit",
+  "eku_and_chains": {
+    "brokers_expected": 3,
+    "brokers_with_serverAuth_proof_in_v6": 0,
+    "logical_roles_expected": 19,
+    "roles_with_broker_observed_presentation": 0,
+    "roles_with_clientAuth_EKU_in_v6_cert_copies": 19,
+    "roles_with_mounted_fingerprint_in_v6": 19
+  },
+  "events": {
+    "families_expected": "UNCLOSED",
+    "families_passed": 0,
+    "families_tested_as_lineage": 0,
+    "marker_only": true
+  },
+  "evidence": {
+    "logs_present": 0,
+    "metrics_present": 0,
+    "pcaps_expected": "CONTRACT_N",
+    "pcaps_present": 0,
+    "traces_expected": "CONTRACT_N",
+    "traces_queryable": 0
+  },
+  "gate5_v7_required": true,
+  "gate_6_authorized": false,
+  "hard_gaps": [
+    "required CI workflow kafka-dns-validate FAILED on exact SHA",
+    "incomplete broker positive matrix (metadata only; produce/consume 0/3)",
+    "incomplete broker negative matrix (2/24 category-broker rows; 6 categories absent)",
+    "marker-only event proof; zero business event-family lineage rows",
+    "topic denominator unresolved (21 expected / 22 discovered; ephemeral probe not dispositioned in v6)",
+    "no per-role broker-observed certificate presentation / pcap handshake proof",
+    "no broker serverAuth/SAN/SNI/runtime-presented chain proof artifacts in v6",
+    "no pcaps; no MetalLB Jaeger exact trace IDs; no metric/log correlation ledger",
+    "no controlled consumer SIGTERM evidence",
+    "steady-state lacks group membership / rebalance denominators"
+  ],
+  "integrity": {
+    "file_count": 26,
+    "immutable_confirmation": true,
+    "terminal_manifest_sha256": "a92ccaf2291f87b40d89ffd2e402593162f752ad4b2955f9c12f4bf5c62be086",
+    "terminal_marker_sha256": "6fb1a01c78de93cbcc5a5686bbd50b45b231bfd5cc90e7b78703a8b67d95898b",
+    "total_bytes": 85058,
+    "v6_tree_sha256": "48fd48fb4f000a748b3f9651b98d6ff648b963d582bbe3ca7a4b53b684a0e437"
+  },
+  "performance_authorized": false,
+  "pin": {
+    "RP_SOURCE_SHA_matches": 16,
+    "containers_ready": "17/17",
+    "digests": "17/17",
+    "image_targets_oci_ok": "16/16",
+    "kafka_brokers_ready": "3/3",
+    "kafka_workloads": [
+      "analytics-service",
+      "auction-monitor",
+      "auth-service",
+      "listings-service",
+      "media-service",
+      "messaging-service",
+      "notification-service",
+      "shopping-service",
+      "trust-service",
+      "python-ai-service",
+      "ollama-gateway",
+      "ollama-worker"
+    ],
+    "restart_sum": 0,
+    "runtime_carry_forward_from_f99868f1": false,
+    "sha": "cc627dac49b20c83342d41071ac2fa484255969c"
+  },
+  "production_approved": false,
+  "stability": {
+    "SIGTERM": "ABSENT",
+    "broker_restarts_converged_flags": "3/3",
+    "group_denominator_in_artifact": "ABSENT",
+    "observation_seconds": 900,
+    "rollouts": [
+      {
+        "ok": true,
+        "out": " out of 1 new replicas have been updated...\nWaiting for deployment \"listings-service\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"listings-service\" successfully rolled out\n",
+        "workload": "listings-service"
+      },
+      {
+        "ok": true,
+        "out": "inish: 1 old replicas are pending termination...\nWaiting for deployment \"ollama-worker\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"ollama-worker\" successfully rolled out\n",
+        "workload": "ollama-worker"
+      }
+    ]
+  },
+  "topics": {
+    "discovered": 22,
+    "expected": 21,
+    "extra_disposition": "ACCEPTANCE_EPHEMERAL_TOPIC",
+    "stale_test_topics": 1,
+    "unauthorized_topics": 0,
+    "unknown_topics": 0
+  },
+  "ts": "2026-08-01T22:50:00Z",
+  "v6_root": "/tmp/record-platform-runtime-heartbeat-gate5-v6",
+  "v6_terminal_status_claim": "PASS"
+}

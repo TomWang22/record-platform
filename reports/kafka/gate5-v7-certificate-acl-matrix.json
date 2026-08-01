@@ -1,0 +1,543 @@
+{
+  "broker_fingerprint": "96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04",
+  "document": "gate5-v7-certificate-acl-matrix",
+  "generic_kafka_client_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+  "intermediate_fingerprint": "99:18:60:03:76:CA:CF:BC:61:72:A6:6F:F2:1A:40:14:8C:4C:AF:C4:FC:72:00:AA:EF:E7:FA:6E:D5:BD:C6:6F",
+  "roles": [
+    {
+      "folder_leaf_available": true,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/analytics-service",
+      "required_client_id_form": "record-platform.analytics-service.<pod-uid-prefix>.producer",
+      "role": "producer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "analytics-service",
+      "topics_consume": [],
+      "topics_produce": [
+        "dev.analytics.events"
+      ]
+    },
+    {
+      "folder_leaf_available": true,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/analytics-service",
+      "required_client_id_form": "record-platform.analytics-service.<pod-uid-prefix>.outbox-publisher",
+      "role": "outbox-publisher",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "analytics-service",
+      "topics_consume": [],
+      "topics_produce": [
+        "dev.analytics.events"
+      ]
+    },
+    {
+      "folder_leaf_available": true,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/auction-monitor",
+      "required_client_id_form": "record-platform.auction-monitor.<pod-uid-prefix>.producer",
+      "role": "producer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "auction-monitor",
+      "topics_consume": [],
+      "topics_produce": [
+        "dev.auction_monitor.events",
+        "auctions.events"
+      ]
+    },
+    {
+      "folder_leaf_available": true,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/auction-monitor",
+      "required_client_id_form": "record-platform.auction-monitor.<pod-uid-prefix>.outbox-publisher",
+      "role": "outbox-publisher",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "auction-monitor",
+      "topics_consume": [],
+      "topics_produce": [
+        "dev.auction_monitor.events"
+      ]
+    },
+    {
+      "folder_leaf_available": true,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/auth-service",
+      "required_client_id_form": "record-platform.auth-service.<pod-uid-prefix>.outbox-publisher",
+      "role": "outbox-publisher",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "auth-service",
+      "topics_consume": [],
+      "topics_produce": [
+        "dev.auth.events",
+        "dev.user.lifecycle.v1"
+      ]
+    },
+    {
+      "folder_leaf_available": true,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/listings-service",
+      "required_client_id_form": "record-platform.listings-service.<pod-uid-prefix>.producer",
+      "role": "producer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "listings-service",
+      "topics_consume": [],
+      "topics_produce": [
+        "dev.listing.events"
+      ]
+    },
+    {
+      "folder_leaf_available": true,
+      "group": "media-service-user-lifecycle",
+      "required_certificate_identity": "spiffe://record-platform/service/media-service",
+      "required_client_id_form": "record-platform.media-service.<pod-uid-prefix>.lifecycle-consumer",
+      "role": "lifecycle-consumer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "media-service",
+      "topics_consume": [
+        "dev.user.lifecycle.v1"
+      ],
+      "topics_produce": []
+    },
+    {
+      "folder_leaf_available": true,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/messaging-service",
+      "required_client_id_form": "record-platform.messaging-service.<pod-uid-prefix>.producer",
+      "role": "producer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "messaging-service",
+      "topics_consume": [],
+      "topics_produce": [
+        "messaging.events.v1",
+        "dev.messaging.dlq"
+      ]
+    },
+    {
+      "folder_leaf_available": true,
+      "group": "messaging-service-user-lifecycle",
+      "required_certificate_identity": "spiffe://record-platform/service/messaging-service",
+      "required_client_id_form": "record-platform.messaging-service.<pod-uid-prefix>.lifecycle-consumer",
+      "role": "lifecycle-consumer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "messaging-service",
+      "topics_consume": [
+        "dev.user.lifecycle.v1"
+      ],
+      "topics_produce": []
+    },
+    {
+      "folder_leaf_available": true,
+      "group": "notification-service-group",
+      "required_certificate_identity": "spiffe://record-platform/service/notification-service",
+      "required_client_id_form": "record-platform.notification-service.<pod-uid-prefix>.notification-consumer",
+      "role": "notification-consumer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "notification-service",
+      "topics_consume": [
+        "dev.notification.events"
+      ],
+      "topics_produce": []
+    },
+    {
+      "folder_leaf_available": true,
+      "group": "notification-service-user-lifecycle",
+      "required_certificate_identity": "spiffe://record-platform/service/notification-service",
+      "required_client_id_form": "record-platform.notification-service.<pod-uid-prefix>.lifecycle-consumer",
+      "role": "lifecycle-consumer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "notification-service",
+      "topics_consume": [
+        "dev.user.lifecycle.v1"
+      ],
+      "topics_produce": []
+    },
+    {
+      "folder_leaf_available": true,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/shopping-service",
+      "required_client_id_form": "record-platform.shopping-service.<pod-uid-prefix>.producer",
+      "role": "producer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "shopping-service",
+      "topics_consume": [],
+      "topics_produce": [
+        "dev.shopping.events"
+      ]
+    },
+    {
+      "folder_leaf_available": true,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/shopping-service",
+      "required_client_id_form": "record-platform.shopping-service.<pod-uid-prefix>.outbox-publisher",
+      "role": "outbox-publisher",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "shopping-service",
+      "topics_consume": [],
+      "topics_produce": [
+        "dev.shopping.events"
+      ]
+    },
+    {
+      "folder_leaf_available": true,
+      "group": "trust-service-user-lifecycle",
+      "required_certificate_identity": "spiffe://record-platform/service/trust-service",
+      "required_client_id_form": "record-platform.trust-service.<pod-uid-prefix>.lifecycle-consumer",
+      "role": "lifecycle-consumer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "trust-service",
+      "topics_consume": [
+        "dev.user.lifecycle.v1"
+      ],
+      "topics_produce": []
+    },
+    {
+      "folder_leaf_available": true,
+      "group": "python-ai-service",
+      "required_certificate_identity": "spiffe://record-platform/service/python-ai-service",
+      "required_client_id_form": "record-platform.python-ai-service.<pod-uid-prefix>.market-event-consumer",
+      "role": "market-event-consumer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "python-ai-service",
+      "topics_consume": [
+        "analytics-predictions",
+        "analytics-searches"
+      ],
+      "topics_produce": []
+    },
+    {
+      "folder_leaf_available": true,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/python-ai-service",
+      "required_client_id_form": "record-platform.python-ai-service.<pod-uid-prefix>.producer",
+      "role": "producer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "python-ai-service",
+      "topics_consume": [],
+      "topics_produce": [
+        "dev.ai.events"
+      ]
+    },
+    {
+      "folder_leaf_available": true,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/python-ai-service",
+      "required_client_id_form": "record-platform.python-ai-service.<pod-uid-prefix>.outbox-publisher",
+      "role": "outbox-publisher",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "python-ai-service",
+      "topics_consume": [],
+      "topics_produce": [
+        "dev.ai.events"
+      ]
+    },
+    {
+      "folder_leaf_available": false,
+      "group": "ollama-worker-group",
+      "required_certificate_identity": "spiffe://record-platform/service/ollama-worker",
+      "required_client_id_form": "record-platform.ollama-worker.<pod-uid-prefix>.inference-consumer",
+      "role": "inference-consumer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "ollama-worker",
+      "topics_consume": [
+        "ollama-jobs"
+      ],
+      "topics_produce": []
+    },
+    {
+      "folder_leaf_available": false,
+      "group": null,
+      "required_certificate_identity": "spiffe://record-platform/service/ollama-gateway",
+      "required_client_id_form": "record-platform.ollama-gateway.<pod-uid-prefix>.producer",
+      "role": "producer",
+      "runtime_kafka_uses_generic_leaf_today": true,
+      "runtime_kafka_uses_service_leaf_today": false,
+      "service": "ollama-gateway",
+      "topics_consume": [],
+      "topics_produce": [
+        "ollama-jobs"
+      ]
+    }
+  ],
+  "root_fingerprint": "E0:D3:94:15:5C:28:84:CA:C5:16:BD:18:1A:0B:79:43:8E:62:3E:33:85:8C:42:C4:A3:C0:DC:C6:28:09:F6:EB",
+  "services": [
+    {
+      "chain_ok": true,
+      "folder_dns_sans": [
+        "analytics-service",
+        "analytics-service.record-platform",
+        "analytics-service.record-platform.svc",
+        "analytics-service.record-platform.svc.cluster.local"
+      ],
+      "folder_eku": [
+        "clientAuth",
+        "serverAuth"
+      ],
+      "folder_fp": "76:19:DC:B5:6D:27:A6:8E:20:3D:47:E1:F7:E5:98:EE:94:B1:4E:37:27:D9:DE:81:81:F2:EA:2F:31:4D:B0:9E",
+      "folder_spiffe": null,
+      "folder_subject": "CN=analytics-service, O=Record Platform",
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": true,
+      "service": "analytics-service",
+      "service_tls_secret_matches_folder": true
+    },
+    {
+      "chain_ok": true,
+      "folder_dns_sans": [
+        "auction-monitor",
+        "auction-monitor.record-platform",
+        "auction-monitor.record-platform.svc",
+        "auction-monitor.record-platform.svc.cluster.local"
+      ],
+      "folder_eku": [
+        "clientAuth",
+        "serverAuth"
+      ],
+      "folder_fp": "51:EA:12:2C:F5:49:E2:F1:8E:36:5C:0D:1B:2E:45:A7:D5:2E:C2:C3:21:A7:03:CE:F6:9F:10:FB:51:30:C5:47",
+      "folder_spiffe": null,
+      "folder_subject": "CN=auction-monitor, O=Record Platform",
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": true,
+      "service": "auction-monitor",
+      "service_tls_secret_matches_folder": true
+    },
+    {
+      "chain_ok": true,
+      "folder_dns_sans": [
+        "auth-service",
+        "auth-service.record-platform",
+        "auth-service.record-platform.svc",
+        "auth-service.record-platform.svc.cluster.local"
+      ],
+      "folder_eku": [
+        "clientAuth",
+        "serverAuth"
+      ],
+      "folder_fp": "F3:65:98:1A:CA:1C:2A:52:B9:9E:BD:2B:AD:F1:62:D8:18:2E:21:FE:44:CD:1E:3F:EB:30:A5:A4:DF:C3:16:E7",
+      "folder_spiffe": null,
+      "folder_subject": "CN=auth-service, O=Record Platform",
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": true,
+      "service": "auth-service",
+      "service_tls_secret_matches_folder": true
+    },
+    {
+      "chain_ok": true,
+      "folder_dns_sans": [
+        "listings-service",
+        "listings-service.record-platform",
+        "listings-service.record-platform.svc",
+        "listings-service.record-platform.svc.cluster.local"
+      ],
+      "folder_eku": [
+        "clientAuth",
+        "serverAuth"
+      ],
+      "folder_fp": "9F:6B:55:41:EF:DE:B2:5E:81:D6:68:CD:32:26:FD:13:B9:F2:51:D9:37:A9:84:F4:59:EA:1E:08:CC:04:A3:8C",
+      "folder_spiffe": null,
+      "folder_subject": "CN=listings-service, O=Record Platform",
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": true,
+      "service": "listings-service",
+      "service_tls_secret_matches_folder": true
+    },
+    {
+      "chain_ok": true,
+      "folder_dns_sans": [
+        "media-service",
+        "media-service.record-platform",
+        "media-service.record-platform.svc",
+        "media-service.record-platform.svc.cluster.local"
+      ],
+      "folder_eku": [
+        "clientAuth",
+        "serverAuth"
+      ],
+      "folder_fp": "67:E4:EF:6A:D7:7A:D5:CD:86:79:02:73:F6:3D:60:E1:3A:EE:96:8D:B4:4C:50:ED:E2:D9:96:D6:9E:DD:FD:9C",
+      "folder_spiffe": null,
+      "folder_subject": "CN=media-service, O=Record Platform",
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": true,
+      "service": "media-service",
+      "service_tls_secret_matches_folder": true
+    },
+    {
+      "chain_ok": true,
+      "folder_dns_sans": [
+        "messaging-service",
+        "messaging-service.record-platform",
+        "messaging-service.record-platform.svc",
+        "messaging-service.record-platform.svc.cluster.local"
+      ],
+      "folder_eku": [
+        "clientAuth",
+        "serverAuth"
+      ],
+      "folder_fp": "84:DE:8D:23:3E:5E:C9:FF:26:2A:93:9A:6B:A5:F6:A3:6A:A9:92:D3:C0:01:A8:E9:92:43:17:6B:5A:3C:D0:52",
+      "folder_spiffe": null,
+      "folder_subject": "CN=messaging-service, O=Record Platform",
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": true,
+      "service": "messaging-service",
+      "service_tls_secret_matches_folder": true
+    },
+    {
+      "chain_ok": true,
+      "folder_dns_sans": [
+        "notification-service",
+        "notification-service.record-platform",
+        "notification-service.record-platform.svc",
+        "notification-service.record-platform.svc.cluster.local"
+      ],
+      "folder_eku": [
+        "clientAuth",
+        "serverAuth"
+      ],
+      "folder_fp": "C3:7C:D4:B9:9B:FC:FE:54:DC:9E:E4:06:65:A6:5A:2B:5C:23:1E:CE:6A:ED:15:59:97:9D:82:5C:1D:86:24:3F",
+      "folder_spiffe": null,
+      "folder_subject": "CN=notification-service, O=Record Platform",
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": true,
+      "service": "notification-service",
+      "service_tls_secret_matches_folder": true
+    },
+    {
+      "chain_ok": true,
+      "folder_dns_sans": [
+        "python-ai-service",
+        "python-ai-service.record-platform",
+        "python-ai-service.record-platform.svc",
+        "python-ai-service.record-platform.svc.cluster.local"
+      ],
+      "folder_eku": [
+        "clientAuth",
+        "serverAuth"
+      ],
+      "folder_fp": "45:B9:AE:65:54:57:6D:ED:1C:3A:35:2D:05:28:D2:D8:05:C1:32:91:59:A3:33:BC:56:E5:B4:9E:88:A0:C6:78",
+      "folder_spiffe": null,
+      "folder_subject": "CN=python-ai-service, O=Record Platform",
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": true,
+      "service": "python-ai-service",
+      "service_tls_secret_matches_folder": true
+    },
+    {
+      "chain_ok": true,
+      "folder_dns_sans": [
+        "shopping-service",
+        "shopping-service.record-platform",
+        "shopping-service.record-platform.svc",
+        "shopping-service.record-platform.svc.cluster.local"
+      ],
+      "folder_eku": [
+        "clientAuth",
+        "serverAuth"
+      ],
+      "folder_fp": "7E:5E:D9:E1:E3:D5:38:C6:49:70:31:47:C3:2E:23:82:5F:CD:8D:F4:2A:7C:17:D5:98:AB:71:73:10:B5:7B:96",
+      "folder_spiffe": null,
+      "folder_subject": "CN=shopping-service, O=Record Platform",
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": true,
+      "service": "shopping-service",
+      "service_tls_secret_matches_folder": true
+    },
+    {
+      "chain_ok": true,
+      "folder_dns_sans": [
+        "trust-service",
+        "trust-service.record-platform",
+        "trust-service.record-platform.svc",
+        "trust-service.record-platform.svc.cluster.local"
+      ],
+      "folder_eku": [
+        "clientAuth",
+        "serverAuth"
+      ],
+      "folder_fp": "D7:42:96:EC:0F:AC:B7:65:A7:DF:81:AE:38:D7:A9:B2:A2:B5:99:D0:87:D0:A6:E2:F1:49:17:C6:1F:FE:00:A4",
+      "folder_spiffe": null,
+      "folder_subject": "CN=trust-service, O=Record Platform",
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": true,
+      "service": "trust-service",
+      "service_tls_secret_matches_folder": true
+    },
+    {
+      "chain_ok": null,
+      "folder_dns_sans": null,
+      "folder_eku": null,
+      "folder_fp": null,
+      "folder_spiffe": null,
+      "folder_subject": null,
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": null,
+      "service": "ollama-gateway",
+      "service_tls_secret_matches_folder": null
+    },
+    {
+      "chain_ok": null,
+      "folder_dns_sans": null,
+      "folder_eku": null,
+      "folder_fp": null,
+      "folder_spiffe": null,
+      "folder_subject": null,
+      "kafka_runtime_fp_today": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+      "kafka_runtime_is_service_specific": false,
+      "key_match": null,
+      "service": "ollama-worker",
+      "service_tls_secret_matches_folder": null
+    }
+  ],
+  "summary": {
+    "blocker_classes": [
+      "RUNTIME_KAFKA_USES_SHARED_GENERIC_CLIENT_LEAF",
+      "OLLAMA_SERVICE_LEAVES_MISSING_FROM_CERTS_FOLDER",
+      "SPIFFE_URI_SAN_ABSENT_ON_EXISTING_LEAVES",
+      "DUAL_USE_EKU_ON_SERVICE_AND_BROKER_LEAVES",
+      "NO_KAFKA_ACL_AUTHORIZER_FOR_SERVICE_PRINCIPALS",
+      "KAFKA_DNS_VALIDATE_CI_REQUIRED_AND_FAILED_UNTIL_JAEGER_MANIFEST_TRACKED"
+    ],
+    "ci_universally_green": false,
+    "folder_distinct_service_leaves": 10,
+    "folder_missing_leaves": [
+      "ollama-gateway",
+      "ollama-worker"
+    ],
+    "gate5_v7_authorized_to_create": false,
+    "kafka_authorizer_acls_present": false,
+    "logical_roles": 19,
+    "participant_services": 12,
+    "runtime_kafka_shared_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
+    "runtime_kafka_shared_generic_leaf": true,
+    "same_ca_wrong_service_deniable": false,
+    "service_tls_secrets_match_folder": true,
+    "service_tls_secrets_wired_to_kafka_client_paths": false
+  },
+  "ts": "2026-08-01T22:59:53Z"
+}

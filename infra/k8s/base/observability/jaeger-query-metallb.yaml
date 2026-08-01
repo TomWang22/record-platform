@@ -1,0 +1,120 @@
+# MetalLB-backed Jaeger Query plane (TLS). Ingestion remains on ClusterIP otel-collector / jaeger.
+# Hostname: jaeger.record-platform.test → LoadBalancer IP 192.168.64.245 (contract).
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-query
+  namespace: observability
+  labels:
+    app: jaeger-query
+    component: tracing-query-plane
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: "192.168.64.245"
+spec:
+  type: LoadBalancer
+  selector:
+    app: jaeger-query-edge
+  ports:
+    - name: https
+      port: 443
+      targetPort: 443
+      protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jaeger-query-edge-caddy
+  namespace: observability
+  labels:
+    app: jaeger-query-edge
+data:
+  Caddyfile: |
+    {
+      admin off
+      auto_https off
+    }
+
+    https://jaeger.record-platform.test {
+      tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key {
+        protocols tls1.2 tls1.3
+      }
+
+      # Preserve /jaeger* — Jaeger QUERY_BASE_PATH=/jaeger serves API at /jaeger/api/*.
+      @root path /
+      redir @root /jaeger/ 308
+
+      handle /jaeger* {
+        reverse_proxy jaeger.observability.svc.cluster.local:16686 {
+          header_up Host {http.request.host}
+          header_up X-Forwarded-Proto {scheme}
+        }
+      }
+
+      handle {
+        respond "jaeger-query-plane" 404
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-query-edge
+  namespace: observability
+  labels:
+    app: jaeger-query-edge
+    component: tracing-query-plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger-query-edge
+  template:
+    metadata:
+      labels:
+        app: jaeger-query-edge
+    spec:
+      containers:
+        - name: caddy
+          image: caddy:2.8-alpine
+          imagePullPolicy: IfNotPresent
+          args: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+          ports:
+            - name: https
+              containerPort: 443
+          readinessProbe:
+            tcpSocket:
+              port: 443
+            periodSeconds: 3
+            failureThreshold: 3
+            initialDelaySeconds: 2
+          livenessProbe:
+            tcpSocket:
+              port: 443
+            periodSeconds: 10
+            initialDelaySeconds: 5
+          volumeMounts:
+            - name: conf
+              mountPath: /etc/caddy/Caddyfile
+              subPath: Caddyfile
+            - name: certs
+              mountPath: /etc/caddy/certs
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+      volumes:
+        - name: conf
+          configMap:
+            name: jaeger-query-edge-caddy
+        - name: certs
+          secret:
+            secretName: jaeger-query-tls
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key

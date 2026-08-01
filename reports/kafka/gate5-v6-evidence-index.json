@@ -1,0 +1,96 @@
+{
+  "acceptance_conclusions": [
+    {
+      "claim": "v6 frozen PASS marker exists",
+      "sufficient_for_evidence_complete": false,
+      "supported_by": [
+        "FROZEN_PASS_EVIDENCE"
+      ]
+    },
+    {
+      "claim": "19 logical roles census closed in v6",
+      "sufficient_for_evidence_complete": false,
+      "supported_by": [
+        "census/gate5-participant-denominator-closure.json"
+      ]
+    },
+    {
+      "claim": "3/3 broker metadata",
+      "sufficient_for_evidence_complete": false,
+      "supported_by": [
+        "mtls/broker-matrix.json"
+      ]
+    },
+    {
+      "claim": "3/3 broker produce+consume",
+      "sufficient_for_evidence_complete": false,
+      "supported_by": []
+    },
+    {
+      "claim": "24 negative rows",
+      "sufficient_for_evidence_complete": false,
+      "supported_by": []
+    },
+    {
+      "claim": "real event families",
+      "sufficient_for_evidence_complete": false,
+      "supported_by": []
+    },
+    {
+      "claim": "pcaps/traces/metrics",
+      "sufficient_for_evidence_complete": false,
+      "supported_by": []
+    },
+    {
+      "claim": "exact-SHA CI universally green",
+      "sufficient_for_evidence_complete": false,
+      "supported_by": []
+    }
+  ],
+  "classification": "FUNCTIONAL_PASS_EVIDENCE_INCOMPLETE",
+  "report_hashes": {
+    "broker-negative-audit.json": "ac5ac41909d9deab2f3f734126b834750fef20f31ab467c94214c527191ff87f",
+    "broker-positive-audit.json": "090800682c620be202c07ffd5aa8de1128ba53f23d78251501ebafe94222fc75",
+    "ci-disposition.json": "9d036fb5a1eb9e4a6902e71577ad2379d60ca4fc3ea4743188c7ac8cae42a275",
+    "eku-and-chain-proof.json": "94efc14e042093666d6f47fc6e7da0c50b84b9ecc7e2c5ce545502e3bfdf80a7",
+    "event-family-audit.json": "226bb99561c8d671043ca1a6000f64ad891e4b24b2e5820f781381df4c65f71e",
+    "gate5-v6-acceptance-audit.json": "aa70173789ca518cdf90c257015ca820e4ed1c1fd38adf9c58d141fb838c64bf",
+    "repo:gate5-v6-acceptance-audit.json": "aa70173789ca518cdf90c257015ca820e4ed1c1fd38adf9c58d141fb838c64bf",
+    "repo:gate5-v6-broker-negative-audit.json": "ac5ac41909d9deab2f3f734126b834750fef20f31ab467c94214c527191ff87f",
+    "repo:gate5-v6-broker-positive-audit.json": "090800682c620be202c07ffd5aa8de1128ba53f23d78251501ebafe94222fc75",
+    "repo:gate5-v6-eku-and-chain-proof.json": "94efc14e042093666d6f47fc6e7da0c50b84b9ecc7e2c5ce545502e3bfdf80a7",
+    "repo:gate5-v6-event-family-audit.json": "226bb99561c8d671043ca1a6000f64ad891e4b24b2e5820f781381df4c65f71e",
+    "repo:gate5-v6-topic-disposition.json": "2273d8b755a0c3d85018dc56b24e571220cf7687fceb2c83520b52f924d1fdd7",
+    "stability-and-observability-audit.json": "a568ef0435a2eb99257116d05258300d460cbc9b3519d24c337338439690fae4",
+    "topic-disposition.json": "2273d8b755a0c3d85018dc56b24e571220cf7687fceb2c83520b52f924d1fdd7"
+  },
+  "ts": "2026-08-01T22:50:00Z",
+  "v6_artifacts_used": [
+    "FROZEN_PASS_EVIDENCE",
+    "WRITER_LOCK.json",
+    "census/analytics-service-758d65f9f5-nzdkj.crt",
+    "census/auction-monitor-7f74d847d7-mn49d.crt",
+    "census/auth-service-6c65c94dd-dgqsp.crt",
+    "census/gate5-participant-denominator-closure.json",
+    "census/listings-service-58b4fd7567-5pmwv.crt",
+    "census/media-service-cbf5fb745-s77mq.crt",
+    "census/messaging-service-965c5b765-kwn6p.crt",
+    "census/notification-service-5b995bbc9f-fghhf.crt",
+    "census/ollama-gateway-65d9997f94-sq7hv.crt",
+    "census/ollama-worker-556f9ffb7f-d27sq.crt",
+    "census/ollama-worker-556f9ffb7f-n777v.crt",
+    "census/python-ai-service-6d86895d59-mmc6m.crt",
+    "census/shopping-service-fdccc9bb7-fd7v8.crt",
+    "census/trust-service-5b48ddd9f8-rh9xs.crt",
+    "events/event-families.json",
+    "failover/broker-restarts.json",
+    "freeze/FROZEN_PASS_EVIDENCE",
+    "freeze/TERMINAL_STATE",
+    "freeze/terminal.json",
+    "mtls/broker-matrix.json",
+    "pins/gate5-remediation-runtime-pin.json",
+    "reports/gate5-final-verdict.json",
+    "stability/controlled-rollouts.json",
+    "stability/steady-state.json"
+  ]
+}

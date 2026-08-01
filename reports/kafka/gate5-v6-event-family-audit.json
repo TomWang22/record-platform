@@ -1,0 +1,31 @@
+{
+  "acceptance": false,
+  "duplicate_business_effects_claimed": 0,
+  "event_families_expected_from_contract": "DERIVE_FROM_SOURCE_NOT_CLOSED_IN_V6",
+  "event_families_passed_as_business_lineage": 0,
+  "event_families_tested_in_v6": [
+    "gate5.v2.probe produce/consume marker",
+    "dev.ai.events describe",
+    "ollama-jobs describe",
+    "dev.user.lifecycle.v1 describe",
+    "consumer group membership proof"
+  ],
+  "families_with_authenticated_product_action": 0,
+  "families_with_broker_ack_partition_offset": 0,
+  "families_with_business_state_proof": 0,
+  "families_with_consumer_delivery_and_commit": 0,
+  "families_with_metalLB_jaeger_trace": 0,
+  "families_with_outbox_lineage": 0,
+  "gaps": [
+    "No authenticated product-action \u2192 DB \u2192 outbox \u2192 produce \u2192 consume \u2192 business-state rows",
+    "Topic describe of domain topics is not event-family delivery proof",
+    "Consumer group membership is not business delivery proof",
+    "No produced/acknowledged/consumed/committed equality ledger"
+  ],
+  "lost_events_claimed": 0,
+  "marker_found": true,
+  "marker_topic": "gate5.v2.probe",
+  "premature_offset_commits_claimed": 0,
+  "transport_marker_only": true,
+  "v6_claim": "marker delivered"
+}

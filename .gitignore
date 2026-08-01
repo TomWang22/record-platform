@@ -80,6 +80,7 @@ tmp/
 !scripts/ai-platform/phase34-semantic-corpus/
 !scripts/ai-platform/phase34-semantic-corpus/**/*.json
 !reports/phase34-runtime-integration/**/*.json
+!reports/kafka/**/*.json
 
 !scripts/ai-platform/phase34-prompt-registry/
 !scripts/ai-platform/phase34-prompt-registry/**/*.json

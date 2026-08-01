@@ -1,0 +1,282 @@
+{
+  "acceptance_proofs_required": [
+    "same CA + wrong service leaf \u2192 denied",
+    "same CA + unlisted service leaf \u2192 denied",
+    "correct service leaf + forged client.id \u2192 authorization unchanged",
+    "unauthorized leaf + authorized-looking client.id \u2192 denied"
+  ],
+  "current_runtime": {
+    "acls_configured": false,
+    "authorizer_enabled": false,
+    "client_id_authorizes": false,
+    "client_id_note": "client.id remains attribution-only even today; authz is effectively 'any trusted client cert'.",
+    "effect": "Any client presenting a trust-chain-valid certificate (including shared kafka-client or any service-tls leaf) can authenticate; topic authorization is not service-differentiated.",
+    "same_ca_wrong_service_denied": false
+  },
+  "document": "gate5-v7-acl-contract",
+  "target_per_service": [
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [],
+      "permitted_topics_consume": [],
+      "permitted_topics_produce": [
+        "dev.analytics.events"
+      ],
+      "principal_dn_fallback": "CN=analytics-service,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/analytics-service",
+      "service": "analytics-service"
+    },
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [],
+      "permitted_topics_consume": [],
+      "permitted_topics_produce": [
+        "auctions.events",
+        "dev.auction_monitor.events"
+      ],
+      "principal_dn_fallback": "CN=auction-monitor,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/auction-monitor",
+      "service": "auction-monitor"
+    },
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [],
+      "permitted_topics_consume": [],
+      "permitted_topics_produce": [
+        "dev.auth.events",
+        "dev.user.lifecycle.v1"
+      ],
+      "principal_dn_fallback": "CN=auth-service,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/auth-service",
+      "service": "auth-service"
+    },
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [],
+      "permitted_topics_consume": [],
+      "permitted_topics_produce": [
+        "dev.listing.events"
+      ],
+      "principal_dn_fallback": "CN=listings-service,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/listings-service",
+      "service": "listings-service"
+    },
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [
+        "media-service-user-lifecycle"
+      ],
+      "permitted_topics_consume": [
+        "dev.user.lifecycle.v1"
+      ],
+      "permitted_topics_produce": [],
+      "principal_dn_fallback": "CN=media-service,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/media-service",
+      "service": "media-service"
+    },
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [
+        "messaging-service-user-lifecycle"
+      ],
+      "permitted_topics_consume": [
+        "dev.user.lifecycle.v1"
+      ],
+      "permitted_topics_produce": [
+        "dev.messaging.dlq",
+        "messaging.events.v1"
+      ],
+      "principal_dn_fallback": "CN=messaging-service,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/messaging-service",
+      "service": "messaging-service"
+    },
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [
+        "notification-service-group",
+        "notification-service-user-lifecycle"
+      ],
+      "permitted_topics_consume": [
+        "dev.notification.events",
+        "dev.user.lifecycle.v1"
+      ],
+      "permitted_topics_produce": [],
+      "principal_dn_fallback": "CN=notification-service,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/notification-service",
+      "service": "notification-service"
+    },
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [
+        "python-ai-service"
+      ],
+      "permitted_topics_consume": [
+        "analytics-predictions",
+        "analytics-searches"
+      ],
+      "permitted_topics_produce": [
+        "dev.ai.events"
+      ],
+      "principal_dn_fallback": "CN=python-ai-service,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/python-ai-service",
+      "service": "python-ai-service"
+    },
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [],
+      "permitted_topics_consume": [],
+      "permitted_topics_produce": [
+        "dev.shopping.events"
+      ],
+      "principal_dn_fallback": "CN=shopping-service,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/shopping-service",
+      "service": "shopping-service"
+    },
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [
+        "trust-service-user-lifecycle"
+      ],
+      "permitted_topics_consume": [
+        "dev.user.lifecycle.v1"
+      ],
+      "permitted_topics_produce": [],
+      "principal_dn_fallback": "CN=trust-service,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/trust-service",
+      "service": "trust-service"
+    },
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [],
+      "permitted_topics_consume": [],
+      "permitted_topics_produce": [
+        "ollama-jobs"
+      ],
+      "principal_dn_fallback": "CN=ollama-gateway,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/ollama-gateway",
+      "service": "ollama-gateway"
+    },
+    {
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "forbidden_groups": "all groups not listed",
+      "forbidden_topics": "all topics not listed in produce/consume",
+      "metadata_access": "DESCRIBE/CLUSTER as required for client bootstrap",
+      "permitted_groups": [
+        "ollama-worker-group"
+      ],
+      "permitted_topics_consume": [
+        "ollama-jobs"
+      ],
+      "permitted_topics_produce": [],
+      "principal_dn_fallback": "CN=ollama-worker,O=Record Platform",
+      "principal_spiffe": "spiffe://record-platform/service/ollama-worker",
+      "service": "ollama-worker"
+    }
+  ],
+  "ts": "2026-08-01T22:59:53Z"
+}

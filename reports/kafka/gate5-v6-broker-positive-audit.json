@@ -1,0 +1,50 @@
+{
+  "acceptance": false,
+  "brokers_expected": 3,
+  "consume_expected_tested_passed": "3/0/0",
+  "gaps": [
+    "v6 mtls/broker-matrix.json only records authorized_metadata via kafka-broker-api-versions",
+    "No per-broker produce acknowledgment with topic/partition/offset",
+    "No per-broker consume delivery row",
+    "No client ID / cert fingerprint / trace / pcap / metric correlation per positive row"
+  ],
+  "metadata_expected_tested_passed": "3/3/3",
+  "operations_per_broker_required": [
+    "metadata",
+    "produce",
+    "consume"
+  ],
+  "positive_rows_expected": 9,
+  "positive_rows_present_in_v6": 3,
+  "produce_expected_tested_passed": "3/0/0",
+  "v6_evidence": {
+    "brokers_expected": 3,
+    "brokers_passed": 3,
+    "brokers_tested": 3,
+    "negatives": {
+      "missing_client_certificate_denied": true,
+      "plaintext_denied": true,
+      "raw": "be available. (org.apache.kafka.clients.NetworkClient)\n[2026-08-01 21:15:06,394] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:9092) could not be established. Broker may not be available. (org.apache.kafka.clients.NetworkClient)\n[2026-08-01 21:15:06,801] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:9092) could not be established. Broker may not be available. (org.apache.kafka.clients.NetworkClient)\n[2026-08-01 21:15:07,515] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:9092) could not be established. Broker may not be available. (org.apache.kafka.clients.NetworkClient)\n[2026-08-01 21:15:08,636] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:9092) could not be established. Broker may not be available. (org.apache.kafka.clients.NetworkClient)\n[2026-08-01 21:15:09,864] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:9092) could not be established. Broker may not be available. (org.apache.kafka.clients.NetworkClient)\n[2026-08-01 21:15:11,004] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:9092) could not be established. Broker may not be available. (org.apache.kafka.clients.NetworkClient)\n[2026-08-01 21:15:11,927] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:9092) could not be established. Broker may not be available. (org.apache.kafka.clients.NetworkClient)\nDENIED_PLAIN=yes\n"
+    },
+    "rows": [
+      {
+        "authorized_metadata": true,
+        "broker": "kafka-0",
+        "host": "kafka-0.kafka.record-platform.svc.cluster.local:9093",
+        "raw": "kafka-0.kafka.record-platform.svc.cluster.local:9093 (id: 0 rack: null) -> (\n\tProduce(0): 0 to 9 [usable: 9],\n\tFetch(1): 0 to 15 [usable: 15],\n\tListOffsets(2): 0 to 8 [usable: 8],\n\tMetadata(3): 0 to 12 [usable: 12],\nEXIT:0\n"
+      },
+      {
+        "authorized_metadata": true,
+        "broker": "kafka-1",
+        "host": "kafka-1.kafka.record-platform.svc.cluster.local:9093",
+        "raw": "kafka-2.kafka.record-platform.svc.cluster.local:9093 (id: 2 rack: null) -> (\n\tProduce(0): 0 to 9 [usable: 9],\n\tFetch(1): 0 to 15 [usable: 15],\n\tListOffsets(2): 0 to 8 [usable: 8],\n\tMetadata(3): 0 to 12 [usable: 12],\nEXIT:0\n"
+      },
+      {
+        "authorized_metadata": true,
+        "broker": "kafka-2",
+        "host": "kafka-2.kafka.record-platform.svc.cluster.local:9093",
+        "raw": "kafka-1.kafka.record-platform.svc.cluster.local:9093 (id: 1 rack: null) -> (\n\tProduce(0): 0 to 9 [usable: 9],\n\tFetch(1): 0 to 15 [usable: 15],\n\tListOffsets(2): 0 to 8 [usable: 8],\n\tMetadata(3): 0 to 12 [usable: 12],\nEXIT:0\n"
+      }
+    ]
+  }
+}

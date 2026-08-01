@@ -1,0 +1,16 @@
+{
+  "acceptance": false,
+  "classification_rationale": "Created by gate5-v2-execute.py event_families() via kafka-topics --create --if-not-exists during Gate 5 execution for marker produce/consume. Not part of cold bootstrap topic set. Should not remain in the durable expected denominator; either delete after acceptance or raise expected to 22 with ephemeral flag. v6 retained expected=21 while discovering 22.",
+  "creator": "scripts/gate5-v2-execute.py::event_families",
+  "deletion_evidence_in_v6": false,
+  "denominator_correct_after_disposition": "After classifying gate5.v2.probe as ACCEPTANCE_EPHEMERAL_TOPIC and deleting it (or excluding it from durable expected), durable expected/discovered must close N/N with unknown=0 stale=0 unauthorized=0. v6 itself did not close this.",
+  "disposition": "ACCEPTANCE_EPHEMERAL_TOPIC",
+  "extra_topic": "gate5.v2.probe",
+  "included_in_cold_bootstrap": false,
+  "should_be_deleted": true,
+  "stale_test_topics": 1,
+  "topics_discovered_in_v6_census": 22,
+  "topics_expected_in_v6_census": 21,
+  "unauthorized_topics": 0,
+  "unknown_topics": 0
+}

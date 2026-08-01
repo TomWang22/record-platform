@@ -1,0 +1,79 @@
+{
+  "acceptance": false,
+  "authorized_cert_forged_client_id": "NOT_IN_V6 (present in separate identity canary v2 only)",
+  "brokers_expected": 3,
+  "categories": {
+    "INVALID_CLIENT_AUTH_EKU": {
+      "acceptance_3_3_3": false,
+      "denied": 0,
+      "expected": 3,
+      "note": "absent from v6 evidence",
+      "tested": 0
+    },
+    "MISSING_CLIENT_CERTIFICATE": {
+      "acceptance_3_3_3": false,
+      "denied": true,
+      "expected": 3,
+      "note": "tested once via kafka-0:9094, not 3/3",
+      "tested": 1,
+      "tested_brokers": 1
+    },
+    "PLAINTEXT_CONNECTION": {
+      "acceptance_3_3_3": false,
+      "denied": true,
+      "expected": 3,
+      "note": "tested once via 127.0.0.1:9092, not 3/3",
+      "tested": 1,
+      "tested_brokers": 1
+    },
+    "SAME_CA_UNAUTHORIZED_SERVICE_IDENTITY": {
+      "acceptance_3_3_3": false,
+      "denied": 0,
+      "expected": 3,
+      "note": "absent from v6 evidence",
+      "tested": 0
+    },
+    "SAME_CA_WRONG_SERVICE_IDENTITY": {
+      "acceptance_3_3_3": false,
+      "denied": 0,
+      "expected": 3,
+      "note": "absent from v6 evidence",
+      "tested": 0
+    },
+    "UNKNOWN_TRUSTED_CA_TEST_IDENTITY": {
+      "acceptance_3_3_3": false,
+      "denied": 0,
+      "expected": 3,
+      "note": "absent from v6 evidence",
+      "tested": 0
+    },
+    "WRONG_BROKER_SNI_OR_SAN": {
+      "acceptance_3_3_3": false,
+      "denied": 0,
+      "expected": 3,
+      "note": "absent from v6 evidence",
+      "tested": 0
+    },
+    "WRONG_TRUST_ROOT": {
+      "acceptance_3_3_3": false,
+      "denied": 0,
+      "expected": 3,
+      "note": "absent from v6 evidence",
+      "tested": 0
+    }
+  },
+  "client_leaf_lacking_clientAuth": "NOT_IN_V6",
+  "forged_client_id_unauthorized_cert": "NOT_IN_V6 (present in separate identity canary v2 only)",
+  "gaps": [
+    "missing category SAME_CA_WRONG_SERVICE_IDENTITY",
+    "missing category SAME_CA_UNAUTHORIZED_SERVICE_IDENTITY",
+    "missing category UNKNOWN_TRUSTED_CA_TEST_IDENTITY",
+    "missing category WRONG_TRUST_ROOT",
+    "missing category WRONG_BROKER_SNI_OR_SAN",
+    "missing category INVALID_CLIENT_AUTH_EKU"
+  ],
+  "negative_categories_expected": 8,
+  "negative_rows_expected": 24,
+  "negative_rows_present": 2,
+  "server_leaf_as_client": "NOT_IN_V6"
+}

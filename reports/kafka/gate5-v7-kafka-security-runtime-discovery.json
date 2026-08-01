@@ -1,0 +1,70 @@
+{
+  "document": "gate5-v7-kafka-security-runtime-discovery",
+  "ts": "2026-08-01T23:35:00Z",
+  "gate5_v7_authorized_to_create": false,
+  "final_acls_authorized_to_apply": false,
+  "kafka": {
+    "image": "confluentinc/cp-kafka:7.5.0",
+    "artifact": "kafka_2.13-7.5.0-ccs.jar",
+    "mode": "KRaft",
+    "process_roles": "broker,controller",
+    "broker_ids": [0, 1, 2],
+    "controller_ids": [0, 1, 2],
+    "cluster_id": "KfF3uZ3kQsyKJvYU8vHvBA",
+    "controller_quorum_voters": "0@kafka-0.kafka.record-platform.svc.cluster.local:9095,1@kafka-1.kafka.record-platform.svc.cluster.local:9095,2@kafka-2.kafka.record-platform.svc.cluster.local:9095"
+  },
+  "listeners": [
+    {
+      "name": "INTERNAL",
+      "port": 9093,
+      "security_protocol": "SSL",
+      "client_auth": "required",
+      "keystore": "/etc/kafka/secrets/kafka.keystore.jks",
+      "truststore": "/etc/kafka/secrets/kafka.truststore.jks",
+      "roles": ["client", "inter_broker"]
+    },
+    {
+      "name": "EXTERNAL",
+      "port": 9094,
+      "security_protocol": "SSL",
+      "client_auth": "required",
+      "keystore": "/etc/kafka/secrets/kafka.keystore.jks",
+      "truststore": "/etc/kafka/secrets/kafka.truststore.jks",
+      "roles": ["external_client"]
+    },
+    {
+      "name": "CONTROLLER",
+      "port": 9095,
+      "security_protocol": "SSL",
+      "client_auth": "none",
+      "keystore": "/etc/kafka/secrets/kafka.keystore.jks",
+      "truststore": "/etc/kafka/secrets/kafka.truststore.jks",
+      "roles": ["controller_quorum"]
+    }
+  ],
+  "inter_broker_listener": "INTERNAL",
+  "inter_broker_identity": {
+    "classification": "DUAL_USE_EKU_REQUIRED_WITH_RATIONALE",
+    "secret": "kafka-ssl-secret",
+    "keystore": "kafka.keystore.jks",
+    "eku": ["serverAuth", "clientAuth"],
+    "rationale": "INTERNAL listener requires clientAuth for peers; brokers use the same keystore as TLS clients for inter-broker SSL. serverAuth-only broker leaves would break inter-broker handshake unless separate listener keystores are introduced."
+  },
+  "controller_identity": {
+    "listener": "CONTROLLER",
+    "client_auth": "none",
+    "uses_same_broker_keystore": true
+  },
+  "authorization": {
+    "authorizer_class_name": null,
+    "super_users": null,
+    "allow_everyone_if_no_acl_found": null,
+    "principal_builder_class": "org.apache.kafka.common.security.authenticator.DefaultKafkaPrincipalBuilder",
+    "ssl_principal_mapping_rules": null,
+    "posture": "MTLS_AUTHENTICATION_WITHOUT_SERVICE_ACL_AUTHORIZER"
+  },
+  "generic_client_principal_measured": "User:O=record-platform,CN=kafka-client",
+  "expected_dedicated_principal_form": "User:O=Record Platform,CN=<canonical-service-name>",
+  "spiffe_is_acl_principal": false,
+  "preferred_authorizer_for_kraft": "org.apache.kafka.metadata.authorizer.StandardAuthorizer"
+}

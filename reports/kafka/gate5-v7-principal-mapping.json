@@ -1,34 +1,32 @@
 {
-  "allow_everyone_if_no_acl_found": null,
-  "authorizer_class_name": null,
   "document": "gate5-v7-principal-mapping",
-  "gap": "No authorizer.* or ACL configuration found in live kafka.properties; any valid same-CA client leaf that completes mTLS is accepted for cluster operations permitted by default.",
-  "kafka_properties_auth_lines": [
-    "36:listener.name.controller.ssl.client.auth=none",
-    "52:listener.name.external.ssl.client.auth=required",
-    "56:listener.name.internal.ssl.client.auth=required",
-    "83:ssl.client.auth=required"
-  ],
-  "observed_authorization_mode": "MTLS_AUTHENTICATION_WITHOUT_SERVICE_ACL_AUTHORIZER",
-  "principal_today": {
-    "derivation": "TLS client certificate subject/DN after successful mTLS handshake",
-    "distinct_service_principals_at_kafka": 0,
-    "effective_shared_fingerprint": "E9:7A:99:31:B6:48:EE:99:A9:5F:2E:AF:94:9F:3D:51:F4:BC:BE:8F:82:A5:01:A8:F2:63:01:3A:63:DC:10:1D",
-    "effective_shared_principal": "CN=kafka-client, O=record-platform"
-  },
+  "ts": "2026-08-01T23:45:26Z",
+  "final_acls_authorized_to_apply": false,
+  "gate5_v7_authorized_to_create": false,
+  "principal_builder_class": "org.apache.kafka.common.security.authenticator.DefaultKafkaPrincipalBuilder",
   "ssl_principal_mapping_rules": null,
-  "super_users": null,
-  "target_principal_mapping": {
-    "authorization": "StandardAuthorizer or AclAuthorizer with topic/group ACLs per service principal",
-    "fallback_dn": "CN=<canonical-service-name>, O=Record Platform",
-    "preferred_san_uri": "spiffe://record-platform/service/<canonical-service-name>",
-    "principal_builder": "Kafka default SSL principal (DN) unless ssl.principal.mapping.rules configured for SPIFFE URI"
+  "spiffe_is_acl_principal": false,
+  "client_id_authorizes": false,
+  "generic_shared_principal": "User:O=record-platform,CN=kafka-client",
+  "observed_service_principals": {
+    "analytics-service": "User:O=Record Platform,CN=analytics-service",
+    "auction-monitor": "User:O=Record Platform,CN=auction-monitor",
+    "auth-service": "User:O=Record Platform,CN=auth-service",
+    "listings-service": "User:O=Record Platform,CN=listings-service",
+    "media-service": "User:O=Record Platform,CN=media-service",
+    "messaging-service": "User:O=Record Platform,CN=messaging-service",
+    "notification-service": "User:O=Record Platform,CN=notification-service",
+    "python-ai-service": "User:O=Record Platform,CN=python-ai-service",
+    "shopping-service": "User:O=Record Platform,CN=shopping-service",
+    "trust-service": "User:O=Record Platform,CN=trust-service",
+    "ollama-gateway": "User:O=Record Platform,CN=ollama-gateway",
+    "ollama-worker": "User:O=Record Platform,CN=ollama-worker"
   },
-  "tls_client_auth": {
-    "controller": "none",
-    "evidence": "listener.name.*.ssl.client.auth in kafka.properties / env",
-    "external": "required",
-    "internal": "required"
-  },
-  "ts": "2026-08-01T22:59:53Z"
+  "notes": [
+    "Principals measured via Java X500Principal.getName() (Kafka DefaultKafkaPrincipalBuilder SSL path) and proven with live INTERNAL mTLS ApiVersions per dedicated leaf.",
+    "DN order is O before CN (RFC2253). Do not ACL on CN=...,O=... OpenSSL display order.",
+    "SPIFFE URI SAN is required identity evidence but is not the Kafka ACL principal.",
+    "Final ACL manifest must quote these exact User:... strings."
+  ],
+  "evidence": "reports/kafka/gate5-v7-observed-principals.json"
 }

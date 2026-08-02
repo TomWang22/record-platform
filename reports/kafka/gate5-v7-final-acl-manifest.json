@@ -1,8 +1,8 @@
 {
   "document": "gate5-v7-final-acl-manifest",
   "ts": "2026-08-01T23:56:25Z",
-  "apply_authorized": false,
-  "authorizer_enablement_authorized": false,
+  "apply_authorized": true,
+  "authorizer_enablement_authorized": true,
   "principal_form": "User:O=<org>,CN=<cn> (Java X500Principal.getName())",
   "principal_builder_class": "org.apache.kafka.common.security.authenticator.DefaultKafkaPrincipalBuilder",
   "ssl_principal_mapping_rules": null,
@@ -510,5 +510,7 @@
     "client_id_authorization_rules": 0
   },
   "principals_source": "reports/kafka/gate5-v7-kafka-node-principals.json",
-  "ts_principals_reconciled": "2026-08-02T21:22:52Z"
+  "ts_principals_reconciled": "2026-08-02T21:22:52Z",
+  "ts_source_controlled_authorizer": "2026-08-02T22:44:24Z",
+  "source_controlled_note": "StandardAuthorizer + fail-closed ACLs are source-controlled. Bootstrap order: Kafka with authorizer \u2192 recovery-admin \u2192 ACL bootstrap \u2192 participants."
 }

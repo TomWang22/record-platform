@@ -1,0 +1,100 @@
+{
+  "document": "gate5-v7-live-authorizer-source-delta",
+  "ts": "2026-08-02T22:46:56Z",
+  "compared_source_sha": "WORKING_TREE_PENDING_COMMIT",
+  "post_landing": true,
+  "settings": [
+    {
+      "env_name": "KAFKA_AUTHORIZER_CLASS_NAME",
+      "live_value": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
+      "source_value": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
+      "expected_durable_value": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
+      "in_source": true,
+      "live_matches_expected": true,
+      "source_matches_expected": true,
+      "live_only_mutation": false,
+      "required_source_path": "infra/k8s/kafka-kraft-metallb/statefulset.yaml"
+    },
+    {
+      "env_name": "KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND",
+      "live_value": "false",
+      "source_value": "false",
+      "expected_durable_value": "false",
+      "in_source": true,
+      "live_matches_expected": true,
+      "source_matches_expected": true,
+      "live_only_mutation": false,
+      "required_source_path": "infra/k8s/kafka-kraft-metallb/statefulset.yaml"
+    },
+    {
+      "env_name": "KAFKA_SUPER_USERS",
+      "live_value": "User:O=record-platform,CN=kafka;User:O=Record Platform,CN=gate5-v7-admin",
+      "source_value": "User:O=record-platform,CN=kafka;User:O=Record Platform,CN=gate5-v7-admin",
+      "expected_durable_value": "User:O=record-platform,CN=kafka;User:O=Record Platform,CN=gate5-v7-admin",
+      "in_source": true,
+      "live_matches_expected": true,
+      "source_matches_expected": true,
+      "live_only_mutation": false,
+      "required_source_path": "infra/k8s/kafka-kraft-metallb/statefulset.yaml"
+    },
+    {
+      "env_name": "KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH",
+      "live_value": "required",
+      "source_value": "required",
+      "expected_durable_value": "required",
+      "in_source": true,
+      "live_matches_expected": true,
+      "source_matches_expected": true,
+      "live_only_mutation": false,
+      "required_source_path": "infra/k8s/kafka-kraft-metallb/statefulset.yaml"
+    },
+    {
+      "env_name": "KAFKA_LISTENER_NAME_INTERNAL_SSL_CLIENT_AUTH",
+      "live_value": "required",
+      "source_value": "required",
+      "expected_durable_value": "required",
+      "in_source": true,
+      "live_matches_expected": true,
+      "source_matches_expected": true,
+      "live_only_mutation": false,
+      "required_source_path": "infra/k8s/kafka-kraft-metallb/statefulset.yaml"
+    },
+    {
+      "env_name": "KAFKA_LISTENER_NAME_EXTERNAL_SSL_CLIENT_AUTH",
+      "live_value": "required",
+      "source_value": "required",
+      "expected_durable_value": "required",
+      "in_source": true,
+      "live_matches_expected": true,
+      "source_matches_expected": true,
+      "live_only_mutation": false,
+      "required_source_path": "infra/k8s/kafka-kraft-metallb/statefulset.yaml"
+    },
+    {
+      "env_name": "KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM",
+      "live_value": "HTTPS",
+      "source_value": "HTTPS",
+      "expected_durable_value": "HTTPS",
+      "in_source": true,
+      "live_matches_expected": true,
+      "source_matches_expected": true,
+      "live_only_mutation": false,
+      "required_source_path": "infra/k8s/kafka-kraft-metallb/statefulset.yaml"
+    }
+  ],
+  "acl": {
+    "bootstrap_script_present": true,
+    "manifest_apply_authorized": true,
+    "live_only_mutation": false
+  },
+  "summary": {
+    "live_authorizer_settings_expected": 7,
+    "live_authorizer_settings_accounted": 7,
+    "source_settings_matching_expected": 7,
+    "live_only_mutations": 0,
+    "unexplained_live_mutations": 0,
+    "remediation_required": false,
+    "final_gate5_v7_authorized": false
+  },
+  "dual_use_eku_accepted_exception": true
+}

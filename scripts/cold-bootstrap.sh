@@ -655,20 +655,20 @@ else
 fi
 rp_cb_phase_complete F.kafka_client_workloads.verify
 
-# --- G.kafka_authorizer.preflight / G.kafka_acls.offline_validate (no enablement/apply) ---
-rp_cb_phase_enter G.kafka_authorizer.preflight "authorizer preflight (enablement deferred)"
+# --- G.kafka_authorizer.preflight / offline validate / ACL bootstrap (fail-closed) ---
+rp_cb_phase_enter G.kafka_authorizer.preflight "verify source-controlled StandardAuthorizer"
 if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
-  echo "[dry-run] bash scripts/gate5-v7-authorizer-preflight.sh"
+  echo "[dry-run] bash scripts/gate5-v7-authorizer-verify.sh"
 else
-  chmod +x "$SCRIPT_DIR/gate5-v7-authorizer-preflight.sh" 2>/dev/null || true
+  chmod +x "$SCRIPT_DIR/gate5-v7-authorizer-verify.sh" "$SCRIPT_DIR/gate5-v7-authorizer-preflight.sh" 2>/dev/null || true
   export RP_CB_RUN_LABEL="G.kafka_authorizer.preflight"
-  rp_cb_run bash "$SCRIPT_DIR/gate5-v7-authorizer-preflight.sh" || \
-    rp_cb_phase_fail G.kafka_authorizer.preflight "authorizer preflight failed" \
-      "bash scripts/gate5-v7-authorizer-preflight.sh"
+  rp_cb_run bash "$SCRIPT_DIR/gate5-v7-authorizer-verify.sh" || \
+    rp_cb_phase_fail G.kafka_authorizer.preflight "authorizer verify failed" \
+      "bash scripts/gate5-v7-authorizer-verify.sh"
 fi
 rp_cb_phase_complete G.kafka_authorizer.preflight
 
-rp_cb_phase_enter G.kafka_acls.offline_validate "ACL offline validation (apply deferred)"
+rp_cb_phase_enter G.kafka_acls.offline_validate "ACL offline validation"
 if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
   echo "[dry-run] python3 scripts/gate5-v7-acl-offline-validate.py"
 else
@@ -678,6 +678,20 @@ else
       "python3 scripts/gate5-v7-acl-offline-validate.py"
 fi
 rp_cb_phase_complete G.kafka_acls.offline_validate
+
+rp_cb_phase_enter G.kafka_acls.bootstrap "recovery-admin ACL bootstrap (before participant runtime)"
+if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
+  echo "[dry-run] bash scripts/gate5-v7-acl-bootstrap.sh"
+elif [[ "${BOOTSTRAP_SKIP_KAFKA_ACL_BOOTSTRAP:-0}" == "1" ]]; then
+  echo "  ℹ️  BOOTSTRAP_SKIP_KAFKA_ACL_BOOTSTRAP=1 — skipping live ACL apply (not for acceptance)"
+else
+  chmod +x "$SCRIPT_DIR/gate5-v7-acl-bootstrap.sh" 2>/dev/null || true
+  export RP_CB_RUN_LABEL="G.kafka_acls.bootstrap"
+  rp_cb_run bash "$SCRIPT_DIR/gate5-v7-acl-bootstrap.sh" || \
+    rp_cb_phase_fail G.kafka_acls.bootstrap "ACL bootstrap failed" \
+      "bash scripts/gate5-v7-acl-bootstrap.sh"
+fi
+rp_cb_phase_complete G.kafka_acls.bootstrap
 
 # H.kafka_identity_canary / I.kafka_three_broker_acceptance are NOT run by default.
 # Use: RP_GATE5_V7_ACCEPTANCE=1 make gate5-v7-identity-canary (separate acceptance DAG).

@@ -736,6 +736,19 @@ else
   ok "Kafka readiness gate passed"
 fi
 
+# --- P5e StandardAuthorizer verify + fail-closed ACL bootstrap BEFORE participant deploy ---
+# Kafka STS source includes authorizer; ACLs must exist before deploy-dev starts app traffic.
+say "[P5e] Gate5 v7 authorizer verify + ACL bootstrap (before P6/P7 participant deploy)"
+if [[ "${BOOTSTRAP_SKIP_KAFKA_ACL_BOOTSTRAP:-0}" == "1" ]]; then
+  echo "  ℹ️  BOOTSTRAP_SKIP_KAFKA_ACL_BOOTSTRAP=1 — skipping authorizer/ACL bootstrap (not for acceptance)"
+else
+  chmod +x "$SCRIPT_DIR/gate5-v7-authorizer-verify.sh" "$SCRIPT_DIR/gate5-v7-acl-bootstrap.sh" 2>/dev/null || true
+  HOUSING_NS="$NS" bash "$SCRIPT_DIR/gate5-v7-authorizer-verify.sh"
+  python3 "$SCRIPT_DIR/gate5-v7-acl-offline-validate.py" >/dev/null
+  HOUSING_NS="$NS" bash "$SCRIPT_DIR/gate5-v7-acl-bootstrap.sh"
+  ok "authorizer verified + ACLs bootstrapped before participant deploy"
+fi
+
 # --- P6 IMAGES ---
 _p6_skip_runtime_build=0
 if [[ "${BOOTSTRAP_SKIP_P6_RUNTIME_IMAGES:-0}" == "1" ]] || [[ "${RP_COLD_BOOTSTRAP_IMAGES_BUILT:-0}" == "1" ]]; then

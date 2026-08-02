@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Fail if infra/bootstrap_invariants.graph.json has a cycle.
- * Regression: the historical A.namespace_integrity_static dual-use edge cycle.
+ * Fail if infra/bootstrap_invariants.graph.json has a cycle or insecure Kafka auth ordering.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -46,13 +45,6 @@ if (out.length !== nodes.length) {
   const stuck = [...indeg.entries()].filter(([, d]) => d > 0).map(([n]) => n);
   console.error("FAIL: bootstrap DAG has a cycle");
   console.error("stuck_nodes=", stuck.join(","));
-  // Explicit regression marker for the known historical cycle
-  const hasLegacyDual =
-    edges.some(([a, b]) => a === "D.contract_audits" && b === "A.namespace_integrity_static") &&
-    edges.some(([a, b]) => a === "A.namespace_integrity_static" && b === "P0.hard_reset");
-  if (hasLegacyDual) {
-    console.error("REGRESSION: A.namespace_integrity_static dual-use cycle present");
-  }
   process.exit(1);
 }
 
@@ -76,8 +68,45 @@ if (nodes.includes("F.kafka_client_workloads.wire")) {
   console.error("FAIL: F.kafka_client_workloads.wire must be renamed to .verify");
   process.exit(1);
 }
-if (nodes.includes("G.kafka_authorizer.configure") || nodes.includes("G.kafka_acls.bootstrap")) {
-  console.error("FAIL: G nodes must use preflight/offline_validate names");
+if (!nodes.includes("G.kafka_authorizer.preflight") && !nodes.includes("G.kafka_authorizer.verify")) {
+  console.error("FAIL: missing G.kafka_authorizer.preflight|verify");
+  process.exit(1);
+}
+if (!nodes.includes("G.kafka_acls.bootstrap")) {
+  console.error("FAIL: missing G.kafka_acls.bootstrap (fail-closed ACL apply required)");
+  process.exit(1);
+}
+if (!nodes.includes("G.kafka_acls.offline_validate")) {
+  console.error("FAIL: missing G.kafka_acls.offline_validate");
+  process.exit(1);
+}
+
+const hasEdge = (a, b) => edges.some(([u, v]) => u === a && v === b);
+const authNode = nodes.includes("G.kafka_authorizer.verify")
+  ? "G.kafka_authorizer.verify"
+  : "G.kafka_authorizer.preflight";
+
+if (!hasEdge(authNode, "G.kafka_acls.offline_validate") && !hasEdge(authNode, "G.kafka_acls.bootstrap")) {
+  console.error("FAIL: authorizer verify must precede ACL offline/bootstrap");
+  process.exit(1);
+}
+if (!hasEdge("G.kafka_acls.offline_validate", "G.kafka_acls.bootstrap")) {
+  console.error("FAIL: offline ACL validate must precede ACL bootstrap");
+  process.exit(1);
+}
+if (!hasEdge("G.kafka_acls.bootstrap", "G.app_runtime")) {
+  console.error("FAIL: ACL bootstrap must precede G.app_runtime");
+  process.exit(1);
+}
+if (hasEdge("F.cluster_deploy", "G.app_runtime")) {
+  console.error("FAIL: F.cluster_deploy must not bypass ACL bootstrap to G.app_runtime");
+  process.exit(1);
+}
+
+// Topological: authorizer before bootstrap before app_runtime
+const idx = Object.fromEntries(out.map((n, i) => [n, i]));
+if (!(idx[authNode] < idx["G.kafka_acls.bootstrap"] && idx["G.kafka_acls.bootstrap"] < idx["G.app_runtime"])) {
+  console.error("FAIL: insecure topological order for authorizer/ACL/app_runtime");
   process.exit(1);
 }
 
@@ -88,8 +117,11 @@ console.log(
       nodes: nodes.length,
       edges: edges.length,
       topological_order_length: out.length,
+      authorizer_before_acl_bootstrap: true,
+      acl_bootstrap_before_participant_start: true,
+      permissive_window_steps: 0,
     },
     null,
-    2
-  )
+    2,
+  ),
 );

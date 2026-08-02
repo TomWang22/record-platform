@@ -1,6 +1,6 @@
 {
-  "version": "v2.1",
-  "description": "Record Platform cold-bootstrap DAG (acyclic). Acceptance nodes H.kafka_identity_canary / I.kafka_three_broker_acceptance are gated (RP_GATE5_V7_ACCEPTANCE=1) and not executed by default cold-bootstrap.",
+  "version": "v2.2",
+  "description": "Record Platform cold-bootstrap DAG (acyclic). StandardAuthorizer + ACL bootstrap precede G.app_runtime. Acceptance nodes H.kafka_identity_canary / I.kafka_three_broker_acceptance are gated (RP_GATE5_V7_ACCEPTANCE=1) and not executed by default cold-bootstrap.",
   "housing_ns_default": "record-platform",
   "nodes": {
     "A.toolchain": {
@@ -230,16 +230,16 @@
       "readOnly": true
     },
     "G.kafka_authorizer.preflight": {
-      "description": "Authorizer preflight only \u2014 does not enable authorizer",
-      "script": "scripts/gate5-v7-authorizer-preflight.sh",
-      "verifyPhase": "kafka_authorizer_preflight",
+      "description": "Verify source-controlled StandardAuthorizer + fail-closed mTLS (delegates to authorizer-verify)",
+      "script": "scripts/gate5-v7-authorizer-verify.sh",
+      "verifyPhase": "kafka_authorizer_verify",
       "context": [
         "post-bootstrap",
         "drift"
       ]
     },
     "G.kafka_acls.offline_validate": {
-      "description": "ACL offline validation \u2014 does not apply ACLs",
+      "description": "ACL offline validation against measured O-before-CN principals",
       "script": "scripts/gate5-v7-acl-offline-validate.py",
       "verifyPhase": "kafka_acls_offline",
       "context": [
@@ -365,6 +365,15 @@
       ],
       "defaultColdBootstrap": false,
       "requiresEnv": "RP_GATE5_V7_ACCEPTANCE=1"
+    },
+    "G.kafka_acls.bootstrap": {
+      "description": "Idempotent recovery-admin ACL bootstrap + structural verify (before participant Kafka traffic)",
+      "script": "scripts/gate5-v7-acl-bootstrap.sh",
+      "verifyPhase": "kafka_acls_bootstrap",
+      "context": [
+        "post-bootstrap",
+        "drift"
+      ]
     }
   },
   "edges": [
@@ -473,18 +482,6 @@
       "G.kafka_acls.offline_validate"
     ],
     [
-      "G.kafka_acls.offline_validate",
-      "G.app_runtime"
-    ],
-    [
-      "F.cluster_deploy",
-      "G.app_runtime"
-    ],
-    [
-      "G.kafka_acls.offline_validate",
-      "H.kafka_identity_canary"
-    ],
-    [
       "H.kafka_identity_canary",
       "I.kafka_three_broker_acceptance"
     ],
@@ -531,6 +528,24 @@
     [
       "I.transport",
       "J.final_contract"
+    ],
+    [
+      "G.kafka_acls.offline_validate",
+      "G.kafka_acls.bootstrap"
+    ],
+    [
+      "G.kafka_acls.bootstrap",
+      "G.app_runtime"
+    ],
+    [
+      "G.kafka_acls.bootstrap",
+      "H.kafka_identity_canary"
     ]
-  ]
+  ],
+  "security_ordering": {
+    "authorizer_before_acl_bootstrap": true,
+    "acl_bootstrap_before_participant_runtime": true,
+    "recovery_admin_before_acl_bootstrap": true,
+    "permissive_window_steps": 0
+  }
 }

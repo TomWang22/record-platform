@@ -260,6 +260,11 @@ spec:
               valueFrom:
                 secretKeyRef: { name: kafka-ssl-secret, key: kafka.truststore-password }
             - { name: KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM, value: "HTTPS" }
+            # Gate5 v7: StandardAuthorizer fail-closed (no permissive transition).
+            # Super users: measured broker leaf + recovery-admin only. Never add application principals.
+            - { name: KAFKA_AUTHORIZER_CLASS_NAME, value: "org.apache.kafka.metadata.authorizer.StandardAuthorizer" }
+            - { name: KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND, value: "false" }
+            - { name: KAFKA_SUPER_USERS, value: "User:O=record-platform,CN=kafka;User:O=Record Platform,CN=gate5-v7-admin" }
             # Optional rack awareness: patch in KAFKA_BROKER_RACK (e.g. from topology labels) when nodes are zoned.
             # Advertised listeners: INTERNAL + EXTERNAL only (set in container command). CONTROLLER stays off advertised.*.
           volumeMounts:

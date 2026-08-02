@@ -2,7 +2,7 @@
   "document": "gate5-v7-acl-offline-validation",
   "manifest": "reports/kafka/gate5-v7-final-acl-manifest.json",
   "measured_principals": "reports/kafka/gate5-v7-kafka-node-principals.json",
-  "apply_authorized": false,
+  "apply_authorized": true,
   "errors": [],
   "passed": true,
   "service_principals": 12,

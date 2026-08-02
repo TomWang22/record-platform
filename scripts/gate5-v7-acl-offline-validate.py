@@ -31,8 +31,10 @@ def main() -> int:
     }
     measured_broker = measured["broker_server_leaf"]["kafka_acl_principal"]
     measured_admin = measured["recovery_admin"]["kafka_acl_principal"]
-    if doc.get("apply_authorized") is not False:
-        errors.append("apply_authorized must be false at this stop gate")
+    if doc.get("apply_authorized") is not True:
+        errors.append("apply_authorized must be true for fail-closed ACL bootstrap")
+    if doc.get("authorizer_enablement_authorized") is not True:
+        errors.append("authorizer_enablement_authorized must be true")
     principals = doc.get("service_principals") or {}
     if len(principals) != 12:
         errors.append(f"service_principals expected 12 got {len(principals)}")
@@ -81,7 +83,7 @@ def main() -> int:
         "document": "gate5-v7-acl-offline-validation",
         "manifest": str(MANIFEST.relative_to(REPO)),
         "measured_principals": str(MEASURED.relative_to(REPO)),
-        "apply_authorized": False,
+        "apply_authorized": True,
         "errors": errors,
         "passed": len(errors) == 0,
         "service_principals": len(principals),

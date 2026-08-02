@@ -1,0 +1,20 @@
+{
+  "document": "gate5-v7-authorizer-verify",
+  "source_checks": {
+    "authorizer_class_name": true,
+    "allow_everyone_false": true,
+    "super_users_exact": true,
+    "controller_client_auth_required": true,
+    "controller_endpoint_https": true,
+    "internal_client_auth_required": true,
+    "external_client_auth_required": true,
+    "manifest_apply_authorized": true,
+    "manifest_super_users": true,
+    "application_super_users_zero": true
+  },
+  "application_super_users_in_source": [],
+  "dual_use_eku_accepted_exception": "DUAL_USE_EKU_ACCEPTED_EXCEPTION",
+  "per_node_broker_identity_claimed": false,
+  "errors": [],
+  "passed": true
+}

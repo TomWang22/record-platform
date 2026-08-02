@@ -1,24 +1,24 @@
 {
   "document": "gate5-v7-authorizer-preflight",
-  "ts": "2026-08-02T00:32:24Z",
-  "authorizer_enablement_authorized": false,
-  "final_acls_apply_authorized": false,
+  "ts": "2026-08-02T22:44:24Z",
+  "authorizer_enablement_authorized": true,
+  "final_acls_apply_authorized": true,
   "intended_authorizer_class": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
   "allow_everyone_if_no_acl_found_intended": false,
   "kafka_version": "confluentinc/cp-kafka:7.5.0",
   "mode": "KRaft",
   "broker_principals_identified": {
-    "status": "PRELIMINARY",
+    "status": "MEASURED",
     "expected_form": "User:O=record-platform,CN=kafka",
     "count_expected": 3,
-    "count_confirmed_live": 0,
-    "note": "Confirm from live keystore subject on each broker before enablement"
+    "count_confirmed_live": 3
   },
   "controller_principals_identified": {
-    "status": "BLOCKED_ON_CONTROLLER_CLIENT_AUTH_DESIGN",
+    "status": "MEASURED",
     "count_expected": 3,
-    "count_confirmed_live": 0,
-    "current_controller_client_auth": "none"
+    "count_confirmed_live": 3,
+    "current_controller_client_auth": "required",
+    "principal": "User:O=record-platform,CN=kafka"
   },
   "admin_recovery_principal_defined": true,
   "admin_recovery_principal": "User:O=Record Platform,CN=gate5-v7-admin",
@@ -28,16 +28,14 @@
   "acl_manifest_syntax_validated": true,
   "rollback_manifest_prepared": true,
   "rollback": {
-    "steps": [
-      "Restore prior kafka.properties without authorizer.class.name",
-      "Roll brokers one at a time",
-      "Confirm quorum/ISR/URP",
-      "Retain kafka-ssl-secret for broker keystores until controller redesign lands"
-    ]
+    "preferred": "RP_GATE5_V7_ROLLBACK_CONFIRM=yes bash scripts/gate5-v7-authorizer-rollback.sh  # repair-acls",
+    "emergency_authorizer_off": "RP_GATE5_V7_ROLLBACK_MODE=authorizer-off RP_GATE5_V7_ROLLBACK_CONFIRM=yes bash scripts/gate5-v7-authorizer-rollback.sh",
+    "forbidden": "never set allow.everyone.if.no.acl.found=true"
   },
   "acceptance_evidence_during_permissive_transition": "FORBIDDEN",
   "historical_kafka_client_super_user": false,
   "application_super_users": 0,
-  "authorizer_enabled": false,
-  "final_acls_applied": false
+  "authorizer_enabled": true,
+  "final_acls_applied": true,
+  "note": "Source-controlled StandardAuthorizer landed; historical absence stop-gate retired."
 }

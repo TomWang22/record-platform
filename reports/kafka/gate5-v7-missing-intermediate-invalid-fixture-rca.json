@@ -1,0 +1,41 @@
+{
+  "document": "gate5-v7-missing-intermediate-invalid-fixture-rca",
+  "ts": "2026-08-02T03:00:36Z",
+  "classification": "INVALID_NEGATIVE_FIXTURE \u2014 INTERMEDIATE_REMOVED_FROM_WRONG SIDE OF HANDSHAKE",
+  "explanation": "Prior rows removed the intermediate from the client truststore while the peer still presented leaf+intermediate. Root-only truststore with peer-supplied intermediate is normal PKIX and must not be treated as a missing-intermediate denial.",
+  "not_counted_as_security_failure": true,
+  "not_counted_as_passing_negative": true,
+  "historical_rows": [
+    {
+      "case": "missing_intermediate",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": true,
+      "pass": false,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "unexpected_ok",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "missing_intermediate",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": true,
+      "pass": false,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "unexpected_ok",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "missing_intermediate",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": true,
+      "pass": false,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "unexpected_ok",
+      "hostname_verification": "HTTPS"
+    }
+  ],
+  "replacement_case": "peer_omits_intermediate"
+}

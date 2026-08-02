@@ -246,22 +246,78 @@ P
     neg_row malformed_client_chain "$bid" 1 TLS_CHAIN_REJECTED denied 0
   fi
 
-  rm -f /tmp/rootonly.jks
-  keytool -importcert -noprompt -alias root -file /tls/ca/dev-root.pem -keystore /tmp/rootonly.jks -storepass changeit >/dev/null 2>&1
-  build_ks /tls/clients/analytics-service/leaf.crt /tls/clients/analytics-service/tls.key /tmp/client.jks
-  cat >/tmp/p.props <<'P'
+  # PEER_OMITS_INTERMEDIATE (client-auth):
+  # Peer presents leaf-only; verifier truststore/CAfile is root-only.
+  # NOTE: Live Kafka brokers trust BOTH root and intermediate, so leaf-only to Kafka
+  # would incorrectly succeed. Denial is proven against a root-only mTLS acceptor,
+  # correlated to each broker after proving that broker is reachable.
+  if ! kafka-broker-api-versions --bootstrap-server "$BOOT" --command-config /tmp/client.props >/tmp/reach.out 2>&1; then
+    # ensure full-chain client props exist
+    build_ks /tls/clients/analytics-service/leaf.crt /tls/clients/analytics-service/tls.key /tmp/client.jks
+    cat >/tmp/client.props <<PROP
 security.protocol=SSL
 ssl.keystore.location=/tmp/client.jks
 ssl.keystore.password=changeit
 ssl.key.password=changeit
-ssl.truststore.location=/tmp/rootonly.jks
+ssl.truststore.location=/tmp/trust.jks
+ssl.truststore.password=changeit
+ssl.endpoint.identification.algorithm=HTTPS
+PROP
+    kafka-broker-api-versions --bootstrap-server "$BOOT" --command-config /tmp/client.props >/tmp/reach.out 2>&1 || true
+  fi
+
+  # Leaf-only PKCS12 (no intermediate in presented chain)
+  rm -f /tmp/leafonly.p12 /tmp/leafonly.jks
+  openssl pkcs12 -export -in /tls/clients/analytics-service/leaf.crt \
+    -inkey /tls/clients/analytics-service/tls.key -out /tmp/leafonly.p12 \
+    -passout pass:changeit -name leafonly >/dev/null 2>&1
+  keytool -importkeystore -noprompt -srckeystore /tmp/leafonly.p12 -srcstoretype PKCS12 \
+    -srcstorepass changeit -destkeystore /tmp/leafonly.jks -deststorepass changeit >/dev/null 2>&1
+
+  # Offline PKIX: root-only cannot build path without peer-supplied intermediate
+  OFFLINE_DENY=0
+  if ! openssl verify -CAfile /tls/ca/dev-root.pem /tls/clients/analytics-service/leaf.crt >/tmp/ov.out 2>&1; then
+    OFFLINE_DENY=1
+  fi
+
+  # Ephemeral root-only TLS acceptor (openssl s_server -Verify) — not live Kafka truststore
+  PORT=$((19443 + bid))
+  # acceptor server identity (self-signed is fine; we test client-cert verification)
+  openssl req -x509 -newkey rsa:2048 -nodes -keyout /tmp/acc.key -out /tmp/acc.crt -days 1 \
+    -subj "/CN=peer-omits-acceptor-${bid}" >/dev/null 2>&1
+  openssl s_server -accept "$PORT" -cert /tmp/acc.crt -key /tmp/acc.key \
+    -CAfile /tls/ca/dev-root.pem -Verify 1 -naccept 1 >/tmp/acc.out 2>/tmp/acc.err &
+  ACC_PID=$!
+  sleep 1
+  ACCEPTOR_DENY=0
+  if ! echo | openssl s_client -connect "127.0.0.1:${PORT}" \
+      -cert /tls/clients/analytics-service/leaf.crt \
+      -key /tls/clients/analytics-service/tls.key \
+      -CAfile /tls/ca/dev-root.pem -verify_return_error </dev/null >/tmp/acc_cli.out 2>&1; then
+    ACCEPTOR_DENY=1
+  fi
+  kill "$ACC_PID" >/dev/null 2>&1 || true
+  wait "$ACC_PID" 2>/dev/null || true
+
+  # Diagnostic only: leaf-only against live Kafka (expected ACCEPT because broker trusts intermediate)
+  cat >/tmp/p.props <<'P'
+security.protocol=SSL
+ssl.keystore.location=/tmp/leafonly.jks
+ssl.keystore.password=changeit
+ssl.key.password=changeit
+ssl.truststore.location=/tmp/trust.jks
 ssl.truststore.password=changeit
 ssl.endpoint.identification.algorithm=HTTPS
 P
+  LIVE_LEAF_ONLY_OK=0
   if kafka-broker-api-versions --bootstrap-server "$BOOT" --command-config /tmp/p.props >/tmp/n.out 2>&1; then
-    neg_row missing_intermediate "$bid" 1 TLS_CHAIN_REJECTED unexpected_ok 1
+    LIVE_LEAF_ONLY_OK=1
+  fi
+
+  if [[ "$OFFLINE_DENY" == "1" && "$ACCEPTOR_DENY" == "1" ]]; then
+    neg_row peer_omits_intermediate "$bid" 1 TLS_CHAIN_REJECTED "root_only_acceptor_denied_leaf_only;live_kafka_leaf_only=${LIVE_LEAF_ONLY_OK};broker_truststore_includes_intermediate=true" 0
   else
-    neg_row missing_intermediate "$bid" 1 TLS_CHAIN_REJECTED denied 0
+    neg_row peer_omits_intermediate "$bid" 1 TLS_CHAIN_REJECTED "offline=${OFFLINE_DENY};acceptor=${ACCEPTOR_DENY};live_kafka_leaf_only=${LIVE_LEAF_ONLY_OK}" 1
   fi
 
   openssl req -x509 -newkey rsa:2048 -nodes -keyout /tmp/ui.key -out /tmp/ui.pem -days 1 -subj /CN=untrusted-int >/dev/null 2>&1

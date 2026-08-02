@@ -1,0 +1,77 @@
+{
+  "document": "complete-three-stage-pki-pre-authorizer-stop",
+  "ts": "2026-08-02T02:00:00Z",
+  "verdict": "BLOCKED",
+  "prior_three_stage_claim_reclassification": "PARTIAL_SUPERSEDED — per-row root/intermediate/leaf now required and recorded for Kafka 36-row matrix and DNS/SNI edge/Jaeger TLS rows",
+  "authorizer_enabled": false,
+  "ACLs_applied": false,
+  "fail_closed_active": false,
+  "broker_observed_authorization_principals": "0/12",
+  "gate5_v7_created": false,
+  "gate6_authorized": false,
+  "pgbench_authorized": false,
+  "production_approved": false,
+  "peer_authorization": "NOT_ENABLED — do not claim SERVICE_PEER_AUTHORIZATION_VERIFIED",
+  "trust_anchors": {
+    "root_sha256": "E0:D3:94:15:5C:28:84:CA:C5:16:BD:18:1A:0B:79:43:8E:62:3E:33:85:8C:42:C4:A3:C0:DC:C6:28:09:F6:EB",
+    "intermediate_sha256": "99:18:60:03:76:CA:CF:BC:61:72:A6:6F:F2:1A:40:14:8C:4C:AF:C4:FC:72:00:AA:EF:E7:FA:6E:D5:BD:C6:6F",
+    "wire_semantics": "peer presents leaf+intermediate; root is verifier trust anchor only"
+  },
+  "blockers": [
+    "KAFKA_TLS_NEGATIVE missing_intermediate unexpected_accept 3/3 (peer-sent intermediate allows root-only truststore)",
+    "CONTROLLER_STRICT_MTLS docker 3-node rehearsal NOT_PROVEN",
+    "EDGE HTTP/1.1 HTTP/2 HTTP/3 business-action matrix NOT_RUN",
+    "JAEGER /jaeger/api exact-trace round-trip NOT_RUN (DNS/SNI TLS handshake only)",
+    "SERVICE_GRPC_MTLS full matrix NOT_RERUN this stage",
+    "EXACT_SHA clean worktree rebuild/repin NOT_COMPLETE"
+  ],
+  "A_inventory": {
+    "report": "reports/transport/complete-three-stage-pki-inventory.json",
+    "kafka_client_leaves": "12/12",
+    "distinct_fps": 12,
+    "invalid_chains_production": 0,
+    "key_leaf_mismatches": 0,
+    "private_keys_in_reports": 0
+  },
+  "B_layer_consistency": {
+    "report": "reports/transport/certificate-layer-consistency.json",
+    "services_layer_equal": "12/12",
+    "chain_ok": "12/12"
+  },
+  "C_dns_sni": {
+    "report": "reports/transport/runtime-dns-sni-proof.json",
+    "hostnames_resolved_contract": "2/2",
+    "correct_sni_san": "2/2",
+    "wrong_sni_hostname_denied": "2/2",
+    "acceptance_rows_using_curl_resolve": 0,
+    "note": "OpenSSL 3 via docker for -verify_hostname; host map uses system-resolved MetalLB IPs"
+  },
+  "D_kafka_mtls_36": {
+    "report": "reports/kafka/gate5-v7-twelve-by-three-mtls-matrix.json",
+    "positive_mtls_rows": "36/36",
+    "distinct_client_leaf_fingerprints": 12,
+    "brokers": [0, 1, 2],
+    "per_row_client_leaf_intermediate_root": true,
+    "per_row_broker_leaf_intermediate_root": true,
+    "hostname_verification_blanked_rows": 0,
+    "private_keys_copied_into_broker_pods": 0,
+    "client_presentation_evidence_class": "INFERRED_FROM_EXCLUSIVE_KEYSTORE_PLUS_CLIENT_AUTH_REQUIRED",
+    "peer_authorization_enabled": false
+  },
+  "E_kafka_negatives": {
+    "report": "reports/kafka/gate5-v7-kafka-tls-negatives.json",
+    "rows": 36,
+    "pass": 33,
+    "fail": 3,
+    "skipped": 0,
+    "client_auth_eku_absent_executed": true,
+    "failing_case": "missing_intermediate (peer presents intermediate)"
+  },
+  "F_controller": {
+    "CONTROLLER_STRICT_MTLS": "NOT_PROVEN",
+    "mode": "config_only"
+  },
+  "G_exact_sha": {
+    "complete": false
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "document": "runtime-dns-sni-proof",
+  "ts": "2026-08-02T01:42:48Z",
+  "acceptance_rows_using_resolve": 0,
+  "diagnostic_only_resolve_allowed": true,
+  "summary": {
+    "hostnames_expected": 2,
+    "hostnames_resolved": 2,
+    "resolution_matches_contract": 2,
+    "correct_sni": 2,
+    "correct_san": 2,
+    "wrong_sni_denied": 2,
+    "wrong_hostname_denied": 2
+  },
+  "rows": [
+    {
+      "hostname": "record-platform.test",
+      "resolved_ip": "192.168.64.244",
+      "expected_ip": "192.168.64.244",
+      "resolution_matches_contract": true,
+      "acceptance_used_curl_resolve": false,
+      "sni": "record-platform.test",
+      "sni_ok": true,
+      "san_ok": true,
+      "chain_path_ok": true,
+      "disk_leaf_sha256": "0F:26:07:DF:46:35:43:1D:2F:00:E0:9C:35:D4:02:E7:30:87:96:A6:F1:8C:97:60:1C:23:79:D6:C6:E5:28:06",
+      "presented_leaf_sha256": "0F:26:07:DF:46:35:43:1D:2F:00:E0:9C:35:D4:02:E7:30:87:96:A6:F1:8C:97:60:1C:23:79:D6:C6:E5:28:06",
+      "intermediate_sha256": "99:18:60:03:76:CA:CF:BC:61:72:A6:6F:F2:1A:40:14:8C:4C:AF:C4:FC:72:00:AA:EF:E7:FA:6E:D5:BD:C6:6F",
+      "root_sha256": "E0:D3:94:15:5C:28:84:CA:C5:16:BD:18:1A:0B:79:43:8E:62:3E:33:85:8C:42:C4:A3:C0:DC:C6:28:09:F6:EB",
+      "leaf_disk_equals_presented": true,
+      "wrong_sni_denied": true,
+      "wrong_hostname_denied": true,
+      "tls_version_hint": "/var/folders/30/blwtlvxj4h57nggzs7p5jr4m0000gp/T/tmp.YB2GT9W8We:    Protocol  : TLSv1.3",
+      "cipher_hint": "/var/folders/30/blwtlvxj4h57nggzs7p5jr4m0000gp/T/tmp.YB2GT9W8We:    Cipher    : TLS_AES_128_GCM_SHA256",
+      "openssl_verify_semantics": "peer presents leaf(+intermediate); root is local trust anchor"
+    },
+    {
+      "hostname": "jaeger.record-platform.test",
+      "resolved_ip": "192.168.64.245",
+      "expected_ip": "192.168.64.245",
+      "resolution_matches_contract": true,
+      "acceptance_used_curl_resolve": false,
+      "sni": "jaeger.record-platform.test",
+      "sni_ok": true,
+      "san_ok": true,
+      "chain_path_ok": true,
+      "disk_leaf_sha256": "61:1C:48:4C:4F:A0:29:D9:F3:43:09:DB:8A:EA:35:B6:57:13:0B:8D:6E:09:F1:2C:C0:0D:DD:B4:01:5A:D9:01",
+      "presented_leaf_sha256": "61:1C:48:4C:4F:A0:29:D9:F3:43:09:DB:8A:EA:35:B6:57:13:0B:8D:6E:09:F1:2C:C0:0D:DD:B4:01:5A:D9:01",
+      "intermediate_sha256": "99:18:60:03:76:CA:CF:BC:61:72:A6:6F:F2:1A:40:14:8C:4C:AF:C4:FC:72:00:AA:EF:E7:FA:6E:D5:BD:C6:6F",
+      "root_sha256": "E0:D3:94:15:5C:28:84:CA:C5:16:BD:18:1A:0B:79:43:8E:62:3E:33:85:8C:42:C4:A3:C0:DC:C6:28:09:F6:EB",
+      "leaf_disk_equals_presented": true,
+      "wrong_sni_denied": true,
+      "wrong_hostname_denied": true,
+      "tls_version_hint": "/var/folders/30/blwtlvxj4h57nggzs7p5jr4m0000gp/T/tmp.1zOqf7cqr8:    Protocol  : TLSv1.3",
+      "cipher_hint": "/var/folders/30/blwtlvxj4h57nggzs7p5jr4m0000gp/T/tmp.1zOqf7cqr8:    Cipher    : TLS_AES_128_GCM_SHA256",
+      "openssl_verify_semantics": "peer presents leaf(+intermediate); root is local trust anchor"
+    }
+  ]
+}

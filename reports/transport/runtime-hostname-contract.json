@@ -1,0 +1,16 @@
+{
+  "document": "runtime-hostname-contract",
+  "ts": "2026-08-02T01:42:48Z",
+  "hosts": [
+    {
+      "hostname": "record-platform.test",
+      "expected_ip": "192.168.64.244",
+      "service": "ingress-nginx/caddy-h3"
+    },
+    {
+      "hostname": "jaeger.record-platform.test",
+      "expected_ip": "192.168.64.245",
+      "service": "observability/jaeger-query"
+    }
+  ]
+}

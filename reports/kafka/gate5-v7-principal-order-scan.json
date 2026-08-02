@@ -1,0 +1,56 @@
+{
+  "document": "gate5-v7-principal-order-scan",
+  "ts": "2026-08-02T21:25:00Z",
+  "authoritative_source": "javax.security.auth.x500.X500Principal.getName()",
+  "canonical_forms": {
+    "broker": "User:O=record-platform,CN=kafka",
+    "recovery_admin": "User:O=Record Platform,CN=gate5-v7-admin",
+    "service_pattern": "User:O=Record Platform,CN=<service>"
+  },
+  "hits": [
+    {
+      "path": "reports/kafka/gate5-v7-final-acl-manifest.json",
+      "match": "User:CN=gate5-v7-admin,O=Record Platform (super_users)",
+      "classification": "ACTIVE_SUPERSEDED_PRINCIPAL_DEFECT",
+      "resolution": "FIXED_TO_MEASURED_O_BEFORE_CN"
+    },
+    {
+      "path": "reports/kafka/gate5-v7-acl-contract.json",
+      "match": "principal_dn_fallback CN=...,O=Record Platform (12 services)",
+      "classification": "ACTIVE_SUPERSEDED_PRINCIPAL_DEFECT",
+      "resolution": "FIXED_TO_MEASURED_O_BEFORE_CN"
+    },
+    {
+      "path": "reports/kafka/gate5-v7-controller-runtime-mtls-proof.json",
+      "match": "server_leaf_subject CN=kafka,O=record-platform (openssl s_client display)",
+      "classification": "ACTIVE_SUPERSEDED_PRINCIPAL_DEFECT",
+      "resolution": "FIXED_SUBJECT_TO_O_BEFORE_CN_PLUS_OPENSSL_DISPLAY_FIELD"
+    },
+    {
+      "path": "reports/kafka/gate5-v7-principal-mapping.json",
+      "match": "notes referencing prior CN-first examples as superseded",
+      "classification": "DOCUMENTATION_EXAMPLE_TO_CORRECT",
+      "resolution": "KEPT_AS_EXPLICIT_SUPERSESSION_NOTE"
+    },
+    {
+      "path": "reports/kafka/gate5-v7-kafka-node-principals.json",
+      "match": "prior_cn_first_examples_superseded=true",
+      "classification": "DOCUMENTATION_EXAMPLE_TO_CORRECT",
+      "resolution": "KEPT_AS_EXPLICIT_SUPERSESSION_FLAG"
+    },
+    {
+      "path": "reports/kafka/gate5-v7-controller-runtime-mtls-design.pre-reconcile-2026-08-02.json",
+      "match": "stale broker_to_controller/controller_to_controller none claims",
+      "classification": "HISTORICAL_EVIDENCE_DO_NOT_EDIT",
+      "resolution": "PRESERVED_VIA_SUPERSESSION_COPY"
+    }
+  ],
+  "summary": {
+    "active_CN_before_O_principals_after_fix": 0,
+    "principals_expected_measured": "16/16",
+    "principals_guessed": 0,
+    "duplicate_service_principals": 0,
+    "unknown_principals": 0,
+    "manifest_vs_measured_principal_differences": 0
+  }
+}

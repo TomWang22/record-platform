@@ -1,13 +1,14 @@
 {
   "document": "gate5-v7-principal-mapping",
-  "ts": "2026-08-01T23:45:26Z",
-  "final_acls_authorized_to_apply": false,
-  "gate5_v7_authorized_to_create": false,
+  "ts": "2026-08-02T17:00:00Z",
   "principal_builder_class": "org.apache.kafka.common.security.authenticator.DefaultKafkaPrincipalBuilder",
   "ssl_principal_mapping_rules": null,
   "spiffe_is_acl_principal": false,
-  "client_id_authorizes": false,
-  "generic_shared_principal": "User:O=record-platform,CN=kafka-client",
+  "measurement_method": "javax.security.auth.x500.X500Principal.getName() on live Secret leaves",
+  "openssl_display_order_used_for_acls": false,
+  "principals_guessed": 0,
+  "broker_principal": "User:O=record-platform,CN=kafka",
+  "recovery_admin_principal": "User:O=Record Platform,CN=gate5-v7-admin",
   "observed_service_principals": {
     "analytics-service": "User:O=Record Platform,CN=analytics-service",
     "auction-monitor": "User:O=Record Platform,CN=auction-monitor",
@@ -23,11 +24,15 @@
     "ollama-worker": "User:O=Record Platform,CN=ollama-worker"
   },
   "notes": [
-    "Values are Kafka-equivalent derived principals with live mTLS ApiVersions acceptance.",
-    "Promote to BROKER_OBSERVED_AUTHORIZATION_PRINCIPAL only after authorizer ALLOW/DENY logs.",
-    "DN order is O before CN. SPIFFE is not the ACL principal."
+    "Live PKI RDN encoding yields Java getName() O-before-CN.",
+    "Prior CN-first examples are superseded for this live certificate set.",
+    "OpenSSL display order must never be used for ACLs or super.users.",
+    "SPIFFE is identity evidence SAN only; not the ACL principal.",
+    "client.id is attribution only and must never authorize access."
   ],
-  "evidence": "reports/kafka/gate5-v7-observed-principals.json",
-  "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
-  "broker_observed_authorization_principals": 0
+  "evidence": [
+    "reports/kafka/gate5-v7-kafka-node-principals.json",
+    "reports/kafka/gate5-v7-measured-principals.json"
+  ],
+  "dual_use_eku_accepted_exception": true
 }

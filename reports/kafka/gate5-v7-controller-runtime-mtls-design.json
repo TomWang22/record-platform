@@ -1,0 +1,130 @@
+{
+  "document": "gate5-v7-controller-runtime-mtls-design",
+  "ts": "2026-08-02T21:22:52Z",
+  "implementation_status": "LIVE_APPLIED_AND_RUNTIME_RECONCILED",
+  "regenerated_from_live_effective_configuration": true,
+  "live_authorizer_enablement": "BLOCKED_PENDING_QUIESCE_ROLL_ACL_CANARY",
+  "final_gate5_v7_root": false,
+  "current_live_posture": {
+    "INTERNAL:9093": {
+      "port": 9093,
+      "ssl": true,
+      "client_auth": "required",
+      "endpoint_identification": ""
+    },
+    "EXTERNAL:9094": {
+      "port": 9094,
+      "ssl": true,
+      "client_auth": "required",
+      "endpoint_identification": ""
+    },
+    "CONTROLLER:9095": {
+      "port": 9095,
+      "ssl": true,
+      "client_auth": "required",
+      "endpoint_identification": "HTTPS"
+    },
+    "inter_broker": "INTERNAL mTLS required (dual-use broker leaf)",
+    "broker_to_controller": "CONTROLLER mTLS required (client.auth=required; dual-use broker leaf)",
+    "controller_to_controller": "CONTROLLER mTLS required (client.auth=required; dual-use broker leaf)"
+  },
+  "nodes_live": {
+    "kafka-0": {
+      "ready": true,
+      "quorum_voter": "0@kafka-0.kafka.record-platform.svc.cluster.local:9095",
+      "listener.name.controller.ssl.client.auth": "required",
+      "listener.name.controller.ssl.endpoint.identification.algorithm": "HTTPS",
+      "listener.name.internal.ssl.client.auth": "required",
+      "listener.name.external.ssl.client.auth": "required",
+      "authorizer.class.name": null,
+      "properties_sha256": "7d118e9edea2f2a7b94160c2eb8d4b20d0ac035d7daca6ac65beb0edb28cf3ef"
+    },
+    "kafka-1": {
+      "ready": true,
+      "quorum_voter": "1@kafka-1.kafka.record-platform.svc.cluster.local:9095",
+      "listener.name.controller.ssl.client.auth": "required",
+      "listener.name.controller.ssl.endpoint.identification.algorithm": "HTTPS",
+      "listener.name.internal.ssl.client.auth": "required",
+      "listener.name.external.ssl.client.auth": "required",
+      "authorizer.class.name": null,
+      "properties_sha256": "3c1d3e245dd7228b3721db7d270ba9e7d6ac48cf1b1d2ad181a8ee13f448de0e"
+    },
+    "kafka-2": {
+      "ready": true,
+      "quorum_voter": "2@kafka-2.kafka.record-platform.svc.cluster.local:9095",
+      "listener.name.controller.ssl.client.auth": "required",
+      "listener.name.controller.ssl.endpoint.identification.algorithm": "HTTPS",
+      "listener.name.internal.ssl.client.auth": "required",
+      "listener.name.external.ssl.client.auth": "required",
+      "authorizer.class.name": null,
+      "properties_sha256": "a9e9b6b2fcf9280d98b6340e5dda076836e042fee55d8c43d60f46a7c7e5e1ac"
+    }
+  },
+  "controller_reports_expected_reconciled": "3/3",
+  "design_vs_runtime_conflicts": 0,
+  "stale_controller_client_auth_none_claims": 0,
+  "conflicts_fixed_this_regeneration": [
+    {
+      "field": "current_live_posture.broker_to_controller",
+      "stale": "CONTROLLER TLS without client certificate requirement",
+      "live": "CONTROLLER mTLS required (client.auth=required) using dual-use broker leaf"
+    },
+    {
+      "field": "current_live_posture.controller_to_controller",
+      "stale": "CONTROLLER TLS without client certificate requirement",
+      "live": "CONTROLLER mTLS required (client.auth=required) using dual-use broker leaf"
+    }
+  ],
+  "parity_gap": {
+    "disposable_rehearsal_controller_ssl_client_auth": "required",
+    "live_controller_ssl_client_auth": "required",
+    "blocks_live_standard_authorizer": false,
+    "note": "Controller mTLS parity closed; authorizer cutover still gated on quiesce/roll/ACL/canary and committed STS pin"
+  },
+  "claims_allowed": [
+    "ALL THREE KAFKA LISTENER PLANES REQUIRE CLIENT CERTIFICATES AT THE TLS LAYER",
+    "CONTROLLER plane requires and verifies client certificates",
+    "INTERNAL and EXTERNAL broker planes require client certificates"
+  ],
+  "claims_forbidden": [
+    "node-distinct Kafka identity verified",
+    "wrong Kafka node identity denied",
+    "least-privilege broker/controller EKU verified",
+    "every Kafka node has a distinct certificate"
+  ],
+  "certificate_strategy": {
+    "selected": "DUAL_USE_EKU_ACCEPTED_EXCEPTION",
+    "DUAL_USE_EKU_ACCEPTED_EXCEPTION": true,
+    "NODE_DISTINCT_KAFKA_IDENTITIES": false,
+    "WRONG_NODE_IDENTITY_DENIAL": "NOT_APPLICABLE_WITH_RATIONALE",
+    "LEAST_PRIVILEGE_KAFKA_NODE_EKU": false,
+    "shared_leaf_sha256": "96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04",
+    "eku": {
+      "serverAuth": true,
+      "clientAuth": true
+    },
+    "rationale": "Shared kafka.keystore.jks dual-use leaf across kafka-0/1/2; proves encrypted mutual authentication, not node-specific identity separation."
+  },
+  "connection_edge_model": {
+    "do_not_invent_full_mesh": true,
+    "quorum_voters": [
+      "0@kafka-0.kafka.record-platform.svc.cluster.local:9095",
+      "1@kafka-1.kafka.record-platform.svc.cluster.local:9095",
+      "2@kafka-2.kafka.record-platform.svc.cluster.local:9095"
+    ],
+    "controller_endpoints_expected": 3,
+    "controller_client_auth_required": "3/3",
+    "missing_controller_client_certificate_denied": "3/3"
+  },
+  "proof_reference": "reports/kafka/gate5-v7-controller-runtime-mtls-proof.json",
+  "rollback": {
+    "required_before_live_mutation": true,
+    "authorizer_not_involved": true,
+    "note": "Controller mTLS rollback would restore client.auth=none; do not use unless emergency. Authorizer enablement has separate rollback."
+  },
+  "live_mutation_gate": {
+    "controller_mtls_live": true,
+    "modify_live_authorizer_authorized": false,
+    "requires_committed_statefulset_pin": true
+  }
+}

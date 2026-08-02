@@ -8,6 +8,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 MANIFEST = REPO / "reports/kafka/gate5-v7-final-acl-manifest.json"
+MEASURED = REPO / "reports/kafka/gate5-v7-kafka-node-principals.json"
 OUT = REPO / "reports/kafka/gate5-v7-acl-offline-validation.json"
 
 FORBIDDEN_OPS = {
@@ -24,6 +25,12 @@ WILDCARD = {"*", "kafka-cluster"}
 def main() -> int:
     errors: list[str] = []
     doc = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    measured = json.loads(MEASURED.read_text(encoding="utf-8"))
+    measured_services = {
+        s["service"]: s["kafka_acl_principal"] for s in measured.get("service_principals") or []
+    }
+    measured_broker = measured["broker_server_leaf"]["kafka_acl_principal"]
+    measured_admin = measured["recovery_admin"]["kafka_acl_principal"]
     if doc.get("apply_authorized") is not False:
         errors.append("apply_authorized must be false at this stop gate")
     principals = doc.get("service_principals") or {}
@@ -33,8 +40,10 @@ def main() -> int:
         p = row.get("principal")
         if not isinstance(p, str) or not p.startswith("User:O=Record Platform,CN="):
             errors.append(f"{svc}: principal must be User:O=Record Platform,CN=… got {p!r}")
-        if p != f"User:O=Record Platform,CN={svc}":
-            errors.append(f"{svc}: principal CN mismatch: {p!r}")
+        if p != measured_services.get(svc):
+            errors.append(f"{svc}: principal must match measured {measured_services.get(svc)!r} got {p!r}")
+        if isinstance(p, str) and p.startswith("User:CN="):
+            errors.append(f"{svc}: superseded CN-before-O principal {p!r}")
         for topic in row.get("topic_acls") or []:
             name = topic.get("name")
             if name in WILDCARD:
@@ -54,13 +63,15 @@ def main() -> int:
         if row.get("super_user") is True:
             errors.append(f"{svc}: application principal must not be super_user")
     supers = doc.get("super_users") or []
+    if supers != [measured_broker, measured_admin]:
+        errors.append(
+            f"super_users must be exactly {[measured_broker, measured_admin]} got {supers}"
+        )
     for s in supers:
-        if "CN=kafka-client" in s or s.startswith("User:O=Record Platform,CN=") and any(
-            s.endswith(f"CN={svc}") for svc in principals
-        ):
-            # application service in super users
-            if any(s == f"User:O=Record Platform,CN={svc}" for svc in principals):
-                errors.append(f"application principal in super_users: {s}")
+        if isinstance(s, str) and s.startswith("User:CN="):
+            errors.append(f"superseded CN-before-O in super_users: {s}")
+        if any(s == measured_services.get(svc) for svc in principals):
+            errors.append(f"application principal in super_users: {s}")
         if "CN=kafka-client" in s:
             errors.append(f"historical generic principal must not be super_user: {s}")
     if doc.get("client_id_authorization_rules"):
@@ -69,12 +80,17 @@ def main() -> int:
     result = {
         "document": "gate5-v7-acl-offline-validation",
         "manifest": str(MANIFEST.relative_to(REPO)),
+        "measured_principals": str(MEASURED.relative_to(REPO)),
         "apply_authorized": False,
         "errors": errors,
         "passed": len(errors) == 0,
         "service_principals": len(principals),
         "wildcard_application_acls": 0,
         "application_super_users": 0,
+        "active_CN_before_O_principals": 0 if not any("User:CN=" in e for e in errors) else 1,
+        "manifest_vs_measured_principal_differences": sum(
+            1 for e in errors if "must match measured" in e or "super_users must be exactly" in e
+        ),
     }
     OUT.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))

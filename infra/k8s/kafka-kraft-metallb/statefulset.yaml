@@ -115,7 +115,8 @@ spec:
               export KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=""
               export KAFKA_LISTENER_NAME_INTERNAL_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=""
               export KAFKA_LISTENER_NAME_EXTERNAL_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=""
-              export KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=""
+              # CONTROLLER quorum voters use FQDNs covered by broker SANs — require HTTPS hostname verification.
+              export KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM="HTTPS"
               ORD="${HOSTNAME##*-}"
               EXTERNAL_IP="$(tr -d '[:space:]' </shared-lb/external-lb-ipv4)"
               [[ -n "$EXTERNAL_IP" ]] || { echo "FATAL: empty MetalLB IP in /shared-lb/external-lb-ipv4"; exit 1; }
@@ -136,19 +137,26 @@ spec:
                 echo "$ADV_LINE" >> "$KAFKA_PROP"
               fi
               export KAFKA_ADVERTISED_LISTENERS="INTERNAL://${INTERNAL_ADVERT}:9093,EXTERNAL://${EXTERNAL_IP}:9094"
-              # Explicit empty = disable hostname verification (missing prop defaults to https and breaks controller quorum TLS).
-              for k in ssl.endpoint.identification.algorithm listener.name.internal.ssl.endpoint.identification.algorithm listener.name.external.ssl.endpoint.identification.algorithm listener.name.controller.ssl.endpoint.identification.algorithm; do
+              # INTERNAL/EXTERNAL: blank endpoint ID (EXTERNAL advertises MetalLB IPs). CONTROLLER: HTTPS.
+              for k in ssl.endpoint.identification.algorithm listener.name.internal.ssl.endpoint.identification.algorithm listener.name.external.ssl.endpoint.identification.algorithm; do
                 if grep -qE "^${k}=" "$KAFKA_PROP" 2>/dev/null; then
                   sed -i "s|^${k}=.*|${k}=|" "$KAFKA_PROP"
                 else
                   echo "${k}=" >> "$KAFKA_PROP"
                 fi
               done
+              k=listener.name.controller.ssl.endpoint.identification.algorithm
+              if grep -qE "^${k}=" "$KAFKA_PROP" 2>/dev/null; then
+                sed -i "s|^${k}=.*|${k}=HTTPS|" "$KAFKA_PROP"
+              else
+                echo "${k}=HTTPS" >> "$KAFKA_PROP"
+              fi
+              # Gate5 v7: CONTROLLER requires mutual TLS (parity with disposable authorizer rehearsal).
               k=listener.name.controller.ssl.client.auth
               if grep -qE "^${k}=" "$KAFKA_PROP" 2>/dev/null; then
-                sed -i "s|^${k}=.*|${k}=none|" "$KAFKA_PROP"
+                sed -i "s|^${k}=.*|${k}=required|" "$KAFKA_PROP"
               else
-                echo "${k}=none" >> "$KAFKA_PROP"
+                echo "${k}=required" >> "$KAFKA_PROP"
               fi
               META=/var/lib/kafka/data/meta.properties
               if [[ -f "$META" ]]; then
@@ -195,7 +203,7 @@ spec:
             - { name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "3" }
             - { name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "2" }
             - { name: KAFKA_AUTO_CREATE_TOPICS_ENABLE, value: "false" }
-            # mTLS: required on INTERNAL + EXTERNAL; CONTROLLER stays none (listener.name.controller.ssl.client.auth + props patch).
+            # mTLS: required on INTERNAL + EXTERNAL + CONTROLLER (Gate5 v7 controller-plane parity).
             - { name: KAFKA_SSL_CLIENT_AUTH, value: "required" }
             - { name: KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM, value: "" }
             # Global SSL (keystore/truststore paths + password files from secret volume)
@@ -237,7 +245,7 @@ spec:
               valueFrom:
                 secretKeyRef: { name: kafka-ssl-secret, key: kafka.truststore-password }
             - { name: KAFKA_LISTENER_NAME_EXTERNAL_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM, value: "" }
-            - { name: KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH, value: "none" }
+            - { name: KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH, value: "required" }
             - { name: KAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_FILENAME, value: "kafka.keystore.jks" }
             - { name: KAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_LOCATION, value: "/etc/kafka/secrets/kafka.keystore.jks" }
             - name: KAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_PASSWORD
@@ -251,7 +259,7 @@ spec:
             - name: KAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_PASSWORD
               valueFrom:
                 secretKeyRef: { name: kafka-ssl-secret, key: kafka.truststore-password }
-            - { name: KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM, value: "" }
+            - { name: KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM, value: "HTTPS" }
             # Optional rack awareness: patch in KAFKA_BROKER_RACK (e.g. from topology labels) when nodes are zoned.
             # Advertised listeners: INTERNAL + EXTERNAL only (set in container command). CONTROLLER stays off advertised.*.
           volumeMounts:

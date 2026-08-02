@@ -31,9 +31,10 @@
       "permitted_topics_produce": [
         "dev.analytics.events"
       ],
-      "principal_dn_fallback": "CN=analytics-service,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=analytics-service",
       "principal_spiffe": "spiffe://record-platform/service/analytics-service",
-      "service": "analytics-service"
+      "service": "analytics-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=analytics-service"
     },
     {
       "forbidden_admin_ops": [
@@ -52,9 +53,10 @@
         "auctions.events",
         "dev.auction_monitor.events"
       ],
-      "principal_dn_fallback": "CN=auction-monitor,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=auction-monitor",
       "principal_spiffe": "spiffe://record-platform/service/auction-monitor",
-      "service": "auction-monitor"
+      "service": "auction-monitor",
+      "kafka_acl_principal": "User:O=Record Platform,CN=auction-monitor"
     },
     {
       "forbidden_admin_ops": [
@@ -73,9 +75,10 @@
         "dev.auth.events",
         "dev.user.lifecycle.v1"
       ],
-      "principal_dn_fallback": "CN=auth-service,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=auth-service",
       "principal_spiffe": "spiffe://record-platform/service/auth-service",
-      "service": "auth-service"
+      "service": "auth-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=auth-service"
     },
     {
       "forbidden_admin_ops": [
@@ -93,9 +96,10 @@
       "permitted_topics_produce": [
         "dev.listing.events"
       ],
-      "principal_dn_fallback": "CN=listings-service,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=listings-service",
       "principal_spiffe": "spiffe://record-platform/service/listings-service",
-      "service": "listings-service"
+      "service": "listings-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=listings-service"
     },
     {
       "forbidden_admin_ops": [
@@ -115,9 +119,10 @@
         "dev.user.lifecycle.v1"
       ],
       "permitted_topics_produce": [],
-      "principal_dn_fallback": "CN=media-service,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=media-service",
       "principal_spiffe": "spiffe://record-platform/service/media-service",
-      "service": "media-service"
+      "service": "media-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=media-service"
     },
     {
       "forbidden_admin_ops": [
@@ -140,9 +145,10 @@
         "dev.messaging.dlq",
         "messaging.events.v1"
       ],
-      "principal_dn_fallback": "CN=messaging-service,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=messaging-service",
       "principal_spiffe": "spiffe://record-platform/service/messaging-service",
-      "service": "messaging-service"
+      "service": "messaging-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=messaging-service"
     },
     {
       "forbidden_admin_ops": [
@@ -164,9 +170,10 @@
         "dev.user.lifecycle.v1"
       ],
       "permitted_topics_produce": [],
-      "principal_dn_fallback": "CN=notification-service,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=notification-service",
       "principal_spiffe": "spiffe://record-platform/service/notification-service",
-      "service": "notification-service"
+      "service": "notification-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=notification-service"
     },
     {
       "forbidden_admin_ops": [
@@ -189,9 +196,10 @@
       "permitted_topics_produce": [
         "dev.ai.events"
       ],
-      "principal_dn_fallback": "CN=python-ai-service,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=python-ai-service",
       "principal_spiffe": "spiffe://record-platform/service/python-ai-service",
-      "service": "python-ai-service"
+      "service": "python-ai-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=python-ai-service"
     },
     {
       "forbidden_admin_ops": [
@@ -209,9 +217,10 @@
       "permitted_topics_produce": [
         "dev.shopping.events"
       ],
-      "principal_dn_fallback": "CN=shopping-service,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=shopping-service",
       "principal_spiffe": "spiffe://record-platform/service/shopping-service",
-      "service": "shopping-service"
+      "service": "shopping-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=shopping-service"
     },
     {
       "forbidden_admin_ops": [
@@ -231,9 +240,10 @@
         "dev.user.lifecycle.v1"
       ],
       "permitted_topics_produce": [],
-      "principal_dn_fallback": "CN=trust-service,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=trust-service",
       "principal_spiffe": "spiffe://record-platform/service/trust-service",
-      "service": "trust-service"
+      "service": "trust-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=trust-service"
     },
     {
       "forbidden_admin_ops": [
@@ -251,9 +261,10 @@
       "permitted_topics_produce": [
         "ollama-jobs"
       ],
-      "principal_dn_fallback": "CN=ollama-gateway,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=ollama-gateway",
       "principal_spiffe": "spiffe://record-platform/service/ollama-gateway",
-      "service": "ollama-gateway"
+      "service": "ollama-gateway",
+      "kafka_acl_principal": "User:O=Record Platform,CN=ollama-gateway"
     },
     {
       "forbidden_admin_ops": [
@@ -273,10 +284,13 @@
         "ollama-jobs"
       ],
       "permitted_topics_produce": [],
-      "principal_dn_fallback": "CN=ollama-worker,O=Record Platform",
+      "principal_dn_fallback": "O=Record Platform,CN=ollama-worker",
       "principal_spiffe": "spiffe://record-platform/service/ollama-worker",
-      "service": "ollama-worker"
+      "service": "ollama-worker",
+      "kafka_acl_principal": "User:O=Record Platform,CN=ollama-worker"
     }
   ],
-  "ts": "2026-08-01T22:59:53Z"
+  "ts": "2026-08-01T22:59:53Z",
+  "principal_order": "O-before-CN via X500Principal.getName()",
+  "ts_principals_reconciled": "2026-08-02T21:22:52Z"
 }

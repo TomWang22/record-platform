@@ -1,0 +1,146 @@
+{
+  "document": "gate5-v7-controller-runtime-mtls-design",
+  "ts": "2026-08-02T20:45:08Z",
+  "implementation_status": "LIVE_APPLIED_CONTROLLER_CLIENT_AUTH_REQUIRED",
+  "live_authorizer_enablement": "BLOCKED_UNTIL_CONTROLLER_MTLS_AND_PARITY_REHEARSAL",
+  "final_gate5_v7_root": false,
+  "current_live_posture": {
+    "INTERNAL:9093": {
+      "ssl": true,
+      "client_auth": "required",
+      "endpoint_identification": ""
+    },
+    "EXTERNAL:9094": {
+      "ssl": true,
+      "client_auth": "required",
+      "endpoint_identification": ""
+    },
+    "CONTROLLER:9095": {
+      "port": 9095,
+      "ssl": true,
+      "client_auth": "required",
+      "endpoint_identification": "HTTPS"
+    },
+    "inter_broker": "INTERNAL mTLS required (dual-use broker leaf)",
+    "broker_to_controller": "CONTROLLER TLS without client certificate requirement",
+    "controller_to_controller": "CONTROLLER TLS without client certificate requirement"
+  },
+  "parity_gap": {
+    "disposable_rehearsal_controller_ssl_client_auth": "required",
+    "live_controller_ssl_client_auth": "required",
+    "blocks_live_standard_authorizer": false,
+    "note": "Controller mTLS parity closed; live StandardAuthorizer still blocked pending quiesce/roll/ACL/canary"
+  },
+  "target_live_posture": {
+    "CONTROLLER:9095": {
+      "ssl": true,
+      "client_auth": "required",
+      "endpoint_identification": "HTTPS"
+    },
+    "INTERNAL:9093": {
+      "client_auth": "required",
+      "endpoint_identification_change_in_this_phase": false,
+      "note": "EXTERNAL uses MetalLB IPs; keep blank endpoint ID on EXTERNAL until dedicated SAN strategy. INTERNAL advertised FQDNs already SAN-covered; endpoint ID left unchanged this phase to minimize blast radius."
+    },
+    "claims_allowed_after_proof": [
+      "CONTROLLER plane requires and verifies client certificates",
+      "INTERNAL and EXTERNAL broker planes require client certificates"
+    ],
+    "claims_forbidden_until_all_planes_proven": [
+      "ALL KAFKA PLANES REQUIRE MUTUAL TLS"
+    ]
+  },
+  "certificate_strategy": {
+    "selected": "DUAL_USE_EKU_ACCEPTED_EXCEPTION",
+    "preferred_least_privilege": {
+      "A_broker_server_identity": "serverAuth EKU + DNS SANs per node (not selected this phase)",
+      "B_broker_controller_client_identity": "clientAuth-only per node with SPIFFE URI SAN (not selected this phase)"
+    },
+    "accepted_exception": {
+      "code": "DUAL_USE_EKU_ACCEPTED_EXCEPTION",
+      "description": "Retain existing shared kafka.keystore.jks dual-use leaf (serverAuth+clientAuth) for INTERNAL/EXTERNAL/CONTROLLER server role and broker/controller client role",
+      "least_privilege_eku_separation_claimed": false,
+      "rationale": "Single keystore mount today; INTERNAL advertised FQDNs and CONTROLLER quorum voters already covered by shared leaf SANs; isolates change to controller client.auth + CONTROLLER endpoint identification",
+      "compensating_controls": [
+        "application clients remain dedicated clientAuth-only leaves",
+        "fail-closed StandardAuthorizer only after controller parity + canary",
+        "recovery-admin isolated Secret outside application mounts"
+      ]
+    },
+    "shared_leaf_fingerprint_note": "kafka-0/1/2 currently present the same broker leaf; node-distinct client fingerprints deferred with dual-use exception"
+  },
+  "configuration_delta": {
+    "statefulset_env": {
+      "KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH": {
+        "from": "none",
+        "to": "required"
+      },
+      "KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM": {
+        "from": "",
+        "to": "HTTPS"
+      }
+    },
+    "unchanged_this_phase": [
+      "authorizer.class.name (still unset)",
+      "allow.everyone.if.no.acl.found",
+      "super.users",
+      "INTERNAL/EXTERNAL client.auth=required",
+      "INTERNAL/EXTERNAL endpoint identification blank",
+      "kafka-ssl-secret material"
+    ]
+  },
+  "connection_edge_model": {
+    "do_not_invent_full_mesh": true,
+    "derive_denominator_from": "KRaft quorum voters + live controller registration telemetry after enablement",
+    "minimum_endpoints": {
+      "controller_endpoints_expected": 3,
+      "controller_client_auth_required": 3,
+      "controller_server_chain_valid": 3
+    },
+    "quorum_voters": [
+      "0@kafka-0.kafka.record-platform.svc.cluster.local:9095",
+      "1@kafka-1.kafka.record-platform.svc.cluster.local:9095",
+      "2@kafka-2.kafka.record-platform.svc.cluster.local:9095"
+    ],
+    "san_coverage_for_https": "broker leaf SANs include kafka-{0,1,2}.kafka.record-platform.svc.cluster.local"
+  },
+  "rollback": {
+    "required_before_live_mutation": true,
+    "steps": [
+      "Capture kafka.properties from kafka-0/1/2",
+      "Capture StatefulSet YAML + resourceVersion + generation",
+      "Capture metadata quorum status",
+      "Patch KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH back to none",
+      "Patch KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM back to empty",
+      "Roll one combined node at a time; wait for Ready + quorum after each",
+      "Verify listener.name.controller.ssl.client.auth=none on each node",
+      "Verify offline_partitions=0 and under_replicated_partitions=0"
+    ],
+    "commands_template": [
+      "kubectl -n record-platform get sts kafka -o yaml > /tmp/rp-kafka-sts-pre-controller-mtls.yaml",
+      "kubectl -n record-platform set env sts/kafka KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH=none KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=",
+      "kubectl -n record-platform rollout status sts/kafka --timeout=600s"
+    ],
+    "authorizer_not_involved": true
+  },
+  "proof_requirements_after_live_enablement": {
+    "controller_endpoints_expected_proven": "3/3",
+    "controller_client_auth_required": "3/3",
+    "controller_server_chain_valid": "3/3",
+    "controller_client_identity_valid": "all_discovered_connection_edges",
+    "anonymous_controller_connections": 0,
+    "plaintext_controller_connections": 0,
+    "wrong_node_identity_denied": "3/3",
+    "missing_controller_client_certificate_denied": "3/3",
+    "reports": [
+      "reports/kafka/gate5-v7-controller-runtime-mtls-proof.json",
+      "reports/kafka/gate5-v7-kafka-node-principals.json"
+    ]
+  },
+  "live_mutation_gate": {
+    "design_complete": true,
+    "rollback_documented": true,
+    "modify_live_nodes_authorized_for_controller_mtls_only": true,
+    "modify_live_authorizer_authorized": false
+  }
+}

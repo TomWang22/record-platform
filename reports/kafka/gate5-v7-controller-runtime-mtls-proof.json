@@ -1,0 +1,93 @@
+{
+  "document": "gate5-v7-controller-runtime-mtls-proof",
+  "ts": "2026-08-02T20:45:08Z",
+  "live_cluster_mutated": true,
+  "authorizer_enabled": false,
+  "dual_use_eku_accepted_exception": true,
+  "least_privilege_eku_separation_claimed": false,
+  "controller_endpoints_expected": 3,
+  "controller_endpoints_proven": 3,
+  "controller_client_auth_required": "3/3",
+  "controller_server_chain_valid": "3/3",
+  "controller_client_identity_valid": "all_discovered_quorum_voter_edges_dual_use_broker_leaf",
+  "anonymous_controller_connections": 0,
+  "plaintext_controller_connections": 0,
+  "missing_controller_client_certificate_denied": "3/3",
+  "wrong_node_identity_denied": "NOT_APPLICABLE_DUAL_USE_SHARED_LEAF",
+  "wrong_node_identity_note": "Shared dual-use broker leaf across kafka-0/1/2; distinct per-node client identities not deployed. TLS layer accepts any truststore-trusted client certificate; node separation not claimed.",
+  "connection_edges_model": {
+    "quorum_voters": [
+      "0@kafka-0.kafka.record-platform.svc.cluster.local:9095",
+      "1@kafka-1.kafka.record-platform.svc.cluster.local:9095",
+      "2@kafka-2.kafka.record-platform.svc.cluster.local:9095"
+    ],
+    "endpoints_proven": 3,
+    "full_mesh_invented": false
+  },
+  "nodes": {
+    "kafka-0": {
+      "endpoint": "kafka-0.kafka.record-platform.svc.cluster.local:9095",
+      "controller_ssl_client_auth": "required",
+      "controller_endpoint_identification": "HTTPS",
+      "ready": true,
+      "server_leaf_subject": "O=record-platform,CN=kafka",
+      "tls_version_observed": "TLSv1.3",
+      "cipher_observed": "TLS_AES_256_GCM_SHA384",
+      "verify_return_code_with_broker_client_cert": 0,
+      "missing_client_certificate_denied": true,
+      "missing_client_certificate_error": "SslAuthenticationException / fatal alert: bad_certificate",
+      "certificate_request_observed": true,
+      "server_leaf_openssl_display_subject": "CN=kafka,O=record-platform",
+      "kafka_acl_principal": "User:O=record-platform,CN=kafka",
+      "openssl_display_not_acl_principal": true
+    },
+    "kafka-1": {
+      "endpoint": "kafka-1.kafka.record-platform.svc.cluster.local:9095",
+      "controller_ssl_client_auth": "required",
+      "controller_endpoint_identification": "HTTPS",
+      "ready": true,
+      "server_leaf_subject": "O=record-platform,CN=kafka",
+      "tls_version_observed": "TLSv1.3",
+      "cipher_observed": "TLS_AES_256_GCM_SHA384",
+      "verify_return_code_with_broker_client_cert": 0,
+      "missing_client_certificate_denied": true,
+      "missing_client_certificate_error": "SslAuthenticationException / fatal alert: bad_certificate",
+      "certificate_request_observed": true,
+      "server_leaf_openssl_display_subject": "CN=kafka,O=record-platform",
+      "kafka_acl_principal": "User:O=record-platform,CN=kafka",
+      "openssl_display_not_acl_principal": true
+    },
+    "kafka-2": {
+      "endpoint": "kafka-2.kafka.record-platform.svc.cluster.local:9095",
+      "controller_ssl_client_auth": "required",
+      "controller_endpoint_identification": "HTTPS",
+      "ready": true,
+      "server_leaf_subject": "O=record-platform,CN=kafka",
+      "tls_version_observed": "TLSv1.3",
+      "cipher_observed": "TLS_AES_256_GCM_SHA384",
+      "verify_return_code_with_broker_client_cert": 0,
+      "missing_client_certificate_denied": true,
+      "missing_client_certificate_error": "SslAuthenticationException / fatal alert: bad_certificate",
+      "certificate_request_observed": true,
+      "server_leaf_openssl_display_subject": "CN=kafka,O=record-platform",
+      "kafka_acl_principal": "User:O=record-platform,CN=kafka",
+      "openssl_display_not_acl_principal": true
+    }
+  },
+  "broker_controller_principal": "User:O=record-platform,CN=kafka",
+  "rolling_enablement": "3/3",
+  "authorizer_still_disabled": true,
+  "live_standard_authorizer_enablement": "BLOCKED",
+  "final_gate5_v7_root_created": false,
+  "all_plane_mtls_claim": false,
+  "all_plane_mtls_claim_note": "INTERNAL+EXTERNAL+CONTROLLER now require client certificates at TLS layer; inter-broker and controller edges use dual-use leaf. Full least-privilege plane claim still deferred.",
+  "probe_artifacts": [
+    "/tmp/rp-g5v7-controller-mtls-probe.out",
+    "/tmp/rp-g5v7-controller-mtls-neg.out"
+  ],
+  "ts_principals_reconciled": "2026-08-02T21:22:52Z",
+  "DUAL_USE_EKU_ACCEPTED_EXCEPTION": true,
+  "NODE_DISTINCT_KAFKA_IDENTITIES": false,
+  "WRONG_NODE_IDENTITY_DENIAL": "NOT_APPLICABLE_WITH_RATIONALE",
+  "LEAST_PRIVILEGE_KAFKA_NODE_EKU": false
+}

@@ -1,0 +1,24 @@
+{
+  "document": "gate5-v7-controller-mtls-design-supersession",
+  "ts": "2026-08-02T21:22:52Z",
+  "action": "REGENERATE_FROM_LIVE_DO_NOT_EDIT_HISTORICAL_COPY",
+  "historical_path": "reports/kafka/gate5-v7-controller-runtime-mtls-design.pre-reconcile-2026-08-02.json",
+  "historical_sha256": "614898e30e365561c3b835e02cdd181d8ee345f1db6f81d8a105a62bb5643970",
+  "active_path": "reports/kafka/gate5-v7-controller-runtime-mtls-design.json",
+  "stale_claims_superseded": [
+    {
+      "field": "current_live_posture.broker_to_controller",
+      "stale": "CONTROLLER TLS without client certificate requirement",
+      "live": "CONTROLLER mTLS required (client.auth=required) using dual-use broker leaf"
+    },
+    {
+      "field": "current_live_posture.controller_to_controller",
+      "stale": "CONTROLLER TLS without client certificate requirement",
+      "live": "CONTROLLER mTLS required (client.auth=required) using dual-use broker leaf"
+    }
+  ],
+  "controller_reports_expected_reconciled": "3/3",
+  "design_vs_runtime_conflicts": 0,
+  "stale_controller_client_auth_none_claims": 0,
+  "historical_reports_not_mutated_in_place_after_supersession_copy": true
+}

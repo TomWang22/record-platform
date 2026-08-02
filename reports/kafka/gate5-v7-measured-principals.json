@@ -1,0 +1,214 @@
+{
+  "document": "gate5-v7-measured-principals",
+  "ts": "2026-08-02T17:01:01Z",
+  "measurement_method": "javax.security.auth.x500.X500Principal.getName() on live Secret leaf PEMs",
+  "openssl_display_order_used_for_acls": false,
+  "principals_guessed": 0,
+  "broker_principal_canonical": "User:O=record-platform,CN=kafka",
+  "broker_leaf_sha256": "96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04",
+  "recovery_admin_acl_principal_canonical": "User:O=Record Platform,CN=gate5-v7-admin",
+  "recovery_admin_leaf_sha256": "B0:52:63:17:15:22:C0:A4:F2:17:56:1B:D0:CA:D8:4E:4D:86:C2:25:75:93:A5:D7:4D:62:D1:F1:B7:FA:B8:B7",
+  "service_acl_principals_canonical": {
+    "analytics-service": "User:O=Record Platform,CN=analytics-service",
+    "auction-monitor": "User:O=Record Platform,CN=auction-monitor",
+    "auth-service": "User:O=Record Platform,CN=auth-service",
+    "listings-service": "User:O=Record Platform,CN=listings-service",
+    "media-service": "User:O=Record Platform,CN=media-service",
+    "messaging-service": "User:O=Record Platform,CN=messaging-service",
+    "notification-service": "User:O=Record Platform,CN=notification-service",
+    "python-ai-service": "User:O=Record Platform,CN=python-ai-service",
+    "shopping-service": "User:O=Record Platform,CN=shopping-service",
+    "trust-service": "User:O=Record Platform,CN=trust-service",
+    "ollama-gateway": "User:O=Record Platform,CN=ollama-gateway",
+    "ollama-worker": "User:O=Record Platform,CN=ollama-worker"
+  },
+  "service_principals_count": 12,
+  "service_principals": [
+    {
+      "x500_principal_getName": "O=Record Platform,CN=analytics-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=analytics-service",
+      "leaf_sha256": "1C:59:F6:42:3E:7B:C6:2D:60:3E:69:C8:99:3C:19:EF:08:89:BC:0C:BA:DD:F5:66:8C:94:50:6E:26:8B:B2:EE",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:analytics-service",
+        "2:analytics-service.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/analytics-service"
+      ],
+      "service": "analytics-service"
+    },
+    {
+      "x500_principal_getName": "O=Record Platform,CN=auction-monitor",
+      "kafka_acl_principal": "User:O=Record Platform,CN=auction-monitor",
+      "leaf_sha256": "E7:2E:EA:B3:11:1A:F7:B3:D7:A6:EB:FE:BE:DF:3A:BF:8B:DE:A7:22:37:E7:FA:57:3E:8F:78:1F:E3:A0:EE:0F",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:auction-monitor",
+        "2:auction-monitor.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/auction-monitor"
+      ],
+      "service": "auction-monitor"
+    },
+    {
+      "x500_principal_getName": "O=Record Platform,CN=auth-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=auth-service",
+      "leaf_sha256": "50:26:8D:32:68:F6:4C:2E:5A:A2:EF:09:E6:27:53:7C:B4:5D:A7:DF:0B:EE:5D:ED:A6:4A:39:C0:96:1D:72:76",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:auth-service",
+        "2:auth-service.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/auth-service"
+      ],
+      "service": "auth-service"
+    },
+    {
+      "x500_principal_getName": "O=Record Platform,CN=listings-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=listings-service",
+      "leaf_sha256": "CF:50:E0:A5:CD:E8:0D:E3:57:A5:7F:8F:98:5B:5D:6F:AA:D5:71:60:2D:18:8B:0F:72:73:F3:98:6E:5B:EE:BB",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:listings-service",
+        "2:listings-service.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/listings-service"
+      ],
+      "service": "listings-service"
+    },
+    {
+      "x500_principal_getName": "O=Record Platform,CN=media-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=media-service",
+      "leaf_sha256": "18:B0:B0:3D:D4:31:1E:01:DB:5D:ED:61:5B:68:2B:5F:64:2D:2E:4C:4E:FB:0D:87:9A:32:58:6A:DC:E0:2F:85",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:media-service",
+        "2:media-service.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/media-service"
+      ],
+      "service": "media-service"
+    },
+    {
+      "x500_principal_getName": "O=Record Platform,CN=messaging-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=messaging-service",
+      "leaf_sha256": "3D:AB:C6:78:90:C0:EB:65:4C:C1:B6:21:91:61:C5:C3:20:71:54:01:62:09:1F:F9:AD:D2:41:2D:85:79:78:7F",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:messaging-service",
+        "2:messaging-service.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/messaging-service"
+      ],
+      "service": "messaging-service"
+    },
+    {
+      "x500_principal_getName": "O=Record Platform,CN=notification-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=notification-service",
+      "leaf_sha256": "99:95:7B:1F:AB:FD:66:1E:74:BE:4B:DE:8C:93:AC:BC:92:B6:01:41:F7:16:7B:AA:C3:7C:8C:0E:85:36:1E:AF",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:notification-service",
+        "2:notification-service.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/notification-service"
+      ],
+      "service": "notification-service"
+    },
+    {
+      "x500_principal_getName": "O=Record Platform,CN=python-ai-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=python-ai-service",
+      "leaf_sha256": "8B:B4:B0:34:64:B5:C3:45:06:BC:9C:43:0E:CC:C2:26:4F:C3:AA:5A:69:5A:50:DC:B2:C3:29:AD:5F:6A:44:65",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:python-ai-service",
+        "2:python-ai-service.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/python-ai-service"
+      ],
+      "service": "python-ai-service"
+    },
+    {
+      "x500_principal_getName": "O=Record Platform,CN=shopping-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=shopping-service",
+      "leaf_sha256": "C5:80:35:A4:D8:ED:78:AE:90:81:7E:F8:7C:31:5F:DC:A2:89:E7:C3:EF:EA:83:D2:3C:5C:DF:66:7C:B8:F6:05",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:shopping-service",
+        "2:shopping-service.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/shopping-service"
+      ],
+      "service": "shopping-service"
+    },
+    {
+      "x500_principal_getName": "O=Record Platform,CN=trust-service",
+      "kafka_acl_principal": "User:O=Record Platform,CN=trust-service",
+      "leaf_sha256": "2B:83:91:56:15:D2:67:6D:75:F6:3F:F4:20:1A:38:94:7F:7E:25:1F:BA:9B:71:C4:67:22:A4:1A:B5:09:2B:59",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:trust-service",
+        "2:trust-service.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/trust-service"
+      ],
+      "service": "trust-service"
+    },
+    {
+      "x500_principal_getName": "O=Record Platform,CN=ollama-gateway",
+      "kafka_acl_principal": "User:O=Record Platform,CN=ollama-gateway",
+      "leaf_sha256": "C6:7A:FC:5B:FF:7F:BD:48:BF:09:5C:E8:77:7B:F4:47:56:20:CB:27:DA:DD:7B:9B:CA:95:83:55:0F:DD:FB:70",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:ollama-gateway",
+        "2:ollama-gateway.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/ollama-gateway"
+      ],
+      "service": "ollama-gateway"
+    },
+    {
+      "x500_principal_getName": "O=Record Platform,CN=ollama-worker",
+      "kafka_acl_principal": "User:O=Record Platform,CN=ollama-worker",
+      "leaf_sha256": "F7:8E:F3:25:F5:D6:52:89:ED:C7:7E:72:D1:00:1C:09:11:02:1F:CC:2C:79:0E:1D:4B:C3:45:DD:4C:52:44:70",
+      "eku_clientAuth": true,
+      "eku_serverAuth": false,
+      "sans": [
+        "2:ollama-worker",
+        "2:ollama-worker.record-platform.svc.cluster.local",
+        "6:spiffe://record-platform/service/ollama-worker"
+      ],
+      "service": "ollama-worker"
+    }
+  ],
+  "kafka_nodes": {
+    "kafka-0": {
+      "node": "kafka-0",
+      "server_principal": "User:O=record-platform,CN=kafka",
+      "controller_client_principal": "User:O=record-platform,CN=kafka",
+      "dual_use_eku_accepted_exception": true,
+      "distinct_node_client_fingerprint": false,
+      "leaf_sha256": "96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04"
+    },
+    "kafka-1": {
+      "node": "kafka-1",
+      "server_principal": "User:O=record-platform,CN=kafka",
+      "controller_client_principal": "User:O=record-platform,CN=kafka",
+      "dual_use_eku_accepted_exception": true,
+      "distinct_node_client_fingerprint": false,
+      "leaf_sha256": "96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04"
+    },
+    "kafka-2": {
+      "node": "kafka-2",
+      "server_principal": "User:O=record-platform,CN=kafka",
+      "controller_client_principal": "User:O=record-platform,CN=kafka",
+      "dual_use_eku_accepted_exception": true,
+      "distinct_node_client_fingerprint": false,
+      "leaf_sha256": "96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04"
+    }
+  },
+  "duplicate_service_principals": 0,
+  "unknown_principals": 0,
+  "dual_use_eku_accepted_exception": true,
+  "note": "Never guess DN ordering. Use kafka_acl_principal exactly."
+}

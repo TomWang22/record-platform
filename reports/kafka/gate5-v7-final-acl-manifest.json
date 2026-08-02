@@ -3,7 +3,7 @@
   "ts": "2026-08-01T23:56:25Z",
   "apply_authorized": false,
   "authorizer_enablement_authorized": false,
-  "principal_form": "User:O=Record Platform,CN=<service>",
+  "principal_form": "User:O=<org>,CN=<cn> (Java X500Principal.getName())",
   "principal_builder_class": "org.apache.kafka.common.security.authenticator.DefaultKafkaPrincipalBuilder",
   "ssl_principal_mapping_rules": null,
   "client_id_authorization_rules": [],
@@ -11,9 +11,9 @@
   "allow_everyone_if_no_acl_found_intended": false,
   "super_users": [
     "User:O=record-platform,CN=kafka",
-    "User:CN=gate5-v7-admin,O=Record Platform"
+    "User:O=Record Platform,CN=gate5-v7-admin"
   ],
-  "super_users_note": "Broker/controller principals must be confirmed from live keystore subject before enablement. Application principals must never appear here. Historical User:O=record-platform,CN=kafka-client must never appear here.",
+  "super_users_note": "Exact measured Java X500Principal principals only. Application principals must never appear here.",
   "service_principals": {
     "analytics-service": {
       "principal": "User:O=Record Platform,CN=analytics-service",
@@ -508,5 +508,7 @@
     "wildcard_application_acls": 0,
     "application_super_users": 0,
     "client_id_authorization_rules": 0
-  }
+  },
+  "principals_source": "reports/kafka/gate5-v7-kafka-node-principals.json",
+  "ts_principals_reconciled": "2026-08-02T21:22:52Z"
 }

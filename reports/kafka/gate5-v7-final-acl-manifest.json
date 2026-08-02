@@ -1,0 +1,512 @@
+{
+  "document": "gate5-v7-final-acl-manifest",
+  "ts": "2026-08-01T23:56:25Z",
+  "apply_authorized": false,
+  "authorizer_enablement_authorized": false,
+  "principal_form": "User:O=Record Platform,CN=<service>",
+  "principal_builder_class": "org.apache.kafka.common.security.authenticator.DefaultKafkaPrincipalBuilder",
+  "ssl_principal_mapping_rules": null,
+  "client_id_authorization_rules": [],
+  "authorizer_class_name_intended": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
+  "allow_everyone_if_no_acl_found_intended": false,
+  "super_users": [
+    "User:O=record-platform,CN=kafka",
+    "User:CN=gate5-v7-admin,O=Record Platform"
+  ],
+  "super_users_note": "Broker/controller principals must be confirmed from live keystore subject before enablement. Application principals must never appear here. Historical User:O=record-platform,CN=kafka-client must never appear here.",
+  "service_principals": {
+    "analytics-service": {
+      "principal": "User:O=Record Platform,CN=analytics-service",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/analytics-service",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "dev.analytics.events",
+          "operations": [
+            "WRITE",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [],
+      "cluster_operations": [
+        "DESCRIBE",
+        "IDEMPOTENT_WRITE"
+      ],
+      "idempotent_write_rationale": "Producer topics present; Kafka 3.x / KafkaJS+aiokafka idempotent producers typically require cluster IDEMPOTENT_WRITE \u2014 grant pending live client capability confirmation before apply.",
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-analytics-service"
+    },
+    "auction-monitor": {
+      "principal": "User:O=Record Platform,CN=auction-monitor",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/auction-monitor",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "auctions.events",
+          "operations": [
+            "WRITE",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        },
+        {
+          "name": "dev.auction_monitor.events",
+          "operations": [
+            "WRITE",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [],
+      "cluster_operations": [
+        "DESCRIBE",
+        "IDEMPOTENT_WRITE"
+      ],
+      "idempotent_write_rationale": "Producer topics present; Kafka 3.x / KafkaJS+aiokafka idempotent producers typically require cluster IDEMPOTENT_WRITE \u2014 grant pending live client capability confirmation before apply.",
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-auction-monitor"
+    },
+    "auth-service": {
+      "principal": "User:O=Record Platform,CN=auth-service",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/auth-service",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "dev.auth.events",
+          "operations": [
+            "WRITE",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        },
+        {
+          "name": "dev.user.lifecycle.v1",
+          "operations": [
+            "WRITE",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [],
+      "cluster_operations": [
+        "DESCRIBE",
+        "IDEMPOTENT_WRITE"
+      ],
+      "idempotent_write_rationale": "Producer topics present; Kafka 3.x / KafkaJS+aiokafka idempotent producers typically require cluster IDEMPOTENT_WRITE \u2014 grant pending live client capability confirmation before apply.",
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-auth-service"
+    },
+    "listings-service": {
+      "principal": "User:O=Record Platform,CN=listings-service",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/listings-service",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "dev.listing.events",
+          "operations": [
+            "WRITE",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [],
+      "cluster_operations": [
+        "DESCRIBE",
+        "IDEMPOTENT_WRITE"
+      ],
+      "idempotent_write_rationale": "Producer topics present; Kafka 3.x / KafkaJS+aiokafka idempotent producers typically require cluster IDEMPOTENT_WRITE \u2014 grant pending live client capability confirmation before apply.",
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-listings-service"
+    },
+    "media-service": {
+      "principal": "User:O=Record Platform,CN=media-service",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/media-service",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "dev.user.lifecycle.v1",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [
+        {
+          "name": "media-service-user-lifecycle",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "cluster_operations": [
+        "DESCRIBE"
+      ],
+      "idempotent_write_rationale": null,
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-media-service"
+    },
+    "messaging-service": {
+      "principal": "User:O=Record Platform,CN=messaging-service",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/messaging-service",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "dev.messaging.dlq",
+          "operations": [
+            "WRITE",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        },
+        {
+          "name": "messaging.events.v1",
+          "operations": [
+            "WRITE",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        },
+        {
+          "name": "dev.user.lifecycle.v1",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [
+        {
+          "name": "messaging-service-user-lifecycle",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "cluster_operations": [
+        "DESCRIBE",
+        "IDEMPOTENT_WRITE"
+      ],
+      "idempotent_write_rationale": "Producer topics present; Kafka 3.x / KafkaJS+aiokafka idempotent producers typically require cluster IDEMPOTENT_WRITE \u2014 grant pending live client capability confirmation before apply.",
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-messaging-service"
+    },
+    "notification-service": {
+      "principal": "User:O=Record Platform,CN=notification-service",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/notification-service",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "dev.notification.events",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        },
+        {
+          "name": "dev.user.lifecycle.v1",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [
+        {
+          "name": "notification-service-group",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        },
+        {
+          "name": "notification-service-user-lifecycle",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "cluster_operations": [
+        "DESCRIBE"
+      ],
+      "idempotent_write_rationale": null,
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-notification-service"
+    },
+    "python-ai-service": {
+      "principal": "User:O=Record Platform,CN=python-ai-service",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/python-ai-service",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "dev.ai.events",
+          "operations": [
+            "WRITE",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        },
+        {
+          "name": "analytics-predictions",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        },
+        {
+          "name": "analytics-searches",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [
+        {
+          "name": "python-ai-service",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "cluster_operations": [
+        "DESCRIBE",
+        "IDEMPOTENT_WRITE"
+      ],
+      "idempotent_write_rationale": "Producer topics present; Kafka 3.x / KafkaJS+aiokafka idempotent producers typically require cluster IDEMPOTENT_WRITE \u2014 grant pending live client capability confirmation before apply.",
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-python-ai-service"
+    },
+    "shopping-service": {
+      "principal": "User:O=Record Platform,CN=shopping-service",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/shopping-service",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "dev.shopping.events",
+          "operations": [
+            "WRITE",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [],
+      "cluster_operations": [
+        "DESCRIBE",
+        "IDEMPOTENT_WRITE"
+      ],
+      "idempotent_write_rationale": "Producer topics present; Kafka 3.x / KafkaJS+aiokafka idempotent producers typically require cluster IDEMPOTENT_WRITE \u2014 grant pending live client capability confirmation before apply.",
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-shopping-service"
+    },
+    "trust-service": {
+      "principal": "User:O=Record Platform,CN=trust-service",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/trust-service",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "dev.user.lifecycle.v1",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [
+        {
+          "name": "trust-service-user-lifecycle",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "cluster_operations": [
+        "DESCRIBE"
+      ],
+      "idempotent_write_rationale": null,
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-trust-service"
+    },
+    "ollama-gateway": {
+      "principal": "User:O=Record Platform,CN=ollama-gateway",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/ollama-gateway",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "ollama-jobs",
+          "operations": [
+            "WRITE",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [],
+      "cluster_operations": [
+        "DESCRIBE",
+        "IDEMPOTENT_WRITE"
+      ],
+      "idempotent_write_rationale": "Producer topics present; Kafka 3.x / KafkaJS+aiokafka idempotent producers typically require cluster IDEMPOTENT_WRITE \u2014 grant pending live client capability confirmation before apply.",
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-ollama-gateway"
+    },
+    "ollama-worker": {
+      "principal": "User:O=Record Platform,CN=ollama-worker",
+      "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "spiffe_uri": "spiffe://record-platform/service/ollama-worker",
+      "spiffe_is_acl_principal": false,
+      "topic_acls": [
+        {
+          "name": "ollama-jobs",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "group_acls": [
+        {
+          "name": "ollama-worker-group",
+          "operations": [
+            "READ",
+            "DESCRIBE"
+          ],
+          "source": "gate5-v7-acl-contract.json"
+        }
+      ],
+      "cluster_operations": [
+        "DESCRIBE"
+      ],
+      "idempotent_write_rationale": null,
+      "forbidden_admin_ops": [
+        "CREATE",
+        "DELETE",
+        "ALTER",
+        "ALTERCONFIGS",
+        "CLUSTER_ACTION"
+      ],
+      "super_user": false,
+      "secret_name": "kafka-client-tls-ollama-worker"
+    }
+  },
+  "summary": {
+    "service_principals_expected": 12,
+    "service_principals_defined": 12,
+    "wildcard_application_acls": 0,
+    "application_super_users": 0,
+    "client_id_authorization_rules": 0
+  }
+}

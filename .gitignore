@@ -202,6 +202,9 @@ infra/docs/EIGHT-DATABASES_ARCHITECTURE.md
 !infra/transport/*.yaml
 !infra/ops/*.yaml
 !infra/k8s/base/observability/*.yaml
+!infra/k8s/base/**/deploy.yaml
+!infra/k8s/base/ollama/*-deploy.yaml
+!infra/bootstrap_invariants.graph.json
 !infra/policies/*.yaml
 *.conf
 *.ini

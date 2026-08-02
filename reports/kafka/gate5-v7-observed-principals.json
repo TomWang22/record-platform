@@ -17,7 +17,9 @@
     "distinct_observed_service_principals": 12,
     "shared_generic_principal_observations": 0,
     "unknown_principals": 0,
-    "final_acl_manifest_authorized": false
+    "final_acl_manifest_authorized": false,
+    "principals_broker_observed_authorization": 0,
+    "principals_kafka_equivalent_derived": 12
   },
   "principals": [
     {
@@ -38,7 +40,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=analytics-service"
     },
     {
       "service": "auction-monitor",
@@ -58,7 +63,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=auction-monitor"
     },
     {
       "service": "auth-service",
@@ -78,7 +86,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=auth-service"
     },
     {
       "service": "listings-service",
@@ -98,7 +109,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=listings-service"
     },
     {
       "service": "media-service",
@@ -118,7 +132,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=media-service"
     },
     {
       "service": "messaging-service",
@@ -138,7 +155,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=messaging-service"
     },
     {
       "service": "notification-service",
@@ -158,7 +178,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=notification-service"
     },
     {
       "service": "python-ai-service",
@@ -178,7 +201,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=python-ai-service"
     },
     {
       "service": "shopping-service",
@@ -198,7 +224,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=shopping-service"
     },
     {
       "service": "trust-service",
@@ -218,7 +247,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=trust-service"
     },
     {
       "service": "ollama-gateway",
@@ -238,7 +270,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=ollama-gateway"
     },
     {
       "service": "ollama-worker",
@@ -258,7 +293,10 @@
       "live_mtls_apiversions_accepted": true,
       "broker_log_reference": null,
       "broker_log_source": "none",
-      "note": "Kafka default SSL principal is User:<X500Principal.getName()>; Java RFC2253 order is O before CN for these leaves. Final ACLs must use broker_observed_principal exactly."
+      "note": "Derived via Java X500Principal.getName() (DefaultKafkaPrincipalBuilder equivalent) plus live mTLS ApiVersions acceptance. Not yet a broker authorization decision record.",
+      "evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+      "broker_observed_authorization_principal": null,
+      "derived_kafka_principal": "User:O=Record Platform,CN=ollama-worker"
     }
   ],
   "distinct_principals": [
@@ -274,5 +312,11 @@
     "User:O=Record Platform,CN=python-ai-service",
     "User:O=Record Platform,CN=shopping-service",
     "User:O=Record Platform,CN=trust-service"
+  ],
+  "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+  "broker_observed_authorization_principals": 0,
+  "promotion_requires": [
+    "authorizer_active",
+    "ALLOW_or_DENY_decision_log_containing_exact_principal"
   ]
 }

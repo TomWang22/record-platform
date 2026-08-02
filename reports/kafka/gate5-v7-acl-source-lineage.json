@@ -1,0 +1,157 @@
+{
+  "document": "gate5-v7-acl-source-lineage",
+  "ts": "2026-08-01T23:56:25Z",
+  "rows": [
+    {
+      "service": "analytics-service",
+      "principal": "User:O=Record Platform,CN=analytics-service",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "producer",
+        "outbox-publisher"
+      ]
+    },
+    {
+      "service": "auction-monitor",
+      "principal": "User:O=Record Platform,CN=auction-monitor",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "producer",
+        "outbox-publisher"
+      ]
+    },
+    {
+      "service": "auth-service",
+      "principal": "User:O=Record Platform,CN=auth-service",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "outbox-publisher"
+      ]
+    },
+    {
+      "service": "listings-service",
+      "principal": "User:O=Record Platform,CN=listings-service",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "producer"
+      ]
+    },
+    {
+      "service": "media-service",
+      "principal": "User:O=Record Platform,CN=media-service",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "lifecycle-consumer"
+      ]
+    },
+    {
+      "service": "messaging-service",
+      "principal": "User:O=Record Platform,CN=messaging-service",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "producer",
+        "lifecycle-consumer"
+      ]
+    },
+    {
+      "service": "notification-service",
+      "principal": "User:O=Record Platform,CN=notification-service",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "notification-consumer",
+        "lifecycle-consumer"
+      ]
+    },
+    {
+      "service": "python-ai-service",
+      "principal": "User:O=Record Platform,CN=python-ai-service",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "market-event-consumer",
+        "producer",
+        "outbox-publisher"
+      ]
+    },
+    {
+      "service": "shopping-service",
+      "principal": "User:O=Record Platform,CN=shopping-service",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "producer",
+        "outbox-publisher"
+      ]
+    },
+    {
+      "service": "trust-service",
+      "principal": "User:O=Record Platform,CN=trust-service",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "lifecycle-consumer"
+      ]
+    },
+    {
+      "service": "ollama-gateway",
+      "principal": "User:O=Record Platform,CN=ollama-gateway",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "producer"
+      ]
+    },
+    {
+      "service": "ollama-worker",
+      "principal": "User:O=Record Platform,CN=ollama-worker",
+      "sources": [
+        "reports/kafka/gate5-v7-acl-contract.json",
+        "reports/kafka/gate5-v7-observed-principals.json",
+        "reports/kafka/gate5-v7-service-identity-contract.json"
+      ],
+      "roles": [
+        "inference-consumer"
+      ]
+    }
+  ]
+}

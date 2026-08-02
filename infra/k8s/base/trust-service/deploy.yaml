@@ -1,9 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: media-service
+  name: trust-service
   namespace: record-platform
-  labels: { app: media-service }
+  labels:
+    app: trust-service
 spec:
   replicas: 1
   strategy:
@@ -11,14 +12,16 @@ spec:
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 1
-  selector: { matchLabels: { app: media-service } }
+  selector:
+    matchLabels:
+      app: trust-service
   template:
     metadata:
-      labels: { app: media-service }
+      labels:
+        app: trust-service
       annotations:
         prometheus.io/scrape: "true"
-        # /metrics is served on HTTP port 4018 (50068 is gRPC).
-        prometheus.io/port: "4018"
+        prometheus.io/port: "4016"
         prometheus.io/path: "/metrics"
     spec:
       initContainers:
@@ -58,29 +61,38 @@ spec:
               exit 1
       containers:
         - name: app
-          image: media-service:dev
+          image: trust-service:dev
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 4018
+              containerPort: 4016
             - name: grpc
-              containerPort: 50068
+              containerPort: 50066
           envFrom:
-            - configMapRef: { name: app-config }
-            - secretRef: { name: app-secrets }
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
           env:
             - name: NODE_ENV
               value: "development"
             - name: OTEL_SERVICE_NAME
-              value: "media-service"
-            - name: GRPC_PORT
-              value: "50068"
+              value: "trust-service"
             - name: HTTP_PORT
-              value: "4018"
-            - name: MEDIA_DB_PORT
-              value: "5443"
-            - name: MEDIA_DB_NAME
-              value: "media"
+              value: "4016"
+            - name: GRPC_PORT
+              value: "50066"
+            - name: TRUST_DB_POOL_MAX
+              value: "20"
+            - name: TRUST_GRPC_HEALTH_REQUIRES_DB
+              value: "1"
+            - name: TRUST_E2E_SEED
+              value: "1"
+            - name: POSTGRES_URL_TRUST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: POSTGRES_URL_TRUST
             - name: GRPC_REQUIRE_CLIENT_CERT
               value: "true"
             - name: TLS_CA_PATH
@@ -89,6 +101,10 @@ spec:
               value: "/etc/certs/tls.crt"
             - name: TLS_KEY_PATH
               value: "/etc/certs/tls.key"
+            - name: KAFKA_USE_SSL
+              value: "true"
+            - name: KAFKA_SSL_ENABLED
+              value: "true"
             - name: KAFKA_CA_CERT
               value: "/etc/kafka/client/ca-chain.pem"
             - name: KAFKA_CLIENT_CERT
@@ -96,9 +112,6 @@ spec:
             - name: KAFKA_CLIENT_KEY
               value: "/etc/kafka/client/tls.key"
           volumeMounts:
-            - name: proto-files
-              mountPath: /app/proto
-              readOnly: true
             - name: service-tls
               mountPath: /etc/certs
               readOnly: true
@@ -135,16 +148,10 @@ spec:
             limits:
               cpu: "500m"
               memory: "256Mi"
-          # Startup must NOT use grpc.health Check with DB — NOT_SERVING while Postgres warms up looks like a crash loop (kubelet restarts the container).
-          # TCP only: gRPC+mTLS listener is accepting connections.
-
       volumes:
-        - name: proto-files
-          configMap:
-            name: proto-files
         - name: service-tls
           secret:
-            secretName: service-tls-media-service
+            secretName: service-tls-trust-service
             items:
               - key: tls.key
                 path: tls.key
@@ -154,7 +161,7 @@ spec:
                 path: ca.crt
         - name: kafka-client-tls
           secret:
-            secretName: kafka-client-tls-media-service
+            secretName: kafka-client-tls-trust-service
             defaultMode: 420
             items:
             - key: tls.crt

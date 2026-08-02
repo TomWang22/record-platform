@@ -1,0 +1,41 @@
+{
+  "document": "gate5-v7-authorizer-preflight",
+  "ts": "2026-08-01T23:56:25Z",
+  "authorizer_enablement_authorized": false,
+  "final_acls_apply_authorized": false,
+  "intended_authorizer_class": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
+  "allow_everyone_if_no_acl_found_intended": false,
+  "kafka_version": "confluentinc/cp-kafka:7.5.0",
+  "mode": "KRaft",
+  "broker_principals_identified": {
+    "status": "PRELIMINARY",
+    "expected_form": "User:O=record-platform,CN=kafka",
+    "count_expected": 3,
+    "count_confirmed_live": 0,
+    "note": "Confirm from live keystore subject on each broker before enablement"
+  },
+  "controller_principals_identified": {
+    "status": "BLOCKED_ON_CONTROLLER_CLIENT_AUTH_DESIGN",
+    "count_expected": 3,
+    "count_confirmed_live": 0,
+    "current_controller_client_auth": "none"
+  },
+  "admin_recovery_principal_defined": true,
+  "admin_recovery_principal": "User:CN=gate5-v7-admin,O=Record Platform",
+  "admin_recovery_principal_materialized": false,
+  "service_principals_derived": 12,
+  "service_principals_broker_observed_authorization": 0,
+  "acl_manifest_syntax_validated": true,
+  "rollback_manifest_prepared": true,
+  "rollback": {
+    "steps": [
+      "Restore prior kafka.properties without authorizer.class.name",
+      "Roll brokers one at a time",
+      "Confirm quorum/ISR/URP",
+      "Retain kafka-ssl-secret for broker keystores until controller redesign lands"
+    ]
+  },
+  "acceptance_evidence_during_permissive_transition": "FORBIDDEN",
+  "historical_kafka_client_super_user": false,
+  "application_super_users": 0
+}

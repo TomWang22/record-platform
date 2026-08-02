@@ -1,9 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: media-service
+  name: notification-service
   namespace: record-platform
-  labels: { app: media-service }
+  labels:
+    app: notification-service
 spec:
   replicas: 1
   strategy:
@@ -11,14 +12,16 @@ spec:
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 1
-  selector: { matchLabels: { app: media-service } }
+  selector:
+    matchLabels:
+      app: notification-service
   template:
     metadata:
-      labels: { app: media-service }
+      labels:
+        app: notification-service
       annotations:
         prometheus.io/scrape: "true"
-        # /metrics is served on HTTP port 4018 (50068 is gRPC).
-        prometheus.io/port: "4018"
+        prometheus.io/port: "4015"
         prometheus.io/path: "/metrics"
     spec:
       initContainers:
@@ -58,29 +61,34 @@ spec:
               exit 1
       containers:
         - name: app
-          image: media-service:dev
+          image: notification-service:dev
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 4018
+              containerPort: 4015
             - name: grpc
-              containerPort: 50068
+              containerPort: 50065
           envFrom:
-            - configMapRef: { name: app-config }
-            - secretRef: { name: app-secrets }
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
           env:
             - name: NODE_ENV
               value: "development"
             - name: OTEL_SERVICE_NAME
-              value: "media-service"
-            - name: GRPC_PORT
-              value: "50068"
+              value: "notification-service"
             - name: HTTP_PORT
-              value: "4018"
-            - name: MEDIA_DB_PORT
-              value: "5443"
-            - name: MEDIA_DB_NAME
-              value: "media"
+              value: "4015"
+            - name: GRPC_PORT
+              value: "50065"
+            - name: NOTIFICATION_E2E_SEED
+              value: "0"
+            - name: POSTGRES_URL_NOTIFICATION
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: POSTGRES_URL_NOTIFICATION
             - name: GRPC_REQUIRE_CLIENT_CERT
               value: "true"
             - name: TLS_CA_PATH
@@ -89,6 +97,10 @@ spec:
               value: "/etc/certs/tls.crt"
             - name: TLS_KEY_PATH
               value: "/etc/certs/tls.key"
+            - name: KAFKA_USE_SSL
+              value: "true"
+            - name: KAFKA_SSL_ENABLED
+              value: "true"
             - name: KAFKA_CA_CERT
               value: "/etc/kafka/client/ca-chain.pem"
             - name: KAFKA_CLIENT_CERT
@@ -96,15 +108,14 @@ spec:
             - name: KAFKA_CLIENT_KEY
               value: "/etc/kafka/client/tls.key"
           volumeMounts:
-            - name: proto-files
-              mountPath: /app/proto
-              readOnly: true
             - name: service-tls
               mountPath: /etc/certs
               readOnly: true
             - name: kafka-client-tls
               mountPath: /etc/kafka/client
               readOnly: true
+          # Startup / liveness: TCP only (gRPC+mTLS listener up). gRPC health includes DB — NOT_SERVING or Kafka
+          # stalls during coordinator migration caused restart storms + SIGTERM → consumer disconnect + exit 0.
           startupProbe:
             tcpSocket:
               port: http
@@ -135,16 +146,10 @@ spec:
             limits:
               cpu: "500m"
               memory: "256Mi"
-          # Startup must NOT use grpc.health Check with DB — NOT_SERVING while Postgres warms up looks like a crash loop (kubelet restarts the container).
-          # TCP only: gRPC+mTLS listener is accepting connections.
-
       volumes:
-        - name: proto-files
-          configMap:
-            name: proto-files
         - name: service-tls
           secret:
-            secretName: service-tls-media-service
+            secretName: service-tls-notification-service
             items:
               - key: tls.key
                 path: tls.key
@@ -154,7 +159,7 @@ spec:
                 path: ca.crt
         - name: kafka-client-tls
           secret:
-            secretName: kafka-client-tls-media-service
+            secretName: kafka-client-tls-notification-service
             defaultMode: 420
             items:
             - key: tls.crt

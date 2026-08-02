@@ -1,0 +1,10 @@
+{
+  "document": "gate5-v7-acl-offline-validation",
+  "manifest": "reports/kafka/gate5-v7-final-acl-manifest.json",
+  "apply_authorized": false,
+  "errors": [],
+  "passed": true,
+  "service_principals": 12,
+  "wildcard_application_acls": 0,
+  "application_super_users": 0
+}

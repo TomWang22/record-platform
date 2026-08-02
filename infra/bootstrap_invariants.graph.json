@@ -1,0 +1,264 @@
+{
+  "version": "v2.0",
+  "description": "Record Platform cold-bootstrap DAG: A.toolchain→A.workspace→P0.hard_reset→Z.colima_clean→P1.host_deps→B.crypto→…→J. P0 is the destructive boundary; F.cluster_deploy ensures (never deletes) record-platform unless RP_FORCE_NAMESPACE_DELETE=1.",
+  "housing_ns_default": "record-platform",
+  "nodes": {
+    "A.toolchain": {
+      "description": "Node 22.x (>=22.13) + pnpm@11.1.3 via corepack (fnm/nvm auto-select)",
+      "script": "scripts/rp-verify-toolchain-contract.sh",
+      "verifyPhase": "toolchain",
+      "context": ["ci", "post-bootstrap", "drift"]
+    },
+    "A.workspace": {
+      "description": "Workspace determinism (pip==26.1.1, pnpm install --frozen-lockfile, pnpm run build, kafka-contract dist)",
+      "script": "scripts/verify-bootstrap-state.mjs",
+      "verifyPhase": "workspace",
+      "context": ["ci", "post-bootstrap", "preflight-start", "preflight-end", "drift"]
+    },
+    "A.namespace_integrity_static": {
+      "description": "Fail-closed static scan: source/config/tests/proxy/OTel/metrics must have zero active legacy namespace hits before image build",
+      "script": "scripts/verify-namespace-integrity-static.sh",
+      "verifyPhase": "namespace_integrity_static",
+      "context": ["ci", "post-bootstrap", "preflight-start", "drift"]
+    },
+    "F.namespace_integrity_runtime": {
+      "description": "Fail-closed runtime scan: live K8s objects, proxy/OTel config, MetalLB Jaeger exact-trace freshness with zero forbidden namespace",
+      "script": "scripts/verify-namespace-integrity-runtime.sh",
+      "verifyPhase": "namespace_integrity_runtime",
+      "context": ["post-bootstrap", "preflight-end", "drift"]
+    },
+    "P1.host_deps": {
+      "description": "Host: node 22 + pnpm 11.1.3, docker, curl HTTP/3, openssl, kubectl, pip==26.1.1 venv",
+      "script": "scripts/rp-bootstrap-host-deps.sh",
+      "verifyPhase": "host_deps",
+      "context": ["ci", "post-bootstrap", "preflight-start", "drift"]
+    },
+    "P0.hard_reset": {
+      "description": "Kill proof/preflight jobs; colima stop/delete; rm ~/.colima (no start)",
+      "script": "scripts/rp-hard-reset.sh",
+      "verifyPhase": "hard_reset",
+      "context": ["post-bootstrap", "drift"]
+    },
+    "Z.colima_clean": {
+      "description": "Start Colima+k3s, k3s settle, VM tcpdump/tshark/htop/strace/xcaddy, bridge kubeconfig",
+      "script": "scripts/rp-colima-start-clean.sh",
+      "verifyPhase": "colima_clean",
+      "context": ["post-bootstrap", "drift"]
+    },
+    "B.crypto": {
+      "description": "rp-bootstrap-crypto: 3-stage PKI, contract service leaves, audit-rp-cert-coverage, strict-tls-bootstrap, K8s TLS secrets audit, Kafka chain, webapp/ollama policy gates",
+      "script": "scripts/verify-bootstrap-state.mjs",
+      "verifyPhase": "crypto",
+      "context": ["ci", "post-bootstrap", "preflight-start", "preflight-end", "drift"]
+    },
+    "B.kafka_client_pki.generate": {
+      "description": "Generate 12 dedicated clientAuth-only Kafka client leaves (kafka-client-tls namespace; not service-tls)",
+      "script": "scripts/generate-kafka-client-service-tls.sh",
+      "verifyPhase": "kafka_client_pki_generate",
+      "context": ["post-bootstrap", "preflight-start", "drift"]
+    },
+    "B.kafka_client_pki.verify": {
+      "description": "Verify clientAuth-only, SPIFFE SAN, chain, key match, distinct fingerprints for 12 Kafka client leaves",
+      "script": "scripts/verify-kafka-client-service-tls.sh",
+      "verifyPhase": "kafka_client_pki_verify",
+      "context": ["post-bootstrap", "preflight-start", "drift"]
+    },
+    "D.kafka_client_secrets.materialize": {
+      "description": "Materialize kafka-client-tls-<service> Secrets (private keys never committed)",
+      "script": "scripts/apply-kafka-client-tls-secrets.sh",
+      "verifyPhase": "kafka_client_secrets",
+      "context": ["post-bootstrap", "drift"]
+    },
+    "F.kafka_client_workloads.wire": {
+      "description": "Wire 12 participants to /etc/kafka/client from kafka-client-tls-*; fail if shared client.crt remains",
+      "script": "scripts/verify-kafka-client-workload-wiring.sh",
+      "verifyPhase": "kafka_client_workloads_wire",
+      "context": ["post-bootstrap", "preflight-end", "drift"]
+    },
+    "G.kafka_authorizer.configure": {
+      "description": "Lockout-safe StandardAuthorizer preflight only — does not enable authorizer until explicit enablement gate",
+      "script": "scripts/gate5-v7-authorizer-preflight.sh",
+      "verifyPhase": "kafka_authorizer_preflight",
+      "context": ["post-bootstrap", "drift"]
+    },
+    "G.kafka_acls.bootstrap": {
+      "description": "Offline ACL manifest validation from exact User:O=Record Platform,CN=<service> principals — apply deferred",
+      "script": "scripts/gate5-v7-acl-offline-validate.py",
+      "verifyPhase": "kafka_acls_offline",
+      "context": ["post-bootstrap", "drift"]
+    },
+    "H.kafka_identity_canary": {
+      "description": "Pre-v7 12-service / 19-role identity+ACL canary (authorized only after authorizer enablement)",
+      "script": "scripts/gate5-v7-identity-canary.sh",
+      "verifyPhase": "kafka_identity_canary",
+      "context": ["post-bootstrap"]
+    },
+    "I.kafka_three_broker_acceptance": {
+      "description": "Three-broker positive/negative mTLS+ACL matrix (authorized only after canary PASS)",
+      "script": "scripts/gate5-v7-three-broker-acceptance.sh",
+      "verifyPhase": "kafka_three_broker_acceptance",
+      "context": ["post-bootstrap"]
+    },
+    "C.infra": {
+      "description": "Host substrate: stop RP containers, compose 5433–5443, Redis 6379, MinIO",
+      "script": "scripts/verify-bootstrap-state.mjs",
+      "verifyPhase": "infra",
+      "context": ["post-bootstrap", "preflight-start", "preflight-end", "drift"]
+    },
+    "D.backup_materialization": {
+      "description": "Hybrid backup materialize + validate (11 DBs × 4 artifacts, no booking/social)",
+      "script": "scripts/verify-bootstrap-state.mjs",
+      "verifyPhase": "backup_materialization",
+      "context": ["post-bootstrap", "drift"]
+    },
+    "E.restore": {
+      "description": "Restore 5433–5443 only from materialized-rp-runtime",
+      "script": "scripts/verify-bootstrap-state.mjs",
+      "verifyPhase": "restore",
+      "context": ["post-bootstrap", "drift"]
+    },
+    "C.metrics": {
+      "description": "metrics-server in kube-system",
+      "script": "scripts/bootstrap-metrics-server.sh",
+      "verifyPhase": "metrics",
+      "context": ["post-bootstrap", "preflight-start", "preflight-end", "drift"]
+    },
+    "C.images": {
+      "description": "Required images loaded into Colima/k3s (infra/required_images.json)",
+      "script": "scripts/verify-required-images.sh",
+      "verifyPhase": "images",
+      "context": ["post-bootstrap", "preflight-start", "preflight-end", "drift"]
+    },
+    "C.image_contract": {
+      "description": "Static Docker image contracts (pnpm 11, webapp standalone) before cluster deploy",
+      "script": "scripts/rp-verify-image-build-contract.sh",
+      "verifyPhase": "image_contract",
+      "context": ["post-bootstrap", "preflight-start", "drift"]
+    },
+    "D.contract_audits": {
+      "description": "RP runtime/gateway/probe/health + audit-rp-cert-coverage (11 mTLS leaves from contract) before image build",
+      "script": "scripts/audit-rp-runtime-contract.sh",
+      "verifyPhase": "contract_audits",
+      "context": ["post-bootstrap", "preflight-start", "drift"]
+    },
+    "E.build_images": {
+      "description": "Build all active :dev images with per-service RP_SOURCE_SHA labels (make build-images)",
+      "script": "scripts/build-record-platform-images-k3s.sh",
+      "verifyPhase": "build_images",
+      "context": ["post-bootstrap", "drift"]
+    },
+    "E.image_freshness": {
+      "description": "Local image labels match current source SHA (audit-rp-image-freshness.sh; blocks stale trust/gateway rollouts)",
+      "script": "scripts/audit-rp-image-freshness.sh",
+      "verifyPhase": "image_freshness",
+      "context": ["post-bootstrap", "drift"]
+    },
+    "F.cluster_deploy": {
+      "description": "make bootstrap (P2–P9): KRaft, deploy, P7a Ollama stack when RP_ENABLE_OLLAMA=1, endpoint wait, K8s TLS re-audit",
+      "script": "scripts/bootstrap-cluster.sh",
+      "verifyPhase": "cluster_deploy",
+      "context": ["preflight-end", "drift", "post-bootstrap"]
+    },
+    "G.app_runtime": {
+      "description": "RP services only: rollouts + /healthz + latency percentiles",
+      "script": "scripts/verify-app-runtime.sh",
+      "verifyPhase": "app_runtime",
+      "context": ["post-bootstrap", "preflight-end", "drift"]
+    },
+    "H.observability": {
+      "description": "Prometheus/Grafana/Jaeger/OTel RP-named dashboards (umbrella; prefer granular H.observability.* nodes)",
+      "script": "scripts/verify-bootstrap-state.mjs",
+      "verifyPhase": "observability",
+      "context": ["post-bootstrap", "preflight-start", "preflight-end", "drift"]
+    },
+    "H.observability.deploy": {
+      "description": "Apply observability namespace resources (otel-collector, jaeger, prometheus, grafana, jaeger-query MetalLB)",
+      "script": "scripts/ensure-observability-stack.sh",
+      "verifyPhase": "observability_deploy",
+      "context": ["post-bootstrap", "preflight-start", "drift"]
+    },
+    "H.observability.otel_ingestion": {
+      "description": "OTel Collector ClusterIP ready; app OTLP must target otel-collector.observability.svc.cluster.local",
+      "script": "scripts/verify-otel-collector-ingestion.sh",
+      "verifyPhase": "otel_ingestion",
+      "context": ["post-bootstrap", "preflight-start", "drift"]
+    },
+    "H.observability.jaeger_storage": {
+      "description": "Jaeger all-in-one Ready (internal storage/query ClusterIP)",
+      "script": "scripts/ensure-observability-stack-ready.sh",
+      "verifyPhase": "jaeger_storage",
+      "context": ["post-bootstrap", "preflight-start", "drift"]
+    },
+    "H.observability.jaeger_query_metallb": {
+      "description": "Jaeger Query MetalLB Service assigned declared IP (contract rp-jaeger-query-endpoint-contract.json)",
+      "script": "scripts/verify-jaeger-query-metallb.sh",
+      "verifyPhase": "jaeger_query_metallb",
+      "context": ["post-bootstrap", "preflight-start", "preflight-end", "drift"]
+    },
+    "H.observability.external_tls": {
+      "description": "jaeger.record-platform.test TLS leaf/intermediate/root + hostname/SNI verification via MetalLB",
+      "script": "scripts/verify-jaeger-query-tls.sh",
+      "verifyPhase": "jaeger_external_tls",
+      "context": ["post-bootstrap", "preflight-start", "preflight-end", "drift"]
+    },
+    "H.observability.trace_round_trip": {
+      "description": "Emit canary span via collector; retrieve exact trace ID through MetalLB Jaeger Query URL",
+      "script": "scripts/jaeger-metallb-trace-roundtrip.sh",
+      "verifyPhase": "trace_round_trip",
+      "context": ["post-bootstrap", "preflight-end", "drift"]
+    },
+    "I.transport": {
+      "description": "caddy-h3 MetalLB IP → /etc/hosts gate (pause; no edge smoke until hosts updated)",
+      "script": "scripts/wait-caddy-metallb-ip.sh",
+      "verifyPhase": "transport",
+      "context": ["preflight-end", "post-bootstrap"]
+    },
+    "J.final_contract": {
+      "description": "Post-hosts: cluster-doctor + verify-bootstrap-state + drift + SLO/SLA (run via make cold-bootstrap-post-hosts)",
+      "script": "scripts/verify-bootstrap-state.mjs",
+      "verifyPhase": "final_contract",
+      "context": ["post-bootstrap", "drift"]
+    }
+  },
+  "edges": [
+    ["A.toolchain", "A.workspace"],
+    ["A.workspace", "A.namespace_integrity_static"],
+    ["A.namespace_integrity_static", "P0.hard_reset"],
+    ["P0.hard_reset", "Z.colima_clean"],
+    ["Z.colima_clean", "P1.host_deps"],
+    ["P1.host_deps", "B.crypto"],
+    ["B.crypto", "B.kafka_client_pki.generate"],
+    ["B.kafka_client_pki.generate", "B.kafka_client_pki.verify"],
+    ["B.kafka_client_pki.verify", "D.kafka_client_secrets.materialize"],
+    ["B.kafka_client_pki.verify", "C.infra"],
+    ["C.infra", "D.backup_materialization"],
+    ["D.backup_materialization", "E.restore"],
+    ["E.restore", "C.metrics"],
+    ["C.metrics", "C.images"],
+    ["C.images", "C.image_contract"],
+    ["C.image_contract", "D.contract_audits"],
+    ["D.contract_audits", "A.namespace_integrity_static"],
+    ["A.namespace_integrity_static", "E.build_images"],
+    ["E.build_images", "E.image_freshness"],
+    ["D.kafka_client_secrets.materialize", "F.cluster_deploy"],
+    ["E.image_freshness", "F.cluster_deploy"],
+    ["F.cluster_deploy", "F.kafka_client_workloads.wire"],
+    ["F.kafka_client_workloads.wire", "G.kafka_authorizer.configure"],
+    ["G.kafka_authorizer.configure", "G.kafka_acls.bootstrap"],
+    ["G.kafka_acls.bootstrap", "G.app_runtime"],
+    ["F.cluster_deploy", "G.app_runtime"],
+    ["G.kafka_acls.bootstrap", "H.kafka_identity_canary"],
+    ["H.kafka_identity_canary", "I.kafka_three_broker_acceptance"],
+    ["G.app_runtime", "H.observability.deploy"],
+    ["H.observability.deploy", "H.observability.otel_ingestion"],
+    ["H.observability.otel_ingestion", "H.observability.jaeger_storage"],
+    ["H.observability.jaeger_storage", "H.observability.jaeger_query_metallb"],
+    ["H.observability.jaeger_query_metallb", "H.observability.external_tls"],
+    ["H.observability.external_tls", "H.observability.trace_round_trip"],
+    ["H.observability.trace_round_trip", "F.namespace_integrity_runtime"],
+    ["F.namespace_integrity_runtime", "H.observability"],
+    ["H.observability", "I.transport"],
+    ["F.cluster_deploy", "I.transport"],
+    ["I.transport", "J.final_contract"]
+  ]
+}

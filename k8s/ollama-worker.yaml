@@ -99,11 +99,11 @@ spec:
                   key: KAFKA_SSL_ENABLED
                   optional: true
             - name: KAFKA_CA_CERT
-              value: "/etc/kafka/secrets/ca-cert.pem"
+              value: "/etc/kafka/client/ca-chain.pem"
             - name: KAFKA_CLIENT_CERT
-              value: "/etc/kafka/secrets/client.crt"
+              value: "/etc/kafka/client/tls.crt"
             - name: KAFKA_CLIENT_KEY
-              value: "/etc/kafka/secrets/client.key"
+              value: "/etc/kafka/client/tls.key"
             - name: OLLAMA_JOBS_TOPIC
               value: "ollama-jobs"
             - name: OLLAMA_DLQ_TOPIC
@@ -117,8 +117,8 @@ spec:
                   key: OLLAMA_MODEL
                   optional: true
           volumeMounts:
-            - name: kafka-ssl
-              mountPath: /etc/kafka/secrets
+            - name: kafka-client-tls
+              mountPath: /etc/kafka/client
               readOnly: true
           readinessProbe:
             httpGet:
@@ -134,13 +134,14 @@ spec:
               cpu: "500m"
               memory: "512Mi"
       volumes:
-        - name: kafka-ssl
+        - name: kafka-client-tls
           secret:
-            secretName: kafka-ssl-secret
+            secretName: kafka-client-tls-ollama-worker
+            defaultMode: 420
             items:
-              - key: ca-cert.pem
-                path: ca-cert.pem
-              - key: client.crt
-                path: client.crt
-              - key: client.key
-                path: client.key
+            - key: tls.crt
+              path: tls.crt
+            - key: tls.key
+              path: tls.key
+            - key: ca-chain.pem
+              path: ca-chain.pem

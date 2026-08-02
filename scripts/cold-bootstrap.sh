@@ -213,6 +213,44 @@ if [[ "$RP_CB_DRY_RUN" != "1" ]] && [[ -n "$_B_CRYPTO_START_MS" ]]; then
   rp_cb_record_phase_ms "B.crypto:${_crypto_mode}" "$_B_CRYPTO_START_MS"
 fi
 
+# --- B.kafka_client_pki.generate / verify (dedicated clientAuth-only leaves; not service-tls) ---
+rp_cb_phase_enter B.kafka_client_pki.generate "dedicated Kafka client leaves (12 services)"
+if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
+  echo "[dry-run] bash scripts/generate-kafka-client-service-tls.sh"
+else
+  chmod +x "$SCRIPT_DIR/generate-kafka-client-service-tls.sh" 2>/dev/null || true
+  export RP_CB_RUN_LABEL="B.kafka_client_pki.generate"
+  rp_cb_run bash "$SCRIPT_DIR/generate-kafka-client-service-tls.sh" || \
+    rp_cb_phase_fail B.kafka_client_pki.generate "kafka client leaf generation failed" \
+      "bash scripts/generate-kafka-client-service-tls.sh"
+fi
+rp_cb_phase_complete B.kafka_client_pki.generate
+
+rp_cb_phase_enter B.kafka_client_pki.verify "verify clientAuth-only + SPIFFE + distinct fingerprints"
+if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
+  echo "[dry-run] bash scripts/verify-kafka-client-service-tls.sh"
+else
+  chmod +x "$SCRIPT_DIR/verify-kafka-client-service-tls.sh" 2>/dev/null || true
+  export RP_CB_RUN_LABEL="B.kafka_client_pki.verify"
+  rp_cb_run bash "$SCRIPT_DIR/verify-kafka-client-service-tls.sh" || \
+    rp_cb_phase_fail B.kafka_client_pki.verify "kafka client leaf verify failed" \
+      "bash scripts/verify-kafka-client-service-tls.sh"
+fi
+rp_cb_phase_complete B.kafka_client_pki.verify
+
+# --- D.kafka_client_secrets.materialize ---
+rp_cb_phase_enter D.kafka_client_secrets.materialize "materialize kafka-client-tls-* Secrets"
+if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
+  echo "[dry-run] bash scripts/apply-kafka-client-tls-secrets.sh"
+else
+  chmod +x "$SCRIPT_DIR/apply-kafka-client-tls-secrets.sh" 2>/dev/null || true
+  export RP_CB_RUN_LABEL="D.kafka_client_secrets.materialize"
+  rp_cb_run bash "$SCRIPT_DIR/apply-kafka-client-tls-secrets.sh" || \
+    rp_cb_phase_fail D.kafka_client_secrets.materialize "kafka-client-tls secret apply failed" \
+      "bash scripts/apply-kafka-client-tls-secrets.sh"
+fi
+rp_cb_phase_complete D.kafka_client_secrets.materialize
+
 # --- C.infra (host DB substrate; TLS secrets already applied in B.crypto) ---
 rp_cb_phase_enter C.infra "compose 5433–5443 + Redis 6379 + MinIO (external infra only)"
 if rp_cb_color_enabled; then
@@ -576,6 +614,48 @@ PY
   fi
 fi
 rp_cb_phase_complete F.cluster_deploy
+
+# --- F.kafka_client_workloads.wire (dedicated mounts; fail if shared client.crt remains) ---
+rp_cb_phase_enter F.kafka_client_workloads.wire "verify kafka-client-tls mounts on 12 participants"
+if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
+  echo "[dry-run] bash scripts/verify-kafka-client-workload-wiring.sh"
+else
+  chmod +x "$SCRIPT_DIR/verify-kafka-client-workload-wiring.sh" \
+    "$SCRIPT_DIR/rp-patch-kafka-mtls-client-env.sh" 2>/dev/null || true
+  export RP_CB_RUN_LABEL="F.kafka_client_workloads.wire patch"
+  rp_cb_run bash "$SCRIPT_DIR/rp-patch-kafka-mtls-client-env.sh" || \
+    rp_cb_phase_fail F.kafka_client_workloads.wire "kafka client env patch failed" \
+      "bash scripts/rp-patch-kafka-mtls-client-env.sh"
+  export RP_CB_RUN_LABEL="F.kafka_client_workloads.wire verify"
+  rp_cb_run bash "$SCRIPT_DIR/verify-kafka-client-workload-wiring.sh" || \
+    rp_cb_phase_fail F.kafka_client_workloads.wire "kafka client workload wiring verify failed" \
+      "bash scripts/verify-kafka-client-workload-wiring.sh"
+fi
+rp_cb_phase_complete F.kafka_client_workloads.wire
+
+# --- G.kafka_authorizer / G.kafka_acls (preflight only — does NOT enable authorizer) ---
+rp_cb_phase_enter G.kafka_authorizer.configure "authorizer preflight (enablement deferred)"
+if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
+  echo "[dry-run] bash scripts/gate5-v7-authorizer-preflight.sh"
+else
+  chmod +x "$SCRIPT_DIR/gate5-v7-authorizer-preflight.sh" 2>/dev/null || true
+  export RP_CB_RUN_LABEL="G.kafka_authorizer.configure preflight"
+  rp_cb_run bash "$SCRIPT_DIR/gate5-v7-authorizer-preflight.sh" || \
+    rp_cb_phase_fail G.kafka_authorizer.configure "authorizer preflight failed" \
+      "bash scripts/gate5-v7-authorizer-preflight.sh"
+fi
+rp_cb_phase_complete G.kafka_authorizer.configure
+
+rp_cb_phase_enter G.kafka_acls.bootstrap "ACL offline validation (apply deferred)"
+if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
+  echo "[dry-run] python3 scripts/gate5-v7-acl-offline-validate.py"
+else
+  export RP_CB_RUN_LABEL="G.kafka_acls.bootstrap offline validate"
+  rp_cb_run python3 "$SCRIPT_DIR/gate5-v7-acl-offline-validate.py" || \
+    rp_cb_phase_fail G.kafka_acls.bootstrap "ACL offline validation failed" \
+      "python3 scripts/gate5-v7-acl-offline-validate.py"
+fi
+rp_cb_phase_complete G.kafka_acls.bootstrap
 
 rp_cb_phase_enter G.app_runtime
 if [[ "$RP_CB_DRY_RUN" != "1" ]]; then

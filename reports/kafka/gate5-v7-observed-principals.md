@@ -1,17 +1,21 @@
-# Gate 5 v7 — broker-observed Kafka principals
+# Gate 5 v7 — principal inventory (pre-authorizer)
 
-**Final ACLs not applied. gate5-v7 not created.**
+**Evidence class: `KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE`**
+
+These strings are **not** yet `BROKER_OBSERVED_AUTHORIZATION_PRINCIPAL`.
+Promotion requires an authorizer ALLOW/DENY decision that records the exact principal.
 
 ## Method
 
-- Leaf subject → Java `X500Principal.getName()` (same path as Kafka `DefaultKafkaPrincipalBuilder`)
-- Live proof: `kafka-broker-api-versions` over INTERNAL SSL with each `kafka-client-tls-*` leaf
-- SPIFFE URI SAN present on every leaf; **not** used as ACL principal
+- Leaf subject → Java `X500Principal.getName()` (DefaultKafkaPrincipalBuilder equivalent)
+- Live proof: `kafka-broker-api-versions` over INTERNAL SSL with each dedicated leaf
+- SPIFFE URI SAN present; **not** the ACL principal
 - No `ssl.principal.mapping.rules`
+- Authorizer: **absent**
 
-## Distinct principals (12/12)
+## Distinct principals (12/12 derived)
 
-| Service | Broker-observed principal | Live mTLS |
+| Service | Derived Kafka principal | Live mTLS ApiVersions |
 |---|---|---|
 | analytics-service | `User:O=Record Platform,CN=analytics-service` | accepted |
 | auction-monitor | `User:O=Record Platform,CN=auction-monitor` | accepted |
@@ -26,21 +30,9 @@
 | ollama-gateway | `User:O=Record Platform,CN=ollama-gateway` | accepted |
 | ollama-worker | `User:O=Record Platform,CN=ollama-worker` | accepted |
 
-Historical shared principal (still mounted by app workloads until migration):
-
 ```text
-User:O=record-platform,CN=kafka-client
-```
-
-## Denominators
-
-```text
-services expected/observed = 12/12
-live_mtls_accepted = 12/12
-distinct_observed_service_principals = 12
-shared_generic_principal_observations = 0
-final_acl_manifest_authorized = false
+services expected/derived = 12/12
+broker_observed_authorization_principals = 0/12
+final_acl_apply_authorized = false
 gate5_v7_authorized_to_create = false
 ```
-
-Machine-readable: `reports/kafka/gate5-v7-observed-principals.json`

@@ -1,0 +1,83 @@
+{
+  "document": "gate5-v7-controller-mtls-design",
+  "ts": "2026-08-01T23:56:25Z",
+  "implementation_status": "DESIGN_ONLY_NOT_APPLIED",
+  "current_runtime": {
+    "INTERNAL": {
+      "port": 9093,
+      "ssl": true,
+      "client_auth": "required",
+      "roles": [
+        "client",
+        "inter_broker"
+      ]
+    },
+    "EXTERNAL": {
+      "port": 9094,
+      "ssl": true,
+      "client_auth": "required",
+      "roles": [
+        "external_client"
+      ]
+    },
+    "CONTROLLER": {
+      "port": 9095,
+      "ssl": true,
+      "client_auth": "none",
+      "roles": [
+        "controller_quorum"
+      ]
+    }
+  },
+  "platform_claim_fully_strict_mtls": false,
+  "reason_not_fully_strict": "CONTROLLER:9095 has ssl.client.auth=none",
+  "preferred_posture": {
+    "broker_listener_server_certificate": "serverAuth_only",
+    "inter_broker_controller_client_certificate": "clientAuth_only",
+    "listener_specific_keystores": "required_to_avoid_dual_use"
+  },
+  "current_broker_certificate_classification": "DUAL_USE_EKU_REQUIRED_WITH_RATIONALE",
+  "dual_use_rationale": {
+    "constraint": "Single keystore mounted for INTERNAL/EXTERNAL/CONTROLLER; INTERNAL inter-broker peers require clientAuth",
+    "affected_roles": [
+      "broker_server",
+      "inter_broker_client",
+      "controller_server"
+    ],
+    "compensating_controls": [
+      "dedicated application kafka-client-tls-* leaves (clientAuth-only)",
+      "fail-closed StandardAuthorizer after lockout-safe rollout",
+      "CONTROLLER clientAuth=required planned before claiming fully strict mTLS"
+    ]
+  },
+  "per_broker_identity_matrix": [
+    {
+      "broker": "kafka-0",
+      "server_role": "present_shared_broker_leaf",
+      "inter_broker_client_role": "same_leaf_dual_use",
+      "controller_role": "same_keystore_client_auth_none_today"
+    },
+    {
+      "broker": "kafka-1",
+      "server_role": "present_shared_broker_leaf",
+      "inter_broker_client_role": "same_leaf_dual_use",
+      "controller_role": "same_keystore_client_auth_none_today"
+    },
+    {
+      "broker": "kafka-2",
+      "server_role": "present_shared_broker_leaf",
+      "inter_broker_client_role": "same_leaf_dual_use",
+      "controller_role": "same_keystore_client_auth_none_today"
+    }
+  ],
+  "target_controller_posture": {
+    "CONTROLLER_TLS_enabled": "3/3",
+    "CONTROLLER_client_certificate_required": "3/3",
+    "controller_identities_expected_presented": "3/3",
+    "unauthenticated_controller_tls_denied": "3/3",
+    "wrong_controller_identity_denied": "3/3",
+    "rollback_required": true,
+    "quorum_health_checks_required": true
+  },
+  "enablement_authorized": false
+}

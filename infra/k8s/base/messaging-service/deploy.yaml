@@ -1,9 +1,11 @@
+# Messaging service: HTTP 4014, gRPC 50064, RP messaging DB host port 5434.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: media-service
+  name: messaging-service
   namespace: record-platform
-  labels: { app: media-service }
+  labels:
+    app: messaging-service
 spec:
   replicas: 1
   strategy:
@@ -11,14 +13,16 @@ spec:
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 1
-  selector: { matchLabels: { app: media-service } }
+  selector:
+    matchLabels:
+      app: messaging-service
   template:
     metadata:
-      labels: { app: media-service }
+      labels:
+        app: messaging-service
       annotations:
         prometheus.io/scrape: "true"
-        # /metrics is served on HTTP port 4018 (50068 is gRPC).
-        prometheus.io/port: "4018"
+        prometheus.io/port: "4014"
         prometheus.io/path: "/metrics"
     spec:
       initContainers:
@@ -58,29 +62,37 @@ spec:
               exit 1
       containers:
         - name: app
-          image: media-service:dev
+          image: messaging-service:dev
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 4018
+              containerPort: 4014
             - name: grpc
-              containerPort: 50068
+              containerPort: 50064
+
           envFrom:
-            - configMapRef: { name: app-config }
-            - secretRef: { name: app-secrets }
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+
           env:
             - name: NODE_ENV
               value: "development"
             - name: OTEL_SERVICE_NAME
-              value: "media-service"
-            - name: GRPC_PORT
-              value: "50068"
+              value: "messaging-service"
             - name: HTTP_PORT
-              value: "4018"
-            - name: MEDIA_DB_PORT
-              value: "5443"
-            - name: MEDIA_DB_NAME
-              value: "media"
+              value: "4014"
+            - name: GRPC_PORT
+              value: "50064"
+            - name: ENABLE_GRPC
+              value: "true"
+            - name: POSTGRES_URL_MESSAGING
+              value: "postgresql://postgres:postgres@host.docker.internal:5434/messaging?connect_timeout=5"
+            - name: LISTINGS_HTTP
+              value: "http://listings-service:4012"
+            - name: NOTIFICATION_HTTP
+              value: "http://notification-service.record-platform.svc.cluster.local:4015"
             - name: GRPC_REQUIRE_CLIENT_CERT
               value: "true"
             - name: TLS_CA_PATH
@@ -89,15 +101,26 @@ spec:
               value: "/etc/certs/tls.crt"
             - name: TLS_KEY_PATH
               value: "/etc/certs/tls.key"
+            - name: NODE_TLS_REJECT_UNAUTHORIZED
+              value: "1"
+            - name: NODE_EXTRA_CA_CERTS
+              value: "/certs/dev-root.pem"
+            - name: KAFKA_USE_SSL
+              value: "true"
+            - name: KAFKA_SSL_ENABLED
+              value: "true"
             - name: KAFKA_CA_CERT
               value: "/etc/kafka/client/ca-chain.pem"
             - name: KAFKA_CLIENT_CERT
               value: "/etc/kafka/client/tls.crt"
             - name: KAFKA_CLIENT_KEY
               value: "/etc/kafka/client/tls.key"
+            - name: MESSAGING_HTTP_MAX_CONCURRENT
+              value: "200"
+
           volumeMounts:
-            - name: proto-files
-              mountPath: /app/proto
+            - name: dev-root-ca
+              mountPath: /certs
               readOnly: true
             - name: service-tls
               mountPath: /etc/certs
@@ -105,6 +128,7 @@ spec:
             - name: kafka-client-tls
               mountPath: /etc/kafka/client
               readOnly: true
+
           startupProbe:
             tcpSocket:
               port: http
@@ -135,16 +159,18 @@ spec:
             limits:
               cpu: "500m"
               memory: "256Mi"
-          # Startup must NOT use grpc.health Check with DB — NOT_SERVING while Postgres warms up looks like a crash loop (kubelet restarts the container).
-          # TCP only: gRPC+mTLS listener is accepting connections.
 
       volumes:
-        - name: proto-files
-          configMap:
-            name: proto-files
+        - name: dev-root-ca
+          secret:
+            secretName: dev-root-ca
+            items:
+              - key: dev-root.pem
+                path: dev-root.pem
+
         - name: service-tls
           secret:
-            secretName: service-tls-media-service
+            secretName: service-tls-messaging-service
             items:
               - key: tls.key
                 path: tls.key
@@ -152,9 +178,10 @@ spec:
                 path: tls.crt
               - key: ca.crt
                 path: ca.crt
+
         - name: kafka-client-tls
           secret:
-            secretName: kafka-client-tls-media-service
+            secretName: kafka-client-tls-messaging-service
             defaultMode: 420
             items:
             - key: tls.crt

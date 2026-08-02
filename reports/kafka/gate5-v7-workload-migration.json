@@ -1,0 +1,40 @@
+{
+  "document": "gate5-v7-workload-migration",
+  "ts": "2026-08-02T00:04:55Z",
+  "participant_services_expected": 12,
+  "logical_roles_expected": 19,
+  "source_deploys_migrated": 12,
+  "live_deploys_configured_dedicated_secret": 12,
+  "live_deploy_ready_replicas": {
+    "analytics-service": "/1",
+    "auction-monitor": "/1",
+    "auth-service": "1/1",
+    "listings-service": "/1",
+    "media-service": "1/2",
+    "messaging-service": "1/2",
+    "notification-service": "1/2",
+    "python-ai-service": "/1",
+    "shopping-service": "/1",
+    "trust-service": "1/2",
+    "ollama-gateway": "1/2",
+    "ollama-worker": "2/3"
+  },
+  "shared_kafka_ssl_secret_refs_in_participant_deploys": 0,
+  "mount_contract": {
+    "secret": "kafka-client-tls-<service>",
+    "paths": {
+      "KAFKA_CLIENT_CERT": "/etc/kafka/client/tls.crt",
+      "KAFKA_CLIENT_KEY": "/etc/kafka/client/tls.key",
+      "KAFKA_CA_CERT": "/etc/kafka/client/ca-chain.pem"
+    }
+  },
+  "kafka_ssl_secret_retained_for": [
+    "broker_keystores",
+    "rollback"
+  ],
+  "kafka_ssl_secret_delete_authorized": false,
+  "authorizer_enabled": false,
+  "final_acls_applied": false,
+  "gate5_v7_authorized_to_create": false,
+  "stop_gate": "workload_migration_controller_design_acl_preflight_complete_authorizer_not_enabled"
+}

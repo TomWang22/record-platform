@@ -54,13 +54,13 @@ spec:
             - name: TLS_CERT_PATH
               value: "/etc/certs/tls.crt"
             - name: KAFKA_SSL_CA_CERT
-              value: "/etc/kafka/secrets/ca-cert.pem"
+              value: "/etc/kafka/client/ca-chain.pem"
             - name: KAFKA_CA_CERT
-              value: "/etc/kafka/secrets/ca-cert.pem"
+              value: "/etc/kafka/client/ca-chain.pem"
             - name: KAFKA_CLIENT_CERT
-              value: "/etc/kafka/secrets/client.crt"
+              value: "/etc/kafka/client/tls.crt"
             - name: KAFKA_CLIENT_KEY
-              value: "/etc/kafka/secrets/client.key"
+              value: "/etc/kafka/client/tls.key"
             # Debug logging for gRPC 403 investigation
             - name: GRPC_VERBOSITY
               value: "DEBUG"
@@ -108,8 +108,8 @@ spec:
             - name: service-tls
               mountPath: /etc/certs
               readOnly: true
-            - name: kafka-ssl-certs
-              mountPath: /etc/kafka/secrets
+            - name: kafka-client-tls
+              mountPath: /etc/kafka/client
               readOnly: true
 
       volumes:
@@ -132,14 +132,14 @@ spec:
                 path: tls.crt
               - key: ca.crt
                 path: ca.crt
-        - name: kafka-ssl-certs
+        - name: kafka-client-tls
           secret:
-            secretName: kafka-ssl-secret
-            optional: true
+            secretName: kafka-client-tls-auth-service
+            defaultMode: 420
             items:
-              - key: ca-cert.pem
-                path: ca-cert.pem
-              - key: client.crt
-                path: client.crt
-              - key: client.key
-                path: client.key
+            - key: tls.crt
+              path: tls.crt
+            - key: tls.key
+              path: tls.key
+            - key: ca-chain.pem
+              path: ca-chain.pem

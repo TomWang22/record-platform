@@ -23,10 +23,11 @@
     "ollama-worker": "User:O=Record Platform,CN=ollama-worker"
   },
   "notes": [
-    "Principals measured via Java X500Principal.getName() (Kafka DefaultKafkaPrincipalBuilder SSL path) and proven with live INTERNAL mTLS ApiVersions per dedicated leaf.",
-    "DN order is O before CN (RFC2253). Do not ACL on CN=...,O=... OpenSSL display order.",
-    "SPIFFE URI SAN is required identity evidence but is not the Kafka ACL principal.",
-    "Final ACL manifest must quote these exact User:... strings."
+    "Values are Kafka-equivalent derived principals with live mTLS ApiVersions acceptance.",
+    "Promote to BROKER_OBSERVED_AUTHORIZATION_PRINCIPAL only after authorizer ALLOW/DENY logs.",
+    "DN order is O before CN. SPIFFE is not the ACL principal."
   ],
-  "evidence": "reports/kafka/gate5-v7-observed-principals.json"
+  "evidence": "reports/kafka/gate5-v7-observed-principals.json",
+  "principal_evidence_class": "KAFKA_EQUIVALENT_DERIVED_PRINCIPAL_WITH_LIVE_MTLS_ACCEPTANCE",
+  "broker_observed_authorization_principals": 0
 }

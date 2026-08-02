@@ -89,11 +89,11 @@ spec:
             - name: KAFKA_SSL_ENABLED
               value: "true"
             - name: KAFKA_CA_CERT
-              value: "/etc/kafka/secrets/ca-cert.pem"
+              value: "/etc/kafka/client/ca-chain.pem"
             - name: KAFKA_CLIENT_CERT
-              value: "/etc/kafka/secrets/client.crt"
+              value: "/etc/kafka/client/tls.crt"
             - name: KAFKA_CLIENT_KEY
-              value: "/etc/kafka/secrets/client.key"
+              value: "/etc/kafka/client/tls.key"
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto
@@ -104,8 +104,8 @@ spec:
             - name: service-tls
               mountPath: /etc/certs
               readOnly: true
-            - name: kafka-ssl-certs
-              mountPath: /etc/kafka/secrets
+            - name: kafka-client-tls
+              mountPath: /etc/kafka/client
               readOnly: true
           startupProbe:
             tcpSocket:
@@ -158,6 +158,14 @@ spec:
                 path: tls.crt
               - key: ca.crt
                 path: ca.crt
-        - name: kafka-ssl-certs
+        - name: kafka-client-tls
           secret:
-            secretName: kafka-ssl-secret
+            secretName: kafka-client-tls-analytics-service
+            defaultMode: 420
+            items:
+            - key: tls.crt
+              path: tls.crt
+            - key: tls.key
+              path: tls.key
+            - key: ca-chain.pem
+              path: ca-chain.pem

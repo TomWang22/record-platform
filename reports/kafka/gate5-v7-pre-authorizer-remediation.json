@@ -1,0 +1,98 @@
+{
+  "document": "gate5-v7-pre-authorizer-remediation-v1",
+  "ts": "2026-08-02T01:12:00Z",
+  "source_sha_at_start": "d560d7fd",
+  "mutable_analysis_root": "/tmp/record-platform-gate5-v7-pre-authorizer-remediation-v1/",
+  "gate5_v6_frozen_preserved": true,
+  "gate5_v7_created": false,
+  "authorizer_enabled": false,
+  "final_acls_applied": false,
+  "fail_closed_active": false,
+  "broker_observed_authorization_principals": "0/12",
+  "gate5_v7_authorized_to_create": false,
+  "gate6_authorized": false,
+  "production_approved": false,
+  "stop_verdict": "BLOCKED",
+  "stop_blockers": [
+    "CONTROLLER_MTLS_DOCKER_REHEARSAL_NOT_EXECUTED (config/cert only)",
+    "clientAuth_absent_leaf negative fixture SKIPPED_NO_FIXTURE",
+    "exact-SHA clean worktree rebuild/repin not completed in this stage"
+  ],
+  "A_rollout_rca": {
+    "unready_services_expected_classified_recovered": "4/4/4",
+    "root_causes_by_class": {
+      "ROLLOUT_CONVERGENCE_DELAY": 4,
+      "KUBERNETES_API_TIMEOUT_ONLY": 4
+    },
+    "secret_mount_failures": 0,
+    "tls_failures": 0,
+    "application_readiness_failures": 0,
+    "kafka_authorization_failures": 0,
+    "blind_restarts": 0,
+    "unknown_root_causes": 0
+  },
+  "B_dag_correctness": {
+    "nodes_present": 39,
+    "edges_present": 41,
+    "cycles_before": 1,
+    "cycles_after": 0,
+    "acyclic": true,
+    "executable_nodes_default_cold_bootstrap": "H/I deferred",
+    "deferred_nodes": [
+      "H.kafka_identity_canary",
+      "I.kafka_three_broker_acceptance"
+    ],
+    "graph_shell_phase_mismatches": 0,
+    "duplicate_phase_executions_under_one_node_name": 0,
+    "regression_test": "tests/bootstrap-dag-acyclic.test.mjs pass 2/2"
+  },
+  "C_pki_and_migration": {
+    "leaves": "12/12",
+    "secrets": "12/12",
+    "services_ready": "12/12",
+    "pods_ready": "13/13",
+    "roles_note": "19/19 role census not re-run this stage; dedicated leaves present for 12 participants",
+    "dns_sans": "24/24",
+    "uri_sans": "12/12",
+    "clientAuth_only": "12/12",
+    "spiffe_uri": "12/12",
+    "shared_generic_leaf_mounts": 0,
+    "shared_generic_live_sessions_observe": 0,
+    "rotation_annotations_source": "12/12",
+    "stale_certificate_sessions_after_annotation_rollout": "not fully proven (no rotation of leaf material this stage)"
+  },
+  "D_tls_probe": {
+    "brokers_tested_dns": "kafka-0.kafka.record-platform.svc.cluster.local",
+    "positive_live_mtls_accepted": "12/12",
+    "hostname_verification_enabled": "12/12",
+    "ssl_endpoint_identification_algorithm_blanked": false,
+    "private_keys_copied_into_broker_pods": 0,
+    "probe_runtime": "ephemeral_acceptance_client_job",
+    "negative_cases_pass_fail_skip": "5/0/1",
+    "negative_skip": "clientAuth_absent_leaf",
+    "broker_observed_authorization_principals": "0/12"
+  },
+  "E_controller_rehearsal": {
+    "mode": "config",
+    "live_cluster_mutated": false,
+    "brokers_ready": "N/A_CONFIG_ONLY",
+    "controllers_quorum": "N/A_CONFIG_ONLY",
+    "docker_cluster_started": false,
+    "enablement_on_live_cluster_authorized": false
+  },
+  "F_recovery_admin": {
+    "defined": "1/1",
+    "materialized": "1/1",
+    "securely_stored": "1/1",
+    "rehearsal_tested_mtls": "1/1",
+    "rehearsal_authorizer_exercise": false,
+    "application_mounts": 0,
+    "private_keys_committed": 0
+  },
+  "G_exact_sha_runtime": {
+    "exact_sha_repin_complete": false,
+    "required_ci": "pending_after_commit",
+    "workloads_ready_after_annotation_apply": "12/12",
+    "note": "Annotation apply used existing :dev images; clean detached worktree rebuild not executed in this stage"
+  }
+}

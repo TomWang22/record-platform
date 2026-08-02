@@ -1,0 +1,87 @@
+{
+  "document": "gate5-v7-migration-rollout-rca",
+  "ts": "2026-08-02T00:32:24Z",
+  "blind_restarts": 0,
+  "authorizer_enabled_during_rca": false,
+  "services": [
+    {
+      "service": "analytics-service",
+      "classification": "ROLLOUT_CONVERGENCE_DELAY",
+      "secondary": [
+        "KUBERNETES_API_TIMEOUT_ONLY"
+      ],
+      "recovered": true,
+      "readyReplicas": "1/1",
+      "restarts": 0,
+      "secret": "kafka-client-tls-analytics-service",
+      "mount_files_ok": true,
+      "leaf_fingerprint": "1C:59:F6:42:3E:7B:C6:2D:60:3E:69:C8:99:3C:19:EF:08:89:BC:0C:BA:DD:F5:66:8C:94:50:6E:26:8B:B2:EE",
+      "key_leaf_match": true,
+      "clientAuth": true,
+      "spiffe": "spiffe://record-platform/service/analytics-service",
+      "evidence": "Earlier unready coincided with mass rollout + API timeouts; pod now Running Ready with dedicated leaf matching disk."
+    },
+    {
+      "service": "listings-service",
+      "classification": "ROLLOUT_CONVERGENCE_DELAY",
+      "secondary": [
+        "KUBERNETES_API_TIMEOUT_ONLY"
+      ],
+      "recovered": true,
+      "readyReplicas": "1/1",
+      "restarts": 0,
+      "secret": "kafka-client-tls-listings-service",
+      "mount_files_ok": true,
+      "leaf_fingerprint": "CF:50:E0:A5:CD:E8:0D:E3:57:A5:7F:8F:98:5B:5D:6F:AA:D5:71:60:2D:18:8B:0F:72:73:F3:98:6E:5B:EE:BB",
+      "key_leaf_match": true,
+      "clientAuth": true,
+      "spiffe": "spiffe://record-platform/service/listings-service",
+      "evidence": "Same rollout/API-timeout window; now Ready with dedicated leaf."
+    },
+    {
+      "service": "python-ai-service",
+      "classification": "ROLLOUT_CONVERGENCE_DELAY",
+      "secondary": [
+        "KUBERNETES_API_TIMEOUT_ONLY"
+      ],
+      "recovered": true,
+      "readyReplicas": "1/1",
+      "restarts": 0,
+      "secret": "kafka-client-tls-python-ai-service",
+      "mount_files_ok": true,
+      "leaf_fingerprint": "8B:B4:B0:34:64:B5:C3:45:06:BC:9C:43:0E:CC:C2:26:4F:C3:AA:5A:69:5A:50:DC:B2:C3:29:AD:5F:6A:44:65",
+      "key_leaf_match": true,
+      "clientAuth": true,
+      "serverAuth_absent": true,
+      "spiffe": "spiffe://record-platform/service/python-ai-service",
+      "evidence": "In-pod openssl confirmed clientAuth-only + SPIFFE; Ready after init wait-db."
+    },
+    {
+      "service": "shopping-service",
+      "classification": "ROLLOUT_CONVERGENCE_DELAY",
+      "secondary": [
+        "KUBERNETES_API_TIMEOUT_ONLY"
+      ],
+      "recovered": true,
+      "readyReplicas": "1/1",
+      "restarts": 0,
+      "secret": "kafka-client-tls-shopping-service",
+      "mount_files_ok": true,
+      "leaf_fingerprint": "C5:80:35:A4:D8:ED:78:AE:90:81:7E:F8:7C:31:5F:DC:A2:89:E7:C3:EF:EA:83:D2:3C:5C:DF:66:7C:B8:F6:05",
+      "key_leaf_match": true,
+      "clientAuth": true,
+      "spiffe": "spiffe://record-platform/service/shopping-service",
+      "evidence": "Same rollout window; dedicated leaf match confirmed host-side."
+    }
+  ],
+  "summary": {
+    "affected_expected": 4,
+    "affected_classified": 4,
+    "unknown_root_causes": 0,
+    "recovered": 4,
+    "secret_mount_failures": 0,
+    "tls_handshake_failures": 0,
+    "kafka_authorization_failures": 0,
+    "blind_restarts": 0
+  }
+}

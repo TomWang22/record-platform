@@ -131,15 +131,15 @@ else
 fi
 rp_cb_phase_complete A.workspace
 
-# --- A.namespace_integrity_static (fail-closed before destructive reset / builds) ---
-rp_cb_phase_enter A.namespace_integrity_static "static legacy-namespace purity scan"
+# --- A.namespace_integrity_static_pre_reset (fail-closed before destructive reset) ---
+rp_cb_phase_enter A.namespace_integrity_static_pre_reset "static legacy-namespace purity scan (pre-reset)"
 if [[ "$RP_CB_DRY_RUN" != "1" ]]; then
   bash "$SCRIPT_DIR/verify-namespace-integrity-static.sh" || \
-    rp_cb_phase_fail A.namespace_integrity_static "active legacy namespace hits in checkout" "bash scripts/verify-namespace-integrity-static.sh"
+    rp_cb_phase_fail A.namespace_integrity_static_pre_reset "active legacy namespace hits in checkout" "bash scripts/verify-namespace-integrity-static.sh"
 else
   echo "[dry-run] bash scripts/verify-namespace-integrity-static.sh"
 fi
-rp_cb_phase_complete A.namespace_integrity_static
+rp_cb_phase_complete A.namespace_integrity_static_pre_reset
 
 # --- P0.hard_reset (destructive boundary — before Colima start) ---
 rp_cb_phase_enter P0.hard_reset "destructive reset"
@@ -238,7 +238,20 @@ else
 fi
 rp_cb_phase_complete B.kafka_client_pki.verify
 
-# --- D.kafka_client_secrets.materialize ---
+# --- F.namespace.prepare (must precede Secret materialization) ---
+rp_cb_phase_enter F.namespace.prepare "ensure record-platform namespace (non-destructive)"
+if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
+  echo "[dry-run] bash scripts/rp-prepare-record-platform-namespace.sh"
+else
+  chmod +x "$SCRIPT_DIR/rp-prepare-record-platform-namespace.sh" 2>/dev/null || true
+  export RP_CB_RUN_LABEL="F.namespace.prepare"
+  rp_cb_run bash "$SCRIPT_DIR/rp-prepare-record-platform-namespace.sh" || \
+    rp_cb_phase_fail F.namespace.prepare "namespace prepare failed" \
+      "bash scripts/rp-prepare-record-platform-namespace.sh"
+fi
+rp_cb_phase_complete F.namespace.prepare
+
+# --- D.kafka_client_secrets.materialize (after namespace exists) ---
 rp_cb_phase_enter D.kafka_client_secrets.materialize "materialize kafka-client-tls-* Secrets"
 if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
   echo "[dry-run] bash scripts/apply-kafka-client-tls-secrets.sh"
@@ -250,6 +263,19 @@ else
       "bash scripts/apply-kafka-client-tls-secrets.sh"
 fi
 rp_cb_phase_complete D.kafka_client_secrets.materialize
+
+# --- D.kafka_client_workload_manifests.render (static committed manifests; no cluster writes) ---
+rp_cb_phase_enter D.kafka_client_workload_manifests.render "static kafka-client-tls manifest check"
+if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
+  echo "[dry-run] RP_KAFKA_CLIENT_WIRE_LIVE=0 bash scripts/verify-kafka-client-workload-wiring.sh"
+else
+  chmod +x "$SCRIPT_DIR/verify-kafka-client-workload-wiring.sh" 2>/dev/null || true
+  export RP_CB_RUN_LABEL="D.kafka_client_workload_manifests.render"
+  RP_KAFKA_CLIENT_WIRE_LIVE=0 rp_cb_run bash "$SCRIPT_DIR/verify-kafka-client-workload-wiring.sh" || \
+    rp_cb_phase_fail D.kafka_client_workload_manifests.render "static kafka client manifest check failed" \
+      "RP_KAFKA_CLIENT_WIRE_LIVE=0 bash scripts/verify-kafka-client-workload-wiring.sh"
+fi
+rp_cb_phase_complete D.kafka_client_workload_manifests.render
 
 # --- C.infra (host DB substrate; TLS secrets already applied in B.crypto) ---
 rp_cb_phase_enter C.infra "compose 5433–5443 + Redis 6379 + MinIO (external infra only)"
@@ -405,15 +431,15 @@ else
 fi
 rp_cb_phase_complete D.contract_audits
 
-# Re-run static namespace gate immediately before image build
-rp_cb_phase_enter A.namespace_integrity_static "static namespace purity before E.build_images"
+# Static namespace gate immediately before image build (separate DAG node)
+rp_cb_phase_enter D.namespace_integrity_static_prebuild "static namespace purity before E.build_images"
 if [[ "$RP_CB_DRY_RUN" != "1" ]]; then
   bash "$SCRIPT_DIR/verify-namespace-integrity-static.sh" || \
-    rp_cb_phase_fail A.namespace_integrity_static "active legacy namespace hits before image build" "bash scripts/verify-namespace-integrity-static.sh"
+    rp_cb_phase_fail D.namespace_integrity_static_prebuild "active legacy namespace hits before image build" "bash scripts/verify-namespace-integrity-static.sh"
 else
   echo "[dry-run] bash scripts/verify-namespace-integrity-static.sh"
 fi
-rp_cb_phase_complete A.namespace_integrity_static
+rp_cb_phase_complete D.namespace_integrity_static_prebuild
 
 # --- E.build_images (all active :dev images with RP_SOURCE_SHA) ---
 rp_cb_phase_enter E.build_images "build active RP :dev images (RP_SOURCE_SHA per service)"
@@ -615,47 +641,48 @@ PY
 fi
 rp_cb_phase_complete F.cluster_deploy
 
-# --- F.kafka_client_workloads.wire (dedicated mounts; fail if shared client.crt remains) ---
-rp_cb_phase_enter F.kafka_client_workloads.wire "verify kafka-client-tls mounts on 12 participants"
+# --- F.kafka_client_workloads.verify (READ-ONLY; never runs rp-patch) ---
+rp_cb_phase_enter F.kafka_client_workloads.verify "read-only verify kafka-client-tls mounts"
 if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
   echo "[dry-run] bash scripts/verify-kafka-client-workload-wiring.sh"
 else
-  chmod +x "$SCRIPT_DIR/verify-kafka-client-workload-wiring.sh" \
-    "$SCRIPT_DIR/rp-patch-kafka-mtls-client-env.sh" 2>/dev/null || true
-  export RP_CB_RUN_LABEL="F.kafka_client_workloads.wire patch"
-  rp_cb_run bash "$SCRIPT_DIR/rp-patch-kafka-mtls-client-env.sh" || \
-    rp_cb_phase_fail F.kafka_client_workloads.wire "kafka client env patch failed" \
-      "bash scripts/rp-patch-kafka-mtls-client-env.sh"
-  export RP_CB_RUN_LABEL="F.kafka_client_workloads.wire verify"
+  chmod +x "$SCRIPT_DIR/verify-kafka-client-workload-wiring.sh" 2>/dev/null || true
+  export RP_CB_RUN_LABEL="F.kafka_client_workloads.verify"
+  # Explicitly do NOT call rp-patch-kafka-mtls-client-env.sh here (recovery-only tool).
   rp_cb_run bash "$SCRIPT_DIR/verify-kafka-client-workload-wiring.sh" || \
-    rp_cb_phase_fail F.kafka_client_workloads.wire "kafka client workload wiring verify failed" \
+    rp_cb_phase_fail F.kafka_client_workloads.verify "kafka client workload verify failed" \
       "bash scripts/verify-kafka-client-workload-wiring.sh"
 fi
-rp_cb_phase_complete F.kafka_client_workloads.wire
+rp_cb_phase_complete F.kafka_client_workloads.verify
 
-# --- G.kafka_authorizer / G.kafka_acls (preflight only — does NOT enable authorizer) ---
-rp_cb_phase_enter G.kafka_authorizer.configure "authorizer preflight (enablement deferred)"
+# --- G.kafka_authorizer.preflight / G.kafka_acls.offline_validate (no enablement/apply) ---
+rp_cb_phase_enter G.kafka_authorizer.preflight "authorizer preflight (enablement deferred)"
 if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
   echo "[dry-run] bash scripts/gate5-v7-authorizer-preflight.sh"
 else
   chmod +x "$SCRIPT_DIR/gate5-v7-authorizer-preflight.sh" 2>/dev/null || true
-  export RP_CB_RUN_LABEL="G.kafka_authorizer.configure preflight"
+  export RP_CB_RUN_LABEL="G.kafka_authorizer.preflight"
   rp_cb_run bash "$SCRIPT_DIR/gate5-v7-authorizer-preflight.sh" || \
-    rp_cb_phase_fail G.kafka_authorizer.configure "authorizer preflight failed" \
+    rp_cb_phase_fail G.kafka_authorizer.preflight "authorizer preflight failed" \
       "bash scripts/gate5-v7-authorizer-preflight.sh"
 fi
-rp_cb_phase_complete G.kafka_authorizer.configure
+rp_cb_phase_complete G.kafka_authorizer.preflight
 
-rp_cb_phase_enter G.kafka_acls.bootstrap "ACL offline validation (apply deferred)"
+rp_cb_phase_enter G.kafka_acls.offline_validate "ACL offline validation (apply deferred)"
 if [[ "$RP_CB_DRY_RUN" == "1" ]]; then
   echo "[dry-run] python3 scripts/gate5-v7-acl-offline-validate.py"
 else
-  export RP_CB_RUN_LABEL="G.kafka_acls.bootstrap offline validate"
+  export RP_CB_RUN_LABEL="G.kafka_acls.offline_validate"
   rp_cb_run python3 "$SCRIPT_DIR/gate5-v7-acl-offline-validate.py" || \
-    rp_cb_phase_fail G.kafka_acls.bootstrap "ACL offline validation failed" \
+    rp_cb_phase_fail G.kafka_acls.offline_validate "ACL offline validation failed" \
       "python3 scripts/gate5-v7-acl-offline-validate.py"
 fi
-rp_cb_phase_complete G.kafka_acls.bootstrap
+rp_cb_phase_complete G.kafka_acls.offline_validate
+
+# H.kafka_identity_canary / I.kafka_three_broker_acceptance are NOT run by default.
+# Use: RP_GATE5_V7_ACCEPTANCE=1 make gate5-v7-identity-canary (separate acceptance DAG).
+echo "H.kafka_identity_canary=DEFERRED_NOT_AUTHORIZED"
+echo "I.kafka_three_broker_acceptance=DEFERRED_NOT_AUTHORIZED"
 
 rp_cb_phase_enter G.app_runtime
 if [[ "$RP_CB_DRY_RUN" != "1" ]]; then

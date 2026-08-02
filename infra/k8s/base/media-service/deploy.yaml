@@ -16,6 +16,7 @@ spec:
     metadata:
       labels: { app: media-service }
       annotations:
+        rp.dev/kafka-client-leaf-sha256: "18:B0:B0:3D:D4:31:1E:01:DB:5D:ED:61:5B:68:2B:5F:64:2D:2E:4C:4E:FB:0D:87:9A:32:58:6A:DC:E0:2F:85"
         prometheus.io/scrape: "true"
         # /metrics is served on HTTP port 4018 (50068 is gRPC).
         prometheus.io/port: "4018"

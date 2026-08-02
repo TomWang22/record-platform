@@ -16,6 +16,7 @@ spec:
       labels:
         app: ollama-worker
       annotations:
+        rp.dev/kafka-client-leaf-sha256: "F7:8E:F3:25:F5:D6:52:89:ED:C7:7E:72:D1:00:1C:09:11:02:1F:CC:2C:79:0E:1D:4B:C3:45:DD:4C:52:44:70"
         prometheus.io/scrape: "true"
         prometheus.io/port: "9100"
         prometheus.io/path: "/metrics"

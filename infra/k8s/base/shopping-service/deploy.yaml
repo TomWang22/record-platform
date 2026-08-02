@@ -13,6 +13,7 @@ spec:
     metadata:
       labels: { app: shopping-service }
       annotations:
+        rp.dev/kafka-client-leaf-sha256: "C5:80:35:A4:D8:ED:78:AE:90:81:7E:F8:7C:31:5F:DC:A2:89:E7:C3:EF:EA:83:D2:3C:5C:DF:66:7C:B8:F6:05"
         prometheus.io/scrape: "true"
         prometheus.io/port: "4007"
         prometheus.io/path: "/metrics"

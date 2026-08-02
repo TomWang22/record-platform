@@ -14,6 +14,7 @@ spec:
     metadata:
       labels: { app: auction-monitor }
       annotations:
+        rp.dev/kafka-client-leaf-sha256: "E7:2E:EA:B3:11:1A:F7:B3:D7:A6:EB:FE:BE:DF:3A:BF:8B:DE:A7:22:37:E7:FA:57:3E:8F:78:1F:E3:A0:EE:0F"
         # If you expose metrics on /metrics, Prom can scrape this; otherwise harmless
         prometheus.io/scrape: "true"
         prometheus.io/port: "4008"

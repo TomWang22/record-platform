@@ -120,35 +120,52 @@ EOF
   crt_mod="$(openssl x509 -in "$leaf" -noout -modulus 2>/dev/null | openssl md5)"
   [[ "$key_mod" == "$crt_mod" ]] || fail "key/leaf mismatch: ${svc}"
 
-  # DNS SANs + URI
-  sans_dns="$(echo "$text" | awk '/DNS:/{gsub(/.*DNS:/,""); gsub(/,.*/,""); print}' | paste -sd, - || true)"
-  sans_uri="$(echo "$text" | awk '/URI:/{gsub(/.*URI:/,""); gsub(/,.*/,""); print}' | paste -sd, - || true)"
-
-  python3 - "$meta" <<PY
-import json, sys
-meta_path = sys.argv[1]
+  # Deterministic SAN extraction from the certificate itself (not meta.json trust).
+  python3 - "$leaf" "$meta" <<'PY'
+import json, re, subprocess, sys
+leaf_path, meta_path = sys.argv[1], sys.argv[2]
+text = subprocess.check_output(["openssl", "x509", "-in", leaf_path, "-noout", "-text"], text=True)
+# Prefer -ext when available
+try:
+    ext = subprocess.check_output(
+        ["openssl", "x509", "-in", leaf_path, "-noout", "-ext", "subjectAltName"],
+        text=True,
+        stderr=subprocess.DEVNULL,
+    )
+except subprocess.CalledProcessError:
+    ext = text
+dns = sorted(set(re.findall(r"DNS:([^,\s]+)", ext + "\n" + text)))
+uri = sorted(set(re.findall(r"URI:([^,\s]+)", ext + "\n" + text)))
+subj = subprocess.check_output(
+    ["openssl", "x509", "-in", leaf_path, "-noout", "-subject", "-nameopt", "RFC2253"], text=True
+).strip().removeprefix("subject=").strip()
+serial = subprocess.check_output(["openssl", "x509", "-in", leaf_path, "-noout", "-serial"], text=True).split("=", 1)[-1].strip()
+nb = subprocess.check_output(["openssl", "x509", "-in", leaf_path, "-noout", "-startdate"], text=True).split("=", 1)[-1].strip()
+na = subprocess.check_output(["openssl", "x509", "-in", leaf_path, "-noout", "-enddate"], text=True).split("=", 1)[-1].strip()
+fp = subprocess.check_output(
+    ["openssl", "x509", "-in", leaf_path, "-noout", "-fingerprint", "-sha256"], text=True
+).split("=", 1)[-1].strip()
+svc = leaf_path.rstrip("/").split("/")[-2]
 doc = {
-  "service": "${svc}",
-  "secret_name": "kafka-client-tls-${svc}",
-  "subject_openssl_rfc2253": """${subject}""",
-  "serial_hex": "${serial}",
-  "not_before": "${not_before}",
-  "not_after": "${not_after}",
-  "leaf_sha256": "${leaf_fp}",
-  "intermediate_sha256": "${INT_FP}",
-  "root_sha256": "${ROOT_FP}",
-  "dns_sans": [s for s in "${sans_dns}".split(",") if s],
-  "uri_sans": [s for s in "${sans_uri}".split(",") if s],
+  "service": svc,
+  "secret_name": f"kafka-client-tls-{svc}",
+  "subject_openssl_rfc2253": subj,
+  "serial_hex": serial,
+  "not_before": nb,
+  "not_after": na,
+  "leaf_sha256": fp,
+  "dns_sans": dns,
+  "uri_sans": uri,
   "key_usage": ["digitalSignature"],
   "eku": ["clientAuth"],
   "serverAuth_absent": True,
   "key_leaf_match": True,
   "chain_valid": True,
   "paths": {
-    "leaf_crt": "certs/kafka-client/${svc}/leaf.crt",
-    "tls_crt_leaf_plus_intermediate": "certs/kafka-client/${svc}/tls.crt",
-    "tls_key": "certs/kafka-client/${svc}/tls.key",
-    "ca_chain": "certs/kafka-client/${svc}/ca-chain.pem",
+    "leaf_crt": f"certs/kafka-client/{svc}/leaf.crt",
+    "tls_crt_leaf_plus_intermediate": f"certs/kafka-client/{svc}/tls.crt",
+    "tls_key": f"certs/kafka-client/{svc}/tls.key",
+    "ca_chain": f"certs/kafka-client/{svc}/ca-chain.pem",
   },
   "mount_paths": {
     "tls_crt": "/etc/kafka/client/tls.crt",
@@ -157,7 +174,23 @@ doc = {
   },
   "trust_boundary": "dedicated_kafka_client_not_service_tls",
 }
-open(meta_path, "w", encoding="utf-8").write(json.dumps(doc, indent=2) + "\n")
+# fill fingerprints from env-less openssl of known anchors relative to leaf
+import pathlib
+root = pathlib.Path(leaf_path).resolve().parents[2]
+int_fp = subprocess.check_output(
+    ["openssl", "x509", "-in", str(root / "dev-intermediate.pem"), "-noout", "-fingerprint", "-sha256"], text=True
+).split("=", 1)[-1].strip()
+root_fp = subprocess.check_output(
+    ["openssl", "x509", "-in", str(root / "dev-root.pem"), "-noout", "-fingerprint", "-sha256"], text=True
+).split("=", 1)[-1].strip()
+doc["intermediate_sha256"] = int_fp
+doc["root_sha256"] = root_fp
+if len(dns) < 2:
+    raise SystemExit(f"expected >=2 DNS SANs for {svc}, got {dns}")
+if not any(u.startswith(f"spiffe://record-platform/service/{svc}") for u in uri):
+    raise SystemExit(f"SPIFFE URI missing for {svc}: {uri}")
+pathlib.Path(meta_path).write_text(json.dumps(doc, indent=2) + "\n")
+print(f"sans dns={len(dns)} uri={len(uri)} for {svc}")
 PY
 
   generated=$((generated + 1))

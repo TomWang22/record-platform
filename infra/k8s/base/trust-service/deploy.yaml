@@ -20,6 +20,7 @@ spec:
       labels:
         app: trust-service
       annotations:
+        rp.dev/kafka-client-leaf-sha256: "2B:83:91:56:15:D2:67:6D:75:F6:3F:F4:20:1A:38:94:7F:7E:25:1F:BA:9B:71:C4:67:22:A4:1A:B5:09:2B:59"
         prometheus.io/scrape: "true"
         prometheus.io/port: "4016"
         prometheus.io/path: "/metrics"

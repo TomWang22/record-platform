@@ -1,0 +1,40 @@
+{
+  "document": "gate5-v7-controller-mtls-rehearsal",
+  "ts": "2026-08-02T00:31:57Z",
+  "live_cluster_mutated": false,
+  "mode": "config",
+  "image": "confluentinc/cp-kafka:7.5.0",
+  "proposed": {
+    "CONTROLLER_client_auth": "required",
+    "authorizer_class_name": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
+    "super_users_include_recovery_admin": true
+  },
+  "rehearsal_certs": {
+    "controller_client": {
+      "fingerprint": "CF:B6:CF:FC:1B:91:7B:53:37:6B:C3:34:A7:25:B5:CA:C0:3B:D5:27:89:54:48:A0:4E:1E:64:0D:0E:C6:28:C9",
+      "eku": {
+        "clientAuth": true,
+        "serverAuth": false
+      }
+    },
+    "controller_server": {
+      "fingerprint": "46:E1:98:41:43:45:72:04:50:77:76:81:EA:ED:1A:E0:F5:35:76:CE:B9:89:79:BC:B6:AA:58:1D:41:73:12:77",
+      "eku": {
+        "clientAuth": false,
+        "serverAuth": true
+      }
+    }
+  },
+  "results": {
+    "config_validated": true,
+    "docker_cluster_started": false,
+    "brokers_ready": "N/A_CONFIG_ONLY",
+    "controllers_quorum": "N/A_CONFIG_ONLY",
+    "controller_tls": "PROPOSED",
+    "controller_client_certificate_required": "PROPOSED_required",
+    "unauthenticated_denied": "NOT_EXECUTED_IN_CONFIG_MODE",
+    "wrong_identity_denied": "NOT_EXECUTED_IN_CONFIG_MODE"
+  },
+  "enablement_on_live_cluster_authorized": false,
+  "note": "Config/cert rehearsal only by default. Set RP_CONTROLLER_REHEARSAL_MODE=docker for disposable compose (still never touches live kafka-*)."
+}

@@ -21,6 +21,7 @@ spec:
       labels:
         app: messaging-service
       annotations:
+        rp.dev/kafka-client-leaf-sha256: "3D:AB:C6:78:90:C0:EB:65:4C:C1:B6:21:91:61:C5:C3:20:71:54:01:62:09:1F:F9:AD:D2:41:2D:85:79:78:7F"
         prometheus.io/scrape: "true"
         prometheus.io/port: "4014"
         prometheus.io/path: "/metrics"

@@ -13,6 +13,7 @@ spec:
     metadata:
       labels: { app: python-ai-service }
       annotations:
+        rp.dev/kafka-client-leaf-sha256: "8B:B4:B0:34:64:B5:C3:45:06:BC:9C:43:0E:CC:C2:26:4F:C3:AA:5A:69:5A:50:DC:B2:C3:29:AD:5F:6A:44:65"
         prometheus.io/scrape: "true"
         prometheus.io/port: "5005"
         prometheus.io/path: "/metrics"

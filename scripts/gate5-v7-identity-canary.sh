@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Deferred until authorizer enablement + broker-side principal promotion.
+# Gated acceptance node — not part of default cold-bootstrap.
 set -euo pipefail
-echo "❌ H.kafka_identity_canary is not authorized until:" >&2
-echo "   - StandardAuthorizer enabled fail-closed" >&2
-echo "   - final ACLs applied" >&2
-echo "   - principals promoted to BROKER_OBSERVED_AUTHORIZATION_PRINCIPAL" >&2
+if [[ "${RP_GATE5_V7_ACCEPTANCE:-0}" != "1" ]]; then
+  echo "status=DEFERRED_NOT_AUTHORIZED"
+  echo "reason=RP_GATE5_V7_ACCEPTANCE!=1; authorizer enablement and canary not authorized"
+  exit 3
+fi
+echo "❌ H.kafka_identity_canary not implemented until authorizer enablement + broker-side principals" >&2
 echo "gate5_v7_authorized_to_create=false" >&2
 exit 2

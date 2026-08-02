@@ -13,6 +13,7 @@ spec:
     metadata:
       labels: { app: analytics-service }
       annotations:
+        rp.dev/kafka-client-leaf-sha256: "1C:59:F6:42:3E:7B:C6:2D:60:3E:69:C8:99:3C:19:EF:08:89:BC:0C:BA:DD:F5:66:8C:94:50:6E:26:8B:B2:EE"
         prometheus.io/scrape: "true"
         prometheus.io/port: "4017"
         prometheus.io/path: "/metrics"

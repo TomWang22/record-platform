@@ -1671,6 +1671,24 @@ rp-kube-api-health: ## Colima bridge kubeconfig API check (no 127.0.0.1:6443 tun
 	@bash $(SCRIPTS)/rp-kube-api-health.sh
 
 # ROLE: DEV — RP cold bootstrap (DAG A–J; embeds cluster-doctor + verify-bootstrap-state + drift)
+# Gate 5 v7 acceptance (NOT part of default cold-bootstrap; default = DEFERRED_NOT_AUTHORIZED)
+.PHONY: gate5-v7-preflight gate5-v7-identity-canary gate5-v7-three-broker-acceptance test-bootstrap-dag-acyclic
+gate5-v7-preflight: ## Offline authorizer/ACL preflight only (does not enable authorizer or apply ACLs)
+	@chmod +x $(SCRIPTS)/gate5-v7-authorizer-preflight.sh $(SCRIPTS)/gate5-v7-acl-offline-validate.py
+	@bash $(SCRIPTS)/gate5-v7-authorizer-preflight.sh
+	@python3 $(SCRIPTS)/gate5-v7-acl-offline-validate.py
+
+gate5-v7-identity-canary: ## Explicit H.kafka_identity_canary (long-running; not default cold-bootstrap)
+	@chmod +x $(SCRIPTS)/gate5-v7-identity-canary.sh
+	@bash $(SCRIPTS)/gate5-v7-identity-canary.sh
+
+gate5-v7-three-broker-acceptance: ## Explicit I.kafka_three_broker_acceptance (long-running; not default cold-bootstrap)
+	@chmod +x $(SCRIPTS)/gate5-v7-three-broker-acceptance.sh
+	@bash $(SCRIPTS)/gate5-v7-three-broker-acceptance.sh
+
+test-bootstrap-dag-acyclic: ## Regression: bootstrap DAG must be acyclic (split namespace integrity nodes)
+	@node --test tests/bootstrap-dag-acyclic.test.mjs
+
 cold-bootstrap: ## COLD_BOOTSTRAP_CONFIRM=yes RESTORE_BACKUP_DIR=backups/all-8-<date> — full DAG (pauses at /etc/hosts)
 	@chmod +x $(SCRIPTS)/cold-bootstrap.sh $(SCRIPTS)/cold-bootstrap-post-hosts.sh $(SCRIPTS)/colima-factory-reset.sh \
 	  $(SCRIPTS)/rp-ensure-kube-api.sh $(SCRIPTS)/lib/rp-ensure-node-toolchain.sh \

@@ -1,6 +1,6 @@
 {
   "document": "gate5-v7-authorizer-preflight",
-  "ts": "2026-08-01T23:56:25Z",
+  "ts": "2026-08-02T00:32:24Z",
   "authorizer_enablement_authorized": false,
   "final_acls_apply_authorized": false,
   "intended_authorizer_class": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
@@ -21,8 +21,8 @@
     "current_controller_client_auth": "none"
   },
   "admin_recovery_principal_defined": true,
-  "admin_recovery_principal": "User:CN=gate5-v7-admin,O=Record Platform",
-  "admin_recovery_principal_materialized": false,
+  "admin_recovery_principal": "User:O=Record Platform,CN=gate5-v7-admin",
+  "admin_recovery_principal_materialized": true,
   "service_principals_derived": 12,
   "service_principals_broker_observed_authorization": 0,
   "acl_manifest_syntax_validated": true,
@@ -37,5 +37,7 @@
   },
   "acceptance_evidence_during_permissive_transition": "FORBIDDEN",
   "historical_kafka_client_super_user": false,
-  "application_super_users": 0
+  "application_super_users": 0,
+  "authorizer_enabled": false,
+  "final_acls_applied": false
 }

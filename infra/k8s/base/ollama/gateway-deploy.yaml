@@ -16,6 +16,7 @@ spec:
       labels:
         app: ollama-gateway
       annotations:
+        rp.dev/kafka-client-leaf-sha256: "C6:7A:FC:5B:FF:7F:BD:48:BF:09:5C:E8:77:7B:F4:47:56:20:CB:27:DA:DD:7B:9B:CA:95:83:55:0F:DD:FB:70"
         prometheus.io/scrape: "true"
         prometheus.io/port: "8081"
         prometheus.io/path: "/metrics"

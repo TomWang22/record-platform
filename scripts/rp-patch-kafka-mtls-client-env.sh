@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Ensure Kafka mTLS client env on RP participants uses dedicated kafka-client-tls-<service>.
-# Mounts /etc/kafka/client from kafka-client-tls-<service> (not shared kafka-ssl-secret client.crt).
+# RECOVERY / MIGRATION ONLY — not an acceptance verifier.
+# Do NOT invoke from cold-bootstrap F.kafka_client_workloads.verify.
+# Patches live Deployments to dedicated kafka-client-tls-<service> mounts.
+# Acceptance must use committed manifests + read-only verify-kafka-client-workload-wiring.sh.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

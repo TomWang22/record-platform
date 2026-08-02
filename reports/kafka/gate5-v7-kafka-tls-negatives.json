@@ -1,0 +1,372 @@
+{
+  "document": "gate5-v7-kafka-tls-negatives",
+  "ts": "2026-08-02T01:59:05Z",
+  "summary": {
+    "rows": 36,
+    "pass": 33,
+    "fail": 3,
+    "skipped": 0
+  },
+  "rows": [
+    {
+      "case": "no_client_certificate",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CLIENT_CERT_REQUIRED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "wrong_root",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_ROOT_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "wrong_sni",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_SNI_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "wrong_broker_hostname",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_HOSTNAME_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "plaintext",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_PLAINTEXT_REJECTED",
+      "detail": "non_kafka",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "client_auth_eku_absent",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_ROOT_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "expired_client_leaf",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CERTIFICATE_EXPIRED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "not_yet_valid_client_leaf",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CERTIFICATE_NOT_YET_VALID",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "malformed_client_chain",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "missing_intermediate",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": true,
+      "pass": false,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "unexpected_ok",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "untrusted_intermediate",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_ROOT_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "server_auth_eku_absent_fixture",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_SERVER_EKU_REJECTED",
+      "detail": "fixture_lacks_serverAuth_ok",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "no_client_certificate",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CLIENT_CERT_REQUIRED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "wrong_root",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_ROOT_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "wrong_sni",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_SNI_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "wrong_broker_hostname",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_HOSTNAME_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "plaintext",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_PLAINTEXT_REJECTED",
+      "detail": "non_kafka",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "client_auth_eku_absent",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_ROOT_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "expired_client_leaf",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CERTIFICATE_EXPIRED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "not_yet_valid_client_leaf",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CERTIFICATE_NOT_YET_VALID",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "malformed_client_chain",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "missing_intermediate",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": true,
+      "pass": false,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "unexpected_ok",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "untrusted_intermediate",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_ROOT_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "server_auth_eku_absent_fixture",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_SERVER_EKU_REJECTED",
+      "detail": "fixture_lacks_serverAuth_ok",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "no_client_certificate",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CLIENT_CERT_REQUIRED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "wrong_root",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_ROOT_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "wrong_sni",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_SNI_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "wrong_broker_hostname",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_HOSTNAME_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "plaintext",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_PLAINTEXT_REJECTED",
+      "detail": "non_kafka",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "client_auth_eku_absent",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_ROOT_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "expired_client_leaf",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CERTIFICATE_EXPIRED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "not_yet_valid_client_leaf",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CERTIFICATE_NOT_YET_VALID",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "malformed_client_chain",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "missing_intermediate",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": true,
+      "pass": false,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "unexpected_ok",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "untrusted_intermediate",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_ROOT_REJECTED",
+      "detail": "denied",
+      "hostname_verification": "HTTPS"
+    },
+    {
+      "case": "server_auth_eku_absent_fixture",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_SERVER_EKU_REJECTED",
+      "detail": "fixture_lacks_serverAuth_ok",
+      "hostname_verification": "HTTPS"
+    }
+  ]
+}

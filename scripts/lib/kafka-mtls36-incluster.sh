@@ -16,6 +16,7 @@ SERVICES=(
 mkdir -p /tmp/out
 : >/tmp/out/positives.jsonl
 : >/tmp/out/negatives.jsonl
+: >/tmp/out/fixtures.jsonl
 
 build_trust() {
   local ts=$1
@@ -101,9 +102,14 @@ ssl.truststore.password=changeit
 ssl.endpoint.identification.algorithm=HTTPS
 client.id=record-platform.${svc}.mtls36.broker${bid}
 PROP
-    OUT=$(kafka-broker-api-versions --bootstrap-server "$BOOT" --command-config /tmp/client.props 2>&1) || true
+    set +e
+    OUT=$(kafka-broker-api-versions --bootstrap-server "$BOOT" --command-config /tmp/client.props 2>&1)
+    RC=$?
+    set -e
     PASS=0
-    echo "$OUT" | grep -qiE 'ApiVersion|id@|kafka-' && PASS=1
+    if [[ "$RC" -eq 0 ]] && echo "$OUT" | grep -qiE 'ApiVersion|CLUSTER_ID|id@[0-9]+'; then
+      PASS=1
+    fi
 
     # shellcheck disable=SC2016
     printf '%s\n' "{\"service\":\"${svc}\",\"broker_id\":${bid},\"broker_dns\":\"${DNS}\",\"resolved_ip\":\"${RESOLVED}\",\"sni\":\"${DNS}\",\"alpn\":\"NOT_APPLICABLE_KAFKA_PROTOCOL\",\"hostname_verification\":\"HTTPS\",\"ssl_endpoint_identification_algorithm_blanked\":false,\"pass\":$(jq_bool "$PASS"),\"client\":{\"leaf_sha256\":\"${CLIENT_FP}\",\"intermediate_sha256\":\"${INT_FP}\",\"root_sha256\":\"${ROOT_FP}\",\"subject_java_x500\":\"${CLIENT_SUBJ//\"/\\\"}\",\"spiffe_uri\":\"${SPIFFE}\",\"clientAuth\":$(jq_bool "$CLIENT_AUTH"),\"serverAuth\":$(jq_bool "$SERVER_AUTH"),\"chain_ok\":$(jq_bool "$CLIENT_CHAIN_OK"),\"path_built_leaf_to_intermediate_to_root\":$(jq_bool "$CLIENT_CHAIN_OK"),\"presented_proof\":\"EXCLUSIVE_KEYSTORE_PLUS_BROKER_CLIENT_AUTH_REQUIRED\",\"broker_observed_client_leaf_fp\":\"${CLIENT_FP}\",\"broker_observed_client_leaf_fp_class\":\"INFERRED_FROM_EXCLUSIVE_KEYSTORE_PLUS_CLIENT_AUTH_REQUIRED\"},\"broker\":{\"leaf_sha256\":\"${BROKER_FP}\",\"intermediate_sha256\":\"${INT_FP}\",\"root_sha256\":\"${ROOT_FP}\",\"chain_ok\":$(jq_bool "$BROKER_CHAIN_OK"),\"path_built_leaf_to_intermediate_to_root\":$(jq_bool "$BROKER_CHAIN_OK"),\"serverAuth\":$(jq_bool "$BROKER_EKU_SERVER"),\"hostname_verify_ok\":$(jq_bool "$HOST_VERIFY")},\"mtls_service_identity_authenticated\":$(jq_bool "$PASS"),\"peer_authorization_enabled\":false,\"authorizer_enabled\":false}" >>/tmp/out/positives.jsonl
@@ -115,8 +121,22 @@ neg_row() {
   local name=$1 bid=$2 expect_deny=$3 layer=$4 detail=$5 observed_ok=$6
   local pass=0
   if [[ "$expect_deny" == "1" && "$observed_ok" == "0" ]]; then pass=1; fi
-  printf '%s\n' "{\"case\":\"${name}\",\"broker_id\":${bid},\"expect_deny\":$(jq_bool "$expect_deny"),\"observed_ok\":$(jq_bool "$observed_ok"),\"pass\":$(jq_bool "$pass"),\"denial_layer\":\"${layer}\",\"detail\":\"${detail}\",\"hostname_verification\":\"HTTPS\"}" >>/tmp/out/negatives.jsonl
+  printf '%s\n' "{\"case\":\"${name}\",\"broker_id\":${bid},\"expect_deny\":$(jq_bool "$expect_deny"),\"observed_ok\":$(jq_bool "$observed_ok"),\"pass\":$(jq_bool "$pass"),\"denial_layer\":\"${layer}\",\"detail\":\"${detail}\",\"hostname_verification\":\"HTTPS\",\"live_broker_negative\":true}" >>/tmp/out/negatives.jsonl
   echo "NEG ${name} broker=${bid} pass=${pass} layer=${layer}"
+}
+
+# Controlled PKIX fixture rows — NOT part of the live broker-negative denominator.
+fixture_row() {
+  local name=$1 bid=$2 expect_deny=$3 layer=$4 detail=$5 observed_ok=$6
+  local pass=0
+  if [[ "$expect_deny" == "1" && "$observed_ok" == "0" ]]; then pass=1; fi
+  printf '%s\n' "{\"case\":\"${name}\",\"broker_id\":${bid},\"expect_deny\":$(jq_bool "$expect_deny"),\"observed_ok\":$(jq_bool "$observed_ok"),\"pass\":$(jq_bool "$pass"),\"denial_layer\":\"${layer}\",\"detail\":\"${detail}\",\"classification\":\"CONTROLLED_PKIX_FIXTURE_PASS\",\"live_broker_negative\":false}" >>/tmp/out/fixtures.jsonl
+  echo "FIXTURE ${name} broker=${bid} pass=${pass} layer=${layer}"
+}
+
+api_versions_ok() {
+  local out=$1 rc=$2
+  [[ "$rc" -eq 0 ]] && echo "$out" | grep -qiE 'ApiVersion|CLUSTER_ID|id@[0-9]+'
 }
 
 for bid in 0 1 2; do
@@ -314,28 +334,70 @@ P
     LIVE_LEAF_ONLY_OK=1
   fi
 
+  # Controlled PKIX only — excluded from live broker-negative denominator.
   if [[ "$OFFLINE_DENY" == "1" && "$ACCEPTOR_DENY" == "1" ]]; then
-    neg_row peer_omits_intermediate "$bid" 1 TLS_CHAIN_REJECTED "root_only_acceptor_denied_leaf_only;live_kafka_leaf_only=${LIVE_LEAF_ONLY_OK};broker_truststore_includes_intermediate=true" 0
+    fixture_row peer_omits_intermediate "$bid" 1 TLS_CHAIN_REJECTED "root_only_acceptor_denied_leaf_only;live_kafka_leaf_only=${LIVE_LEAF_ONLY_OK};broker_truststore_includes_intermediate=true" 0
   else
-    neg_row peer_omits_intermediate "$bid" 1 TLS_CHAIN_REJECTED "offline=${OFFLINE_DENY};acceptor=${ACCEPTOR_DENY};live_kafka_leaf_only=${LIVE_LEAF_ONLY_OK}" 1
+    fixture_row peer_omits_intermediate "$bid" 1 TLS_CHAIN_REJECTED "offline=${OFFLINE_DENY};acceptor=${ACCEPTOR_DENY};live_kafka_leaf_only=${LIVE_LEAF_ONLY_OK}" 1
   fi
 
-  openssl req -x509 -newkey rsa:2048 -nodes -keyout /tmp/ui.key -out /tmp/ui.pem -days 1 -subj /CN=untrusted-int >/dev/null 2>&1
-  rm -f /tmp/uitrust.jks
-  keytool -importcert -noprompt -alias ui -file /tmp/ui.pem -keystore /tmp/uitrust.jks -storepass changeit >/dev/null 2>&1
-  cat >/tmp/p.props <<'P'
+  # Live broker negatives: foreign PKI presented to unchanged production truststore.
+  if [[ -f /tls/fixtures/untrusted-int-leaf.crt && -f /tls/fixtures/foreign-int.pem ]]; then
+    rm -f /tmp/ui.p12 /tmp/ui.jks
+    openssl pkcs12 -export -in /tls/fixtures/untrusted-int-leaf.crt \
+      -inkey /tls/fixtures/untrusted-int-leaf.key -certfile /tls/fixtures/foreign-int.pem \
+      -out /tmp/ui.p12 -passout pass:changeit -name c >/dev/null 2>&1
+    keytool -importkeystore -noprompt -srckeystore /tmp/ui.p12 -srcstoretype PKCS12 \
+      -srcstorepass changeit -destkeystore /tmp/ui.jks -deststorepass changeit >/dev/null 2>&1
+    cat >/tmp/p.props <<'P'
 security.protocol=SSL
-ssl.keystore.location=/tmp/client.jks
+ssl.keystore.location=/tmp/ui.jks
 ssl.keystore.password=changeit
 ssl.key.password=changeit
-ssl.truststore.location=/tmp/uitrust.jks
+ssl.truststore.location=/tmp/trust.jks
 ssl.truststore.password=changeit
 ssl.endpoint.identification.algorithm=HTTPS
 P
-  if kafka-broker-api-versions --bootstrap-server "$BOOT" --command-config /tmp/p.props >/tmp/n.out 2>&1; then
-    neg_row untrusted_intermediate "$bid" 1 TLS_ROOT_REJECTED unexpected_ok 1
+    set +e
+    UOUT=$(kafka-broker-api-versions --bootstrap-server "$BOOT" --command-config /tmp/p.props 2>&1)
+    URC=$?
+    set -e
+    if api_versions_ok "$UOUT" "$URC"; then
+      neg_row untrusted_intermediate "$bid" 1 TLS_CHAIN_REJECTED unexpected_ok 1
+    else
+      neg_row untrusted_intermediate "$bid" 1 TLS_CHAIN_REJECTED denied 0
+    fi
   else
-    neg_row untrusted_intermediate "$bid" 1 TLS_ROOT_REJECTED denied 0
+    neg_row untrusted_intermediate "$bid" 1 TLS_CHAIN_REJECTED SKIPPED_NO_FIXTURE 1
+  fi
+
+  if [[ -f /tls/fixtures/untrusted-client-leaf.crt ]]; then
+    rm -f /tmp/ul.p12 /tmp/ul.jks
+    openssl pkcs12 -export -in /tls/fixtures/untrusted-client-leaf.crt \
+      -inkey /tls/fixtures/untrusted-client-leaf.key \
+      -out /tmp/ul.p12 -passout pass:changeit -name c >/dev/null 2>&1
+    keytool -importkeystore -noprompt -srckeystore /tmp/ul.p12 -srcstoretype PKCS12 \
+      -srcstorepass changeit -destkeystore /tmp/ul.jks -deststorepass changeit >/dev/null 2>&1
+    cat >/tmp/p.props <<'P'
+security.protocol=SSL
+ssl.keystore.location=/tmp/ul.jks
+ssl.keystore.password=changeit
+ssl.key.password=changeit
+ssl.truststore.location=/tmp/trust.jks
+ssl.truststore.password=changeit
+ssl.endpoint.identification.algorithm=HTTPS
+P
+    set +e
+    UOUT=$(kafka-broker-api-versions --bootstrap-server "$BOOT" --command-config /tmp/p.props 2>&1)
+    URC=$?
+    set -e
+    if api_versions_ok "$UOUT" "$URC"; then
+      neg_row untrusted_client_leaf "$bid" 1 TLS_CHAIN_REJECTED unexpected_ok 1
+    else
+      neg_row untrusted_client_leaf "$bid" 1 TLS_CHAIN_REJECTED denied 0
+    fi
+  else
+    neg_row untrusted_client_leaf "$bid" 1 TLS_CHAIN_REJECTED SKIPPED_NO_FIXTURE 1
   fi
 
   if openssl x509 -in /tls/fixtures/server-auth-eku-absent.crt -noout -text | grep -q 'TLS Web Server Authentication'; then
@@ -348,8 +410,10 @@ done
 
 echo POSITIVES_DONE
 echo NEGATIVES_DONE
-wc -l /tmp/out/positives.jsonl /tmp/out/negatives.jsonl
+wc -l /tmp/out/positives.jsonl /tmp/out/negatives.jsonl /tmp/out/fixtures.jsonl
 echo '===POSITIVES_JSONL==='
 cat /tmp/out/positives.jsonl
 echo '===NEGATIVES_JSONL==='
 cat /tmp/out/negatives.jsonl
+echo '===FIXTURES_JSONL==='
+cat /tmp/out/fixtures.jsonl

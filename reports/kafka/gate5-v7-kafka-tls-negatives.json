@@ -1,6 +1,39 @@
 {
   "document": "gate5-v7-kafka-tls-negatives",
-  "ts": "2026-08-02T03:01:57Z",
+  "ts": "2026-08-02T03:13:21Z",
+  "denominator_kind": "LIVE_KAFKA_BROKER_NEGATIVES",
+  "excluded_from_live_denominator": [
+    {
+      "case": "peer_omits_intermediate",
+      "classification": "CONTROLLED_PKIX_FIXTURE_PASS"
+    },
+    {
+      "case": "missing_intermediate",
+      "classification": "INVALID_NEGATIVE_FIXTURE"
+    }
+  ],
+  "summary": {
+    "categories_present": 12,
+    "rows": 36,
+    "pass": 36,
+    "fail": 0,
+    "skipped": 0,
+    "controlled_fixtures_counted_in_live_denominator": 0
+  },
+  "cases": {
+    "no_client_certificate": 3,
+    "wrong_root": 3,
+    "wrong_sni": 3,
+    "wrong_broker_hostname": 3,
+    "plaintext": 3,
+    "client_auth_eku_absent": 3,
+    "expired_client_leaf": 3,
+    "not_yet_valid_client_leaf": 3,
+    "malformed_client_chain": 3,
+    "server_auth_eku_absent_fixture": 3,
+    "untrusted_intermediate": 3,
+    "untrusted_client_leaf": 3
+  },
   "rows": [
     {
       "case": "no_client_certificate",
@@ -93,16 +126,6 @@
       "hostname_verification": "HTTPS"
     },
     {
-      "case": "untrusted_intermediate",
-      "broker_id": 0,
-      "expect_deny": true,
-      "observed_ok": false,
-      "pass": true,
-      "denial_layer": "TLS_ROOT_REJECTED",
-      "detail": "denied",
-      "hostname_verification": "HTTPS"
-    },
-    {
       "case": "server_auth_eku_absent_fixture",
       "broker_id": 0,
       "expect_deny": true,
@@ -199,16 +222,6 @@
       "observed_ok": false,
       "pass": true,
       "denial_layer": "TLS_CHAIN_REJECTED",
-      "detail": "denied",
-      "hostname_verification": "HTTPS"
-    },
-    {
-      "case": "untrusted_intermediate",
-      "broker_id": 1,
-      "expect_deny": true,
-      "observed_ok": false,
-      "pass": true,
-      "denial_layer": "TLS_ROOT_REJECTED",
       "detail": "denied",
       "hostname_verification": "HTTPS"
     },
@@ -313,16 +326,6 @@
       "hostname_verification": "HTTPS"
     },
     {
-      "case": "untrusted_intermediate",
-      "broker_id": 2,
-      "expect_deny": true,
-      "observed_ok": false,
-      "pass": true,
-      "denial_layer": "TLS_ROOT_REJECTED",
-      "detail": "denied",
-      "hostname_verification": "HTTPS"
-    },
-    {
       "case": "server_auth_eku_absent_fixture",
       "broker_id": 2,
       "expect_deny": true,
@@ -333,51 +336,94 @@
       "hostname_verification": "HTTPS"
     },
     {
-      "case": "peer_omits_intermediate",
+      "case": "untrusted_intermediate",
       "broker_id": 0,
       "expect_deny": true,
       "observed_ok": false,
       "pass": true,
       "denial_layer": "TLS_CHAIN_REJECTED",
-      "detail": "root_only_acceptor_denied_leaf_only",
+      "detail": "live_broker_denial",
       "hostname_verification": "HTTPS",
-      "live_kafka_leaf_only_accepted": true,
-      "live_kafka_broker_truststore_includes_intermediate": true,
-      "verifier": "ephemeral_openssl_s_server_root_only_CAfile"
+      "application_protocol_reached": false,
+      "kafka_request_processed": false,
+      "broker_authorization_decision_reached": false,
+      "business_effect": false,
+      "live_broker_negative": true
     },
     {
-      "case": "peer_omits_intermediate",
+      "case": "untrusted_client_leaf",
+      "broker_id": 0,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "live_broker_denial",
+      "hostname_verification": "HTTPS",
+      "application_protocol_reached": false,
+      "kafka_request_processed": false,
+      "broker_authorization_decision_reached": false,
+      "business_effect": false,
+      "live_broker_negative": true
+    },
+    {
+      "case": "untrusted_intermediate",
       "broker_id": 1,
       "expect_deny": true,
       "observed_ok": false,
       "pass": true,
       "denial_layer": "TLS_CHAIN_REJECTED",
-      "detail": "root_only_acceptor_denied_leaf_only",
+      "detail": "live_broker_denial",
       "hostname_verification": "HTTPS",
-      "live_kafka_leaf_only_accepted": true,
-      "live_kafka_broker_truststore_includes_intermediate": true,
-      "verifier": "ephemeral_openssl_s_server_root_only_CAfile"
+      "application_protocol_reached": false,
+      "kafka_request_processed": false,
+      "broker_authorization_decision_reached": false,
+      "business_effect": false,
+      "live_broker_negative": true
     },
     {
-      "case": "peer_omits_intermediate",
+      "case": "untrusted_client_leaf",
+      "broker_id": 1,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "live_broker_denial",
+      "hostname_verification": "HTTPS",
+      "application_protocol_reached": false,
+      "kafka_request_processed": false,
+      "broker_authorization_decision_reached": false,
+      "business_effect": false,
+      "live_broker_negative": true
+    },
+    {
+      "case": "untrusted_intermediate",
       "broker_id": 2,
       "expect_deny": true,
       "observed_ok": false,
       "pass": true,
       "denial_layer": "TLS_CHAIN_REJECTED",
-      "detail": "root_only_acceptor_denied_leaf_only",
+      "detail": "live_broker_denial",
       "hostname_verification": "HTTPS",
-      "live_kafka_leaf_only_accepted": true,
-      "live_kafka_broker_truststore_includes_intermediate": true,
-      "verifier": "ephemeral_openssl_s_server_root_only_CAfile"
+      "application_protocol_reached": false,
+      "kafka_request_processed": false,
+      "broker_authorization_decision_reached": false,
+      "business_effect": false,
+      "live_broker_negative": true
+    },
+    {
+      "case": "untrusted_client_leaf",
+      "broker_id": 2,
+      "expect_deny": true,
+      "observed_ok": false,
+      "pass": true,
+      "denial_layer": "TLS_CHAIN_REJECTED",
+      "detail": "live_broker_denial",
+      "hostname_verification": "HTTPS",
+      "application_protocol_reached": false,
+      "kafka_request_processed": false,
+      "broker_authorization_decision_reached": false,
+      "business_effect": false,
+      "live_broker_negative": true
     }
-  ],
-  "summary": {
-    "rows": 36,
-    "pass": 36,
-    "fail": 0,
-    "skipped": 0,
-    "invalid_historical_missing_intermediate_rows_reclassified": 3,
-    "categories_note": "missing_intermediate replaced by peer_omits_intermediate"
-  }
+  ]
 }

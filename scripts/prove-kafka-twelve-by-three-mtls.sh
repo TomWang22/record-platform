@@ -26,10 +26,14 @@ ok() { echo "✅ $*"; }
 
 [[ -f "$PROBE_SRC" ]] || fail "missing ${PROBE_SRC}"
 chmod +x "$SCRIPT_DIR/generate-kafka-tls-negative-fixtures.sh"
+chmod +x "$SCRIPT_DIR/generate-untrusted-kafka-client-fixtures.sh"
 # Preserve dated fixtures if already correct; regenerate EKU fixtures only when missing
 if [[ ! -f "$FIX_DIR/client-auth-eku-absent.crt" ]]; then
   bash "$SCRIPT_DIR/generate-kafka-tls-negative-fixtures.sh"
 fi
+bash "$SCRIPT_DIR/generate-untrusted-kafka-client-fixtures.sh"
+UNTRUST_DIR="${FIX_DIR}/untrusted"
+[[ -f "$UNTRUST_DIR/untrusted-int-leaf.crt" ]] || fail "missing untrusted intermediate fixtures"
 # Ensure dated fixtures via OpenSSL 3 when host LibreSSL cannot set dates
 need_dates=0
 if ! openssl x509 -in "$FIX_DIR/client-expired.crt" -noout -checkend 0 >/dev/null 2>&1; then
@@ -123,6 +127,11 @@ kubectl -n "$NS" create secret generic "$FIX_SECRET" \
   --from-file=client-malformed-chain-leaf-only.key="$FIX_DIR/client-auth-eku-absent.key" \
   --from-file=server-auth-eku-absent.crt="$FIX_DIR/server-auth-eku-absent.crt" \
   --from-file=server-auth-eku-absent.key="$FIX_DIR/server-auth-eku-absent.key" \
+  --from-file=untrusted-int-leaf.crt="$UNTRUST_DIR/untrusted-int-leaf.crt" \
+  --from-file=untrusted-int-leaf.key="$UNTRUST_DIR/untrusted-int-leaf.key" \
+  --from-file=foreign-int.pem="$UNTRUST_DIR/foreign-int.pem" \
+  --from-file=untrusted-client-leaf.crt="$UNTRUST_DIR/untrusted-client-leaf.crt" \
+  --from-file=untrusted-client-leaf.key="$UNTRUST_DIR/untrusted-client-leaf.key" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 VOLS=""
@@ -190,30 +199,44 @@ echo "$LOGS" | grep -E 'ROW |NEG |POSITIVES_DONE|ROOT_FP|INT_FP' | tail -60
 
 python3 - "${WORKDIR}/job.log" "$OUT_JSON" "$OUT_MD" "$NEG_JSON" "$ROOT_FP" "$INT_FP" <<'PY'
 import json, pathlib, sys
+from collections import Counter
 from datetime import datetime, timezone
 log=pathlib.Path(sys.argv[1]).read_text(errors="replace")
 out_json,out_md,neg_json=map(pathlib.Path, sys.argv[2:5])
 root_fp,int_fp=sys.argv[5:7]
-pos=[]; neg=[]
+pos=[]; neg=[]; fixtures=[]
+
+def take_jsonl(text):
+  rows=[]
+  for line in text.splitlines():
+    line=line.strip()
+    if line.startswith("{"):
+      try: rows.append(json.loads(line))
+      except Exception: pass
+  return rows
+
 if "===POSITIVES_JSONL===" in log:
-  chunk=log.split("===POSITIVES_JSONL===",1)[1]
-  if "===NEGATIVES_JSONL===" in chunk:
-    pchunk,nchunk=chunk.split("===NEGATIVES_JSONL===",1)
+  rest=log.split("===POSITIVES_JSONL===",1)[1]
+  if "===NEGATIVES_JSONL===" in rest:
+    pchunk,rest=rest.split("===NEGATIVES_JSONL===",1)
   else:
-    pchunk,nchunk=chunk,""
-  for line in pchunk.splitlines():
-    line=line.strip()
-    if line.startswith("{"):
-      try: pos.append(json.loads(line))
-      except: pass
-  for line in nchunk.splitlines():
-    line=line.strip()
-    if line.startswith("{"):
-      try: neg.append(json.loads(line))
-      except: pass
+    pchunk,rest=rest,""
+  if "===FIXTURES_JSONL===" in rest:
+    nchunk,fchunk=rest.split("===FIXTURES_JSONL===",1)
+  else:
+    nchunk,fchunk=rest,""
+  pos=take_jsonl(pchunk)
+  neg=take_jsonl(nchunk)
+  fixtures=take_jsonl(fchunk)
+
+# Never count controlled PEER_OMITS rows in the live denominator.
+neg=[r for r in neg if r.get("case")!="peer_omits_intermediate" and r.get("live_broker_negative") is not False]
 pos_pass=sum(1 for r in pos if r.get("pass") is True)
 neg_pass=sum(1 for r in neg if r.get("pass") is True)
 neg_fail=sum(1 for r in neg if r.get("pass") is False)
+cases=Counter(r.get("case") for r in neg)
+ui=[r for r in neg if r.get("case")=="untrusted_intermediate"]
+ul=[r for r in neg if r.get("case")=="untrusted_client_leaf"]
 fps=sorted({r["client"]["leaf_sha256"] for r in pos if r.get("client")})
 doc={
   "document":"gate5-v7-twelve-by-three-mtls-matrix",
@@ -241,7 +264,32 @@ doc={
   },
   "rows":pos,
 }
-neg_doc={"document":"gate5-v7-kafka-tls-negatives","ts":doc["ts"],"summary":{"rows":len(neg),"pass":neg_pass,"fail":neg_fail,"skipped":0},"rows":neg}
+neg_doc={
+  "document":"gate5-v7-kafka-tls-negatives",
+  "ts":doc["ts"],
+  "denominator_kind":"LIVE_KAFKA_BROKER_NEGATIVES",
+  "excluded_from_live_denominator":[
+    {"case":"peer_omits_intermediate","classification":"CONTROLLED_PKIX_FIXTURE_PASS"},
+    {"case":"missing_intermediate","classification":"INVALID_NEGATIVE_FIXTURE"},
+  ],
+  "summary":{
+    "categories_present":len(cases),
+    "rows":len(neg),
+    "pass":neg_pass,
+    "fail":neg_fail,
+    "skipped":0,
+    "controlled_fixtures_counted_in_live_denominator":0,
+    "untrusted_intermediate_expected":3,
+    "untrusted_intermediate_tested":len(ui),
+    "untrusted_intermediate_denied":sum(1 for r in ui if r.get("pass") is True),
+    "untrusted_client_leaf_expected":3,
+    "untrusted_client_leaf_tested":len(ul),
+    "untrusted_client_leaf_denied":sum(1 for r in ul if r.get("pass") is True),
+  },
+  "cases":dict(cases),
+  "controlled_pkix_fixtures":fixtures,
+  "rows":neg,
+}
 out_json.parent.mkdir(parents=True, exist_ok=True)
 out_json.write_text(json.dumps(doc, indent=2)+"\n")
 neg_json.write_text(json.dumps(neg_doc, indent=2)+"\n")
@@ -249,16 +297,18 @@ out_md.write_text("\n".join([
   "# 12×3 Kafka mTLS matrix (pre-authorizer)",
   "",
   f"- positives: **{pos_pass}/36** tested={len(pos)}",
+  f"- live negatives: **{neg_pass}/{len(neg)}** (fail={neg_fail})",
+  f"- controlled PKIX fixtures (excluded): **{len(fixtures)}**",
   f"- distinct client leaf fps: **{len(fps)}**",
-  f"- negatives pass/fail: **{neg_pass}/{neg_fail}**",
   f"- root: `{root_fp}`",
   f"- intermediate: `{int_fp}`",
   "- authorizer_enabled: false",
   "- peer_authorization: NOT_ENABLED",
   "",
 ])+"\n")
-print(json.dumps({"positives":doc["summary"],"negatives":neg_doc["summary"]}, indent=2))
-sys.exit(0 if len(pos)==36 and pos_pass==36 else 2)
+print(json.dumps({"positives":doc["summary"],"negatives":neg_doc["summary"],"fixtures":len(fixtures)}, indent=2))
+live_ok = len(neg)==36 and neg_pass==36 and neg_fail==0 and len(ui)==3 and all(r.get("pass") for r in ui)
+sys.exit(0 if len(pos)==36 and pos_pass==36 and live_ok else 2)
 PY
 STATUS=$?
 exit "$STATUS"

@@ -1,0 +1,75 @@
+{
+  "document": "gate5-v7-preauthorizer-mtls-semantics-correction",
+  "ts": "2026-08-02T03:15:05Z",
+  "historical_invalid_fixtures_expected_preserved": "3/3",
+  "controlled_pkix_fixtures_expected_tested_denied": "3/3/3",
+  "controlled_fixtures_counted_in_live_denominator": 0,
+  "live_negative_categories_expected": 12,
+  "live_negative_rows_expected_tested_denied_failed_skipped": "36/36/36/0/0",
+  "untrusted_intermediate_expected_tested_denied": "3/3/3",
+  "untrusted_client_leaf_expected_tested_denied": "3/3/3",
+  "live_kafka_peer_omits_intermediate_expected_tested_denied_accepted": "0/3/0/3",
+  "positive_rows_expected_tested_passed": "36/36/36",
+  "cases": {
+    "no_client_certificate": 3,
+    "wrong_root": 3,
+    "wrong_sni": 3,
+    "wrong_broker_hostname": 3,
+    "plaintext": 3,
+    "client_auth_eku_absent": 3,
+    "expired_client_leaf": 3,
+    "not_yet_valid_client_leaf": 3,
+    "malformed_client_chain": 3,
+    "server_auth_eku_absent_fixture": 3,
+    "untrusted_intermediate": 3,
+    "untrusted_client_leaf": 3
+  },
+  "artifacts": {
+    "historical_rca": "reports/kafka/gate5-v7-missing-intermediate-invalid-fixture-rca.json",
+    "peer_omits_pkix": "reports/kafka/gate5-v7-peer-omits-intermediate.json",
+    "live_untrusted": "reports/kafka/gate5-v7-live-untrusted-negatives.json",
+    "live_negatives": "reports/kafka/gate5-v7-kafka-tls-negatives.json",
+    "classification": "reports/kafka/gate5-v7-negative-classification.json",
+    "v1_canary_immutable": "/tmp/record-platform-gate5-v7-preauthorizer-mtls-v1/",
+    "v2_canary": "/tmp/record-platform-gate5-v7-preauthorizer-mtls-v2/ (after exact-SHA repin)"
+  },
+  "live_broker_truststore_mutated": false,
+  "StandardAuthorizer_enabled": false,
+  "final_acls_applied": false,
+  "final_gate5_v7_created": false,
+  "Gate_6_authorized": false,
+  "production_approved": false,
+  "classification_A": {
+    "classification": "INVALID_NEGATIVE_FIXTURE",
+    "reason": "intermediate removed from verifier truststore while peer still transmitted leaf+intermediate",
+    "acceptance_contribution": "NONE",
+    "preserved": 3
+  },
+  "classification_B": {
+    "classification": "CONTROLLED_PKIX_FIXTURE_PASS",
+    "case": "peer_omits_intermediate",
+    "verifier": "root-only truststore / openssl s_server",
+    "peer_presentation": "leaf-only",
+    "result": "rejected 3/3",
+    "acceptance_contribution": "PKIX_FIXTURE_PROOF_ONLY",
+    "live_kafka_broker_acceptance_contribution": "NONE",
+    "peer_summary": {
+      "peer_omits_intermediate_expected": 3,
+      "peer_omits_intermediate_tested": 3,
+      "peer_omits_intermediate_denied": 3,
+      "peer_omits_intermediate_failed": 0,
+      "peer_omits_intermediate_skipped": 0
+    }
+  },
+  "required_fields": {
+    "historical_invalid_rows_preserved": 3,
+    "controlled_pkix_fixture_expected": 3,
+    "controlled_pkix_fixture_tested": 3,
+    "controlled_pkix_fixture_denied": 3,
+    "live_kafka_peer_omits_intermediate_expected": 0,
+    "live_kafka_peer_omits_intermediate_tested": 3,
+    "live_kafka_peer_omits_intermediate_denied": 0,
+    "live_kafka_peer_omits_intermediate_accepted": 3,
+    "denominator_double_count": 0
+  }
+}

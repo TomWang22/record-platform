@@ -1,0 +1,67 @@
+{
+  "document": "gate5-v7-negative-classification",
+  "ts": "2026-08-02T03:12:36Z",
+  "historical_invalid_rows": {
+    "classification": "INVALID_NEGATIVE_FIXTURE",
+    "reason": "intermediate removed from verifier truststore while peer still transmitted leaf+intermediate",
+    "acceptance_contribution": "NONE",
+    "preserved": 3
+  },
+  "A_historical_invalid_rows": {
+    "classification": "INVALID_NEGATIVE_FIXTURE",
+    "reason": "intermediate removed from verifier truststore while peer still transmitted leaf+intermediate",
+    "acceptance_contribution": "NONE",
+    "preserved": 3
+  },
+  "B_controlled_replacement_fixture": {
+    "classification": "CONTROLLED_PKIX_FIXTURE_PASS",
+    "case": "peer_omits_intermediate",
+    "verifier": "root-only truststore / openssl s_server",
+    "peer_presentation": "leaf-only",
+    "result": "rejected 3/3",
+    "acceptance_contribution": "PKIX_FIXTURE_PROOF_ONLY",
+    "live_kafka_broker_acceptance_contribution": "NONE",
+    "peer_summary": {
+      "peer_omits_intermediate_expected": 3,
+      "peer_omits_intermediate_tested": 3,
+      "peer_omits_intermediate_denied": 3,
+      "peer_omits_intermediate_failed": 0,
+      "peer_omits_intermediate_skipped": 0
+    }
+  },
+  "controlled_pkix_fixture": {
+    "classification": "CONTROLLED_PKIX_FIXTURE_PASS",
+    "case": "peer_omits_intermediate",
+    "verifier": "root-only truststore / openssl s_server",
+    "peer_presentation": "leaf-only",
+    "result": {
+      "peer_omits_intermediate_expected": 3,
+      "peer_omits_intermediate_tested": 3,
+      "peer_omits_intermediate_denied": 3,
+      "peer_omits_intermediate_failed": 0,
+      "peer_omits_intermediate_skipped": 0
+    },
+    "acceptance_contribution": "PKIX_FIXTURE_PROOF_ONLY",
+    "live_kafka_broker_acceptance_contribution": "NONE"
+  },
+  "required_fields": {
+    "historical_invalid_rows_preserved": 3,
+    "controlled_pkix_fixture_expected": 3,
+    "controlled_pkix_fixture_tested": 3,
+    "controlled_pkix_fixture_denied": 3,
+    "live_kafka_peer_omits_intermediate_expected": 0,
+    "live_kafka_peer_omits_intermediate_tested": 3,
+    "live_kafka_peer_omits_intermediate_denied": 0,
+    "live_kafka_peer_omits_intermediate_accepted": 3,
+    "denominator_double_count": 0
+  },
+  "live_replacement": {
+    "removed_from_live_denominator": [
+      "peer_omits_intermediate"
+    ],
+    "added_or_corrected": [
+      "untrusted_intermediate",
+      "untrusted_client_leaf"
+    ]
+  }
+}

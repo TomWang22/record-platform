@@ -37,7 +37,8 @@ kubectl -n "$NS" get secret "$ADMIN_SECRET" >/dev/null 2>&1 \
 
 mkdir -p "$EVIDENCE_ROOT"
 chmod 700 "$EVIDENCE_ROOT" 2>/dev/null || true
-RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+# Kubernetes resource names must be lowercase RFC 1123 subdomains (no uppercase).
+RUN_ID="$(date -u +%Y%m%d%H%M%S)-$$"
 EVIDENCE_DIR="${EVIDENCE_ROOT}/${RUN_ID}"
 mkdir -p "$EVIDENCE_DIR"
 ok "evidence_dir=${EVIDENCE_DIR}"

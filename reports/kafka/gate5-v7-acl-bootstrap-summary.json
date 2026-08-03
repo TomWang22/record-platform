@@ -1,0 +1,20 @@
+{
+  "document": "gate5-v7-acl-bootstrap-summary",
+  "apply_authorized": true,
+  "verification": "AdminClient_AclBinding_exact_set",
+  "prune_mode_requested": false,
+  "prune_executed": false,
+  "prune_deletions": 0,
+  "evidence_dir": "/tmp/record-platform-gate5-v7-acl-bootstrap-evidence/<run-id>",
+  "expected_acl_rows": 72,
+  "actual_acl_rows": 72,
+  "missing_acl_rows": 0,
+  "unexpected_acl_rows": 0,
+  "duplicate_acl_rows": 0,
+  "unexpected_deny_rows": 0,
+  "wildcard_application_acl_rows": 0,
+  "unknown_principals": 0,
+  "manifest_vs_live_delta": 0,
+  "passed": true,
+  "raw_evidence_in_git": false
+}

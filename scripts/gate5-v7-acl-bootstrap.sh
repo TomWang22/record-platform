@@ -104,6 +104,8 @@ JAVA_DESCRIBE_SRC="${SCRIPT_DIR}/lib/Gate5V7DescribeAcls.java"
 JAVA_APPLY_SRC="${SCRIPT_DIR}/lib/Gate5V7ApplyAndDescribeAcls.java"
 
 python3 "$SCRIPT_DIR/lib/gate5-v7-acl-normalize.py" expected "$MANIFEST" >"$EXPECTED_FILE"
+# Compact JSON (no ": " spacing) for the Job-side minimal parser
+python3 -c 'import json,sys; p=sys.argv[1]; json.dump(json.load(open(p)), open(p,"w"), separators=(",",":"))' "$EXPECTED_FILE"
 EXP_COUNT="$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))))' "$EXPECTED_FILE")"
 ok "expected_acl_rows=${EXP_COUNT}"
 

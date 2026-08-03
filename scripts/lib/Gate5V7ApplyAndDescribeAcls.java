@@ -66,6 +66,10 @@ public class Gate5V7ApplyAndDescribeAcls {
   private static String field(String obj, String key) {
     String needle = "\"" + key + "\":\"";
     int i = obj.indexOf(needle);
+    if (i < 0) {
+      needle = "\"" + key + "\": \"";
+      i = obj.indexOf(needle);
+    }
     if (i < 0) throw new IllegalArgumentException("missing field " + key);
     int start = i + needle.length();
     int end = obj.indexOf('"', start);

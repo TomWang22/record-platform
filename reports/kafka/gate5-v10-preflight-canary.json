@@ -1,27 +1,33 @@
 {
   "document": "gate5-v10-preflight-canary",
-  "ts": "2026-08-03T20:50:00Z",
-  "status": "NOT_RUN",
-  "blocked_until": [
-    "readiness remediation landed",
-    "exact-SHA CI green",
-    "kafka brokers rebuilt/repinned if required",
-    "analytics→kafka-0 20/20/20/0 post-roll",
-    "controls 5/5 each",
-    "full identity 36/36/36/0",
-    "negative controls",
-    "ACL 72/72/0",
-    "15-minute stability"
-  ],
-  "analytics_to_kafka0": null,
-  "analytics_to_kafka1": null,
-  "analytics_to_kafka2": null,
-  "full_identity_canary": null,
-  "negatives": null,
-  "acl_exact_match": null,
-  "stability_15m": null,
+  "ts": "2026-08-03T21:40:00Z",
+  "status": "BLOCKED",
   "pre_v10_canary_pass": false,
+  "post_roll_attempt": {
+    "evidence": "/tmp/record-platform-gate5-v9-positive-mtls-rca-v1/reproducer/20260803212111-87981",
+    "analytics_to_kafka0": "20/20/18/2",
+    "analytics_to_kafka1": "5/5/5/0",
+    "analytics_to_kafka2": "5/5/3/2",
+    "staged_apiversions": {
+      "0": "PASS",
+      "1": "PASS",
+      "2": "TLS_HANDSHAKE_COMPLETE_KAFKA_PROTOCOL_FAILED:BROKER_DISCONNECTED"
+    },
+    "failure_signatures": [
+      "exit_code=124 (process timeout 25s)",
+      "BROKER_DISCONNECTED",
+      "KAFKA_COMMAND_FAILED"
+    ],
+    "layer": "TLS_HANDSHAKE_COMPLETE_KAFKA_PROTOCOL_FAILED",
+    "note": "OpenSSL path not the failure mode; Kafka ApiVersions intermittent under load. Heavy JVM readiness probes were also timing out (Unhealthy events)."
+  },
+  "full_identity_canary": "NOT_RUN_BLOCKED_BY_ANALYTICS_REPETITION",
+  "negatives": "NOT_RUN",
+  "acl_exact_match": "NOT_RUN",
+  "stability_15m": "NOT_RUN",
   "v10_created": false,
   "gate5_final_pass": false,
-  "gate6_authorized": false
+  "gate6_authorized": false,
+  "production_approved": false,
+  "next": "Tune authenticated readiness period/timeouts to avoid JVM-probe thrash; re-run 20/5/5 then 36/36 before creating v10"
 }

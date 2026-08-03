@@ -76,8 +76,8 @@ ssl.truststore.location=/tmp/t.jks
 ssl.truststore.password=changeit
 ssl.endpoint.identification.algorithm=HTTPS
 client.id=${cid}
-request.timeout.ms=15000
-default.api.timeout.ms=20000
+request.timeout.ms=30000
+default.api.timeout.ms=40000
 EOF
 }
 

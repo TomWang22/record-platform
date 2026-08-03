@@ -293,15 +293,16 @@ spec:
                     echo "ssl.truststore.password=${TPASS}"
                     echo "ssl.endpoint.identification.algorithm=HTTPS"
                     echo "client.id=record-platform.kafka.readiness.${HOSTNAME}"
-                    echo "request.timeout.ms=8000"
-                    echo "default.api.timeout.ms=10000"
+                    # JVM client cold-start is expensive; keep timeouts above observed ApiVersions p95 under load.
+                    echo "request.timeout.ms=25000"
+                    echo "default.api.timeout.ms=30000"
                   } >/tmp/rp-ready.props
-                  OUT=$(timeout 15 kafka-broker-api-versions --bootstrap-server "${HOST}:9093" --command-config /tmp/rp-ready.props 2>&1)
+                  OUT=$(timeout 40 kafka-broker-api-versions --bootstrap-server "${HOST}:9093" --command-config /tmp/rp-ready.props 2>&1)
                   echo "$OUT" | grep -qiE 'ApiVersion|id@[0-9]+'
             initialDelaySeconds: 90
-            periodSeconds: 15
-            timeoutSeconds: 20
-            failureThreshold: 30
+            periodSeconds: 45
+            timeoutSeconds: 45
+            failureThreshold: 6
           livenessProbe:
             tcpSocket: { port: 9093 }
             initialDelaySeconds: 240

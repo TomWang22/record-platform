@@ -2,6 +2,7 @@
   "document": "gate5-v7-authorizer-verify",
   "source_checks": {
     "authorizer_class_name": true,
+    "authorizer_exactly_once": true,
     "allow_everyone_false": true,
     "super_users_exact": true,
     "controller_client_auth_required": true,

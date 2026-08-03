@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Verify StandardAuthorizer is source-controlled and (when cluster present) live.
-# Replaces the historical "authorizer must be absent" preflight stop-gate.
+# Uses structural StatefulSet env parsing — not line-split heuristics.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,54 +22,61 @@ python3 - "$STS" "$MANIFEST" "$MEASURED" "$OUT" <<'PY'
 import json, re, sys
 from pathlib import Path
 
-sts = Path(sys.argv[1]).read_text(encoding="utf-8")
+sts_text = Path(sys.argv[1]).read_text(encoding="utf-8")
 manifest = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
 measured = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
 out = Path(sys.argv[4])
 
-errors = []
+env = {}
+for m in re.finditer(r"\{\s*name:\s*([A-Z0-9_]+)\s*,\s*value:\s*\"([^\"]*)\"\s*\}", sts_text):
+    env[m.group(1)] = m.group(2)
+for m in re.finditer(r"-\s*name:\s*([A-Z0-9_]+)\n\s*value:\s*\"([^\"]*)\"", sts_text):
+    env.setdefault(m.group(1), m.group(2))
+
 broker = measured["broker_server_leaf"]["kafka_acl_principal"]
 admin = measured["recovery_admin"]["kafka_acl_principal"]
 want_super = f"{broker};{admin}"
+errors = []
 
-checks = {
-    "authorizer_class_name": "org.apache.kafka.metadata.authorizer.StandardAuthorizer" in sts
-        and "KAFKA_AUTHORIZER_CLASS_NAME" in sts,
-    "allow_everyone_false": bool(re.search(
-        r'KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND.*?value:\s*"false"', sts, re.S
-    )),
-    "super_users_exact": f'value: "{want_super}"' in sts or f"value: '{want_super}'" in sts,
-    "controller_client_auth_required": "KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH" in sts
-        and 'value: "required"' in sts,
-    "controller_endpoint_https": "KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM" in sts
-        and "HTTPS" in sts,
-    "internal_client_auth_required": "KAFKA_LISTENER_NAME_INTERNAL_SSL_CLIENT_AUTH" in sts,
-    "external_client_auth_required": "KAFKA_LISTENER_NAME_EXTERNAL_SSL_CLIENT_AUTH" in sts,
-    "manifest_apply_authorized": manifest.get("apply_authorized") is True,
-    "manifest_super_users": manifest.get("super_users") == [broker, admin],
-}
+def need(cond, name):
+    if not cond:
+        errors.append(name)
 
-# Reject application principals in SUPER_USERS value line
-m = re.search(r'KAFKA_SUPER_USERS.*?value:\s*"([^"]+)"', sts, re.S)
-super_val = m.group(1) if m else ""
+need(env.get("KAFKA_AUTHORIZER_CLASS_NAME") == "org.apache.kafka.metadata.authorizer.StandardAuthorizer", "authorizer_class_name")
+need(sum(1 for v in env.values() if v == "org.apache.kafka.metadata.authorizer.StandardAuthorizer") == 1, "authorizer_exactly_once")
+need(env.get("KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND") == "false", "allow_everyone_false")
+need(env.get("KAFKA_SUPER_USERS") == want_super, "super_users_exact")
+need(env.get("KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH") == "required", "controller_client_auth_required")
+need(env.get("KAFKA_LISTENER_NAME_INTERNAL_SSL_CLIENT_AUTH") == "required", "internal_client_auth_required")
+need(env.get("KAFKA_LISTENER_NAME_EXTERNAL_SSL_CLIENT_AUTH") == "required", "external_client_auth_required")
+need(env.get("KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM") == "HTTPS", "controller_endpoint_https")
+need(manifest.get("apply_authorized") is True, "manifest_apply_authorized")
+need(manifest.get("super_users") == [broker, admin], "manifest_super_users")
+
 app_in_super = []
+super_val = env.get("KAFKA_SUPER_USERS") or ""
 for s in measured.get("service_principals") or []:
     if s["kafka_acl_principal"] in super_val:
         app_in_super.append(s["service"])
-checks["application_super_users_zero"] = len(app_in_super) == 0
-
-for k, v in checks.items():
-    if not v:
-        errors.append(k)
-
-# Dual-use exception documented — do not claim per-node broker identity
-dual_use = "DUAL_USE_EKU_ACCEPTED_EXCEPTION"
+need(len(app_in_super) == 0, "application_super_users_zero")
 
 result = {
     "document": "gate5-v7-authorizer-verify",
-    "source_checks": checks,
+    "source_checks": {
+        "authorizer_class_name": "authorizer_class_name" not in errors,
+        "authorizer_exactly_once": "authorizer_exactly_once" not in errors,
+        "allow_everyone_false": "allow_everyone_false" not in errors,
+        "super_users_exact": "super_users_exact" not in errors,
+        "controller_client_auth_required": "controller_client_auth_required" not in errors,
+        "controller_endpoint_https": "controller_endpoint_https" not in errors,
+        "internal_client_auth_required": "internal_client_auth_required" not in errors,
+        "external_client_auth_required": "external_client_auth_required" not in errors,
+        "manifest_apply_authorized": "manifest_apply_authorized" not in errors,
+        "manifest_super_users": "manifest_super_users" not in errors,
+        "application_super_users_zero": "application_super_users_zero" not in errors,
+    },
     "application_super_users_in_source": app_in_super,
-    "dual_use_eku_accepted_exception": dual_use,
+    "dual_use_eku_accepted_exception": "DUAL_USE_EKU_ACCEPTED_EXCEPTION",
     "per_node_broker_identity_claimed": False,
     "errors": errors,
     "passed": len(errors) == 0,
@@ -80,7 +87,6 @@ if errors:
     raise SystemExit(1)
 PY
 
-# Live check when kafka-0 exists
 if kubectl -n "$NS" get pod kafka-0 >/dev/null 2>&1; then
   props="$(kubectl -n "$NS" exec kafka-0 -c kafka -- \
     grep -E '^(authorizer\.class\.name|allow\.everyone\.if\.no\.acl\.found|super\.users|listener\.name\.(controller|internal|external)\.ssl\.client\.auth|listener\.name\.controller\.ssl\.endpoint\.identification\.algorithm)=' \

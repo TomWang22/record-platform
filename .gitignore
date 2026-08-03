@@ -280,3 +280,4 @@ Dockerfile*
 # Ops folder at repo root (excluded from GitHub); keep infra/ops Kafka KRaft bundle tracked
 /ops/
 !infra/ops/
+.tmp/

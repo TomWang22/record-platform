@@ -1,0 +1,36 @@
+{
+  "document": "gate5-v7-harness-carry-forward",
+  "ts": "2026-08-03T03:20:00Z",
+  "classification": "ACCEPTANCE_HARNESS_ONLY",
+  "frozen_root": "/tmp/record-platform-runtime-heartbeat-gate5-v7/",
+  "frozen_terminal_state": "FROZEN_BLOCKED_EVIDENCE",
+  "frozen_classification": "HARNESS_FALSE_PASS_RISK",
+  "do_not_convert_gate5_v7_to_pass": true,
+  "runtime_pin_preserved": "c800ac5313ea8fb88a59f08c7347103ba1d4ed19",
+  "participant_image_rebuild_required": false,
+  "kafka_manifest_changed": false,
+  "acl_contract_changed": false,
+  "certificate_wiring_changed": false,
+  "changes_scope": [
+    "scripts/gate5-v7-acl-bootstrap.sh",
+    "scripts/gate5-v7-authorizer-verify.sh",
+    "scripts/lib/gate5-v7-acl-normalize.py",
+    "scripts/lib/Gate5V7DescribeAcls.java",
+    "tests/gate5-v7-fail-closed-authorizer.test.mjs",
+    "reports/kafka/gate5-v7-harness-defect-rca.json",
+    "reports/kafka/gate5-v7-harness-defect-rca.md",
+    "reports/kafka/gate5-v7-authorizer-verify.json"
+  ],
+  "preserved_positive_mtls": "36/36/36/0",
+  "required_before_gate5_v8": [
+    "exact-SHA CI GREEN on harness commit",
+    "rerun 12-service identity canary",
+    "verify live authorizer/configuration/ACL exact equality with corrected harness",
+    "harness_false_pass_tests = PASS",
+    "create /tmp/record-platform-runtime-heartbeat-gate5-v8/"
+  ],
+  "gate5_final_pass": false,
+  "gate6_authorized": false,
+  "pre_performance_gate_earned": false,
+  "production_approved": false
+}

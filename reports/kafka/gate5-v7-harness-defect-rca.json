@@ -1,0 +1,105 @@
+{
+  "document": "gate5-v7-harness-defect-rca",
+  "ts": "2026-08-03T03:10:00Z",
+  "frozen_root": "/tmp/record-platform-runtime-heartbeat-gate5-v7/",
+  "classification": "HARNESS_FALSE_PASS_RISK",
+  "terminal_state": "FROZEN_BLOCKED_EVIDENCE",
+  "source_sha_at_freeze": "c800ac5313ea8fb88a59f08c7347103ba1d4ed19",
+  "preserved_positive_mtls": "36/36/36/0",
+  "do_not_convert_root_to_pass": true,
+  "gate5_v8_required": true,
+  "defects": [
+    {
+      "id": "EKU_SPIFFE_ALWAYS_PASS",
+      "severity": "tests/gate5-v7-fail-closed-authorizer.test.mjs",
+      "defect": "assert.ok(s.spiffe_uri || s.spiffe || true) is unconditionally true",
+      "impact": "EKU/SPIFFE regressions cannot fail the suite",
+      "fix": "Assert measured eku_clientAuth/eku_serverAuth/sans fields exactly"
+    },
+    {
+      "id": "FIELD_NAME_MISMATCH",
+      "severity": "tests/gate5-v7-fail-closed-authorizer.test.mjs",
+      "defect": "Tests check eku_client_auth / spiffe_uri; measured report uses eku_clientAuth / sans",
+      "impact": "Wrong-field checks skip silently when null",
+      "fix": "Use measured report field names"
+    },
+    {
+      "id": "ACL_PRUNE_NOOP",
+      "severity": "scripts/gate5-v7-acl-bootstrap.sh",
+      "defect": "RP_GATE5_V7_ACL_PRUNE only sets prune_mode in the report",
+      "impact": "Stale/excessive ACLs can remain while reporting success",
+      "fix": "Implement exact reconciliation deletions or remove the option"
+    },
+    {
+      "id": "ACL_SUBSET_VERIFY",
+      "severity": "scripts/gate5-v7-acl-bootstrap.sh",
+      "defect": "Verifier proves expected strings appear; does not reject unexpected/duplicate/DENY/stale/host/pattern drift",
+      "impact": "Least privilege can be falsely certified",
+      "fix": "Compare normalized AclBinding sets exactly (expected vs actual)"
+    },
+    {
+      "id": "CLI_PROXIMITY_PARSE",
+      "severity": "scripts/gate5-v7-acl-bootstrap.sh",
+      "defect": "principal.{0,400}operation regex can cross-associate ACL blocks",
+      "impact": "Wrong principal may be credited for another binding's operation",
+      "fix": "Use AdminClient describeAcls JSON serialization"
+    },
+    {
+      "id": "WILDCARD_NOOP_BRANCH",
+      "severity": "scripts/gate5-v7-acl-bootstrap.sh",
+      "defect": "re.search(...): pass detects nothing",
+      "impact": "Some wildcard patterns never fail closed",
+      "fix": "Remove no-op; reject wildcards via normalized set rules"
+    },
+    {
+      "id": "SUPER_USERS_LINE_SPLIT",
+      "severity": "scripts/gate5-v7-acl-bootstrap.sh / authorizer-verify",
+      "defect": "text.split('KAFKA_SUPER_USERS')[1].split('\\n')[0] does not parse YAML value",
+      "impact": "Application principals in super.users may be missed",
+      "fix": "Parse StatefulSet env entries structurally"
+    },
+    {
+      "id": "ROLES_12_NOT_19",
+      "severity": "tests/gate5-v7-fail-closed-authorizer.test.mjs",
+      "defect": "Suite validates 12 service principals, not 19 logical roles",
+      "impact": "Producer/consumer/outbox/retry role policy gaps invisible",
+      "fix": "Assert identity-contract logical_roles length and per-role policy coverage"
+    },
+    {
+      "id": "TRUSTSTORE_SINGLE_ALIAS",
+      "severity": "scripts/gate5-v7-acl-bootstrap.sh",
+      "defect": "ca-chain.pem imported once under one alias",
+      "impact": "Root vs intermediate presence not proven as distinct trust entries",
+      "fix": "Import root and intermediate under separate aliases and inspect"
+    },
+    {
+      "id": "UNBOUNDED_CLI",
+      "severity": "scripts/gate5-v7-acl-bootstrap.sh",
+      "defect": "kafka CLI calls lack strict timeouts",
+      "impact": "Hangs classified incorrectly or block bootstrap",
+      "fix": "Wrap every metadata/ACL/AdminClient call with bounded timeout"
+    },
+    {
+      "id": "MUTABLE_REPO_EVIDENCE",
+      "severity": "scripts/gate5-v7-acl-bootstrap.sh",
+      "defect": "Raw runtime evidence written to reports/kafka/gate5-v7-acl-bootstrap.json",
+      "impact": "Mutable live evidence mixed into Git path",
+      "fix": "Write raw evidence under /tmp evidence root; Git gets sanitized summary only"
+    }
+  ],
+  "dual_use_eku_accepted_exception": true,
+  "per_node_broker_identity_claimed": false,
+  "remediations_applied_in_harness_fix": [
+    "EKU/SPIFFE tests assert measured eku_clientAuth/eku_serverAuth/sans; removed || true",
+    "scripts/lib/gate5-v7-acl-normalize.py exact AclBinding set compare",
+    "scripts/lib/Gate5V7DescribeAcls.java AdminClient describeAcls JSON",
+    "RP_GATE5_V7_ACL_PRUNE implements unexpected application binding deletion + re-describe",
+    "Structural StatefulSet env parse for StandardAuthorizer/super.users/client.auth",
+    "19 logical_roles coverage in fail-closed source tests",
+    "Dual truststore aliases record-platform-root + record-platform-intermediate",
+    "Bounded CLI/Job timeouts + ConfigMap single-writer lock",
+    "Raw evidence under RP_GATE5_V7_EVIDENCE_ROOT (/tmp); Git summary only"
+  ],
+  "gate5_v7_root_remains_frozen_blocked": true,
+  "next": "Land harness exact SHA, carry-forward c800ac53 runtime pin if harness-only, then create gate5-v8 after corrected preflight"
+}

@@ -33,7 +33,7 @@
   "gate6_authorized": false,
   "pre_performance_gate_earned": false,
   "production_approved": false,
-  "harness_sha": "c3620c4d",
+  "harness_sha": "391634d134b20de10907d3ea21dc60a09e0b2b68",
   "live_authorizer_verify": "PASS",
   "acl_expected_vs_actual_exact_match": true,
   "expected_acl_rows": 72,
@@ -44,6 +44,5 @@
   "single_writer": true,
   "evidence_dir": "/tmp/record-platform-gate5-v7-acl-bootstrap-evidence/20260803035633-59755",
   "gate5_v8_created": false,
-  "note": "Identity canary script remains gated stub; 12/12 dedicated identities and 36/36 mTLS preserved historically. Corrected harness proved live authorizer + exact ACL equality.",
-  "harness_sha_pending_commit": true
+  "note": "Identity canary script remains gated stub; 12/12 dedicated identities and 36/36 mTLS preserved historically. Corrected harness proved live authorizer + exact ACL equality."
 }

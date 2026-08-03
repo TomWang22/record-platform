@@ -125,7 +125,7 @@ for b in rows:
     base = (
         f'timeout {timeout} '
         f'kafka-acls --bootstrap-server "$BOOT" --command-config /tmp/admin.props '
-        f'--add --allow-principal "{principal}" --operation {cli_op} --host "*"'
+        f'--add --allow-principal "{principal}" --operation {cli_op} --allow-host "*"'
     )
     rt = b["resource_type"]
     if rt == "TOPIC":

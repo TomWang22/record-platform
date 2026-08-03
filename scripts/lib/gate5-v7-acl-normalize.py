@@ -181,7 +181,7 @@ def kafka_acls_remove_cmds(bindings: list[dict[str, str]]) -> list[str]:
         base = (
             f'kafka-acls --bootstrap-server "$BOOT" --command-config /tmp/admin.props '
             f'--remove --force --allow-principal "{principal}" --operation {cli_op} '
-            f'--host "{host}"'
+            f'--allow-host "{host}"'
         )
         rt = b["resource_type"].upper()
         name = b["resource_name"]

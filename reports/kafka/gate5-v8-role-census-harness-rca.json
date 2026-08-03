@@ -1,0 +1,49 @@
+{
+  "document": "gate5-v8-role-census-harness-rca",
+  "ts": "2026-08-03T18:50:00Z",
+  "evidence_root": "/tmp/record-platform-runtime-heartbeat-gate5-v8",
+  "terminal_state": "FROZEN_BLOCKED_EVIDENCE",
+  "recorded_hard_failure": "ROLE_CENSUS_MISMATCH",
+  "refined_classification": "HARNESS_ROLE_IDENTITY_KEY_BUG",
+  "platform_failure": false,
+  "harness_failure": true,
+  "v8_immutable": true,
+  "do_not_reopen_v8": true,
+  "do_not_import_v8_rows_into_pass": true,
+  "completed_v8_evidence_classification": "HISTORICAL_FUNCTIONAL_EVIDENCE_NOT_FINAL_GATE5_ACCEPTANCE",
+  "defect": {
+    "incorrect_uniqueness_key": "bare_role_suffix",
+    "correct_contract_key": "<service>:<role> / required_client_id_form",
+    "correct_live_key": "observed full client ID including pod token",
+    "bare_suffix_duplication_allowed": true
+  },
+  "preservation_index": {
+    "files": 67,
+    "bytes": 640816,
+    "marker_sha256": "cae2225463c0c550894ea4f3916242d31f7084db12ebfb4ed9e7234d6e03c301",
+    "hard_failure_sha256": "4cf076c9f5aa41fc8204d9997bacb6cdd27294a04fd9395b981db1b1b8e1391e"
+  },
+  "completed_historical_sections": [
+    "preflight_sealed",
+    "denominator_contract",
+    "acl_checkpoints_00_03",
+    "positive_mtls_36",
+    "tls_negatives",
+    "authorization_effect_aware"
+  ],
+  "unexecuted_sections": [
+    "broker_matrix",
+    "event_outbox_lineage",
+    "recovery_matrices",
+    "pcap_binding",
+    "metallb_jaeger",
+    "final_evidence_audit"
+  ],
+  "remediation": {
+    "module": "scripts/lib/gate5_role_census.py",
+    "tests": "tests/gate5-role-census.test.mjs",
+    "next_root": "gate5-v9 after harness-only CI + carry-forward/revalidation"
+  },
+  "gate5_final_pass": false,
+  "gate6_authorized": false
+}

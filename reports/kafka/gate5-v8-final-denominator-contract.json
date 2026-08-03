@@ -1,0 +1,95 @@
+{
+  "document": "gate5-v8-final-denominator-contract",
+  "ts": "2026-08-03T17:01:12Z",
+  "denominator_contract_closed": true,
+  "unknown_denominators": 0,
+  "zero_denominator_without_rationale": 0,
+  "exact_controller_sha": "c7e71bd749654b2526eab1b5e064d8dccaeb91de",
+  "accepted_participant_runtime_sha": "c800ac5313ea8fb88a59f08c7347103ba1d4ed19",
+  "transport": {
+    "participant_services": 12,
+    "logical_client_roles": 19,
+    "kafka_brokers": 3,
+    "brokers_ready_live": 3,
+    "positive_service_x_broker_mtls_rows": 36,
+    "tls_negative_categories": [
+      "missing_client_certificate",
+      "wrong_trust_root",
+      "untrusted_intermediate",
+      "untrusted_client_leaf",
+      "client_leaf_without_clientAuth",
+      "expired_client_leaf",
+      "not_yet_valid_client_leaf",
+      "wrong_broker_hostname_sni",
+      "invalid_broker_san",
+      "server_leaf_without_serverAuth",
+      "plaintext_connection",
+      "malformed_or_incomplete_client_keypair"
+    ],
+    "tls_negative_categories_count": 12,
+    "tls_negative_rows": 36,
+    "invalid_negative_fixture_rows": 1,
+    "invalid_negative_fixture_names": [
+      "PEER_OMITS_INTERMEDIATE"
+    ],
+    "controller_endpoints": 3,
+    "controller_negative_rows": 3
+  },
+  "authorization": {
+    "permitted_topic_operations": 12,
+    "forbidden_topic_operations": 12,
+    "permitted_group_operations_applicable": "from_manifest",
+    "forbidden_group_operations": 12,
+    "forbidden_cluster_operations": 12,
+    "same_ca_wrong_service_rows": 12,
+    "unlisted_same_ca_rows": 12,
+    "forged_client_id_rows": 24,
+    "acl_read_only_verification_rows": 72,
+    "verdict_rule": "authorization_error_AND_no_record_offset_outbox_business_effect",
+    "process_exit_code_not_authoritative": true
+  },
+  "delivery": {
+    "producer_roles": 19,
+    "consumer_roles": 19,
+    "topics": 14,
+    "groups": 7,
+    "real_event_families": 8,
+    "outbox_enabled_event_families": 8,
+    "expected_broker_specific_produce_rows": 3,
+    "expected_broker_specific_consume_rows": 3,
+    "expected_offset_commit_rows": 3
+  },
+  "recovery": {
+    "stable_membership_windows": 1,
+    "stable_membership_seconds": 900,
+    "controlled_producer_rollouts": 1,
+    "controlled_consumer_rollouts": 1,
+    "sigterm_cases": 2,
+    "broker_restart_cases": 3,
+    "controller_movement_cases": 1,
+    "producer_crash_cases": 1,
+    "consumer_crash_cases": 1,
+    "duplicate_delivery_cases": 1,
+    "poison_dlq_cases": 1,
+    "replay_cases": 1,
+    "recovery_rows_total": 16
+  },
+  "evidence": {
+    "packet_captures": 87,
+    "exact_metallb_jaeger_traces": 8,
+    "prometheus_before_after_snapshots": 12,
+    "grafana_query_results": 12,
+    "bounded_log_references": 36,
+    "database_outbox_rows": 8,
+    "topic_partition_offset_records": 3,
+    "business_result_assertions": 8
+  },
+  "acl_scope_contract": "gate5-v8-acl-scope-contract",
+  "prior_closure_ts": "2026-08-03T01:44:01Z",
+  "acceptance_invariants": {
+    "mode_describe_only": true,
+    "mutation_attempted": false,
+    "expected_acl_rows": 72,
+    "manifest_vs_live_delta": 0
+  }
+}

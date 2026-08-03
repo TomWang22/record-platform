@@ -1,0 +1,48 @@
+{
+  "document": "gate5-v8-hard-failure-rca",
+  "ts": "2026-08-03T17:40:00Z",
+  "evidence_root": "/tmp/record-platform-runtime-heartbeat-gate5-v8",
+  "terminal_state": "FROZEN_BLOCKED_EVIDENCE",
+  "phase": "nineteen_roles",
+  "recorded_reason": "ROLE_CENSUS_MISMATCH",
+  "refined_classification": "HARNESS_ROLE_IDENTITY_KEY_BUG",
+  "platform_failure": false,
+  "harness_failure": true,
+  "summary": "Nineteen logical roles exist (19/19) with unique required_client_id_form values. The v8 census keyed uniqueness on bare role suffix (producer/outbox-publisher/...), which legitimately repeats across services, and incorrectly froze as ROLE_CENSUS_MISMATCH.",
+  "correct_uniqueness_key": "required_client_id_form",
+  "roles_expected": 19,
+  "roles_discovered": 19,
+  "unique_required_client_id_forms": 19,
+  "completed_before_freeze": {
+    "preflight_sealed": true,
+    "denominator_contract_closed": true,
+    "acl_checkpoints": [
+      "00-before-matrices",
+      "01-after-positive-mtls",
+      "02-after-tls-negatives",
+      "03-after-authorization"
+    ],
+    "positive_mtls": "36/36/36",
+    "tls_negatives_twelve_by_three": "36/36 pass rows recorded",
+    "untrusted_negatives": "6/6 denied",
+    "authorization_effect_aware": {
+      "passed": true,
+      "forbidden_topic_denied": "12/12",
+      "forbidden_cluster_operation_denied": "12/12",
+      "unauthorized_records_written": 0,
+      "indistinguishable_rows": 0,
+      "process_exit_code_authoritative": false
+    }
+  },
+  "not_executed": [
+    "broker_matrix",
+    "event_outbox_lineage",
+    "recovery_matrices",
+    "pcap_binding",
+    "metallb_jaeger_exact_traces",
+    "final_evidence_audit"
+  ],
+  "gate5_final_pass": false,
+  "gate6_authorized": false,
+  "next": "Remediate census uniqueness key outside v8; create gate5-v9 after harness fix + CI; do not reopen v8"
+}

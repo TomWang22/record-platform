@@ -1,0 +1,43 @@
+{
+  "document": "gate5-v8-preservation-index",
+  "ts": "2026-08-03T18:47:07Z",
+  "evidence_root": "/tmp/record-platform-runtime-heartbeat-gate5-v8",
+  "terminal_state": "FROZEN_BLOCKED_EVIDENCE",
+  "immutable": true,
+  "platform_failure": false,
+  "harness_failure": true,
+  "refined_classification": "HARNESS_ROLE_IDENTITY_KEY_BUG",
+  "files": 67,
+  "bytes": 640816,
+  "hashes": {
+    "FROZEN_BLOCKED_EVIDENCE.json": "cae2225463c0c550894ea4f3916242d31f7084db12ebfb4ed9e7234d6e03c301",
+    "HARD_FAILURE.json": "4cf076c9f5aa41fc8204d9997bacb6cdd27294a04fd9395b981db1b1b8e1391e",
+    "STATUS.json": "bca3681b8c4ada81ba13e60ac96971d6d7d260808ff5b5e0c40d322af367b655",
+    "preflight/preflight-manifest.json": "9963c4808ea4f2cd782cca973dec23f488e28ecb4b547f1c36acf9bafbb4dbe6",
+    "preflight/preflight-manifest.sha256": "21b8d6c05af5e98aff7b76492cefd51a62cda17dc06ad00e1b7b12d207b98c29",
+    "contracts/final-denominator-contract.json": "8cd5cbdf3893a2373e51576e749f6665ba9b1c765f67cd5ffee3fc4a16d1e597",
+    "acl-checkpoints": "380c94e36ccda8f5d1d982ae4b8ebcb22c8b62f3e6c1fd8bd46917eaf35a9f91",
+    "matrices/identity-canary-summary.json": "ff0613fc23db0a09c477197be5bfa96c2fbe8c47e869dc3610e4e4808c23608c",
+    "matrices/kafka-tls-negatives.json": "af52b25d91a91d71820f82f582bd80282ea5da724da39b892e6f5503c264e536",
+    "matrices/authorization-canary-summary.json": "c072b6b7e2100fa6c48b4cb95a9a45e6cf7080db7434aabf76323ec15b0267fb",
+    "matrices/nineteen-role-census.json": "e03e2ea44801bf752198ec424f858af4536cad08624f134af9ccbad0a5182902"
+  },
+  "completed_historical_sections": [
+    "preflight_sealed",
+    "denominator_contract",
+    "acl_checkpoints_00_03",
+    "positive_mtls_36",
+    "tls_negatives",
+    "authorization_effect_aware"
+  ],
+  "unexecuted_sections": [
+    "broker_matrix",
+    "event_outbox_lineage",
+    "recovery_matrices",
+    "pcap_binding",
+    "metallb_jaeger",
+    "final_evidence_audit"
+  ],
+  "classification": "HISTORICAL_FUNCTIONAL_EVIDENCE_NOT_FINAL_GATE5_ACCEPTANCE",
+  "do_not_import_into_future_pass": true
+}

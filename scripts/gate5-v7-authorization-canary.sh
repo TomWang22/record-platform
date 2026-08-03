@@ -108,6 +108,13 @@ for row in plan:
     ]}})
     mounts.append({"name": f"c-{svc}"[:63], "mountPath": f"/tls/clients/{svc}", "readOnly": True})
 
+# Recovery-admin for offset/marker effect checks (read-only relative to acceptance ACL mutation rule)
+vols.append({"name": "c-admin", "secret": {"secretName": "kafka-client-tls-gate5-v7-admin", "items": [
+    {"key": "tls.crt", "path": "tls.crt"},
+    {"key": "tls.key", "path": "tls.key"},
+]}})
+mounts.append({"name": "c-admin", "mountPath": "/tls/admin", "readOnly": True})
+
 doc = {
   "apiVersion": "batch/v1",
   "kind": "Job",
@@ -122,7 +129,11 @@ doc = {
         "name": "authz",
         "image": image,
         "imagePullPolicy": "IfNotPresent",
-        "env": [{"name": "BOOT", "value": boot}, {"name": "CLI_TIMEOUT_SEC", "value": "25"}],
+        "env": [
+          {"name": "BOOT", "value": boot},
+          {"name": "CLI_TIMEOUT_SEC", "value": "25"},
+          {"name": "ADMIN_CLIENT_DIR", "value": "/tls/admin"},
+        ],
         "volumeMounts": mounts,
         "command": ["/bin/bash", "/assets/probe.sh"],
       }],
@@ -163,10 +174,12 @@ summary = {
     "forbidden_topic_denied": body.get("forbidden_topic_denied"),
     "forbidden_cluster_operation_denied": body.get("forbidden_cluster_denied"),
     "client_id_authorization_effects": body.get("client_id_authorization_effects", 0),
-    "unauthorized_records_written": 0,
-    "unauthorized_offsets_committed": 0,
+    "unauthorized_records_written": body.get("unauthorized_records_written", 0),
+    "unauthorized_offsets_committed": body.get("unauthorized_offsets_committed", 0),
     "unauthorized_business_effects": 0,
-    "passed": body.get("failed", 1) == 0,
+    "indistinguishable_rows": body.get("indistinguishable_rows", 0),
+    "process_exit_code_authoritative": False,
+    "passed": body.get("failed", 1) == 0 and body.get("indistinguishable_rows", 0) == 0 and body.get("unauthorized_records_written", 0) == 0,
 }
 Path(sys.argv[2]).write_text(json.dumps(summary, indent=2) + "\n")
 Path(sys.argv[3]).write_text(json.dumps(summary, indent=2) + "\n")

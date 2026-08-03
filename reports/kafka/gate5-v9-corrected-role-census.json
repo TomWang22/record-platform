@@ -1,0 +1,211 @@
+{
+  "document": "gate5-role-census-evaluation",
+  "result": "PASS",
+  "ok": true,
+  "roles_expected": 19,
+  "roles_discovered": 19,
+  "unique_contract_role_keys": 19,
+  "unique_required_client_id_forms": 19,
+  "unique_bare_role_suffixes": 6,
+  "duplicate_bare_role_suffixes": 3,
+  "bare_role_suffix_counts": {
+    "producer": 7,
+    "outbox-publisher": 5,
+    "lifecycle-consumer": 4,
+    "notification-consumer": 1,
+    "market-event-consumer": 1,
+    "inference-consumer": 1
+  },
+  "contract_role_identity_counts": {
+    "analytics-service:producer": 1,
+    "analytics-service:outbox-publisher": 1,
+    "auction-monitor:producer": 1,
+    "auction-monitor:outbox-publisher": 1,
+    "auth-service:outbox-publisher": 1,
+    "listings-service:producer": 1,
+    "media-service:lifecycle-consumer": 1,
+    "messaging-service:producer": 1,
+    "messaging-service:lifecycle-consumer": 1,
+    "notification-service:notification-consumer": 1,
+    "notification-service:lifecycle-consumer": 1,
+    "shopping-service:producer": 1,
+    "shopping-service:outbox-publisher": 1,
+    "trust-service:lifecycle-consumer": 1,
+    "python-ai-service:market-event-consumer": 1,
+    "python-ai-service:producer": 1,
+    "python-ai-service:outbox-publisher": 1,
+    "ollama-worker:inference-consumer": 1,
+    "ollama-gateway:producer": 1
+  },
+  "required_client_id_form_counts": {
+    "record-platform.analytics-service.<pod-uid-prefix>.producer": 1,
+    "record-platform.analytics-service.<pod-uid-prefix>.outbox-publisher": 1,
+    "record-platform.auction-monitor.<pod-uid-prefix>.producer": 1,
+    "record-platform.auction-monitor.<pod-uid-prefix>.outbox-publisher": 1,
+    "record-platform.auth-service.<pod-uid-prefix>.outbox-publisher": 1,
+    "record-platform.listings-service.<pod-uid-prefix>.producer": 1,
+    "record-platform.media-service.<pod-uid-prefix>.lifecycle-consumer": 1,
+    "record-platform.messaging-service.<pod-uid-prefix>.producer": 1,
+    "record-platform.messaging-service.<pod-uid-prefix>.lifecycle-consumer": 1,
+    "record-platform.notification-service.<pod-uid-prefix>.notification-consumer": 1,
+    "record-platform.notification-service.<pod-uid-prefix>.lifecycle-consumer": 1,
+    "record-platform.shopping-service.<pod-uid-prefix>.producer": 1,
+    "record-platform.shopping-service.<pod-uid-prefix>.outbox-publisher": 1,
+    "record-platform.trust-service.<pod-uid-prefix>.lifecycle-consumer": 1,
+    "record-platform.python-ai-service.<pod-uid-prefix>.market-event-consumer": 1,
+    "record-platform.python-ai-service.<pod-uid-prefix>.producer": 1,
+    "record-platform.python-ai-service.<pod-uid-prefix>.outbox-publisher": 1,
+    "record-platform.ollama-worker.<pod-uid-prefix>.inference-consumer": 1,
+    "record-platform.ollama-gateway.<pod-uid-prefix>.producer": 1
+  },
+  "observed_live_client_id_counts": {},
+  "duplicate_contract_role_keys": [],
+  "duplicate_required_client_id_forms": [],
+  "duplicate_live_client_ids": [],
+  "generic_client_ids": 0,
+  "missing_role_suffix": 0,
+  "nonconforming_client_ids": 0,
+  "missing_pod_tokens": 0,
+  "missing_certificate_fingerprints": 0,
+  "unknown_group_ids": 0,
+  "unknown_services": 0,
+  "unknown_roles": 0,
+  "unaccounted_topics": 0,
+  "roles": [
+    {
+      "service": "analytics-service",
+      "role_suffix": "producer",
+      "contract_role_key": "analytics-service:producer",
+      "required_client_id_form": "record-platform.analytics-service.<pod-uid-prefix>.producer",
+      "group": null
+    },
+    {
+      "service": "analytics-service",
+      "role_suffix": "outbox-publisher",
+      "contract_role_key": "analytics-service:outbox-publisher",
+      "required_client_id_form": "record-platform.analytics-service.<pod-uid-prefix>.outbox-publisher",
+      "group": null
+    },
+    {
+      "service": "auction-monitor",
+      "role_suffix": "producer",
+      "contract_role_key": "auction-monitor:producer",
+      "required_client_id_form": "record-platform.auction-monitor.<pod-uid-prefix>.producer",
+      "group": null
+    },
+    {
+      "service": "auction-monitor",
+      "role_suffix": "outbox-publisher",
+      "contract_role_key": "auction-monitor:outbox-publisher",
+      "required_client_id_form": "record-platform.auction-monitor.<pod-uid-prefix>.outbox-publisher",
+      "group": null
+    },
+    {
+      "service": "auth-service",
+      "role_suffix": "outbox-publisher",
+      "contract_role_key": "auth-service:outbox-publisher",
+      "required_client_id_form": "record-platform.auth-service.<pod-uid-prefix>.outbox-publisher",
+      "group": null
+    },
+    {
+      "service": "listings-service",
+      "role_suffix": "producer",
+      "contract_role_key": "listings-service:producer",
+      "required_client_id_form": "record-platform.listings-service.<pod-uid-prefix>.producer",
+      "group": null
+    },
+    {
+      "service": "media-service",
+      "role_suffix": "lifecycle-consumer",
+      "contract_role_key": "media-service:lifecycle-consumer",
+      "required_client_id_form": "record-platform.media-service.<pod-uid-prefix>.lifecycle-consumer",
+      "group": "media-service-user-lifecycle"
+    },
+    {
+      "service": "messaging-service",
+      "role_suffix": "producer",
+      "contract_role_key": "messaging-service:producer",
+      "required_client_id_form": "record-platform.messaging-service.<pod-uid-prefix>.producer",
+      "group": null
+    },
+    {
+      "service": "messaging-service",
+      "role_suffix": "lifecycle-consumer",
+      "contract_role_key": "messaging-service:lifecycle-consumer",
+      "required_client_id_form": "record-platform.messaging-service.<pod-uid-prefix>.lifecycle-consumer",
+      "group": "messaging-service-user-lifecycle"
+    },
+    {
+      "service": "notification-service",
+      "role_suffix": "notification-consumer",
+      "contract_role_key": "notification-service:notification-consumer",
+      "required_client_id_form": "record-platform.notification-service.<pod-uid-prefix>.notification-consumer",
+      "group": "notification-service-group"
+    },
+    {
+      "service": "notification-service",
+      "role_suffix": "lifecycle-consumer",
+      "contract_role_key": "notification-service:lifecycle-consumer",
+      "required_client_id_form": "record-platform.notification-service.<pod-uid-prefix>.lifecycle-consumer",
+      "group": "notification-service-user-lifecycle"
+    },
+    {
+      "service": "shopping-service",
+      "role_suffix": "producer",
+      "contract_role_key": "shopping-service:producer",
+      "required_client_id_form": "record-platform.shopping-service.<pod-uid-prefix>.producer",
+      "group": null
+    },
+    {
+      "service": "shopping-service",
+      "role_suffix": "outbox-publisher",
+      "contract_role_key": "shopping-service:outbox-publisher",
+      "required_client_id_form": "record-platform.shopping-service.<pod-uid-prefix>.outbox-publisher",
+      "group": null
+    },
+    {
+      "service": "trust-service",
+      "role_suffix": "lifecycle-consumer",
+      "contract_role_key": "trust-service:lifecycle-consumer",
+      "required_client_id_form": "record-platform.trust-service.<pod-uid-prefix>.lifecycle-consumer",
+      "group": "trust-service-user-lifecycle"
+    },
+    {
+      "service": "python-ai-service",
+      "role_suffix": "market-event-consumer",
+      "contract_role_key": "python-ai-service:market-event-consumer",
+      "required_client_id_form": "record-platform.python-ai-service.<pod-uid-prefix>.market-event-consumer",
+      "group": "python-ai-service"
+    },
+    {
+      "service": "python-ai-service",
+      "role_suffix": "producer",
+      "contract_role_key": "python-ai-service:producer",
+      "required_client_id_form": "record-platform.python-ai-service.<pod-uid-prefix>.producer",
+      "group": null
+    },
+    {
+      "service": "python-ai-service",
+      "role_suffix": "outbox-publisher",
+      "contract_role_key": "python-ai-service:outbox-publisher",
+      "required_client_id_form": "record-platform.python-ai-service.<pod-uid-prefix>.outbox-publisher",
+      "group": null
+    },
+    {
+      "service": "ollama-worker",
+      "role_suffix": "inference-consumer",
+      "contract_role_key": "ollama-worker:inference-consumer",
+      "required_client_id_form": "record-platform.ollama-worker.<pod-uid-prefix>.inference-consumer",
+      "group": "ollama-worker-group"
+    },
+    {
+      "service": "ollama-gateway",
+      "role_suffix": "producer",
+      "contract_role_key": "ollama-gateway:producer",
+      "required_client_id_form": "record-platform.ollama-gateway.<pod-uid-prefix>.producer",
+      "group": null
+    }
+  ],
+  "assert_note": "bare_role_suffix uniqueness is NOT compared to roles_expected; unique_bare_suffixes=6 roles_expected=19",
+  "reasons": []
+}

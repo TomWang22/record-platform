@@ -198,47 +198,54 @@ spec:
               # Prefer mounted dedicated root/intermediate if provided via secret ca-chain only:
               # Extract with openssl: write each cert from chain
               python3 - <<'PY'
+              import subprocess, tempfile
               from pathlib import Path
               text=Path('/etc/kafka/admin/ca-chain.pem').read_text()
-              parts=[]
-              cur=[]
+              parts=[]; cur=[]
               for line in text.splitlines():
-                if 'BEGIN CERTIFICATE' in line:
-                  cur=[line]
+                if 'BEGIN CERTIFICATE' in line: cur=[line]
                 elif cur:
                   cur.append(line)
                   if 'END CERTIFICATE' in line:
                     parts.append('\\n'.join(cur)+'\\n'); cur=[]
               assert len(parts)>=2, f'ca-chain must contain root+intermediate, got {len(parts)}'
-              Path('/tmp/intermediate.pem').write_text(parts[0])
-              Path('/tmp/root.pem').write_text(parts[-1] if len(parts)>1 else parts[0])
-              # If only leaf+int sometimes order is int then root — fingerprint later
-              if len(parts)==2:
-                Path('/tmp/intermediate.pem').write_text(parts[0])
-                Path('/tmp/root.pem').write_text(parts[1])
-              print(f'chain_pem_count={len(parts)}')
+              def is_self_signed(pem: str) -> bool:
+                with tempfile.NamedTemporaryFile('w', suffix='.pem') as f:
+                  f.write(pem); f.flush()
+                  subj=subprocess.check_output(['openssl','x509','-in',f.name,'-noout','-subject'], text=True)
+                  iss=subprocess.check_output(['openssl','x509','-in',f.name,'-noout','-issuer'], text=True)
+                  return subj.strip().replace('subject=','') == iss.strip().replace('issuer=','')
+              roots=[p for p in parts if is_self_signed(p)]
+              ints=[p for p in parts if not is_self_signed(p)]
+              assert len(roots)>=1 and len(ints)>=1, f'need root+intermediate self-signed classify roots={len(roots)} ints={len(ints)}'
+              Path('/tmp/root.pem').write_text(roots[-1])
+              Path('/tmp/intermediate.pem').write_text(ints[0])
+              print(f'chain_pem_count={len(parts)} root_self_signed=1 intermediate=1')
               PY
               rm -f /tmp/trust.jks
-              keytool -importcert -noprompt -alias record-platform-root -file /tmp/root.pem \
+              keytool -importcert -noprompt -storetype JKS -alias record-platform-root -file /tmp/root.pem \
                 -keystore /tmp/trust.jks -storepass changeit >/dev/null
-              keytool -importcert -noprompt -alias record-platform-intermediate -file /tmp/intermediate.pem \
+              keytool -importcert -noprompt -storetype JKS -alias record-platform-intermediate -file /tmp/intermediate.pem \
                 -keystore /tmp/trust.jks -storepass changeit >/dev/null
               echo "=== truststore aliases ==="
-              keytool -list -keystore /tmp/trust.jks -storepass changeit | tee /tmp/trust.list
+              keytool -list -storetype JKS -keystore /tmp/trust.jks -storepass changeit | tee /tmp/trust.list
               grep -q 'record-platform-root' /tmp/trust.list
               grep -q 'record-platform-intermediate' /tmp/trust.list
               echo "TRUST_ENTRIES=2/2"
               openssl pkcs12 -export -inkey /etc/kafka/admin/tls.key -in /etc/kafka/admin/tls.crt \
                 -certfile /etc/kafka/admin/ca-chain.pem -out /tmp/c.p12 -passout pass:changeit -name c
-              keytool -importkeystore -noprompt \
+              rm -f /tmp/c.jks
+              keytool -importkeystore -noprompt -storetype JKS \
                 -srckeystore /tmp/c.p12 -srcstoretype PKCS12 -srcstorepass changeit \
-                -destkeystore /tmp/c.jks -deststorepass changeit >/dev/null
+                -destkeystore /tmp/c.jks -deststoretype JKS -deststorepass changeit >/dev/null
               printf '%s\n' \
                 'security.protocol=SSL' \
                 'ssl.truststore.location=/tmp/trust.jks' \
                 'ssl.truststore.password=changeit' \
+                'ssl.truststore.type=JKS' \
                 'ssl.keystore.location=/tmp/c.jks' \
                 'ssl.keystore.password=changeit' \
+                'ssl.keystore.type=JKS' \
                 'ssl.key.password=changeit' \
                 'ssl.endpoint.identification.algorithm=HTTPS' \
                 > /tmp/admin.props
@@ -378,6 +385,7 @@ spec:
               set -euo pipefail
               timed() { timeout "\${CLI_TIMEOUT_SEC}" "\$@"; }
               python3 - <<'PY'
+              import subprocess, tempfile
               from pathlib import Path
               text=Path('/etc/kafka/admin/ca-chain.pem').read_text()
               parts=[]; cur=[]
@@ -387,15 +395,22 @@ spec:
                   cur.append(line)
                   if 'END CERTIFICATE' in line:
                     parts.append('\\n'.join(cur)+'\\n'); cur=[]
-              Path('/tmp/intermediate.pem').write_text(parts[0])
-              Path('/tmp/root.pem').write_text(parts[1] if len(parts)>1 else parts[0])
+              def is_self_signed(pem: str) -> bool:
+                with tempfile.NamedTemporaryFile('w', suffix='.pem') as f:
+                  f.write(pem); f.flush()
+                  subj=subprocess.check_output(['openssl','x509','-in',f.name,'-noout','-subject'], text=True)
+                  iss=subprocess.check_output(['openssl','x509','-in',f.name,'-noout','-issuer'], text=True)
+                  return subj.strip().replace('subject=','') == iss.strip().replace('issuer=','')
+              roots=[p for p in parts if is_self_signed(p)]; ints=[p for p in parts if not is_self_signed(p)]
+              Path('/tmp/root.pem').write_text(roots[-1]); Path('/tmp/intermediate.pem').write_text(ints[0])
               PY
               rm -f /tmp/trust.jks
-              keytool -importcert -noprompt -alias record-platform-root -file /tmp/root.pem -keystore /tmp/trust.jks -storepass changeit >/dev/null
-              keytool -importcert -noprompt -alias record-platform-intermediate -file /tmp/intermediate.pem -keystore /tmp/trust.jks -storepass changeit >/dev/null
+              keytool -importcert -noprompt -storetype JKS -alias record-platform-root -file /tmp/root.pem -keystore /tmp/trust.jks -storepass changeit >/dev/null
+              keytool -importcert -noprompt -storetype JKS -alias record-platform-intermediate -file /tmp/intermediate.pem -keystore /tmp/trust.jks -storepass changeit >/dev/null
               openssl pkcs12 -export -inkey /etc/kafka/admin/tls.key -in /etc/kafka/admin/tls.crt -certfile /etc/kafka/admin/ca-chain.pem -out /tmp/c.p12 -passout pass:changeit -name c
-              keytool -importkeystore -noprompt -srckeystore /tmp/c.p12 -srcstoretype PKCS12 -srcstorepass changeit -destkeystore /tmp/c.jks -deststorepass changeit >/dev/null
-              printf '%s\n' 'security.protocol=SSL' 'ssl.truststore.location=/tmp/trust.jks' 'ssl.truststore.password=changeit' 'ssl.keystore.location=/tmp/c.jks' 'ssl.keystore.password=changeit' 'ssl.key.password=changeit' 'ssl.endpoint.identification.algorithm=HTTPS' > /tmp/admin.props
+              rm -f /tmp/c.jks
+              keytool -importkeystore -noprompt -srckeystore /tmp/c.p12 -srcstoretype PKCS12 -srcstorepass changeit -destkeystore /tmp/c.jks -deststoretype JKS -deststorepass changeit >/dev/null
+              printf '%s\n' 'security.protocol=SSL' 'ssl.truststore.location=/tmp/trust.jks' 'ssl.truststore.password=changeit' 'ssl.truststore.type=JKS' 'ssl.keystore.location=/tmp/c.jks' 'ssl.keystore.password=changeit' 'ssl.keystore.type=JKS' 'ssl.key.password=changeit' 'ssl.endpoint.identification.algorithm=HTTPS' > /tmp/admin.props
               bash /cmds/prune.sh
               echo PRUNE_APPLY_OK
       volumes:
@@ -460,6 +475,7 @@ spec:
               set -euo pipefail
               timed() { timeout "\${CLI_TIMEOUT_SEC}" "\$@"; }
               python3 - <<'PY'
+              import subprocess, tempfile
               from pathlib import Path
               text=Path('/etc/kafka/admin/ca-chain.pem').read_text()
               parts=[]; cur=[]
@@ -469,15 +485,22 @@ spec:
                   cur.append(line)
                   if 'END CERTIFICATE' in line:
                     parts.append('\\n'.join(cur)+'\\n'); cur=[]
-              Path('/tmp/intermediate.pem').write_text(parts[0])
-              Path('/tmp/root.pem').write_text(parts[1] if len(parts)>1 else parts[0])
+              def is_self_signed(pem: str) -> bool:
+                with tempfile.NamedTemporaryFile('w', suffix='.pem') as f:
+                  f.write(pem); f.flush()
+                  subj=subprocess.check_output(['openssl','x509','-in',f.name,'-noout','-subject'], text=True)
+                  iss=subprocess.check_output(['openssl','x509','-in',f.name,'-noout','-issuer'], text=True)
+                  return subj.strip().replace('subject=','') == iss.strip().replace('issuer=','')
+              roots=[p for p in parts if is_self_signed(p)]; ints=[p for p in parts if not is_self_signed(p)]
+              Path('/tmp/root.pem').write_text(roots[-1]); Path('/tmp/intermediate.pem').write_text(ints[0])
               PY
               rm -f /tmp/trust.jks
-              keytool -importcert -noprompt -alias record-platform-root -file /tmp/root.pem -keystore /tmp/trust.jks -storepass changeit >/dev/null
-              keytool -importcert -noprompt -alias record-platform-intermediate -file /tmp/intermediate.pem -keystore /tmp/trust.jks -storepass changeit >/dev/null
+              keytool -importcert -noprompt -storetype JKS -alias record-platform-root -file /tmp/root.pem -keystore /tmp/trust.jks -storepass changeit >/dev/null
+              keytool -importcert -noprompt -storetype JKS -alias record-platform-intermediate -file /tmp/intermediate.pem -keystore /tmp/trust.jks -storepass changeit >/dev/null
               openssl pkcs12 -export -inkey /etc/kafka/admin/tls.key -in /etc/kafka/admin/tls.crt -certfile /etc/kafka/admin/ca-chain.pem -out /tmp/c.p12 -passout pass:changeit -name c
-              keytool -importkeystore -noprompt -srckeystore /tmp/c.p12 -srcstoretype PKCS12 -srcstorepass changeit -destkeystore /tmp/c.jks -deststorepass changeit >/dev/null
-              printf '%s\n' 'security.protocol=SSL' 'ssl.truststore.location=/tmp/trust.jks' 'ssl.truststore.password=changeit' 'ssl.keystore.location=/tmp/c.jks' 'ssl.keystore.password=changeit' 'ssl.key.password=changeit' 'ssl.endpoint.identification.algorithm=HTTPS' > /tmp/admin.props
+              rm -f /tmp/c.jks
+              keytool -importkeystore -noprompt -srckeystore /tmp/c.p12 -srcstoretype PKCS12 -srcstorepass changeit -destkeystore /tmp/c.jks -deststoretype JKS -deststorepass changeit >/dev/null
+              printf '%s\n' 'security.protocol=SSL' 'ssl.truststore.location=/tmp/trust.jks' 'ssl.truststore.password=changeit' 'ssl.truststore.type=JKS' 'ssl.keystore.location=/tmp/c.jks' 'ssl.keystore.password=changeit' 'ssl.keystore.type=JKS' 'ssl.key.password=changeit' 'ssl.endpoint.identification.algorithm=HTTPS' > /tmp/admin.props
               CP=\$(echo /usr/share/java/kafka/*.jar /usr/share/java/cp-base-java/*.jar 2>/dev/null | tr ' ' ':')
               timed javac -cp "\$CP" -d /tmp /assets/Gate5V7DescribeAcls.java
               timed java -cp "/tmp:\$CP" Gate5V7DescribeAcls "\$BOOT" /tmp/admin.props | tee /tmp/describe.out

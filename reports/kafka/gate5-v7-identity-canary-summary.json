@@ -1,0 +1,14 @@
+{
+  "document": "gate5-v7-identity-canary-summary",
+  "ts": "2026-08-03T15:03:32Z",
+  "positive_rows_expected": 36,
+  "positive_rows_tested": 36,
+  "positive_rows_passed": 36,
+  "positive_rows_failed": 0,
+  "distinct_service_leaf_fingerprints": 12,
+  "clientAuth_present": "36/36",
+  "serverAuth_absent_on_clients": "36/36",
+  "broker_serverAuth_present": "36/36",
+  "matrix_report": "reports/kafka/gate5-v7-twelve-by-three-mtls-matrix.json",
+  "passed": true
+}

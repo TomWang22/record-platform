@@ -1,0 +1,25 @@
+{
+  "document": "gate5-v7-acl-72-72-reclassification",
+  "ts": "2026-08-03T14:30:00Z",
+  "prior_claim": {
+    "expected_acl_rows": 72,
+    "actual_acl_rows": 72,
+    "manifest_vs_live_delta": 0,
+    "incorrectly_implied": "PREEXISTING_READ_ONLY_EXACT_MATCH"
+  },
+  "reclassification": "RECONCILED_POST_MUTATION_MATCH",
+  "reason": "Gate5V7ApplyAndDescribeAcls executed createAcls(expected) before describeAcls; missing expected ACLs could be repaired before the verifier observed the original live state.",
+  "not_classified_as": "PREEXISTING_READ_ONLY_EXACT_MATCH",
+  "gate5_v7_frozen": "FROZEN_BLOCKED_EVIDENCE",
+  "gate5_v7_classification": "HARNESS_FALSE_PASS_RISK",
+  "preserved_positive_mtls": "36/36/36",
+  "gate5_v8_authorized": false,
+  "required_before_gate5_v8": [
+    "read-only pre-mutation ACL snapshot + exact compare",
+    "independent acceptance verify with mutation disabled",
+    "expanded managed ACL universe (stale/unknown/superseded principals)",
+    "AdminClient deleteAcls with exact filters (DENY + pattern type)",
+    "real 36-row identity canary",
+    "12-service authorization canary"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "document": "gate5-v8-preflight-carry-forward",
+  "ts": "2026-08-03T15:27:18Z",
+  "runtime_carry_forward_from": "c800ac5313ea8fb88a59f08c7347103ba1d4ed19",
+  "classification": "ACCEPTANCE_HARNESS_ONLY",
+  "read_only_acl_verifier": "PASS",
+  "mutation_during_acceptance_verify": false,
+  "acl_expected_vs_actual": "72/72",
+  "manifest_vs_live_delta": 0,
+  "preexisting_read_only_exact_match": true,
+  "identity_canary": "36/36",
+  "authorization_canary": "PASS",
+  "roles_expected_discovered": "19/19",
+  "participant_images_preserved": "12/12",
+  "gate5_v7_remains": "FROZEN_BLOCKED_EVIDENCE / HARNESS_FALSE_PASS_RISK",
+  "gate5_v8_preflight": "PASS"
+}

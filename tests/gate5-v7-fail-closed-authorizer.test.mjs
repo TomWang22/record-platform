@@ -254,23 +254,23 @@ describe("gate5-v7 fail-closed authorizer source", () => {
     const gi = read(path.join(REPO, ".gitignore"));
     assert.match(gi, /\.pem|\.key|pcap|pcaps/i);
     const boot = read(BOOTSTRAP);
-    assert.match(boot, /Does not place private keys/);
+    assert.match(boot, /Does not place private keys|Raw evidence under/);
     assert.equal(boot.includes("BEGIN PRIVATE KEY"), false);
     assert.match(boot, /RP_GATE5_V7_EVIDENCE_ROOT|evidence/);
-    assert.match(boot, /AdminClient|Gate5V7DescribeAcls|exact/);
+    assert.match(boot, /Gate5V7AclAdmin|describe/);
+    assert.match(boot, /pre-mutation|PREEXISTING_READ_ONLY|RECONCILED_POST_MUTATION/);
   });
 
-  it("20. authorizer/ACL drift fails acceptance preflight + prune is not a silent no-op", () => {
+  it("20. authorizer/ACL drift fails acceptance; describe≠reconcile; no silent expected dedupe", () => {
     assert.ok(fs.existsSync(path.join(REPO, "scripts/gate5-v7-authorizer-verify.sh")));
     assert.ok(fs.existsSync(path.join(REPO, "scripts/lib/gate5-v7-acl-normalize.py")));
-    assert.ok(fs.existsSync(path.join(REPO, "scripts/lib/Gate5V7DescribeAcls.java")));
+    assert.ok(fs.existsSync(path.join(REPO, "scripts/lib/Gate5V7AclAdmin.java")));
+    assert.ok(fs.existsSync(path.join(REPO, "reports/kafka/gate5-v8-acl-scope-contract.json")));
     assert.equal(manifest.apply_authorized, true);
-    assert.equal(manifest.authorizer_enablement_authorized, true);
     const boot = read(BOOTSTRAP);
-    // prune must either reconcile or refuse dishonest prune_mode
-    assert.match(boot, /RP_GATE5_V7_ACL_PRUNE/);
-    assert.match(boot, /prune_executed/);
-    assert.equal(boot.includes("prune_mode\": prune") && !boot.includes("prune_executed"), false);
+    assert.match(boot, /RP_GATE5_V7_ACL_RECONCILE/);
+    assert.match(boot, /independent-verify|preexisting_read_only_exact_match/);
+    assert.equal(boot.includes("createAcls(expected)") && boot.includes("describeAcls") && !boot.includes("JAVA_MODE"), false);
     const r = spawnSync("python3", [path.join(REPO, "scripts/gate5-v7-acl-offline-validate.py")], {
       encoding: "utf8",
       cwd: REPO,
@@ -278,26 +278,28 @@ describe("gate5-v7 fail-closed authorizer source", () => {
     assert.equal(r.status, 0, r.stderr || r.stdout);
     const norm = spawnSync(
       "python3",
-      [path.join(REPO, "scripts/lib/gate5-v7-acl-normalize.py"), "expected", MANIFEST],
+      [path.join(REPO, "scripts/lib/gate5-v7-acl-normalize.py"), "expected-json", MANIFEST],
       { encoding: "utf8", cwd: REPO },
     );
     assert.equal(norm.status, 0, norm.stderr || norm.stdout);
-    const expected = JSON.parse(norm.stdout);
-    assert.ok(expected.length >= 12);
-    // exact-set compare against itself must pass
-    const tmpExpected = path.join(REPO, "bench_logs", "gate5-v7-expected-self.json");
-    fs.mkdirSync(path.dirname(tmpExpected), { recursive: true });
-    fs.writeFileSync(tmpExpected, JSON.stringify(expected));
-    const cmp = spawnSync(
+    const body = JSON.parse(norm.stdout);
+    assert.equal(body.meta.expected_duplicate_rows, 0);
+    assert.equal(body.meta.expected_rows_unique, 72);
+    const tsv = spawnSync(
       "python3",
-      [path.join(REPO, "scripts/lib/gate5-v7-acl-normalize.py"), "compare", tmpExpected, tmpExpected, MANIFEST],
+      [path.join(REPO, "scripts/lib/gate5-v7-acl-normalize.py"), "expected-tsv", MANIFEST],
       { encoding: "utf8", cwd: REPO },
     );
-    assert.equal(cmp.status, 0, cmp.stderr || cmp.stdout);
-    const body = JSON.parse(cmp.stdout);
-    assert.equal(body.missing_acl_rows, 0);
-    assert.equal(body.unexpected_acl_rows, 0);
-    assert.equal(body.manifest_vs_live_delta, 0);
+    assert.equal(tsv.status, 0, tsv.stderr || tsv.stdout);
+    assert.match(tsv.stdout, /^resource_type\t/);
+  });
+
+  it("20b. identity canary is not a stub; authorization canary script exists", () => {
+    const id = read(path.join(REPO, "scripts/gate5-v7-identity-canary.sh"));
+    assert.equal(id.includes("not implemented until authorizer"), false);
+    assert.match(id, /prove-kafka-twelve-by-three-mtls|kafka-mtls36-incluster|36/);
+    assert.ok(fs.existsSync(path.join(REPO, "scripts/gate5-v7-authorization-canary.sh")));
+    assert.ok(fs.existsSync(path.join(REPO, "scripts/lib/gate5-v7-authz-canary-incluster.sh")));
   });
 
   it("21. all 19 logical roles have policy coverage (no shared/generic/unbounded)", () => {

@@ -1,0 +1,71 @@
+{
+  "document": "gate5-v8-acl-scope-contract",
+  "ts": "2026-08-03T14:30:00Z",
+  "managed_universe": {
+    "include": [
+      "bindings whose principal is one of the expected 12 service principals",
+      "bindings whose principal matches Record Platform service principal form User:O=Record Platform,CN=*",
+      "bindings whose resource is any managed topic or group in the final ACL manifest",
+      "application-principal cluster ACLs",
+      "superseded known principals listed below"
+    ],
+    "exclude_only": [
+      "measured broker principal",
+      "measured recovery-admin principal",
+      "documented Kafka internal/system principals",
+      "documented system ACL rows"
+    ]
+  },
+  "expected_application_principals": [
+    "User:O=Record Platform,CN=analytics-service",
+    "User:O=Record Platform,CN=auction-monitor",
+    "User:O=Record Platform,CN=auth-service",
+    "User:O=Record Platform,CN=listings-service",
+    "User:O=Record Platform,CN=media-service",
+    "User:O=Record Platform,CN=messaging-service",
+    "User:O=Record Platform,CN=notification-service",
+    "User:O=Record Platform,CN=python-ai-service",
+    "User:O=Record Platform,CN=shopping-service",
+    "User:O=Record Platform,CN=trust-service",
+    "User:O=Record Platform,CN=ollama-gateway",
+    "User:O=Record Platform,CN=ollama-worker"
+  ],
+  "superseded_principals": [
+    "User:O=record-platform,CN=kafka-client",
+    "User:CN=analytics-service,O=Record Platform",
+    "User:CN=auction-monitor,O=Record Platform",
+    "User:CN=auth-service,O=Record Platform",
+    "User:CN=listings-service,O=Record Platform",
+    "User:CN=media-service,O=Record Platform",
+    "User:CN=messaging-service,O=Record Platform",
+    "User:CN=notification-service,O=Record Platform",
+    "User:CN=python-ai-service,O=Record Platform",
+    "User:CN=shopping-service,O=Record Platform",
+    "User:CN=trust-service,O=Record Platform",
+    "User:CN=ollama-gateway,O=Record Platform",
+    "User:CN=ollama-worker,O=Record Platform",
+    "User:O=Record Platform,CN=kafka-client"
+  ],
+  "excluded_principals_allowlist": [
+    {
+      "principal": "User:O=record-platform,CN=kafka",
+      "role": "broker",
+      "source": "gate5-v7-kafka-node-principals.json"
+    },
+    {
+      "principal": "User:O=Record Platform,CN=gate5-v7-admin",
+      "role": "recovery-admin",
+      "source": "gate5-v7-kafka-node-principals.json"
+    }
+  ],
+  "kafka_internal_system_principals": [],
+  "documented_system_acl_rows": [],
+  "record_platform_service_principal_regex": "^User:O=Record Platform,CN=[A-Za-z0-9._-]+$",
+  "cn_before_o_regex": "^User:CN=.+,O=",
+  "acceptance": {
+    "unknown_principals": 0,
+    "stale_principals": 0,
+    "superseded_principals": 0,
+    "managed_resource_unknown_principal_rows": 0
+  }
+}

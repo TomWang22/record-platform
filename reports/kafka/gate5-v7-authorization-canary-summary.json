@@ -1,0 +1,13 @@
+{
+  "document": "gate5-v7-authorization-canary-summary",
+  "ts": "2026-08-03T15:26:45Z",
+  "rows": 48,
+  "failed": 0,
+  "forbidden_topic_denied": "12/12",
+  "forbidden_cluster_operation_denied": "12/12",
+  "client_id_authorization_effects": 0,
+  "unauthorized_records_written": 0,
+  "unauthorized_offsets_committed": 0,
+  "unauthorized_business_effects": 0,
+  "passed": true
+}

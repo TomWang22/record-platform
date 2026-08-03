@@ -25,7 +25,7 @@ IMAGE="${KAFKA_IMAGE:-confluentinc/cp-kafka:7.5.0}"
 PRUNE="${RP_GATE5_V7_ACL_PRUNE:-0}"
 LOCK_CM="gate5-v7-acl-bootstrap-lock"
 JOB_TIMEOUT_SEC="${RP_GATE5_V7_ACL_JOB_TIMEOUT_SEC:-300}"
-CLI_TIMEOUT_SEC="${RP_GATE5_V7_ACL_CLI_TIMEOUT_SEC:-45}"
+CLI_TIMEOUT_SEC="${RP_GATE5_V7_ACL_CLI_TIMEOUT_SEC:-180}"
 
 fail() { echo "❌ $*" >&2; exit 1; }
 ok() { echo "✅ $*"; }
@@ -99,53 +99,20 @@ PY
 EXPECTED_FILE="${EVIDENCE_DIR}/expected-acls.json"
 LIVE_FILE="${EVIDENCE_DIR}/live-acls.json"
 COMPARE_FILE="${EVIDENCE_DIR}/compare.json"
-CMDS_FILE="${EVIDENCE_DIR}/add-cmds.sh"
 PRUNE_CMDS_FILE="${EVIDENCE_DIR}/prune-cmds.sh"
-JAVA_SRC="${SCRIPT_DIR}/lib/Gate5V7DescribeAcls.java"
+JAVA_DESCRIBE_SRC="${SCRIPT_DIR}/lib/Gate5V7DescribeAcls.java"
+JAVA_APPLY_SRC="${SCRIPT_DIR}/lib/Gate5V7ApplyAndDescribeAcls.java"
 
 python3 "$SCRIPT_DIR/lib/gate5-v7-acl-normalize.py" expected "$MANIFEST" >"$EXPECTED_FILE"
 EXP_COUNT="$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))))' "$EXPECTED_FILE")"
 ok "expected_acl_rows=${EXP_COUNT}"
 
-# Build add commands from expected set
-export CLI_TIMEOUT_SEC
-python3 - "$EXPECTED_FILE" "$CMDS_FILE" <<'PY'
-import json, os, sys
-from pathlib import Path
-rows = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-timeout = int(os.environ.get("CLI_TIMEOUT_SEC", "45"))
-cmds = []
-for b in rows:
-    op = b["operation"]
-    cli_op = {
-        "IDEMPOTENT_WRITE": "IdempotentWrite",
-        "ALTER_CONFIGS": "AlterConfigs",
-    }.get(op, op.title().replace("_", ""))
-    principal = b["principal"]
-    base = (
-        f'timeout {timeout} '
-        f'kafka-acls --bootstrap-server "$BOOT" --command-config /tmp/admin.props '
-        f'--add --allow-principal "{principal}" --operation {cli_op} --allow-host "*"'
-    )
-    rt = b["resource_type"]
-    if rt == "TOPIC":
-        cmds.append(f'{base} --topic "{b["resource_name"]}"')
-    elif rt == "GROUP":
-        cmds.append(f'{base} --group "{b["resource_name"]}"')
-    elif rt == "CLUSTER":
-        cmds.append(f"{base} --cluster")
-    else:
-        raise SystemExit(f"unsupported {rt}")
-Path(sys.argv[2]).write_text("\n".join(cmds) + "\n", encoding="utf-8")
-print(f"acl_add_commands={len(cmds)}")
-PY
-
 JOB="gate5-v7-acl-bootstrap-${RUN_ID}"
 kubectl -n "$NS" delete job "$JOB" --ignore-not-found >/dev/null 2>&1 || true
 kubectl -n "$NS" delete configmap "${JOB}-assets" --ignore-not-found >/dev/null 2>&1 || true
 kubectl -n "$NS" create configmap "${JOB}-assets" \
-  --from-file=cmds.sh="$CMDS_FILE" \
-  --from-file=Gate5V7DescribeAcls.java="$JAVA_SRC" \
+  --from-file=Gate5V7DescribeAcls.java="$JAVA_DESCRIBE_SRC" \
+  --from-file=Gate5V7ApplyAndDescribeAcls.java="$JAVA_APPLY_SRC" \
   --from-file=expected.json="$EXPECTED_FILE" >/dev/null
 
 cat <<EOF | kubectl -n "$NS" apply -f -
@@ -175,7 +142,7 @@ spec:
             - name: PRUNE
               value: "${PRUNE}"
             - name: RP_GATE5_V7_ACL_DESCRIBE_TIMEOUT_SEC
-              value: "${CLI_TIMEOUT_SEC}"
+              value: "120"
           volumeMounts:
             - name: admin-tls
               mountPath: /etc/kafka/admin
@@ -253,15 +220,14 @@ spec:
               timed kafka-broker-api-versions --bootstrap-server "\$BOOT" --command-config /tmp/admin.props >/tmp/meta.out \
                 || { echo "TIMEOUT_OR_FAIL=metadata"; exit 42; }
               head -c 400 /tmp/meta.out; echo
-              echo "=== apply ACLs ==="
-              bash /assets/cmds.sh
-              # Optional prune path requires describe first then remove unexpected — handled after describe below when PRUNE=1
-              echo "=== compile AdminClient describer ==="
+              echo "=== AdminClient createAcls + describeAcls ==="
               CP=\$(echo /usr/share/java/kafka/*.jar /usr/share/java/cp-base-java/*.jar 2>/dev/null | tr ' ' ':')
-              timed javac -cp "\$CP" -d /tmp /assets/Gate5V7DescribeAcls.java
-              echo "=== describe ACLs (AdminClient) ==="
-              timed java -cp "/tmp:\$CP" Gate5V7DescribeAcls "\$BOOT" /tmp/admin.props | tee /tmp/describe.out \
-                || { echo "TIMEOUT_OR_FAIL=describeAcls"; exit 42; }
+              timed javac -cp "\$CP" -d /tmp /assets/Gate5V7ApplyAndDescribeAcls.java \
+                || { echo "TIMEOUT_OR_FAIL=javac"; exit 42; }
+              timed java -cp "/tmp:\$CP" Gate5V7ApplyAndDescribeAcls "\$BOOT" /tmp/admin.props /assets/expected.json \
+                | tee /tmp/describe.out \
+                || { echo "TIMEOUT_OR_FAIL=applyDescribeAcls"; exit 42; }
+              grep -q 'ACL_CREATE_OK' /tmp/describe.out
               python3 - <<'PY'
               from pathlib import Path
               text=Path('/tmp/describe.out').read_text()
@@ -272,8 +238,6 @@ spec:
               PY
               if [[ "\${PRUNE}" == "1" ]]; then
                 echo "=== prune unexpected application ACLs ==="
-                # Host-side prune plan is preferred; in-Job prune uses python normalize if shipped.
-                # For Job autonomy: unexpected removals computed on host after first describe when PRUNE=1.
                 echo "PRUNE_IN_JOB=deferred_to_host"
               fi
               echo "ACL_BOOTSTRAP_APPLY_OK"

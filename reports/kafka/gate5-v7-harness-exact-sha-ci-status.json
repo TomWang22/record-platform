@@ -1,0 +1,37 @@
+{
+  "document": "gate5-v7-harness-exact-sha-ci-status",
+  "ts": "2026-08-03T03:28:47Z",
+  "source_sha": "362e8617a38fe59af9d892ade25f4b292f917f4a",
+  "runtime_pin_preserved": "c800ac5313ea8fb88a59f08c7347103ba1d4ed19",
+  "classification": "ACCEPTANCE_HARNESS_ONLY",
+  "workflows": [
+    {
+      "name": "ci",
+      "conclusion": "success",
+      "id": 30781478293
+    },
+    {
+      "name": "docker-build",
+      "conclusion": "success",
+      "id": 30781478332
+    },
+    {
+      "name": "Protocol validation (static + fixtures)",
+      "conclusion": "success",
+      "id": 30781478319
+    },
+    {
+      "name": "RP Namespace Lint",
+      "conclusion": "success",
+      "id": 30781478317
+    }
+  ],
+  "workflows_expected": 4,
+  "workflows_passed": 4,
+  "exact_sha_ci": "GREEN",
+  "path_filtered_note": "kafka-dns-validate and Kafka cluster verify static workflows did not trigger (harness-only path change vs prior authorizer/manifest land)",
+  "gate5_v7_frozen": "FROZEN_BLOCKED_EVIDENCE",
+  "gate5_v8_created": false,
+  "gate5_final_pass": false,
+  "gate6_authorized": false
+}

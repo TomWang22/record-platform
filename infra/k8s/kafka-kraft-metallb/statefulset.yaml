@@ -272,10 +272,35 @@ spec:
             - { name: data, mountPath: /var/lib/kafka/data }
             - { name: external-lb-ip, mountPath: /shared-lb, readOnly: true }
           readinessProbe:
-            tcpSocket: { port: 9093 }
+            # Gate 5: TCP-open is insufficient. Require authenticated Kafka ApiVersions on INTERNAL :9093
+            # using the broker's own keystore/truststore (clientAuth required; no TLS/auth bypass).
+            exec:
+              command:
+                - /bin/bash
+                - -lc
+                - |
+                  set -euo pipefail
+                  KS=/etc/kafka/secrets
+                  PASS=$(cat "$KS/kafka.keystore-password")
+                  TPASS=$(cat "$KS/kafka.truststore-password")
+                  HOST="${HOSTNAME}.kafka.record-platform.svc.cluster.local"
+                  {
+                    echo "security.protocol=SSL"
+                    echo "ssl.keystore.location=${KS}/kafka.keystore.jks"
+                    echo "ssl.keystore.password=${PASS}"
+                    echo "ssl.key.password=${PASS}"
+                    echo "ssl.truststore.location=${KS}/kafka.truststore.jks"
+                    echo "ssl.truststore.password=${TPASS}"
+                    echo "ssl.endpoint.identification.algorithm=HTTPS"
+                    echo "client.id=record-platform.kafka.readiness.${HOSTNAME}"
+                    echo "request.timeout.ms=8000"
+                    echo "default.api.timeout.ms=10000"
+                  } >/tmp/rp-ready.props
+                  OUT=$(timeout 15 kafka-broker-api-versions --bootstrap-server "${HOST}:9093" --command-config /tmp/rp-ready.props 2>&1)
+                  echo "$OUT" | grep -qiE 'ApiVersion|id@[0-9]+'
             initialDelaySeconds: 90
-            periodSeconds: 10
-            timeoutSeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 20
             failureThreshold: 30
           livenessProbe:
             tcpSocket: { port: 9093 }

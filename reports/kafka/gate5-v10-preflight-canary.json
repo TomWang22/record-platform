@@ -1,0 +1,27 @@
+{
+  "document": "gate5-v10-preflight-canary",
+  "ts": "2026-08-03T20:50:00Z",
+  "status": "NOT_RUN",
+  "blocked_until": [
+    "readiness remediation landed",
+    "exact-SHA CI green",
+    "kafka brokers rebuilt/repinned if required",
+    "analytics→kafka-0 20/20/20/0 post-roll",
+    "controls 5/5 each",
+    "full identity 36/36/36/0",
+    "negative controls",
+    "ACL 72/72/0",
+    "15-minute stability"
+  ],
+  "analytics_to_kafka0": null,
+  "analytics_to_kafka1": null,
+  "analytics_to_kafka2": null,
+  "full_identity_canary": null,
+  "negatives": null,
+  "acl_exact_match": null,
+  "stability_15m": null,
+  "pre_v10_canary_pass": false,
+  "v10_created": false,
+  "gate5_final_pass": false,
+  "gate6_authorized": false
+}

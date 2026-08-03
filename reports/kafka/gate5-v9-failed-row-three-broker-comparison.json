@@ -1,0 +1,99 @@
+{
+  "document": "gate5-v9-failed-row-three-broker-comparison",
+  "client": "analytics-service",
+  "staged_apiversions": {
+    "0": {
+      "classification": "PASS",
+      "exit_code": 0,
+      "duration_ms": 10635,
+      "detail_tail": "amCredentials(50): 0 [usable: 0],\n\tAlterUserScramCredentials(51): 0 [usable: 0],\n\tDescribeQuorum(55): 0 to 1 [usable: 1],\n\tAlterPartition(56): UNSUPPORTED,\n\tUpdateFeatures(57): 0 to 1 [usable: 1],\n\tEnvelope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+    },
+    "1": {
+      "classification": "PASS",
+      "exit_code": 0,
+      "duration_ms": 4133,
+      "detail_tail": "amCredentials(50): 0 [usable: 0],\n\tAlterUserScramCredentials(51): 0 [usable: 0],\n\tDescribeQuorum(55): 0 to 1 [usable: 1],\n\tAlterPartition(56): UNSUPPORTED,\n\tUpdateFeatures(57): 0 to 1 [usable: 1],\n\tEnvelope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+    },
+    "2": {
+      "classification": "PASS",
+      "exit_code": 0,
+      "duration_ms": 3169,
+      "detail_tail": "amCredentials(50): 0 [usable: 0],\n\tAlterUserScramCredentials(51): 0 [usable: 0],\n\tDescribeQuorum(55): 0 to 1 [usable: 1],\n\tAlterPartition(56): UNSUPPORTED,\n\tUpdateFeatures(57): 0 to 1 [usable: 1],\n\tEnvelope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+    }
+  },
+  "repetition_summary": {
+    "kafka_0": {
+      "expected": 20,
+      "tested": 20,
+      "passed": 20,
+      "failed": 0,
+      "classifications": {
+        "PASS": 20
+      },
+      "latency_ms": [
+        2727,
+        3001,
+        3107,
+        3154,
+        3307,
+        3539,
+        3559,
+        3718,
+        3773,
+        3869,
+        5176,
+        5373,
+        5741,
+        7281,
+        7633,
+        8141,
+        9508,
+        10071,
+        10339,
+        13105
+      ]
+    },
+    "kafka_1": {
+      "expected": 5,
+      "tested": 5,
+      "passed": 5,
+      "failed": 0,
+      "classifications": {
+        "PASS": 5
+      },
+      "latency_ms": [
+        2313,
+        6278,
+        8695,
+        11187,
+        19249
+      ]
+    },
+    "kafka_2": {
+      "expected": 5,
+      "tested": 5,
+      "passed": 5,
+      "failed": 0,
+      "classifications": {
+        "PASS": 5
+      },
+      "latency_ms": [
+        3466,
+        5773,
+        6592,
+        6991,
+        13845
+      ]
+    }
+  },
+  "brief": {
+    "staged_api": {
+      "0": "PASS",
+      "1": "PASS",
+      "2": "PASS"
+    },
+    "rep0": "20/20/20/0",
+    "rep1": "5/5/5/0",
+    "rep2": "5/5/5/0"
+  }
+}

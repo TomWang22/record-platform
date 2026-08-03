@@ -1,0 +1,43 @@
+{
+  "document": "gate5-v9-kafka0-readiness-analysis",
+  "ts": "2026-08-03T20:50:00Z",
+  "at_v9_failure_window": {
+    "readinessProbe": {
+      "tcpSocket": { "port": 9093 },
+      "initialDelaySeconds": 90,
+      "periodSeconds": 10,
+      "timeoutSeconds": 5,
+      "failureThreshold": 30
+    },
+    "livenessProbe": {
+      "tcpSocket": { "port": 9093 }
+    },
+    "proves": [
+      "TCP_PORT_OPEN"
+    ],
+    "does_not_prove": [
+      "TLS_LISTENER_ACCEPTING_WITH_CLIENT_AUTH",
+      "APIVERSIONS_SUCCESS",
+      "BROKER_REGISTERED_IN_QUORUM",
+      "STANDARD_AUTHORIZER_INITIALIZED",
+      "METADATA_AVAILABLE"
+    ]
+  },
+  "classification": [
+    "TCP_ONLY_READINESS_FALSE_POSITIVE_RISK",
+    "BROKER_READINESS_FALSE_POSITIVE"
+  ],
+  "acceptance_relevant_kafka_protocol_required": true,
+  "kubernetes_ready_alone_insufficient": true,
+  "remediation_applied_in_source": {
+    "file": "infra/k8s/kafka-kraft-metallb/statefulset.yaml",
+    "readiness": "exec kafka-broker-api-versions with mounted keystore/truststore",
+    "tls_bypass": false,
+    "client_auth_bypass": false,
+    "allow_everyone_bypass": false,
+    "hostname_verification": "HTTPS",
+    "dry_run_on_live_kafka0": "PASS",
+    "runtime_rolled": false
+  },
+  "regression_test": "tests/gate5-kafka-readiness-not-tcp-only.test.mjs"
+}

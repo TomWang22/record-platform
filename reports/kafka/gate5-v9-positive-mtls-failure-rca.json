@@ -1,0 +1,107 @@
+{
+  "document": "gate5-v9-positive-mtls-failure-rca",
+  "ts": "2026-08-03T20:50:00Z",
+  "evidence_root_v9": "/tmp/record-platform-runtime-heartbeat-gate5-v9",
+  "rca_root": "/tmp/record-platform-gate5-v9-positive-mtls-rca-v1",
+  "v9_terminal_state": "FROZEN_BLOCKED_EVIDENCE",
+  "v9_mutated_after_freeze": false,
+  "v9_rows_retried": 0,
+  "v9_rows_importable_into_v10": false,
+  "platform_failure": true,
+  "harness_failure": false,
+  "classification": "POSITIVE_MTLS_ROW_FAILED",
+  "failed_row": "analytics-service × kafka-0",
+  "controls": {
+    "analytics-service × kafka-1": "PASS",
+    "analytics-service × kafka-2": "PASS"
+  },
+  "matrix": "36/36/35/1",
+  "ORIGINAL_ROW_CAUSAL_LAYER": "INSUFFICIENT_EVIDENCE",
+  "exact_original_exception": null,
+  "exact_original_exception_note": "v9 matrix row retained OpenSSL/chain/hostname fields and pass=false but did not retain kafka-broker-api-versions stdout/stderr/exit_code; first causal exception unavailable",
+  "failure_layer_at_acceptance": "KAFKA_PROTOCOL_OR_RESPONSE_HANDLING_UNLOCALIZED",
+  "openssl_not_confused_with_kafka_success": true,
+  "preservation": {
+    "FROZEN_BLOCKED_EVIDENCE_sha256": "492ecea2a0e7817a1de49334ff6ba6161576c0347c83a62391352162288881a1",
+    "HARD_FAILURE_sha256": "5ed31ff19ad2dbd68fd1abc010119efb1352a696eef45fcfd70d7c3b78fcb163",
+    "failed_row_json_sha256": "9ef9244e7263bec56133ac843341155e5e31b57f2b122cbedd02fad58deb74b4",
+    "denominator_contract_sha256": "26c9b719f1248279ef939cb161441e0199cbea4013f117fa8ae1ec6da5bf7470",
+    "acl_checkpoint_00_sha256": "ee240248a63f4c22f4abfbeb043f97e8832e7c12f1a0ef956d99d4110ce06d91",
+    "v9_file_count": 26,
+    "v9_byte_count": 203017,
+    "v8_frozen": true
+  },
+  "reproducer": {
+    "script": "scripts/gate5-v9-positive-mtls-rca-reproducer.sh",
+    "endpoint": "kafka-0.kafka.record-platform.svc.cluster.local:9093",
+    "no_bootstrap_fallback": true,
+    "staged_expected_tested_passed_failed": "1/1/1/0",
+    "staged_apiversions_by_broker": {
+      "kafka-0": "PASS",
+      "kafka-1": "PASS",
+      "kafka-2": "PASS"
+    }
+  },
+  "repetition": {
+    "analytics_to_kafka0": "20/20/20/0",
+    "analytics_to_kafka1": "5/5/5/0",
+    "analytics_to_kafka2": "5/5/5/0",
+    "interpretation": "NO_REPRODUCED_FAILURE_AT_RCA_TIME — not remediation; acceptance failure remains valid until readiness/race defect remediated and pre-v10 canary passes"
+  },
+  "broker_config": {
+    "broker_config_expected_collected": "3/3",
+    "unexpected_config_differences": 0,
+    "only_expected_difference": "podIP",
+    "standard_authorizer_present_all": true,
+    "pki_mount_aligned": true
+  },
+  "readiness": {
+    "at_failure_window_probe": "tcpSocket:9093",
+    "classification": "TCP_ONLY_READINESS_FALSE_POSITIVE_RISK",
+    "BROKER_READINESS_FALSE_POSITIVE": "RISK_CONFIRMED_AS_ACCEPTANCE_GAP",
+    "remediation": "replace readiness with authenticated kafka-broker-api-versions using mounted keystore/truststore; HTTPS endpoint ID; no allow.everyone; no ssl.client.auth=none"
+  },
+  "packet_captures": {
+    "expected": 3,
+    "present": 0,
+    "note": "pcap directory empty at RCA time; layer localization relied on staged OpenSSL vs Kafka client paths"
+  },
+  "rca_answers": {
+    "1_exact_kafka_client_tls_handshake_complete": "UNKNOWN_AT_ORIGINAL_ROW; YES on all later staged/repetition rows (OpenSSL and Kafka client succeeded)",
+    "2_client_certificate_kafka0_received": "INFERRED_FROM_EXCLUSIVE_KEYSTORE leaf_fp=1C:59:F6:42:3E:7B:C6:2D:60:3E:69:C8:99:3C:19:EF:08:89:BC:0C:BA:DD:F5:66:8C:94:50:6E:26:8B:B2:EE; broker-observed leaf not logged in original row",
+    "3_server_certificate_client_received": "broker leaf_fp=96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04 (OpenSSL path in original row and later repro)",
+    "4_hostname_verification_kafka_client_path": "OpenSSL hostname_verify_ok=true on original row; Kafka client path not separately evidenced on failure; later repro PASS with HTTPS algorithm",
+    "5_apiversions_reached_kafka0": "UNKNOWN on original failure (pass=false without stderr); YES on later 20/20 and staged row",
+    "6_kafka0_returned_kafka_response": "UNKNOWN on original; YES later",
+    "7_standard_authorizer_initialized": "authorizer.class.name present on all three brokers at RCA; original-window authorizer readiness not proven",
+    "8_kafka0_registered_serving_metadata": "YES at RCA (metadata/topic describe PASS); original-window UNKNOWN",
+    "9_deterministic_or_intermittent": "NOT_REPRODUCED — consistent with intermittent readiness/saturation/timeout; not proven deterministic config drift",
+    "10_why_kafka1_kafka2_passed": "same client identity/PKI; no config drift vs kafka-0 except podIP; kafka-0 ApiVersions often slower in staged run (~10s) — consistent with broker-local latency/race under TCP-only Ready",
+    "11_exact_remediation": "C. BROKER_READINESS_FALSE_POSITIVE harden + harness causal capture (timeout 45, exit_code, failure_class, stderr_tail) so future failures localize layer",
+    "12_regression_test": "tests/gate5-kafka-readiness-not-tcp-only.test.mjs"
+  },
+  "root_cause": {
+    "primary_class": "BROKER_READINESS_FALSE_POSITIVE",
+    "supporting": [
+      "ORIGINAL_ROW_CAUSAL_LAYER=INSUFFICIENT_EVIDENCE",
+      "TCP-only readiness allowed Ready while acceptance requires authenticated ApiVersions",
+      "no kafka-0-only config/PKI drift found",
+      "failure not reproduced in 20 direct rows — does not clear the acceptance failure"
+    ],
+    "not_proven": [
+      "deterministic TLS defect on kafka-0",
+      "authorizer startup race at exact failure instant",
+      "CNI packet loss",
+      "harness false classification of a successful ApiVersions"
+    ]
+  },
+  "remediation_paths": [
+    "infra/k8s/kafka-kraft-metallb/statefulset.yaml readinessProbe → authenticated ApiVersions",
+    "scripts/lib/kafka-mtls36-incluster.sh → retain kafka exit/class/stderr on failure",
+    "tests/gate5-kafka-readiness-not-tcp-only.test.mjs"
+  ],
+  "v10_created": false,
+  "gate5_final_pass": false,
+  "gate6_authorized": false,
+  "production_approved": false
+}

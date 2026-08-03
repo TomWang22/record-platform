@@ -1,0 +1,270 @@
+{
+  "document": "gate5-v9-broker-effective-config-comparison",
+  "ts": "2026-08-03T20:40:07Z",
+  "statefulset": {
+    "generation": 6,
+    "resourceVersion": "296769",
+    "replicas": 3,
+    "readyReplicas": 3
+  },
+  "brokers": {
+    "kafka-0": {
+      "uid": "6fd05d69-33ca-4e96-9af6-5d77282bbd68",
+      "resourceVersion": "296692",
+      "ready": true,
+      "phase": "Running",
+      "image": "confluentinc/cp-kafka:7.5.0",
+      "imageID": "docker-pullable://confluentinc/cp-kafka@sha256:fbbb6fa11b258a88b83f54d4f0bddfcffbf2279f99d66a843486e3da7bdfbf41",
+      "restartCount": 0,
+      "startedAt": "2026-08-03T08:15:21Z",
+      "podIP": "10.42.0.91",
+      "nodeName": "colima",
+      "env_subset": {
+        "KAFKA_HEAP_OPTS": "-Xms256m -Xmx384m",
+        "KAFKA_PROCESS_ROLES": "broker,controller",
+        "KAFKA_CLUSTER_ID": "KfF3uZ3kQsyKJvYU8vHvBA",
+        "KAFKA_LISTENERS": "INTERNAL://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9095",
+        "KAFKA_CONTROLLER_QUORUM_VOTERS": "0@kafka-0.kafka.record-platform.svc.cluster.local:9095,1@kafka-1.kafka.record-platform.svc.cluster.local:9095,2@kafka-2.kafka.record-platform.svc.cluster.local:9095",
+        "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "INTERNAL:SSL,EXTERNAL:SSL,CONTROLLER:SSL",
+        "KAFKA_INTER_BROKER_LISTENER_NAME": "INTERNAL",
+        "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+        "KAFKA_DEFAULT_REPLICATION_FACTOR": "3",
+        "KAFKA_MIN_INSYNC_REPLICAS": "2",
+        "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "3",
+        "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "3",
+        "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "2",
+        "KAFKA_AUTO_CREATE_TOPICS_ENABLE": "false",
+        "KAFKA_SSL_CLIENT_AUTH": "required",
+        "KAFKA_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_SSL_KEYSTORE_CREDENTIALS": "/etc/kafka/secrets/kafka.keystore-password",
+        "KAFKA_SSL_KEY_CREDENTIALS": "/etc/kafka/secrets/kafka.key-password",
+        "KAFKA_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_SSL_TRUSTSTORE_CREDENTIALS": "/etc/kafka/secrets/kafka.truststore-password",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_CLIENT_AUTH": "required",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_CLIENT_AUTH": "required",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH": "required",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM": "HTTPS",
+        "KAFKA_AUTHORIZER_CLASS_NAME": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
+        "KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND": "false",
+        "KAFKA_SUPER_USERS": "User:O=record-platform,CN=kafka;User:O=Record Platform,CN=gate5-v7-admin"
+      },
+      "probes": [
+        {
+          "readinessProbe": {
+            "failureThreshold": 30,
+            "initialDelaySeconds": 90,
+            "periodSeconds": 10,
+            "successThreshold": 1,
+            "tcpSocket": {
+              "port": 9093
+            },
+            "timeoutSeconds": 5
+          },
+          "livenessProbe": {
+            "failureThreshold": 8,
+            "initialDelaySeconds": 240,
+            "periodSeconds": 20,
+            "successThreshold": 1,
+            "tcpSocket": {
+              "port": 9093
+            },
+            "timeoutSeconds": 5
+          },
+          "startupProbe": null
+        }
+      ],
+      "runtime_snapshot": "ORT=9094\nKAFKA_2_EXTERNAL_PORT_9094_TCP_PROTO=tcp\nKAFKA_2_EXTERNAL_SERVICE_HOST=10.43.83.110\nKAFKA_2_EXTERNAL_SERVICE_PORT=9094\nKAFKA_2_EXTERNAL_SERVICE_PORT_EXTERNAL=9094\nKAFKA_ADVERTISED_LISTENERS=\nKAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND=false\nKAFKA_AUTHORIZER_CLASS_NAME=org.apache.kafka.metadata.authorizer.StandardAuthorizer\nKAFKA_AUTO_CREATE_TOPICS_ENABLE=false\nKAFKA_CLUSTER_ID=KfF3uZ3kQsyKJvYU8vHvBA\nKAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER\nKAFKA_CONTROLLER_QUORUM_VOTERS=0@kafka-0.kafka.record-platform.svc.cluster.local:9095,1@kafka-1.kafka.record-platform.svc.cluster.local:9095,2@kafka-2.kafka.record-platform.svc.cluster.local:9095\nKAFKA_DEFAULT_REPLICATION_FACTOR=3\nKAFKA_EXTERNAL_PORT=tcp://10.43.123.113:9093\nKAFKA_EXTERNAL_PORT_9093_TCP=tcp://10.43.123.113:9093\nKAFKA_EXTERNAL_PORT_9093_TCP_ADDR=10.43.123.113\nKAFKA_EXTERNAL_PORT_9093_TCP_PORT=9093\nKAFKA_EXTERNAL_PORT_9093_TCP_PROTO=tcp\nKAFKA_EXTERNAL_SERVICE_HOST=10.43.123.113\nKAFKA_EXTERNAL_SERVICE_PORT=9093\nKAFKA_EXTERNAL_SERVICE_PORT_KAFKA_SSL=9093\nKAFKA_HEAP_OPTS=-Xms256m -Xmx384m\nKAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL\nKAFKA_LISTENERS=INTERNAL://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9095\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH=required\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=HTTPS\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEY_PASSWORD=changeit\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_CLIENT_AUTH=required\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEY_PASSWORD=changeit\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_INTERNAL_SSL_CLIENT_AUTH=required\nKAFKA_LISTENER_NAME_INTERNAL_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEY_PASSWORD=changeit\nKAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_PASSWORD=changeit\nKAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:SSL,EXTERNAL:SSL,CONTROLLER:SSL\nKAFKA_MIN_INSYNC_REPLICAS=2\nKAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=3\nKAFKA_PROCESS_ROLES=broker,controller\nKAFKA_SSL_CLIENT_AUTH=required\nKAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=\nKAFKA_SSL_KEYSTORE_CREDENTIALS=/etc/kafka/secrets/kafka.keystore-password\nKAFKA_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_SSL_KEY_CREDENTIALS=/etc/kafka/secrets/kafka.key-password\nKAFKA_SSL_TRUSTSTORE_CREDENTIALS=/etc/kafka/secrets/kafka.truststore-password\nKAFKA_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_SUPER_USERS=User:O=record-platform,CN=kafka;User:O=Record Platform,CN=gate5-v7-admin\nKAFKA_TRANSACTION_STATE_LOG_MIN_ISR=2\nKAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3\nKAFKA_ZOOKEEPER_CONNECT=\n"
+    },
+    "kafka-1": {
+      "uid": "a3bb9beb-37a6-47c1-820c-b879eb129ac5",
+      "resourceVersion": "296750",
+      "ready": true,
+      "phase": "Running",
+      "image": "confluentinc/cp-kafka:7.5.0",
+      "imageID": "docker-pullable://confluentinc/cp-kafka@sha256:fbbb6fa11b258a88b83f54d4f0bddfcffbf2279f99d66a843486e3da7bdfbf41",
+      "restartCount": 0,
+      "startedAt": "2026-08-03T08:15:06Z",
+      "podIP": "10.42.0.86",
+      "nodeName": "colima",
+      "env_subset": {
+        "KAFKA_HEAP_OPTS": "-Xms256m -Xmx384m",
+        "KAFKA_PROCESS_ROLES": "broker,controller",
+        "KAFKA_CLUSTER_ID": "KfF3uZ3kQsyKJvYU8vHvBA",
+        "KAFKA_LISTENERS": "INTERNAL://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9095",
+        "KAFKA_CONTROLLER_QUORUM_VOTERS": "0@kafka-0.kafka.record-platform.svc.cluster.local:9095,1@kafka-1.kafka.record-platform.svc.cluster.local:9095,2@kafka-2.kafka.record-platform.svc.cluster.local:9095",
+        "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "INTERNAL:SSL,EXTERNAL:SSL,CONTROLLER:SSL",
+        "KAFKA_INTER_BROKER_LISTENER_NAME": "INTERNAL",
+        "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+        "KAFKA_DEFAULT_REPLICATION_FACTOR": "3",
+        "KAFKA_MIN_INSYNC_REPLICAS": "2",
+        "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "3",
+        "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "3",
+        "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "2",
+        "KAFKA_AUTO_CREATE_TOPICS_ENABLE": "false",
+        "KAFKA_SSL_CLIENT_AUTH": "required",
+        "KAFKA_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_SSL_KEYSTORE_CREDENTIALS": "/etc/kafka/secrets/kafka.keystore-password",
+        "KAFKA_SSL_KEY_CREDENTIALS": "/etc/kafka/secrets/kafka.key-password",
+        "KAFKA_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_SSL_TRUSTSTORE_CREDENTIALS": "/etc/kafka/secrets/kafka.truststore-password",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_CLIENT_AUTH": "required",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_CLIENT_AUTH": "required",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH": "required",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM": "HTTPS",
+        "KAFKA_AUTHORIZER_CLASS_NAME": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
+        "KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND": "false",
+        "KAFKA_SUPER_USERS": "User:O=record-platform,CN=kafka;User:O=Record Platform,CN=gate5-v7-admin"
+      },
+      "probes": [
+        {
+          "readinessProbe": {
+            "failureThreshold": 30,
+            "initialDelaySeconds": 90,
+            "periodSeconds": 10,
+            "successThreshold": 1,
+            "tcpSocket": {
+              "port": 9093
+            },
+            "timeoutSeconds": 5
+          },
+          "livenessProbe": {
+            "failureThreshold": 8,
+            "initialDelaySeconds": 240,
+            "periodSeconds": 20,
+            "successThreshold": 1,
+            "tcpSocket": {
+              "port": 9093
+            },
+            "timeoutSeconds": 5
+          },
+          "startupProbe": null
+        }
+      ],
+      "runtime_snapshot": "ORT=9094\nKAFKA_2_EXTERNAL_PORT_9094_TCP_PROTO=tcp\nKAFKA_2_EXTERNAL_SERVICE_HOST=10.43.83.110\nKAFKA_2_EXTERNAL_SERVICE_PORT=9094\nKAFKA_2_EXTERNAL_SERVICE_PORT_EXTERNAL=9094\nKAFKA_ADVERTISED_LISTENERS=\nKAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND=false\nKAFKA_AUTHORIZER_CLASS_NAME=org.apache.kafka.metadata.authorizer.StandardAuthorizer\nKAFKA_AUTO_CREATE_TOPICS_ENABLE=false\nKAFKA_CLUSTER_ID=KfF3uZ3kQsyKJvYU8vHvBA\nKAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER\nKAFKA_CONTROLLER_QUORUM_VOTERS=0@kafka-0.kafka.record-platform.svc.cluster.local:9095,1@kafka-1.kafka.record-platform.svc.cluster.local:9095,2@kafka-2.kafka.record-platform.svc.cluster.local:9095\nKAFKA_DEFAULT_REPLICATION_FACTOR=3\nKAFKA_EXTERNAL_PORT=tcp://10.43.123.113:9093\nKAFKA_EXTERNAL_PORT_9093_TCP=tcp://10.43.123.113:9093\nKAFKA_EXTERNAL_PORT_9093_TCP_ADDR=10.43.123.113\nKAFKA_EXTERNAL_PORT_9093_TCP_PORT=9093\nKAFKA_EXTERNAL_PORT_9093_TCP_PROTO=tcp\nKAFKA_EXTERNAL_SERVICE_HOST=10.43.123.113\nKAFKA_EXTERNAL_SERVICE_PORT=9093\nKAFKA_EXTERNAL_SERVICE_PORT_KAFKA_SSL=9093\nKAFKA_HEAP_OPTS=-Xms256m -Xmx384m\nKAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL\nKAFKA_LISTENERS=INTERNAL://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9095\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH=required\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=HTTPS\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEY_PASSWORD=changeit\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_CLIENT_AUTH=required\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEY_PASSWORD=changeit\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_INTERNAL_SSL_CLIENT_AUTH=required\nKAFKA_LISTENER_NAME_INTERNAL_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEY_PASSWORD=changeit\nKAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_PASSWORD=changeit\nKAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:SSL,EXTERNAL:SSL,CONTROLLER:SSL\nKAFKA_MIN_INSYNC_REPLICAS=2\nKAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=3\nKAFKA_PROCESS_ROLES=broker,controller\nKAFKA_SSL_CLIENT_AUTH=required\nKAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=\nKAFKA_SSL_KEYSTORE_CREDENTIALS=/etc/kafka/secrets/kafka.keystore-password\nKAFKA_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_SSL_KEY_CREDENTIALS=/etc/kafka/secrets/kafka.key-password\nKAFKA_SSL_TRUSTSTORE_CREDENTIALS=/etc/kafka/secrets/kafka.truststore-password\nKAFKA_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_SUPER_USERS=User:O=record-platform,CN=kafka;User:O=Record Platform,CN=gate5-v7-admin\nKAFKA_TRANSACTION_STATE_LOG_MIN_ISR=2\nKAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3\nKAFKA_ZOOKEEPER_CONNECT=\n"
+    },
+    "kafka-2": {
+      "uid": "9f8ecb95-d26e-44fc-b5e2-da46859122ab",
+      "resourceVersion": "296672",
+      "ready": true,
+      "phase": "Running",
+      "image": "confluentinc/cp-kafka:7.5.0",
+      "imageID": "docker-pullable://confluentinc/cp-kafka@sha256:fbbb6fa11b258a88b83f54d4f0bddfcffbf2279f99d66a843486e3da7bdfbf41",
+      "restartCount": 0,
+      "startedAt": "2026-08-03T08:15:14Z",
+      "podIP": "10.42.0.92",
+      "nodeName": "colima",
+      "env_subset": {
+        "KAFKA_HEAP_OPTS": "-Xms256m -Xmx384m",
+        "KAFKA_PROCESS_ROLES": "broker,controller",
+        "KAFKA_CLUSTER_ID": "KfF3uZ3kQsyKJvYU8vHvBA",
+        "KAFKA_LISTENERS": "INTERNAL://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9095",
+        "KAFKA_CONTROLLER_QUORUM_VOTERS": "0@kafka-0.kafka.record-platform.svc.cluster.local:9095,1@kafka-1.kafka.record-platform.svc.cluster.local:9095,2@kafka-2.kafka.record-platform.svc.cluster.local:9095",
+        "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "INTERNAL:SSL,EXTERNAL:SSL,CONTROLLER:SSL",
+        "KAFKA_INTER_BROKER_LISTENER_NAME": "INTERNAL",
+        "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+        "KAFKA_DEFAULT_REPLICATION_FACTOR": "3",
+        "KAFKA_MIN_INSYNC_REPLICAS": "2",
+        "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "3",
+        "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "3",
+        "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "2",
+        "KAFKA_AUTO_CREATE_TOPICS_ENABLE": "false",
+        "KAFKA_SSL_CLIENT_AUTH": "required",
+        "KAFKA_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_SSL_KEYSTORE_CREDENTIALS": "/etc/kafka/secrets/kafka.keystore-password",
+        "KAFKA_SSL_KEY_CREDENTIALS": "/etc/kafka/secrets/kafka.key-password",
+        "KAFKA_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_SSL_TRUSTSTORE_CREDENTIALS": "/etc/kafka/secrets/kafka.truststore-password",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_CLIENT_AUTH": "required",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_CLIENT_AUTH": "required",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH": "required",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_FILENAME": "kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_LOCATION": "/etc/kafka/secrets/kafka.keystore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_FILENAME": "kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_LOCATION": "/etc/kafka/secrets/kafka.truststore.jks",
+        "KAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM": "HTTPS",
+        "KAFKA_AUTHORIZER_CLASS_NAME": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
+        "KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND": "false",
+        "KAFKA_SUPER_USERS": "User:O=record-platform,CN=kafka;User:O=Record Platform,CN=gate5-v7-admin"
+      },
+      "probes": [
+        {
+          "readinessProbe": {
+            "failureThreshold": 30,
+            "initialDelaySeconds": 90,
+            "periodSeconds": 10,
+            "successThreshold": 1,
+            "tcpSocket": {
+              "port": 9093
+            },
+            "timeoutSeconds": 5
+          },
+          "livenessProbe": {
+            "failureThreshold": 8,
+            "initialDelaySeconds": 240,
+            "periodSeconds": 20,
+            "successThreshold": 1,
+            "tcpSocket": {
+              "port": 9093
+            },
+            "timeoutSeconds": 5
+          },
+          "startupProbe": null
+        }
+      ],
+      "runtime_snapshot": "ORT=9094\nKAFKA_2_EXTERNAL_PORT_9094_TCP_PROTO=tcp\nKAFKA_2_EXTERNAL_SERVICE_HOST=10.43.83.110\nKAFKA_2_EXTERNAL_SERVICE_PORT=9094\nKAFKA_2_EXTERNAL_SERVICE_PORT_EXTERNAL=9094\nKAFKA_ADVERTISED_LISTENERS=\nKAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND=false\nKAFKA_AUTHORIZER_CLASS_NAME=org.apache.kafka.metadata.authorizer.StandardAuthorizer\nKAFKA_AUTO_CREATE_TOPICS_ENABLE=false\nKAFKA_CLUSTER_ID=KfF3uZ3kQsyKJvYU8vHvBA\nKAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER\nKAFKA_CONTROLLER_QUORUM_VOTERS=0@kafka-0.kafka.record-platform.svc.cluster.local:9095,1@kafka-1.kafka.record-platform.svc.cluster.local:9095,2@kafka-2.kafka.record-platform.svc.cluster.local:9095\nKAFKA_DEFAULT_REPLICATION_FACTOR=3\nKAFKA_EXTERNAL_PORT=tcp://10.43.123.113:9093\nKAFKA_EXTERNAL_PORT_9093_TCP=tcp://10.43.123.113:9093\nKAFKA_EXTERNAL_PORT_9093_TCP_ADDR=10.43.123.113\nKAFKA_EXTERNAL_PORT_9093_TCP_PORT=9093\nKAFKA_EXTERNAL_PORT_9093_TCP_PROTO=tcp\nKAFKA_EXTERNAL_SERVICE_HOST=10.43.123.113\nKAFKA_EXTERNAL_SERVICE_PORT=9093\nKAFKA_EXTERNAL_SERVICE_PORT_KAFKA_SSL=9093\nKAFKA_HEAP_OPTS=-Xms256m -Xmx384m\nKAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL\nKAFKA_LISTENERS=INTERNAL://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9095\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH=required\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=HTTPS\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEYSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_KEY_PASSWORD=changeit\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_LISTENER_NAME_CONTROLLER_SSL_TRUSTSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_CLIENT_AUTH=required\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEYSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_KEY_PASSWORD=changeit\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_LISTENER_NAME_EXTERNAL_SSL_TRUSTSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_INTERNAL_SSL_CLIENT_AUTH=required\nKAFKA_LISTENER_NAME_INTERNAL_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_PASSWORD=changeit\nKAFKA_LISTENER_NAME_INTERNAL_SSL_KEY_PASSWORD=changeit\nKAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_PASSWORD=changeit\nKAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:SSL,EXTERNAL:SSL,CONTROLLER:SSL\nKAFKA_MIN_INSYNC_REPLICAS=2\nKAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=3\nKAFKA_PROCESS_ROLES=broker,controller\nKAFKA_SSL_CLIENT_AUTH=required\nKAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=\nKAFKA_SSL_KEYSTORE_CREDENTIALS=/etc/kafka/secrets/kafka.keystore-password\nKAFKA_SSL_KEYSTORE_FILENAME=kafka.keystore.jks\nKAFKA_SSL_KEYSTORE_LOCATION=/etc/kafka/secrets/kafka.keystore.jks\nKAFKA_SSL_KEY_CREDENTIALS=/etc/kafka/secrets/kafka.key-password\nKAFKA_SSL_TRUSTSTORE_CREDENTIALS=/etc/kafka/secrets/kafka.truststore-password\nKAFKA_SSL_TRUSTSTORE_FILENAME=kafka.truststore.jks\nKAFKA_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/kafka.truststore.jks\nKAFKA_SUPER_USERS=User:O=record-platform,CN=kafka;User:O=Record Platform,CN=gate5-v7-admin\nKAFKA_TRANSACTION_STATE_LOG_MIN_ISR=2\nKAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3\nKAFKA_ZOOKEEPER_CONNECT=\n"
+    }
+  },
+  "standard_authorizer_string_present": {
+    "kafka-0": true,
+    "kafka-1": true,
+    "kafka-2": true
+  },
+  "field_differences": [
+    {
+      "podIP": {
+        "kafka-0": "10.42.0.91",
+        "kafka-1": "10.42.0.86",
+        "kafka-2": "10.42.0.92"
+      }
+    }
+  ],
+  "broker_config_expected_collected": "3/3"
+}

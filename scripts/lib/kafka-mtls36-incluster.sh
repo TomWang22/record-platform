@@ -103,17 +103,29 @@ ssl.endpoint.identification.algorithm=HTTPS
 client.id=record-platform.${svc}.mtls36.broker${bid}
 PROP
     set +e
-    OUT=$(kafka-broker-api-versions --bootstrap-server "$BOOT" --command-config /tmp/client.props 2>&1)
+    OUT=$(timeout 45 kafka-broker-api-versions --bootstrap-server "$BOOT" --command-config /tmp/client.props 2>&1)
     RC=$?
     set -e
     PASS=0
     if [[ "$RC" -eq 0 ]] && echo "$OUT" | grep -qiE 'ApiVersion|CLUSTER_ID|id@[0-9]+'; then
       PASS=1
     fi
+    # Retain causal evidence on failure (do not confuse OpenSSL chain PASS with Kafka protocol success).
+    FAIL_TAIL=""
+    FAIL_CLASS=""
+    if [[ "$PASS" -ne 1 ]]; then
+      FAIL_TAIL=$(printf '%s' "$OUT" | tail -c 1500 | tr '\n' ' ' | tr '"' "'")
+      if echo "$OUT" | grep -qi 'AuthorizerNotReadyException'; then FAIL_CLASS="AUTHORIZER_NOT_READY"
+      elif echo "$OUT" | grep -qiE 'SSLHandshakeException|handshake_failure|bad_certificate'; then FAIL_CLASS="TLS_HANDSHAKE_FAILED"
+      elif echo "$OUT" | grep -qiE 'TimeoutException|Timed out|timeout'; then FAIL_CLASS="REQUEST_TIMEOUT"
+      elif echo "$OUT" | grep -qiE 'disconnected|DisconnectException'; then FAIL_CLASS="BROKER_DISCONNECTED"
+      else FAIL_CLASS="TLS_HANDSHAKE_COMPLETE_KAFKA_PROTOCOL_FAILED"
+      fi
+    fi
 
     # shellcheck disable=SC2016
-    printf '%s\n' "{\"service\":\"${svc}\",\"broker_id\":${bid},\"broker_dns\":\"${DNS}\",\"resolved_ip\":\"${RESOLVED}\",\"sni\":\"${DNS}\",\"alpn\":\"NOT_APPLICABLE_KAFKA_PROTOCOL\",\"hostname_verification\":\"HTTPS\",\"ssl_endpoint_identification_algorithm_blanked\":false,\"pass\":$(jq_bool "$PASS"),\"client\":{\"leaf_sha256\":\"${CLIENT_FP}\",\"intermediate_sha256\":\"${INT_FP}\",\"root_sha256\":\"${ROOT_FP}\",\"subject_java_x500\":\"${CLIENT_SUBJ//\"/\\\"}\",\"spiffe_uri\":\"${SPIFFE}\",\"clientAuth\":$(jq_bool "$CLIENT_AUTH"),\"serverAuth\":$(jq_bool "$SERVER_AUTH"),\"chain_ok\":$(jq_bool "$CLIENT_CHAIN_OK"),\"path_built_leaf_to_intermediate_to_root\":$(jq_bool "$CLIENT_CHAIN_OK"),\"presented_proof\":\"EXCLUSIVE_KEYSTORE_PLUS_BROKER_CLIENT_AUTH_REQUIRED\",\"broker_observed_client_leaf_fp\":\"${CLIENT_FP}\",\"broker_observed_client_leaf_fp_class\":\"INFERRED_FROM_EXCLUSIVE_KEYSTORE_PLUS_CLIENT_AUTH_REQUIRED\"},\"broker\":{\"leaf_sha256\":\"${BROKER_FP}\",\"intermediate_sha256\":\"${INT_FP}\",\"root_sha256\":\"${ROOT_FP}\",\"chain_ok\":$(jq_bool "$BROKER_CHAIN_OK"),\"path_built_leaf_to_intermediate_to_root\":$(jq_bool "$BROKER_CHAIN_OK"),\"serverAuth\":$(jq_bool "$BROKER_EKU_SERVER"),\"hostname_verify_ok\":$(jq_bool "$HOST_VERIFY")},\"mtls_service_identity_authenticated\":$(jq_bool "$PASS"),\"peer_authorization_enabled\":false,\"authorizer_enabled\":false}" >>/tmp/out/positives.jsonl
-    echo "ROW svc=${svc} broker=${bid} pass=${PASS} client_fp=${CLIENT_FP} broker_fp=${BROKER_FP} client_chain=${CLIENT_CHAIN_OK} broker_chain=${BROKER_CHAIN_OK}"
+    printf '%s\n' "{\"service\":\"${svc}\",\"broker_id\":${bid},\"broker_dns\":\"${DNS}\",\"resolved_ip\":\"${RESOLVED}\",\"sni\":\"${DNS}\",\"alpn\":\"NOT_APPLICABLE_KAFKA_PROTOCOL\",\"hostname_verification\":\"HTTPS\",\"ssl_endpoint_identification_algorithm_blanked\":false,\"pass\":$(jq_bool "$PASS"),\"kafka_apiversions_exit_code\":${RC},\"kafka_failure_class\":\"${FAIL_CLASS}\",\"kafka_stderr_tail\":\"${FAIL_TAIL}\",\"openssl_hostname_verify_ok\":$(jq_bool "$HOST_VERIFY"),\"client\":{\"leaf_sha256\":\"${CLIENT_FP}\",\"intermediate_sha256\":\"${INT_FP}\",\"root_sha256\":\"${ROOT_FP}\",\"subject_java_x500\":\"${CLIENT_SUBJ//\"/\\\"}\",\"spiffe_uri\":\"${SPIFFE}\",\"clientAuth\":$(jq_bool "$CLIENT_AUTH"),\"serverAuth\":$(jq_bool "$SERVER_AUTH"),\"chain_ok\":$(jq_bool "$CLIENT_CHAIN_OK"),\"path_built_leaf_to_intermediate_to_root\":$(jq_bool "$CLIENT_CHAIN_OK"),\"presented_proof\":\"EXCLUSIVE_KEYSTORE_PLUS_BROKER_CLIENT_AUTH_REQUIRED\",\"broker_observed_client_leaf_fp\":\"${CLIENT_FP}\",\"broker_observed_client_leaf_fp_class\":\"INFERRED_FROM_EXCLUSIVE_KEYSTORE_PLUS_CLIENT_AUTH_REQUIRED\"},\"broker\":{\"leaf_sha256\":\"${BROKER_FP}\",\"intermediate_sha256\":\"${INT_FP}\",\"root_sha256\":\"${ROOT_FP}\",\"chain_ok\":$(jq_bool "$BROKER_CHAIN_OK"),\"path_built_leaf_to_intermediate_to_root\":$(jq_bool "$BROKER_CHAIN_OK"),\"serverAuth\":$(jq_bool "$BROKER_EKU_SERVER"),\"hostname_verify_ok\":$(jq_bool "$HOST_VERIFY")},\"mtls_service_identity_authenticated\":$(jq_bool "$PASS"),\"peer_authorization_enabled\":false,\"authorizer_enabled\":false}" >>/tmp/out/positives.jsonl
+    echo "ROW svc=${svc} broker=${bid} pass=${PASS} rc=${RC} class=${FAIL_CLASS:-PASS} client_fp=${CLIENT_FP} broker_fp=${BROKER_FP} client_chain=${CLIENT_CHAIN_OK} broker_chain=${BROKER_CHAIN_OK}"
   done
 done
 

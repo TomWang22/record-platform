@@ -1,0 +1,582 @@
+{
+  "document": "gate5-v9-direct-row-repetition",
+  "direct_endpoint": "kafka-{n}.kafka.record-platform.svc.cluster.local:9093",
+  "no_bootstrap_fallback": true,
+  "client": "analytics-service",
+  "staged_stages": [
+    {
+      "stage": "01_DNS_RESOLUTION_b0",
+      "expected_result": "A_record",
+      "actual_result": "ok:10.42.0.91",
+      "exit_code": 0,
+      "duration_ms": 598,
+      "classification": "PASS",
+      "detail": "10.42.0.91"
+    },
+    {
+      "stage": "02_TCP_CONNECT_b0",
+      "expected_result": "connect",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 86,
+      "classification": "PASS",
+      "detail": "10.42.0.91:9093"
+    },
+    {
+      "stage": "03_OPENSSL_TLS_HANDSHAKE_b0",
+      "expected_result": "verify0",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 618,
+      "classification": "PASS",
+      "detail": "broker_fp=96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04 client_fp=1C:59:F6:42:3E:7B:C6:2D:60:3E:69:C8:99:3C:19:EF:08:89:BC:0C:BA:DD:F5:66:8C:94:50:6E:26:8B:B2:EE"
+    },
+    {
+      "stage": "04_CLIENT_CERTIFICATE_PRESENTATION_b0",
+      "expected_result": "presented",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 0,
+      "classification": "PASS",
+      "detail": "1C:59:F6:42:3E:7B:C6:2D:60:3E:69:C8:99:3C:19:EF:08:89:BC:0C:BA:DD:F5:66:8C:94:50:6E:26:8B:B2:EE"
+    },
+    {
+      "stage": "05_SERVER_CERTIFICATE_PRESENTATION_b0",
+      "expected_result": "presented",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 0,
+      "classification": "PASS",
+      "detail": "96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04"
+    },
+    {
+      "stage": "06_HOSTNAME_AND_SAN_VERIFICATION_b0",
+      "expected_result": "verify_hostname",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 0,
+      "classification": "PASS",
+      "detail": "kafka-0.kafka.record-platform.svc.cluster.local"
+    },
+    {
+      "stage": "07_KAFKA_APIVERSIONS_b0",
+      "expected_result": "ApiVersions_ok",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 10635,
+      "classification": "PASS",
+      "detail": ": 0 to 1 [usable: 1],\n\tAlterPartition(56): UNSUPPORTED,\n\tUpdateFeatures(57): 0 to 1 [usable: 1],\n\tEnvelope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+    },
+    {
+      "stage": "08_KAFKA_METADATA_b0",
+      "expected_result": "topic_list",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 8106,
+      "classification": "PASS",
+      "detail": "dev.analytics.events"
+    },
+    {
+      "stage": "09_AUTHORIZED_TOPIC_DESCRIBE_b0",
+      "expected_result": "describe",
+      "actual_result": "rc=1",
+      "exit_code": 1,
+      "duration_ms": 11248,
+      "classification": "KAFKA_COMMAND_FAILED",
+      "detail": "g.IllegalArgumentException: Topic '__consumer_offsets' does not exist as expected\n\tat kafka.admin.TopicCommand$.kafka$admin$TopicCommand$$ensureTopicExists(TopicCommand.scala:399)\n\tat kafka.admin.TopicCommand$TopicService.describeTopic(TopicCommand.scala:311)\n\tat kafka.admin.TopicCommand$.main(TopicCommand.scala:62)\n\tat kafka.admin.TopicCommand.main(TopicCommand.scala)\n (kafka.admin.TopicCommand$)"
+    },
+    {
+      "stage": "01_DNS_RESOLUTION_b1",
+      "expected_result": "A_record",
+      "actual_result": "ok:10.42.0.86",
+      "exit_code": 0,
+      "duration_ms": 56,
+      "classification": "PASS",
+      "detail": "10.42.0.86"
+    },
+    {
+      "stage": "02_TCP_CONNECT_b1",
+      "expected_result": "connect",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 28,
+      "classification": "PASS",
+      "detail": "10.42.0.86:9093"
+    },
+    {
+      "stage": "03_OPENSSL_TLS_HANDSHAKE_b1",
+      "expected_result": "verify0",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 235,
+      "classification": "PASS",
+      "detail": "broker_fp=96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04 client_fp=1C:59:F6:42:3E:7B:C6:2D:60:3E:69:C8:99:3C:19:EF:08:89:BC:0C:BA:DD:F5:66:8C:94:50:6E:26:8B:B2:EE"
+    },
+    {
+      "stage": "04_CLIENT_CERTIFICATE_PRESENTATION_b1",
+      "expected_result": "presented",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 0,
+      "classification": "PASS",
+      "detail": "1C:59:F6:42:3E:7B:C6:2D:60:3E:69:C8:99:3C:19:EF:08:89:BC:0C:BA:DD:F5:66:8C:94:50:6E:26:8B:B2:EE"
+    },
+    {
+      "stage": "05_SERVER_CERTIFICATE_PRESENTATION_b1",
+      "expected_result": "presented",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 0,
+      "classification": "PASS",
+      "detail": "96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04"
+    },
+    {
+      "stage": "06_HOSTNAME_AND_SAN_VERIFICATION_b1",
+      "expected_result": "verify_hostname",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 0,
+      "classification": "PASS",
+      "detail": "kafka-1.kafka.record-platform.svc.cluster.local"
+    },
+    {
+      "stage": "07_KAFKA_APIVERSIONS_b1",
+      "expected_result": "ApiVersions_ok",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 4133,
+      "classification": "PASS",
+      "detail": ": 0 to 1 [usable: 1],\n\tAlterPartition(56): UNSUPPORTED,\n\tUpdateFeatures(57): 0 to 1 [usable: 1],\n\tEnvelope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+    },
+    {
+      "stage": "08_KAFKA_METADATA_b1",
+      "expected_result": "topic_list",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 6191,
+      "classification": "PASS",
+      "detail": "dev.analytics.events"
+    },
+    {
+      "stage": "09_AUTHORIZED_TOPIC_DESCRIBE_b1",
+      "expected_result": "describe",
+      "actual_result": "rc=1",
+      "exit_code": 1,
+      "duration_ms": 6345,
+      "classification": "KAFKA_COMMAND_FAILED",
+      "detail": "g.IllegalArgumentException: Topic '__consumer_offsets' does not exist as expected\n\tat kafka.admin.TopicCommand$.kafka$admin$TopicCommand$$ensureTopicExists(TopicCommand.scala:399)\n\tat kafka.admin.TopicCommand$TopicService.describeTopic(TopicCommand.scala:311)\n\tat kafka.admin.TopicCommand$.main(TopicCommand.scala:62)\n\tat kafka.admin.TopicCommand.main(TopicCommand.scala)\n (kafka.admin.TopicCommand$)"
+    },
+    {
+      "stage": "01_DNS_RESOLUTION_b2",
+      "expected_result": "A_record",
+      "actual_result": "ok:10.42.0.92",
+      "exit_code": 0,
+      "duration_ms": 31,
+      "classification": "PASS",
+      "detail": "10.42.0.92"
+    },
+    {
+      "stage": "02_TCP_CONNECT_b2",
+      "expected_result": "connect",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 47,
+      "classification": "PASS",
+      "detail": "10.42.0.92:9093"
+    },
+    {
+      "stage": "03_OPENSSL_TLS_HANDSHAKE_b2",
+      "expected_result": "verify0",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 89,
+      "classification": "PASS",
+      "detail": "broker_fp=96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04 client_fp=1C:59:F6:42:3E:7B:C6:2D:60:3E:69:C8:99:3C:19:EF:08:89:BC:0C:BA:DD:F5:66:8C:94:50:6E:26:8B:B2:EE"
+    },
+    {
+      "stage": "04_CLIENT_CERTIFICATE_PRESENTATION_b2",
+      "expected_result": "presented",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 0,
+      "classification": "PASS",
+      "detail": "1C:59:F6:42:3E:7B:C6:2D:60:3E:69:C8:99:3C:19:EF:08:89:BC:0C:BA:DD:F5:66:8C:94:50:6E:26:8B:B2:EE"
+    },
+    {
+      "stage": "05_SERVER_CERTIFICATE_PRESENTATION_b2",
+      "expected_result": "presented",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 0,
+      "classification": "PASS",
+      "detail": "96:3C:D6:A7:05:04:11:0D:6E:B2:37:01:D8:E6:E0:2F:79:A4:6C:FC:51:4B:44:BC:E1:FF:56:7A:3C:44:D9:04"
+    },
+    {
+      "stage": "06_HOSTNAME_AND_SAN_VERIFICATION_b2",
+      "expected_result": "verify_hostname",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 0,
+      "classification": "PASS",
+      "detail": "kafka-2.kafka.record-platform.svc.cluster.local"
+    },
+    {
+      "stage": "07_KAFKA_APIVERSIONS_b2",
+      "expected_result": "ApiVersions_ok",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 3169,
+      "classification": "PASS",
+      "detail": ": 0 to 1 [usable: 1],\n\tAlterPartition(56): UNSUPPORTED,\n\tUpdateFeatures(57): 0 to 1 [usable: 1],\n\tEnvelope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+    },
+    {
+      "stage": "08_KAFKA_METADATA_b2",
+      "expected_result": "topic_list",
+      "actual_result": "ok",
+      "exit_code": 0,
+      "duration_ms": 2720,
+      "classification": "PASS",
+      "detail": "dev.analytics.events"
+    },
+    {
+      "stage": "09_AUTHORIZED_TOPIC_DESCRIBE_b2",
+      "expected_result": "describe",
+      "actual_result": "rc=1",
+      "exit_code": 1,
+      "duration_ms": 11898,
+      "classification": "KAFKA_COMMAND_FAILED",
+      "detail": "g.IllegalArgumentException: Topic '__consumer_offsets' does not exist as expected\n\tat kafka.admin.TopicCommand$.kafka$admin$TopicCommand$$ensureTopicExists(TopicCommand.scala:399)\n\tat kafka.admin.TopicCommand$TopicService.describeTopic(TopicCommand.scala:311)\n\tat kafka.admin.TopicCommand$.main(TopicCommand.scala:62)\n\tat kafka.admin.TopicCommand.main(TopicCommand.scala)\n (kafka.admin.TopicCommand$)"
+    }
+  ],
+  "staged_apiversions": {
+    "0": {
+      "classification": "PASS",
+      "exit_code": 0,
+      "duration_ms": 10635,
+      "detail_tail": "amCredentials(50): 0 [usable: 0],\n\tAlterUserScramCredentials(51): 0 [usable: 0],\n\tDescribeQuorum(55): 0 to 1 [usable: 1],\n\tAlterPartition(56): UNSUPPORTED,\n\tUpdateFeatures(57): 0 to 1 [usable: 1],\n\tEnvelope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+    },
+    "1": {
+      "classification": "PASS",
+      "exit_code": 0,
+      "duration_ms": 4133,
+      "detail_tail": "amCredentials(50): 0 [usable: 0],\n\tAlterUserScramCredentials(51): 0 [usable: 0],\n\tDescribeQuorum(55): 0 to 1 [usable: 1],\n\tAlterPartition(56): UNSUPPORTED,\n\tUpdateFeatures(57): 0 to 1 [usable: 1],\n\tEnvelope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+    },
+    "2": {
+      "classification": "PASS",
+      "exit_code": 0,
+      "duration_ms": 3169,
+      "detail_tail": "amCredentials(50): 0 [usable: 0],\n\tAlterUserScramCredentials(51): 0 [usable: 0],\n\tDescribeQuorum(55): 0 to 1 [usable: 1],\n\tAlterPartition(56): UNSUPPORTED,\n\tUpdateFeatures(57): 0 to 1 [usable: 1],\n\tEnvelope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+    }
+  },
+  "repetition": {
+    "kafka_0": {
+      "expected": 20,
+      "tested": 20,
+      "passed": 20,
+      "failed": 0,
+      "classifications": {
+        "PASS": 20
+      },
+      "latency_ms": [
+        2727,
+        3001,
+        3107,
+        3154,
+        3307,
+        3539,
+        3559,
+        3718,
+        3773,
+        3869,
+        5176,
+        5373,
+        5741,
+        7281,
+        7633,
+        8141,
+        9508,
+        10071,
+        10339,
+        13105
+      ],
+      "rows": [
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 3307,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 10071,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 7633,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 2727,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 5373,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 3001,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 3773,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 9508,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 3107,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 3718,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 8141,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 7281,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 3869,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 13105,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 3154,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 5741,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 5176,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 10339,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 3539,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 0,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 3559,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        }
+      ]
+    },
+    "kafka_1": {
+      "expected": 5,
+      "tested": 5,
+      "passed": 5,
+      "failed": 0,
+      "classifications": {
+        "PASS": 5
+      },
+      "latency_ms": [
+        2313,
+        6278,
+        8695,
+        11187,
+        19249
+      ],
+      "rows": [
+        {
+          "broker": 1,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 6278,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 1,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 2313,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 1,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 11187,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 1,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 8695,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 1,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 19249,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        }
+      ]
+    },
+    "kafka_2": {
+      "expected": 5,
+      "tested": 5,
+      "passed": 5,
+      "failed": 0,
+      "classifications": {
+        "PASS": 5
+      },
+      "latency_ms": [
+        3466,
+        5773,
+        6592,
+        6991,
+        13845
+      ],
+      "rows": [
+        {
+          "broker": 2,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 6991,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 2,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 13845,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 2,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 5773,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 2,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 3466,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        },
+        {
+          "broker": 2,
+          "apiversions_ok": 1,
+          "classification": "PASS",
+          "duration_ms": 6592,
+          "exit_code": 0,
+          "stderr_tail": "velope(58): UNSUPPORTED,\n\tDescribeCluster(60): 0 [usable: 0],\n\tDescribeProducers(61): 0 [usable: 0],\n\tUnregisterBroker(64): 0 [usable: 0],\n\tDescribeTransactions(65): 0 [usable: 0],\n\tListTransactions(66): 0 [usable: 0],\n\tAllocateProducerIds(67): UNSUPPORTED,\n\tConsumerGroupHeartbeat(68): UNSUPPORTED\n)"
+        }
+      ]
+    }
+  }
+}

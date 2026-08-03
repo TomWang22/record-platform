@@ -1,0 +1,32 @@
+{
+  "document": "gate5-v9-hard-failure-rca",
+  "ts": "2026-08-03T20:23:06Z",
+  "evidence_root": "/tmp/record-platform-runtime-heartbeat-gate5-v9",
+  "terminal_state": "FROZEN_BLOCKED_EVIDENCE",
+  "phase": "positive_mtls",
+  "reason": "IDENTITY_CANARY_FAILED",
+  "refined_classification": "POSITIVE_MTLS_ROW_FAILED",
+  "platform_failure": true,
+  "harness_failure": false,
+  "denominators": {
+    "positive_mtls": "36/36/35/1",
+    "failed_row": "analytics-service \u00d7 kafka-0",
+    "acl_checkpoint_00": "PASS 72/72",
+    "phases_not_executed": [
+      "tls_negatives_as_acceptance_phase",
+      "authorization",
+      "nineteen_role_ops",
+      "broker_matrix",
+      "event_outbox",
+      "recovery",
+      "pcap",
+      "jaeger",
+      "independent_audit_pass"
+    ]
+  },
+  "v8_untouched": true,
+  "do_not_retry_v9_into_pass": true,
+  "next": "remediate outside v9; create gate5-v10 after fix + CI + preflight",
+  "gate5_final_pass": false,
+  "gate6_authorized": false
+}

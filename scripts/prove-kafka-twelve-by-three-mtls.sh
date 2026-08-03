@@ -264,6 +264,10 @@ doc={
   },
   "rows":pos,
 }
+if len(pos) != 36:
+  raise SystemExit(f"positive denominator incomplete: expected 36 rows, got {len(pos)} (JSONL parse drops corrupt lines)")
+if pos_pass != 36:
+  raise SystemExit(f"positive matrix incomplete: passed {pos_pass}/36")
 neg_doc={
   "document":"gate5-v7-kafka-tls-negatives",
   "ts":doc["ts"],

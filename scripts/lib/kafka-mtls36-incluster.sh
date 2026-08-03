@@ -113,8 +113,9 @@ PROP
     # Retain causal evidence on failure (do not confuse OpenSSL chain PASS with Kafka protocol success).
     FAIL_TAIL=""
     FAIL_CLASS=""
+    : >/tmp/fail_tail.txt
     if [[ "$PASS" -ne 1 ]]; then
-      FAIL_TAIL=$(printf '%s' "$OUT" | tail -c 1500 | tr '\n' ' ' | tr '"' "'")
+      printf '%s' "$OUT" | tail -c 1500 >/tmp/fail_tail.txt
       if echo "$OUT" | grep -qi 'AuthorizerNotReadyException'; then FAIL_CLASS="AUTHORIZER_NOT_READY"
       elif echo "$OUT" | grep -qiE 'SSLHandshakeException|handshake_failure|bad_certificate'; then FAIL_CLASS="TLS_HANDSHAKE_FAILED"
       elif echo "$OUT" | grep -qiE 'TimeoutException|Timed out|timeout'; then FAIL_CLASS="REQUEST_TIMEOUT"
@@ -123,8 +124,68 @@ PROP
       fi
     fi
 
-    # shellcheck disable=SC2016
-    printf '%s\n' "{\"service\":\"${svc}\",\"broker_id\":${bid},\"broker_dns\":\"${DNS}\",\"resolved_ip\":\"${RESOLVED}\",\"sni\":\"${DNS}\",\"alpn\":\"NOT_APPLICABLE_KAFKA_PROTOCOL\",\"hostname_verification\":\"HTTPS\",\"ssl_endpoint_identification_algorithm_blanked\":false,\"pass\":$(jq_bool "$PASS"),\"kafka_apiversions_exit_code\":${RC},\"kafka_failure_class\":\"${FAIL_CLASS}\",\"kafka_stderr_tail\":\"${FAIL_TAIL}\",\"openssl_hostname_verify_ok\":$(jq_bool "$HOST_VERIFY"),\"client\":{\"leaf_sha256\":\"${CLIENT_FP}\",\"intermediate_sha256\":\"${INT_FP}\",\"root_sha256\":\"${ROOT_FP}\",\"subject_java_x500\":\"${CLIENT_SUBJ//\"/\\\"}\",\"spiffe_uri\":\"${SPIFFE}\",\"clientAuth\":$(jq_bool "$CLIENT_AUTH"),\"serverAuth\":$(jq_bool "$SERVER_AUTH"),\"chain_ok\":$(jq_bool "$CLIENT_CHAIN_OK"),\"path_built_leaf_to_intermediate_to_root\":$(jq_bool "$CLIENT_CHAIN_OK"),\"presented_proof\":\"EXCLUSIVE_KEYSTORE_PLUS_BROKER_CLIENT_AUTH_REQUIRED\",\"broker_observed_client_leaf_fp\":\"${CLIENT_FP}\",\"broker_observed_client_leaf_fp_class\":\"INFERRED_FROM_EXCLUSIVE_KEYSTORE_PLUS_CLIENT_AUTH_REQUIRED\"},\"broker\":{\"leaf_sha256\":\"${BROKER_FP}\",\"intermediate_sha256\":\"${INT_FP}\",\"root_sha256\":\"${ROOT_FP}\",\"chain_ok\":$(jq_bool "$BROKER_CHAIN_OK"),\"path_built_leaf_to_intermediate_to_root\":$(jq_bool "$BROKER_CHAIN_OK"),\"serverAuth\":$(jq_bool "$BROKER_EKU_SERVER"),\"hostname_verify_ok\":$(jq_bool "$HOST_VERIFY")},\"mtls_service_identity_authenticated\":$(jq_bool "$PASS"),\"peer_authorization_enabled\":false,\"authorizer_enabled\":false}" >>/tmp/out/positives.jsonl
+    # Emit via Python so stderr tails cannot corrupt JSONL (Gate 5 v9 RCA: skipped row risk).
+    PASS_BOOL=$(jq_bool "$PASS")
+    HOST_BOOL=$(jq_bool "$HOST_VERIFY")
+    CLIENT_AUTH_BOOL=$(jq_bool "$CLIENT_AUTH")
+    SERVER_AUTH_BOOL=$(jq_bool "$SERVER_AUTH")
+    CLIENT_CHAIN_BOOL=$(jq_bool "$CLIENT_CHAIN_OK")
+    BROKER_CHAIN_BOOL=$(jq_bool "$BROKER_CHAIN_OK")
+    BROKER_EKU_BOOL=$(jq_bool "$BROKER_EKU_SERVER")
+    export RP_MTLS_SVC="$svc" RP_MTLS_BID="$bid" RP_MTLS_DNS="$DNS" RP_MTLS_RESOLVED="$RESOLVED"
+    export RP_MTLS_PASS="$PASS_BOOL" RP_MTLS_RC="$RC" RP_MTLS_FAIL_CLASS="$FAIL_CLASS"
+    export RP_MTLS_HOST_VERIFY="$HOST_BOOL" RP_MTLS_CLIENT_FP="$CLIENT_FP" RP_MTLS_INT_FP="$INT_FP"
+    export RP_MTLS_ROOT_FP="$ROOT_FP" RP_MTLS_CLIENT_SUBJ="$CLIENT_SUBJ" RP_MTLS_SPIFFE="$SPIFFE"
+    export RP_MTLS_CLIENT_AUTH="$CLIENT_AUTH_BOOL" RP_MTLS_SERVER_AUTH="$SERVER_AUTH_BOOL"
+    export RP_MTLS_CLIENT_CHAIN="$CLIENT_CHAIN_BOOL" RP_MTLS_BROKER_FP="$BROKER_FP"
+    export RP_MTLS_BROKER_CHAIN="$BROKER_CHAIN_BOOL" RP_MTLS_BROKER_EKU="$BROKER_EKU_BOOL"
+    python3 <<'PY' >>/tmp/out/positives.jsonl
+import json, os
+from pathlib import Path
+fail_tail = Path("/tmp/fail_tail.txt").read_text(errors="replace")
+def jb(s): return s == "true"
+print(json.dumps({
+  "service": os.environ["RP_MTLS_SVC"],
+  "broker_id": int(os.environ["RP_MTLS_BID"]),
+  "broker_dns": os.environ["RP_MTLS_DNS"],
+  "resolved_ip": os.environ.get("RP_MTLS_RESOLVED", ""),
+  "sni": os.environ["RP_MTLS_DNS"],
+  "alpn": "NOT_APPLICABLE_KAFKA_PROTOCOL",
+  "hostname_verification": "HTTPS",
+  "ssl_endpoint_identification_algorithm_blanked": False,
+  "pass": jb(os.environ["RP_MTLS_PASS"]),
+  "kafka_apiversions_exit_code": int(os.environ["RP_MTLS_RC"]),
+  "kafka_failure_class": os.environ.get("RP_MTLS_FAIL_CLASS", ""),
+  "kafka_stderr_tail": fail_tail,
+  "openssl_hostname_verify_ok": jb(os.environ["RP_MTLS_HOST_VERIFY"]),
+  "client": {
+    "leaf_sha256": os.environ["RP_MTLS_CLIENT_FP"],
+    "intermediate_sha256": os.environ["RP_MTLS_INT_FP"],
+    "root_sha256": os.environ["RP_MTLS_ROOT_FP"],
+    "subject_java_x500": os.environ["RP_MTLS_CLIENT_SUBJ"],
+    "spiffe_uri": os.environ.get("RP_MTLS_SPIFFE", ""),
+    "clientAuth": jb(os.environ["RP_MTLS_CLIENT_AUTH"]),
+    "serverAuth": jb(os.environ["RP_MTLS_SERVER_AUTH"]),
+    "chain_ok": jb(os.environ["RP_MTLS_CLIENT_CHAIN"]),
+    "path_built_leaf_to_intermediate_to_root": jb(os.environ["RP_MTLS_CLIENT_CHAIN"]),
+    "presented_proof": "EXCLUSIVE_KEYSTORE_PLUS_BROKER_CLIENT_AUTH_REQUIRED",
+    "broker_observed_client_leaf_fp": os.environ["RP_MTLS_CLIENT_FP"],
+    "broker_observed_client_leaf_fp_class": "INFERRED_FROM_EXCLUSIVE_KEYSTORE_PLUS_CLIENT_AUTH_REQUIRED",
+  },
+  "broker": {
+    "leaf_sha256": os.environ.get("RP_MTLS_BROKER_FP", ""),
+    "intermediate_sha256": os.environ["RP_MTLS_INT_FP"],
+    "root_sha256": os.environ["RP_MTLS_ROOT_FP"],
+    "chain_ok": jb(os.environ["RP_MTLS_BROKER_CHAIN"]),
+    "path_built_leaf_to_intermediate_to_root": jb(os.environ["RP_MTLS_BROKER_CHAIN"]),
+    "serverAuth": jb(os.environ["RP_MTLS_BROKER_EKU"]),
+    "hostname_verify_ok": jb(os.environ["RP_MTLS_HOST_VERIFY"]),
+  },
+  "mtls_service_identity_authenticated": jb(os.environ["RP_MTLS_PASS"]),
+  "peer_authorization_enabled": False,
+  "authorizer_enabled": False,
+}, ensure_ascii=False))
+PY
     echo "ROW svc=${svc} broker=${bid} pass=${PASS} rc=${RC} class=${FAIL_CLASS:-PASS} client_fp=${CLIENT_FP} broker_fp=${BROKER_FP} client_chain=${CLIENT_CHAIN_OK} broker_chain=${BROKER_CHAIN_OK}"
   done
 done

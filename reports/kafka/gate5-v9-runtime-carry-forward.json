@@ -1,0 +1,60 @@
+{
+  "document": "gate5-v9-runtime-carry-forward",
+  "ts": "2026-08-03T19:43:10Z",
+  "new_harness_sha": "1e97d624df7056474e2797dea74da4bf8db1f6f7",
+  "origin_main_sha": "1e97d624df7056474e2797dea74da4bf8db1f6f7",
+  "HEAD_equals_origin_main": true,
+  "exact_sha_ci": {
+    "expected": 4,
+    "passed": 4,
+    "failed": 0,
+    "workflows": [
+      "ci",
+      "docker-build",
+      "Protocol validation (static + fixtures)",
+      "RP Namespace Lint"
+    ]
+  },
+  "classification": "ACCEPTANCE_HARNESS_ONLY",
+  "runtime_impact_paths": [],
+  "runtime_impact_paths_count": 0,
+  "kafka_configuration_changes": 0,
+  "participant_source_changes": 0,
+  "certificate_changes": 0,
+  "acl_changes": 0,
+  "image_build_inputs_changed": 0,
+  "carry_forward_from": "c800ac5313ea8fb88a59f08c7347103ba1d4ed19",
+  "carry_forward_accepted": true,
+  "revalidation": {
+    "participant_services_expected_ready": "12/12",
+    "logical_roles_expected_discovered": "19/19",
+    "unique_contract_role_keys": 19,
+    "unique_required_client_id_forms": 19,
+    "duplicate_bare_role_suffixes": 3,
+    "bare_role_suffix_counts": {
+      "producer": 7,
+      "outbox-publisher": 5,
+      "lifecycle-consumer": 4,
+      "notification-consumer": 1,
+      "market-event-consumer": 1,
+      "inference-consumer": 1
+    },
+    "participant_RP_SOURCE_SHA_match": "12/12",
+    "brokers_ready": "3/3",
+    "ACL_expected_live_delta": "72/72/0",
+    "identity_preflight": "36/36",
+    "authorization_preflight": "PASS",
+    "authorization_process_exit_code_authoritative": false
+  },
+  "bounded_carry_forward_canary": {
+    "identity_36": true,
+    "authorization_effect_aware": true,
+    "unauthorized_records_written": 0,
+    "indistinguishable_rows": 0
+  },
+  "harness_regression_tests": {
+    "expected": 10,
+    "passed": 10,
+    "failed": 0
+  }
+}

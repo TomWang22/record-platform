@@ -1,0 +1,838 @@
+{
+  "document": "gate5-pre-v10-readiness-probe-cost",
+  "ts": "2026-08-04T01:14:17Z",
+  "readiness_expected_tested": "90/90",
+  "static_command_audit": {
+    "keytool_import_per_probe": false,
+    "pkcs12_creation_per_probe": false,
+    "openssl_certificate_conversion_per_probe": false,
+    "java_source_compilation_per_probe": false,
+    "truststore_generation_per_probe": false,
+    "keystore_generation_per_probe": false,
+    "uses_mounted_broker_jks": true,
+    "rewrites_tmp_rp_ready_props_each_invoke": true,
+    "kafka_cli_jvm_startup_each_invoke": true,
+    "multi_broker_bootstrap": false,
+    "direct_endpoint": "$(hostname).kafka.record-platform.svc.cluster.local:9093",
+    "hostname_verification": "HTTPS",
+    "periodSeconds": 45,
+    "timeoutSeconds": 45,
+    "timeout_equals_period_no_margin": true
+  },
+  "static_from_runtime": {
+    "0": {
+      "keytool": "0",
+      "openssl_convert": "0",
+      "pkcs12": "0",
+      "jks_generate": "0",
+      "uses_mounted_jks": "1",
+      "jvm_cli_each_invoke": "1",
+      "rewrites_tmp_props": "1",
+      "multi_broker_bootstrap": "0"
+    },
+    "1": {
+      "keytool": "0",
+      "openssl_convert": "0",
+      "pkcs12": "0",
+      "jks_generate": "0",
+      "uses_mounted_jks": "1",
+      "jvm_cli_each_invoke": "1",
+      "rewrites_tmp_props": "1",
+      "multi_broker_bootstrap": "0"
+    },
+    "2": {
+      "keytool": "0",
+      "openssl_convert": "0",
+      "pkcs12": "0",
+      "jks_generate": "0",
+      "uses_mounted_jks": "1",
+      "jvm_cli_each_invoke": "1",
+      "rewrites_tmp_props": "1",
+      "multi_broker_bootstrap": "0"
+    }
+  },
+  "leaks": {
+    "0": {
+      "before_tmp": 1,
+      "after_tmp": 1,
+      "before_java": 4,
+      "after_java": 3
+    },
+    "1": {
+      "before_tmp": 1,
+      "after_tmp": 1,
+      "before_java": 3,
+      "after_java": 4
+    },
+    "2": {
+      "before_tmp": 1,
+      "after_tmp": 1,
+      "before_java": 4,
+      "after_java": 3
+    }
+  },
+  "per_broker": {
+    "0": {
+      "count": 30,
+      "ok": 30,
+      "timed_out": 0,
+      "min": 6765,
+      "median": 13415,
+      "p95": 32058,
+      "max": 33004
+    },
+    "1": {
+      "count": 30,
+      "ok": 30,
+      "timed_out": 0,
+      "min": 2568,
+      "median": 9092,
+      "p95": 19963,
+      "max": 20771
+    },
+    "2": {
+      "count": 30,
+      "ok": 30,
+      "timed_out": 0,
+      "min": 7456,
+      "median": 14287,
+      "p95": 17071,
+      "max": 17349
+    }
+  },
+  "overall": {
+    "count": 90,
+    "ok": 90,
+    "timed_out": 0,
+    "min": 2568,
+    "median": 12302,
+    "p95": 21970,
+    "max": 33004
+  },
+  "readiness_probe_overlap_possible": true,
+  "readiness_probe_process_leaks": false,
+  "readiness_probe_temp_file_leaks": false,
+  "note_temp_file": "/tmp/rp-ready.props overwritten in place each invoke (not accumulated)",
+  "invocations": [
+    {
+      "broker": 0,
+      "i": 1,
+      "duration_ms": 13539,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 2,
+      "duration_ms": 13521,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 3,
+      "duration_ms": 8706,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 4,
+      "duration_ms": 14224,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 5,
+      "duration_ms": 18613,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 6,
+      "duration_ms": 31204,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 7,
+      "duration_ms": 13310,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 8,
+      "duration_ms": 14256,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 9,
+      "duration_ms": 11942,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 10,
+      "duration_ms": 33004,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 11,
+      "duration_ms": 17358,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 12,
+      "duration_ms": 14612,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 13,
+      "duration_ms": 12349,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 14,
+      "duration_ms": 21970,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 15,
+      "duration_ms": 32058,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 16,
+      "duration_ms": 7613,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 17,
+      "duration_ms": 11258,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 18,
+      "duration_ms": 11742,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 19,
+      "duration_ms": 10068,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 20,
+      "duration_ms": 16046,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 21,
+      "duration_ms": 23482,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 22,
+      "duration_ms": 19096,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 23,
+      "duration_ms": 9126,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 24,
+      "duration_ms": 9278,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 25,
+      "duration_ms": 7510,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 26,
+      "duration_ms": 9549,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 27,
+      "duration_ms": 14078,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 28,
+      "duration_ms": 7372,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 29,
+      "duration_ms": 6765,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 0,
+      "i": 30,
+      "duration_ms": 6893,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 1,
+      "duration_ms": 6638,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 2,
+      "duration_ms": 13886,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 3,
+      "duration_ms": 7762,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 4,
+      "duration_ms": 5134,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 5,
+      "duration_ms": 5941,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 6,
+      "duration_ms": 8874,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 7,
+      "duration_ms": 12990,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 8,
+      "duration_ms": 11131,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 9,
+      "duration_ms": 8189,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 10,
+      "duration_ms": 6737,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 11,
+      "duration_ms": 7785,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 12,
+      "duration_ms": 14721,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 13,
+      "duration_ms": 5953,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 14,
+      "duration_ms": 7960,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 15,
+      "duration_ms": 5729,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 16,
+      "duration_ms": 2568,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 17,
+      "duration_ms": 3938,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 18,
+      "duration_ms": 5549,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 19,
+      "duration_ms": 14131,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 20,
+      "duration_ms": 15410,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 21,
+      "duration_ms": 13809,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 22,
+      "duration_ms": 15890,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 23,
+      "duration_ms": 9311,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 24,
+      "duration_ms": 11134,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 25,
+      "duration_ms": 6058,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 26,
+      "duration_ms": 9851,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 27,
+      "duration_ms": 11845,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 28,
+      "duration_ms": 10423,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 29,
+      "duration_ms": 19963,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 1,
+      "i": 30,
+      "duration_ms": 20771,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 1,
+      "duration_ms": 12316,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 2,
+      "duration_ms": 17071,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 3,
+      "duration_ms": 17349,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 4,
+      "duration_ms": 8475,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 5,
+      "duration_ms": 8151,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 6,
+      "duration_ms": 16112,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 7,
+      "duration_ms": 16729,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 8,
+      "duration_ms": 11839,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 9,
+      "duration_ms": 14880,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 10,
+      "duration_ms": 16413,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 11,
+      "duration_ms": 11789,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 12,
+      "duration_ms": 7456,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 13,
+      "duration_ms": 14753,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 14,
+      "duration_ms": 11870,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 15,
+      "duration_ms": 12921,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 16,
+      "duration_ms": 14234,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 17,
+      "duration_ms": 15939,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 18,
+      "duration_ms": 11196,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 19,
+      "duration_ms": 16598,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 20,
+      "duration_ms": 13948,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 21,
+      "duration_ms": 10331,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 22,
+      "duration_ms": 9047,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 23,
+      "duration_ms": 12288,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 24,
+      "duration_ms": 16908,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 25,
+      "duration_ms": 14341,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 26,
+      "duration_ms": 14688,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 27,
+      "duration_ms": 14478,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 28,
+      "duration_ms": 15488,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 29,
+      "duration_ms": 11512,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    },
+    {
+      "broker": 2,
+      "i": 30,
+      "duration_ms": 15772,
+      "exit_code": 0,
+      "ok": true,
+      "timed_out": false
+    }
+  ]
+}

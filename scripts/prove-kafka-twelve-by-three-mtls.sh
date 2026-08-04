@@ -197,106 +197,106 @@ LOGS=$(kubectl -n "$NS" logs "job/${JOB}" -c prove 2>/dev/null || true)
 printf '%s\n' "$LOGS" >"${WORKDIR}/job.log"
 echo "$LOGS" | grep -E 'ROW |NEG |POSITIVES_DONE|ROOT_FP|INT_FP' | tail -60
 
-python3 - "${WORKDIR}/job.log" "$OUT_JSON" "$OUT_MD" "$NEG_JSON" "$ROOT_FP" "$INT_FP" <<'PY'
+python3 - "${WORKDIR}/job.log" "$OUT_JSON" "$OUT_MD" "$NEG_JSON" "$ROOT_FP" "$INT_FP" "$REPO_ROOT" <<'PY'
 import json, pathlib, sys
 from collections import Counter
 from datetime import datetime, timezone
-log=pathlib.Path(sys.argv[1]).read_text(errors="replace")
-out_json,out_md,neg_json=map(pathlib.Path, sys.argv[2:5])
-root_fp,int_fp=sys.argv[5:7]
-pos=[]; neg=[]; fixtures=[]
 
-def take_jsonl(text):
-  rows=[]
-  for line in text.splitlines():
-    line=line.strip()
-    if line.startswith("{"):
-      try: rows.append(json.loads(line))
-      except Exception: pass
-  return rows
+repo_lib = pathlib.Path(sys.argv[7]) / "scripts" / "lib"
+sys.path.insert(0, str(repo_lib))
+from gate5_json_io import Gate5JsonError, dump_json_atomic, parse_jsonl_text
+
+log = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+out_json, out_md, neg_json = map(pathlib.Path, sys.argv[2:5])
+root_fp, int_fp = sys.argv[5:7]
+pos = []
+neg = []
+fixtures = []
 
 if "===POSITIVES_JSONL===" in log:
-  rest=log.split("===POSITIVES_JSONL===",1)[1]
+  rest = log.split("===POSITIVES_JSONL===", 1)[1]
   if "===NEGATIVES_JSONL===" in rest:
-    pchunk,rest=rest.split("===NEGATIVES_JSONL===",1)
+    pchunk, rest = rest.split("===NEGATIVES_JSONL===", 1)
   else:
-    pchunk,rest=rest,""
+    pchunk, rest = rest, ""
   if "===FIXTURES_JSONL===" in rest:
-    nchunk,fchunk=rest.split("===FIXTURES_JSONL===",1)
+    nchunk, fchunk = rest.split("===FIXTURES_JSONL===", 1)
   else:
-    nchunk,fchunk=rest,""
-  pos=take_jsonl(pchunk)
-  neg=take_jsonl(nchunk)
-  fixtures=take_jsonl(fchunk)
+    nchunk, fchunk = rest, ""
+  try:
+    pos = parse_jsonl_text(pchunk, source="positives.jsonl")
+    neg = parse_jsonl_text(nchunk, source="negatives.jsonl")
+    fixtures = parse_jsonl_text(fchunk, source="fixtures.jsonl")
+  except Gate5JsonError as exc:
+    raise SystemExit(f"HARNESS_REPORTING_FAILURE {exc.classification}: {exc}") from exc
 
 # Never count controlled PEER_OMITS rows in the live denominator.
-neg=[r for r in neg if r.get("case")!="peer_omits_intermediate" and r.get("live_broker_negative") is not False]
-pos_pass=sum(1 for r in pos if r.get("pass") is True)
-neg_pass=sum(1 for r in neg if r.get("pass") is True)
-neg_fail=sum(1 for r in neg if r.get("pass") is False)
-cases=Counter(r.get("case") for r in neg)
-ui=[r for r in neg if r.get("case")=="untrusted_intermediate"]
-ul=[r for r in neg if r.get("case")=="untrusted_client_leaf"]
-fps=sorted({r["client"]["leaf_sha256"] for r in pos if r.get("client")})
-doc={
-  "document":"gate5-v7-twelve-by-three-mtls-matrix",
-  "ts":datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-  "authorizer_enabled":False,
-  "final_acls_applied":False,
-  "peer_authorization_enabled":False,
-  "classification":{
-    "mtls_service_identity_authenticated": pos_pass==36 and len(pos)==36,
-    "peer_authorization_not_enabled":True,
-    "broker_observed_authorization_principals":"0/12",
-    "three_stage_claim":"PER_ROW_ROOT_INTERMEDIATE_LEAF_RECORDED",
+neg = [r for r in neg if r.get("case") != "peer_omits_intermediate" and r.get("live_broker_negative") is not False]
+pos_pass = sum(1 for r in pos if r.get("pass") is True)
+neg_pass = sum(1 for r in neg if r.get("pass") is True)
+neg_fail = sum(1 for r in neg if r.get("pass") is False)
+cases = Counter(r.get("case") for r in neg)
+ui = [r for r in neg if r.get("case") == "untrusted_intermediate"]
+ul = [r for r in neg if r.get("case") == "untrusted_client_leaf"]
+fps = sorted({r["client"]["leaf_sha256"] for r in pos if r.get("client")})
+doc = {
+  "document": "gate5-v7-twelve-by-three-mtls-matrix",
+  "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+  "authorizer_enabled": False,
+  "final_acls_applied": False,
+  "peer_authorization_enabled": False,
+  "classification": {
+    "mtls_service_identity_authenticated": pos_pass == 36 and len(pos) == 36,
+    "peer_authorization_not_enabled": True,
+    "broker_observed_authorization_principals": "0/12",
+    "three_stage_claim": "PER_ROW_ROOT_INTERMEDIATE_LEAF_RECORDED",
   },
-  "trust_anchors":{"root_sha256":root_fp,"intermediate_sha256":int_fp},
-  "summary":{
-    "positive_mtls_rows_expected":36,
-    "positive_mtls_rows_tested":len(pos),
-    "positive_mtls_rows_passed":pos_pass,
-    "positive_mtls_rows_failed":len(pos)-pos_pass,
-    "positive_mtls_rows_skipped":max(0,36-len(pos)),
-    "distinct_client_leaf_fingerprints":len(fps),
-    "brokers_tested":sorted({r.get("broker_id") for r in pos}),
-    "hostname_verification_blanked_rows":sum(1 for r in pos if r.get("ssl_endpoint_identification_algorithm_blanked")),
-    "private_keys_copied_into_broker_pods":0,
+  "trust_anchors": {"root_sha256": root_fp, "intermediate_sha256": int_fp},
+  "summary": {
+    "positive_mtls_rows_expected": 36,
+    "positive_mtls_rows_tested": len(pos),
+    "positive_mtls_rows_passed": pos_pass,
+    "positive_mtls_rows_failed": len(pos) - pos_pass,
+    "positive_mtls_rows_skipped": max(0, 36 - len(pos)),
+    "distinct_client_leaf_fingerprints": len(fps),
+    "brokers_tested": sorted({r.get("broker_id") for r in pos}),
+    "hostname_verification_blanked_rows": sum(1 for r in pos if r.get("ssl_endpoint_identification_algorithm_blanked")),
+    "private_keys_copied_into_broker_pods": 0,
   },
-  "rows":pos,
+  "rows": pos,
 }
 if len(pos) != 36:
-  raise SystemExit(f"positive denominator incomplete: expected 36 rows, got {len(pos)} (JSONL parse drops corrupt lines)")
+  raise SystemExit(f"positive denominator incomplete: expected 36 rows, got {len(pos)}")
 if pos_pass != 36:
   raise SystemExit(f"positive matrix incomplete: passed {pos_pass}/36")
-neg_doc={
-  "document":"gate5-v7-kafka-tls-negatives",
-  "ts":doc["ts"],
-  "denominator_kind":"LIVE_KAFKA_BROKER_NEGATIVES",
-  "excluded_from_live_denominator":[
-    {"case":"peer_omits_intermediate","classification":"CONTROLLED_PKIX_FIXTURE_PASS"},
-    {"case":"missing_intermediate","classification":"INVALID_NEGATIVE_FIXTURE"},
+neg_doc = {
+  "document": "gate5-v7-kafka-tls-negatives",
+  "ts": doc["ts"],
+  "denominator_kind": "LIVE_KAFKA_BROKER_NEGATIVES",
+  "excluded_from_live_denominator": [
+    {"case": "peer_omits_intermediate", "classification": "CONTROLLED_PKIX_FIXTURE_PASS"},
+    {"case": "missing_intermediate", "classification": "INVALID_NEGATIVE_FIXTURE"},
   ],
-  "summary":{
-    "categories_present":len(cases),
-    "rows":len(neg),
-    "pass":neg_pass,
-    "fail":neg_fail,
-    "skipped":0,
-    "controlled_fixtures_counted_in_live_denominator":0,
-    "untrusted_intermediate_expected":3,
-    "untrusted_intermediate_tested":len(ui),
-    "untrusted_intermediate_denied":sum(1 for r in ui if r.get("pass") is True),
-    "untrusted_client_leaf_expected":3,
-    "untrusted_client_leaf_tested":len(ul),
-    "untrusted_client_leaf_denied":sum(1 for r in ul if r.get("pass") is True),
+  "summary": {
+    "categories_present": len(cases),
+    "rows": len(neg),
+    "pass": neg_pass,
+    "fail": neg_fail,
+    "skipped": 0,
+    "controlled_fixtures_counted_in_live_denominator": 0,
+    "untrusted_intermediate_expected": 3,
+    "untrusted_intermediate_tested": len(ui),
+    "untrusted_intermediate_denied": sum(1 for r in ui if r.get("pass") is True),
+    "untrusted_client_leaf_expected": 3,
+    "untrusted_client_leaf_tested": len(ul),
+    "untrusted_client_leaf_denied": sum(1 for r in ul if r.get("pass") is True),
   },
-  "cases":dict(cases),
-  "controlled_pkix_fixtures":fixtures,
-  "rows":neg,
+  "cases": dict(cases),
+  "controlled_pkix_fixtures": fixtures,
+  "rows": neg,
 }
-out_json.parent.mkdir(parents=True, exist_ok=True)
-out_json.write_text(json.dumps(doc, indent=2)+"\n")
-neg_json.write_text(json.dumps(neg_doc, indent=2)+"\n")
+dump_json_atomic(out_json, doc)
+dump_json_atomic(neg_json, neg_doc)
 out_md.write_text("\n".join([
   "# 12×3 Kafka mTLS matrix (pre-authorizer)",
   "",
@@ -309,10 +309,10 @@ out_md.write_text("\n".join([
   "- authorizer_enabled: false",
   "- peer_authorization: NOT_ENABLED",
   "",
-])+"\n")
-print(json.dumps({"positives":doc["summary"],"negatives":neg_doc["summary"],"fixtures":len(fixtures)}, indent=2))
-live_ok = len(neg)==36 and neg_pass==36 and neg_fail==0 and len(ui)==3 and all(r.get("pass") for r in ui)
-sys.exit(0 if len(pos)==36 and pos_pass==36 and live_ok else 2)
+]) + "\n", encoding="utf-8")
+print(json.dumps({"positives": doc["summary"], "negatives": neg_doc["summary"], "fixtures": len(fixtures)}, indent=2))
+live_ok = len(neg) == 36 and neg_pass == 36 and neg_fail == 0 and len(ui) == 3 and all(r.get("pass") for r in ui)
+sys.exit(0 if len(pos) == 36 and pos_pass == 36 and live_ok else 2)
 PY
 STATUS=$?
 exit "$STATUS"

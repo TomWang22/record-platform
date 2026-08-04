@@ -1,33 +1,43 @@
 {
   "document": "gate5-v10-preflight-canary",
-  "ts": "2026-08-03T21:40:00Z",
+  "ts": "2026-08-04T00:30:00Z",
   "status": "BLOCKED",
   "pre_v10_canary_pass": false,
-  "post_roll_attempt": {
-    "evidence": "/tmp/record-platform-gate5-v9-positive-mtls-rca-v1/reproducer/20260803212111-87981",
-    "analytics_to_kafka0": "20/20/18/2",
-    "analytics_to_kafka1": "5/5/5/0",
-    "analytics_to_kafka2": "5/5/3/2",
-    "staged_apiversions": {
-      "0": "PASS",
-      "1": "PASS",
-      "2": "TLS_HANDSHAKE_COMPLETE_KAFKA_PROTOCOL_FAILED:BROKER_DISCONNECTED"
+  "v10_created": false,
+  "attempts": [
+    {
+      "id": "post_roll_heavy_probe",
+      "analytics_to_kafka0": "20/20/18/2",
+      "analytics_to_kafka1": "5/5/5/0",
+      "analytics_to_kafka2": "5/5/3/2",
+      "layer": "TLS_HANDSHAKE_COMPLETE_KAFKA_PROTOCOL_FAILED",
+      "note": "JVM readiness thrash / ApiVersions timeout under load"
     },
-    "failure_signatures": [
-      "exit_code=124 (process timeout 25s)",
-      "BROKER_DISCONNECTED",
-      "KAFKA_COMMAND_FAILED"
-    ],
-    "layer": "TLS_HANDSHAKE_COMPLETE_KAFKA_PROTOCOL_FAILED",
-    "note": "OpenSSL path not the failure mode; Kafka ApiVersions intermittent under load. Heavy JVM readiness probes were also timing out (Unhealthy events)."
-  },
-  "full_identity_canary": "NOT_RUN_BLOCKED_BY_ANALYTICS_REPETITION",
-  "negatives": "NOT_RUN",
+    {
+      "id": "after_period_45_timeout_tune",
+      "analytics_to_kafka0": "20/20/20/0",
+      "analytics_to_kafka1": "5/5/5/0",
+      "analytics_to_kafka2": "5/5/5/0",
+      "evidence": "/tmp/record-platform-gate5-v9-positive-mtls-rca-v1/reproducer/20260803220222-32894"
+    },
+    {
+      "id": "full_identity_36_a",
+      "result": "35/35/35/0 with 1 skipped (corrupt JSONL on failed-row stderr)",
+      "missing_row": "analytics-service × kafka-1"
+    },
+    {
+      "id": "full_identity_36_b_safe_jsonl",
+      "result": "BLOCKED passed 33/36 (builder hard-fail)",
+      "observed_row_fail_in_partial_log": "messaging-service × kafka-0 TLS_HANDSHAKE_COMPLETE_KAFKA_PROTOCOL_FAILED rc=1",
+      "cluster_events_during_run": ["NodeNotReady kafka-0/1/2", "widespread probe deadline exceeded"],
+      "log": "/tmp/gate5-pre-v10-36-b.log"
+    }
+  ],
+  "negatives_partial": "36/36 deny categories passed in attempt a (before hard-fail path)",
   "acl_exact_match": "NOT_RUN",
   "stability_15m": "NOT_RUN",
-  "v10_created": false,
   "gate5_final_pass": false,
   "gate6_authorized": false,
   "production_approved": false,
-  "next": "Tune authenticated readiness period/timeouts to avoid JVM-probe thrash; re-run 20/5/5 then 36/36 before creating v10"
+  "blocking_reason": "Intermittent Kafka ApiVersions failures remain under cluster load/node not-ready; full 36/36/36/0 not achieved"
 }

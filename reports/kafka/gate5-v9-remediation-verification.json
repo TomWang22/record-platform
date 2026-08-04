@@ -1,36 +1,23 @@
 {
   "document": "gate5-v9-remediation-verification",
-  "ts": "2026-08-03T20:50:00Z",
-  "status": "SOURCE_REMEDIATION_PREPARED_RUNTIME_NOT_YET_VERIFIED",
-  "changes": [
-    {
-      "path": "infra/k8s/kafka-kraft-metallb/statefulset.yaml",
-      "change": "readinessProbe: TCP:9093 → authenticated kafka-broker-api-versions",
-      "dry_run": "PASS on live kafka-0 before apply"
-    },
-    {
-      "path": "scripts/lib/kafka-mtls36-incluster.sh",
-      "change": "timeout 45; record kafka_apiversions_exit_code, kafka_failure_class, kafka_stderr_tail"
-    },
-    {
-      "path": "tests/gate5-kafka-readiness-not-tcp-only.test.mjs",
-      "change": "reject TCP-only readiness; require ApiVersions SSL HTTPS probe"
-    },
-    {
-      "path": "scripts/gate5-v9-positive-mtls-rca-reproducer.sh",
-      "change": "bounded single-row staged reproducer (diagnostic)"
-    }
+  "ts": "2026-08-04T00:20:25Z",
+  "status": "PARTIAL_RUNTIME_VERIFIED_PREV10_BLOCKED",
+  "commits": [
+    "94a1c353",
+    "92e25d35",
+    "77c59496",
+    "035942be"
   ],
-  "HEAD_equals_origin_main": null,
-  "exact_sha_ci_required_failed": null,
-  "build_worktree_clean": null,
-  "runtime_source_sha_matching": "pending_roll",
-  "oci_revision_matching": "pending_roll",
-  "image_digests_present": "pending_roll",
-  "kafka_brokers_ready": "3/3_pre_roll_tcp_ready",
-  "offline_partitions": null,
-  "under_replicated_partitions": null,
-  "restart_growth": null,
+  "HEAD": "035942be",
+  "HEAD_equals_origin_main": true,
+  "exact_sha_ci": {
+    "94a1c353": "passed path-required (ci,docker-build,kafka-dns,kafka-verify,ns-lint,protocol)",
+    "92e25d35": "passed path-required",
+    "035942be": "pending_or_in_flight"
+  },
+  "kafka_readiness": "authenticated ApiVersions; periodSeconds=45 timeoutSeconds=45",
+  "kafka_brokers_ready": "3/3",
+  "restart_growth": 0,
   "pre_v10_canary_pass": false,
   "v10_created": false
 }

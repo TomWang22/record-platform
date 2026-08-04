@@ -1,0 +1,49 @@
+{
+  "document": "gate5-pre-v10-failure-attribution-classification-correction",
+  "ts": "2026-08-04T02:40:30Z",
+  "supersedes_unsupported_claims_in": [
+    "reports/kafka/gate5-pre-v10-stability-rca-rollup.json"
+  ],
+  "corrected_state": {
+    "node_failure_root_cause": "UNRESOLVED",
+    "probe_induced_load": "HYPOTHESIS_UNDER_TEST",
+    "colima_capacity_failure": "HYPOTHESIS_UNDER_TEST",
+    "kafka_protocol_instability": "RUNTIME_PROVEN",
+    "serial_matrix_stable": false
+  },
+  "not_supported": [
+    "NODE_NOT_READY_ROOT_CAUSED",
+    "PROBE_INDUCED_LOAD_PROVEN",
+    "COLIMA_CAPACITY_INSUFFICIENT_PROVEN",
+    "KAFKA_BROKER_DEFECT_PROVEN"
+  ],
+  "node_accounting_correction": {
+    "NodeNotReady_event_lines_including_pod_fanout": 39,
+    "pods_receiving_NodeNotReady_events": 37,
+    "node_ready_false_transitions": 2,
+    "node_ready_true_transitions": 1,
+    "unique_incident_windows_estimated": 2,
+    "incidents_fully_classified": 0,
+    "incidents_remaining_unknown": 2
+  },
+  "seven_row_ledger": {
+    "expected_accounted": "7/7",
+    "identity_known": "4/7",
+    "stdout_stderr_timestamps_pcap": "0/7"
+  },
+  "probe_overlap": {
+    "forced_sync_measurement": "90/90 with max concurrent JVMs=3",
+    "correlation_to_serial_failures": "NOT_COMPUTABLE_WITHOUT_ROW_TIMESTAMPS",
+    "timing_overlap_is": "correlation_not_causation"
+  },
+  "authorized_next": [
+    "retain full job.log outside mktemp before any future matrix",
+    "replace JVM-per-probe only after A/B disposable rehearsal",
+    "no concurrency matrices until serial 36/36/36/0"
+  ],
+  "v10_created": false,
+  "gate5_final_pass": false,
+  "gate6_authorized": false,
+  "pre_performance_gate_earned": false,
+  "production_approved": false
+}

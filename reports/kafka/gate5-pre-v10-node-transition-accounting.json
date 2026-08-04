@@ -1,0 +1,19 @@
+{
+  "document": "gate5-pre-v10-node-transition-accounting",
+  "ts": "2026-08-04T02:23:24Z",
+  "node_event_lines_NodeNotReady_total_including_pods": 39,
+  "pods_receiving_NodeNotReady_events": 37,
+  "node_ready_false_transitions_lines": 2,
+  "node_ready_true_transitions_lines": 1,
+  "node_object_NodeNotReady_event_lines": 2,
+  "ready_false_samples": [
+    "default           44m         Normal    NodeNotReady                   node/colima                                             Node colima status is now: NodeNotReady",
+    "default           42m         Normal    NodeNotReady                   node/colima                                             Node colima status is now: NodeNotReady"
+  ],
+  "ready_true_samples": [
+    "default           42m         Normal    NodeReady                      node/colima                                             Node colima status is now: NodeReady"
+  ],
+  "node_failure_root_cause": "UNRESOLVED",
+  "classification_note": "Pod NodeNotReady event fan-out is not unique node transition count",
+  "incidents_remaining_unknown": "ALL_UNTIL_KUBELET_COLIMA_LOGS_CORRELATED"
+}

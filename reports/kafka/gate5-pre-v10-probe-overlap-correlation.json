@@ -1,0 +1,51 @@
+{
+  "document": "gate5-pre-v10-probe-overlap-correlation",
+  "ts": "2026-08-04T02:40:01Z",
+  "measurement": {
+    "expected_tested": "90/90",
+    "ok": 87,
+    "timed_out_rc124": 4,
+    "duration_min_median_p95_max": [
+      8938,
+      23121,
+      39987,
+      43694
+    ],
+    "first_spawn_spread_ms_across_brokers": 742,
+    "method_note": "Three brokers started measurement in parallel from host; each then loops with sleep 1. This intentionally stresses synchronized JVM launches. It does not prove kubelet schedules probes in lockstep in production."
+  },
+  "synchronization": {
+    "maximum_concurrent_probe_JVMs": 3,
+    "maximum_distinct_brokers_with_active_probe": 3,
+    "invocations_overlapping_any_other_broker": 90,
+    "invocations_overlapping_two_other_brokers": 86,
+    "invocations_classified_three_broker_overlap": 86,
+    "event_samples_with_distinct_brokers_ge_2": 147,
+    "event_samples_with_distinct_brokers_ge_3": 60
+  },
+  "correlation_with_seven_serial_failures": {
+    "status": "NOT_COMPUTABLE",
+    "reason": "Seven serial failure rows lack start/end timestamps (HISTORICALLY_MISSING); timing overlap with readiness probes cannot be established. Timing overlap would be correlation, not causation.",
+    "failed_rows_overlapping_any_probe": "HISTORICALLY_MISSING",
+    "failed_rows_overlapping_two_or_more_probes": "HISTORICALLY_MISSING",
+    "failed_rows_overlapping_three_probes": "HISTORICALLY_MISSING",
+    "successful_rows_overlapping_three_probes": "HISTORICALLY_MISSING",
+    "failure_rate_with_probe_overlap": "HISTORICALLY_MISSING",
+    "failure_rate_without_probe_overlap": "HISTORICALLY_MISSING"
+  },
+  "hypothesis_status": {
+    "probe_induced_load": "HYPOTHESIS_UNDER_TEST",
+    "evidence_supporting_hypothesis": [
+      "JVM per readiness invocation confirmed",
+      "duration p95/max leave little margin vs 45s period/timeout",
+      "measurement showed max_concurrent_probe_JVMs=3 and three-broker overlap invocations=86"
+    ],
+    "evidence_missing_for_proof": [
+      "timestamped serial failure ledger",
+      "kubelet-scheduled probe timestamps during the serial matrix",
+      "A/B with non-JVM probe"
+    ]
+  },
+  "explicit": "A timing overlap is correlation, not causation.",
+  "v10_created": false
+}

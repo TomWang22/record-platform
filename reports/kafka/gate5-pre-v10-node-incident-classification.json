@@ -1,0 +1,28 @@
+{
+  "document": "gate5-pre-v10-node-incident-classification",
+  "ts": "2026-08-04T02:40:02Z",
+  "node_event_lines_including_pod_fanout": 39,
+  "pods_receiving_NodeNotReady_events": 37,
+  "node_ready_false_transitions": 2,
+  "node_ready_true_transitions": 1,
+  "unique_incident_windows_estimated": 2,
+  "incidents": [
+    {
+      "incident_index": 1,
+      "ready_false_event_line": "default           44m         Normal    NodeNotReady                   node/colima                                             Node colima status is now: NodeNotReady",
+      "classification": "UNKNOWN_WITH_EVIDENCE_GAPS",
+      "reason": "Event buffer has relative ages only; kubelet/colima/containerd logs not yet correlated to absolute wall clock"
+    },
+    {
+      "incident_index": 2,
+      "ready_false_event_line": "default           42m         Normal    NodeNotReady                   node/colima                                             Node colima status is now: NodeNotReady",
+      "classification": "UNKNOWN_WITH_EVIDENCE_GAPS",
+      "reason": "Event buffer has relative ages only; kubelet/colima/containerd logs not yet correlated to absolute wall clock"
+    }
+  ],
+  "incidents_fully_classified": 0,
+  "incidents_remaining_unknown": 2,
+  "node_failure_root_cause": "UNRESOLVED",
+  "matrix_rows_overlapping_incident": "HISTORICALLY_MISSING",
+  "readiness_probes_overlapping_incident": "HISTORICALLY_MISSING"
+}

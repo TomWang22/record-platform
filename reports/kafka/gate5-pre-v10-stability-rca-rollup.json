@@ -1,0 +1,147 @@
+{
+  "document": "gate5-pre-v10-stability-rca-rollup",
+  "ts": "2026-08-04T02:03:17Z",
+  "HEAD": "d7e0dc34dc21ad6c0848a0f448d8c0654ddd7a3d",
+  "HEAD_equals_origin_main": true,
+  "path_json_tests": "10/10/10/0",
+  "exact_sha_ci": {
+    "prior_HEAD_0d7bc9b2": true,
+    "tip": "d7e0dc34dc21ad6c0848a0f448d8c0654ddd7a3d",
+    "note": "tip includes harness+probe-cost docs; await CI for d7e0dc34/2bfb6540 as applicable"
+  },
+  "readiness": {
+    "expected_tested_passed_timed_out": "90/90/90/0",
+    "duration_min_median_p95_max": [
+      2568,
+      12302,
+      21970,
+      33004
+    ],
+    "keytool_per_probe": false,
+    "jvm_cli_each_invoke": true,
+    "timeout_equals_period": true,
+    "process_leaks": false,
+    "temp_file_leaks": false
+  },
+  "node": {
+    "document": "gate5-pre-v10-node-pressure",
+    "ts": "2026-08-04T00:54:26Z",
+    "NodeNotReady_events_in_current_event_buffer": 39,
+    "hits_tail": [
+      "45:record-platform   43m         Warning   NodeNotReady                   pod/messaging-service-669c6678b7-t6nwf                  Node is not ready",
+      "46:record-platform   43m         Warning   NodeNotReady                   pod/ollama-worker-7b7ccb6c79-j5wzv                      Node is not ready",
+      "47:observability     43m         Warning   NodeNotReady                   pod/grafana-5874ddf4db-swbk6                            Node is not ready",
+      "48:record-platform   42m         Warning   NodeNotReady                   pod/auth-service-775f98f4fb-4blmj                       Node is not ready",
+      "49:default           42m         Normal    NodeNotReady                   node/colima                                             Node colima status is now: NodeNotReady",
+      "50:record-platform   42m         Warning   NodeNotReady                   pod/analytics-service-7c79c6c4c5-fz8f6                  Node is not ready",
+      "51:kube-system       42m         Warning   NodeNotReady                   pod/metrics-server-6c5ffbcb5f-smck7                     Node is not ready",
+      "52:metallb-system    42m         Warning   NodeNotReady                   pod/speaker-dbv7h                                       Node is not ready",
+      "53:record-platform   42m         Warning   NodeNotReady                   pod/nginx-6d594f84b7-bdkhl                              Node is not ready",
+      "54:record-platform   42m         Warning   NodeNotReady                   pod/ollama-worker-7b7ccb6c79-b7bz2                      Node is not ready",
+      "55:ingress-nginx     42m         Warning   NodeNotReady                   pod/caddy-h3-6c6cc56fd-j5r67                            Node is not ready",
+      "56:record-platform   42m         Warning   NodeNotReady                   pod/kafka-2                                             Node is not ready",
+      "57:record-platform   42m         Warning   NodeNotReady                   pod/ollama-gateway-d899948d8-k5d5l                      Node is not ready",
+      "61:record-platform   42m         Warning   NodeNotReady                   pod/records-service-757c8487b9-jtckp                    Node is not ready",
+      "62:observability     42m         Warning   NodeNotReady                   pod/otel-collector-6967f48c8b-sj7kj                     Node is not ready",
+      "63:record-platform   42m         Warning   NodeNotReady                   pod/listings-service-69b68b686c-gcb56                   Node is not ready",
+      "65:record-platform   42m         Warning   NodeNotReady                   pod/python-ai-service-5dc78b669f-db97z                  Node is not ready",
+      "66:kube-system       42m         Warning   NodeNotReady                   pod/local-path-provisioner-6f5d79df6-bx24x              Node is not ready",
+      "67:record-platform   42m         Warning   NodeNotReady                   pod/webapp-6ccdb9bd98-kmd4t                             Node is not ready",
+      "68:metallb-system    42m         Warning   NodeNotReady                   pod/controller-56bb48dcd4-tnsjl                         Node is not ready"
+    ],
+    "node_conditions": [
+      {
+        "type": "MemoryPressure",
+        "status": "False",
+        "reason": "03",
+        "message": "Aug 2026 20:52:45 -0400   Mon, 03 Aug 2026 20:10:30 -0400   KubeletHasSufficientMemory   kubelet has sufficient memory available"
+      },
+      {
+        "type": "DiskPressure",
+        "status": "False",
+        "reason": "03",
+        "message": "Aug 2026 20:52:45 -0400   Mon, 03 Aug 2026 20:10:30 -0400   KubeletHasNoDiskPressure     kubelet has no disk pressure"
+      },
+      {
+        "type": "PIDPressure",
+        "status": "False",
+        "reason": "03",
+        "message": "Aug 2026 20:52:45 -0400   Mon, 03 Aug 2026 20:10:30 -0400   KubeletHasSufficientPID      kubelet has sufficient PID available"
+      },
+      {
+        "type": "Ready",
+        "status": "True",
+        "reason": "03",
+        "message": "Aug 2026 20:52:45 -0400   Mon, 03 Aug 2026 20:11:49 -0400   KubeletReady                 kubelet is posting ready status. AppArmor enabled"
+      },
+      {
+        "type": "Ready",
+        "status": "44m",
+        "reason": "Node",
+        "message": "colima status is now: NodeNotReady"
+      },
+      {
+        "type": "DiskPressure",
+        "status": "43m",
+        "reason": "over",
+        "message": "3h14m)  kubelet          Node colima status is now: NodeHasNoDiskPressure"
+      },
+      {
+        "type": "Ready",
+        "status": "42m",
+        "reason": "over",
+        "message": "3h14m)  kubelet          Node colima status is now: NodeNotReady"
+      },
+      {
+        "type": "Ready",
+        "status": "42m",
+        "reason": "over",
+        "message": "3h14m)  kubelet          Node colima status is now: NodeReady"
+      }
+    ],
+    "classification_current": "KUBELET_OR_NODE_NOT_READY",
+    "active_reason": {
+      "type": "Ready",
+      "status": "42m",
+      "reason": "over",
+      "message": "3h14m)  kubelet          Node colima status is now: NodeReady"
+    }
+  },
+  "serial_36": "36/36/29/7/0",
+  "root_cause_candidates": [
+    "PROBE_INDUCED_LOAD (JVM ApiVersions every 45s, timeout=period, p95~22s max~33s)",
+    "COLIMA_CAPACITY / HISTORICAL NodeNotReady under matrix load",
+    "KAFKA_APIVERSIONS intermittent disconnect/protocol failure even under serial matrix"
+  ],
+  "v10_created": false,
+  "gate5_final_pass": false,
+  "gate6_authorized": false,
+  "production_approved": false,
+  "preservation": {
+    "v8": {
+      "exists": true,
+      "marker_sha256": "cae2225463c0c550894ea4f3916242d31f7084db12ebfb4ed9e7234d6e03c301",
+      "hard_failure_sha256": "4cf076c9f5aa41fc8204d9997bacb6cdd27294a04fd9395b981db1b1b8e1391e",
+      "files": 67,
+      "bytes": 640816,
+      "writer_pids": []
+    },
+    "v9": {
+      "exists": true,
+      "marker_sha256": "492ecea2a0e7817a1de49334ff6ba6161576c0347c83a62391352162288881a1",
+      "hard_failure_sha256": "5ed31ff19ad2dbd68fd1abc010119efb1352a696eef45fcfd70d7c3b78fcb163",
+      "files": 26,
+      "bytes": 203017,
+      "writer_pids": []
+    },
+    "writer_process_lines": [
+      "48753"
+    ],
+    "ts": "2026-08-04T00:48:58Z",
+    "v8_mutated": false,
+    "v9_mutated": false,
+    "v9_rows_imported_into_future_root": false,
+    "frozen_root_retry_count": 0,
+    "stability_rca_root": "/tmp/record-platform-gate5-pre-v10-stability-rca-v1"
+  }
+}

@@ -1,0 +1,3 @@
+# Readiness A/B
+
+**A_B_BLOCKED_NO_ISOLATED_CAPACITY**

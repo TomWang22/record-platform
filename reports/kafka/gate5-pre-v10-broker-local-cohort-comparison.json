@@ -1,0 +1,98 @@
+{
+  "document": "gate5-pre-v10-broker-local-cohort-comparison",
+  "ts": "2026-08-05T03:21:39Z",
+  "baseline_run_id": "baseline-1785877112309-cfe2081c",
+  "CURRENT_JVM_PROBE_CAUSALITY": "NOT_SUPPORTED",
+  "KAFKA_2_LOCALITY_SIGNAL": "SUPPORTED_NOT_CAUSAL",
+  "locality_rationale": "kafka-2 accounts for 4/5 failures (4/36 vs 0/36 on kafka-1 and 1/36 on kafka-0). This is a material locality signal but n_fail=5 does not prove kafka-2 is defective.",
+  "agent_classification": "HARDENING_CANDIDATE_NOT_CAUSAL_REMEDIATION",
+  "brokers": {
+    "0": {
+      "rows_expected_tested_passed_failed": "36/36/35/1",
+      "failure_layers": {
+        "KAFKA_APIVERSIONS_DISCONNECT": 1
+      },
+      "latency_ms": {
+        "min": 5056,
+        "median": 9910,
+        "p95": 34127,
+        "max": 37848,
+        "n": 36
+      },
+      "tls_handshake_failures": 0,
+      "apiversions_invalid_responses": 0,
+      "apiversions_disconnects": 1,
+      "metadata_failures_in_exception": 1,
+      "readiness_overlap_distribution": {
+        "1": 15,
+        "0": 18,
+        "2": 3
+      },
+      "dns_resolution_results": {
+        "RESOLVED": 36
+      },
+      "node_not_ready_sightings_in_row_snapshots": 0,
+      "failure_rate": 0.027777777777777776
+    },
+    "1": {
+      "rows_expected_tested_passed_failed": "36/36/36/0",
+      "failure_layers": {},
+      "latency_ms": {
+        "min": 3339,
+        "median": 7622,
+        "p95": 18673,
+        "max": 38446,
+        "n": 36
+      },
+      "tls_handshake_failures": 0,
+      "apiversions_invalid_responses": 0,
+      "apiversions_disconnects": 0,
+      "metadata_failures_in_exception": 0,
+      "readiness_overlap_distribution": {
+        "2": 5,
+        "0": 19,
+        "1": 12
+      },
+      "dns_resolution_results": {
+        "RESOLVED": 36
+      },
+      "node_not_ready_sightings_in_row_snapshots": 0,
+      "failure_rate": 0.0
+    },
+    "2": {
+      "rows_expected_tested_passed_failed": "36/36/32/4",
+      "failure_layers": {
+        "KAFKA_INVALID_RESPONSE": 3,
+        "KAFKA_APIVERSIONS_DISCONNECT": 1
+      },
+      "latency_ms": {
+        "min": 3201,
+        "median": 10620,
+        "p95": 24773,
+        "max": 41033,
+        "n": 36
+      },
+      "tls_handshake_failures": 3,
+      "apiversions_invalid_responses": 3,
+      "apiversions_disconnects": 1,
+      "metadata_failures_in_exception": 4,
+      "readiness_overlap_distribution": {
+        "1": 13,
+        "0": 18,
+        "3": 2,
+        "2": 3
+      },
+      "dns_resolution_results": {
+        "RESOLVED": 36
+      },
+      "node_not_ready_sightings_in_row_snapshots": 0,
+      "failure_rate": 0.1111111111111111
+    }
+  },
+  "cross_broker_failures": {
+    "kafka-0": "1/36",
+    "kafka-1": "0/36",
+    "kafka-2": "4/36"
+  },
+  "statistical_significance_claimed": false
+}

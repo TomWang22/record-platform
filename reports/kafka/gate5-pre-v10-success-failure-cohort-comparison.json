@@ -1,0 +1,322 @@
+{
+  "document": "gate5-pre-v10-success-failure-cohort-comparison",
+  "ts": "2026-08-05T02:39:27Z",
+  "baseline_run_id": "baseline-1785877112309-cfe2081c",
+  "n_rows": 108,
+  "n_success": 103,
+  "n_failure": 5,
+  "cohort_test_ids": {
+    "success_overlap_0": [
+      "r1-auth-service-b0-1785878103388",
+      "r1-auth-service-b2-1785878183162",
+      "r1-listings-service-b2-1785878381893",
+      "r1-media-service-b0-1785878490380",
+      "r1-media-service-b1-1785878563561",
+      "r1-messaging-service-b0-1785878726905",
+      "r1-messaging-service-b1-1785878757126",
+      "r1-notification-service-b1-1785879067789",
+      "r1-notification-service-b2-1785879106279",
+      "r1-ollama-gateway-b0-1785880251723",
+      "r1-ollama-gateway-b1-1785880358060",
+      "r1-ollama-gateway-b2-1785880422588",
+      "r1-ollama-worker-b0-1785880466151",
+      "r1-ollama-worker-b1-1785880551175",
+      "r1-ollama-worker-b2-1785880629268",
+      "r1-python-ai-service-b2-1785879505200",
+      "r1-shopping-service-b1-1785879837820",
+      "r1-shopping-service-b2-1785879933383",
+      "r1-trust-service-b0-1785880048406",
+      "r1-trust-service-b2-1785880213584",
+      "r2-analytics-service-b0-1785880730200",
+      "r2-analytics-service-b2-1785880914731",
+      "r2-auction-monitor-b1-1785881173767",
+      "r2-auth-service-b0-1785881447271",
+      "r2-auth-service-b2-1785881624754",
+      "r2-listings-service-b1-1785881850027",
+      "r2-listings-service-b2-1785882104556",
+      "r2-media-service-b0-1785882271056",
+      "r2-messaging-service-b1-1785882717054",
+      "r2-messaging-service-b2-1785882862664",
+      "r2-notification-service-b1-1785883310831",
+      "r2-ollama-gateway-b0-1785884897645",
+      "r2-python-ai-service-b1-1785883648330",
+      "r2-shopping-service-b1-1785883991585",
+      "r2-trust-service-b1-1785884395885",
+      "r3-analytics-service-b0-1785886033701",
+      "r3-auth-service-b0-1785886768552",
+      "r3-listings-service-b0-1785887043766",
+      "r3-media-service-b1-1785887444656",
+      "r3-media-service-b2-1785887520581",
+      "r3-messaging-service-b0-1785887581464",
+      "r3-messaging-service-b1-1785887693511",
+      "r3-messaging-service-b2-1785887788528",
+      "r3-notification-service-b0-1785887901476",
+      "r3-notification-service-b2-1785888034367",
+      "r3-ollama-gateway-b1-1785889089881",
+      "r3-ollama-worker-b0-1785889285191",
+      "r3-ollama-worker-b1-1785889386786",
+      "r3-python-ai-service-b0-1785888106823",
+      "r3-python-ai-service-b1-1785888216545",
+      "r3-python-ai-service-b2-1785888278202",
+      "r3-trust-service-b1-1785888815839"
+    ],
+    "success_overlap_1": [
+      "r1-analytics-service-b0-1785877290486",
+      "r1-auction-monitor-b0-1785877742699",
+      "r1-auction-monitor-b2-1785878034413",
+      "r1-listings-service-b0-1785878248353",
+      "r1-notification-service-b0-1785878952323",
+      "r1-python-ai-service-b0-1785879185140",
+      "r1-python-ai-service-b1-1785879262922",
+      "r1-shopping-service-b0-1785879614335",
+      "r2-analytics-service-b1-1785880824082",
+      "r2-auction-monitor-b0-1785881034837",
+      "r2-auction-monitor-b2-1785881280827",
+      "r2-auth-service-b1-1785881549237",
+      "r2-listings-service-b0-1785881711807",
+      "r2-media-service-b1-1785882360911",
+      "r2-messaging-service-b0-1785882621292",
+      "r2-notification-service-b2-1785883484154",
+      "r2-ollama-gateway-b1-1785885094772",
+      "r2-ollama-gateway-b2-1785885272826",
+      "r2-ollama-worker-b0-1785885478826",
+      "r2-ollama-worker-b1-1785885596900",
+      "r2-python-ai-service-b0-1785883558183",
+      "r2-python-ai-service-b2-1785883754217",
+      "r2-shopping-service-b2-1785884045488",
+      "r2-trust-service-b0-1785884169173",
+      "r3-analytics-service-b1-1785886120965",
+      "r3-analytics-service-b2-1785886250898",
+      "r3-auction-monitor-b0-1785886377077",
+      "r3-auction-monitor-b1-1785886525103",
+      "r3-auction-monitor-b2-1785886638991",
+      "r3-auth-service-b1-1785886857565",
+      "r3-listings-service-b1-1785887131639",
+      "r3-listings-service-b2-1785887219972",
+      "r3-notification-service-b1-1785887964609",
+      "r3-ollama-gateway-b0-1785889012972",
+      "r3-shopping-service-b1-1785888499490",
+      "r3-shopping-service-b2-1785888613188",
+      "r3-trust-service-b0-1785888713464",
+      "r3-trust-service-b2-1785888945901"
+    ],
+    "success_overlap_2": [
+      "r1-analytics-service-b1-1785877392304",
+      "r1-auction-monitor-b1-1785877972231",
+      "r1-auth-service-b1-1785878157330",
+      "r1-listings-service-b1-1785878330195",
+      "r1-messaging-service-b2-1785878872543",
+      "r1-trust-service-b1-1785880141744",
+      "r2-notification-service-b0-1785883162684",
+      "r2-shopping-service-b0-1785883912298",
+      "r3-auth-service-b2-1785886966719",
+      "r3-media-service-b0-1785887304845",
+      "r3-ollama-worker-b2-1785889553795"
+    ],
+    "success_overlap_3": [
+      "r1-media-service-b2-1785878675583",
+      "r2-media-service-b2-1785882535542"
+    ],
+    "failure_overlap_0": [
+      "r2-ollama-worker-b2-1785885765937",
+      "r2-trust-service-b2-1785884610777",
+      "r3-shopping-service-b0-1785888363316"
+    ],
+    "failure_overlap_1": [
+      "r1-analytics-service-b2-1785877568532",
+      "r3-ollama-gateway-b2-1785889154836"
+    ],
+    "failure_overlap_2": [],
+    "failure_overlap_3": []
+  },
+  "cohort_counts": {
+    "success_overlap_0": 52,
+    "success_overlap_1": 38,
+    "success_overlap_2": 11,
+    "success_overlap_3": 2,
+    "failure_overlap_0": 3,
+    "failure_overlap_1": 2,
+    "failure_overlap_2": 0,
+    "failure_overlap_3": 0
+  },
+  "failure_rate_by_probe_overlap": {
+    "0": {
+      "failures": 3,
+      "successes": 52,
+      "n": 55,
+      "failure_rate": 0.05454545454545454
+    },
+    "3": {
+      "failures": 0,
+      "successes": 2,
+      "n": 2,
+      "failure_rate": 0.0
+    },
+    "1": {
+      "failures": 2,
+      "successes": 38,
+      "n": 40,
+      "failure_rate": 0.05
+    },
+    "2": {
+      "failures": 0,
+      "successes": 11,
+      "n": 11,
+      "failure_rate": 0.0
+    }
+  },
+  "failure_rate_by_broker": {
+    "0": {
+      "failures": 1,
+      "successes": 35,
+      "n": 36,
+      "failure_rate": 0.027777777777777776
+    },
+    "1": {
+      "failures": 0,
+      "successes": 36,
+      "n": 36,
+      "failure_rate": 0.0
+    },
+    "2": {
+      "failures": 4,
+      "successes": 32,
+      "n": 36,
+      "failure_rate": 0.1111111111111111
+    }
+  },
+  "failure_rate_by_service": {
+    "media-service": {
+      "failures": 0,
+      "successes": 9,
+      "n": 9,
+      "failure_rate": 0.0
+    },
+    "trust-service": {
+      "failures": 1,
+      "successes": 8,
+      "n": 9,
+      "failure_rate": 0.1111111111111111
+    },
+    "ollama-worker": {
+      "failures": 1,
+      "successes": 8,
+      "n": 9,
+      "failure_rate": 0.1111111111111111
+    },
+    "analytics-service": {
+      "failures": 1,
+      "successes": 8,
+      "n": 9,
+      "failure_rate": 0.1111111111111111
+    },
+    "listings-service": {
+      "failures": 0,
+      "successes": 9,
+      "n": 9,
+      "failure_rate": 0.0
+    },
+    "ollama-gateway": {
+      "failures": 1,
+      "successes": 8,
+      "n": 9,
+      "failure_rate": 0.1111111111111111
+    },
+    "auth-service": {
+      "failures": 0,
+      "successes": 9,
+      "n": 9,
+      "failure_rate": 0.0
+    },
+    "auction-monitor": {
+      "failures": 0,
+      "successes": 9,
+      "n": 9,
+      "failure_rate": 0.0
+    },
+    "shopping-service": {
+      "failures": 1,
+      "successes": 8,
+      "n": 9,
+      "failure_rate": 0.1111111111111111
+    },
+    "messaging-service": {
+      "failures": 0,
+      "successes": 9,
+      "n": 9,
+      "failure_rate": 0.0
+    },
+    "notification-service": {
+      "failures": 0,
+      "successes": 9,
+      "n": 9,
+      "failure_rate": 0.0
+    },
+    "python-ai-service": {
+      "failures": 0,
+      "successes": 9,
+      "n": 9,
+      "failure_rate": 0.0
+    }
+  },
+  "failure_rate_by_round": {
+    "1": {
+      "failures": 1,
+      "successes": 35,
+      "n": 36,
+      "failure_rate": 0.027777777777777776
+    },
+    "2": {
+      "failures": 2,
+      "successes": 34,
+      "n": 36,
+      "failure_rate": 0.05555555555555555
+    },
+    "3": {
+      "failures": 2,
+      "successes": 34,
+      "n": 36,
+      "failure_rate": 0.05555555555555555
+    }
+  },
+  "latency_by_probe_overlap": {
+    "0": {
+      "n": 55,
+      "min": 3345,
+      "median": 9336,
+      "p95": 24773,
+      "max": 41033
+    },
+    "1": {
+      "n": 40,
+      "min": 3201,
+      "median": 11015,
+      "p95": 31802,
+      "max": 38446
+    },
+    "2": {
+      "n": 11,
+      "min": 3339,
+      "median": 6728,
+      "p95": 18673,
+      "max": 18673
+    },
+    "3": {
+      "n": 2,
+      "min": 3372,
+      "median": 3372,
+      "p95": 8600,
+      "max": 8600
+    }
+  },
+  "broker_JVM_pressure_by_probe_overlap": {
+    "note": "Per-row broker JVM samples exist under broker_jvm_reference; aggregate CPU/RSS-by-overlap not claimed as statistically significant for n_fail=5.",
+    "failure_overlap_distribution": {
+      "1": 2,
+      "0": 3
+    }
+  },
+  "statistical_significance_claimed": false,
+  "CURRENT_JVM_PROBE_CAUSALITY": "NOT_SUPPORTED",
+  "causality_rationale": "Failure rate with readiness overlap is not higher than with zero overlap; current evidence does not support readiness-probe causation. Broker-local issues remain primary alternatives."
+}

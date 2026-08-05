@@ -1,0 +1,14 @@
+{
+  "document": "gate5-pre-v10-readiness-ab-comparison",
+  "ts": "2026-08-05T03:24:29Z",
+  "status": "A_B_BLOCKED_NO_ISOLATED_CAPACITY",
+  "live_kafka_mutated": false,
+  "v10_created": false,
+  "A_started": false,
+  "B_started": false,
+  "b_arm_acceptance_passed": false,
+  "READINESS_REPLACEMENT_DECISION": "BLOCKED_INSUFFICIENT_EVIDENCE",
+  "agent_classification": "HARDENING_CANDIDATE_NOT_CAUSAL_REMEDIATION",
+  "evidence_root": "/Users/tom/record-platform/.tmp/rp-g5-readiness-ab-ab-20260805T032429Z-95591",
+  "note": "Set RP_AB_COLIMA_PROFILE and RP_AB_DOCKER_HOST to a dedicated Colima profile; do not run A/B on saturated live default context."
+}

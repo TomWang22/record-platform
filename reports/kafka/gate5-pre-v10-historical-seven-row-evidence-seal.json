@@ -1,0 +1,78 @@
+{
+  "document": "gate5-pre-v10-historical-seven-row-evidence-seal",
+  "ts": "2026-08-04T03:05:00Z",
+  "classification": "HISTORICAL_FAILURE_EVIDENCE_INCOMPLETE",
+  "forbidden_claim": "SEVEN SERIAL KAFKA FAILURES UNDER COMPLETE LAYER ATTRIBUTION",
+  "actual_proof": {
+    "historical_failure_slots_accounted": "7/7",
+    "service_and_broker_identity_known": "4/7",
+    "stdout_present": "0/7",
+    "stderr_present": "0/7",
+    "timestamps_present": "0/7",
+    "packet_captures_present": "0/7",
+    "complete_causal_attribution": "0/7"
+  },
+  "sealed_rows": [
+    {
+      "failure_index": 1,
+      "service": "trust-service",
+      "broker": 0,
+      "seal": "HISTORICAL_FAILURE_EVIDENCE_INCOMPLETE",
+      "raw_gaps": ["PERMANENT_HISTORICAL_RAW_EVIDENCE_GAP"]
+    },
+    {
+      "failure_index": 2,
+      "service": "ollama-gateway",
+      "broker": 1,
+      "seal": "HISTORICAL_FAILURE_EVIDENCE_INCOMPLETE",
+      "raw_gaps": ["PERMANENT_HISTORICAL_RAW_EVIDENCE_GAP"]
+    },
+    {
+      "failure_index": 3,
+      "service": "ollama-worker",
+      "broker": 0,
+      "seal": "HISTORICAL_FAILURE_EVIDENCE_INCOMPLETE",
+      "raw_gaps": ["PERMANENT_HISTORICAL_RAW_EVIDENCE_GAP"]
+    },
+    {
+      "failure_index": 4,
+      "service": "ollama-worker",
+      "broker": 2,
+      "seal": "HISTORICAL_FAILURE_EVIDENCE_INCOMPLETE",
+      "raw_gaps": ["PERMANENT_HISTORICAL_RAW_EVIDENCE_GAP"]
+    },
+    {
+      "failure_index": 5,
+      "service": null,
+      "broker": null,
+      "seal": "PERMANENT_HISTORICAL_IDENTITY_GAP",
+      "raw_gaps": ["PERMANENT_HISTORICAL_RAW_EVIDENCE_GAP", "PERMANENT_HISTORICAL_IDENTITY_GAP"],
+      "candidate_set_non_authoritative": [
+        "analytics-service|auction-monitor|auth-service|listings-service × kafka-{0,1,2}",
+        "media-service × kafka-0"
+      ]
+    },
+    {
+      "failure_index": 6,
+      "service": null,
+      "broker": null,
+      "seal": "PERMANENT_HISTORICAL_IDENTITY_GAP",
+      "raw_gaps": ["PERMANENT_HISTORICAL_RAW_EVIDENCE_GAP", "PERMANENT_HISTORICAL_IDENTITY_GAP"]
+    },
+    {
+      "failure_index": 7,
+      "service": null,
+      "broker": null,
+      "seal": "PERMANENT_HISTORICAL_IDENTITY_GAP",
+      "raw_gaps": ["PERMANENT_HISTORICAL_RAW_EVIDENCE_GAP", "PERMANENT_HISTORICAL_IDENTITY_GAP"]
+    }
+  ],
+  "reconstruction_attempts_closed": true,
+  "do_not_invent_bytes": true,
+  "replacement_required": "fresh fully instrumented current-probe baseline (108 rows)",
+  "jvm_per_readiness_probe_design": "MEASURED_AND_REPLACEMENT_NOT_YET_IMPLEMENTED",
+  "v10_created": false,
+  "gate5_final_pass": false,
+  "gate6_authorized": false,
+  "production_approved": false
+}

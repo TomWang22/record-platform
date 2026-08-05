@@ -1,0 +1,112 @@
+{
+  "document": "gate5-pre-v10-readiness-agent-contract",
+  "version": 1,
+  "ts": "2026-08-05T02:46:00Z",
+  "module": "services/kafka-readiness-agent",
+  "module_path": "record-platform/kafka-readiness-agent",
+  "agent_classification": "HARDENING_CANDIDATE_NOT_CAUSAL_REMEDIATION",
+  "agent_classification_note": "May eliminate JVM-per-probe cost; not accepted as causal remediation for the five baseline failures (probe causality NOT_SUPPORTED; kafka-2 locality SUPPORTED_NOT_CAUSAL).",
+  "live_statefulset_modified": false,
+  "live_cluster_apply_authorized": false,
+  "heartbeat_path_forbidden": "/tmp/record-platform-runtime-heartbeat-gate5-v10",
+  "endpoints": {
+    "bind": "127.0.0.1:8099",
+    "bind_constraint": "loopback_only",
+    "livez": {
+      "method": "GET",
+      "path": "/livez",
+      "ready_http": 200,
+      "body": { "status": "LIVE" }
+    },
+    "readyz": {
+      "method": "GET",
+      "path": "/readyz",
+      "ready_http": 200,
+      "ready_body_status": "READY",
+      "not_ready_http": 503,
+      "not_ready_body_status": "NOT_READY",
+      "not_ready_requires_reason": true
+    },
+    "status": {
+      "method": "GET",
+      "path": "/status",
+      "http": 200,
+      "secrets_forbidden": true
+    },
+    "metrics": {
+      "method": "GET",
+      "path": "/metrics",
+      "format": "prometheus"
+    }
+  },
+  "reason_codes": [
+    "TLS_CHAIN_FAILURE",
+    "TLS_HOSTNAME_FAILURE",
+    "TLS_CLIENT_IDENTITY_FAILURE",
+    "TCP_CONNECT_FAILURE",
+    "APIVERSIONS_FAILURE",
+    "METADATA_FAILURE",
+    "LOCAL_NODE_ID_MISMATCH",
+    "STALE_LAST_SUCCESS",
+    "AGENT_INTERNAL_FAILURE"
+  ],
+  "ready_predicates": {
+    "all_required": [
+      "last_success_newer_than_freshness_threshold",
+      "local_node_id_matched_in_metadata",
+      "tls_ok_chain_hostname_client_identity",
+      "not_stuck_reconnecting_past_grace"
+    ],
+    "freshness_threshold_default": "30s",
+    "poll_interval_default": "5s",
+    "reconnect_grace_default": "60s"
+  },
+  "protocol_checks": {
+    "broker_target": "${POD_NAME}.kafka.${NAMESPACE}.svc.cluster.local:9093",
+    "tls": {
+      "hostname_verification": "HTTPS",
+      "sni": true,
+      "server_name": "broker_fqdn",
+      "chain_validation": "leaf_to_intermediate_to_root_via_TLS_CA_FILE",
+      "client_auth": "required_mtls"
+    },
+    "kafka_apis": ["ApiVersions", "Metadata"],
+    "client_library": "github.com/twmb/franz-go",
+    "client_reuse": "single_reusable_client_reconnect_after_failure"
+  },
+  "tls_config": {
+    "preferred_pem": ["TLS_CERT_FILE", "TLS_KEY_FILE", "TLS_CA_FILE"],
+    "alternate_keystore": ["KEYSTORE_PATH", "TRUSTSTORE_PATH"],
+    "keystore_formats": ["PEM", "PKCS12"],
+    "jks_note": "Convert JKS→PEM via init/sidecar; see scripts/kafka-readiness-jks-to-pem.sh"
+  },
+  "prometheus_metrics": [
+    "kafka_readiness_ready",
+    "kafka_readiness_check_latency_seconds",
+    "kafka_readiness_last_success_age_seconds",
+    "kafka_readiness_reason_total",
+    "kafka_readiness_check_total",
+    "kafka_readiness_client_creations"
+  ],
+  "forbidden_behaviors": [
+    "no_jvm_spawn_per_probe",
+    "no_kafka_broker_api_versions_cli_per_probe",
+    "no_tcp_only_readiness",
+    "no_non_loopback_http_bind",
+    "no_logging_of_passwords_keys_or_raw_payloads",
+    "no_new_protocol_client_per_readyz",
+    "no_modify_infra_k8s_kafka_kraft_metallb_statefulset_yaml",
+    "no_apply_to_live_kafka_cluster_without_ab_pass",
+    "no_create_tmp_record_platform_runtime_heartbeat_gate5_v10"
+  ],
+  "k8s_rollout": {
+    "manifests_dir": "infra/k8s/kafka-kraft-metallb/readiness-agent/",
+    "patch_marker": "DO_NOT_APPLY_UNTIL_AB_PASSES",
+    "kubelet_probe": "http://127.0.0.1:8099/readyz"
+  },
+  "docs": [
+    "docs/KAFKA_READINESS_AND_ACCEPTANCE.md",
+    "services/kafka-readiness-agent/README.md",
+    "infra/k8s/kafka-kraft-metallb/readiness-agent/README.md"
+  ]
+}

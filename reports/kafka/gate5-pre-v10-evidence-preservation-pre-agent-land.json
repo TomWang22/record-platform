@@ -1,0 +1,69 @@
+{
+  "document": "gate5-pre-v10-evidence-preservation-pre-agent-land",
+  "ts": "2026-08-05T03:20:48Z",
+  "paths": {
+    "baseline": {
+      "path": "/tmp/record-platform-gate5-pre-v10-current-probe-baseline-v1",
+      "exists": true,
+      "active_writers": [],
+      "TERMINAL.json_sha256": "04dfe6846b6838939d30c8f2298263abf4e40e4ee4df1924d94907530f52efc1",
+      "FROZEN_DIAGNOSTIC_EVIDENCE_COMPLETE.json_sha256": "04dfe6846b6838939d30c8f2298263abf4e40e4ee4df1924d94907530f52efc1",
+      "SUMMARY.json_sha256": "99faa4fe70a664a1f0bb4bf4f7d01563009c875627d55ea8ded351d9145e152a",
+      "WRITER_LOCK.json_sha256": "1d5205ea8b8c4aa7bb202cb370e09faf1795dd64eeceaab72e780f06f2f2957e"
+    },
+    "v8": {
+      "path": "/tmp/record-platform-runtime-heartbeat-gate5-v8",
+      "exists": true,
+      "active_writers": []
+    },
+    "v9": {
+      "path": "/tmp/record-platform-runtime-heartbeat-gate5-v9",
+      "exists": true,
+      "active_writers": []
+    },
+    "v10": {
+      "path": "/tmp/record-platform-runtime-heartbeat-gate5-v10",
+      "exists": false,
+      "active_writers": []
+    },
+    "rca": {
+      "path": "/tmp/record-platform-gate5-pre-v10-stability-rca-v1",
+      "exists": true,
+      "active_writers": []
+    },
+    "attr": {
+      "path": "/tmp/record-platform-gate5-pre-v10-failure-attribution-v1",
+      "exists": true,
+      "active_writers": []
+    }
+  },
+  "reports": {
+    "reports/kafka/gate5-pre-v10-current-probe-baseline-integrity.json": {
+      "exists": true,
+      "sha256": "afc5617b597a482600948703dfde4e6c371350e4a2bc128aae1458d3a2269651"
+    },
+    "reports/kafka/gate5-pre-v10-five-row-failure-attribution.json": {
+      "exists": true,
+      "sha256": "89b419b8e3a119676eb109defb19b9702b4003107e3ad89dac1649b98860575a"
+    },
+    "reports/kafka/gate5-pre-v10-success-failure-cohort-comparison.json": {
+      "exists": true,
+      "sha256": "ff52758922f3ff8d43307ed4d011e19ee2f835045dc753ccfa8da803ebbf4e05"
+    },
+    "reports/kafka/gate5-pre-v10-probe-overlap-correlation-corrected.json": {
+      "exists": true,
+      "sha256": "5e0ab469b8afb7805ead36774b6407bf6fa53983b91eb66b8eb8cf4c9e5a58eb"
+    },
+    "reports/kafka/gate5-pre-v10-historical-seven-row-evidence-seal.json": {
+      "exists": true,
+      "sha256": "88fddce4c789d4b6f3bfb67a0e40c0d2d4edbc9acaa01df7107f5b2f05bdda0b"
+    }
+  },
+  "invariants": {
+    "baseline_active_writers_after_freeze": 0,
+    "v8_active_writers": 0,
+    "v9_active_writers": 0,
+    "v10_exists": false,
+    "ok": true
+  }
+}

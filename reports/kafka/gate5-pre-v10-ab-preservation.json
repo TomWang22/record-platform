@@ -1,0 +1,104 @@
+{
+  "document": "gate5-pre-v10-ab-preservation",
+  "ts": "2026-08-05T03:53:38Z",
+  "roots": {
+    "record-platform-gate5-pre-v10-current-probe-baseline-v1": {
+      "path": "/tmp/record-platform-gate5-pre-v10-current-probe-baseline-v1",
+      "exists": true,
+      "file_count": 1654,
+      "byte_count": 72617564,
+      "newest_mtime": 1785889786.1935267,
+      "markers": {
+        "TERMINAL.json": {
+          "sha256": "04dfe6846b6838939d30c8f2298263abf4e40e4ee4df1924d94907530f52efc1",
+          "mtime": 1785889786.1935267
+        },
+        "FROZEN_DIAGNOSTIC_EVIDENCE_COMPLETE.json": {
+          "sha256": "04dfe6846b6838939d30c8f2298263abf4e40e4ee4df1924d94907530f52efc1",
+          "mtime": 1785889786.1928442
+        },
+        "WRITER_LOCK.json": {
+          "sha256": "1d5205ea8b8c4aa7bb202cb370e09faf1795dd64eeceaab72e780f06f2f2957e",
+          "mtime": 1785877113.2412293
+        }
+      },
+      "active_writers": []
+    },
+    "record-platform-runtime-heartbeat-gate5-v8": {
+      "path": "/tmp/record-platform-runtime-heartbeat-gate5-v8",
+      "exists": true,
+      "file_count": 67,
+      "byte_count": 640816,
+      "newest_mtime": 1785778813.4919722,
+      "markers": {
+        "FROZEN_BLOCKED_EVIDENCE.json": {
+          "sha256": "cae2225463c0c550894ea4f3916242d31f7084db12ebfb4ed9e7234d6e03c301",
+          "mtime": 1785778599.4727657
+        },
+        "STATUS.json": {
+          "sha256": "bca3681b8c4ada81ba13e60ac96971d6d7d260808ff5b5e0c40d322af367b655",
+          "mtime": 1785778599.4731107
+        },
+        "HARD_FAILURE.json": {
+          "sha256": "4cf076c9f5aa41fc8204d9997bacb6cdd27294a04fd9395b981db1b1b8e1391e",
+          "mtime": 1785778813.4919722
+        }
+      },
+      "active_writers": []
+    },
+    "record-platform-runtime-heartbeat-gate5-v9": {
+      "path": "/tmp/record-platform-runtime-heartbeat-gate5-v9",
+      "exists": true,
+      "file_count": 26,
+      "byte_count": 203017,
+      "newest_mtime": 1785788586.2746215,
+      "markers": {
+        "FROZEN_BLOCKED_EVIDENCE.json": {
+          "sha256": "492ecea2a0e7817a1de49334ff6ba6161576c0347c83a62391352162288881a1",
+          "mtime": 1785787809.9254458
+        },
+        "STATUS.json": {
+          "sha256": "da4d593d1f190df96759b1e61239268b3c96230717e6c614c65c2c50f9c94612",
+          "mtime": 1785787809.930955
+        },
+        "HARD_FAILURE.json": {
+          "sha256": "5ed31ff19ad2dbd68fd1abc010119efb1352a696eef45fcfd70d7c3b78fcb163",
+          "mtime": 1785788586.2746215
+        }
+      },
+      "active_writers": []
+    },
+    "record-platform-gate5-pre-v10-stability-rca-v1": {
+      "path": "/tmp/record-platform-gate5-pre-v10-stability-rca-v1",
+      "exists": true,
+      "file_count": 31,
+      "byte_count": 216905,
+      "newest_mtime": 1785808997.1928627,
+      "markers": {
+        "FROZEN_BLOCKED_EVIDENCE.json": {
+          "sha256": "526ea48341c9a897a54f9b649e8862ac1c283fd75b161632b43c45c2c8fa73d7",
+          "mtime": 1785808997.1910887
+        }
+      },
+      "active_writers": []
+    },
+    "record-platform-gate5-pre-v10-failure-attribution-v1": {
+      "path": "/tmp/record-platform-gate5-pre-v10-failure-attribution-v1",
+      "exists": true,
+      "file_count": 15,
+      "byte_count": 148565,
+      "newest_mtime": 1785812600.26456,
+      "markers": {},
+      "active_writers": []
+    }
+  },
+  "v10_exists": false,
+  "invariants": {
+    "baseline_active_writers": 0,
+    "v8_active_writers": 0,
+    "v9_active_writers": 0,
+    "v10_exists": false,
+    "frozen_root_mutations": 0,
+    "ok": true
+  }
+}

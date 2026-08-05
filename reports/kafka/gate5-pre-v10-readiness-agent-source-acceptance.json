@@ -8,6 +8,8 @@
     "TestClassifyVerifyHostname",
     "TestConcurrentReadyzDoesNotCreateClients",
     "TestContractLoopbackBindPrefix",
+    "TestFileLeakProof",
+    "TestFileLeakProofNoCredentialCopies",
     "TestInjectStale",
     "TestLivezAlwaysOK",
     "TestLoadFromEnvPEM",
@@ -21,6 +23,8 @@
     "TestNotReadyReasons/metadata_timeout",
     "TestNotReadyReasons/wrong_node",
     "TestNotReadyReasons/wrong_root",
+    "TestProcessLeakProof",
+    "TestPrometheusMetricBoundsProof",
     "TestReadyValidLocalBroker",
     "TestRestartRecoveryViaReset",
     "TestStaleLastSuccess",
@@ -28,8 +32,8 @@
     "TestTLSFailureTCP"
   ],
   "go_tests_unique_failed": [],
-  "go_tests_expected_passed_failed": "25/25/0",
-  "ticket_cases_expected_passed_failed": "20/17/3",
+  "go_tests_expected_passed_failed": "29/29/0",
+  "ticket_cases_expected_passed_failed": "20/20/0",
   "ticket_cases": {
     "valid broker": true,
     "wrong root": true,
@@ -48,14 +52,15 @@
     "client creation bounded": true,
     "loopback bind": true,
     "secret-redaction": true,
-    "process leak": false,
-    "file leak": false,
-    "Prometheus metric bounds": false
+    "process leak": true,
+    "file leak": true,
+    "Prometheus metric bounds": true
+  },
+  "three_prior_gaps_closed": {
+    "PROCESS_LEAK_PROOF": true,
+    "FILE_LEAK_PROOF": true,
+    "PROMETHEUS_METRIC_BOUNDS_PROOF": true
   },
   "agent_classification": "HARDENING_CANDIDATE_NOT_CAUSAL_REMEDIATION",
-  "gaps": [
-    "process leak",
-    "file leak",
-    "Prometheus metric bounds"
-  ]
+  "gaps": []
 }

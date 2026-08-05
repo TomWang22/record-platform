@@ -16,8 +16,12 @@ import (
 	"record-platform/kafka-readiness-agent/internal/metrics"
 )
 
+// Set via -ldflags "-X main.version=<sha>" at image build time.
+var version = "dev"
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	slog.Info("kafka-readiness-agent", "version", version)
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {

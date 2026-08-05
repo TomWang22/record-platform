@@ -9,7 +9,7 @@ import { Kafka } from 'kafkajs';
 import { Counter, Gauge, Histogram, Registry } from 'prom-client';
 
 // Canonical runtime value comes from app-config REDIS_URL → redis-external Service DNS.
-// Fail closed: do not fall back to host.docker.internal / lima gateway.
+// Fail closed: never fall back to the macOS/Lima host gateway or published-host aliases.
 const REDIS_URL = (process.env.REDIS_URL || 'redis://redis-external.record-platform.svc.cluster.local:6379/0').trim();
 const OLLAMA = (process.env.OLLAMA_URL || 'http://ollama:11434').replace(/\/$/, '');
 const KAFKA_BROKERS = (

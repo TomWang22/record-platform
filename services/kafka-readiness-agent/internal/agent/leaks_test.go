@@ -199,7 +199,7 @@ func TestFileLeakProof(t *testing.T) {
 	// No credential material filenames.
 	for rel := range after {
 		low := strings.ToLower(rel)
-		for _, bad := range []string{".jks", ".p12", ".pem", "password", "keystore", "truststore", "private"} {
+		for _, bad := range denyTokens("file_names") {
 			if strings.Contains(low, bad) {
 				t.Fatalf("secret_material_or_keystore_artifact=%s", rel)
 			}
@@ -216,8 +216,8 @@ func TestFileLeakProofNoCredentialCopies(t *testing.T) {
 	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/status", nil))
 	body, _ := io.ReadAll(rr.Body)
 	s := strings.ToLower(string(body))
-	for _, tok := range []string{"-----begin", "private_key", "keystore_password", "truststore_password"} {
-		if strings.Contains(s, tok) {
+	for _, tok := range denyTokens("file_status") {
+		if strings.Contains(s, strings.ToLower(tok)) {
 			t.Fatalf("credential_copies_created_in_status token=%s", tok)
 		}
 	}

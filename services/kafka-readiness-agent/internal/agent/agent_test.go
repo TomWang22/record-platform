@@ -185,9 +185,8 @@ func TestStatusHasNoSecrets(t *testing.T) {
 	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/status", nil))
 	raw, _ := io.ReadAll(rr.Body)
 	s := strings.ToLower(string(raw))
-	forbidden := []string{"password", "private_key", "-----begin", "keystore_password", "truststore_password", "secret"}
-	for _, f := range forbidden {
-		if strings.Contains(s, f) {
+	for _, f := range denyTokens("status_body") {
+		if strings.Contains(s, strings.ToLower(f)) {
 			t.Fatalf("status JSON contains forbidden token %q: %s", f, s)
 		}
 	}
@@ -195,7 +194,7 @@ func TestStatusHasNoSecrets(t *testing.T) {
 	if err := json.Unmarshal(raw, &body); err != nil {
 		t.Fatal(err)
 	}
-	for _, k := range []string{"password", "tls_key", "keystore_password", "cert_pem"} {
+	for _, k := range denyTokens("status_fields") {
 		if _, ok := body[k]; ok {
 			t.Fatalf("status has secret field %s", k)
 		}

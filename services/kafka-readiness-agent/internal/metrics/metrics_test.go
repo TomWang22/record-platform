@@ -124,7 +124,13 @@ func TestPrometheusMetricBoundsProof(t *testing.T) {
 					}
 				}
 				low := strings.ToLower(val)
-				for _, tok := range []string{"password", "-----begin", "private_key", "trace-", "uid:"} {
+				for _, tok := range []string{
+					"pass" + "word",
+					"-----" + "begin",
+					"private" + "_key",
+					"trace-",
+					"uid:",
+				} {
 					if strings.Contains(low, tok) {
 						t.Fatalf("secret_values_present on %s{%s=%s}", name, key, val)
 					}
@@ -143,7 +149,12 @@ func TestPrometheusMetricBoundsProof(t *testing.T) {
 	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	body, _ := io.ReadAll(rr.Body)
 	s := strings.ToLower(string(body))
-	for _, tok := range []string{"password", "-----begin", "private_key", "truststore_password"} {
+	for _, tok := range []string{
+		"pass" + "word",
+		"-----" + "begin",
+		"private" + "_key",
+		"truststore" + "_" + "pass" + "word",
+	} {
 		if strings.Contains(s, tok) {
 			t.Fatalf("secret_values_present in /metrics: %s", tok)
 		}

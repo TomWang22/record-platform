@@ -1,6 +1,6 @@
-# Service for external Redis (Docker Compose :6379 on the host gateway).
-# Endpoints are NOT in git — patch after apply with the pod-routable gateway IP (not 172.18.0.x bridge):
-#   bash scripts/sync-redis-external-endpoints.sh
+# Service for external Redis (Docker Compose :6379 on Colima VM published port).
+# Endpoints/EndpointSlices are reconciled by scripts/reconcile-external-endpoints.sh
+# (COLIMA_DEFAULT_DOCKER_CONTAINER → profile VM address — not macOS gateway).
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,6 +8,8 @@ metadata:
   namespace: record-platform
   labels:
     app: redis-external
+    rp.external-dependency: "true"
+    rp.dependency-name: redis
 spec:
   type: ClusterIP
   ports:

@@ -18,13 +18,8 @@ spec:
         prometheus.io/port: "4007"
         prometheus.io/path: "/metrics"
     spec:
-      # Colima/k3s: pods do not resolve host.docker.internal; alias to VM host gateway so externalized Redis/Postgres (Docker Compose) are reachable.
-      # Default Lima/Colima host IP is 192.168.5.2. Override with a Colima overlay if your network uses a different gateway (e.g. 192.168.106.1).
-      hostAliases:
-        - ip: "192.168.5.2"
-          hostnames:
-            - "host.docker.internal"
-            - "host.lima.internal"
+      # External Redis/Postgres via selectorless Services (scripts/reconcile-external-endpoints.sh).
+      # Do not use emergency hostAliases for host.docker.internal.
       containers:
         - name: app
           image: shopping-service:dev

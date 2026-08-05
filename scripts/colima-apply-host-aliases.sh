@@ -1,47 +1,60 @@
 #!/usr/bin/env bash
-# Patch all app deployments so host.docker.internal resolves correctly for pods.
-# When Docker Compose uses Colima, Postgres runs in the VM → use node InternalIP.
-# When Postgres runs on Mac → use host.lima.internal. Override: HOST_GATEWAY_IP=... ./$0
+# EMERGENCY_POST_COLIMA_RECOVERY_WORKAROUND only.
+# Durable routing = selectorless Services + EndpointSlices (see reconcile-external-endpoints.sh).
 #
-# Undo: To revert to repo-defined hostAliases (192.168.5.2), run:
-#   ./scripts/colima-undo-host-aliases.sh
-# This re-applies the kustomize overlay and restores deployment specs from base YAML.
+# Requires explicit plane for Colima container deps (default) OR emergency macOS gateway:
+#   TARGET_EXECUTION_PLANE=COLIMA_DEFAULT_DOCKER_CONTAINER  → hostAliases → Colima VM IP
+#   TARGET_EXECUTION_PLANE=MACOS_FORWARDED_PORT              → hostAliases → host.lima.internal
+#   HOST_GATEWAY_IP=x.x.x.x                                 → explicit override (still plane-checked)
+#
+# Never silently falls back between 192.168.64.x and 192.168.5.x.
+# Undo: ./scripts/colima-undo-host-aliases.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 NS="record-platform"
 say() { printf "\033[1m%s\033[0m\n" "$*"; }
 ok() { echo "✅ $*"; }
 info() { echo "ℹ️  $*"; }
+bad() { echo "❌ $*" >&2; }
+
+# shellcheck source=lib/rp-resolve-external-dependency-endpoint.sh
+source "$SCRIPT_DIR/lib/rp-resolve-external-dependency-endpoint.sh"
 
 ctx=$(kubectl config current-context 2>/dev/null || echo "")
 if [[ "$ctx" != *"colima"* ]]; then
-  say "Context is not Colima ($ctx). This script patches host.docker.internal for Colima pods."
-  info "For k3d, preflight applies host aliases automatically. For Colima, switch context first."
+  say "Context is not Colima ($ctx). This emergency script patches hostAliases for Colima pods only."
   exit 1
 fi
 
-# Extract first IPv4 only — getent/node addresses can return IPv4+IPv6; tr -d space concatenates them
-_extract_ipv4() { echo "$1" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true; }
-_host_ip="${HOST_GATEWAY_IP:-}"
-if [[ -z "$_host_ip" ]] || ! [[ "$_host_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  _raw=""
-  _raw=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
-  _host_ip=$(_extract_ipv4 "$_raw")
-  if [[ -z "$_host_ip" ]] && command -v colima >/dev/null 2>&1; then
-    _raw=$(colima ssh -- getent hosts host.lima.internal 2>/dev/null || true)
-    _host_ip=$(_extract_ipv4 "$_raw")
-  fi
-  if [[ -z "$_host_ip" ]] && command -v colima >/dev/null 2>&1; then
-    _raw=$(colima ssh -- ip route show default 2>/dev/null | awk '{print $3}' || true)
-    _host_ip=$(_extract_ipv4 "$_raw")
-  fi
-  _host_ip="${_host_ip:-192.168.5.2}"
+if [[ "${RP_ALLOW_EMERGENCY_HOSTALIASES:-0}" != "1" ]]; then
+  bad "Refusing deployment-wide hostAliases without RP_ALLOW_EMERGENCY_HOSTALIASES=1"
+  bad "Durable path: scripts/reconcile-external-endpoints.sh (Services + EndpointSlices)"
+  exit 1
 fi
 
-# Keep in sync with APP_DEPLOYS_FULL in scripts/run-preflight-scale-and-all-suites.sh (all services that use host Postgres/Redis).
-say "Patching host.docker.internal -> $_host_ip for app deployments..."
+plane="${TARGET_EXECUTION_PLANE:-}"
+if [[ -z "$plane" ]]; then
+  bad "TARGET_EXECUTION_PLANE is required (COLIMA_DEFAULT_DOCKER_CONTAINER or MACOS_FORWARDED_PORT)"
+  exit 1
+fi
+
+export TARGET_SERVICE="${TARGET_SERVICE:-compose-external}"
+export TARGET_PORT="${TARGET_PORT:-0}"
+export TARGET_PROTOCOL="${TARGET_PROTOCOL:-tcp}"
+export COLIMA_PROFILE="${COLIMA_PROFILE:-default}"
+if [[ -n "${HOST_GATEWAY_IP:-}" ]]; then
+  export RP_EXTERNAL_ENDPOINT_IP="$HOST_GATEWAY_IP"
+fi
+
+_host_ip="$(TARGET_EXECUTION_PLANE="$plane" rp_resolve_external_dependency_endpoint)" || exit 1
+_host_ip="$(echo "$_host_ip" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+if [[ -z "$_host_ip" ]]; then
+  bad "resolver returned empty IP (fail closed)"
+  exit 1
+fi
+
+say "EMERGENCY hostAliases → $_host_ip (plane=$plane). Not durable design."
 for _d in auth-service api-gateway records-service listings-service shopping-service messaging-service trust-service analytics-service media-service notification-service python-ai-service auction-monitor; do
   if kubectl get deployment "$_d" -n "$NS" --request-timeout=5s >/dev/null 2>&1; then
     kubectl patch deployment "$_d" -n "$NS" --type=merge \
@@ -49,5 +62,5 @@ for _d in auth-service api-gateway records-service listings-service shopping-ser
       --request-timeout=10s 2>/dev/null && info "  $_d patched" || true
   fi
 done
-ok "host.docker.internal -> $_host_ip (ensure docker compose up -d for Postgres/Redis)"
-info "Run ./scripts/diagnose-502-and-analytics.sh to verify pod→DB connectivity"
+ok "emergency hostAliases → $_host_ip (plane=$plane)"
+info "Replace with External EndpointSlices before treating routing as durable"

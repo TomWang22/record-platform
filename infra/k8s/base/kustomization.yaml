@@ -8,8 +8,9 @@ resources:
   - namespaces.yaml           # ensure namespaces exist first
   - config                    # configmaps (app-config, proto-files)
   - secrets                   # TLS/CA secrets (service-tls, dev-root-ca)
-  # - postgres                # Permanently externalized: all DBs via host.docker.internal (Docker Compose)
+  # - postgres                # Permanently externalized: postgres-*-external Services (Compose in Colima)
   # - pgbouncer               # Disabled for direct DB tuning
+  - external-dependencies
   - redis
   # - zookeeper               # External Kafka only: Docker Compose ZK
   # - kafka                   # External Kafka only: Docker Compose :29092

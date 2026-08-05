@@ -18,11 +18,6 @@ spec:
         prometheus.io/port: "4017"
         prometheus.io/path: "/metrics"
     spec:
-      hostAliases:
-        - ip: "192.168.5.2"
-          hostnames:
-            - "host.docker.internal"
-            - "host.lima.internal"
       initContainers:
         - name: wait-db
           image: alpine:3.19
@@ -31,12 +26,12 @@ spec:
             - -c
             - |
               for i in $(seq 1 90); do
-                nc -zv host.docker.internal 5433 2>/dev/null && \
-                nc -zv host.docker.internal 5435 2>/dev/null && \
-                nc -zv host.docker.internal 5439 2>/dev/null && exit 0
+                nc -zv postgres-records-external.record-platform.svc.cluster.local 5433 2>/dev/null && \
+                nc -zv postgres-listings-external.record-platform.svc.cluster.local 5435 2>/dev/null && \
+                nc -zv postgres-analytics-external.record-platform.svc.cluster.local 5439 2>/dev/null && exit 0
                 sleep 2
               done
-              echo "External Postgres unreachable (need 5433 records, 5435 listings, 5439 analytics); ensure docker compose up and hostAliases (scripts/colima-apply-host-aliases.sh)"
+              echo "External Postgres unreachable (need 5433 records, 5435 listings, 5439 analytics); ensure docker compose up and scripts/reconcile-external-endpoints.sh"
               exit 1
       containers:
         - name: app

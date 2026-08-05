@@ -18,11 +18,6 @@ spec:
         prometheus.io/port: "4001"
         prometheus.io/path: "/metrics"
     spec:
-      hostAliases:
-        - ip: "192.168.5.2"
-          hostnames:
-            - "host.docker.internal"
-            - "host.lima.internal"
       containers:
         - name: app
           image: auth-service:dev

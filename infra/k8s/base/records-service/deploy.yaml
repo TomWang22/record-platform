@@ -17,11 +17,6 @@ spec:
         prometheus.io/port: "4002"
         prometheus.io/path: "/metrics"
     spec:
-      hostAliases:
-        - ip: "192.168.5.2"
-          hostnames:
-            - "host.docker.internal"
-            - "host.lima.internal"
       containers:
         - name: app
           image: records-service:dev
@@ -65,8 +60,7 @@ spec:
               value: "/etc/kafka/secrets/client.crt"
             - name: KAFKA_CLIENT_KEY
               value: "/etc/kafka/secrets/client.key"
-            # Use external Docker Postgres (port 5433) as per run_pgbench_sweep.sh reference
-            # DATABASE_URL from app-config.yaml is already set correctly to host.docker.internal:5433
+            # DATABASE_URL / REDIS_URL from app-config (Service DNS)
           volumeMounts:
             - name: proto-files
               mountPath: /app/proto
@@ -137,3 +131,7 @@ spec:
             items:
               - key: ca-cert.pem
                 path: ca-cert.pem
+              - key: client.crt
+                path: client.crt
+              - key: client.key
+                path: client.key

@@ -89,7 +89,7 @@ spec:
             - name: ENABLE_GRPC
               value: "true"
             - name: POSTGRES_URL_MESSAGING
-              value: "postgresql://postgres:postgres@host.docker.internal:5434/messaging?connect_timeout=5"
+              value: "postgresql://postgres:postgres@postgres-messaging-external.record-platform.svc.cluster.local:5434/messaging?connect_timeout=5"
             - name: LISTINGS_HTTP
               value: "http://listings-service:4012"
             - name: NOTIFICATION_HTTP

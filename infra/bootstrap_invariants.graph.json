@@ -1,6 +1,6 @@
 {
-  "version": "v2.2",
-  "description": "Record Platform cold-bootstrap DAG (acyclic). StandardAuthorizer + ACL bootstrap precede G.app_runtime. Acceptance nodes H.kafka_identity_canary / I.kafka_three_broker_acceptance are gated (RP_GATE5_V7_ACCEPTANCE=1) and not executed by default cold-bootstrap.",
+  "version": "v2.3",
+  "description": "Record Platform cold-bootstrap DAG (acyclic). External dependency execution-plane discovery/EndpointSlice materialization precedes G.app_runtime. StandardAuthorizer + ACL bootstrap precede G.app_runtime. Acceptance nodes H.kafka_identity_canary / I.kafka_three_broker_acceptance are gated (RP_GATE5_V7_ACCEPTANCE=1) and not executed by default cold-bootstrap.",
   "housing_ns_default": "record-platform",
   "nodes": {
     "A.toolchain": {
@@ -57,6 +57,60 @@
       "verifyPhase": "host_deps",
       "context": [
         "ci",
+        "post-bootstrap",
+        "drift"
+      ]
+    },
+    "B.colima_network.discover": {
+      "description": "Discover Colima VM address vs host.lima.internal macOS gateway (not interchangeable)",
+      "script": "scripts/reconcile-external-endpoints.sh",
+      "verifyPhase": "colima_network_discover",
+      "context": [
+        "post-bootstrap",
+        "drift"
+      ]
+    },
+    "B.external_dependencies.classify": {
+      "description": "Classify Postgres/Redis execution planes (container vs macOS vs K8s)",
+      "script": "scripts/reconcile-external-endpoints.sh",
+      "verifyPhase": "external_dependencies_classify",
+      "context": [
+        "post-bootstrap",
+        "drift"
+      ]
+    },
+    "B.external_dependencies.resolve": {
+      "description": "Resolve plane-correct endpoint IPs without silent .64.x/.5.x fallback",
+      "script": "scripts/reconcile-external-endpoints.sh",
+      "verifyPhase": "external_dependencies_resolve",
+      "context": [
+        "post-bootstrap",
+        "drift"
+      ]
+    },
+    "B.external_dependencies.protocol_verify": {
+      "description": "Authenticated pod probes (Redis PING / Postgres SELECT 1) before EndpointSlice write",
+      "script": "scripts/reconcile-external-endpoints.sh",
+      "verifyPhase": "external_dependencies_protocol_verify",
+      "context": [
+        "post-bootstrap",
+        "drift"
+      ]
+    },
+    "D.external_endpoints.materialize": {
+      "description": "Materialize selectorless Services + Endpoints for proven external dependency IPs",
+      "script": "scripts/reconcile-external-endpoints.sh",
+      "verifyPhase": "external_endpoints_materialize",
+      "context": [
+        "post-bootstrap",
+        "drift"
+      ]
+    },
+    "D.external_endpoints.verify": {
+      "description": "Verify external EndpointSlices before application runtime",
+      "script": "scripts/reconcile-external-endpoints.sh",
+      "verifyPhase": "external_endpoints_verify",
+      "context": [
         "post-bootstrap",
         "drift"
       ]
@@ -423,6 +477,38 @@
     ],
     [
       "C.infra",
+      "B.colima_network.discover"
+    ],
+    [
+      "F.namespace.prepare",
+      "B.colima_network.discover"
+    ],
+    [
+      "B.colima_network.discover",
+      "B.external_dependencies.classify"
+    ],
+    [
+      "B.external_dependencies.classify",
+      "B.external_dependencies.resolve"
+    ],
+    [
+      "B.external_dependencies.resolve",
+      "B.external_dependencies.protocol_verify"
+    ],
+    [
+      "B.external_dependencies.protocol_verify",
+      "D.external_endpoints.materialize"
+    ],
+    [
+      "D.external_endpoints.materialize",
+      "D.external_endpoints.verify"
+    ],
+    [
+      "D.external_endpoints.verify",
+      "F.cluster_deploy"
+    ],
+    [
+      "C.infra",
       "D.backup_materialization"
     ],
     [
@@ -535,6 +621,10 @@
     ],
     [
       "G.kafka_acls.bootstrap",
+      "G.app_runtime"
+    ],
+    [
+      "D.external_endpoints.verify",
       "G.app_runtime"
     ],
     [

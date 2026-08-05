@@ -1,0 +1,68 @@
+# =============================================================================
+# DO_NOT_APPLY_UNTIL_AB_PASSES
+# =============================================================================
+# Strategic merge / illustrative patch that ADDS a readiness-agent sidecar and
+# REPLACES the kafka container readinessProbe with an HTTP GET to loopback.
+#
+# FORBIDDEN until Gate 5 A/B comparison proves the sidecar is not worse than
+# the current JVM exec probe on success rate, latency, and broker stability.
+#
+# Do NOT kubectl apply this file against the live cluster.
+# Do NOT edit infra/k8s/kafka-kraft-metallb/statefulset.yaml from this workstream
+# until A/B passes and rollout is explicitly authorized.
+# =============================================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: record-platform
+  annotations:
+    record-platform.io/readiness-agent: "DO_NOT_APPLY_UNTIL_AB_PASSES"
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: jks-to-pem
+          image: eclipse-temurin:17-jre-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              # Requires keytool + openssl in image; prefer baking scripts/kafka-readiness-jks-to-pem.sh
+              echo "Convert JKS→PEM into /etc/kafka/pem (see scripts/kafka-readiness-jks-to-pem.sh)"
+              exit 0
+          volumeMounts:
+            - { name: kafka-ssl-secret, mountPath: /etc/kafka/secrets, readOnly: true }
+            - { name: kafka-pem, mountPath: /etc/kafka/pem }
+      containers:
+        - name: kafka
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8099
+              host: 127.0.0.1
+              scheme: HTTP
+            initialDelaySeconds: 90
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+        - name: kafka-readiness-agent
+          image: record-platform/kafka-readiness-agent:DO_NOT_APPLY
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: { name: kafka-readiness-agent-env }
+          env:
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: NAMESPACE
+              valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+          ports:
+            - { name: ready-http, containerPort: 8099, protocol: TCP }
+          volumeMounts:
+            - { name: kafka-ssl-secret, mountPath: /etc/kafka/secrets, readOnly: true }
+            - { name: kafka-pem, mountPath: /etc/kafka/pem, readOnly: true }
+          resources:
+            requests: { cpu: "25m", memory: "64Mi" }
+            limits: { cpu: "200m", memory: "128Mi" }
+      volumes:
+        - name: kafka-pem
+          emptyDir: {}

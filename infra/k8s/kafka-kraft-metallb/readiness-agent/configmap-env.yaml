@@ -1,0 +1,40 @@
+# FUTURE rollout only — DO NOT APPLY until Gate 5 A/B readiness comparison passes.
+#
+# Sidecar + probe replacement for kafka StatefulSet.
+# Live file infra/k8s/kafka-kraft-metallb/statefulset.yaml must remain untouched
+# until explicit authorization after A/B.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-readiness-agent-env
+  namespace: record-platform
+  labels:
+    app: kafka-readiness-agent
+    gate: gate5-pre-v10
+data:
+  HTTP_ADDR: "127.0.0.1:8099"
+  POLL_INTERVAL: "5s"
+  FRESHNESS_THRESHOLD: "30s"
+  RECONNECT_GRACE: "60s"
+  CHECK_TIMEOUT: "10s"
+  BROKER_PORT: "9093"
+  # PEM paths after init conversion from /etc/kafka/secrets JKS
+  TLS_CERT_FILE: "/etc/kafka/pem/tls.crt"
+  TLS_KEY_FILE: "/etc/kafka/pem/tls.key"
+  TLS_CA_FILE: "/etc/kafka/pem/ca.pem"
+---
+# Example container env snippet (reference only)
+# env:
+#   - name: POD_NAME
+#     valueFrom: { fieldRef: { fieldPath: metadata.name } }
+#   - name: NAMESPACE
+#     valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+#   - name: NODE_ID
+#     valueFrom: { fieldRef: { fieldPath: metadata.name } }  # parse ordinal in agent
+# volumeMounts:
+#   - name: kafka-ssl-secret
+#     mountPath: /etc/kafka/secrets
+#     readOnly: true
+#   - name: kafka-pem
+#     mountPath: /etc/kafka/pem

@@ -8,7 +8,9 @@ import Redis from 'ioredis';
 import { Kafka } from 'kafkajs';
 import { Counter, Gauge, Histogram, Registry } from 'prom-client';
 
-const REDIS_URL = (process.env.REDIS_URL || 'redis://host.docker.internal:6380/0').trim();
+// Canonical runtime value comes from app-config REDIS_URL → redis-external Service DNS.
+// Fail closed: do not fall back to host.docker.internal / lima gateway.
+const REDIS_URL = (process.env.REDIS_URL || 'redis://redis-external.record-platform.svc.cluster.local:6379/0').trim();
 const OLLAMA = (process.env.OLLAMA_URL || 'http://ollama:11434').replace(/\/$/, '');
 const KAFKA_BROKERS = (
   process.env.KAFKA_BROKERS ||

@@ -3,7 +3,26 @@
  */
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
+import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 import { getRpKafka } from "@common/utils/kafka";
+import { buildKafkaMessageHeaders, withKafkaProduceSpan } from "@common/utils/otel";
+import {
+  incOchOutboxPublishAttempt,
+  incOchOutboxPublishFailure,
+  incOchOutboxPublishSuccess,
+  setOchOutboxOldestUnpublishedAgeSeconds,
+  setOchOutboxUnpublishedCount,
+} from "@common/utils";
+import {
+  incOutboxBrokerAck,
+  incOutboxDbAck,
+  incOutboxFailure,
+  incOutboxProduceAttempt,
+  incOutboxSelected,
+  observeOutboxPublishLatency,
+  setOutboxOldestPendingAgeSeconds,
+  setOutboxPending,
+} from "./outbox-publish-metrics.js";
 
 export type AuctionAiSignal = {
   listing_id: string;
@@ -220,38 +239,251 @@ export async function scanAndPersistAuctionSignals(
   return { scanned: rows.length, inserted };
 }
 
+let lastPendingGaugeRefreshMs = 0;
+
+async function refreshOutboxPendingGauges(auctionPool: Pool): Promise<void> {
+  const now = Date.now();
+  // Full pending COUNT on multi-million-row table is expensive; throttle hard.
+  if (now - lastPendingGaugeRefreshMs < 600_000) return;
+  lastPendingGaugeRefreshMs = now;
+  try {
+    const r = await auctionPool.query<{ c: string; oldest_sec: number | null }>(
+      `SELECT count(*)::text AS c,
+              COALESCE(EXTRACT(EPOCH FROM (NOW() - MIN(created_at))), 0)::float8 AS oldest_sec
+       FROM auction_monitor.outbox_events WHERE published = false`,
+    );
+    const n = Number(r.rows[0]?.c ?? 0);
+    const oldest = Number(r.rows[0]?.oldest_sec ?? 0);
+    setOutboxPending(n);
+    setOutboxOldestPendingAgeSeconds(oldest);
+    setOchOutboxUnpublishedCount(n);
+    setOchOutboxOldestUnpublishedAgeSeconds(oldest);
+  } catch {
+    // gauges are best-effort; never fail the publisher on refresh
+  }
+}
+
+/**
+ * Publish oldest unpublished auction-monitor outbox rows.
+ * Broker acknowledgment (KafkaJS RecordMetadata) and database acknowledgment
+ * (published=true) are counted and logged separately — never equated.
+ */
 export async function publishAuctionMonitorOutbox(auctionPool: Pool): Promise<number> {
   const PREFIX = process.env.ENV_PREFIX || "dev";
   const topic = `${PREFIX}.auction_monitor.events`;
   const producer = getRpKafka("outbox-publisher").producer();
+  const producerClientId = process.env.KAFKA_CLIENT_ID || "auction-monitor-outbox-publisher";
+  const tracer = trace.getTracer("auction-monitor-outbox");
+  const invocationId = randomUUID();
+  const tickStarted = Date.now();
+  let published = 0;
+
+  const rootSpan = tracer.startSpan("auction_monitor.outbox.publish_tick", {
+    attributes: {
+      "rp.outbox.invocation_id": invocationId,
+      "messaging.destination.name": topic,
+      "rp.kafka.principal": "User:O=Record Platform,CN=auction-monitor",
+    },
+  });
+
   try {
-    await producer.connect();
-    const { rows } = await auctionPool.query<{
-      id: string;
-      aggregate_id: string;
-      payload: Buffer;
-    }>(
-      `WITH picked AS (
-         SELECT id FROM auction_monitor.outbox_events WHERE published = false
-         ORDER BY created_at ASC LIMIT 25 FOR UPDATE SKIP LOCKED
-       )
-       SELECT b.id::text, b.aggregate_id, b.payload FROM auction_monitor.outbox_events b
-       INNER JOIN picked p ON b.id = p.id`,
-    );
-    for (const row of rows) {
-      await producer.send({ topic, messages: [{ key: row.aggregate_id, value: row.payload }] });
-      await auctionPool.query(`UPDATE auction_monitor.outbox_events SET published = true WHERE id = $1::uuid`, [
-        row.id,
-      ]);
-      await auctionPool.query(`UPDATE auction_monitor.ai_signals SET published = true WHERE outbox_id = $1::uuid`, [
-        row.id,
-      ]);
-    }
-    return rows.length;
+    return await context.with(trace.setSpan(context.active(), rootSpan), async () => {
+      await producer.connect();
+
+      const selectStarted = Date.now();
+      const selectSpan = tracer.startSpan("auction_monitor.outbox.database_selection");
+      let rows: Array<{ id: string; aggregate_id: string; payload: Buffer }>;
+      try {
+        const result = await auctionPool.query<{
+          id: string;
+          aggregate_id: string;
+          payload: Buffer;
+        }>(
+          `WITH picked AS (
+             SELECT id FROM auction_monitor.outbox_events WHERE published = false
+             ORDER BY created_at ASC LIMIT 25 FOR UPDATE SKIP LOCKED
+           )
+           SELECT b.id::text, b.aggregate_id, b.payload FROM auction_monitor.outbox_events b
+           INNER JOIN picked p ON b.id = p.id`,
+        );
+        rows = result.rows;
+        selectSpan.setAttribute("rp.outbox.selected", rows.length);
+      } catch (e) {
+        selectSpan.recordException(e instanceof Error ? e : new Error(String(e)));
+        selectSpan.setStatus({ code: SpanStatusCode.ERROR });
+        incOutboxSelected("error");
+        throw e;
+      } finally {
+        selectSpan.end();
+        observeOutboxPublishLatency("database_selection", (Date.now() - selectStarted) / 1000);
+      }
+
+      if (rows.length === 0) {
+        incOutboxSelected("empty");
+        void refreshOutboxPendingGauges(auctionPool);
+        console.log(
+          JSON.stringify({
+            msg: "auction_monitor_outbox_publish_batch",
+            invocation_id: invocationId,
+            selected: 0,
+            broker_acks: 0,
+            db_acks: 0,
+            failures: 0,
+            topic,
+            producer_client_id: producerClientId,
+            kafka_principal: "User:O=Record Platform,CN=auction-monitor",
+            latency_ms: Date.now() - tickStarted,
+            note: "no rows",
+          }),
+        );
+        return 0;
+      }
+
+      incOutboxSelected("ok");
+      let brokerAcks = 0;
+      let dbAcks = 0;
+      let failures = 0;
+
+      for (const row of rows) {
+        const attemptNumber = 1;
+        const sendStarted = Date.now();
+        incOchOutboxPublishAttempt();
+        let produceResultRecorded = false;
+        try {
+          const metadata = await withKafkaProduceSpan(
+            `auction_monitor.outbox.kafka_produce`,
+            {
+              "messaging.destination.name": topic,
+              "rp.outbox.id": row.id,
+              "rp.outbox.attempt": attemptNumber,
+            },
+            async () =>
+              producer.send({
+                topic,
+                messages: [
+                  {
+                    key: row.aggregate_id,
+                    value: row.payload,
+                    headers: buildKafkaMessageHeaders(),
+                  },
+                ],
+              }),
+          );
+          const sendDurationMs = Date.now() - sendStarted;
+          observeOutboxPublishLatency("kafka_produce", sendDurationMs / 1000);
+          incOutboxProduceAttempt("ok");
+          produceResultRecorded = true;
+
+          const meta0 = Array.isArray(metadata) ? metadata[0] : undefined;
+          const partition = meta0?.partition;
+          const offset = meta0?.offset;
+          const brokerAckTs = new Date().toISOString();
+          const activeSpan = trace.getActiveSpan();
+          const traceId = activeSpan?.spanContext().traceId ?? "NOT_INSTRUMENTED";
+
+          if (partition === undefined || offset === undefined) {
+            incOutboxBrokerAck("error");
+            throw new Error("kafka_broker_ack_metadata_missing");
+          }
+          incOutboxBrokerAck("ok");
+          brokerAcks += 1;
+
+          const dbStarted = Date.now();
+          const dbSpan = tracer.startSpan("auction_monitor.outbox.database_acknowledgment");
+          try {
+            await auctionPool.query(
+              `UPDATE auction_monitor.outbox_events SET published = true WHERE id = $1::uuid`,
+              [row.id],
+            );
+            await auctionPool.query(
+              `UPDATE auction_monitor.ai_signals SET published = true WHERE outbox_id = $1::uuid`,
+              [row.id],
+            );
+            incOutboxDbAck("ok");
+            incOchOutboxPublishSuccess();
+            dbAcks += 1;
+            published += 1;
+            dbSpan.setAttribute("rp.outbox.db_ack", "ok");
+          } catch (e) {
+            incOutboxDbAck("error");
+            dbSpan.recordException(e instanceof Error ? e : new Error(String(e)));
+            dbSpan.setStatus({ code: SpanStatusCode.ERROR });
+            throw e;
+          } finally {
+            dbSpan.end();
+            observeOutboxPublishLatency("database_acknowledgment", (Date.now() - dbStarted) / 1000);
+          }
+
+          console.log(
+            JSON.stringify({
+              msg: "auction_monitor_outbox_broker_and_db_ack",
+              invocation_id: invocationId,
+              outbox_id: row.id,
+              event_id: row.id,
+              topic,
+              partition,
+              offset: String(offset),
+              broker_ack_timestamp: brokerAckTs,
+              producer_client_id: producerClientId,
+              kafka_principal: "User:O=Record Platform,CN=auction-monitor",
+              trace_id: traceId,
+              attempt_number: attemptNumber,
+              send_duration_ms: sendDurationMs,
+              database_acknowledgment_result: "ok",
+            }),
+          );
+        } catch (e) {
+          failures += 1;
+          if (!produceResultRecorded) {
+            incOutboxProduceAttempt("error");
+          }
+          incOutboxFailure("publish_or_db_ack");
+          incOchOutboxPublishFailure();
+          console.warn(
+            JSON.stringify({
+              msg: "auction_monitor_outbox_publish_row_failed",
+              invocation_id: invocationId,
+              outbox_id: row.id,
+              topic,
+              producer_client_id: producerClientId,
+              kafka_principal: "User:O=Record Platform,CN=auction-monitor",
+              attempt_number: attemptNumber,
+              database_acknowledgment_result: "not_attempted_or_failed",
+              error_class: e instanceof Error ? e.name : "Error",
+            }),
+          );
+          // Stop the batch on first failure (prior behavior returned 0 on outer catch).
+          break;
+        }
+      }
+
+      void refreshOutboxPendingGauges(auctionPool);
+      console.log(
+        JSON.stringify({
+          msg: "auction_monitor_outbox_publish_batch",
+          invocation_id: invocationId,
+          selected: rows.length,
+          broker_acks: brokerAcks,
+          db_acks: dbAcks,
+          failures,
+          topic,
+          producer_client_id: producerClientId,
+          kafka_principal: "User:O=Record Platform,CN=auction-monitor",
+          latency_ms: Date.now() - tickStarted,
+        }),
+      );
+      rootSpan.setAttribute("rp.outbox.broker_acks", brokerAcks);
+      rootSpan.setAttribute("rp.outbox.db_acks", dbAcks);
+      return published;
+    });
   } catch (e) {
+    rootSpan.recordException(e instanceof Error ? e : new Error(String(e)));
+    rootSpan.setStatus({ code: SpanStatusCode.ERROR });
+    incOutboxFailure("tick");
     console.warn("[auction-monitor] outbox publish failed:", (e as Error).message);
-    return 0;
+    return published;
   } finally {
+    rootSpan.end();
     await producer.disconnect().catch(() => undefined);
   }
 }

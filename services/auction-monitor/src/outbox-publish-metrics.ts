@@ -5,19 +5,33 @@
  */
 import { Counter, Gauge, Histogram } from "prom-client";
 import { register } from "@common/utils";
+import { isForbiddenMetricLabel } from "./outbox-publish-accounting.js";
 
 let selectedTotal: Counter | undefined;
 let produceAttemptTotal: Counter | undefined;
 let brokerAckTotal: Counter | undefined;
 let dbAckTotal: Counter | undefined;
+let dbAckFailureTotal: Counter | undefined;
 let retryTotal: Counter | undefined;
 let failureTotal: Counter | undefined;
 let pendingGauge: Gauge | undefined;
 let oldestPendingAge: Gauge | undefined;
 let publishLatency: Histogram | undefined;
+let brokerAckToDbAck: Histogram | undefined;
+
+const ALLOWED_LABELS = new Set(["result", "reason_class", "stage"]);
+
+function assertLabels(labelNames: string[]): void {
+  for (const name of labelNames) {
+    if (isForbiddenMetricLabel(name) || !ALLOWED_LABELS.has(name)) {
+      throw new Error(`forbidden or unknown metric label: ${name}`);
+    }
+  }
+}
 
 function ensure(): void {
   if (selectedTotal) return;
+  assertLabels(["result"]);
   selectedTotal = new Counter({
     name: "auction_monitor_outbox_selected_total",
     help: "Outbox rows selected for publish (FOR UPDATE SKIP LOCKED batch).",
@@ -36,6 +50,11 @@ function ensure(): void {
   dbAckTotal = new Counter({
     name: "auction_monitor_outbox_db_ack_total",
     help: "Rows transitioned to published=true after broker acknowledgment.",
+    labelNames: ["result"],
+  });
+  dbAckFailureTotal = new Counter({
+    name: "auction_monitor_outbox_db_ack_failure_total",
+    help: "DB acknowledgment failures after successful broker acknowledgment.",
     labelNames: ["result"],
   });
   retryTotal = new Counter({
@@ -62,20 +81,31 @@ function ensure(): void {
     labelNames: ["stage"],
     buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
   });
-  register.registerMetric(selectedTotal);
-  register.registerMetric(produceAttemptTotal);
-  register.registerMetric(brokerAckTotal);
-  register.registerMetric(dbAckTotal);
-  register.registerMetric(retryTotal);
-  register.registerMetric(failureTotal);
-  register.registerMetric(pendingGauge);
-  register.registerMetric(oldestPendingAge);
-  register.registerMetric(publishLatency);
+  brokerAckToDbAck = new Histogram({
+    name: "auction_monitor_outbox_broker_ack_to_db_ack_seconds",
+    help: "Latency from broker acknowledgment to database acknowledgment.",
+    buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5],
+  });
+  for (const m of [
+    selectedTotal,
+    produceAttemptTotal,
+    brokerAckTotal,
+    dbAckTotal,
+    dbAckFailureTotal,
+    retryTotal,
+    failureTotal,
+    pendingGauge,
+    oldestPendingAge,
+    publishLatency,
+    brokerAckToDbAck,
+  ]) {
+    register.registerMetric(m);
+  }
 }
 
-export function incOutboxSelected(result: "ok" | "empty" | "error" = "ok"): void {
+export function incOutboxSelected(result: "ok" | "empty" | "error" = "ok", n = 1): void {
   ensure();
-  selectedTotal!.inc({ result });
+  selectedTotal!.inc({ result }, n);
 }
 
 export function incOutboxProduceAttempt(result: "ok" | "error" = "ok"): void {
@@ -91,6 +121,11 @@ export function incOutboxBrokerAck(result: "ok" | "error" = "ok"): void {
 export function incOutboxDbAck(result: "ok" | "error" = "ok"): void {
   ensure();
   dbAckTotal!.inc({ result });
+}
+
+export function incOutboxDbAckFailure(result: "error" = "error"): void {
+  ensure();
+  dbAckFailureTotal!.inc({ result });
 }
 
 export function incOutboxRetry(reasonClass: string): void {
@@ -117,4 +152,28 @@ export function observeOutboxPublishLatency(stage: string, seconds: number): voi
   ensure();
   if (!Number.isFinite(seconds) || seconds < 0) return;
   publishLatency!.observe({ stage: stage.slice(0, 64) }, seconds);
+}
+
+export function observeBrokerAckToDbAckSeconds(seconds: number): void {
+  ensure();
+  if (!Number.isFinite(seconds) || seconds < 0) return;
+  brokerAckToDbAck!.observe(seconds);
+}
+
+/** Test helper: metric names registered by this module. */
+export function listOutboxMetricNames(): string[] {
+  ensure();
+  return [
+    "auction_monitor_outbox_selected_total",
+    "auction_monitor_outbox_produce_attempt_total",
+    "auction_monitor_outbox_broker_ack_total",
+    "auction_monitor_outbox_db_ack_total",
+    "auction_monitor_outbox_db_ack_failure_total",
+    "auction_monitor_outbox_retry_total",
+    "auction_monitor_outbox_failure_total",
+    "auction_monitor_outbox_pending",
+    "auction_monitor_outbox_oldest_pending_age_seconds",
+    "auction_monitor_outbox_publish_latency_seconds",
+    "auction_monitor_outbox_broker_ack_to_db_ack_seconds",
+  ];
 }

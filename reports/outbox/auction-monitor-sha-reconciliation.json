@@ -1,0 +1,91 @@
+{
+  "report": "auction-monitor-sha-reconciliation",
+  "captured_at_utc": "2026-08-06T00:21:08Z",
+  "HEAD": "080ed6da63e1ad2bad18d6f8f1634abc3a0a2cd7",
+  "origin_main": "1efd9fb7ab71e497b711421d1dc4e186a3a67c56",
+  "HEAD_equals_origin_main": false,
+  "branch_ahead_behind": "+2 -0",
+  "instrumentation_source_commit": "27d134c4acd6d9448f0a2f408ae42187de8bdd23",
+  "evidence_commit": "080ed6da63e1ad2bad18d6f8f1634abc3a0a2cd7",
+  "paths_27d134c4_to_080ed6da": [
+    {
+      "path": "reports/outbox/auction-monitor-broker-ack-instrumentation-design.json",
+      "classification": "DURABLE_REPORT"
+    },
+    {
+      "path": "reports/outbox/auction-monitor-broker-ack-instrumentation-design.md",
+      "classification": "DOCUMENTATION"
+    },
+    {
+      "path": "reports/outbox/auction-monitor-capacity-model-supersession.json",
+      "classification": "DURABLE_REPORT"
+    },
+    {
+      "path": "reports/outbox/auction-monitor-capacity-model-supersession.md",
+      "classification": "DOCUMENTATION"
+    },
+    {
+      "path": "reports/outbox/auction-monitor-capacity-model-v2.json",
+      "classification": "DURABLE_REPORT"
+    },
+    {
+      "path": "reports/outbox/auction-monitor-interval-accounting.json",
+      "classification": "DURABLE_REPORT"
+    },
+    {
+      "path": "reports/outbox/auction-monitor-interval-accounting.md",
+      "classification": "DOCUMENTATION"
+    },
+    {
+      "path": "reports/outbox/auction-monitor-observability-contract.json",
+      "classification": "DURABLE_REPORT"
+    },
+    {
+      "path": "reports/outbox/auction-monitor-publisher-invocation-census.json",
+      "classification": "DURABLE_REPORT"
+    },
+    {
+      "path": "reports/outbox/auction-monitor-semantic-duplicate-analysis.json",
+      "classification": "DURABLE_REPORT"
+    },
+    {
+      "path": "reports/outbox/auction-monitor-unknown-cohort-analysis.json",
+      "classification": "DURABLE_REPORT"
+    },
+    {
+      "path": "reports/outbox/auction-monitor-unknown-cohort-analysis.md",
+      "classification": "DOCUMENTATION"
+    },
+    {
+      "path": "reports/outbox/outbox-actionable-state-contract-v2.json",
+      "classification": "DURABLE_REPORT"
+    },
+    {
+      "path": "reports/outbox/outbox-drain-feasibility-v2.json",
+      "classification": "DURABLE_REPORT"
+    },
+    {
+      "path": "reports/outbox/outbox-rca-phase3-return.json",
+      "classification": "DURABLE_REPORT"
+    }
+  ],
+  "runtime_impact_paths_count": 0,
+  "runtime_source_commit": "27d134c4acd6d9448f0a2f408ae42187de8bdd23",
+  "accepted_controller_sha": "080ed6da63e1ad2bad18d6f8f1634abc3a0a2cd7",
+  "carry_forward_allowed": true,
+  "carry_forward_rationale": "080ed6da adds only durable reports/docs; auction-monitor runtime source unchanged since 27d134c4. Image must be labeled with accepted controller SHA 080ed6da (contains instrumentation by ancestry), not published as 27d134c4 while claiming pin 080ed6da.",
+  "excluded_untracked_must_not_stage": [
+    "webapp/e2e/scripts/",
+    "webapp/test-results/",
+    "reports/outbox/listings-unpublished-full-classification.jsonl",
+    "reports/outbox/media-unpublished-full-classification.jsonl",
+    "reports/outbox/maintenance-quiesce-v1-file-hashes.jsonl",
+    "reports/outbox/maintenance-quiesce-v2-contract-draft.md",
+    "reports/outbox/outbox-remediation-plan.md"
+  ],
+  "acceptance": {
+    "HEAD_equals_origin_main": false,
+    "unknown_runtime_impact_paths": 0,
+    "blocker": "HEAD ahead of origin/main by 2 commits; push required before exact-SHA CI and image build"
+  }
+}

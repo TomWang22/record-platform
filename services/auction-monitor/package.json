@@ -12,7 +12,8 @@
     "test:api-keys": "tsx scripts/test-api-keys.ts",
     "test:analytics": "tsx scripts/test-analytics-comprehensive.ts",
     "test:load": "tsx scripts/load-test-analytics.ts",
-    "test:stress": "tsx scripts/stress-test-analytics.ts"
+    "test:stress": "tsx scripts/stress-test-analytics.ts",
+    "test:outbox-accounting": "vitest run src/__tests__/outbox-publish-accounting.test.ts"
   },
   "dependencies": {
     "@common/utils": "workspace:*",

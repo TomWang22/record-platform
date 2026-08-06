@@ -1,0 +1,102 @@
+{
+  "captured_at_utc": "2026-08-06T00:20:41Z",
+  "phase": "BEFORE",
+  "roots": {
+    "/tmp/record-platform-maintenance-quiesce-v1": {
+      "stats": {
+        "exists": true,
+        "files": 19,
+        "bytes": 17166,
+        "mtime_max_utc": "2026-08-05T19:49:48Z",
+        "mtime_min_utc": "2026-08-05T18:48:02Z"
+      },
+      "markers": {
+        "FROZEN_BLOCKED_EVIDENCE": {
+          "sha256": "984e6a6b19c6c252a356d292bc883f71fc933f39969e75412c4de00acd9f52b5",
+          "size": 4089
+        }
+      },
+      "lsof_pids": []
+    },
+    "/tmp/record-platform-outbox-backlog-rca-v1": {
+      "stats": {
+        "exists": true,
+        "files": 42,
+        "bytes": 262447,
+        "mtime_max_utc": "2026-08-05T20:55:50Z",
+        "mtime_min_utc": "2026-08-05T20:22:27Z"
+      },
+      "markers": {},
+      "lsof_pids": []
+    },
+    "/tmp/record-platform-outbox-rate-reconciliation-v1": {
+      "stats": {
+        "exists": true,
+        "files": 26,
+        "bytes": 686301,
+        "mtime_max_utc": "2026-08-06T00:15:25Z",
+        "mtime_min_utc": "2026-08-05T21:19:47Z"
+      },
+      "markers": {
+        "OBSERVER_DONE": {
+          "sha256": "dc51b8c96c2d745df3bd5590d990230a482fd247123599548e0632fdbf97fc22",
+          "size": 3
+        },
+        "STATUS.json": {
+          "sha256": "208d66ddf51cb25552aced47a2f16a30887e556608684e022d4b22b2f1a12a16",
+          "size": 99
+        },
+        "ABORTED_ATTEMPT_3.json": {
+          "sha256": "5dbbc7c81be0df0561673cb6f3d6eab39791937649dc9c143871c68b47fb7b46",
+          "size": 633
+        },
+        "polls.json": {
+          "sha256": "1382fd3abad8c7fc77528996678104ee17613c8316d50789bbb0746625bffbbe",
+          "size": 11426
+        },
+        "window_end.json": {
+          "sha256": "07f321b664b575e83b7f4bdbe04120bc12d10f6f29cfa8a9b554eccb97a318a4",
+          "size": 708
+        },
+        "window_start.json": {
+          "sha256": "4c654ae4b70f4b48724a75a31b466d3d0c8d344320799db490f0687c83ce2e18",
+          "size": 241
+        },
+        "reconcile.json": {
+          "sha256": "4eef101f5019dd01ef4aba3ea1601893bef3ca215c91215ee6b1f51a4752e717",
+          "size": 3726
+        },
+        "ABORTED_ATTEMPT_1.json": {
+          "sha256": "ac88a2c2e178b18d3f353414fe91b48ffb29d73b401ae154c36735842df34bfb",
+          "size": 204
+        }
+      },
+      "lsof_pids": []
+    },
+    "/tmp/record-platform-runtime-heartbeat-gate5-v8": {
+      "stats": null,
+      "markers": {}
+    },
+    "/tmp/record-platform-runtime-heartbeat-gate5-v9": {
+      "stats": null,
+      "markers": {}
+    }
+  },
+  "absences": {
+    "maintenance_quiesce_v2": true,
+    "gate5_ab": true,
+    "gate5_v10": true
+  },
+  "prior_frozen_roots_mutated": 0,
+  "prior_frozen_roots_active_writers": 0,
+  "colima_status": [
+    "time=\"2026-08-05T20:20:44-04:00\" level=info msg=\"colima is running using macOS Virtualization.Framework\"",
+    "time=\"2026-08-05T20:20:44-04:00\" level=info msg=\"arch: aarch64\"",
+    "time=\"2026-08-05T20:20:44-04:00\" level=info msg=\"runtime: docker\"",
+    "time=\"2026-08-05T20:20:44-04:00\" level=info msg=\"mountType: virtiofs\"",
+    "time=\"2026-08-05T20:20:44-04:00\" level=info msg=\"address: 192.168.64.7\"",
+    "time=\"2026-08-05T20:20:44-04:00\" level=info msg=\"docker socket: unix:///Users/tom/.colima/default/docker.sock\"",
+    "time=\"2026-08-05T20:20:44-04:00\" level=info msg=\"containerd socket: unix:///Users/tom/.colima/default/containerd.sock\"",
+    "time=\"2026-08-05T20:20:44-04:00\" level=info msg=\"kubernetes: enabled\""
+  ]
+}

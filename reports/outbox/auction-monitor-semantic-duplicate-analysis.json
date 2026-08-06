@@ -1,0 +1,39 @@
+{
+  "report": "auction-monitor-semantic-duplicate-analysis",
+  "captured_at_utc": "2026-08-05T21:19:36Z",
+  "window": "pending created_at > now()-1 hour",
+  "source_contract": {
+    "conflict_target": "auction_monitor.ai_signals UNIQUE (listing_id, signal_code)",
+    "domain_row_updated_on_conflict": true,
+    "outbox_inserted_every_observation": true,
+    "new_event_id_each_time": true,
+    "idempotency_key_on_outbox": false
+  },
+  "bounded_counts": {
+    "duplicate_hash_summary": {
+      "singleton_pairs": "16620",
+      "duplicate_hash_pairs": "0",
+      "rows_in_duplicate_hash_groups": "0",
+      "max_dup_group_size": "1"
+    },
+    "aggregate_summary": {
+      "distinct_aggregates": "351",
+      "pending_rows_1h": "16620"
+    },
+    "same_vs_changed_hash": {
+      "same_hash_repeated": "0",
+      "changed_hash_same_aggregate": "351",
+      "single_row_aggregates": "0"
+    },
+    "top_duplicate_groups_n": 0,
+    "top_duplicate_groups_sample": []
+  },
+  "classifications": {
+    "same_listing_signal_stable_payload_hash": "rows sharing aggregate_id+payload_sha256 with n>1",
+    "same_listing_signal_changed_payload_hash": "aggregate_ids with hash_n>1",
+    "true_state_transition": "NOT_PROVEN_WITHOUT_PRIOR_STATE_STORE",
+    "downstream_idempotent": "UNKNOWN \u2014 consumers not verified this pass",
+    "repeated_business_effects": "UNKNOWN"
+  },
+  "deduplication_changes_applied": false
+}

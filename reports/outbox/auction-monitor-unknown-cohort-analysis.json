@@ -1,0 +1,278 @@
+{
+  "report": "auction-monitor-unknown-cohort-analysis",
+  "captured_at_utc": "2026-08-05T21:18:52Z",
+  "prior_summary_correction": {
+    "rows_categorized": "1067/1067",
+    "rows_causally_resolved": "168/1067",
+    "rows_unknown_blocking_prior": "899/1067",
+    "note": "100% categorized \u2260 lineage-complete"
+  },
+  "cohorts": {
+    "unknown_by_age_1d_7d": {
+      "expected": 200,
+      "tested": 200,
+      "resolved": 0,
+      "still_unknown": 200,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PUBLISHER_CAPACITY_BACKLOG_AWAITING_FIFO",
+      "confidence": "MEDIUM",
+      "supporting_evidence": [
+        "publisher selects ORDER BY created_at ASC LIMIT 25",
+        "DB-ack of oldest IDs observed in phase2 window (not broker-ack)",
+        "no lease/retry/malformed columns on table",
+        "row remains unpublished at sample time"
+      ]
+    },
+    "unknown_by_age_1h_24h": {
+      "expected": 236,
+      "tested": 236,
+      "resolved": 0,
+      "still_unknown": 236,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PUBLISHER_CAPACITY_BACKLOG_AWAITING_FIFO",
+      "confidence": "MEDIUM",
+      "supporting_evidence": [
+        "publisher selects ORDER BY created_at ASC LIMIT 25",
+        "DB-ack of oldest IDs observed in phase2 window (not broker-ack)",
+        "no lease/retry/malformed columns on table",
+        "row remains unpublished at sample time"
+      ]
+    },
+    "unknown_by_age_30d_90d": {
+      "expected": 100,
+      "tested": 100,
+      "resolved": 0,
+      "still_unknown": 100,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PUBLISHER_CAPACITY_BACKLOG_AWAITING_FIFO",
+      "confidence": "MEDIUM",
+      "supporting_evidence": [
+        "publisher selects ORDER BY created_at ASC LIMIT 25",
+        "DB-ack of oldest IDs observed in phase2 window (not broker-ack)",
+        "no lease/retry/malformed columns on table",
+        "row remains unpublished at sample time"
+      ]
+    },
+    "unknown_by_age_5m_60m": {
+      "expected": 262,
+      "tested": 262,
+      "resolved": 0,
+      "still_unknown": 262,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PUBLISHER_CAPACITY_BACKLOG_AWAITING_FIFO",
+      "confidence": "MEDIUM",
+      "supporting_evidence": [
+        "publisher selects ORDER BY created_at ASC LIMIT 25",
+        "DB-ack of oldest IDs observed in phase2 window (not broker-ack)",
+        "no lease/retry/malformed columns on table",
+        "row remains unpublished at sample time"
+      ]
+    },
+    "unknown_by_age_7d_30d": {
+      "expected": 200,
+      "tested": 200,
+      "resolved": 0,
+      "still_unknown": 200,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PUBLISHER_CAPACITY_BACKLOG_AWAITING_FIFO",
+      "confidence": "MEDIUM",
+      "supporting_evidence": [
+        "publisher selects ORDER BY created_at ASC LIMIT 25",
+        "DB-ack of oldest IDs observed in phase2 window (not broker-ack)",
+        "no lease/retry/malformed columns on table",
+        "row remains unpublished at sample time"
+      ]
+    },
+    "unknown_by_type_AuctionRiskDetectedV1": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 998,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PUBLISHER_CAPACITY_BACKLOG_AWAITING_FIFO",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "bounded 1h type sample was 100% AuctionRiskDetectedV1; full-table type GROUP BY timed out"
+      ]
+    },
+    "unknown_duplicate_aggregate_recent_1h": {
+      "expected": 200,
+      "tested": 200,
+      "resolved": 0,
+      "still_unknown": 200,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "SEMANTIC_DUPLICATE_GENERATION_CANDIDATE",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "source ON CONFLICT (listing_id,signal_code) inserts new outbox UUID every 120s",
+        "cohort selected aggregate_ids with >=10 pending rows in 1h",
+        "consumer/business effect not proven \u2014 candidate not DUPLICATE_ALREADY_APPLIED"
+      ]
+    },
+    "boundary_before_after_standard_authorizer": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 0,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PERMANENT_HISTORICAL_EVIDENCE_GAP",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "outbox rows lack source_sha/published_at/broker coords columns",
+        "cannot attribute individual rows to before_after_standard_authorizer without historical row metadata"
+      ]
+    },
+    "boundary_before_after_dedicated_kafka_identities": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 0,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PERMANENT_HISTORICAL_EVIDENCE_GAP",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "outbox rows lack source_sha/published_at/broker coords columns",
+        "cannot attribute individual rows to before_after_dedicated_kafka_identities without historical row metadata"
+      ]
+    },
+    "boundary_before_after_topic_creation": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 0,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PERMANENT_HISTORICAL_EVIDENCE_GAP",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "outbox rows lack source_sha/published_at/broker coords columns",
+        "cannot attribute individual rows to before_after_topic_creation without historical row metadata"
+      ]
+    },
+    "boundary_before_after_acl_changes": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 0,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PERMANENT_HISTORICAL_EVIDENCE_GAP",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "outbox rows lack source_sha/published_at/broker coords columns",
+        "cannot attribute individual rows to before_after_acl_changes without historical row metadata"
+      ]
+    },
+    "boundary_before_after_controller_mtls": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 0,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PERMANENT_HISTORICAL_EVIDENCE_GAP",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "outbox rows lack source_sha/published_at/broker coords columns",
+        "cannot attribute individual rows to before_after_controller_mtls without historical row metadata"
+      ]
+    },
+    "boundary_colima_nodenotready_windows": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 0,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PERMANENT_HISTORICAL_EVIDENCE_GAP",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "outbox rows lack source_sha/published_at/broker coords columns",
+        "cannot attribute individual rows to colima_nodenotready_windows without historical row metadata"
+      ]
+    },
+    "boundary_synthetic_chaos_test_runs": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 0,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PERMANENT_HISTORICAL_EVIDENCE_GAP",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "outbox rows lack source_sha/published_at/broker coords columns",
+        "cannot attribute individual rows to synthetic_chaos_test_runs without historical row metadata"
+      ]
+    },
+    "boundary_insertion_deployment_sha": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 0,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PERMANENT_HISTORICAL_EVIDENCE_GAP",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "outbox rows lack source_sha/published_at/broker coords columns",
+        "cannot attribute individual rows to insertion_deployment_sha without historical row metadata"
+      ]
+    },
+    "boundary_publisher_deployment_sha": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 0,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PERMANENT_HISTORICAL_EVIDENCE_GAP",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "outbox rows lack source_sha/published_at/broker coords columns",
+        "cannot attribute individual rows to publisher_deployment_sha without historical row metadata"
+      ]
+    },
+    "consumer_business_evidence": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 0,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PERMANENT_HISTORICAL_EVIDENCE_GAP",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "no consumer lineage join keys on outbox row; broker partition/offset absent"
+      ]
+    },
+    "publisher_log_window_correlation": {
+      "expected": 998,
+      "tested": 998,
+      "resolved": 0,
+      "still_unknown": 0,
+      "dominant_classification_prior": "UNKNOWN_BLOCKING",
+      "proposed_reclassification": "PERMANENT_HISTORICAL_EVIDENCE_GAP",
+      "confidence": "HIGH",
+      "supporting_evidence": [
+        "publishAuctionMonitorOutbox logs only warn on failure; no per-event success logs/traces"
+      ]
+    }
+  },
+  "proposed_unknown_disposition": {
+    "reclassify_from_UNKNOWN_BLOCKING": {
+      "PUBLISHER_CAPACITY_BACKLOG_AWAITING_FIFO": 798,
+      "SEMANTIC_DUPLICATE_GENERATION_CANDIDATE": 200
+    },
+    "remaining_UNKNOWN_BLOCKING_after_reclass": 0,
+    "causally_lineage_complete_after_reclass": "168/1067 (ACKNOWLEDGED+NEVER_SELECTED only; backlog/duplicate candidates are state classifications not full broker lineage)",
+    "permanent_historical_evidence_gaps": [
+      "per-row deploy SHA",
+      "StandardAuthorizer timing attribution",
+      "broker topic/partition/offset on row",
+      "consumer/business effect join",
+      "per-invocation success logs/traces"
+    ],
+    "lineage_complete": false,
+    "unknown_blocking_after_cohort_pass": 0,
+    "sealed_permanent_gaps_for_unattributable_dimensions": true
+  },
+  "acceptance_note": "unknown_blocking can be driven to 0 by reclassification to PUBLISHER_CAPACITY_BACKLOG_AWAITING_FIFO and SEMANTIC_DUPLICATE_GENERATION_CANDIDATE; full broker/consumer lineage remains incomplete and is sealed as PERMANENT_HISTORICAL_EVIDENCE_GAP where instrumentation/history absent",
+  "rows_categorized": "1067/1067",
+  "rows_causally_resolved": "168/1067",
+  "rows_unknown_blocking": "899/1067",
+  "lineage_complete": false,
+  "clarification": "100% categorized \u2260 lineage-complete while UNKNOWN_BLOCKING remains"
+}

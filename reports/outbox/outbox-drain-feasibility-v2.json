@@ -1,0 +1,26 @@
+{
+  "report": "outbox-drain-feasibility-v2",
+  "authoritative": true,
+  "auction_monitor": {
+    "pending_now": 7803359,
+    "insertion_rate_rph": 16584.5,
+    "database_ack_rate_rph": 748.398,
+    "broker_ack_rate_rph": "NOT_OBSERVABLE_WITH_CURRENT_RUNTIME",
+    "net_growth_rph": 15836.1019,
+    "drain_feasible_while_generation_continues": false,
+    "drain_time_while_generation_continues": "INFINITE_WHILE_NET_GROWTH_POSITIVE",
+    "drain_time_if_generation_paused_hours": 10426.75,
+    "required_capacity_multiplier_vs_db_ack": 22.16
+  },
+  "listings": {
+    "actionable_eligible_now": 0,
+    "terminal_dlq_requires_owner_disposition": 70,
+    "contract_orphan": 1
+  },
+  "media": {
+    "BLOCKED_NO_PUBLISHER": 124,
+    "ACTIONABLE_ELIGIBLE_NOW": 0,
+    "QUIESCE_BLOCKING_IMPLEMENTATION_GAP": 124
+  },
+  "captured_at_utc": "2026-08-05T22:53:53Z"
+}

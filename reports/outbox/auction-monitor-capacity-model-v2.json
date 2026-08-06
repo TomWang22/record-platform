@@ -1,0 +1,39 @@
+{
+  "report": "auction-monitor-capacity-model-v2",
+  "supersedes": "reports/outbox/auction-monitor-capacity-model.json (INTERNALLY_INCONSISTENT \u2014 see supersession)",
+  "authoritative": true,
+  "interval": {
+    "window_start_utc_host": "2026-08-05T21:52:38Z",
+    "window_end_utc_host": "2026-08-05T22:52:46Z",
+    "duration_seconds": 3607.706,
+    "analysis_root": "/tmp/record-platform-outbox-rate-reconciliation-v1"
+  },
+  "configured_selection_ceiling_rows_per_hour": 750.0,
+  "configured_selection_ceiling_formula": "batch_size(25) * (3600/120)",
+  "measured_insertion_rate_rows_per_hour": 16584.5,
+  "measured_selection_rate_rows_per_hour": 757.3788,
+  "measured_broker_ack_rate_rows_per_hour": "NOT_OBSERVABLE_WITH_CURRENT_RUNTIME",
+  "measured_database_ack_rate_rows_per_hour": 748.398,
+  "measured_net_pending_growth_rate_rows_per_hour": 15836.1019,
+  "measured_retry_rate_rows_per_hour": "NOT_OBSERVABLE_NO_RETRY_COLUMNS",
+  "measured_failure_rate_rows_per_hour": "NOT_OBSERVABLE_WITH_CURRENT_RUNTIME",
+  "net_equation": "net = insertion + reopen - database_ack - deletion_from_pending",
+  "net_equation_check": {
+    "insertion": 16584.5,
+    "reopen": 0,
+    "database_ack": 748.398,
+    "deletion": 0,
+    "computed_net": 15836.102,
+    "observed_net": 15836.1019,
+    "match": true
+  },
+  "required_multiplier": 22.16,
+  "required_multiplier_formula": "insertion_into_pending_rate / sustainable_database_ack_rate",
+  "sustainable_database_ack_rate_rows_per_hour": 748.398,
+  "drain_feasible_while_generation_continues": false,
+  "drain_time_while_generation_continues": "INFINITE_WHILE_NET_GROWTH_POSITIVE",
+  "drain_time_if_generation_paused_hours": 10426.75,
+  "negative_ack_rate_accepted": false,
+  "broker_ack_not_substituted_for_db_ack": true,
+  "captured_at_utc": "2026-08-05T22:53:53Z"
+}

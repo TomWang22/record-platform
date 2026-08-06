@@ -1,0 +1,38 @@
+{
+  "report": "outbox-actionable-state-contract-v2",
+  "supersedes": "reports/outbox/outbox-actionable-state-contract.json",
+  "captured_at_utc": "2026-08-05T21:15:08Z",
+  "listings": {
+    "raw_unpublished": 71,
+    "terminal_dead_lettered": 70,
+    "contract_orphan": 1,
+    "actionable_eligible_now": 0,
+    "active_drain_blocked_by_terminal_dlq": false,
+    "dlq_requires_explicit_owner_disposition": true,
+    "dlq_gate_separate_from_actionable_drain": true
+  },
+  "media": {
+    "raw_unpublished": 124,
+    "publisher_present": false,
+    "ACTIONABLE_ELIGIBLE_NOW": 0,
+    "BLOCKED_NO_PUBLISHER": 124,
+    "QUIESCE_BLOCKING_IMPLEMENTATION_GAP": 124,
+    "note": "Quiesce-blocking implementation gap; not actionable for drain while publisher absent"
+  },
+  "auction_monitor": {
+    "do_not_say": "approximately all raw rows are actionable",
+    "separations_required": [
+      "eligible_under_SQL_predicate",
+      "selectable_at_next_poll",
+      "blocked_by_lease",
+      "blocked_by_retry_schedule",
+      "blocked_by_malformed_data",
+      "publisher_capacity_backlog",
+      "unknown"
+    ],
+    "eligible_under_SQL_predicate": "published = false",
+    "selectable_at_next_poll": "published=false ORDER BY created_at ASC LIMIT 25 (FOR UPDATE SKIP LOCKED at runtime)",
+    "publisher_capacity_backlog": "unpublished rows not in the next LIMIT 25 head"
+  },
+  "kafka_principal_form_required": "User:O=Record Platform,CN=<service>"
+}

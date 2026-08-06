@@ -1,0 +1,128 @@
+{
+  "report": "auction-monitor-broker-ack-instrumentation-design",
+  "captured_at_utc": "2026-08-05T21:18:00Z",
+  "status": "IMPLEMENTED_IN_SOURCE_NOT_DEPLOYED",
+  "applied": true,
+  "deployed": false,
+  "target_service": "auction-monitor",
+  "target_function": "publishAuctionMonitorOutbox",
+  "source_path": "services/auction-monitor/src/ai-signals.ts",
+  "problem": "Current runtime updates published=true after producer.send but does not record topic/partition/offset, broker ack timestamp, client identity, or trace IDs; broker ack cannot be measured separately from DB ack.",
+  "structured_log_or_span_fields_after_kafka_send": [
+    "event_id",
+    "outbox_id",
+    "topic",
+    "partition",
+    "offset",
+    "broker_ack_timestamp",
+    "producer_client_id",
+    "trace_id",
+    "attempt_number",
+    "send_duration_ms",
+    "database_acknowledgment_result"
+  ],
+  "prometheus_metrics": [
+    {
+      "name": "auction_monitor_outbox_selected_total",
+      "type": "counter",
+      "labels": [
+        "result"
+      ]
+    },
+    {
+      "name": "auction_monitor_outbox_produce_attempt_total",
+      "type": "counter",
+      "labels": [
+        "result"
+      ]
+    },
+    {
+      "name": "auction_monitor_outbox_broker_ack_total",
+      "type": "counter",
+      "labels": [
+        "result"
+      ]
+    },
+    {
+      "name": "auction_monitor_outbox_db_ack_total",
+      "type": "counter",
+      "labels": [
+        "result"
+      ]
+    },
+    {
+      "name": "auction_monitor_outbox_retry_total",
+      "type": "counter",
+      "labels": [
+        "reason_class"
+      ]
+    },
+    {
+      "name": "auction_monitor_outbox_failure_total",
+      "type": "counter",
+      "labels": [
+        "reason_class"
+      ]
+    },
+    {
+      "name": "auction_monitor_outbox_pending",
+      "type": "gauge",
+      "labels": []
+    },
+    {
+      "name": "auction_monitor_outbox_oldest_pending_age_seconds",
+      "type": "gauge",
+      "labels": []
+    },
+    {
+      "name": "auction_monitor_outbox_publish_latency_seconds",
+      "type": "histogram",
+      "labels": [
+        "stage"
+      ]
+    }
+  ],
+  "forbidden_metric_labels": [
+    "raw outbox IDs",
+    "raw event IDs",
+    "listing IDs",
+    "user IDs",
+    "payloads",
+    "exception text",
+    "topic/partition/offset as unbounded labels"
+  ],
+  "trace_span_chain": [
+    "database_selection",
+    "lease_FOR_UPDATE_SKIP_LOCKED",
+    "kafka_produce",
+    "broker_acknowledgment",
+    "database_acknowledgment"
+  ],
+  "optional_schema_extension_design_only": {
+    "columns": [
+      "broker_topic",
+      "broker_partition",
+      "broker_offset",
+      "published_at",
+      "last_error"
+    ],
+    "note": "Not applied in this pass; required for historical interval reconstruction"
+  },
+  "kafka_principal_form": "User:O=Record Platform,CN=auction-monitor",
+  "authorization": {
+    "source_mutations": 0,
+    "schema_mutations": 0,
+    "runtime_mutations": 0
+  },
+  "runtime_mutations": 0,
+  "source_files": [
+    "services/auction-monitor/src/ai-signals.ts",
+    "services/auction-monitor/src/outbox-publish-metrics.ts",
+    "services/auction-monitor/src/server.ts",
+    "services/auction-monitor/package.json"
+  ],
+  "implemented_at_utc": "2026-08-06T00:15:21Z",
+  "note": "Source landed after interval accounting PASS. Not deployed to cluster; awaiting new exact SHA image build/rollout authorization.",
+  "instrumentation_source_sha": "27d134c4acd6d9448f0a2f408ae42187de8bdd23",
+  "instrumentation_deployed": false
+}

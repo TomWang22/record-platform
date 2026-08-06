@@ -1,0 +1,32 @@
+{
+  "report": "auction-monitor-observability-contract",
+  "captured_at_utc": "2026-08-05T21:18:00Z",
+  "status": "CONTRACT_IMPLEMENTED_IN_SOURCE_NOT_DEPLOYED",
+  "rates_must_remain_distinct": [
+    "CONFIGURED_SELECTION_CEILING",
+    "ACTUAL_SELECTION_RATE",
+    "ACTUAL_BROKER_ACK_RATE",
+    "ACTUAL_DATABASE_ACK_RATE"
+  ],
+  "current_runtime": {
+    "actual_broker_ack_rate_rows_per_hour": "NOT_OBSERVABLE_UNTIL_INSTRUMENTED_IMAGE_DEPLOYED",
+    "broker_ack_instrumentation_required": true,
+    "actual_database_ack_rate": "requires published_at or tracked-ID census or instrumentation"
+  },
+  "kafka_principal_exact_form": "User:O=Record Platform,CN=auction-monitor",
+  "metrics_names": [
+    "auction_monitor_outbox_selected_total",
+    "auction_monitor_outbox_produce_attempt_total",
+    "auction_monitor_outbox_broker_ack_total",
+    "auction_monitor_outbox_db_ack_total",
+    "auction_monitor_outbox_retry_total",
+    "auction_monitor_outbox_failure_total",
+    "auction_monitor_outbox_pending",
+    "auction_monitor_outbox_oldest_pending_age_seconds",
+    "auction_monitor_outbox_publish_latency_seconds"
+  ],
+  "source_landed": true,
+  "deployed": false,
+  "instrumentation_source_sha": "27d134c4acd6d9448f0a2f408ae42187de8bdd23",
+  "instrumentation_deployed": false
+}

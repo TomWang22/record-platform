@@ -1,0 +1,82 @@
+{
+  "report": "auction-monitor-capacity-model-supersession",
+  "captured_at_utc": "2026-08-05T21:15:08Z",
+  "classification": "PRIOR_CAPACITY_MODEL_INTERNALLY_INCONSISTENT",
+  "originals_preserved_not_rewritten": [
+    "reports/outbox/auction-monitor-capacity-model.json",
+    "reports/outbox/outbox-publisher-throughput-observation.json",
+    "reports/outbox/outbox-drain-feasibility.json"
+  ],
+  "authoritative_auction_monitor_ack_rate": "UNRESOLVED",
+  "authoritative_auction_monitor_net_growth_rate": "UNRESOLVED",
+  "negative_ack_rate_accepted": false,
+  "conflicting_fields": [
+    {
+      "field": "measured_net_growth_rows_per_hour",
+      "values": [
+        {
+          "value": 20563.4,
+          "source_artifact": "phase2 python capacity write (pre-fix)",
+          "kind": "inferred",
+          "interval": "pending_delta/elapsed from 285s window",
+          "reason_unaccepted": "inconsistent with insert 16620 and produces negative ack"
+        },
+        {
+          "value": 15870,
+          "source_artifact": "reports/outbox/auction-monitor-capacity-model.json measured.net_growth",
+          "kind": "configured_comparison/tick_aligned",
+          "interval": "not the same 285s wall clock as pending_delta",
+          "reason_unaccepted": "uses insert-ceiling arithmetic, not observed pending_delta/elapsed"
+        }
+      ]
+    },
+    {
+      "field": "measured_db_ack_rate_rows_per_hour",
+      "values": [
+        {
+          "value": -3943.4,
+          "source_artifact": "phase2 initial subtraction inference",
+          "kind": "inferred",
+          "equation": "insert_rate - net_growth_from_pending_delta",
+          "reason_unaccepted": "negative acknowledgment rate is physically impossible; mismatched intervals/denominators"
+        },
+        {
+          "value": 750,
+          "source_artifact": "reports/outbox/auction-monitor-capacity-model.json + throughput-observation after patch",
+          "kind": "configured_ceiling_aligned_estimate",
+          "evidence": "oldest ID flips + batch_size*polls/hour",
+          "reason_unaccepted": "not interval-aligned measured DB transitions; confuses configured selection ceiling with DB ack; broker ack unobserved"
+        }
+      ]
+    },
+    {
+      "field": "pending_delta vs rates",
+      "values": [
+        {
+          "pending_delta": 1587,
+          "elapsed_s": 277.833,
+          "source": "outbox-publisher-throughput-observation.json",
+          "kind": "measured"
+        },
+        {
+          "insertion_rate": 16620,
+          "source": "recent_1h pending created_at window (different denominator)",
+          "kind": "measured_different_interval"
+        }
+      ],
+      "reason_unaccepted": "pending_delta/elapsed\u224820563/h cannot reconcile with insert 16620/h without a negative or unstated component; intervals/denominators mixed"
+    }
+  ],
+  "required_next": "single common interval accounting in /tmp/record-platform-outbox-rate-reconciliation-v1/",
+  "authoritative_after_interval_accounting": {
+    "authoritative_auction_monitor_ack_rate": 748.398,
+    "authoritative_auction_monitor_ack_rate_kind": "ACTUAL_DATABASE_ACK_RATE_rows_per_hour",
+    "authoritative_broker_ack_rate": "NOT_OBSERVABLE_WITH_CURRENT_RUNTIME",
+    "authoritative_auction_monitor_net_growth_rate": 15836.1019,
+    "authoritative_insertion_rate": 16584.5,
+    "negative_ack_rate_accepted": false,
+    "source": "reports/outbox/auction-monitor-interval-accounting.json + auction-monitor-capacity-model-v2.json",
+    "resolved_at_utc": "2026-08-05T22:53:53Z"
+  },
+  "prior_fields_remain_unaccepted": true
+}

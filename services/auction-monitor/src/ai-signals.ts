@@ -515,6 +515,7 @@ export async function publishAuctionMonitorOutbox(auctionPool: Pool): Promise<nu
               attempt_number: attemptNumber,
               database_acknowledgment_result: "not_attempted_or_failed",
               error_class: e instanceof Error ? e.name : "Error",
+              error_message_bounded: (e instanceof Error ? e.message : String(e)).slice(0, 200),
             }),
           );
           stoppedEarly = true;

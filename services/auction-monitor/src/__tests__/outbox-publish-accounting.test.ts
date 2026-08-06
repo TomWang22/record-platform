@@ -31,7 +31,7 @@ describe("auction-monitor outbox publish accounting", () => {
     const ledger = createBatchLedger("inv-2", "batch-2");
     recordSelected(ledger, ["b", "c"]);
     expect(parseBrokerMetadata("t", undefined)).toBeNull();
-    expect(parseBrokerMetadata("t", [{ partition: 1 }])).toBeNull();
+    expect(parseBrokerMetadata("t", [{ partition: 1, errorCode: 42 }])).toBeNull();
     recordProduceOutcome(ledger, "b", 1, null, true);
     recordProduceOutcome(ledger, "c", 1, null, false);
     expect(ledger.broker_acknowledged).toBe(0);

@@ -84,16 +84,31 @@ export function recordSelected(ledger: BatchLedger, outboxIds: string[]): void {
 
 export function parseBrokerMetadata(
   topic: string,
-  metadata: Array<{ topicName?: string; partition?: number; offset?: string }> | undefined,
+  metadata: Array<{
+    topicName?: string;
+    partition?: number;
+    offset?: string;
+    baseOffset?: string;
+    errorCode?: number;
+  }> | undefined,
 ): BrokerMetadata | null {
   const meta0 = Array.isArray(metadata) ? metadata[0] : undefined;
-  if (!meta0 || meta0.partition === undefined || meta0.offset === undefined || meta0.offset === "") {
+  if (!meta0 || meta0.partition === undefined || meta0.partition === null) {
     return null;
   }
+  if (typeof meta0.errorCode === "number" && meta0.errorCode !== 0) {
+    return null;
+  }
+  const offsetRaw = meta0.offset ?? meta0.baseOffset;
+  // KafkaJS types mark offset optional; when absent after errorCode=0, record sentinel.
+  const offset =
+    offsetRaw !== undefined && offsetRaw !== null && String(offsetRaw) !== ""
+      ? String(offsetRaw)
+      : "NOT_PROVIDED_BY_CLIENT";
   return {
     topic: meta0.topicName || topic,
     partition: meta0.partition,
-    offset: String(meta0.offset),
+    offset,
   };
 }
 

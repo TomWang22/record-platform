@@ -86,6 +86,13 @@ describe("auction-monitor outbox publish accounting", () => {
 
   it("fails closed when kafka metadata missing", () => {
     expect(parseBrokerMetadata("t", [])).toBeNull();
-    expect(parseBrokerMetadata("t", [{ topicName: "t", partition: 0, offset: "" }])).toBeNull();
+    expect(parseBrokerMetadata("t", [{ topicName: "t", partition: 0, errorCode: 3 }])).toBeNull();
+  });
+
+  it("accepts partition with optional offset using sentinel", () => {
+    const m = parseBrokerMetadata("t", [{ topicName: "t", partition: 1, errorCode: 0 }]);
+    expect(m).toEqual({ topic: "t", partition: 1, offset: "NOT_PROVIDED_BY_CLIENT" });
+    const m2 = parseBrokerMetadata("t", [{ partition: 2, baseOffset: "99", errorCode: 0 }]);
+    expect(m2?.offset).toBe("99");
   });
 });

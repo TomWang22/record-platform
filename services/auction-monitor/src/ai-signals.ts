@@ -411,12 +411,22 @@ export async function publishAuctionMonitorOutbox(auctionPool: Pool): Promise<nu
           const sendDurationMs = Date.now() - sendStarted;
           observeOutboxPublishLatency("kafka_produce", sendDurationMs / 1000);
 
-          const broker = parseBrokerMetadata(topic, metadata as Array<{ topicName?: string; partition?: number; offset?: string }>);
+          const metaArr = metadata as Array<{
+            topicName?: string;
+            partition?: number;
+            offset?: string;
+            baseOffset?: string;
+            errorCode?: number;
+          }>;
+          const broker = parseBrokerMetadata(topic, metaArr);
           const produceResult = recordProduceOutcome(ledger, row.id, attemptNumber, broker, false);
           if (produceResult === "BROKER_SEND_FAILED" || !broker) {
             incOutboxProduceAttempt("error");
             incOutboxBrokerAck("error");
-            throw new Error("kafka_broker_ack_metadata_missing");
+            const meta0 = Array.isArray(metaArr) ? metaArr[0] : undefined;
+            throw new Error(
+              `kafka_broker_ack_metadata_missing keys=${meta0 ? Object.keys(meta0).sort().join(",") : "none"} errorCode=${meta0?.errorCode ?? "na"} partition=${meta0?.partition ?? "na"}`,
+            );
           }
           incOutboxProduceAttempt("ok");
           incOutboxBrokerAck("ok");

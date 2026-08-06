@@ -1,0 +1,26 @@
+{
+  "auction_monitor_source_sha_matching": "1/1",
+  "auction_monitor_oci_revision_matching": "1/1",
+  "auction_monitor_digest_present": "1/1",
+  "auction_monitor_ready": "1/1",
+  "auction_monitor_restart_growth": 0,
+  "obsolete_replicas_with_replicas": 0,
+  "Kafka_client_secret": "kafka-client-tls-auction-monitor",
+  "generic_kafka_client_secret_mounts": 0,
+  "runtime_sha": "04c4abf109f60cc370edd89e65b5eed9186002a4",
+  "controller_sha": "f7fbb7bafd4865ee98843cad0cf8764fdfbc547f",
+  "carry_forward": {
+    "runtime_source_commit": "04c4abf109f60cc370edd89e65b5eed9186002a4",
+    "accepted_controller_sha": "f7fbb7bafd4865ee98843cad0cf8764fdfbc547f",
+    "paths_controller_vs_runtime": "TEST only (unit test assertion tweak)",
+    "carry_forward_allowed": true
+  },
+  "certificate": {
+    "principal": "User:O=Record Platform,CN=auction-monitor",
+    "leaf": "E7:2E:EA:B3:11:1A:F7:B3:D7:A6:EB:FE:BE:DF:3A:BF:8B:DE:A7:22:37:E7:FA:57:3E:8F:78:1F:E3:A0:EE:0F",
+    "disk_secret_mount_equal": true,
+    "clientAuth_EKU": true,
+    "serverAuth_EKU": false,
+    "spiffe": "spiffe://record-platform/service/auction-monitor"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "report": "auction-monitor-capacity-model-v3",
+  "authoritative": true,
+  "supersedes": [
+    "reports/outbox/auction-monitor-capacity-model-v2.json",
+    "prior \u2248757.3/h selection claim from oldest-flip cohort (COHORT_TRANSITION_NOT_SELECTION_DENOMINATOR)"
+  ],
+  "interval": {
+    "start_host": "2026-08-06T00:58:51Z",
+    "end_host": "2026-08-06T01:58:59Z",
+    "start_db": "2026-08-06 00:58:51.324442+00",
+    "end_db": "2026-08-06 01:58:59.405873+00",
+    "duration_seconds": 3608.012
+  },
+  "configured_selection_ceiling_rows_per_hour": 750,
+  "actual_scheduled_invocations_per_hour": 29.9334,
+  "actual_completed_invocations_per_hour": 29.9334,
+  "actual_rows_selected_per_hour": 748.3345,
+  "actual_produce_attempts_per_hour": 748.3345,
+  "actual_broker_acknowledgments_per_hour": 748.3345,
+  "actual_database_acknowledgments_per_hour": 748.3345,
+  "actual_database_ack_failures_after_broker_ack_per_hour": 0.0,
+  "actual_retries_per_hour": 0,
+  "actual_failures_per_hour": 0.0,
+  "actual_pending_growth_per_hour": 15834.7589,
+  "insertion_rate_rows_per_hour": 16583.0934,
+  "required_multiplier": 22.16,
+  "drain_feasible_while_generation_continues": false,
+  "drain_time_while_generation_continues": "INFINITE_WHILE_NET_GROWTH_POSITIVE",
+  "selection_measurement_basis": "auction_monitor_outbox_selected_total counter delta over common interval",
+  "broker_ack_measurement_basis": "auction_monitor_outbox_broker_ack_total{result=ok} + structured RecordMetadata logs",
+  "negative_ack_rate_accepted": false,
+  "captured_at_utc": "2026-08-06T01:59:41Z"
+}

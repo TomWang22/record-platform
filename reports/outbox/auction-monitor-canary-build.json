@@ -1,0 +1,14 @@
+{
+  "accepted_sha": "cea409feb6c3e3592cd0eb8ce1fb07a8fa0976b0",
+  "build_id": "am-broker-ack-canary-20260806T003526Z",
+  "worktree": "/tmp/record-platform-am-broker-ack-build-cea409feb6c3",
+  "image_id": "sha256:2ddf9f98131ba8448ae1352f7422a91d179713efce1511c979652e2ba1e9e5b5",
+  "oci_revision": "cea409feb6c3e3592cd0eb8ce1fb07a8fa0976b0",
+  "rp_source_sha_label": "cea409feb6c3e3592cd0eb8ce1fb07a8fa0976b0",
+  "repo_digest": "auction-monitor@sha256:2ddf9f98131ba8448ae1352f7422a91d179713efce1511c979652e2ba1e9e5b5",
+  "tags": [
+    "auction-monitor:dev",
+    "auction-monitor:cea409feb6c3e3592cd0eb8ce1fb07a8fa0976b0"
+  ],
+  "captured_at_utc": "2026-08-06T00:38:12Z"
+}

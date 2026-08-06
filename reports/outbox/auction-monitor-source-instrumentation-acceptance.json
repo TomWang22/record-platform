@@ -1,0 +1,35 @@
+{
+  "report": "auction-monitor-source-instrumentation-acceptance",
+  "captured_at_utc": "2026-08-06T00:24:36Z",
+  "accepted_runtime_sha": "cea409feb6c3e3592cd0eb8ce1fb07a8fa0976b0",
+  "instrumentation_source_commit": "27d134c4acd6d9448f0a2f408ae42187de8bdd23",
+  "hardening_commit": "cea409feb6c3e3592cd0eb8ce1fb07a8fa0976b0",
+  "evidence_commit": "080ed6da63e1ad2bad18d6f8f1634abc3a0a2cd7",
+  "distinct_states": [
+    "SELECTED",
+    "LEASED",
+    "PRODUCE_ATTEMPTED",
+    "BROKER_ACKNOWLEDGED",
+    "BROKER_SEND_FAILED",
+    "DATABASE_ACKNOWLEDGED",
+    "DATABASE_ACK_FAILED_AFTER_BROKER_ACK",
+    "RETRY_SCHEDULED",
+    "TERMINAL_FAILURE",
+    "NOT_ATTEMPTED"
+  ],
+  "metrics_required_present": true,
+  "db_ack_requires_rowcount": true,
+  "broker_ack_requires_metadata": true,
+  "raw_payload_logged": false,
+  "forbidden_metric_labels_blocked": true,
+  "selection_vs_oldest_flip_correction": {
+    "prior_claim": "measured selection rate \u2248757.3/h from 759/1000 oldest flips",
+    "classification": "COHORT_TRANSITION_NOT_SELECTION_DENOMINATOR",
+    "superseded": true,
+    "until_live_canary": "actual_rows_selected_per_hour = UNRESOLVED"
+  },
+  "source_tests_expected": 8,
+  "source_tests_tested": 8,
+  "source_tests_passed": 8,
+  "source_tests_failed": 0
+}

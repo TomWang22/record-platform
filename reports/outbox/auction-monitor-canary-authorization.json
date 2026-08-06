@@ -1,0 +1,18 @@
+{
+  "publisher_throughput_changed": false,
+  "historical_outbox_rows_mutated": 0,
+  "rows_replayed": 0,
+  "rows_deleted": 0,
+  "schema_mutations": 0,
+  "Kafka_ACL_mutations": 0,
+  "Kafka_topic_mutations": 0,
+  "maintenance_quiesce_v2_created": false,
+  "maintenance_window_ready": false,
+  "stop_default_authorized": false,
+  "gate5_ab_started": false,
+  "gate5_v10_created": false,
+  "gate5_final_pass": false,
+  "gate6_authorized": false,
+  "pre_performance_gate_earned": false,
+  "production_approved": false
+}

@@ -1,0 +1,37 @@
+{
+  "report": "auction-monitor-observability-proof",
+  "metric_equations": {
+    "selected_metric_delta": 750.0,
+    "produce_attempt_metric_delta": 750.0,
+    "broker_ack_metric_delta": 750.0,
+    "db_ack_metric_delta": 750.0,
+    "selected_equals_produce_equals_broker_equals_db": true
+  },
+  "jaeger": {
+    "trace_id": "d248900a2e6819e149a7f56b6b984818",
+    "jaeger_url": "https://jaeger.record-platform.test/jaeger/trace/d248900a2e6819e149a7f56b6b984818",
+    "localhost_used": false,
+    "port_forward_used": false,
+    "span_count": 213,
+    "operation_names": [
+      "auction_monitor.outbox.database_acknowledgment",
+      "auction_monitor.outbox.database_selection",
+      "auction_monitor.outbox.kafka_produce",
+      "auction_monitor.outbox.lease",
+      "auction_monitor.outbox.publish_tick",
+      "dev.auction_monitor.events",
+      "dns.lookup",
+      "pg-pool.connect",
+      "pg.query:UPDATE postgres",
+      "pg.query:WITH postgres",
+      "tcp.connect",
+      "tls.connect"
+    ]
+  },
+  "localhost_jaeger_count": 0,
+  "port_forward_count": 0,
+  "alternate_service_fallback_count": 0,
+  "bounded_labels_only": true,
+  "raw_payload_logged": false,
+  "captured_at_utc": "2026-08-06T01:59:41Z"
+}

@@ -1,0 +1,51 @@
+{
+  "report": "auction-monitor-live-broker-ack-canary",
+  "captured_at_utc": "2026-08-06T01:59:41Z",
+  "analysis_root": "/tmp/record-platform-auction-monitor-broker-ack-canary-v1",
+  "status": "PASS",
+  "not": [
+    "maintenance-quiesce-v2",
+    "gate5-ab",
+    "gate5-v10"
+  ],
+  "accepted_controller_sha": "f7fbb7bafd4865ee98843cad0cf8764fdfbc547f",
+  "runtime_source_sha": "04c4abf109f60cc370edd89e65b5eed9186002a4",
+  "window": {
+    "start_host": "2026-08-06T00:58:51Z",
+    "end_host": "2026-08-06T01:58:59Z",
+    "start_db": "2026-08-06 00:58:51.324442+00",
+    "end_db": "2026-08-06 01:58:59.405873+00",
+    "duration_seconds": 3608.012
+  },
+  "pod": "auction-monitor-69c9bb474c-f282d",
+  "pod_uid": "8ec9f080-16ee-4780-b2dd-d1c88731284d",
+  "image_id": "docker-pullable://auction-monitor@sha256:64fa4fc1cb099144abcd933bd156fcfcb810e40b193be4d150f24498d492f5f1",
+  "kafka_principal": "User:O=Record Platform,CN=auction-monitor",
+  "scheduled_invocations_expected": 30,
+  "scheduled_invocations_observed": 30,
+  "invocations_started": 30,
+  "invocations_completed": 30,
+  "delta_selected": 750.0,
+  "delta_produce_ok": 750.0,
+  "delta_broker_ok": 750.0,
+  "delta_db_ok": 750.0,
+  "delta_produce_err": 0.0,
+  "delta_db_fail": 0.0,
+  "pending_T0": 7821470,
+  "pending_T1": 7837340,
+  "created_total_delta": 16620,
+  "published_true_delta": 750,
+  "pending_delta": 15870,
+  "equations": {
+    "pending_T1_equals_T0_plus_created_minus_published": true,
+    "selected_equals_produce_ok_plus_produce_err": true,
+    "broker_ok_equals_db_ok_plus_db_fail": true,
+    "db_ok_equals_published_true_delta": true,
+    "selected_equals_broker_ok": true
+  },
+  "throughput_unchanged": true,
+  "batch_size": 25,
+  "poll_interval_ms": 120000,
+  "head_equals_origin_main": true,
+  "invocations_ledger_note": "window_end.invocations_observed=30 is authoritative; overlapping log scrapes may duplicate ledger lines"
+}

@@ -1,0 +1,24 @@
+{
+  "accepted_sha": "cea409feb6c3e3592cd0eb8ce1fb07a8fa0976b0",
+  "HEAD_equals_origin_main": true,
+  "required_workflows_expected": [
+    "ci",
+    "docker-build",
+    "coverage",
+    "RP Namespace Lint"
+  ],
+  "required_workflows_triggered": 4,
+  "required_workflows_passed": 4,
+  "required_workflows_failed": 0,
+  "path_filter_not_applicable": 0,
+  "unresolved": 0,
+  "exact_sha_ci": "GREEN",
+  "runs": {
+    "docker-build": "https://github.com/TomWang22/record-platform/actions/runs/31059596612",
+    "ci": 31059596570,
+    "coverage": 31059596548,
+    "lint": 31059596526
+  },
+  "auction_monitor_docker_job": "success",
+  "captured_at_utc": "2026-08-06T00:35:26Z"
+}

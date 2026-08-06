@@ -1,0 +1,23 @@
+{
+  "captured_at_utc": "2026-08-06T01:58:41Z",
+  "phase": "AFTER",
+  "roots": {
+    "/tmp/record-platform-maintenance-quiesce-v1": {
+      "files": 19,
+      "bytes": 17166,
+      "exists": true
+    },
+    "/tmp/record-platform-outbox-backlog-rca-v1": {
+      "files": 42,
+      "bytes": 262447,
+      "exists": true
+    },
+    "/tmp/record-platform-outbox-rate-reconciliation-v1": {
+      "files": 26,
+      "bytes": 686301,
+      "exists": true
+    }
+  },
+  "marker_sha256": "984e6a6b19c6c252a356d292bc883f71fc933f39969e75412c4de00acd9f52b5",
+  "quiesce_v2_absent": true
+}

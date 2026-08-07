@@ -259,6 +259,12 @@ def build_default_live_adapters(
             colima_profile=str(docker_pin.get("colima_profile") or ""),
             docker_host=str(docker_pin.get("docker_host") or ""),
             docker_context=str(docker_pin.get("docker_context") or ""),
+            compose_project=str(
+                docker_pin.get("compose_project") or "record-platform"
+            ),
+            compose_service=str(
+                docker_pin.get("compose_service") or "postgres-auction-monitor-core"
+            ),
             container_id=str(docker_pin.get("container_id") or ""),
             container_name=str(docker_pin.get("container_name") or ""),
             image_digest=str(docker_pin.get("image_digest") or ""),

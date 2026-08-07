@@ -16,9 +16,9 @@
     "hostname": "jaeger.record-platform.test",
     "metallb_ip": "192.168.64.245",
     "jaeger_base": "https://jaeger.record-platform.test/jaeger",
-    "leaf_sha256": "UNSET_PENDING_LIVE_QUERY_PLANE_LEAF",
-    "intermediate_sha256": "UNSET_PENDING_LIVE_QUERY_PLANE_INTERMEDIATE",
-    "root_sha256": "UNSET_PENDING_LIVE_QUERY_PLANE_ROOT"
+    "leaf_sha256": "611c484c4fa029d9f34309db8aea35b657130b8d6e09f12cc00dddb4015ad901",
+    "intermediate_sha256": "9918600376cacfbc6172a66ff21a40148c4cafc4fc7200aaefe7fa6ed5bdc66f",
+    "root_sha256": "e0d394155c2884cac516bd181a0b79438e623e33858c42c4a3c0dcc62809f6eb"
   },
   "throughput_pin": {
     "batch": 25,
@@ -38,7 +38,8 @@
     "This packet freezes adapter hashes and pins for a future live arm.",
     "status PREPARED_NOT_AUTHORIZED does not authorize execution.",
     "live_capture_implementations exist but LIVE_CAPTURE_ACCEPTANCE_READY=false.",
-    "LIVE_CAPTURE_ARMED_FOR_WINDOW remains false until an AUTHORIZED arm."
+    "LIVE_CAPTURE_ARMED_FOR_WINDOW remains false until an AUTHORIZED arm.",
+    "query_plane_pin fingerprints frozen from live A2 attempt 009 observed TLS (certificate_path_verification=VERIFIED); does not authorize canary-v3."
   ],
   "live_capture_implementations_enabled": true,
   "live_capture_acceptance_ready": false,

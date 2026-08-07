@@ -542,17 +542,41 @@ def assert_readonly_command(
     head = args[0]
     if head not in {"kubectl", "docker"}:
         raise ForbiddenLiveCaptureCommand(f"binary_not_readonly_allowlisted:{head}")
-    for arg in args:
-        if _CMD_METACHAR_RE.search(arg) or _UNICODE_WS_RE.search(arg):
-            raise ForbiddenLiveCaptureCommand("command_metachar_or_unicode_ws_forbidden")
-        if "\x00" in arg:
-            raise ForbiddenLiveCaptureCommand("command_nul_forbidden")
-
     joined = " ".join(args)
     if "/tmp/" in joined and "props" in joined.lower():
         raise ForbiddenLiveCaptureCommand("tmp_props_write_forbidden")
     if "bash" in args or "sh" in args or "zsh" in args or "python" in args:
         raise ForbiddenLiveCaptureCommand("shell_exec_forbidden")
+
+    # Metachar scan: exempt the allowlisted psql -c SQL payload (validated separately).
+    exempt_indices: set[int] = set()
+    if (
+        head == "docker"
+        and len(args) == 14
+        and args[1] == "exec"
+        and list(args[3:13])
+        == [
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            "postgres",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-t",
+            "-A",
+            "-c",
+        ]
+    ):
+        exempt_indices.add(13)
+
+    for idx, arg in enumerate(args):
+        if idx in exempt_indices:
+            continue
+        if _CMD_METACHAR_RE.search(arg) or _UNICODE_WS_RE.search(arg):
+            raise ForbiddenLiveCaptureCommand("command_metachar_or_unicode_ws_forbidden")
+        if "\x00" in arg:
+            raise ForbiddenLiveCaptureCommand("command_nul_forbidden")
 
     if head == "kubectl":
         if _is_kafka_describe_template(args):

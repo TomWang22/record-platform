@@ -33,6 +33,7 @@ from auction_monitor_canary_v3_live_capture import (  # noqa: E402
     DockerExecutionPlanePin,
     LiveCaptureError,
     REQUIRED_PROVENANCE_COUNTER_SERIES,
+    STATEMENT_TIMEOUT,
     VALID_KAFKA_BROKER_IDS,
     build_and_write_db_provenance,
     build_fixture_db_provenance,
@@ -46,6 +47,7 @@ from auction_monitor_canary_v3_live_capture import (  # noqa: E402
     docker_execution_plane_as_dict,
     extract_process_start_time_seconds,
     independently_recompute_db_provenance,
+    is_live_interval_db_statement_timeout,
     scrape_auction_monitor_prometheus,
 )
 from auction_monitor_canary_v3_production_adapters import (  # noqa: E402
@@ -237,7 +239,9 @@ def build_default_live_adapters(
         return out
 
     def _docker() -> Mapping[str, Any]:
-        return docker_execution_plane_as_dict(capture_docker_execution_plane(runner=runner))
+        # capture_docker_execution_plane is keyword-only (*, runner=...); never pass positionals.
+        pin = capture_docker_execution_plane(runner=runner)
+        return docker_execution_plane_as_dict(pin)
 
     def _query() -> Mapping[str, Any]:
         return build_query_plane_preflight(pin=query_plane_pin)
@@ -317,6 +321,10 @@ def _validate_query_plane(payload: Mapping[str, Any]) -> list[str]:
             gaps.append(f"query_plane:{stage}:not_pass")
     stage2 = stages.get("stage2_tls") if isinstance(stages.get("stage2_tls"), Mapping) else {}
     observed = stage2.get("observed") if isinstance(stage2.get("observed"), Mapping) else {}
+    if observed.get("certificate_path_verification") != "VERIFIED":
+        gaps.append("query_plane:tls_not_verified")
+    if observed.get("sni_hostname") != "jaeger.record-platform.test":
+        gaps.append("query_plane:sni_mismatch")
     for fp in ("leaf_sha256", "intermediate_sha256", "root_sha256"):
         value = str(observed.get(fp) or "")
         if not value or value.startswith("UNSET"):
@@ -493,9 +501,25 @@ def capture_live_provenance_interval(
             )
             interval_end = (start_dt + timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     except Exception as exc:  # noqa: BLE001
+        if is_live_interval_db_statement_timeout(exc):
+            return {
+                "ready": False,
+                "reason": "live_interval_db_statement_timeout",
+                "failure_layer": "db",
+                "diagnosis": "db_contention",
+                "collector_blame": False,
+                "statement_timeout_budget": STATEMENT_TIMEOUT,
+                "error": str(exc),
+                "auditor_recompute_pass": False,
+                "common_interval_proven": False,
+                "counter_epoch_unchanged": False,
+                "required_series_present": False,
+            }
         return {
             "ready": False,
             "reason": f"live_interval_capture_error:{type(exc).__name__}:{exc}",
+            "failure_layer": "live_interval",
+            "collector_blame": False,
             "auditor_recompute_pass": False,
             "common_interval_proven": False,
             "counter_epoch_unchanged": False,
@@ -775,26 +799,36 @@ def run_readonly_live_probe(
         )
 
     if not provenance.get("ready"):
-        return emit(
-            {
-                "schema": "canary-v3-live-readonly-probe/v1",
-                "verdict": "DB_PROVENANCE_NOT_READY",
-                "db_provenance": {
-                    "status": "NOT_READY",
-                    "required_series_present": bool(provenance.get("required_series_present")),
-                    "auditor_recompute_pass": False,
-                    "common_interval_proven": bool(provenance.get("common_interval_proven")),
-                    "counter_epoch_unchanged": bool(provenance.get("counter_epoch_unchanged")),
-                    "detail": provenance,
-                },
-                "packet_status_unchanged": "PREPARED_NOT_AUTHORIZED",
-                "read_only_live_probe_pass": False,
-                "prepared_packet_sha256": prepared_sha_before,
-                "prepared_packet_byte_equal_after": True,
-                **_base_forbidden_posture(),
+        reason = str(provenance.get("reason") or "db_provenance_not_ready")
+        report: dict[str, Any] = {
+            "schema": "canary-v3-live-readonly-probe/v1",
+            "verdict": "DB_PROVENANCE_NOT_READY",
+            "blocker": reason,
+            "failure_layer": provenance.get("failure_layer"),
+            "diagnosis": provenance.get("diagnosis"),
+            "collector_blame": provenance.get("collector_blame"),
+            "db_provenance": {
+                "status": "NOT_READY",
+                "required_series_present": bool(provenance.get("required_series_present")),
+                "auditor_recompute_pass": False,
+                "common_interval_proven": bool(provenance.get("common_interval_proven")),
+                "counter_epoch_unchanged": bool(provenance.get("counter_epoch_unchanged")),
+                "detail": provenance,
             },
-            probe_root=probe_root,
-        )
+            "packet_status_unchanged": "PREPARED_NOT_AUTHORIZED",
+            "read_only_live_probe_pass": False,
+            "prepared_packet_sha256": prepared_sha_before,
+            "prepared_packet_byte_equal_after": True,
+            **_base_forbidden_posture(),
+        }
+        if reason == "live_interval_db_statement_timeout":
+            report["failure_layer"] = "db"
+            report["diagnosis"] = "db_contention"
+            report["collector_blame"] = False
+            report["statement_timeout_budget"] = provenance.get(
+                "statement_timeout_budget", STATEMENT_TIMEOUT
+            )
+        return emit(report, probe_root=probe_root)
 
     docker_plane = provenance["docker_plane"]
     observed, gaps = collect_and_validate_observation_planes(

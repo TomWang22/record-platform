@@ -48,7 +48,7 @@ function requireApi<K extends (typeof COMMITTED_APIS)[number]>(name: K): (...arg
 
 describe("A1.1 outbox provenance counters", () => {
   beforeAll(() => {
-    metrics.listOutboxMetricNames();
+    metrics.registerOutboxPublishMetrics();
   });
 
   it("exports the four committed-transition APIs", () => {
@@ -67,13 +67,19 @@ describe("A1.1 outbox provenance counters", () => {
   });
 
   it("registers all four provenance series in the Prometheus registry (exportable at zero)", async () => {
+    metrics.registerOutboxPublishMetrics();
+    const exported = await register.metrics();
     for (const series of PROVENANCE_SERIES) {
       const metric = register.getSingleMetric(series);
       expect(metric, `registry missing ${series}`).toBeTruthy();
+      expect(exported, `scrape text missing ${series}`).toContain(series);
       const v = await counterValue(series);
       expect(Number.isFinite(v)).toBe(true);
       expect(v).toBeGreaterThanOrEqual(0);
     }
+    // Legacy labeled counter stays registered for v2 tooling (samples appear after first label use).
+    expect(register.getSingleMetric("auction_monitor_outbox_db_ack_total")).toBeTruthy();
+    expect(exported).toMatch(/TYPE auction_monitor_outbox_db_ack /);
   });
 
   it("increments created_total by committed inserted row count only", async () => {

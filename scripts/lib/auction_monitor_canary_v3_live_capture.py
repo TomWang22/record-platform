@@ -46,7 +46,28 @@ POSTGRES_CONTAINER_NAME = DEFAULT_POSTGRES_COMPOSE_SERVICE
 KAFKA_BOOTSTRAP = "kafka-0.kafka.record-platform.svc.cluster.local:9093"
 KAFKA_COMMAND_CONFIG = "/etc/kafka/secrets/canary-readonly-describe.properties"
 STATEMENT_TIMEOUT = "5s"
+# Diagnostic-only path for exact full-table count — never on the 5s T0/T1 snapshot.
+DIAGNOSTIC_TOTAL_COUNT_TIMEOUT = "300s"
 AUCTION_MONITOR_METRICS_URL = "http://127.0.0.1:4008/metrics"
+
+# Attempt 003 blocker: full-table count(*) under 5s (~18s measured). Kept for RCA only.
+ATTEMPT_003_BLOCKING_TOTAL_COUNT_SQL = (
+    "SELECT count(*) FROM auction_monitor.outbox_events"
+)
+
+# 5s T0/T1 path after query rewrite: exact pending only; total via cheap reltuples estimate.
+DB_COUNTS_SNAPSHOT_5S_SQL = """
+SELECT json_build_object(
+  'pending', (SELECT count(*) FROM auction_monitor.outbox_events WHERE published=false),
+  'total_estimate', (
+    SELECT GREATEST(COALESCE(c.reltuples, 0), 0)::bigint
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'auction_monitor' AND c.relname = 'outbox_events'
+  ),
+  'db_now', now()::text
+)::text
+"""
 
 LIVE_CAPTURE_ACCEPTANCE_READY = False
 
@@ -159,11 +180,32 @@ def kafka_describe_template(
     )
 
 
-def build_readonly_psql_sql(select_sql: str) -> str:
+def kafka_readonly_describe_props_stat_template(
+    *, namespace: str = NAMESPACE
+) -> tuple[str, ...]:
+    """Allowlisted existence/readability check for the readonly describe props artifact."""
+    return (
+        "kubectl",
+        "-n",
+        namespace,
+        "exec",
+        "kafka-0",
+        "--",
+        "test",
+        "-r",
+        KAFKA_COMMAND_CONFIG,
+    )
+
+
+def build_readonly_psql_sql(
+    select_sql: str, *, statement_timeout: str = STATEMENT_TIMEOUT
+) -> str:
     body = select_sql.strip().rstrip(";")
     assert_readonly_sql_payload(body)
+    if not re.fullmatch(r"\d+s", statement_timeout):
+        raise ForbiddenLiveCaptureCommand("sql_statement_timeout_format_invalid")
     return (
-        f"BEGIN READ ONLY; SET LOCAL statement_timeout = '{STATEMENT_TIMEOUT}'; "
+        f"BEGIN READ ONLY; SET LOCAL statement_timeout = '{statement_timeout}'; "
         f"{body}; COMMIT;"
     )
 
@@ -188,7 +230,9 @@ def assert_readonly_sql_payload(sql: str) -> None:
         raise ForbiddenLiveCaptureCommand("sql_dollar_quoting_forbidden")
 
     if lower.startswith("begin read only"):
-        if f"set local statement_timeout = '{STATEMENT_TIMEOUT}'" not in lower:
+        if not re.search(
+            r"set\s+local\s+statement_timeout\s*=\s*'\d+s'", lower, flags=re.IGNORECASE
+        ):
             raise ForbiddenLiveCaptureCommand("sql_missing_statement_timeout")
         if not lower.rstrip(";").endswith("commit"):
             raise ForbiddenLiveCaptureCommand("sql_missing_commit")
@@ -221,7 +265,7 @@ def assert_readonly_sql_payload(sql: str) -> None:
 
 def _inner_select_from_readonly_tx(wrapped: str) -> str:
     match = re.search(
-        rf"BEGIN\s+READ\s+ONLY\s*;\s*SET\s+LOCAL\s+statement_timeout\s*=\s*'{re.escape(STATEMENT_TIMEOUT)}'\s*;\s*(.+?)\s*;\s*COMMIT\s*;?\s*$",
+        r"BEGIN\s+READ\s+ONLY\s*;\s*SET\s+LOCAL\s+statement_timeout\s*=\s*'\d+s'\s*;\s*(.+?)\s*;\s*COMMIT\s*;?\s*$",
         " ".join(wrapped.split()),
         flags=re.IGNORECASE | re.DOTALL,
     )
@@ -280,6 +324,10 @@ def _is_kubectl_logs_template(args: Sequence[str]) -> bool:
 
 def _is_kafka_describe_template(args: Sequence[str]) -> bool:
     return tuple(args) == kafka_describe_template()
+
+
+def _is_kafka_readonly_describe_props_stat_template(args: Sequence[str]) -> bool:
+    return tuple(args) == kafka_readonly_describe_props_stat_template()
 
 
 def kubectl_metrics_scrape_template(
@@ -580,6 +628,8 @@ def assert_readonly_command(
 
     if head == "kubectl":
         if _is_kafka_describe_template(args):
+            return
+        if _is_kafka_readonly_describe_props_stat_template(args):
             return
         if _is_kubectl_metrics_scrape_template(args):
             return
@@ -883,11 +933,130 @@ def _psql_json(
     pinned_container_id: str,
 ) -> dict[str, Any]:
     wrapped = build_readonly_psql_sql(sql)
+    try:
+        raw = _run(
+            runner,
+            "docker",
+            "exec",
+            pinned_container_id,
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            "postgres",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-t",
+            "-A",
+            "-c",
+            wrapped,
+            pinned_container_id=pinned_container_id,
+        ).strip()
+    except LiveCaptureError as exc:
+        if is_live_interval_db_statement_timeout(exc):
+            raise LiveCaptureError(
+                f"live_interval_db_statement_timeout:budget={STATEMENT_TIMEOUT}"
+            ) from exc
+        raise
+    # BEGIN/COMMIT may yield multiple cells; take last non-empty JSON object line.
+    lines = [ln.strip() for ln in raw.splitlines() if ln.strip() and ln.strip() not in {"BEGIN", "COMMIT", "SET"}]
+    if not lines:
+        return {}
+    payload = lines[-1]
+    return json.loads(payload)
+
+
+_STATEMENT_TIMEOUT_RE = re.compile(
+    r"canceling statement due to statement timeout",
+    re.IGNORECASE,
+)
+
+
+def is_live_interval_db_statement_timeout(exc: BaseException | str) -> bool:
+    """True when a T0/T1 5s snapshot was canceled by Postgres statement_timeout."""
+    text = str(exc)
+    if "live_interval_db_statement_timeout" in text:
+        return True
+    return bool(_STATEMENT_TIMEOUT_RE.search(text))
+
+
+def capture_db_counts_snapshot(
+    *,
+    runner: CommandRunner,
+    docker_pin: DockerExecutionPlanePin,
+    label: str,
+    captured_at_utc: str,
+    verify_pin: bool = True,
+) -> dict[str, Any]:
+    """Read-only T0/T1 outbox counts under STATEMENT_TIMEOUT (5s).
+
+    Query rewrite (db_rca): keep exact ``pending`` count; do **not** run full-table
+    ``count(*)`` on the 5s path (attempt 003 blocker ~18s). ``total`` is filled from
+    ``pg_class.reltuples`` as an estimate and must not drive equation terms.
+    """
+    if verify_pin:
+        verify_docker_execution_plane(docker_pin, runner=runner)
+    try:
+        counts = _psql_json(
+            runner,
+            DB_COUNTS_SNAPSHOT_5S_SQL,
+            pinned_container_id=docker_pin.container_id,
+        )
+    except LiveCaptureError as exc:
+        if is_live_interval_db_statement_timeout(exc):
+            raise LiveCaptureError(
+                f"live_interval_db_statement_timeout:label={label}:budget={STATEMENT_TIMEOUT}"
+            ) from exc
+        raise
+    pending = int(counts["pending"])
+    total_estimate = int(counts["total_estimate"])
+    return {
+        "label": label,
+        "captured_at_utc": captured_at_utc,
+        "db_now": counts.get("db_now"),
+        "pending": pending,
+        "total": total_estimate,
+        "total_kind": "estimate_reltuples",
+        "total_exact": False,
+        # Do not derive published_true from an estimate — equation uses pending only.
+        "published_true": None,
+        "published_true_kind": "not_derived_from_estimate",
+        "docker_pin": {
+            "container_id": docker_pin.container_id,
+            "container_name": docker_pin.container_name,
+            "docker_context": docker_pin.docker_context,
+            "image_digest": docker_pin.image_digest,
+        },
+        "read_only": True,
+        "capture_mode": "live_readonly",
+        "snapshot_query_rewrite": "pending_exact_total_estimate_reltuples",
+        "excluded_from_5s_path": ATTEMPT_003_BLOCKING_TOTAL_COUNT_SQL,
+    }
+
+
+def capture_db_total_count_diagnostic(
+    *,
+    runner: CommandRunner,
+    docker_pin: DockerExecutionPlanePin,
+    captured_at_utc: str,
+    verify_pin: bool = True,
+    statement_timeout: str = DIAGNOSTIC_TOTAL_COUNT_TIMEOUT,
+) -> dict[str, Any]:
+    """Separate diagnostic path for exact full-table count(*) — not T0/T1.
+
+    Uses a long timeout. Never call from the 5s probe snapshot path.
+    """
+    if verify_pin:
+        verify_docker_execution_plane(docker_pin, runner=runner)
+    wrapped = build_readonly_psql_sql(
+        ATTEMPT_003_BLOCKING_TOTAL_COUNT_SQL,
+        statement_timeout=statement_timeout,
+    )
     raw = _run(
         runner,
         "docker",
         "exec",
-        pinned_container_id,
+        docker_pin.container_id,
         "psql",
         "-U",
         "postgres",
@@ -899,53 +1068,30 @@ def _psql_json(
         "-A",
         "-c",
         wrapped,
-        pinned_container_id=pinned_container_id,
+        pinned_container_id=docker_pin.container_id,
     ).strip()
-    # BEGIN/COMMIT may yield multiple cells; take last non-empty JSON object line.
-    lines = [ln.strip() for ln in raw.splitlines() if ln.strip() and ln.strip() not in {"BEGIN", "COMMIT", "SET"}]
+    lines = [
+        ln.strip()
+        for ln in raw.splitlines()
+        if ln.strip() and ln.strip() not in {"BEGIN", "COMMIT", "SET"}
+    ]
     if not lines:
-        return {}
-    payload = lines[-1]
-    return json.loads(payload)
-
-
-def capture_db_counts_snapshot(
-    *,
-    runner: CommandRunner,
-    docker_pin: DockerExecutionPlanePin,
-    label: str,
-    captured_at_utc: str,
-    verify_pin: bool = True,
-) -> dict[str, Any]:
-    if verify_pin:
-        verify_docker_execution_plane(docker_pin, runner=runner)
-    counts_q = """
-SELECT json_build_object(
-  'pending', (SELECT count(*) FROM auction_monitor.outbox_events WHERE published=false),
-  'total', (SELECT count(*) FROM auction_monitor.outbox_events),
-  'db_now', now()::text
-)::text
-"""
-    counts = _psql_json(
-        runner, counts_q, pinned_container_id=docker_pin.container_id
-    )
-    pending = int(counts["pending"])
-    total = int(counts["total"])
+        raise LiveCaptureError("diagnostic_total_count_empty")
+    total = int(lines[-1])
     return {
-        "label": label,
         "captured_at_utc": captured_at_utc,
-        "db_now": counts.get("db_now"),
-        "pending": pending,
-        "total": total,
-        "published_true": total - pending,
+        "total_exact": total,
+        "total_kind": "exact_count_star",
+        "statement_timeout": statement_timeout,
+        "sql": ATTEMPT_003_BLOCKING_TOTAL_COUNT_SQL,
+        "path": "diagnostic_not_t0_t1",
+        "read_only": True,
         "docker_pin": {
             "container_id": docker_pin.container_id,
             "container_name": docker_pin.container_name,
             "docker_context": docker_pin.docker_context,
             "image_digest": docker_pin.image_digest,
         },
-        "read_only": True,
-        "capture_mode": "live_readonly",
     }
 
 
@@ -1664,12 +1810,28 @@ def build_fixture_db_provenance(
     )
 
 
+def assert_kafka_readonly_describe_props_present(
+    *,
+    runner: CommandRunner = default_command_runner,
+    namespace: str = NAMESPACE,
+) -> None:
+    """Fail closed if the allowlisted readonly describe properties artifact is missing."""
+    args = kafka_readonly_describe_props_stat_template(namespace=namespace)
+    try:
+        _run(runner, *args)
+    except LiveCaptureError as exc:
+        raise LiveCaptureError(
+            f"kafka_readonly_describe_props_missing_or_unreadable:{KAFKA_COMMAND_CONFIG}:{exc}"
+        ) from exc
+
+
 def describe_topic_leaders(
     *,
     runner: CommandRunner = default_command_runner,
     namespace: str = NAMESPACE,
     topic: str = TOPIC,
 ) -> tuple[str, dict[int, int]]:
+    assert_kafka_readonly_describe_props_present(runner=runner, namespace=namespace)
     args = kafka_describe_template(namespace=namespace, topic=topic)
     out = _run(runner, *args)
     leaders: dict[int, int] = {}
@@ -1684,6 +1846,20 @@ def describe_topic_leaders(
                 continue
     if not leaders:
         raise LiveCaptureError("topic_leaders_unparsed")
+    expected = set(range(EXPECTED_AUCTION_MONITOR_TOPIC_PARTITIONS))
+    actual = set(leaders.keys())
+    if not expected.issubset(actual):
+        raise LiveCaptureError(
+            f"leader_coverage_incomplete:missing={sorted(expected - actual)}:"
+            f"actual={sorted(actual)}"
+        )
+    for partition, broker in leaders.items():
+        if int(partition) in expected and int(broker) not in VALID_KAFKA_BROKER_IDS:
+            raise LiveCaptureError(
+                f"leader_broker_out_of_range:partition={partition}:broker={broker}"
+            )
+    # Keep only the expected partition denominator for probe validation.
+    leaders = {p: leaders[p] for p in sorted(expected)}
     return out, leaders
 
 
@@ -2358,6 +2534,8 @@ __all__ = [
     "assert_readonly_sql_payload",
     "build_readonly_psql_sql",
     "kafka_describe_template",
+    "kafka_readonly_describe_props_stat_template",
+    "assert_kafka_readonly_describe_props_present",
     "default_command_runner",
     "capture_runtime_pin",
     "capture_observability_snapshot",
@@ -2366,6 +2544,11 @@ __all__ = [
     "capture_docker_execution_plane",
     "verify_docker_execution_plane",
     "capture_db_counts_snapshot",
+    "capture_db_total_count_diagnostic",
+    "DB_COUNTS_SNAPSHOT_5S_SQL",
+    "ATTEMPT_003_BLOCKING_TOTAL_COUNT_SQL",
+    "is_live_interval_db_statement_timeout",
+    "STATEMENT_TIMEOUT",
     "compute_database_equation_terms",
     "REQUIRED_PROVENANCE_COUNTER_SERIES",
     "parse_prometheus_exposition",

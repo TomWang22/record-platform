@@ -5,10 +5,10 @@
   "example_or_prepared_only": true,
   "expected_runtime_sha": "UNSET_PENDING_LIVE_ARM",
   "adapter_source_hashes": {
-    "production_adapters_module": "976e46d98ba90b4e4f0d5b17be6cbc7ccb730270e114a87948005f22f4bcccd1",
-    "live_capture_module": "15a71c2559aac85d838d50891bfef68775f02e1f7072db1d064edfd2b7548499",
+    "production_adapters_module": "8962240e660d1a8ef01f7a08aef40b99ea06458259169a0ef723e58f6e675b4d",
+    "live_capture_module": "4c2777dd535b2448f575211a7d01a7697d3b68029af741058e4e650bb8c8c10f",
     "orchestrator_module": "8577a38848a8ca7390200230aa59fd44303d8e01092178579d29aa988b317d11",
-    "trace_lib_module": "42f39a15bf40dd2bab349d6dcc45b9499a5518e608504ccd131390e8d8fb989f",
+    "trace_lib_module": "2e9ab791cb19ec2c4ca5ad3df2448ec4f82098d48cafebf16219581ded42951a",
     "final_root_auditor": "f7ef81f84008ce7df152ebc38cf694b39edc822dca2d73e571deb0e58a026c7c",
     "runner_module": "10d6f90ccaf4dc1d616e07bbb097fd0030cae448cc2ff6acbdd1d86ed06c6eaa"
   },

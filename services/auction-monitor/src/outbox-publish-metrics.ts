@@ -266,9 +266,18 @@ export function observeBrokerAckToDbAckSeconds(seconds: number): void {
   brokerAckToDbAck!.observe(seconds);
 }
 
+/**
+ * Eagerly register all outbox publish counters (including provenance series at 0).
+ * Call at process boot and before /metrics so scrapes always export the four
+ * exact provenance series even before any committed transition.
+ */
+export function registerOutboxPublishMetrics(): void {
+  ensure();
+}
+
 /** Test helper: metric names registered by this module. */
 export function listOutboxMetricNames(): string[] {
-  ensure();
+  registerOutboxPublishMetrics();
   return [
     "auction_monitor_outbox_selected_total",
     "auction_monitor_outbox_produce_attempt_total",

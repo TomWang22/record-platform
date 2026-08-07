@@ -286,6 +286,7 @@ class ProductionAdapterBundle:
 
     def kafka_leader_snapshot(self) -> Mapping[str, Any]:
         self._assert_readonly_capture("kafka_leader_snapshot")
+        # Readonly describe props must exist at the allowlisted path before describe.
         now = utc_now()
         return capture_leader_snapshot(
             runner=self.capture.runner,

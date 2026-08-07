@@ -12,7 +12,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 REPO_DEFAULT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_DEFAULT / "scripts" / "lib"))
@@ -128,6 +128,43 @@ def _verify_sidecar(path: Path, failures: list[str], label: str) -> str | None:
     return actual
 
 
+def _load_expected_summary(path: Path, failures: list[str]) -> dict[str, Any] | None:
+    if not path.is_file():
+        failures.append("expected_summary:artifact_missing")
+        return None
+    try:
+        line = path.read_text(encoding="utf-8").splitlines()[0]
+        doc = json.loads(line)
+    except (OSError, json.JSONDecodeError, IndexError):
+        failures.append("expected_summary:malformed")
+        return None
+    if not isinstance(doc, dict):
+        failures.append("expected_summary:json_not_object")
+        return None
+    shape = doc.get("expected_if_db_busy")
+    if not isinstance(shape, dict) or not shape:
+        failures.append("expected_summary:expected_if_db_busy_missing")
+        return None
+    return shape
+
+
+def _assert_expected_db_busy_shape(
+    probe: Mapping[str, Any],
+    shape: Mapping[str, Any],
+    failures: list[str],
+) -> None:
+    """When probe claims the pinned DB-busy blocker, require exact field match.
+
+    DB-contention archives may only pass with collector_blame=false (and the
+    rest of the pinned expected_if_db_busy shape).
+    """
+    if probe.get("blocker") != shape.get("blocker"):
+        return
+    for key, want in shape.items():
+        if probe.get(key) != want:
+            failures.append(f"expected_summary:field_drift:{key}")
+
+
 def audit_live_probe_archive(
     *,
     probe_path: Path,
@@ -135,6 +172,7 @@ def audit_live_probe_archive(
     prepared_packet_path: Path | None = None,
     prepared_sha_before: str | None = None,
     require_prepared_for_pass: bool = True,
+    expected_summary_path: Path | None = None,
 ) -> dict[str, Any]:
     failures: list[str] = []
 
@@ -186,6 +224,16 @@ def audit_live_probe_archive(
             failures.append(f"probe:forbidden_true:{key}")
         if probed.get(key) is True:
             failures.append(f"probed:forbidden_true:{key}")
+
+    # DB-contention timeout must never be archived as collector failure.
+    if probe.get("blocker") == "live_interval_db_statement_timeout":
+        if probe.get("collector_blame") is not False:
+            failures.append("probe:db_timeout_collector_blame_not_false")
+
+    if expected_summary_path is not None:
+        shape = _load_expected_summary(expected_summary_path, failures)
+        if shape is not None:
+            _assert_expected_db_busy_shape(probe, shape, failures)
 
     # Option A: PROBED required for every terminal archive (including fail-closed).
     if probed.get("status") != "PREPARED_NOT_AUTHORIZED":
@@ -277,6 +325,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--prepared-sha-before", type=str, default=None)
     parser.add_argument(
+        "--expected-summary",
+        type=Path,
+        default=None,
+        help=(
+            "Optional one-line EXPECTED.jsonl with expected_if_db_busy. "
+            "When probe.blocker matches, require exact field match "
+            "(collector_blame must stay false for DB contention)."
+        ),
+    )
+    parser.add_argument(
         "--out",
         type=Path,
         default=REPO_DEFAULT
@@ -291,6 +349,7 @@ def main(argv: list[str] | None = None) -> int:
             probed_packet_path=args.probed_packet,
             prepared_packet_path=args.prepared_packet,
             prepared_sha_before=args.prepared_sha_before,
+            expected_summary_path=args.expected_summary,
         )
     except Exception as exc:  # noqa: BLE001 — absolute fail-closed
         report = _base_report(failures=[f"auditor_internal_error:{type(exc).__name__}:{exc}"])

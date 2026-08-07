@@ -28,7 +28,7 @@ async function counterValue(name: string, labels?: Record<string, string>): Prom
 
 describe("A1.1 committed-transition wiring", () => {
   beforeAll(() => {
-    metrics.listOutboxMetricNames();
+    metrics.registerOutboxPublishMetrics();
   });
 
   it("does not increment created_total when COMMIT fails after outbox insert", async () => {

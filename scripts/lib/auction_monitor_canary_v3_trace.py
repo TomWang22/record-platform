@@ -9,6 +9,7 @@ import os
 import random
 import socket
 import ssl
+import subprocess
 import tempfile
 import time
 import urllib.error
@@ -22,6 +23,9 @@ from urllib.parse import urlparse
 JAEGER_BASE_LOCKED = "https://jaeger.record-platform.test/jaeger"
 JAEGER_HOSTNAME_LOCKED = "jaeger.record-platform.test"
 METALLB_IP_LOCKED = "192.168.64.245"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+RP_DEV_ROOT_CA_PEM = _REPO_ROOT / "certs" / "dev-root.pem"
+RP_DEV_INTERMEDIATE_PEM = _REPO_ROOT / "certs" / "dev-intermediate.pem"
 POLL_MAX_WALL_SECONDS_DEFAULT = 90
 HTTP_TIMEOUT_CAP_DEFAULT = 30.0
 BACKOFF_INITIAL_MS = 250
@@ -35,6 +39,141 @@ STABILITY_SCHEMA = "canary-v3-observability-stability/v1"
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _sha256_der(der: bytes) -> str:
+    return hashlib.sha256(der).hexdigest()
+
+
+def _pem_file_der_sha256(path: Path) -> str:
+    if not path.is_file():
+        raise FileNotFoundError(f"tls_ca_missing:{path}")
+    der = subprocess.check_output(
+        ["openssl", "x509", "-in", str(path), "-outform", "DER"],
+        stderr=subprocess.DEVNULL,
+    )
+    return _sha256_der(der)
+
+
+def build_rp_ssl_context() -> ssl.SSLContext:
+    """Trust the Record Platform dev root only — never system/fallback trust alone."""
+    if not RP_DEV_ROOT_CA_PEM.is_file():
+        raise FileNotFoundError(f"tls_ca_missing:{RP_DEV_ROOT_CA_PEM}")
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.verify_mode = ssl.CERT_REQUIRED
+    ctx.check_hostname = True
+    ctx.load_verify_locations(cafile=str(RP_DEV_ROOT_CA_PEM))
+    return ctx
+
+
+def inspect_jaeger_query_plane_tls(host: str, port: int) -> dict[str, Any]:
+    """Exact TLS verify for the locked Jaeger query hostname.
+
+    Fail closed: verification must be VERIFIED and leaf/intermediate/root
+    fingerprints must all be present. No localhost / port-forward path.
+    """
+    if host != JAEGER_HOSTNAME_LOCKED:
+        return {
+            "sni_hostname": host,
+            "leaf_sha256": None,
+            "intermediate_sha256": None,
+            "root_sha256": None,
+            "certificate_path_verification": "FAILED",
+            "error": "sni_hostname_not_locked",
+        }
+
+    try:
+        ctx = build_rp_ssl_context()
+        with socket.create_connection((host, port), timeout=10) as raw:
+            with ctx.wrap_socket(raw, server_hostname=host) as connection:
+                leaf = connection.getpeercert(binary_form=True) or b""
+                if not leaf:
+                    raise ssl.SSLError("peer_leaf_missing")
+                leaf_fp = _sha256_der(leaf)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "sni_hostname": host,
+            "leaf_sha256": None,
+            "intermediate_sha256": None,
+            "root_sha256": None,
+            "certificate_path_verification": "FAILED",
+            "error": f"{type(exc).__name__}:{exc}",
+        }
+
+    # Peer chain via openssl (leaf + intermediates presented by server).
+    try:
+        out = subprocess.check_output(
+            [
+                "openssl",
+                "s_client",
+                "-connect",
+                f"{host}:{port}",
+                "-servername",
+                host,
+                "-showcerts",
+            ],
+            input=b"",
+            stderr=subprocess.STDOUT,
+            timeout=15,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "sni_hostname": host,
+            "leaf_sha256": leaf_fp,
+            "intermediate_sha256": None,
+            "root_sha256": None,
+            "certificate_path_verification": "FAILED",
+            "error": f"chain_capture_failed:{type(exc).__name__}:{exc}",
+        }
+
+    chain_fps: list[str] = []
+    current: list[str] = []
+    for line in out.decode(errors="ignore").splitlines():
+        if "BEGIN CERTIFICATE" in line:
+            current = [line]
+        elif current:
+            current.append(line)
+            if "END CERTIFICATE" in line:
+                pem = ("\n".join(current) + "\n").encode()
+                der = subprocess.check_output(
+                    ["openssl", "x509", "-outform", "DER"],
+                    input=pem,
+                    stderr=subprocess.DEVNULL,
+                )
+                chain_fps.append(_sha256_der(der))
+                current = []
+
+    intermediate_fp = chain_fps[1] if len(chain_fps) >= 2 else None
+    try:
+        root_fp = _pem_file_der_sha256(RP_DEV_ROOT_CA_PEM)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "sni_hostname": host,
+            "leaf_sha256": leaf_fp,
+            "intermediate_sha256": intermediate_fp,
+            "root_sha256": None,
+            "certificate_path_verification": "FAILED",
+            "error": f"root_fingerprint_failed:{type(exc).__name__}:{exc}",
+        }
+
+    if not leaf_fp or not intermediate_fp or not root_fp:
+        return {
+            "sni_hostname": host,
+            "leaf_sha256": leaf_fp,
+            "intermediate_sha256": intermediate_fp,
+            "root_sha256": root_fp,
+            "certificate_path_verification": "FAILED",
+            "error": "fingerprint_missing",
+        }
+
+    return {
+        "sni_hostname": host,
+        "leaf_sha256": leaf_fp,
+        "intermediate_sha256": intermediate_fp,
+        "root_sha256": root_fp,
+        "certificate_path_verification": "VERIFIED",
+        "error": None,
+    }
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -163,7 +302,8 @@ def default_http_fetch(
     started = time.perf_counter()
     request = urllib.request.Request(url, headers={"Accept": "application/json"})
     try:
-        with urllib.request.urlopen(request, context=ssl_context, timeout=timeout_s) as response:
+        ctx = ssl_context if ssl_context is not None else build_rp_ssl_context()
+        with urllib.request.urlopen(request, context=ctx, timeout=timeout_s) as response:
             return {
                 "http_status": int(response.status),
                 "body": response.read(),
@@ -380,28 +520,20 @@ def build_query_plane_preflight(
     dns_ips = resolve(JAEGER_HOSTNAME_LOCKED)
     stage1_pass = dns_ips.count(METALLB_IP_LOCKED) == 1
 
-    def inspect(host: str, port: int) -> Mapping[str, Any]:
-        context = ssl.create_default_context()
-        with socket.create_connection((host, port), timeout=10) as raw:
-            with context.wrap_socket(raw, server_hostname=host) as connection:
-                leaf = connection.getpeercert(binary_form=True) or b""
-                return {
-                    "sni_hostname": host,
-                    "leaf_sha256": hashlib.sha256(leaf).hexdigest() if leaf else None,
-                    "intermediate_sha256": None,
-                    "root_sha256": None,
-                    "certificate_path_verification": "VERIFIED",
-                }
-
-    tls = dict((tls_inspect_fn or inspect)(JAEGER_HOSTNAME_LOCKED, 443))
+    tls = dict((tls_inspect_fn or inspect_jaeger_query_plane_tls)(JAEGER_HOSTNAME_LOCKED, 443))
     fingerprint_matches = {
         "leaf": tls.get("leaf_sha256") == pin.leaf_sha256,
         "intermediate": tls.get("intermediate_sha256") == pin.intermediate_sha256,
         "root": tls.get("root_sha256") == pin.root_sha256,
     }
+    fingerprints_present = all(
+        bool(tls.get(key)) and not str(tls.get(key)).startswith("UNSET")
+        for key in ("leaf_sha256", "intermediate_sha256", "root_sha256")
+    )
     stage2_pass = (
         tls.get("sni_hostname") == JAEGER_HOSTNAME_LOCKED
         and tls.get("certificate_path_verification") == "VERIFIED"
+        and fingerprints_present
         and all(fingerprint_matches.values())
     )
     if api_health_fn:

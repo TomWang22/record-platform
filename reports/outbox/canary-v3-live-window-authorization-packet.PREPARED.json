@@ -6,7 +6,7 @@
   "expected_runtime_sha": "UNSET_PENDING_LIVE_ARM",
   "adapter_source_hashes": {
     "production_adapters_module": "976e46d98ba90b4e4f0d5b17be6cbc7ccb730270e114a87948005f22f4bcccd1",
-    "live_capture_module": "98cdb0abdbba1ec3e1e8c458a4cac0a9d3eee0d847cc1f901a742333fe24d0ad",
+    "live_capture_module": "306b8b57f280893b7db7589b92a3e9fa0c3487db872bb142a0360e84fe25a6ec",
     "orchestrator_module": "8577a38848a8ca7390200230aa59fd44303d8e01092178579d29aa988b317d11",
     "trace_lib_module": "42f39a15bf40dd2bab349d6dcc45b9499a5518e608504ccd131390e8d8fb989f",
     "final_root_auditor": "f7ef81f84008ce7df152ebc38cf694b39edc822dca2d73e571deb0e58a026c7c",

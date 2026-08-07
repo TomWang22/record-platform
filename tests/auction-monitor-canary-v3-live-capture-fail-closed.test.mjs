@@ -236,8 +236,10 @@ pin = DockerExecutionPlanePin(
     colima_profile="default",
     docker_host="unix:///tmp/colima-test.sock",
     docker_context="colima",
-    container_id="cid123",
-    container_name="postgres-auction-monitor-core",
+    compose_project="record-platform",
+    compose_service="postgres-auction-monitor-core",
+    container_id="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    container_name="record-platform-postgres-auction-monitor-core-1",
     image_digest="sha256:pg",
 )
 session = LiveReadonlyCaptureSession(
@@ -292,11 +294,17 @@ expect_live("partial_container_ready", lambda: capture_observability_snapshot(
 def docker_runner(*args, **kwargs):
     if args[:3] == ("docker", "context", "show"):
         return "wrong-context\\n"
+    if args[:3] == ("docker", "ps", "--quiet"):
+        return "bbbbbbbbbbbb\\n"
     if args[0] == "docker" and args[1] == "inspect":
         return json.dumps({
-            "Id": "othercid",
-            "Name": "/postgres-auction-monitor-core",
+            "Id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "Name": "/record-platform-postgres-auction-monitor-core-1",
             "Image": "sha256:other",
+            "Config": {"Labels": {
+                "com.docker.compose.project": "record-platform",
+                "com.docker.compose.service": "postgres-auction-monitor-core",
+            }},
         })
     raise AssertionError(args)
 expect_live("wrong_docker_plane", lambda: verify_docker_execution_plane(pin, runner=docker_runner))

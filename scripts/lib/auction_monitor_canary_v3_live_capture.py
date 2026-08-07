@@ -25,7 +25,24 @@ from typing import Any, Callable, Mapping, Sequence
 TOPIC = "dev.auction_monitor.events"
 NAMESPACE = "record-platform"
 OBSERVABILITY_NS = "observability"
-POSTGRES_CONTAINER_NAME = "postgres-auction-monitor-core"
+COMPOSE_PROJECT_DEFAULT = "record-platform"
+# Logical Compose service names (durable). Never use these as docker inspect targets.
+FROZEN_POSTGRES_COMPOSE_SERVICES: tuple[str, ...] = (
+    "postgres-records",
+    "postgres-messaging",
+    "postgres-listings",
+    "postgres-shopping",
+    "postgres-auth",
+    "postgres-auction-monitor-core",
+    "postgres-analytics",
+    "postgres-python-ai",
+    "postgres-notification",
+    "postgres-trust",
+    "postgres-media",
+)
+DEFAULT_POSTGRES_COMPOSE_SERVICE = "postgres-auction-monitor-core"
+# Legacy alias — logical Compose service only; not a Docker object name.
+POSTGRES_CONTAINER_NAME = DEFAULT_POSTGRES_COMPOSE_SERVICE
 KAFKA_BOOTSTRAP = "kafka-0.kafka.record-platform.svc.cluster.local:9093"
 KAFKA_COMMAND_CONFIG = "/etc/kafka/secrets/canary-readonly-describe.properties"
 STATEMENT_TIMEOUT = "5s"
@@ -47,6 +64,10 @@ EXPECTED_OBSERVABILITY_PODS: Mapping[str, int] = {
 # Auction-monitor canary topic denominator (three-broker plane).
 EXPECTED_AUCTION_MONITOR_TOPIC_PARTITIONS = 3
 VALID_KAFKA_BROKER_IDS: frozenset[int] = frozenset({0, 1, 2})
+
+_CONTAINER_ID_RE = re.compile(r"^[0-9a-f]{12,64}$")
+_COMPOSE_LABEL_PROJECT_PREFIX = "label=com.docker.compose.project="
+_COMPOSE_LABEL_SERVICE_PREFIX = "label=com.docker.compose.service="
 
 _INDEPENDENT_TERM_KEYS = (
     "created_unpublished",
@@ -104,6 +125,8 @@ class DockerExecutionPlanePin:
     colima_profile: str
     docker_host: str
     docker_context: str
+    compose_project: str
+    compose_service: str
     container_id: str
     container_name: str
     image_digest: str
@@ -302,10 +325,36 @@ def _is_docker_context_show(args: Sequence[str]) -> bool:
     return list(args) == ["docker", "context", "show"]
 
 
-def _is_docker_inspect_postgres(args: Sequence[str]) -> bool:
+def _is_docker_ps_compose_label_discovery(args: Sequence[str]) -> bool:
+    """Allow only structured Compose-label discovery for frozen Postgres services."""
+    # docker ps --quiet
+    #   --filter label=com.docker.compose.project=<project>
+    #   --filter label=com.docker.compose.service=<service>
+    if list(args[:3]) != ["docker", "ps", "--quiet"]:
+        return False
+    if len(args) != 7:
+        return False
+    if args[3] != "--filter" or args[5] != "--filter":
+        return False
+    project_filter = args[4]
+    service_filter = args[6]
+    if not project_filter.startswith(_COMPOSE_LABEL_PROJECT_PREFIX):
+        return False
+    if not service_filter.startswith(_COMPOSE_LABEL_SERVICE_PREFIX):
+        return False
+    project = project_filter[len(_COMPOSE_LABEL_PROJECT_PREFIX) :]
+    service = service_filter[len(_COMPOSE_LABEL_SERVICE_PREFIX) :]
+    if project != COMPOSE_PROJECT_DEFAULT:
+        return False
+    if service not in FROZEN_POSTGRES_COMPOSE_SERVICES:
+        return False
+    return True
+
+
+def _is_docker_inspect_container_id(args: Sequence[str]) -> bool:
+    """Allow docker inspect of a hex container ID only — never a Compose service name."""
     if len(args) < 3 or args[0] != "docker" or args[1] != "inspect":
         return False
-    # Exact container name only (never substring docker ps discovery).
     cleaned: list[str] = []
     skip_next = False
     for arg in args[2:]:
@@ -318,7 +367,130 @@ def _is_docker_inspect_postgres(args: Sequence[str]) -> bool:
         if arg.startswith("--format="):
             continue
         cleaned.append(arg)
-    return cleaned == [POSTGRES_CONTAINER_NAME]
+    if len(cleaned) != 1:
+        return False
+    return bool(_CONTAINER_ID_RE.match(cleaned[0]))
+
+
+def compose_ps_discovery_argv(
+    *,
+    compose_project: str = COMPOSE_PROJECT_DEFAULT,
+    compose_service: str,
+) -> tuple[str, ...]:
+    if compose_project != COMPOSE_PROJECT_DEFAULT:
+        raise ForbiddenLiveCaptureCommand(
+            f"compose_project_not_allowlisted:{compose_project}"
+        )
+    if compose_service not in FROZEN_POSTGRES_COMPOSE_SERVICES:
+        raise ForbiddenLiveCaptureCommand(
+            f"compose_service_not_in_postgres_denominator:{compose_service}"
+        )
+    return (
+        "docker",
+        "ps",
+        "--quiet",
+        "--filter",
+        f"{_COMPOSE_LABEL_PROJECT_PREFIX}{compose_project}",
+        "--filter",
+        f"{_COMPOSE_LABEL_SERVICE_PREFIX}{compose_service}",
+    )
+
+
+def discover_compose_container(
+    *,
+    compose_project: str = COMPOSE_PROJECT_DEFAULT,
+    compose_service: str,
+    runner: CommandRunner | None = None,
+    colima_profile: str | None = None,
+    docker_host: str | None = None,
+    expected_docker_context: str | None = None,
+) -> DockerExecutionPlanePin:
+    """Resolve Compose service → exactly one container via labels; pin by inspect ID."""
+    active_runner: CommandRunner = runner if runner is not None else default_command_runner
+    if compose_service not in FROZEN_POSTGRES_COMPOSE_SERVICES:
+        raise LiveCaptureError(
+            f"compose_service_not_in_postgres_denominator:{compose_service}"
+        )
+    if compose_project != COMPOSE_PROJECT_DEFAULT:
+        raise LiveCaptureError(f"compose_project_unsupported:{compose_project}")
+
+    context = _run(active_runner, "docker", "context", "show").strip()
+    if not context:
+        raise LiveCaptureError("docker_context_missing")
+    if expected_docker_context is not None and context != expected_docker_context:
+        raise LiveCaptureError(
+            f"docker_context_mismatch:{context}!={expected_docker_context}"
+        )
+
+    host = docker_host if docker_host is not None else os.environ.get("DOCKER_HOST", "")
+    profile = (
+        colima_profile
+        if colima_profile is not None
+        else os.environ.get("COLIMA_PROFILE", "default")
+    )
+
+    ps_argv = compose_ps_discovery_argv(
+        compose_project=compose_project, compose_service=compose_service
+    )
+    ps_out = _run(active_runner, *ps_argv).strip()
+    ids = [line.strip() for line in ps_out.splitlines() if line.strip()]
+    # Also accept space-separated IDs on one line from some docker versions.
+    if len(ids) == 1 and " " in ids[0]:
+        ids = [part for part in ids[0].split() if part]
+    if len(ids) == 0:
+        raise LiveCaptureError("docker_compose_service_not_found")
+    if len(ids) > 1:
+        raise LiveCaptureError("docker_compose_service_ambiguous")
+    discovered_id = ids[0]
+    if not _CONTAINER_ID_RE.match(discovered_id):
+        raise LiveCaptureError(f"docker_compose_service_id_malformed:{discovered_id}")
+
+    raw = _run(
+        active_runner,
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .}}",
+        discovered_id,
+    ).strip()
+    try:
+        info = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise LiveCaptureError("docker_inspect_unparseable") from exc
+
+    container_id = str(info.get("Id") or "").strip()
+    name = str(info.get("Name") or "").lstrip("/")
+    image = str(info.get("Image") or "").strip()
+    config = info.get("Config") if isinstance(info.get("Config"), dict) else {}
+    labels = config.get("Labels") if isinstance(config.get("Labels"), dict) else {}
+    label_project = str(labels.get("com.docker.compose.project") or "")
+    label_service = str(labels.get("com.docker.compose.service") or "")
+
+    if not container_id or not name or not image:
+        raise LiveCaptureError("docker_execution_plane_incomplete")
+    if not container_id.startswith(discovered_id):
+        raise LiveCaptureError(
+            f"docker_container_id_mismatch:{container_id}!={discovered_id}"
+        )
+    if label_project != compose_project:
+        raise LiveCaptureError(
+            f"docker_compose_project_label_mismatch:{label_project}!={compose_project}"
+        )
+    if label_service != compose_service:
+        raise LiveCaptureError(
+            f"docker_compose_service_label_mismatch:{label_service}!={compose_service}"
+        )
+
+    return DockerExecutionPlanePin(
+        colima_profile=profile,
+        docker_host=host,
+        docker_context=context,
+        compose_project=compose_project,
+        compose_service=compose_service,
+        container_id=container_id,
+        container_name=name,
+        image_digest=image,
+    )
 
 
 def _is_docker_psql_template(
@@ -334,6 +506,10 @@ def _is_docker_psql_template(
     container_id = args[2]
     if pinned_container_id is not None and container_id != pinned_container_id:
         raise ForbiddenLiveCaptureCommand("docker_exec_container_pin_mismatch")
+    if not _CONTAINER_ID_RE.match(container_id) and pinned_container_id is None:
+        # Without a pin, still require hex-ish IDs (never compose service names).
+        if container_id in FROZEN_POSTGRES_COMPOSE_SERVICES:
+            raise ForbiddenLiveCaptureCommand("docker_exec_compose_service_name_forbidden")
     expected_prefix = [
         "docker",
         "exec",
@@ -396,7 +572,9 @@ def assert_readonly_command(
             raise ForbiddenLiveCaptureCommand("docker_entrypoint_forbidden")
         if _is_docker_context_show(args):
             return
-        if _is_docker_inspect_postgres(args):
+        if _is_docker_ps_compose_label_discovery(args):
+            return
+        if _is_docker_inspect_container_id(args):
             return
         if "exec" in args:
             if _is_docker_psql_template(args, pinned_container_id=pinned_container_id):
@@ -604,57 +782,40 @@ def capture_observability_snapshot(
 
 def capture_docker_execution_plane(
     *,
-    runner: CommandRunner = default_command_runner,
+    runner: CommandRunner | None = None,
     colima_profile: str | None = None,
     docker_host: str | None = None,
+    compose_project: str = COMPOSE_PROJECT_DEFAULT,
+    compose_service: str = DEFAULT_POSTGRES_COMPOSE_SERVICE,
 ) -> DockerExecutionPlanePin:
-    context = _run(runner, "docker", "context", "show").strip()
-    if not context:
-        raise LiveCaptureError("docker_context_missing")
-    host = docker_host if docker_host is not None else os.environ.get("DOCKER_HOST", "")
-    profile = (
-        colima_profile
-        if colima_profile is not None
-        else os.environ.get("COLIMA_PROFILE", "default")
-    )
-    raw = _run(
-        runner,
-        "docker",
-        "inspect",
-        "--format",
-        "{{json .}}",
-        POSTGRES_CONTAINER_NAME,
-    ).strip()
-    try:
-        info = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise LiveCaptureError("docker_inspect_unparseable") from exc
-    container_id = str(info.get("Id") or "").strip()
-    name = str(info.get("Name") or "").lstrip("/")
-    image = str(info.get("Image") or "").strip()
-    if name != POSTGRES_CONTAINER_NAME:
-        raise LiveCaptureError(f"docker_container_name_mismatch:{name}")
-    if not container_id or not image:
-        raise LiveCaptureError("docker_execution_plane_incomplete")
-    return DockerExecutionPlanePin(
-        colima_profile=profile,
-        docker_host=host,
-        docker_context=context,
-        container_id=container_id,
-        container_name=name,
-        image_digest=image,
+    active_runner: CommandRunner = runner if runner is not None else default_command_runner
+    return discover_compose_container(
+        compose_project=compose_project,
+        compose_service=compose_service,
+        runner=active_runner,
+        colima_profile=colima_profile,
+        docker_host=docker_host,
     )
 
 
 def verify_docker_execution_plane(
     pin: DockerExecutionPlanePin,
     *,
-    runner: CommandRunner = default_command_runner,
+    runner: CommandRunner | None = None,
 ) -> DockerExecutionPlanePin:
-    current = capture_docker_execution_plane(
-        runner=runner,
+    active_runner: CommandRunner = runner if runner is not None else default_command_runner
+    host_env = os.environ.get("DOCKER_HOST", pin.docker_host)
+    if host_env != pin.docker_host:
+        raise LiveCaptureError(
+            f"docker_host_mismatch:{host_env}!={pin.docker_host}"
+        )
+    current = discover_compose_container(
+        compose_project=pin.compose_project,
+        compose_service=pin.compose_service,
+        runner=active_runner,
         colima_profile=pin.colima_profile,
-        docker_host=os.environ.get("DOCKER_HOST", pin.docker_host),
+        docker_host=pin.docker_host,
+        expected_docker_context=pin.docker_context,
     )
     if current.docker_context != pin.docker_context:
         raise LiveCaptureError(
@@ -679,6 +840,14 @@ def verify_docker_execution_plane(
     if current.colima_profile != pin.colima_profile:
         raise LiveCaptureError(
             f"colima_profile_mismatch:{current.colima_profile}!={pin.colima_profile}"
+        )
+    if current.compose_project != pin.compose_project:
+        raise LiveCaptureError(
+            f"compose_project_mismatch:{current.compose_project}!={pin.compose_project}"
+        )
+    if current.compose_service != pin.compose_service:
+        raise LiveCaptureError(
+            f"compose_service_mismatch:{current.compose_service}!={pin.compose_service}"
         )
     return current
 
@@ -1055,6 +1224,8 @@ def docker_execution_plane_as_dict(pin: DockerExecutionPlanePin) -> dict[str, An
         "colima_profile": pin.colima_profile,
         "docker_host": pin.docker_host,
         "docker_context": pin.docker_context,
+        "compose_project": pin.compose_project,
+        "compose_service": pin.compose_service,
         "container_id": pin.container_id,
         "container_name": pin.container_name,
         "image_digest": pin.image_digest,
@@ -2148,6 +2319,9 @@ __all__ = [
     "NAMESPACE",
     "OBSERVABILITY_NS",
     "POSTGRES_CONTAINER_NAME",
+    "DEFAULT_POSTGRES_COMPOSE_SERVICE",
+    "FROZEN_POSTGRES_COMPOSE_SERVICES",
+    "COMPOSE_PROJECT_DEFAULT",
     "EXPECTED_OBSERVABILITY_PODS",
     "EXPECTED_AUCTION_MONITOR_TOPIC_PARTITIONS",
     "VALID_KAFKA_BROKER_IDS",
@@ -2163,6 +2337,8 @@ __all__ = [
     "default_command_runner",
     "capture_runtime_pin",
     "capture_observability_snapshot",
+    "discover_compose_container",
+    "compose_ps_discovery_argv",
     "capture_docker_execution_plane",
     "verify_docker_execution_plane",
     "capture_db_counts_snapshot",

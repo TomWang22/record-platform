@@ -38,6 +38,7 @@ const TRACK_A_SOURCE_FILES = [
   "scripts/ci/emit-denom-freeze.mjs",
   "scripts/ci/run-track-a-exact-sha-ci.mjs",
   "scripts/ci/verify-track-a-owner-preflight.mjs",
+  "scripts/ci/run-track-a-owner-readonly-probe.sh",
   "reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json",
 ];
 

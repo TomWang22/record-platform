@@ -1,0 +1,5 @@
+attempt=001
+probe_verdict=DB_PROVENANCE_NOT_READY
+prepared_sha=c658f7adbbe5250265031dcf5784574d169b7588c8eac878b51d42a8dbde192b
+source_sha=914c7e52fd0878d29e576d9a9fa3e055c4be8144
+note=fail-closed docker inspect used compose service name as container object

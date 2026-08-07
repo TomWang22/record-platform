@@ -1,0 +1,34 @@
+{
+  "a2_live_acceptance_ready": false,
+  "a2_live_implemented": true,
+  "cluster_mutation_attempted": false,
+  "db_provenance": {
+    "auditor_recompute_pass": false,
+    "common_interval_proven": false,
+    "counter_epoch_unchanged": false,
+    "detail": {
+      "auditor_recompute_pass": false,
+      "common_interval_proven": false,
+      "counter_epoch_unchanged": false,
+      "ready": false,
+      "reason": "live_interval_capture_error:LiveCaptureError:command_failed:docker:\nError: No such object: postgres-auction-monitor-core\n",
+      "required_series_present": false
+    },
+    "required_series_present": false,
+    "status": "NOT_READY"
+  },
+  "execution_authorized": false,
+  "live_capture_acceptance_ready": false,
+  "live_capture_armed_for_window": false,
+  "live_capture_implementations_enabled": true,
+  "live_window_authorized": false,
+  "outbox_rows_mutated": 0,
+  "packet_status_unchanged": "PREPARED_NOT_AUTHORIZED",
+  "prepared_packet_byte_equal_after": true,
+  "prepared_packet_sha256": "c658f7adbbe5250265031dcf5784574d169b7588c8eac878b51d42a8dbde192b",
+  "publisher_invocation_triggered": false,
+  "read_only_live_probe_pass": false,
+  "schema": "canary-v3-live-readonly-probe/v1",
+  "throughput_changed": false,
+  "verdict": "DB_PROVENANCE_NOT_READY"
+}

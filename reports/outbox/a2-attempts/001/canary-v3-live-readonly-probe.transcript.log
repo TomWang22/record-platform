@@ -1,0 +1,45 @@
+TRACK_A_MANUAL_READONLY_PROBE
+started_utc=2026-08-07T01:34:03Z
+head_sha=914c7e52fd0878d29e576d9a9fa3e055c4be8144
+origin_sha=914c7e52fd0878d29e576d9a9fa3e055c4be8144
+prepared_sha_before=c658f7adbbe5250265031dcf5784574d169b7588c8eac878b51d42a8dbde192b
+
+{
+  "schema": "canary-v3-live-readonly-probe/v1",
+  "verdict": "DB_PROVENANCE_NOT_READY",
+  "db_provenance": {
+    "status": "NOT_READY",
+    "required_series_present": false,
+    "auditor_recompute_pass": false,
+    "common_interval_proven": false,
+    "counter_epoch_unchanged": false,
+    "detail": {
+      "ready": false,
+      "reason": "live_interval_capture_error:LiveCaptureError:command_failed:docker:\nError: No such object: postgres-auction-monitor-core\n",
+      "auditor_recompute_pass": false,
+      "common_interval_proven": false,
+      "counter_epoch_unchanged": false,
+      "required_series_present": false
+    }
+  },
+  "packet_status_unchanged": "PREPARED_NOT_AUTHORIZED",
+  "read_only_live_probe_pass": false,
+  "prepared_packet_sha256": "c658f7adbbe5250265031dcf5784574d169b7588c8eac878b51d42a8dbde192b",
+  "prepared_packet_byte_equal_after": true,
+  "cluster_mutation_attempted": false,
+  "publisher_invocation_triggered": false,
+  "outbox_rows_mutated": 0,
+  "throughput_changed": false,
+  "live_window_authorized": false,
+  "execution_authorized": false,
+  "live_capture_acceptance_ready": false,
+  "live_capture_armed_for_window": false,
+  "live_capture_implementations_enabled": true,
+  "a2_live_implemented": true,
+  "a2_live_acceptance_ready": false
+}
+
+probe_exit_code=2
+prepared_sha_after=c658f7adbbe5250265031dcf5784574d169b7588c8eac878b51d42a8dbde192b
+prepared_byte_equal=true
+finished_utc=2026-08-07T01:34:06Z

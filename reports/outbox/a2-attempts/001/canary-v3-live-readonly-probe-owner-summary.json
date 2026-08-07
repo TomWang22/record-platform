@@ -1,0 +1,29 @@
+{
+  "source_sha": "914c7e52fd0878d29e576d9a9fa3e055c4be8144",
+  "probe_exit_code": 2,
+  "probe_verdict": "DB_PROVENANCE_NOT_READY",
+  "read_only_live_probe_pass": false,
+  "archive_auditor_exit_code": 0,
+  "archive_audit_verdict": "LIVE_PROBE_ARCHIVE_AUDIT_PASS",
+  "prepared_packet_byte_equal": true,
+  "probed_packet_status": "PREPARED_NOT_AUTHORIZED",
+  "probe_failures": [],
+  "audit_failures": [],
+  "runtime": {
+    "RP_SOURCE_SHA": null,
+    "image_digest": null,
+    "pod_uid": null,
+    "pod_name": null
+  },
+  "authorization": {
+    "live_window_authorized": false,
+    "canary_v3_execution_authorized": false,
+    "canary_v3_window_executed": false,
+    "finite_drain_experiment_armed": false,
+    "maintenance_quiesce_v2_created": false,
+    "gate5_ab_started": false,
+    "gate5_v10_created": false,
+    "gate6_authorized": false,
+    "production_approved": false
+  }
+}

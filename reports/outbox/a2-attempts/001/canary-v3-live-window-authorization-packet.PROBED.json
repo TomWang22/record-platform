@@ -1,0 +1,47 @@
+{
+  "adapter_source_hashes": {
+    "final_root_auditor": "f7ef81f84008ce7df152ebc38cf694b39edc822dca2d73e571deb0e58a026c7c",
+    "live_capture_module": "98cdb0abdbba1ec3e1e8c458a4cac0a9d3eee0d847cc1f901a742333fe24d0ad",
+    "orchestrator_module": "8577a38848a8ca7390200230aa59fd44303d8e01092178579d29aa988b317d11",
+    "production_adapters_module": "976e46d98ba90b4e4f0d5b17be6cbc7ccb730270e114a87948005f22f4bcccd1",
+    "runner_module": "10d6f90ccaf4dc1d616e07bbb097fd0030cae448cc2ff6acbdd1d86ed06c6eaa",
+    "trace_lib_module": "42f39a15bf40dd2bab349d6dcc45b9499a5518e608504ccd131390e8d8fb989f"
+  },
+  "example_or_prepared_only": true,
+  "expected_runtime_sha": "UNSET_PENDING_LIVE_ARM",
+  "live_capture_acceptance_ready": false,
+  "live_capture_armed_for_window": false,
+  "live_capture_implementations_enabled": true,
+  "live_window_authorized": false,
+  "notes": [
+    "This packet freezes adapter hashes and pins for a future live arm.",
+    "status PREPARED_NOT_AUTHORIZED does not authorize execution.",
+    "live_capture_implementations exist but LIVE_CAPTURE_ACCEPTANCE_READY=false.",
+    "LIVE_CAPTURE_ARMED_FOR_WINDOW remains false until an AUTHORIZED arm.",
+    "PROBED snapshot for terminal verdict DB_PROVENANCE_NOT_READY; status remains PREPARED_NOT_AUTHORIZED; not an authorization."
+  ],
+  "query_plane_pin": {
+    "hostname": "jaeger.record-platform.test",
+    "intermediate_sha256": "UNSET_PENDING_LIVE_QUERY_PLANE_INTERMEDIATE",
+    "jaeger_base": "https://jaeger.record-platform.test/jaeger",
+    "leaf_sha256": "UNSET_PENDING_LIVE_QUERY_PLANE_LEAF",
+    "metallb_ip": "192.168.64.245",
+    "root_sha256": "UNSET_PENDING_LIVE_QUERY_PLANE_ROOT"
+  },
+  "rollback_conditions": [
+    "restore_publisher_batch_25_interval_120s_on_any_acceptance_failure",
+    "never_mutate_historical_outbox_rows",
+    "never_forceFlush_without_separate_authorization",
+    "abort_window_on_jaeger_or_otel_restart_or_oom_growth",
+    "abort_window_on_runtime_pin_drift",
+    "abort_window_on_root_lease_loss_or_foreign_writer",
+    "leave_incomplete_root_immutable_never_retry_into_pass"
+  ],
+  "schema": "canary-v3-live-window-authorization-packet/v1",
+  "status": "PREPARED_NOT_AUTHORIZED",
+  "throughput_pin": {
+    "batch": 25,
+    "interval_seconds": 120,
+    "invocations": 30
+  }
+}

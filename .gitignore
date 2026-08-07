@@ -84,6 +84,7 @@ tmp/
 !reports/ci/track-a*.json
 !reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json
 !reports/outbox/canary-v3-manual-readonly-probe-command-packet.PREPARED.json
+!reports/outbox/a2-attempts/**/*.json
 
 !scripts/ai-platform/phase34-prompt-registry/
 !scripts/ai-platform/phase34-prompt-registry/**/*.json

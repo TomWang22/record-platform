@@ -1,0 +1,22 @@
+{
+  "a2_live_acceptance_ready": false,
+  "canary_v3_execution_authorized": false,
+  "canary_v3_window_executed": false,
+  "execution_authorized": false,
+  "failures": [],
+  "finite_drain_experiment_armed": false,
+  "gate5_ab_started": false,
+  "gate5_v10_created": false,
+  "gate6_authorized": false,
+  "live_capture_acceptance_ready": false,
+  "live_capture_armed_for_window": false,
+  "live_window_authorized": false,
+  "maintenance_quiesce_v2_created": false,
+  "note": "Archive audit PASS validates posture of archived artifacts only. It does not authorize canary-v3 or flip acceptance flags.",
+  "prepared_packet_byte_equal": true,
+  "probe_verdict": "DB_PROVENANCE_NOT_READY",
+  "production_approved": false,
+  "read_only_live_probe_pass": false,
+  "schema": "canary-v3-live-readonly-probe-archive-audit/v1",
+  "verdict": "LIVE_PROBE_ARCHIVE_AUDIT_PASS"
+}

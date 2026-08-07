@@ -13,7 +13,9 @@
     "test:analytics": "tsx scripts/test-analytics-comprehensive.ts",
     "test:load": "tsx scripts/load-test-analytics.ts",
     "test:stress": "tsx scripts/stress-test-analytics.ts",
-    "test:outbox-accounting": "vitest run src/__tests__/outbox-publish-accounting.test.ts"
+    "test:outbox-accounting": "vitest run src/__tests__/outbox-publish-accounting.test.ts",
+    "test:outbox-provenance-counters": "vitest run src/__tests__/outbox-provenance-counters.test.ts",
+    "test:outbox-provenance-wiring": "vitest run src/__tests__/outbox-provenance-wiring.test.ts"
   },
   "dependencies": {
     "@common/utils": "workspace:*",

@@ -1,0 +1,75 @@
+{
+  "schema": "canary-v3-manual-readonly-probe-command-packet/v1",
+  "status": "PREPARED_NOT_AUTHORIZED",
+  "purpose": "Owner-attended manual read-only probe only. Does not authorize canary-v3.",
+  "exact_command": {
+    "cwd": "<repo-root>",
+    "argv": [
+      "python3",
+      "scripts/run-auction-monitor-canary-v3-readonly-live-probe.py",
+      "--mode",
+      "live",
+      "--packet",
+      "reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json",
+      "--out",
+      "reports/outbox/canary-v3-live-readonly-probe.json",
+      "--probed-packet-out",
+      "reports/outbox/canary-v3-live-window-authorization-packet.PROBED.json"
+    ],
+    "shell_one_liner": "python3 scripts/run-auction-monitor-canary-v3-readonly-live-probe.py --mode live --packet reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json --out reports/outbox/canary-v3-live-readonly-probe.json --probed-packet-out reports/outbox/canary-v3-live-window-authorization-packet.PROBED.json"
+  },
+  "preflight": {
+    "require_prepared_packet": "reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json",
+    "require_prepared_status": "PREPARED_NOT_AUTHORIZED",
+    "freeze_prepared_sha256_before_run": true,
+    "require_track_a_meta_pass": "reports/ci/track-a-meta-auditor-result.json",
+    "require_exact_source_sha": "git rev-parse HEAD must match CI exact_sha AND origin/main",
+    "require_owner_preflight_command": "node scripts/ci/verify-track-a-owner-preflight.mjs",
+    "require_track_a_sources_committed_and_clean": true,
+    "do_not_run_probe_if_preflight_fails": true
+  },
+  "post_run_independent_audit": {
+    "command": "python3 scripts/audit-canary-v3-live-readonly-probe-archive.py --probe reports/outbox/canary-v3-live-readonly-probe.json --probed-packet reports/outbox/canary-v3-live-window-authorization-packet.PROBED.json --prepared-packet reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json --prepared-sha-before <PREPARED_SHA_BEFORE>",
+    "required_verdict": "LIVE_PROBE_ARCHIVE_AUDIT_PASS",
+    "does_not_authorize_canary_v3": true
+  },
+  "forbidden_argv_additions": [
+    "any flag that starts the canary window",
+    "any publisher_tick invocation",
+    "any AUTHORIZED packet path",
+    "any throughput override"
+  ],
+  "required_posture_even_on_pass": {
+    "live_window_authorized": false,
+    "canary_v3_execution_authorized": false,
+    "canary_v3_window_executed": false,
+    "finite_drain_experiment_armed": false,
+    "maintenance_quiesce_v2_created": false,
+    "gate5_ab_started": false,
+    "gate5_v10_created": false,
+    "gate6_authorized": false,
+    "production_approved": false,
+    "live_capture_acceptance_ready": false,
+    "a2_live_acceptance_ready": false,
+    "packet_status_unchanged": "PREPARED_NOT_AUTHORIZED"
+  },
+  "archive_after_run": [
+    "reports/outbox/canary-v3-live-readonly-probe.json",
+    "reports/outbox/canary-v3-live-readonly-probe.json.sha256",
+    "reports/outbox/canary-v3-live-window-authorization-packet.PROBED.json",
+    "reports/outbox/canary-v3-live-window-authorization-packet.PROBED.json.sha256",
+    "command transcript (stdout/stderr)",
+    "exact source SHA",
+    "auction-monitor runtime SHA / image digest / pod UID"
+  ],
+  "owner_checklist": "docs/superpowers/checklists/2026-08-06-track-a-owner-review-checklist.md",
+  "notes": [
+    "CI harness PASS is not operational acceptance.",
+    "A successful READ_ONLY_LIVE_PROBE_PASS still requires independent audit before any acceptance flag change.",
+    "A separate owner action is required to create an AUTHORIZED canary-v3 execution packet."
+  ],
+  "execution_authorized": false,
+  "live_window_authorized": false,
+  "live_capture_acceptance_ready": false,
+  "a2_live_acceptance_ready": false
+}

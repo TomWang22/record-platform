@@ -15,7 +15,9 @@ import {
 } from "@common/utils";
 import {
   incOutboxBrokerAck,
+  incOutboxCreatedCommitted,
   incOutboxDbAck,
+  incOutboxDbAcknowledgedCommitted,
   incOutboxDbAckFailure,
   incOutboxFailure,
   incOutboxProduceAttempt,
@@ -181,6 +183,7 @@ export async function scanAndPersistAuctionSignals(
   );
   const client = await auctionPool.connect();
   let inserted = 0;
+  let committedOutboxRows = 0;
   try {
     await client.query("BEGIN");
     for (const row of rows) {
@@ -233,12 +236,16 @@ export async function scanAndPersistAuctionSignals(
         );
         if ((ins.rowCount ?? 0) === 0) continue;
         inserted += 1;
-        await client.query(
+
+        const outboxInsert = await client.query(
           `INSERT INTO auction_monitor.outbox_events (id, aggregate_id, type, version, payload, published)
            VALUES ($1::uuid, $2, 'AuctionRiskDetectedV1', 1, $3::bytea, false)
-           ON CONFLICT (id) DO NOTHING`,
+           ON CONFLICT (id) DO NOTHING
+           RETURNING id`,
           [eventId, sig.listing_id, Buffer.from(payload, "utf8")],
         );
+
+        committedOutboxRows += outboxInsert.rowCount ?? 0;
       }
     }
     await client.query("COMMIT");
@@ -248,6 +255,13 @@ export async function scanAndPersistAuctionSignals(
   } finally {
     client.release();
   }
+
+  /*
+   * Increment only after COMMIT succeeds. A rollback leaves the provenance
+   * counter unchanged even if INSERT statements had previously returned rows.
+   */
+  incOutboxCreatedCommitted(committedOutboxRows);
+
   return { scanned: rows.length, inserted };
 }
 
@@ -273,6 +287,34 @@ async function refreshOutboxPendingGauges(auctionPool: Pool): Promise<void> {
   } catch {
     // gauges are best-effort; never fail the publisher on refresh
   }
+}
+
+/**
+ * Apply published=false → published=true on one outbox row and validate the
+ * committed transition before provenance counters move.
+ * Exported for unit tests with a mocked Pool.
+ */
+export async function applyOutboxPublishedTrueTransition(
+  auctionPool: Pool,
+  outboxId: string,
+): Promise<number> {
+  const upd = await auctionPool.query(
+    `UPDATE auction_monitor.outbox_events SET published = true WHERE id = $1::uuid AND published = false`,
+    [outboxId],
+  );
+  const affected = upd.rowCount ?? 0;
+
+  /*
+   * The UPDATE has completed in its auto-committed statement transaction.
+   * Validate the exact transition denominator before incrementing acceptance counters.
+   */
+  incOutboxDbAcknowledgedCommitted(affected, 1);
+
+  await auctionPool.query(
+    `UPDATE auction_monitor.ai_signals SET published = true WHERE outbox_id = $1::uuid`,
+    [outboxId],
+  );
+  return affected;
 }
 
 /**
@@ -438,15 +480,7 @@ export async function publishAuctionMonitorOutbox(auctionPool: Pool): Promise<nu
           const dbStarted = Date.now();
           const dbSpan = tracer.startSpan("auction_monitor.outbox.database_acknowledgment");
           try {
-            const upd = await auctionPool.query(
-              `UPDATE auction_monitor.outbox_events SET published = true WHERE id = $1::uuid AND published = false`,
-              [row.id],
-            );
-            const affected = upd.rowCount ?? 0;
-            await auctionPool.query(
-              `UPDATE auction_monitor.ai_signals SET published = true WHERE outbox_id = $1::uuid`,
-              [row.id],
-            );
+            const affected = await applyOutboxPublishedTrueTransition(auctionPool, row.id);
             const dbResult = recordDatabaseAckOutcome(ledger, row.id, affected, false);
             if (dbResult !== "DATABASE_ACKNOWLEDGED") {
               throw new Error("database_ack_affected_rows_zero");
@@ -458,6 +492,7 @@ export async function publishAuctionMonitorOutbox(auctionPool: Pool): Promise<nu
             dbSpan.setAttribute("rp.outbox.db_ack", "ok");
             const dbAckTs = new Date().toISOString();
 
+            const meta0 = Array.isArray(metaArr) ? metaArr[0] : undefined;
             console.log(
               JSON.stringify({
                 msg: "auction_monitor_outbox_broker_and_db_ack",
@@ -469,6 +504,14 @@ export async function publishAuctionMonitorOutbox(auctionPool: Pool): Promise<nu
                 topic: broker.topic,
                 partition: broker.partition,
                 offset: broker.offset,
+                // Normalized KafkaJS RecordMetadata projection (bounded; no payload).
+                kafkajs_record_metadata: {
+                  topicName: meta0?.topicName ?? broker.topic,
+                  partition: meta0?.partition ?? broker.partition,
+                  offset: meta0?.offset ?? null,
+                  baseOffset: meta0?.baseOffset ?? null,
+                  errorCode: meta0?.errorCode ?? 0,
+                },
                 selection_timestamp: selectionTs,
                 produce_start_timestamp: produceStartTs,
                 broker_ack_timestamp: brokerAckTs,
@@ -485,6 +528,8 @@ export async function publishAuctionMonitorOutbox(auctionPool: Pool): Promise<nu
                 attempt_number: attemptNumber,
                 database_acknowledgment_result: "ok",
                 affected_rows: affected,
+                published_before: false,
+                published_after: true,
               }),
             );
           } catch (e) {

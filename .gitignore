@@ -81,6 +81,9 @@ tmp/
 !scripts/ai-platform/phase34-semantic-corpus/**/*.json
 !reports/phase34-runtime-integration/**/*.json
 !reports/kafka/**/*.json
+!reports/ci/track-a*.json
+!reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json
+!reports/outbox/canary-v3-manual-readonly-probe-command-packet.PREPARED.json
 
 !scripts/ai-platform/phase34-prompt-registry/
 !scripts/ai-platform/phase34-prompt-registry/**/*.json

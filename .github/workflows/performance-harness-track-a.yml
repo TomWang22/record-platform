@@ -1,0 +1,132 @@
+# Track A exact-SHA performance harness (coding gate only).
+# Never authorizes canary-v3 or executes a live cluster probe.
+name: performance-harness-track-a
+
+on:
+  push:
+    paths:
+      - "services/auction-monitor/**"
+      - "scripts/lib/auction_monitor_canary_v3_*.py"
+      - "scripts/audit-auction-monitor-canary-v3-final-root.py"
+      - "scripts/run-auction-monitor-canary-v3-readonly-live-probe.py"
+      - "scripts/run-auction-monitor-broker-ack-canary-v3.py"
+      - "scripts/audit-track-a-meta.py"
+      - "scripts/ci/emit-denom-freeze.mjs"
+      - "scripts/ci/run-track-a-exact-sha-ci.mjs"
+      - "tests/auction-monitor-canary-v3-*.mjs"
+      - "tests/track-a-meta-auditor.test.mjs"
+      - "reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json"
+      - ".github/workflows/performance-harness-track-a.yml"
+  pull_request:
+    paths:
+      - "services/auction-monitor/**"
+      - "scripts/lib/auction_monitor_canary_v3_*.py"
+      - "scripts/audit-auction-monitor-canary-v3-final-root.py"
+      - "scripts/run-auction-monitor-canary-v3-readonly-live-probe.py"
+      - "scripts/run-auction-monitor-broker-ack-canary-v3.py"
+      - "scripts/audit-track-a-meta.py"
+      - "scripts/ci/emit-denom-freeze.mjs"
+      - "scripts/ci/run-track-a-exact-sha-ci.mjs"
+      - "tests/auction-monitor-canary-v3-*.mjs"
+      - "tests/track-a-meta-auditor.test.mjs"
+      - "reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json"
+      - ".github/workflows/performance-harness-track-a.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: perf-track-a-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22.13"
+  PYTHON_VERSION: "3.11"
+  EXECUTION_AUTHORIZED: "false"
+  LIVE_CAPTURE_ACCEPTANCE_READY: "false"
+  A2_LIVE_ACCEPTANCE_READY: "false"
+
+jobs:
+  perf-track-a-exact-sha:
+    name: Track A exact-SHA harness + meta-auditor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build common + auction-monitor
+        run: |
+          set -euo pipefail
+          pnpm --filter @common/utils run build
+          pnpm --filter auction-monitor run build
+
+      - name: Run Track A exact-SHA CI (tests + artifacts + meta-auditor)
+        run: node scripts/ci/run-track-a-exact-sha-ci.mjs
+
+      - name: Guard — refuse acceptance / authorization flags
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          forbidden = [
+              "execution_authorized",
+              "live_window_authorized",
+              "gate5_ab_started",
+              "gate5_v10_created",
+              "gate6_authorized",
+              "production_approved",
+              "a2_live_acceptance_ready",
+              "live_capture_acceptance_ready",
+              "canary_v3_execution_authorized",
+              "canary_v3_window_executed",
+          ]
+          for rel in [
+              "reports/ci/denom-freeze.json",
+              "reports/ci/track-a1-provenance-result.json",
+              "reports/ci/track-a2-readonly-probe-result.json",
+              "reports/ci/track-a-exact-sha-bundle.json",
+              "reports/ci/track-a-meta-auditor-result.json",
+          ]:
+              payload = json.loads(Path(rel).read_text())
+              for key in forbidden:
+                  if payload.get(key) is True:
+                      raise SystemExit(f"{rel}:{key}=true")
+              if payload.get("read_only_live_probe_pass") is True:
+                  raise SystemExit(f"{rel}:read_only_live_probe_pass=true")
+          print("flag_guard_ok")
+          PY
+
+      - name: Upload Track A CI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-exact-sha-${{ github.sha }}
+          path: |
+            reports/ci/denom-freeze.json
+            reports/ci/denom-freeze.json.sha256
+            reports/ci/track-a1-provenance-result.json
+            reports/ci/track-a1-provenance-result.json.sha256
+            reports/ci/track-a2-readonly-probe-result.json
+            reports/ci/track-a2-readonly-probe-result.json.sha256
+            reports/ci/track-a-exact-sha-bundle.json
+            reports/ci/track-a-exact-sha-bundle.json.sha256
+            reports/ci/track-a-meta-auditor-result.json
+            reports/ci/track-a-meta-auditor-result.json.sha256
+            reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json
+            reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json.sha256

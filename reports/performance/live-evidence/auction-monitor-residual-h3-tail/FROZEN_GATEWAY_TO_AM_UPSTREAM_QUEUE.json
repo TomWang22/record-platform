@@ -1,0 +1,33 @@
+{
+  "CLOSED": {
+    "caddy_chase": true,
+    "observation_packet": true,
+    "old_am_db_rca": true,
+    "one_way_directionality_with_current_timestamps": true
+  },
+  "CURRENT_CLASSIFICATION": {
+    "auction_monitor_process_local_ttfb": "RULED_OUT_AS_PRIMARY",
+    "auction_monitor_route_local_ttfb_tail": "PROVED",
+    "gateway_client_or_network_queue_before_am": "HIGH_CONFIDENCE_NOT_YET_CLOCK_SAFE",
+    "gateway_to_auction_monitor_external_gap": "PROVED_PRIMARY_RESIDUAL_OWNER",
+    "old_auction_monitor_db_rca": "NOT_REOPENED",
+    "one_way_pre_vs_post_directionality": "UNRESOLVED_WITH_CURRENT_CROSS_POD_CLOCKS",
+    "pre_am_clock_safe_support": {
+      "excluded_infeasible_transport_gap_ge_750": 563,
+      "hard_pre_am_lower_bound_ge_750": 119,
+      "infeasible_means": "CLOCK_MODEL_OR_TIMESTAMP_SEMANTICS_INCONSISTENT",
+      "status": "PARTIAL_POSITIVE_EVIDENCE",
+      "usable_transport_gap_ge_750": 381
+    },
+    "response_body": "RULED_OUT",
+    "shared_caddy_pool": "PROVED_CONTRIBUTOR_AND_CLOSED"
+  },
+  "NEXT": "MOVE_TO_NEXT_PERFORMANCE_TRACK",
+  "before_am_promoted": false,
+  "emitted_at_utc": "2026-08-09T21:16:51Z",
+  "reason": "The clock-invariant outside-AM gap is authoritative, while one-way gateway\u2192AM versus AM\u2192gateway decomposition is not. Only 59/412 one-second clock-offset windows are causally feasible, and 33/40 largest upstream-tail records fall in infeasible windows. Positive clock-safe pre-AM evidence exists in the feasible subset, but its coverage is insufficient for promotion.",
+  "schema": "frozen-gateway-to-am-upstream-queue/v4",
+  "status": "FROZEN_TERMINAL",
+  "terminal_classification_artifact": "reports/performance/live-evidence/packet-a-am-residual-h3-observation-001/TERMINAL_AM_SUBHOP_CLASSIFICATION.json",
+  "terminal_classification_sha256": "b9099e6bae77298ed95136cc819b7d3b84d6eb9d76730d1ad9cee4fbe2374418"
+}

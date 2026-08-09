@@ -1,0 +1,290 @@
+{
+  "CURRENT_CLASSIFICATION": {
+    "auction_monitor_process_local_ttfb": "RULED_OUT_AS_PRIMARY",
+    "auction_monitor_route_local_ttfb_tail": "PROVED",
+    "gateway_client_or_network_queue_before_am": "HIGH_CONFIDENCE_NOT_YET_CLOCK_SAFE",
+    "gateway_to_auction_monitor_external_gap": "PROVED_PRIMARY_RESIDUAL_OWNER",
+    "old_auction_monitor_db_rca": "NOT_REOPENED",
+    "one_way_pre_vs_post_directionality": "UNRESOLVED_WITH_CURRENT_CROSS_POD_CLOCKS",
+    "pre_am_clock_safe_support": {
+      "excluded_infeasible_transport_gap_ge_750": 563,
+      "hard_pre_am_lower_bound_ge_750": 119,
+      "infeasible_means": "CLOCK_MODEL_OR_TIMESTAMP_SEMANTICS_INCONSISTENT",
+      "status": "PARTIAL_POSITIVE_EVIDENCE",
+      "usable_transport_gap_ge_750": 381
+    },
+    "response_body": "RULED_OUT",
+    "shared_caddy_pool": "PROVED_CONTRIBUTOR_AND_CLOSED"
+  },
+  "am_improvement_vs_control": {
+    "p99_improve_pct": 69.245,
+    "p99_ms": [
+      3257.81,
+      1001.928
+    ],
+    "still_residual_p99_gte_1000": true,
+    "waiting_p99_ms": [
+      3257.705,
+      1001.858
+    ]
+  },
+  "arm_a_am_from_frozen_control": {
+    "over_1000ms": 179,
+    "p50": 111.59,
+    "p95": 1347.154,
+    "p99": 3257.81,
+    "receiving_p99": 0.255,
+    "request_count": 2328,
+    "waiting_p99": 3257.705
+  },
+  "arm_b_am_authoritative_stage_thresholds": {
+    "max": 2178.725,
+    "over_1000": 51,
+    "over_1500": 9,
+    "over_500": 107,
+    "over_750": 66,
+    "p50": 31.25,
+    "p95": 261.587,
+    "p99": 1001.928
+  },
+  "arm_b_am_duration_ms": {
+    "count": 5015,
+    "max": 2178.725,
+    "mean": 72.832,
+    "over_1000": 51,
+    "over_1500": 9,
+    "over_500": 107,
+    "over_750": 66,
+    "p50": 31.25,
+    "p95": 261.587,
+    "p99": 1001.928
+  },
+  "arm_b_am_from_stage_result": {
+    "error_count": 1,
+    "error_rate": 0.000199,
+    "max": 2178.725,
+    "over_1000ms": 51,
+    "over_1500ms": 9,
+    "over_500ms": 107,
+    "over_750ms": 66,
+    "p50": 31.25,
+    "p75": 62.973,
+    "p90": 133.821,
+    "p95": 261.587,
+    "p99": 1001.928,
+    "receiving_p99": 0.085,
+    "request_count": 5015,
+    "rps": 16.772,
+    "sending_p99": 0,
+    "service": "auction-monitor",
+    "slowest_1_percent_count": 135,
+    "slowest_1_percent_share": 0.2058,
+    "waiting_p99": 1001.858
+  },
+  "arm_b_am_receiving_ms": {
+    "count": 5015,
+    "max": 2.023,
+    "mean": 0.021,
+    "over_1000": 0,
+    "over_1500": 0,
+    "over_500": 0,
+    "over_750": 0,
+    "p50": 0.014,
+    "p95": 0.046,
+    "p99": 0.085
+  },
+  "arm_b_am_sending_ms": {
+    "count": 5015,
+    "max": 0.0,
+    "mean": 0.0,
+    "over_1000": 0,
+    "over_1500": 0,
+    "over_500": 0,
+    "over_750": 0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0
+  },
+  "arm_b_am_waiting_ms": {
+    "count": 5015,
+    "max": 2178.701,
+    "mean": 72.812,
+    "over_1000": 51,
+    "over_1500": 9,
+    "over_500": 107,
+    "over_750": 66,
+    "p50": 31.225,
+    "p95": 261.571,
+    "p99": 1001.858
+  },
+  "authoritative_observation": {
+    "before_am": "HIGH_CONFIDENCE_NOT_YET_CLOCK_SAFE",
+    "frozen_artifact": "reports/performance/live-evidence/packet-a-am-residual-h3-observation-001/FROZEN_GATEWAY_TO_AM_UPSTREAM_QUEUE.json",
+    "outside_am": "PROVED_PRIMARY_RESIDUAL_OWNER",
+    "packet_id": "PACKET_A_AM_RESIDUAL_H3_OBSERVATION_001",
+    "prepared_sha256": "4bab46cf2d107dafb610e8f817b2ae1edd18af28fea6366e5f0a6e9d509fdabc",
+    "terminal_result": "GATEWAY_TO_AM_UPSTREAM_QUEUE"
+  },
+  "burst_clustering_1s": {
+    "am_seconds_with_ge_1000": 10,
+    "max_am_ge_1000_in_one_second": 11,
+    "top_bursts": [
+      {
+        "am_ge_1000": 11,
+        "am_reqs_in_sec": 28,
+        "epoch_s": 1786304354
+      },
+      {
+        "am_ge_1000": 10,
+        "am_reqs_in_sec": 17,
+        "epoch_s": 1786304168
+      },
+      {
+        "am_ge_1000": 7,
+        "am_reqs_in_sec": 20,
+        "epoch_s": 1786304169
+      },
+      {
+        "am_ge_1000": 6,
+        "am_reqs_in_sec": 13,
+        "epoch_s": 1786304375
+      },
+      {
+        "am_ge_1000": 6,
+        "am_reqs_in_sec": 26,
+        "epoch_s": 1786304378
+      },
+      {
+        "am_ge_1000": 3,
+        "am_reqs_in_sec": 16,
+        "epoch_s": 1786304165
+      },
+      {
+        "am_ge_1000": 2,
+        "am_reqs_in_sec": 8,
+        "epoch_s": 1786304374
+      },
+      {
+        "am_ge_1000": 2,
+        "am_reqs_in_sec": 2,
+        "epoch_s": 1786304377
+      },
+      {
+        "am_ge_1000": 1,
+        "am_reqs_in_sec": 10,
+        "epoch_s": 1786304166
+      },
+      {
+        "am_ge_1000": 1,
+        "am_reqs_in_sec": 1,
+        "epoch_s": 1786304167
+      }
+    ]
+  },
+  "caddy_chase_closed": true,
+  "concurrent_service_coincidence": {
+    "am_only_fraction": 0.8,
+    "am_only_windows": 8,
+    "am_slow_windows": 10,
+    "other_service_coincidence_counts": {
+      "media-service": 1,
+      "notification-service": 1
+    },
+    "shared_with_other_service_windows": 2,
+    "top_shared_windows": [
+      {
+        "am_ge_1000": 3,
+        "epoch_s": 1786304165,
+        "others_ge_1000": {
+          "media-service": 2
+        }
+      },
+      {
+        "am_ge_1000": 2,
+        "epoch_s": 1786304377,
+        "others_ge_1000": {
+          "notification-service": 1
+        }
+      }
+    ]
+  },
+  "emitted_at_utc": "2026-08-09T19:45:42Z",
+  "full_confirmation_blocker": {
+    "residual_service_count": 1,
+    "residual_services": [
+      "auction-monitor"
+    ]
+  },
+  "hypotheses_from_evidence": [
+    {
+      "id": "AM_UPSTREAM_OR_APP_TTFB",
+      "note": "waiting\u2248duration; receiving negligible",
+      "weight": "high"
+    },
+    {
+      "id": "AM_LOCAL_NOT_SHARED_EDGE_BURST",
+      "note": "8/10 slow seconds are AM-only",
+      "weight": "high"
+    },
+    {
+      "id": "NOT_RESPONSE_BODY_BOUND",
+      "note": "receiving_p99=0.085ms vs p99\u22481002ms",
+      "weight": "high"
+    },
+    {
+      "id": "IMPROVED_WITH_CADDY_BUT_STILL_RESIDUAL",
+      "note": "AM p99 3257.8->1001.9 still >=1000",
+      "weight": "high"
+    },
+    {
+      "id": "OLD_AM_DB_RCA_NOT_AUTO_REOPENED",
+      "note": "Do not reopen DB RCA without proving this tail is DB-bound",
+      "weight": "policy"
+    }
+  ],
+  "log_postprocess": "INCONCLUSIVE_LOGS_NOT_RETAINED_FOR_HOP_SPLIT",
+  "next_step": "MOVE_TO_NEXT_PERFORMANCE_TRACK",
+  "observation_artifacts": {
+    "cpu_throttling_event_loop_outbox_tick": null,
+    "kafka_post_status": {
+      "authoritative_for_causal_latency": false,
+      "status": "PASS"
+    },
+    "note": "Observation artifacts lack pod CPU/throttling/event-loop/outbox-tick series; not claimed from this freeze.",
+    "pods_post": {
+      "count": 25,
+      "crashloop": [],
+      "restarts_sum": 107,
+      "unready_running": []
+    },
+    "pods_start": {
+      "count": 25,
+      "crashloop": [],
+      "restarts_sum": 107,
+      "unready_running": []
+    }
+  },
+  "residual_owner_preliminary": "auction_monitor_route_local_ttfb_tail_PROVED__process_vs_gateway_hop_UNRESOLVED",
+  "schema": "auction-monitor-residual-h3-tail-rca/v1",
+  "source": {
+    "arm": "arm_b_load",
+    "events": "reports/performance/live-evidence/packet-a-h3-caddy-causal-b-continuation-001/stages/arm_b_load/k6-events.json",
+    "events_sha256": "b322652f5a4490e8234d302dcb54080b83da52e06258e9ecba194843443463e2",
+    "frozen_caddy_classification": "CADDY_POOL_HYPOTHESIS_PARTIALLY_CONFIRMED",
+    "hypothesis_status_caddy": "PROVED_CONTRIBUTOR",
+    "method": "postprocess_read_only_no_live_load",
+    "metric_basis": "http3_req_duration + http3_req_waiting + http3_req_receiving (no double count)",
+    "packet": "PACKET_A_H3_CADDY_CAUSAL_B_CONTINUATION_001"
+  },
+  "terminal_am_subhop": {
+    "before_am_promoted": false,
+    "next": "MOVE_TO_NEXT_PERFORMANCE_TRACK",
+    "sha256": "b9099e6bae77298ed95136cc819b7d3b84d6eb9d76730d1ad9cee4fbe2374418",
+    "status": "FROZEN_TERMINAL"
+  },
+  "waiting_vs_receiving": {
+    "dominant_mechanism": "waiting_dominated_ttfb_queue_or_upstream",
+    "receiving_p99_over_duration_p99": 8.5e-05,
+    "waiting_p99_over_duration_p99": 0.9999
+  }
+}

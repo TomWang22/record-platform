@@ -1,0 +1,77 @@
+{
+  "CLOSED": {
+    "caddy_chase": true,
+    "observation_packet": true,
+    "old_am_db_rca": true,
+    "one_way_directionality_with_current_timestamps": true
+  },
+  "CURRENT_CLASSIFICATION": {
+    "auction_monitor_process_local_ttfb": "RULED_OUT_AS_PRIMARY",
+    "auction_monitor_route_local_ttfb_tail": "PROVED",
+    "gateway_client_or_network_queue_before_am": "HIGH_CONFIDENCE_NOT_YET_CLOCK_SAFE",
+    "gateway_to_auction_monitor_external_gap": "PROVED_PRIMARY_RESIDUAL_OWNER",
+    "old_auction_monitor_db_rca": "NOT_REOPENED",
+    "one_way_pre_vs_post_directionality": "UNRESOLVED_WITH_CURRENT_CROSS_POD_CLOCKS",
+    "pre_am_clock_safe_support": {
+      "excluded_infeasible_transport_gap_ge_750": 563,
+      "hard_pre_am_lower_bound_ge_750": 119,
+      "infeasible_means": "CLOCK_MODEL_OR_TIMESTAMP_SEMANTICS_INCONSISTENT",
+      "status": "PARTIAL_POSITIVE_EVIDENCE",
+      "usable_transport_gap_ge_750": 381
+    },
+    "response_body": "RULED_OUT",
+    "shared_caddy_pool": "PROVED_CONTRIBUTOR_AND_CLOSED"
+  },
+  "EVIDENCE": {
+    "auction_monitor_handler": {
+      "count": 44874,
+      "max_ms": 741.47981,
+      "p50_ms": 0.682778,
+      "p95_ms": 8.761771499999986,
+      "p99_ms": 46.85398803999962
+    },
+    "clock_safe_windows_1s": {
+      "feasible": 59,
+      "infeasible": 353,
+      "infeasible_means": "CLOCK_MODEL_OR_TIMESTAMP_SEMANTICS_INCONSISTENT",
+      "total": 412
+    },
+    "correlated_requests": 44874,
+    "gateway_upstream_minus_am_handler": {
+      "count": 44874,
+      "max_ms": 4513.012032,
+      "p50_ms": 18.829174000000002,
+      "p95_ms": 367.26168019999983,
+      "p99_ms": 1089.5588089499968
+    },
+    "top40_upstream_tail": {
+      "hard_pre_am_lower_ge_750": 0,
+      "infeasible": 33,
+      "usable": 7
+    },
+    "transport_gap_ge_750": {
+      "count": 944,
+      "hard_pre_am_lower_ge_750": 119,
+      "infeasible": 563,
+      "usable": 381
+    }
+  },
+  "NEXT": "MOVE_TO_NEXT_PERFORMANCE_TRACK",
+  "artifacts": {
+    "clock_safe_intervals": "reports/performance/live-evidence/packet-a-am-residual-h3-observation-001/CLOCK_SAFE_INTERVALS.json",
+    "hop_classification": "reports/performance/live-evidence/packet-a-am-residual-h3-observation-001/HOP_CLASSIFICATION.json",
+    "terminal_report": "reports/performance/live-evidence/packet-a-am-residual-h3-observation-001/TERMINAL_REPORT.json"
+  },
+  "authoritative_metric": "gateway_upstream_ms - am_handler_ms",
+  "authorization_consumed": true,
+  "authorization_status": "CLOSED_AFTER_EXECUTION",
+  "before_am_promoted": false,
+  "emitted_at_utc": "2026-08-09T21:16:51Z",
+  "new_load_authorized": false,
+  "packet_id": "PACKET_A_AM_RESIDUAL_H3_OBSERVATION_001",
+  "postprocess_raw_pre_post_for_ownership": false,
+  "prepared_sha256": "4bab46cf2d107dafb610e8f817b2ae1edd18af28fea6366e5f0a6e9d509fdabc",
+  "reason": "The clock-invariant outside-AM gap is authoritative, while one-way gateway\u2192AM versus AM\u2192gateway decomposition is not. Only 59/412 one-second clock-offset windows are causally feasible, and 33/40 largest upstream-tail records fall in infeasible windows. Positive clock-safe pre-AM evidence exists in the feasible subset, but its coverage is insufficient for promotion.",
+  "schema": "terminal-am-subhop-classification/v1",
+  "status": "FROZEN_TERMINAL"
+}

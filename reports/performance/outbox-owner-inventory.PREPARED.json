@@ -1,0 +1,1761 @@
+{
+  "schema": "outbox-owner-inventory/v1",
+  "status": "PREPARED",
+  "execution_authorized": false,
+  "canary_v3_is_platform_wide_pass": false,
+  "lifecycle_publish_executed": false,
+  "track_b_terminal_sha256": "3d4d06245f0acde997bea77db4a9b32ab5be6563fc1979faeb71defe4ae569bb",
+  "expected_count": 12,
+  "discovered_count": 12,
+  "complete": true,
+  "outboxes_expected": 12,
+  "outboxes_discovered": 12,
+  "ddl_outbox_sql_files": 11,
+  "ddl_outbox_sql_files_on_disk": 13,
+  "supplemental_tables": 1,
+  "platform_postgres_databases_expected": 11,
+  "forbidden_nonexistent_services": {
+    "booking": "FORBIDDEN_NONEXISTENT_SERVICE",
+    "social": "FORBIDDEN_NONEXISTENT_SERVICE",
+    "inventory_status": "ABSENT_BY_CONTRACT",
+    "stale_ddl_on_disk": [
+      {
+        "filename": "01-social-outbox.sql",
+        "schema": "social",
+        "table": "social.outbox_events",
+        "classification": "FORBIDDEN_NONEXISTENT_SERVICE",
+        "inventory_status": "ABSENT_BY_CONTRACT"
+      },
+      {
+        "filename": "03-booking-outbox.sql",
+        "schema": "booking",
+        "table": "booking.outbox_events",
+        "classification": "FORBIDDEN_NONEXISTENT_SERVICE",
+        "inventory_status": "ABSENT_BY_CONTRACT"
+      }
+    ]
+  },
+  "obsolete_inventory_sha256": [
+    "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be"
+  ],
+  "owners": [
+    {
+      "service": "python-ai-service",
+      "publisher_owner": "python-ai-service",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
+      "creation_transition": "AI insight route + INSERT ai.outbox_events same transaction",
+      "publisher_implementation": "services/python-ai-service/app/ai/outbox.py",
+      "poll_batch": {
+        "batch_limit": 25,
+        "claim": "FOR UPDATE SKIP LOCKED"
+      },
+      "topic": "${ENV_PREFIX}.ai.events",
+      "kafka_principal": "CN=python-ai-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.ai.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "transactional row lock only",
+        "leased_until_column": false
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [
+        "inference-consumer"
+      ],
+      "business_effect": "AI insight / inference consumers",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "ai",
+      "table": "ai.outbox_events",
+      "database": "ai",
+      "ddl_source": "infra/db/01-ai-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": null
+    },
+    {
+      "service": "analytics-service",
+      "publisher_owner": "analytics-service",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
+      "creation_transition": "analytics AI insight + INSERT analytics.outbox_events",
+      "publisher_implementation": "services/analytics-service/src/lib/analytics-ai-outbox.ts",
+      "poll_batch": {
+        "batch_limit": 25,
+        "claim": "FOR UPDATE SKIP LOCKED"
+      },
+      "topic": "${ENV_PREFIX}.ai.events (AIInsightCreatedV1)",
+      "kafka_principal": "CN=analytics-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.ai.events",
+        "WRITE ${ENV_PREFIX}.analytics.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "transactional row lock only",
+        "leased_until_column": false
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "analytics AI insight consumers",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "analytics",
+      "table": "analytics.outbox_events",
+      "database": "analytics",
+      "ddl_source": "infra/db/03-analytics-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": null
+    },
+    {
+      "service": "auction-monitor",
+      "publisher_owner": "auction-monitor",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
+      "creation_transition": "scanAndPersistAuctionSignals ON CONFLICT + INSERT auction_monitor.outbox_events",
+      "publisher_implementation": "services/auction-monitor/src/ai-signals.ts publishAuctionMonitorOutbox",
+      "poll_batch": {
+        "interval_ms": 120000,
+        "batch_limit": 25,
+        "claim": "FOR UPDATE SKIP LOCKED"
+      },
+      "topic": "${ENV_PREFIX}.auction_monitor.events",
+      "kafka_principal": "CN=auction-monitor",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.auction_monitor.events"
+      ],
+      "retry": {
+        "model": "ABSENT — failed publish leaves row unpublished"
+      },
+      "lease": {
+        "model": "ephemeral FOR UPDATE SKIP LOCKED only",
+        "leased_until_column": false
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "auction signal / AI insight downstream consumers",
+      "cleanup_disposition": "RETAINED published=true",
+      "annotations": [
+        "publisher exists — capacity-limited historically",
+        "canary-v3 closes auction-monitor evidence only — not platform-wide outbox PASS"
+      ],
+      "schema": "auction_monitor",
+      "table": "auction_monitor.outbox_events",
+      "database": "auction_monitor",
+      "ddl_source": "infra/db/01-auction-monitor-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": null
+    },
+    {
+      "service": "auth-service",
+      "publisher_owner": "auth-service",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
+      "creation_transition": "account lifecycle / domain write + INSERT auth.auth_outbox same transaction",
+      "publisher_implementation": "services/auth-service/src/lib/auth-outbox-publisher.ts",
+      "poll_batch": {
+        "interval_ms": null,
+        "batch_limit": 50,
+        "env_batch": "AUTH_OUTBOX_BATCH",
+        "claim": "FOR UPDATE SKIP LOCKED"
+      },
+      "topic": "row.topic (e.g. ${ENV_PREFIX}.user.lifecycle.v1)",
+      "kafka_principal": "CN=auth-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.auth.events",
+        "WRITE ${ENV_PREFIX}.user.lifecycle.v1"
+      ],
+      "retry": {
+        "model": "retry_count column",
+        "max_attempts": null,
+        "backoff": "implicit per tick"
+      },
+      "lease": {
+        "model": "transactional row lock only",
+        "leased_until_column": false
+      },
+      "terminal_predicates": [
+        "published_at IS NOT NULL"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published_at",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [
+        "lifecycle-consumer"
+      ],
+      "business_effect": "GDPR account deletion / lifecycle ack consumers",
+      "cleanup_disposition": "RETAINED published_at set",
+      "supplemental": true,
+      "ddl_source": "services/auth-service/prisma/migrations/20260404120000_auth_transactional_outbox/migration.sql",
+      "schema": "auth",
+      "table": "auth.auth_outbox",
+      "database": "auth",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published_at IS NULL",
+      "publisher_disposition": null
+    },
+    {
+      "service": "auth-service",
+      "publisher_owner": "auth-service",
+      "publisher_present": false,
+      "disposition": "DDL_CANONICAL_UNWIRED",
+      "creation_transition": "domain_write + INSERT auth.outbox_events same transaction (canonical DDL)",
+      "publisher_implementation": "none — active publisher uses auth.auth_outbox",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.auth.events",
+      "kafka_principal": "CN=auth-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.auth.events",
+        "WRITE ${ENV_PREFIX}.user.lifecycle.v1"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "future auth domain consumers via EventEnvelope",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "auth",
+      "table": "auth.outbox_events",
+      "database": "auth",
+      "ddl_source": "infra/db/01-auth-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MIGRATION_PENDING",
+        "reason": "Canonical auth.outbox_events DDL exists; active publisher drains auth.auth_outbox only",
+        "evidence": "services/auth-service/src/lib/auth-outbox-publisher.ts; infra/db/01-auth-outbox.sql"
+      }
+    },
+    {
+      "service": "listings-service",
+      "publisher_owner": "listings-service",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
+      "creation_transition": "auction/offers domain write or shopping SALE_COMPLETED + INSERT listings.outbox_events",
+      "publisher_implementation": "services/listings-service/src/listings-auction-outbox.ts; listings-offers-outbox.ts; services/shopping-service/src/lib/sale-completed-outbox-drain.ts",
+      "poll_batch": {
+        "interval_ms": null,
+        "batch_limit": 25,
+        "claim": "FOR UPDATE SKIP LOCKED / lease_outbox_batch (SaleCompleted)"
+      },
+      "topic": "${ENV_PREFIX}.listing.events",
+      "kafka_principal": "CN=listings-service / CN=shopping-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.listing.events"
+      ],
+      "retry": {
+        "model": "retry_count + next_attempt_at + last_error",
+        "max_attempts": 8,
+        "env": "PHASE34_OUTBOX_MAX_RETRIES"
+      },
+      "lease": {
+        "model": "leased_until + lease_owner",
+        "env_lease_ms": "PHASE34_OUTBOX_LEASE_MS",
+        "default_lease_ms": 30000
+      },
+      "terminal_predicates": [
+        "published=true",
+        "dead_lettered=true"
+      ],
+      "dlq": {
+        "present": true,
+        "column": "dead_lettered",
+        "after_retry_exhaustion": true
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false,
+        "columns": [
+          "broker_topic",
+          "broker_partition",
+          "broker_offset"
+        ]
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [
+        "market-event-consumer"
+      ],
+      "business_effect": "listing/market event normalization + settlement lineage",
+      "cleanup_disposition": "RETAINED — DLQ rows preserved; never bulk mark DLQ published to pass quiesce",
+      "annotations": [
+        "terminal DLQ cohort preserved as separate gate",
+        "contract orphan cohorts (SALE_COMPLETED casing / non-drain types)"
+      ],
+      "schema": "listings",
+      "table": "listings.outbox_events",
+      "database": "listings",
+      "ddl_source": "infra/db/03-listings-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": null
+    },
+    {
+      "service": "media-service",
+      "publisher_owner": "media-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "CompleteUpload verified + INSERT media.outbox_events same transaction",
+      "publisher_implementation": "services/media-service/src/outbox/insertOutbox.ts (insert only; no publish/mark)",
+      "poll_batch": {
+        "model": "ABSENT",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.media.events",
+      "kafka_principal": "CN=media-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.media.events (not provisioned)"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "MediaUploadedV1 consumers (unwired)",
+      "cleanup_disposition": "RETAINED — write-only ledger relative to Kafka",
+      "annotations": [
+        "publisher ownership/implementation gap — explicit disposition not silent ack"
+      ],
+      "schema": "media",
+      "table": "media.outbox_events",
+      "database": "media",
+      "ddl_source": "infra/db/02-media-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "Insert-only outbox; no Kafka publish/mark path",
+        "evidence": "services/media-service/src/outbox/insertOutbox.ts; infra/db/02-media-outbox.sql"
+      }
+    },
+    {
+      "service": "messaging-service",
+      "publisher_owner": "messaging-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "send message + INSERT messaging.outbox_events same transaction",
+      "publisher_implementation": "none located — integration tests insert only",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "messaging.events.v1",
+      "kafka_principal": "CN=messaging-service",
+      "acl_expectations": [
+        "WRITE messaging.events.v1"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "messaging consumers (MessageSentV1)",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "messaging",
+      "table": "messaging.outbox_events",
+      "database": "messaging",
+      "ddl_source": "infra/db/02-messaging-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "DDL + insert paths exist; no publish/mark loop located",
+        "evidence": "infra/db/02-messaging-outbox.sql"
+      }
+    },
+    {
+      "service": "notification-service",
+      "publisher_owner": "notification-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "notification domain write + INSERT notification.outbox_events",
+      "publisher_implementation": "none located in repository",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.notification.events",
+      "kafka_principal": "CN=notification-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.notification.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [
+        "notification-consumer"
+      ],
+      "business_effect": "notification dispatch consumers (unwired publisher)",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "notification",
+      "table": "notification.outbox_events",
+      "database": "notification",
+      "ddl_source": "infra/db/03-notification-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "DDL present; no repository publisher implementation located",
+        "evidence": "infra/db/03-notification-outbox.sql"
+      }
+    },
+    {
+      "service": "records-service",
+      "publisher_owner": "records-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "domain write + INSERT records.outbox_events same transaction",
+      "publisher_implementation": "none located in repository",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.records.events",
+      "kafka_principal": "CN=records-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.records.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "records domain consumers (unwired publisher)",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "records",
+      "table": "records.outbox_events",
+      "database": "records",
+      "ddl_source": "infra/db/01-records-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "DDL present; no repository publisher implementation located",
+        "evidence": "infra/db/01-records-outbox.sql"
+      }
+    },
+    {
+      "service": "shopping-service",
+      "publisher_owner": "shopping-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "shopping domain write + INSERT shopping.outbox_events",
+      "publisher_implementation": "SaleCompleted uses listings.outbox_events — shopping.outbox_events unwired",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.shopping.events",
+      "kafka_principal": "CN=shopping-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.shopping.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "shopping domain consumers (table present; publisher unwired)",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "shopping",
+      "table": "shopping.outbox_events",
+      "database": "shopping",
+      "ddl_source": "infra/db/01-shopping-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "shopping.outbox_events unwired; SaleCompleted drains listings.outbox_events instead",
+        "evidence": "infra/db/01-shopping-outbox.sql; services/shopping-service/src/lib/sale-completed-outbox-drain.ts"
+      }
+    },
+    {
+      "service": "trust-service",
+      "publisher_owner": "trust-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "trust domain write + INSERT trust.outbox_events same transaction",
+      "publisher_implementation": "none located in repository",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.trust.events",
+      "kafka_principal": "CN=trust-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.trust.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "trust domain consumers (unwired)",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "trust",
+      "table": "trust.outbox_events",
+      "database": "trust",
+      "ddl_source": "infra/db/03-trust-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "DDL present; no repository publisher implementation located",
+        "evidence": "infra/db/03-trust-outbox.sql"
+      }
+    }
+  ],
+  "outboxes": [
+    {
+      "service": "python-ai-service",
+      "publisher_owner": "python-ai-service",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
+      "creation_transition": "AI insight route + INSERT ai.outbox_events same transaction",
+      "publisher_implementation": "services/python-ai-service/app/ai/outbox.py",
+      "poll_batch": {
+        "batch_limit": 25,
+        "claim": "FOR UPDATE SKIP LOCKED"
+      },
+      "topic": "${ENV_PREFIX}.ai.events",
+      "kafka_principal": "CN=python-ai-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.ai.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "transactional row lock only",
+        "leased_until_column": false
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [
+        "inference-consumer"
+      ],
+      "business_effect": "AI insight / inference consumers",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "ai",
+      "table": "ai.outbox_events",
+      "database": "ai",
+      "ddl_source": "infra/db/01-ai-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": null
+    },
+    {
+      "service": "analytics-service",
+      "publisher_owner": "analytics-service",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
+      "creation_transition": "analytics AI insight + INSERT analytics.outbox_events",
+      "publisher_implementation": "services/analytics-service/src/lib/analytics-ai-outbox.ts",
+      "poll_batch": {
+        "batch_limit": 25,
+        "claim": "FOR UPDATE SKIP LOCKED"
+      },
+      "topic": "${ENV_PREFIX}.ai.events (AIInsightCreatedV1)",
+      "kafka_principal": "CN=analytics-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.ai.events",
+        "WRITE ${ENV_PREFIX}.analytics.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "transactional row lock only",
+        "leased_until_column": false
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "analytics AI insight consumers",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "analytics",
+      "table": "analytics.outbox_events",
+      "database": "analytics",
+      "ddl_source": "infra/db/03-analytics-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": null
+    },
+    {
+      "service": "auction-monitor",
+      "publisher_owner": "auction-monitor",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
+      "creation_transition": "scanAndPersistAuctionSignals ON CONFLICT + INSERT auction_monitor.outbox_events",
+      "publisher_implementation": "services/auction-monitor/src/ai-signals.ts publishAuctionMonitorOutbox",
+      "poll_batch": {
+        "interval_ms": 120000,
+        "batch_limit": 25,
+        "claim": "FOR UPDATE SKIP LOCKED"
+      },
+      "topic": "${ENV_PREFIX}.auction_monitor.events",
+      "kafka_principal": "CN=auction-monitor",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.auction_monitor.events"
+      ],
+      "retry": {
+        "model": "ABSENT — failed publish leaves row unpublished"
+      },
+      "lease": {
+        "model": "ephemeral FOR UPDATE SKIP LOCKED only",
+        "leased_until_column": false
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "auction signal / AI insight downstream consumers",
+      "cleanup_disposition": "RETAINED published=true",
+      "annotations": [
+        "publisher exists — capacity-limited historically",
+        "canary-v3 closes auction-monitor evidence only — not platform-wide outbox PASS"
+      ],
+      "schema": "auction_monitor",
+      "table": "auction_monitor.outbox_events",
+      "database": "auction_monitor",
+      "ddl_source": "infra/db/01-auction-monitor-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": null
+    },
+    {
+      "service": "auth-service",
+      "publisher_owner": "auth-service",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
+      "creation_transition": "account lifecycle / domain write + INSERT auth.auth_outbox same transaction",
+      "publisher_implementation": "services/auth-service/src/lib/auth-outbox-publisher.ts",
+      "poll_batch": {
+        "interval_ms": null,
+        "batch_limit": 50,
+        "env_batch": "AUTH_OUTBOX_BATCH",
+        "claim": "FOR UPDATE SKIP LOCKED"
+      },
+      "topic": "row.topic (e.g. ${ENV_PREFIX}.user.lifecycle.v1)",
+      "kafka_principal": "CN=auth-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.auth.events",
+        "WRITE ${ENV_PREFIX}.user.lifecycle.v1"
+      ],
+      "retry": {
+        "model": "retry_count column",
+        "max_attempts": null,
+        "backoff": "implicit per tick"
+      },
+      "lease": {
+        "model": "transactional row lock only",
+        "leased_until_column": false
+      },
+      "terminal_predicates": [
+        "published_at IS NOT NULL"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published_at",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [
+        "lifecycle-consumer"
+      ],
+      "business_effect": "GDPR account deletion / lifecycle ack consumers",
+      "cleanup_disposition": "RETAINED published_at set",
+      "supplemental": true,
+      "ddl_source": "services/auth-service/prisma/migrations/20260404120000_auth_transactional_outbox/migration.sql",
+      "schema": "auth",
+      "table": "auth.auth_outbox",
+      "database": "auth",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published_at IS NULL",
+      "publisher_disposition": null
+    },
+    {
+      "service": "auth-service",
+      "publisher_owner": "auth-service",
+      "publisher_present": false,
+      "disposition": "DDL_CANONICAL_UNWIRED",
+      "creation_transition": "domain_write + INSERT auth.outbox_events same transaction (canonical DDL)",
+      "publisher_implementation": "none — active publisher uses auth.auth_outbox",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.auth.events",
+      "kafka_principal": "CN=auth-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.auth.events",
+        "WRITE ${ENV_PREFIX}.user.lifecycle.v1"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "future auth domain consumers via EventEnvelope",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "auth",
+      "table": "auth.outbox_events",
+      "database": "auth",
+      "ddl_source": "infra/db/01-auth-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MIGRATION_PENDING",
+        "reason": "Canonical auth.outbox_events DDL exists; active publisher drains auth.auth_outbox only",
+        "evidence": "services/auth-service/src/lib/auth-outbox-publisher.ts; infra/db/01-auth-outbox.sql"
+      }
+    },
+    {
+      "service": "listings-service",
+      "publisher_owner": "listings-service",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
+      "creation_transition": "auction/offers domain write or shopping SALE_COMPLETED + INSERT listings.outbox_events",
+      "publisher_implementation": "services/listings-service/src/listings-auction-outbox.ts; listings-offers-outbox.ts; services/shopping-service/src/lib/sale-completed-outbox-drain.ts",
+      "poll_batch": {
+        "interval_ms": null,
+        "batch_limit": 25,
+        "claim": "FOR UPDATE SKIP LOCKED / lease_outbox_batch (SaleCompleted)"
+      },
+      "topic": "${ENV_PREFIX}.listing.events",
+      "kafka_principal": "CN=listings-service / CN=shopping-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.listing.events"
+      ],
+      "retry": {
+        "model": "retry_count + next_attempt_at + last_error",
+        "max_attempts": 8,
+        "env": "PHASE34_OUTBOX_MAX_RETRIES"
+      },
+      "lease": {
+        "model": "leased_until + lease_owner",
+        "env_lease_ms": "PHASE34_OUTBOX_LEASE_MS",
+        "default_lease_ms": 30000
+      },
+      "terminal_predicates": [
+        "published=true",
+        "dead_lettered=true"
+      ],
+      "dlq": {
+        "present": true,
+        "column": "dead_lettered",
+        "after_retry_exhaustion": true
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false,
+        "columns": [
+          "broker_topic",
+          "broker_partition",
+          "broker_offset"
+        ]
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [
+        "market-event-consumer"
+      ],
+      "business_effect": "listing/market event normalization + settlement lineage",
+      "cleanup_disposition": "RETAINED — DLQ rows preserved; never bulk mark DLQ published to pass quiesce",
+      "annotations": [
+        "terminal DLQ cohort preserved as separate gate",
+        "contract orphan cohorts (SALE_COMPLETED casing / non-drain types)"
+      ],
+      "schema": "listings",
+      "table": "listings.outbox_events",
+      "database": "listings",
+      "ddl_source": "infra/db/03-listings-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": null
+    },
+    {
+      "service": "media-service",
+      "publisher_owner": "media-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "CompleteUpload verified + INSERT media.outbox_events same transaction",
+      "publisher_implementation": "services/media-service/src/outbox/insertOutbox.ts (insert only; no publish/mark)",
+      "poll_batch": {
+        "model": "ABSENT",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.media.events",
+      "kafka_principal": "CN=media-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.media.events (not provisioned)"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "MediaUploadedV1 consumers (unwired)",
+      "cleanup_disposition": "RETAINED — write-only ledger relative to Kafka",
+      "annotations": [
+        "publisher ownership/implementation gap — explicit disposition not silent ack"
+      ],
+      "schema": "media",
+      "table": "media.outbox_events",
+      "database": "media",
+      "ddl_source": "infra/db/02-media-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "Insert-only outbox; no Kafka publish/mark path",
+        "evidence": "services/media-service/src/outbox/insertOutbox.ts; infra/db/02-media-outbox.sql"
+      }
+    },
+    {
+      "service": "messaging-service",
+      "publisher_owner": "messaging-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "send message + INSERT messaging.outbox_events same transaction",
+      "publisher_implementation": "none located — integration tests insert only",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "messaging.events.v1",
+      "kafka_principal": "CN=messaging-service",
+      "acl_expectations": [
+        "WRITE messaging.events.v1"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "messaging consumers (MessageSentV1)",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "messaging",
+      "table": "messaging.outbox_events",
+      "database": "messaging",
+      "ddl_source": "infra/db/02-messaging-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "DDL + insert paths exist; no publish/mark loop located",
+        "evidence": "infra/db/02-messaging-outbox.sql"
+      }
+    },
+    {
+      "service": "notification-service",
+      "publisher_owner": "notification-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "notification domain write + INSERT notification.outbox_events",
+      "publisher_implementation": "none located in repository",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.notification.events",
+      "kafka_principal": "CN=notification-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.notification.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [
+        "notification-consumer"
+      ],
+      "business_effect": "notification dispatch consumers (unwired publisher)",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "notification",
+      "table": "notification.outbox_events",
+      "database": "notification",
+      "ddl_source": "infra/db/03-notification-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "DDL present; no repository publisher implementation located",
+        "evidence": "infra/db/03-notification-outbox.sql"
+      }
+    },
+    {
+      "service": "records-service",
+      "publisher_owner": "records-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "domain write + INSERT records.outbox_events same transaction",
+      "publisher_implementation": "none located in repository",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.records.events",
+      "kafka_principal": "CN=records-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.records.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "records domain consumers (unwired publisher)",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "records",
+      "table": "records.outbox_events",
+      "database": "records",
+      "ddl_source": "infra/db/01-records-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "DDL present; no repository publisher implementation located",
+        "evidence": "infra/db/01-records-outbox.sql"
+      }
+    },
+    {
+      "service": "shopping-service",
+      "publisher_owner": "shopping-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "shopping domain write + INSERT shopping.outbox_events",
+      "publisher_implementation": "SaleCompleted uses listings.outbox_events — shopping.outbox_events unwired",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.shopping.events",
+      "kafka_principal": "CN=shopping-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.shopping.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "shopping domain consumers (table present; publisher unwired)",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "shopping",
+      "table": "shopping.outbox_events",
+      "database": "shopping",
+      "ddl_source": "infra/db/01-shopping-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "shopping.outbox_events unwired; SaleCompleted drains listings.outbox_events instead",
+        "evidence": "infra/db/01-shopping-outbox.sql; services/shopping-service/src/lib/sale-completed-outbox-drain.ts"
+      }
+    },
+    {
+      "service": "trust-service",
+      "publisher_owner": "trust-service",
+      "publisher_present": false,
+      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "creation_transition": "trust domain write + INSERT trust.outbox_events same transaction",
+      "publisher_implementation": "none located in repository",
+      "poll_batch": {
+        "model": "unwired",
+        "batch_limit": null,
+        "claim": null
+      },
+      "topic": "${ENV_PREFIX}.trust.events",
+      "kafka_principal": "CN=trust-service",
+      "acl_expectations": [
+        "WRITE ${ENV_PREFIX}.trust.events"
+      ],
+      "retry": {
+        "model": "ABSENT"
+      },
+      "lease": {
+        "model": "ABSENT"
+      },
+      "terminal_predicates": [
+        "published=true"
+      ],
+      "dlq": {
+        "present": false
+      },
+      "broker_ack": {
+        "required": true,
+        "marks_published": false
+      },
+      "db_ack": {
+        "required": true,
+        "column": "published",
+        "after_broker_ack": true
+      },
+      "consumer_groups": [],
+      "business_effect": "trust domain consumers (unwired)",
+      "cleanup_disposition": "RETAINED published=true",
+      "schema": "trust",
+      "table": "trust.outbox_events",
+      "database": "trust",
+      "ddl_source": "infra/db/03-trust-outbox.sql",
+      "in_platform_denominator": true,
+      "lifecycle_states_supported": [
+        "created",
+        "selected",
+        "leased",
+        "produce_attempted",
+        "broker_acknowledged",
+        "db_acknowledged",
+        "consumed",
+        "offset_committed",
+        "business_effect_applied",
+        "retrying",
+        "dead_lettered",
+        "orphaned",
+        "unknown_blocking"
+      ],
+      "status_predicate": "published=false",
+      "publisher_disposition": {
+        "status": "MISSING_BLOCKS_ACCEPTANCE",
+        "reason": "DDL present; no repository publisher implementation located",
+        "evidence": "infra/db/03-trust-outbox.sql"
+      }
+    }
+  ],
+  "lifecycle_states": [
+    "created",
+    "selected",
+    "leased",
+    "produce_attempted",
+    "broker_acknowledged",
+    "db_acknowledged",
+    "consumed",
+    "offset_committed",
+    "business_effect_applied",
+    "retrying",
+    "dead_lettered",
+    "orphaned",
+    "unknown_blocking"
+  ],
+  "required_lifecycle_states_for_pass": [
+    "created",
+    "selected",
+    "produce_attempted",
+    "broker_acknowledged",
+    "db_acknowledged",
+    "consumed",
+    "offset_committed",
+    "business_effect_applied"
+  ],
+  "mutually_exclusive_terminals": [
+    "dead_lettered",
+    "orphaned",
+    "unknown_blocking"
+  ],
+  "publisher_disposition_statuses": [
+    "MISSING_BLOCKS_ACCEPTANCE",
+    "INTENTIONALLY_NO_PUBLISHER",
+    "MIGRATION_PENDING"
+  ],
+  "notes": [
+    "PREPARED static inventory — no live lifecycle publish or historical mutation.",
+    "publisher_present=false requires publisher_disposition {status,reason,evidence}.",
+    "Auction-monitor canary-v3 does not close platform-wide outbox denominator.",
+    "Track B terminal referenced as prior evidence only; Packet B not reopened.",
+    "booking/social are FORBIDDEN_NONEXISTENT_SERVICE — ABSENT_BY_CONTRACT, not disposition rows.",
+    "Obsolete 14/14 SHA 70ae0ee0… must not be carried forward.",
+    "Listings DLQ + orphan cohorts preserved as contract annotations."
+  ]
+}

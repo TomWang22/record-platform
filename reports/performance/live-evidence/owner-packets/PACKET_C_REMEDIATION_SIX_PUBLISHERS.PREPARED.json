@@ -1,0 +1,152 @@
+{
+  "acceptance_denominator_count": 12,
+  "acceptance_denominator_tables": [
+    "ai.outbox_events",
+    "analytics.outbox_events",
+    "auction_monitor.outbox_events",
+    "auth.auth_outbox",
+    "auth.outbox_events",
+    "listings.outbox_events",
+    "media.outbox_events",
+    "messaging.outbox_events",
+    "notification.outbox_events",
+    "records.outbox_events",
+    "shopping.outbox_events",
+    "trust.outbox_events"
+  ],
+  "emitted_at_utc": "2026-08-10T15:11:51Z",
+  "execution_authorized": false,
+  "explicitly_excluded": [
+    "packet_c_authorization",
+    "live_outbox_publish",
+    "seed_mutation",
+    "include_auth_outbox_events_as_blocked",
+    "include_lifecycle_executable_owners",
+    "narrow_acceptance_denominator_to_six",
+    "authorize_obsolete_prepared_91c033c9",
+    "authorize_obsolete_prepared_c3c432b9"
+  ],
+  "hard_rules": [
+    "acceptance_denominator_remains_12",
+    "remediation_packet_must_not_redefine_track_c_acceptance_denominator",
+    "terminal_track_c_pass_requires_lifecycle_closure_and_unknowns_0_for_all_12",
+    "booking_and_social_forbidden",
+    "no_live_publish_without_separate_authorization",
+    "source_and_test_pins_required"
+  ],
+  "lifecycle_publish_executed": false,
+  "load_testing_authorized": false,
+  "next_boundary": "IMPLEMENT_SIX_PUBLISHERS_ONE_TABLE_AT_A_TIME_NO_LIVE_PUBLISH",
+  "not_in_remediation_scope": {
+    "lifecycle_executable": [
+      "ai.outbox_events",
+      "analytics.outbox_events",
+      "auction_monitor.outbox_events",
+      "auth.auth_outbox",
+      "listings.outbox_events"
+    ],
+    "migration_pending": [
+      "auth.outbox_events"
+    ],
+    "note": "auth.outbox_events remains MIGRATION_PENDING and must not be treated as publisher-blocked or executable in this packet"
+  },
+  "obsolete_inventory_sha256": [
+    "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be"
+  ],
+  "obsolete_prepared_sha256": [
+    "91c033c997e3f3c8ab56a0594165bc814a1892e043839f9df3e01aad6e2fb9b8",
+    "c3c432b91001967eceec651f7b2e201576e1f442a3ccbf256fa01c2c63da77f6"
+  ],
+  "packet_id": "PACKET_C_REMEDIATION_SIX_PUBLISHERS",
+  "pins": {
+    "inventory_denominator_sha256": "4330610d2f5fa727839ca0e5e5cd821ae31eff53a9298b1ba20fcbe2dd128f7e",
+    "inventory_sha256": "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
+    "readiness_matrix_sha256": "f2ba461d31da4bc6db029a8c528a101ebd73108299f046619ca5e1dbdd0e9bf4",
+    "source": {
+      "build_outbox_inventory_mjs": "3ed47465f0da11ad432620aa6713154ff47406c2780bad82b5e60db7be3f3eb6",
+      "build_packet_c_readiness_matrix_mjs": "7c78bc9b62de12d1b3655efc4388e7dd65ceae9c23ab8d4607f1d776e3a32bf6",
+      "freeze_track_c_inventory_denominator_mjs": "0fd1d7e9208216cdf2d8bb856fea14a447b1903b91af9bf7ba6490dd40aa85bb",
+      "outbox_owner_inventory_test_mjs": "17dba745a12b4fd7a11ea9ff7ae17e5cdecb4edcb72da4b9b97f05c11191d93d",
+      "performance_track_c_mjs": "bbc8efd6e35b77c3dca24d62231b5c204b43518c79708c9826afd7386e61c2cb",
+      "prepare_packet_c_remediation_mjs": "c83b3b5dca3fb1a99ba42de6a88324fdbe74911dc43448d36ac3cf475b5b3e60",
+      "track_c_inventory_denominator_freeze_test_mjs": "bb075a8ec4d5ec6f585b7ee6ca943424878270afb46d52c1d6961d39a76293d1",
+      "track_c_inventory_guards_mjs": "47ec2e983e2263c52b502452a809a7398ca614dfa20259dd0069378ac30a8c99",
+      "track_c_inventory_guards_test_mjs": "2c94fbba5ac79a289a4adef8687ca1eae72f4332db0fcccfddb676f86f0a44ca"
+    },
+    "track_b_terminal_sha256": "3d4d06245f0acde997bea77db4a9b32ab5be6563fc1979faeb71defe4ae569bb"
+  },
+  "platform_pass": false,
+  "purpose": "Remediation/observation readiness for the six PUBLISHER_BLOCKED canonical outboxes only",
+  "remediation_target_count": 6,
+  "remediation_targets": [
+    {
+      "database": "media",
+      "live_publish_authorized": false,
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "media-service",
+      "readiness": "PUBLISHER_BLOCKED",
+      "remediation_in_scope": true,
+      "required_for_track_c_acceptance": true,
+      "service": "media-service",
+      "table": "media.outbox_events"
+    },
+    {
+      "database": "messaging",
+      "live_publish_authorized": false,
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "messaging-service",
+      "readiness": "PUBLISHER_BLOCKED",
+      "remediation_in_scope": true,
+      "required_for_track_c_acceptance": true,
+      "service": "messaging-service",
+      "table": "messaging.outbox_events"
+    },
+    {
+      "database": "notification",
+      "live_publish_authorized": false,
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "notification-service",
+      "readiness": "PUBLISHER_BLOCKED",
+      "remediation_in_scope": true,
+      "required_for_track_c_acceptance": true,
+      "service": "notification-service",
+      "table": "notification.outbox_events"
+    },
+    {
+      "database": "records",
+      "live_publish_authorized": false,
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "records-service",
+      "readiness": "PUBLISHER_BLOCKED",
+      "remediation_in_scope": true,
+      "required_for_track_c_acceptance": true,
+      "service": "records-service",
+      "table": "records.outbox_events"
+    },
+    {
+      "database": "shopping",
+      "live_publish_authorized": false,
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "shopping-service",
+      "readiness": "PUBLISHER_BLOCKED",
+      "remediation_in_scope": true,
+      "required_for_track_c_acceptance": true,
+      "service": "shopping-service",
+      "table": "shopping.outbox_events"
+    },
+    {
+      "database": "trust",
+      "live_publish_authorized": false,
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "trust-service",
+      "readiness": "PUBLISHER_BLOCKED",
+      "remediation_in_scope": true,
+      "required_for_track_c_acceptance": true,
+      "service": "trust-service",
+      "table": "trust.outbox_events"
+    }
+  ],
+  "schema": "packet-c-remediation-six-publishers/v1",
+  "status": "PREPARED_NON_LIVE",
+  "track_c_acceptance_pass": false
+}

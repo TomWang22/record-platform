@@ -1,0 +1,29 @@
+{
+  "track": "C",
+  "verdict": "HARNESS_PASS",
+  "platform_pass": false,
+  "execution_authorized": false,
+  "lifecycle_publish_executed": false,
+  "expected_count": 12,
+  "discovered_count": 12,
+  "complete": true,
+  "outboxes_expected": 12,
+  "outboxes_discovered": 12,
+  "publisher_absent_rows_explicit": true,
+  "publisher_absent_count": 7,
+  "publisher_present_count": 5,
+  "missing_blocks_acceptance_count": 6,
+  "acceptance_blockers": [
+    "media.outbox_events",
+    "messaging.outbox_events",
+    "notification.outbox_events",
+    "records.outbox_events",
+    "shopping.outbox_events",
+    "trust.outbox_events"
+  ],
+  "platform_in_denominator_count": 12,
+  "canary_v3_is_platform_wide_pass": false,
+  "track_b_terminal_sha256": "3d4d06245f0acde997bea77db4a9b32ab5be6563fc1979faeb71defe4ae569bb",
+  "forbidden_nonexistent_absent_by_contract": true,
+  "obsolete_14_14_inventory_sha256_rejected": true
+}

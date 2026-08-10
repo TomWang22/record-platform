@@ -1,0 +1,168 @@
+{
+  "acceptance_denominator_count": 12,
+  "acceptance_denominator_note": "Track C terminal acceptance must account for all 12 canonical outboxes; a six-blocker remediation packet must not redefine the acceptance denominator.",
+  "canonical_owners": [
+    "ai.outbox_events",
+    "analytics.outbox_events",
+    "auction_monitor.outbox_events",
+    "auth.auth_outbox",
+    "auth.outbox_events",
+    "listings.outbox_events",
+    "media.outbox_events",
+    "messaging.outbox_events",
+    "notification.outbox_events",
+    "records.outbox_events",
+    "shopping.outbox_events",
+    "trust.outbox_events"
+  ],
+  "complete": true,
+  "discovered_count": 12,
+  "emitted_at_utc": "2026-08-10T14:50:37Z",
+  "execution_authorized": false,
+  "expected_count": 12,
+  "explicitly_excluded": [
+    "packet_c_authorization",
+    "live_outbox_publish",
+    "seed_mutation",
+    "reinterpret_14_owner_inventory_as_pass",
+    "narrow_acceptance_denominator_to_six_blockers"
+  ],
+  "forbidden_nonexistent_services": {
+    "booking": "FORBIDDEN_NONEXISTENT_SERVICE",
+    "inventory_status": "ABSENT_BY_CONTRACT",
+    "social": "FORBIDDEN_NONEXISTENT_SERVICE"
+  },
+  "freeze_kind": "INVENTORY_DENOMINATOR_ONLY",
+  "inventory_denominator_pass": true,
+  "inventory_path": "reports/performance/outbox-owner-inventory.PREPARED.json",
+  "inventory_sha256": "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
+  "lifecycle_executable_count": 5,
+  "lifecycle_executable_owners": [
+    "ai.outbox_events",
+    "analytics.outbox_events",
+    "auction_monitor.outbox_events",
+    "auth.auth_outbox",
+    "listings.outbox_events"
+  ],
+  "lifecycle_publish_executed": false,
+  "migration_pending_owners": [
+    "auth.outbox_events"
+  ],
+  "missing_blocks_acceptance_count": 6,
+  "missing_blocks_acceptance_owners": [
+    "media.outbox_events",
+    "messaging.outbox_events",
+    "notification.outbox_events",
+    "records.outbox_events",
+    "shopping.outbox_events",
+    "trust.outbox_events"
+  ],
+  "next_boundary": "PACKET_C_READINESS_MATRIX_THEN_NO_LIVE_UNTIL_AUTHORIZED",
+  "obsolete_inventory_sha256": [
+    "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be"
+  ],
+  "owners": [
+    {
+      "database": "ai",
+      "publisher_disposition_status": null,
+      "publisher_owner": "python-ai-service",
+      "publisher_present": true,
+      "service": "python-ai-service",
+      "table": "ai.outbox_events"
+    },
+    {
+      "database": "analytics",
+      "publisher_disposition_status": null,
+      "publisher_owner": "analytics-service",
+      "publisher_present": true,
+      "service": "analytics-service",
+      "table": "analytics.outbox_events"
+    },
+    {
+      "database": "auction_monitor",
+      "publisher_disposition_status": null,
+      "publisher_owner": "auction-monitor",
+      "publisher_present": true,
+      "service": "auction-monitor",
+      "table": "auction_monitor.outbox_events"
+    },
+    {
+      "database": "auth",
+      "publisher_disposition_status": null,
+      "publisher_owner": "auth-service",
+      "publisher_present": true,
+      "service": "auth-service",
+      "table": "auth.auth_outbox"
+    },
+    {
+      "database": "auth",
+      "publisher_disposition_status": "MIGRATION_PENDING",
+      "publisher_owner": "auth-service",
+      "publisher_present": false,
+      "service": "auth-service",
+      "table": "auth.outbox_events"
+    },
+    {
+      "database": "listings",
+      "publisher_disposition_status": null,
+      "publisher_owner": "listings-service",
+      "publisher_present": true,
+      "service": "listings-service",
+      "table": "listings.outbox_events"
+    },
+    {
+      "database": "media",
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "media-service",
+      "publisher_present": false,
+      "service": "media-service",
+      "table": "media.outbox_events"
+    },
+    {
+      "database": "messaging",
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "messaging-service",
+      "publisher_present": false,
+      "service": "messaging-service",
+      "table": "messaging.outbox_events"
+    },
+    {
+      "database": "notification",
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "notification-service",
+      "publisher_present": false,
+      "service": "notification-service",
+      "table": "notification.outbox_events"
+    },
+    {
+      "database": "records",
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "records-service",
+      "publisher_present": false,
+      "service": "records-service",
+      "table": "records.outbox_events"
+    },
+    {
+      "database": "shopping",
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "shopping-service",
+      "publisher_present": false,
+      "service": "shopping-service",
+      "table": "shopping.outbox_events"
+    },
+    {
+      "database": "trust",
+      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_owner": "trust-service",
+      "publisher_present": false,
+      "service": "trust-service",
+      "table": "trust.outbox_events"
+    }
+  ],
+  "platform_pass": false,
+  "schema": "track-c-inventory-denominator/v1",
+  "track": "C",
+  "track_b_terminal_sha256": "3d4d06245f0acde997bea77db4a9b32ab5be6563fc1979faeb71defe4ae569bb",
+  "track_c_acceptance_pass": false,
+  "verdict": "INVENTORY_DENOMINATOR_PASS"
+}

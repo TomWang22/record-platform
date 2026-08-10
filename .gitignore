@@ -108,6 +108,10 @@ tmp/
 !reports/performance/live-evidence/track-c/**/*.sha256
 !reports/performance/live-evidence/owner-packets/PACKET_C_REMEDIATION_SIX_PUBLISHERS.PREPARED.json
 !reports/performance/live-evidence/owner-packets/PACKET_C_REMEDIATION_SIX_PUBLISHERS.PREPARED.json.sha256
+!reports/performance/live-evidence/owner-packets/PACKET_C_REMEDIATION_SIX_PUBLISHERS.PREPARED.OBSOLETE_288fd8aa.json
+!reports/performance/live-evidence/owner-packets/PACKET_C_REMEDIATION_SIX_PUBLISHERS.PREPARED.OBSOLETE_288fd8aa.json.sha256
+!reports/performance/live-evidence/owner-packets/PACKET_C_REMEDIATION_SIX_PUBLISHERS.PREPARED.OBSOLETE_6fbc2410.json
+!reports/performance/live-evidence/owner-packets/PACKET_C_REMEDIATION_SIX_PUBLISHERS.PREPARED.OBSOLETE_6fbc2410.json.sha256
 !reports/outbox/canary-v3-live-window-authorization-packet.PREPARED.json
 !reports/outbox/canary-v3-manual-readonly-probe-command-packet.PREPARED.json
 !reports/outbox/performance-program-owner-live-gates.PREPARED.json

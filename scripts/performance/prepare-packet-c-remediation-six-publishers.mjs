@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * Prepare non-live Packet C six-publisher remediation readiness packet.
+ * Prepare non-live Packet C publisher-remediation readiness packet.
  *
- * Targets only PUBLISHER_BLOCKED owners. Does not authorize, publish, or seed.
+ * Targets only remaining PUBLISHER_BLOCKED owners. Does not authorize, publish, or seed.
  * Acceptance denominator remains the frozen 12-owner Track C set.
  *
  * Pins both data artifacts and source/test/generator implementation digests so
  * the PREPARED freeze cannot silently drift after validation.
+ *
+ * After media publisher remediation: remaining blocked = 5 (messaging…trust).
+ * Pre-media freeze 288fd8aa… is obsolete and must never be authorized.
  */
 
 import { createHash } from "node:crypto";
@@ -36,9 +39,9 @@ const OUT_REL =
   "reports/performance/live-evidence/owner-packets/PACKET_C_REMEDIATION_SIX_PUBLISHERS.PREPARED.json";
 
 const EXPECTED_DENOM_SHA256 =
-  "4330610d2f5fa727839ca0e5e5cd821ae31eff53a9298b1ba20fcbe2dd128f7e";
+  "065f0c7832531f9f32fae36a14d6e67868c5c1be08b2b2171e0cbd8c5d818ac6";
 const EXPECTED_MATRIX_SHA256 =
-  "f2ba461d31da4bc6db029a8c528a101ebd73108299f046619ca5e1dbdd0e9bf4";
+  "b15959513b5e728be8679a2dc85c17eeaf02ab02f4ba932f3a2b571b3cb349ec";
 
 /** Prior remediation PREPARED freezes — never authorize against these. */
 export const OBSOLETE_REMEDIATION_PREPARED_SHA256 = Object.freeze([
@@ -46,6 +49,10 @@ export const OBSOLETE_REMEDIATION_PREPARED_SHA256 = Object.freeze([
   "91c033c997e3f3c8ab56a0594165bc814a1892e043839f9df3e01aad6e2fb9b8",
   // data pins present, still missing source/test/generator pins
   "c3c432b91001967eceec651f7b2e201576e1f442a3ccbf256fa01c2c63da77f6",
+  // pre-media source-pinned freeze (6 blocked)
+  "288fd8aa40f22634acd087a2b2192ddb459beb07412bfa2a58be2e1e7872b694",
+  // post-media but claim-released-before-send / default-on gaps
+  "6fbc2410995cc409cb9e3a06f7474ab87216e23f7e77db3e5f9f16531cf9f905",
 ]);
 
 const SOURCE_PIN_PATHS = Object.freeze({
@@ -62,10 +69,13 @@ const SOURCE_PIN_PATHS = Object.freeze({
   track_c_inventory_denominator_freeze_test_mjs:
     "tests/track-c-inventory-denominator-freeze.test.mjs",
   outbox_owner_inventory_test_mjs: "tests/outbox-owner-inventory.test.mjs",
+  media_outbox_publisher_ts:
+    "services/media-service/src/outbox/publishOutbox.ts",
+  media_outbox_publisher_test_ts:
+    "services/media-service/tests/media-outbox-publisher.test.ts",
 });
 
 const EXPECTED_BLOCKED = Object.freeze([
-  "media.outbox_events",
   "messaging.outbox_events",
   "notification.outbox_events",
   "records.outbox_events",
@@ -168,8 +178,8 @@ function main() {
     }))
     .sort((a, b) => a.table.localeCompare(b.table));
 
-  if (remediationTargets.length !== 6) {
-    throw new Error(`remediation_target_count_not_6:${remediationTargets.length}`);
+  if (remediationTargets.length !== 5) {
+    throw new Error(`remediation_target_count_not_5:${remediationTargets.length}`);
   }
 
   const now = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -184,7 +194,7 @@ function main() {
     track_c_acceptance_pass: false,
     emitted_at_utc: now,
     purpose:
-      "Remediation/observation readiness for the six PUBLISHER_BLOCKED canonical outboxes only",
+      "Remediation/observation readiness for remaining PUBLISHER_BLOCKED canonical outboxes (media publisher present; 5 blocked remain)",
     pins: {
       inventory_sha256: TRACK_C_CANONICAL_INVENTORY_SHA256,
       inventory_denominator_sha256: EXPECTED_DENOM_SHA256,
@@ -195,13 +205,13 @@ function main() {
     },
     acceptance_denominator_count: TRACK_C_EXPECTED_OWNER_COUNT,
     acceptance_denominator_tables: [...expectedTables],
-    remediation_target_count: 6,
+    remediation_target_count: 5,
     remediation_targets: remediationTargets,
     not_in_remediation_scope: {
       lifecycle_executable: [...matrix.partitions.lifecycle_executable].sort(),
       migration_pending: [...matrix.partitions.migration_pending].sort(),
       note:
-        "auth.outbox_events remains MIGRATION_PENDING and must not be treated as publisher-blocked or executable in this packet",
+        "auth.outbox_events remains MIGRATION_PENDING; media.outbox_events is LIFECYCLE_EXECUTABLE with lock-through-ack publisher (MEDIA_OUTBOX_PUBLISHER===1 opt-in; live still unauthorized)",
     },
     hard_rules: [
       "acceptance_denominator_remains_12",
@@ -210,6 +220,8 @@ function main() {
       "booking_and_social_forbidden",
       "no_live_publish_without_separate_authorization",
       "source_and_test_pins_required",
+      "do_not_authorize_obsolete_prepared_288fd8aa",
+      "do_not_authorize_obsolete_prepared_6fbc2410",
     ],
     obsolete_inventory_sha256: [...OBSOLETE_INVENTORY_SHA256],
     obsolete_prepared_sha256: [...OBSOLETE_REMEDIATION_PREPARED_SHA256],
@@ -222,9 +234,11 @@ function main() {
       "narrow_acceptance_denominator_to_six",
       "authorize_obsolete_prepared_91c033c9",
       "authorize_obsolete_prepared_c3c432b9",
+      "authorize_obsolete_prepared_288fd8aa",
+      "authorize_obsolete_prepared_6fbc2410",
     ],
     next_boundary:
-      "IMPLEMENT_SIX_PUBLISHERS_ONE_TABLE_AT_A_TIME_NO_LIVE_PUBLISH",
+      "IMPLEMENT_REMAINING_FIVE_PUBLISHERS_ONE_TABLE_AT_A_TIME_STARTING_MESSAGING_NO_LIVE_PUBLISH",
   };
 
   assertTrackCRemediationPacket({
@@ -246,7 +260,7 @@ function main() {
       {
         path: OUT_REL,
         prepared_sha256: digest,
-        remediation_target_count: 6,
+        remediation_target_count: 5,
         acceptance_denominator_count: 12,
         readiness_matrix_sha256: EXPECTED_MATRIX_SHA256,
         source_pin_count: Object.keys(sourcePins).length,

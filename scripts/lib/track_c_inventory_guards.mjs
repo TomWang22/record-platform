@@ -105,8 +105,9 @@ export function assertObsoleteInventoryDigests(inventory, obsoleteInventorySha25
 }
 
 /**
- * Validate the frozen 5 + 1 + 6 Track C readiness partition.
+ * Validate the frozen Track C readiness partition.
  *
+ * After media publisher remediation the live freeze is 6 + 1 + 5.
  * expectedTables must come from the frozen 12-owner denominator artifact,
  * rather than being reconstructed from the readiness matrix itself.
  */
@@ -114,6 +115,8 @@ export function assertTrackCReadinessMatrix({
   matrix,
   expectedTables,
   expectedOwnerCount = 12,
+  expectedLifecycleExecutableCount = 6,
+  expectedPublisherBlockedCount = 5,
 }) {
   if (!matrix || typeof matrix !== "object") {
     throw new Error("TRACK_C_READINESS_INVALID:matrix_missing");
@@ -155,9 +158,9 @@ export function assertTrackCReadinessMatrix({
     );
   }
 
-  if (lifecycleExecutable.length !== 5) {
+  if (lifecycleExecutable.length !== expectedLifecycleExecutableCount) {
     throw new Error(
-      `TRACK_C_READINESS_INVALID:lifecycle_executable_count:${lifecycleExecutable.length}!=5`,
+      `TRACK_C_READINESS_INVALID:lifecycle_executable_count:${lifecycleExecutable.length}!=${expectedLifecycleExecutableCount}`,
     );
   }
 
@@ -167,9 +170,9 @@ export function assertTrackCReadinessMatrix({
     );
   }
 
-  if (publisherBlocked.length !== 6) {
+  if (publisherBlocked.length !== expectedPublisherBlockedCount) {
     throw new Error(
-      `TRACK_C_READINESS_INVALID:publisher_blocked_count:${publisherBlocked.length}!=6`,
+      `TRACK_C_READINESS_INVALID:publisher_blocked_count:${publisherBlocked.length}!=${expectedPublisherBlockedCount}`,
     );
   }
 

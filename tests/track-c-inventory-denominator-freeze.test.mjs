@@ -20,10 +20,20 @@ function shaFile(rel) {
     .digest("hex");
 }
 
-test("Track C freeze: canonical inventory SHA is 5707bed2 12/12", () => {
+test("Track C freeze: canonical inventory SHA is post-media 12/12", () => {
   const digest = shaFile("reports/performance/outbox-owner-inventory.PREPARED.json");
   assert.equal(digest, TRACK_C_CANONICAL_INVENTORY_SHA256);
   assert.ok(!OBSOLETE_INVENTORY_SHA256.includes(digest));
+  assert.ok(
+    OBSOLETE_INVENTORY_SHA256.includes(
+      "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
+    ),
+  );
+  assert.ok(
+    OBSOLETE_INVENTORY_SHA256.includes(
+      "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6",
+    ),
+  );
 
   const inv = JSON.parse(
     readFileSync(join(REPO, "reports/performance/outbox-owner-inventory.PREPARED.json"), "utf8"),
@@ -86,7 +96,7 @@ test("Track C freeze: reject obsolete 70ae0ee0 inventory SHA if presented", () =
   assert.throws(() => assertOutboxInventory(inv), /obsolete_inventory_sha/);
 });
 
-test("Track C readiness: matrix covers all 12 with 5 executable / 1 migration / 6 blocked", () => {
+test("Track C readiness: matrix covers all 12 with 6 executable / 1 migration / 5 blocked", () => {
   const matrix = JSON.parse(
     readFileSync(
       join(REPO, "reports/performance/live-evidence/track-c/PACKET_C_READINESS_MATRIX.json"),
@@ -99,14 +109,14 @@ test("Track C readiness: matrix covers all 12 with 5 executable / 1 migration / 
   assert.equal(matrix.track_c_acceptance_pass, false);
   assert.equal(matrix.acceptance_denominator_count, 12);
   assert.equal(matrix.owners.length, 12);
-  assert.equal(matrix.counts.lifecycle_executable, 5);
+  assert.equal(matrix.counts.lifecycle_executable, 6);
   assert.equal(matrix.counts.migration_pending, 1);
-  assert.equal(matrix.counts.publisher_blocked, 6);
-  assert.equal(matrix.counts.acceptance_blockers, 7);
+  assert.equal(matrix.counts.publisher_blocked, 5);
+  assert.equal(matrix.counts.acceptance_blockers, 6);
+  assert.ok(matrix.partitions.lifecycle_executable.includes("media.outbox_events"));
   assert.deepEqual(
     matrix.partitions.publisher_blocked.sort(),
     [
-      "media.outbox_events",
       "messaging.outbox_events",
       "notification.outbox_events",
       "records.outbox_events",

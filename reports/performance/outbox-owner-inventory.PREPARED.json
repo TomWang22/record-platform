@@ -36,7 +36,9 @@
     ]
   },
   "obsolete_inventory_sha256": [
-    "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be"
+    "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be",
+    "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
+    "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6"
   ],
   "owners": [
     {
@@ -465,14 +467,15 @@
     {
       "service": "media-service",
       "publisher_owner": "media-service",
-      "publisher_present": false,
-      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
       "creation_transition": "CompleteUpload verified + INSERT media.outbox_events same transaction",
-      "publisher_implementation": "services/media-service/src/outbox/insertOutbox.ts (insert only; no publish/mark)",
+      "publisher_implementation": "services/media-service/src/outbox/publishOutbox.ts (claim/produce/mark after broker ack); insertOutbox.ts",
       "poll_batch": {
-        "model": "ABSENT",
-        "batch_limit": null,
-        "claim": null
+        "interval_ms": null,
+        "batch_limit": 25,
+        "env_batch": "MEDIA_OUTBOX_BATCH",
+        "claim": "FOR UPDATE SKIP LOCKED"
       },
       "topic": "${ENV_PREFIX}.media.events",
       "kafka_principal": "CN=media-service",
@@ -480,10 +483,13 @@
         "WRITE ${ENV_PREFIX}.media.events (not provisioned)"
       ],
       "retry": {
-        "model": "ABSENT"
+        "model": "soft_in_process_attempt_budget",
+        "max_attempts": 3,
+        "backoff": "next tick re-claim"
       },
       "lease": {
-        "model": "ABSENT"
+        "model": "transactional row lock only",
+        "leased_until_column": false
       },
       "terminal_predicates": [
         "published=true"
@@ -504,7 +510,9 @@
       "business_effect": "MediaUploadedV1 consumers (unwired)",
       "cleanup_disposition": "RETAINED — write-only ledger relative to Kafka",
       "annotations": [
-        "publisher ownership/implementation gap — explicit disposition not silent ack"
+        "publisher present non-live; MEDIA_OUTBOX_PUBLISHER must be exactly 1 (default OFF)",
+        "claim holds FOR UPDATE SKIP LOCKED through broker ack + DB mark in one transaction",
+        "soft retry_exhaustion is process-scoped (restart resets); no DDL retry_count/DLQ"
       ],
       "schema": "media",
       "table": "media.outbox_events",
@@ -527,11 +535,7 @@
         "unknown_blocking"
       ],
       "status_predicate": "published=false",
-      "publisher_disposition": {
-        "status": "MISSING_BLOCKS_ACCEPTANCE",
-        "reason": "Insert-only outbox; no Kafka publish/mark path",
-        "evidence": "services/media-service/src/outbox/insertOutbox.ts; infra/db/02-media-outbox.sql"
-      }
+      "publisher_disposition": null
     },
     {
       "service": "messaging-service",
@@ -1303,14 +1307,15 @@
     {
       "service": "media-service",
       "publisher_owner": "media-service",
-      "publisher_present": false,
-      "disposition": "PUBLISHER_ABSENT_EXPLICIT",
+      "publisher_present": true,
+      "disposition": "INVENTORIED",
       "creation_transition": "CompleteUpload verified + INSERT media.outbox_events same transaction",
-      "publisher_implementation": "services/media-service/src/outbox/insertOutbox.ts (insert only; no publish/mark)",
+      "publisher_implementation": "services/media-service/src/outbox/publishOutbox.ts (claim/produce/mark after broker ack); insertOutbox.ts",
       "poll_batch": {
-        "model": "ABSENT",
-        "batch_limit": null,
-        "claim": null
+        "interval_ms": null,
+        "batch_limit": 25,
+        "env_batch": "MEDIA_OUTBOX_BATCH",
+        "claim": "FOR UPDATE SKIP LOCKED"
       },
       "topic": "${ENV_PREFIX}.media.events",
       "kafka_principal": "CN=media-service",
@@ -1318,10 +1323,13 @@
         "WRITE ${ENV_PREFIX}.media.events (not provisioned)"
       ],
       "retry": {
-        "model": "ABSENT"
+        "model": "soft_in_process_attempt_budget",
+        "max_attempts": 3,
+        "backoff": "next tick re-claim"
       },
       "lease": {
-        "model": "ABSENT"
+        "model": "transactional row lock only",
+        "leased_until_column": false
       },
       "terminal_predicates": [
         "published=true"
@@ -1342,7 +1350,9 @@
       "business_effect": "MediaUploadedV1 consumers (unwired)",
       "cleanup_disposition": "RETAINED — write-only ledger relative to Kafka",
       "annotations": [
-        "publisher ownership/implementation gap — explicit disposition not silent ack"
+        "publisher present non-live; MEDIA_OUTBOX_PUBLISHER must be exactly 1 (default OFF)",
+        "claim holds FOR UPDATE SKIP LOCKED through broker ack + DB mark in one transaction",
+        "soft retry_exhaustion is process-scoped (restart resets); no DDL retry_count/DLQ"
       ],
       "schema": "media",
       "table": "media.outbox_events",
@@ -1365,11 +1375,7 @@
         "unknown_blocking"
       ],
       "status_predicate": "published=false",
-      "publisher_disposition": {
-        "status": "MISSING_BLOCKS_ACCEPTANCE",
-        "reason": "Insert-only outbox; no Kafka publish/mark path",
-        "evidence": "services/media-service/src/outbox/insertOutbox.ts; infra/db/02-media-outbox.sql"
-      }
+      "publisher_disposition": null
     },
     {
       "service": "messaging-service",
@@ -1755,7 +1761,7 @@
     "Auction-monitor canary-v3 does not close platform-wide outbox denominator.",
     "Track B terminal referenced as prior evidence only; Packet B not reopened.",
     "booking/social are FORBIDDEN_NONEXISTENT_SERVICE — ABSENT_BY_CONTRACT, not disposition rows.",
-    "Obsolete 14/14 SHA 70ae0ee0… must not be carried forward.",
+    "Obsolete 14/14 SHA 70ae0ee0… and pre-media 5707bed2… must not be carried forward as canonical.",
     "Listings DLQ + orphan cohorts preserved as contract annotations."
   ]
 }

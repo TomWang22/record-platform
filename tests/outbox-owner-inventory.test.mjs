@@ -66,11 +66,10 @@ test("Track C: prepared inventory closes 12-row denominator without booking/soci
   assert.equal(result.platform_pass, false);
   assert.equal(result.publisher_absent_rows_explicit, true);
   assert.equal(result.lifecycle_publish_executed, false);
-  assert.equal(result.missing_blocks_acceptance_count, 6);
+  assert.equal(result.missing_blocks_acceptance_count, 5);
   assert.deepEqual(
     result.acceptance_blockers.sort(),
     [
-      "media.outbox_events",
       "messaging.outbox_events",
       "notification.outbox_events",
       "records.outbox_events",
@@ -108,12 +107,13 @@ test("Track C: preserve known specials as annotations", () => {
   assert.ok(auction.annotations?.some((a) => a.includes("capacity-limited")));
 
   const media = inv.owners.find((o) => o.service === "media-service");
-  assert.equal(media.publisher_present, false);
-  assert.equal(media.disposition, "PUBLISHER_ABSENT_EXPLICIT");
-  assert.equal(media.publisher_disposition.status, "MISSING_BLOCKS_ACCEPTANCE");
-  assert.ok(media.publisher_disposition.reason.length > 0);
-  assert.ok(media.publisher_disposition.evidence.includes("insertOutbox.ts"));
-  assert.ok(media.annotations?.some((a) => a.includes("implementation gap")));
+  assert.equal(media.publisher_present, true);
+  assert.equal(media.disposition, "INVENTORIED");
+  assert.equal(media.publisher_disposition, null);
+  assert.ok(media.publisher_implementation.includes("publishOutbox.ts"));
+  assert.ok(media.poll_batch?.claim?.includes("FOR UPDATE SKIP LOCKED"));
+  assert.ok(media.annotations?.some((a) => a.includes("MEDIA_OUTBOX_PUBLISHER must be exactly 1")));
+  assert.ok(media.annotations?.some((a) => a.includes("FOR UPDATE SKIP LOCKED through broker ack")));
 
   const authCanonical = inv.owners.find((o) => o.table === "auth.outbox_events");
   assert.equal(authCanonical.publisher_disposition.status, "MIGRATION_PENDING");
@@ -226,7 +226,7 @@ test("Track C: auditor accepts frozen 12-row inventory harness without platform 
   assert.equal(audit.harness_pass, true);
   assert.equal(audit.platform_pass, false);
   assert.equal(audit.track_b_terminal_sha256_referenced, true);
-  assert.equal(audit.missing_blocks_acceptance_count, 6);
+  assert.equal(audit.missing_blocks_acceptance_count, 5);
   assert.equal(audit.mutation_performed, false);
   assert.equal(audit.network_calls, false);
 });

@@ -90,13 +90,17 @@ export const FORBIDDEN_NONEXISTENT_OUTBOX_TABLES = Object.freeze([
 
 export const TRACK_C_EXPECTED_OWNER_COUNT = 12;
 
-/** Frozen corrected 12/12 inventory (booking/social absent by contract). */
+/** Frozen post-media-publisher 12/12 inventory (media lock-through-ack + default-off). */
 export const TRACK_C_CANONICAL_INVENTORY_SHA256 =
-  "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052";
+  "fd35ad0afaed963f9285e8a89d1a73bdd68f664b001dfc09cf50ec270287fe12";
 
 export const OBSOLETE_INVENTORY_SHA256 = Object.freeze([
   // 14/14 denominator that incorrectly included booking+social disposition rows
   "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be",
+  // pre-media-publisher remediation baseline (5 exec / 1 mig / 6 blocked)
+  "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
+  // media publisher present but claim-released-before-send / default-on gaps
+  "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6",
 ]);
 
 export function isForbiddenOutboxSchema(schemaOrDatabase) {
@@ -145,11 +149,6 @@ export const PUBLISHER_ABSENT_DISPOSITIONS = Object.freeze({
     status: "MISSING_BLOCKS_ACCEPTANCE",
     reason: "DDL + insert paths exist; no publish/mark loop located",
     evidence: "infra/db/02-messaging-outbox.sql",
-  }),
-  "media.outbox_events": Object.freeze({
-    status: "MISSING_BLOCKS_ACCEPTANCE",
-    reason: "Insert-only outbox; no Kafka publish/mark path",
-    evidence: "services/media-service/src/outbox/insertOutbox.ts; infra/db/02-media-outbox.sql",
   }),
   "trust.outbox_events": Object.freeze({
     status: "MISSING_BLOCKS_ACCEPTANCE",
@@ -283,17 +282,26 @@ export const OUTBOX_REGISTRY = {
   "media.outbox_events": {
     service: "media-service",
     publisher_owner: "media-service",
-    publisher_present: false,
-    disposition: "PUBLISHER_ABSENT_EXPLICIT",
+    publisher_present: true,
+    disposition: "INVENTORIED",
     creation_transition: "CompleteUpload verified + INSERT media.outbox_events same transaction",
     publisher_implementation:
-      "services/media-service/src/outbox/insertOutbox.ts (insert only; no publish/mark)",
-    poll_batch: { model: "ABSENT", batch_limit: null, claim: null },
+      "services/media-service/src/outbox/publishOutbox.ts (claim/produce/mark after broker ack); insertOutbox.ts",
+    poll_batch: {
+      interval_ms: null,
+      batch_limit: 25,
+      env_batch: "MEDIA_OUTBOX_BATCH",
+      claim: "FOR UPDATE SKIP LOCKED",
+    },
     topic: "${ENV_PREFIX}.media.events",
     kafka_principal: "CN=media-service",
     acl_expectations: ["WRITE ${ENV_PREFIX}.media.events (not provisioned)"],
-    retry: { model: "ABSENT" },
-    lease: { model: "ABSENT" },
+    retry: {
+      model: "soft_in_process_attempt_budget",
+      max_attempts: 3,
+      backoff: "next tick re-claim",
+    },
+    lease: { model: "transactional row lock only", leased_until_column: false },
     terminal_predicates: ["published=true"],
     dlq: { present: false },
     broker_ack: { required: true, marks_published: false },
@@ -301,7 +309,11 @@ export const OUTBOX_REGISTRY = {
     consumer_groups: [],
     business_effect: "MediaUploadedV1 consumers (unwired)",
     cleanup_disposition: "RETAINED — write-only ledger relative to Kafka",
-    annotations: ["publisher ownership/implementation gap — explicit disposition not silent ack"],
+    annotations: [
+      "publisher present non-live; MEDIA_OUTBOX_PUBLISHER must be exactly 1 (default OFF)",
+      "claim holds FOR UPDATE SKIP LOCKED through broker ack + DB mark in one transaction",
+      "soft retry_exhaustion is process-scoped (restart resets); no DDL retry_count/DLQ",
+    ],
   },
   "listings.outbox_events": {
     service: "listings-service",
@@ -789,7 +801,7 @@ export function buildPreparedOutboxInventory(repoRoot) {
       "Auction-monitor canary-v3 does not close platform-wide outbox denominator.",
       "Track B terminal referenced as prior evidence only; Packet B not reopened.",
       "booking/social are FORBIDDEN_NONEXISTENT_SERVICE — ABSENT_BY_CONTRACT, not disposition rows.",
-      "Obsolete 14/14 SHA 70ae0ee0… must not be carried forward.",
+      "Obsolete 14/14 SHA 70ae0ee0… and pre-media 5707bed2… must not be carried forward as canonical.",
       "Listings DLQ + orphan cohorts preserved as contract annotations.",
     ],
   };

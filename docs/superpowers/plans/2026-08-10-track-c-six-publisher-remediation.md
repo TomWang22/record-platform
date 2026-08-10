@@ -6,8 +6,8 @@
 **load_testing_authorized:** false  
 **Parent denominator:** `TRACK_C_INVENTORY_DENOMINATOR` (`4330610d…`) bound to inventory `5707bed2…`  
 **Readiness matrix:** `f2ba461d…`  
-**Remediation PREPARED (current):** `288fd8aa…` (`PACKET_C_REMEDIATION_SIX_PUBLISHERS.PREPARED.json`, includes source/test/generator pins)  
-**Obsolete unauthorized PREPARED:** `91c033c9…`, `c3c432b9…` (never authorize; `c3c432b9…` lacked source pins)
+**Remediation PREPARED (current post-media lock-through-ack):** `3c679ecd…` (5 remaining blocked; media source pins)  
+**Obsolete unauthorized PREPARED:** `91c033c9…`, `c3c432b9…`, `288fd8aa…`, `6fbc2410…` (never authorize)
 
 ## Goal
 
@@ -20,14 +20,15 @@ This plan does **not** authorize live publish, seed mutation, or Track C lifecyc
 ```text
 TRACK_C_DENOMINATOR = 12
 
-Current readiness partition:
-  LIFECYCLE_EXECUTABLE = 5
+Current readiness partition (after media publisher lock-through-ack fix):
+  LIFECYCLE_EXECUTABLE = 6
   MIGRATION_PENDING    = 1   # auth.outbox_events only
-  PUBLISHER_BLOCKED    = 6
+  PUBLISHER_BLOCKED    = 5
   TOTAL                = 12
 
-REMEDIATION_TARGETS = exactly the 6 PUBLISHER_BLOCKED owners
+REMEDIATION_TARGETS = exactly the remaining 5 PUBLISHER_BLOCKED owners
 booking/social      = FORBIDDEN_NONEXISTENT_SERVICE (ABSENT_BY_CONTRACT)
+MEDIA_OUTBOX_PUBLISHER must be exactly "1" (default OFF)
 ```
 
 Expected intermediate readiness after all six publishers are genuinely present:
@@ -53,8 +54,8 @@ Then — and only then — prepare a **12-owner lifecycle-acceptance packet**. N
 
 | Order | Table | Service | Current disposition | Notes |
 | ---: | --- | --- | --- | --- |
-| 1 | `media.outbox_events` | media-service | `MISSING_BLOCKS_ACCEPTANCE` | Insert-only today (`insertOutbox.ts`); needs publish/mark loop |
-| 2 | `messaging.outbox_events` | messaging-service | `MISSING_BLOCKS_ACCEPTANCE` | Insert paths exist; no publish/mark located |
+| 1 | `media.outbox_events` | media-service | **DONE** (publisher present; live off) | `publishOutbox.ts` + mocked lifecycle tests |
+| 2 | `messaging.outbox_events` | messaging-service | `MISSING_BLOCKS_ACCEPTANCE` | **next** |
 | 3 | `notification.outbox_events` | notification-service | `MISSING_BLOCKS_ACCEPTANCE` | DDL present; no publisher located |
 | 4 | `records.outbox_events` | records-service | `MISSING_BLOCKS_ACCEPTANCE` | DDL present; no publisher located |
 | 5 | `shopping.outbox_events` | shopping-service | `MISSING_BLOCKS_ACCEPTANCE` | SaleCompleted drains listings; shopping table unwired |

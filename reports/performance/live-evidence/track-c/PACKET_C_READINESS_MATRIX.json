@@ -15,14 +15,14 @@
     "trust.outbox_events"
   ],
   "counts": {
-    "acceptance_blockers": 7,
+    "acceptance_blockers": 6,
     "canonical_owners": 12,
-    "lifecycle_executable": 5,
+    "lifecycle_executable": 6,
     "migration_pending": 1,
-    "observation_eligible": 5,
-    "publisher_blocked": 6
+    "observation_eligible": 6,
+    "publisher_blocked": 5
   },
-  "emitted_at_utc": "2026-08-10T14:50:37Z",
+  "emitted_at_utc": "2026-08-10T15:40:43Z",
   "execution_authorized": false,
   "explicitly_excluded": [
     "packet_c_authorization",
@@ -35,7 +35,9 @@
   "load_testing_authorized": false,
   "next_boundary": "NO_PACKET_C_AUTH_UNTIL_OWNER_EXPLICITLY_AUTHORIZES",
   "obsolete_inventory_sha256": [
-    "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be"
+    "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be",
+    "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
+    "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6"
   ],
   "owners": [
     {
@@ -129,14 +131,14 @@
       "topic": "${ENV_PREFIX}.listing.events"
     },
     {
-      "blocks_track_c_acceptance": true,
+      "blocks_track_c_acceptance": false,
       "database": "media",
-      "packet_c_observation_eligible": false,
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "packet_c_observation_eligible": true,
+      "publisher_disposition_status": null,
       "publisher_owner": "media-service",
-      "publisher_present": false,
-      "readiness": "PUBLISHER_BLOCKED",
-      "reason": "Missing publisher blocks Track C acceptance for this canonical owner",
+      "publisher_present": true,
+      "readiness": "LIFECYCLE_EXECUTABLE",
+      "reason": "Publisher present; non-live lifecycle evidence may be prepared for this owner",
       "required_for_track_c_acceptance": true,
       "service": "media-service",
       "status_predicate": "published=false",
@@ -226,13 +228,13 @@
       "analytics.outbox_events",
       "auction_monitor.outbox_events",
       "auth.auth_outbox",
-      "listings.outbox_events"
+      "listings.outbox_events",
+      "media.outbox_events"
     ],
     "migration_pending": [
       "auth.outbox_events"
     ],
     "publisher_blocked": [
-      "media.outbox_events",
       "messaging.outbox_events",
       "notification.outbox_events",
       "records.outbox_events",
@@ -243,8 +245,8 @@
   "platform_pass": false,
   "remediation_packet_note": "A six-service remediation/observation packet may target publisher_blocked owners only, but Track C terminal acceptance must still account for all 12 canonical outboxes.",
   "schema": "packet-c-readiness-matrix/v1",
-  "source_inventory_denominator_sha256": "4330610d2f5fa727839ca0e5e5cd821ae31eff53a9298b1ba20fcbe2dd128f7e",
-  "source_inventory_sha256": "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
+  "source_inventory_denominator_sha256": "065f0c7832531f9f32fae36a14d6e67868c5c1be08b2b2171e0cbd8c5d818ac6",
+  "source_inventory_sha256": "fd35ad0afaed963f9285e8a89d1a73bdd68f664b001dfc09cf50ec270287fe12",
   "status": "PREPARED_NON_LIVE",
   "track_c_acceptance_pass": false
 }

@@ -14,7 +14,7 @@
     "shopping.outbox_events",
     "trust.outbox_events"
   ],
-  "emitted_at_utc": "2026-08-10T15:41:30Z",
+  "emitted_at_utc": "2026-08-10T15:28:06Z",
   "execution_authorized": false,
   "explicitly_excluded": [
     "packet_c_authorization",
@@ -25,8 +25,7 @@
     "narrow_acceptance_denominator_to_six",
     "authorize_obsolete_prepared_91c033c9",
     "authorize_obsolete_prepared_c3c432b9",
-    "authorize_obsolete_prepared_288fd8aa",
-    "authorize_obsolete_prepared_6fbc2410"
+    "authorize_obsolete_prepared_288fd8aa"
   ],
   "hard_rules": [
     "acceptance_denominator_remains_12",
@@ -35,8 +34,7 @@
     "booking_and_social_forbidden",
     "no_live_publish_without_separate_authorization",
     "source_and_test_pins_required",
-    "do_not_authorize_obsolete_prepared_288fd8aa",
-    "do_not_authorize_obsolete_prepared_6fbc2410"
+    "do_not_authorize_obsolete_prepared_288fd8aa"
   ],
   "lifecycle_publish_executed": false,
   "load_testing_authorized": false,
@@ -53,36 +51,34 @@
     "migration_pending": [
       "auth.outbox_events"
     ],
-    "note": "auth.outbox_events remains MIGRATION_PENDING; media.outbox_events is LIFECYCLE_EXECUTABLE with lock-through-ack publisher (MEDIA_OUTBOX_PUBLISHER===1 opt-in; live still unauthorized)"
+    "note": "auth.outbox_events remains MIGRATION_PENDING; media.outbox_events is now LIFECYCLE_EXECUTABLE (publisher present, live publish still unauthorized)"
   },
   "obsolete_inventory_sha256": [
     "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be",
-    "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
-    "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6"
+    "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052"
   ],
   "obsolete_prepared_sha256": [
     "91c033c997e3f3c8ab56a0594165bc814a1892e043839f9df3e01aad6e2fb9b8",
     "c3c432b91001967eceec651f7b2e201576e1f442a3ccbf256fa01c2c63da77f6",
-    "288fd8aa40f22634acd087a2b2192ddb459beb07412bfa2a58be2e1e7872b694",
-    "6fbc2410995cc409cb9e3a06f7474ab87216e23f7e77db3e5f9f16531cf9f905"
+    "288fd8aa40f22634acd087a2b2192ddb459beb07412bfa2a58be2e1e7872b694"
   ],
   "packet_id": "PACKET_C_REMEDIATION_SIX_PUBLISHERS",
   "pins": {
-    "inventory_denominator_sha256": "065f0c7832531f9f32fae36a14d6e67868c5c1be08b2b2171e0cbd8c5d818ac6",
-    "inventory_sha256": "fd35ad0afaed963f9285e8a89d1a73bdd68f664b001dfc09cf50ec270287fe12",
-    "readiness_matrix_sha256": "b15959513b5e728be8679a2dc85c17eeaf02ab02f4ba932f3a2b571b3cb349ec",
+    "inventory_denominator_sha256": "4f6d8a2b1a7e037a9cdde95f94657e4f9d9cf8805bb0178e0814c5545303e8e3",
+    "inventory_sha256": "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6",
+    "readiness_matrix_sha256": "2170511b72f284c0c94680f7861025b0bf8680b93e9c43795f269f0740095b8a",
     "source": {
       "build_outbox_inventory_mjs": "3ed47465f0da11ad432620aa6713154ff47406c2780bad82b5e60db7be3f3eb6",
       "build_packet_c_readiness_matrix_mjs": "79c5c8d449166042c690609327060014cb6949317271dcd64dcf238cddda2ae4",
       "freeze_track_c_inventory_denominator_mjs": "0fd1d7e9208216cdf2d8bb856fea14a447b1903b91af9bf7ba6490dd40aa85bb",
-      "media_outbox_publisher_test_ts": "97d17a6d1011b2ea3e0588e425b359b8f0e1d47611771b8b532ed8f17a75e6a7",
-      "media_outbox_publisher_ts": "5de58a4f13060aaee3c68eb165015097cbc7f1e73714aea2f829ab118c727661",
-      "outbox_owner_inventory_test_mjs": "bf73f88d3e3917c317cd135584d4d149b189aed6cc09012a79846eb7ce5c0676",
-      "performance_track_c_mjs": "d2890ab4a5c90fc2f7edf8658ebc8527c7d8739ed147955ab01a2d4f42f9c8f7",
-      "prepare_packet_c_remediation_mjs": "be09db50d6243632620f0ed6ab28a0294baf762e8d3a844b380d5446e900e229",
-      "track_c_inventory_denominator_freeze_test_mjs": "c5a53b813e5eb436f4ab988b6f8282d791d5f58fd7cb7d4fd3c73f6f2e0a0358",
+      "media_outbox_publisher_test_ts": "57d1c2a270514ac72ee4093b61d98ab2a500b37483c4fd2542e5bb8ce954d85b",
+      "media_outbox_publisher_ts": "370ba2f4084f914820904062a5bfeacffddd1a6a20a149d173bd355ee817e40d",
+      "outbox_owner_inventory_test_mjs": "7a04544171675322fa817806c97c6f2a77c0da53b9437632bbbaa31976c4b2ed",
+      "performance_track_c_mjs": "51a712b84c139c78274a22b5df9225c2556c70ce61a8ce525002e597091f1407",
+      "prepare_packet_c_remediation_mjs": "8686ddcd37f770e8c6d5f0e58c539f7898a4ed8b14927471514a917121ccbd21",
+      "track_c_inventory_denominator_freeze_test_mjs": "8ccd25f8542120a4405bfd8d9b71c945abcb603e184e166d3ba14ee5b896776b",
       "track_c_inventory_guards_mjs": "cc707f4d8b53ac34b0d7489610c5dd8c38fb15c315f4dfaf08d9b1858bf26b4d",
-      "track_c_inventory_guards_test_mjs": "d8241e5deb3d8c66da7198e9698c3ecf8230c8f45a83b05b11c5343b35d13c5b"
+      "track_c_inventory_guards_test_mjs": "50f6247679e474ecb98cf8a5a52b395b370107ab152d484c9e4c975e27353c17"
     },
     "track_b_terminal_sha256": "3d4d06245f0acde997bea77db4a9b32ab5be6563fc1979faeb71defe4ae569bb"
   },

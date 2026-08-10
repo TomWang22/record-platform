@@ -17,7 +17,7 @@
   ],
   "complete": true,
   "discovered_count": 12,
-  "emitted_at_utc": "2026-08-10T14:50:37Z",
+  "emitted_at_utc": "2026-08-10T15:40:42Z",
   "execution_authorized": false,
   "expected_count": 12,
   "explicitly_excluded": [
@@ -35,22 +35,22 @@
   "freeze_kind": "INVENTORY_DENOMINATOR_ONLY",
   "inventory_denominator_pass": true,
   "inventory_path": "reports/performance/outbox-owner-inventory.PREPARED.json",
-  "inventory_sha256": "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
-  "lifecycle_executable_count": 5,
+  "inventory_sha256": "fd35ad0afaed963f9285e8a89d1a73bdd68f664b001dfc09cf50ec270287fe12",
+  "lifecycle_executable_count": 6,
   "lifecycle_executable_owners": [
     "ai.outbox_events",
     "analytics.outbox_events",
     "auction_monitor.outbox_events",
     "auth.auth_outbox",
-    "listings.outbox_events"
+    "listings.outbox_events",
+    "media.outbox_events"
   ],
   "lifecycle_publish_executed": false,
   "migration_pending_owners": [
     "auth.outbox_events"
   ],
-  "missing_blocks_acceptance_count": 6,
+  "missing_blocks_acceptance_count": 5,
   "missing_blocks_acceptance_owners": [
-    "media.outbox_events",
     "messaging.outbox_events",
     "notification.outbox_events",
     "records.outbox_events",
@@ -59,7 +59,9 @@
   ],
   "next_boundary": "PACKET_C_READINESS_MATRIX_THEN_NO_LIVE_UNTIL_AUTHORIZED",
   "obsolete_inventory_sha256": [
-    "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be"
+    "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be",
+    "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
+    "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6"
   ],
   "owners": [
     {
@@ -112,9 +114,9 @@
     },
     {
       "database": "media",
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "publisher_disposition_status": null,
       "publisher_owner": "media-service",
-      "publisher_present": false,
+      "publisher_present": true,
       "service": "media-service",
       "table": "media.outbox_events"
     },

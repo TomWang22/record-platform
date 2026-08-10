@@ -162,11 +162,11 @@ function main() {
   if (executable.length + migrationPending.length + publisherBlocked.length !== 12) {
     throw new Error("readiness_partition_incomplete");
   }
-  if (publisherBlocked.length !== 6) {
-    throw new Error(`publisher_blocked_count_not_6:${publisherBlocked.length}`);
+  if (publisherBlocked.length !== 5) {
+    throw new Error(`publisher_blocked_count_not_5:${publisherBlocked.length}`);
   }
-  if (executable.length !== 5) {
-    throw new Error(`lifecycle_executable_count_not_5:${executable.length}`);
+  if (executable.length !== 6) {
+    throw new Error(`lifecycle_executable_count_not_6:${executable.length}`);
   }
   if (migrationPending.length !== 1) {
     throw new Error(`migration_pending_count_not_1:${migrationPending.length}`);

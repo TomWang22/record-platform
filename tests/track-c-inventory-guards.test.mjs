@@ -47,9 +47,9 @@ test("Track C guards: frozen readiness matrix is exhaustive and disjoint", () =>
     assertTrackCReadinessMatrix({ matrix, expectedTables }),
     true,
   );
-  assert.equal(matrix.counts.lifecycle_executable, 5);
+  assert.equal(matrix.counts.lifecycle_executable, 6);
   assert.equal(matrix.counts.migration_pending, 1);
-  assert.equal(matrix.counts.publisher_blocked, 6);
+  assert.equal(matrix.counts.publisher_blocked, 5);
   assert.equal(
     matrix.counts.lifecycle_executable +
       matrix.counts.migration_pending +
@@ -68,7 +68,7 @@ test("Track C guards: auth.outbox_events stays migration_pending only", () => {
   const badExecutable = structuredClone(matrix);
   badExecutable.partitions.lifecycle_executable.push("auth.outbox_events");
   badExecutable.partitions.migration_pending = [];
-  badExecutable.counts.lifecycle_executable = 6;
+  badExecutable.counts.lifecycle_executable = 7;
   badExecutable.counts.migration_pending = 0;
   assert.throws(
     () =>
@@ -82,7 +82,7 @@ test("Track C guards: auth.outbox_events stays migration_pending only", () => {
   const badBlocked = structuredClone(matrix);
   badBlocked.partitions.publisher_blocked.push("auth.outbox_events");
   badBlocked.partitions.migration_pending = [];
-  badBlocked.counts.publisher_blocked = 7;
+  badBlocked.counts.publisher_blocked = 6;
   badBlocked.counts.migration_pending = 0;
   assert.throws(
     () =>
@@ -113,8 +113,8 @@ test("Track C guards: incomplete partition set fails closed", () => {
   const matrix = loadMatrix();
   const expectedTables = loadExpectedTables();
   const bad = structuredClone(matrix);
-  bad.partitions.publisher_blocked = bad.partitions.publisher_blocked.slice(0, 5);
-  bad.counts.publisher_blocked = 5;
+  bad.partitions.publisher_blocked = bad.partitions.publisher_blocked.slice(0, 4);
+  bad.counts.publisher_blocked = 4;
   assert.throws(
     () => assertTrackCReadinessMatrix({ matrix: bad, expectedTables }),
     /partition_count|publisher_blocked_count|counts_sum|partition_tables/,
@@ -139,7 +139,7 @@ test("Track C guards: mismatched counts.* vs partition lengths fail closed", () 
   );
 
   const badBlocked = structuredClone(matrix);
-  badBlocked.counts.publisher_blocked = 5;
+  badBlocked.counts.publisher_blocked = 4;
   assert.throws(
     () => assertTrackCReadinessMatrix({ matrix: badBlocked, expectedTables }),
     /publisher_blocked_count_field/,
@@ -210,7 +210,7 @@ test("Track C guards: obsolete_inventory_sha256 must be array of allowlisted dig
   );
 });
 
-test("Track C remediation packet: six blocked targets pinned to 12-owner denominator", () => {
+test("Track C remediation packet: remaining blocked targets pinned to 12-owner denominator", () => {
   const packet = loadRemediationPacket();
   const matrix = loadMatrix();
   const expectedTables = loadExpectedTables();
@@ -223,19 +223,21 @@ test("Track C remediation packet: six blocked targets pinned to 12-owner denomin
   assert.equal(packet.platform_pass, false);
   assert.equal(packet.track_c_acceptance_pass, false);
   assert.equal(packet.acceptance_denominator_count, 12);
-  assert.equal(packet.remediation_target_count, 6);
+  assert.equal(packet.remediation_target_count, 5);
   assert.equal(packet.pins.inventory_sha256, TRACK_C_CANONICAL_INVENTORY_SHA256);
   assert.equal(
     packet.pins.readiness_matrix_sha256,
-    "f2ba461d31da4bc6db029a8c528a101ebd73108299f046619ca5e1dbdd0e9bf4",
+    "b15959513b5e728be8679a2dc85c17eeaf02ab02f4ba932f3a2b571b3cb349ec",
   );
   assert.equal(
     packet.pins.inventory_denominator_sha256,
-    "4330610d2f5fa727839ca0e5e5cd821ae31eff53a9298b1ba20fcbe2dd128f7e",
+    "065f0c7832531f9f32fae36a14d6e67868c5c1be08b2b2171e0cbd8c5d818ac6",
   );
   assert.ok(packet.pins.source);
   assert.ok(packet.pins.source.track_c_inventory_guards_mjs);
   assert.ok(packet.pins.source.prepare_packet_c_remediation_mjs);
+  assert.ok(packet.pins.source.media_outbox_publisher_ts);
+  assert.ok(packet.pins.source.media_outbox_publisher_test_ts);
   assert.ok(packet.pins.source.track_c_inventory_guards_test_mjs);
   assert.ok(Object.keys(packet.pins.source).length >= 5);
   assert.ok(
@@ -248,6 +250,18 @@ test("Track C remediation packet: six blocked targets pinned to 12-owner denomin
       "c3c432b91001967eceec651f7b2e201576e1f442a3ccbf256fa01c2c63da77f6",
     ),
   );
+  assert.ok(
+    packet.obsolete_prepared_sha256.includes(
+      "288fd8aa40f22634acd087a2b2192ddb459beb07412bfa2a58be2e1e7872b694",
+    ),
+  );
+  assert.ok(
+    packet.obsolete_prepared_sha256.includes(
+      "6fbc2410995cc409cb9e3a06f7474ab87216e23f7e77db3e5f9f16531cf9f905",
+    ),
+  );
+  assert.ok(!packet.remediation_targets.some((t) => t.table === "media.outbox_events"));
+  assert.ok(packet.not_in_remediation_scope.lifecycle_executable.includes("media.outbox_events"));
   assert.deepEqual(
     packet.remediation_targets.map((t) => t.table).sort(),
     [...matrix.partitions.publisher_blocked].sort(),

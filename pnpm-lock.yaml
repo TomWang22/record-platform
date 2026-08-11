@@ -695,6 +695,12 @@ importers:
       '@types/node':
         specifier: ^20.14.12
         version: 20.19.19
+      '@types/pg':
+        specifier: ^8.15.6
+        version: 8.15.6
+      '@vitest/coverage-v8':
+        specifier: 2.1.9
+        version: 2.1.9(vitest@2.1.9(@types/node@20.19.19))
       prisma:
         specifier: 6.17.1
         version: 6.17.1(magicast@0.3.5)(typescript@5.9.3)
@@ -704,6 +710,9 @@ importers:
       typescript:
         specifier: ^5.5.4
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@20.19.19)
 
   services/shopping-service:
     dependencies:
@@ -744,6 +753,9 @@ importers:
       '@types/pg':
         specifier: ^8.10.9
         version: 8.15.6
+      '@vitest/coverage-v8':
+        specifier: 2.1.9
+        version: 2.1.9(vitest@2.1.9(@types/node@20.19.19))
       prisma:
         specifier: 6.17.1
         version: 6.17.1(magicast@0.3.5)(typescript@5.9.3)
@@ -753,6 +765,9 @@ importers:
       typescript:
         specifier: ^5.5.4
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@20.19.19)
 
   services/transport-watchdog:
     dependencies:

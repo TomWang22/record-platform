@@ -261,7 +261,7 @@ describe("E14/E15 decoder + self-emit", () => {
     ).toBe(true);
     expect(
       isSelfEmittedNotificationCreated({
-        producer: "booking-service",
+        producer: "foreign-producer",
         eventType: NOTIFICATION_CREATED_V1,
       }),
     ).toBe(false);

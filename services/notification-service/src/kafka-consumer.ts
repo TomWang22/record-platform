@@ -6,7 +6,6 @@ import { getRpKafka, rpKafkaTopicIsolationSuffix } from "@common/utils/kafka";
 import { withKafkaConsumerSpan } from "@common/utils/otel";
 import { Consumer } from "kafkajs";
 import type { Pool } from "pg";
-import { randomUUID } from "node:crypto";
 import {
   createLandlordBookingNotification,
   normalizeLandlordBookingNotificationPayload,
@@ -23,6 +22,11 @@ import { notificationConsumeLatency } from "./notification-metrics.js";
 import { publishRealtimeNotification } from "./realtime-publisher.js";
 import { createMessageReceivedNotification } from "./consumers/message-received.js";
 import { invalidateNotificationListCacheForUser } from "./notification-list-cache.js";
+import {
+  isSelfEmittedNotificationCreated,
+  parseNotificationEnvelope,
+} from "./notificationKafkaEvents.js";
+import { createNotificationWithOutbox } from "./application/notificationOutbox.js";
 
 const PREFIX = process.env.ENV_PREFIX || "dev";
 
@@ -81,134 +85,147 @@ export function extractNotificationEnvelopeMeta(buf: Buffer): {
   eventId: string;
   userId: string | null;
   eventType: string;
+  producer: string;
 } | null {
   try {
-    const j = JSON.parse(buf.toString("utf8")) as Record<string, unknown>;
-    const md = (j.metadata as Record<string, unknown>) || {};
-    const eventId = String(md.event_id || j.event_id || j.id || randomUUID());
-      const payload = (j.payload as Record<string, unknown>) || {};
-      const eventType = String(j.type || j.event_type || md.event_type || md.type || "domain.event");
-      // Listings community fan-out events: never treat aggregate_id (post/comment id) as a user recipient.
-      if (eventType === "comment.created" || eventType === "post.created") {
-        return { eventId, userId: null, eventType };
-      }
-      if (eventType === "MessageSent") {
-        const recipient = String(j.recipient_id || "").trim();
-        return {
-          eventId,
-          userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
-          eventType,
-        };
-      }
-      if (
-        eventType === "AIInsightCreatedV1" ||
-        eventType === "PricingRecommendationCreatedV1" ||
-        eventType === "AuctionRiskDetectedV1"
-      ) {
-        const recipient = String(
-          payload.user_id ||
-            payload.seller_user_id ||
-            payload.sellerUserId ||
-            "",
-        ).trim();
-        return {
-          eventId,
-          userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
-          eventType,
-        };
-      }
-      if (
-        eventType === "OfferCreated" ||
-        eventType === "OfferCountered" ||
-        eventType === "OfferAccepted" ||
-        eventType === "OfferRejected" ||
-        eventType === "OfferWithdrawn" ||
-        eventType === "OfferExpired"
-      ) {
-        const recipient =
-          eventType === "OfferCreated" || eventType === "OfferWithdrawn"
-            ? String(payload.seller_user_id || payload.sellerUserId || "").trim()
-            : String(payload.buyer_user_id || payload.buyerUserId || "").trim();
-        return {
-          eventId,
-          userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
-          eventType,
-        };
-      }
+    const parsed = parseNotificationEnvelope(buf);
+    if (!parsed) return null;
+    // Track C identity: never manufacture event_id with randomUUID().
+    if (parsed.missingEventId || !parsed.eventId) {
+      return null;
+    }
+    const eventId = parsed.eventId;
+    const j = parsed.raw;
+    const md = parsed.metadata;
+    const payload = parsed.payload;
+    const eventType = parsed.eventType;
+    if (eventType === "comment.created" || eventType === "post.created") {
+      return { eventId, userId: null, eventType, producer: parsed.producer };
+    }
+    if (eventType === "MessageSent") {
+      const recipient = String(j.recipient_id || "").trim();
+      return {
+        eventId,
+        userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
+        eventType,
+        producer: parsed.producer,
+      };
+    }
+    if (
+      eventType === "AIInsightCreatedV1" ||
+      eventType === "PricingRecommendationCreatedV1" ||
+      eventType === "AuctionRiskDetectedV1"
+    ) {
+      const recipient = String(
+        payload.user_id ||
+          payload.seller_user_id ||
+          payload.sellerUserId ||
+          "",
+      ).trim();
+      return {
+        eventId,
+        userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
+        eventType,
+        producer: parsed.producer,
+      };
+    }
+    if (
+      eventType === "OfferCreated" ||
+      eventType === "OfferCountered" ||
+      eventType === "OfferAccepted" ||
+      eventType === "OfferRejected" ||
+      eventType === "OfferWithdrawn" ||
+      eventType === "OfferExpired"
+    ) {
+      const recipient =
+        eventType === "OfferCreated" || eventType === "OfferWithdrawn"
+          ? String(payload.seller_user_id || payload.sellerUserId || "").trim()
+          : String(payload.buyer_user_id || payload.buyerUserId || "").trim();
+      return {
+        eventId,
+        userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
+        eventType,
+        producer: parsed.producer,
+      };
+    }
+    if (
+      eventType === "BidPlaced" ||
+      eventType === "AuctionOutbid" ||
+      eventType === "AuctionEndingSoon" ||
+      eventType === "AuctionEnded" ||
+      eventType === "AuctionWon" ||
+      eventType === "AuctionLost" ||
+      eventType === "AuctionSold"
+    ) {
+      let recipient = "";
       if (
         eventType === "BidPlaced" ||
-        eventType === "AuctionOutbid" ||
-        eventType === "AuctionEndingSoon" ||
         eventType === "AuctionEnded" ||
-        eventType === "AuctionWon" ||
-        eventType === "AuctionLost" ||
-        eventType === "AuctionSold"
+        eventType === "AuctionEndingSoon"
       ) {
-        let recipient = "";
-        if (
-          eventType === "BidPlaced" ||
-          eventType === "AuctionEnded" ||
-          eventType === "AuctionEndingSoon"
-        ) {
-          const role = String(payload.recipient_role || "").trim().toLowerCase();
-          if (role === "bidder") {
-            recipient = String(
-              payload.high_bidder_user_id || payload.highBidderUserId || "",
-            ).trim();
-          } else {
-            recipient = String(payload.seller_user_id || payload.sellerUserId || "").trim();
-          }
-        } else if (eventType === "AuctionSold") {
-          recipient = String(payload.seller_user_id || payload.sellerUserId || "").trim();
-        } else if (eventType === "AuctionWon") {
-          recipient = String(payload.winner_user_id || payload.winnerUserId || "").trim();
-        } else if (eventType === "AuctionOutbid" || eventType === "AuctionLost") {
+        const role = String(payload.recipient_role || "").trim().toLowerCase();
+        if (role === "bidder") {
           recipient = String(
-            payload.outbid_user_id ||
-              payload.outbidUserId ||
-              payload.loser_user_id ||
-              payload.loserUserId ||
-              "",
+            payload.high_bidder_user_id || payload.highBidderUserId || "",
           ).trim();
+        } else {
+          recipient = String(payload.seller_user_id || payload.sellerUserId || "").trim();
         }
-        return {
-          eventId,
-          userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
-          eventType,
-        };
+      } else if (eventType === "AuctionSold") {
+        recipient = String(payload.seller_user_id || payload.sellerUserId || "").trim();
+      } else if (eventType === "AuctionWon") {
+        recipient = String(payload.winner_user_id || payload.winnerUserId || "").trim();
+      } else if (eventType === "AuctionOutbid" || eventType === "AuctionLost") {
+        recipient = String(
+          payload.outbid_user_id ||
+            payload.outbidUserId ||
+            payload.loser_user_id ||
+            payload.loserUserId ||
+            "",
+        ).trim();
       }
-      if (eventType === "booking.thread.ensure") {
-        return { eventId, userId: null, eventType };
+      return {
+        eventId,
+        userId: /^[0-9a-f-]{36}$/i.test(recipient) ? recipient.toLowerCase() : null,
+        eventType,
+        producer: parsed.producer,
+      };
+    }
+    if (eventType === "booking.thread.ensure") {
+      return { eventId, userId: null, eventType, producer: parsed.producer };
+    }
+    if (eventType === "booking.status.updated") {
+      const tenant = String(payload.tenant_id || payload.tenantId || "").trim();
+      const landlord = String(payload.landlord_id || payload.landlordId || "").trim();
+      const newStatusUpper = String(payload.new_status || "").trim().toUpperCase();
+      const changedBy = String(payload.changed_by || "").trim().toLowerCase();
+      if (newStatusUpper === "ACCEPTED" && /^[0-9a-f-]{36}$/i.test(tenant)) {
+        return { eventId, userId: tenant.toLowerCase(), eventType, producer: parsed.producer };
       }
-      if (eventType === "booking.status.updated") {
-        const tenant = String(payload.tenant_id || payload.tenantId || "").trim();
-        const landlord = String(payload.landlord_id || payload.landlordId || "").trim();
-        const newStatusUpper = String(payload.new_status || "").trim().toUpperCase();
-        const changedBy = String(payload.changed_by || "").trim().toLowerCase();
-        if (newStatusUpper === "ACCEPTED" && /^[0-9a-f-]{36}$/i.test(tenant)) {
-          return { eventId, userId: tenant.toLowerCase(), eventType };
-        }
-        if (newStatusUpper === "PENDING" && /^[0-9a-f-]{36}$/i.test(landlord)) {
-          return { eventId, userId: landlord.toLowerCase(), eventType };
-        }
-        if (newStatusUpper === "CONFIRMED" && /^[0-9a-f-]{36}$/i.test(landlord)) {
-          return { eventId, userId: landlord.toLowerCase(), eventType };
-        }
-        if (newStatusUpper === "REJECTED" && /^[0-9a-f-]{36}$/i.test(tenant)) {
-          return { eventId, userId: tenant.toLowerCase(), eventType };
-        }
-        if (
-          (newStatusUpper === "CANCELLED" || newStatusUpper === "EXPIRED") &&
-          /^[0-9a-f-]{36}$/i.test(landlord) &&
-          /^[0-9a-f-]{36}$/i.test(tenant)
-        ) {
-          if (changedBy === "tenant") return { eventId, userId: landlord.toLowerCase(), eventType };
-          if (changedBy === "landlord" || changedBy === "system") return { eventId, userId: tenant.toLowerCase(), eventType };
-        }
-        return { eventId, userId: null, eventType };
+      if (newStatusUpper === "PENDING" && /^[0-9a-f-]{36}$/i.test(landlord)) {
+        return { eventId, userId: landlord.toLowerCase(), eventType, producer: parsed.producer };
       }
-      const aggregateId = String(j.aggregate_id || md.aggregate_id || "");
-    // Do not use aggregate_id as notification recipient for booking requests: aggregate_id is the booking id.
+      if (newStatusUpper === "CONFIRMED" && /^[0-9a-f-]{36}$/i.test(landlord)) {
+        return { eventId, userId: landlord.toLowerCase(), eventType, producer: parsed.producer };
+      }
+      if (newStatusUpper === "REJECTED" && /^[0-9a-f-]{36}$/i.test(tenant)) {
+        return { eventId, userId: tenant.toLowerCase(), eventType, producer: parsed.producer };
+      }
+      if (
+        (newStatusUpper === "CANCELLED" || newStatusUpper === "EXPIRED") &&
+        /^[0-9a-f-]{36}$/i.test(landlord) &&
+        /^[0-9a-f-]{36}$/i.test(tenant)
+      ) {
+        if (changedBy === "tenant") {
+          return { eventId, userId: landlord.toLowerCase(), eventType, producer: parsed.producer };
+        }
+        if (changedBy === "landlord" || changedBy === "system") {
+          return { eventId, userId: tenant.toLowerCase(), eventType, producer: parsed.producer };
+        }
+      }
+      return { eventId, userId: null, eventType, producer: parsed.producer };
+    }
+    const aggregateId = String(j.aggregate_id || md.aggregate_id || "");
     const entityId =
       eventType === "BookingRequestV1"
         ? String(
@@ -221,12 +238,11 @@ export function extractNotificationEnvelopeMeta(buf: Buffer): {
         : eventType === "community.comment.notification" || eventType === "community.reply.notification"
           ? String(j.entity_id || j.user_id || "")
           : String(j.entity_id || j.user_id || j.aggregate_id || md.aggregate_id || "");
-    // Booking request should notify landlord first; generic fallbacks keep existing behavior.
     const preferredRecipient =
       eventType === "BookingRequestV1"
         ? String(payload.landlord_id || payload.landlordId || payload.recipient_id || "")
         : eventType === "community.comment.notification" || eventType === "community.reply.notification"
-          ? String(payload.recipient_id || "")
+          ? String(payload.recipient_id || payload.user_id || "")
           : String(payload.user_id || payload.recipient_id || payload.landlord_id || payload.landlordId || "");
     const rawUserId =
       (entityId && /^[0-9a-f-]{36}$/i.test(entityId) ? entityId : null) ||
@@ -242,7 +258,12 @@ export function extractNotificationEnvelopeMeta(buf: Buffer): {
         : null);
     const userId =
       rawUserId && /^[0-9a-f-]{36}$/i.test(rawUserId) ? rawUserId.toLowerCase() : null;
-    return { eventId, userId: userId && userId.length >= 32 ? userId : null, eventType };
+    return {
+      eventId,
+      userId: userId && userId.length >= 32 ? userId : null,
+      eventType,
+      producer: parsed.producer,
+    };
   } catch {
     return null;
   }
@@ -402,8 +423,13 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
             const started = Date.now();
             try {
               applyBookingEnvelopeTraceAttrs(v);
+              const envelope = parseNotificationEnvelope(v);
+              if (envelope && isSelfEmittedNotificationCreated(envelope)) {
+                // E14: producer=notification-service + NotificationCreatedV1 ⇒ ignore
+                return;
+              }
               const meta = extractNotificationEnvelopeMeta(v);
-              if (!meta) return;
+              if (!meta) return; // includes MISSING_EVENT_ID fail-closed
               const bookingParsed = parseBookingCreated(v);
               if (
                 !meta.userId &&
@@ -499,11 +525,11 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
                     /* minimal */
                   }
                   if (meta.userId) {
-                    await pool.query(
-                      `INSERT INTO notification.notifications (user_id, event_type, channel, status, payload)
-                       VALUES ($1::uuid, $2, 'push'::notification.notification_channel, 'pending', $3::jsonb)`,
-                      [meta.userId, meta.eventType, JSON.stringify(payloadObj)],
-                    );
+                    await createNotificationWithOutbox(pool, {
+                      userId: meta.userId,
+                      eventType: meta.eventType,
+                      payload: payloadObj,
+                    });
                     await invalidateNotificationListCacheForUser(meta.userId);
                     await publishRealtimeNotification(meta.userId, {
                       ...payloadObj,
@@ -547,11 +573,11 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
                     /* minimal */
                   }
                   if (meta.userId) {
-                    await pool.query(
-                      `INSERT INTO notification.notifications (user_id, event_type, channel, status, payload)
-                       VALUES ($1::uuid, $2, 'push'::notification.notification_channel, 'pending', $3::jsonb)`,
-                      [meta.userId, meta.eventType, JSON.stringify(payloadObj)],
-                    );
+                    await createNotificationWithOutbox(pool, {
+                      userId: meta.userId,
+                      eventType: meta.eventType,
+                      payload: payloadObj,
+                    });
                     await invalidateNotificationListCacheForUser(meta.userId);
                     await publishRealtimeNotification(meta.userId, {
                       ...payloadObj,
@@ -600,11 +626,11 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
                     /* minimal */
                   }
                   if (meta.userId) {
-                    await pool.query(
-                      `INSERT INTO notification.notifications (user_id, event_type, channel, status, payload)
-                       VALUES ($1::uuid, $2, 'push'::notification.notification_channel, 'pending', $3::jsonb)`,
-                      [meta.userId, meta.eventType, JSON.stringify(payloadObj)],
-                    );
+                    await createNotificationWithOutbox(pool, {
+                      userId: meta.userId,
+                      eventType: meta.eventType,
+                      payload: payloadObj,
+                    });
                     await invalidateNotificationListCacheForUser(meta.userId);
                     await publishRealtimeNotification(meta.userId, {
                       ...payloadObj,
@@ -688,11 +714,11 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
                   } catch {
                     /* keep minimal payload */
                   }
-                  await pool.query(
-                    `INSERT INTO notification.notifications (user_id, event_type, channel, status, payload)
-                     VALUES ($1::uuid, $2, 'push'::notification.notification_channel, 'pending', $3::jsonb)`,
-                    [meta.userId, meta.eventType, JSON.stringify(payloadObj)],
-                  );
+                  await createNotificationWithOutbox(pool, {
+                      userId: meta.userId,
+                      eventType: meta.eventType,
+                      payload: payloadObj,
+                    });
                   if (meta.userId) {
                     await publishRealtimeNotification(meta.userId, {
                       ...payloadObj,
@@ -946,21 +972,17 @@ export async function startNotificationConsumer(pool: Pool | null): Promise<Cons
                   }
                   return;
                 }
-                await pool.query(
-                  `INSERT INTO notification.notifications (user_id, event_type, channel, status, payload)
-             VALUES ($1::uuid, $2, 'push'::notification.notification_channel, 'pending', $3::jsonb)`,
-                  [
-                    meta.userId,
-                    meta.eventType,
-                    JSON.stringify({
-                      notification_audience: "user",
-                      notification_category: "system",
-                      notification_recipient_role: "user",
-                      source: "kafka",
-                      raw_preview: v.toString("utf8").slice(0, 2000),
-                    }),
-                  ],
-                );
+                await createNotificationWithOutbox(pool, {
+                  userId: meta.userId,
+                  eventType: meta.eventType,
+                  payload: {
+                    notification_audience: "user",
+                    notification_category: "system",
+                    notification_recipient_role: "user",
+                    source: "kafka",
+                    raw_preview: v.toString("utf8").slice(0, 2000),
+                  },
+                });
                 if (meta.userId) {
                   await publishRealtimeNotification(meta.userId, {
                     event: meta.eventType,

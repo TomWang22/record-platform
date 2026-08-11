@@ -11,6 +11,12 @@ import {
   assertBookingEligibleForPeerReview,
   loadBookingForPeerReviewGate,
 } from "./peer-review-booking-gate.js";
+import {
+  insertListingFlagSubmittedWithOutbox,
+  insertPeerReviewCreatedWithOutbox,
+} from "./application/trustOutbox.js";
+import { classifyTrustEnqueueClientResult } from "./outbox/trustEnqueueClient.js";
+import type { TrustEnqueueResult } from "./outbox/trustEnqueueTx.js";
 
 // Logs per-request gRPC latency and marks requests over 100ms as slow.
 function logGrpcTiming(method: string, start: number) {
@@ -40,6 +46,29 @@ function isValidUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+function isPgUniqueViolation(e: unknown): boolean {
+  return String((e as { code?: string })?.code) === "23505";
+}
+
+function replyTrustEnqueue<T>(
+  start: number,
+  method: string,
+  cb: grpc.sendUnaryData<any>,
+  result: TrustEnqueueResult<T>,
+  toOk: (value: T) => unknown,
+): void {
+  const mapped = classifyTrustEnqueueClientResult(result);
+  logGrpcTiming(method, start);
+  if (mapped.disposition === "succeeded") {
+    cb(null, toOk(mapped.value));
+    return;
+  }
+  cb({
+    code: grpc.status[mapped.grpcStatusName],
+    message: mapped.message,
+  });
 }
 
 /** Exported for unit tests (no bind / no credentials). */
@@ -78,25 +107,28 @@ export const trustGrpcHandlersForTest = {
       });
       return;
     }
-    pool
-      .query(
-        `INSERT INTO trust.listing_flags (listing_id, reporter_id, reason) VALUES ($1::uuid, $2::uuid, $3) RETURNING id, status::text`,
-        [listingId, reporterId, reason],
-      )
-      .then((r) => {
-        logGrpcTiming("FlagListing", start);
-        cb(null, { flag_id: r.rows[0].id, status: r.rows[0].status });
-      })
-      .catch((e) => {
+    void (async () => {
+      try {
+        const result = await insertListingFlagSubmittedWithOutbox(pool, {
+          listingId,
+          flaggedBy: reporterId,
+          reason,
+        });
+        replyTrustEnqueue(start, "FlagListing", cb, result, (value) => ({
+          flag_id: value.flagId,
+          status: value.status,
+        }));
+      } catch (e) {
         console.error("[FlagListing]", e);
-        if (String(e?.code) === "23505") {
+        if (isPgUniqueViolation(e)) {
           logGrpcTiming("FlagListing", start);
           cb({ code: grpc.status.ALREADY_EXISTS, message: "duplicate flag" });
           return;
         }
         logGrpcTiming("FlagListing", start);
         cb({ code: grpc.status.INTERNAL, message: "failed" });
-      });
+      }
+    })();
   },
 
   ReportAbuse(
@@ -137,25 +169,29 @@ export const trustGrpcHandlersForTest = {
       return;
     }
     if (t === "listing") {
-      pool
-        .query(
-          `INSERT INTO trust.listing_flags (listing_id, reporter_id, reason, description) VALUES ($1::uuid, $2::uuid, $3, $4) RETURNING id, status::text`,
-          [targetId, reporterId, category, details || null],
-        )
-        .then((r) => {
-          logGrpcTiming("ReportAbuse", start);
-          cb(null, { flag_id: r.rows[0].id, status: r.rows[0].status });
-        })
-        .catch((e) => {
+      void (async () => {
+        try {
+          const result = await insertListingFlagSubmittedWithOutbox(pool, {
+            listingId: targetId,
+            flaggedBy: reporterId,
+            reason: category,
+            description: details || null,
+          });
+          replyTrustEnqueue(start, "ReportAbuse", cb, result, (value) => ({
+            flag_id: value.flagId,
+            status: value.status,
+          }));
+        } catch (e) {
           console.error("[ReportAbuse listing]", e);
-          if (String(e?.code) === "23505") {
+          if (isPgUniqueViolation(e)) {
             logGrpcTiming("ReportAbuse", start);
             cb({ code: grpc.status.ALREADY_EXISTS, message: "duplicate flag" });
             return;
           }
           logGrpcTiming("ReportAbuse", start);
           cb({ code: grpc.status.INTERNAL, message: "failed" });
-        });
+        }
+      })();
     } else {
       pool
         .query(
@@ -230,18 +266,21 @@ export const trustGrpcHandlersForTest = {
             return;
           }
         }
-        const r = await pool.query(
-          `INSERT INTO trust.reviews (booking_id, reviewer_id, target_type, target_id, rating, comment)
-         VALUES ($1::uuid, $2::uuid, 'user'::trust.review_target_type, $3::uuid, $4, $5) RETURNING id`,
-          [bookingId, reviewerId, revieweeId, rating, comment || null],
-        );
-        logGrpcTiming("SubmitReview", start);
-        cb(null, { review_id: r.rows[0].id });
+        const result = await insertPeerReviewCreatedWithOutbox(pool, {
+          bookingId,
+          reviewerId,
+          revieweeId,
+          rating,
+          comment: comment || null,
+        });
+        replyTrustEnqueue(start, "SubmitReview", cb, result, (value) => ({
+          review_id: value.reviewId,
+        }));
       } catch (e) {
         console.error("[SubmitReview]", e);
         if (
           String((e as { message?: string })?.message || "").includes("unique") ||
-          String((e as { code?: string })?.code) === "23505"
+          isPgUniqueViolation(e)
         ) {
           logGrpcTiming("SubmitReview", start);
           cb({ code: grpc.status.ALREADY_EXISTS, message: "duplicate review" });
@@ -298,18 +337,21 @@ export const trustGrpcHandlersForTest = {
             return;
           }
         }
-        const r = await pool.query(
-          `INSERT INTO trust.reviews (booking_id, reviewer_id, target_type, target_id, rating, comment)
-         VALUES ($1::uuid, $2::uuid, 'user'::trust.review_target_type, $3::uuid, $4, $5) RETURNING id`,
-          [bookingId, reviewerId, revieweeId, rating, meta || null],
-        );
-        logGrpcTiming("SubmitPeerReview", start);
-        cb(null, { review_id: r.rows[0].id });
+        const result = await insertPeerReviewCreatedWithOutbox(pool, {
+          bookingId,
+          reviewerId,
+          revieweeId,
+          rating,
+          comment: meta || null,
+        });
+        replyTrustEnqueue(start, "SubmitPeerReview", cb, result, (value) => ({
+          review_id: value.reviewId,
+        }));
       } catch (e) {
         console.error("[SubmitPeerReview]", e);
         if (
           String((e as { message?: string })?.message || "").includes("unique") ||
-          String((e as { code?: string })?.code) === "23505"
+          isPgUniqueViolation(e)
         ) {
           logGrpcTiming("SubmitPeerReview", start);
           cb({ code: grpc.status.ALREADY_EXISTS, message: "duplicate review" });

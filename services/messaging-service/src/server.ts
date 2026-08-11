@@ -17,6 +17,8 @@ import os from 'os'
 import { userLifecycleV1Topic, installShutdownSignalHandlers } from '@common/utils'
 import { ensureKafkaBrokerReady } from '@common/utils/kafka'
 import { MESSAGING_EVENTS_TOPIC } from './kafkaMessagingEvents.js'
+import { pool } from './lib/db.js'
+import { startMessagingOutboxPublisher } from './outbox/publishOutbox.js'
 import { startMessagingUserLifecycleConsumer } from './user-lifecycle-consumer.js'
 import { startGrpcServer } from './grpc-server.js'
 import { makeRedis } from './lib/cache.js'
@@ -38,6 +40,8 @@ async function main() {
     console.log(`[messaging] HTTP server listening on port ${httpPort}`)
   })
   startGrpcServer(grpcPort)
+  // Phase A drain present; default OFF until Phase B enqueue + authorization.
+  startMessagingOutboxPublisher(pool)
   setImmediate(() => {
     void startMessagingUserLifecycleConsumer().catch((e) =>
       console.error('[messaging-service] user lifecycle consumer:', e),

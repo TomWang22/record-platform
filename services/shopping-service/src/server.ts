@@ -2,10 +2,15 @@ import './otel-bootstrap.js'
 import express, { type Request, type Response, type NextFunction } from 'express'
 import os from 'os'
 import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions, installShutdownSignalHandlers } from '@common/utils'
+import { tracingMiddleware } from '@common/utils/otel'
 
 installShutdownSignalHandlers({ service: 'shopping-service' })
 import { requireUser, type AuthedRequest } from './lib/auth.js'
 import { pool, syncOrderNumberSequence } from './lib/db.js'
+import {
+  disconnectShoppingOutboxProducer,
+  startShoppingOutboxPublisher,
+} from './outbox/publishOutbox.js'
 import { makeRedis, CacheManager, getCacheStats } from './lib/cache.js'
 import cartRouter from './routes/cart.js'
 import watchlistRouter from './routes/watchlist.js'
@@ -20,6 +25,7 @@ import internalCartRouter from './routes/internal-cart.js'
 
 const app = express()
 app.use(express.json())
+app.use(tracingMiddleware)
 
 // --- Redis (for cache) ---
 const redis = makeRedis()
@@ -110,6 +116,9 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 const PORT = process.env.SHOPPING_PORT || 4007
 async function start() {
   await syncOrderNumberSequence()
+  // Default OFF: SHOPPING_OUTBOX_PUBLISHER must be exactly "1". Reuse the
+  // existing shopping pool — do not open a second pool for the drain.
+  startShoppingOutboxPublisher(pool)
   const server = app.listen(PORT, () => {
     console.log(`[shopping] HTTP server listening on port ${PORT}`)
   })
@@ -142,6 +151,11 @@ function shutdown(signal: string) {
     ? server.close.bind(server)
     : (cb: () => void) => setImmediate(cb)
   close(async () => {
+    try {
+      await disconnectShoppingOutboxProducer()
+    } catch {
+      /* ignore */
+    }
     try {
       const { stopSaleCompletedOutboxDrain } = await import('./lib/sale-completed-outbox-drain.js')
       await stopSaleCompletedOutboxDrain()

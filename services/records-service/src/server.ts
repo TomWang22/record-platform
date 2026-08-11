@@ -6,15 +6,21 @@ import compression from "compression";
 import cors from "cors";
 import { PrismaClient } from '../generated/records-client';
 import { register, httpCounter, mountRpHttpHealth, rpGrpcHealthOptions, installShutdownSignalHandlers } from "@common/utils";
+import { tracingMiddleware } from "@common/utils/otel";
 
 installShutdownSignalHandlers({ service: "records-service" });
 import { recordsRouter } from "./routes/records.js";
 import { exportRouter } from "./routes/export.js";
 import { makeRedis, attachPgInvalidationListener } from "./lib/cache.js";
-import { Client as PgClient } from "pg";
+import pg, { Client as PgClient } from "pg";
+import {
+  disconnectRecordsOutboxProducer,
+  startRecordsOutboxPublisher,
+} from "./outbox/publishOutbox.js";
 
 const app = express();
 app.disable("x-powered-by");
+app.use(tracingMiddleware);
 
 // --- Prisma: force runtime DATABASE_URL ---
 const RUNTIME_DB_URL = process.env.DATABASE_URL || "";
@@ -24,6 +30,15 @@ if (!RUNTIME_DB_URL) {
 const prisma = new PrismaClient({
   datasources: { db: { url: RUNTIME_DB_URL } },
 });
+
+const outboxPool = RUNTIME_DB_URL
+  ? new pg.Pool({
+      connectionString: RUNTIME_DB_URL,
+      max: Number(process.env.RECORDS_OUTBOX_POOL_MAX ?? "5") || 5,
+    })
+  : null;
+// Default OFF: RECORDS_OUTBOX_PUBLISHER must be exactly "1".
+if (outboxPool) startRecordsOutboxPublisher(outboxPool);
 
 // --- Redis (for cache + rate-limit) ---
 const redis = makeRedis();
@@ -165,6 +180,12 @@ function shutdown(signal: string) {
       if (redis) await redis.quit();
       try {
         await pgListener.end();
+      } catch {}
+      try {
+        await disconnectRecordsOutboxProducer();
+      } catch {}
+      try {
+        if (outboxPool) await outboxPool.end();
       } catch {}
     } finally {
       process.exit(0);

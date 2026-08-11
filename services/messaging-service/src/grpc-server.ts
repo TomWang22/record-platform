@@ -19,7 +19,20 @@ import { kafka } from '@common/utils/kafka'
 import { registerHealthService, createRpGrpcServerCredentialsForBind } from '@common/utils'
 import { resolveProtoPath } from '@common/utils/proto'
 import { buildMetadata, sendMessagingEvent } from './kafkaMessagingEvents.js'
-import { randomUUID } from 'node:crypto'
+import {
+  createMessageWithOutbox,
+  replyMessageWithOutbox,
+} from './application/messageOutbox.js'
+import { stableHumanDmThreadId } from './lib/dm-thread-id.js'
+
+function isoTs(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : String(value)
+}
+
+function toGrpcError(error: unknown): { code: number; message: string } {
+  const message = error instanceof Error ? error.message : String(error)
+  return { code: grpc.status.INTERNAL, message }
+}
 
 const PROTO_PATH = resolveProtoPath('messaging.proto')
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -348,52 +361,56 @@ export const messagingGrpcHandlers = {
 
   async SendMessage(call: any, callback: any) {
     const { sender_id, recipient_id, message_type, subject, content, parent_message_id } = call.request
-    if (!recipient_id || !message_type || !subject || !content) {
+    if (!sender_id || !recipient_id || !message_type || !subject || !content) {
       return callback({
         code: grpc.status.INVALID_ARGUMENT,
-        message: 'recipient_id, message_type, subject, and content required',
+        message: 'sender_id, recipient_id, message_type, subject, and content required',
       })
     }
 
-    const messageId = randomUUID()
-    const createdAt = new Date().toISOString()
-    const producer = await getKafkaProducer()
-    await Promise.race([
-      sendMessagingEvent(producer, recipient_id, {
-        metadata: buildMetadata({
-          event_type: 'MessageSent',
-          aggregate_id: messageId,
-          aggregate_type: 'message',
-        }),
-        message_id: messageId,
-        sender_id,
-        recipient_id,
-        thread_id: parent_message_id ? 'thread-pending' : '',
-        message_type,
-        subject,
-        content,
-        created_at: createdAt,
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Kafka send timeout')), 2000),
-      ),
-    ])
+    try {
+      const parentId =
+        parent_message_id != null && String(parent_message_id).trim()
+          ? String(parent_message_id).trim()
+          : null
+      let threadId: string | null = null
+      try {
+        threadId = stableHumanDmThreadId(String(sender_id), String(recipient_id))
+      } catch {
+        threadId = null
+      }
 
-    callback(null, {
-      message: {
-        id: messageId,
-        sender_id,
-        recipient_id,
-        parent_message_id: parent_message_id || '',
-        thread_id: parent_message_id ? 'placeholder-thread-id' : '',
-        message_type,
-        subject,
-        content,
-        is_read: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    })
+      const { message } = await createMessageWithOutbox(pool, {
+        senderId: String(sender_id),
+        recipientId: String(recipient_id),
+        groupId: null,
+        parentMessageId: parentId,
+        threadId,
+        messageType: String(message_type),
+        subject: String(subject),
+        content: String(content),
+        // Preserve prior gRPC partition key: recipient_id
+        partitionKey: String(recipient_id),
+      })
+
+      callback(null, {
+        message: {
+          id: message.id,
+          sender_id: message.sender_id,
+          recipient_id: message.recipient_id ?? '',
+          parent_message_id: message.parent_message_id ?? '',
+          thread_id: message.thread_id ?? '',
+          message_type: message.message_type,
+          subject: message.subject,
+          content: message.content,
+          is_read: false,
+          created_at: isoTs(message.created_at),
+          updated_at: isoTs(message.updated_at),
+        },
+      })
+    } catch (error) {
+      callback(toGrpcError(error))
+    }
   },
 
   async ReplyMessage(call: any, callback: any) {
@@ -404,41 +421,93 @@ export const messagingGrpcHandlers = {
         message: 'content required',
       })
     }
+    if (!message_id || !sender_id) {
+      return callback({
+        code: grpc.status.INVALID_ARGUMENT,
+        message: 'message_id and sender_id required',
+      })
+    }
 
-    const replyId = randomUUID()
-    const replyCreated = new Date().toISOString()
-    const producer = await getKafkaProducer()
-    await sendMessagingEvent(producer, message_id, {
-      metadata: buildMetadata({
-        event_type: 'MessageReplied',
-        aggregate_id: replyId,
-        aggregate_type: 'message',
-        causation_id: message_id,
-      }),
-      message_id: replyId,
-      parent_message_id: message_id,
-      sender_id,
-      recipient_id: '',
-      thread_id: '',
-      content,
-      created_at: replyCreated,
-    })
+    try {
+      const parentQuery = await pool.query(
+        `SELECT id, sender_id, recipient_id, group_id, subject, thread_id, message_type
+         FROM messages.messages WHERE id = $1`,
+        [message_id],
+      )
+      if (parentQuery.rows.length === 0) {
+        return callback({
+          code: grpc.status.NOT_FOUND,
+          message: 'Parent message not found',
+        })
+      }
 
-    callback(null, {
-      message: {
-        id: replyId,
-        sender_id,
-        recipient_id: 'placeholder',
-        parent_message_id: message_id,
-        thread_id: 'placeholder-thread-id',
-        message_type: message_type || 'General',
-        subject: subject || 'Re: ...',
-        content,
-        is_read: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    })
+      const parent = parentQuery.rows[0] as {
+        id: string
+        sender_id: string
+        recipient_id: string | null
+        group_id: string | null
+        subject: string | null
+        thread_id: string | null
+        message_type: string | null
+      }
+      const group_id = parent.group_id
+      let recipient_id: string | null = null
+      let replyThreadId: string | null = null
+      if (group_id) {
+        recipient_id = null
+        replyThreadId = parent.thread_id != null ? String(parent.thread_id) : null
+      } else {
+        const ps = String(parent.sender_id)
+        const pr = parent.recipient_id != null ? String(parent.recipient_id) : ''
+        const peer = ps === String(sender_id) ? pr : ps
+        recipient_id = peer || null
+        if (recipient_id) {
+          try {
+            replyThreadId = stableHumanDmThreadId(String(sender_id), recipient_id)
+          } catch {
+            replyThreadId = parent.thread_id != null ? String(parent.thread_id) : null
+          }
+        } else {
+          replyThreadId = parent.thread_id != null ? String(parent.thread_id) : null
+        }
+      }
+
+      const subj = group_id
+        ? String(subject || '').trim() || `Re: ${parent.subject || 'Message'}`
+        : String(subject || '').trim()
+
+      const { message } = await replyMessageWithOutbox(pool, {
+        senderId: String(sender_id),
+        recipientId: recipient_id,
+        groupId: group_id != null ? String(group_id) : null,
+        parentMessageId: String(message_id),
+        threadId: replyThreadId,
+        messageType: String(message_type || parent.message_type || 'General'),
+        subject: subj,
+        content: String(content),
+        // Preserve prior gRPC partition key: parent message_id
+        partitionKey: String(message_id),
+        causationId: String(message_id),
+      })
+
+      callback(null, {
+        message: {
+          id: message.id,
+          sender_id: message.sender_id,
+          recipient_id: message.recipient_id ?? '',
+          parent_message_id: message.parent_message_id ?? String(message_id),
+          thread_id: message.thread_id ?? '',
+          message_type: message.message_type,
+          subject: message.subject,
+          content: message.content,
+          is_read: false,
+          created_at: isoTs(message.created_at),
+          updated_at: isoTs(message.updated_at),
+        },
+      })
+    } catch (error) {
+      callback(toGrpcError(error))
+    }
   },
 
   async UpdateMessage(call: any, callback: any) {

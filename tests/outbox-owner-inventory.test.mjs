@@ -66,17 +66,8 @@ test("Track C: prepared inventory closes 12-row denominator without booking/soci
   assert.equal(result.platform_pass, false);
   assert.equal(result.publisher_absent_rows_explicit, true);
   assert.equal(result.lifecycle_publish_executed, false);
-  assert.equal(result.missing_blocks_acceptance_count, 5);
-  assert.deepEqual(
-    result.acceptance_blockers.sort(),
-    [
-      "messaging.outbox_events",
-      "notification.outbox_events",
-      "records.outbox_events",
-      "shopping.outbox_events",
-      "trust.outbox_events",
-    ].sort(),
-  );
+  assert.equal(result.missing_blocks_acceptance_count, 0);
+  assert.deepEqual(result.acceptance_blockers, []);
 });
 
 test("Track C: every owner row has full contract fields and lifecycle states", () => {
@@ -114,6 +105,69 @@ test("Track C: preserve known specials as annotations", () => {
   assert.ok(media.poll_batch?.claim?.includes("FOR UPDATE SKIP LOCKED"));
   assert.ok(media.annotations?.some((a) => a.includes("MEDIA_OUTBOX_PUBLISHER must be exactly 1")));
   assert.ok(media.annotations?.some((a) => a.includes("FOR UPDATE SKIP LOCKED through broker ack")));
+
+  const messaging = inv.owners.find((o) => o.table === "messaging.outbox_events");
+  assert.equal(messaging.publisher_present, true);
+  assert.equal(messaging.disposition, "INVENTORIED");
+  assert.equal(messaging.publisher_disposition, null);
+  assert.ok(messaging.publisher_implementation.includes("publishOutbox.ts"));
+  assert.ok(messaging.publisher_implementation.includes("messageOutbox.ts"));
+  assert.ok(messaging.poll_batch?.claim?.includes("FOR UPDATE SKIP LOCKED"));
+  assert.ok(messaging.annotations?.some((a) => a.includes("MESSAGING_OUTBOX_PUBLISHER must be exactly 1")));
+
+  const notification = inv.owners.find((o) => o.table === "notification.outbox_events");
+  assert.equal(notification.publisher_present, true);
+  assert.equal(notification.disposition, "INVENTORIED");
+  assert.equal(notification.publisher_disposition, null);
+  assert.ok(notification.publisher_implementation.includes("publishOutbox.ts"));
+  assert.ok(notification.publisher_implementation.includes("notificationOutbox.ts"));
+  assert.ok(notification.poll_batch?.claim?.includes("FOR UPDATE SKIP LOCKED"));
+  assert.ok(
+    notification.annotations?.some((a) =>
+      a.includes("NOTIFICATION_OUTBOX_PUBLISHER must be exactly 1"),
+    ),
+  );
+
+  const records = inv.owners.find((o) => o.table === "records.outbox_events");
+  assert.equal(records.publisher_present, true);
+  assert.equal(records.disposition, "INVENTORIED");
+  assert.equal(records.publisher_disposition, null);
+  assert.ok(records.publisher_implementation.includes("publishOutbox.ts"));
+  assert.ok(records.publisher_implementation.includes("recordOutbox.ts"));
+  assert.ok(records.poll_batch?.claim?.includes("FOR UPDATE SKIP LOCKED"));
+  assert.ok(
+    records.annotations?.some((a) =>
+      a.includes("RECORDS_OUTBOX_PUBLISHER must be exactly 1"),
+    ),
+  );
+
+  const shopping = inv.owners.find((o) => o.table === "shopping.outbox_events");
+  assert.equal(shopping.publisher_present, true);
+  assert.equal(shopping.disposition, "INVENTORIED");
+  assert.equal(shopping.publisher_disposition, null);
+  assert.ok(shopping.publisher_implementation.includes("publishOutbox.ts"));
+  assert.ok(shopping.publisher_implementation.includes("shoppingOutbox.ts"));
+  assert.ok(shopping.poll_batch?.claim?.includes("FOR UPDATE SKIP LOCKED"));
+  assert.ok(
+    shopping.annotations?.some((a) =>
+      a.includes("SHOPPING_OUTBOX_PUBLISHER must be exactly 1"),
+    ),
+  );
+  assert.ok(shopping.annotations?.some((a) => a.includes("SaleCompleted remains listings")));
+
+  const trust = inv.owners.find((o) => o.table === "trust.outbox_events");
+  assert.equal(trust.publisher_present, true);
+  assert.equal(trust.disposition, "INVENTORIED");
+  assert.equal(trust.publisher_disposition, null);
+  assert.ok(trust.publisher_implementation.includes("publishOutbox.ts"));
+  assert.ok(trust.publisher_implementation.includes("trustOutbox.ts"));
+  assert.ok(trust.poll_batch?.claim?.includes("FOR UPDATE SKIP LOCKED"));
+  assert.ok(
+    trust.annotations?.some((a) =>
+      a.includes("TRUST_OUTBOX_PUBLISHER must be exactly 1"),
+    ),
+  );
+  assert.ok(trust.annotations?.some((a) => a.includes("ListingFlagSubmittedV1")));
 
   const authCanonical = inv.owners.find((o) => o.table === "auth.outbox_events");
   assert.equal(authCanonical.publisher_disposition.status, "MIGRATION_PENDING");
@@ -226,7 +280,7 @@ test("Track C: auditor accepts frozen 12-row inventory harness without platform 
   assert.equal(audit.harness_pass, true);
   assert.equal(audit.platform_pass, false);
   assert.equal(audit.track_b_terminal_sha256_referenced, true);
-  assert.equal(audit.missing_blocks_acceptance_count, 5);
+  assert.equal(audit.missing_blocks_acceptance_count, 0);
   assert.equal(audit.mutation_performed, false);
   assert.equal(audit.network_calls, false);
 });

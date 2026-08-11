@@ -15,14 +15,14 @@
     "trust.outbox_events"
   ],
   "counts": {
-    "acceptance_blockers": 6,
+    "acceptance_blockers": 1,
     "canonical_owners": 12,
-    "lifecycle_executable": 6,
+    "lifecycle_executable": 11,
     "migration_pending": 1,
-    "observation_eligible": 6,
-    "publisher_blocked": 5
+    "observation_eligible": 11,
+    "publisher_blocked": 0
   },
-  "emitted_at_utc": "2026-08-10T15:40:43Z",
+  "emitted_at_utc": "2026-08-11T15:32:14Z",
   "execution_authorized": false,
   "explicitly_excluded": [
     "packet_c_authorization",
@@ -37,7 +37,12 @@
   "obsolete_inventory_sha256": [
     "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be",
     "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
-    "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6"
+    "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6",
+    "fd35ad0afaed963f9285e8a89d1a73bdd68f664b001dfc09cf50ec270287fe12",
+    "d24f95d7cef09298f9d88ba1718c54f3aef51b59f42102e6be8c1c09051a2be9",
+    "9ece392aac4c9a1889287e0f6e233dc6a2b3e5666e9183f7a362cfeaa8d4c7da",
+    "6e8df5b92509eb0351b2f5c15b2c0b85149f01960897cf668909ccd283a82476",
+    "e3ad155c4b7916d73c5ba397d13f0432832e79f2197d2fc79dce36091e730e12"
   ],
   "owners": [
     {
@@ -146,14 +151,14 @@
       "topic": "${ENV_PREFIX}.media.events"
     },
     {
-      "blocks_track_c_acceptance": true,
+      "blocks_track_c_acceptance": false,
       "database": "messaging",
-      "packet_c_observation_eligible": false,
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "packet_c_observation_eligible": true,
+      "publisher_disposition_status": null,
       "publisher_owner": "messaging-service",
-      "publisher_present": false,
-      "readiness": "PUBLISHER_BLOCKED",
-      "reason": "Missing publisher blocks Track C acceptance for this canonical owner",
+      "publisher_present": true,
+      "readiness": "LIFECYCLE_EXECUTABLE",
+      "reason": "Publisher present; non-live lifecycle evidence may be prepared for this owner",
       "required_for_track_c_acceptance": true,
       "service": "messaging-service",
       "status_predicate": "published=false",
@@ -161,14 +166,14 @@
       "topic": "messaging.events.v1"
     },
     {
-      "blocks_track_c_acceptance": true,
+      "blocks_track_c_acceptance": false,
       "database": "notification",
-      "packet_c_observation_eligible": false,
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "packet_c_observation_eligible": true,
+      "publisher_disposition_status": null,
       "publisher_owner": "notification-service",
-      "publisher_present": false,
-      "readiness": "PUBLISHER_BLOCKED",
-      "reason": "Missing publisher blocks Track C acceptance for this canonical owner",
+      "publisher_present": true,
+      "readiness": "LIFECYCLE_EXECUTABLE",
+      "reason": "Publisher present; non-live lifecycle evidence may be prepared for this owner",
       "required_for_track_c_acceptance": true,
       "service": "notification-service",
       "status_predicate": "published=false",
@@ -176,14 +181,14 @@
       "topic": "${ENV_PREFIX}.notification.events"
     },
     {
-      "blocks_track_c_acceptance": true,
+      "blocks_track_c_acceptance": false,
       "database": "records",
-      "packet_c_observation_eligible": false,
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "packet_c_observation_eligible": true,
+      "publisher_disposition_status": null,
       "publisher_owner": "records-service",
-      "publisher_present": false,
-      "readiness": "PUBLISHER_BLOCKED",
-      "reason": "Missing publisher blocks Track C acceptance for this canonical owner",
+      "publisher_present": true,
+      "readiness": "LIFECYCLE_EXECUTABLE",
+      "reason": "Publisher present; non-live lifecycle evidence may be prepared for this owner",
       "required_for_track_c_acceptance": true,
       "service": "records-service",
       "status_predicate": "published=false",
@@ -191,14 +196,14 @@
       "topic": "${ENV_PREFIX}.records.events"
     },
     {
-      "blocks_track_c_acceptance": true,
+      "blocks_track_c_acceptance": false,
       "database": "shopping",
-      "packet_c_observation_eligible": false,
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "packet_c_observation_eligible": true,
+      "publisher_disposition_status": null,
       "publisher_owner": "shopping-service",
-      "publisher_present": false,
-      "readiness": "PUBLISHER_BLOCKED",
-      "reason": "Missing publisher blocks Track C acceptance for this canonical owner",
+      "publisher_present": true,
+      "readiness": "LIFECYCLE_EXECUTABLE",
+      "reason": "Publisher present; non-live lifecycle evidence may be prepared for this owner",
       "required_for_track_c_acceptance": true,
       "service": "shopping-service",
       "status_predicate": "published=false",
@@ -206,14 +211,14 @@
       "topic": "${ENV_PREFIX}.shopping.events"
     },
     {
-      "blocks_track_c_acceptance": true,
+      "blocks_track_c_acceptance": false,
       "database": "trust",
-      "packet_c_observation_eligible": false,
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
+      "packet_c_observation_eligible": true,
+      "publisher_disposition_status": null,
       "publisher_owner": "trust-service",
-      "publisher_present": false,
-      "readiness": "PUBLISHER_BLOCKED",
-      "reason": "Missing publisher blocks Track C acceptance for this canonical owner",
+      "publisher_present": true,
+      "readiness": "LIFECYCLE_EXECUTABLE",
+      "reason": "Publisher present; non-live lifecycle evidence may be prepared for this owner",
       "required_for_track_c_acceptance": true,
       "service": "trust-service",
       "status_predicate": "published=false",
@@ -229,24 +234,23 @@
       "auction_monitor.outbox_events",
       "auth.auth_outbox",
       "listings.outbox_events",
-      "media.outbox_events"
-    ],
-    "migration_pending": [
-      "auth.outbox_events"
-    ],
-    "publisher_blocked": [
+      "media.outbox_events",
       "messaging.outbox_events",
       "notification.outbox_events",
       "records.outbox_events",
       "shopping.outbox_events",
       "trust.outbox_events"
-    ]
+    ],
+    "migration_pending": [
+      "auth.outbox_events"
+    ],
+    "publisher_blocked": []
   },
   "platform_pass": false,
   "remediation_packet_note": "A six-service remediation/observation packet may target publisher_blocked owners only, but Track C terminal acceptance must still account for all 12 canonical outboxes.",
   "schema": "packet-c-readiness-matrix/v1",
-  "source_inventory_denominator_sha256": "065f0c7832531f9f32fae36a14d6e67868c5c1be08b2b2171e0cbd8c5d818ac6",
-  "source_inventory_sha256": "fd35ad0afaed963f9285e8a89d1a73bdd68f664b001dfc09cf50ec270287fe12",
+  "source_inventory_denominator_sha256": "1b614ba485e03bddf7bcf296c9bf0c89fee97b7013e9f034d8fdc7ea77079074",
+  "source_inventory_sha256": "71f9a0f494e4cdd3375fd6c8852647fbedd1a7571b97f8a7f24ad1fef5ae5d78",
   "status": "PREPARED_NON_LIVE",
   "track_c_acceptance_pass": false
 }

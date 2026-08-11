@@ -25,6 +25,12 @@ import {
 } from "./review-booking-eligibility.js";
 import { resolvePublicUsersByHandle } from "./resolve-public-user.js";
 import { registerMarketplaceFeedbackRoutes } from "./marketplace-feedback.js";
+import {
+  insertListingFlagSubmittedWithOutbox,
+  insertPeerReviewCreatedWithOutbox,
+} from "./application/trustOutbox.js";
+import { classifyTrustEnqueueClientResult } from "./outbox/trustEnqueueClient.js";
+import type { TrustEnqueueResult } from "./outbox/trustEnqueueTx.js";
 
 type AuthedRequest = Request & { userId?: string };
 
@@ -67,6 +73,23 @@ function sendErr(
   code?: string,
 ): void {
   res.status(status).json(code ? { error: message, code } : { error: message });
+}
+
+function isPgUniqueViolation(e: unknown): boolean {
+  return String((e as { code?: string })?.code) === "23505";
+}
+
+function sendTrustEnqueue<T>(
+  res: Response,
+  result: TrustEnqueueResult<T>,
+  toBody: (value: T) => unknown,
+): void {
+  const mapped = classifyTrustEnqueueClientResult(result);
+  if (mapped.disposition === "succeeded") {
+    sendOk(res, toBody(mapped.value), 201);
+    return;
+  }
+  sendErr(res, mapped.httpStatus, mapped.message, mapped.code);
 }
 
 function isValidUuid(value: string): boolean {
@@ -156,13 +179,17 @@ export function createTrustHttpApp() {
           sendErr(res, 400, "invalid reporter id", "INVALID_ID");
           return;
         }
-        const r = await pool.query(
-          `INSERT INTO trust.listing_flags (listing_id, reporter_id, reason) VALUES ($1::uuid, $2::uuid, $3) RETURNING id, status::text`,
-          [listingId, req.userId, reason],
-        );
-        sendOk(res, { flag_id: r.rows[0].id, status: r.rows[0].status }, 201);
+        const result = await insertListingFlagSubmittedWithOutbox(pool, {
+          listingId,
+          flaggedBy: req.userId,
+          reason,
+        });
+        sendTrustEnqueue(res, result, (value) => ({
+          flag_id: value.flagId,
+          status: value.status,
+        }));
       } catch (e: any) {
-        if (e?.code === "23505") {
+        if (isPgUniqueViolation(e)) {
           sendErr(res, 409, "duplicate flag");
           return;
         }
@@ -199,11 +226,16 @@ export function createTrustHttpApp() {
           return;
         }
         if (t === "listing") {
-          const r = await pool.query(
-            `INSERT INTO trust.listing_flags (listing_id, reporter_id, reason, description) VALUES ($1::uuid, $2::uuid, $3, $4) RETURNING id, status::text`,
-            [targetId, req.userId, category, details || null],
-          );
-          sendOk(res, { flag_id: r.rows[0].id, status: r.rows[0].status }, 201);
+          const result = await insertListingFlagSubmittedWithOutbox(pool, {
+            listingId: targetId,
+            flaggedBy: req.userId,
+            reason: category,
+            description: details || null,
+          });
+          sendTrustEnqueue(res, result, (value) => ({
+            flag_id: value.flagId,
+            status: value.status,
+          }));
         } else {
           const r = await pool.query(
             `INSERT INTO trust.user_flags (user_id, reporter_id, reason, description) VALUES ($1::uuid, $2::uuid, $3, $4) RETURNING id, status::text`,
@@ -212,7 +244,7 @@ export function createTrustHttpApp() {
           sendOk(res, { flag_id: r.rows[0].id, status: r.rows[0].status }, 201);
         }
       } catch (e: any) {
-        if (e?.code === "23505") {
+        if (isPgUniqueViolation(e)) {
           sendErr(res, 409, "duplicate flag");
           return;
         }
@@ -275,16 +307,18 @@ export function createTrustHttpApp() {
           }
         }
         const meta = `[${side}] ${comment}`.slice(0, 4000);
-        const r = await pool.query(
-          `INSERT INTO trust.reviews (booking_id, reviewer_id, target_type, target_id, rating, comment)
-         VALUES ($1::uuid, $2::uuid, 'user'::trust.review_target_type, $3::uuid, $4, $5) RETURNING id`,
-          [bookingId, req.userId, revieweeId, rating, meta || null],
-        );
-        sendOk(res, { review_id: r.rows[0].id }, 201);
+        const result = await insertPeerReviewCreatedWithOutbox(pool, {
+          bookingId,
+          reviewerId: req.userId!,
+          revieweeId,
+          rating,
+          comment: meta || null,
+        });
+        sendTrustEnqueue(res, result, (value) => ({ review_id: value.reviewId }));
       } catch (e: any) {
         if (
           String(e?.message || "").includes("unique") ||
-          e?.code === "23505"
+          isPgUniqueViolation(e)
         ) {
           sendErr(res, 409, "duplicate review");
           return;

@@ -63,7 +63,55 @@ function invoke(name: HandlerName, request: Record<string, unknown>) {
 describe('messagingGrpcHandlers', () => {
   beforeEach(() => {
     poolQuery.mockReset()
-    poolQuery.mockResolvedValue({ rows: [{ upvotes: 2, downvotes: 1 }] })
+    poolQuery.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      const norm = sql.replace(/\s+/g, ' ').trim()
+      if (norm === 'BEGIN' || norm === 'COMMIT' || norm === 'ROLLBACK') {
+        return { rows: [], rowCount: 0 }
+      }
+      if (norm.includes('INSERT INTO messages.messages')) {
+        return {
+          rows: [
+            {
+              id: '11111111-1111-4111-8111-111111111111',
+              sender_id: params[0],
+              recipient_id: params[1],
+              group_id: params[2],
+              parent_message_id: params[3],
+              thread_id: params[4],
+              message_type: params[5],
+              subject: params[6],
+              content: params[7],
+              created_at: new Date('2026-08-10T12:00:00.000Z'),
+              updated_at: new Date('2026-08-10T12:00:00.000Z'),
+            },
+          ],
+          rowCount: 1,
+        }
+      }
+      if (norm.includes('INSERT INTO messaging.outbox_events')) {
+        return { rows: [], rowCount: 1 }
+      }
+      if (
+        norm.includes('SELECT id, sender_id, recipient_id, group_id') &&
+        norm.includes('FROM messages.messages WHERE id = $1')
+      ) {
+        return {
+          rows: [
+            {
+              id: params[0],
+              sender_id: '22222222-2222-4222-8222-222222222222',
+              recipient_id: '33333333-3333-4333-8333-333333333333',
+              group_id: null,
+              subject: 'Parent',
+              thread_id: '44444444-4444-4444-8444-444444444444',
+              message_type: 'General',
+            },
+          ],
+          rowCount: 1,
+        }
+      }
+      return { rows: [{ upvotes: 2, downvotes: 1 }], rowCount: 1 }
+    })
     kafkaSend.mockClear()
     kafkaConnect.mockClear()
   })
@@ -251,7 +299,10 @@ describe('messagingGrpcHandlers', () => {
     })
     expect(err).toBeNull()
     expect((res as { message: { recipient_id: string } }).message.recipient_id).toBe('b')
-    expect(kafkaSend).toHaveBeenCalled()
+    expect(kafkaSend).not.toHaveBeenCalled()
+    expect(
+      poolQuery.mock.calls.some((c) => String(c[0] ?? '').includes('INSERT INTO messaging.outbox_events')),
+    ).toBe(true)
   })
 
   it('ReplyMessage rejects empty content', async () => {
@@ -269,6 +320,10 @@ describe('messagingGrpcHandlers', () => {
     })
     expect(err).toBeNull()
     expect((res as { message: { parent_message_id: string } }).message.parent_message_id).toBe('parent')
+    expect(kafkaSend).not.toHaveBeenCalled()
+    expect(
+      poolQuery.mock.calls.some((c) => String(c[0] ?? '').includes('INSERT INTO messaging.outbox_events')),
+    ).toBe(true)
   })
 
   it('UpdateMessage and DeleteMessage publish events', async () => {

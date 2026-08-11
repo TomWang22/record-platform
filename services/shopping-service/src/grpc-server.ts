@@ -6,6 +6,11 @@ import * as path from 'path'
 import * as fs from 'fs'
 import os from 'os'
 import { pool, withRetry } from './lib/db.js'
+import {
+  addOrIncrementCartWithOutbox,
+  removeWatchlistWithOutbox,
+  upsertWatchlistWithOutbox,
+} from './application/shoppingOutbox.js'
 import { makeRedis, CacheManager } from './lib/cache.js'
 import { kafka } from '@common/utils/kafka'
 import { registerHealthService, createRpGrpcServerCredentialsForBind } from '@common/utils'
@@ -84,51 +89,24 @@ const shoppingService = {
   async AddToCart(call: any, callback: any) {
     const { user_id, item_type, item_id, quantity = 1, listing_id, price, metadata } = call.request
     try {
-      const existing = await withRetry(
-        () => pool.query(
-          `SELECT id, quantity FROM shopping.shopping_cart
-           WHERE user_id = $1 AND item_type = $2 AND item_id = $3`,
-          [user_id, item_type, item_id]
-        ),
+      const added = await withRetry(
+        () =>
+          addOrIncrementCartWithOutbox(pool, {
+            userId: user_id,
+            itemType: item_type,
+            itemId: item_id,
+            quantity,
+            listingId: listing_id || null,
+            price,
+            metadata,
+          }),
         3,
-        'gRPC AddToCart: check existing'
+        'gRPC AddToCart'
       )
-
-      let cartItemId: string
-      if (existing.rows.length > 0) {
-        const newQuantity = existing.rows[0].quantity + quantity
-        await withRetry(
-          () => pool.query(
-            `UPDATE shopping.shopping_cart SET quantity = $1, updated_at = now() WHERE id = $2`,
-            [newQuantity, existing.rows[0].id]
-          ),
-          3,
-          'gRPC AddToCart: update quantity'
-        )
-        cartItemId = existing.rows[0].id
-      } else {
-        const result = await withRetry(
-          () => pool.query(
-            `INSERT INTO shopping.shopping_cart (user_id, item_type, item_id, listing_id, quantity, price, metadata)
-             VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) RETURNING id`,
-            [user_id, item_type, item_id, listing_id || null, quantity, price || null, metadata || null]
-          ),
-          3,
-          'gRPC AddToCart: insert new'
-        )
-        cartItemId = result.rows[0].id
-      }
 
       await cacheManager.incrementLFU(`cart:${item_type}:${item_id}`, user_id)
 
-      // Publish to Kafka
-      const producer = await getKafkaProducer()
-      await producer.send({
-        topic: 'shopping-cart',
-        messages: [{ key: user_id, value: JSON.stringify({ action: 'add', user_id, item_id, cart_item_id: cartItemId }) }],
-      })
-
-      callback(null, { success: true, cart_item_id: cartItemId, message: 'Item added to cart' })
+      callback(null, { success: true, cart_item_id: added.cartItemId, message: 'Item added to cart' })
     } catch (err: any) {
       callback({ code: grpc.status.INTERNAL, message: err.message })
     }
@@ -214,21 +192,22 @@ const shoppingService = {
     const { user_id, item_type, item_id, listing_id, notify_on = [], metadata } = call.request
     try {
       const result = await withRetry(
-        () => pool.query(
-          `INSERT INTO shopping.watchlist (user_id, item_type, item_id, listing_id, notify_on, metadata)
-           VALUES ($1, $2, $3, $4, $5, $6::jsonb)
-           ON CONFLICT (user_id, item_type, item_id)
-           DO UPDATE SET notify_on = $5, metadata = $6::jsonb, updated_at = now()
-           RETURNING id`,
-          [user_id, item_type, item_id, listing_id || null, notify_on, metadata || null]
-        ),
+        () =>
+          upsertWatchlistWithOutbox(pool, {
+            userId: user_id,
+            itemType: item_type,
+            itemId: item_id,
+            listingId: listing_id || null,
+            notifyOn: notify_on,
+            metadata,
+          }),
         3,
         'gRPC AddToWatchlist'
       )
 
       await cacheManager.incrementLFU(`watchlist:${item_type}:${item_id}`, user_id)
 
-      callback(null, { success: true, watchlist_id: result.rows[0].id, message: 'Item added to watchlist' })
+      callback(null, { success: true, watchlist_id: result.watchlistId, message: 'Item added to watchlist' })
     } catch (err: any) {
       callback({ code: grpc.status.INTERNAL, message: err.message })
     }
@@ -277,17 +256,17 @@ const shoppingService = {
     const { user_id, item_type, item_id } = call.request
     try {
       const result = await withRetry(
-        () => pool.query(
-          `DELETE FROM shopping.watchlist
-           WHERE user_id = $1 AND item_type = $2 AND item_id = $3
-           RETURNING id`,
-          [user_id, item_type, item_id]
-        ),
+        () =>
+          removeWatchlistWithOutbox(pool, {
+            userId: user_id,
+            itemType: item_type,
+            itemId: item_id,
+          }),
         3,
         'gRPC RemoveFromWatchlist'
       )
 
-      if (result.rows.length === 0) {
+      if (result.kind === 'not_found') {
         return callback({
           code: grpc.status.NOT_FOUND,
           message: 'Item not found in watchlist',

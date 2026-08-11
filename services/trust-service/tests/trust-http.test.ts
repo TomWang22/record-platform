@@ -5,14 +5,23 @@ import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { poolQuery } = vi.hoisted(() => ({
+const { poolQuery, insertFlagMock, insertReviewMock } = vi.hoisted(() => ({
   poolQuery: vi.fn(),
+  insertFlagMock: vi.fn(),
+  insertReviewMock: vi.fn(),
 }));
 
 vi.mock("../src/db.js", () => ({
   pool: {
     query: (...args: unknown[]) => poolQuery(...args),
   },
+}));
+
+vi.mock("../src/application/trustOutbox.js", () => ({
+  insertListingFlagSubmittedWithOutbox: (...args: unknown[]) =>
+    insertFlagMock(...args),
+  insertPeerReviewCreatedWithOutbox: (...args: unknown[]) =>
+    insertReviewMock(...args),
 }));
 
 vi.mock("@common/utils/otel", async (importOriginal) => {
@@ -72,6 +81,16 @@ describe("createTrustHttpApp", () => {
     delete process.env.TRUST_HTTP_TIMING;
     poolQuery.mockReset();
     poolQuery.mockImplementation((sql: string) => defaultPool(sql));
+    insertFlagMock.mockReset();
+    insertReviewMock.mockReset();
+    insertFlagMock.mockResolvedValue({
+      outcome: "committed",
+      value: { flagId: "flag-1", eventId: "evt-1", status: "open" },
+    });
+    insertReviewMock.mockResolvedValue({
+      outcome: "committed",
+      value: { reviewId: "rev-1", eventId: "evt-1" },
+    });
   });
 
   afterEach(() => {
@@ -171,7 +190,9 @@ describe("createTrustHttpApp", () => {
   });
 
   it("POST /flag-listing — 409 duplicate", async () => {
-    poolQuery.mockRejectedValueOnce(Object.assign(new Error("dup"), { code: "23505" }));
+    insertFlagMock.mockRejectedValueOnce(
+      Object.assign(new Error("dup"), { code: "23505" }),
+    );
     const app = createTrustHttpApp();
     await request(app)
       .post("/flag-listing")
@@ -181,7 +202,7 @@ describe("createTrustHttpApp", () => {
   });
 
   it("POST /flag-listing — 500 internal", async () => {
-    poolQuery.mockRejectedValueOnce(new Error("db"));
+    insertFlagMock.mockRejectedValueOnce(new Error("db"));
     const app = createTrustHttpApp();
     await request(app)
       .post("/flag-listing")
@@ -259,7 +280,9 @@ describe("createTrustHttpApp", () => {
   });
 
   it("POST /report-abuse — 409 duplicate", async () => {
-    poolQuery.mockRejectedValueOnce(Object.assign(new Error("dup"), { code: "23505" }));
+    insertFlagMock.mockRejectedValueOnce(
+      Object.assign(new Error("dup"), { code: "23505" }),
+    );
     const app = createTrustHttpApp();
     await request(app)
       .post("/report-abuse")
@@ -269,7 +292,7 @@ describe("createTrustHttpApp", () => {
   });
 
   it("POST /report-abuse — 500", async () => {
-    poolQuery.mockRejectedValueOnce(new Error("db"));
+    insertFlagMock.mockRejectedValueOnce(new Error("db"));
     const app = createTrustHttpApp();
     await request(app)
       .post("/report-abuse")
@@ -320,7 +343,9 @@ describe("createTrustHttpApp", () => {
   });
 
   it("POST /peer-review — 409 duplicate (code)", async () => {
-    poolQuery.mockRejectedValueOnce(Object.assign(new Error("dup"), { code: "23505" }));
+    insertReviewMock.mockRejectedValueOnce(
+      Object.assign(new Error("dup"), { code: "23505" }),
+    );
     const app = createTrustHttpApp();
     await request(app)
       .post("/peer-review")
@@ -334,7 +359,7 @@ describe("createTrustHttpApp", () => {
   });
 
   it("POST /peer-review — 409 duplicate (message unique)", async () => {
-    poolQuery.mockRejectedValueOnce(new Error("unique constraint"));
+    insertReviewMock.mockRejectedValueOnce(new Error("unique constraint"));
     const app = createTrustHttpApp();
     await request(app)
       .post("/peer-review")
@@ -348,7 +373,7 @@ describe("createTrustHttpApp", () => {
   });
 
   it("POST /peer-review — 500", async () => {
-    poolQuery.mockRejectedValueOnce(new Error("syntax"));
+    insertReviewMock.mockRejectedValueOnce(new Error("syntax"));
     const app = createTrustHttpApp();
     await request(app)
       .post("/peer-review")

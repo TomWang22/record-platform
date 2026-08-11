@@ -107,7 +107,7 @@ export function assertObsoleteInventoryDigests(inventory, obsoleteInventorySha25
 /**
  * Validate the frozen Track C readiness partition.
  *
- * After media publisher remediation the live freeze is 6 + 1 + 5.
+ * After trust publisher remediation the live freeze is 11 + 1 + 0.
  * expectedTables must come from the frozen 12-owner denominator artifact,
  * rather than being reconstructed from the readiness matrix itself.
  */
@@ -115,8 +115,8 @@ export function assertTrackCReadinessMatrix({
   matrix,
   expectedTables,
   expectedOwnerCount = 12,
-  expectedLifecycleExecutableCount = 6,
-  expectedPublisherBlockedCount = 5,
+  expectedLifecycleExecutableCount = 11,
+  expectedPublisherBlockedCount = 0,
 }) {
   if (!matrix || typeof matrix !== "object") {
     throw new Error("TRACK_C_READINESS_INVALID:matrix_missing");

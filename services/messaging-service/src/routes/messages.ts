@@ -6,6 +6,10 @@ import { pool } from '../lib/db.js'
 import { kafka } from '@common/utils/kafka'
 import { buildMetadata, sendMessagingEvent } from '../kafkaMessagingEvents.js'
 import {
+  createMessageWithOutbox,
+  replyMessageWithOutbox,
+} from '../application/messageOutbox.js'
+import {
   pushMessageEditedNotification,
   pushMessageReactionNotification,
   pushMessageReceivedNotification,
@@ -520,44 +524,17 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     const content = String(initial_message).slice(0, 8000)
 
     try {
-      const insertQuery = `
-        INSERT INTO messages.messages (
-          sender_id, recipient_id, group_id, parent_message_id, thread_id,
-          message_type, subject, content, is_read
-        ) VALUES ($1, $2, NULL, NULL, $3::uuid, $4, $5, $6, FALSE)
-        RETURNING id, sender_id, recipient_id, group_id, parent_message_id, thread_id,
-                  message_type, subject, content, is_read, created_at, updated_at
-      `
-      const { rows } = await pool.query(insertQuery, [
-        renter_id,
-        resolvedRecipient,
-        dmThreadId,
+      const { message } = await createMessageWithOutbox(pool, {
+        senderId: String(renter_id),
+        recipientId: String(resolvedRecipient),
+        groupId: null,
+        parentMessageId: null,
+        threadId: dmThreadId,
         messageType,
         subject,
         content,
-      ])
-      const message = rows[0]
-
-      const producer = await getKafkaProducer()
-      const createdAt =
-        message.created_at instanceof Date
-          ? message.created_at.toISOString()
-          : String(message.created_at)
-      await sendMessagingEvent(producer, resolvedRecipient, {
-        metadata: buildMetadata({
-          event_type: 'MessageSent',
-          aggregate_id: message.id,
-          aggregate_type: 'message',
-        }),
-        message_id: message.id,
-        sender_id: renter_id,
-        recipient_id: resolvedRecipient,
-        thread_id: message.thread_id || '',
-        message_type: messageType,
-        subject,
-        content,
-        listing_id: listing_id || undefined,
-        created_at: createdAt,
+        partitionKey: String(resolvedRecipient),
+        extraPayload: listing_id ? { listing_id } : undefined,
       })
 
       await bustThreadCachesAfterWrite([message.thread_id, dmThreadId])
@@ -675,45 +652,20 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
     }
 
     try {
-      // Insert message into database
-      const insertQuery = `
-        INSERT INTO messages.messages (
-          sender_id, recipient_id, group_id, parent_message_id, thread_id,
-          message_type, subject, content, is_read
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE)
-        RETURNING id, sender_id, recipient_id, group_id, parent_message_id, thread_id,
-                  message_type, subject, content, is_read, created_at, updated_at
-      `
-      const { rows } = await pool.query(insertQuery, [
-        sender_id,
-        recipient_id || null,
-        group_id || null,
-        parentResolved && ROUTE_UUID_RE.test(String(parentResolved)) ? String(parentResolved).trim() : null,
-        effectiveThreadId,
-        message_type,
-        subjectFinal,
-        content,
-      ])
-      const message = rows[0] as Record<string, unknown>
-
-      const producer = await getKafkaProducer()
-      const kafkaKey = String(group_id || recipient_id || message.id || "")
-      const createdAt =
-        message.created_at instanceof Date ? message.created_at.toISOString() : String(message.created_at)
-      await sendMessagingEvent(producer, kafkaKey, {
-        metadata: buildMetadata({
-          event_type: 'MessageSent',
-          aggregate_id: String(message.id ?? ""),
-          aggregate_type: 'message',
-        }),
-        message_id: String(message.id ?? ""),
-        sender_id,
-        recipient_id: recipient_id || '',
-        thread_id: String(message.thread_id ?? ""),
-        message_type,
+      const { message } = await createMessageWithOutbox(pool, {
+        senderId: String(sender_id),
+        recipientId: recipient_id || null,
+        groupId: group_id || null,
+        parentMessageId:
+          parentResolved && ROUTE_UUID_RE.test(String(parentResolved))
+            ? String(parentResolved).trim()
+            : null,
+        threadId: effectiveThreadId,
+        messageType: message_type,
         subject: subjectFinal,
         content,
-        created_at: createdAt,
+        partitionKey: (row) =>
+          String(row.group_id || row.recipient_id || row.id),
       })
 
       await bustThreadCachesAfterWrite([
@@ -2197,28 +2149,21 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
       }
 
       // Insert reply with parent_message_id set (WhatsApp-style reply)
-      const insertQuery = `
-        INSERT INTO messages.messages (
-          sender_id, recipient_id, group_id, parent_message_id, thread_id,
-          message_type, subject, content, is_read
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE)
-        RETURNING id, sender_id, recipient_id, group_id, parent_message_id, thread_id,
-                  message_type, subject, content, is_read, created_at, updated_at
-      `
       const subj = group_id
         ? String(subject || "").trim() || `Re: ${parent.subject || "Message"}`
         : ""
-      const { rows } = await pool.query(insertQuery, [
-        sender_id,
-        recipient_id,
-        group_id,
-        messageId, // parent_message_id - links to the message being replied to
-        replyThreadId,
-        message_type || 'General',
-        subj,
+      const { message } = await replyMessageWithOutbox(pool, {
+        senderId: String(sender_id),
+        recipientId: recipient_id,
+        groupId: group_id != null ? String(group_id) : null,
+        parentMessageId: String(messageId),
+        threadId: replyThreadId,
+        messageType: message_type || "General",
+        subject: subj,
         content,
-      ])
-      const message = rows[0]
+        // Preserve prior key: group_id || recipient_id || parent messageId
+        partitionKey: String(group_id || recipient_id || messageId),
+      })
 
       // Fetch parent message details to include in response (for UI to show "replying to...")
       const parentDetails = {
@@ -2229,25 +2174,6 @@ export default function messagesRouter(redis: Redis | null, cpuCores: number) {
         message_type: parent.message_type,
         created_at: parent.created_at,
       }
-
-      const producer = await getKafkaProducer()
-      const kafkaKey = group_id || recipient_id || messageId
-      const createdAt =
-        message.created_at instanceof Date ? message.created_at.toISOString() : String(message.created_at)
-      await sendMessagingEvent(producer, kafkaKey, {
-        metadata: buildMetadata({
-          event_type: 'MessageReplied',
-          aggregate_id: message.id,
-          aggregate_type: 'message',
-        }),
-        message_id: message.id,
-        parent_message_id: messageId,
-        sender_id,
-        recipient_id: recipient_id || '',
-        thread_id: message.thread_id || '',
-        content,
-        created_at: createdAt,
-      })
 
       await bustThreadCachesAfterWrite([replyThreadId, group_id, message.thread_id])
 

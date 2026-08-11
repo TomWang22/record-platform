@@ -25,6 +25,11 @@ import {
   docKey,
 } from '../lib/cache.js';
 import { Decimal } from "@prisma/client/runtime/library";
+import {
+  createRecordWithOutbox,
+  deleteRecordWithOutbox,
+  updateRecordWithOutbox,
+} from "../application/recordOutbox.js";
 
 type AuthedReq = Request & { userId?: string; userEmail?: string };
 
@@ -802,9 +807,8 @@ export function recordsRouter(
         patch.recordGrade = deriveOverallGrade(patch.mediaPieces);
       }
 
-      const created = await db.$transaction(async (tx: any) => {
-        const rec = await tx.record.create({
-          data: {
+      const { record: created } = await createRecordWithOutbox(db, {
+        data: {
           userId,
           artist: String(patch.artist ?? artist),
           name: String(patch.name ?? name),
@@ -851,20 +855,6 @@ export function recordsRouter(
               }
             : {}),
         },
-          include: { mediaPieces: { orderBy: { index: "asc" } } },
-        });
-        await tx.recordRevision.create({
-          data: {
-            recordId: rec.id,
-            userId,
-            revisionNumber: 1,
-            changedFields: Object.keys(rec),
-            previousValues: {},
-            newValues: toPlainRecord(rec),
-            createdBy: userId,
-          },
-        });
-        return rec;
       });
 
       // warm doc cache (best-effort)
@@ -894,13 +884,6 @@ export function recordsRouter(
 
       const id = req.params.id;
 
-      const existing = await db.record.findUnique({
-        where: { id },
-        include: { mediaPieces: true },
-      });
-      if (!existing || existing.userId !== userId)
-        return res.status(404).json({ error: "not found" });
-
       const patch = pickUpdate(req.body);
       const { mediaPieces, ...recordData } = patch;
 
@@ -922,62 +905,25 @@ export function recordsRouter(
         recordData.recordGrade = deriveOverallGrade(mediaPieces);
       }
 
-      const updated = await db.$transaction(async (tx: any) => {
-        await tx.record.update({
-          where: { id },
-          data: {
-          ...recordData,
-          ...(formatUpdate ? { format: formatUpdate } : {}),
-          ...(Array.isArray(mediaPieces)
-            ? {
-                mediaPieces: {
-                  deleteMany: {},
-                  create: mediaPieces.map((p: any) => {
-                    const { __formatHint, ...rest } = p;
-                    return { ...rest, userId };
-                  }),
-                },
-              }
-            : {}),
-          },
-        });
-        const freshRow = await tx.record.findFirst({
-          where: { id, userId },
-          include: { mediaPieces: { orderBy: { index: "asc" } } },
-        });
-        const prevPlain = toPlainRecord(existing);
-        const nextPlain = toPlainRecord(freshRow);
-        const diff = jsonDiff(prevPlain, nextPlain);
-        const last = await tx.recordRevision.findFirst({
-          where: { recordId: id, userId },
-          orderBy: { revisionNumber: "desc" },
-        });
-        const nextRevision = Number(last?.revisionNumber ?? 0) + 1;
-        if (diff.changed.length > 0) {
-          await tx.recordRevision.create({
-            data: {
-              recordId: id,
-              userId,
-              revisionNumber: nextRevision,
-              changedFields: diff.changed,
-              previousValues: diff.previousValues,
-              newValues: diff.newValues,
-              createdBy: userId,
-            },
-          });
-        }
-        return freshRow;
+      const result = await updateRecordWithOutbox(db, {
+        id,
+        userId,
+        recordData,
+        mediaPieces: Array.isArray(mediaPieces) ? mediaPieces : undefined,
+        formatUpdate,
       });
+      if (result.kind === "not_found")
+        return res.status(404).json({ error: "not found" });
 
-      // purge doc cache for this record (fresh read will refill)
-      try {
-        if (redis) await redis.del(docKey(id));
-      } catch {}
+      if (result.kind !== "noop") {
+        try {
+          if (redis) await redis.del(docKey(id));
+        } catch {}
+        if (redis) await redis.incr(verKey(userId));
+        await invalidateSearchKeysForUser(redis ?? null, userId);
+      }
 
-      if (redis) await redis.incr(verKey(userId));
-      await invalidateSearchKeysForUser(redis ?? null, userId);
-
-      res.json(toPublicRecord(updated));
+      res.json(toPublicRecord(result.record));
     })
   );
 
@@ -990,11 +936,9 @@ export function recordsRouter(
 
       const id = req.params.id;
 
-      const existing = await db.record.findUnique({ where: { id } });
-      if (!existing || existing.userId !== userId)
+      const result = await deleteRecordWithOutbox(db, { id, userId });
+      if (result.kind === "not_found")
         return res.status(404).json({ error: "not found" });
-
-      await db.record.delete({ where: { id } });
 
       try {
         if (redis) await redis.del(docKey(id));

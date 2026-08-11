@@ -15,7 +15,7 @@
 | auth.proto | events.auth | UserCreatedV1, UserDeletedV1, **UserAccountDeletedV1**, **UserDeletionAckV1**, UserRoleUpdatedV1, UserSuspendedV1 |
 | booking.proto | events.booking | *(legacy RP — not deployed in RP; topic removed)* |
 | listing.proto | events.listing | ListingCreatedV1, ListingUpdatedV1, ListingDeletedV1, ListingPriceUpdatedV1 |
-| trust.proto | events.trust | ListingFlaggedV1, ListingUnflaggedV1, ReviewCreatedV1, UserReputationUpdatedV1 |
+| trust.proto | events.trust | ListingFlaggedV1, ListingUnflaggedV1, **ListingFlagSubmittedV1**, ReviewCreatedV1, **PeerReviewCreatedV1**, UserReputationUpdatedV1 |
 | analytics.proto | events.analytics | WatchlistActivityV1, DailyMetricsSnapshotV1, ListingInsightRequestedV1 |
 | messaging.proto | events.messaging | ConversationCreatedV1, MessageSentV1, MessageReadV1 |
 | notification.proto | events.notification | NotificationSentV1 (optional emit) |

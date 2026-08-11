@@ -4,6 +4,10 @@ import type { AuthedRequest } from '../lib/auth.js'
 import { pool, withRetry } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
 import { normalizeWatchlistItems } from '../lib/shopping-product-contract.js'
+import {
+  removeWatchlistWithOutbox,
+  upsertWatchlistWithOutbox,
+} from '../application/shoppingOutbox.js'
 
 export default function watchlistRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
   const router: Router = Router()
@@ -68,14 +72,15 @@ export default function watchlistRouter(redis: Redis | null, cacheManager: Cache
 
     try {
       const result = await withRetry(
-        () => pool.query(
-          `INSERT INTO shopping.watchlist (user_id, item_type, item_id, listing_id, notify_on, metadata)
-           VALUES ($1, $2, $3, $4, $5, $6::jsonb)
-           ON CONFLICT (user_id, item_type, item_id) 
-           DO UPDATE SET notify_on = $5, metadata = $6::jsonb, updated_at = now()
-           RETURNING id`,
-          [userId, item_type, item_id, listing_id || null, notify_on, metadata ? JSON.stringify(metadata) : null]
-        ),
+        () =>
+          upsertWatchlistWithOutbox(pool, {
+            userId,
+            itemType: item_type,
+            itemId: item_id,
+            listingId: listing_id || null,
+            notifyOn: notify_on,
+            metadata,
+          }),
         3,
         'add to watchlist'
       )
@@ -85,7 +90,7 @@ export default function watchlistRouter(redis: Redis | null, cacheManager: Cache
 
       res.status(201).json({
         success: true,
-        watchlist_id: result.rows[0].id,
+        watchlist_id: result.watchlistId,
         message: 'Item added to watchlist',
       })
     } catch (err) {
@@ -105,17 +110,17 @@ export default function watchlistRouter(redis: Redis | null, cacheManager: Cache
 
     try {
       const result = await withRetry(
-        () => pool.query(
-          `DELETE FROM shopping.watchlist
-           WHERE user_id = $1 AND item_type = $2 AND item_id = $3
-           RETURNING id`,
-          [userId, itemType, itemId]
-        ),
+        () =>
+          removeWatchlistWithOutbox(pool, {
+            userId,
+            itemType,
+            itemId,
+          }),
         3,
         'remove from watchlist'
       )
 
-      if (result.rows.length === 0) {
+      if (result.kind === 'not_found') {
         return res.status(404).json({ error: 'Item not found in watchlist' })
       }
 

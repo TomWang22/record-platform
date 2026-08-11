@@ -8,7 +8,10 @@
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "test": "ROLLUP_DISABLE_NATIVE=true vitest run",
+    "test:coverage": "ROLLUP_DISABLE_NATIVE=true vitest run --coverage",
+    "test:watch": "ROLLUP_DISABLE_NATIVE=true vitest"
   },
   "dependencies": {
     "@common/utils": "workspace:*",
@@ -25,8 +28,10 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/pg": "^8.10.9",
+    "@vitest/coverage-v8": "2.1.9",
     "prisma": "6.17.1",
     "tsx": "^4.16.2",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.9"
   }
 }

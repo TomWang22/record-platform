@@ -15,6 +15,7 @@ CREATE INDEX IF NOT EXISTS idx_messaging_outbox_unpublished
   ON messaging.outbox_events(published, created_at)
   WHERE published = false;
 
-COMMENT ON COLUMN messaging.outbox_events.payload IS 'Serialized domain event (proto bytes); not JSON.';
-COMMENT ON COLUMN messaging.outbox_events.id IS 'UUID = envelope.event_id; publisher must set envelope.event_id = this id (no new UUID on publish).';
-COMMENT ON TABLE messaging.outbox_events IS 'Transactional outbox: same transaction as domain write; background publisher sends EventEnvelope; Kafka key = aggregate_id.';
+COMMENT ON COLUMN messaging.outbox_events.payload IS 'UTF-8 JSON bytes for messaging.events.v1 matching versioned proto field names (not binary protobuf wire format).';
+COMMENT ON COLUMN messaging.outbox_events.id IS 'UUID = payload.metadata.event_id; publisher must not mint a new event id on drain.';
+COMMENT ON COLUMN messaging.outbox_events.aggregate_id IS 'Frozen Kafka partition key for messaging.events.v1 (may be recipient_id, group_id, or message.id depending on route).';
+COMMENT ON TABLE messaging.outbox_events IS 'Transactional outbox: same transaction as domain write; background publisher sends UTF-8 JSON to messaging.events.v1; Kafka key = aggregate_id.';

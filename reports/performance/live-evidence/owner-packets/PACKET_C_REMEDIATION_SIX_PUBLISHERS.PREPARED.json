@@ -14,7 +14,7 @@
     "shopping.outbox_events",
     "trust.outbox_events"
   ],
-  "emitted_at_utc": "2026-08-10T15:41:30Z",
+  "emitted_at_utc": "2026-08-11T15:35:24Z",
   "execution_authorized": false,
   "explicitly_excluded": [
     "packet_c_authorization",
@@ -26,7 +26,12 @@
     "authorize_obsolete_prepared_91c033c9",
     "authorize_obsolete_prepared_c3c432b9",
     "authorize_obsolete_prepared_288fd8aa",
-    "authorize_obsolete_prepared_6fbc2410"
+    "authorize_obsolete_prepared_6fbc2410",
+    "authorize_obsolete_prepared_3c679ecd",
+    "authorize_obsolete_prepared_9efd0a03",
+    "authorize_obsolete_prepared_ca9a35c7",
+    "authorize_obsolete_prepared_38099359",
+    "authorize_obsolete_prepared_7176a934"
   ],
   "hard_rules": [
     "acceptance_denominator_remains_12",
@@ -36,11 +41,16 @@
     "no_live_publish_without_separate_authorization",
     "source_and_test_pins_required",
     "do_not_authorize_obsolete_prepared_288fd8aa",
-    "do_not_authorize_obsolete_prepared_6fbc2410"
+    "do_not_authorize_obsolete_prepared_6fbc2410",
+    "do_not_authorize_obsolete_prepared_3c679ecd",
+    "do_not_authorize_obsolete_prepared_9efd0a03",
+    "do_not_authorize_obsolete_prepared_ca9a35c7",
+    "do_not_authorize_obsolete_prepared_38099359",
+    "do_not_authorize_obsolete_prepared_7176a934"
   ],
   "lifecycle_publish_executed": false,
   "load_testing_authorized": false,
-  "next_boundary": "IMPLEMENT_REMAINING_FIVE_PUBLISHERS_ONE_TABLE_AT_A_TIME_STARTING_MESSAGING_NO_LIVE_PUBLISH",
+  "next_boundary": "STOP_NO_AUTH_NO_LIVE_PUBLISH",
   "not_in_remediation_scope": {
     "lifecycle_executable": [
       "ai.outbox_events",
@@ -48,104 +58,92 @@
       "auction_monitor.outbox_events",
       "auth.auth_outbox",
       "listings.outbox_events",
-      "media.outbox_events"
+      "media.outbox_events",
+      "messaging.outbox_events",
+      "notification.outbox_events",
+      "records.outbox_events",
+      "shopping.outbox_events",
+      "trust.outbox_events"
     ],
     "migration_pending": [
       "auth.outbox_events"
     ],
-    "note": "auth.outbox_events remains MIGRATION_PENDING; media.outbox_events is LIFECYCLE_EXECUTABLE with lock-through-ack publisher (MEDIA_OUTBOX_PUBLISHER===1 opt-in; live still unauthorized)"
+    "note": "auth.outbox_events remains MIGRATION_PENDING; trust/shopping/records/media/messaging/notification.outbox_events are LIFECYCLE_EXECUTABLE with lock-through-ack publishers (opt-in env===1; live still unauthorized)"
   },
   "obsolete_inventory_sha256": [
     "70ae0ee0292870571f7fefc6ccaa6c2450069e45b734e7a48a6322502eb187be",
     "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
-    "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6"
+    "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6",
+    "fd35ad0afaed963f9285e8a89d1a73bdd68f664b001dfc09cf50ec270287fe12",
+    "d24f95d7cef09298f9d88ba1718c54f3aef51b59f42102e6be8c1c09051a2be9",
+    "9ece392aac4c9a1889287e0f6e233dc6a2b3e5666e9183f7a362cfeaa8d4c7da",
+    "6e8df5b92509eb0351b2f5c15b2c0b85149f01960897cf668909ccd283a82476",
+    "e3ad155c4b7916d73c5ba397d13f0432832e79f2197d2fc79dce36091e730e12"
   ],
   "obsolete_prepared_sha256": [
     "91c033c997e3f3c8ab56a0594165bc814a1892e043839f9df3e01aad6e2fb9b8",
     "c3c432b91001967eceec651f7b2e201576e1f442a3ccbf256fa01c2c63da77f6",
     "288fd8aa40f22634acd087a2b2192ddb459beb07412bfa2a58be2e1e7872b694",
-    "6fbc2410995cc409cb9e3a06f7474ab87216e23f7e77db3e5f9f16531cf9f905"
+    "6fbc2410995cc409cb9e3a06f7474ab87216e23f7e77db3e5f9f16531cf9f905",
+    "3c679ecde42b800ddefa77a85ca9399562bc0be292dd6cc448cc83fb59b153de",
+    "9efd0a0333741909d6b4b75256973bbb4035a18709e69d4a6441d07487edb1e7",
+    "ca9a35c7a97d660878837b46cc2c4a4828c4a1d3c1ca972b827bfc08ff349f46",
+    "380993598d3f2d419a54eec5fbb43e7562bdd5b30cc94f130d2a98d66806a7e9",
+    "7176a934cdf80152c57d9a336e57898983833c20b476637dbcf1a0f9b7ee312f"
   ],
   "packet_id": "PACKET_C_REMEDIATION_SIX_PUBLISHERS",
   "pins": {
-    "inventory_denominator_sha256": "065f0c7832531f9f32fae36a14d6e67868c5c1be08b2b2171e0cbd8c5d818ac6",
-    "inventory_sha256": "fd35ad0afaed963f9285e8a89d1a73bdd68f664b001dfc09cf50ec270287fe12",
-    "readiness_matrix_sha256": "b15959513b5e728be8679a2dc85c17eeaf02ab02f4ba932f3a2b571b3cb349ec",
+    "inventory_denominator_sha256": "1b614ba485e03bddf7bcf296c9bf0c89fee97b7013e9f034d8fdc7ea77079074",
+    "inventory_sha256": "71f9a0f494e4cdd3375fd6c8852647fbedd1a7571b97f8a7f24ad1fef5ae5d78",
+    "readiness_matrix_sha256": "e2908e28e468229b8609e9a726d0ae22875be6032d9bbdf0888510300dffae2b",
     "source": {
       "build_outbox_inventory_mjs": "3ed47465f0da11ad432620aa6713154ff47406c2780bad82b5e60db7be3f3eb6",
-      "build_packet_c_readiness_matrix_mjs": "79c5c8d449166042c690609327060014cb6949317271dcd64dcf238cddda2ae4",
+      "build_packet_c_readiness_matrix_mjs": "0d421b1f5d53350eabcac44e9e5bd9493abc948626a81a59d1b475b09928edcb",
       "freeze_track_c_inventory_denominator_mjs": "0fd1d7e9208216cdf2d8bb856fea14a447b1903b91af9bf7ba6490dd40aa85bb",
       "media_outbox_publisher_test_ts": "97d17a6d1011b2ea3e0588e425b359b8f0e1d47611771b8b532ed8f17a75e6a7",
       "media_outbox_publisher_ts": "5de58a4f13060aaee3c68eb165015097cbc7f1e73714aea2f829ab118c727661",
-      "outbox_owner_inventory_test_mjs": "bf73f88d3e3917c317cd135584d4d149b189aed6cc09012a79846eb7ce5c0676",
-      "performance_track_c_mjs": "d2890ab4a5c90fc2f7edf8658ebc8527c7d8739ed147955ab01a2d4f42f9c8f7",
-      "prepare_packet_c_remediation_mjs": "be09db50d6243632620f0ed6ab28a0294baf762e8d3a844b380d5446e900e229",
-      "track_c_inventory_denominator_freeze_test_mjs": "c5a53b813e5eb436f4ab988b6f8282d791d5f58fd7cb7d4fd3c73f6f2e0a0358",
-      "track_c_inventory_guards_mjs": "cc707f4d8b53ac34b0d7489610c5dd8c38fb15c315f4dfaf08d9b1858bf26b4d",
-      "track_c_inventory_guards_test_mjs": "d8241e5deb3d8c66da7198e9698c3ecf8230c8f45a83b05b11c5343b35d13c5b"
+      "messaging_message_outbox_test_ts": "1e872d9733c32b0c68e810315ee377a064b97bd3f1dc5d787ea2f66c1dc4ab99",
+      "messaging_message_outbox_ts": "0532704747eea1dc003db1336767371d4dc0140ae6b38a9a01bd377708b7f42d",
+      "messaging_outbox_publisher_test_ts": "1b21e316fe930ac83375012e7f4e3d9512d7f9eefafb83404eca8d25e30a9193",
+      "messaging_outbox_publisher_ts": "9835204e52fd546ecb83f4de239831923e4c408274aa320389d6efb7a2ac82dd",
+      "notification_kafka_events_ts": "b61b946f65a05e7eb6c05857135045adaa36896e8a73b5f8f0f9430c6d352771",
+      "notification_message_outbox_test_ts": "478fd508608d8a945b5620344ac88cf4f07b61a010a02f381580fae393cd75b0",
+      "notification_message_outbox_ts": "cbf09201927cc5a6431a38861e729ea14a0eea88edd77af60d38e3fd9dc0fb4a",
+      "notification_outbox_enqueue_ts": "64160c3f115ba5dc12cc5ea9915458fe78e74bb6577773775193cd5b212d26bb",
+      "notification_outbox_publisher_test_ts": "669ef7d76ca5a7cb08970d131073a4fc54c0f237c9e0b0a1f852e954b1f8606c",
+      "notification_outbox_publisher_ts": "5f72e1e33f07197f1dd6f86f24e674fa4003144620c96ce64d3cfab1800d99dc",
+      "outbox_owner_inventory_test_mjs": "37976e745eef85110db5cd590f6c5003f77f14d084411737910fa7a73d692d06",
+      "performance_track_c_mjs": "6c5bab01bfadea5d4a3258c0907481e566274a8cf85c3532ded1f08e6b8e21e2",
+      "prepare_packet_c_remediation_mjs": "fa590a585c5d7e71f5122abea8a404ad08abdd6e61640ea4b65608644ed99060",
+      "records_kafka_events_ts": "c7393986ed4b132ca729688876775a01416bae525ac0328b1eb6b307474b086e",
+      "records_message_outbox_test_ts": "e400839402444bc5e94f3de59efd2e3bb8383bf5f78626ed900b6dfaf68a830d",
+      "records_message_outbox_ts": "91f2c3374ede93e04b176c0d1a11c262547e41f70c615059e18610eb9d0eb624",
+      "records_outbox_enqueue_ts": "4765803f5c5d84c4e2d37a75ca237f194aa78cd26ea4d492176836e067f52b5b",
+      "records_outbox_publisher_test_ts": "3dba92ac536dc48457133ac8ee8fef61295434a7fd6ad0b84116ece613437162",
+      "records_outbox_publisher_ts": "db665c85753c1f12ac20016a53ce5975ac2de88a8aba2acc7d816a22df5a8852",
+      "shopping_kafka_events_ts": "18f99c795f8eeb86f8f4a28e3c633df397de52caccea31ed0af21f4283e51a22",
+      "shopping_message_outbox_test_ts": "7233495299c7d67cd56abc6371d926bbc3a9ca7296af5811aa9400f3ab3da277",
+      "shopping_message_outbox_ts": "6e18c9bee30b05b77401f32f0a95187d048eee0cc3658269cc0886605532fe33",
+      "shopping_outbox_enqueue_ts": "8814f5fc4e1f72347315bb2465336f6c5636811ee749556d1ff656b717c94992",
+      "shopping_outbox_publisher_test_ts": "09281ee105e7ee66043f7815c6620f5fed5946424d3dc4c33b3bfeffc44ffa9e",
+      "shopping_outbox_publisher_ts": "f38d82c92850b5808d3658878f19b3e202af8cbc52b8fd637c12827444bbe6fa",
+      "track_c_inventory_denominator_freeze_test_mjs": "e1c914a5515b312f841939c71e2f20ac26aaca863873b5de0c5ba6ab4d72b997",
+      "track_c_inventory_guards_mjs": "6ae20e7d2dab3c3e008ba976a26a26c09f672803371bc7b5f30537b6ec544489",
+      "track_c_inventory_guards_test_mjs": "c95ee78fca37c3eff7b60aa93c228a2c6a85990f7a7764fcfd03ce6cdcd76fc7",
+      "trust_kafka_events_ts": "60cff7f8c7ff78617054f6ca940417f8cee179177a49b222fce8cca084257ae9",
+      "trust_message_outbox_test_ts": "acd5d4bda131aa9bece819f8bf09964f38337244e2662291d42e81192f81a0a5",
+      "trust_message_outbox_ts": "e05489e7f842aa552d25e36199eaf22e66d8c8334546a00508753becd57e8b61",
+      "trust_outbox_enqueue_ts": "80e7098e9e8b5656b168ad2b5bc5961485263b2193e237880157235280378418",
+      "trust_outbox_publisher_test_ts": "8ddce64365ab0d403d7f6246b846029681227457cdbf9d2b8512c92eb43c575d",
+      "trust_outbox_publisher_ts": "20eb5e12b350fa4a6c2589ad0d3a703e3bad3448dee60137cd564a36be6a2f39",
+      "trust_outbox_wiring_test_ts": "e13d6f8c0ac2e23a5733061adfc603e816d04f00448a4d46d649a2e09b52c226"
     },
     "track_b_terminal_sha256": "3d4d06245f0acde997bea77db4a9b32ab5be6563fc1979faeb71defe4ae569bb"
   },
   "platform_pass": false,
-  "purpose": "Remediation/observation readiness for remaining PUBLISHER_BLOCKED canonical outboxes (media publisher present; 5 blocked remain)",
-  "remediation_target_count": 5,
-  "remediation_targets": [
-    {
-      "database": "messaging",
-      "live_publish_authorized": false,
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
-      "publisher_owner": "messaging-service",
-      "readiness": "PUBLISHER_BLOCKED",
-      "remediation_in_scope": true,
-      "required_for_track_c_acceptance": true,
-      "service": "messaging-service",
-      "table": "messaging.outbox_events"
-    },
-    {
-      "database": "notification",
-      "live_publish_authorized": false,
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
-      "publisher_owner": "notification-service",
-      "readiness": "PUBLISHER_BLOCKED",
-      "remediation_in_scope": true,
-      "required_for_track_c_acceptance": true,
-      "service": "notification-service",
-      "table": "notification.outbox_events"
-    },
-    {
-      "database": "records",
-      "live_publish_authorized": false,
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
-      "publisher_owner": "records-service",
-      "readiness": "PUBLISHER_BLOCKED",
-      "remediation_in_scope": true,
-      "required_for_track_c_acceptance": true,
-      "service": "records-service",
-      "table": "records.outbox_events"
-    },
-    {
-      "database": "shopping",
-      "live_publish_authorized": false,
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
-      "publisher_owner": "shopping-service",
-      "readiness": "PUBLISHER_BLOCKED",
-      "remediation_in_scope": true,
-      "required_for_track_c_acceptance": true,
-      "service": "shopping-service",
-      "table": "shopping.outbox_events"
-    },
-    {
-      "database": "trust",
-      "live_publish_authorized": false,
-      "publisher_disposition_status": "MISSING_BLOCKS_ACCEPTANCE",
-      "publisher_owner": "trust-service",
-      "readiness": "PUBLISHER_BLOCKED",
-      "remediation_in_scope": true,
-      "required_for_track_c_acceptance": true,
-      "service": "trust-service",
-      "table": "trust.outbox_events"
-    }
-  ],
+  "purpose": "Remediation/observation readiness for remaining PUBLISHER_BLOCKED canonical outboxes (trust+shopping+records+notification+messaging+media publishers present; 0 blocked remains)",
+  "remediation_target_count": 0,
+  "remediation_targets": [],
   "schema": "packet-c-remediation-six-publishers/v1",
   "status": "PREPARED_NON_LIVE",
   "track_c_acceptance_pass": false

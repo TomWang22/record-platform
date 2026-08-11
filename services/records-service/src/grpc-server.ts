@@ -7,6 +7,11 @@ import { PrismaClient as PrismaClientCtor, Prisma } from '../generated/records-c
 import path from "path";
 import fs from "fs";
 import { registerHealthService, createOchGrpcServerCredentialsForBind } from "@common/utils";
+import {
+  createRecordWithOutbox,
+  deleteRecordWithOutbox,
+  updateRecordWithOutbox,
+} from "./application/recordOutbox.js";
 
 type LoadedRecord = Awaited<ReturnType<PrismaClient["record"]["findFirst"]>>;
 
@@ -158,10 +163,10 @@ export function startGrpcServer(port: number = 50051, prismaClient?: PrismaClien
         if (!user_id || !record) {
           return callback({ code: grpc.status.INVALID_ARGUMENT, message: "user_id and record required" });
         }
-        const created = await prisma.record.create({
+        const { record: created } = await createRecordWithOutbox(prisma as never, {
           data: recordInputFromProto(record, user_id),
         });
-        callback(null, { record: mapRecord(created) });
+        callback(null, { record: mapRecord(created as LoadedRecord) });
       } catch (err: any) {
         console.error("[records grpc] CreateRecord error", err);
         callback({ code: grpc.status.INTERNAL, message: err?.message || "internal error" });
@@ -174,17 +179,15 @@ export function startGrpcServer(port: number = 50051, prismaClient?: PrismaClien
         if (!record_id || !user_id || !record) {
           return callback({ code: grpc.status.INVALID_ARGUMENT, message: "record_id, user_id and record required" });
         }
-        const existing = await prisma.record.findFirst({
-          where: { id: record_id, userId: user_id },
+        const result = await updateRecordWithOutbox(prisma as never, {
+          id: record_id,
+          userId: user_id,
+          recordData: recordInputFromProto(record, user_id),
         });
-        if (!existing) {
+        if (result.kind === "not_found") {
           return callback({ code: grpc.status.NOT_FOUND, message: "record not found" });
         }
-        const updated = await prisma.record.update({
-          where: { id: record_id },
-          data: recordInputFromProto(record, user_id),
-        });
-        callback(null, { record: mapRecord(updated) });
+        callback(null, { record: mapRecord(result.record as LoadedRecord) });
       } catch (err: any) {
         const code = err?.code === "P2025" ? grpc.status.NOT_FOUND : grpc.status.INTERNAL;
         console.error("[records grpc] UpdateRecord error", err);
@@ -198,10 +201,11 @@ export function startGrpcServer(port: number = 50051, prismaClient?: PrismaClien
         if (!record_id || !user_id) {
           return callback({ code: grpc.status.INVALID_ARGUMENT, message: "record_id and user_id required" });
         }
-        const deleted = await prisma.record.deleteMany({
-          where: { id: record_id, userId: user_id },
+        const result = await deleteRecordWithOutbox(prisma as never, {
+          id: record_id,
+          userId: user_id,
         });
-        if (deleted.count === 0) {
+        if (result.kind === "not_found") {
           return callback({ code: grpc.status.NOT_FOUND, message: "record not found" });
         }
         callback(null, { success: true });

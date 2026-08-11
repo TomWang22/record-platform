@@ -9,7 +9,10 @@
     "dev": "tsx watch src/server.ts",
     "prestart": "test -f dist/lib/singleflight_cache.lua || (echo '❌ dist/lib/singleflight_cache.lua missing' && exit 1)",
     "start": "node dist/server.js",
-    "migrate:custom": "psql \"$POSTGRES_URL\" -f prisma/migrations/INIT.sql"
+    "migrate:custom": "psql \"$POSTGRES_URL\" -f prisma/migrations/INIT.sql",
+    "test": "ROLLUP_DISABLE_NATIVE=true vitest run",
+    "test:coverage": "ROLLUP_DISABLE_NATIVE=true vitest run --coverage",
+    "test:watch": "ROLLUP_DISABLE_NATIVE=true vitest"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",
@@ -32,8 +35,11 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.14.12",
+    "@types/pg": "^8.15.6",
+    "@vitest/coverage-v8": "2.1.9",
     "prisma": "6.17.1",
     "tsx": "^4.16.2",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.9"
   }
 }

@@ -7,6 +7,7 @@ import { startNotificationHttpServer } from "./http-server.js";
 import { pool } from "./db.js";
 import { notificationKafkaTopics, startNotificationConsumer } from "./kafka-consumer.js";
 import { startNotificationUserLifecycleConsumer } from "./user-lifecycle-consumer.js";
+import { startNotificationOutboxPublisher } from "./outbox/publishOutbox.js";
 
 const HTTP_PORT = Number(process.env.HTTP_PORT || "4015");
 const GRPC_PORT = Number(process.env.GRPC_PORT || "50065");
@@ -15,6 +16,8 @@ async function main() {
   installShutdownSignalHandlers({ service: "notification-service" });
   startNotificationHttpServer(HTTP_PORT);
   startGrpcServer(GRPC_PORT);
+  // Default OFF: NOTIFICATION_OUTBOX_PUBLISHER must be exactly "1".
+  if (pool) startNotificationOutboxPublisher(pool);
   void (async () => {
     try {
       await ensureKafkaBrokerReady("notification-service", {

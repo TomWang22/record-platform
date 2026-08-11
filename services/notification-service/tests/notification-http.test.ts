@@ -15,6 +15,10 @@ const { poolQuery } = vi.hoisted(() => ({
 vi.mock("../src/db.js", () => ({
   pool: {
     query: (...args: unknown[]) => poolQuery(...args),
+    connect: async () => ({
+      query: (...args: unknown[]) => poolQuery(...args),
+      release: vi.fn(),
+    }),
   },
 }));
 
@@ -57,8 +61,11 @@ vi.mock("../src/notification-list-cache.js", () => ({
 
 function defaultPool(sql: string): { rows: unknown[]; rowCount?: number } {
   const norm = sql.replace(/\s+/g, " ").trim();
-  if (norm === "SELECT 1") {
+  if (norm === "SELECT 1" || norm === "BEGIN" || norm === "COMMIT" || norm === "ROLLBACK") {
     return { rows: [{ "?column?": 1 }], rowCount: 1 };
+  }
+  if (norm.includes("INSERT INTO notification.outbox_events")) {
+    return { rows: [], rowCount: 1 };
   }
   if (norm.includes("FROM notification.user_preferences")) {
     return {
@@ -533,7 +540,16 @@ describe("createNotificationHttpApp (mocked pool)", () => {
       }
       if (norm.includes("INSERT INTO notification.notifications")) {
         insertedPayload = JSON.parse(String((params as unknown[])?.[2] ?? "{}")) as Record<string, unknown>;
-        return { rows: [], rowCount: 1 };
+        return {
+          rows: [
+            {
+              id: randomUUID(),
+              read_at: null,
+              created_at: new Date("2026-08-10T12:00:00.000Z"),
+            },
+          ],
+          rowCount: 1,
+        };
       }
       return defaultPool(sql);
     });
@@ -657,7 +673,19 @@ describe("createNotificationHttpApp (mocked pool)", () => {
         return { rows: [], rowCount: 0 };
       }
       if (n.includes("INSERT INTO notification.notifications") && n.includes("RETURNING")) {
-        return { rows: [{ id: nid }], rowCount: 1 };
+        return {
+          rows: [
+            {
+              id: nid,
+              read_at: null,
+              created_at: new Date("2026-08-10T12:00:00.000Z"),
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      if (n.includes("INSERT INTO notification.outbox_events")) {
+        return { rows: [], rowCount: 1 };
       }
       return defaultPool(sql);
     });

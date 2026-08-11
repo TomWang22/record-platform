@@ -90,9 +90,9 @@ export const FORBIDDEN_NONEXISTENT_OUTBOX_TABLES = Object.freeze([
 
 export const TRACK_C_EXPECTED_OWNER_COUNT = 12;
 
-/** Frozen post-media-publisher 12/12 inventory (media lock-through-ack + default-off). */
+/** Frozen post-trust-publisher 12/12 inventory (Phase B enqueue + Phase A drain + G7 recon). */
 export const TRACK_C_CANONICAL_INVENTORY_SHA256 =
-  "fd35ad0afaed963f9285e8a89d1a73bdd68f664b001dfc09cf50ec270287fe12";
+  "71f9a0f494e4cdd3375fd6c8852647fbedd1a7571b97f8a7f24ad1fef5ae5d78";
 
 export const OBSOLETE_INVENTORY_SHA256 = Object.freeze([
   // 14/14 denominator that incorrectly included booking+social disposition rows
@@ -101,6 +101,16 @@ export const OBSOLETE_INVENTORY_SHA256 = Object.freeze([
   "5707bed2b371ff95f96d16f6c203f771c17fff1ab07c3193c7475ec404119052",
   // media publisher present but claim-released-before-send / default-on gaps
   "5cb24b02e1351bcb3f886bc48e8bc3b7423e4ab91cced6f82cb6df0b89fcb6b6",
+  // post-media lock-through-ack; pre-messaging Phase B (6 exec / 1 mig / 5 blocked)
+  "fd35ad0afaed963f9285e8a89d1a73bdd68f664b001dfc09cf50ec270287fe12",
+  // post-messaging Phase B; pre-notification Phase B (7 exec / 1 mig / 4 blocked)
+  "d24f95d7cef09298f9d88ba1718c54f3aef51b59f42102e6be8c1c09051a2be9",
+  // post-notification Phase B; pre-records Phase B (8 exec / 1 mig / 3 blocked)
+  "9ece392aac4c9a1889287e0f6e233dc6a2b3e5666e9183f7a362cfeaa8d4c7da",
+  // post-records Phase B; pre-shopping Phase B (9 exec / 1 mig / 2 blocked)
+  "6e8df5b92509eb0351b2f5c15b2c0b85149f01960897cf668909ccd283a82476",
+  // post-shopping Phase B; pre-trust Phase B (10 exec / 1 mig / 1 blocked)
+  "e3ad155c4b7916d73c5ba397d13f0432832e79f2197d2fc79dce36091e730e12",
 ]);
 
 export function isForbiddenOutboxSchema(schemaOrDatabase) {
@@ -139,33 +149,6 @@ export const PUBLISHER_ABSENT_DISPOSITIONS = Object.freeze({
       "Canonical auth.outbox_events DDL exists; active publisher drains auth.auth_outbox only",
     evidence:
       "services/auth-service/src/lib/auth-outbox-publisher.ts; infra/db/01-auth-outbox.sql",
-  }),
-  "records.outbox_events": Object.freeze({
-    status: "MISSING_BLOCKS_ACCEPTANCE",
-    reason: "DDL present; no repository publisher implementation located",
-    evidence: "infra/db/01-records-outbox.sql",
-  }),
-  "messaging.outbox_events": Object.freeze({
-    status: "MISSING_BLOCKS_ACCEPTANCE",
-    reason: "DDL + insert paths exist; no publish/mark loop located",
-    evidence: "infra/db/02-messaging-outbox.sql",
-  }),
-  "trust.outbox_events": Object.freeze({
-    status: "MISSING_BLOCKS_ACCEPTANCE",
-    reason: "DDL present; no repository publisher implementation located",
-    evidence: "infra/db/03-trust-outbox.sql",
-  }),
-  "notification.outbox_events": Object.freeze({
-    status: "MISSING_BLOCKS_ACCEPTANCE",
-    reason: "DDL present; no repository publisher implementation located",
-    evidence: "infra/db/03-notification-outbox.sql",
-  }),
-  "shopping.outbox_events": Object.freeze({
-    status: "MISSING_BLOCKS_ACCEPTANCE",
-    reason:
-      "shopping.outbox_events unwired; SaleCompleted drains listings.outbox_events instead",
-    evidence:
-      "infra/db/01-shopping-outbox.sql; services/shopping-service/src/lib/sale-completed-outbox-drain.ts",
   }),
 });
 
@@ -240,44 +223,76 @@ export const OUTBOX_REGISTRY = {
   "records.outbox_events": {
     service: "records-service",
     publisher_owner: "records-service",
-    publisher_present: false,
-    disposition: "PUBLISHER_ABSENT_EXPLICIT",
-    creation_transition: "domain write + INSERT records.outbox_events same transaction",
-    publisher_implementation: "none located in repository",
-    poll_batch: { model: "unwired", batch_limit: null, claim: null },
+    publisher_present: true,
+    disposition: "INVENTORIED",
+    creation_transition:
+      "HTTP/gRPC create/update/delete + INSERT records.outbox_events same Prisma transaction (recordOutbox.ts); no-op PUT short-circuits",
+    publisher_implementation:
+      "services/records-service/src/outbox/publishOutbox.ts (claim/produce/mark after broker ack; ambiguous COMMIT reconciliation); application/recordOutbox.ts; outbox/enqueueOutbox.ts",
+    poll_batch: {
+      interval_ms: null,
+      batch_limit: 25,
+      env_batch: "RECORDS_OUTBOX_BATCH",
+      claim: "FOR UPDATE SKIP LOCKED",
+    },
     topic: "${ENV_PREFIX}.records.events",
     kafka_principal: "CN=records-service",
     acl_expectations: ["WRITE ${ENV_PREFIX}.records.events"],
-    retry: { model: "ABSENT" },
-    lease: { model: "ABSENT" },
+    retry: {
+      model: "soft_in_process_attempt_budget",
+      max_attempts: 3,
+      backoff: "next tick re-claim",
+    },
+    lease: { model: "transactional row lock only", leased_until_column: false },
     terminal_predicates: ["published=true"],
     dlq: { present: false },
     broker_ack: { required: true, marks_published: false },
     db_ack: { required: true, column: "published", after_broker_ack: true },
     consumer_groups: [],
-    business_effect: "records domain consumers (unwired publisher)",
+    business_effect: "RecordCreatedV1 / RecordUpdatedV1 / RecordDeletedV1 consumers",
     cleanup_disposition: "RETAINED published=true",
+    annotations: [
+      "publisher present non-live; RECORDS_OUTBOX_PUBLISHER must be exactly 1 (default OFF)",
+      "stored BYTEA = Record*V1 protobuf; kafka_value = EventEnvelope wrapping stored payload; event_id === outbox.id",
+      "claim holds FOR UPDATE SKIP LOCKED through broker ack + DB mark; COMMIT throw ⇒ fresh-connection reconciliation",
+      "soft retry_exhaustion is process-scoped (restart resets); no DDL retry_count/DLQ",
+      "no-op PUT: no mutation ⇒ no revision ⇒ no outbox",
+    ],
   },
   "messaging.outbox_events": {
     service: "messaging-service",
     publisher_owner: "messaging-service",
-    publisher_present: false,
-    disposition: "PUBLISHER_ABSENT_EXPLICIT",
-    creation_transition: "send message + INSERT messaging.outbox_events same transaction",
-    publisher_implementation: "none located — integration tests insert only",
-    poll_batch: { model: "unwired", batch_limit: null, claim: null },
+    publisher_present: true,
+    disposition: "INVENTORIED",
+    creation_transition:
+      "HTTP/gRPC create+reply + INSERT messaging.outbox_events same transaction (messageOutbox.ts)",
+    publisher_implementation:
+      "services/messaging-service/src/outbox/publishOutbox.ts (claim/produce/mark after broker ack); application/messageOutbox.ts; outbox/enqueueOutbox.ts",
+    poll_batch: {
+      interval_ms: null,
+      batch_limit: 25,
+      env_batch: "MESSAGING_OUTBOX_BATCH",
+      claim: "FOR UPDATE SKIP LOCKED",
+    },
     topic: "messaging.events.v1",
     kafka_principal: "CN=messaging-service",
     acl_expectations: ["WRITE messaging.events.v1"],
     retry: { model: "ABSENT" },
-    lease: { model: "ABSENT" },
+    lease: { model: "transactional row lock only", leased_until_column: false },
     terminal_predicates: ["published=true"],
     dlq: { present: false },
     broker_ack: { required: true, marks_published: false },
     db_ack: { required: true, column: "published", after_broker_ack: true },
     consumer_groups: [],
-    business_effect: "messaging consumers (MessageSentV1)",
+    business_effect: "messaging consumers (MessageSentV1 / MessageRepliedV1)",
     cleanup_disposition: "RETAINED published=true",
+    annotations: [
+      "publisher present non-live; MESSAGING_OUTBOX_PUBLISHER must be exactly 1 (default OFF)",
+      "claim holds FOR UPDATE SKIP LOCKED through broker ack + DB mark in one transaction",
+      "Phase B: create/reply HTTP+gRPC share transactional enqueue; update/delete/read still direct-produce debt",
+      "payload is UTF-8 JSON matching versioned proto field names (not binary protobuf)",
+      "soft retry_exhaustion is process-scoped (restart resets); no DDL retry_count/DLQ",
+    ],
   },
   "media.outbox_events": {
     service: "media-service",
@@ -357,66 +372,121 @@ export const OUTBOX_REGISTRY = {
   "trust.outbox_events": {
     service: "trust-service",
     publisher_owner: "trust-service",
-    publisher_present: false,
-    disposition: "PUBLISHER_ABSENT_EXPLICIT",
-    creation_transition: "trust domain write + INSERT trust.outbox_events same transaction",
-    publisher_implementation: "none located in repository",
-    poll_batch: { model: "unwired", batch_limit: null, claim: null },
+    publisher_present: true,
+    disposition: "INVENTORIED",
+    creation_transition:
+      "HTTP/gRPC listing-flag submit + peer-review + INSERT trust.outbox_events same PoolClient transaction (trustOutbox.ts); user_flags / marketplace / reputation unwired",
+    publisher_implementation:
+      "services/trust-service/src/outbox/publishOutbox.ts (claim/produce/mark after broker ack; ambiguous COMMIT reconciliation); application/trustOutbox.ts; outbox/enqueueOutbox.ts",
+    poll_batch: {
+      interval_ms: null,
+      batch_limit: 25,
+      env_batch: "TRUST_OUTBOX_BATCH",
+      claim: "FOR UPDATE SKIP LOCKED",
+    },
     topic: "${ENV_PREFIX}.trust.events",
     kafka_principal: "CN=trust-service",
     acl_expectations: ["WRITE ${ENV_PREFIX}.trust.events"],
-    retry: { model: "ABSENT" },
-    lease: { model: "ABSENT" },
+    retry: {
+      model: "soft_in_process_attempt_budget",
+      max_attempts: 3,
+      backoff: "next tick re-claim",
+    },
+    lease: { model: "transactional row lock only", leased_until_column: false },
     terminal_predicates: ["published=true"],
     dlq: { present: false },
     broker_ack: { required: true, marks_published: false },
     db_ack: { required: true, column: "published", after_broker_ack: true },
     consumer_groups: [],
-    business_effect: "trust domain consumers (unwired)",
+    business_effect:
+      "ListingFlagSubmittedV1 / PeerReviewCreatedV1 consumers (ListingFlaggedV1 / ReviewCreatedV1 not on these paths)",
     cleanup_disposition: "RETAINED published=true",
+    annotations: [
+      "publisher present non-live; TRUST_OUTBOX_PUBLISHER must be exactly 1 (default OFF)",
+      "stored BYTEA = ListingFlagSubmittedV1 / PeerReviewCreatedV1 protobuf; kafka_value = EventEnvelope wrapping stored payload; event_id === outbox.id; timestamp === outbox.created_at",
+      "claim holds FOR UPDATE SKIP LOCKED through broker ack + DB mark; COMMIT throw ⇒ fresh-connection reconciliation",
+      "soft retry_exhaustion is process-scoped (restart resets); no DDL retry_count/DLQ",
+      "pending listing flag emits ListingFlagSubmittedV1 not ListingFlaggedV1; peer review emits PeerReviewCreatedV1 not ReviewCreatedV1",
+      "user_flags / marketplace_feedback / reputation scoring remain unwired",
+    ],
   },
   "notification.outbox_events": {
     service: "notification-service",
     publisher_owner: "notification-service",
-    publisher_present: false,
-    disposition: "PUBLISHER_ABSENT_EXPLICIT",
-    creation_transition: "notification domain write + INSERT notification.outbox_events",
-    publisher_implementation: "none located in repository",
-    poll_batch: { model: "unwired", batch_limit: null, claim: null },
+    publisher_present: true,
+    disposition: "INVENTORIED",
+    creation_transition:
+      "domain create/upsert(inserted=true) + INSERT notification.outbox_events same transaction (notificationOutbox.ts)",
+    publisher_implementation:
+      "services/notification-service/src/outbox/publishOutbox.ts (claim/produce/mark after broker ack; ambiguous COMMIT reconciliation); application/notificationOutbox.ts; outbox/enqueueOutbox.ts",
+    poll_batch: {
+      interval_ms: null,
+      batch_limit: 25,
+      env_batch: "NOTIFICATION_OUTBOX_BATCH",
+      claim: "FOR UPDATE SKIP LOCKED",
+    },
     topic: "${ENV_PREFIX}.notification.events",
     kafka_principal: "CN=notification-service",
     acl_expectations: ["WRITE ${ENV_PREFIX}.notification.events"],
-    retry: { model: "ABSENT" },
-    lease: { model: "ABSENT" },
+    retry: {
+      model: "soft_in_process_attempt_budget",
+      max_attempts: 3,
+      backoff: "next tick re-claim",
+    },
+    lease: { model: "transactional row lock only", leased_until_column: false },
     terminal_predicates: ["published=true"],
     dlq: { present: false },
     broker_ack: { required: true, marks_published: false },
     db_ack: { required: true, column: "published", after_broker_ack: true },
     consumer_groups: ["notification-consumer"],
-    business_effect: "notification dispatch consumers (unwired publisher)",
+    business_effect: "NotificationCreatedV1 consumers (self-emit filtered)",
     cleanup_disposition: "RETAINED published=true",
+    annotations: [
+      "publisher present non-live; NOTIFICATION_OUTBOX_PUBLISHER must be exactly 1 (default OFF)",
+      "UTF-8 JSON envelope; metadata.event_id === outbox.id; Kafka key = notification_id",
+      "claim holds FOR UPDATE SKIP LOCKED through broker ack + DB mark; COMMIT throw ⇒ fresh-connection reconciliation",
+      "soft retry_exhaustion is process-scoped (restart resets); no DDL retry_count/DLQ",
+    ],
   },
   "shopping.outbox_events": {
     service: "shopping-service",
     publisher_owner: "shopping-service",
-    publisher_present: false,
-    disposition: "PUBLISHER_ABSENT_EXPLICIT",
-    creation_transition: "shopping domain write + INSERT shopping.outbox_events",
+    publisher_present: true,
+    disposition: "INVENTORIED",
+    creation_transition:
+      "HTTP cart/watchlist/checkout + gRPC AddToCart/watchlist + INSERT shopping.outbox_events same PoolClient transaction (shoppingOutbox.ts); SaleCompleted remains listings-owned",
     publisher_implementation:
-      "SaleCompleted uses listings.outbox_events — shopping.outbox_events unwired",
-    poll_batch: { model: "unwired", batch_limit: null, claim: null },
+      "services/shopping-service/src/outbox/publishOutbox.ts (claim/produce/mark after broker ack; ambiguous COMMIT reconciliation); application/shoppingOutbox.ts; outbox/enqueueOutbox.ts",
+    poll_batch: {
+      interval_ms: null,
+      batch_limit: 25,
+      env_batch: "SHOPPING_OUTBOX_BATCH",
+      claim: "FOR UPDATE SKIP LOCKED",
+    },
     topic: "${ENV_PREFIX}.shopping.events",
     kafka_principal: "CN=shopping-service",
     acl_expectations: ["WRITE ${ENV_PREFIX}.shopping.events"],
-    retry: { model: "ABSENT" },
-    lease: { model: "ABSENT" },
+    retry: {
+      model: "soft_in_process_attempt_budget",
+      max_attempts: 3,
+      backoff: "next tick re-claim",
+    },
+    lease: { model: "transactional row lock only", leased_until_column: false },
     terminal_predicates: ["published=true"],
     dlq: { present: false },
     broker_ack: { required: true, marks_published: false },
     db_ack: { required: true, column: "published", after_broker_ack: true },
     consumer_groups: [],
-    business_effect: "shopping domain consumers (table present; publisher unwired)",
+    business_effect:
+      "CartUpdatedV1 / WatchlistChangedV1 / OrderCreatedV1 / OrderPaidV1 / ShipmentCreatedV1 consumers",
     cleanup_disposition: "RETAINED published=true",
+    annotations: [
+      "publisher present non-live; SHOPPING_OUTBOX_PUBLISHER must be exactly 1 (default OFF)",
+      "stored BYTEA = Shopping*V1 protobuf; kafka_value = EventEnvelope wrapping stored payload; event_id === outbox.id; timestamp === outbox.created_at",
+      "claim holds FOR UPDATE SKIP LOCKED through broker ack + DB mark; COMMIT throw ⇒ fresh-connection reconciliation",
+      "soft retry_exhaustion is process-scoped (restart resets); no DDL retry_count/DLQ",
+      "SaleCompleted remains listings.outbox_events; AddPurchase / OrderPlacedV1 out of scope",
+    ],
   },
   "auction_monitor.outbox_events": {
     service: "auction-monitor",

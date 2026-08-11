@@ -44,6 +44,16 @@ describe("notification kafka-consumer", () => {
   const origEnv: Record<string, string | undefined> = {};
   const poolQuery = vi.fn();
 
+  function mockPool() {
+    return {
+      query: poolQuery,
+      connect: async () => ({
+        query: poolQuery,
+        release: vi.fn(),
+      }),
+    } as import("pg").Pool;
+  }
+
   function saveEnv(key: string) {
     origEnv[key] = process.env[key];
   }
@@ -134,7 +144,7 @@ describe("notification kafka-consumer", () => {
     process.env.NOTIFICATION_KAFKA_CONSUMER = "0";
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const { startNotificationConsumer } = await import("../src/kafka-consumer.js");
-    const pool = { query: poolQuery } as import("pg").Pool;
+    const pool = mockPool();
     const c = await startNotificationConsumer(pool);
     expect(c).toBeNull();
     expect(log).toHaveBeenCalled();
@@ -147,7 +157,7 @@ describe("notification kafka-consumer", () => {
     delete process.env.KAFKA_SSL_CA_PATH;
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { startNotificationConsumer } = await import("../src/kafka-consumer.js");
-    const pool = { query: poolQuery } as import("pg").Pool;
+    const pool = mockPool();
     const c = await startNotificationConsumer(pool);
     expect(c).toBeNull();
     expect(warn).toHaveBeenCalled();
@@ -156,7 +166,7 @@ describe("notification kafka-consumer", () => {
 
   it("startNotificationConsumer starts consumer and eachMessage skips null value", async () => {
     const { startNotificationConsumer } = await import("../src/kafka-consumer.js");
-    const pool = { query: poolQuery } as import("pg").Pool;
+    const pool = mockPool();
     const c = await startNotificationConsumer(pool);
     expect(c).not.toBeNull();
     expect(connectFn).toHaveBeenCalled();
@@ -168,7 +178,7 @@ describe("notification kafka-consumer", () => {
 
   it("eachMessage returns early when extractMeta fails", async () => {
     const { startNotificationConsumer } = await import("../src/kafka-consumer.js");
-    const pool = { query: poolQuery } as import("pg").Pool;
+    const pool = mockPool();
     await startNotificationConsumer(pool);
     await capturedEachMessage!({
       topic: "t",
@@ -179,12 +189,16 @@ describe("notification kafka-consumer", () => {
 
   it("eachMessage marks processed and skips insert when userId missing", async () => {
     const { startNotificationConsumer } = await import("../src/kafka-consumer.js");
-    const pool = { query: poolQuery } as import("pg").Pool;
+    const pool = mockPool();
     await startNotificationConsumer(pool);
     poolQuery.mockResolvedValueOnce({ rowCount: 1 });
     await capturedEachMessage!({
       topic: "t",
-      message: { value: Buffer.from(JSON.stringify({ type: "x", entity_id: "nope" })) },
+      message: {
+        value: Buffer.from(
+          JSON.stringify({ event_id: randomUUID(), type: "x", entity_id: "nope" }),
+        ),
+      },
     });
     const processed = poolQuery.mock.calls.find(
       (c) => typeof c[0] === "string" && String(c[0]).includes("processed_events"),
@@ -199,10 +213,34 @@ describe("notification kafka-consumer", () => {
   it("eachMessage inserts when event is new and userId is uuid", async () => {
     const uid = randomUUID();
     const { startNotificationConsumer } = await import("../src/kafka-consumer.js");
-    const pool = { query: poolQuery } as import("pg").Pool;
+    const pool = mockPool();
     await startNotificationConsumer(pool);
-    poolQuery.mockResolvedValueOnce({ rowCount: 1 });
-    poolQuery.mockResolvedValueOnce({ rowCount: 1 });
+    poolQuery.mockImplementation(async (sql: string) => {
+      const norm = String(sql).replace(/\s+/g, " ").trim();
+      if (norm.includes("processed_events") && norm.startsWith("INSERT")) {
+        return { rowCount: 1 };
+      }
+      if (norm === "BEGIN" || norm === "COMMIT" || norm === "ROLLBACK") {
+        return { rows: [], rowCount: 0 };
+      }
+      if (norm.includes("INSERT INTO notification.notifications")) {
+        return {
+          rows: [
+            {
+              id: randomUUID(),
+              user_id: uid,
+              event_type: "Booked",
+              created_at: new Date(),
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      if (norm.includes("INSERT INTO notification.outbox_events")) {
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    });
     await capturedEachMessage!({
       topic: "dev.booking.events.v1",
       message: {
@@ -214,12 +252,16 @@ describe("notification kafka-consumer", () => {
       (c) => typeof c[0] === "string" && String(c[0]).includes("processed_events"),
     );
     expect(insertProcessed).toBeTruthy();
+    const notifInserts = poolQuery.mock.calls.filter(
+      (c) => typeof c[0] === "string" && String(c[0]).includes("INSERT INTO notification.notifications"),
+    );
+    expect(notifInserts.length).toBe(1);
   });
 
   it("eachMessage skips insert when ensureProcessed returns false", async () => {
     const uid = randomUUID();
     const { startNotificationConsumer } = await import("../src/kafka-consumer.js");
-    const pool = { query: poolQuery } as import("pg").Pool;
+    const pool = mockPool();
     await startNotificationConsumer(pool);
     poolQuery.mockResolvedValueOnce({ rowCount: 0 });
     await capturedEachMessage!({
@@ -238,11 +280,24 @@ describe("notification kafka-consumer", () => {
     const uid = randomUUID();
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const { startNotificationConsumer } = await import("../src/kafka-consumer.js");
-    const pool = { query: poolQuery } as import("pg").Pool;
+    const pool = mockPool();
     await startNotificationConsumer(pool);
-    poolQuery.mockResolvedValueOnce({ rowCount: 1 });
-    poolQuery.mockRejectedValueOnce(new Error("insert boom"));
-    poolQuery.mockResolvedValueOnce({ rowCount: 1 });
+    poolQuery.mockImplementation(async (sql: string) => {
+      const norm = String(sql).replace(/\s+/g, " ").trim();
+      if (norm.includes("processed_events") && norm.startsWith("INSERT")) {
+        return { rowCount: 1 };
+      }
+      if (norm.includes("DELETE FROM notification.processed_events")) {
+        return { rowCount: 1 };
+      }
+      if (norm === "BEGIN" || norm === "ROLLBACK") {
+        return { rows: [], rowCount: 0 };
+      }
+      if (norm.includes("INSERT INTO notification.notifications")) {
+        throw new Error("insert boom");
+      }
+      return { rows: [], rowCount: 0 };
+    });
     await capturedEachMessage!({
       topic: "t",
       message: {
@@ -257,11 +312,35 @@ describe("notification kafka-consumer", () => {
     err.mockRestore();
   });
 
+  it("E14 self-emitted NotificationCreatedV1 from notification-service is ignored", async () => {
+    const { startNotificationConsumer } = await import("../src/kafka-consumer.js");
+    const pool = mockPool();
+    await startNotificationConsumer(pool);
+    await capturedEachMessage!({
+      topic: "dev.notification.events",
+      message: {
+        value: Buffer.from(
+          JSON.stringify({
+            metadata: {
+              event_id: randomUUID(),
+              event_type: "NotificationCreated",
+              producer: "notification-service",
+            },
+            type: "NotificationCreatedV1",
+            notification_id: randomUUID(),
+            user_id: randomUUID(),
+          }),
+        ),
+      },
+    });
+    expect(poolQuery).not.toHaveBeenCalled();
+  });
+
   it("startNotificationConsumer disconnects and returns null on connect failure", async () => {
     connectFn.mockRejectedValueOnce(new Error("kafka down"));
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const { startNotificationConsumer } = await import("../src/kafka-consumer.js");
-    const pool = { query: poolQuery } as import("pg").Pool;
+    const pool = mockPool();
     const c = await startNotificationConsumer(pool);
     expect(c).toBeNull();
     expect(disconnectFn).toHaveBeenCalled();
@@ -274,7 +353,7 @@ describe("notification kafka-consumer", () => {
     connectFn.mockImplementation(() => new Promise(() => {}));
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const { startNotificationConsumer } = await import("../src/kafka-consumer.js");
-    const pool = { query: poolQuery } as import("pg").Pool;
+    const pool = mockPool();
     const c = await startNotificationConsumer(pool);
     expect(c).toBeNull();
     expect(disconnectFn).toHaveBeenCalled();

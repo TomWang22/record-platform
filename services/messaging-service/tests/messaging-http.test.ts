@@ -33,6 +33,14 @@ vi.mock('../src/lib/db.js', () => ({
 const kafkaSend = vi.fn().mockResolvedValue(undefined)
 const kafkaConnect = vi.fn().mockResolvedValue(undefined)
 
+function expectOutboxEnqueued() {
+  const outboxCalls = poolQuery.mock.calls.filter((c) =>
+    String(c[0] ?? '').includes('INSERT INTO messaging.outbox_events'),
+  )
+  expect(outboxCalls.length).toBeGreaterThanOrEqual(1)
+  expect(kafkaSend).not.toHaveBeenCalled()
+}
+
 vi.mock('@common/utils/kafka', () => ({
   kafka: {
     producer: () => ({
@@ -535,7 +543,7 @@ function defaultPoolHandler(sql: string, params: unknown[] = []): Promise<{ rows
         created_at: new Date(),
         updated_at: new Date(),
       }
-      return Promise.resolve({ rows: [row] })
+      return Promise.resolve({ rows: [row], rowCount: 1 })
     }
     if (params.length === 6) {
       const row = {
@@ -552,7 +560,7 @@ function defaultPoolHandler(sql: string, params: unknown[] = []): Promise<{ rows
         created_at: new Date(),
         updated_at: new Date(),
       }
-      return Promise.resolve({ rows: [row] })
+      return Promise.resolve({ rows: [row], rowCount: 1 })
     }
     const row = {
       id: messageId,
@@ -568,7 +576,11 @@ function defaultPoolHandler(sql: string, params: unknown[] = []): Promise<{ rows
       created_at: new Date(),
       updated_at: new Date(),
     }
-    return Promise.resolve({ rows: [row] })
+    return Promise.resolve({ rows: [row], rowCount: 1 })
+  }
+
+  if (norm.includes('INSERT INTO messaging.outbox_events')) {
+    return Promise.resolve({ rows: [], rowCount: 1 })
   }
 
   if (
@@ -1008,7 +1020,7 @@ describe('createMessagingHttpApp (mocked pool + kafka)', () => {
     expect(res.status).toBe(201)
     expect(res.body.subject).toBe('')
     expect(res.body.thread_id).toBe(stableHumanDmThreadId(userId, recipientId))
-    expect(kafkaSend).toHaveBeenCalled()
+    expectOutboxEnqueued()
   })
 
   it('POST /messages — direct message without subject → 201 empty subject', async () => {
@@ -1107,7 +1119,7 @@ describe('createMessagingHttpApp (mocked pool + kafka)', () => {
       expect(res.body.seller_id).toBe(recipientId)
       expect(res.body.landlord_id).toBeUndefined()
       expect(res.body.listing_id).toBe(listingUuid)
-      expect(kafkaSend).toHaveBeenCalled()
+      expectOutboxEnqueued()
     } finally {
       vi.unstubAllGlobals()
     }
@@ -1240,7 +1252,7 @@ describe('createMessagingHttpApp (mocked pool + kafka)', () => {
       .send({ content: 'Reply body', message_type: 'direct', subject: 'Re: hi' })
     expect(res.status).toBe(201)
     expect(res.body.content).toBe('Reply body')
-    expect(kafkaSend).toHaveBeenCalled()
+    expectOutboxEnqueued()
   })
 
   it('GET /messages/thread/:threadId — returns thread payload', async () => {
@@ -1725,15 +1737,16 @@ describe('createMessagingHttpApp (mocked pool + kafka)', () => {
               recipient_id: params[1],
               group_id: params[2],
               parent_message_id: params[3],
-              thread_id: threadId,
-              message_type: params[4],
-              subject: params[5],
-              content: params[6],
+              thread_id: params[4],
+              message_type: params[5],
+              subject: params[6],
+              content: params[7],
               is_read: false,
               created_at: new Date(),
               updated_at: new Date(),
             },
           ],
+          rowCount: 1,
         })
       }
       return defaultPoolHandler(sql, params)
@@ -1781,15 +1794,16 @@ describe('createMessagingHttpApp (mocked pool + kafka)', () => {
               recipient_id: params[1],
               group_id: params[2],
               parent_message_id: params[3],
-              thread_id: null,
-              message_type: params[4],
-              subject: params[5],
-              content: params[6],
+              thread_id: params[4],
+              message_type: params[5],
+              subject: params[6],
+              content: params[7],
               is_read: false,
               created_at: new Date(),
               updated_at: new Date(),
             },
           ],
+          rowCount: 1,
         })
       }
       return defaultPoolHandler(sql, params)
@@ -2137,7 +2151,7 @@ describe('createMessagingHttpApp (mocked pool + kafka)', () => {
         content: 'All',
       })
     expect(res.status).toBe(201)
-    expect(kafkaSend).toHaveBeenCalled()
+    expectOutboxEnqueued()
   })
 
   it('POST /messages/groups/:groupId/ban — 201', async () => {

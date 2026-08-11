@@ -1,6 +1,6 @@
 -- Trust service DB: moderation, flags, reviews, reputation, suspension. No cross-DB writes.
--- Run against database 'trust' on port 5446:
---   PGPASSWORD=postgres psql -h 127.0.0.1 -p 5446 -U postgres -d trust -f infra/db/01-trust-schema.sql
+-- Run against database 'trust' on port 5442:
+--   PGPASSWORD=postgres psql -h 127.0.0.1 -p 5442 -U postgres -d trust -f infra/db/01-trust-schema.sql
 --
 -- Trust does NOT mutate other service DBs. It emits events (listing.flagged, user.warned, review.created, reputation.updated).
 -- Listing/booking/notification services consume and update their own state.

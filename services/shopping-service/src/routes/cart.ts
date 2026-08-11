@@ -5,6 +5,14 @@ import { pool, withRetry } from '../lib/db.js'
 import { CacheManager } from '../lib/cache.js'
 import { cleanupUnavailableItems, removeSoldOutFromCarts, markWatchlistSoldOut, notifyCartItemRemoved } from '../lib/availability.js'
 import { emitSaleCompletedFromCheckout, resolveSettlementSource } from '../lib/sale-completed-emitter.js'
+import {
+  addOrIncrementCartWithOutbox,
+  createOrderWithOutbox,
+  createShipmentWithOutbox,
+  deleteCartItemWithOutbox,
+  markOrderPaidWithOutbox,
+  updateCartItemWithOutbox,
+} from '../application/shoppingOutbox.js'
 
 export default function cartRouter(redis: Redis | null, cacheManager: CacheManager): ExpressRouter {
   const router: Router = Router()
@@ -78,55 +86,41 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
       const tax = subtotal * 0.08 // 8% tax (simulated)
       const total = subtotal + shippingCost + tax
 
-      // Atomic: generate order_number inside INSERT so nextval and insert are one statement (root-cause fix for duplicate key).
-      const orderResult = await withRetry(
+      const firstListingId =
+        orderItems.find((item) => item.listing_id)?.listing_id ?? ''
+      const created = await withRetry(
         () =>
-          pool.query(
-            `INSERT INTO shopping.orders (
-              user_id, order_number, status, payment_status, payment_method,
-              subtotal, shipping_cost, tax, total, currency,
-              shipping_address, billing_address, notes, metadata
-            )
-            VALUES ($1, (SELECT shopping.generate_order_number()), $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13::jsonb)
-            RETURNING id, order_number, status, payment_status, total, created_at`,
-            [
-              userId,
-              'processing',
-              'processing',
-              payment_method,
-              subtotal,
-              shippingCost,
-              tax,
-              total,
-              'USD',
-              shipping_address ? JSON.stringify(shipping_address) : null,
-              billing_address ? JSON.stringify(billing_address) : null,
-              notes || null,
-              JSON.stringify({ simulated_payment: true }),
-            ]
-          ),
+          createOrderWithOutbox(pool, {
+            userId,
+            paymentMethod: payment_method,
+            subtotal,
+            shippingCost,
+            tax,
+            total,
+            currency: 'USD',
+            shippingAddress: shipping_address,
+            billingAddress: billing_address,
+            notes: notes || null,
+            listingId: firstListingId,
+            sellerUserId: '',
+          }),
         3,
         'create order'
       )
 
-      const order = orderResult.rows[0]
+      const order = created.order
       const orderId = order.id
       const orderNumber = order.order_number
 
       // Simulate payment processing (always succeeds in simulation)
       const paymentTransactionId = `PAY-SIM-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-      // Update order with payment success
       await withRetry(
-        () => pool.query(
-          `UPDATE shopping.orders
-           SET payment_status = 'paid',
-               payment_transaction_id = $1,
-               status = 'completed',
-               completed_at = NOW()
-           WHERE id = $2`,
-          [paymentTransactionId, orderId]
-        ),
+        () =>
+          markOrderPaidWithOutbox(pool, {
+            orderId,
+            paymentTransactionId,
+          }),
         3,
         'update order payment status'
       )
@@ -134,25 +128,20 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
       // Create shipment with random tracking number (eBay-style simulation)
       let trackingNumber: string | null = null
       try {
-        const shipResult = await withRetry(
-          () => pool.query(
-            `INSERT INTO shopping.shipments (order_id, tracking_number, carrier, status)
-             VALUES ($1, (SELECT shopping.generate_tracking_number()), 'SIMULATED', 'shipped')
-             RETURNING id, tracking_number, carrier, status`,
-            [orderId]
-          ),
+        const shipped = await withRetry(
+          () => createShipmentWithOutbox(pool, { orderId }),
           3,
           'create shipment with tracking'
         )
-        if (shipResult.rows[0]) {
-          trackingNumber = shipResult.rows[0].tracking_number
+        if (shipped.shipment) {
+          trackingNumber = shipped.shipment.tracking_number
           const { pushShipmentStatusNotification } = await import('../pushShoppingNotification.js')
           void pushShipmentStatusNotification({
             buyerUserId: userId,
             orderId,
             orderNumber,
             trackingNumber,
-            status: String(shipResult.rows[0].status || 'shipped'),
+            status: String(shipped.shipment.status || 'shipped'),
           })
         }
       } catch (shipErr: any) {
@@ -545,51 +534,22 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
     }
 
     try {
-      // Check if item already in cart
-      const existing = await withRetry(
-        () => pool.query(
-          `SELECT id, quantity FROM shopping.shopping_cart
-           WHERE user_id = $1 AND item_type = $2 AND item_id = $3`,
-          [userId, item_type, item_id]
-        ),
+      const added = await withRetry(
+        () =>
+          addOrIncrementCartWithOutbox(pool, {
+            userId,
+            itemType: item_type,
+            itemId: item_id,
+            quantity,
+            listingId: listing_id || null,
+            price,
+            metadata,
+            notes,
+          }),
         3,
-        'check existing cart item'
+        'add to cart'
       )
-
-      let cartItemId: string
-      if (existing.rows.length > 0) {
-        // Update quantity and notes (if provided)
-        const newQuantity = existing.rows[0].quantity + quantity
-        const updateQuery = notes !== undefined
-          ? `UPDATE shopping.shopping_cart
-             SET quantity = $1, notes = $2, updated_at = now()
-             WHERE id = $3`
-          : `UPDATE shopping.shopping_cart
-             SET quantity = $1, updated_at = now()
-             WHERE id = $2`
-        const updateParams = notes !== undefined
-          ? [newQuantity, notes || null, existing.rows[0].id]
-          : [newQuantity, existing.rows[0].id]
-        await withRetry(
-          () => pool.query(updateQuery, updateParams),
-          3,
-          'update cart item quantity'
-        )
-        cartItemId = existing.rows[0].id
-      } else {
-        // Insert new item
-        const result = await withRetry(
-          () => pool.query(
-          `INSERT INTO shopping.shopping_cart (user_id, item_type, item_id, listing_id, quantity, price, metadata, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
-           RETURNING id`,
-          [userId, item_type, item_id, listing_id || null, quantity, price || null, metadata ? JSON.stringify(metadata) : null, notes || null]
-          ),
-          3,
-          'insert new cart item'
-        )
-        cartItemId = result.rows[0].id
-      }
+      const cartItemId = added.cartItemId
 
       // Update LFU cache
       await cacheManager.incrementLFU(`cart:${item_type}:${item_id}`, userId)
@@ -616,17 +576,16 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
 
     try {
       const result = await withRetry(
-        () => pool.query(
-          `DELETE FROM shopping.shopping_cart
-           WHERE id = $1 AND user_id = $2
-           RETURNING id`,
-          [itemId, userId]
-        ),
+        () =>
+          deleteCartItemWithOutbox(pool, {
+            userId,
+            cartItemId: itemId,
+          }),
         3,
         'remove item from cart'
       )
 
-      if (result.rows.length === 0) {
+      if (result.kind === 'not_found') {
         return res.status(404).json({ error: 'Item not found in cart' })
       }
 
@@ -648,42 +607,24 @@ export default function cartRouter(redis: Redis | null, cacheManager: CacheManag
     const { quantity, price, notes } = req.body
 
     try {
-      const updates: string[] = []
-      const values: any[] = [itemId, userId]
-      let paramIndex = 3
-
-      if (quantity !== undefined) {
-        updates.push(`quantity = $${paramIndex++}`)
-        values.push(quantity)
-      }
-      if (price !== undefined) {
-        updates.push(`price = $${paramIndex++}`)
-        values.push(price)
-      }
-      if (notes !== undefined) {
-        updates.push(`notes = $${paramIndex++}`)
-        values.push(notes || null)
-      }
-
-      if (updates.length === 0) {
+      if (quantity === undefined && price === undefined && notes === undefined) {
         return res.status(400).json({ error: 'No fields to update' })
       }
 
-      updates.push('updated_at = now()')
-
       const result = await withRetry(
-        () => pool.query(
-          `UPDATE shopping.shopping_cart
-           SET ${updates.join(', ')}
-           WHERE id = $1 AND user_id = $2
-           RETURNING id`,
-          values
-        ),
+        () =>
+          updateCartItemWithOutbox(pool, {
+            userId,
+            cartItemId: itemId,
+            quantity,
+            price,
+            notes,
+          }),
         3,
         'update cart item'
       )
 
-      if (result.rows.length === 0) {
+      if (result.kind === 'not_found') {
         return res.status(404).json({ error: 'Item not found in cart' })
       }
 

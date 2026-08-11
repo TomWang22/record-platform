@@ -47,9 +47,9 @@ test("Track C guards: frozen readiness matrix is exhaustive and disjoint", () =>
     assertTrackCReadinessMatrix({ matrix, expectedTables }),
     true,
   );
-  assert.equal(matrix.counts.lifecycle_executable, 6);
+  assert.equal(matrix.counts.lifecycle_executable, 11);
   assert.equal(matrix.counts.migration_pending, 1);
-  assert.equal(matrix.counts.publisher_blocked, 5);
+  assert.equal(matrix.counts.publisher_blocked, 0);
   assert.equal(
     matrix.counts.lifecycle_executable +
       matrix.counts.migration_pending +
@@ -68,7 +68,7 @@ test("Track C guards: auth.outbox_events stays migration_pending only", () => {
   const badExecutable = structuredClone(matrix);
   badExecutable.partitions.lifecycle_executable.push("auth.outbox_events");
   badExecutable.partitions.migration_pending = [];
-  badExecutable.counts.lifecycle_executable = 7;
+  badExecutable.counts.lifecycle_executable = 8;
   badExecutable.counts.migration_pending = 0;
   assert.throws(
     () =>
@@ -82,7 +82,7 @@ test("Track C guards: auth.outbox_events stays migration_pending only", () => {
   const badBlocked = structuredClone(matrix);
   badBlocked.partitions.publisher_blocked.push("auth.outbox_events");
   badBlocked.partitions.migration_pending = [];
-  badBlocked.counts.publisher_blocked = 6;
+  badBlocked.counts.publisher_blocked = 5;
   badBlocked.counts.migration_pending = 0;
   assert.throws(
     () =>
@@ -113,11 +113,12 @@ test("Track C guards: incomplete partition set fails closed", () => {
   const matrix = loadMatrix();
   const expectedTables = loadExpectedTables();
   const bad = structuredClone(matrix);
-  bad.partitions.publisher_blocked = bad.partitions.publisher_blocked.slice(0, 4);
-  bad.counts.publisher_blocked = 4;
+  bad.partitions.lifecycle_executable =
+    bad.partitions.lifecycle_executable.slice(1);
+  bad.counts.lifecycle_executable = bad.partitions.lifecycle_executable.length;
   assert.throws(
     () => assertTrackCReadinessMatrix({ matrix: bad, expectedTables }),
-    /partition_count|publisher_blocked_count|counts_sum|partition_tables/,
+    /partition_count|lifecycle_executable_count|counts_sum|partition_tables/,
   );
 });
 
@@ -139,7 +140,7 @@ test("Track C guards: mismatched counts.* vs partition lengths fail closed", () 
   );
 
   const badBlocked = structuredClone(matrix);
-  badBlocked.counts.publisher_blocked = 4;
+  badBlocked.counts.publisher_blocked = 2;
   assert.throws(
     () => assertTrackCReadinessMatrix({ matrix: badBlocked, expectedTables }),
     /publisher_blocked_count_field/,
@@ -223,21 +224,37 @@ test("Track C remediation packet: remaining blocked targets pinned to 12-owner d
   assert.equal(packet.platform_pass, false);
   assert.equal(packet.track_c_acceptance_pass, false);
   assert.equal(packet.acceptance_denominator_count, 12);
-  assert.equal(packet.remediation_target_count, 5);
+  assert.equal(packet.remediation_target_count, 0);
   assert.equal(packet.pins.inventory_sha256, TRACK_C_CANONICAL_INVENTORY_SHA256);
   assert.equal(
     packet.pins.readiness_matrix_sha256,
-    "b15959513b5e728be8679a2dc85c17eeaf02ab02f4ba932f3a2b571b3cb349ec",
+    "e2908e28e468229b8609e9a726d0ae22875be6032d9bbdf0888510300dffae2b",
   );
   assert.equal(
     packet.pins.inventory_denominator_sha256,
-    "065f0c7832531f9f32fae36a14d6e67868c5c1be08b2b2171e0cbd8c5d818ac6",
+    "1b614ba485e03bddf7bcf296c9bf0c89fee97b7013e9f034d8fdc7ea77079074",
   );
   assert.ok(packet.pins.source);
   assert.ok(packet.pins.source.track_c_inventory_guards_mjs);
   assert.ok(packet.pins.source.prepare_packet_c_remediation_mjs);
   assert.ok(packet.pins.source.media_outbox_publisher_ts);
   assert.ok(packet.pins.source.media_outbox_publisher_test_ts);
+  assert.ok(packet.pins.source.messaging_outbox_publisher_ts);
+  assert.ok(packet.pins.source.messaging_message_outbox_ts);
+  assert.ok(packet.pins.source.messaging_message_outbox_test_ts);
+  assert.ok(packet.pins.source.notification_outbox_publisher_ts);
+  assert.ok(packet.pins.source.notification_message_outbox_ts);
+  assert.ok(packet.pins.source.notification_message_outbox_test_ts);
+  assert.ok(packet.pins.source.records_outbox_publisher_ts);
+  assert.ok(packet.pins.source.records_message_outbox_ts);
+  assert.ok(packet.pins.source.records_message_outbox_test_ts);
+  assert.ok(packet.pins.source.shopping_outbox_publisher_ts);
+  assert.ok(packet.pins.source.shopping_message_outbox_ts);
+  assert.ok(packet.pins.source.shopping_message_outbox_test_ts);
+  assert.ok(packet.pins.source.trust_outbox_publisher_ts);
+  assert.ok(packet.pins.source.trust_message_outbox_ts);
+  assert.ok(packet.pins.source.trust_message_outbox_test_ts);
+  assert.ok(packet.pins.source.trust_outbox_wiring_test_ts);
   assert.ok(packet.pins.source.track_c_inventory_guards_test_mjs);
   assert.ok(Object.keys(packet.pins.source).length >= 5);
   assert.ok(
@@ -260,8 +277,43 @@ test("Track C remediation packet: remaining blocked targets pinned to 12-owner d
       "6fbc2410995cc409cb9e3a06f7474ab87216e23f7e77db3e5f9f16531cf9f905",
     ),
   );
+  assert.ok(
+    packet.obsolete_prepared_sha256.includes(
+      "3c679ecde42b800ddefa77a85ca9399562bc0be292dd6cc448cc83fb59b153de",
+    ),
+  );
+  assert.ok(
+    packet.obsolete_prepared_sha256.includes(
+      "9efd0a0333741909d6b4b75256973bbb4035a18709e69d4a6441d07487edb1e7",
+    ),
+  );
+  assert.ok(
+    packet.obsolete_prepared_sha256.includes(
+      "ca9a35c7a97d660878837b46cc2c4a4828c4a1d3c1ca972b827bfc08ff349f46",
+    ),
+  );
+  assert.ok(
+    packet.obsolete_prepared_sha256.includes(
+      "380993598d3f2d419a54eec5fbb43e7562bdd5b30cc94f130d2a98d66806a7e9",
+    ),
+  );
+  assert.ok(
+    packet.obsolete_prepared_sha256.includes(
+      "7176a934cdf80152c57d9a336e57898983833c20b476637dbcf1a0f9b7ee312f",
+    ),
+  );
   assert.ok(!packet.remediation_targets.some((t) => t.table === "media.outbox_events"));
+  assert.ok(!packet.remediation_targets.some((t) => t.table === "messaging.outbox_events"));
+  assert.ok(!packet.remediation_targets.some((t) => t.table === "notification.outbox_events"));
+  assert.ok(!packet.remediation_targets.some((t) => t.table === "records.outbox_events"));
+  assert.ok(!packet.remediation_targets.some((t) => t.table === "shopping.outbox_events"));
+  assert.ok(!packet.remediation_targets.some((t) => t.table === "trust.outbox_events"));
   assert.ok(packet.not_in_remediation_scope.lifecycle_executable.includes("media.outbox_events"));
+  assert.ok(packet.not_in_remediation_scope.lifecycle_executable.includes("messaging.outbox_events"));
+  assert.ok(packet.not_in_remediation_scope.lifecycle_executable.includes("notification.outbox_events"));
+  assert.ok(packet.not_in_remediation_scope.lifecycle_executable.includes("records.outbox_events"));
+  assert.ok(packet.not_in_remediation_scope.lifecycle_executable.includes("shopping.outbox_events"));
+  assert.ok(packet.not_in_remediation_scope.lifecycle_executable.includes("trust.outbox_events"));
   assert.deepEqual(
     packet.remediation_targets.map((t) => t.table).sort(),
     [...matrix.partitions.publisher_blocked].sort(),
@@ -294,11 +346,13 @@ test("Track C remediation packet: swapped executable target fails closed", () =>
   const expectedTables = loadExpectedTables();
   const bad = structuredClone(packet);
   const executable = matrix.partitions.lifecycle_executable[0];
-  bad.remediation_targets[0] = {
-    ...bad.remediation_targets[0],
-    table: executable,
-    readiness: "LIFECYCLE_EXECUTABLE",
-  };
+  bad.remediation_targets = [
+    {
+      table: executable,
+      readiness: "LIFECYCLE_EXECUTABLE",
+    },
+  ];
+  bad.remediation_target_count = 1;
   assert.throws(
     () =>
       assertTrackCRemediationPacket({
@@ -306,6 +360,6 @@ test("Track C remediation packet: swapped executable target fails closed", () =>
         matrix,
         expectedTables,
       }),
-    /remediation_targets_missing|remediation_targets_unexpected|lifecycle_executable_targeted/,
+    /remediation_targets_missing|remediation_targets_unexpected|remediation_targets_count|lifecycle_executable_targeted/,
   );
 });

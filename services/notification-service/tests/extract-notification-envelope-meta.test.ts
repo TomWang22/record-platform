@@ -32,6 +32,7 @@ describe("extractNotificationEnvelopeMeta", () => {
     const buf = Buffer.from(
       JSON.stringify({
         metadata: {
+          event_id: "11111111-1111-4111-8111-111111111111",
           event_type: "BookingRequestV1",
           aggregate_id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
         },
@@ -41,6 +42,20 @@ describe("extractNotificationEnvelopeMeta", () => {
     );
     const meta = extractNotificationEnvelopeMeta(buf);
     expect(meta!.userId).toBe(landlordId);
+  });
+
+  it("E15 missing event_id fail-closed: never manufactures identity", () => {
+    const buf = Buffer.from(
+      JSON.stringify({
+        metadata: {
+          event_type: "BookingRequestV1",
+          aggregate_id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        },
+        payload: { landlordId: "66666666-6666-4666-8666-666666666666" },
+      }),
+      "utf8",
+    );
+    expect(extractNotificationEnvelopeMeta(buf)).toBeNull();
   });
 
   it("community.comment.notification targets recipient_id (post author)", () => {

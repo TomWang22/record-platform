@@ -16,12 +16,21 @@ const bookingId = randomUUID();
 const reviewerId = randomUUID();
 const revieweeId = randomUUID();
 
-const { poolQuery } = vi.hoisted(() => ({
+const { poolQuery, insertFlagMock, insertReviewMock } = vi.hoisted(() => ({
   poolQuery: vi.fn(),
+  insertFlagMock: vi.fn(),
+  insertReviewMock: vi.fn(),
 }));
 
 vi.mock("../src/db.js", () => ({
   pool: { query: (...args: unknown[]) => poolQuery(...args) },
+}));
+
+vi.mock("../src/application/trustOutbox.js", () => ({
+  insertListingFlagSubmittedWithOutbox: (...args: unknown[]) =>
+    insertFlagMock(...args),
+  insertPeerReviewCreatedWithOutbox: (...args: unknown[]) =>
+    insertReviewMock(...args),
 }));
 
 let failNextInsert = false;
@@ -52,6 +61,36 @@ describe("trust grpc-server handlers", () => {
     failNextInsert = false;
     dupNextListingFlag = false;
     dupNextReview = false;
+    insertFlagMock.mockReset();
+    insertReviewMock.mockReset();
+    insertFlagMock.mockImplementation(async () => {
+      if (failNextInsert) {
+        failNextInsert = false;
+        throw new Error("db unavailable");
+      }
+      if (dupNextListingFlag) {
+        dupNextListingFlag = false;
+        throw Object.assign(new Error("duplicate"), { code: "23505" });
+      }
+      return {
+        outcome: "committed",
+        value: { flagId: randomUUID(), eventId: randomUUID(), status: "open" },
+      };
+    });
+    insertReviewMock.mockImplementation(async () => {
+      if (failNextInsert) {
+        failNextInsert = false;
+        throw new Error("db unavailable");
+      }
+      if (dupNextReview) {
+        dupNextReview = false;
+        throw Object.assign(new Error("unique violation"), { code: "23505" });
+      }
+      return {
+        outcome: "committed",
+        value: { reviewId: randomUUID(), eventId: randomUUID() },
+      };
+    });
     poolQuery.mockReset();
     poolQuery.mockImplementation(async (sql: unknown) => {
       const text = String(sql);
@@ -250,10 +289,9 @@ describe("trust grpc-server handlers", () => {
     });
 
     it("ALREADY_EXISTS on duplicate (listing)", async () => {
-      poolQuery.mockImplementationOnce(async () => {
-        const e = Object.assign(new Error("dup"), { code: "23505" });
-        throw e;
-      });
+      insertFlagMock.mockRejectedValueOnce(
+        Object.assign(new Error("dup"), { code: "23505" }),
+      );
       const { err } = await runCallback((cb) =>
         trustGrpcHandlersForTest.ReportAbuse(
           {

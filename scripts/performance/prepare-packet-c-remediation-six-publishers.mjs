@@ -9,8 +9,8 @@
  * Pins both data artifacts and source/test/generator implementation digests so
  * the PREPARED freeze cannot silently drift after validation.
  *
- * After media publisher remediation: remaining blocked = 5 (messaging…trust).
- * Pre-media freeze 288fd8aa… is obsolete and must never be authorized.
+ * After trust publisher remediation: remaining blocked = 0.
+ * Post-shopping freeze 7176a934… is obsolete and must never be authorized.
  */
 
 import { createHash } from "node:crypto";
@@ -39,9 +39,9 @@ const OUT_REL =
   "reports/performance/live-evidence/owner-packets/PACKET_C_REMEDIATION_SIX_PUBLISHERS.PREPARED.json";
 
 const EXPECTED_DENOM_SHA256 =
-  "065f0c7832531f9f32fae36a14d6e67868c5c1be08b2b2171e0cbd8c5d818ac6";
+  "1b614ba485e03bddf7bcf296c9bf0c89fee97b7013e9f034d8fdc7ea77079074";
 const EXPECTED_MATRIX_SHA256 =
-  "b15959513b5e728be8679a2dc85c17eeaf02ab02f4ba932f3a2b571b3cb349ec";
+  "e2908e28e468229b8609e9a726d0ae22875be6032d9bbdf0888510300dffae2b";
 
 /** Prior remediation PREPARED freezes — never authorize against these. */
 export const OBSOLETE_REMEDIATION_PREPARED_SHA256 = Object.freeze([
@@ -53,6 +53,16 @@ export const OBSOLETE_REMEDIATION_PREPARED_SHA256 = Object.freeze([
   "288fd8aa40f22634acd087a2b2192ddb459beb07412bfa2a58be2e1e7872b694",
   // post-media but claim-released-before-send / default-on gaps
   "6fbc2410995cc409cb9e3a06f7474ab87216e23f7e77db3e5f9f16531cf9f905",
+  // post-media lock-through-ack; pre-messaging Phase B (5 blocked)
+  "3c679ecde42b800ddefa77a85ca9399562bc0be292dd6cc448cc83fb59b153de",
+  // post-messaging Phase B; pre-notification Phase B (4 blocked)
+  "9efd0a0333741909d6b4b75256973bbb4035a18709e69d4a6441d07487edb1e7",
+  // post-notification Phase B; pre-records Phase B (3 blocked)
+  "ca9a35c7a97d660878837b46cc2c4a4828c4a1d3c1ca972b827bfc08ff349f46",
+  // post-records Phase B; pre-shopping Phase B (2 blocked)
+  "380993598d3f2d419a54eec5fbb43e7562bdd5b30cc94f130d2a98d66806a7e9",
+  // post-shopping Phase B; pre-trust Phase B (1 blocked)
+  "7176a934cdf80152c57d9a336e57898983833c20b476637dbcf1a0f9b7ee312f",
 ]);
 
 const SOURCE_PIN_PATHS = Object.freeze({
@@ -73,15 +83,67 @@ const SOURCE_PIN_PATHS = Object.freeze({
     "services/media-service/src/outbox/publishOutbox.ts",
   media_outbox_publisher_test_ts:
     "services/media-service/tests/media-outbox-publisher.test.ts",
+  messaging_outbox_publisher_ts:
+    "services/messaging-service/src/outbox/publishOutbox.ts",
+  messaging_message_outbox_ts:
+    "services/messaging-service/src/application/messageOutbox.ts",
+  messaging_outbox_publisher_test_ts:
+    "services/messaging-service/tests/messaging-outbox-publisher.test.ts",
+  messaging_message_outbox_test_ts:
+    "services/messaging-service/tests/messaging-message-outbox.test.ts",
+  notification_outbox_publisher_ts:
+    "services/notification-service/src/outbox/publishOutbox.ts",
+  notification_outbox_enqueue_ts:
+    "services/notification-service/src/outbox/enqueueOutbox.ts",
+  notification_message_outbox_ts:
+    "services/notification-service/src/application/notificationOutbox.ts",
+  notification_kafka_events_ts:
+    "services/notification-service/src/notificationKafkaEvents.ts",
+  notification_outbox_publisher_test_ts:
+    "services/notification-service/tests/notification-outbox-publisher.test.ts",
+  notification_message_outbox_test_ts:
+    "services/notification-service/tests/notification-message-outbox.test.ts",
+  records_outbox_publisher_ts:
+    "services/records-service/src/outbox/publishOutbox.ts",
+  records_outbox_enqueue_ts:
+    "services/records-service/src/outbox/enqueueOutbox.ts",
+  records_message_outbox_ts:
+    "services/records-service/src/application/recordOutbox.ts",
+  records_kafka_events_ts:
+    "services/records-service/src/recordsKafkaEvents.ts",
+  records_outbox_publisher_test_ts:
+    "services/records-service/tests/records-outbox-publisher.test.ts",
+  records_message_outbox_test_ts:
+    "services/records-service/tests/records-message-outbox.test.ts",
+  shopping_outbox_publisher_ts:
+    "services/shopping-service/src/outbox/publishOutbox.ts",
+  shopping_outbox_enqueue_ts:
+    "services/shopping-service/src/outbox/enqueueOutbox.ts",
+  shopping_message_outbox_ts:
+    "services/shopping-service/src/application/shoppingOutbox.ts",
+  shopping_kafka_events_ts:
+    "services/shopping-service/src/shoppingKafkaEvents.ts",
+  shopping_outbox_publisher_test_ts:
+    "services/shopping-service/tests/shopping-outbox-publisher.test.ts",
+  shopping_message_outbox_test_ts:
+    "services/shopping-service/tests/shopping-message-outbox.test.ts",
+  trust_outbox_publisher_ts:
+    "services/trust-service/src/outbox/publishOutbox.ts",
+  trust_outbox_enqueue_ts:
+    "services/trust-service/src/outbox/enqueueOutbox.ts",
+  trust_message_outbox_ts:
+    "services/trust-service/src/application/trustOutbox.ts",
+  trust_kafka_events_ts:
+    "services/trust-service/src/trustKafkaEvents.ts",
+  trust_outbox_publisher_test_ts:
+    "services/trust-service/tests/trust-outbox-publisher.test.ts",
+  trust_message_outbox_test_ts:
+    "services/trust-service/tests/trust-message-outbox.test.ts",
+  trust_outbox_wiring_test_ts:
+    "services/trust-service/tests/trust-outbox-wiring.test.ts",
 });
 
-const EXPECTED_BLOCKED = Object.freeze([
-  "messaging.outbox_events",
-  "notification.outbox_events",
-  "records.outbox_events",
-  "shopping.outbox_events",
-  "trust.outbox_events",
-]);
+const EXPECTED_BLOCKED = Object.freeze([]);
 
 function sha256Bytes(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -178,8 +240,8 @@ function main() {
     }))
     .sort((a, b) => a.table.localeCompare(b.table));
 
-  if (remediationTargets.length !== 5) {
-    throw new Error(`remediation_target_count_not_5:${remediationTargets.length}`);
+  if (remediationTargets.length !== 0) {
+    throw new Error(`remediation_target_count_not_0:${remediationTargets.length}`);
   }
 
   const now = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -194,7 +256,7 @@ function main() {
     track_c_acceptance_pass: false,
     emitted_at_utc: now,
     purpose:
-      "Remediation/observation readiness for remaining PUBLISHER_BLOCKED canonical outboxes (media publisher present; 5 blocked remain)",
+      "Remediation/observation readiness for remaining PUBLISHER_BLOCKED canonical outboxes (trust+shopping+records+notification+messaging+media publishers present; 0 blocked remains)",
     pins: {
       inventory_sha256: TRACK_C_CANONICAL_INVENTORY_SHA256,
       inventory_denominator_sha256: EXPECTED_DENOM_SHA256,
@@ -205,13 +267,13 @@ function main() {
     },
     acceptance_denominator_count: TRACK_C_EXPECTED_OWNER_COUNT,
     acceptance_denominator_tables: [...expectedTables],
-    remediation_target_count: 5,
+    remediation_target_count: 0,
     remediation_targets: remediationTargets,
     not_in_remediation_scope: {
       lifecycle_executable: [...matrix.partitions.lifecycle_executable].sort(),
       migration_pending: [...matrix.partitions.migration_pending].sort(),
       note:
-        "auth.outbox_events remains MIGRATION_PENDING; media.outbox_events is LIFECYCLE_EXECUTABLE with lock-through-ack publisher (MEDIA_OUTBOX_PUBLISHER===1 opt-in; live still unauthorized)",
+        "auth.outbox_events remains MIGRATION_PENDING; trust/shopping/records/media/messaging/notification.outbox_events are LIFECYCLE_EXECUTABLE with lock-through-ack publishers (opt-in env===1; live still unauthorized)",
     },
     hard_rules: [
       "acceptance_denominator_remains_12",
@@ -222,6 +284,11 @@ function main() {
       "source_and_test_pins_required",
       "do_not_authorize_obsolete_prepared_288fd8aa",
       "do_not_authorize_obsolete_prepared_6fbc2410",
+      "do_not_authorize_obsolete_prepared_3c679ecd",
+      "do_not_authorize_obsolete_prepared_9efd0a03",
+      "do_not_authorize_obsolete_prepared_ca9a35c7",
+      "do_not_authorize_obsolete_prepared_38099359",
+      "do_not_authorize_obsolete_prepared_7176a934",
     ],
     obsolete_inventory_sha256: [...OBSOLETE_INVENTORY_SHA256],
     obsolete_prepared_sha256: [...OBSOLETE_REMEDIATION_PREPARED_SHA256],
@@ -236,9 +303,14 @@ function main() {
       "authorize_obsolete_prepared_c3c432b9",
       "authorize_obsolete_prepared_288fd8aa",
       "authorize_obsolete_prepared_6fbc2410",
+      "authorize_obsolete_prepared_3c679ecd",
+      "authorize_obsolete_prepared_9efd0a03",
+      "authorize_obsolete_prepared_ca9a35c7",
+      "authorize_obsolete_prepared_38099359",
+      "authorize_obsolete_prepared_7176a934",
     ],
     next_boundary:
-      "IMPLEMENT_REMAINING_FIVE_PUBLISHERS_ONE_TABLE_AT_A_TIME_STARTING_MESSAGING_NO_LIVE_PUBLISH",
+      "STOP_NO_AUTH_NO_LIVE_PUBLISH",
   };
 
   assertTrackCRemediationPacket({
@@ -260,7 +332,7 @@ function main() {
       {
         path: OUT_REL,
         prepared_sha256: digest,
-        remediation_target_count: 5,
+        remediation_target_count: 0,
         acceptance_denominator_count: 12,
         readiness_matrix_sha256: EXPECTED_MATRIX_SHA256,
         source_pin_count: Object.keys(sourcePins).length,

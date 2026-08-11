@@ -9,6 +9,7 @@ import { createTenantBookingAcceptedNotification } from "./consumers/booking-acc
 import { createMessageReceivedNotification } from "./consumers/message-received.js";
 import { pool } from "./db.js";
 import { publishRealtimeNotification } from "./realtime-publisher.js";
+import { createNotificationWithOutbox } from "./application/notificationOutbox.js";
 import {
   getCachedNotificationList,
   invalidateNotificationListCacheForUser,
@@ -390,11 +391,11 @@ export function createNotificationHttpApp(): Application {
           String((payload as Record<string, unknown>).notification_recipient_role || "").trim() || "user",
         ...payload,
       };
-      await pool.query(
-        `INSERT INTO notification.notifications (user_id, event_type, channel, status, payload)
-         VALUES ($1::uuid, $2, 'push'::notification.notification_channel, 'pending', $3::jsonb)`,
-        [userId, eventType.slice(0, 120), JSON.stringify(decoratedPayload)],
-      );
+      await createNotificationWithOutbox(pool, {
+        userId,
+        eventType: eventType.slice(0, 120),
+        payload: decoratedPayload,
+      });
       await publishRealtimeNotification(userId, {
         event: eventType,
         ...decoratedPayload,
@@ -840,14 +841,13 @@ export function createNotificationHttpApp(): Application {
     const eventType = String((req.body as { event_type?: string })?.event_type || "marketplace.contract");
     const payload = (req.body as { payload?: Record<string, unknown> })?.payload ?? {};
     try {
-      const r = await pool.query(
-        `INSERT INTO notification.notifications (user_id, event_type, channel, status, payload)
-         VALUES ($1::uuid, $2, 'push'::notification.notification_channel, 'pending', $3::jsonb)
-         RETURNING id, created_at`,
-        [req.userId, eventType, JSON.stringify(payload)],
-      );
+      const { notification } = await createNotificationWithOutbox(pool, {
+        userId: String(req.userId),
+        eventType,
+        payload,
+      });
       if (req.userId) await invalidateNotificationListCacheForUser(req.userId);
-      res.status(201).json({ id: r.rows[0]?.id, created_at: r.rows[0]?.created_at });
+      res.status(201).json({ id: notification.id, created_at: notification.created_at });
     } catch (e) {
       console.error("[notifications seed-contract]", e);
       res.status(500).json({ error: "internal" });

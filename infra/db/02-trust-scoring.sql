@@ -1,4 +1,4 @@
--- Trust: deterministic reputation score formula and trigger. Run after 01-trust-schema.sql on port 5446.
+-- Trust: deterministic reputation score formula and trigger. Run after 01-trust-schema.sql on port 5442.
 -- Formula: score = LEAST(GREATEST(average_rating*0.6 + completed_bookings*0.2 - flags_count*0.3, 0), 5)
 -- average_rating from positive_reviews/(positive+negative) as 1-5 scale (positive=good, negative=bad): 5*pos/(pos+neg) when total>0 else 0.
 

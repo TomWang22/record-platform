@@ -16,6 +16,17 @@ message ListingUnflaggedV1 {
   string listing_id = 1;
 }
 
+// Emitted when a listing flag is submitted (status=pending).
+// Not a confirmation. ListingFlaggedV1 remains the resolved/confirmed event.
+message ListingFlagSubmittedV1 {
+  string flag_id = 1;
+  string listing_id = 2;
+  string flagged_by = 3;
+  string reason = 4;
+  string description = 5;
+  string submitted_at = 6;
+}
+
 message ReviewCreatedV1 {
   string review_id = 1;
   string listing_id = 2;
@@ -23,6 +34,18 @@ message ReviewCreatedV1 {
   string reviewer_id = 4;
   string reviewee_id = 5;
   int32 rating = 6;
+  string created_at = 7;
+}
+
+// Emitted when a housing peer review is inserted.
+// Matches trust.reviews: booking_id + target_id (reviewee). No listing_id/order_id.
+message PeerReviewCreatedV1 {
+  string review_id = 1;
+  string booking_id = 2;
+  string reviewer_id = 3;
+  string reviewee_id = 4;
+  int32 rating = 5;
+  string comment = 6;
   string created_at = 7;
 }
 

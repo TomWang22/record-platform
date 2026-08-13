@@ -33,6 +33,8 @@ import {
   loadCheckpointIndex,
   nextMissingCells,
 } from "../lib/pgbench_resume.mjs";
+import { buildSourceBundle } from "../lib/pgbench_source_bundle.mjs";
+import { buildControlPlaneBundle } from "../lib/pgbench_control_plane_bundle.mjs";
 import {
   MAX_RESTARTS_PER_CELL,
   assertFrozenRunIdentity,
@@ -163,20 +165,26 @@ function observeIdentity() {
   const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
   const identityPath = join(reportDir, "run-identity.json");
   const identity = existsSync(identityPath) ? JSON.parse(readFileSync(identityPath, "utf8")) : {};
-  const bundlePath = join(reportDir, "source-bundle.json");
-  const bundle = existsSync(bundlePath) ? JSON.parse(readFileSync(bundlePath, "utf8")) : {};
+  const head = gitSha();
+  const workload = buildSourceBundle({
+    repoRoot: ROOT,
+    gitSha: head,
+    workloadRevision: WORKLOAD_REVISION,
+  });
+  const control = buildControlPlaneBundle({ repoRoot: ROOT, gitSha: head });
   return {
     resume_dir: RESUME,
-    git_sha: gitSha(),
+    git_sha: head,
     catalog_sha: sha256File(catalogPath),
-    environment_fingerprint: environmentFingerprint(),
+    environment_fingerprint: identity.environment_fingerprint || environmentFingerprint(),
     warmup_seconds: Number(catalog.warmup_seconds),
     measured_seconds: Number(catalog.measured_seconds),
     expected_cell_count: Number(catalog.cell_count),
     expected_owner_cells: cellsPerOwner(),
     workload_revision: catalog.workload_revision,
     run_id: identity.run_id || runId,
-    source_bundle_sha: identity.source_bundle_sha || bundle.bundle_sha256 || null,
+    source_bundle_sha: workload.bundle_sha256 || null,
+    control_plane_bundle_sha: control.bundle_sha256 || null,
   };
 }
 
@@ -373,7 +381,18 @@ async function main() {
   acquireLock();
   let state = readJson(statePath, {});
   if (!state.frozen_identity) {
-    state.frozen_identity = observeIdentity();
+    const observed = observeIdentity();
+    const identityPath = join(reportDir, "run-identity.json");
+    const identity = existsSync(identityPath) ? JSON.parse(readFileSync(identityPath, "utf8")) : {};
+    state.frozen_identity = {
+      ...observed,
+      git_sha: identity.git_sha || observed.git_sha,
+      source_bundle_sha:
+        identity.workload_source_bundle_sha || identity.source_bundle_sha || observed.source_bundle_sha,
+      control_plane_bundle_sha: identity.control_plane_bundle_sha || observed.control_plane_bundle_sha,
+      environment_fingerprint: identity.environment_fingerprint || observed.environment_fingerprint,
+      run_id: identity.run_id || observed.run_id,
+    };
     writeJsonAtomic(statePath, state);
   }
 

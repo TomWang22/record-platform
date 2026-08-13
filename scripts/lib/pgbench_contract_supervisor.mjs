@@ -6,6 +6,7 @@
 import { PER_OWNER_OPERATIONAL_ORDER, isReusableContractCell } from "./pgbench_resume.mjs";
 import { resolveLastProgressAtMs } from "./pgbench_run_watchdog.mjs";
 import { prepareIsolatedShardLaunch } from "./pgbench_isolated_shard_launcher.mjs";
+import { CONTROL_PLANE_PROVENANCE_MISMATCH } from "./pgbench_cell_provenance.mjs";
 
 export { prepareIsolatedShardLaunch };
 
@@ -147,13 +148,17 @@ export function assertFrozenRunIdentity(frozen, observed) {
     "expected_owner_cells",
     "workload_revision",
     "source_bundle_sha",
+    "control_plane_bundle_sha",
     "run_id",
   ];
   for (const key of keys) {
     if (frozen?.[key] !== observed?.[key]) {
       return {
         ok: false,
-        code: "FROZEN_RUN_IDENTITY_MISMATCH",
+        code:
+          key === "control_plane_bundle_sha"
+            ? CONTROL_PLANE_PROVENANCE_MISMATCH
+            : "FROZEN_RUN_IDENTITY_MISMATCH",
         field: key,
         frozen: frozen?.[key],
         observed: observed?.[key],
@@ -291,7 +296,7 @@ export function decideSupervisorAction(s) {
   if (!identity.ok) {
     return {
       ...base,
-      action: "FROZEN_RUN_IDENTITY_MISMATCH",
+      action: identity.code,
       reason: identity.code,
       field: identity.field,
       launch: false,

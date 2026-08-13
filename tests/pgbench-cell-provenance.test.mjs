@@ -19,6 +19,7 @@ const freeze = {
   run_id: "pgbench-contract-test-abc",
   git_sha: "abc123",
   source_bundle_sha: "bundle-aaa",
+  control_plane_bundle_sha: "control-aaa",
   catalog_sha: "catalog-aaa",
   workload_revision: WORKLOAD_REVISION,
   contention_domain_id: "colima-or-host",

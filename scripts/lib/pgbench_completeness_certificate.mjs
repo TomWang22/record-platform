@@ -19,6 +19,7 @@ export function buildCompletenessCertificate(counts) {
     legacy_used !== 0 ||
     prohibited_cross_environment_pairs !== 0 ||
     Number(counts.source_provenance_mismatches || 0) !== 0 ||
+    Number(counts.control_plane_provenance_mismatches || 0) !== 0 ||
     Number(counts.source_changed_during_cell || 0) !== 0 ||
     valid_total !== expected_total;
   const complete = expected_total === 14616 && valid_total === 14616 && !anomalies;
@@ -33,6 +34,7 @@ export function buildCompletenessCertificate(counts) {
     legacy_used,
     prohibited_cross_environment_pairs,
     source_provenance_mismatches: Number(counts.source_provenance_mismatches || 0),
+    control_plane_provenance_mismatches: Number(counts.control_plane_provenance_mismatches || 0),
     source_changed_during_cell: Number(counts.source_changed_during_cell || 0),
     status: complete ? "COMPLETE" : "INCOMPLETE",
     pgbench_ceiling_complete: complete,

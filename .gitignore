@@ -185,6 +185,8 @@ bench_export_*.csv
 !reports/performance/end-harness.PREPARED.json.sha256
 !reports/performance/pgbench/source-bundle.PREPARED.json
 !reports/performance/pgbench/source-bundle.PREPARED.json.sha256
+!reports/performance/pgbench/control-plane-bundle.PREPARED.json
+!reports/performance/pgbench/control-plane-bundle.PREPARED.json.sha256
 # Exceptions: keep important text files
 !README.md
 !LICENSE

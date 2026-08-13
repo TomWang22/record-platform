@@ -46,6 +46,13 @@ import {
   discoverLocalPgEnvironments,
 } from "./pgbench_environment.mjs";
 import { buildSourceBundle } from "./pgbench_source_bundle.mjs";
+import { buildControlPlaneBundle } from "./pgbench_control_plane_bundle.mjs";
+import {
+  writeRunIdentityOnce,
+  loadRunIdentity,
+  assertControlPlaneMatchesIdentity,
+  RUN_IDENTITY_SCHEMA,
+} from "./pgbench_run_identity.mjs";
 import {
   captureCellSourceProvenance,
   evaluateSourceBeforeAccept,
@@ -101,7 +108,7 @@ function postgresConfigHash(owner) {
 
 function applyHarnessIndexes(root, owner) {
   const db = OWNER_DB[owner];
-  spawnSync(
+  const r = spawnSync(
     "psql",
     [
       "-h",
@@ -119,6 +126,11 @@ function applyHarnessIndexes(root, owner) {
     ],
     { env: { ...process.env, PGPASSWORD: "postgres" }, encoding: "utf8" },
   );
+  if (r.status !== 0) {
+    throw new Error(
+      `HARNESS_INDEXES_FAILED owner=${owner}: ${String(r.stderr || r.stdout || "").slice(0, 400)}`,
+    );
+  }
 }
 
 function prepareOwnerFixtures(root, owner) {
@@ -478,35 +490,81 @@ export async function runPgbenchContractMatrix(opts) {
   if (!sourceBundle.ok) {
     throw new Error(`SOURCE_BUNDLE_NOT_FROZEN: ${(sourceBundle.reasons || []).join("; ")}`);
   }
+  const controlPlane = buildControlPlaneBundle({
+    repoRoot: root,
+    gitSha: gitSha(root),
+  });
+  if (!controlPlane.ok) {
+    throw new Error(`CONTROL_PLANE_BUNDLE_NOT_FROZEN: ${(controlPlane.reasons || []).join("; ")}`);
+  }
+  const probeEnv = captureEnvironmentForOwner({
+    owner: "records",
+    shard_id: shardId || "sequential-shared-colima",
+    environment_id: environmentId || "colima-shared-domain",
+    database_target: `127.0.0.1:${OWNER_DB.records.port}/${OWNER_DB.records.database}`,
+    postgres_config_hash: cfgHash,
+  });
+  const environment_fingerprint = `${probeEnv.environment_id}|${probeEnv.contention_domain_id}|${probeEnv.postgres_config_hash}`;
+  const identityPath = join(reportDir, "run-identity.json");
+  const liveDigests = {
+    source_bundle_sha: sourceBundle.bundle_sha256,
+    workload_source_bundle_sha: sourceBundle.bundle_sha256,
+    control_plane_bundle_sha: controlPlane.bundle_sha256,
+  };
   const freeze = {
     run_id: runId,
     git_sha: sourceBundle.git_sha,
     source_bundle_sha: sourceBundle.bundle_sha256,
+    workload_source_bundle_sha: sourceBundle.bundle_sha256,
+    control_plane_bundle_sha: controlPlane.bundle_sha256,
     catalog_sha,
     workload_revision: WORKLOAD_REVISION,
-    contention_domain_id: environmentId || "colima-shared-domain",
+    contention_domain_id: probeEnv.contention_domain_id,
+    environment_fingerprint,
     files: sourceBundle.files,
   };
-  writeFileSync(
-    join(reportDir, "run-identity.json"),
-    JSON.stringify(
-      {
-        schema: "record-platform-pgbench-run-identity/v1",
-        run_id: runId,
-        git_sha: freeze.git_sha,
-        source_bundle_sha: freeze.source_bundle_sha,
-        catalog_sha,
-        workload_revision: WORKLOAD_REVISION,
-        contention_domain_id: freeze.contention_domain_id,
-        environment_fingerprint: null,
-        expected_total_cells: 14616,
-        lineage: "SEQUENTIAL_SINGLE_CONTENTION_DOMAIN",
-      },
-      null,
-      2,
-    ) + "\n",
-  );
+  const existing = loadRunIdentity(identityPath);
+  if (existing) {
+    const match = assertControlPlaneMatchesIdentity(existing, liveDigests);
+    if (!match.ok) {
+      throw new Error(`${match.reason}: frozen=${match.frozen} live=${match.live}`);
+    }
+    if (existing.git_sha !== freeze.git_sha) {
+      throw new Error(`CONTROL_PLANE_PROVENANCE_MISMATCH git_sha: frozen=${existing.git_sha} live=${freeze.git_sha}`);
+    }
+    if (existing.catalog_sha !== catalog_sha) {
+      throw new Error(`RUN_IDENTITY_IMMUTABLE_MISMATCH catalog_sha: frozen=${existing.catalog_sha} live=${catalog_sha}`);
+    }
+    freeze.run_id = existing.run_id;
+    freeze.git_sha = existing.git_sha;
+    freeze.source_bundle_sha = existing.workload_source_bundle_sha || existing.source_bundle_sha;
+    freeze.workload_source_bundle_sha = freeze.source_bundle_sha;
+    freeze.control_plane_bundle_sha = existing.control_plane_bundle_sha;
+    freeze.catalog_sha = existing.catalog_sha;
+    freeze.workload_revision = existing.workload_revision;
+    freeze.contention_domain_id = existing.contention_domain_id;
+    freeze.environment_fingerprint = existing.environment_fingerprint;
+  } else {
+    const minted = writeRunIdentityOnce(identityPath, {
+      schema: RUN_IDENTITY_SCHEMA,
+      run_id: runId,
+      git_sha: freeze.git_sha,
+      workload_source_bundle_sha: freeze.workload_source_bundle_sha,
+      source_bundle_sha: freeze.source_bundle_sha,
+      control_plane_bundle_sha: freeze.control_plane_bundle_sha,
+      catalog_sha,
+      workload_revision: WORKLOAD_REVISION,
+      contention_domain_id: freeze.contention_domain_id,
+      environment_fingerprint,
+      expected_total_cells: 14616,
+      lineage: "SEQUENTIAL_SINGLE_CONTENTION_DOMAIN",
+    });
+    if (!minted.ok) {
+      throw new Error(minted.reason);
+    }
+  }
   writeFileSync(join(reportDir, "source-bundle.json"), JSON.stringify(sourceBundle, null, 2) + "\n");
+  writeFileSync(join(reportDir, "control-plane-bundle.json"), JSON.stringify(controlPlane, null, 2) + "\n");
 
   // Load checkpoints from top-level cells/ and shards/<id>/cells/
   const checkpoint = loadCheckpointIndex(reportDir);

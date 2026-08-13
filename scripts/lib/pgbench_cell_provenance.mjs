@@ -9,6 +9,7 @@ const SOURCE_IDENTITY_FIELDS = [
   "run_id",
   "git_sha",
   "source_bundle_sha",
+  "control_plane_bundle_sha",
   "catalog_sha",
   "workload_revision",
 ];
@@ -33,6 +34,7 @@ export function sourceDigestsMatchFreeze(cell, freeze) {
 
 export const SOURCE_CHANGED_DURING_CELL = "SOURCE_CHANGED_DURING_CELL";
 export const SOURCE_PROVENANCE_MISMATCH = "SOURCE_PROVENANCE_MISMATCH";
+export const CONTROL_PLANE_PROVENANCE_MISMATCH = "CONTROL_PLANE_PROVENANCE_MISMATCH";
 
 function sha256File(abs) {
   return createHash("sha256").update(readFileSync(abs)).digest("hex");
@@ -68,7 +70,9 @@ export function captureCellSourceProvenance(opts) {
   return {
     run_id: freeze.run_id,
     git_sha: freeze.git_sha,
-    source_bundle_sha: freeze.source_bundle_sha,
+    source_bundle_sha: freeze.source_bundle_sha || freeze.workload_source_bundle_sha,
+    workload_source_bundle_sha: freeze.workload_source_bundle_sha || freeze.source_bundle_sha,
+    control_plane_bundle_sha: freeze.control_plane_bundle_sha,
     catalog_sha: freeze.catalog_sha,
     workload_revision: freeze.workload_revision,
     workload_sql_path: w.path,
@@ -115,6 +119,12 @@ export function evaluateSourceBeforeAccept(opts) {
     }
   }
   const freeze = opts.freeze || {};
+  if (
+    freeze.control_plane_bundle_sha &&
+    now.control_plane_bundle_sha !== freeze.control_plane_bundle_sha
+  ) {
+    return { ok: false, status: "INVALID", reason: CONTROL_PLANE_PROVENANCE_MISMATCH, start, now };
+  }
   if (freeze.files?.length) {
     const pairs = [
       [now.workload_sql_path, now.workload_sql_sha256],
@@ -135,6 +145,13 @@ export function classifySourceLockedReuse(cell, freeze, isReusable) {
   if (!cell) return { reusable: false, reason: "MISSING" };
   if (typeof isReusable === "function" && !isReusable(cell)) {
     return { reusable: false, reason: "NOT_REUSABLE" };
+  }
+  if (
+    cell.control_plane_bundle_sha == null ||
+    freeze?.control_plane_bundle_sha == null ||
+    cell.control_plane_bundle_sha !== freeze.control_plane_bundle_sha
+  ) {
+    return { reusable: false, reason: CONTROL_PLANE_PROVENANCE_MISMATCH };
   }
   if (!sourceDigestsMatchFreeze(cell, freeze)) {
     return { reusable: false, reason: SOURCE_PROVENANCE_MISMATCH };

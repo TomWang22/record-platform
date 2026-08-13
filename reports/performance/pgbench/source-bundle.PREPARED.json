@@ -1,0 +1,225 @@
+{
+  "schema": "record-platform-pgbench-source-bundle/v1",
+  "git_sha": "ee430c96cb9f2a162d65698b2e86d462b4340c80",
+  "workload_revision": "gate3-v1-domain-touch",
+  "files": [
+    {
+      "path": "reports/performance/end-harness.PREPARED.json",
+      "sha256": "56f1c1d72d1ae0b8e89dc198baba0379dea6f33d567896661bd87a5c618b2513"
+    },
+    {
+      "path": "reports/performance/outbox-publisher-parity.PREPARED.json",
+      "sha256": "4872d4d85ef28b8f28ed854d3a670b14613f3a8a0bcc160f35b262bb98a6d26c"
+    },
+    {
+      "path": "scripts/performance/pgbench/ai/domain-only.sql",
+      "sha256": "6a3169202227d5f184ce532c17b76ad61ff380751b3c758c6c19931cf47757bc"
+    },
+    {
+      "path": "scripts/performance/pgbench/ai/domain-plus-outbox.sql",
+      "sha256": "72cf02bfa4897c4c727ab182d2ca432af77221215730a69602130fefb1d8d2c7"
+    },
+    {
+      "path": "scripts/performance/pgbench/ai/publisher-db-path.sql",
+      "sha256": "6d4275f216d83fa77043e035648f80c8d508d67c6af3bc3672107902eca2d7f8"
+    },
+    {
+      "path": "scripts/performance/pgbench/ai/wmix.sql",
+      "sha256": "c8e0589b66da1e4995668e5ea4228818ba180461a963ead3cb7c237cfe97cc7f"
+    },
+    {
+      "path": "scripts/performance/pgbench/analytics/domain-only.sql",
+      "sha256": "5da578b1d6439921d839587b8e6d57e2769afa2bfb8632ec7272368911872274"
+    },
+    {
+      "path": "scripts/performance/pgbench/analytics/domain-plus-outbox.sql",
+      "sha256": "91d7b679eccf9ff47492c42f00f614cdc1bc5d9b370e2a1a751a5248c37999f4"
+    },
+    {
+      "path": "scripts/performance/pgbench/analytics/publisher-db-path.sql",
+      "sha256": "70da4b569760129c4afccfa08f9c33d6fb8273fc2eb9528a7fadc19739995bab"
+    },
+    {
+      "path": "scripts/performance/pgbench/analytics/wmix.sql",
+      "sha256": "8d5feecef51b1736b2d7f70f9c0a8ec1f0122684d4a036259f7c603e8f61d005"
+    },
+    {
+      "path": "scripts/performance/pgbench/auction_monitor/domain-only.sql",
+      "sha256": "c1e833d391d69cccbaab761e942da7bccc09f65d024bf457e13dec914ab9a178"
+    },
+    {
+      "path": "scripts/performance/pgbench/auction_monitor/domain-plus-outbox.sql",
+      "sha256": "79284bf23fedfa9ad8df9aea63b4488bbae7926d7f98327b94b002c2755155fc"
+    },
+    {
+      "path": "scripts/performance/pgbench/auction_monitor/publisher-db-path.sql",
+      "sha256": "2c6e73aca95a8d34a7c9211be748566d016c07ff13e5e9ef927345cebb68677e"
+    },
+    {
+      "path": "scripts/performance/pgbench/auction_monitor/wmix.sql",
+      "sha256": "b20e4b0bcc6a2de60cfd0de6a752b401e4c575194a913a8b622eefef5fde7407"
+    },
+    {
+      "path": "scripts/performance/pgbench/auth/domain-only.sql",
+      "sha256": "3af68f397e1a9d5986a99a36f340cd94485d5a5f8bc7d534c87f964853217d53"
+    },
+    {
+      "path": "scripts/performance/pgbench/auth/domain-plus-outbox.sql",
+      "sha256": "f6d8783d7b1162ad187b70f93ef9c35a0f691899f9f1f0fd8885b8548ed76a3f"
+    },
+    {
+      "path": "scripts/performance/pgbench/auth/publisher-db-path.sql",
+      "sha256": "ee96ad2462e2a0baf4fc68ff004a7fd76a8e3d237a951e53c87af0b95a77545b"
+    },
+    {
+      "path": "scripts/performance/pgbench/auth/wmix.sql",
+      "sha256": "26c9b93fd488264b1ad63f7d4f5296d1408e9ff224500e5bd98337a37331760a"
+    },
+    {
+      "path": "scripts/performance/pgbench/common/capture-db-stats.sql",
+      "sha256": "fb88f042df3315516a401e9930dda0ebed3ba51b6936f002699af20783212de1"
+    },
+    {
+      "path": "scripts/performance/pgbench/common/cleanup.sql",
+      "sha256": "d8fbf29999faa78659bb132a822bd3052529875c7f4437325472f9d86436a80a"
+    },
+    {
+      "path": "scripts/performance/pgbench/common/indexes.sql",
+      "sha256": "4b2d882c718810d2b0a23e31114a20f78a2984491d2903a6bbdf3a3d0578f389"
+    },
+    {
+      "path": "scripts/performance/pgbench/common/seed.sql",
+      "sha256": "58f7eb6fc120d8da342618b4eae094259d7d86df02a1846b53f2e6031d4258b5"
+    },
+    {
+      "path": "scripts/performance/pgbench/listings/domain-only.sql",
+      "sha256": "e4075c007bc708c51aed49210ba846d7cf4572dba5cdfe381d4a9d9361d24008"
+    },
+    {
+      "path": "scripts/performance/pgbench/listings/domain-plus-outbox.sql",
+      "sha256": "259c7357dcee2e331d45f34a6b59b648db34f8eb1de0790a73d02b6d8e1c5340"
+    },
+    {
+      "path": "scripts/performance/pgbench/listings/publisher-db-path.sql",
+      "sha256": "9de9fea3e4d72a1fa22b7baf3ce917987c6f26123bfbf2ed61eab29a0684ac9c"
+    },
+    {
+      "path": "scripts/performance/pgbench/listings/wmix.sql",
+      "sha256": "b76e5d6511a6a3ebe54918b46cb94cc4427cf01902f2636577f41c77b1f3ad90"
+    },
+    {
+      "path": "scripts/performance/pgbench/media/domain-only.sql",
+      "sha256": "eb5151a18b1ee397e863e542d47ce420f60e5032eee6b1ba6a289bcf16ba4c1a"
+    },
+    {
+      "path": "scripts/performance/pgbench/media/domain-plus-outbox.sql",
+      "sha256": "9e302e5b02aea04e5b459d5b9f776a49b8b72f6f4beebc0f17321bd1bb8a3490"
+    },
+    {
+      "path": "scripts/performance/pgbench/media/publisher-db-path.sql",
+      "sha256": "e27523794bd9836c40347aa35dccc735f3013f855cb5c79f931e6cc864e43913"
+    },
+    {
+      "path": "scripts/performance/pgbench/media/wmix.sql",
+      "sha256": "12455d924f63250fe95d58cd629418594a4d412a5d266f5d9d8e262343558a6d"
+    },
+    {
+      "path": "scripts/performance/pgbench/messaging/domain-only.sql",
+      "sha256": "0752fe8c56fdb0fb5c407686b1b9f60c456a2432e38a6ced7ea085723a1c8f4a"
+    },
+    {
+      "path": "scripts/performance/pgbench/messaging/domain-plus-outbox.sql",
+      "sha256": "e07e0dda04b560e3366d85804eb374aadda8e7c35a048348db2d2894c9ed3dbc"
+    },
+    {
+      "path": "scripts/performance/pgbench/messaging/publisher-db-path.sql",
+      "sha256": "c4524c110d9571d7b8ff56ca3cdb948845e39834df3c78e8ec89c710803b8931"
+    },
+    {
+      "path": "scripts/performance/pgbench/messaging/wmix.sql",
+      "sha256": "9369c73ee3daf859f20705f9b4ba0f91be49efa89ae67becfea6d0974401ede7"
+    },
+    {
+      "path": "scripts/performance/pgbench/notification/domain-only.sql",
+      "sha256": "4501479ade1dfaaa9a9623a1199050c4d3f06623b2ecf8ae0002521b32234e21"
+    },
+    {
+      "path": "scripts/performance/pgbench/notification/domain-plus-outbox.sql",
+      "sha256": "092b287a733e7c4b000af00e840d26a638bead535deae73dc7c8838404733690"
+    },
+    {
+      "path": "scripts/performance/pgbench/notification/publisher-db-path.sql",
+      "sha256": "ff61559dff4e11de74203664612b214fd42534cacb480c49cf52a60bbd667ce2"
+    },
+    {
+      "path": "scripts/performance/pgbench/notification/wmix.sql",
+      "sha256": "7c699fba436a603bcbbaa311f655b827cebf96f47adb26decb92a8b743617436"
+    },
+    {
+      "path": "scripts/performance/pgbench/owner-design-catalog.json",
+      "sha256": "7d3b8149548f5b02781d1d0b42cb537eac89a844b62d9e9fcbff0899064c6f4d"
+    },
+    {
+      "path": "scripts/performance/pgbench/randomized-query-catalog.json",
+      "sha256": "fa5150c67d9095767e50bf4f4dd40f707026ea604d11ca4a69a576d211d0ac19"
+    },
+    {
+      "path": "scripts/performance/pgbench/records/domain-only.sql",
+      "sha256": "d0104a571fa8b0f0567c8e444d6f3f4dc3d23b6ce4cff20d8befcabd561ed496"
+    },
+    {
+      "path": "scripts/performance/pgbench/records/domain-plus-outbox.sql",
+      "sha256": "e5bf73ad9ae462d3c547cfce539cff5b66d329e51eff93291ee1bb02156ec10d"
+    },
+    {
+      "path": "scripts/performance/pgbench/records/publisher-db-path.sql",
+      "sha256": "67a9c901aebcc8c57025be849c7243e6908fde3dfd38086dd4876d801a4318ec"
+    },
+    {
+      "path": "scripts/performance/pgbench/records/wmix.sql",
+      "sha256": "8aae5b3fe4c590825dfb4a32ff07ec1fbc03adac6daa6ce20be58708f6bc4590"
+    },
+    {
+      "path": "scripts/performance/pgbench/report-schema.json",
+      "sha256": "47ca6d6520ff91b1bd81cb2f5880f8479c3d61ea3de3b1d543d203116ebcd0ca"
+    },
+    {
+      "path": "scripts/performance/pgbench/shopping/domain-only.sql",
+      "sha256": "d6213e7239756de0ddcdb5a7f60aece6fb570f2c3f64d1f37de2b1307931e067"
+    },
+    {
+      "path": "scripts/performance/pgbench/shopping/domain-plus-outbox.sql",
+      "sha256": "e212431374b721faa95265ae32c6146a8d8637dbb83c1b2a49c764ff165395e8"
+    },
+    {
+      "path": "scripts/performance/pgbench/shopping/publisher-db-path.sql",
+      "sha256": "dd09dd3d2edbedbc57435fd733c4ba7d697b3cddbf2ef1da7264feeb0145ac38"
+    },
+    {
+      "path": "scripts/performance/pgbench/shopping/wmix.sql",
+      "sha256": "08eb83f8f9f141edf588fd88eab3f292c5d427daecf642b9b477297a373fefa5"
+    },
+    {
+      "path": "scripts/performance/pgbench/trust/domain-only.sql",
+      "sha256": "1fa4f131494f1f77312c2e2263b9e98b31bfafad222795bdf5ecb6b10d21d233"
+    },
+    {
+      "path": "scripts/performance/pgbench/trust/domain-plus-outbox.sql",
+      "sha256": "7422ece4e496a843a8c60f932ee09f4ab5ee5ea8aed003e4b124e76d1a666226"
+    },
+    {
+      "path": "scripts/performance/pgbench/trust/publisher-db-path.sql",
+      "sha256": "a5abc1a2290c0748a87132c289ae154f23e5274183ad2271024d98bb3622a987"
+    },
+    {
+      "path": "scripts/performance/pgbench/trust/wmix.sql",
+      "sha256": "21e0082740391655f317ef189f5161012cd2c7a63731186f7d28cb5d1229dfd2"
+    },
+    {
+      "path": "scripts/performance/pgbench/workload-catalog.json",
+      "sha256": "c2aabce619238234f9a9ee6a201a253c754f5e9d4ab41afb56f9bfd49aa10c37"
+    }
+  ],
+  "file_count": 54,
+  "bundle_sha256": "afbc31dc5f5d125aba09e13ff7ebed1b6026d69fb52a69343eb3895d23451071"
+}

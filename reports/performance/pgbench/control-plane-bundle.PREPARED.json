@@ -1,0 +1,105 @@
+{
+  "schema": "record-platform-pgbench-control-plane-bundle/v1",
+  "git_sha": "3e534371f0921816da59c214d8087f79b210c03c",
+  "kind": "control_plane",
+  "files": [
+    {
+      "path": "scripts/lib/pgbench_cell_provenance.mjs",
+      "sha256": "70087b95fab8f2cda57c03e99fdf2534ffe75f1956828cb31385e6b0d8a72ff4"
+    },
+    {
+      "path": "scripts/lib/pgbench_completeness.mjs",
+      "sha256": "19e56438068b179f72789f55b09b10d831375aa744a544dab7200469f8f62886"
+    },
+    {
+      "path": "scripts/lib/pgbench_completeness_certificate.mjs",
+      "sha256": "a9084c0da701d2eab9eef56e45091f9c07ac18b9d2861f46b5dcabe6339a48d3"
+    },
+    {
+      "path": "scripts/lib/pgbench_contract_runner.mjs",
+      "sha256": "683c3935348fc063b637b953a11de1b468c2c35e4962d6d4516a38f55e37e183"
+    },
+    {
+      "path": "scripts/lib/pgbench_contract_supervisor.mjs",
+      "sha256": "15df0c4275f3b21fd27a26a07131e6dfbe51d863b3a3fbf0f665d84c7e25972a"
+    },
+    {
+      "path": "scripts/lib/pgbench_control_plane_bundle.mjs",
+      "sha256": "d42b89b329f98987ff0ad9ae3b2b17a004df7a45d52ca621aaddb705de5112c4"
+    },
+    {
+      "path": "scripts/lib/pgbench_environment.mjs",
+      "sha256": "0c36761ef829583fb72249ec0359755c6968e0f150005e2bbc5759ef4217cfd7"
+    },
+    {
+      "path": "scripts/lib/pgbench_latency.mjs",
+      "sha256": "f25518f1354c75ea1cfc88287f118f702e3f21d50959ffd264fa669b28410795"
+    },
+    {
+      "path": "scripts/lib/pgbench_merge.mjs",
+      "sha256": "4652d34ba48d80af21e9a1d5bc0c06664dbee2868a166871da4bce9f0a56867a"
+    },
+    {
+      "path": "scripts/lib/pgbench_outbox_tax.mjs",
+      "sha256": "e22eea80ae7d2160fab3774c85113daa7d3096e9ec6539e6dfe5388e3e8f1b53"
+    },
+    {
+      "path": "scripts/lib/pgbench_owner_review.mjs",
+      "sha256": "560b33c0c85802b0f54bb73c1ab7402602706873783d94b839e8a9792b2ce862"
+    },
+    {
+      "path": "scripts/lib/pgbench_parity_gate.mjs",
+      "sha256": "06a0aeddced8b05def9ff2c06dbf5fb8fe1d586f689b61715e46e7e63f89fca1"
+    },
+    {
+      "path": "scripts/lib/pgbench_postgres_sample.mjs",
+      "sha256": "a7397efd6f7aee8754f2a7b38b6accbdc085cf3d4e59ea84062a8000947ad968"
+    },
+    {
+      "path": "scripts/lib/pgbench_resume.mjs",
+      "sha256": "ef6c3657c884afc1491c101f7479ecf9f26671486379b1a569103f7f4c8fb4ee"
+    },
+    {
+      "path": "scripts/lib/pgbench_run_identity.mjs",
+      "sha256": "c0067dce2a550ed4c5b26c28dc169061e20872682748cb3e73dc094c2d76fbf4"
+    },
+    {
+      "path": "scripts/lib/pgbench_run_watchdog.mjs",
+      "sha256": "25fdc12dc654bfb9f27bfdfe1703de14eaa4421db7b55fda380e90850722f347"
+    },
+    {
+      "path": "scripts/lib/pgbench_runner.mjs",
+      "sha256": "53e191930962016344a88f86ee1e8e3d0c0a9c1320100d3bdf8aa96063d8a359"
+    },
+    {
+      "path": "scripts/lib/pgbench_saturation_knee.mjs",
+      "sha256": "3d2027e81b6666dc988790c1f2078b31cf842a61be4d3ab68d598f1cbb3aa05c"
+    },
+    {
+      "path": "scripts/lib/pgbench_seed_cleanup.mjs",
+      "sha256": "7ab7357ce92df471d53a41d301c55f2cffc037d9f980b54a08aae1015ae818e7"
+    },
+    {
+      "path": "scripts/lib/pgbench_shard.mjs",
+      "sha256": "53efd6595e12229b08d2224f36be8013f53d06b4a7794eb4e5a6305911bbf821"
+    },
+    {
+      "path": "scripts/lib/pgbench_source_bundle.mjs",
+      "sha256": "cf1b1b76350c6bc648ac1d9913edef1135b91a6c82e56323d9883829bdf86989"
+    },
+    {
+      "path": "scripts/lib/pgbench_wait_event_classifier.mjs",
+      "sha256": "3d55f8c1c7f6192a3ec1ee16e6cf54e74e32b12f459e27768326820968d4e304"
+    },
+    {
+      "path": "scripts/performance/run-pgbench-matrix.mjs",
+      "sha256": "2c8837be894a1dcacaf990693bfbb17d90d3b0ec690cc77696bc6b4e28b3b032"
+    },
+    {
+      "path": "scripts/performance/supervise-pgbench-contract.mjs",
+      "sha256": "1232ac346b41ea23324174c4a27a865812087bc5aedc8c3dba4cd9331cc90064"
+    }
+  ],
+  "file_count": 24,
+  "bundle_sha256": "acc850323c26e3a19a8b906e0c3d394f5168425272804a43a56c60c06a573d7a"
+}

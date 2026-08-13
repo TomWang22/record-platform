@@ -1,0 +1,172 @@
+{
+  "schema": "record-platform-end-harness/v1",
+  "status": "AUDIT_DRAFT",
+  "skeleton": "COMPLETE",
+  "generated_at": "2026-08-11T20:50:00.000Z",
+  "end_harness_execution_authorized": false,
+  "kafka_test_execution_authorized": true,
+  "protocol_execution_authorized": false,
+  "pgbench_execution_authorized": true,
+  "pgbench_ceiling_complete": false,
+  "production_topics_forbidden": true,
+  "execution_authorized": false,
+  "track_c_acceptance_pass": false,
+  "platform_pass": false,
+  "gate_0_track_c": {
+    "denominator": 12,
+    "readiness": "12/0/0",
+    "execution_authorized": false,
+    "track_c_acceptance_pass": false
+  },
+  "gate_1_canonical_parity": {
+    "required_canonical": 11,
+    "required_pass": 11,
+    "current_pass": 11,
+    "unknowns": 0,
+    "order": [
+      "media.outbox_events",
+      "messaging.outbox_events",
+      "notification.outbox_events",
+      "records.outbox_events",
+      "shopping.outbox_events",
+      "trust.outbox_events",
+      "auth.outbox_events",
+      "listings.outbox_events",
+      "analytics.outbox_events",
+      "auction_monitor.outbox_events",
+      "ai.outbox_events"
+    ],
+    "media": "PASS",
+    "messaging": "PASS",
+    "notification": "PASS",
+    "records": "PASS",
+    "shopping": "PASS",
+    "trust": "PASS",
+    "auth": "PASS",
+    "listings": "PASS",
+    "analytics": "PASS",
+    "auction_monitor": "PASS",
+    "ai": "PASS",
+    "next_owner": "NONE",
+    "supplemental": {
+      "table": "auth.auth_outbox",
+      "lifecycle_test_required": true,
+      "canonical_parity_required": false,
+      "retrofit_forbidden": true
+    }
+  },
+  "gate_2_kafka_lifecycle": {
+    "status": "COMPLETE",
+    "run_id": "e2e-20260811-234520-ef21a35",
+    "lifecycle_owner_count": 12,
+    "lifecycle_pass_count": 12,
+    "production_topic_count": 0,
+    "unknowns": 0,
+    "manifest_sha256": "11b9f1d983003b3a7222e63d53baef37021e29088450fa2e6dd428b607cfa699",
+    "raw_results_sha256": "4c1fa3b70ca62d618a25f45f2f086c1e0da8a0b8e1a49749f1839b88f76d325f",
+    "summary_sha256": "9cc8f84877178917f9dcca3425221bf72f93f1693735937fc324b034da929d0d"
+  },
+  "gate_3_pgbench": {
+    "requires_parity_pass_count": 11,
+    "requires_unknowns": 0,
+    "requires_explicit_go": true,
+    "workloads": [
+      "W1_DOMAIN_ONLY",
+      "W2_DOMAIN_PLUS_OUTBOX",
+      "W3_PUBLISHER_DB_PATH",
+      "WMIX_OWNER_RANDOMIZED"
+    ],
+    "clients": [
+      8,
+      16,
+      32,
+      64,
+      128,
+      256
+    ],
+    "thread_candidates": [
+      1,
+      2,
+      4,
+      8,
+      16
+    ],
+    "distributions": [
+      "UNIFORM",
+      "ZIPFIAN_HOTSET"
+    ],
+    "warmup_seconds": 30,
+    "measured_seconds": 120,
+    "repetitions": 3,
+    "publisher_batches": [
+      1,
+      10,
+      25,
+      50
+    ],
+    "modes": [
+      "PER_OWNER_CEILING",
+      "ALL_OWNERS_CONCURRENT"
+    ],
+    "randomization": {
+      "deterministic_seed_per_repetition": true,
+      "rotate_seed_between_repetitions": true,
+      "weighted_owner_query_catalog": true
+    },
+    "status": "AUTHORIZED_PENDING_RUN"
+  },
+  "gate_4_tuning": {
+    "rule": "ONE_DECLARED_CHANGE_PER_EXPERIMENT",
+    "status": "BLOCKED"
+  },
+  "gate_5_protocol_matrix": {
+    "protocols": [
+      "HTTP_1_1",
+      "HTTP_2",
+      "HTTP_3"
+    ],
+    "clients": [
+      8,
+      16,
+      32,
+      64,
+      128,
+      256
+    ],
+    "lane_A": {
+      "publishers": "OFF",
+      "purpose": "application_plus_db_protocol_cost"
+    },
+    "lane_B": {
+      "publishers": "ON_ISOLATED_TEST_ENV_ONLY",
+      "purpose": "full_outbox_plus_kafka_pipeline"
+    },
+    "status": "BLOCKED"
+  },
+  "gate_6_attribution": {
+    "status": "BLOCKED"
+  },
+  "run_manifest_required_fields": [
+    "git_sha",
+    "inventory_sha",
+    "parity_sha",
+    "workload_revision",
+    "host_kernel_container_limits",
+    "postgres_version_config",
+    "kafka_config",
+    "proxy_caddy_config",
+    "service_image_shas",
+    "protocol",
+    "owner",
+    "workload",
+    "clients",
+    "threads",
+    "batch_size",
+    "random_seed",
+    "warmup_seconds",
+    "measured_seconds",
+    "repetition",
+    "tuning_delta"
+  ],
+  "kafka_lifecycle_complete": true
+}

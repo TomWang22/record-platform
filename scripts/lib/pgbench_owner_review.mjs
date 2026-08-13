@@ -14,6 +14,8 @@ import {
   WORKLOAD_REVISION,
 } from "./pgbench_resume.mjs";
 import { computeCellMatchedOutboxTax, summarizeOutboxTax } from "./pgbench_outbox_tax.mjs";
+import { classifyPostgresWaitEvents } from "./pgbench_wait_event_classifier.mjs";
+import { generateSaturationKnee } from "./pgbench_saturation_knee.mjs";
 
 function sha256(buf) {
   return createHash("sha256").update(buf).digest("hex");
@@ -140,22 +142,61 @@ export function summarizeLatency(rows) {
  */
 export function summarizePostgresWaits(rows) {
   const withSamples = rows.filter(
-    (r) => r.postgres_samples?.before || r.postgres_samples?.after,
+    (r) => r.postgres_samples?.before?.sample || r.postgres_samples?.after?.sample || r.postgres_samples?.before || r.postgres_samples?.after,
   );
   if (!withSamples.length) {
+    const classifier = classifyPostgresWaitEvents(null);
     return {
       status: "PARTIAL_OR_UNAVAILABLE",
       reason: "no postgres_samples on owner cells",
+      classifier,
       locks: null,
       io: null,
       cpu: null,
     };
   }
+  const deltas = [];
+  const histograms = [];
+  for (const r of withSamples) {
+    const before = r.postgres_samples?.before?.sample || r.postgres_samples?.before;
+    const after = r.postgres_samples?.after?.sample || r.postgres_samples?.after;
+    const afterObj = after && typeof after === "object" ? after : null;
+    histograms.push(classifyPostgresWaitEvents(afterObj || before));
+    if (!before || !after || typeof before !== "object" || typeof after !== "object") continue;
+    const n = (a, b, k) =>
+      a[k] != null && b[k] != null ? Number(b[k]) - Number(a[k]) : null;
+    deltas.push({
+      cell_id: r.cell_id,
+      waiting_backends_after: after.waiting_backends ?? null,
+      deadlocks_delta: n(before, after, "deadlocks"),
+      blks_read_delta: n(before, after, "blks_read"),
+      blks_hit_delta: n(before, after, "blks_hit"),
+    });
+  }
+  const classifiedOk = histograms.filter((h) => h.status === "OK");
+  if (classifiedOk.length === histograms.length && histograms.length > 0) {
+    const locks = { count: classifiedOk.reduce((s, h) => s + Number(h.locks?.count || 0), 0) };
+    const io = { count: classifiedOk.reduce((s, h) => s + Number(h.io?.count || 0), 0) };
+    const cpu = { count: classifiedOk.reduce((s, h) => s + Number(h.cpu?.count || 0), 0) };
+    return {
+      status: "OK",
+      reason: null,
+      cells_with_samples: withSamples.length,
+      deltas,
+      classifier: classifiedOk[0],
+      locks,
+      io,
+      cpu,
+    };
+  }
+  const classifier = histograms.find((h) => h.status !== "OK") || classifyPostgresWaitEvents(null);
   return {
     status: "PARTIAL_OR_UNAVAILABLE",
     reason:
-      "raw before/after samples present; lock/IO/CPU attribution classifier not yet complete — do not invent values",
+      "raw before/after samples present; wait_event histogram absent — lock/IO/CPU counts stay null, never invented as zero",
     cells_with_samples: withSamples.length,
+    deltas,
+    classifier,
     locks: null,
     io: null,
     cpu: null,
@@ -371,13 +412,13 @@ export function writeOwnerReviewArtifacts(reportDir, owner, runId) {
     [`${owner}-postgres-waits-summary.json`]: review.postgres_waits_summary,
   };
 
-  // saturation stub from valid rows series
-  const saturation = {
+  const saturation = generateSaturationKnee({
     owner,
-    note: "owner-scoped; full saturation.json remains Gate-3 merge artifact",
     owner_complete: review.owner_complete,
-    series_note: "derive knees only when owner_complete=true",
-  };
+    valid_owner_cells: review.valid_owner_cells,
+    expected_owner_cells: review.expected_owner_cells,
+    rows: loadOwnerResultsFromRunDir(reportDir, owner),
+  });
   files[`${owner}-saturation.json`] = saturation;
 
   /** @type {Record<string, string>} */

@@ -177,6 +177,14 @@ bench_export_*.csv
 # Exceptions: keep infrastructure and Prisma migrations
 !infra/db/*.sql
 !services/*/prisma/migrations/*.sql
+!scripts/performance/pgbench/**/*.sql
+!scripts/performance/pgbench/**/*.json
+!reports/performance/outbox-publisher-parity.PREPARED.json
+!reports/performance/outbox-publisher-parity.PREPARED.json.sha256
+!reports/performance/end-harness.PREPARED.json
+!reports/performance/end-harness.PREPARED.json.sha256
+!reports/performance/pgbench/source-bundle.PREPARED.json
+!reports/performance/pgbench/source-bundle.PREPARED.json.sha256
 # Exceptions: keep important text files
 !README.md
 !LICENSE

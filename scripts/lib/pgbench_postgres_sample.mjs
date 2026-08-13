@@ -4,11 +4,25 @@
  */
 import { spawnSync } from "node:child_process";
 
-const SAMPLE_SQL = `
+export const POSTGRES_SAMPLE_SQL = `
 SELECT json_build_object(
   'captured_at', clock_timestamp(),
   'num_backends', (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()),
   'waiting_backends', (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type IS NOT NULL),
+  'wait_events', (
+    SELECT COALESCE(json_agg(json_build_object(
+      'wait_event_type', wait_event_type,
+      'wait_event', wait_event,
+      'state', state,
+      'n', n
+    ) ORDER BY n DESC), '[]'::json)
+    FROM (
+      SELECT wait_event_type, wait_event, state, count(*)::int AS n
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+      GROUP BY wait_event_type, wait_event, state
+    ) wait_hist
+  ),
   'deadlocks', (SELECT deadlocks FROM pg_stat_database WHERE datname = current_database()),
   'blks_read', (SELECT blks_read FROM pg_stat_database WHERE datname = current_database()),
   'blks_hit', (SELECT blks_hit FROM pg_stat_database WHERE datname = current_database()),
@@ -20,6 +34,7 @@ SELECT json_build_object(
   'max_connections', current_setting('max_connections')::int
 ) AS sample;
 `;
+const SAMPLE_SQL = POSTGRES_SAMPLE_SQL;
 
 /**
  * @param {{ host: string, port: number, database: string, user?: string, password?: string }} db

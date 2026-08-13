@@ -1,0 +1,21 @@
+{
+  "schema": "record-platform-pgbench-workload-catalog/v1",
+  "workloads": ["W1_DOMAIN_ONLY", "W2_DOMAIN_PLUS_OUTBOX", "W3_PUBLISHER_DB_PATH", "WMIX_OWNER_RANDOMIZED"],
+  "clients": [8, 16, 32, 64, 128, 256],
+  "thread_candidates": [1, 2, 4, 8, 16],
+  "distributions": ["UNIFORM", "ZIPFIAN_HOTSET"],
+  "modes": ["PER_OWNER_CEILING", "ALL_OWNERS_CONCURRENT"],
+  "owners": [
+    "media",
+    "messaging",
+    "notification",
+    "records",
+    "shopping",
+    "trust",
+    "auth",
+    "listings",
+    "analytics",
+    "auction_monitor",
+    "ai"
+  ]
+}

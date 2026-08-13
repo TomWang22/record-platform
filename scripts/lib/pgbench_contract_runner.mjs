@@ -28,8 +28,9 @@ import {
   loadCheckpointIndex,
   nextMissingCells,
   evaluateContractCompleteness,
-  isReusableContractCell,
   classifyCheckpointReuse,
+  isSourceLockedReusable,
+  shouldStopAtCellBoundary,
 } from "./pgbench_resume.mjs";
 import { parsePgbenchLatencyLog, percentilesFromSamples } from "./pgbench_latency.mjs";
 import { samplePostgresMetrics, sampleHostResources, metricUnavailable } from "./pgbench_postgres_sample.mjs";
@@ -44,6 +45,13 @@ import {
   detectInterference,
   discoverLocalPgEnvironments,
 } from "./pgbench_environment.mjs";
+import { buildSourceBundle } from "./pgbench_source_bundle.mjs";
+import {
+  captureCellSourceProvenance,
+  evaluateSourceBeforeAccept,
+  SOURCE_CHANGED_DURING_CELL,
+} from "./pgbench_cell_provenance.mjs";
+import { CLEANUP_SQL_REL, SEED_SQL_REL, INDEXES_SQL_REL } from "./pgbench_seed_cleanup.mjs";
 
 function sha256(buf) {
   return createHash("sha256").update(buf).digest("hex");
@@ -91,9 +99,8 @@ function postgresConfigHash(owner) {
   return String(r.stdout || "").trim() || "empty";
 }
 
-function seedOwner(root, owner) {
+function applyHarnessIndexes(root, owner) {
   const db = OWNER_DB[owner];
-  const seedSql = join(root, "scripts/performance/pgbench/common/seed.sql");
   spawnSync(
     "psql",
     [
@@ -108,10 +115,36 @@ function seedOwner(root, owner) {
       "-v",
       "ON_ERROR_STOP=1",
       "-f",
-      seedSql,
+      join(root, INDEXES_SQL_REL),
     ],
     { env: { ...process.env, PGPASSWORD: "postgres" }, encoding: "utf8" },
   );
+}
+
+function prepareOwnerFixtures(root, owner) {
+  const db = OWNER_DB[owner];
+  const env = { ...process.env, PGPASSWORD: "postgres" };
+  const psql = (rel) =>
+    spawnSync(
+      "psql",
+      [
+        "-h",
+        "127.0.0.1",
+        "-p",
+        String(db.port),
+        "-U",
+        "postgres",
+        "-d",
+        db.database,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-f",
+        join(root, rel),
+      ],
+      { env, encoding: "utf8" },
+    );
+  psql(CLEANUP_SQL_REL);
+  psql(SEED_SQL_REL);
 }
 
 function runOneContractPgbench({
@@ -383,6 +416,9 @@ export async function runPgbenchContractMatrix(opts) {
   mkdirSync(join(reportDir, "latency-samples"), { recursive: true });
   mkdirSync(join(reportDir, "postgres-samples"), { recursive: true });
   mkdirSync(join(reportDir, "cells"), { recursive: true });
+  for (const owner of OWNERS) {
+    applyHarnessIndexes(root, owner);
+  }
 
   const shardId = process.env.GATE3_SHARD_ID || opts.shardId || null;
   const shardOwner = process.env.GATE3_OWNER || opts.owner || null;
@@ -433,6 +469,44 @@ export async function runPgbenchContractMatrix(opts) {
     run_id: runId,
   });
   writeFileSync(join(reportDir, "expected-cells.json"), JSON.stringify(catalog, null, 2) + "\n");
+  const catalog_sha = sha256(readFileSync(join(reportDir, "expected-cells.json")));
+  const sourceBundle = buildSourceBundle({
+    repoRoot: root,
+    gitSha: gitSha(root),
+    workloadRevision: WORKLOAD_REVISION,
+  });
+  if (!sourceBundle.ok) {
+    throw new Error(`SOURCE_BUNDLE_NOT_FROZEN: ${(sourceBundle.reasons || []).join("; ")}`);
+  }
+  const freeze = {
+    run_id: runId,
+    git_sha: sourceBundle.git_sha,
+    source_bundle_sha: sourceBundle.bundle_sha256,
+    catalog_sha,
+    workload_revision: WORKLOAD_REVISION,
+    contention_domain_id: environmentId || "colima-shared-domain",
+    files: sourceBundle.files,
+  };
+  writeFileSync(
+    join(reportDir, "run-identity.json"),
+    JSON.stringify(
+      {
+        schema: "record-platform-pgbench-run-identity/v1",
+        run_id: runId,
+        git_sha: freeze.git_sha,
+        source_bundle_sha: freeze.source_bundle_sha,
+        catalog_sha,
+        workload_revision: WORKLOAD_REVISION,
+        contention_domain_id: freeze.contention_domain_id,
+        environment_fingerprint: null,
+        expected_total_cells: 14616,
+        lineage: "SEQUENTIAL_SINGLE_CONTENTION_DOMAIN",
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  writeFileSync(join(reportDir, "source-bundle.json"), JSON.stringify(sourceBundle, null, 2) + "\n");
 
   // Load checkpoints from top-level cells/ and shards/<id>/cells/
   const checkpoint = loadCheckpointIndex(reportDir);
@@ -456,7 +530,7 @@ export async function runPgbenchContractMatrix(opts) {
     }
   }
 
-  let pending = nextMissingCells(catalog, checkpoint);
+  let pending = nextMissingCells(catalog, checkpoint, freeze);
   if (shardIndex != null && shardMode === "OWNER_AFFINITY") {
     pending = filterCellsForShard(pending, {
       mode: "OWNER_AFFINITY",
@@ -480,7 +554,7 @@ export async function runPgbenchContractMatrix(opts) {
   const results = [];
   for (const cell of catalog.cells) {
     const got = checkpoint.get(cell.cell_id);
-    if (got && isReusableContractCell(got)) results.push(got);
+    if (got && isSourceLockedReusable(got, freeze)) results.push(got);
   }
 
   function persistCell(row) {
@@ -504,6 +578,9 @@ export async function runPgbenchContractMatrix(opts) {
 
   let executed = 0;
   for (const cell of pending) {
+    if (shouldStopAtCellBoundary({ reportDir, env: process.env })) {
+      break;
+    }
     if (cellLimit > 0 && executed >= cellLimit) {
       break;
     }
@@ -511,6 +588,7 @@ export async function runPgbenchContractMatrix(opts) {
     // Sequential PER_OWNER — never parallelize ceilings on same instance.
     if (cell.mode === "ALL_OWNERS_CONCURRENT") {
       const ownerResults = [];
+      let concurrentSourceReason = null;
       for (const owner of OWNERS) {
         const sqlPath = join(
           root,
@@ -518,7 +596,19 @@ export async function runPgbenchContractMatrix(opts) {
           owner,
           WORKLOAD_FILES[cell.workload],
         );
-        seedOwner(root, owner);
+        const environment = envFor(owner);
+        const startProv = captureCellSourceProvenance({
+          root,
+          freeze,
+          owner,
+          workload: cell.workload,
+          environment: {
+            ...environment,
+            environment_fingerprint: `${environment.environment_id}|${environment.contention_domain_id}|${environment.postgres_config_hash}`,
+          },
+          cell: { ...cell, owner },
+        });
+        prepareOwnerFixtures(root, owner);
         const latencyLogPath = join(
           reportDir,
           shardId ? join("shards", shardId, "latency-samples") : "latency-samples",
@@ -537,7 +627,17 @@ export async function runPgbenchContractMatrix(opts) {
           sqlPath,
           latencyLogPath,
         });
-        ownerResults.push({ owner, ...bench, environment: envFor(owner) });
+        const sourceVerdict = evaluateSourceBeforeAccept({
+          root,
+          start: startProv,
+          freeze,
+          owner,
+          workload: cell.workload,
+          environment,
+          cell: { ...cell, owner },
+        });
+        if (!sourceVerdict.ok) concurrentSourceReason = sourceVerdict.reason;
+        ownerResults.push({ owner, ...bench, environment, ...startProv });
         writeFileSync(
           join(
             reportDir,
@@ -547,18 +647,35 @@ export async function runPgbenchContractMatrix(opts) {
           JSON.stringify({ before: bench.postgres_samples.before, after: bench.postgres_samples.after }, null, 2),
         );
       }
-      const status = ownerResults.every((r) => r.exit_code === 0) ? "PASS" : "BLOCKED";
+      const env0 = ownerResults[0]?.environment || null;
+      const startProv0 = captureCellSourceProvenance({
+        root,
+        freeze,
+        owner: "records",
+        workload: cell.workload,
+        environment: env0 || {},
+        cell,
+      });
+      const status = concurrentSourceReason
+        ? "INVALID"
+        : ownerResults.every((r) => r.exit_code === 0)
+          ? "PASS"
+          : "BLOCKED";
       const row = {
         ...cell,
+        ...startProv0,
         status,
-        blocked_reason:
-          status === "PASS" ? null : "ALL_OWNERS_CONCURRENT: one or more owners failed pgbench",
+        blocked_reason: concurrentSourceReason
+          ? concurrentSourceReason
+          : status === "PASS"
+            ? null
+            : "ALL_OWNERS_CONCURRENT: one or more owners failed pgbench",
         owner_results: ownerResults,
         warmup_seconds: warmup,
         measured_seconds: measured,
         shard_id: shardId,
         environment_id: environmentId,
-        environment: ownerResults[0]?.environment || null,
+        environment: env0,
       };
       results.push(row);
       persistCell(row);
@@ -599,7 +716,19 @@ export async function runPgbenchContractMatrix(opts) {
       cell.owner,
       WORKLOAD_FILES[cell.workload],
     );
-    seedOwner(root, cell.owner);
+    const environment = envFor(cell.owner);
+    const startProv = captureCellSourceProvenance({
+      root,
+      freeze,
+      owner: cell.owner,
+      workload: cell.workload,
+      environment: {
+        ...environment,
+        environment_fingerprint: `${environment.environment_id}|${environment.contention_domain_id}|${environment.postgres_config_hash}`,
+      },
+      cell,
+    });
+    prepareOwnerFixtures(root, cell.owner);
     const latencyBase = shardId
       ? join(reportDir, "shards", shardId, "latency-samples")
       : join(reportDir, "latency-samples");
@@ -626,19 +755,37 @@ export async function runPgbenchContractMatrix(opts) {
       join(pgSampleDir, `${cell.cell_id.replace(/\|/g, "__")}.json`),
       JSON.stringify(bench.postgres_samples, null, 2),
     );
+    const sourceVerdict = evaluateSourceBeforeAccept({
+      root,
+      start: startProv,
+      freeze,
+      owner: cell.owner,
+      workload: cell.workload,
+      environment,
+      cell,
+    });
+    let status = bench.exit_code === 0 ? "PASS" : "BLOCKED";
+    let blocked_reason =
+      bench.exit_code === 0
+        ? null
+        : `pgbench_exit_${bench.exit_code}: ${String(bench.raw_tail).slice(0, 300)}`;
+    if (!sourceVerdict.ok) {
+      status = "INVALID";
+      blocked_reason = sourceVerdict.reason || SOURCE_CHANGED_DURING_CELL;
+    }
     const row = {
       ...cell,
-      status: bench.exit_code === 0 ? "PASS" : "BLOCKED",
-      blocked_reason:
-        bench.exit_code === 0
-          ? null
-          : `pgbench_exit_${bench.exit_code}: ${String(bench.raw_tail).slice(0, 300)}`,
+      ...startProv,
+      status,
+      blocked_reason,
       warmup_seconds: warmup,
       measured_seconds: measured,
-      environment: envFor(cell.owner),
+      environment,
       shard_id: shardId || cell.owner,
       environment_id: environmentId || undefined,
       ...bench,
+      status,
+      blocked_reason,
     };
     results.push(row);
     persistCell(row);

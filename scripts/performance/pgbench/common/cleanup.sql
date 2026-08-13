@@ -1,6 +1,6 @@
 -- Cleanup Gate-3 harness fixtures for the connected owner database.
--- Deletes only bench-typed outbox rows and pgbench_domain_touch rows.
--- Does not touch production domain tables or non-bench outbox event types.
+-- pgbench_domain_touch is a harness-only table: TRUNCATE, never production domain tables.
+-- Outbox deletes only bench-typed rows (PgbenchSeedV1 / PgbenchDomainTouchV1).
 
 DO $$
 DECLARE
@@ -18,6 +18,8 @@ BEGIN
     )
     ORDER BY 1
   LOOP
+    EXECUTE format('TRUNCATE TABLE %I.pgbench_domain_touch', sch);
+
     IF EXISTS (
       SELECT 1
       FROM pg_class c
@@ -33,17 +35,5 @@ BEGIN
         sch
       );
     END IF;
-
-    EXECUTE format(
-      $f$
-        DELETE FROM %I.pgbench_domain_touch
-        WHERE note IS NULL
-           OR note LIKE 'pgbench-%%'
-           OR note LIKE 'w1-%%'
-           OR note LIKE 'w2-%%'
-           OR note LIKE 'wmix-%%'
-      $f$,
-      sch
-    );
   END LOOP;
 END $$;

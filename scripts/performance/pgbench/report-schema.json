@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "record-platform-pgbench-matrix/v1",
+  "title": "pgbench W1/W2/W3 matrix report",
+  "description": "Database ceiling only. Not an HTTP/1.1, HTTP/2, or HTTP/3 benchmark. Execution blocked until canonical outbox parity is green and pgbench_execution_authorized is true.",
+  "type": "object",
+  "required": [
+    "schema",
+    "pgbench_is_database_baseline",
+    "pgbench_is_not_http_benchmark",
+    "execution_authorized",
+    "blocked_reason",
+    "run_id",
+    "parity_artifact",
+    "workloads",
+    "matrix",
+    "results",
+    "unknowns"
+  ],
+  "properties": {
+    "schema": { "const": "record-platform-pgbench-matrix/v1" },
+    "pgbench_is_database_baseline": { "const": true },
+    "pgbench_is_not_http_benchmark": { "const": true },
+    "pgbench_is_not_http2_benchmark": { "const": true },
+    "pgbench_is_not_http3_benchmark": { "const": true },
+    "execution_authorized": { "type": "boolean" },
+    "blocked_reason": { "type": ["string", "null"] },
+    "run_id": { "type": "string" },
+    "parity_artifact": {
+      "type": "object",
+      "required": ["path", "canonical_owner_count", "parity_pass_count", "unknowns"],
+      "properties": {
+        "path": { "const": "reports/performance/outbox-publisher-parity.PREPARED.json" },
+        "canonical_owner_count": { "type": "integer" },
+        "parity_pass_count": { "type": "integer" },
+        "unknowns": { "type": "integer" }
+      }
+    },
+    "workloads": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "W1_DOMAIN_ONLY",
+          "W2_DOMAIN_PLUS_OUTBOX",
+          "W3_PUBLISHER_DB_PATH",
+          "WMIX_OWNER_RANDOMIZED"
+        ]
+      }
+    },
+    "modes": {
+      "type": "array",
+      "items": { "enum": ["PER_OWNER_CEILING", "ALL_OWNERS_CONCURRENT"] }
+    },
+    "distributions": {
+      "type": "array",
+      "items": { "enum": ["UNIFORM", "ZIPFIAN_HOTSET"] }
+    },
+    "matrix": {
+      "type": "object",
+      "required": [
+        "clients",
+        "threads",
+        "warmup_seconds",
+        "measured_seconds",
+        "repetitions",
+        "publisher_batch_sizes"
+      ],
+      "properties": {
+        "clients": { "type": "array", "items": { "type": "integer" } },
+        "threads": { "type": "array", "items": { "type": "integer" } },
+        "warmup_seconds": { "const": 30 },
+        "measured_seconds": { "const": 120 },
+        "repetitions": { "const": 3 },
+        "publisher_batch_sizes": { "type": "array", "items": { "type": "integer" } }
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "service",
+          "workload",
+          "clients",
+          "threads",
+          "batch_size",
+          "repetition",
+          "tps",
+          "latency_average",
+          "latency_stddev",
+          "latency_p50",
+          "latency_p95",
+          "latency_p99",
+          "latency_max",
+          "failures",
+          "retries",
+          "serialization_failures",
+          "deadlocks",
+          "lock_waits",
+          "connections",
+          "db_cpu",
+          "wal_bytes",
+          "rows_written"
+        ]
+      }
+    },
+    "unknowns": { "type": "integer", "minimum": 0 }
+  }
+}

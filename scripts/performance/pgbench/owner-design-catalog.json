@@ -1,0 +1,105 @@
+{
+  "schema": "record-platform-pgbench-owner-design/v1",
+  "note": "Design metadata only. SQL tripwires remain fail-closed (SELECT 1/0). Execution GO may materialize SQL from this catalog. No SELECT 1 stub is a completed workload.",
+  "matrix": {
+    "clients": [8, 16, 32, 64, 128, 256],
+    "threads": [1, 2, 4, 8, 16],
+    "threads_lte_clients": true,
+    "warmup_seconds": 30,
+    "measured_seconds": 120,
+    "repetitions": 3,
+    "publisher_batches": [1, 10, 25, 50],
+    "distributions": ["UNIFORM", "ZIPFIAN_HOTSET"],
+    "modes": ["PER_OWNER_CEILING", "ALL_OWNERS_CONCURRENT"]
+  },
+  "owners": {
+    "media": {
+      "domain_tables": ["media.assets"],
+      "outbox_table": "media.outbox_events",
+      "w1_mutation_family": "insert/update media.assets",
+      "w2_family": "same TX insert media.assets + media.outbox_events",
+      "w3_publisher_db_path": "SKIP LOCKED claim + guarded published=true mark",
+      "required_fixture_columns": ["id", "aggregate_id", "type", "payload", "published", "created_at"]
+    },
+    "messaging": {
+      "domain_tables": ["messaging.messages"],
+      "outbox_table": "messaging.outbox_events",
+      "w1_mutation_family": "insert messaging.messages",
+      "w2_family": "same TX message + outbox JSON envelope",
+      "w3_publisher_db_path": "SKIP LOCKED + mark published",
+      "required_fixture_columns": ["id", "aggregate_id", "type", "payload", "published"]
+    },
+    "notification": {
+      "domain_tables": ["notification.notifications"],
+      "outbox_table": "notification.outbox_events",
+      "w1_mutation_family": "insert notification.notifications",
+      "w2_family": "same TX notification + outbox",
+      "w3_publisher_db_path": "SKIP LOCKED + mark published",
+      "required_fixture_columns": ["id", "aggregate_id", "type", "payload", "published"]
+    },
+    "records": {
+      "domain_tables": ["records.records"],
+      "outbox_table": "records.outbox_events",
+      "w1_mutation_family": "insert records.records",
+      "w2_family": "same TX record + outbox proto payload",
+      "w3_publisher_db_path": "SKIP LOCKED + mark published",
+      "required_fixture_columns": ["id", "aggregate_id", "type", "version", "payload", "published"]
+    },
+    "shopping": {
+      "domain_tables": ["shopping.carts", "shopping.orders"],
+      "outbox_table": "shopping.outbox_events",
+      "w1_mutation_family": "cart/order mutations",
+      "w2_family": "same TX domain + shopping.outbox_events",
+      "w3_publisher_db_path": "SKIP LOCKED + mark published",
+      "required_fixture_columns": ["id", "aggregate_id", "type", "payload", "published"]
+    },
+    "trust": {
+      "domain_tables": ["trust.reviews"],
+      "outbox_table": "trust.outbox_events",
+      "w1_mutation_family": "insert trust.reviews",
+      "w2_family": "same TX review + outbox",
+      "w3_publisher_db_path": "SKIP LOCKED + mark published",
+      "required_fixture_columns": ["id", "aggregate_id", "type", "payload", "published"]
+    },
+    "auth": {
+      "domain_tables": ["auth.users"],
+      "outbox_table": "auth.outbox_events",
+      "w1_mutation_family": "canonical auth user mutation (not auth.auth_outbox)",
+      "w2_family": "same TX user + auth.outbox_events",
+      "w3_publisher_db_path": "SKIP LOCKED + mark published on canonical table only",
+      "required_fixture_columns": ["id", "aggregate_id", "type", "payload", "published"]
+    },
+    "listings": {
+      "domain_tables": ["listings.listings", "listings.auction_settings", "listings.offers"],
+      "outbox_table": "listings.outbox_events",
+      "w1_mutation_family": "listing/auction/offer mutations",
+      "w2_family": "same TX domain + listings.outbox_events (lease/DLQ columns preserved)",
+      "w3_publisher_db_path": "lease claim or SKIP LOCKED + guarded mark; SaleCompleted stays listings-owned",
+      "required_fixture_columns": ["id", "aggregate_id", "type", "payload", "published", "leased_until", "dead_lettered"]
+    },
+    "analytics": {
+      "domain_tables": ["analytics.ai_user_features"],
+      "outbox_table": "analytics.outbox_events",
+      "w1_mutation_family": "upsert analytics.ai_user_features",
+      "w2_family": "same TX upsert + insertAiInsightCreatedOutbox",
+      "w3_publisher_db_path": "SKIP LOCKED + published=false mark rowCount=1",
+      "required_fixture_columns": ["id", "aggregate_id", "type", "payload", "published"]
+    },
+    "auction_monitor": {
+      "domain_tables": ["auction_monitor.ai_signals"],
+      "outbox_table": "auction_monitor.outbox_events",
+      "w1_mutation_family": "insert auction_monitor.ai_signals",
+      "w2_family": "same TX ai_signals + insertAuctionRiskDetectedOutbox",
+      "w3_publisher_db_path": "BEGIN + SKIP LOCKED + applyOutboxPublishedTrueTransition",
+      "required_fixture_columns": ["id", "aggregate_id", "type", "payload", "published"]
+    },
+    "ai": {
+      "domain_tables": ["ai.pricing_recommendations"],
+      "outbox_table": "ai.outbox_events",
+      "w1_mutation_family": "python-ai insight persist",
+      "w2_family": "same asyncpg connection insert_pricing_recommendation_created_outbox",
+      "w3_publisher_db_path": "BEGIN + SKIP LOCKED + UPDATE published=false rowcount",
+      "required_fixture_columns": ["id", "aggregate_id", "type", "payload", "published"]
+    }
+  }
+}

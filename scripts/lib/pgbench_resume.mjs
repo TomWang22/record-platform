@@ -15,6 +15,7 @@ import {
   enumerateExpectedPgbenchCells,
   OWNERS,
 } from "./pgbench_completeness.mjs";
+import { sourceDigestsMatchFreeze } from "./pgbench_cell_provenance.mjs";
 
 export const CONTRACT_WARMUP_SECONDS = 30;
 export const CONTRACT_MEASURED_SECONDS = 120;
@@ -213,6 +214,18 @@ export function isReusableContractCell(cell) {
   return true;
 }
 
+export function isSourceLockedReusable(cell, freeze) {
+  if (!isReusableContractCell(cell)) return false;
+  return sourceDigestsMatchFreeze(cell, freeze);
+}
+
+export function shouldStopAtCellBoundary(opts = {}) {
+  const env = opts.env || process.env;
+  if (String(env.GATE3_STOP_AT_BOUNDARY || "") === "1") return true;
+  if (opts.reportDir && existsSync(join(opts.reportDir, "STOP"))) return true;
+  return false;
+}
+
 export function classifyCheckpointReuse(cell) {
   if (!cell) return { reusable: false, reason: "MISSING" };
   if (cell.status !== "PASS") return { reusable: false, reason: cell.status };
@@ -273,14 +286,17 @@ export function writeCellCheckpoint(reportDir, result) {
  * @param {{ cells: any[] }} catalog
  * @param {Map<string, any>} checkpointIndex
  */
-export function nextMissingCells(catalog, checkpointIndex) {
+export function nextMissingCells(catalog, checkpointIndex, freeze) {
   /** @type {any[]} */
   const pending = [];
   for (const expected of catalog.cells) {
     const got = checkpointIndex.get(expected.cell_id);
-    if (got && isReusableContractCell(got) && keysMatch(expected, got)) {
-      continue;
-    }
+    const reusable =
+      got &&
+      isReusableContractCell(got) &&
+      keysMatch(expected, got) &&
+      (freeze ? isSourceLockedReusable(got, freeze) : true);
+    if (reusable) continue;
     pending.push(expected);
   }
   return pending;

@@ -1,0 +1,745 @@
+{
+  "schema": "record-platform-pgbench-randomized-queries/v1",
+  "distributions": [
+    "UNIFORM",
+    "ZIPFIAN_HOTSET"
+  ],
+  "seeds": {
+    "deterministic_per_repetition": true,
+    "rotate_across_repetitions": true,
+    "manifest_records_seed": true
+  },
+  "mix_weights": {
+    "W1_DOMAIN_ONLY": 40,
+    "W2_DOMAIN_PLUS_OUTBOX": 40,
+    "W3_PUBLISHER_DB_PATH": 20
+  },
+  "queries": [
+    {
+      "query_id": "media.w1.domain_touch",
+      "owner": "media",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "media.pgbench_domain_touch"
+      ],
+      "outbox_expected": false,
+      "parameter_generators": [
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "media.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete pgbench_domain_touch by note prefix",
+      "compatible_workloads": [
+        "W1_DOMAIN_ONLY",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "media.w2.domain_touch_plus_outbox",
+      "owner": "media",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "media.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "event_id_uuid",
+        "aggregate_id_uuid",
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "media.outbox_events exists",
+        "media.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete unpublished PgbenchDomainTouchV1 outbox + domain-touch rows",
+      "compatible_workloads": [
+        "W2_DOMAIN_PLUS_OUTBOX",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "media.w3.publisher_skip_locked_mark",
+      "owner": "media",
+      "weight": 2,
+      "mutation": true,
+      "domain_tables": [
+        "media.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "batch_size"
+      ],
+      "preconditions": [
+        "media.outbox_events published=false"
+      ],
+      "cleanup_strategy": "seed unpublished rows; mark published during W3",
+      "compatible_workloads": [
+        "W3_PUBLISHER_DB_PATH",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "messaging.w1.domain_touch",
+      "owner": "messaging",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "messaging.pgbench_domain_touch"
+      ],
+      "outbox_expected": false,
+      "parameter_generators": [
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "messaging.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete pgbench_domain_touch by note prefix",
+      "compatible_workloads": [
+        "W1_DOMAIN_ONLY",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "messaging.w2.domain_touch_plus_outbox",
+      "owner": "messaging",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "messaging.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "event_id_uuid",
+        "aggregate_id_uuid",
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "messaging.outbox_events exists",
+        "messaging.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete unpublished PgbenchDomainTouchV1 outbox + domain-touch rows",
+      "compatible_workloads": [
+        "W2_DOMAIN_PLUS_OUTBOX",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "messaging.w3.publisher_skip_locked_mark",
+      "owner": "messaging",
+      "weight": 2,
+      "mutation": true,
+      "domain_tables": [
+        "messaging.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "batch_size"
+      ],
+      "preconditions": [
+        "messaging.outbox_events published=false"
+      ],
+      "cleanup_strategy": "seed unpublished rows; mark published during W3",
+      "compatible_workloads": [
+        "W3_PUBLISHER_DB_PATH",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "notification.w1.domain_touch",
+      "owner": "notification",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "notification.pgbench_domain_touch"
+      ],
+      "outbox_expected": false,
+      "parameter_generators": [
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "notification.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete pgbench_domain_touch by note prefix",
+      "compatible_workloads": [
+        "W1_DOMAIN_ONLY",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "notification.w2.domain_touch_plus_outbox",
+      "owner": "notification",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "notification.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "event_id_uuid",
+        "aggregate_id_uuid",
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "notification.outbox_events exists",
+        "notification.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete unpublished PgbenchDomainTouchV1 outbox + domain-touch rows",
+      "compatible_workloads": [
+        "W2_DOMAIN_PLUS_OUTBOX",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "notification.w3.publisher_skip_locked_mark",
+      "owner": "notification",
+      "weight": 2,
+      "mutation": true,
+      "domain_tables": [
+        "notification.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "batch_size"
+      ],
+      "preconditions": [
+        "notification.outbox_events published=false"
+      ],
+      "cleanup_strategy": "seed unpublished rows; mark published during W3",
+      "compatible_workloads": [
+        "W3_PUBLISHER_DB_PATH",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "records.w1.domain_touch",
+      "owner": "records",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "records.pgbench_domain_touch"
+      ],
+      "outbox_expected": false,
+      "parameter_generators": [
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "records.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete pgbench_domain_touch by note prefix",
+      "compatible_workloads": [
+        "W1_DOMAIN_ONLY",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "records.w2.domain_touch_plus_outbox",
+      "owner": "records",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "records.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "event_id_uuid",
+        "aggregate_id_uuid",
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "records.outbox_events exists",
+        "records.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete unpublished PgbenchDomainTouchV1 outbox + domain-touch rows",
+      "compatible_workloads": [
+        "W2_DOMAIN_PLUS_OUTBOX",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "records.w3.publisher_skip_locked_mark",
+      "owner": "records",
+      "weight": 2,
+      "mutation": true,
+      "domain_tables": [
+        "records.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "batch_size"
+      ],
+      "preconditions": [
+        "records.outbox_events published=false"
+      ],
+      "cleanup_strategy": "seed unpublished rows; mark published during W3",
+      "compatible_workloads": [
+        "W3_PUBLISHER_DB_PATH",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "shopping.w1.domain_touch",
+      "owner": "shopping",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "shopping.pgbench_domain_touch"
+      ],
+      "outbox_expected": false,
+      "parameter_generators": [
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "shopping.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete pgbench_domain_touch by note prefix",
+      "compatible_workloads": [
+        "W1_DOMAIN_ONLY",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "shopping.w2.domain_touch_plus_outbox",
+      "owner": "shopping",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "shopping.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "event_id_uuid",
+        "aggregate_id_uuid",
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "shopping.outbox_events exists",
+        "shopping.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete unpublished PgbenchDomainTouchV1 outbox + domain-touch rows",
+      "compatible_workloads": [
+        "W2_DOMAIN_PLUS_OUTBOX",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "shopping.w3.publisher_skip_locked_mark",
+      "owner": "shopping",
+      "weight": 2,
+      "mutation": true,
+      "domain_tables": [
+        "shopping.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "batch_size"
+      ],
+      "preconditions": [
+        "shopping.outbox_events published=false"
+      ],
+      "cleanup_strategy": "seed unpublished rows; mark published during W3",
+      "compatible_workloads": [
+        "W3_PUBLISHER_DB_PATH",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "trust.w1.domain_touch",
+      "owner": "trust",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "trust.pgbench_domain_touch"
+      ],
+      "outbox_expected": false,
+      "parameter_generators": [
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "trust.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete pgbench_domain_touch by note prefix",
+      "compatible_workloads": [
+        "W1_DOMAIN_ONLY",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "trust.w2.domain_touch_plus_outbox",
+      "owner": "trust",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "trust.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "event_id_uuid",
+        "aggregate_id_uuid",
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "trust.outbox_events exists",
+        "trust.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete unpublished PgbenchDomainTouchV1 outbox + domain-touch rows",
+      "compatible_workloads": [
+        "W2_DOMAIN_PLUS_OUTBOX",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "trust.w3.publisher_skip_locked_mark",
+      "owner": "trust",
+      "weight": 2,
+      "mutation": true,
+      "domain_tables": [
+        "trust.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "batch_size"
+      ],
+      "preconditions": [
+        "trust.outbox_events published=false"
+      ],
+      "cleanup_strategy": "seed unpublished rows; mark published during W3",
+      "compatible_workloads": [
+        "W3_PUBLISHER_DB_PATH",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "auth.w1.domain_touch",
+      "owner": "auth",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "auth.pgbench_domain_touch"
+      ],
+      "outbox_expected": false,
+      "parameter_generators": [
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "auth.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete pgbench_domain_touch by note prefix",
+      "compatible_workloads": [
+        "W1_DOMAIN_ONLY",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "auth.w2.domain_touch_plus_outbox",
+      "owner": "auth",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "auth.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "event_id_uuid",
+        "aggregate_id_uuid",
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "auth.outbox_events exists",
+        "auth.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete unpublished PgbenchDomainTouchV1 outbox + domain-touch rows",
+      "compatible_workloads": [
+        "W2_DOMAIN_PLUS_OUTBOX",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "auth.w3.publisher_skip_locked_mark",
+      "owner": "auth",
+      "weight": 2,
+      "mutation": true,
+      "domain_tables": [
+        "auth.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "batch_size"
+      ],
+      "preconditions": [
+        "auth.outbox_events published=false"
+      ],
+      "cleanup_strategy": "seed unpublished rows; mark published during W3",
+      "compatible_workloads": [
+        "W3_PUBLISHER_DB_PATH",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "listings.w1.domain_touch",
+      "owner": "listings",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "listings.pgbench_domain_touch"
+      ],
+      "outbox_expected": false,
+      "parameter_generators": [
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "listings.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete pgbench_domain_touch by note prefix",
+      "compatible_workloads": [
+        "W1_DOMAIN_ONLY",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "listings.w2.domain_touch_plus_outbox",
+      "owner": "listings",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "listings.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "event_id_uuid",
+        "aggregate_id_uuid",
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "listings.outbox_events exists",
+        "listings.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete unpublished PgbenchDomainTouchV1 outbox + domain-touch rows",
+      "compatible_workloads": [
+        "W2_DOMAIN_PLUS_OUTBOX",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "listings.w3.publisher_skip_locked_mark",
+      "owner": "listings",
+      "weight": 2,
+      "mutation": true,
+      "domain_tables": [
+        "listings.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "batch_size"
+      ],
+      "preconditions": [
+        "listings.outbox_events published=false AND dead_lettered=false"
+      ],
+      "cleanup_strategy": "seed unpublished rows; mark published during W3",
+      "compatible_workloads": [
+        "W3_PUBLISHER_DB_PATH",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "analytics.w1.domain_touch",
+      "owner": "analytics",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "analytics.pgbench_domain_touch"
+      ],
+      "outbox_expected": false,
+      "parameter_generators": [
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "analytics.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete pgbench_domain_touch by note prefix",
+      "compatible_workloads": [
+        "W1_DOMAIN_ONLY",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "analytics.w2.domain_touch_plus_outbox",
+      "owner": "analytics",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "analytics.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "event_id_uuid",
+        "aggregate_id_uuid",
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "analytics.outbox_events exists",
+        "analytics.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete unpublished PgbenchDomainTouchV1 outbox + domain-touch rows",
+      "compatible_workloads": [
+        "W2_DOMAIN_PLUS_OUTBOX",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "analytics.w3.publisher_skip_locked_mark",
+      "owner": "analytics",
+      "weight": 2,
+      "mutation": true,
+      "domain_tables": [
+        "analytics.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "batch_size"
+      ],
+      "preconditions": [
+        "analytics.outbox_events published=false"
+      ],
+      "cleanup_strategy": "seed unpublished rows; mark published during W3",
+      "compatible_workloads": [
+        "W3_PUBLISHER_DB_PATH",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "auction_monitor.w1.domain_touch",
+      "owner": "auction_monitor",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "auction_monitor.pgbench_domain_touch"
+      ],
+      "outbox_expected": false,
+      "parameter_generators": [
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "auction_monitor.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete pgbench_domain_touch by note prefix",
+      "compatible_workloads": [
+        "W1_DOMAIN_ONLY",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "auction_monitor.w2.domain_touch_plus_outbox",
+      "owner": "auction_monitor",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "auction_monitor.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "event_id_uuid",
+        "aggregate_id_uuid",
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "auction_monitor.outbox_events exists",
+        "auction_monitor.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete unpublished PgbenchDomainTouchV1 outbox + domain-touch rows",
+      "compatible_workloads": [
+        "W2_DOMAIN_PLUS_OUTBOX",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "auction_monitor.w3.publisher_skip_locked_mark",
+      "owner": "auction_monitor",
+      "weight": 2,
+      "mutation": true,
+      "domain_tables": [
+        "auction_monitor.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "batch_size"
+      ],
+      "preconditions": [
+        "auction_monitor.outbox_events published=false"
+      ],
+      "cleanup_strategy": "seed unpublished rows; mark published during W3",
+      "compatible_workloads": [
+        "W3_PUBLISHER_DB_PATH",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "ai.w1.domain_touch",
+      "owner": "ai",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "ai.pgbench_domain_touch"
+      ],
+      "outbox_expected": false,
+      "parameter_generators": [
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "ai.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete pgbench_domain_touch by note prefix",
+      "compatible_workloads": [
+        "W1_DOMAIN_ONLY",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "ai.w2.domain_touch_plus_outbox",
+      "owner": "ai",
+      "weight": 4,
+      "mutation": true,
+      "domain_tables": [
+        "ai.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "event_id_uuid",
+        "aggregate_id_uuid",
+        "touch_id_uuid"
+      ],
+      "preconditions": [
+        "ai.outbox_events exists",
+        "ai.pgbench_domain_touch exists"
+      ],
+      "cleanup_strategy": "delete unpublished PgbenchDomainTouchV1 outbox + domain-touch rows",
+      "compatible_workloads": [
+        "W2_DOMAIN_PLUS_OUTBOX",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    },
+    {
+      "query_id": "ai.w3.publisher_skip_locked_mark",
+      "owner": "ai",
+      "weight": 2,
+      "mutation": true,
+      "domain_tables": [
+        "ai.pgbench_domain_touch"
+      ],
+      "outbox_expected": true,
+      "parameter_generators": [
+        "batch_size"
+      ],
+      "preconditions": [
+        "ai.outbox_events published=false"
+      ],
+      "cleanup_strategy": "seed unpublished rows; mark published during W3",
+      "compatible_workloads": [
+        "W3_PUBLISHER_DB_PATH",
+        "WMIX_OWNER_RANDOMIZED"
+      ]
+    }
+  ]
+}

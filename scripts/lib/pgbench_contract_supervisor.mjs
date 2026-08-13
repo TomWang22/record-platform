@@ -146,6 +146,8 @@ export function assertFrozenRunIdentity(frozen, observed) {
     "expected_cell_count",
     "expected_owner_cells",
     "workload_revision",
+    "source_bundle_sha",
+    "run_id",
   ];
   for (const key of keys) {
     if (frozen?.[key] !== observed?.[key]) {
@@ -219,6 +221,8 @@ export function evaluateGlobalCeiling(input) {
     "cross_environment_w1_w2_pairs",
     "execution_failures",
     "unresolved_cells",
+    "source_provenance_mismatches",
+    "source_changed_during_cell",
   ];
   for (const key of counters) {
     if (Number(input[key] || 0) !== 0) reasons.push(`${key}=${input[key]}`);

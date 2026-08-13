@@ -161,6 +161,10 @@ function environmentFingerprint() {
 function observeIdentity() {
   const catalogPath = join(reportDir, "expected-cells.json");
   const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
+  const identityPath = join(reportDir, "run-identity.json");
+  const identity = existsSync(identityPath) ? JSON.parse(readFileSync(identityPath, "utf8")) : {};
+  const bundlePath = join(reportDir, "source-bundle.json");
+  const bundle = existsSync(bundlePath) ? JSON.parse(readFileSync(bundlePath, "utf8")) : {};
   return {
     resume_dir: RESUME,
     git_sha: gitSha(),
@@ -171,6 +175,8 @@ function observeIdentity() {
     expected_cell_count: Number(catalog.cell_count),
     expected_owner_cells: cellsPerOwner(),
     workload_revision: catalog.workload_revision,
+    run_id: identity.run_id || runId,
+    source_bundle_sha: identity.source_bundle_sha || bundle.bundle_sha256 || null,
   };
 }
 

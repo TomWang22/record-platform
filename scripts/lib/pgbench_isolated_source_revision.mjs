@@ -26,7 +26,10 @@ export function isIsolatedBenchmarkSourcePath(relPath) {
   if (p.startsWith("scripts/performance/report-pgbench")) return true;
   if (p.startsWith("scripts/performance/merge-pgbench")) return true;
   if (p.startsWith("scripts/performance/run-pgbench")) return true;
-  if (/^scripts\/performance\/.*pgbench/.test(p)) return true;
+  if (p.startsWith("scripts/performance/pgbench-stubs/")) return false;
+  if (p.startsWith("scripts/performance/pgbench/")) {
+    return p.endsWith(".mjs") || p.endsWith(".sql") || p.endsWith(".md");
+  }
   return false;
 }
 

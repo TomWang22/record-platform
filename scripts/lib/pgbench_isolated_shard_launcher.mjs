@@ -22,6 +22,7 @@ import {
 
 export const PRIMARY_TOPOLOGY = "11_OWNER_VMS_PLUS_4_FULLSTACK_VMS";
 export const CAPACITY_FALLBACK_TOPOLOGY = "11_OWNER_VMS_PLUS_1_FULLSTACK_VM";
+export const GATE3_REQUESTED_STANDARD_VCPU = 152;
 export const COLIMA_SEQUENTIAL_RUN_ID = "pgbench-contract-20260812-011924-ef21a35e";
 export const PLACEHOLDER_ISOLATED_RUN_ID = "NEW_RUN_ID_REQUIRED";
 export const PLACEHOLDER_CONTENTION_DOMAIN = "DECLARED_AT_PROVISION";
@@ -70,9 +71,15 @@ export function isolatedOwnerClassPins() {
     postgres_image_digest: "sha256:owner-pg-16.4-pinned",
     postgres_config_hash: "cfg-owner-class",
     storage_device_identity: "equiv-class:dedicated-ssd-owner",
+    volume_type: "gp3",
     storage_size_gb: 500,
     storage_iops: 12000,
-    storage_throughput_mbps: 1000,
+    storage_throughput_mbps: 300,
+    storage_contract: "SUSTAINED_NOT_BURST",
+    instance_ebs_baseline_throughput_mbps: 312.5,
+    instance_ebs_max_throughput_mbps: 1250,
+    instance_ebs_baseline_iops: 12000,
+    instance_ebs_max_iops: 40000,
     filesystem_type: "ext4",
     postgres_data_mount_options_hash: "mount-owner-class",
     container_runtime: "dedicated-vm",
@@ -99,9 +106,15 @@ export function isolatedFullstackClassPins() {
     postgres_image_digest: "sha256:fullstack-pg-16.4-pinned",
     postgres_config_hash: "cfg-fullstack-class",
     storage_device_identity: "equiv-class:dedicated-ssd-fullstack",
+    volume_type: "gp3",
     storage_size_gb: 1000,
     storage_iops: 16000,
-    storage_throughput_mbps: 2000,
+    storage_throughput_mbps: 625,
+    storage_contract: "SUSTAINED_NOT_BURST",
+    instance_ebs_baseline_throughput_mbps: 625,
+    instance_ebs_max_throughput_mbps: 1250,
+    instance_ebs_baseline_iops: 20000,
+    instance_ebs_max_iops: 40000,
     filesystem_type: "ext4",
     postgres_data_mount_options_hash: "mount-fullstack-class",
     container_runtime: "dedicated-vm",
@@ -280,6 +293,15 @@ export function evaluateIsolatedProbeContract(input = {}) {
   for (const id of fullstack) {
     const loc = assertFullstackDatabaseLocality(id);
     if (!loc.ok) reasons.push(loc.reason);
+  }
+
+  for (const id of owners) {
+    const storage = assertSustainedStorageContract(id, "owner");
+    if (!storage.ok) reasons.push(storage.reason);
+  }
+  for (const id of fullstack) {
+    const storage = assertSustainedStorageContract(id, "fullstack");
+    if (!storage.ok) reasons.push(storage.reason);
   }
 
   return {
@@ -563,6 +585,22 @@ export function buildIsolatedRunIdentity(opts) {
     topology: PRIMARY_TOPOLOGY,
     phase1_shard_count: 11,
     phase2_shard_count: 4,
+    owner_instance_type: "m7i.2xlarge",
+    fullstack_instance_type: "m7i.4xlarge",
+    owner_gp3: {
+      volume_type: "gp3",
+      size_gb: 500,
+      iops: 12000,
+      throughput_mibps: 300,
+    },
+    fullstack_gp3: {
+      volume_type: "gp3",
+      size_gb: 1000,
+      iops: 16000,
+      throughput_mibps: 625,
+    },
+    storage_contract: "SUSTAINED_NOT_BURST",
+    requested_standard_vcpu: GATE3_REQUESTED_STANDARD_VCPU,
     frozen_hash_catalog_sha: FROZEN_HASH_CELL_ID_CATALOG_SHA256,
     frozen_hash_counts: [...FROZEN_HASH_PARTITION_COUNTS],
     created_at: opts.created_at || new Date().toISOString(),
@@ -942,4 +980,91 @@ export function validateIsolatedLaunchManifest(manifest) {
     track_c_acceptance_pass: false,
     platform_pass: false,
   };
+}
+
+const OWNER_SUSTAINED_THROUGHPUT_MBPS = 312.5;
+const FULLSTACK_SUSTAINED_THROUGHPUT_MBPS = 625;
+
+/**
+ * Gate-3 frozen class only: effective volume throughput must not exceed
+ * instance EBS baseline (sustained, not burst).
+ *
+ * @param {any} identity
+ * @param {"owner"|"fullstack"} cls
+ */
+export function assertSustainedStorageContract(identity, cls) {
+  const baseline =
+    cls === "owner"
+      ? OWNER_SUSTAINED_THROUGHPUT_MBPS
+      : cls === "fullstack"
+        ? FULLSTACK_SUSTAINED_THROUGHPUT_MBPS
+        : null;
+  if (baseline == null) {
+    return { ok: false, reason: "UNKNOWN_STORAGE_CLASS" };
+  }
+  const throughput = Number(identity?.storage_throughput_mbps);
+  if (!Number.isFinite(throughput) || throughput > baseline) {
+    return { ok: false, reason: "SUSTAINED_THROUGHPUT_EXCEEDS_INSTANCE_BASELINE" };
+  }
+  return { ok: true };
+}
+
+/**
+ * Preflight-only quota contract. Does not request quota increases or create VMs.
+ *
+ * @param {{
+ *   available_standard_on_demand_vcpu?: number,
+ *   existing_standard_vcpu_usage?: number,
+ * }} opts
+ */
+export function assertIsolatedStandardVcpuQuota(opts = {}) {
+  const available = Number(opts.available_standard_on_demand_vcpu);
+  const existing = Number(opts.existing_standard_vcpu_usage);
+  const required = existing + GATE3_REQUESTED_STANDARD_VCPU;
+  if (Number.isFinite(available) && Number.isFinite(existing) && available >= required) {
+    return {
+      ok: true,
+      requested_standard_vcpu: GATE3_REQUESTED_STANDARD_VCPU,
+      required_available: required,
+    };
+  }
+  return {
+    ok: false,
+    stop_code: "PROVISIONING_QUOTA_REQUIRED",
+    requested_standard_vcpu: GATE3_REQUESTED_STANDARD_VCPU,
+    vm_api_calls_creating_instances: 0,
+  };
+}
+
+/**
+ * Mark a pre-provision isolated run superseded without mutating run-identity.json.
+ *
+ * @param {string} reportDir
+ * @param {{
+ *   status: string,
+ *   reason?: string,
+ *   provisioned_vm_count?: number,
+ *   pgbench_spawn_count?: number,
+ *   reusable_cells?: number,
+ * }} opts
+ */
+export function markIsolatedRunSuperseded(reportDir, opts) {
+  const identityPath = join(reportDir, "run-identity.json");
+  if (!existsSync(identityPath)) {
+    return { ok: false, reasons: ["run-identity.json missing"] };
+  }
+  const identity = JSON.parse(readFileSync(identityPath, "utf8"));
+  const side = {
+    schema: "record-platform-gate3-isolated-run-superseded/v1",
+    isolated_run_id: identity.isolated_run_id,
+    git_sha: identity.git_sha,
+    status: opts.status,
+    reason: opts.reason || null,
+    provisioned_vm_count: opts.provisioned_vm_count ?? 0,
+    pgbench_spawn_count: opts.pgbench_spawn_count ?? 0,
+    reusable_cells: opts.reusable_cells ?? 0,
+    run_identity_mutated: false,
+  };
+  writeFileSync(join(reportDir, "run-superseded.json"), `${JSON.stringify(side, null, 2)}\n`);
+  return { ok: true, identity, superseded: side };
 }

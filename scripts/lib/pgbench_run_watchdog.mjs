@@ -148,6 +148,21 @@ export function evaluateRunWatchdog(snap) {
     };
   }
 
+  if (snap.supervisor_alive === false && !owner_complete) {
+    return {
+      state: "UNSUPERVISED_RUNNER",
+      stalled: true,
+      incident: "UNSUPERVISED_RUNNER",
+      reason: "runner_alive && !supervisor_alive && incomplete",
+      age_ms,
+      owner_valid_cells: owner_valid,
+      owner_expected_cells: owner_expected,
+      owner_complete,
+      last_progress: snap.last_progress || null,
+      pgbench_ceiling_complete: false,
+    };
+  }
+
   if (lastAt == null) {
     return {
       state: "WAITING_FOR_FIRST_PROGRESS",

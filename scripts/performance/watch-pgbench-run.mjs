@@ -23,6 +23,7 @@ import {
   writeJsonAtomic,
 } from "../lib/pgbench_run_watchdog.mjs";
 import { evaluateOwnerReview } from "../lib/pgbench_owner_review.mjs";
+import { classifyMonitorHealth } from "../lib/pgbench_in_flight.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const RUN =
@@ -46,8 +47,10 @@ function pgrep(pattern) {
 
 const runnerLines = pgrep("run-pgbench-matrix");
 const pgbenchLines = pgrep("pgbench -h");
+const supervisorLines = pgrep("supervise-pgbench-contract");
 const runner_alive = runnerLines.some((l) => l.includes("run-pgbench-matrix"));
 const pgbench_alive = pgbenchLines.some((l) => /\bpgbench\b/.test(l));
+const supervisor_alive = supervisorLines.some((l) => l.includes("supervise-pgbench-contract"));
 
 const logText = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
 const events = parseProgressLog(logText);
@@ -91,6 +94,7 @@ const verdict = evaluateRunWatchdog({
   now_ms: now,
   runner_alive,
   pgbench_alive,
+  supervisor_alive,
   last_progress_at_ms,
   stall_after_ms: stallAfterMs,
   expected_cell_seconds: 150,
@@ -98,6 +102,11 @@ const verdict = evaluateRunWatchdog({
   owner_valid_cells: owner_valid,
   owner_expected_cells: owner_expected,
   owner_complete,
+});
+const monitor_health = classifyMonitorHealth({
+  runner_alive,
+  supervisor_alive,
+  run_incomplete: !owner_complete,
 });
 
 const history = appendWatchdogHistory(priorHistory, {
@@ -131,6 +140,7 @@ const report = {
   log_path: logPath,
   runner_alive,
   pgbench_alive,
+  supervisor_alive,
   runner_sample: runnerLines.slice(0, 3),
   pgbench_sample: pgbenchLines.slice(0, 3),
   progress_events: events.length,
@@ -141,6 +151,7 @@ const report = {
   owner_expected_cells: owner_expected,
   owner_complete,
   watchdog: verdict,
+  monitor_health,
   eta,
   history_samples: history.samples.length,
   history_path: historyPath,
@@ -158,4 +169,7 @@ console.log(JSON.stringify(report, null, 2));
 
 if (verdict.state === "RUNNING") process.exit(0);
 if (verdict.state === "STOPPED" && owner_complete) process.exit(0);
+if (verdict.state === "UNSUPERVISED_RUNNER" || monitor_health.incident === "UNSUPERVISED_RUNNER") {
+  process.exit(2);
+}
 process.exit(2);

@@ -79,6 +79,24 @@ describe("pgbench run watchdog", () => {
     assert.equal(r.state, "STOPPED");
     assert.equal(r.stalled, false);
   });
+
+  it("reports UNSUPERVISED_RUNNER when runner is alive without a supervisor", () => {
+    const now = Date.now();
+    const r = evaluateRunWatchdog({
+      now_ms: now,
+      runner_alive: true,
+      pgbench_alive: true,
+      supervisor_alive: false,
+      last_progress_at_ms: now - 60_000,
+      stall_after_ms: 20 * 60_000,
+      last_progress: { executed: 18, cell_id: "x", status: "PASS" },
+      owner_valid_cells: 18,
+      owner_expected_cells: 1218,
+    });
+    assert.equal(r.state, "UNSUPERVISED_RUNNER");
+    assert.equal(r.incident, "UNSUPERVISED_RUNNER");
+    assert.equal(r.stalled, true);
+  });
 });
 
 describe("pgbench watchdog history + ETA", () => {

@@ -1,8 +1,8 @@
 /**
  * Write-once Gate-3 run identity. Discover environment first, mint once, never edit.
  */
-import { existsSync, readFileSync } from "node:fs";
-import { writeJsonAtomic } from "./pgbench_run_watchdog.mjs";
+import { closeSync, constants, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, writeSync } from "node:fs";
+import { dirname } from "node:path";
 import {
   CONTROL_PLANE_PROVENANCE_MISMATCH,
   SOURCE_PROVENANCE_MISMATCH,
@@ -17,15 +17,35 @@ export function loadRunIdentity(path) {
 }
 
 /**
- * Atomic create. Refuses if the file already exists (even with identical bytes).
+ * Exclusive create (O_CREAT|O_EXCL) + fsync(file) + fsync(parent).
+ * Refuses if the file already exists (even with identical bytes).
  * @param {string} path
  * @param {Record<string, unknown>} identity
  */
 export function writeRunIdentityOnce(path, identity) {
-  if (existsSync(path)) {
-    return { ok: false, reason: RUN_IDENTITY_MUTATION_REFUSED, path };
+  mkdirSync(dirname(path), { recursive: true });
+  const body = JSON.stringify(identity, null, 2) + "\n";
+  let fd;
+  try {
+    fd = openSync(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o644);
+  } catch (err) {
+    if (err && err.code === "EEXIST") {
+      return { ok: false, reason: RUN_IDENTITY_MUTATION_REFUSED, path };
+    }
+    throw err;
   }
-  writeJsonAtomic(path, identity);
+  try {
+    writeSync(fd, body);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  const dirFd = openSync(dirname(path), "r");
+  try {
+    fsyncSync(dirFd);
+  } finally {
+    closeSync(dirFd);
+  }
   return { ok: true, reason: null, path };
 }
 

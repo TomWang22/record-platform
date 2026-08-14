@@ -59,9 +59,21 @@ import {
   SOURCE_CHANGED_DURING_CELL,
 } from "./pgbench_cell_provenance.mjs";
 import { CLEANUP_SQL_REL, SEED_SQL_REL, INDEXES_SQL_REL } from "./pgbench_seed_cleanup.mjs";
+import { writeInFlightAtomic } from "./pgbench_in_flight.mjs";
 
 function sha256(buf) {
   return createHash("sha256").update(buf).digest("hex");
+}
+
+function publishInFlight(reportDir, doc) {
+  if (!reportDir) return;
+  writeInFlightAtomic(join(reportDir, "supervisor", "in-flight.json"), {
+    schema: "record-platform-pgbench-in-flight/v1",
+    runner_pid: process.pid,
+    phase_started_at: Date.now(),
+    last_phase_progress_at: Date.now(),
+    ...doc,
+  });
 }
 
 function gitSha(root) {
@@ -171,6 +183,7 @@ function runOneContractPgbench({
   measured,
   sqlPath,
   latencyLogPath,
+  onPhase,
 }) {
   const db = OWNER_DB[owner];
   const args = [
@@ -211,6 +224,7 @@ function runOneContractPgbench({
     if (li >= 0) warmArgs.splice(li, 3); // remove --log --log-prefix path
     const ti = warmArgs.indexOf("-T");
     if (ti >= 0) warmArgs[ti + 1] = String(warmup);
+    onPhase?.("WARMUP_CONNECTING", { pgbench_argv: warmArgs });
     spawnSync("pgbench", warmArgs, {
       cwd: root,
       env,
@@ -226,6 +240,7 @@ function runOneContractPgbench({
   });
   const beforeHost = sampleHostResources();
   const started = Date.now();
+  onPhase?.("MEASURE_CONNECTING", { pgbench_argv: args });
   const result = spawnSync("pgbench", args, {
     cwd: root,
     env,
@@ -428,8 +443,12 @@ export async function runPgbenchContractMatrix(opts) {
   mkdirSync(join(reportDir, "latency-samples"), { recursive: true });
   mkdirSync(join(reportDir, "postgres-samples"), { recursive: true });
   mkdirSync(join(reportDir, "cells"), { recursive: true });
-  for (const owner of OWNERS) {
-    applyHarnessIndexes(root, owner);
+  const mintIdentityOnly =
+    opts.mintIdentityOnly === true || process.env.GATE3_MINT_IDENTITY_ONLY === "1";
+  if (!mintIdentityOnly) {
+    for (const owner of OWNERS) {
+      applyHarnessIndexes(root, owner);
+    }
   }
 
   const shardId = process.env.GATE3_SHARD_ID || opts.shardId || null;
@@ -565,6 +584,29 @@ export async function runPgbenchContractMatrix(opts) {
   }
   writeFileSync(join(reportDir, "source-bundle.json"), JSON.stringify(sourceBundle, null, 2) + "\n");
   writeFileSync(join(reportDir, "control-plane-bundle.json"), JSON.stringify(controlPlane, null, 2) + "\n");
+  if (mintIdentityOnly) {
+    return {
+      runId,
+      reportDir,
+      summary: {
+        minted_identity_only: true,
+        pass_cell_count: 0,
+        required_cell_count: 14616,
+        pgbench_ceiling_complete: false,
+      },
+      completeness: {
+        expected_cell_count: 14616,
+        pass_cell_count: 0,
+        complete: false,
+        pgbench_ceiling_complete_allowed: false,
+      },
+      shas: {
+        catalog_sha,
+        workload_source_bundle_sha: freeze.workload_source_bundle_sha,
+        control_plane_bundle_sha: freeze.control_plane_bundle_sha,
+      },
+    };
+  }
 
   // Load checkpoints from top-level cells/ and shards/<id>/cells/
   const checkpoint = loadCheckpointIndex(reportDir);
@@ -620,6 +662,36 @@ export async function runPgbenchContractMatrix(opts) {
     if (shardId) {
       writeCellCheckpoint(join(reportDir, "shards", shardId), row);
     }
+    publishInFlight(reportDir, {
+      run_id: runId,
+      cell_id: row.cell_id,
+      owner: row.owner ?? null,
+      mode: row.mode,
+      workload: row.workload,
+      distribution: row.distribution,
+      clients: row.clients,
+      threads: row.threads,
+      batch: row.batch ?? null,
+      repetition: row.repetition,
+      phase: "IDLE",
+      pgbench_pid: null,
+      pgbench_argv: null,
+    });
+  }
+
+  function inFlightBase(cell, owner = cell.owner) {
+    return {
+      run_id: runId,
+      cell_id: cell.cell_id,
+      owner,
+      mode: cell.mode,
+      workload: cell.workload,
+      distribution: cell.distribution,
+      clients: cell.clients,
+      threads: cell.threads,
+      batch: cell.batch ?? null,
+      repetition: cell.repetition,
+    };
   }
 
   function envFor(owner) {
@@ -666,7 +738,10 @@ export async function runPgbenchContractMatrix(opts) {
           },
           cell: { ...cell, owner },
         });
+        const inflightBase = inFlightBase(cell, owner);
+        publishInFlight(reportDir, { ...inflightBase, phase: "CLEANUP" });
         prepareOwnerFixtures(root, owner);
+        publishInFlight(reportDir, { ...inflightBase, phase: "SEEDING" });
         const latencyLogPath = join(
           reportDir,
           shardId ? join("shards", shardId, "latency-samples") : "latency-samples",
@@ -684,7 +759,9 @@ export async function runPgbenchContractMatrix(opts) {
           measured,
           sqlPath,
           latencyLogPath,
+          onPhase: (phase, extra = {}) => publishInFlight(reportDir, { ...inflightBase, phase, ...extra }),
         });
+        publishInFlight(reportDir, { ...inflightBase, phase: "CHECKPOINTING" });
         const sourceVerdict = evaluateSourceBeforeAccept({
           root,
           start: startProv,
@@ -786,7 +863,10 @@ export async function runPgbenchContractMatrix(opts) {
       },
       cell,
     });
+    const inflightBase = inFlightBase(cell);
+    publishInFlight(reportDir, { ...inflightBase, phase: "CLEANUP" });
     prepareOwnerFixtures(root, cell.owner);
+    publishInFlight(reportDir, { ...inflightBase, phase: "SEEDING" });
     const latencyBase = shardId
       ? join(reportDir, "shards", shardId, "latency-samples")
       : join(reportDir, "latency-samples");
@@ -804,7 +884,9 @@ export async function runPgbenchContractMatrix(opts) {
       measured,
       sqlPath,
       latencyLogPath,
+      onPhase: (phase, extra = {}) => publishInFlight(reportDir, { ...inflightBase, phase, ...extra }),
     });
+    publishInFlight(reportDir, { ...inflightBase, phase: "CHECKPOINTING" });
     const pgSampleDir = shardId
       ? join(reportDir, "shards", shardId, "postgres-samples")
       : join(reportDir, "postgres-samples");

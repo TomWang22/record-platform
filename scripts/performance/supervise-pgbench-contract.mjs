@@ -37,7 +37,6 @@ import { buildSourceBundle } from "../lib/pgbench_source_bundle.mjs";
 import { buildControlPlaneBundle } from "../lib/pgbench_control_plane_bundle.mjs";
 import {
   MAX_RESTARTS_PER_CELL,
-  assertFrozenRunIdentity,
   countCellRestarts,
   decideSupervisorAction,
   evaluateGlobalCeiling,
@@ -46,9 +45,16 @@ import {
   resolveSupervisorProgressAtMs,
   nextRequiredFromCatalog,
   planSupervisorShutdown,
+  planSupervisorSideEffects,
   releaseSupervisorLock,
   buildSupervisorStatus,
 } from "../lib/pgbench_contract_supervisor.mjs";
+import {
+  actualInFlightCellId,
+  buildRestartIncident,
+  reconstructAdoptionRetryState,
+  verifyTerminalCleanup,
+} from "../lib/pgbench_in_flight.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const RESUME =
@@ -126,12 +132,14 @@ function releaseOwnedLock() {
   }
 }
 
-function persistFatal(decision) {
+function persistFatal(decision, extra = {}) {
   mkdirSync(supDir, { recursive: true });
   writeJsonAtomic(fatalPath, {
     at: new Date().toISOString(),
     action: decision.action,
     reason: decision.reason || decision.action,
+    actual_cell_id: decision.actual_cell_id || decision.incident_cell_id || extra.actual_cell_id || null,
+    last_completed_cell_id: extra.last_completed_cell_id || null,
     pgbench_ceiling_complete: false,
   });
 }
@@ -323,6 +331,16 @@ function globalSnapshot(currentOwner, currentReview) {
   });
 }
 
+function countOwnedProcesses() {
+  const runner_process_count = parsePids(
+    pgrep("run-pgbench-matrix").filter((l) => l.includes("run-pgbench-matrix")),
+  ).filter(isPidAlive).length;
+  const pgbench_process_count = parsePids(
+    pgrep("pgbench -h").filter((l) => /\bpgbench\b/.test(l)),
+  ).filter(isPidAlive).length;
+  return { runner_process_count, pgbench_process_count };
+}
+
 async function applyAction(decision, ctx) {
   if (decision.action === "GENERATE_OWNER_REVIEW") {
     writeOwnerReviewArtifacts(reportDir, decision.generate_owner_review, runId);
@@ -331,25 +349,43 @@ async function applyAction(decision, ctx) {
     ctx.owner_reviews_written = [...written];
     return;
   }
-  if (decision.action === "STALL_RESTART") {
+  const plan = planSupervisorSideEffects(decision);
+  if (plan.write_incident) {
     const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const incident = buildRestartIncident({
+      decision,
+      in_flight: ctx.in_flight,
+      last_completed_cell_id: ctx.last_completed_cell_id,
+      runner_pid: ctx.runner_pids?.[0] ?? null,
+      pgbench_pid: ctx.pgbench_pids?.[0] ?? null,
+      signal: decision.terminate ? "SIGTERM" : null,
+      retry_count_for_actual_cell: ctx.restarts_for_current_cell + (decision.action === "STALL_RESTART" ? 1 : 0),
+      pins: ctx.frozen_identity || {},
+    });
     writeJsonAtomic(join(incidentsDir, `${ts}.json`), {
-      at: new Date().toISOString(),
-      cell_id: ctx.cell_id,
+      ...incident,
       executed: ctx.executed,
       owner_valid_cells: ctx.owner_valid_cells,
       runner_pids: ctx.runner_pids,
       pgbench_pids: ctx.pgbench_pids,
-      environment_fingerprint: ctx.frozen_identity.environment_fingerprint,
+      environment_fingerprint: ctx.frozen_identity?.environment_fingerprint,
       last_progress_at_ms: ctx.last_progress_at_ms,
       stdout_stderr_tail: logTail(logPath),
-      restart_number: ctx.restarts_for_current_cell + 1,
+      restart_number: incident.retry_count_for_actual_cell,
     });
-    await terminatePids([...ctx.runner_pids, ...ctx.pgbench_pids]);
-    launchRunner(decision.launch_env);
-    return;
   }
-  if (decision.action === "LAUNCH") {
+  if (decision.terminate) {
+    const targets = [];
+    if ((decision.terminate_targets || []).includes("runner")) targets.push(...(ctx.runner_pids || []));
+    if ((decision.terminate_targets || []).includes("pgbench")) targets.push(...(ctx.pgbench_pids || []));
+    await terminatePids(targets);
+    const leftover = [
+      ...parsePids(pgrep("run-pgbench-matrix").filter((l) => l.includes("run-pgbench-matrix"))),
+      ...parsePids(pgrep("pgbench -h").filter((l) => /\bpgbench\b/.test(l))),
+    ].filter(isPidAlive);
+    if (leftover.length) await terminatePids(leftover);
+  }
+  if (plan.launch) {
     launchRunner(decision.launch_env);
     return;
   }
@@ -411,11 +447,6 @@ async function main() {
     if (observed.warmup_seconds !== CONTRACT_WARMUP_SECONDS) process.exit(2);
     if (observed.measured_seconds !== CONTRACT_MEASURED_SECONDS) process.exit(2);
     if (observed.workload_revision !== WORKLOAD_REVISION) process.exit(2);
-    const identity = assertFrozenRunIdentity(state.frozen_identity, observed);
-    if (!identity.ok) {
-      console.error(JSON.stringify({ error: identity.code, field: identity.field, identity }));
-      process.exit(2);
-    }
 
     const now = Date.now();
     const runnerLines = pgrep("run-pgbench-matrix").filter((l) => l.includes("run-pgbench-matrix"));
@@ -454,6 +485,21 @@ async function main() {
           .map((f) => readJson(join(incidentsDir, f), null))
           .filter(Boolean)
       : [];
+    const in_flight = readJson(join(supDir, "in-flight.json"), null);
+    const last_completed_cell_id = last?.cell_id || null;
+    const previous_terminal_state = readJson(fatalPath, null);
+    const adopted = reconstructAdoptionRetryState({
+      incidents,
+      in_flight,
+      last_completed_cell_id,
+      previous_terminal_state,
+      countCellRestarts,
+      max_restarts_per_cell: MAX_RESTARTS_PER_CELL,
+    });
+    const actual_cell_id = actualInFlightCellId({
+      in_flight,
+      last_completed_cell_id,
+    });
     const global_ceiling = globalSnapshot(owner, review);
     const decision = decideSupervisorAction({
       now_ms: now,
@@ -467,14 +513,18 @@ async function main() {
       last_progress_at_ms,
       stall_after_ms: stallAfterMs,
       owner,
-      cell_id: last?.cell_id,
+      cell_id: actual_cell_id,
+      last_completed_cell_id,
+      in_flight,
+      previous_terminal_state,
+      incidents,
       executed: last?.executed,
       owner_valid_cells: review.valid_owner_cells,
       owner_expected_cells: review.expected_owner_cells,
       owner_complete: review.owner_complete === true,
       owner_reviews_written: [...ownerReviewsWritten],
       pending_cells,
-      restarts_for_current_cell: countCellRestarts(incidents, last?.cell_id),
+      restarts_for_current_cell: adopted.retries_for_actual_cell,
       max_restarts_per_cell: MAX_RESTARTS_PER_CELL,
       resume_dir: RESUME,
       global_valid_cells: global_ceiling.valid_cell_count,
@@ -518,7 +568,8 @@ async function main() {
       owner_expected_cells: review.expected_owner_cells,
       global_valid_cells: global_ceiling.valid_cell_count,
       global_expected_cells: 14616,
-      current_cell: last?.cell_id || null,
+      current_cell: actual_cell_id,
+      last_completed_cell_id,
       last_progress_at_ms,
       observed_sec_per_cell: eta.seconds_per_cell_observed,
       eta,
@@ -534,14 +585,16 @@ async function main() {
 
     await applyAction(decision, {
       ...decision,
-      cell_id: last?.cell_id,
+      cell_id: actual_cell_id,
+      last_completed_cell_id,
+      in_flight,
       executed: last?.executed,
       owner_valid_cells: review.valid_owner_cells,
       runner_pids,
       pgbench_pids,
       last_progress_at_ms,
       frozen_identity: state.frozen_identity,
-      restarts_for_current_cell: countCellRestarts(incidents, last?.cell_id),
+      restarts_for_current_cell: adopted.retries_for_actual_cell,
       owner_reviews_written: [...ownerReviewsWritten],
     });
     if (decision.generate_owner_review) ownerReviewsWritten.add(decision.generate_owner_review);
@@ -554,7 +607,7 @@ async function main() {
       owner_valid_cells: review.valid_owner_cells,
       global_valid_cells: global_ceiling.valid_cell_count,
       executed: last?.executed ?? null,
-      cell_id: last?.cell_id ?? null,
+      cell_id: actual_cell_id,
       last_progress_at_ms,
     });
     writeJsonAtomic(historyPath, history);
@@ -563,7 +616,7 @@ async function main() {
       supervisor_pid: process.pid,
       runner_pid: runner_pids[0] || null,
       owner,
-      current_cell: last?.cell_id || catalogProgress.next_cell?.cell_id || null,
+      current_cell: actual_cell_id || catalogProgress.next_cell?.cell_id || null,
       owner_valid: review.valid_owner_cells,
       owner_expected: review.expected_owner_cells,
       global_valid: global_ceiling.valid_cell_count,
@@ -586,7 +639,19 @@ async function main() {
     writeJsonAtomic(statePath, state);
 
     if (decision.stop) {
-      if (decision.exit_code === 2) persistFatal(decision);
+      if (decision.exit_code === 2) persistFatal(decision, { last_completed_cell_id, actual_cell_id });
+      if (decision.terminate) {
+        const leftover = [
+          ...parsePids(pgrep("run-pgbench-matrix").filter((l) => l.includes("run-pgbench-matrix"))),
+          ...parsePids(pgrep("pgbench -h").filter((l) => /\bpgbench\b/.test(l))),
+        ].filter(isPidAlive);
+        if (leftover.length) await terminatePids(leftover);
+        const counts = countOwnedProcesses();
+        const safety = verifyTerminalCleanup(counts);
+        if (!safety.ok) {
+          console.error(JSON.stringify({ error: "TERMINAL_ORPHAN_REMAINING", ...counts }));
+        }
+      }
       releaseOwnedLock();
       process.exit(decision.exit_code || 0);
     }

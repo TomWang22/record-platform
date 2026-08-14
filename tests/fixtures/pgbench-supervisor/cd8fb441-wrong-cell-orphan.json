@@ -1,0 +1,66 @@
+{
+  "schema": "record-platform-pgbench-historical-wrong-cell-orphan/v1",
+  "source_run_id": "pgbench-contract-20260813-193216-cd8fb441",
+  "source_artifacts": {
+    "rca_incident": "reports/performance/pgbench/pgbench-contract-20260813-193216-cd8fb441/incidents/records-W1-c256-t4-r3.json",
+    "supervisor_incidents": [
+      "reports/performance/pgbench/pgbench-contract-20260813-193216-cd8fb441/supervisor/incidents/2026-08-14T00-35-46-469Z.json",
+      "reports/performance/pgbench/pgbench-contract-20260813-193216-cd8fb441/supervisor/incidents/2026-08-14T00-36-32-634Z.json",
+      "reports/performance/pgbench/pgbench-contract-20260813-193216-cd8fb441/supervisor/incidents/2026-08-14T00-37-18-572Z.json"
+    ],
+    "fatal": "reports/performance/pgbench/pgbench-contract-20260813-193216-cd8fb441/supervisor/fatal.json"
+  },
+  "cell_a": "PER_OWNER_CEILING|records|W1_DOMAIN_ONLY|UNIFORM|c256|t4|bNA|r3",
+  "cell_b": "PER_OWNER_CEILING|records|W1_DOMAIN_ONLY|UNIFORM|c256|t8|bNA|r1",
+  "cell_a_status": "PASS",
+  "cell_a_checkpoint_at": "2026-08-14T00:07:30.153589+00:00",
+  "orphan_runner_pid": 39992,
+  "legacy_incidents": [
+    {
+      "at": "2026-08-14T00:35:46.473Z",
+      "cell_id": "PER_OWNER_CEILING|records|W1_DOMAIN_ONLY|UNIFORM|c256|t4|bNA|r3",
+      "executed": 81,
+      "owner_valid_cells": 81,
+      "runner_pids": [41460, 41476],
+      "pgbench_pids": [8953],
+      "last_progress_at_ms": 1786666056240,
+      "restart_number": 1
+    },
+    {
+      "at": "2026-08-14T00:36:32.634Z",
+      "cell_id": "PER_OWNER_CEILING|records|W1_DOMAIN_ONLY|UNIFORM|c256|t4|bNA|r3",
+      "executed": 81,
+      "owner_valid_cells": 81,
+      "runner_pids": [22425],
+      "pgbench_pids": [26810],
+      "last_progress_at_ms": 1786666056240,
+      "restart_number": 2
+    },
+    {
+      "at": "2026-08-14T00:37:18.572Z",
+      "cell_id": "PER_OWNER_CEILING|records|W1_DOMAIN_ONLY|UNIFORM|c256|t4|bNA|r3",
+      "executed": 81,
+      "owner_valid_cells": 81,
+      "runner_pids": [31241],
+      "pgbench_pids": [39541],
+      "last_progress_at_ms": 1786666056240,
+      "restart_number": 3
+    }
+  ],
+  "inferred_in_flight": {
+    "cell_id": "PER_OWNER_CEILING|records|W1_DOMAIN_ONLY|UNIFORM|c256|t8|bNA|r1",
+    "phase": "MEASURE_CONNECTING",
+    "clients": 256,
+    "threads": 8,
+    "repetition": 1,
+    "pgbench_argv": ["pgbench", "-c", "256", "-j", "8", "-T", "120"]
+  },
+  "previous_terminal_state": {
+    "at": "2026-08-14T00:38:03.362Z",
+    "action": "CELL_REPEATEDLY_UNEXECUTABLE",
+    "reason": "CELL_REPEATEDLY_UNEXECUTABLE",
+    "actual_cell_id": "PER_OWNER_CEILING|records|W1_DOMAIN_ONLY|UNIFORM|c256|t8|bNA|r1",
+    "pgbench_ceiling_complete": false
+  },
+  "later_last_completed_after_orphan": "PER_OWNER_CEILING|records|W1_DOMAIN_ONLY|ZIPFIAN_HOTSET|c16|t2|bNA|r1"
+}

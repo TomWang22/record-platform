@@ -33,6 +33,8 @@ const REQUIRED_CONTROL_PLANE = [
   "scripts/lib/pgbench_environment.mjs",
   "scripts/lib/pgbench_cell_provenance.mjs",
   "scripts/lib/pgbench_source_bundle.mjs",
+  "scripts/lib/pgbench_control_plane_bundle.mjs",
+  "scripts/lib/pgbench_run_identity.mjs",
   "scripts/lib/pgbench_shard.mjs",
   "scripts/lib/pgbench_contract_runner.mjs",
   "scripts/lib/pgbench_contract_supervisor.mjs",
@@ -41,6 +43,7 @@ const REQUIRED_CONTROL_PLANE = [
 
 describe("control-plane bundle", () => {
   it("pins runner, resume, supervisor, catalog, provenance, and watchdog modules", () => {
+    assert.equal(CONTROL_PLANE_PATHS.length, 25);
     for (const rel of REQUIRED_CONTROL_PLANE) {
       assert.ok(CONTROL_PLANE_PATHS.includes(rel), `missing ${rel}`);
     }
@@ -107,6 +110,7 @@ describe("dual-digest resume and supervision", () => {
     catalog_sha: "catalog-aaa",
     workload_revision: WORKLOAD_REVISION,
     contention_domain_id: "colima-or-host:deadbeef",
+    environment_fingerprint: "colima-shared-domain|colima-or-host:deadbeef|cfg",
   };
   const env = {
     environment_id: "colima-shared-domain",
@@ -156,6 +160,39 @@ describe("dual-digest resume and supervision", () => {
     };
     assert.equal(sourceDigestsMatchFreeze(changed, freeze), false);
     assert.equal(isSourceLockedReusable(changed, freeze), false);
+  });
+
+  it("environment.contention_domain_id change with frozen top-level is rejected", () => {
+    const changed = {
+      ...good,
+      environment: { ...env, contention_domain_id: "colima-or-host:other" },
+    };
+    assert.equal(changed.contention_domain_id, freeze.contention_domain_id);
+    assert.equal(sourceDigestsMatchFreeze(changed, freeze), false);
+    assert.equal(isSourceLockedReusable(changed, freeze), false);
+  });
+
+  // Disposition: TOP_LEVEL_ENVIRONMENT_FIELDS_DIAGNOSTIC_ALIASES
+  // Frozen matcher ignores these aliases; nested environment.contention_domain_id is authoritative.
+  it("top-level contention_domain_id is a diagnostic alias and does not affect reuse", () => {
+    const changed = {
+      ...good,
+      contention_domain_id: "colima-or-host:other",
+    };
+    assert.equal(changed.environment.contention_domain_id, freeze.contention_domain_id);
+    assert.equal(sourceDigestsMatchFreeze(changed, freeze), true);
+    assert.equal(isSourceLockedReusable(changed, freeze), true);
+  });
+
+  it("top-level environment_fingerprint is a diagnostic alias and does not affect reuse", () => {
+    const changed = {
+      ...good,
+      environment_fingerprint: "mutated-fingerprint",
+    };
+    assert.equal(changed.contention_domain_id, freeze.contention_domain_id);
+    assert.equal(changed.environment.contention_domain_id, freeze.contention_domain_id);
+    assert.equal(sourceDigestsMatchFreeze(changed, freeze), true);
+    assert.equal(isSourceLockedReusable(changed, freeze), true);
   });
 
   it("first cell missing control_plane_bundle_sha is non-reusable", () => {

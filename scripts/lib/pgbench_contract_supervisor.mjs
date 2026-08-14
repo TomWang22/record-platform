@@ -6,7 +6,16 @@
 import { PER_OWNER_OPERATIONAL_ORDER, isReusableContractCell } from "./pgbench_resume.mjs";
 import { resolveLastProgressAtMs } from "./pgbench_run_watchdog.mjs";
 import { prepareIsolatedShardLaunch } from "./pgbench_isolated_shard_launcher.mjs";
-import { CONTROL_PLANE_PROVENANCE_MISMATCH } from "./pgbench_cell_provenance.mjs";
+import {
+  CONTROL_PLANE_PROVENANCE_MISMATCH,
+  SOURCE_PROVENANCE_MISMATCH,
+} from "./pgbench_cell_provenance.mjs";
+import {
+  TERMINAL_SUPERVISOR_ACTIONS,
+  actualInFlightCellId,
+  evaluateInFlightStall,
+  terminalProcessSafety,
+} from "./pgbench_in_flight.mjs";
 
 export { prepareIsolatedShardLaunch };
 
@@ -129,7 +138,9 @@ export function countReusableCells(results) {
 }
 
 export function countCellRestarts(incidents, cellId) {
-  return (incidents || []).filter((i) => i && i.cell_id === cellId).length;
+  return (incidents || []).filter(
+    (i) => i && (i.actual_cell_id || i.cell_id) === cellId,
+  ).length;
 }
 
 /**
@@ -158,7 +169,9 @@ export function assertFrozenRunIdentity(frozen, observed) {
         code:
           key === "control_plane_bundle_sha"
             ? CONTROL_PLANE_PROVENANCE_MISMATCH
-            : "FROZEN_RUN_IDENTITY_MISMATCH",
+            : key === "source_bundle_sha"
+              ? SOURCE_PROVENANCE_MISMATCH
+              : "FROZEN_RUN_IDENTITY_MISMATCH",
         field: key,
         frozen: frozen?.[key],
         observed: observed?.[key],
@@ -273,6 +286,16 @@ export function decideSupervisorAction(s) {
   const authorization = blockedAuth(s);
   const resume_dir = s.resume_dir || s.frozen_identity?.resume_dir;
   const launch_env = frozenLaunchEnv(s.frozen_identity || { resume_dir });
+  const inflight = s.in_flight || s.inFlight || null;
+  const lastCompleted = s.last_completed_cell_id || null;
+  const actualCell = actualInFlightCellId({
+    in_flight: inflight,
+    last_completed_cell_id: lastCompleted || s.cell_id,
+  });
+  const restarts =
+    s.restarts_for_current_cell != null
+      ? Number(s.restarts_for_current_cell)
+      : countCellRestarts(s.incidents || [], actualCell);
   /** @type {Record<string, unknown>} */
   const base = {
     authorization,
@@ -290,10 +313,13 @@ export function decideSupervisorAction(s) {
     next_owner: nextRequiredFromCatalog(s.pending_cells).next_owner || nextOwner(s.owner),
     terminate_targets: [],
     concurrent_safe: Number(s.concurrent_runner_count || 0) <= 1,
+    incident_cell_id: actualCell,
+    actual_cell_id: actualCell,
   };
 
   const identity = assertFrozenRunIdentity(s.frozen_identity, s.observed_identity);
   if (!identity.ok) {
+    const safety = terminalProcessSafety(identity.code);
     return {
       ...base,
       action: identity.code,
@@ -302,6 +328,27 @@ export function decideSupervisorAction(s) {
       launch: false,
       exit_code: 2,
       stop: true,
+      terminate: safety.terminate,
+      terminate_targets: safety.terminate_targets,
+      write_incident: true,
+    };
+  }
+
+  const prevTerm = s.previous_terminal_state;
+  if (prevTerm && TERMINAL_SUPERVISOR_ACTIONS.includes(prevTerm.action)) {
+    const safety = terminalProcessSafety(prevTerm.action);
+    return {
+      ...base,
+      action: prevTerm.action,
+      reason: "PREVIOUS_TERMINAL_STATE",
+      launch: false,
+      exit_code: 2,
+      stop: true,
+      terminate: safety.terminate,
+      terminate_targets: safety.terminate_targets,
+      write_incident: true,
+      incident_cell_id: prevTerm.actual_cell_id || prevTerm.cell_id || actualCell,
+      actual_cell_id: prevTerm.actual_cell_id || prevTerm.cell_id || actualCell,
     };
   }
 
@@ -316,7 +363,8 @@ export function decideSupervisorAction(s) {
   }
 
   const max = Number(s.max_restarts_per_cell ?? MAX_RESTARTS_PER_CELL);
-  if (Number(s.restarts_for_current_cell || 0) >= max) {
+  if (restarts >= max) {
+    const safety = terminalProcessSafety("CELL_REPEATEDLY_UNEXECUTABLE");
     return {
       ...base,
       action: "CELL_REPEATEDLY_UNEXECUTABLE",
@@ -325,6 +373,10 @@ export function decideSupervisorAction(s) {
       exit_code: 2,
       stop: true,
       pgbench_ceiling_complete: false,
+      terminate: safety.terminate,
+      terminate_targets: safety.terminate_targets,
+      write_incident: true,
+      incident_cell_id: actualCell,
     };
   }
 
@@ -341,12 +393,16 @@ export function decideSupervisorAction(s) {
     };
   }
 
-  const stalled =
-    Boolean(s.runner_alive) &&
-    s.last_progress_at_ms != null &&
-    s.now_ms - s.last_progress_at_ms > Number(s.stall_after_ms);
+  const stall = evaluateInFlightStall({
+    now_ms: s.now_ms,
+    runner_alive: Boolean(s.runner_alive),
+    pgbench_alive: Boolean(s.pgbench_alive),
+    in_flight: inflight,
+    last_progress_at_ms: s.last_progress_at_ms,
+    last_completed_cell_id: lastCompleted,
+  });
 
-  if (stalled) {
+  if (stall.stalled) {
     return {
       ...base,
       action: "STALL_RESTART",
@@ -356,6 +412,9 @@ export function decideSupervisorAction(s) {
       launch: true,
       count_interrupted_cell: false,
       resume_dir,
+      incident_cell_id: stall.actual_cell_id,
+      actual_cell_id: stall.actual_cell_id,
+      stall_reason: stall.reason,
     };
   }
 
@@ -375,3 +434,19 @@ export function decideSupervisorAction(s) {
     terminate: false,
   };
 }
+
+/**
+ * Side-effect plan for applyAction. Terminal actions never launch a replacement.
+ */
+export function planSupervisorSideEffects(decision) {
+  const terminal = TERMINAL_SUPERVISOR_ACTIONS.includes(decision?.action);
+  return {
+    write_incident: decision?.write_incident === true || decision?.action === "STALL_RESTART",
+    terminate_runner: decision?.terminate === true && (decision.terminate_targets || []).includes("runner"),
+    terminate_pgbench: decision?.terminate === true && (decision.terminate_targets || []).includes("pgbench"),
+    launch: terminal ? false : decision?.launch === true,
+    persist_fatal: decision?.stop === true && Number(decision?.exit_code) === 2,
+    refuse_orphan: terminal && decision?.launch !== true,
+  };
+}
+

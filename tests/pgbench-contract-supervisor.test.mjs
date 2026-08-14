@@ -174,7 +174,7 @@ describe("S4–S7 stall clock (logical progress only)", () => {
     const d = decideSupervisorAction(
       snap({ now_ms: t0 + 25 * 60_000, last_progress_at_ms: last, executed: 21, owner_valid_cells: 21 }),
     );
-    assert.equal(d.action, "STALL_RESTART");
+    assert.equal(d.action, "WAIT");
   });
 
   it("S5 repeated same cell/executed value does not reset stall", () => {
@@ -224,12 +224,20 @@ describe("S4–S7 stall clock (logical progress only)", () => {
 });
 
 describe("S8–S10 stall restart + resume identity", () => {
-  it("S8 stalled runner gets incident + controlled termination + resume", () => {
+  it("S8 stalled in-flight phase gets incident + controlled termination + resume", () => {
     const now = 1_700_000_000_000;
     const d = decideSupervisorAction(
       snap({
         now_ms: now,
         last_progress_at_ms: now - 45 * 60_000,
+        in_flight: {
+          cell_id: "PER_OWNER_CEILING|records|W1_DOMAIN_ONLY|UNIFORM|c8|t1|bNA|r1",
+          phase: "MEASURE_RUNNING",
+          phase_started_at: now - 10 * 60_000,
+          last_phase_progress_at: now - 10 * 60_000,
+          pgbench_pid: 61529,
+          pgbench_argv: ["pgbench", "-T", "120"],
+        },
       }),
     );
     assert.equal(d.action, "STALL_RESTART");

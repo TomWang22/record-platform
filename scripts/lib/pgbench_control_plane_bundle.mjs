@@ -18,6 +18,7 @@ export const CONTROL_PLANE_PATHS = [
   "scripts/lib/pgbench_contract_supervisor.mjs",
   "scripts/lib/pgbench_control_plane_bundle.mjs",
   "scripts/lib/pgbench_environment.mjs",
+  "scripts/lib/pgbench_in_flight.mjs",
   "scripts/lib/pgbench_latency.mjs",
   "scripts/lib/pgbench_merge.mjs",
   "scripts/lib/pgbench_outbox_tax.mjs",

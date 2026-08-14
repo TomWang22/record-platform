@@ -35,6 +35,7 @@ tmp/
 !services/common/contracts/*.json
 !docs/bundles/INTEGRITY_*.json
 !scripts/protocol/fixtures/**/*.json
+!tests/fixtures/**/*.json
 !scripts/coverage/*.json
 !scripts/ai-platform/intelligence-capability-matrix.json
 !scripts/ai-platform/intelligence-output-schemas/
